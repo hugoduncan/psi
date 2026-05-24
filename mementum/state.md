@@ -15,6 +15,8 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-24: Executed task 171 code-shaper follow-up: Anthropic 400 compatibility fallback now removes `:output_format` whenever all beta headers are stripped, so retries never send JSON Schema native fields without `structured-outputs-2025-11-13`; focused Anthropic/model/user tests green (`37 tests, 238 assertions`).
+
 - 2026-05-24: Reviewed task 171 with code-shaper; found one actionable robustness gap: Anthropic 400 compatibility fallback can strip all beta headers while leaving JSON Schema `:output_format`, creating an invalid retry without `structured-outputs-2025-11-13`. Added follow-up step.
 
 - 2026-05-24: Reviewed task 171 with test-shaper; found one actionable test-quality gap: Anthropic JSON Schema native non-streaming `:execute` tests assert extraction but do not capture the outbound request to prove `:stream` is absent/false. Added follow-up step and committed 11e76163.
@@ -112,11 +114,12 @@ Bootstrapped on 2026-04-02.
 Focused OAuth routing tests ✅. bb tests previously ✅. Task 169 focused structured-output/model tests ✅ (`clojure -M:test --focus psi.ai.providers.openai-structured-output-test --focus psi.ai.providers.anthropic-structured-output-test --focus psi.ai.model-registry-test --focus psi.ai.user-models-test` => 32 tests, 199 assertions). 5 former test errors fixed (commit 0b37b83f: NPE on nil session-file, SOE in git resolvers). Task 158 addressed persistence test garbage (still open but test-review showed no actionable feedback). Task 167 focused Emacs tool-output suite ✅ (`bb emacs:test --focus psi-tool-output-mode-test`, 313/313).
 
 ## Suggested next step
-- Judge/review task 171 after executed test-shaper follow-up: focused Anthropic/model/user tests are green with the new non-streaming `:execute` outbound request assertion.
+- Judge/review task 171 after executed code-shaper follow-up: focused Anthropic/model/user tests are green with the new 400 fallback retry invariant coverage.
 - Backlog: `105-agent-session-component-extraction-map`, `124-turn-execution-contract-extraction`, `149-reload-fixup-inventory-and-safety`, `141`/`144`/`147` workflow items
 
 ## Latest session notes
 
+- 2026-05-24: Executed task 171 code-shaper follow-up: fixed 400 compatibility fallback to drop Anthropic JSON Schema `:output_format` when the structured-output beta is stripped; added focused retry coverage; focused Anthropic/model/user tests green (`37 tests, 238 assertions`).
 - 2026-05-24: Executed task 171 test-shaper follow-up: non-streaming Anthropic JSON Schema native `:execute` test now captures outbound request body, asserts `:stream` is omitted, and still proves top-level `:structured-output`; focused Anthropic/model/user tests green (`36 tests, 232 assertions`).
 - 2026-05-24: test-shaper review for task 171 found one actionable test-quality gap and added an unchecked `steps.md` follow-up; no code/tests executed in this review pass.
 - 2026-05-24: Re-reviewed task 171 implementation with task-implementation-review; found no new actionable implementation feedback, reran focused Anthropic/model/user tests green (`35 tests, 221 assertions`), appended implementation.md no-action note, and added no steps.md items.

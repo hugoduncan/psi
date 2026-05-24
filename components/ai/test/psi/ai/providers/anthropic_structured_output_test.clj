@@ -108,6 +108,42 @@
       (is (some #{token} beta-tokens)
           (str "missing beta token " token)))))
 
+(deftest anthropic-json-schema-output-400-fallback-removes-output-format-with-beta-test
+  ;; Tests 400 compatibility fallback never retries an Anthropic JSON Schema
+  ;; native request with :output_format present after the structured-output beta
+  ;; header has been stripped.
+  (let [model  (models/get-model :sonnet-4.6)
+        convo  (-> (conv/create "sys")
+                   (conv/add-user-message "Review this"))
+        calls  (atom [])
+        events (atom [])
+        sse    (str (sse-line "message_start" {:type "message_start"})
+                    (sse-line "message_stop" {:type "message_stop"}))]
+    (with-redefs [http/post (fn [_url req]
+                              (swap! calls conj req)
+                              (if (= 1 (count @calls))
+                                {:status 400
+                                 :headers {"request-id" "req_ant_first"}
+                                 :body nil}
+                                {:status 200
+                                 :headers {}
+                                 :body (stream-body sse)}))]
+      ((:stream anthropic/provider)
+       convo model {:api-key "test-key"
+                    :structured-output judge-structured-output-request}
+       (fn [ev] (swap! events conj ev))))
+    (is (= 2 (count @calls)))
+    (let [first-beta  (or (get-in (first @calls) [:headers "anthropic-beta"]) "")
+          second-beta (or (get-in (second @calls) [:headers "anthropic-beta"]) "")
+          first-body  (json/parse-string (:body (first @calls)) true)
+          second-body (json/parse-string (:body (second @calls)) true)]
+      (is (re-find #"structured-outputs-2025-11-13" first-beta))
+      (is (contains? first-body :output_format))
+      (is (not (re-find #"structured-outputs-2025-11-13" second-beta)))
+      (is (not (contains? second-body :output_format))
+          "retry body must not keep output_format when the beta header is absent"))
+    (is (not-any? #(= :error (:type %)) @events))))
+
 (deftest anthropic-structured-output-forced-tool-request-shaping-test
   ;; Tests Anthropic provider-native structured output as a synthetic forced tool
   ;; composed alongside ordinary user tools.

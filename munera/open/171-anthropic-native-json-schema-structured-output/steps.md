@@ -13,4 +13,4 @@
 - [x] Add focused Anthropic JSON Schema native parse-failure tests for non-streaming and streaming invalid/non-object output, asserting `:parse-error? true`, preserved `:raw-payload`, and no `:payload`.
 - [x] Add focused Anthropic JSON Schema native beta-header composition coverage proving `structured-outputs-2025-11-13` composes with OAuth, prompt-caching, and thinking beta tokens without dropping or duplicating existing betas.
 - [x] Add a focused Anthropic JSON Schema native non-streaming `:execute` test assertion that captures the outbound request body and proves `:stream` is absent/false while returning top-level `:structured-output`.
-- [ ] Preserve or remove Anthropic JSON Schema native fields coherently during 400 compatibility fallback: never retry a request with `:output_format` present and `structured-outputs-2025-11-13` absent; add focused coverage for the retry transform.
+- [x] Preserve or remove Anthropic JSON Schema native fields coherently during 400 compatibility fallback: never retry a request with `:output_format` present and `structured-outputs-2025-11-13` absent; add focused coverage for the retry transform.

@@ -124,7 +124,14 @@
           (update-request-body #(dissoc % :thinking :output_config))))
 
     :without-all-betas
-    #(update-request-headers % clear-beta-header)
+    (fn [request]
+      (-> request
+          (update-request-headers clear-beta-header)
+          ;; Anthropic JSON Schema output_format is gated by the
+          ;; structured-output beta.  A compatibility retry with all betas
+          ;; removed must also remove the native output field rather than send
+          ;; an invalid body/header combination.
+          (update-request-body #(dissoc % :output_format))))
 
     identity))
 
