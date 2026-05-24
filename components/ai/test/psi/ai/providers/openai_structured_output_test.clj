@@ -140,3 +140,44 @@
                     (= {:ok true} (get-in % [:structured-output :payload]))
                     (= :openai/message-json (get-in % [:structured-output :source])))
               @events))))
+
+(deftest openai-codex-streaming-prompted-json-structured-output-events-test
+  ;; Tests prompted-JSON fallback streaming emits both first-class strategy and
+  ;; parsed result handoff events, not only request prompt injection.
+  (let [model  (models/get-model :gpt-5.3-codex)
+        token  (jwt-with-account-id "acc_test")
+        convo  (-> (conv/create "sys")
+                   (conv/add-user-message "Review this"))
+        events (atom [])
+        sse    (str "data: " (json/generate-string
+                              {:type "response.output_item.added"
+                               :item {:type "message"
+                                      :id "msg_1"
+                                      :role "assistant"
+                                      :status "in_progress"
+                                      :content []}}) "\n\n"
+                    "data: " (json/generate-string
+                              {:type "response.output_text.delta"
+                               :delta "{\"ok\":true}"}) "\n\n"
+                    "data: " (json/generate-string
+                              {:type "response.completed"
+                               :response {:status "completed"
+                                          :usage {:input_tokens 1
+                                                  :output_tokens 1
+                                                  :total_tokens 2
+                                                  :input_tokens_details {:cached_tokens 0}}}}) "\n\n")]
+    (with-redefs [http/post (fn [_url _req]
+                              {:body (stream-body sse)})]
+      ((:stream openai/provider)
+       convo model {:api-key token
+                    :structured-output judge-structured-output-request}
+       (fn [ev] (swap! events conj ev))))
+    (is (some #(and (= :structured-output-strategy (:type %))
+                    (= :prompted-json (get-in % [:structured-output :strategy]))
+                    (true? (get-in % [:structured-output :fallback-used?])))
+              @events))
+    (is (some #(and (= :structured-output-result (:type %))
+                    (= :prompted-json (get-in % [:structured-output :strategy]))
+                    (= {:ok true} (get-in % [:structured-output :payload]))
+                    (= :prompted-json/text (get-in % [:structured-output :source])))
+              @events))))

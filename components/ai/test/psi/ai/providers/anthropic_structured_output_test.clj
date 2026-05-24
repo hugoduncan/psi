@@ -142,3 +142,47 @@
               @events))
     (is (not-any? #(contains? #{:toolcall-start :toolcall-delta :toolcall-end} (:type %))
                   @events))))
+
+(deftest anthropic-streaming-prompted-json-fallback-structured-output-events-test
+  ;; Tests fallback-only Anthropic streaming emits a first-class strategy event
+  ;; without pretending provider extraction happened through the forced-tool result surface.
+  (let [model  (-> (models/get-model :sonnet-4.6)
+                   (structured-output/with-structured-output-capability
+                     {:supported? true
+                      :strategies [:prompted-json]
+                      :native-mechanism nil}))
+        convo  (-> (conv/create "sys")
+                   (conv/add-user-message "Review this"))
+        events (atom [])
+        sse    (str (sse-line "message_start"
+                              {:type "message_start"
+                               :message {:usage {:input_tokens 1}}})
+                    (sse-line "content_block_start"
+                              {:type "content_block_start"
+                               :index 0
+                               :content_block {:type "text"}})
+                    (sse-line "content_block_delta"
+                              {:type "content_block_delta"
+                               :index 0
+                               :delta {:text "{\"ok\":true}"}})
+                    (sse-line "content_block_stop"
+                              {:type "content_block_stop"
+                               :index 0})
+                    (sse-line "message_delta"
+                              {:type "message_delta"
+                               :delta {:stop_reason "end_turn"}
+                               :usage {:output_tokens 1}}))]
+    (with-redefs [http/post (fn [_url _req]
+                              {:body (stream-body sse)})]
+      ((:stream anthropic/provider)
+       convo model {:api-key "test-key"
+                    :structured-output judge-structured-output-request}
+       (fn [ev] (swap! events conj ev))))
+    (is (some #(and (= :structured-output-strategy (:type %))
+                    (= :prompted-json (get-in % [:structured-output :strategy]))
+                    (true? (get-in % [:structured-output :fallback-used?])))
+              @events))
+    (is (some #(and (= :text-delta (:type %))
+                    (= "{\"ok\":true}" (:delta %)))
+              @events))
+    (is (not-any? #(= :structured-output-result (:type %)) @events))))
