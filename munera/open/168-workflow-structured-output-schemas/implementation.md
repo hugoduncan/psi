@@ -53,3 +53,7 @@ Found new actionable ambiguity feedback: the task allows one or more structured 
 ## 2026-05-23 — ambiguity follow-up repeat 3
 
 Completed newly added ambiguity follow-ups only: specified one structured-output key per session step or LLM judge, with one raw response mapping to one prompted-JSON/provider-native structured envelope; specified workflow-runtime ownership for reusable schema ids, including `psi.workflow-runtime.structured-output-schemas` and `:psi.workflow/judge-review-result` version 1. Aligned design and workflow docs. Marked both design-steps done. Did not execute `steps.md` implementation items.
+
+## 2026-05-23 — inconsistency review repeat 3
+
+Found one new actionable inconsistency: `doc/workflow-ir.md` documents LLM judges as able to declare judge-local structured `:outputs`, and the design/grammar/user guide agree, but the same IR doc's compact suggested grammar still defines `llm-judge` without `outputs?`. That internal mismatch would lead implementers using the grammar block to reject the judge-local structured output surface described elsewhere.
