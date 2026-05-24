@@ -1,7 +1,8 @@
 (ns psi.workflow-runtime.statechart-runtime.step-execution-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [psi.workflow-runtime.statechart-runtime.step-execution :as step-execution]))
+   [psi.workflow-runtime.statechart-runtime.step-execution :as step-execution]
+   [psi.workflow-runtime.turn-execution-contract :as turn-execution]))
 
 (deftest operation-result->invoke-step-result-test
   (testing "ok deterministic operation results become accepted workflow step results"
@@ -37,6 +38,47 @@
 ;; This surface is integration-tested via workflow execution (e.g. local-logprobs workflow
 ;; exercises {:from {:step "run" :output :session-id}} in its invoke step).
 ;; A unit-level assertion is impractical here without substantial test infrastructure.
+
+(deftest execute-session-step-invalid-structured-output-blocks-with-envelope-test
+  (testing "invalid structured output records raw output and validation errors instead of escaping surface resolution"
+    (let [working-memory* (atom {:current-step-id "classify"})
+          event-queue* (atom [])
+          raw-output "not json"]
+      (with-redefs [turn-execution/execute-actor-turn!
+                    (fn [_ctx session-id prompt]
+                      (is (= "child-session" session-id))
+                      (is (= "Classify" prompt))
+                      {:status :ok
+                       :assistant-text raw-output
+                       :execution-result nil
+                       :assistant-message nil})]
+        (step-execution/execute-session-step!
+         {}
+         {:session-id "child-session"}
+         {:name "classify"
+          :type :session
+          :outputs {:classification {:source :session/structured-output
+                                     :mode :structured
+                                     :schema-id :psi.workflow/test-classification
+                                     :schema-version 1
+                                     :schema [:map
+                                              [:decision [:enum :pass :fail]]]}}}
+         "classify"
+         "attempt-1"
+         working-memory*
+         event-queue*
+         "Classify"))
+      (let [pending (:pending-actor-result @working-memory*)
+            payload (:payload pending)
+            classification (get-in payload [:outputs :classification])]
+        (is (= :blocked (:kind pending)))
+        (is (= :blocked (:outcome payload)))
+        (is (= :invalid-structured-output (get-in payload [:blocked :reason])))
+        (is (= raw-output (:raw-output classification)))
+        (is (= :invalid (get-in classification [:structured-output :status])))
+        (is (seq (get-in classification [:structured-output :errors])))
+        (is (= raw-output (get-in payload [:outputs :final-llm-reply])))
+        (is (= :actor/blocked (:event (first @event-queue*))))))))
 
 (deftest assistant-message-text-test
   (testing "assistant-message-text delegates to turn-execution-contract"

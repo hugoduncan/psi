@@ -73,3 +73,7 @@ Completed the remaining broad verification step after the first structured-outpu
 ## 2026-05-23 — implementation review
 
 Found one new actionable implementation issue: invalid session structured output currently calls `workflow-ir/step-output-surfaces` before the fail-fast blocked envelope is built, so `step-output-value` throws on the invalid result and `execute-actor-step!` degrades the step to a generic failure without preserving the designed blocked payload/raw structured-output errors.
+
+## 2026-05-23 — implementation-review follow-up
+
+Completed the newly added implementation-review follow-up: invalid session structured output now bypasses logical output surface normalization before blocking, preserving the raw assistant text and canonical invalid structured-output envelope in the blocked payload instead of being caught as a generic execution failure. Added regression coverage in `psi.workflow-runtime.statechart-runtime.step-execution-test`. Focused verification green: `clojure -M:test --focus psi.workflow-runtime.structured-output-test --focus psi.workflow-runtime.statechart-runtime.step-execution-test --focus psi.workflow-runtime.ir-test --focus psi.workflow-step-materialization.structured-source-resolution-test --focus psi.agent-session.workflow-judge-test`.

@@ -15,6 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-23: Executed task 168 implementation-review follow-up: invalid session structured-output fail-fast now preserves raw output and invalid structured envelope by blocking before output-surface normalization; focused workflow tests green.
 - 2026-05-23: Completed task 168 broader verification pass: marked final implementation step done after `bb clojure:test:unit` passed across the unit suite; no deviations discovered.
 - 2026-05-23: Implemented task 168 first runtime structured-output slice: reusable judge-review schema, prompted-JSON canonical envelopes, IR validation, session fail-fast, structured judge routing, downstream valid-value refs; focused workflow tests green.
 - 2026-05-23: Executed task 168 inconsistency follow-up repeat 3: aligned `doc/workflow-ir.md` compact suggested grammar so `llm-judge` includes `outputs?`, matching documented judge-local structured outputs; design-steps all checked.

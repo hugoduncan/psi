@@ -156,18 +156,20 @@
                                  (structured-output/output-result output-spec assistant-text))
                           raw-outputs)
             structured-result (some-> structured-entry first raw-outputs)
-            normalized-outputs (workflow-ir/step-output-surfaces
-                                step-def
-                                {:outcome :ok
-                                 :outputs raw-outputs})
-            envelope (if (and structured-entry
-                              (not (structured-output/valid-output-result? structured-result)))
+            invalid-structured-output? (and structured-entry
+                                            (not (structured-output/valid-output-result? structured-result)))
+            normalized-outputs (when-not invalid-structured-output?
+                                 (workflow-ir/step-output-surfaces
+                                  step-def
+                                  {:outcome :ok
+                                   :outputs raw-outputs}))
+            envelope (if invalid-structured-output?
                        {:outcome :blocked
                         :blocked {:reason :invalid-structured-output
                                   :message "Workflow structured output failed validation"
                                   :details {:output-key (first structured-entry)
                                             :structured-output (:structured-output structured-result)}}
-                        :outputs (merge raw-outputs normalized-outputs)}
+                        :outputs raw-outputs}
                        {:outcome :ok
                         :outputs (merge raw-outputs normalized-outputs)})]
         (swap! working-memory* assoc :pending-actor-result {:kind (if (= :blocked (:outcome envelope)) :blocked :success)
