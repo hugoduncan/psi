@@ -25,3 +25,5 @@
 - 2026-05-24 inconsistency follow-up repeat 2: no newly added actionable design follow-up items were present after the no-action inconsistency review. `design-steps.md` was already fully checked, so no task implementation steps from `steps.md` were executed.
 
 - 2026-05-24 ambiguity review repeat 3: found no new actionable ambiguity feedback. Rechecked design/plan/steps/design-steps, prior implementation notes, current workflow IR/grammar/docs, turn-execution contract, session-step and LLM-judge structured-output code paths, and task-169/171 AI structured-output surfaces. Existing unchecked implementation steps already cover the intentional code/docs work; design remains unambiguous on policy keys, explicit JSON Schema boundary, fallback-forbidden failure surfaces, envelope payload naming, and the top-level bounded turn-result `:structured-output` seam.
+
+- 2026-05-24 ambiguity follow-up repeat 3: no newly added actionable ambiguity design follow-up items were present after the no-action ambiguity review. `design-steps.md` was already fully checked, so no task implementation steps from `steps.md` were executed.

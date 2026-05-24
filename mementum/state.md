@@ -122,6 +122,7 @@ Focused OAuth routing tests ✅. bb tests previously ✅. Task 169 focused struc
 ## Latest session notes
 
 - 2026-05-24: Reviewed task 170 design/plan/steps for ambiguities repeat 3; found no new actionable ambiguity feedback after rechecking task artifacts, workflow IR/grammar/docs, turn-execution contract, step/judge structured-output code, and task-169/171 AI structured-output surfaces. Existing unchecked implementation steps cover intentional code/docs work.
+- 2026-05-24: Executed task 170 ambiguity follow-up repeat 3 after no-action review; design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the no-op pass.
 
 - 2026-05-24: Reviewed task 170 design/plan/steps for inconsistencies repeat 2; found no new actionable inconsistency feedback after rechecking task artifacts, prior notes, task-168 docs/current IR code, turn-execution contract code, workflow step/judge code, and task-169/171 AI structured-output surfaces. Existing unchecked implementation steps already cover code/docs gaps.
 - 2026-05-24: Executed task 170 ambiguity follow-up repeat 2: turn-execution structured-output metadata seam is now explicit. Workflow runtime reads top-level `:structured-output` from bounded actor/judge turn results, copied only from canonical `:execution-result/structured-output`; turn runtime owns non-streaming provider-result and streaming event accumulation. Design-step checked, implementation steps untouched.
