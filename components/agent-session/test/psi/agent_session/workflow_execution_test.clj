@@ -10,6 +10,7 @@
    [psi.agent-session.workflow-execution-test-support :as support]
    [psi.shared-config.project :as project-prefs]
    [psi.shared-config.user :as user-config]
+   [psi.skill-registry.root-storage :as skill-storage]
    [psi.workflow-runtime.attempts]
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.agent-session.workflow-judge]
@@ -469,13 +470,18 @@
                      (let [[s _ _] (workflow-registry/register-definition state support/workflow-selection-definition)
                            [s _ _] (workflow-runtime/create-run s {:definition-id "planner-selection"
                                                                    :run-id "run-selection-1"
-                                                                   :workflow-input {:input "plan it"}})]
+                                                                   :workflow-input {:input "plan it"}})
+                           skill {:name "testing-best-practices"
+                                  :description "Testing guidance"
+                                  :file-path "/tmp/SKILL.md"
+                                  :base-dir "/tmp"
+                                  :source :project
+                                  :disable-model-invocation false}
+                           s (:root-state (skill-storage/set-skills-in-root-state s session-id [skill]))]
                        (-> s
                            (assoc-in [:agent-session :sessions session-id :data :tool-defs]
                                      [{:name "read" :description "Read"}
                                       {:name "bash" :description "Bash"}])
-                           (assoc-in [:agent-session :sessions session-id :data :skill-ids]
-                                     ["testing-best-practices"])
                            (assoc-in [:agent-session :sessions session-id :data :prompt-contributions]
                                      [{:id "a"
                                        :ext-path "/ext/a"

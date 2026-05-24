@@ -253,7 +253,7 @@
                                                                :messages []
                                                                :thinking-level :off
                                                                :model {:provider :openai :id "gpt-4.1"}}}}}}
-          state* (atom (:root-state (skill-storage/register-skill-in-root-state state session-id skill)))
+          state* (atom (:root-state (skill-storage/set-skills-in-root-state state session-id [skill])))
           ctx {:state* state*}
           prepared (prompt-request/build-prepared-request
                     ctx
