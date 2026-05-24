@@ -159,6 +159,38 @@ Illustrative shape:
 - the assembled result of contributions is the child-session conversation
 - canonical first-cut session output is `:final-llm-reply`
 - transcript output is optional but normalized when present
+- structured machine-facing output is declared under step-local `:outputs` with `:source :session/structured-output`
+
+### Session structured outputs
+
+A session step may declare one or more structured output entries under its
+step-local `:outputs` map. The output key is the logical machine-facing value
+that downstream references address.
+
+Illustrative normalized shape:
+
+```clojure
+{:name "classify-reproduction"
+ :type :session
+ :session {:contributions [...]}
+ :outputs {:classification
+           {:source :session/structured-output
+            :mode :structured
+            :schema-id :psi.workflow/bug-reproduction-classification
+            :schema-version 1
+            :schema [:map
+                     [:status [:enum :reproducible :not-reproducible :unclear]]
+                     [:summary :string]
+                     [:evidence [:vector :string]]
+                     [:commands-run [:vector :string]]
+                     [:next-action [:enum :request-more-info :handoff-to-fix :stop]]]}}
+ :yields {:type :data
+          :data :classification}}
+```
+
+Session structured outputs are optional. If omitted, the session step remains a
+text-producing step and should expose `:final-llm-reply` when downstream text
+consumption is needed.
 
 ## Delegate step
 
@@ -202,14 +234,90 @@ Each step may expose step-local outputs by logical output key.
 Illustrative common output keys:
 
 - invoke step: `:data`, `:summary`, `:result`
-- session step: commonly `:final-llm-reply`, `:transcript`, `:result`
-- delegate step: no first-cut step-local outputs; only explicit delegate-local outputs such as a later justified debug/result surface if intentionally added
+- session step: commonly `:final-llm-reply`, `:transcript`, `:result`, plus any declared structured output keys
+- delegate step: no first-cut step-local outputs except explicitly declared boundary outputs such as `:handoff`
+- LLM judge: judge-local structured output keys under the judge's own `:outputs` map
 
-The `:outputs` map should describe what logical output keys exist for a step and, at minimum, give runtime a canonical local meaning for each key.
+The `:outputs` map should describe what logical output keys exist for a step or
+judge and, at minimum, give runtime a canonical local meaning for each key.
 
 The exact internal value of each `:outputs` entry may evolve, but the key-space should be stable for runtime reference and validation.
 
 If a local `:yields` form names an output key (for example `{:type :text :text :final-llm-reply}` or `{:type :data :data :data}`), that output key must be declared in the same step's `:outputs` map at the normalized IR boundary.
+
+### Structured output specs
+
+A structured output spec is an output entry with a structured source and schema
+contract. The normalized IR accepts these sources for this slice:
+
+- `:session/structured-output` on session-step `:outputs`
+- `:judge/structured-output` on LLM-judge `:outputs`
+
+Normalized structured output spec shape:
+
+```clojure
+{:source structured-output-source
+ :mode :structured
+ :schema-id schema-id
+ :schema-version schema-version
+ :schema malli-schema
+ :on-invalid? invalid-policy}
+```
+
+The first implementation's minimum invalid policy is fail-fast. If `:on-invalid`
+is omitted, runtime treats it as `{:action :fail-fast}`. Bounded retry/repair may
+be added only when explicit in `:on-invalid` and proven by tests.
+
+### Structured output runtime envelope
+
+Execution records the resolved value behind a structured output key as a
+canonical envelope. Downstream references must use only the validated
+`:structured-output :value` when status is `:valid`.
+
+Valid example:
+
+```clojure
+{:raw-output "..."
+ :structured-output
+ {:mode :structured
+  :schema-id :psi.workflow/judge-review-result
+  :schema-version 1
+  :strategy :prompted-json
+  :status :valid
+  :value {:decision :needs-work
+          :issues []
+          :confidence 0.84}}}
+```
+
+Invalid example:
+
+```clojure
+{:raw-output "..."
+ :structured-output
+ {:mode :structured
+  :schema-id :psi.workflow/judge-review-result
+  :schema-version 1
+  :strategy :prompted-json
+  :status :invalid
+  :errors [{:message "missing required key"
+            :path [:decision]}]
+  :parsed-value {"issues" []}}}
+```
+
+The strategy field is observable runtime metadata. The first slice should record
+at least one of:
+
+- `:provider-native` — the provider/API accepted a structured-output schema or mode directly
+- `:prompted-json` — the runtime prompted for one JSON object, parsed it, coerced it to Malli-domain data, and validated it
+- `:repair-parse` — the runtime performed an explicit repair parse attempt
+- `:unsupported` — the runtime could not reasonably request the structured mode
+
+For `:prompted-json`, raw model text remains in `:raw-output`; parsed JSON is
+schema-guided into Malli-domain values before validation. Object keys may become
+keywords when the schema expects map keys, and enum strings may become keyword
+enum values when the declared enum contains the corresponding keyword. Coercion,
+parse, or validation failure records `:status :invalid`, `:errors`, and
+`:parsed-value` when a parsed value exists; it must not expose `:value`.
 
 ## Yielded value
 
@@ -335,6 +443,41 @@ Illustrative shape:
               :tool-output false}}
 ```
 
+An LLM judge may declare judge-local structured outputs. The `:outputs` map is
+local to the judge result, not to the parent step's ordinary text outputs.
+
+Illustrative normalized structured judge shape:
+
+```clojure
+{:type :llm
+ :session {:model "gpt-5.4"
+           :contributions [...]}
+ :outputs {:review
+           {:source :judge/structured-output
+            :mode :structured
+            :schema-id :psi.workflow/judge-review-result
+            :schema-version 1
+            :schema [:map
+                     [:decision [:enum :clear :needs-work :unclear]]
+                     [:issues
+                      [:vector
+                       [:map
+                        [:severity [:enum :blocking :minor]]
+                        [:kind [:enum :ambiguity :inconsistency :missing-acceptance :scope-drift]]
+                        [:description :string]
+                        [:evidence :string]
+                        [:suggested-change :string]]]]
+                     [:confidence [:double {:min 0.0 :max 1.0}]]]}}
+ :projection {:type :tail
+              :turns 4
+              :tool-output false}}
+```
+
+Judge structured outputs are intended for judge routing, retry decisions, and
+review-loop control data. They do not replace the parent step's yielded value; a
+judge routes while the parent step still yields according to its own `:yields`
+form.
+
 ### Invoke judge
 
 Illustrative shape:
@@ -410,6 +553,14 @@ the runtime boundary.
 - `:workflow-original` -> current workflow invocation original request surface
 - `{:step s :output k}` -> step-local output surface `k` from prior step `s`
 - `{:step s :yield f}` -> yielded-value field `f` from prior step `s`
+
+For structured outputs, `{:step s :output k}` addresses the logical output key
+that declared `:source :session/structured-output` or a judge-local structured
+output that the runtime has surfaced for the parent step's transition context. A
+source-spec `:path` is resolved against the validated structured `:value`, not
+against `:raw-output`, `:parsed-value`, or prose. Resolution must fail clearly
+when the source output is missing, non-structured, invalid, or lacks the requested
+path.
 
 Current implementation note:
 
@@ -552,8 +703,26 @@ goto-target ::= :next | :previous | :done | step-name
 
 outputs ::= {:outputs {output-key output-spec}+}
 
-output-spec ::= {:source keyword
-                 output-metadata*}
+output-spec ::= text-output-spec | structured-output-spec | delegate-output-spec | invoke-output-spec
+
+text-output-spec ::= {:source :session/final-llm-reply}
+
+structured-output-spec ::= {:source structured-output-source
+                            :mode :structured
+                            :schema-id schema-id
+                            :schema-version schema-version
+                            :schema malli-schema
+                            :on-invalid? invalid-policy}
+
+structured-output-source ::= :session/structured-output | :judge/structured-output
+
+delegate-output-spec ::= {:source :delegate/handoff}
+
+invoke-output-spec ::= {:source keyword
+                        output-metadata*}
+
+invalid-policy ::= {:action :fail-fast}
+                 | {:action :retry :max-attempts pos-int}
 
 yields ::= {:type :data :data output-key}
          | {:type :text :text output-key}
@@ -585,6 +754,9 @@ source-ref ::= :workflow-input
 
 output-key ::= keyword
 yield-field ::= keyword
+schema-id ::= keyword
+schema-version ::= pos-int
+malli-schema ::= vector | map | keyword
 projection ::= map
 compat ::= :compat map
 step-name ::= string

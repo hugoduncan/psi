@@ -31,3 +31,7 @@ Completed the newly added inconsistency follow-up: aligned `doc/workflows.md` wi
 ## 2026-05-23 — ambiguity review repeat 2
 
 Found one new actionable ambiguity: `doc/workflow-ir.md` remains generic about `:outputs` and does not specify the normalized IR shape for session structured outputs or judge-local structured outputs, even though the task design and user guide point implementers to IR docs for the formal envelope. This leaves implementers guessing where judge `:outputs` live in normalized IR and what runtime envelope/source metadata the IR validator should accept.
+
+## 2026-05-23 — ambiguity follow-up repeat 2
+
+Completed the newly added ambiguity follow-up: aligned `doc/workflow-ir.md` with the structured-output contract by documenting normalized session-step structured `:outputs`, judge-local structured `:outputs`, canonical structured-output runtime envelopes, provider strategy/coercion metadata, and downstream reference failure semantics. Marked the design-step done. Did not execute `steps.md` implementation items.
