@@ -89,3 +89,7 @@
 - Scheduler deliver/drain message construction now accepts explicit `:delivered-at` or resolves it from the scheduler time source.
 - Updated focused scheduler tests to pass explicit create instants and deterministic scheduler time sources for create, timer, delay-ms, absolute-at, delivery, and drain timestamp assertions.
 - Focused scheduler proof passed: 31 tests, 332 assertions, 0 failures.
+
+## 2026-05-24 implementation review
+- Reviewed task-implementation-review skill, task artifacts, scheduler source, focused scheduler tests, wall-clock scan, and focused scheduler proof subset (17 tests, 195 assertions, 0 failures).
+- New actionable feedback: missing/invalid `:scheduler-time-source` fail-fast behavior is implemented by `scheduler-time/now` but not directly covered at scheduler runtime boundaries, so a regression could reintroduce fallback/default behavior unnoticed.
