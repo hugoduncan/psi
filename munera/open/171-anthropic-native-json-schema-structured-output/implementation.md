@@ -47,3 +47,5 @@
 - 2026-05-24 executed task-implementation-review follow-up: added focused Anthropic JSON Schema native parse-failure coverage for non-streaming `:execute` and streaming result events. Invalid JSON and non-object JSON cases now assert `:parse-error? true`, preserved `:raw-payload`, source/native mechanism `:anthropic/json-schema-output`, and omitted `:payload`. Verification: `clojure -M:test --focus psi.ai.providers.anthropic-structured-output-test --focus psi.ai.model-registry-test --focus psi.ai.user-models-test` => `35 tests, 221 assertions, 0 failures`.
 
 - 2026-05-24 task-implementation-review repeat: found no new actionable implementation feedback after rechecking task artifacts, Anthropic schema/request/execute/stream code, model capability assignment, docs/task-170 wording, live-smoke seam, and focused Anthropic/model/user tests. Existing parse-failure follow-up is implemented and verified; no new steps added.
+
+- 2026-05-24 executed task-implementation-review repeat follow-up: preloaded implementation review found no new actionable feedback, and `steps.md` has no newly added unchecked follow-up items. No implementation steps were executed.
