@@ -23,3 +23,7 @@ Completed newly added ambiguity follow-ups only: aligned `doc/workflow-grammar.m
 ## 2026-05-23 — inconsistency review repeat
 
 Found one new actionable inconsistency: `design.md`, `plan.md`, and `doc/workflow-grammar.md` now define session-step and LLM-judge structured outputs under `:outputs`, but the referenced user guide `doc/workflows.md` still describes `:output :handoff` as the only standardized structured export key and says the guide intentionally avoids a broader author-facing output menu. That guide wording conflicts with the chosen task contract and would mislead authors away from the new session/judge structured-output surface.
+
+## 2026-05-23 — inconsistency follow-up repeat
+
+Completed the newly added inconsistency follow-up: aligned `doc/workflows.md` with the structured-output contract by documenting session-step and LLM-judge structured `:outputs` as validated machine-facing data surfaces, adding representative `:path` reference examples, and pointing authors to grammar/IR docs for formal envelope, validation, and provider strategy details. Marked the design-step done. Did not execute `steps.md` implementation items.
