@@ -32,3 +32,7 @@ Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, referenced AI pr
 ## 2026-05-23 — executed inconsistency follow-ups repeat
 
 No newly added unchecked `design-steps.md` items existed after the repeated inconsistency review, so there were no actionable design follow-ups to execute. Did not execute implementation `steps.md` work.
+
+## 2026-05-23 — ambiguity review repeat 2
+
+Found one new actionable ambiguity: the artifacts say AI adapters do not final-validate/coerce provider payloads, but the testing requirements still say "local validation is still invoked after provider response extraction." For this provider/model slice, the task should specify whether implementation only proves the AI result preserves extracted/raw payload metadata for task-170 workflow validation, or whether task 169 must introduce an AI-level caller/test seam that invokes Malli validation after extraction.
