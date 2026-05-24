@@ -69,3 +69,7 @@ No newly added unchecked `design-steps.md` items existed after the preloaded inc
 ## 2026-05-23 — ambiguity review repeat 4
 
 Found one new actionable ambiguity: fallback strategy is required to be tested and reported as `:prompted-json`, but the task artifacts do not specify the concrete AI request behavior for fallback selection. They should state whether the AI adapter injects schema-guided JSON instructions into the prompt/request, relies on an already-prompted caller/runtime text, or only reports fallback metadata without mutating the outbound request, so fallback request-shape tests have a deterministic target.
+
+## 2026-05-23 — executed ambiguity follow-up repeat 4
+
+Completed the newly added ambiguity follow-up without executing implementation `steps.md` work. Specified that prompted-JSON fallback is an adapter-owned deterministic request mutation: when `:prompted-json` is selected, the adapter injects schema-guided JSON-only instructions while preserving caller text, avoids provider-native schema fields, and reports `:fallback-used? true`; no-fallback unsupported requests fail/report `:unsupported` without injecting fallback instructions. Updated `plan.md` and `steps.md` with the fallback request-shape target and marked the ambiguity design-step done.

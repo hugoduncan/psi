@@ -2,6 +2,7 @@
 
 - [ ] Add structured-output capability schemas and model registry support, including explicit `:supported?` semantics for native-capable, fallback-only, and unsupported models.
 - [ ] Add request structured-output contract helpers and strategy selection that combines model capability with request fallback policy.
+- [ ] Add prompted-JSON fallback request shaping that injects deterministic schema-guided JSON-only instructions when fallback is selected, avoids provider-native fields, and reports `:fallback-used? true`; unsupported/no-fallback requests must not inject fallback instructions.
 - [ ] Implement OpenAI Chat Completions JSON Schema `response_format` request construction for explicitly capable models.
 - [ ] Ensure OpenAI Codex Responses and other fallback-only paths never receive unverified provider-native schema fields.
 - [ ] Implement Anthropic synthetic forced tool structured output composition and extraction, exposing synthetic input as structured-output payload and hiding it from ordinary tool calls.

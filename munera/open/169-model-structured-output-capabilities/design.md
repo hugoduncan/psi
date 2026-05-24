@@ -161,6 +161,22 @@ The LLM request path should support a structured-output option equivalent to:
 
 Adapters may derive `:json-schema` from `:schema` if the conversion is part of this task. If conversion is too broad for the first cut, this task should support the subset of Malli schemas needed by `:psi.workflow/judge-review-result` and record unsupported schema forms clearly.
 
+## Prompted JSON fallback behavior
+
+When strategy selection chooses `:prompted-json`, the AI adapter owns a deterministic fallback request mutation. It must add schema-guided JSON-only instructions to the outbound provider request rather than merely reporting fallback metadata or relying on callers to have already written a JSON prompt. Caller/runtime prompts may add domain context, but the adapter-owned fallback instruction is the minimum contract that makes a structured-output request observable and testable.
+
+Fallback instruction composition:
+
+- append a provider-neutral instruction block to the request messages/content at the AI adapter boundary, preserving the caller's original prompt text;
+- include the structured-output `:name`, `:schema-id`, `:schema-version`, and JSON-Schema-compatible schema;
+- require a single JSON object matching the schema, with no Markdown fences, prose wrapper, or extra top-level text;
+- mention that local runtime validation remains authoritative;
+- do not add provider-native fields such as OpenAI `response_format`, Responses `text.format`, strict tool schemas, or Anthropic forced `tool_choice`.
+
+The exact insertion point follows each provider adapter's existing message-building conventions. For chat/message APIs, prefer an appended user-visible instruction segment on the final user/request content, or the nearest existing provider-neutral prompt augmentation seam. Do not silently replace caller text.
+
+Fallback request-shape tests should assert both sides of the contract: the outbound request contains the adapter-owned JSON-only/schema instruction, and it contains no native schema-enforcement field. Strategy metadata reports `:prompted-json` with `:fallback-used? true`. If fallback is disallowed, the adapter must fail/report `:unsupported` clearly and must not inject fallback instructions.
+
 ## Provider behavior
 
 ### OpenAI
