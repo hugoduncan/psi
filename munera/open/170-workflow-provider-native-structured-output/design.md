@@ -63,7 +63,7 @@ In scope:
 5. When provider-native support is required but unavailable, workflow execution fails clearly before or during the step rather than silently degrading to prose.
 6. Local runtime validation still gates downstream structured values in all strategies.
 7. Downstream source resolution behavior from task 168 remains unchanged: only valid structured `:value` fields are exposed.
-8. Focused tests cover provider-native strategy selection, fallback strategy selection, unsupported/no-fallback failure, and invalid-output fail-fast behavior.
+8. Focused tests cover provider-native strategy selection, fallback strategy selection, unsupported/no-fallback failure, missing `:json-schema` failure, and invalid-output fail-fast behavior.
 9. At least one representative workflow or workflow test fixture demonstrates a structured judge or session step using the provider-native-capable path.
 10. Documentation explains how workflow authors opt into structured output, how strategy selection works, and when to require native support versus allow fallback.
 
@@ -76,41 +76,89 @@ In scope:
 - Fallback policy must be explicit enough to avoid surprising downgrades for workflows that require strong schema enforcement.
 - Judges should remain able to route by validated `:decision` from structured output. Invalid structured judge output should route to explicit failure, not no-match prose retry loops unless a structured retry policy is deliberately implemented.
 
-## Proposed workflow authoring extension
+## Workflow structured-output policy and request contract
 
-The existing task 168 structured output declaration should gain or use a policy equivalent to:
+Task 170 uses these exact normalized structured-output spec keys for session-step and LLM-judge `:outputs` entries:
 
 ```edn
 :outputs
 {:review {:source :judge/structured-output
+          :mode :structured
           :schema-id :psi.workflow/judge-review-result
           :schema-version 1
           :schema [...]
+          :json-schema {:type "object"
+                        :additionalProperties false
+                        :required ["decision" "issues" "confidence"]
+                        :properties {"decision" {:type "string"
+                                                   :enum ["clear" "needs-work" "unclear"]}
+                                     "issues" {:type "array" :items {...}}
+                                     "confidence" {:type "number"}}}
           :strategy-preference :provider-native
-          :fallback :prompted-json}}
+          :fallback :prompted-json
+          :require-provider-native? false}}
 ```
 
-Possible policy values:
+Canonical policy keys:
 
-- `:strategy-preference :provider-native` — prefer native when available, otherwise use declared fallback.
-- `:require-provider-native? true` — fail if selected model/transport cannot enforce natively.
-- `:fallback :prompted-json` — allow prompted JSON fallback.
-- `:fallback :none` — no fallback; unsupported native capability is an error.
+- `:json-schema` — required for provider-native and prompted-JSON AI request shaping. It is the JSON Schema map passed into the AI request as `[:structured-output :json-schema]`.
+- `:strategy-preference` — optional enum. `:provider-native` means prefer provider-native enforcement when the resolved model/transport supports it. Omitted defaults to `:provider-native` for structured workflow outputs.
+- `:fallback` — optional enum. `:prompted-json` allows adapter-owned prompted JSON fallback; `:none` forbids fallback. Omitted defaults to `:prompted-json`.
+- `:require-provider-native?` — optional boolean. When true, fallback is forbidden regardless of `:fallback`, and unsupported native capability is a clear workflow failure. Omitted defaults to false.
 
-The exact keys may be adjusted to match current schema conventions, but the task must make the behavior unambiguous.
+The workflow runtime converts this to the provider-neutral task-169 AI request shape:
+
+```edn
+{:structured-output
+ {:schema-id schema-id
+  :schema-version schema-version
+  :json-schema json-schema
+  :strategy-preference strategy-preference
+  :fallback-allowed? (and (not require-provider-native?) (= :prompted-json fallback))
+  :strict? true}}
+```
+
+Workflow runtime and docs should not introduce provider-specific request keys such as OpenAI `:response_format`, Anthropic `:output_format`, or forced tool definitions. Provider adapters own those translations.
 
 ## Runtime flow
 
 For a structured workflow step or judge:
 
-1. Resolve the structured-output spec from the step/judge `:outputs`.
-2. Convert or resolve the schema into the provider-neutral request contract expected by task 169.
-3. Ask turn execution to generate with that structured-output contract.
-4. Receive text or native structured payload plus actual strategy metadata.
-5. Build the task 168 structured-output envelope using the actual strategy.
-6. Validate locally.
-7. Expose downstream structured value only if valid.
-8. Block/fail explicitly on invalid output or unsupported required capability.
+1. Resolve the single structured-output spec from the step/judge `:outputs`.
+2. Require the spec to include both the Malli `:schema` for workflow-local validation/coercion and `:json-schema` for AI request shaping.
+3. Build the provider-neutral task-169 request under `:structured-output` using the canonical keys above.
+4. Ask turn execution to generate with that structured-output contract.
+5. Receive text or native structured payload plus actual AI structured-output metadata.
+6. Build the workflow structured-output envelope using the actual strategy and metadata.
+7. Validate locally against the Malli schema.
+8. Expose downstream structured value only if valid.
+9. Block/fail explicitly on invalid output or unsupported required capability.
+
+## JSON Schema source boundary
+
+Task 170 does **not** convert arbitrary Malli schemas to JSON Schema. Workflow structured-output specs must provide an explicit authored or registry-resolved `:json-schema` alongside the Malli `:schema`.
+
+Boundary rules:
+
+- `:schema` remains the workflow-runtime validation and coercion contract from task 168.
+- `:json-schema` is the provider/request contract required by task 169.
+- Reusable schema registries may return a paired Malli schema and JSON Schema for known `[:schema-id :schema-version]` pairs, but task 170 must not infer JSON Schema from Malli at the AI request boundary.
+- If a structured-output spec reaches execution without `:json-schema`, workflow execution fails clearly before model generation with an error equivalent to `:missing-json-schema`.
+- Tests should use paired schemas in fixtures so provider-native and fallback request shaping both prove the explicit JSON Schema handoff.
+
+## Workflow envelope metadata mapping
+
+The workflow structured-output envelope keeps `:value` as the only downstream data surface, but persists enough metadata for replay/debugging. For both session steps and LLM judges, map AI structured-output metadata as follows:
+
+- `[:structured-output :strategy]` is the actual AI strategy: `:provider-native`, `:prompted-json`, `:repair-parse`, or `:unsupported`.
+- `[:structured-output :native-mechanism]` is copied when the AI result reports one, such as `:openai/chat-completions-json-schema-response-format`, `:anthropic/forced-tool-use`, or `:anthropic/json-schema-output`.
+- `[:structured-output :source]` is copied when present, such as `:openai/message-content`, `:anthropic/output-format`, `:anthropic/tool-input`, or `:prompted-json/text`.
+- `[:structured-output :fallback-used?]` is copied when present; otherwise derive true only for `:strategy :prompted-json`.
+- `[:structured-output :raw-payload]` stores the provider/native structured payload or parsed JSON object before Malli coercion when available.
+- top-level `:raw-output` remains the raw assistant text when available. If a native provider returns only structured payload and no text, `:raw-output` may be nil and `:raw-payload` is authoritative for validation input.
+- Provider-specific diagnostic maps may be kept under `[:structured-output :provider-metadata]`, but downstream source resolution must ignore them.
+
+Local validation still determines `[:structured-output :status]` and `[:structured-output :value]`. Downstream `{:step ... :output ...}` resolution continues to read only valid `:value`; it must not read `:raw-payload`, `:parsed-value`, `:provider-metadata`, or provider text.
 
 ## Testing requirements
 
