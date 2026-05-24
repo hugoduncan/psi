@@ -15,6 +15,8 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-24: Reviewed task 171 design for ambiguities; found actionable gaps around absent plan/steps plus exact Anthropic JSON Schema request/header, response/stream extraction, model mechanism assignment, JSON Schema vs forced-tool selection, and live smoke criteria. Commit e85104d8.
+
 - 2026-05-24: Created task 171 to update Anthropic structured-output support from task 169's forced-tool-only native assumption to the documented JSON Schema native output mechanism, with forced-tool and prompted-JSON kept as separate paths.
 
 - 2026-05-23: Executed task 169 code-shaper follow-up: Anthropic prompted-JSON fallback streaming now preserves text deltas and emits parsed first-class `:structured-output-result` with `:source :prompted-json/text`; focused structured-output/model tests green.
