@@ -114,8 +114,8 @@
         (is (= "{\"ok\":true}"
                (get-in result [:assistant-message :content 0 :text])))))))
 
-(deftest openai-streaming-structured-output-strategy-event-test
-  ;; Tests streaming strategy metadata is emitted as a first-class AI event.
+(deftest openai-streaming-structured-output-events-test
+  ;; Tests streaming strategy and result metadata are emitted as first-class AI events.
   (let [model    (models/get-model :gpt-5)
         convo    (-> (conv/create "sys")
                      (conv/add-user-message "Review this"))
@@ -123,7 +123,7 @@
         sse      (str "data: " (json/generate-string
                                 {:choices [{:delta {:role "assistant"}}]}) "\n\n"
                       "data: " (json/generate-string
-                                {:choices [{:delta {:content "{}"}}]}) "\n\n"
+                                {:choices [{:delta {:content "{\"ok\":true}"}}]}) "\n\n"
                       "data: " (json/generate-string
                                 {:choices [{:finish_reason "stop"}]
                                  :usage {:prompt_tokens 1 :completion_tokens 1 :total_tokens 2}}) "\n\n")]
@@ -135,4 +135,8 @@
        (fn [ev] (swap! events conj ev))))
     (is (some #(and (= :structured-output-strategy (:type %))
                     (= :provider-native (get-in % [:structured-output :strategy])))
+              @events))
+    (is (some #(and (= :structured-output-result (:type %))
+                    (= {:ok true} (get-in % [:structured-output :payload]))
+                    (= :openai/message-json (get-in % [:structured-output :source])))
               @events))))

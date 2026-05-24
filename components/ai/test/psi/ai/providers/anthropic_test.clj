@@ -774,8 +774,8 @@
     (is (nil? (:tools body)))
     (is (nil? (:tool_choice body)))))
 
-(deftest anthropic-streaming-structured-output-strategy-event-test
-  ;; Tests streaming strategy metadata is emitted as a first-class AI event.
+(deftest anthropic-streaming-structured-output-events-test
+  ;; Tests streaming strategy and result metadata are emitted as first-class AI events.
   (let [model  (models/get-model :sonnet-4.6)
         convo  (-> (conv/create "sys")
                    (conv/add-user-message "Review this"))
@@ -783,6 +783,19 @@
         sse    (str (sse-line "message_start"
                               {:type "message_start"
                                :message {:usage {:input_tokens 1}}})
+                    (sse-line "content_block_start"
+                              {:type "content_block_start"
+                               :index 0
+                               :content_block {:type "tool_use"
+                                               :id "toolu_1"
+                                               :name "psi_structured_output__judge_review_result"}})
+                    (sse-line "content_block_delta"
+                              {:type "content_block_delta"
+                               :index 0
+                               :delta {:partial_json "{\"ok\":true}"}})
+                    (sse-line "content_block_stop"
+                              {:type "content_block_stop"
+                               :index 0})
                     (sse-line "message_delta"
                               {:type "message_delta"
                                :delta {:stop_reason "end_turn"}
@@ -795,4 +808,10 @@
        (fn [ev] (swap! events conj ev))))
     (is (some #(and (= :structured-output-strategy (:type %))
                     (= :provider-native (get-in % [:structured-output :strategy])))
-              @events))))
+              @events))
+    (is (some #(and (= :structured-output-result (:type %))
+                    (= {:ok true} (get-in % [:structured-output :payload]))
+                    (= :anthropic/tool-use (get-in % [:structured-output :source])))
+              @events))
+    (is (not-any? #(contains? #{:toolcall-start :toolcall-delta :toolcall-end} (:type %))
+                  @events))))

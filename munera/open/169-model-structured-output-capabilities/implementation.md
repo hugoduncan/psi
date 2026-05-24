@@ -245,3 +245,11 @@ Implemented the model/capability foundation slice. Added structured-output capab
 ## 2026-05-23 — implementation slice 2
 
 Implemented structured-output request strategy/request-shaping slice. Added request normalization, explicit `:json-schema` strategy selection, provider-neutral prompted-JSON fallback instruction generation, OpenAI Chat Completions native `response_format` construction, OpenAI Codex fallback-only prompt shaping with no native schema fields, Anthropic synthetic forced-tool request composition with deterministic collision suffixing, and first-class streaming strategy events. OpenAI non-streaming execution now returns top-level `:structured-output` metadata with parsed payload handoff for provider-native/prompted JSON content; local Malli/domain validation remains outside AI adapters. Updated AI/custom-provider docs. Focused verification: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.user-models-test` => 24 tests, 160 assertions, 0 failures; `clojure -M:test --focus psi.ai.providers.openai-test --focus psi.ai.providers.anthropic-test` => 49 tests, 268 assertions, 0 failures.
+
+## 2026-05-23 — implementation slice 3
+
+Completed the remaining streaming result/payload surface slice. OpenAI Chat Completions streaming now accumulates assistant text for structured-output requests and emits `:structured-output-result` with parsed payload/raw text before completion. Anthropic streaming now recognizes the synthetic forced structured-output tool, suppresses its ordinary `:toolcall-*` events, accumulates its `partial_json`, and emits `:structured-output-result` with `:source :anthropic/tool-use`; ordinary tools remain unaffected. Updated AI docs to name both first-class streaming structured-output events. Focused verification: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.user-models-test` => 24 tests, 160 assertions, 0 failures; `clojure -M:test --focus psi.ai.providers.openai-test --focus psi.ai.providers.anthropic-test` => 45 tests, 252 assertions, 0 failures; targeted combined provider structured-output/Anthropic focused run => 26 tests, 167 assertions, 0 failures.
+
+## 2026-05-23 — broader verification
+
+Ran `bb clojure:test:unit`; all tests passed.

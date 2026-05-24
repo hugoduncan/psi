@@ -211,12 +211,14 @@
 
 (defn- make-chat-stream-state
   []
-  {:stream-started?      (atom false)
-   :done?                (atom false)
-   :pending-finish-reason (atom nil)
-   :next-tool-index      (atom 0)
-   :tool-index-by-id     (atom {})
-   :tool-state           (atom {})})
+  {:stream-started?            (atom false)
+   :done?                      (atom false)
+   :pending-finish-reason      (atom nil)
+   :structured-result-emitted? (atom false)
+   :text-buffer                (atom "")
+   :next-tool-index            (atom 0)
+   :tool-index-by-id           (atom {})
+   :tool-state                 (atom {})})
 
 (defn- emit-stream-start!
   [consume-fn stream-started?]
@@ -343,12 +345,13 @@
 
 (defn- emit-chat-chunk!
   [stream-state consume-fn choice delta]
-  (let [{:keys [stream-started?]} stream-state
+  (let [{:keys [stream-started? text-buffer]} stream-state
         text-delta      (extract-text-delta delta)
         reasoning-delta (extract-reasoning-delta delta)]
     (when (and choice (= (:role delta) "assistant"))
       (emit-stream-start! consume-fn stream-started?))
     (when (seq text-delta)
+      (swap! text-buffer str text-delta)
       (emit-started-event! consume-fn stream-started?
                            {:type :text-delta
                             :content-index 0
@@ -366,14 +369,34 @@
                                (resolve-chat-tool-index stream-state tool-call fallback-idx)
                                tool-call))))
 
+(defn- emit-structured-output-result!
+  [stream-state consume-fn strategy source]
+  (let [{:keys [structured-result-emitted? text-buffer]} stream-state
+        raw-text @text-buffer
+        payload  (structured-output/parse-json-object raw-text)]
+    (when (and (contains? #{:provider-native :prompted-json} (:strategy strategy))
+               (compare-and-set! structured-result-emitted? false true))
+      (consume-fn {:type :structured-output-result
+                   :structured-output (cond-> (assoc strategy
+                                                     :source source
+                                                     :raw-text raw-text)
+                                        payload (assoc :payload payload
+                                                       :raw-payload payload))}))))
+
 (defn- finish-chat-chunk!
-  [stream-state consume-fn model chunk choice]
+  [stream-state consume-fn model chunk choice strategy]
   (let [{:keys [stream-started? done? pending-finish-reason]} stream-state]
     (cond
       (:usage chunk)
       (do
         (force-start-pending-chat-tools! stream-state consume-fn)
         (emit-chat-tool-ends! stream-state consume-fn)
+        (emit-structured-output-result! stream-state
+                                        consume-fn
+                                        strategy
+                                        (if (= :provider-native (:strategy strategy))
+                                          :openai/message-json
+                                          :prompted-json/text))
         (emit-chat-completion-finish! consume-fn
                                       stream-started?
                                       done?
@@ -391,23 +414,29 @@
         (reset! pending-finish-reason (keyword (:finish_reason choice)))))))
 
 (defn- flush-pending-chat-finish!
-  [stream-state consume-fn]
+  [stream-state consume-fn strategy]
   (let [{:keys [stream-started? done? pending-finish-reason]} stream-state]
     (when-let [reason @pending-finish-reason]
+      (emit-structured-output-result! stream-state
+                                      consume-fn
+                                      strategy
+                                      (if (= :provider-native (:strategy strategy))
+                                        :openai/message-json
+                                        :prompted-json/text))
       (emit-chat-completion-finish! consume-fn stream-started? done? reason nil)
       (reset! pending-finish-reason nil))))
 
 (defn- process-chat-sse-line!
-  [stream-state consume-fn model options url line]
+  [stream-state consume-fn model options url strategy line]
   (if-let [chunk (transport/parse-sse-line line)]
     (do
       (transport/capture-response! model options :openai-completions url chunk)
       (let [choice (first (:choices chunk))
             delta  (:delta choice)]
         (emit-chat-chunk! stream-state consume-fn choice delta)
-        (finish-chat-chunk! stream-state consume-fn model chunk choice)))
+        (finish-chat-chunk! stream-state consume-fn model chunk choice strategy)))
     (when (and line (.startsWith ^String line "data: ") (= "[DONE]" (.substring ^String line 6)))
-      (flush-pending-chat-finish! stream-state consume-fn))))
+      (flush-pending-chat-finish! stream-state consume-fn strategy))))
 
 (defn- non-streaming-request
   [conversation model options]
@@ -501,7 +530,7 @@
                                  (transport/response->error response))
           (with-open [reader (io/reader (:body response))]
             (doseq [line (line-seq reader)]
-              (process-chat-sse-line! stream-state consume-fn model options url line)))))
+              (process-chat-sse-line! stream-state consume-fn model options url strategy line)))))
       (catch Exception e
         (transport/emit-error! model
                                options

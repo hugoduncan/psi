@@ -135,7 +135,7 @@ Supported native mechanisms in this slice:
 - Anthropic `:anthropic-messages` models that declare `:anthropic/forced-tool-use` append a synthetic forced tool with `input_schema`.
 - OpenAI `:openai-codex-responses` models are fallback-only when declared; they never receive public OpenAI Chat Completions/Responses schema fields.
 
-Strategy metadata is explicit. Streaming calls emit `:structured-output-strategy`; non-streaming provider results include top-level `:structured-output` metadata and any extracted payload. Provider-native output still requires caller/workflow validation before use as trusted structured data.
+Strategy metadata is explicit. Streaming calls emit `:structured-output-strategy` before provider content and `:structured-output-result` when extracted payload data is known. Non-streaming provider results include top-level `:structured-output` metadata and any extracted payload. Provider-native output still requires caller/workflow validation before use as trusted structured data.
 
 ## Provider Support
 

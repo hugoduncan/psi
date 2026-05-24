@@ -711,7 +711,11 @@
         structured-request (structured-output/structured-output-request options)
         strategy           (structured-output/select-strategy model structured-request)
         request            (build-request conversation model options)
+        request-body       (request-support/parse-json-body-safe (:body request))
+        structured-tool-name (when (= :provider-native (:strategy strategy))
+                               (get-in request-body [:tool_choice :name]))
         block-types        (atom {})
+        structured-buffers (atom {})
         usage-acc   (atom {:input-tokens       0
                            :output-tokens      0
                            :cache-read-tokens  0
@@ -736,18 +740,39 @@
                         "content_block_start"
                         (let [idx   (:index event-data)
                               block (:content_block event-data)]
-                          (swap! block-types assoc idx (:type block))
-                          (consume-fn (content-block-start-event idx block)))
+                          (swap! block-types assoc idx {:type (:type block)
+                                                        :name (:name block)})
+                          (when-not (and (= "tool_use" (:type block))
+                                         (= structured-tool-name (:name block)))
+                            (consume-fn (content-block-start-event idx block))))
 
                         "content_block_delta"
-                        (consume-event! consume-fn
-                                        (content-block-delta-event (get @block-types (:index event-data))
-                                                                   (:index event-data)
-                                                                   (:delta event-data)))
+                        (let [idx (:index event-data)
+                              block-info (get @block-types idx)
+                              delta (:delta event-data)]
+                          (if (and (= "tool_use" (:type block-info))
+                                   (= structured-tool-name (:name block-info)))
+                            (when-let [json-delta (:partial_json delta)]
+                              (swap! structured-buffers update idx str json-delta))
+                            (consume-event! consume-fn
+                                            (content-block-delta-event (:type block-info)
+                                                                       idx
+                                                                       delta))))
 
                         "content_block_stop"
-                        (consume-fn (content-block-stop-event (get @block-types (:index event-data))
-                                                              (:index event-data)))
+                        (let [idx (:index event-data)
+                              block-info (get @block-types idx)]
+                          (if (and (= "tool_use" (:type block-info))
+                                   (= structured-tool-name (:name block-info)))
+                            (let [raw-payload (get @structured-buffers idx)
+                                  payload     (structured-output/parse-json-object raw-payload)]
+                              (consume-fn {:type :structured-output-result
+                                           :structured-output (cond-> (assoc strategy
+                                                                             :source :anthropic/tool-use
+                                                                             :raw-payload raw-payload)
+                                                                payload (assoc :payload payload))}))
+                            (consume-fn (content-block-stop-event (:type block-info)
+                                                                  idx))))
 
                         "message_delta"
                         (do
