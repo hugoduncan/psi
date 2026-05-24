@@ -1,9 +1,9 @@
 # Steps
 
-- [ ] Audit current direct `:skills` write seams and classify each as authoritative write to remove or normalize into canonical `:skill-ids`-based writes.
-- [ ] Audit current direct `:skills` read seams and classify each as authoritative read to migrate, exact-lookup consumer, display/projection consumer, or dead legacy read to remove.
-- [ ] Audit bootstrap/root-runtime skill loading seams separately from session membership seams.
-- [ ] Audit child-session inheritance and any other membership-copy seams that should become `:skill-ids`-based, distinguishing parent-id copy/filter paths from concrete-skill-map inputs that must synchronously ensure missing root definitions before persisting ids.
+- [x] Audit current direct `:skills` write seams and classify each as authoritative write to remove or normalize into canonical `:skill-ids`-based writes.
+- [x] Audit current direct `:skills` read seams and classify each as authoritative read to migrate, exact-lookup consumer, display/projection consumer, or dead legacy read to remove.
+- [x] Audit bootstrap/root-runtime skill loading seams separately from session membership seams.
+- [x] Audit child-session inheritance and any other membership-copy seams that should become `:skill-ids`-based, distinguishing parent-id copy/filter paths from concrete-skill-map inputs that must synchronously ensure missing root definitions before persisting ids.
 - [x] Decide the persistent storage split: root-registry definition registry id, lower owner/extension id convention, and canonical session membership field shape (`:skill-ids` or justified equivalent).
 - [x] Implement root-registry-backed definition storage helpers plus session-membership helpers for declaring storage, definition conversion, exact lookup, register/insert, projected list-by-session, `skill-ids` access, and replace whole session membership.
 - [x] Update bootstrap/root-runtime initialization to hydrate or register skill definitions directly into root-registry before sessions exist.
