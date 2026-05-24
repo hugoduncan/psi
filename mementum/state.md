@@ -121,6 +121,7 @@ Focused OAuth routing tests ✅. bb tests previously ✅. Task 169 focused struc
 
 ## Latest session notes
 
+- 2026-05-24: Reviewed task 170 design/plan/steps for ambiguities; found actionable gaps: missing plan/steps artifacts, exact workflow structured-output policy/request keys, task-168 Malli-to-task-169 JSON Schema source boundary, and AI-result-to-workflow-envelope metadata mapping. Added design-steps and committed 1060d281.
 - 2026-05-24: Executed task 171 code-shaper follow-up: fixed 400 compatibility fallback to drop Anthropic JSON Schema `:output_format` when the structured-output beta is stripped; added focused retry coverage; focused Anthropic/model/user tests green (`37 tests, 238 assertions`).
 - 2026-05-24: Executed task 171 test-shaper follow-up: non-streaming Anthropic JSON Schema native `:execute` test now captures outbound request body, asserts `:stream` is omitted, and still proves top-level `:structured-output`; focused Anthropic/model/user tests green (`36 tests, 232 assertions`).
 - 2026-05-24: test-shaper review for task 171 found one actionable test-quality gap and added an unchecked `steps.md` follow-up; no code/tests executed in this review pass.
