@@ -121,6 +121,8 @@ Focused OAuth routing tests ✅. bb tests previously ✅. Task 169 focused struc
 
 ## Latest session notes
 
+- 2026-05-24: Task 170 implementation pass added direct structured-output workflow coverage for unsupported fallback-forbidden session-step/judge failure surfaces, ranked fallback opts preservation, and downstream provider-native source refs; fixed ranked fallback terminal error propagation to retain top-level `:structured-output`; focused tests green (`24 tests, 123 assertions`).
+
 - 2026-05-24: Reviewed task 170 design/plan/steps for ambiguities repeat 7; found no new actionable ambiguity feedback after rechecking task artifacts, current turn-execution contract/aliases, session-step and LLM-judge structured-output paths, workflow structured-output runtime/IR/docs, and task-169/171 AI structured-output surfaces. Existing unchecked implementation steps remain intentional code/docs work. Commit 618b0a78.
 - 2026-05-24: Executed task 170 inconsistency follow-up repeat 6 after no-action review; design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the no-op pass.
 - 2026-05-24: Reviewed task 170 design/plan/steps for ambiguities repeat 6; found no new actionable ambiguity feedback after rechecking task artifacts, current turn-execution contract/aliases, workflow structured-output grammar/IR/docs, and task-169/171 AI structured-output surfaces. Existing unchecked implementation steps remain intentional code/docs work.

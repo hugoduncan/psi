@@ -128,6 +128,7 @@
                :assistant-message (:assistant-message result)
                :assistant-text (:assistant-text result)
                :execution-result (:execution-result result)
+               :structured-output (:structured-output result)
                :failure (if (get-in result [:failure :fallback-worthy?])
                           (exhaustion-failure all-failures)
                           (:failure result))})))))))

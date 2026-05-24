@@ -29,7 +29,10 @@
                 :structured-output {:mode :structured
                                     :schema-id :psi.workflow/bug-reproduction-classification
                                     :schema-version 1
-                                    :strategy :prompted-json
+                                    :strategy :provider-native
+                                    :native-mechanism :openai/chat-completions-json-schema-response-format
+                                    :payload {"next-action" "handoff-to-fix"}
+                                    :raw-payload "{raw}"
                                     :status :valid
                                     :value {:next-action :handoff-to-fix}}})]
       (is (= :handoff-to-fix

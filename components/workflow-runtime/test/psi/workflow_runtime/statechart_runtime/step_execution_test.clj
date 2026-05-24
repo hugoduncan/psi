@@ -1,6 +1,7 @@
 (ns psi.workflow-runtime.statechart-runtime.step-execution-test
   (:require
    [clojure.test :refer [deftest is testing]]
+   [psi.workflow-runtime.execution-adapter :as execution-adapter]
    [psi.workflow-runtime.statechart-runtime.step-execution :as step-execution]
    [psi.workflow-runtime.turn-execution-contract :as turn-execution]))
 
@@ -93,6 +94,112 @@
                                     :strict? true}}
                @turn-opts*))
         (is (= :actor/blocked (:event (first @event-queue*))))))))
+
+(deftest execute-session-step-unsupported-structured-output-blocks-test
+  ;; Tests fallback-forbidden AI strategy failures use the structured blocked
+  ;; workflow surface, preserving machine-readable AI metadata for inspection.
+  (testing "unsupported structured output records a blocked actor result"
+    (let [working-memory* (atom {:current-step-id "classify"})
+          event-queue* (atom [])]
+      (with-redefs [turn-execution/execute-actor-turn!
+                    (fn [_ctx _session-id _prompt _opts]
+                      {:status :error
+                       :assistant-text ""
+                       :execution-result {:execution-result/structured-output
+                                          {:strategy :unsupported
+                                           :reason :unsupported-structured-output
+                                           :resolved-model {:provider "local" :id "fallback-only"}}}
+                       :structured-output {:strategy :unsupported
+                                           :reason :unsupported-structured-output
+                                           :resolved-model {:provider "local" :id "fallback-only"}}
+                       :failure {:reason :unsupported-structured-output
+                                 :message "Resolved model cannot provide native structured output"}})]
+        (step-execution/execute-session-step!
+         {}
+         {:session-id "child-session"}
+         {:name "classify"
+          :type :session
+          :outputs {:classification {:source :session/structured-output
+                                     :mode :structured
+                                     :schema-id :psi.workflow/test-classification
+                                     :schema-version 1
+                                     :schema [:map [:decision [:enum :pass :fail]]]
+                                     :json-schema {:type "object"}
+                                     :require-provider-native? true}}}
+         "classify"
+         "attempt-1"
+         working-memory*
+         event-queue*
+         "Classify"))
+      (let [pending (:pending-actor-result @working-memory*)
+            payload (:payload pending)]
+        (is (= :blocked (:kind pending)))
+        (is (= :blocked (:outcome payload)))
+        (is (= :unsupported-structured-output (get-in payload [:blocked :reason])))
+        (is (= :classification (get-in payload [:blocked :details :output-key])))
+        (is (= {:strategy :unsupported
+                :reason :unsupported-structured-output
+                :resolved-model {:provider "local" :id "fallback-only"}}
+               (get-in payload [:blocked :details :structured-output])))
+        (is (= :actor/blocked (:event (first @event-queue*))))))))
+
+(deftest execute-session-step-ranked-fallback-preserves-structured-output-opts-test
+  ;; Tests ranked model fallback reuses the exact provider-neutral structured
+  ;; output opts for each candidate instead of rebuilding or dropping policy.
+  (testing "ranked fallback preserves structured output opts across candidates"
+    (let [working-memory* (atom {:current-step-id "classify"})
+          event-queue* (atom [])
+          calls* (atom [])
+          set-models* (atom [])
+          adapter (execution-adapter/create
+                   {:set-session-model! (fn [_ctx session-id model _scope]
+                                          (swap! set-models* conj {:session-id session-id
+                                                                   :model model}))})
+          ctx {execution-adapter/adapter-key adapter}]
+      (with-redefs [turn-execution/execute-actor-turn!
+                    (fn [_ctx session-id _prompt opts]
+                      (swap! calls* conj {:session-id session-id :opts opts})
+                      (if (= 1 (count @calls*))
+                        {:status :error
+                         :assistant-text ""
+                         :execution-result nil
+                         :failure {:reason :provider-unavailable
+                                   :message "connection refused"
+                                   :fallback-worthy? true}}
+                        {:status :ok
+                         :assistant-text "{\"decision\":\"pass\"}"
+                         :execution-result nil
+                         :assistant-message nil}))]
+        (step-execution/execute-session-step!
+         ctx
+         {:session-id "child-session"
+          :model-fallback {:type :ranked-model-candidates
+                           :candidates [{:provider "local" :id "first"}
+                                        {:provider "local" :id "second"}]}}
+         {:name "classify"
+          :type :session
+          :outputs {:classification {:source :session/structured-output
+                                     :mode :structured
+                                     :schema-id :psi.workflow/test-classification
+                                     :schema-version 1
+                                     :schema [:map [:decision [:enum :pass :fail]]]
+                                     :json-schema {:type "object"}}}}
+         "classify"
+         "attempt-1"
+         working-memory*
+         event-queue*
+         "Classify"))
+      (let [expected-opts {:structured-output {:schema-id :psi.workflow/test-classification
+                                               :schema-version 1
+                                               :json-schema {:type "object"}
+                                               :strategy-preference :provider-native
+                                               :fallback-allowed? true
+                                               :strict? true}}]
+        (is (= [expected-opts expected-opts] (mapv :opts @calls*)))
+        (is (= [{:session-id "child-session"
+                 :model {:provider "local" :id "second"}}]
+               @set-models*))
+        (is (= :success (get-in @working-memory* [:pending-actor-result :kind])))))))
 
 (deftest execute-session-step-text-output-remains-compatible-test
   (testing "session steps without structured outputs still accept text outputs unchanged"

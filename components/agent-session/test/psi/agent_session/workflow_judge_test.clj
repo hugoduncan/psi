@@ -307,6 +307,44 @@
                                       :strict? true}}
                  @turn-opts*)))))))
 
+(deftest execute-judge-unsupported-structured-output-fails-test
+  ;; Tests fallback-forbidden AI strategy failures for structured judges return
+  ;; the terminal judge failure surface without prose no-match retries.
+  (testing "unsupported structured judge output fails with machine-readable reason"
+    (let [turn-prompts* (atom [])]
+      (with-redefs [psi.session-persistence.core/messages-from-entries-in
+                    (fn [_ctx _sid] [])
+                    psi.workflow-runtime.turn-execution-contract/execute-judge-turn!
+                    (fn [_ctx sid text _opts]
+                      (swap! turn-prompts* conj text)
+                      {:status :error
+                       :session-id sid
+                       :assistant-text ""
+                       :structured-output {:strategy :unsupported
+                                           :reason :unsupported-structured-output
+                                           :resolved-model {:provider "local" :id "fallback-only"}}
+                       :failure {:reason :unsupported-structured-output
+                                 :message "Resolved model cannot provide native structured output"}})]
+        (let [result (workflow-judge/execute-judge!
+                      (structured-judge-test-ctx) "parent-1" "actor-1"
+                      (assoc-in structured-review-judge-spec
+                                [:outputs :review :require-provider-native?]
+                                true)
+                      structured-review-routing-table
+                      {:current-step-id "step-3-review"
+                       :step-order step-order
+                       :step-runs structured-review-step-runs})]
+          (is (nil? (:judge-event result)))
+          (is (= {:action :fail
+                  :reason :unsupported-structured-output
+                  :output-key :review}
+                 (select-keys (:routing-result result) [:action :reason :output-key])))
+          (is (= {:strategy :unsupported
+                  :reason :unsupported-structured-output
+                  :resolved-model {:provider "local" :id "fallback-only"}}
+                 (get-in result [:routing-result :details :structured-output])))
+          (is (= ["Return review JSON"] @turn-prompts*)))))))
+
 (deftest execute-judge-invalid-structured-output-fails-locally-test
   (testing "invalid structured judge output fails locally without prose routing or retry"
     (let [turn-prompts* (atom [])]
