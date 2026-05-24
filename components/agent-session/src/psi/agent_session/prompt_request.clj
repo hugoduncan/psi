@@ -8,6 +8,7 @@
    [psi.ai.model-registry :as model-registry]
    [psi.turn-runtime.request :as turn-request]
    [psi.prompt-assets.prompt-templates :as prompt-templates]
+   [psi.prompt-assets.skills :as prompt-skills]
    [psi.provider-auth.core :as provider-auth]
    [psi.session-state.state :as ss]
    [psi.prompt-assets.system-prompt :as system-prompt]
@@ -188,13 +189,10 @@
 (defn- input-expansion
   [root-state session-data text commands]
   (let [templates (:prompt-templates session-data)
-        skill-id  (some->> text
-                           (re-matches #"/skill:(.+)")
-                           second)]
-    (if-let [skill (some->> skill-id
-                            (skill-storage/find-skill root-state session-data))]
-      {:text      (str (:name skill) " → " (:description skill) " @ " (:file-path skill))
-       :expansion {:kind :skill :name (:name skill)}}
+        skills    (skill-storage/all-skills root-state session-data)]
+    (if-let [skill-result (prompt-skills/invoke-skill skills text)]
+      {:text      (:content skill-result)
+       :expansion {:kind :skill :name (:skill-name skill-result)}}
       (if-let [tpl-result (prompt-templates/invoke-template templates commands text)]
         {:text      (:content tpl-result)
          :expansion {:kind :template :name (:source-template tpl-result)}}
