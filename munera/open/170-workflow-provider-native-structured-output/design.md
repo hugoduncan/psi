@@ -163,6 +163,51 @@ The workflow structured-output envelope keeps `:value` as the only downstream da
 
 Local validation still determines `[:structured-output :status]` and `[:structured-output :value]`. Downstream `{:step ... :output ...}` resolution continues to read only valid `:value`; it must not read `:payload`, `:raw-payload`, `:parsed-value`, `:provider-metadata`, or provider text.
 
+
+## Structured-output failure surfaces
+
+Structured-output request-shaping failures and AI strategy-selection failures must use the existing workflow failure surfaces, with stable machine-readable reasons.
+
+### Session-step failures
+
+For a session step, local request-shaping failures before model generation, invalid structured output after generation, and AI structured-output strategy-selection failures all record a pending actor result with the blocked surface rather than a generic thrown failure:
+
+```edn
+{:kind :blocked
+ :step-id step-id
+ :attempt-id attempt-id
+ :payload
+ {:outcome :blocked
+  :blocked {:reason reason
+            :message message
+            :details details}
+  :outputs outputs}}
+```
+
+Reasons are:
+
+- `:missing-json-schema` when a structured-output spec has a Malli `:schema` but no explicit `:json-schema`. This is detected before model generation. `:details` includes at least `:output-key`, `:schema-id`, and `:schema-version` when available.
+- `:unsupported-structured-output` when the AI layer resolves the model/transport/auth capability and cannot satisfy a fallback-forbidden `:require-provider-native? true` request. `:details` includes `:output-key`, requested strategy/fallback policy, and any AI error data such as resolved model/provider/native mechanism candidates.
+- `:invalid-structured-output` when generation occurred but local Malli parse/coerce/validation rejects the payload. This keeps the task-168 surface and includes the invalid structured-output envelope in `[:blocked :details :structured-output]`.
+
+All three are `:blocked`, not `:failed`, because the workflow cannot safely continue or route, but the run state should preserve an inspectable step result and blocking reason. Runtime exceptions unrelated to the structured-output contract may still use the existing `:failure` path.
+
+### LLM-judge failures
+
+For an LLM judge, request-shaping failures before model generation, invalid structured judge output, and AI structured-output strategy-selection failures return a judge result with `:routing-result {:action :fail ...}`. They do not enter prose no-match retry loops.
+
+```edn
+{:judge-session-id judge-session-id
+ :judge-output {output-key structured-result-or-error-envelope}
+ :judge-event nil
+ :routing-result {:action :fail
+                  :reason reason
+                  :output-key output-key
+                  :details details}}
+```
+
+Reasons mirror session steps: `:missing-json-schema`, `:unsupported-structured-output`, and `:invalid-structured-output`. Invalid structured judge output keeps the existing `:invalid-structured-output` action/fail behavior and adds details sufficient to inspect the structured-output envelope. Missing JSON Schema and unsupported required-native failures are terminal judge failures for the current workflow run; the statechart records them through the existing failed terminal outcome with the judge output and reason, not as `:no-match`.
+
 ## Testing requirements
 
 Focused tests should cover:
