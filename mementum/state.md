@@ -120,7 +120,7 @@ Bootstrapped on 2026-04-02.
 Focused OAuth routing tests ✅. bb tests previously ✅. Task 169 focused structured-output/model tests ✅ (`clojure -M:test --focus psi.ai.providers.openai-structured-output-test --focus psi.ai.providers.anthropic-structured-output-test --focus psi.ai.model-registry-test --focus psi.ai.user-models-test` => 32 tests, 199 assertions). 5 former test errors fixed (commit 0b37b83f: NPE on nil session-file, SOE in git resolvers). Task 158 addressed persistence test garbage (still open but test-review showed no actionable feedback). Task 167 focused Emacs tool-output suite ✅ (`bb emacs:test --focus psi-tool-output-mode-test`, 313/313).
 
 ## Suggested next step
-- Execute task 170 test-shaper follow-up: add success-path session-step and/or LLM-judge tests where bounded turn result top-level `:structured-output` metadata is propagated into the workflow envelope.
+- Task 170 test-shaper follow-up is complete: session-step and LLM-judge success-path tests now prove bounded turn-result top-level `:structured-output` strategy/source/payload metadata is propagated into workflow envelopes; focused workflow tests and clj-kondo green.
 - Backlog: `105-agent-session-component-extraction-map`, `124-turn-execution-contract-extraction`, `149-reload-fixup-inventory-and-safety`, `141`/`144`/`147` workflow items
 
 ## Latest session notes

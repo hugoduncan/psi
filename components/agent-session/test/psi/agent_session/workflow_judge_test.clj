@@ -307,6 +307,49 @@
                                       :strict? true}}
                  @turn-opts*)))))))
 
+(deftest execute-judge-structured-output-success-uses-turn-result-metadata-test
+  ;; Tests successful structured judge envelopes are built from the top-level
+  ;; bounded turn-result :structured-output seam, preserving the actual strategy,
+  ;; source, and payload instead of parsing prose-only output.
+  (testing "structured judge records actual prompted-json metadata and payload from turn result"
+    (let [ai-structured-output {:strategy :prompted-json
+                                :source :prompted-json/text
+                                :fallback-used? true
+                                :payload {"decision" "needs-work"
+                                          "issues" [{"severity" "blocking"
+                                                     "kind" "ambiguity"
+                                                     "description" "unclear"
+                                                     "evidence" "design"
+                                                     "suggested-change" "clarify"}]
+                                          "confidence" 0.7}
+                                :raw-payload "{\"decision\":\"needs-work\"}"}]
+      (with-redefs [psi.session-persistence.core/messages-from-entries-in
+                    (fn [_ctx _sid] [])
+                    psi.workflow-runtime.turn-execution-contract/execute-judge-turn!
+                    (fn [_ctx sid _text _opts]
+                      {:status :ok
+                       :session-id sid
+                       :assistant-text "this prose is not JSON and must not be the source"
+                       :structured-output ai-structured-output
+                       :execution-result {:execution-result/structured-output ai-structured-output}})]
+        (let [result (workflow-judge/execute-judge!
+                      (structured-judge-test-ctx) "parent-1" "actor-1"
+                      structured-review-judge-spec structured-review-routing-table
+                      {:current-step-id "step-3-review"
+                       :step-order step-order
+                       :step-runs structured-review-step-runs})
+              envelope (get-in result [:judge-output :review :structured-output])]
+          (is (= :needs-work (:judge-event result)))
+          (is (= {:action :goto :target "step-2-build"} (:routing-result result)))
+          (is (= :valid (:status envelope)))
+          (is (= :prompted-json (:strategy envelope)))
+          (is (= :prompted-json/text (:source envelope)))
+          (is (true? (:fallback-used? envelope)))
+          (is (= (:payload ai-structured-output) (:payload envelope)))
+          (is (= (:raw-payload ai-structured-output) (:raw-payload envelope)))
+          (is (= :needs-work (get-in envelope [:value :decision])))
+          (is (= :blocking (get-in envelope [:value :issues 0 :severity]))))))))
+
 (deftest execute-judge-unsupported-structured-output-fails-test
   ;; Tests fallback-forbidden AI strategy failures for structured judges return
   ;; the terminal judge failure surface without prose no-match retries.

@@ -191,6 +191,57 @@
         (is (not (get-in @turn-opts* [:structured-output :require-provider-native?])))
         (is (= :actor/blocked (:event (first @event-queue*))))))))
 
+(deftest execute-session-step-success-uses-turn-result-structured-output-metadata-test
+  ;; Tests successful session-step envelopes are built from the authoritative
+  ;; bounded turn-result :structured-output seam rather than assistant prose or
+  ;; helper-level defaults.
+  (testing "session step records actual provider-native strategy metadata and payload from turn result"
+    (let [working-memory* (atom {:current-step-id "classify"})
+          event-queue* (atom [])
+          ai-structured-output {:strategy :provider-native
+                                :native-mechanism :openai/chat-completions-json-schema-response-format
+                                :source :openai/message-content
+                                :payload {"decision" "pass"}
+                                :raw-payload "{\"decision\":\"pass\"}"}]
+      (with-redefs [turn-execution/execute-actor-turn!
+                    (fn [_ctx session-id prompt _opts]
+                      (is (= "child-session" session-id))
+                      (is (= "Classify" prompt))
+                      {:status :ok
+                       :assistant-text "ordinary prose should not be parsed"
+                       :structured-output ai-structured-output
+                       :execution-result {:execution-result/structured-output ai-structured-output}
+                       :assistant-message {:role "assistant"
+                                           :content [{:type :text :text "ordinary prose should not be parsed"}]}})]
+        (step-execution/execute-session-step!
+         {}
+         {:session-id "child-session"}
+         {:name "classify"
+          :type :session
+          :outputs {:classification {:source :session/structured-output
+                                     :mode :structured
+                                     :schema-id :psi.workflow/test-classification
+                                     :schema-version 1
+                                     :schema [:map [:decision [:enum :pass :fail]]]
+                                     :json-schema {:type "object"}}}}
+         "classify"
+         "attempt-1"
+         working-memory*
+         event-queue*
+         "Classify"))
+      (let [pending (:pending-actor-result @working-memory*)
+            classification (get-in pending [:payload :outputs :classification])]
+        (is (= :success (:kind pending)))
+        (is (= :valid (get-in classification [:structured-output :status])))
+        (is (= :provider-native (get-in classification [:structured-output :strategy])))
+        (is (= :openai/chat-completions-json-schema-response-format
+               (get-in classification [:structured-output :native-mechanism])))
+        (is (= :openai/message-content (get-in classification [:structured-output :source])))
+        (is (= {"decision" "pass"} (get-in classification [:structured-output :payload])))
+        (is (= "{\"decision\":\"pass\"}" (get-in classification [:structured-output :raw-payload])))
+        (is (= {:decision :pass} (get-in classification [:structured-output :value])))
+        (is (= :actor/done (:event (first @event-queue*))))))))
+
 (deftest execute-session-step-ranked-fallback-preserves-structured-output-opts-test
   ;; Tests ranked model fallback reuses the exact provider-neutral structured
   ;; output opts for each candidate instead of rebuilding or dropping policy.

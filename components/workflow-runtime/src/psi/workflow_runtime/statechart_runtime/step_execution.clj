@@ -211,7 +211,7 @@
                                                 :structured-output (:structured-output structured-result)}}
                             :outputs raw-outputs}
                            {:outcome :ok
-                            :outputs (merge raw-outputs normalized-outputs)})]
+                            :outputs (merge normalized-outputs raw-outputs)})]
             (record-actor-pending!
              working-memory* event-queue* step-id attempt-id
              (if (= :blocked (:outcome envelope)) :blocked :success)
