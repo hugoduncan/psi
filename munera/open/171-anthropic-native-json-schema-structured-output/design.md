@@ -171,7 +171,7 @@ Streaming extraction:
 8. Prompted JSON fallback still works for fallback-only Anthropic capabilities and reports `:prompted-json`, not provider-native.
 9. Missing JSON Schema still reports unsupported clearly without native fields or fallback prompt injection.
 10. Focused tests cover JSON Schema native request shape, strategy metadata, response extraction, streaming event behavior, forced-tool separation, fallback, and unsupported paths.
-11. A live Anthropic OAuth smoke test verifies the documented JSON Schema path when a token is available; results are recorded without secrets.
+11. A guarded live Anthropic smoke test verifies the documented JSON Schema native path when an effective credential is available through the Anthropic provider `:api-key`/`ANTHROPIC_API_KEY` seam; OAuth is acceptable only when supplied through that same seam, and results are recorded without secrets.
 12. Documentation explains Anthropic's three distinct paths: JSON Schema native output, forced/strict tool schema use, and prompted JSON fallback.
 
 ## Testing notes
