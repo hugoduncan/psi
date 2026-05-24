@@ -52,7 +52,7 @@ In scope:
    - prompted JSON fallback only;
    - unsupported.
 3. Capability selection is transport-aware. Public OpenAI platform APIs and ChatGPT/Codex backend APIs are not treated as interchangeable unless verified by tests or live capability checks.
-4. LLM request options can include a structured-output contract containing at least schema identity/version and a JSON-Schema-compatible schema payload or converted schema.
+4. LLM request options can include a structured-output contract containing at least schema identity/version and an explicit `:json-schema` payload supplied by the caller. AI adapters do not convert Malli/domain `:schema` to JSON Schema in this slice.
 5. OpenAI capable paths include the provider-native structured-output fields in the outbound request and report `:provider-native` as the used strategy.
 6. Anthropic capable paths include a forced synthetic tool call or equivalent native mechanism using `input_schema`, and report `:provider-native` as the used strategy.
 7. Unsupported paths do not pretend to use native enforcement. They either fall back to prompted JSON when allowed or report unsupported clearly.
@@ -66,7 +66,7 @@ In scope:
 - Do not mark a request as `:provider-native` unless the outbound API request actually carried a provider-native schema constraint.
 - Keep model descriptions declarative. Adapter code should consume capabilities rather than encode large hard-coded provider conditionals wherever avoidable.
 - Preserve current working ChatGPT OAuth/Codex behavior for `openai/gpt-5.5` unless native structured output support is verified for that backend.
-- Convert Malli/domain schemas to provider-compatible JSON Schema at the API boundary. Keep the workflow/runtime schema authority in Psi domain terms.
+- Require caller-supplied `:json-schema` as the provider-bound schema source. Keep Malli/domain `:schema` as optional metadata only; conversion to provider-compatible JSON Schema remains outside task 169.
 - Always keep local parse/coerce/validate as the final authority before structured data is exposed downstream.
 - Make the actual strategy used observable in request result metadata or an equivalent traceable surface.
 

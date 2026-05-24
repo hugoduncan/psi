@@ -168,3 +168,7 @@ Completed the newly added ambiguity follow-up without executing implementation `
 ## 2026-05-23 — inconsistency review repeat 9
 
 Found one new actionable inconsistency: the finalized request contract and plan require explicit request `:json-schema` and say AI adapters do not convert Malli/domain `:schema` in task 169, but `design.md` still says request options may carry a JSON-Schema payload "or converted schema" and the design constraints still say to convert Malli/domain schemas to provider-compatible JSON Schema at the API boundary. Align those older acceptance/constraint statements with the explicit-`:json-schema` source contract.
+
+## 2026-05-23 — executed inconsistency follow-up repeat 9
+
+Completed the newly added inconsistency follow-up without executing implementation `steps.md` work. Aligned the remaining `design.md` acceptance and design-constraint wording with the finalized explicit-`:json-schema` request contract: callers must supply provider-bound `:json-schema`, `:schema` is metadata only, and AI adapters do not convert Malli/domain schemas in task 169. Marked the design-step done.
