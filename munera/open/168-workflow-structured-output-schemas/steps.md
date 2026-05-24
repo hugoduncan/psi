@@ -16,4 +16,4 @@
 - [x] Add IR semantic-validation tests for rejecting multiple structured-output entries on one session step or LLM judge, and for rejecting known reusable schema id/version declarations whose inline schema does not match the exported schema.
 - [x] Add structured judge tests for invalid structured output failing locally without prose routing, and for a schema-valid negative `:decision` (for example `:needs-work`) driving the expected non-clear branch.
 - [x] Add downstream structured source-ref tests for clear failure on missing `:path` fields and on `:path` references against a non-structured source output.
-- [ ] Add a focused structured-output boundary test proving syntactically valid non-object JSON (for example an array or scalar) is rejected as an invalid single-JSON-object envelope and records the parsed value/errors without exposing `:value`.
+- [x] Add a focused structured-output boundary test proving syntactically valid non-object JSON (for example an array or scalar) is rejected as an invalid single-JSON-object envelope and records the parsed value/errors without exposing `:value`.

@@ -89,3 +89,7 @@ Completed newly added test-review follow-ups: added text-mode session compatibil
 ## 2026-05-23 — test-shaper review
 
 Found one new actionable test-shaping issue: prompted JSON tests cover malformed JSON and schema-invalid objects, but not syntactically valid non-object JSON. The single-JSON-object boundary should have a focused boundary test proving arrays/scalars are rejected with an invalid envelope rather than treated as schema failures or valid structured values.
+
+## 2026-05-23 — test-shaper follow-up
+
+Completed the newly added structured-output boundary test: syntactically valid non-object JSON arrays and scalars are rejected at the single-JSON-object envelope boundary with `:status :invalid`, parsed value retained for debugging, parse-error recorded, and no exposed `:value`. Focused verification green: `clojure -M:test --focus psi.workflow-runtime.structured-output-test`.

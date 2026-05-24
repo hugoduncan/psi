@@ -61,6 +61,23 @@
       (is (seq (get-in result [:structured-output :errors])))
       (is (not (contains? (:structured-output result) :value))))))
 
+(deftest structured-output-envelope-non-object-json-test
+  ;; Tests the prompted JSON boundary: syntactically valid JSON must still be a
+  ;; single object envelope, not an array/scalar value passed to schema checks.
+  (testing "valid non-object JSON is rejected as an invalid structured envelope"
+    (doseq [[raw parsed] [["[1,2,3]" [1 2 3]]
+                          ["42" 42]
+                          ["\"text\"" "text"]]]
+      (let [result (structured-output/output-result classification-output-spec raw)]
+        (is (= :invalid (get-in result [:structured-output :status])) raw)
+        (is (= :prompted-json (get-in result [:structured-output :strategy])) raw)
+        (is (= parsed (get-in result [:structured-output :parsed-value])) raw)
+        (is (= [{:type :parse-error
+                 :message "Structured output must be a single JSON object"}]
+               (get-in result [:structured-output :errors]))
+            raw)
+        (is (not (contains? (:structured-output result) :value)) raw)))))
+
 (deftest reusable-judge-review-result-schema-test
   ;; Tests the first reusable workflow structured-output schema exported by the
   ;; runtime and referenced by schema id/version.
