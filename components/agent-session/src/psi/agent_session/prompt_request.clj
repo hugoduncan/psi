@@ -191,8 +191,8 @@
         skill-id  (some->> text
                            (re-matches #"/skill:(.+)")
                            second)]
-    (if-let [skill (some-> skill-id
-                           (skill-storage/find-skill root-state session-data))]
+    (if-let [skill (some->> skill-id
+                            (skill-storage/find-skill root-state session-data))]
       {:text      (str (:name skill) " → " (:description skill) " @ " (:file-path skill))
        :expansion {:kind :skill :name (:name skill)}}
       (if-let [tpl-result (prompt-templates/invoke-template templates commands text)]

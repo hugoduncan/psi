@@ -62,7 +62,7 @@
 
 (defn find-skill
   [ctx skills skill-name]
-  ((required-op ctx :find-skill) skills skill-name))
+  ((required-op ctx :find-skill) ctx skills skill-name))
 
 (defn set-session-model!
   ([ctx session-id model]

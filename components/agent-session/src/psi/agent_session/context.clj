@@ -172,7 +172,8 @@
     :prompt-execution-result! (:workflow-prompt-execution-result-fn ctx)
     :get-session-data (:get-session-data-fn ctx)
     :list-context-sessions (:list-context-sessions-fn ctx)
-    :find-skill (:find-skill-fn ctx)
+    :find-skill (fn [adapter-ctx session-skills skill-name]
+                  ((:find-skill-fn ctx) adapter-ctx session-skills skill-name))
     :set-session-model! (fn [ctx session-id model scope]
                           (dispatch/dispatch! ctx :session/set-model
                                               (cond-> {:session-id session-id :model model}
@@ -206,13 +207,14 @@
    :resume-and-execute-workflow-run-fn #'workflow-execution/resume-and-execute-run!
    :get-session-data-fn #'ss/get-session-data-in
    :list-context-sessions-fn #'ss/list-context-sessions-in
-   :find-skill-fn (fn [ctx skills skill-name]
-                    (let [skill-ids (mapv :name (or skills []))]
-                      (or (some (fn [skill]
-                                  (when (= skill-name (:name skill))
-                                    skill))
-                                skills)
-                          (skill-storage/find-skill @(:state* ctx) {:skill-ids skill-ids} skill-name))))
+   :find-skill-fn (fn [ctx session-skills skill-name]
+                    (or (some (fn [skill]
+                                (when (= skill-name (:name skill))
+                                  skill))
+                              session-skills)
+                        (skill-storage/find-skill @(:state* ctx)
+                                                  {:skill-ids (mapv :name (or session-skills []))}
+                                                  skill-name)))
    :resolve-workflow-step-session-config-fn #'workflow-step-session-config/resolve-step-session-config
    :materialize-workflow-step-session-conversation-fn #'workflow-step-materialization/materialize-step-session-conversation
    :split-workflow-step-session-conversation-fn #'workflow-step-materialization/split-step-session-conversation
