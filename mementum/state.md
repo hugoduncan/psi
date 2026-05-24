@@ -15,6 +15,8 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-24: Reviewed task 170 with test-shaper; found one actionable success-path seam coverage gap: no session-step or LLM-judge execution test feeds top-level bounded turn-result `:structured-output` success metadata and asserts the workflow envelope records actual strategy/source/payload from that seam. Added follow-up step.
+
 - 2026-05-24: Reviewed task 170 implementation with task-implementation-review; found one actionable gap: unsupported structured-output strategies (`:fallback-not-allowed` / unsupported capability) can still proceed to ordinary provider prose generation instead of terminal `:unsupported-structured-output` failure before generation. Added follow-up step.
 
 - 2026-05-24: Closed tasks 169 and 171 after implementation/review. Task 169 provides model/provider structured-output capabilities; task 171 adds live-verified Anthropic JSON Schema native output. Remaining adjacent workflow adoption is task 170.
@@ -118,7 +120,7 @@ Bootstrapped on 2026-04-02.
 Focused OAuth routing tests ✅. bb tests previously ✅. Task 169 focused structured-output/model tests ✅ (`clojure -M:test --focus psi.ai.providers.openai-structured-output-test --focus psi.ai.providers.anthropic-structured-output-test --focus psi.ai.model-registry-test --focus psi.ai.user-models-test` => 32 tests, 199 assertions). 5 former test errors fixed (commit 0b37b83f: NPE on nil session-file, SOE in git resolvers). Task 158 addressed persistence test garbage (still open but test-review showed no actionable feedback). Task 167 focused Emacs tool-output suite ✅ (`bb emacs:test --focus psi-tool-output-mode-test`, 313/313).
 
 ## Suggested next step
-- Judge/review task 170 after executing task-test-review follow-up: all task steps are checked; focused turn-runtime/workflow structured-output/session-step/judge tests are green (`30 tests, 157 assertions`).
+- Execute task 170 test-shaper follow-up: add success-path session-step and/or LLM-judge tests where bounded turn result top-level `:structured-output` metadata is propagated into the workflow envelope.
 - Backlog: `105-agent-session-component-extraction-map`, `124-turn-execution-contract-extraction`, `149-reload-fixup-inventory-and-safety`, `141`/`144`/`147` workflow items
 
 ## Latest session notes
