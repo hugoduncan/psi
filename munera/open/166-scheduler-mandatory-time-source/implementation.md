@@ -137,3 +137,12 @@
 ## 2026-05-24 test-shaper review
 - Reviewed test-shaper skill, task artifacts, scheduler handler/psi-tool/effect/lifecycle tests, test support time-source helpers, scheduler wall-clock scan, and focused proof subset (`scheduler-handlers`, `psi-tool-scheduler`, `scheduler-effects`: 11 tests, 168 assertions, 0 failures).
 - New actionable test-shaping feedback: `scheduler-lifecycle-test` exercises `:scheduler/deliver`/`:scheduler/drain-queue` without explicit `:delivered-at` while using the production scheduler time source, leaving scheduled user-message timestamps uncontrolled and unasserted in integration coverage.
+
+## 2026-05-24 test-shaper follow-up execution
+- Used the preloaded test-shaper result and completed the newly added follow-up item.
+- Updated scheduler lifecycle integration coverage to install deterministic `:scheduler-time-source` values for delivery/drain paths that omit explicit `:delivered-at`.
+- Asserted canonical scheduled delivery stamps the scheduled user message with the supplied deterministic source instant.
+- Asserted queued drain handler output stamps scheduled user messages from an advanceable deterministic scheduler time source across successive drains.
+- Marked the follow-up checklist item complete in `steps.md`.
+- Focused lifecycle proof passed: `clojure -M:test --focus psi.agent-session.scheduler-lifecycle-test` => 3 tests, 26 assertions, 0 failures.
+- Full scheduler proof passed: `clojure -M:test --focus psi.agent-session.scheduler-test --focus psi.agent-session.scheduler-handlers-test --focus psi.agent-session.psi-tool-scheduler-test --focus psi.agent-session.scheduler-timer-seam-test --focus psi.agent-session.scheduler-effects-test --focus psi.agent-session.scheduler-end-to-end-test --focus psi.agent-session.scheduler-background-jobs-test --focus psi.agent-session.scheduler-resolvers-test --focus psi.agent-session.scheduler-tools-test --focus psi.agent-session.scheduler-lifecycle-test --focus psi.agent-session.scheduler-cancel-job-test --focus psi.agent-session.scheduler-context-shutdown-test --focus psi.agent-session.scheduler-dispatch-test` => 34 tests, 348 assertions, 0 failures.
