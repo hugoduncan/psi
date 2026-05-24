@@ -201,6 +201,51 @@ For streaming calls, emit the same metadata in an early stream event after `:sta
 
 If the existing stream event schema makes a new event type too broad, the equivalent traceable surface may be a provider-capture/request metadata callback, but the implementation must document how callers read it. `:provider-native` is emitted only after the outbound request body actually includes the native schema constraint. Fallback-only requests emit `:prompted-json` when fallback is allowed. No-fallback unsupported requests emit or return `:unsupported` with a reason and must fail clearly rather than silently weakening the contract. `:repair-parse` is reserved for a later repair layer and should not be reported unless that layer actually ran.
 
+## Structured payload result surface
+
+Provider adapters expose provider-extracted structured payloads separately from ordinary assistant text and tool calls. The payload surface is AI-owned extraction metadata, not the final validated workflow output.
+
+For non-streaming calls, the provider result includes or is associated with structured-output metadata shaped as:
+
+```edn
+{:structured-output
+ {:strategy :provider-native
+  :native-mechanism :anthropic/forced-tool-use
+  :schema-id :psi.workflow/judge-review-result
+  :schema-version 1
+  :fallback-used? false
+  :payload {:ok? true ...}        ;; provider-extracted structured value when available
+  :raw-payload {:ok true ...}     ;; optional uncoerced provider value when distinct
+  :source :anthropic/tool-use}}    ;; e.g. :openai/message-json or :prompted-json/text
+```
+
+For OpenAI Chat Completions JSON Schema response format, the payload is parsed from the assistant message content generated under the provider-native response format and attached at `[:structured-output :payload]` when extraction succeeds. The ordinary assistant text remains available for diagnostics/raw transcript needs, but downstream structured consumers read the extracted payload field rather than reparsing provider-specific message shapes.
+
+For Anthropic forced tool use, the matching synthetic structured-output `tool_use` block's `input` becomes `[:structured-output :payload]`, with `:source :anthropic/tool-use`. That synthetic tool use is removed from the ordinary assistant tool-call surface. Only non-synthetic tool calls remain visible as assistant tool calls; a response that lacks the forced synthetic tool, or returns some other selected tool while forced choice was requested, is reported as a provider anomaly/unsupported structured-output extraction according to existing error handling.
+
+For streaming calls, emit a traceable structured-output event when the extraction result is known:
+
+```edn
+{:type :structured-output-result
+ :structured-output
+ {:strategy :provider-native
+  :native-mechanism :anthropic/forced-tool-use
+  :schema-id :psi.workflow/judge-review-result
+  :schema-version 1
+  :payload {...}
+  :source :anthropic/tool-use}}
+```
+
+The earlier strategy metadata event may still be emitted before deltas. The result event carries the extracted payload and may arrive near completion because Anthropic tool blocks and OpenAI message content are only complete at the end of the provider response. If adding a stream event type is too broad, the implementation must provide an equivalent documented callback/capture surface with the same fields.
+
+## AI/workflow validation boundary
+
+This task makes AI adapters responsible for request construction, native strategy selection, provider-specific extraction, synthetic-tool filtering, and explicit strategy/result metadata. It does not make AI adapters the final schema authority.
+
+AI adapters may parse JSON and may perform minimal shape checks needed to extract provider payloads safely, but they should not expose provider-native output as trusted workflow data merely because the provider accepted a schema. Malli coercion and final validation remain runtime/workflow responsibilities, completed in task 168 and wired to provider-native extraction in task 170.
+
+If an adapter implements a small Malli-to-JSON-Schema conversion or extraction-time parse helper in this slice, failures are reported as extraction/request errors or `:unsupported` strategy reasons. Successful extraction records raw/extracted payload plus strategy metadata; validated/coerced domain values are produced only by the caller/runtime validation layer before downstream workflow references can read them.
+
 ## Testing requirements
 
 Focused tests should prove:

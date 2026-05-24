@@ -19,3 +19,8 @@ No newly added unchecked `design-steps.md` items existed after the inconsistency
 ## 2026-05-23 — ambiguity review repeat
 
 Found actionable ambiguity feedback: the design does not specify the concrete AI result/event surface for provider-extracted structured payloads. In particular, Anthropic synthetic tool input must be hidden from ordinary tool-call output, but the task does not say where that payload appears for non-streaming results or streaming callers. The local-validation requirement is also ambiguous for this AI-only slice: the artifacts should state whether the AI component validates/coerces against the request schema itself or only returns extracted/raw structured payload plus strategy metadata for the workflow/runtime layer to validate in task 170.
+
+
+## 2026-05-23 — executed ambiguity follow-ups repeat
+
+Completed the newly added ambiguity follow-ups without executing implementation `steps.md` work. Updated `design.md` to define the provider-extracted structured payload surface as `[:structured-output :payload]` for non-streaming results and `:structured-output-result` streaming events or equivalent captures, with Anthropic synthetic `tool_use` input hidden from ordinary assistant tool calls. Clarified the AI/workflow validation boundary: AI adapters select native strategy, build requests, extract raw/provider payloads, and report metadata; workflow/runtime validation remains the final authority before downstream structured values are exposed. Updated `plan.md` and `steps.md` to reflect the payload surface and validation boundary. Marked the ambiguity `design-steps.md` items done.
