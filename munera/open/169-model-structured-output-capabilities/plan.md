@@ -33,7 +33,7 @@ Likely tests:
 
 1. Add declarative structured-output capability schemas and model/user-model validation.
 2. Add request option validation/helpers for `:structured-output` and JSON-Schema-compatible payloads.
-3. Add strategy selection helper that consumes model capability plus request fallback policy and returns one of `:provider-native`, `:prompted-json`, or `:unsupported` with a reason.
+3. Add strategy selection helper that consumes model capability plus request fallback policy and returns one of `:provider-native`, `:prompted-json`, or `:unsupported` with a reason. Treat `:supported?` as "at least one declared structured-output path exists," not as provider-native support; fallback-only models are supported only when the request allows fallback, while `:supported? false` always selects `:unsupported`.
 4. Wire OpenAI Chat Completions provider-native request construction via `response_format` JSON Schema only when model capability declares `:openai/chat-completions-json-schema-response-format`.
 5. Preserve Codex Responses fallback-only behavior: no unverified public OpenAI schema fields on `:openai-codex-responses`.
 6. Wire Anthropic forced synthetic tool use via `tools` + `tool_choice`, then extract the synthetic tool input as `[:structured-output :payload]` while excluding it from ordinary assistant tool calls.

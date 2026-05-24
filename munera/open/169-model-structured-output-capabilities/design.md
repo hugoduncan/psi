@@ -117,6 +117,33 @@ For a fallback-only or unknown transport:
    :notes "Do not assume public OpenAI Responses API fields are supported."}}}
 ```
 
+For a model or transport that should not accept structured-output requests at all:
+
+```edn
+{:capabilities
+ {:structured-output
+  {:supported? false
+   :strategies []
+   :native-mechanism nil
+   :notes "Structured-output requests are not supported for this model/transport."}}}
+```
+
+## Capability semantics
+
+`:supported?` means the model description declares at least one structured-output request path that Psi may intentionally use for this model/transport. It is not synonymous with provider-native enforcement. Provider-native support is present only when `:strategies` contains `:provider-native` and `:native-mechanism` names the concrete provider mechanism.
+
+Fallback-only models set `:supported? true`, `:strategies [:prompted-json]`, and `:native-mechanism nil`. They can satisfy a structured-output request only when the request permits fallback. If `:fallback-allowed? false` is requested against a fallback-only model, request-time strategy selection returns `:unsupported` with a clear reason; the model description itself remains fallback-capable rather than globally unsupported.
+
+Unsupported models set `:supported? false`, `:strategies []`, and `:native-mechanism nil`. Strategy selection returns `:unsupported` regardless of fallback policy, because the model/provider description does not declare any acceptable structured-output path.
+
+Request-time support is therefore the combination of the model capability declaration and the request fallback policy:
+
+- native-capable + native request => `:provider-native`;
+- native-capable + fallback allowed but native unavailable for the concrete transport/schema => `:prompted-json` only when listed in `:strategies`;
+- fallback-only + fallback allowed => `:prompted-json`;
+- fallback-only + fallback disallowed => `:unsupported`;
+- unsupported capability => `:unsupported`.
+
 ## Request contract
 
 The LLM request path should support a structured-output option equivalent to:

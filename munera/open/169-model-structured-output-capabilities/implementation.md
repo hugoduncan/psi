@@ -52,3 +52,8 @@ No newly added unchecked `design-steps.md` items existed after the preloaded inc
 ## 2026-05-23 — ambiguity review repeat 3
 
 Found one new actionable ambiguity: the capability shape uses `:supported? true` for fallback-only structured output while the acceptance criteria also list `:unsupported`, but the artifacts do not define whether `:supported?` means any structured-output path (including prompted JSON), provider-native support only, or request-time support under the requested fallback policy. This should be explicit so model/user-model validation, strategy selection, and documentation do not interpret fallback-only models differently.
+
+
+## 2026-05-23 — executed ambiguity follow-up repeat 3
+
+Completed the newly added ambiguity follow-up without executing implementation `steps.md` work. Clarified that `:supported?` means at least one declared structured-output request path exists, not provider-native support; provider-native requires `:strategies` to include `:provider-native` plus a concrete `:native-mechanism`. Fallback-only models use `:supported? true` with `[:prompted-json]` and become request-time `:unsupported` when fallback is disallowed. Globally unsupported models use `:supported? false`, empty strategies, and always select `:unsupported`. Updated `plan.md` and `steps.md` to carry the same strategy-selection semantics. Marked the ambiguity design-step done.
