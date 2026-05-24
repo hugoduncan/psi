@@ -121,6 +121,8 @@ Focused OAuth routing tests ✅. bb tests previously ✅. Task 169 focused struc
 
 ## Latest session notes
 
+- 2026-05-24: Task 170 implementation pass completed remaining persisted/replay metadata behavior coverage. Provider-native structured-output envelopes are now proven preserved exactly in accepted result state, latest attempt result envelope, and workflow history; all implementation steps checked; focused workflow tests green (`31 tests, 148 assertions`).
+
 - 2026-05-24: Task 170 implementation pass added direct structured-output workflow coverage for unsupported fallback-forbidden session-step/judge failure surfaces, ranked fallback opts preservation, and downstream provider-native source refs; fixed ranked fallback terminal error propagation to retain top-level `:structured-output`; focused tests green (`24 tests, 123 assertions`).
 
 - 2026-05-24: Reviewed task 170 design/plan/steps for ambiguities repeat 7; found no new actionable ambiguity feedback after rechecking task artifacts, current turn-execution contract/aliases, session-step and LLM-judge structured-output paths, workflow structured-output runtime/IR/docs, and task-169/171 AI structured-output surfaces. Existing unchecked implementation steps remain intentional code/docs work. Commit 618b0a78.

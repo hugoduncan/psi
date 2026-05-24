@@ -72,6 +72,39 @@
       (is (= :succeeded (get-in run [:step-runs "plan" :attempts 0 :status])))
       (is (= :running (:status run))))))
 
+(deftest record-step-result-preserves-structured-output-metadata-test
+  ;; Tests persisted workflow run state stores the workflow structured-output
+  ;; envelope exactly, including provider strategy metadata, so replay/source
+  ;; resolution can inspect accepted results without re-running model generation.
+  (testing "accepted result, latest attempt, and history preserve structured-output metadata"
+    (let [[state run-id] (base-state-with-run)
+          structured-result {:raw-output nil
+                             :structured-output {:mode :structured
+                                                 :schema-id :psi.workflow/bug-reproduction-classification
+                                                 :schema-version 1
+                                                 :strategy :provider-native
+                                                 :native-mechanism :openai/chat-completions-json-schema-response-format
+                                                 :source :openai/message-content
+                                                 :fallback-used? false
+                                                 :payload {"next-action" "handoff-to-fix"}
+                                                 :raw-payload "{raw}"
+                                                 :status :valid
+                                                 :value {:next-action :handoff-to-fix}}}
+          envelope {:outcome :ok
+                    :outputs {:classification structured-result}}
+          state' (-> state
+                     (workflow-recording/start-latest-attempt run-id "plan")
+                     (workflow-recording/record-step-result run-id "plan" envelope))
+          run (get-in state' [:workflows :runs run-id])]
+      (is (= structured-result
+             (get-in run [:step-runs "plan" :accepted-result :outputs :classification])))
+      (is (= structured-result
+             (get-in run [:step-runs "plan" :attempts 0 :result-envelope :outputs :classification])))
+      (is (= structured-result
+             (get-in (last (:history run))
+                     [:data :envelope :outputs :classification])))
+      (is (true? (workflow-model/valid-workflow-run? run))))))
+
 (deftest record-actor-result-test
   (testing "record-actor-result remains an explicit alias for judged-step success recording"
     (let [[state run-id] (base-state-with-run)
