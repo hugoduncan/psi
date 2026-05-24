@@ -436,8 +436,14 @@
                                        [{:name "read" :description "Read" :parameters {:type "object" :properties {}}}])
                            s (assoc-in s [:agent-session :sessions session-id :data :system-prompt-build-opts]
                                        {:selected-tools ["read" "psi-tool"]})
+                           s (assoc-in s [:agent-session :sessions session-id :data :prompt-contribution-ids]
+                                       [(:id contribution)])
                            s (assoc-in s [:agent-session :sessions session-id :data :prompt-contributions]
-                                       [contribution])]
+                                       [contribution])
+                           s (assoc-in s [:root-registries :prompt-contributions :entries-by-id (:id contribution)]
+                                       {:id (:id contribution)
+                                        :extension-id (:ext-path contribution)
+                                        :value contribution})]
                        s)))]
       (with-redefs [psi.agent-session.turn/prompt-execution-result-in! (fn [_ctx _child-session-id _prompt]
                                                                          {:execution-result/assistant-message
@@ -482,13 +488,24 @@
                            (assoc-in [:agent-session :sessions session-id :data :tool-defs]
                                      [{:name "read" :description "Read"}
                                       {:name "bash" :description "Bash"}])
+                           (assoc-in [:agent-session :sessions session-id :data :prompt-contribution-ids]
+                                     ["a"])
                            (assoc-in [:agent-session :sessions session-id :data :prompt-contributions]
                                      [{:id "a"
                                        :ext-path "/ext/a"
                                        :content "A"
                                        :enabled true
                                        :created-at (java.time.Instant/parse "2026-04-22T12:00:00Z")
-                                       :updated-at (java.time.Instant/parse "2026-04-22T12:00:00Z")}])))))]
+                                       :updated-at (java.time.Instant/parse "2026-04-22T12:00:00Z")}])
+                           (assoc-in [:root-registries :prompt-contributions :entries-by-id "a"]
+                                     {:id "a"
+                                      :extension-id "/ext/a"
+                                      :value {:id "a"
+                                              :ext-path "/ext/a"
+                                              :content "A"
+                                              :enabled true
+                                              :created-at (java.time.Instant/parse "2026-04-22T12:00:00Z")
+                                              :updated-at (java.time.Instant/parse "2026-04-22T12:00:00Z")}})))))]
       (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
                     (fn [_ctx _child-session-id _prompt]
                       {:execution-result/assistant-message
