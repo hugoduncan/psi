@@ -80,6 +80,44 @@
         (is (= raw-output (get-in payload [:outputs :final-llm-reply])))
         (is (= :actor/blocked (:event (first @event-queue*))))))))
 
+(deftest execute-session-step-text-output-remains-compatible-test
+  (testing "session steps without structured outputs still accept text outputs unchanged"
+    (let [working-memory* (atom {:current-step-id "summarize"})
+          event-queue* (atom [])
+          raw-output "plain human summary"]
+      (with-redefs [turn-execution/execute-actor-turn!
+                    (fn [_ctx session-id prompt]
+                      (is (= "child-session" session-id))
+                      (is (= "Summarize" prompt))
+                      {:status :ok
+                       :assistant-text raw-output
+                       :execution-result nil
+                       :assistant-message {:role "assistant"
+                                           :content [{:type :text :text raw-output}]}})]
+        (step-execution/execute-session-step!
+         {}
+         {:session-id "child-session"}
+         {:name "summarize"
+          :type :session
+          :outputs {:final-llm-reply {:source :session/final-llm-reply}
+                    :transcript {:source :session/transcript}}
+          :yields {:type :text :text :final-llm-reply}}
+         "summarize"
+         "attempt-1"
+         working-memory*
+         event-queue*
+         "Summarize"))
+      (let [pending (:pending-actor-result @working-memory*)
+            payload (:payload pending)]
+        (is (= :success (:kind pending)))
+        (is (= :ok (:outcome payload)))
+        (is (= raw-output (get-in payload [:outputs :final-llm-reply])))
+        (is (= raw-output (get-in payload [:outputs :text])))
+        (is (= [{:role "assistant" :content [{:type :text :text raw-output}]}]
+               (get-in payload [:outputs :transcript])))
+        (is (string? (get-in payload [:outputs :final-llm-reply])))
+        (is (= :actor/done (:event (first @event-queue*))))))))
+
 (deftest assistant-message-text-test
   (testing "assistant-message-text delegates to turn-execution-contract"
     (is (= "hello world"

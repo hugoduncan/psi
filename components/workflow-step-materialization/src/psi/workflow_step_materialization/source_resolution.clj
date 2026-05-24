@@ -14,7 +14,10 @@
    [clojure.string :as str]
    [malli.core :as m]
    [psi.workflow-runtime.model :as workflow-model]
-   [psi.workflow-step-materialization.semantics :as semantics]))
+   [psi.workflow-step-materialization.semantics :as semantics]
+   [psi.workflow-step-materialization.structured-output :as structured-output]))
+
+(def ^:private missing-path ::missing-path)
 
 (defn get-path*
   [m path]
@@ -23,6 +26,24 @@
               (get acc k)))
           m
           path))
+
+(defn- get-path-sentinel
+  [m path]
+  (reduce (fn [acc k]
+            (cond
+              (= missing-path acc) missing-path
+              (map? acc) (get acc k missing-path)
+              (vector? acc) (get acc k missing-path)
+              :else missing-path))
+          m
+          path))
+
+(defn- path-output-spec
+  [workflow-run source-spec]
+  (let [from (:from source-spec)]
+    (when (and (map? from) (:output from))
+      (get-in (semantics/effective-step-def workflow-run (:step from))
+              [:outputs (:output from)]))))
 
 (defn source-spec?
   [x]
@@ -68,7 +89,25 @@
                         {:source-spec source-spec}))
 
         (seq path)
-        (get-path* base path)
+        (let [output-spec (path-output-spec workflow-run source-spec)
+              path-value (get-path-sentinel base path)]
+          (if (= missing-path path-value)
+            (cond
+              (structured-output/structured-output-spec? output-spec)
+              (throw (ex-info "Workflow structured output path is missing"
+                              {:type :missing-structured-output-path
+                               :source-spec source-spec
+                               :path path}))
+
+              (and output-spec (some? base) (not (coll? base)))
+              (throw (ex-info "Workflow source output is not structured"
+                              {:type :non-structured-output-path
+                               :source-spec source-spec
+                               :path path
+                               :output-spec output-spec}))
+
+              :else nil)
+            path-value))
 
         (some? projection)
         (semantics/project-source-value base projection)

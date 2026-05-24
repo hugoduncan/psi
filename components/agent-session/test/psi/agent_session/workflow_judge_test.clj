@@ -233,49 +233,102 @@
       (is (= :psi.agent-session.workflow-judge/execute-judge!
              (:caller (ex-data ex)))))))
 
+(def structured-review-judge-spec
+  {:type :llm
+   :session {:contributions [{:type :template
+                              :text "Return review JSON"
+                              :vars {}}]}
+   :outputs {:review {:source :judge/structured-output
+                      :mode :structured
+                      :schema-id :psi.workflow/judge-review-result
+                      :schema-version 1
+                      :schema [:map
+                               [:decision [:enum :clear :needs-work :unclear]]
+                               [:issues [:vector [:map
+                                                  [:severity [:enum :blocking :minor]]
+                                                  [:kind [:enum :ambiguity :inconsistency :missing-acceptance :scope-drift]]
+                                                  [:description :string]
+                                                  [:evidence :string]
+                                                  [:suggested-change :string]]]]
+                               [:confidence [:double {:min 0.0 :max 1.0}]]]}}
+   :projection :none})
+
+(defn- structured-judge-test-ctx []
+  {workflow-execution-adapter/adapter-key
+   (workflow-execution-adapter/create
+    {:create-child-session! (fn [_ctx _parent opts]
+                              {:psi.agent-session/session-id (:child-session-id opts)})})})
+
+(def structured-review-routing-table
+  {:clear {:goto :done}
+   :needs-work {:goto "step-2-build" :max-iterations 3}})
+
+(def structured-review-step-runs
+  {"step-2-build" {:step-id "step-2-build" :attempts [] :iteration-count 1}
+   "step-3-review" {:step-id "step-3-review" :attempts [] :iteration-count 1}})
+
 (deftest execute-judge-structured-output-test
   ;; Tests LLM judges can return a schema-validated local structured output and
   ;; route from its explicit decision field without prose matching.
   (testing "structured judge output validates and routes by decision"
-    (let [ctx {workflow-execution-adapter/adapter-key
-               (workflow-execution-adapter/create
-                {:create-child-session! (fn [_ctx _parent opts]
-                                          {:psi.agent-session/session-id (:child-session-id opts)})})}
-          judge-spec {:type :llm
-                      :session {:contributions [{:type :template
-                                                 :text "Return review JSON"
-                                                 :vars {}}]}
-                      :outputs {:review {:source :judge/structured-output
-                                         :mode :structured
-                                         :schema-id :psi.workflow/judge-review-result
-                                         :schema-version 1
-                                         :schema [:map
-                                                  [:decision [:enum :clear :needs-work :unclear]]
-                                                  [:issues [:vector [:map
-                                                                     [:severity [:enum :blocking :minor]]
-                                                                     [:kind [:enum :ambiguity :inconsistency :missing-acceptance :scope-drift]]
-                                                                     [:description :string]
-                                                                     [:evidence :string]
-                                                                     [:suggested-change :string]]]]
-                                                  [:confidence [:double {:min 0.0 :max 1.0}]]]}}
-                      :projection :none}
-          routing-table {:clear {:goto :done}
-                         :needs-work {:goto "step-2-build" :max-iterations 3}}
-          step-runs {"step-2-build" {:step-id "step-2-build" :attempts [] :iteration-count 1}
-                     "step-3-review" {:step-id "step-3-review" :attempts [] :iteration-count 1}}]
+    (with-redefs [psi.session-persistence.core/messages-from-entries-in
+                  (fn [_ctx _sid] [])
+                  psi.workflow-runtime.turn-execution-contract/execute-judge-turn!
+                  (fn [_ctx sid _text]
+                    {:status :ok
+                     :session-id sid
+                     :assistant-text "{\"decision\":\"clear\",\"issues\":[],\"confidence\":0.8}"})]
+      (let [result (workflow-judge/execute-judge!
+                    (structured-judge-test-ctx) "parent-1" "actor-1"
+                    structured-review-judge-spec structured-review-routing-table
+                    {:current-step-id "step-3-review"
+                     :step-order step-order
+                     :step-runs structured-review-step-runs})]
+        (is (= :clear (:judge-event result)))
+        (is (= {:action :complete} (:routing-result result)))
+        (is (= :valid (get-in result [:judge-output :review :structured-output :status])))
+        (is (= :clear (get-in result [:judge-output :review :structured-output :value :decision])))))))
+
+(deftest execute-judge-invalid-structured-output-fails-locally-test
+  (testing "invalid structured judge output fails locally without prose routing or retry"
+    (let [turn-prompts* (atom [])]
       (with-redefs [psi.session-persistence.core/messages-from-entries-in
                     (fn [_ctx _sid] [])
                     psi.workflow-runtime.turn-execution-contract/execute-judge-turn!
-                    (fn [_ctx sid _text]
+                    (fn [_ctx sid text]
+                      (swap! turn-prompts* conj text)
                       {:status :ok
                        :session-id sid
-                       :assistant-text "{\"decision\":\"needs-work\",\"issues\":[{\"severity\":\"blocking\",\"kind\":\"ambiguity\",\"description\":\"unclear\",\"evidence\":\"design\",\"suggested-change\":\"clarify\"}],\"confidence\":0.8}"})]
+                       :assistant-text "APPROVED"})]
         (let [result (workflow-judge/execute-judge!
-                      ctx "parent-1" "actor-1" judge-spec routing-table
+                      (structured-judge-test-ctx) "parent-1" "actor-1"
+                      structured-review-judge-spec structured-review-routing-table
                       {:current-step-id "step-3-review"
                        :step-order step-order
-                       :step-runs step-runs})]
-          (is (= :needs-work (:judge-event result)))
-          (is (= {:action :goto :target "step-2-build"} (:routing-result result)))
-          (is (= :valid (get-in result [:judge-output :review :structured-output :status])))
-          (is (= :needs-work (get-in result [:judge-output :review :structured-output :value :decision]))))))))
+                       :step-runs structured-review-step-runs})]
+          (is (nil? (:judge-event result)))
+          (is (= {:action :fail
+                  :reason :invalid-structured-output
+                  :output-key :review}
+                 (:routing-result result)))
+          (is (= :invalid (get-in result [:judge-output :review :structured-output :status])))
+          (is (= ["Return review JSON"] @turn-prompts*)))))))
+
+(deftest execute-judge-schema-valid-negative-decision-routes-test
+  (testing "schema-valid negative decision drives the configured non-clear branch"
+    (with-redefs [psi.session-persistence.core/messages-from-entries-in
+                  (fn [_ctx _sid] [])
+                  psi.workflow-runtime.turn-execution-contract/execute-judge-turn!
+                  (fn [_ctx sid _text]
+                    {:status :ok
+                     :session-id sid
+                     :assistant-text "{\"decision\":\"needs-work\",\"issues\":[{\"severity\":\"blocking\",\"kind\":\"ambiguity\",\"description\":\"unclear\",\"evidence\":\"design\",\"suggested-change\":\"clarify\"}],\"confidence\":0.8}"})]
+      (let [result (workflow-judge/execute-judge!
+                    (structured-judge-test-ctx) "parent-1" "actor-1"
+                    structured-review-judge-spec structured-review-routing-table
+                    {:current-step-id "step-3-review"
+                     :step-order step-order
+                     :step-runs structured-review-step-runs})]
+        (is (= :needs-work (:judge-event result)))
+        (is (= {:action :goto :target "step-2-build"} (:routing-result result)))
+        (is (= :needs-work (get-in result [:judge-output :review :structured-output :value :decision])))))))

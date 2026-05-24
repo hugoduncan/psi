@@ -336,6 +336,89 @@
       (is (= {:valid? true :structural-errors nil :semantic-errors []}
              result))))
 
+  (testing "semantic validation rejects multiple structured outputs on one session step"
+    (let [ir {:version :workflow-ir/v1
+              :steps [{:name "classify"
+                       :type :session
+                       :session {:contributions [{:type :template
+                                                  :text "classify"
+                                                  :vars {}}]}
+                       :outputs {:classification {:source :session/structured-output
+                                                  :mode :structured
+                                                  :schema-id :psi.workflow/test-classification
+                                                  :schema-version 1
+                                                  :schema [:map [:decision [:enum :pass :fail]]]}
+                                 :diagnostics {:source :session/structured-output
+                                               :mode :structured
+                                               :schema-id :psi.workflow/test-diagnostics
+                                               :schema-version 1
+                                               :schema [:map [:summary :string]]}}
+                       :yields {:type :data :data :classification}}]}
+          result (workflow-ir/validate-workflow-ir ir)]
+      (is (false? (:valid? result)))
+      (is (= [{:type :multiple-structured-outputs
+               :step "classify"
+               :scope :step
+               :output-keys [:classification :diagnostics]}]
+             (:semantic-errors result)))))
+
+  (testing "semantic validation rejects multiple structured outputs on one LLM judge"
+    (let [prior-step valid-invoke-step
+          judge-output {:source :judge/structured-output
+                        :mode :structured
+                        :schema-id :psi.workflow/judge-review-result
+                        :schema-version 1
+                        :schema [:map
+                                 [:decision [:enum :clear :needs-work :unclear]]
+                                 [:issues [:vector [:map
+                                                    [:severity [:enum :blocking :minor]]
+                                                    [:kind [:enum :ambiguity :inconsistency :missing-acceptance :scope-drift]]
+                                                    [:description :string]
+                                                    [:evidence :string]
+                                                    [:suggested-change :string]]]]
+                                 [:confidence [:double {:min 0.0 :max 1.0}]]]}
+          ir {:version :workflow-ir/v1
+              :steps [prior-step
+                      (assoc valid-session-step
+                             :judge {:type :llm
+                                     :session {:contributions [{:type :template
+                                                                :text "judge"
+                                                                :vars {}}]}
+                                     :outputs {:review judge-output
+                                               :review-extra judge-output}}
+                             :on {:clear {:goto :done}})]}
+          result (workflow-ir/validate-workflow-ir ir)]
+      (is (false? (:valid? result)))
+      (is (= [{:type :multiple-structured-outputs
+               :step "report"
+               :scope :judge
+               :output-keys [:review :review-extra]}]
+             (:semantic-errors result)))))
+
+  (testing "semantic validation rejects mismatched reusable structured-output schema declarations"
+    (let [ir {:version :workflow-ir/v1
+              :steps [valid-invoke-step
+                      (assoc valid-session-step
+                             :judge {:type :llm
+                                     :session {:contributions [{:type :template
+                                                                :text "judge"
+                                                                :vars {}}]}
+                                     :outputs {:review {:source :judge/structured-output
+                                                        :mode :structured
+                                                        :schema-id :psi.workflow/judge-review-result
+                                                        :schema-version 1
+                                                        :schema [:map [:decision [:enum :clear :needs-work]]]}}}
+                             :on {:clear {:goto :done}})]}
+          result (workflow-ir/validate-workflow-ir ir)]
+      (is (false? (:valid? result)))
+      (is (= [{:type :reusable-structured-output-schema-mismatch
+               :step "report"
+               :scope :judge
+               :output-key :review
+               :schema-id :psi.workflow/judge-review-result
+               :schema-version 1}]
+             (:semantic-errors result)))))
+
   (testing "structural failures stop before semantic validation"
     (let [result (workflow-ir/validate-workflow-ir {:steps []})]
       (is (false? (:valid? result)))

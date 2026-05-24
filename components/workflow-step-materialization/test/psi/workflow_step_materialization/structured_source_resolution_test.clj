@@ -53,4 +53,34 @@
            (source-resolution/apply-source-spec
             run
             {:from {:step "classify" :output :classification}
-             :path [:next-action]}))))))
+             :path [:next-action]})))))
+
+  (testing "missing structured output path fails clearly"
+    (let [run (workflow-run-with-output
+               {:raw-output "{...}"
+                :structured-output {:mode :structured
+                                    :schema-id :psi.workflow/bug-reproduction-classification
+                                    :schema-version 1
+                                    :strategy :prompted-json
+                                    :status :valid
+                                    :value {:next-action :handoff-to-fix}}})]
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"Workflow structured output path is missing"
+           (source-resolution/apply-source-spec
+            run
+            {:from {:step "classify" :output :classification}
+             :path [:missing]})))))
+
+  (testing "path references against non-structured source outputs fail clearly"
+    (let [run {:effective-definition {:canonical-ir {:steps [(assoc structured-step
+                                                                    :outputs {:final-llm-reply {:source :session/final-llm-reply}})]}}
+               :step-runs {"classify" {:accepted-result {:outcome :ok
+                                                         :outputs {:final-llm-reply "plain text"}}}}}]
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"Workflow source output is not structured"
+           (source-resolution/apply-source-spec
+            run
+            {:from {:step "classify" :output :final-llm-reply}
+             :path [:decision]}))))))
