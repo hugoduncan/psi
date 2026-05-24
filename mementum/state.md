@@ -176,6 +176,7 @@ Focused OAuth routing tests ✅. bb tests previously ✅. 5 former test errors f
 - 2026-05-23: Reviewed task 169 design/plan/steps for inconsistencies repeat 4; found workflow structured-output docs still describe prompted-JSON as runtime-owned prompting, conflicting with task 169's finalized adapter-owned fallback instruction boundary; added design-step.
 - 2026-05-23: Executed task 169 inconsistency follow-up repeat 5 after no-action review; no newly added unchecked design-steps existed, so only implementation.md was updated.
 - 2026-05-23: Executed task 169 inconsistency follow-up repeat 6 after no-action review; no newly added unchecked design-steps existed, so only implementation.md was updated.
+- 2026-05-23: Implemented task 169 capability foundation slice: structured-output schemas/helpers, built-in capability declarations, user-model capability parsing/defaulting, OAuth `gpt-5.5` Codex fallback capability replacement, and focused model/user-model tests green.
 ## 2026-05-24 task 166 scheduler mandatory time source
 - Implemented mandatory scheduler time-source slice for task 166: production `psi.agent-session.scheduler-time`, context `:scheduler-time-source`, explicit scheduler create instants, deterministic psi-tool/timer/deliver/drain time boundaries, and scheduler test helper support.
 - Added fail-fast proof for missing/invalid `:scheduler-time-source` at psi-tool create, scheduler timer effect, deliver, and drain boundaries (commit 1d54bf66).

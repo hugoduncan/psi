@@ -1,5 +1,6 @@
 (ns psi.ai.models
-  "Model definitions and capabilities")
+  "Model definitions and capabilities"
+  (:require [psi.ai.structured-output :as structured-output]))
 
 ;; Model definitions following allium spec
 
@@ -552,16 +553,54 @@
       (and (<= input* 5.0) (<= output* 20.0)) :medium
       :else :high)))
 
+(def ^:private openai-chat-completions-native-model-keys
+  #{:gpt-4o
+    :gpt-5
+    :gpt-5-chat-latest
+    :gpt-5-mini
+    :gpt-5-nano
+    :gpt-5-pro
+    :gpt-5.1
+    :gpt-5.1-chat-latest
+    :gpt-5.2
+    :gpt-5.2-chat-latest
+    :gpt-5.2-pro
+    :gpt-5.4-mini
+    :gpt-5.5})
+
+(defn- built-in-structured-output-capability
+  [model-key model]
+  (case (:api model)
+    :anthropic-messages
+    structured-output/anthropic-forced-tool-native-capability
+
+    :openai-codex-responses
+    structured-output/openai-codex-fallback-capability
+
+    :openai-completions
+    (when (contains? openai-chat-completions-native-model-keys model-key)
+      structured-output/openai-chat-completions-native-capability)
+
+    nil))
+
+(defn- annotate-structured-output-capability
+  [model-key model]
+  (if-let [capability (built-in-structured-output-capability model-key model)]
+    (structured-output/with-structured-output-capability model capability)
+    model))
+
 (defn- annotate-model
-  [model]
+  [model-key model]
   (let [provider-meta (get provider-defaults (:provider model) {})]
-    (merge provider-meta
-           model
-           {:cost-tier (cost-tier model)})))
+    (annotate-structured-output-capability
+     model-key
+     (merge provider-meta
+            model
+            {:cost-tier (cost-tier model)}))))
 
 (def all-models
   (->> (merge anthropic-models openai-models)
-       (map (fn [[k model]] [k (annotate-model model)]))
+       (map (fn [[k model]] [k (annotate-model k model)]))
        (into {})))
 
 ;; Model access functions

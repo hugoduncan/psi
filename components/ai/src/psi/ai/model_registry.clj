@@ -6,6 +6,7 @@
   (:require
    [clojure.string :as str]
    [psi.ai.models :as built-in]
+   [psi.ai.structured-output :as structured-output]
    [psi.ai.user-models :as user-models]
    [taoensso.timbre :as log]))
 
@@ -23,7 +24,7 @@
   []
   (reduce-kv
    (fn [acc _key model]
-     (assoc acc [(:provider model) (:id model)] model))
+     (assoc acc [(:provider model) (:id model)] (structured-output/normalize-model model)))
    {}
    built-in/all-models))
 
@@ -44,7 +45,7 @@
          (do (log/warn "Custom model" (name (:provider model)) "/" (:id model)
                        "shadows existing entry; skipping")
              cat)
-         (assoc cat k model))))
+         (assoc cat k (structured-output/normalize-model model)))))
    catalog
    custom-models))
 
@@ -185,10 +186,11 @@
   [provider-kw model-id]
   (when (and (= :openai provider-kw)
              (= "gpt-5.5" model-id))
-    (assoc (or (find-model :openai "gpt-5.5")
-               (get built-in/all-models :gpt-5.5))
-           :api :openai-codex-responses
-           :base-url "https://chatgpt.com/backend-api")))
+    (-> (or (find-model :openai "gpt-5.5")
+            (get built-in/all-models :gpt-5.5))
+        (assoc :api :openai-codex-responses
+               :base-url "https://chatgpt.com/backend-api")
+        structured-output/with-openai-codex-fallback-capability)))
 
 (defn resolve-runtime-model
   "Resolve the runtime model map for provider/model-id, optionally considering

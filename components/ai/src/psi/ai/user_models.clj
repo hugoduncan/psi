@@ -13,6 +13,8 @@
    [clojure.java.io :as io]
    [clojure.string :as str]
    [malli.core :as m]
+   [psi.ai.schemas :as schemas]
+   [psi.ai.structured-output :as structured-output]
    [taoensso.timbre :as log]))
 
 ;; ── Schemas ──────────────────────────────────────────────────────────────────
@@ -50,7 +52,8 @@
    [:cache-write-cost {:optional true} [:maybe number?]]
    [:locality {:optional true} [:maybe Locality]]
    [:latency-tier {:optional true} [:maybe LatencyTier]]
-   [:cost-tier {:optional true} [:maybe CostTier]]])
+   [:cost-tier {:optional true} [:maybe CostTier]]
+   [:capabilities {:optional true} schemas/ModelCapabilities]])
 
 (def ^:private ProviderDef
   [:map {:closed true}
@@ -107,12 +110,13 @@
   (let [provider-kw (if (keyword? provider-key)
                       provider-key
                       (keyword provider-key))]
-    (merge model-defaults
-           {:provider provider-kw
-            :api      api
-            :base-url base-url}
-           (dissoc model-def :name)
-           {:name (or (:name model-def) (:id model-def))})))
+    (-> (merge model-defaults
+               {:provider provider-kw
+                :api      api
+                :base-url base-url}
+               (dissoc model-def :name)
+               {:name (or (:name model-def) (:id model-def))})
+        structured-output/normalize-model)))
 
 ;; ── Provider auth ────────────────────────────────────────────────────────────
 

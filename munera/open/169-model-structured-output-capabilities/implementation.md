@@ -237,3 +237,7 @@ Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, prior implementa
 ## 2026-05-23 — executed inconsistency follow-ups repeat 13
 
 No newly added unchecked `design-steps.md` items existed after the preloaded inconsistency review, so there were no actionable design follow-ups to execute. Did not execute implementation `steps.md` work.
+
+## 2026-05-23 — implementation slice 1
+
+Implemented the model/capability foundation slice. Added structured-output capability schemas and stream event enum values, introduced `psi.ai.structured-output` normalization helpers, declared built-in capabilities for Anthropic Messages/native forced-tool, named modern OpenAI Chat Completions/native JSON Schema response format, OpenAI Codex Responses/fallback-only, and left unverified OpenAI Chat Completions entries omitted so they normalize to unsupported. User/custom models now accept optional structured-output capability data while omitted data remains load-valid and effective unsupported. Runtime OAuth resolution for `openai/gpt-5.5` now materializes Codex fallback-only capability after transport override so platform-native capability cannot leak into ChatGPT OAuth execution. Added focused model registry and user model tests. Verification: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.user-models-test` => 24 tests, 160 assertions, 0 failures.

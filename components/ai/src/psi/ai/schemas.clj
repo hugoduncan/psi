@@ -27,6 +27,7 @@
    :thinking-start :thinking-delta :thinking-signature-delta :thinking-end
    :toolcall-start :toolcall-delta :toolcall-end
    :logprob-delta
+   :structured-output-strategy :structured-output-result
    :done :error])
 
 (def ContentBlockKind
@@ -132,6 +133,26 @@
 (def CostTier
   [:enum :zero :low :medium :high])
 
+(def StructuredOutputStrategy
+  [:enum :provider-native :prompted-json :repair-parse :unsupported])
+
+(def StructuredOutputNativeMechanism
+  [:enum :openai/chat-completions-json-schema-response-format
+   :openai/strict-tool-schema
+   :anthropic/forced-tool-use])
+
+(def StructuredOutputCapability
+  [:map {:closed true}
+   [:supported? boolean?]
+   [:strategies [:vector StructuredOutputStrategy]]
+   [:native-mechanism [:maybe StructuredOutputNativeMechanism]]
+   [:defaulted? {:optional true} boolean?]
+   [:notes {:optional true} string?]])
+
+(def ModelCapabilities
+  [:map {:closed true}
+   [:structured-output {:optional true} StructuredOutputCapability]])
+
 (def Model
   [:map {:closed true}
    [:id string?]
@@ -149,6 +170,7 @@
    [:output-cost number?]
    [:cache-read-cost number?]
    [:cache-write-cost number?]
+   [:capabilities {:optional true} ModelCapabilities]
    [:locality {:optional true} Locality]
    [:latency-tier {:optional true} LatencyTier]
    [:cost-tier {:optional true} CostTier]])
@@ -179,7 +201,8 @@
    [:updated-at inst?]
    [:messages [:vector Message]]
    [:tools [:set Tool]]
-   [:error-message {:optional true} string?]])
+   [:error-message {:optional true} string?]
+   [:structured-output {:optional true} [:map-of keyword? any?]]])
 
 (def StreamSession
   [:map {:closed true}
