@@ -97,3 +97,7 @@ Completed the newly added structured-output boundary test: syntactically valid n
 ## 2026-05-23 — code-shaper review
 
 Found one new actionable code-shaping issue: structured-output source/result predicates now exist in both workflow-runtime and workflow-step-materialization namespaces, duplicating the canonical source set and validity check across component boundaries. This drift-prone duplication should be consolidated into one shared lower helper or an explicit adapter so structured-output semantics have a single owner.
+
+## 2026-05-23 — code-shaper follow-up
+
+Completed the duplicate structured-output helper consolidation: `psi.workflow-step-materialization.structured-output` now owns the canonical structured-output source set, structured-output entry helpers, and valid-envelope predicate; `psi.workflow-runtime.structured-output` delegates those contract predicates while retaining runtime parsing/coercion/envelope construction. Focused verification green: `clojure -M:test --focus psi.workflow-runtime.structured-output-test --focus psi.workflow-runtime.ir-test --focus psi.workflow-step-materialization.structured-source-resolution-test --focus psi.agent-session.workflow-judge-test`.

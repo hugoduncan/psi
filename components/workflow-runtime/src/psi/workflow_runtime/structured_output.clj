@@ -3,23 +3,13 @@
   (:require
    [cheshire.core :as json]
    [malli.core :as m]
-   [psi.workflow-runtime.structured-output-schemas :as structured-output-schemas]))
+   [psi.workflow-runtime.structured-output-schemas :as structured-output-schemas]
+   [psi.workflow-step-materialization.structured-output :as structured-output-contract]))
 
-(def structured-output-sources #{:session/structured-output :judge/structured-output})
-
-(defn structured-output-spec?
-  [output-spec]
-  (contains? structured-output-sources (:source output-spec)))
-
-(defn structured-output-entries
-  [outputs]
-  (filter (fn [[_ output-spec]]
-            (structured-output-spec? output-spec))
-          outputs))
-
-(defn single-structured-output-entry
-  [outputs]
-  (first (structured-output-entries outputs)))
+(def structured-output-sources structured-output-contract/structured-output-sources)
+(def structured-output-spec? structured-output-contract/structured-output-spec?)
+(def structured-output-entries structured-output-contract/structured-output-entries)
+(def single-structured-output-entry structured-output-contract/single-structured-output-entry)
 
 (defn canonical-schema
   [{:keys [schema-id schema-version schema]}]
@@ -133,6 +123,4 @@
   {:raw-output raw-output
    :structured-output (structured-output-envelope output-spec raw-output)})
 
-(defn valid-output-result?
-  [result]
-  (= :valid (get-in result [:structured-output :status])))
+(def valid-output-result? structured-output-contract/valid-output-result?)

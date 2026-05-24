@@ -17,4 +17,4 @@
 - [x] Add structured judge tests for invalid structured output failing locally without prose routing, and for a schema-valid negative `:decision` (for example `:needs-work`) driving the expected non-clear branch.
 - [x] Add downstream structured source-ref tests for clear failure on missing `:path` fields and on `:path` references against a non-structured source output.
 - [x] Add a focused structured-output boundary test proving syntactically valid non-object JSON (for example an array or scalar) is rejected as an invalid single-JSON-object envelope and records the parsed value/errors without exposing `:value`.
-- [ ] Consolidate duplicate structured-output predicate/source helper logic between workflow-runtime and workflow-step-materialization so the source set and valid-envelope predicate have one canonical owner or explicit adapter boundary.
+- [x] Consolidate duplicate structured-output predicate/source helper logic between workflow-runtime and workflow-step-materialization so the source set and valid-envelope predicate have one canonical owner or explicit adapter boundary.
