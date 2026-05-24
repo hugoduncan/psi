@@ -7,7 +7,7 @@
    - Avoid mocks/spies in favor of nullable infrastructure"
   (:require
    [clojure.string :as str]
-   [psi.prompt-registry.contributions :as contributions]))
+   [psi.prompt-registry.root-storage :as prompt-storage]))
 
 (defn create-state
   "Create mutable in-memory state used by the nullable API."
@@ -32,7 +32,10 @@
          :scheduled-events     []
          :workflow-types       {}
          :workflows            {}
-         :prompt-contributions {}
+         :root-state           {:agent-session {:sessions {"nullable-session"
+                                                           {:data {:prompt-contribution-ids []
+                                                                   :prompt-contributions []}}}}
+                                :root-registries {}}
          :post-tool-processors []
          :services             []
          :service-requests     []
@@ -75,9 +78,9 @@
 
     ;; Extension prompt contributions
     (= q [:psi.extension/prompt-contributions])
-    {:psi.extension/prompt-contributions (->> (:prompt-contributions @state)
-                                              vals
-                                              vec)}
+    {:psi.extension/prompt-contributions (prompt-storage/list-contributions
+                                          (:root-state @state)
+                                          (get-in @state [:root-state :agent-session :sessions "nullable-session" :data]))}
 
     :else
     {}))
@@ -92,8 +95,15 @@
            :psi.extension.workflow/id id}
     job-id (assoc :psi.extension.background-job/id job-id)))
 
+(def ^:private nullable-session-id "nullable-session")
+
+(defn- nullable-session-data
+  [state]
+  (get-in @state [:root-state :agent-session :sessions nullable-session-id :data]))
+
 (defn- prompt-contribution-count [state]
-  (count (:prompt-contributions @state)))
+  (prompt-storage/contribution-count (:root-state @state)
+                                     (nullable-session-data state)))
 
 (defn- register-command! [state params]
   (let [name (:name params)
@@ -165,36 +175,36 @@
     {:psi.extension.workflow/removed? removed?}))
 
 (defn- register-prompt-contribution! [state params]
-  (let [result (contributions/register-contribution
-                (vals (:prompt-contributions @state))
+  (let [result (prompt-storage/register-contribution-in-root-state
+                (:root-state @state)
+                nullable-session-id
                 (:ext-path params)
                 (:id params)
-                (:contribution params))
-        contribution (:contribution result)]
-    (swap! state assoc-in [:prompt-contributions (:id contribution)] contribution)
+                (:contribution params))]
+    (swap! state assoc :root-state (:root-state result))
     {:psi.extension.prompt-contribution/registered? true
-     :psi.extension.prompt-contribution/id (:id contribution)
+     :psi.extension.prompt-contribution/id (:id (:contribution result))
      :psi.extension.prompt-contribution/count (prompt-contribution-count state)}))
 
 (defn- update-prompt-contribution! [state params]
-  (let [result (contributions/update-contribution
-                (vals (:prompt-contributions @state))
+  (let [result (prompt-storage/update-contribution-in-root-state
+                (:root-state @state)
+                nullable-session-id
                 (:ext-path params)
                 (:id params)
                 (:patch params))]
-    (when-let [contribution (:contribution result)]
-      (swap! state assoc-in [:prompt-contributions (:id contribution)] contribution))
+    (swap! state assoc :root-state (:root-state result))
     {:psi.extension.prompt-contribution/updated? (:updated? result)
      :psi.extension.prompt-contribution/id (str (:id params))
      :psi.extension.prompt-contribution/count (prompt-contribution-count state)}))
 
 (defn- unregister-prompt-contribution! [state params]
-  (let [result (contributions/unregister-contribution
-                (vals (:prompt-contributions @state))
+  (let [result (prompt-storage/unregister-contribution-in-root-state
+                (:root-state @state)
+                nullable-session-id
                 (:ext-path params)
                 (:id params))]
-    (when (:removed? result)
-      (swap! state update :prompt-contributions dissoc (str (:id params))))
+    (swap! state assoc :root-state (:root-state result))
     {:psi.extension.prompt-contribution/removed? (:removed? result)
      :psi.extension.prompt-contribution/id (str (:id params))
      :psi.extension.prompt-contribution/count (prompt-contribution-count state)}))
