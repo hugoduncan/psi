@@ -27,3 +27,7 @@ Found one new actionable inconsistency: `design.md`, `plan.md`, and `doc/workflo
 ## 2026-05-23 — inconsistency follow-up repeat
 
 Completed the newly added inconsistency follow-up: aligned `doc/workflows.md` with the structured-output contract by documenting session-step and LLM-judge structured `:outputs` as validated machine-facing data surfaces, adding representative `:path` reference examples, and pointing authors to grammar/IR docs for formal envelope, validation, and provider strategy details. Marked the design-step done. Did not execute `steps.md` implementation items.
+
+## 2026-05-23 — ambiguity review repeat 2
+
+Found one new actionable ambiguity: `doc/workflow-ir.md` remains generic about `:outputs` and does not specify the normalized IR shape for session structured outputs or judge-local structured outputs, even though the task design and user guide point implementers to IR docs for the formal envelope. This leaves implementers guessing where judge `:outputs` live in normalized IR and what runtime envelope/source metadata the IR validator should accept.
