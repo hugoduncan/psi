@@ -15,6 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-23: Re-reviewed task 169 design/plan/steps for inconsistencies after validation-boundary clarification; found no new actionable inconsistency feedback; appended implementation note and committed 35a4a62d.
 - 2026-05-23: Executed task 169 ambiguity follow-up repeat 2: resolved validation-test ambiguity by specifying task 169 proves extracted/raw payload + strategy metadata handoff preservation for workflow/runtime validation, without adding an AI-level Malli validation seam.
 - 2026-05-23: Executed task 169 inconsistency follow-up repeat after no-action review; no newly added unchecked design-steps existed, so only implementation.md was updated. Commit 5c48d582.
 - 2026-05-23: Executed task 169 ambiguity follow-ups repeat: specified provider-extracted structured payload surface (`[:structured-output :payload]` and streaming `:structured-output-result`/equivalent capture), hid Anthropic synthetic tool input from ordinary tool calls, and clarified AI adapters extract/report payload metadata while workflow/runtime validation remains authoritative.
@@ -85,6 +86,7 @@ Focused OAuth routing tests ✅. bb tests previously ✅. 5 former test errors f
 
 ## Latest session notes
 
+- 2026-05-23: Task 169 no-action inconsistency review repeat 2: design/plan/steps remain aligned around OpenAI Chat Completions native-only support, Codex fallback-only, Anthropic synthetic forced-tool extraction, explicit metadata/payload handoff, and workflow-owned final validation.
 - 2026-05-23: Task 168 judge-local structured outputs are now explicitly transition-evaluation-only; downstream `{:step ... :output ...}` refs address session structured parent outputs, not hidden judge output promotion.
 - 2026-05-23: Executed task 168 ambiguity follow-ups repeat: grammar docs now allow session and LLM-judge structured outputs; design clarifies JSON wire format, schema-guided enum/key coercion, and invalid parse/coercion recording.
 - 2026-05-23: Reviewed task 168 design for ambiguities; added design follow-ups for absent plan/steps, unresolved concrete structured-output IR/authored syntax, and unspecified first standard schema/example.
