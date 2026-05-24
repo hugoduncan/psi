@@ -15,6 +15,8 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-24: Reviewed task 170 with code-shaper; found one actionable robustness gap: structured session-step/judge success paths can still accept a nil bounded turn-result `:structured-output` seam and parse raw assistant JSON with a synthetic/default `:prompted-json` envelope instead of failing on missing authoritative metadata. Added follow-up step.
+
 - 2026-05-24: Reviewed task 170 with test-shaper; found one actionable success-path seam coverage gap: no session-step or LLM-judge execution test feeds top-level bounded turn-result `:structured-output` success metadata and asserts the workflow envelope records actual strategy/source/payload from that seam. Added follow-up step.
 
 - 2026-05-24: Reviewed task 170 implementation with task-implementation-review; found one actionable gap: unsupported structured-output strategies (`:fallback-not-allowed` / unsupported capability) can still proceed to ordinary provider prose generation instead of terminal `:unsupported-structured-output` failure before generation. Added follow-up step.
