@@ -15,6 +15,8 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-24: Reviewed task 170 implementation with task-implementation-review; found one actionable gap: unsupported structured-output strategies (`:fallback-not-allowed` / unsupported capability) can still proceed to ordinary provider prose generation instead of terminal `:unsupported-structured-output` failure before generation. Added follow-up step.
+
 - 2026-05-24: Closed tasks 169 and 171 after implementation/review. Task 169 provides model/provider structured-output capabilities; task 171 adds live-verified Anthropic JSON Schema native output. Remaining adjacent workflow adoption is task 170.
 
 - 2026-05-24: Executed task 171 code-shaper follow-up: Anthropic 400 compatibility fallback now removes `:output_format` whenever all beta headers are stripped, so retries never send JSON Schema native fields without `structured-outputs-2025-11-13`; focused Anthropic/model/user tests green (`37 tests, 238 assertions`).
