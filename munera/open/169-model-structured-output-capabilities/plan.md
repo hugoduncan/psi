@@ -38,7 +38,7 @@ Likely tests:
 5. Preserve Codex Responses fallback-only behavior: no unverified public OpenAI schema fields on `:openai-codex-responses`.
 6. Wire Anthropic forced synthetic tool use via `tools` + `tool_choice`, then extract the synthetic tool input as `[:structured-output :payload]` while excluding it from ordinary assistant tool calls.
 7. Emit/store strategy metadata for streaming and non-streaming calls, plus a structured-output result surface/event carrying provider-extracted payloads when available.
-8. Keep local parse/coerce/validate in the caller/runtime after provider extraction; AI adapters return raw/extracted payload metadata, not final trusted workflow values.
+8. Keep local parse/coerce/validate in the caller/runtime after provider extraction; AI adapters return raw/extracted payload metadata, not final trusted workflow values, and this task does not add an AI-level Malli validation invocation seam.
 9. Update docs for capabilities, caveats, and fallback semantics.
 10. Run focused tests, then broader AI component tests if focused changes pass.
 
@@ -63,4 +63,4 @@ bb clojure:test:unit
 - ChatGPT/Codex backend compatibility is unknown; it must not receive public Chat Completions/Responses schema fields.
 - Anthropic synthetic tool names must avoid user-tool collisions deterministically.
 - Strategy metadata must be explicit; callers must not infer provider-native use from provider/model names or outbound request shape.
-- Provider-native enforcement does not replace local validation; provider adapters extract and report payloads, while workflow/runtime validation remains the final authority.
+- Provider-native enforcement does not replace local validation; provider adapters extract and report payloads, while workflow/runtime validation remains the final authority. Task 169 tests the handoff metadata/payload preservation, not workflow validation invocation.

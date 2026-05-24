@@ -56,7 +56,7 @@ In scope:
 5. OpenAI capable paths include the provider-native structured-output fields in the outbound request and report `:provider-native` as the used strategy.
 6. Anthropic capable paths include a forced synthetic tool call or equivalent native mechanism using `input_schema`, and report `:provider-native` as the used strategy.
 7. Unsupported paths do not pretend to use native enforcement. They either fall back to prompted JSON when allowed or report unsupported clearly.
-8. Runtime-local validation remains in place after provider response handling.
+8. Runtime-local validation remains the caller/workflow responsibility after provider response handling; this task proves AI results preserve extracted/raw payload metadata for that later validation rather than adding a new AI-level validation seam.
 9. Tests cover OpenAI request shape, Anthropic request shape, fallback request shape, and strategy reporting.
 10. Documentation explains which model/provider descriptions are authoritative for structured-output support.
 
@@ -244,7 +244,7 @@ This task makes AI adapters responsible for request construction, native strateg
 
 AI adapters may parse JSON and may perform minimal shape checks needed to extract provider payloads safely, but they should not expose provider-native output as trusted workflow data merely because the provider accepted a schema. Malli coercion and final validation remain runtime/workflow responsibilities, completed in task 168 and wired to provider-native extraction in task 170.
 
-If an adapter implements a small Malli-to-JSON-Schema conversion or extraction-time parse helper in this slice, failures are reported as extraction/request errors or `:unsupported` strategy reasons. Successful extraction records raw/extracted payload plus strategy metadata; validated/coerced domain values are produced only by the caller/runtime validation layer before downstream workflow references can read them.
+If an adapter implements a small Malli-to-JSON-Schema conversion or extraction-time parse helper in this slice, failures are reported as extraction/request errors or `:unsupported` strategy reasons. Successful extraction records raw/extracted payload plus strategy metadata; validated/coerced domain values are produced only by the caller/runtime validation layer before downstream workflow references can read them. Task 169 verification is therefore limited to preserving the payload/metadata handoff contract; task 170 or existing workflow-runtime tests prove final Malli validation is invoked when workflows consume that handoff.
 
 ## Testing requirements
 
@@ -256,7 +256,7 @@ Focused tests should prove:
 - Anthropic capable request construction includes forced tool use with `input_schema`;
 - fallback-only models report/use `:prompted-json` when fallback is allowed;
 - unsupported/no-fallback requests fail clearly;
-- local validation is still invoked after provider response extraction;
+- AI provider tests prove extracted/raw payloads and strategy metadata are preserved for the existing caller/workflow validation layer; task 169 does not add or test a new AI-level Malli validation invocation seam;
 - strategy metadata distinguishes provider-native from prompted fallback.
 
 ## Documentation requirements

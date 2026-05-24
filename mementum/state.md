@@ -15,6 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-23: Executed task 169 ambiguity follow-up repeat 2: resolved validation-test ambiguity by specifying task 169 proves extracted/raw payload + strategy metadata handoff preservation for workflow/runtime validation, without adding an AI-level Malli validation seam.
 - 2026-05-23: Executed task 169 inconsistency follow-up repeat after no-action review; no newly added unchecked design-steps existed, so only implementation.md was updated. Commit 5c48d582.
 - 2026-05-23: Executed task 169 ambiguity follow-ups repeat: specified provider-extracted structured payload surface (`[:structured-output :payload]` and streaming `:structured-output-result`/equivalent capture), hid Anthropic synthetic tool input from ordinary tool calls, and clarified AI adapters extract/report payload metadata while workflow/runtime validation remains authoritative.
 - 2026-05-23: Reviewed task 168 code with code-shaper; added follow-up to consolidate duplicate structured-output predicate/source helper logic between workflow-runtime and workflow-step-materialization.
