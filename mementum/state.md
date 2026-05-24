@@ -121,6 +121,7 @@ Focused OAuth routing tests ✅. bb tests previously ✅. Task 169 focused struc
 
 ## Latest session notes
 
+- 2026-05-24: Reviewed task 170 design/plan/steps for inconsistencies repeat 3; found no new actionable inconsistency feedback after rechecking task artifacts, workflow structured-output helpers, step/judge execution paths, turn-execution contract, workflow docs, and task-169/171 AI structured-output surfaces. Existing unchecked implementation steps already cover intentional code/docs work.
 - 2026-05-24: Reviewed task 170 design/plan/steps for ambiguities repeat 3; found no new actionable ambiguity feedback after rechecking task artifacts, workflow IR/grammar/docs, turn-execution contract, step/judge structured-output code, and task-169/171 AI structured-output surfaces. Existing unchecked implementation steps cover intentional code/docs work.
 - 2026-05-24: Executed task 170 ambiguity follow-up repeat 3 after no-action review; design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the no-op pass.
 
