@@ -267,19 +267,25 @@
 
 (deftest anthropic-json-schema-output-non-streaming-execute-test
   ;; Tests Anthropic non-streaming execute returns the top-level structured-output
-  ;; surface for JSON Schema native responses.
-  (let [model  (models/get-model :sonnet-4.6)
-        convo  (-> (conv/create "sys")
-                   (conv/add-user-message "Review this"))
-        body   {:content [{:type "text" :text "{\"ok\":true}"}]
-                :stop_reason "end_turn"
-                :usage {:input_tokens 1 :output_tokens 1}}
-        result (with-redefs [http/post (fn [_url _req]
-                                         {:status 200
-                                          :body (json/generate-string body)})]
-                 ((:execute anthropic/provider)
-                  convo model {:api-key "test-key"
-                               :structured-output judge-structured-output-request}))]
+  ;; surface for JSON Schema native responses and sends a non-streaming request
+  ;; body instead of reusing the streaming request shape.
+  (let [model            (models/get-model :sonnet-4.6)
+        convo            (-> (conv/create "sys")
+                             (conv/add-user-message "Review this"))
+        captured-request (atom nil)
+        body             {:content [{:type "text" :text "{\"ok\":true}"}]
+                          :stop_reason "end_turn"
+                          :usage {:input_tokens 1 :output_tokens 1}}
+        result           (with-redefs [http/post (fn [_url req]
+                                                   (reset! captured-request req)
+                                                   {:status 200
+                                                    :body (json/generate-string body)})]
+                           ((:execute anthropic/provider)
+                            convo model {:api-key "test-key"
+                                         :structured-output judge-structured-output-request}))
+        outbound-body    (json/parse-string (:body @captured-request) true)]
+    (is (false? (contains? outbound-body :stream))
+        "non-streaming execute should omit :stream from the Anthropic request body")
     (is (= {:ok true} (get-in result [:structured-output :payload])))
     (is (= :anthropic/json-schema-output
            (get-in result [:structured-output :source])))
