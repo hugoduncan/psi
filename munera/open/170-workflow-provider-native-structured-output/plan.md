@@ -19,7 +19,7 @@ Implement task 170 as a narrow workflow-runtime wiring slice. Keep provider-spec
 - Workflow specs must provide explicit `:json-schema`; task 170 does not perform Malli-to-JSON-Schema conversion.
 - Omitted `:strategy-preference` defaults to `:provider-native`.
 - Omitted `:fallback` defaults to `:prompted-json`.
-- `:require-provider-native? true` forbids fallback even if `:fallback :prompted-json` is present; unsupported-native detection happens in turn execution / AI strategy selection after resolved model/provider capability is known, and the workflow propagates that as a clear step or judge failure.
+- `:require-provider-native? true` forbids fallback even if `:fallback :prompted-json` is present; `:fallback :none` also forbids fallback when native support is unavailable. Unsupported-native detection happens in turn execution / AI strategy selection after resolved model/provider capability is known, and the workflow propagates either fallback-forbidden case with the same clear `:unsupported-structured-output` step or judge failure surface.
 - The workflow envelope stores metadata for debugging, but downstream source resolution remains limited to validated `:value`.
 - Workflow envelope naming follows AI structured-output metadata: `:payload` is parsed/native structured data before local coercion and is the validation input; `:raw-payload` is copied only for raw provider text/payload diagnostics.
 - Session-step structured-output contract failures (`:missing-json-schema`, unsupported required-native, invalid local validation) use blocked actor pending results with `:outcome :blocked`; LLM-judge structured-output contract failures use `:routing-result {:action :fail}` with the same stable reasons and do not enter prose no-match retry loops.

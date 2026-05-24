@@ -187,7 +187,7 @@ For a session step, local request-shaping failures before model generation, inva
 Reasons are:
 
 - `:missing-json-schema` when a structured-output spec has a Malli `:schema` but no explicit `:json-schema`. This is detected before model generation. `:details` includes at least `:output-key`, `:schema-id`, and `:schema-version` when available.
-- `:unsupported-structured-output` when the AI layer resolves the model/transport/auth capability and cannot satisfy a fallback-forbidden `:require-provider-native? true` request. `:details` includes `:output-key`, requested strategy/fallback policy, and any AI error data such as resolved model/provider/native mechanism candidates.
+- `:unsupported-structured-output` when the AI layer resolves the model/transport/auth capability and cannot satisfy any fallback-forbidden structured-output request. Fallback is forbidden when `:require-provider-native? true` or when `:fallback :none` makes `:fallback-allowed? false`; both use this same stable reason rather than distinct required-native/no-fallback surfaces. `:details` includes `:output-key`, requested strategy/fallback policy, whether fallback was forbidden by `:require-provider-native?` or `:fallback :none`, and any AI error data such as resolved model/provider/native mechanism candidates.
 - `:invalid-structured-output` when generation occurred but local Malli parse/coerce/validation rejects the payload. This keeps the task-168 surface and includes the invalid structured-output envelope in `[:blocked :details :structured-output]`.
 
 All three are `:blocked`, not `:failed`, because the workflow cannot safely continue or route, but the run state should preserve an inspectable step result and blocking reason. Runtime exceptions unrelated to the structured-output contract may still use the existing `:failure` path.
@@ -206,7 +206,7 @@ For an LLM judge, request-shaping failures before model generation, invalid stru
                   :details details}}
 ```
 
-Reasons mirror session steps: `:missing-json-schema`, `:unsupported-structured-output`, and `:invalid-structured-output`. Invalid structured judge output keeps the existing `:invalid-structured-output` action/fail behavior and adds details sufficient to inspect the structured-output envelope. Missing JSON Schema and unsupported required-native failures are terminal judge failures for the current workflow run; the statechart records them through the existing failed terminal outcome with the judge output and reason, not as `:no-match`.
+Reasons mirror session steps: `:missing-json-schema`, `:unsupported-structured-output`, and `:invalid-structured-output`. Invalid structured judge output keeps the existing `:invalid-structured-output` action/fail behavior and adds details sufficient to inspect the structured-output envelope. Missing JSON Schema and unsupported fallback-forbidden failures are terminal judge failures for the current workflow run; fallback-forbidden includes both `:require-provider-native? true` and `:fallback :none` requests whose resolved model/transport cannot provide native structured output. The statechart records these through the existing failed terminal outcome with the judge output and reason, not as `:no-match`.
 
 ## Testing requirements
 
