@@ -1,3 +1,3 @@
 - [x] Clarify whether `plan.md`, `steps.md`, and `implementation.md` are intentionally absent for task 176 or must be created before execution/design review continues.
-- [ ] Rewrite `plan.md` so it matches the current task design rather than a scaffolding-only pass, explicitly covering resolution of canonical `id` normalization, same-owner duplicate behavior, cross-owner conflict behavior, post-change lookup/update/unregister targeting, ordering, and any narrow compatibility handling.
-- [ ] Rewrite `steps.md` so it tracks the actual remaining design work from `design.md` instead of only the already-completed scaffolding creation step.
+- [x] Rewrite `plan.md` so it matches the current task design rather than a scaffolding-only pass, explicitly covering resolution of canonical `id` normalization, same-owner duplicate behavior, cross-owner conflict behavior, post-change lookup/update/unregister targeting, ordering, and any narrow compatibility handling.
+- [x] Rewrite `steps.md` so it tracks the actual remaining design work from `design.md` instead of only the already-completed scaffolding creation step.
