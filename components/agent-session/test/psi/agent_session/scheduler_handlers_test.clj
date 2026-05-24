@@ -43,7 +43,8 @@
       (kernel/clear-handlers!))))
 
 (deftest scheduler-create-cancel-fire-deliver-handlers-test
-  (let [[ctx session-id] (test-support/make-session-ctx {})]
+  (let [delivered-at (instant "2026-04-21T18:12:00Z")
+        [ctx session-id] (test-support/make-session-ctx {})]
     (with-registered-handlers
       ctx
       #(do
@@ -118,12 +119,162 @@
                                                                  :fire-at (instant "2026-04-21T18:11:00Z")
                                                                  :delay-ms 1000})]
              (apply-root-state-update! ctx create-r)
-             (let [result (invoke-handler ctx :scheduler/deliver {:session-id session-id :schedule-id "sch-2"})]
+             (let [result (invoke-handler ctx :scheduler/deliver {:session-id session-id
+                                                                  :schedule-id "sch-2"
+                                                                  :delivered-at delivered-at})]
                (apply-root-state-update! ctx result)
                (is (= :delivered (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-2" :status])))
                (is (= 1 (count (:effects result))))
+               (is (= delivered-at (-> result :effects first :event-data :user-msg :timestamp)))
                (is (= :runtime/dispatch-event-with-effect-result (-> result :effects first :effect/type)))
                (is (= :session/submit-synthetic-user-prompt (-> result :effects first :event-type))))))))))
+
+(deftest scheduler-deliver-and-drain-use-time-source-when-delivered-at-omitted-test
+  (let [delivered-at (instant "2026-04-21T18:12:34Z")
+        [ctx0 session-id] (test-support/make-session-ctx {})
+        ctx (assoc ctx0 :scheduler-time-source (test-support/fixed-scheduler-time-source delivered-at))]
+    (with-registered-handlers
+      ctx
+      #(do
+         (apply-root-state-update!
+          ctx
+          (invoke-handler ctx :scheduler/create {:session-id session-id
+                                                 :schedule-id "sch-deliver-from-source"
+                                                 :kind :message
+                                                 :message "wake up"
+                                                 :created-at (instant "2026-04-21T18:10:00Z")
+                                                 :fire-at (instant "2026-04-21T18:11:00Z")
+                                                 :delay-ms 1000}))
+         (testing "deliver stamps scheduled user message from scheduler time source"
+           (let [result (invoke-handler ctx :scheduler/deliver {:session-id session-id
+                                                                :schedule-id "sch-deliver-from-source"})]
+             (apply-root-state-update! ctx result)
+             (is (= delivered-at (-> result :effects first :event-data :user-msg :timestamp)))))
+
+         (swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming true))))
+         (apply-root-state-update!
+          ctx
+          (invoke-handler ctx :scheduler/create {:session-id session-id
+                                                 :schedule-id "sch-drain-from-source"
+                                                 :kind :message
+                                                 :message "resume"
+                                                 :created-at (instant "2026-04-21T18:13:00Z")
+                                                 :fire-at (instant "2026-04-21T18:14:00Z")
+                                                 :delay-ms 1000}))
+         (apply-root-state-update! ctx (invoke-handler ctx :scheduler/fired {:session-id session-id
+                                                                             :schedule-id "sch-drain-from-source"}))
+         (swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming false))))
+         (testing "drain stamps scheduled user message from scheduler time source"
+           (let [result (invoke-handler ctx :scheduler/drain-queue {:session-id session-id})]
+             (apply-root-state-update! ctx result)
+             (is (= delivered-at (-> result :effects first :event-data :user-msg :timestamp)))))))))
+
+(deftest scheduler-deliver-and-drain-require-time-source-when-delivered-at-omitted-test
+  (let [[ctx session-id] (test-support/make-session-ctx {})]
+    (with-registered-handlers
+      ctx
+      #(do
+         (apply-root-state-update!
+          ctx
+          (invoke-handler ctx :scheduler/create {:session-id session-id
+                                                 :schedule-id "sch-deliver-needs-time"
+                                                 :kind :message
+                                                 :message "wake up"
+                                                 :created-at (instant "2026-04-21T18:10:00Z")
+                                                 :fire-at (instant "2026-04-21T18:11:00Z")
+                                                 :delay-ms 1000}))
+         (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                               #"scheduler time-source"
+                               (invoke-handler (dissoc ctx :scheduler-time-source)
+                                               :scheduler/deliver
+                                               {:session-id session-id
+                                                :schedule-id "sch-deliver-needs-time"})))
+
+         (swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming true))))
+         (apply-root-state-update! ctx (invoke-handler ctx :scheduler/fired {:session-id session-id
+                                                                             :schedule-id "sch-deliver-needs-time"}))
+         (swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming false))))
+         (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                               #"scheduler time-source"
+                               (invoke-handler (dissoc ctx :scheduler-time-source)
+                                               :scheduler/drain-queue
+                                               {:session-id session-id})))))))
+
+(deftest scheduler-session-deliver-requires-time-source-without-marking-failed-test
+  (let [[ctx session-id] (test-support/make-session-ctx {})]
+    (with-registered-handlers
+      ctx
+      #(do
+         (apply-root-state-update!
+          ctx
+          (invoke-handler ctx :scheduler/create {:session-id session-id
+                                                 :schedule-id "sch-session-needs-missing-time"
+                                                 :kind :session
+                                                 :message "run in fresh session"
+                                                 :session-config {:session-name "later session"}
+                                                 :created-at (instant "2026-04-21T18:30:00Z")
+                                                 :fire-at (instant "2026-04-21T18:31:00Z")
+                                                 :delay-ms 1000}))
+         (testing "missing scheduler time source fails fast before failed-schedule handling"
+           (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                                 #"scheduler time-source"
+                                 (invoke-handler (dissoc ctx :scheduler-time-source)
+                                                 :scheduler/deliver
+                                                 {:session-id session-id
+                                                  :schedule-id "sch-session-needs-missing-time"})))
+           (is (= :pending (get-in (ss/get-session-data-in ctx session-id)
+                                   [:scheduler :schedules "sch-session-needs-missing-time" :status]))))
+
+         (apply-root-state-update!
+          ctx
+          (invoke-handler ctx :scheduler/create {:session-id session-id
+                                                 :schedule-id "sch-session-needs-valid-time"
+                                                 :kind :session
+                                                 :message "run in fresh session"
+                                                 :session-config {:session-name "later session"}
+                                                 :created-at (instant "2026-04-21T18:32:00Z")
+                                                 :fire-at (instant "2026-04-21T18:33:00Z")
+                                                 :delay-ms 1000}))
+         (testing "invalid scheduler time source fails fast before failed-schedule handling"
+           (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                                 #"scheduler time-source"
+                                 (invoke-handler (assoc ctx :scheduler-time-source (fn [] "not an instant"))
+                                                 :scheduler/deliver
+                                                 {:session-id session-id
+                                                  :schedule-id "sch-session-needs-valid-time"})))
+           (is (= :pending (get-in (ss/get-session-data-in ctx session-id)
+                                   [:scheduler :schedules "sch-session-needs-valid-time" :status]))))))))
+
+(deftest scheduler-deliver-checks-schedule-before-time-source-test
+  (let [[ctx session-id] (test-support/make-session-ctx {})]
+    (with-registered-handlers
+      ctx
+      #(do
+         (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                               #"schedule not found"
+                               (invoke-handler (dissoc ctx :scheduler-time-source)
+                                               :scheduler/deliver
+                                               {:session-id session-id
+                                                :schedule-id "missing-schedule"})))
+         (apply-root-state-update!
+          ctx
+          (invoke-handler ctx :scheduler/create {:session-id session-id
+                                                 :schedule-id "sch-cancelled"
+                                                 :kind :message
+                                                 :message "wake up"
+                                                 :created-at (instant "2026-04-21T18:10:00Z")
+                                                 :fire-at (instant "2026-04-21T18:11:00Z")
+                                                 :delay-ms 1000}))
+         (apply-root-state-update!
+          ctx
+          (invoke-handler ctx :scheduler/cancel {:session-id session-id
+                                                 :schedule-id "sch-cancelled"}))
+         (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                               #"schedule is not deliverable"
+                               (invoke-handler (dissoc ctx :scheduler-time-source)
+                                               :scheduler/deliver
+                                               {:session-id session-id
+                                                :schedule-id "sch-cancelled"})))))))
 
 (deftest scheduler-session-kind-fires-without-origin-idle-test
   (let [[ctx session-id] (test-support/make-session-ctx {:session-data {:is-streaming true}})]
@@ -222,7 +373,8 @@
              (is (= :prompt-submit (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-session-fail" :delivery-phase])))))))))
 
 (deftest scheduler-drain-and-statechart-idle-hooks-test
-  (let [[ctx session-id] (test-support/make-session-ctx {:session-data {:is-streaming true}})]
+  (let [drained-at (instant "2026-04-21T18:06:00Z")
+        [ctx session-id] (test-support/make-session-ctx {:session-data {:is-streaming true}})]
     (with-registered-handlers
       ctx
       #(do
@@ -247,11 +399,13 @@
            (swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming false))))
 
            (testing "drain-queue delivers one queued schedule when idle"
-             (let [result (invoke-handler ctx :scheduler/drain-queue {:session-id session-id})]
+             (let [result (invoke-handler ctx :scheduler/drain-queue {:session-id session-id
+                                                                      :delivered-at drained-at})]
                (apply-root-state-update! ctx result)
                (is (= ["sch-b"] (get-in (ss/get-session-data-in ctx session-id) [:scheduler :queue])))
                (is (= "sch-a" (get-in result [:return :schedule-id])))
                (is (= 1 (count (:effects result))))
+               (is (= drained-at (-> result :effects first :event-data :user-msg :timestamp)))
                (is (= :runtime/dispatch-event-with-effect-result (-> result :effects first :effect/type)))
                (is (= :session/submit-synthetic-user-prompt (-> result :effects first :event-type)))))
 

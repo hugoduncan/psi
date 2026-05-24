@@ -1,0 +1,14 @@
+# Execution steps
+
+- [x] Add scheduler time-source production contract and context wiring.
+- [x] Require explicit `:created-at` and `:fire-at` for scheduler create dispatch.
+- [x] Thread scheduler time source through psi-tool create resolution and timer delay calculation.
+- [x] Thread scheduler time source or explicit `:delivered-at` through deliver and drain message construction.
+- [x] Add deterministic scheduler time-source test helpers.
+- [x] Update focused scheduler tests for deterministic create, `delay-ms`, `at`, delivery, and drain behavior.
+- [x] Run the focused scheduler verification suite from `design.md`.
+- [x] Add focused tests proving missing/invalid `:scheduler-time-source` fails early at scheduler runtime boundaries (for example psi-tool create and timer/deliver/drain paths) instead of falling back to wall-clock/default time.
+- [x] Move `:scheduler/deliver` delivered-at resolution until after the target schedule has been found and the path actually needs to construct a scheduled user message, preserving schedule-not-found/non-deliverable error precedence.
+- [x] Add positive scheduler handler coverage proving `:scheduler/deliver` and `:scheduler/drain-queue` without explicit `:delivered-at` stamp scheduled user messages with the supplied deterministic `:scheduler-time-source` instant.
+- [x] Update scheduler lifecycle integration tests to install a deterministic `:scheduler-time-source` and assert scheduled user-message timestamps for deliver/drain paths that omit explicit `:delivered-at`.
+- [x] Narrow session-kind `:scheduler/deliver` error handling so scheduler time-source validation failures are not caught as delivery failures; add focused coverage proving missing/invalid `:scheduler-time-source` fails fast for session-kind delivery while real session creation/prompt-submit failures still mark the schedule failed.

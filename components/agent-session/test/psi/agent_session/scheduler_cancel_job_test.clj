@@ -20,6 +20,7 @@
                                                   :schedule-id "sch-1"
                                                   :label "check-build"
                                                   :message "check build"
+                                                  :created-at (java.time.Instant/parse "2099-04-21T17:59:00Z")
                                                   :fire-at (java.time.Instant/parse "2099-04-21T18:00:00Z")}
                                                  {:origin :core})
           result           (session/cancel-job-in! ctx session-id "sch-1" :user)]

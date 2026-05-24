@@ -22,6 +22,7 @@
                                                   :kind :message
                                                   :label "check-build"
                                                   :message "check build"
+                                                  :created-at (java.time.Instant/parse "2099-04-21T17:59:00Z")
                                                   :fire-at (java.time.Instant/parse "2099-04-21T18:00:00Z")}
                                                  {:origin :core})
           _                (session/dispatch-in! ctx :scheduler/create
@@ -31,6 +32,7 @@
                                                   :label "review"
                                                   :message "review"
                                                   :session-config {:session-name "review later"}
+                                                  :created-at (java.time.Instant/parse "2099-04-21T18:59:00Z")
                                                   :fire-at (java.time.Instant/parse "2099-04-21T19:00:00Z")}
                                                  {:origin :core})
           _                (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data :scheduler :schedules "sch-2" :status] :queued)
@@ -49,6 +51,7 @@
                                                   :kind :message
                                                   :label "check-build"
                                                   :message "check build"
+                                                  :created-at (java.time.Instant/parse "2099-04-21T17:59:00Z")
                                                   :fire-at (java.time.Instant/parse "2099-04-21T18:00:00Z")}
                                                  {:origin :core})
           cancelled        (bg-rt/cancel-background-job-in! ctx session-id "schedule/sch-1" :user)]

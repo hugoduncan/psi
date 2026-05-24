@@ -20,6 +20,7 @@
    [psi.agent-session.turn :as turn]
    [psi.agent-session.resolvers :as resolvers]
    [psi.agent-session.services :as services]
+   [psi.agent-session.scheduler-time :as scheduler-time]
    [psi.session-state.model :as session]
    [psi.session-state.state :as ss]
    [psi.agent-session.statechart :as sc]
@@ -240,6 +241,7 @@
 
 (defn- create-context* [{:keys [session-defaults compaction-fn branch-summary-fn agent-initial config cwd persist? session-root event-queue oauth-ctx recursion-ctx nrepl-runtime-atom ui-type mutations
                                 create-workflow-child-session-fn execute-workflow-run-fn resume-and-execute-workflow-run-fn
+                                scheduler-time-source
                                 get-session-data-fn list-context-sessions-fn find-skill-fn
                                 resolve-workflow-step-session-config-fn materialize-workflow-step-session-conversation-fn
                                 split-workflow-step-session-conversation-fn execute-workflow-judge-fn]
@@ -275,6 +277,8 @@
                      :extension-run-fn-atom (atom nil)
                      :background-job-ui-refresh-fn (atom nil)
                      :scheduler-timers* (atom {})
+                     :scheduler-time-source (or scheduler-time-source
+                                                (scheduler-time/system-time-source))
                      :projection-listeners* projection-listeners*}
                     (callback-fns mutations projection-listeners*)
                     (cond-> {}

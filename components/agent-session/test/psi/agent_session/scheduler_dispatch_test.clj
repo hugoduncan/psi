@@ -11,19 +11,21 @@
    :label nil
    :message (str "message-" schedule-id)
    :source :scheduled
-   :created-at (java.time.Instant/now)
-   :fire-at (java.time.Instant/now)
+   :created-at (java.time.Instant/parse "2026-04-21T12:00:00Z")
+   :fire-at (java.time.Instant/parse "2026-04-21T12:01:00Z")
    :status status
    :session-id session-id})
 
 (deftest scheduler-create-stores-schedule-and-starts-timer-test
-  (let [[ctx session-id] (test-support/make-session-ctx {})
-        fire-at          (.plusMillis (java.time.Instant/now) 1000)
+  (let [created-at       (java.time.Instant/parse "2026-04-21T12:00:00Z")
+        [ctx session-id] (test-support/make-session-ctx {})
+        fire-at          (.plusMillis created-at 1000)
         result           (session/dispatch-in! ctx :scheduler/create
                                                {:session-id session-id
                                                 :schedule-id "sch-1"
                                                 :label "check-build"
                                                 :message "Check build"
+                                                :created-at created-at
                                                 :fire-at fire-at}
                                                {:origin :core})
         stored           (get-in (ss/get-session-data-in ctx session-id)

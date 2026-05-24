@@ -22,7 +22,8 @@
                                                   :kind :message
                                                   :label "check-build"
                                                   :message "check build"
-                                                  :fire-at (java.time.Instant/now)}
+                                                  :created-at (java.time.Instant/parse "2026-04-21T18:00:00Z")
+                                                  :fire-at (java.time.Instant/parse "2026-04-21T18:00:01Z")}
                                                  {:origin :core})
           _                (session/dispatch-in! ctx :scheduler/fired
                                                  {:session-id session-id

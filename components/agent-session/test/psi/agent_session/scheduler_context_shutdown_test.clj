@@ -20,7 +20,8 @@
                                                   :schedule-id "sch-1"
                                                   :label "later"
                                                   :message "later"
-                                                  :fire-at (.plusSeconds (java.time.Instant/now) 60)}
+                                                  :created-at (java.time.Instant/parse "2099-04-21T17:59:00Z")
+                                                  :fire-at (java.time.Instant/parse "2099-04-21T18:00:00Z")}
                                                  {:origin :core})]
       (is (contains? @(:scheduler-timers* ctx) "sch-1"))
       (session/shutdown-context! ctx)
