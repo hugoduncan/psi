@@ -118,6 +118,8 @@ The workflow runtime converts this to the provider-neutral task-169 AI request s
   :strict? true}}
 ```
 
+The request-building helper is intentionally capability-blind. It may fail immediately for local contract errors such as missing `:json-schema`; for `:require-provider-native? true`, it encodes `:fallback-allowed? false` and passes the request onward. The clear unsupported-native failure belongs at the turn execution / AI structured-output strategy-selection boundary after the model, transport, auth path, and effective structured-output capability are resolved. Workflow execution must propagate that AI failure as a workflow step/judge failure before downstream routing; it must not reinterpret it as prose output or retry via prompted JSON.
+
 Workflow runtime and docs should not introduce provider-specific request keys such as OpenAI `:response_format`, Anthropic `:output_format`, or forced tool definitions. Provider adapters own those translations.
 
 ## Runtime flow
@@ -154,11 +156,12 @@ The workflow structured-output envelope keeps `:value` as the only downstream da
 - `[:structured-output :native-mechanism]` is copied when the AI result reports one, such as `:openai/chat-completions-json-schema-response-format`, `:anthropic/forced-tool-use`, or `:anthropic/json-schema-output`.
 - `[:structured-output :source]` is copied when present, such as `:openai/message-content`, `:anthropic/output-format`, `:anthropic/tool-input`, or `:prompted-json/text`.
 - `[:structured-output :fallback-used?]` is copied when present; otherwise derive true only for `:strategy :prompted-json`.
-- `[:structured-output :raw-payload]` stores the provider/native structured payload or parsed JSON object before Malli coercion when available.
-- top-level `:raw-output` remains the raw assistant text when available. If a native provider returns only structured payload and no text, `:raw-output` may be nil and `:raw-payload` is authoritative for validation input.
+- `[:structured-output :payload]` stores the parsed/native structured value before Malli coercion. Copy it from AI metadata `[:structured-output :payload]` when present; otherwise use the parsed prompted-JSON object produced from raw text. This is the authoritative validation input before local coercion.
+- `[:structured-output :raw-payload]` stores raw provider payload text/bytes/maps only when AI metadata reports `:raw-payload`; it must not be populated with the parsed/native object merely for convenience. This preserves task-169/171 meaning: `:payload` is parsed/native data, `:raw-payload` is raw provider text or raw provider payload.
+- top-level `:raw-output` remains the raw assistant text when available. If a native provider returns only structured payload and no text, `:raw-output` may be nil and `:payload` is authoritative for validation input.
 - Provider-specific diagnostic maps may be kept under `[:structured-output :provider-metadata]`, but downstream source resolution must ignore them.
 
-Local validation still determines `[:structured-output :status]` and `[:structured-output :value]`. Downstream `{:step ... :output ...}` resolution continues to read only valid `:value`; it must not read `:raw-payload`, `:parsed-value`, `:provider-metadata`, or provider text.
+Local validation still determines `[:structured-output :status]` and `[:structured-output :value]`. Downstream `{:step ... :output ...}` resolution continues to read only valid `:value`; it must not read `:payload`, `:raw-payload`, `:parsed-value`, `:provider-metadata`, or provider text.
 
 ## Testing requirements
 

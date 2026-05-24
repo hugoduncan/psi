@@ -121,6 +121,7 @@ Focused OAuth routing tests ✅. bb tests previously ✅. Task 169 focused struc
 
 ## Latest session notes
 
+- 2026-05-24: Executed task 170 inconsistency follow-ups: required-native unsupported detection now belongs to turn execution / AI strategy selection after resolved model/provider capability, while workflow request building only encodes fallback-forbidden; envelope naming now uses `:payload` for parsed/native validation input and `:raw-payload` only for raw provider diagnostics. Design-steps fully checked.
 - 2026-05-24: Executed task 170 ambiguity follow-ups: added plan/steps, fixed canonical workflow structured-output policy keys (`:json-schema`, `:strategy-preference`, `:fallback`, `:require-provider-native?`), chose explicit JSON Schema boundary with no Malli conversion, specified AI metadata-to-envelope mapping, and checked all design-steps.
 - 2026-05-24: Reviewed task 170 design/plan/steps for ambiguities; found actionable gaps: missing plan/steps artifacts, exact workflow structured-output policy/request keys, task-168 Malli-to-task-169 JSON Schema source boundary, and AI-result-to-workflow-envelope metadata mapping. Added design-steps and committed 1060d281.
 - 2026-05-24: Executed task 171 code-shaper follow-up: fixed 400 compatibility fallback to drop Anthropic JSON Schema `:output_format` when the structured-output beta is stripped; added focused retry coverage; focused Anthropic/model/user tests green (`37 tests, 238 assertions`).
