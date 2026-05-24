@@ -3,3 +3,7 @@
 ## 2026-05-23 — ambiguity review
 
 Found actionable ambiguity feedback: `plan.md` and `steps.md` are absent, so the implementation approach, sequencing, target files, and verification are not reviewable. The design also leaves the first OpenAI native mechanism/transport unresolved against the current AI API surface (`:openai-completions` and `:openai-codex-responses`, with no explicit public Responses transport), leaves strategy metadata propagation ambiguous for streaming vs non-streaming callers, and does not specify how Anthropic forced structured-output tool use composes with ordinary user tools/tool choice.
+
+## 2026-05-23 — executed ambiguity follow-ups
+
+Completed all newly added ambiguity follow-up items without executing implementation `steps.md` work. Created `plan.md` and `steps.md`; refined `design.md` to choose OpenAI Chat Completions JSON Schema `response_format` for explicit `:openai-completions` capabilities, defer public `/v1/responses`, keep `:openai-codex-responses` fallback-only, specify strategy metadata for non-streaming and streaming calls, and define Anthropic synthetic forced-tool composition/collision/extraction semantics. Marked all ambiguity `design-steps.md` items done.

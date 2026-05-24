@@ -72,26 +72,29 @@ In scope:
 
 ## Proposed capability shape
 
-The exact shape should align with current model registry conventions, but conceptually model descriptions should be able to express:
+The exact shape should align with current model registry conventions. For this first implementation slice the transport identity is the existing `:api` enum, not a new `:transport` key. Add a nested `:capabilities :structured-output` map to model descriptions and user model definitions.
+
+For OpenAI, do not introduce a new public `/v1/responses` API enum in this task. The first provider-native OpenAI mechanism is Chat Completions JSON Schema response format on explicitly capable `:openai-completions` models:
 
 ```edn
 {:id "openai/gpt-4.1"
  :provider :openai
- :transport :openai-responses
- :auth :platform-api-key
+ :api :openai-completions
  :capabilities
  {:structured-output
   {:supported? true
    :strategies [:provider-native :prompted-json]
-   :native-mechanism :openai/response-format-json-schema}}}
+   :native-mechanism :openai/chat-completions-json-schema-response-format}}}
 ```
+
+A future task may add `:openai-responses` after the transport is implemented and tested; until then the design's public `/v1/responses` preference is satisfied only by deferral, not by pretending the current adapters are equivalent.
 
 For Anthropic:
 
 ```edn
 {:id "anthropic/claude-sonnet-4"
  :provider :anthropic
- :transport :anthropic-messages
+ :api :anthropic-messages
  :capabilities
  {:structured-output
   {:supported? true
@@ -104,7 +107,7 @@ For a fallback-only or unknown transport:
 ```edn
 {:id "openai/gpt-5.5"
  :provider :openai
- :transport :openai-codex-responses
+ :api :openai-codex-responses
  :auth :chatgpt-oauth
  :capabilities
  {:structured-output
@@ -135,13 +138,68 @@ Adapters may derive `:json-schema` from `:schema` if the conversion is part of t
 
 ### OpenAI
 
-Use provider-native schema fields only on verified capable OpenAI platform transports. Prefer public `/v1/responses` where that is already the selected or introduced platform transport for the target model. Do not assume ChatGPT/Codex backend compatibility.
+Use provider-native schema fields only on verified capable OpenAI platform transports. In this task that means existing `:openai-completions` only, using Chat Completions `response_format` JSON Schema. The outbound body shape is:
 
-The outbound request should carry a JSON Schema response constraint or strict tool/function schema, depending on the chosen OpenAI mechanism and adapter architecture.
+```edn
+{:response_format
+ {:type "json_schema"
+  :json_schema
+  {:name "judge_review_result"
+   :strict true
+   :schema {...}}}}
+```
+
+The schema source is request `[:structured-output :json-schema]`, or a supported Malli-to-JSON-Schema conversion if implemented for the requested schema subset.
+
+Do not add public `/v1/responses` in this task. Do not send `response_format`, Responses-style `text.format`, or strict function schema fields to `:openai-codex-responses` unless a separate verification proves that backend accepts them. Codex/ChatGPT OAuth models such as `openai/gpt-5.5` remain `:prompted-json` fallback-only for this slice.
+
+OpenAI strict tool/function schema is represented as a possible capability mechanism but is not the first implemented native mechanism unless implementation discovers it is simpler and updates this design before coding.
 
 ### Anthropic
 
-Use a synthetic forced tool call as the native structured-output mechanism. The tool should have a deterministic name derived from the schema or request, an `input_schema` derived from the requested output schema, and tool choice should require that tool. The adapter should extract the tool input as the structured output payload.
+Use a synthetic forced tool call as the native structured-output mechanism. The adapter appends one synthetic tool definition to the ordinary user tools:
+
+```edn
+{:name "psi_structured_output__judge_review_result"
+ :description "Return the requested structured output."
+ :input_schema {...}}
+```
+
+Tool naming rules:
+
+- derive the base name from request `:name` or `:schema-id`;
+- sanitize to Anthropic tool-name characters;
+- prefix with `psi_structured_output__`;
+- if a user tool already has that name, append a deterministic numeric suffix based on the occupied names in the current request.
+
+When provider-native structured output is selected, set `:tool_choice {:type "tool" :name synthetic-name}` so Anthropic must call the synthetic tool. Ordinary user tools may remain in `:tools` for context, but they cannot be chosen for the final response while the synthetic forced choice is active.
+
+Response handling must separate the synthetic tool from normal assistant tool calls: a returned `tool_use` block whose name matches the synthetic name is extracted as the structured-output payload and is not surfaced downstream as an ordinary assistant tool call. Any other returned tool call remains a normal assistant tool call or provider anomaly according to existing handling.
+
+
+## Strategy metadata surface
+
+The actual structured-output strategy is observable through an explicit metadata map, never inferred from model/provider names.
+
+For non-streaming calls, provider execution returns or associates:
+
+```edn
+{:structured-output
+ {:strategy :provider-native ;; or :prompted-json, :repair-parse, :unsupported
+  :native-mechanism :openai/chat-completions-json-schema-response-format
+  :schema-id :psi.workflow/judge-review-result
+  :schema-version 1
+  :fallback-used? false}}
+```
+
+For streaming calls, emit the same metadata in an early stream event after `:start` and before content deltas when possible:
+
+```edn
+{:type :structured-output-strategy
+ :structured-output {...}}
+```
+
+If the existing stream event schema makes a new event type too broad, the equivalent traceable surface may be a provider-capture/request metadata callback, but the implementation must document how callers read it. `:provider-native` is emitted only after the outbound request body actually includes the native schema constraint. Fallback-only requests emit `:prompted-json` when fallback is allowed. No-fallback unsupported requests emit or return `:unsupported` with a reason and must fail clearly rather than silently weakening the contract. `:repair-parse` is reserved for a later repair layer and should not be reported unless that layer actually ran.
 
 ## Testing requirements
 
