@@ -15,6 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-23: Reviewed task 168 design/plan/steps for ambiguities repeat 2; added follow-up to align `doc/workflow-ir.md` with normalized session/judge structured output IR shape and runtime envelope semantics.
 - 2026-05-23: Executed task 168 inconsistency follow-up repeat: aligned `doc/workflows.md` with session/judge structured `:outputs`, representative structured field refs, and grammar/IR pointers; design-steps all checked.
 - 2026-05-23: Executed task 168 ambiguity follow-ups repeat: aligned workflow grammar docs for session/judge structured `:outputs` and specified prompted JSON fallback with schema-guided Malli coercion; design-steps all checked.
 - 2026-05-23: Created Munera task 168 design for workflow structured output schemas: optional step/judge schemas, raw+validated result storage, explicit downstream structured references, provider strategy visibility, and fail-fast validation semantics. Commit 3106da5f.
