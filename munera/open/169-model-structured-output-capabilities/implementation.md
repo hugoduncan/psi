@@ -102,3 +102,8 @@ No newly added unchecked `design-steps.md` items existed after the preloaded inc
 ## 2026-05-23 — ambiguity review repeat 6
 
 Found one new actionable ambiguity: the artifacts define explicit structured-output capability maps for native-capable, fallback-only, and unsupported models, but do not say how to interpret a model description that omits `:capabilities :structured-output` entirely. Existing built-in and custom model definitions currently have no such field, and `user_models.clj` uses a closed model schema, so implementation needs one clear rule for absent capability data: invalid config, default unsupported, default fallback-only, or migration/defaulting behavior.
+
+
+## 2026-05-23 — executed ambiguity follow-up repeat 6
+
+Completed the newly added ambiguity follow-up without executing implementation `steps.md` work. Specified that omitted `[:capabilities :structured-output]` remains valid for existing built-in and user/custom model descriptions, but normalizes to effective unsupported for strategy selection. Prompted-JSON fallback is explicit opt-in via `:strategies [:prompted-json]`; omitted capability data returns `:unsupported` even when fallback is allowed, avoiding surprise prompt injection for legacy/custom models. Updated `design.md`, `plan.md`, and `steps.md`, and marked the ambiguity design-step done.

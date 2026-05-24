@@ -32,9 +32,9 @@ Likely tests:
 
 ## Sequence
 
-1. Add declarative structured-output capability schemas and model/user-model validation.
+1. Add declarative structured-output capability schemas, model/user-model validation, and normalization for omitted capability data. Missing `[:capabilities :structured-output]` remains valid for compatibility but normalizes to effective unsupported, not fallback-only.
 2. Add request option validation/helpers for `:structured-output` and JSON-Schema-compatible payloads.
-3. Add strategy selection helper that consumes model capability plus request fallback policy and returns one of `:provider-native`, `:prompted-json`, or `:unsupported` with a reason. Treat `:supported?` as "at least one declared structured-output path exists," not as provider-native support; fallback-only models are supported only when the request allows fallback, while `:supported? false` always selects `:unsupported`.
+3. Add strategy selection helper that consumes normalized model capability plus request fallback policy and returns one of `:provider-native`, `:prompted-json`, or `:unsupported` with a reason. Treat `:supported?` as "at least one declared structured-output path exists," not as provider-native support; fallback-only models are supported only when the request allows fallback, while `:supported? false` or omitted/defaulted capability data always selects `:unsupported`.
 4. Add deterministic prompted-JSON fallback request shaping: when `:prompted-json` is selected, inject provider-neutral JSON-only/schema instructions at the AI adapter boundary, preserve caller text, avoid all provider-native schema fields, and report `:fallback-used? true`; when fallback is disallowed, report/fail `:unsupported` without injecting fallback instructions.
 5. Wire OpenAI Chat Completions provider-native request construction via `response_format` JSON Schema only when model capability declares `:openai/chat-completions-json-schema-response-format`.
 6. Preserve Codex Responses fallback-only behavior: no unverified public OpenAI schema fields on `:openai-codex-responses`.
@@ -66,3 +66,4 @@ bb clojure:test:unit
 - Anthropic synthetic tool names must avoid user-tool collisions deterministically.
 - Strategy metadata must be explicit; callers must not infer provider-native use from provider/model names or outbound request shape. Streaming callers read first-class `:structured-output-strategy` and `:structured-output-result` events, not provider-capture callbacks.
 - Provider-native enforcement does not replace local validation; provider adapters extract and report payloads, while workflow/runtime validation remains the final authority. Task 169 tests the handoff metadata/payload preservation, not workflow validation invocation.
+- Existing built-in and custom model descriptions may omit structured-output capability data. The task preserves load compatibility by defaulting omitted effective capabilities to unsupported; prompted fallback remains explicit opt-in so legacy models do not receive schema-prompt injection unexpectedly.

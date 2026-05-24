@@ -136,13 +136,25 @@ Fallback-only models set `:supported? true`, `:strategies [:prompted-json]`, and
 
 Unsupported models set `:supported? false`, `:strategies []`, and `:native-mechanism nil`. Strategy selection returns `:unsupported` regardless of fallback policy, because the model/provider description does not declare any acceptable structured-output path.
 
-Request-time support is therefore the combination of the model capability declaration and the request fallback policy:
+Absent structured-output capability data is a distinct compatibility state for existing built-in and user/custom model descriptions that omit `[:capabilities :structured-output]` entirely. Omission is valid input for this task so existing configurations do not break at load time. Registry/user-model normalization should default the effective structured-output capability to unsupported:
+
+```edn
+{:supported? false
+ :strategies []
+ :native-mechanism nil
+ :defaulted? true
+ :notes "No structured-output capability was declared for this model/transport."}
+```
+
+The original persisted/user description does not need to be rewritten by this task, but all strategy-selection code must consume a normalized/effective capability map so missing data is treated exactly like unsupported for request-time behavior. In particular, a structured-output request against an omitted-capability model returns `:unsupported` even when `:fallback-allowed? true`; fallback-only behavior requires an explicit declaration of `:strategies [:prompted-json]`. This keeps prompted fallback opt-in rather than silently mutating prompts for every legacy/custom model. Documentation should tell users to add an explicit fallback-only capability when they want a custom model to accept structured-output requests through prompted JSON.
+
+Request-time support is therefore the combination of the normalized model capability declaration and the request fallback policy:
 
 - native-capable + native request => `:provider-native`;
 - native-capable + fallback allowed but native unavailable for the concrete transport/schema => `:prompted-json` only when listed in `:strategies`;
 - fallback-only + fallback allowed => `:prompted-json`;
 - fallback-only + fallback disallowed => `:unsupported`;
-- unsupported capability => `:unsupported`.
+- unsupported capability, including omitted capability data normalized to unsupported => `:unsupported`.
 
 ## Request contract
 

@@ -1,6 +1,6 @@
 # Implementation steps
 
-- [ ] Add structured-output capability schemas and model registry support, including explicit `:supported?` semantics for native-capable, fallback-only, and unsupported models.
+- [ ] Add structured-output capability schemas and model registry support, including explicit `:supported?` semantics for native-capable, fallback-only, unsupported, and omitted-capability models; omitted data must normalize to effective unsupported while preserving load compatibility.
 - [ ] Add request structured-output contract helpers and strategy selection that combines model capability with request fallback policy.
 - [ ] Add prompted-JSON fallback request shaping that injects deterministic schema-guided JSON-only instructions when fallback is selected, avoids provider-native fields, and reports `:fallback-used? true`; unsupported/no-fallback requests must not inject fallback instructions.
 - [ ] Implement OpenAI Chat Completions JSON Schema `response_format` request construction for explicitly capable models.
