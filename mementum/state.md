@@ -108,4 +108,5 @@ Focused OAuth routing tests ✅. bb tests previously ✅. 5 former test errors f
 
 ## 2026-05-24 task 166 scheduler mandatory time source
 - Implemented mandatory scheduler time-source slice for task 166: production `psi.agent-session.scheduler-time`, context `:scheduler-time-source`, explicit scheduler create instants, deterministic psi-tool/timer/deliver/drain time boundaries, and scheduler test helper support.
-- Focused scheduler proof green: 31 tests, 332 assertions, 0 failures.
+- Added fail-fast proof for missing/invalid `:scheduler-time-source` at psi-tool create, scheduler timer effect, deliver, and drain boundaries (commit 1d54bf66).
+- Full scheduler proof green: 32 tests, 342 assertions, 0 failures.
