@@ -121,6 +121,7 @@ Focused OAuth routing tests ✅. bb tests previously ✅. Task 169 focused struc
 
 ## Latest session notes
 
+- 2026-05-24: Executed task 170 inconsistency follow-up repeat 6 after no-action review; design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the no-op pass.
 - 2026-05-24: Reviewed task 170 design/plan/steps for ambiguities repeat 6; found no new actionable ambiguity feedback after rechecking task artifacts, current turn-execution contract/aliases, workflow structured-output grammar/IR/docs, and task-169/171 AI structured-output surfaces. Existing unchecked implementation steps remain intentional code/docs work.
 - 2026-05-24: Executed task 170 inconsistency follow-up repeat 5 after no-action review; design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the no-op pass.
 - 2026-05-24: Executed task 170 ambiguity follow-up repeat 4: defined the turn-execution request input seam as optional fourth opts arities on `execute-actor-turn!` / `execute-judge-turn!`, forwarding provider-neutral `{:structured-output ...}` unchanged to `execute-session-turn!`; ranked fallback preserves opts, structured judges avoid prose retry loops for structured contract failures. Design-step checked; implementation steps untouched.
