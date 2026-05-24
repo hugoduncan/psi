@@ -31,6 +31,13 @@
 - Used the preloaded review result plus current task artifacts to execute any newly added actionable unchecked `steps.md` items.
 - Found no unchecked follow-up implementation items to execute; this pass was a no-op.
 
+## 2026-05-24 code-shaper review pass
+- Re-read `design.md`, `plan.md`, `steps.md`, `implementation.md`, the prompt-registry contribution owner, lower-level dispatch/mutation seams, session-state prompt-contribution ordering helper, extension prompt-contribution projection/query surfaces, nullable extension helper state, and focused tests.
+- Re-ran focused verification:
+  - `clojure -M:test --focus psi.prompt-registry.contributions-test --focus psi.agent-session.query-graph-tools-test --focus psi.agent-session.model-dispatch-test`
+  - `clj-kondo --lint components/prompt-registry/src components/prompt-registry/test components/agent-session/src components/agent-session/test components/extension-test-helpers/src`
+- No new actionable code-shaping feedback found; the current implementation already uses the shared canonical ordering seam, keeps single-id identity logic localized in `prompt-registry`, and leaves extension-facing list filtering owner-scoped without reintroducing composite identity. `steps.md` unchanged.
+
 ## 2026-05-24 test-shaper review pass
 - Re-read `design.md`, `plan.md`, `steps.md`, `implementation.md`, the prompt-registry contribution owner, affected dispatch/mutation/resolver seams, extension API prompt-contribution helper contract, and focused task tests.
 - Re-ran focused verification:
