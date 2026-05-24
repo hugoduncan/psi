@@ -31,6 +31,11 @@
 - Used the preloaded review result plus current task artifacts to execute any newly added actionable unchecked `steps.md` items.
 - Found no unchecked follow-up implementation items to execute; this pass was a no-op.
 
+## 2026-05-24 inconsistency review pass
+- Re-read `design.md`, `plan.md`, `steps.md`, `implementation.md`, `design-steps.md`, the prompt-registry ownership code, lower dispatch/mutation seams, extension docs, and nullable extension test helpers.
+- Found one new actionable inconsistency: the task artifacts say nullable/test-helper infrastructure now models canonical single-id prompt-contribution identity, but `components/extension-test-helpers/src/psi/extension_test_helpers/nullable_api.clj` still registers contributions under composite `[ext-path id]` keys while update/unregister use single-id lookup.
+- Added one unchecked `design-steps.md` follow-up item so the task artifacts consistently account for that remaining composite-identity seam.
+
 ## 2026-05-24 ambiguity follow-up execution pass
 - Used the preloaded ambiguity-review result to execute the newly added unchecked `design-steps.md` item.
 - Clarified `design.md` so cross-owner duplicate registration failure is part of the required external contract at prompt-registry, lower dispatch, and Pathom mutation seams: callers now rely on the existing thrown ownership-conflict shape rather than a structured non-throwing failure result.
