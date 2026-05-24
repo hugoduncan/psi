@@ -15,6 +15,8 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-24: Reviewed task 171 with code-shaper; found one actionable robustness gap: Anthropic 400 compatibility fallback can strip all beta headers while leaving JSON Schema `:output_format`, creating an invalid retry without `structured-outputs-2025-11-13`. Added follow-up step.
+
 - 2026-05-24: Reviewed task 171 with test-shaper; found one actionable test-quality gap: Anthropic JSON Schema native non-streaming `:execute` tests assert extraction but do not capture the outbound request to prove `:stream` is absent/false. Added follow-up step and committed 11e76163.
 
 - 2026-05-24: Executed task 171 task-test-review follow-up: added focused Anthropic JSON Schema native beta-header composition coverage for structured-output + OAuth + prompt-caching + thinking betas with no duplicates; focused Anthropic/model/user tests green (`36 tests, 231 assertions`).
