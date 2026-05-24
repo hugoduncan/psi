@@ -156,3 +156,7 @@ Found one new actionable ambiguity: the request contract still leaves JSON Schem
 ## 2026-05-23 — executed ambiguity follow-up repeat 9
 
 Completed the newly added ambiguity follow-up without executing implementation `steps.md` work. Chose explicit request `:json-schema` as the provider-bound schema source for task 169; AI adapters do not convert Malli/domain `:schema` in this slice. Schema-only structured-output requests must report `:unsupported` with a clear missing-JSON-Schema reason and must not inject fallback prompts or provider-native fields. Updated `design.md`, `plan.md`, and `steps.md`, and marked the ambiguity design-step done.
+
+## 2026-05-23 — ambiguity review repeat 10
+
+Found one new actionable ambiguity: the task specifies capability shapes and provider-native request behavior, but does not identify which current built-in model descriptions should actually declare structured-output capability in this slice. The OpenAI example uses `openai/gpt-4.1`, which is not a current built-in model, and the Anthropic example names a conceptual Sonnet 4 id while current built-ins include several Anthropic Messages models. Implementation and tests need one rule: mark all current `:openai-completions` / `:anthropic-messages` built-ins that support the chosen mechanisms, mark only a named subset, or use test-only synthetic models while documenting built-ins as omitted/unsupported.
