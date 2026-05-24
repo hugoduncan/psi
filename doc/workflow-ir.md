@@ -707,6 +707,7 @@ judge-spec ::= llm-judge | invoke-judge   ;; invoke-judge is documented IR shape
 
 llm-judge ::= {:type :llm
                :session judge-session-spec
+               outputs?
                :projection? projection}
 
 judge-session-spec ::= {:model? model-selection-spec

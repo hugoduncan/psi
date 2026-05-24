@@ -57,3 +57,7 @@ Completed newly added ambiguity follow-ups only: specified one structured-output
 ## 2026-05-23 — inconsistency review repeat 3
 
 Found one new actionable inconsistency: `doc/workflow-ir.md` documents LLM judges as able to declare judge-local structured `:outputs`, and the design/grammar/user guide agree, but the same IR doc's compact suggested grammar still defines `llm-judge` without `outputs?`. That internal mismatch would lead implementers using the grammar block to reject the judge-local structured output surface described elsewhere.
+
+## 2026-05-23 — inconsistency follow-up repeat 3
+
+Completed the newly added inconsistency follow-up: aligned `doc/workflow-ir.md` suggested documentation grammar with the documented judge-local structured `:outputs` contract by adding `outputs?` to the `llm-judge` production. Marked the design-step done. Did not execute `steps.md` implementation items.
