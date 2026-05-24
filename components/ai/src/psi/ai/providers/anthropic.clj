@@ -7,7 +7,8 @@
             [psi.ai.models :as models]
             [psi.ai.proxy :as proxy]
             [psi.ai.providers.anthropic.request-schema :as request-schema]
-            [psi.ai.providers.anthropic.request-support :as request-support])
+            [psi.ai.providers.anthropic.request-support :as request-support]
+            [psi.ai.structured-output :as structured-output])
   (:import [java.io InputStream]
            [java.util UUID]))
 
@@ -232,6 +233,23 @@
               (:cache-control tool)))
           (:tools conversation))))
 
+(defn- anthropic-structured-tool-name
+  [request tools]
+  (let [base     (str "psi_structured_output__"
+                      (structured-output/structured-output-name request))
+        occupied (set (keep :name tools))]
+    (loop [candidate base
+           n         2]
+      (if (contains? occupied candidate)
+        (recur (str base "_" n) (inc n))
+        candidate))))
+
+(defn- anthropic-structured-tool
+  [request tools]
+  {:name (anthropic-structured-tool-name request tools)
+   :description "Return the requested structured output."
+   :input_schema (:json-schema request)})
+
 (defn- oauth-api-key?
   [api-key]
   (and api-key (str/includes? api-key "sk-ant-oat")))
@@ -331,12 +349,18 @@
 (defn build-request
   "Build Anthropic API request map."
   [conversation model options]
-  (let [thinking        (thinking-param model options)
+  (let [structured-request (structured-output/structured-output-request options)
+        strategy           (structured-output/select-strategy model structured-request)
+        thinking        (thinking-param model options)
         adaptive?       (adaptive-thinking? model)
         effort          (when (and thinking adaptive?)
                           (get thinking-level->effort (:thinking-level options)))
         api-key         (resolve-api-key options)
         tool-defs       (tool-definitions conversation)
+        structured-tool (when (= :provider-native (:strategy strategy))
+                          (anthropic-structured-tool structured-request tool-defs))
+        tool-defs       (cond-> (vec (or tool-defs []))
+                          structured-tool (conj structured-tool))
         system-body     (system-prompt-body conversation)
         prompt-caching? (prompt-caching? conversation)
         body            (cond-> {:model      (:id model)
@@ -351,7 +375,9 @@
                           thinking            (assoc :thinking thinking)
                           ;; adaptive thinking uses output_config.effort instead of budget_tokens
                           effort              (assoc :output_config {:effort effort})
-                          (seq tool-defs)     (assoc :tools tool-defs))
+                          (seq tool-defs)     (assoc :tools tool-defs)
+                          structured-tool   (assoc :tool_choice {:type "tool"
+                                                                 :name (:name structured-tool)}))
         body*           (request-schema/validate-request-body! body)
         base-hdrs       (if (:no-auth-header options)
                           ;; Strip auth headers when explicitly disabled
@@ -722,9 +748,11 @@
 (defn stream-anthropic
   "Stream response from Anthropic API."
   [conversation model options consume-fn]
-  (let [url         (str (:base-url model) "/v1/messages")
-        request     (build-request conversation model options)
-        block-types (atom {})
+  (let [url                (str (:base-url model) "/v1/messages")
+        structured-request (structured-output/structured-output-request options)
+        strategy           (structured-output/select-strategy model structured-request)
+        request            (build-request conversation model options)
+        block-types        (atom {})
         usage-acc   (atom {:input-tokens       0
                            :output-tokens      0
                            :cache-read-tokens  0
@@ -732,6 +760,9 @@
         done?       (atom false)]
     (try
       (capture-request! model options url request)
+      (when strategy
+        (consume-fn {:type :structured-output-strategy
+                     :structured-output strategy}))
       (letfn [(consume-stream-response! [response]
                 (with-open [reader (io/reader (:body response))]
                   (doseq [line (line-seq reader)]

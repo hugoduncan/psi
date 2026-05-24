@@ -4,7 +4,8 @@
             [psi.ai.models :as models]
             [psi.ai.providers.openai.content :as content]
             [psi.ai.providers.openai.reasoning :as reasoning]
-            [psi.ai.providers.openai.transport :as transport]))
+            [psi.ai.providers.openai.transport :as transport]
+            [psi.ai.structured-output :as structured-output]))
 
 (defn- extract-reasoning-delta
   [delta]
@@ -87,39 +88,54 @@
 
 (defn transform-messages
   "Transform conversation messages to OpenAI chat completions format."
-  [conversation]
-  (->> (:messages conversation)
-       (reduce
-        (fn [acc msg]
-          (case (:role msg)
-            :user
-            (conj acc {:role    "user"
-                       :content (content/user-message-text msg)})
+  ([conversation]
+   (transform-messages conversation nil))
+  ([conversation fallback-request]
+   (let [last-user-index (when fallback-request
+                           (last (keep-indexed (fn [idx msg]
+                                                 (when (= :user (:role msg)) idx))
+                                               (:messages conversation))))]
+     (->> (:messages conversation)
+          (map-indexed vector)
+          (reduce
+           (fn [acc [idx msg]]
+             (case (:role msg)
+               :user
+               (let [text (content/user-message-text msg)]
+                 (conj acc {:role    "user"
+                            :content (if (= idx last-user-index)
+                                       (structured-output/append-fallback-instructions-to-text
+                                        text fallback-request)
+                                       text)}))
 
-            :assistant
-            (if (= :structured (get-in msg [:content :kind]))
-              (let [{:keys [text tool-calls]} (content/assistant-structured-content msg)
-                    base                     (cond-> {:role "assistant"}
-                                               (seq text) (assoc :content text))]
-                (conj acc
-                      (if (seq tool-calls)
-                        (assoc base :tool_calls (mapv content/chat-tool-call tool-calls))
-                        base)))
-              (conj acc {:role    "assistant"
-                         :content (get-in msg [:content :text] "")}))
+               :assistant
+               (if (= :structured (get-in msg [:content :kind]))
+                 (let [{:keys [text tool-calls]} (content/assistant-structured-content msg)
+                       base                     (cond-> {:role "assistant"}
+                                                  (seq text) (assoc :content text))]
+                   (conj acc
+                         (if (seq tool-calls)
+                           (assoc base :tool_calls (mapv content/chat-tool-call tool-calls))
+                           base)))
+                 (conj acc {:role    "assistant"
+                            :content (get-in msg [:content :text] "")}))
 
-            :tool-result
-            (conj acc {:role         "tool"
-                       :tool_call_id (:tool-call-id msg)
-                       :content      (content/tool-result-text msg)})
+               :tool-result
+               (conj acc {:role         "tool"
+                          :tool_call_id (:tool-call-id msg)
+                          :content      (content/tool-result-text msg)})
 
-            acc))
-        [])))
+               acc))
+           [])))))
 
 (defn build-request
   "Build OpenAI Chat Completions API request map."
   [conversation model options]
-  (let [base-messages (transform-messages conversation)
+  (let [structured-request (structured-output/structured-output-request options)
+        strategy           (structured-output/select-strategy model structured-request)
+        fallback-request   (when (= :prompted-json (:strategy strategy))
+                             structured-request)
+        base-messages      (transform-messages conversation fallback-request)
         messages      (if (:system-prompt conversation)
                         (cons {:role    "system"
                                :content (:system-prompt conversation)}
@@ -145,7 +161,16 @@
                         effort                      (assoc :reasoning_effort effort)
                         template-kw                 (assoc :chat_template_kwargs template-kw)
                         (:logprobs-enabled options) (assoc :logprobs true
-                                                           :top_logprobs (or (:top-logprobs options) 3)))]
+                                                           :top_logprobs (or (:top-logprobs options) 3))
+                        (and (= :provider-native (:strategy strategy))
+                             (= :openai/chat-completions-json-schema-response-format
+                                (:native-mechanism strategy)))
+                        (assoc :response_format
+                               {:type "json_schema"
+                                :json_schema
+                                {:name (structured-output/structured-output-name structured-request)
+                                 :strict (not (false? (:strict? structured-request)))
+                                 :schema (:json-schema structured-request)}}))]
     {:headers (cond-> {"Content-Type" "application/json"}
                 ;; Skip Authorization when :no-auth-header is set
                 ;; (e.g. local servers that reject auth headers)
@@ -410,25 +435,39 @@
       (seq tool-calls) (into tool-calls))))
 
 (defn- completion-response->assistant-message
-  [model body]
-  (let [choice (first (:choices body))
-        message (:message choice)
-        stop-reason (keyword (or (:finish_reason choice) "stop"))
-        usage (when-let [usage (:usage body)]
-                (completions-usage-map model usage))
-        logprobs (or (extract-openai-logprob-delta choice)
-                     (extract-llama-logprob-delta body))]
-    {:assistant-message (cond-> {:role "assistant"
-                                 :content (completion-message->content message)
-                                 :stop-reason stop-reason
-                                 :timestamp (java.time.Instant/now)}
-                          (map? usage) (assoc :usage usage))
-     :logprobs logprobs}))
+  ([model body]
+   (completion-response->assistant-message model body nil))
+  ([model body strategy]
+   (let [choice (first (:choices body))
+         message (:message choice)
+         stop-reason (keyword (or (:finish_reason choice) "stop"))
+         usage (when-let [usage (:usage body)]
+                 (completions-usage-map model usage))
+         logprobs (or (extract-openai-logprob-delta choice)
+                      (extract-llama-logprob-delta body))
+         text (content/string-fragment (:content message))
+         payload (when (contains? #{:provider-native :prompted-json} (:strategy strategy))
+                   (structured-output/parse-json-object text))]
+     (cond-> {:assistant-message (cond-> {:role "assistant"
+                                          :content (completion-message->content message)
+                                          :stop-reason stop-reason
+                                          :timestamp (java.time.Instant/now)}
+                                   (map? usage) (assoc :usage usage))
+              :logprobs logprobs}
+       strategy (assoc :structured-output
+                       (cond-> strategy
+                         payload (assoc :payload payload
+                                        :raw-payload payload
+                                        :source (if (= :provider-native (:strategy strategy))
+                                                  :openai/message-json
+                                                  :prompted-json/text))))))))
 
 (defn execute-openai
   [conversation model options]
-  (let [url     (str (:base-url model) "/chat/completions")
-        request (non-streaming-request conversation model options)]
+  (let [url                (str (:base-url model) "/chat/completions")
+        structured-request (structured-output/structured-output-request options)
+        strategy           (structured-output/select-strategy model structured-request)
+        request            (non-streaming-request conversation model options)]
     (try
       (transport/capture-request! model options :openai-completions url request)
       (let [response (transport/execute-response url request)]
@@ -436,17 +475,22 @@
           (transport/response->error response)
           (let [body (json/parse-string (:body response) true)
                 _    (transport/capture-response! model options :openai-completions url body)]
-            (completion-response->assistant-message model body))))
+            (completion-response->assistant-message model body strategy))))
       (catch Exception e
         (transport/exception->error e)))))
 
 (defn stream-openai
   [conversation model options consume-fn]
-  (let [url          (str (:base-url model) "/chat/completions")
-        request      (build-request conversation model options)
-        stream-state (make-chat-stream-state)]
+  (let [url                (str (:base-url model) "/chat/completions")
+        structured-request (structured-output/structured-output-request options)
+        strategy           (structured-output/select-strategy model structured-request)
+        request            (build-request conversation model options)
+        stream-state       (make-chat-stream-state)]
     (try
       (transport/capture-request! model options :openai-completions url request)
+      (when strategy
+        (consume-fn {:type :structured-output-strategy
+                     :structured-output strategy}))
       (let [response (transport/stream-response url request)]
         (if (transport/error-status? (:status response))
           (transport/emit-error! model

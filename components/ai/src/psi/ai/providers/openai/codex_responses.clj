@@ -5,7 +5,8 @@
             [psi.ai.models :as models]
             [psi.ai.providers.openai.content :as content]
             [psi.ai.providers.openai.reasoning :as reasoning]
-            [psi.ai.providers.openai.transport :as transport]))
+            [psi.ai.providers.openai.transport :as transport]
+            [psi.ai.structured-output :as structured-output]))
 
 (defn- resolve-codex-url
   [base-url]
@@ -39,20 +40,31 @@
      "output"  (content/tool-result-text msg)}))
 
 (defn codex-input-messages
-  [conversation]
-  (->> (:messages conversation)
-       (mapcat (fn [msg]
-                 (case (:role msg)
-                   :user
-                   [{"role"    "user"
-                     "content" [{"type" "input_text"
-                                 "text" (content/user-message-text msg)}]}]
-                   :assistant
-                   (assistant-content->codex-items msg)
-                   :tool-result
-                   [(tool-result->codex-item msg)]
-                   [])))
-       vec))
+  ([conversation]
+   (codex-input-messages conversation nil))
+  ([conversation fallback-request]
+   (let [last-user-index (when fallback-request
+                           (last (keep-indexed (fn [idx msg]
+                                                 (when (= :user (:role msg)) idx))
+                                               (:messages conversation))))]
+     (->> (:messages conversation)
+          (map-indexed vector)
+          (mapcat (fn [[idx msg]]
+                    (case (:role msg)
+                      :user
+                      (let [text (content/user-message-text msg)]
+                        [{"role"    "user"
+                          "content" [{"type" "input_text"
+                                      "text" (if (= idx last-user-index)
+                                               (structured-output/append-fallback-instructions-to-text
+                                                text fallback-request)
+                                               text)}]}])
+                      :assistant
+                      (assistant-content->codex-items msg)
+                      :tool-result
+                      [(tool-result->codex-item msg)]
+                      [])))
+          vec))))
 
 (defn- codex-tools
   [conversation]
@@ -106,7 +118,11 @@
     (when-not (seq account-id)
       (throw (ex-info "OpenAI Codex requires ChatGPT OAuth access token (missing chatgpt_account_id)"
                       {:provider :openai :api :openai-codex-responses})))
-    (let [tools     (codex-tools conversation)
+    (let [structured-request (structured-output/structured-output-request options)
+          strategy           (structured-output/select-strategy model structured-request)
+          fallback-request   (when (= :prompted-json (:strategy strategy))
+                               structured-request)
+          tools     (codex-tools conversation)
           reasoning (codex-reasoning model options)
           base-hdrs (cond-> {"Content-Type"       "application/json"
                              "accept"             "text/event-stream"
@@ -125,7 +141,7 @@
                              "store"               false
                              "stream"              true
                              "instructions"        (:system-prompt conversation)
-                             "input"               (codex-input-messages conversation)
+                             "input"               (codex-input-messages conversation fallback-request)
                              "text"                {"verbosity" "medium"}
                              "tool_choice"         "auto"
                              "parallel_tool_calls" true}
@@ -364,11 +380,16 @@
 
 (defn stream-openai-codex
   [conversation model options consume-fn]
-  (let [url          (resolve-codex-url (:base-url model))
-        stream-state (make-codex-stream-state)]
+  (let [url                (resolve-codex-url (:base-url model))
+        structured-request (structured-output/structured-output-request options)
+        strategy           (structured-output/select-strategy model structured-request)
+        stream-state       (make-codex-stream-state)]
     (try
       (let [request  (build-codex-request conversation model options)
             _        (transport/capture-request! model options :openai-codex-responses url request)
+            _        (when strategy
+                       (consume-fn {:type :structured-output-strategy
+                                    :structured-output strategy}))
             response (transport/stream-response url request)]
         (if (transport/error-status? (:status response))
           (let [{:keys [error-message http-status]} (transport/response->error response)]

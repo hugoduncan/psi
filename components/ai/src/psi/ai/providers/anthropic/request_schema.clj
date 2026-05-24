@@ -107,7 +107,11 @@
    [:temperature {:optional true} number?]
    [:thinking {:optional true} anthropic-thinking-schema]
    [:output_config {:optional true} anthropic-output-config-schema]
-   [:tools {:optional true} [:sequential anthropic-tool-schema]]])
+   [:tools {:optional true} [:sequential anthropic-tool-schema]]
+   [:tool_choice {:optional true}
+    [:map {:closed true}
+     [:type [:= "tool"]]
+     [:name [:re "^[a-zA-Z0-9_-]{1,128}$"]]]]])
 
 (defn- request-shape-error-message
   [body explain]

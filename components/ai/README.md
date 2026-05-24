@@ -123,6 +123,20 @@ All entities are validated using Malli schemas:
 - `schemas/StreamOptions` - streaming configuration options
 - `schemas/Usage` - token usage and cost tracking
 
+## Structured output capabilities
+
+Model descriptions may declare `[:capabilities :structured-output]` to make the effective structured-output strategy explicit. Omitted capability data remains load-valid but normalizes to unsupported; prompted JSON fallback is opt-in with `:strategies [:prompted-json]`.
+
+Request options may include `:structured-output` with `:schema-id`, `:schema-version`, `:name`, `:strict?`, `:fallback-allowed?`, and a caller-supplied `:json-schema`. AI adapters do not convert Malli/domain `:schema` to JSON Schema.
+
+Supported native mechanisms in this slice:
+
+- OpenAI `:openai-completions` models that declare `:openai/chat-completions-json-schema-response-format` send Chat Completions `response_format {:type "json_schema" ...}`.
+- Anthropic `:anthropic-messages` models that declare `:anthropic/forced-tool-use` append a synthetic forced tool with `input_schema`.
+- OpenAI `:openai-codex-responses` models are fallback-only when declared; they never receive public OpenAI Chat Completions/Responses schema fields.
+
+Strategy metadata is explicit. Streaming calls emit `:structured-output-strategy`; non-streaming provider results include top-level `:structured-output` metadata and any extracted payload. Provider-native output still requires caller/workflow validation before use as trusted structured data.
+
 ## Provider Support
 
 Currently supports:

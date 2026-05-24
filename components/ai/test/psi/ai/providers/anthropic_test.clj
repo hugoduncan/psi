@@ -7,7 +7,8 @@
    [psi.ai.models :as models]
    [psi.ai.proxy :as proxy]
    [psi.ai.providers.anthropic :as anthropic]
-   [psi.ai.providers.anthropic.request-schema :as request-schema])
+   [psi.ai.providers.anthropic.request-schema :as request-schema]
+   [psi.ai.structured-output :as structured-output])
   (:import [java.io ByteArrayInputStream]))
 
 (defn- sse-line [event-type data-map]
@@ -720,3 +721,78 @@
               {:type "text"
                :text "tail"}]
              (get-in out [0 :content]))))))
+
+(def ^:private judge-json-schema
+  {:type "object"
+   :properties {:ok {:type "boolean"}}
+   :required ["ok"]
+   :additionalProperties false})
+
+(def ^:private judge-structured-output-request
+  {:schema-id :psi.workflow/judge-review-result
+   :schema-version 1
+   :name "judge_review_result"
+   :json-schema judge-json-schema
+   :strict? true
+   :fallback-allowed? true})
+
+(deftest anthropic-structured-output-forced-tool-request-shaping-test
+  ;; Tests Anthropic provider-native structured output as a synthetic forced tool
+  ;; composed alongside ordinary user tools.
+  (let [model (models/get-model :sonnet-4.6)
+        convo (-> (conv/create "sys")
+                  (conv/add-tool {:name "psi_structured_output__judge_review_result"
+                                  :description "existing"
+                                  :parameters {:type "object"}})
+                  (conv/add-user-message "Review this"))
+        req   (#'anthropic/build-request convo model {:api-key "test-key"
+                                                      :structured-output judge-structured-output-request})
+        body  (json/parse-string (:body req) true)
+        tools (:tools body)
+        structured-tool (some #(when (= "psi_structured_output__judge_review_result_2" (:name %)) %)
+                              tools)]
+    (is (= 2 (count tools)))
+    (is (= judge-json-schema (:input_schema structured-tool)))
+    (is (= {:type "tool" :name "psi_structured_output__judge_review_result_2"}
+           (:tool_choice body)))
+    (is (= :provider-native
+           (:strategy (structured-output/select-strategy model judge-structured-output-request))))))
+
+(deftest anthropic-structured-output-missing-json-schema-test
+  ;; Tests schema-only structured-output requests report unsupported and do not
+  ;; add a synthetic forced tool.
+  (let [model   (models/get-model :sonnet-4.6)
+        request (dissoc judge-structured-output-request :json-schema)
+        convo   (-> (conv/create "sys")
+                    (conv/add-user-message "Review this"))
+        req     (#'anthropic/build-request convo model {:api-key "test-key"
+                                                        :structured-output request})
+        body    (json/parse-string (:body req) true)
+        strategy (structured-output/select-strategy model request)]
+    (is (= :unsupported (:strategy strategy)))
+    (is (= :missing-json-schema (:reason strategy)))
+    (is (nil? (:tools body)))
+    (is (nil? (:tool_choice body)))))
+
+(deftest anthropic-streaming-structured-output-strategy-event-test
+  ;; Tests streaming strategy metadata is emitted as a first-class AI event.
+  (let [model  (models/get-model :sonnet-4.6)
+        convo  (-> (conv/create "sys")
+                   (conv/add-user-message "Review this"))
+        events (atom [])
+        sse    (str (sse-line "message_start"
+                              {:type "message_start"
+                               :message {:usage {:input_tokens 1}}})
+                    (sse-line "message_delta"
+                              {:type "message_delta"
+                               :delta {:stop_reason "end_turn"}
+                               :usage {:output_tokens 1}}))]
+    (with-redefs [http/post (fn [_url _req]
+                              {:body (stream-body sse)})]
+      ((:stream anthropic/provider)
+       convo model {:api-key "test-key"
+                    :structured-output judge-structured-output-request}
+       (fn [ev] (swap! events conj ev))))
+    (is (some #(and (= :structured-output-strategy (:type %))
+                    (= :provider-native (get-in % [:structured-output :strategy])))
+              @events))))

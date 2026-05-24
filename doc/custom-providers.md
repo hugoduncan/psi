@@ -35,6 +35,29 @@ Supported custom-provider API protocols are:
 
 In practice, most custom hosted providers fit the first two.
 
+## Structured output capability
+
+Custom model definitions may opt into structured-output requests with a model-level capability map:
+
+```clojure
+{:capabilities
+ {:structured-output
+  {:supported? true
+   :strategies [:prompted-json]
+   :native-mechanism nil
+   :notes "Use adapter-owned JSON-only prompt fallback."}}}
+```
+
+Omitting `:capabilities :structured-output` is valid and normalizes to unsupported. Psi will not inject prompted-JSON fallback instructions for omitted legacy/custom models; add `:strategies [:prompted-json]` when that behavior is wanted.
+
+Native capability declarations should only be used when the configured transport is known to support the provider mechanism:
+
+- `:openai-completions` may use `:native-mechanism :openai/chat-completions-json-schema-response-format` when the compatible API supports Chat Completions `response_format` JSON Schema.
+- `:anthropic-messages` may use `:native-mechanism :anthropic/forced-tool-use` when the compatible API supports forced tool choice with `input_schema`.
+- `:openai-codex-responses` should remain prompted-JSON fallback-only unless that backend's native schema contract has been verified.
+
+Structured-output requests must supply an explicit `:json-schema`; Psi does not convert Malli/domain schemas in the AI adapter. Local workflow/runtime validation remains mandatory after provider generation.
+
 ## OpenAI-compatible example: MiniMax
 
 Illustrative example: confirm the provider's current base URL and model ids in
