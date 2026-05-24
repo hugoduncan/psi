@@ -11,3 +11,7 @@
 - Chose test helper location/shape in `components/agent-session/test/psi/agent_session/test_support.clj` as test support only; production API remains `psi.agent-session.scheduler-time`.
 - Created `plan.md` from the clarified design because it was missing and the task protocol expects it before implementation.
 - No ambiguity follow-up item remains blocked.
+
+## 2026-05-24 inconsistency review
+- Reviewed `design.md`, `plan.md`, missing `steps.md`, `design-steps.md`, `implementation.md`, and referenced scheduler source/tests.
+- New actionable inconsistencies found: task execution checklist file is missing despite task/protocol references to steps, and scheduler wall-clock boundary text misplaces the `scheduler-time/system-time-source` exception under `context.clj` while omitting the new `scheduler_time.clj` file from the scan boundary.
