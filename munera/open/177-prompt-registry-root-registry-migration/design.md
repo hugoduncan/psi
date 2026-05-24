@@ -88,7 +88,8 @@ The migration should move these concerns down to `root-registry` ownership where
 
 The refined design must make the following points unambiguous:
 
-- Prompt contributions should live in a dedicated per-session root-registry instance keyed by a stable prompt registry id owned by `prompt-registry`; implementation may choose the exact keyword, but the registry must be session-scoped rather than process-global because prompt contributions are session-visible prompt state and are inherited/forked per session.
+- Prompt contributions do not get a dedicated per-session root-registry host. The substrate is the shared top-level `:root-registries` area already used by other adopter registries, and prompt-registry should declare one stable registry id there, e.g. `:prompt-contributions` or equivalent prompt-registry-owned keyword.
+- Session scoping must be represented inside that shared root-state substrate rather than by separate registry hosts. The prompt-registry adapter therefore needs one authoritative root-state shape that distinguishes the shared prompt definition store from per-session membership or copied prompt visibility state.
 - The canonical stored root-registry entry should keep root-registry ownership metadata at the outer layer and preserve the current prompt contribution map as the prompt-registry-owned value payload, i.e. conceptually `{:id <string-id> :extension-id <ext-path> :value <canonical-prompt-contribution-map>}` where the value retains prompt fields such as `:section`, `:content`, `:priority`, `:enabled`, `:created-at`, and `:updated-at`.
 - Prompt-registry should continue to own normalization/canonicalization of prompt values; root-registry should own only authoritative keyed storage, duplicate/ownership enforcement compatible with task `176`, and removal by canonical id.
 - Prompt patch/update should remain adapter-owned over root-registry storage: lookup current stored prompt contribution by canonical id, assert owner when `ext-path` is supplied, merge the allowed patch into the prompt value, preserve non-patchable `:created-at`, advance `:updated-at`, then write back through root-registry replace-capable registration.
@@ -96,6 +97,35 @@ The refined design must make the following points unambiguous:
 - Owner-scoped bulk cleanup remains in scope if reload/reset paths need it, but it must operate through prompt-registry/root-registry ownership rather than by clearing an independently authoritative session vector.
 - The refined design must name every current higher projection that still reads session-local prompt-contribution vectors directly and redirect them to prompt-registry/root-registry-backed reads.
 - The refined design must require seam-level guard tests that prove legacy session-local prompt-contribution vectors are no longer authoritative.
+
+## Root-state storage topology
+
+Task `177` adopts the same shared-substrate model used by the skill, tool, workflow, and deterministic-operation migrations:
+
+- canonical prompt contribution definitions live under shared top-level root state `[:root-registries <prompt-registry-id> :entries-by-id <id>]`
+- each canonical entry uses root-registry shape `{:id <string-id> :extension-id <ext-path> :value <canonical-prompt-contribution-map>}`
+- session visibility is not encoded by a dedicated per-session registry host; it is encoded by each session's own prompt-contribution membership data, analogous to `:skill-ids`
+- the likely session-owned projection is a vector of canonical prompt ids, e.g. `:prompt-contribution-ids`, while any surviving `:prompt-contributions` vector is strictly derived from those ids plus root-registry definitions
+
+That topology makes the storage owner precise:
+
+- `root-registry` owns prompt contribution definitions and cross-owner duplicate protection
+- session data owns only which prompt ids are visible in that session
+- prompt-registry owns the adapter that joins those two layers into the public prompt contribution behavior callers see
+
+This task does not need to preserve raw copied prompt maps inside every session once canonical definitions are rooted in shared storage. If compatibility requires `:prompt-contributions` to survive temporarily, it must be rebuilt from root-registry-backed definitions selected by the session's canonical membership state rather than copied forward as authority.
+
+## Session lifecycle copy and derive rules
+
+The current lifecycle code still copies raw `:prompt-contributions` vectors in `session_state/init.clj` and `child_session_state.clj`. After migration, those flows must instead follow these rules:
+
+- new root session creation copies or seeds prompt visibility from the current session using canonical session membership state (expected to be prompt ids), not by copying raw prompt maps as authority
+- resumed session initialization reconstructs session prompt visibility from persisted canonical session membership state and root-registry-backed definitions; it must not treat a persisted `:prompt-contributions` vector as authoritative when a root-registry-backed representation exists
+- forked session initialization copies the parent's prompt membership state and continues to resolve prompt maps from shared root-registry definitions
+- child session creation copies the parent's prompt membership state by default, then derives renderable prompt contribution values from root-registry-backed definitions after any child prompt-component filtering
+- reset/cleanup paths clear per-session prompt membership state and, where required, clear root-registry-owned definitions by extension ownership through prompt-registry/root-registry operations rather than by mutating only session-local vectors
+
+Implementation can choose the exact session membership field name, but the design requires the following invariant: whenever lifecycle code needs prompt contributions for a session, the authoritative path is `session membership -> root-registry entry lookup -> canonical prompt ordering`, never `raw session-local prompt-contributions vector -> trust as source of truth`.
 
 ## Concrete seam inventory
 
