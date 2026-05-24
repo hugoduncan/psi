@@ -28,11 +28,12 @@
 (pco/defresolver prompt-template-detail-resolver
   "Resolve a single enriched prompt template by name.
    Seed input: {:psi.prompt-template/name \"template-name\"}"
-  [{:keys [psi/agent-session-ctx psi.agent-session/session-id psi.prompt-template/name]}]
+  [{:keys [psi/agent-session-ctx psi.agent-session/session-id]
+    template-name :psi.prompt-template/name}]
   {::pco/input  [:psi/agent-session-ctx :psi.agent-session/session-id :psi.prompt-template/name]
    ::pco/output [:psi.prompt-template/detail]}
   (let [templates (:prompt-templates (support/session-data agent-session-ctx session-id))
-        tpl       (pt/find-template templates name)]
+        tpl       (pt/find-template templates template-name)]
     {:psi.prompt-template/detail
      (when tpl (pt/enrich-template tpl))}))
 
@@ -61,11 +62,12 @@
 (pco/defresolver skill-detail-resolver
   "Resolve a single enriched skill by name.
    Seed input: {:psi.skill/name \"skill-name\"}"
-  [{:keys [psi/agent-session-ctx psi.agent-session/session-id psi.skill/name]}]
+  [{:keys [psi/agent-session-ctx psi.agent-session/session-id]
+    skill-name :psi.skill/name}]
   {::pco/input  [:psi/agent-session-ctx :psi.agent-session/session-id :psi.skill/name]
    ::pco/output [:psi.skill/detail]}
   (let [session-data (support/session-data agent-session-ctx session-id)
-        skill        (skill-storage/find-skill @(:state* agent-session-ctx) session-data name)]
+        skill        (skill-storage/find-skill @(:state* agent-session-ctx) session-data skill-name)]
     {:psi.skill/detail
      (when skill (skills/enrich-skill skill))}))
 

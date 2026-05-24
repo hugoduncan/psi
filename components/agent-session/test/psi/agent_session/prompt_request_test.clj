@@ -261,9 +261,10 @@
                     {:user-message {:role "user"
                                     :content [{:type :text :text "/skill:lambda-compiler"}]}
                      :runtime-opts {}})]
-      (is (= "/skill:lambda-compiler" (:prepared-request/input-text prepared)))
-      (is (= "user" (-> prepared :prepared-request/provider-messages first :role)))
-      (is (re-find #"lambda-compiler" (-> prepared :prepared-request/provider-messages first :content first :text))))))
+      (is (= :skill (get-in prepared [:prepared-request/input-expansion :kind])))
+      (is (= "lambda-compiler" (get-in prepared [:prepared-request/input-expansion :name])))
+      (is (= "user" (-> prepared :prepared-request/user-message :role)))
+      (is (re-find #"lambda-compiler" (-> prepared :prepared-request/user-message :content first :text))))))
 
 ;; ── Temperature projection ──────────────────────────────────────────────────
 
