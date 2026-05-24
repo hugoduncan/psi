@@ -188,3 +188,7 @@ Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, prior implementa
 ## 2026-05-23 — executed inconsistency follow-ups repeat 10
 
 No newly added unchecked `design-steps.md` items existed after the preloaded inconsistency review, so there were no actionable design follow-ups to execute. Did not execute implementation `steps.md` work.
+
+## 2026-05-23 — ambiguity review repeat 12
+
+Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, prior implementation notes, referenced workflow docs, and current AI model/provider/schema/user-model files for ambiguity. Found no new actionable ambiguity feedback. The task artifacts remain unambiguous on caller-supplied `:json-schema`, capability defaulting and built-in assignment, auth/transport-aware resolved capabilities without `:auth`, OpenAI/Anthropic native request shapes, prompted-JSON fallback injection, top-level non-streaming `:structured-output`, first-class streaming events, extracted payload handoff, and workflow/runtime final validation authority.
