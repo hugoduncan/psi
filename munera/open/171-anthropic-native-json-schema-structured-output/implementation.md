@@ -23,3 +23,5 @@
 - 2026-05-24 executed inconsistency follow-up repeat 2: resolved the Anthropic JSON Schema `:output_format :strict` inconsistency by choosing normalized request semantics. Requests default `:strict` to true when `[:structured-output :strict?]` is omitted, honor explicit `:strict? false` by sending `:strict false`, and plan/test expectations now require coverage for both cases. Marked the design-step done.
 
 - 2026-05-24 ambiguity review repeat 3: found no new actionable ambiguity feedback after rechecking design/plan/steps/design-steps, current Anthropic/model/core structured-output code, AI docs, custom-provider docs, and task 170 dependency wording. Existing checked design-steps already resolve prior ambiguity around request/header shape, strict semantics, response/stream extraction, model assignment, mechanism selection, live-smoke seam, docs targets, and Anthropic non-streaming `:execute` scope.
+
+- 2026-05-24 executed ambiguity follow-up repeat 3: preloaded ambiguity review found no new actionable feedback, and `design-steps.md` has no unchecked follow-up items. No `steps.md` implementation items were executed.
