@@ -85,3 +85,7 @@ Found new actionable test feedback: the implemented structured-output tests cove
 ## 2026-05-23 — test-review follow-up
 
 Completed newly added test-review follow-ups: added text-mode session compatibility coverage, IR semantic validation tests for multiple structured outputs and reusable schema mismatch, structured judge invalid-local-failure and schema-valid `:needs-work` branch coverage, and downstream structured source-ref missing-path/non-structured-output coverage. Tightened structured source path resolution to fail clearly on missing paths for structured outputs and on path traversal against scalar declared step outputs, while preserving legacy nil behavior for unstructured missing nested collection paths. Focused verification green: `clojure -M:test --focus psi.workflow-runtime.ir-test --focus psi.workflow-runtime.statechart-runtime.step-execution-test --focus psi.workflow-step-materialization.structured-source-resolution-test --focus psi.agent-session.workflow-judge-test`.
+
+## 2026-05-23 — test-shaper review
+
+Found one new actionable test-shaping issue: prompted JSON tests cover malformed JSON and schema-invalid objects, but not syntactically valid non-object JSON. The single-JSON-object boundary should have a focused boundary test proving arrays/scalars are rejected with an invalid envelope rather than treated as schema failures or valid structured values.
