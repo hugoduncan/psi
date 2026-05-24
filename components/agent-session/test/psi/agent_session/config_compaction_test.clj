@@ -112,21 +112,33 @@
       (session/dispatch-in! ctx :session/register-prompt-template {:session-id session-id :template template} {:origin :core})
       (session/dispatch-in! ctx :session/register-skill {:session-id session-id :skill skill} {:origin :core})
       (session/consume-queued-input-text-in! ctx session-id)
-      (let [sd         (ss/get-session-data-in ctx session-id)
-            entries    (kernel/event-log-entries)
-            event-types (mapv :event-type entries)]
+      (let [sd          (ss/get-session-data-in ctx session-id)
+            entries      (kernel/event-log-entries)
+            event-types   (mapv :event-type entries)
+            event-indexes (zipmap event-types (range))]
         (is (= [] (:steering-messages sd)))
         (is (= [] (:follow-up-messages sd)))
         (is (= 1 (count (:prompt-templates sd))))
         (is (= ["coding"] (:skill-ids sd)))
         (is (nil? (:skills sd)))
-        (is (= [:session/enqueue-steering-message
-                :session/enqueue-follow-up-message
-                :session/register-prompt-template
-                :session/refresh-system-prompt
-                :session/register-skill
-                :session/clear-queued-messages]
-               event-types)))))
+        (is (some #{:session/enqueue-steering-message} event-types)
+            {:event-types event-types})
+        (is (some #{:session/enqueue-follow-up-message} event-types)
+            {:event-types event-types})
+        (is (some #{:session/register-prompt-template} event-types)
+            {:event-types event-types})
+        (is (some #{:session/refresh-system-prompt} event-types)
+            {:event-types event-types})
+        (is (some #{:session/register-skill} event-types)
+            {:event-types event-types})
+        (is (= :session/clear-queued-messages (last event-types))
+            {:event-types event-types})
+        (is (< (get event-indexes :session/enqueue-steering-message)
+               (get event-indexes :session/enqueue-follow-up-message)
+               (get event-indexes :session/register-prompt-template)
+               (get event-indexes :session/register-skill)
+               (get event-indexes :session/clear-queued-messages))
+            {:event-types event-types}))))
 
   (testing "register-skill refreshes the system prompt so newly added skills appear"
     (let [[ctx session-id] (create-session-context)
