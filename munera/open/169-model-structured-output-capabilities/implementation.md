@@ -40,3 +40,7 @@ Found one new actionable ambiguity: the artifacts say AI adapters do not final-v
 ## 2026-05-23 — executed ambiguity follow-up repeat 2
 
 Completed the newly added ambiguity follow-up without executing implementation `steps.md` work. Updated `design.md`, `plan.md`, and `steps.md` to make task 169's validation proof a handoff-contract proof: AI adapters preserve extracted/raw payloads plus strategy metadata for the existing workflow/runtime validation layer, and this task does not introduce an AI-level Malli validation invocation seam. Marked the ambiguity `design-steps.md` item done.
+
+## 2026-05-23 — inconsistency review repeat 2
+
+Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, prior implementation notes, current AI model/provider/schema files, and provider docs for cross-artifact inconsistency. Found no new actionable inconsistency feedback. The task artifacts consistently specify OpenAI native support only for explicitly capable `:openai-completions` Chat Completions `response_format`, keep `:openai-codex-responses` fallback-only, model Anthropic forced synthetic-tool extraction separately from ordinary tool calls, require explicit strategy/payload metadata, and preserve workflow/runtime as the final validation authority.
