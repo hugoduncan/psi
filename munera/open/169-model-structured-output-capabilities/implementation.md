@@ -200,3 +200,7 @@ No newly added unchecked `design-steps.md` items existed after the preloaded amb
 ## 2026-05-23 — inconsistency review repeat 11
 
 Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, prior implementation notes, referenced workflow docs, and current AI model/provider/schema/user-model files for cross-artifact inconsistency. Found no new actionable inconsistency feedback. The artifacts remain aligned on explicit caller-supplied `:json-schema`, no AI-side Malli/domain schema conversion, omitted capability normalization to unsupported, resolved-runtime-model capability authority without `:auth`, top-level non-streaming `:structured-output`, first-class streaming structured-output events, OpenAI Chat Completions native-only support, Codex fallback-only/unsupported behavior, Anthropic hidden synthetic forced-tool extraction, adapter-owned prompted-JSON fallback shaping, and workflow/runtime final validation authority.
+
+## 2026-05-23 — executed inconsistency follow-ups repeat 11
+
+No newly added unchecked `design-steps.md` items existed after the preloaded inconsistency review, so there were no actionable design follow-ups to execute. Did not execute implementation `steps.md` work.
