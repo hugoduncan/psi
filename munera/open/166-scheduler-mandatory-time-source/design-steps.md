@@ -5,5 +5,5 @@
 - [x] Specify how scheduled user-message timestamps in both `:scheduler/deliver` and `:scheduler/drain-queue` receive time, including whether delivery events carry `delivered-at` or handlers receive a time source.
 - [x] Define the exact scheduler-owned wall-clock search boundary: list the namespaces/files that must be free of direct `Instant/now` and explicitly exclude any remaining test/runtime timer wall-clock use that is outside this task.
 - [x] Choose the test time-source helper location and shape, and state whether it is production API, test support only, or a documented map/function contract.
-- [ ] Create the task execution checklist `steps.md` (or explicitly state why `design-steps.md` is the only checklist) so the task artifacts match the Munera protocol and review instructions that reference `steps.md`.
-- [ ] Correct the scheduler-owned wall-clock search boundary so `components/agent-session/src/psi/agent_session/scheduler_time.clj` is listed and the `scheduler-time/system-time-source` wall-clock exception is attached to that file, not to `context.clj`.
+- [x] Create the task execution checklist `steps.md` (or explicitly state why `design-steps.md` is the only checklist) so the task artifacts match the Munera protocol and review instructions that reference `steps.md`.
+- [x] Correct the scheduler-owned wall-clock search boundary so `components/agent-session/src/psi/agent_session/scheduler_time.clj` is listed and the `scheduler-time/system-time-source` wall-clock exception is attached to that file, not to `context.clj`.

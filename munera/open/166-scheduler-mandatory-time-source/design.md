@@ -73,7 +73,8 @@ The implementation must remove direct `java.time.Instant/now` or equivalent wall
 - `components/agent-session/src/psi/agent_session/psi_tool_scheduler.clj`
 - `components/agent-session/src/psi/agent_session/dispatch_handlers/scheduler.clj`
 - `components/agent-session/src/psi/agent_session/dispatch_effects.clj` for the `:scheduler/start-timer` delay calculation
-- `components/agent-session/src/psi/agent_session/context.clj` for scheduler context wiring, except inside `scheduler-time/system-time-source` itself
+- `components/agent-session/src/psi/agent_session/context.clj` for scheduler context wiring
+- `components/agent-session/src/psi/agent_session/scheduler_time.clj`, except inside `scheduler-time/system-time-source` itself
 - `components/agent-session/src/psi/agent_session/scheduler_runtime.clj` and `components/agent-session/src/psi/agent_session/resolvers/scheduler.clj` if touched; these should remain projection-only and not read current time
 
 The following wall-clock uses are explicitly outside this task unless needed by a touched scheduler test:
