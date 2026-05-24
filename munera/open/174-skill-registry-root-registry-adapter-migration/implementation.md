@@ -1,5 +1,3 @@
-# Implementation
-
 Task created to plan a root-registry migration for `skill-registry`.
 
 Initial design decision was helper-level alignment only, but the user clarified that the desired direction is a real storage move: root-registry should become authoritative for registered session skills.
@@ -115,3 +113,5 @@ Many code paths currently seed, copy, or read embedded `:skills` directly: boots
 2026-05-23 follow-up execution: used the preloaded implementation-review result as the authoritative source for newly added actionable work, re-read `steps.md` / `implementation.md` / `design.md` / `plan.md`, and verified the remaining unchecked top-level items were stale proof/accounting follow-ups rather than unresolved implementation work. Re-ran full `bb test` successfully, marked those stale checklist items done to synchronize the task surface with the already-green implementation state, and found no blocking follow-up requiring additional code changes in this pass.
 
 2026-05-23 task-test-review: no new actionable test feedback after re-reading the task artifacts plus representative migrated test surfaces (`skill-registry` lower storage/duplicate semantics, `config_compaction` prompt-refresh gating and duplicate no-op behavior, command `/help` and `/skills` ordering, workflow child-session skill selection, prompt-request `/skill:` expansion, and system-prompt skill rendering), then re-running full `bb test` successfully. Existing coverage already exercises the task-test-review contract across design behavior and root-registry-backed/session-`skill-ids` seams, so `steps.md` remains unchanged.
+
+2026-05-23 follow-up execution: used the preloaded test-review result to orient on newly added actionable work, re-read `steps.md`, `implementation.md`, `design.md`, and `plan.md`, and confirmed there were no newly added unchecked implementation follow-up items to execute. `steps.md` remained unchanged, no blocking reason needed recording, and this pass is a no-op aside from task-memory synchronization before commit.
