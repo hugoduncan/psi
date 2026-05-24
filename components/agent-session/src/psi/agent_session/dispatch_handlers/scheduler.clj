@@ -30,6 +30,10 @@
    :class (.getName (class e))
    :data (ex-data e)})
 
+(defn- scheduler-time-source-error?
+  [e]
+  (= :scheduler-time-source (:boundary (ex-data e))))
+
 (defn- require-instant!
   [field value]
   (when-not (instance? java.time.Instant value)
@@ -218,6 +222,8 @@
                        :created-session-id created-id
                        :prompt-result prompt-result}})
            (catch Exception e
+             (when (scheduler-time-source-error? e)
+               (throw e))
              (let [created-session-id (or (some-> e ex-data :created-session-id)
                                           (some-> e ex-data :session-id))
                    delivery-phase    (or (some-> e ex-data :delivery-phase)

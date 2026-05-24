@@ -150,3 +150,12 @@
 ## 2026-05-24 code-shaper review
 - Reviewed code-shaper skill, task artifacts, scheduler source/tests, and deterministic time-source seams for simplicity, consistency, and robustness.
 - New actionable code-shaping feedback: `:scheduler/deliver` handles session-kind delivery inside a broad `catch Exception`; missing/invalid `:scheduler-time-source` is caught and recorded as a failed schedule instead of failing fast like message delivery, drain, timer, and psi-tool create boundaries.
+
+## 2026-05-24 code-shaper follow-up execution
+- Used the preloaded code-shaper result and completed the newly added follow-up item.
+- Narrowed session-kind `:scheduler/deliver` broad exception handling so scheduler time-source validation errors rethrow and fail fast instead of marking the schedule failed.
+- Added focused session-kind coverage proving missing/invalid `:scheduler-time-source` fails fast and leaves schedules pending.
+- Existing prompt-submit failure coverage still proves real session delivery failures mark schedules failed.
+- Marked the follow-up checklist item complete in `steps.md`.
+- Focused handler proof passed: `clojure -M:test --focus psi.agent-session.scheduler-handlers-test` => 9 tests, 62 assertions, 0 failures.
+- Full scheduler proof passed: `clojure -M:test --focus psi.agent-session.scheduler-test --focus psi.agent-session.scheduler-handlers-test --focus psi.agent-session.psi-tool-scheduler-test --focus psi.agent-session.scheduler-timer-seam-test --focus psi.agent-session.scheduler-effects-test --focus psi.agent-session.scheduler-end-to-end-test --focus psi.agent-session.scheduler-background-jobs-test --focus psi.agent-session.scheduler-resolvers-test --focus psi.agent-session.scheduler-tools-test --focus psi.agent-session.scheduler-lifecycle-test --focus psi.agent-session.scheduler-cancel-job-test --focus psi.agent-session.scheduler-context-shutdown-test --focus psi.agent-session.scheduler-dispatch-test` => 35 tests, 352 assertions, 0 failures.

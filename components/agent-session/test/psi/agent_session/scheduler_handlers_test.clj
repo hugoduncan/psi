@@ -200,6 +200,51 @@
                                                :scheduler/drain-queue
                                                {:session-id session-id})))))))
 
+(deftest scheduler-session-deliver-requires-time-source-without-marking-failed-test
+  (let [[ctx session-id] (test-support/make-session-ctx {})]
+    (with-registered-handlers
+      ctx
+      #(do
+         (apply-root-state-update!
+          ctx
+          (invoke-handler ctx :scheduler/create {:session-id session-id
+                                                 :schedule-id "sch-session-needs-missing-time"
+                                                 :kind :session
+                                                 :message "run in fresh session"
+                                                 :session-config {:session-name "later session"}
+                                                 :created-at (instant "2026-04-21T18:30:00Z")
+                                                 :fire-at (instant "2026-04-21T18:31:00Z")
+                                                 :delay-ms 1000}))
+         (testing "missing scheduler time source fails fast before failed-schedule handling"
+           (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                                 #"scheduler time-source"
+                                 (invoke-handler (dissoc ctx :scheduler-time-source)
+                                                 :scheduler/deliver
+                                                 {:session-id session-id
+                                                  :schedule-id "sch-session-needs-missing-time"})))
+           (is (= :pending (get-in (ss/get-session-data-in ctx session-id)
+                                   [:scheduler :schedules "sch-session-needs-missing-time" :status]))))
+
+         (apply-root-state-update!
+          ctx
+          (invoke-handler ctx :scheduler/create {:session-id session-id
+                                                 :schedule-id "sch-session-needs-valid-time"
+                                                 :kind :session
+                                                 :message "run in fresh session"
+                                                 :session-config {:session-name "later session"}
+                                                 :created-at (instant "2026-04-21T18:32:00Z")
+                                                 :fire-at (instant "2026-04-21T18:33:00Z")
+                                                 :delay-ms 1000}))
+         (testing "invalid scheduler time source fails fast before failed-schedule handling"
+           (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                                 #"scheduler time-source"
+                                 (invoke-handler (assoc ctx :scheduler-time-source (fn [] "not an instant"))
+                                                 :scheduler/deliver
+                                                 {:session-id session-id
+                                                  :schedule-id "sch-session-needs-valid-time"})))
+           (is (= :pending (get-in (ss/get-session-data-in ctx session-id)
+                                   [:scheduler :schedules "sch-session-needs-valid-time" :status]))))))))
+
 (deftest scheduler-deliver-checks-schedule-before-time-source-test
   (let [[ctx session-id] (test-support/make-session-ctx {})]
     (with-registered-handlers
