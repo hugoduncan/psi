@@ -15,6 +15,12 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-24: Executed task 170 code-shaper follow-up: structured workflow session-step and LLM-judge success paths now reject a nil bounded turn-result `:structured-output` seam for structured requests, producing `:invalid-structured-output` blocked/fail surfaces instead of parsing assistant JSON with synthetic prompted-JSON metadata; focused tests green (`29 tests, 168 assertions`).
+- `STATE.md` — project-local state file
+- `AGENTS.md` — bootstrap/system instructions
+
+## Current work state
+
 - 2026-05-24: Reviewed task 170 with code-shaper; found one actionable robustness gap: structured session-step/judge success paths can still accept a nil bounded turn-result `:structured-output` seam and parse raw assistant JSON with a synthetic/default `:prompted-json` envelope instead of failing on missing authoritative metadata. Added follow-up step.
 
 - 2026-05-24: Reviewed task 170 with test-shaper; found one actionable success-path seam coverage gap: no session-step or LLM-judge execution test feeds top-level bounded turn-result `:structured-output` success metadata and asserts the workflow envelope records actual strategy/source/payload from that seam. Added follow-up step.

@@ -282,9 +282,16 @@
                     psi.workflow-runtime.turn-execution-contract/execute-judge-turn!
                     (fn [_ctx sid _text opts]
                       (reset! turn-opts* opts)
-                      {:status :ok
-                       :session-id sid
-                       :assistant-text "{\"decision\":\"clear\",\"issues\":[],\"confidence\":0.8}"})]
+                      (let [ai-structured-output {:strategy :prompted-json
+                                                  :source :prompted-json/text
+                                                  :payload {"decision" "clear"
+                                                            "issues" []
+                                                            "confidence" 0.8}
+                                                  :raw-payload "{\"decision\":\"clear\",\"issues\":[],\"confidence\":0.8}"}]
+                        {:status :ok
+                         :session-id sid
+                         :assistant-text "{\"decision\":\"clear\",\"issues\":[],\"confidence\":0.8}"
+                         :structured-output ai-structured-output}))]
         (let [result (workflow-judge/execute-judge!
                       (structured-judge-test-ctx) "parent-1" "actor-1"
                       structured-review-judge-spec structured-review-routing-table
@@ -306,6 +313,37 @@
                                       :fallback-allowed? true
                                       :strict? true}}
                  @turn-opts*)))))))
+
+(deftest execute-judge-missing-turn-result-structured-output-fails-test
+  ;; Tests structured judge requests reject a missing bounded turn-result
+  ;; :structured-output seam instead of parsing raw assistant JSON with a
+  ;; synthetic/default strategy envelope.
+  (testing "structured judge fails when structured metadata seam is absent"
+    (with-redefs [psi.session-persistence.core/messages-from-entries-in
+                  (fn [_ctx _sid] [])
+                  psi.workflow-runtime.turn-execution-contract/execute-judge-turn!
+                  (fn [_ctx sid _text _opts]
+                    {:status :ok
+                     :session-id sid
+                     :assistant-text "{\"decision\":\"clear\",\"issues\":[],\"confidence\":0.9}"})]
+      (let [result (workflow-judge/execute-judge!
+                    (structured-judge-test-ctx) "parent-1" "actor-1"
+                    structured-review-judge-spec structured-review-routing-table
+                    {:current-step-id "step-3-review"
+                     :step-order step-order
+                     :step-runs structured-review-step-runs})
+            envelope (get-in result [:judge-output :review :structured-output])]
+        (is (nil? (:judge-event result)))
+        (is (= {:action :fail
+                :reason :invalid-structured-output
+                :output-key :review}
+               (select-keys (:routing-result result) [:action :reason :output-key])))
+        (is (= :invalid (:status envelope)))
+        (is (= :prompted-json (:strategy envelope)))
+        (is (= [{:type :missing-structured-output
+                 :message "Structured workflow generation did not return structured-output metadata"}]
+               (:errors envelope)))
+        (is (not (contains? envelope :value)))))))
 
 (deftest execute-judge-structured-output-success-uses-turn-result-metadata-test
   ;; Tests successful structured judge envelopes are built from the top-level
@@ -474,9 +512,20 @@
                       :session-id sid
                       :assistant-text "{\"decision\":\"needs-work\",\"issues\":[{\"severity\":\"blocking\",\"kind\":\"ambiguity\",\"description\":\"unclear\",\"evidence\":\"design\",\"suggested-change\":\"clarify\"}],\"confidence\":0.8}"})
                     ([_ctx sid _text _opts]
-                     {:status :ok
-                      :session-id sid
-                      :assistant-text "{\"decision\":\"needs-work\",\"issues\":[{\"severity\":\"blocking\",\"kind\":\"ambiguity\",\"description\":\"unclear\",\"evidence\":\"design\",\"suggested-change\":\"clarify\"}],\"confidence\":0.8}"}))]
+                     (let [ai-structured-output {:strategy :prompted-json
+                                                 :source :prompted-json/text
+                                                 :payload {"decision" "needs-work"
+                                                           "issues" [{"severity" "blocking"
+                                                                      "kind" "ambiguity"
+                                                                      "description" "unclear"
+                                                                      "evidence" "design"
+                                                                      "suggested-change" "clarify"}]
+                                                           "confidence" 0.8}
+                                                 :raw-payload "{\"decision\":\"needs-work\"}"}]
+                       {:status :ok
+                        :session-id sid
+                        :assistant-text "{\"decision\":\"needs-work\",\"issues\":[{\"severity\":\"blocking\",\"kind\":\"ambiguity\",\"description\":\"unclear\",\"evidence\":\"design\",\"suggested-change\":\"clarify\"}],\"confidence\":0.8}"
+                        :structured-output ai-structured-output})))]
       (let [result (workflow-judge/execute-judge!
                     (structured-judge-test-ctx) "parent-1" "actor-1"
                     structured-review-judge-spec structured-review-routing-table

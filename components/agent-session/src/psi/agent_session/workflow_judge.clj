@@ -95,7 +95,9 @@
                                   :reason :unsupported-structured-output
                                   :output-key output-key
                                   :details {:structured-output last-structured-output}}}
-                (let [structured-result (structured-output/output-result output-spec last-output last-structured-output)
+                (let [structured-result (if (some? last-structured-output)
+                                          (structured-output/output-result output-spec last-output last-structured-output)
+                                          (structured-output/missing-ai-structured-output-result output-spec last-output))
                       judge-output {output-key structured-result}]
                   (if (structured-output/valid-output-result? structured-result)
                     (let [judge-event (get-in structured-result [:structured-output :value :decision])

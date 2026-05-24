@@ -184,4 +184,17 @@
    {:raw-output raw-output
     :structured-output (structured-output-envelope output-spec raw-output ai-structured-output)}))
 
+(defn missing-ai-structured-output-result
+  "Build the stable invalid envelope used when workflow execution made a
+  structured-output request but the bounded turn result omitted the authoritative
+  top-level :structured-output metadata seam.  The caller must not fall back to
+  parsing assistant prose in this case because the AI strategy/payload metadata
+  would be synthetic."
+  [output-spec raw-output]
+  {:raw-output raw-output
+   :structured-output (assoc (envelope-base output-spec {})
+                             :status :invalid
+                             :errors [{:type :missing-structured-output
+                                       :message "Structured workflow generation did not return structured-output metadata"}])})
+
 (def valid-output-result? structured-output-contract/valid-output-result?)

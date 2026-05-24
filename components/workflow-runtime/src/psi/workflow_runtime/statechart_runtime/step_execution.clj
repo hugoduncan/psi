@@ -193,7 +193,9 @@
                              :session-id (:session-id execution-session)}
                 raw-outputs (if-let [[output-key output-spec] structured-entry]
                               (assoc raw-outputs output-key
-                                     (structured-output/output-result output-spec assistant-text structured-output))
+                                     (if (some? structured-output)
+                                       (structured-output/output-result output-spec assistant-text structured-output)
+                                       (structured-output/missing-ai-structured-output-result output-spec assistant-text)))
                               raw-outputs)
                 structured-result (some-> structured-entry first raw-outputs)
                 invalid-structured-output? (and structured-entry

@@ -191,6 +191,47 @@
         (is (not (get-in @turn-opts* [:structured-output :require-provider-native?])))
         (is (= :actor/blocked (:event (first @event-queue*))))))))
 
+(deftest execute-session-step-missing-turn-result-structured-output-blocks-test
+  ;; Tests structured workflow requests reject a missing bounded turn-result
+  ;; :structured-output seam instead of guessing strategy/payload from prose.
+  (testing "session step blocks when structured metadata seam is absent"
+    (let [working-memory* (atom {:current-step-id "classify"})
+          event-queue* (atom [])]
+      (with-redefs [turn-execution/execute-actor-turn!
+                    (fn [_ctx _session-id _prompt _opts]
+                      {:status :ok
+                       :assistant-text "{\"decision\":\"pass\"}"
+                       :execution-result nil
+                       :assistant-message nil})]
+        (step-execution/execute-session-step!
+         {}
+         {:session-id "child-session"}
+         {:name "classify"
+          :type :session
+          :outputs {:classification {:source :session/structured-output
+                                     :mode :structured
+                                     :schema-id :psi.workflow/test-classification
+                                     :schema-version 1
+                                     :schema [:map [:decision [:enum :pass :fail]]]
+                                     :json-schema {:type "object"}}}}
+         "classify"
+         "attempt-1"
+         working-memory*
+         event-queue*
+         "Classify"))
+      (let [pending (:pending-actor-result @working-memory*)
+            classification (get-in pending [:payload :outputs :classification])]
+        (is (= :blocked (:kind pending)))
+        (is (= :blocked (get-in pending [:payload :outcome])))
+        (is (= :invalid-structured-output (get-in pending [:payload :blocked :reason])))
+        (is (= :invalid (get-in classification [:structured-output :status])))
+        (is (= :prompted-json (get-in classification [:structured-output :strategy])))
+        (is (= [{:type :missing-structured-output
+                 :message "Structured workflow generation did not return structured-output metadata"}]
+               (get-in classification [:structured-output :errors])))
+        (is (not (contains? (:structured-output classification) :value)))
+        (is (= :actor/blocked (:event (first @event-queue*))))))))
+
 (deftest execute-session-step-success-uses-turn-result-structured-output-metadata-test
   ;; Tests successful session-step envelopes are built from the authoritative
   ;; bounded turn-result :structured-output seam rather than assistant prose or
@@ -265,10 +306,15 @@
                          :failure {:reason :provider-unavailable
                                    :message "connection refused"
                                    :fallback-worthy? true}}
-                        {:status :ok
-                         :assistant-text "{\"decision\":\"pass\"}"
-                         :execution-result nil
-                         :assistant-message nil}))]
+                        (let [ai-structured-output {:strategy :prompted-json
+                                                    :source :prompted-json/text
+                                                    :payload {"decision" "pass"}
+                                                    :raw-payload "{\"decision\":\"pass\"}"}]
+                          {:status :ok
+                           :assistant-text "{\"decision\":\"pass\"}"
+                           :structured-output ai-structured-output
+                           :execution-result {:execution-result/structured-output ai-structured-output}
+                           :assistant-message nil})))]
         (step-execution/execute-session-step!
          ctx
          {:session-id "child-session"
