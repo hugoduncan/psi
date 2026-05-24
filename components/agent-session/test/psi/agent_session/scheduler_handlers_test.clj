@@ -160,6 +160,37 @@
                                                :scheduler/drain-queue
                                                {:session-id session-id})))))))
 
+(deftest scheduler-deliver-checks-schedule-before-time-source-test
+  (let [[ctx session-id] (test-support/make-session-ctx {})]
+    (with-registered-handlers
+      ctx
+      #(do
+         (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                               #"schedule not found"
+                               (invoke-handler (dissoc ctx :scheduler-time-source)
+                                               :scheduler/deliver
+                                               {:session-id session-id
+                                                :schedule-id "missing-schedule"})))
+         (apply-root-state-update!
+          ctx
+          (invoke-handler ctx :scheduler/create {:session-id session-id
+                                                 :schedule-id "sch-cancelled"
+                                                 :kind :message
+                                                 :message "wake up"
+                                                 :created-at (instant "2026-04-21T18:10:00Z")
+                                                 :fire-at (instant "2026-04-21T18:11:00Z")
+                                                 :delay-ms 1000}))
+         (apply-root-state-update!
+          ctx
+          (invoke-handler ctx :scheduler/cancel {:session-id session-id
+                                                 :schedule-id "sch-cancelled"}))
+         (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                               #"schedule is not deliverable"
+                               (invoke-handler (dissoc ctx :scheduler-time-source)
+                                               :scheduler/deliver
+                                               {:session-id session-id
+                                                :schedule-id "sch-cancelled"})))))))
+
 (deftest scheduler-session-kind-fires-without-origin-idle-test
   (let [[ctx session-id] (test-support/make-session-ctx {:session-data {:is-streaming true}})]
     (with-registered-handlers

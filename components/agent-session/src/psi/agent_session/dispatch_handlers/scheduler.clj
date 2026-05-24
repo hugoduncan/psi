@@ -181,11 +181,12 @@
   (register-core-handler!
    :scheduler/deliver
    (fn [ctx {:keys [session-id schedule-id delivered-at]}]
-     (let [delivered-at (or delivered-at (scheduler-now! ctx))
-           schedule (scheduler/get-schedule (scheduler-state-in ctx session-id) schedule-id)]
+     (let [{state' :state schedule :schedule}
+           (scheduler/deliver-schedule (scheduler-state-in ctx session-id) schedule-id)]
        (if (= :session (:kind schedule))
          (try
-           (let [session-config   (or (:session-config schedule) {})
+           (let [delivered-at     (or delivered-at (scheduler-now! ctx))
+                 session-config   (or (:session-config schedule) {})
                  created         (session-lifecycle/create-top-level-session-in!
                                   ctx
                                   session-id
@@ -208,9 +209,7 @@
                                                       :delivery-phase :prompt-submit
                                                       :result result})))
                                    result)
-                 {state' :state schedule' :schedule}
-                 (scheduler/deliver-schedule (scheduler-state-in ctx session-id) schedule-id)
-                 final-schedule  (assoc schedule'
+                 final-schedule  (assoc schedule
                                         :created-session-id created-id
                                         :delivery-phase :prompt-submit)
                  final-state     (assoc-in state' [:schedules schedule-id] final-schedule)]
@@ -223,24 +222,23 @@
                                           (some-> e ex-data :session-id))
                    delivery-phase    (or (some-> e ex-data :delivery-phase)
                                          (if created-session-id :prompt-submit :create-session))
-                   {state' :state failed :schedule}
+                   {failed-state :state failed :schedule}
                    (scheduler/fail-schedule (scheduler-state-in ctx session-id)
                                             schedule-id
                                             {:delivery-phase delivery-phase
                                              :created-session-id created-session-id
                                              :error-summary (scheduler-error-summary e)})]
-               {:root-state-update (scheduler-update session-id (constantly state'))
+               {:root-state-update (scheduler-update session-id (constantly failed-state))
                 :return failed})))
-         (let [{state' :state schedule' :schedule}
-               (scheduler/deliver-schedule (scheduler-state-in ctx session-id) schedule-id)
-               user-msg (scheduled-user-message schedule' delivered-at)]
+         (let [delivered-at (or delivered-at (scheduler-now! ctx))
+               user-msg (scheduled-user-message schedule delivered-at)]
            {:root-state-update (scheduler-update session-id (constantly state'))
             :effects [{:effect/type :runtime/dispatch-event-with-effect-result
                        :event-type :session/submit-synthetic-user-prompt
                        :event-data {:session-id session-id
                                     :user-msg user-msg}
                        :origin :core}]
-            :return (assoc schedule' :message-record user-msg)})))))
+            :return (assoc schedule :message-record user-msg)})))))
 
   (register-core-handler!
    :scheduler/drain-queue

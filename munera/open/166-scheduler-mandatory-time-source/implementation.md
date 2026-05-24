@@ -113,3 +113,11 @@
 ## 2026-05-24 implementation review pass 3
 - Reviewed task-implementation-review skill, task artifacts, scheduler source/tests, wall-clock scan boundary, and focused deterministic time-source/fail-fast coverage.
 - New actionable feedback: `:scheduler/deliver` resolves `:scheduler-time-source` before confirming the target schedule exists/is deliverable, so missing/invalid time source can mask schedule-not-found or non-deliverable errors even when delivery will not construct a scheduled user message.
+
+## 2026-05-24 implementation review follow-up execution pass 3
+- Used the preloaded implementation-review pass 3 result and completed the newly added follow-up item.
+- Moved `:scheduler/deliver` schedule validation/deliverability check before resolving `:scheduler-time-source`, so missing schedules and non-deliverable schedules preserve their original errors even when context lacks a scheduler time source.
+- Added focused handler coverage proving `:scheduler/deliver` reports `schedule not found` and `schedule is not deliverable` before missing time-source errors.
+- Marked the follow-up checklist item complete in `steps.md`.
+- Focused proof passed: `clojure -M:test --focus psi.agent-session.scheduler-handlers-test` => 7 tests, 56 assertions, 0 failures.
+- Full scheduler proof passed: `clojure -M:test --focus psi.agent-session.scheduler-test --focus psi.agent-session.scheduler-handlers-test --focus psi.agent-session.psi-tool-scheduler-test --focus psi.agent-session.scheduler-timer-seam-test --focus psi.agent-session.scheduler-effects-test --focus psi.agent-session.scheduler-end-to-end-test --focus psi.agent-session.scheduler-background-jobs-test --focus psi.agent-session.scheduler-resolvers-test --focus psi.agent-session.scheduler-tools-test --focus psi.agent-session.scheduler-lifecycle-test --focus psi.agent-session.scheduler-cancel-job-test --focus psi.agent-session.scheduler-context-shutdown-test --focus psi.agent-session.scheduler-dispatch-test` => 33 tests, 344 assertions, 0 failures.
