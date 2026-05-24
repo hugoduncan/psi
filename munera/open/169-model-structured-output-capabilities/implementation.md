@@ -65,3 +65,7 @@ Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, prior implementa
 ## 2026-05-23 — executed inconsistency follow-ups repeat 3
 
 No newly added unchecked `design-steps.md` items existed after the preloaded inconsistency review, so there were no actionable design follow-ups to execute. Did not execute implementation `steps.md` work.
+
+## 2026-05-23 — ambiguity review repeat 4
+
+Found one new actionable ambiguity: fallback strategy is required to be tested and reported as `:prompted-json`, but the task artifacts do not specify the concrete AI request behavior for fallback selection. They should state whether the AI adapter injects schema-guided JSON instructions into the prompt/request, relies on an already-prompted caller/runtime text, or only reports fallback metadata without mutating the outbound request, so fallback request-shape tests have a deterministic target.
