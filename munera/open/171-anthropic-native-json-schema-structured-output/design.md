@@ -31,8 +31,8 @@ In scope:
 - Ensure unsupported or older Anthropic models do not silently claim JSON Schema native support.
 - Expose precise strategy metadata naming the actual Anthropic mechanism used.
 - Add focused tests for request shape, metadata, response extraction, fallback, and unsupported behavior.
-- Perform a live smoke verification against Anthropic OAuth when credentials are available, without committing secrets.
-- Update AI/model documentation and any task 170 dependency text that currently assumes Anthropic native equals forced-tool use.
+- Perform a guarded live smoke verification against Anthropic's provider seam when credentials are available, without committing secrets. The concrete task-171 seam is the Anthropic provider option/env API-key path (`:api-key` or `ANTHROPIC_API_KEY`); an Anthropic OAuth token may be exercised only when it is supplied to that same provider seam as the effective `:api-key`/bearer token. Task 171 does not implement or require a separate OAuth resolver integration for the live smoke.
+- Update the exact documentation targets named in this task: `components/ai/README.md` (`## Structured output capabilities` and `### Anthropic` provider-support bullets), `doc/custom-providers.md` (`## Structured output capability` native mechanism bullets), and task 170's dependency/out-of-scope wording in `munera/open/170-workflow-provider-native-structured-output/design.md`.
 
 Out of scope:
 
@@ -195,16 +195,31 @@ The live smoke should use a small schema, for example:
 Live smoke invocation and skip policy:
 
 - test namespace/name should make the opt-in nature obvious, e.g. `psi.ai.providers.anthropic-live-structured-output-test`;
-- run only when `PSI_LIVE_ANTHROPIC_STRUCTURED_OUTPUT=1` and either `ANTHROPIC_API_KEY` or the existing Anthropic OAuth resolution path is available;
+- run only when `PSI_LIVE_ANTHROPIC_STRUCTURED_OUTPUT=1` and an effective Anthropic credential is available through the provider's concrete credential seam: explicit test option `:api-key` or `ANTHROPIC_API_KEY` as consumed by `psi.ai.providers.anthropic/resolve-api-key`;
+- if the available credential is an Anthropic OAuth bearer token, pass it through that same `:api-key`/`ANTHROPIC_API_KEY` seam and let the provider's OAuth-token detection choose `Authorization` plus OAuth beta headers;
+- do not add or depend on a new live-test OAuth resolver path in task 171; if no concrete token reaches the provider seam, record OAuth live smoke as skipped/unavailable rather than blocked;
 - default model id is the catalog `:sonnet-4.5` (`claude-sonnet-4-5`) unless implementation-time docs identify a better lowest-cost supported JSON Schema model;
-- skipped runs should report a terse skip reason such as `missing PSI_LIVE_ANTHROPIC_STRUCTURED_OUTPUT=1` or `missing Anthropic credentials`;
-- successful notes in `implementation.md` must include date, model key/id, native mechanism, schema name, and pass/fail/skip, but never token values, authorization headers, or raw secret-bearing request maps.
+- skipped runs should report a terse skip reason such as `missing PSI_LIVE_ANTHROPIC_STRUCTURED_OUTPUT=1` or `missing Anthropic credential at :api-key/ANTHROPIC_API_KEY provider seam`;
+- successful notes in `implementation.md` must include date, model key/id, native mechanism, schema name, credential seam used (`:api-key` option, `ANTHROPIC_API_KEY`, or OAuth token via provider api-key seam), and pass/fail/skip, but never token values, authorization headers, or raw secret-bearing request maps.
 
 The test must assert the response is obtained through the native JSON Schema mechanism, not through prompted JSON or forced-tool fallback.
 
 ## Documentation requirements
 
-Update user/developer documentation to state:
+Update these exact user/developer documentation targets:
+
+1. `components/ai/README.md`
+   - In `## Structured output capabilities`, add `:anthropic/json-schema-output` as the preferred Anthropic native mechanism for supported models.
+   - In the same section, keep `:anthropic/forced-tool-use` as a separate native tool-use mechanism and keep prompted JSON as fallback only.
+   - In `## Provider Support` / `### Anthropic`, mention JSON Schema structured output for supported Claude 4.5+ catalog entries and forced tool-use structured output for older/compatibility entries.
+2. `doc/custom-providers.md`
+   - In `## Structured output capability`, add a native mechanism bullet for Anthropic-compatible providers that implement Anthropic Messages `output_format` JSON Schema plus the structured-output beta/header.
+   - Keep the forced-tool bullet separate so custom providers do not infer forced tool use is the only Anthropic native path.
+3. `munera/open/170-workflow-provider-native-structured-output/design.md`
+   - In `## Dependencies`, change the Anthropic dependency wording from generic task-169 Anthropic support to task 169 plus task 171 support: OpenAI native support from task 169, Anthropic forced-tool native support from task 169, and Anthropic JSON Schema native output from task 171 or equivalent.
+   - In `## Explicitly out of scope`, replace "task 169" as the sole owner of Anthropic adapter support with "task 169/task 171 provider-adapter capability work".
+
+All documentation updates must state:
 
 - Anthropic JSON Schema structured output is the preferred native mechanism for supported models.
 - Forced/strict tool schema use is a separate native tool-use mechanism, not the only Anthropic structured-output path.

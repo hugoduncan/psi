@@ -12,8 +12,8 @@ Implement Anthropic JSON Schema structured output as a separate native mechanism
    - `:prompted-json` keeps prompt injection only.
 4. Update Anthropic streaming extraction so JSON Schema output text is accumulated and emitted as first-class `:structured-output-result` metadata with source `:anthropic/json-schema-output`.
 5. Add or update focused provider/model tests before broad verification.
-6. Update AI docs and task 170 dependency text to describe Anthropic JSON Schema native output, forced tool use, and prompted JSON fallback as distinct paths.
-7. Add a guarded live smoke helper/test that skips without Anthropic credentials and records only non-secret outcome metadata.
+6. Update the named docs/task dependency targets from `design.md`: `components/ai/README.md`, `doc/custom-providers.md`, and `munera/open/170-workflow-provider-native-structured-output/design.md`.
+7. Add a guarded live smoke helper/test that uses the Anthropic provider `:api-key`/`ANTHROPIC_API_KEY` seam, skips without credentials, treats OAuth only as a token supplied through that seam, and records only non-secret outcome metadata.
 
 ## Decisions
 
@@ -42,4 +42,4 @@ Broader AI verification when focused tests pass:
 clojure -M:test --focus psi.ai.providers.openai-structured-output-test --focus psi.ai.providers.anthropic-structured-output-test --focus psi.ai.model-registry-test --focus psi.ai.user-models-test
 ```
 
-Live smoke is opt-in and skipped unless Anthropic credentials are available. It must not print, persist, or commit tokens.
+Live smoke is opt-in and skipped unless an Anthropic credential is available through the provider `:api-key` option or `ANTHROPIC_API_KEY` environment seam. OAuth is not a separate task-171 resolver requirement; an OAuth bearer token may be tested only by supplying it through the same provider seam. The smoke must not print, persist, or commit tokens.

@@ -15,6 +15,8 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-24: Executed task 171 ambiguity follow-up: design/plan now name exact docs/task-170 dependency targets and define live-smoke credential seam as Anthropic provider `:api-key`/`ANTHROPIC_API_KEY`, with OAuth only via that seam; design-steps fully checked.
+
 - 2026-05-24: Re-reviewed task 171 refined design/plan/steps for ambiguities; found actionable gaps around exact documentation targets/task-170 wording and the concrete live-smoke credential/OAuth seam. Commit 619a4795.
 
 - 2026-05-24: Reviewed task 171 design for ambiguities; found actionable gaps around absent plan/steps plus exact Anthropic JSON Schema request/header, response/stream extraction, model mechanism assignment, JSON Schema vs forced-tool selection, and live smoke criteria. Commit e85104d8.

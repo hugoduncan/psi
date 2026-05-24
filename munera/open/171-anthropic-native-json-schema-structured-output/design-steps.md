@@ -6,5 +6,5 @@
 - [x] Define the request/model policy for choosing `:anthropic/json-schema-output` versus `:anthropic/forced-tool-use` when both are available or when a caller needs the compatibility forced-tool path.
 - [x] Specify the live Anthropic OAuth smoke test invocation, credential discovery/skip behavior, expected model id, and non-secret result note format.
 - [x] Create `plan.md` and `steps.md` before implementation so review can verify sequencing, test coverage, and documentation updates against the refined design.
-- [ ] Name the exact documentation files/sections task 171 must update, and the exact task 170 dependency wording to change, so the documentation step is verifiable without guessing what counts as "AI documentation" or "task 170 dependency text".
-- [ ] Specify the exact live-smoke credential seam and invocation: whether the opt-in test calls the Anthropic provider with `ANTHROPIC_API_KEY`/`:api-key`, exercises an existing OAuth resolver path, or records OAuth as unavailable when no concrete test seam exists.
+- [x] Name the exact documentation files/sections task 171 must update, and the exact task 170 dependency wording to change, so the documentation step is verifiable without guessing what counts as "AI documentation" or "task 170 dependency text".
+- [x] Specify the exact live-smoke credential seam and invocation: whether the opt-in test calls the Anthropic provider with `ANTHROPIC_API_KEY`/`:api-key`, exercises an existing OAuth resolver path, or records OAuth as unavailable when no concrete test seam exists.
