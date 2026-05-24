@@ -20,3 +20,7 @@
 - Created `steps.md` as the task execution checklist; left all execution items unchecked because this pass was only for newly added design follow-ups and the user explicitly said not to execute `steps.md` items.
 - Corrected `design.md` scheduler-owned wall-clock boundary to list `components/agent-session/src/psi/agent_session/scheduler_time.clj` and attach the `scheduler-time/system-time-source` wall-clock exception to that file.
 - Completed all newly added design follow-up items; none remain blocked.
+
+## 2026-05-24 ambiguity review pass 2
+- Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, `implementation.md`, and scheduler source/tests/docs references.
+- No new actionable ambiguities found; prior ambiguity/inconsistency follow-ups already cover the design boundary, scan scope, test helper shape, and execution checklist.
