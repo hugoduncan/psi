@@ -1,5 +1,6 @@
 (ns psi.ai.providers.anthropic-structured-output-test
   (:require
+   [clojure.string :as str]
    [clojure.test :refer [deftest is]]
    [cheshire.core :as json]
    [clj-http.client :as http]
@@ -72,6 +73,40 @@
                                                                                 :strict? false)})
         body  (json/parse-string (:body req) true)]
     (is (not (contains? (:output_format body) :strict)))))
+
+(deftest anthropic-json-schema-output-beta-header-composition-test
+  ;; Tests JSON Schema native output appends its beta token without dropping or
+  ;; duplicating OAuth, prompt-caching, or thinking beta tokens.
+  (let [model       (models/get-model :sonnet-4.6)
+        convo       (-> (conv/create {:system-prompt "sys"
+                                      :system-prompt-blocks [{:kind :text
+                                                              :text "sys"
+                                                              :cache-control {:type :ephemeral}}]})
+                        (conv/add-tool {:name "read"
+                                        :description "Read a file"
+                                        :parameters {:type "object"}
+                                        :cache-control {:type :ephemeral}})
+                        (conv/add-user-message "Review this"))
+        req         (#'anthropic/build-request convo model {:api-key "sk-ant-oat-test-token"
+                                                            :thinking-level :medium
+                                                            :structured-output judge-structured-output-request})
+        beta        (get-in req [:headers "anthropic-beta"])
+        beta-tokens (str/split beta #",")]
+    (is (= "Bearer sk-ant-oat-test-token"
+           (get-in req [:headers "Authorization"])))
+    (is (nil? (get-in req [:headers "x-api-key"])))
+    (is (= (count beta-tokens)
+           (count (distinct beta-tokens)))
+        "beta header should not duplicate tokens")
+    (doseq [token ["claude-code-20250219"
+                   "oauth-2025-04-20"
+                   "context-management-2025-06-27"
+                   "prompt-caching-scope-2026-01-05"
+                   "prompt-caching-2024-07-31"
+                   "interleaved-thinking-2025-05-14"
+                   "structured-outputs-2025-11-13"]]
+      (is (some #{token} beta-tokens)
+          (str "missing beta token " token)))))
 
 (deftest anthropic-structured-output-forced-tool-request-shaping-test
   ;; Tests Anthropic provider-native structured output as a synthetic forced tool

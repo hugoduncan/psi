@@ -15,6 +15,8 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-24: Executed task 171 task-test-review follow-up: added focused Anthropic JSON Schema native beta-header composition coverage for structured-output + OAuth + prompt-caching + thinking betas with no duplicates; focused Anthropic/model/user tests green (`36 tests, 231 assertions`).
+
 - 2026-05-24: Reviewed task 171 tests with task-test-review; found one actionable test gap: no focused Anthropic JSON Schema native beta-header composition test proving structured-output beta composes with OAuth, prompt-caching, and thinking tokens without dropping/duplicating existing betas. Added follow-up step and committed cfb7db17.
 
 - 2026-05-24: Executed task 171 implementation-review repeat 2 follow-up after no-action review; steps.md had no newly added unchecked actionable items, so only implementation.md records the pass.
