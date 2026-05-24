@@ -48,3 +48,7 @@ Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, prior implementa
 ## 2026-05-23 — executed inconsistency follow-ups repeat 2
 
 No newly added unchecked `design-steps.md` items existed after the preloaded inconsistency review, so there were no actionable design follow-ups to execute. Did not execute implementation `steps.md` work.
+
+## 2026-05-23 — ambiguity review repeat 3
+
+Found one new actionable ambiguity: the capability shape uses `:supported? true` for fallback-only structured output while the acceptance criteria also list `:unsupported`, but the artifacts do not define whether `:supported?` means any structured-output path (including prompted JSON), provider-native support only, or request-time support under the requested fallback policy. This should be explicit so model/user-model validation, strategy selection, and documentation do not interpret fallback-only models differently.
