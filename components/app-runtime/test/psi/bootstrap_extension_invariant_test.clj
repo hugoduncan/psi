@@ -13,25 +13,7 @@
   (testing "bootstrap keeps startup summary, live registry, and active tools aligned"
     (let [[ctx session-id] (test-support/create-test-session {:persist? false})
           reg              (:extension-registry ctx)
-          nullable-state   (nullable-api/create-state)
-          runtime-fns      {:query-fn  (fn [q]
-                                         (case q
-                                           [:psi.extension/prompt-contributions]
-                                           {:psi.extension/prompt-contributions (->> (:prompt-contributions @nullable-state)
-                                                                                     vals
-                                                                                     vec)}
-                                           {}))
-                            :mutate-fn (fn [op params]
-                                         (case op
-                                           psi.extension/register-prompt-contribution
-                                           (let [id    (str (:id params))
-                                                 key   [(:ext-path params) id]
-                                                 value (merge {:id id
-                                                               :ext-path (:ext-path params)}
-                                                              (:contribution params))]
-                                             (swap! nullable-state assoc-in [:prompt-contributions key] value)
-                                             {:psi.extension.prompt-contribution/registered? true})
-                                           (throw (ex-info "unexpected mutation" {:op op :params params}))))}
+          {:keys [api]}    (nullable-api/create-nullable-extension-api {:path "/ext/test"})
           ext-path         "/ext/test"
           _                (ext/register-extension-in! reg ext-path)
           _                (tool-registry/register-tool-in! reg ext-path {:name "delegate"
@@ -40,8 +22,7 @@
                                                                           :format-request (fn [_] "delegate")
                                                                           :parameters {:type "object"}})
           _                (command-registry/register-command-in! reg ext-path {:name "delegate" :description "Run a workflow"})
-          _                (((ext/create-extension-api reg ext-path runtime-fns)
-                             :register-prompt-contribution)
+          _                ((api :register-prompt-contribution)
                             "workflow-loader-workflows"
                             {:section "Extension Capabilities"
                              :content "tool: delegate"
