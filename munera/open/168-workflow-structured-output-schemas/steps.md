@@ -11,3 +11,4 @@
 - [x] Update workflow grammar/IR/user docs for structured output authoring, runtime state, validation failure, downstream references, and provider strategy.
 - [x] Run focused workflow tests and any broader practical verification.
 - [x] Run a broader workflow/runtime test set after this first implementation slice.
+- [ ] Fix invalid session structured-output fail-fast handling so raw output and structured validation errors are recorded in the designed blocked envelope instead of escaping through `step-output-surfaces` as a generic failure.

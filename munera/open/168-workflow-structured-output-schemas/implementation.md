@@ -69,3 +69,7 @@ Implemented the first runtime structured-output slice: runtime-owned reusable `:
 ## 2026-05-23 — broader verification pass
 
 Completed the remaining broad verification step after the first structured-output implementation slice. Ran `bb clojure:test:unit`; all unit tests passed, covering workflow runtime/loader/materialization/judge namespaces along with the broader unit suite. No implementation deviations discovered.
+
+## 2026-05-23 — implementation review
+
+Found one new actionable implementation issue: invalid session structured output currently calls `workflow-ir/step-output-surfaces` before the fail-fast blocked envelope is built, so `step-output-value` throws on the invalid result and `execute-actor-step!` degrades the step to a generic failure without preserving the designed blocked payload/raw structured-output errors.
