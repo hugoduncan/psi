@@ -106,6 +106,7 @@ Focused OAuth routing tests ✅. bb tests previously ✅. Task 169 focused struc
 
 ## Latest session notes
 
+- 2026-05-24: Re-reviewed task 171 implementation with task-implementation-review; found no new actionable implementation feedback, reran focused Anthropic/model/user tests green (`35 tests, 221 assertions`), appended implementation.md no-action note, and added no steps.md items.
 - 2026-05-24: task-implementation-review for task 171 read skill/task/code/tests/docs, reran focused Anthropic/model/user tests green, appended implementation.md note, added one unchecked steps.md follow-up, and committed.
 - 2026-05-23: Task 169 test-review follow-up complete: no code change needed; current Anthropic provider compile/load path is healthy, focused structured-output/model verification is refreshed, and task step is checked.
 - 2026-05-23: Task 169 implementation slice 3 completed remaining streaming result surfaces: OpenAI emits `:structured-output-result` from accumulated assistant JSON; Anthropic suppresses synthetic forced-tool ordinary toolcall events and emits `:structured-output-result` from tool input. Focused and full unit verification green; commit 6e673424.
