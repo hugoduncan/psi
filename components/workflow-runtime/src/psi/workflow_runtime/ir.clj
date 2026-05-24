@@ -85,6 +85,12 @@
    [:source :keyword]
    [:metadata {:optional true} [:maybe :map]]])
 
+(def structured-output-strategy-schema
+  [:enum :provider-native :prompted-json :repair-parse :unsupported])
+
+(def structured-output-fallback-schema
+  [:enum :prompted-json :none])
+
 (def structured-output-spec-schema
   [:map
    [:source structured-output-source-schema]
@@ -92,7 +98,11 @@
    [:schema-id :keyword]
    [:schema-version pos-int?]
    [:schema :any]
-   [:strategy {:optional true} [:enum :provider-native :prompted-json :repair-parse :unsupported]]
+   [:json-schema {:optional true} :map]
+   [:strategy {:optional true} structured-output-strategy-schema]
+   [:strategy-preference {:optional true} structured-output-strategy-schema]
+   [:fallback {:optional true} structured-output-fallback-schema]
+   [:require-provider-native? {:optional true} :boolean]
    [:metadata {:optional true} [:maybe :map]]])
 
 (def output-spec-schema

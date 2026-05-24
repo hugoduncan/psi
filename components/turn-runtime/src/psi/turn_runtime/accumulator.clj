@@ -308,6 +308,12 @@
 (defn- handle-logprob-delta! [td data]
   (swap! td update :logprob-buffer (fnil conj []) (:tokens data)))
 
+(defn- handle-structured-output-strategy! [td data]
+  (swap! td assoc :structured-output-strategy (:structured-output data)))
+
+(defn- handle-structured-output-result! [td data]
+  (swap! td assoc :structured-output-result (:structured-output data)))
+
 (defn- handle-done! [td done-p progress-queue data]
   (let [{:keys [thinking-blocks text-buffer tool-calls logprob-buffer]} @td
         completed (complete-tool-calls (:turn-id @td) tool-calls)
@@ -375,6 +381,8 @@
         :on-toolcall-delta (handle-toolcall-delta! ctx session-id td progress-queue data)
         :on-toolcall-end (handle-toolcall-end! ctx session-id td progress-queue data)
         :on-logprob-delta (handle-logprob-delta! td data)
+        :on-structured-output-strategy (handle-structured-output-strategy! td data)
+        :on-structured-output-result (handle-structured-output-result! td data)
         :on-done (handle-done! td done-p progress-queue data)
         :on-error (handle-error! td done-p data)
         :on-reset (reset! td (turn-sc/create-turn-data))

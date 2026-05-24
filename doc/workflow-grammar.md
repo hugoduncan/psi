@@ -128,6 +128,10 @@ judge-structured-output ::= {:source :judge/structured-output
 schema-contract ::= :schema-id keyword
                   :schema-version pos-int
                   :schema malli-schema
+                  :json-schema json-schema-map?
+                  :strategy-preference (:provider-native | :prompted-json)?
+                  :fallback (:prompted-json | :none)?
+                  :require-provider-native? boolean?
 
 invalid-policy ::= :on-invalid {:action :fail-fast}
                  | :on-invalid {:action :retry
@@ -194,11 +198,16 @@ for handoff data; `outputs` is no longer delegate-only.
 Structured outputs use `:source :session/structured-output` for ordinary
 session step output and `:source :judge/structured-output` for LLM judge
 output. Both forms require `:mode :structured` plus a Malli-compatible schema
-contract (`:schema-id`, `:schema-version`, and `:schema`). A session step may
-have at most one session structured-output entry, and an LLM judge may have at
-most one judge structured-output entry. Authors who need multiple machine-facing
-values should group them as fields inside one structured map schema and address
-fields with `:path`.
+contract (`:schema-id`, `:schema-version`, and `:schema`). Provider-native and
+prompted-JSON request shaping also require an explicit `:json-schema`; the
+runtime does not derive JSON Schema from Malli. Authors may set
+`:strategy-preference :provider-native`, `:fallback :prompted-json` or `:none`,
+and `:require-provider-native? true`. Omitted strategy defaults to native-first
+with prompted-JSON fallback. A session step may have at most one session
+structured-output entry, and an LLM judge may have at most one judge
+structured-output entry. Authors who need multiple machine-facing values should
+group them as fields inside one structured map schema and address fields with
+`:path`.
 
 Downstream references to session structured outputs use the normal source-spec shape:
 
@@ -224,4 +233,6 @@ schema-guided coercion maps JSON object keys and enum strings into the declared
 Malli-domain values before validation. Raw text is retained even when coercion
 and validation succeed. Provider-native structured output likewise requests one
 schema-constrained object and records it behind the single declared
-structured-output key.
+structured-output key. If native support is required or fallback is `:none`, an
+unsupported resolved model/transport fails with `:unsupported-structured-output`
+instead of retrying as prose.

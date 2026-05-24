@@ -262,6 +262,10 @@ Normalized structured output spec shape:
  :schema-id schema-id
  :schema-version schema-version
  :schema malli-schema
+ :json-schema json-schema-map
+ :strategy-preference :provider-native
+ :fallback :prompted-json
+ :require-provider-native? false
  :on-invalid? invalid-policy}
 ```
 
@@ -274,6 +278,19 @@ more than one `:source :session/structured-output` entry, and an LLM judge must
 not contain more than one `:source :judge/structured-output` entry. Compiler or
 IR validation should reject multiple structured entries clearly. One raw
 model/judge response maps to one structured envelope for the one declared key.
+Structured workflow outputs use two schema contracts. `:schema` is the Malli
+contract used by workflow runtime for local coercion and validation. `:json-schema`
+is the explicit provider/request contract passed under provider-neutral
+`:structured-output` options to turn execution; workflow runtime does not infer
+JSON Schema from Malli. Omitted `:strategy-preference` defaults to
+`:provider-native`, omitted `:fallback` defaults to `:prompted-json`, and
+`:require-provider-native? true` forbids fallback. `:fallback :none` also forbids
+fallback. If a structured spec opts into provider-native request shaping but has
+no `:json-schema`, execution fails with `:missing-json-schema` before generation.
+If fallback is forbidden and the resolved model/transport cannot provide native
+structured output, execution fails with `:unsupported-structured-output` rather
+than silently degrading to prose.
+
 For `:prompted-json`, the AI adapter injects schema-guided JSON-only
 instructions into the outbound provider request, and the workflow runtime parses
 the returned text as a single JSON object. For `:provider-native`, the provider
@@ -295,7 +312,13 @@ Valid example:
  {:mode :structured
   :schema-id :psi.workflow/judge-review-result
   :schema-version 1
-  :strategy :prompted-json
+  :strategy :provider-native
+  :native-mechanism :openai/chat-completions-json-schema-response-format
+  :source :openai/message-json
+  :payload {"decision" "needs-work"
+            "issues" []
+            "confidence" 0.84}
+  :raw-payload "... raw provider diagnostic payload when available ..."
   :status :valid
   :value {:decision :needs-work
           :issues []

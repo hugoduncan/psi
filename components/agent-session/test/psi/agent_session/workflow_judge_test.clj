@@ -250,7 +250,12 @@
                                                   [:description :string]
                                                   [:evidence :string]
                                                   [:suggested-change :string]]]]
-                               [:confidence [:double {:min 0.0 :max 1.0}]]]}}
+                               [:confidence [:double {:min 0.0 :max 1.0}]]]
+                      :json-schema {:type "object"
+                                    :required ["decision" "issues" "confidence"]
+                                    :properties {"decision" {:type "string"}
+                                                 "issues" {:type "array"}
+                                                 "confidence" {:type "number"}}}}}
    :projection :none})
 
 (defn- structured-judge-test-ctx []

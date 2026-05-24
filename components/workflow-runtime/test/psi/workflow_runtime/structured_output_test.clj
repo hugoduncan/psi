@@ -13,7 +13,14 @@
             [:status [:enum :reproducible :not-reproducible :unclear]]
             [:summary :string]
             [:evidence [:vector :string]]
-            [:next-action [:enum :request-more-info :handoff-to-fix :stop]]]})
+            [:next-action [:enum :request-more-info :handoff-to-fix :stop]]]
+   :strategy-preference :provider-native
+   :json-schema {:type "object"
+                 :required ["status" "summary" "evidence" "next-action"]
+                 :properties {"status" {:type "string"}
+                              "summary" {:type "string"}
+                              "evidence" {:type "array" :items {:type "string"}}
+                              "next-action" {:type "string"}}}})
 
 (deftest structured-output-envelope-valid-json-test
   ;; Tests prompted JSON fallback parsing, schema-guided keyword coercion,
@@ -92,3 +99,56 @@
       (is (= :valid (get-in result [:structured-output :status])))
       (is (= :needs-work (get-in result [:structured-output :value :decision])))
       (is (= :ambiguity (get-in result [:structured-output :value :issues 0 :kind]))))))
+
+(deftest structured-output-request-policy-test
+  ;; Tests workflow policy keys are translated to provider-neutral AI request options.
+  (testing "defaults prefer provider-native and allow prompted JSON fallback"
+    (is (= {:ok? true
+            :opts {:structured-output {:schema-id :psi.workflow/bug-reproduction-classification
+                                       :schema-version 1
+                                       :json-schema (:json-schema classification-output-spec)
+                                       :strategy-preference :provider-native
+                                       :fallback-allowed? true
+                                       :strict? true}}}
+           (structured-output/structured-output-request :classification classification-output-spec))))
+  (testing "required-native and fallback none encode fallback-forbidden without capability checks"
+    (is (false? (get-in (structured-output/structured-output-request
+                         :classification
+                         (assoc classification-output-spec :require-provider-native? true))
+                        [:opts :structured-output :fallback-allowed?])))
+    (is (false? (get-in (structured-output/structured-output-request
+                         :classification
+                         (assoc classification-output-spec :fallback :none))
+                        [:opts :structured-output :fallback-allowed?]))))
+  (testing "missing JSON Schema fails before generation"
+    (let [result (structured-output/structured-output-request :classification
+                                                              (assoc (dissoc classification-output-spec :json-schema)
+                                                                     :strategy-preference :provider-native))]
+      (is (false? (:ok? result)))
+      (is (= :missing-json-schema (:reason result)))
+      (is (= :classification (get-in result [:details :output-key]))))))
+
+(deftest structured-output-envelope-provider-native-payload-test
+  ;; Tests provider-native metadata/payload is copied into the workflow envelope
+  ;; and the parsed/native payload is the local validation input.
+  (testing "valid provider-native payload is locally validated and exposes only coerced value downstream"
+    (let [ai-metadata {:strategy :provider-native
+                       :native-mechanism :openai/chat-completions-json-schema-response-format
+                       :source :openai/message-json
+                       :payload {"status" "reproducible"
+                                 "summary" "fails"
+                                 "evidence" ["bb test"]
+                                 "next-action" "handoff-to-fix"}
+                       :raw-payload "{raw}"}
+          result (structured-output/output-result classification-output-spec nil ai-metadata)]
+      (is (= :valid (get-in result [:structured-output :status])))
+      (is (= :provider-native (get-in result [:structured-output :strategy])))
+      (is (= :openai/chat-completions-json-schema-response-format
+             (get-in result [:structured-output :native-mechanism])))
+      (is (= (:payload ai-metadata) (get-in result [:structured-output :payload])))
+      (is (= "{raw}" (get-in result [:structured-output :raw-payload])))
+      (is (= {:status :reproducible
+              :summary "fails"
+              :evidence ["bb test"]
+              :next-action :handoff-to-fix}
+             (get-in result [:structured-output :value]))))))

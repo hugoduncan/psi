@@ -89,38 +89,107 @@
            :value value})
         (:errors (m/explain schema value))))
 
+(defn structured-output-request
+  "Build provider-neutral AI structured-output request options from a workflow
+   structured output spec.
+
+   Returns {:ok? true :opts {:structured-output ...}} or
+   {:ok? false :reason :missing-json-schema :details ...}. Capability-based
+   unsupported-native detection remains below this boundary after model/transport
+   resolution."
+  [output-key output-spec]
+  (let [fallback (or (:fallback output-spec) :prompted-json)
+        require-native? (true? (:require-provider-native? output-spec))]
+    (if-not (:json-schema output-spec)
+      (if (or (contains? output-spec :strategy-preference)
+              (contains? output-spec :fallback)
+              (contains? output-spec :require-provider-native?))
+        {:ok? false
+         :reason :missing-json-schema
+         :message "Workflow structured output requires an explicit JSON Schema"
+         :details (cond-> {:output-key output-key}
+                    (:schema-id output-spec) (assoc :schema-id (:schema-id output-spec))
+                    (:schema-version output-spec) (assoc :schema-version (:schema-version output-spec)))}
+        {:ok? true})
+      (if (or (contains? output-spec :strategy-preference)
+              (contains? output-spec :fallback)
+              (contains? output-spec :require-provider-native?))
+        {:ok? true
+         :opts {:structured-output
+                {:schema-id (:schema-id output-spec)
+                 :schema-version (:schema-version output-spec)
+                 :json-schema (:json-schema output-spec)
+                 :strategy-preference (or (:strategy-preference output-spec) :provider-native)
+                 :fallback-allowed? (and (not require-native?) (= :prompted-json fallback))
+                 :strict? true}}}
+        {:ok? true}))))
+
+(defn- envelope-base
+  [output-spec ai-structured-output]
+  (let [strategy (or (:strategy ai-structured-output)
+                     (:strategy output-spec)
+                     :prompted-json)]
+    (cond-> {:mode :structured
+             :schema-id (:schema-id output-spec)
+             :schema-version (:schema-version output-spec)
+             :strategy strategy}
+      (:native-mechanism ai-structured-output)
+      (assoc :native-mechanism (:native-mechanism ai-structured-output))
+
+      (:source ai-structured-output)
+      (assoc :source (:source ai-structured-output))
+
+      (contains? ai-structured-output :fallback-used?)
+      (assoc :fallback-used? (:fallback-used? ai-structured-output))
+
+      (contains? ai-structured-output :payload)
+      (assoc :payload (:payload ai-structured-output))
+
+      (contains? ai-structured-output :raw-payload)
+      (assoc :raw-payload (:raw-payload ai-structured-output))
+
+      (:provider-metadata ai-structured-output)
+      (assoc :provider-metadata (:provider-metadata ai-structured-output)))))
+
+(defn- validation-input
+  [raw-output ai-structured-output]
+  (if (contains? ai-structured-output :payload)
+    {:ok? true :parsed-value (:payload ai-structured-output)}
+    (parse-json-object raw-output)))
+
 (defn structured-output-envelope
-  [output-spec raw-output]
-  (let [strategy (or (:strategy output-spec) :prompted-json)
-        schema (canonical-schema output-spec)
-        base {:mode :structured
-              :schema-id (:schema-id output-spec)
-              :schema-version (:schema-version output-spec)
-              :strategy strategy}]
-    (if-not schema
-      (assoc base
-             :status :invalid
-             :errors [{:type :missing-schema
-                       :message "Structured output declaration must include a schema or known schema-id/schema-version"}])
-      (let [{:keys [ok? parsed-value errors]} (parse-json-object raw-output)]
-        (if-not ok?
-          (cond-> (assoc base
-                         :status :invalid
-                         :errors errors)
-            (some? parsed-value) (assoc :parsed-value parsed-value))
-          (let [coerced (coerce-value schema parsed-value)]
-            (if (m/validate schema coerced)
-              (assoc base
-                     :status :valid
-                     :value coerced)
-              (assoc base
-                     :status :invalid
-                     :parsed-value parsed-value
-                     :errors (validation-errors schema coerced)))))))))
+  ([output-spec raw-output]
+   (structured-output-envelope output-spec raw-output nil))
+  ([output-spec raw-output ai-structured-output]
+   (let [ai-structured-output (or ai-structured-output {})
+         schema (canonical-schema output-spec)
+         base (envelope-base output-spec ai-structured-output)]
+     (if-not schema
+       (assoc base
+              :status :invalid
+              :errors [{:type :missing-schema
+                        :message "Structured output declaration must include a schema or known schema-id/schema-version"}])
+       (let [{:keys [ok? parsed-value errors]} (validation-input raw-output ai-structured-output)]
+         (if-not ok?
+           (cond-> (assoc base
+                          :status :invalid
+                          :errors errors)
+             (some? parsed-value) (assoc :parsed-value parsed-value))
+           (let [coerced (coerce-value schema parsed-value)]
+             (if (m/validate schema coerced)
+               (assoc base
+                      :status :valid
+                      :value coerced)
+               (assoc base
+                      :status :invalid
+                      :parsed-value parsed-value
+                      :errors (validation-errors schema coerced))))))))))
 
 (defn output-result
-  [output-spec raw-output]
-  {:raw-output raw-output
-   :structured-output (structured-output-envelope output-spec raw-output)})
+  ([output-spec raw-output]
+   (output-result output-spec raw-output nil))
+  ([output-spec raw-output ai-structured-output]
+   {:raw-output raw-output
+    :structured-output (structured-output-envelope output-spec raw-output ai-structured-output)}))
 
 (def valid-output-result? structured-output-contract/valid-output-result?)

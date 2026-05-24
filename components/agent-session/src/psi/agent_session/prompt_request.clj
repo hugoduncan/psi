@@ -168,7 +168,10 @@
 
       ;; Merge custom provider options (headers, no-auth-header)
       (some? provider-options)
-      (merge provider-options))))
+      (merge provider-options)
+
+      (:structured-output runtime-opts)
+      (assoc :structured-output (:structured-output runtime-opts)))))
 
 (defn- resolve-runtime-model
   [ctx session-model]

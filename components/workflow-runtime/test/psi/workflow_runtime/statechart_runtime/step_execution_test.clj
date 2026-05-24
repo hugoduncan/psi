@@ -62,7 +62,10 @@
                                      :schema-id :psi.workflow/test-classification
                                      :schema-version 1
                                      :schema [:map
-                                              [:decision [:enum :pass :fail]]]}}}
+                                              [:decision [:enum :pass :fail]]]
+                                     :json-schema {:type "object"
+                                                   :required ["decision"]
+                                                   :properties {"decision" {:type "string"}}}}}}
          "classify"
          "attempt-1"
          working-memory*

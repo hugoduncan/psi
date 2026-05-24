@@ -132,6 +132,12 @@
                                                          {:content-index (:content-index event)})
           :logprob-delta            (call-action! :on-logprob-delta
                                                   {:tokens (:tokens event)})
+          :structured-output-strategy
+          (call-action! :on-structured-output-strategy
+                        {:structured-output (:structured-output event)})
+          :structured-output-result
+          (call-action! :on-structured-output-result
+                        {:structured-output (:structured-output event)})
           :done                     (turn-sc/send-event! turn-ctx :turn/done
                                                          {:reason (:reason event)
                                                           :usage  (:usage event)})
@@ -186,14 +192,18 @@
                          {:idle-timeout-ms (:llm-stream-idle-timeout-ms ai-options)
                           :wait-poll-ms    (:llm-stream-wait-poll-ms ai-options)
                           :abort-pred      cancelled-pred})
+        turn-data       @(:turn-data turn-ctx)
         _               (swap! (:turn-data turn-ctx) dissoc :stream-handle)
-        logprobs        (get @(:turn-data turn-ctx) :logprobs)]
+        logprobs        (:logprobs turn-data)
+        structured-output (or (:structured-output-result turn-data)
+                              (:structured-output-strategy turn-data))]
     {:turn-id           turn-id
      :model             ai-model
      :ai-options        ai-options
      :turn-ctx          turn-ctx
      :assistant-message assistant-msg
-     :logprobs          logprobs}))
+     :logprobs          logprobs
+     :structured-output structured-output}))
 
 (defn- response-mode-for
   [ctx session-id prepared-request]
@@ -218,12 +228,14 @@
                                    :timestamp (java.time.Instant/now)}
                             (:http-status result) (assoc :http-status (:http-status result))
                             (:headers result) (assoc :provider-error/headers (:headers result)))
-       :logprobs nil}
+       :logprobs nil
+       :structured-output (:structured-output result)}
       {:turn-id turn-id
        :model ai-model
        :ai-options ai-options
        :assistant-message (:assistant-message result)
-       :logprobs (:logprobs result)})))
+       :logprobs (:logprobs result)
+       :structured-output (:structured-output result)})))
 
 (defn- provider-captures-for-turn
   [ctx session-id turn-id]
@@ -276,7 +288,7 @@
                           :provider provider-id
                           :model-id model-id
                           :retry-attempt retry-attempt})
-        {:keys [assistant-message logprobs]}
+        {:keys [assistant-message logprobs structured-output]}
         (if (= :non-streaming response-mode)
           (execute-non-streaming-turn! ai-ctx ctx session-id
                                        {:ai-conv ai-conv
@@ -314,4 +326,5 @@
      :execution-result/error-message       (:error-message assistant-message)
      :execution-result/http-status         (:http-status assistant-message)
      :execution-result/stop-reason         (:stop-reason assistant-message)
-     :execution-result/logprobs            logprobs}))
+     :execution-result/logprobs            logprobs
+     :execution-result/structured-output   structured-output}))
