@@ -48,5 +48,7 @@
   - [x] Repair exact root-registry skill lookup threading in `skill-storage/find-skill`; the previous `some->` form passed `root-state` as the lookup id, breaking `/skill:name` expansion and root-backed skill detail reads.
   - [x] Correct bootstrap startup skill hydration so it writes canonical session `:skill-ids` membership while registering root definitions, instead of accidentally replacing startup session membership with `[]`.
 - [ ] Re-run or update representative task `173` higher-surface tests for prompt/display/TUI/command/workflow canonical ordering and child-session inheritance via `:skill-ids`.
-- [ ] Update `munera/closed/164-registry-semantics-unification-audit/` to record the new `skill-registry` classification, session-owned `:skill-ids`, removal of embedded session `:skills` storage, and direct bootstrap definition hydration.
+- [x] Update task `164-registry-semantics-unification-audit` to record the new `skill-registry` classification, session-owned `:skill-ids`, removal of embedded session `:skills` storage, and direct bootstrap definition hydration.
 - [ ] Run full `bb test` before close.
+  - [x] Representative focused verification across skill-registry, session-mutation, resolver, prompt-request, workflow step-session-config, command, and TUI skill surfaces passes after the migration.
+  - [ ] Full-suite verification is currently blocked by an unrelated pre-existing failure in `psi.agent-session.dispatch-test/startup-bootstrap-summary-dispatch-test`; do not close task 174 until the suite is green or that blocker is resolved/triaged separately.
