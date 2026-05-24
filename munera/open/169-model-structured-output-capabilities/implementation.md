@@ -265,3 +265,7 @@ Implemented the Anthropic Messages prompted-JSON fallback path for fallback-only
 ## 2026-05-23 — test review
 
 Found one new actionable test/verification issue: current focused structured-output verification does not load because `components/ai/src/psi/ai/providers/anthropic.clj` fails compilation after the Anthropic error extraction (`Unable to resolve symbol: oauth-auth-request?` / `psi.ai.providers.anthropic` not found). The recorded green test results are therefore stale until the compile/load failure is fixed and the focused provider/model tests are rerun.
+
+## 2026-05-23 — test-review follow-up
+
+Rechecked the preloaded Anthropic provider compile/load failure. The current Anthropic namespace loads successfully; `anthropic-error/oauth-auth-request?` is present and the focused Anthropic structured-output test now runs. Marked the follow-up complete after refreshing focused structured-output evidence. Verification: `clojure -M:test --focus psi.ai.providers.anthropic-structured-output-test` => 4 tests, 20 assertions, 0 failures; `clojure -M:test --focus psi.ai.providers.openai-structured-output-test --focus psi.ai.providers.anthropic-structured-output-test --focus psi.ai.model-registry-test --focus psi.ai.user-models-test` => 32 tests, 199 assertions, 0 failures.
