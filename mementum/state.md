@@ -15,6 +15,8 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-24: Re-reviewed task 171 refined design/plan/steps for ambiguities; found actionable gaps around exact documentation targets/task-170 wording and the concrete live-smoke credential/OAuth seam. Commit 619a4795.
+
 - 2026-05-24: Reviewed task 171 design for ambiguities; found actionable gaps around absent plan/steps plus exact Anthropic JSON Schema request/header, response/stream extraction, model mechanism assignment, JSON Schema vs forced-tool selection, and live smoke criteria. Commit e85104d8.
 
 - 2026-05-24: Created task 171 to update Anthropic structured-output support from task 169's forced-tool-only native assumption to the documented JSON Schema native output mechanism, with forced-tool and prompted-JSON kept as separate paths.
