@@ -135,3 +135,8 @@ Completed the newly added inconsistency follow-up without executing implementati
 ## 2026-05-23 — ambiguity review repeat 8
 
 Found one new actionable ambiguity: the non-streaming structured-output metadata/payload surface is still not anchored to the current `execute-response` return shape. The design says provider execution "returns or associates" `:structured-output` and examples show `[:structured-output :payload]`, but current OpenAI execution returns a top-level map like `{:assistant-message ... :logprobs ...}`. The task should specify whether non-streaming `:structured-output` is a top-level provider result key, nested on `:assistant-message`, only present in captures, or exposed through another exact field so implementation and tests do not choose different roots.
+
+
+## 2026-05-23 — executed ambiguity follow-up repeat 8
+
+Completed the newly added ambiguity follow-up without executing implementation `steps.md` work. Anchored non-streaming structured-output metadata and extracted payloads to a top-level `:structured-output` key on provider result maps, sibling to existing `:assistant-message` and `:logprobs` entries, not nested under `:assistant-message` and not capture-only. Updated `design.md`, `plan.md`, and `steps.md` so tests target that exact root, and marked the ambiguity design-step done.

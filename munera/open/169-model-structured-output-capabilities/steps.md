@@ -7,7 +7,7 @@
 - [ ] Implement OpenAI Chat Completions JSON Schema `response_format` request construction for explicitly capable models.
 - [ ] Ensure OpenAI Codex Responses and other fallback-only paths never receive unverified provider-native schema fields.
 - [ ] Implement Anthropic synthetic forced tool structured output composition and extraction, exposing synthetic input as structured-output payload and hiding it from ordinary tool calls.
-- [ ] Add explicit structured-output strategy metadata and extracted-payload result surfaces for non-streaming results and first-class streaming `:structured-output-strategy` / `:structured-output-result` events in `psi.ai.schemas/StreamEventType`; provider-capture callbacks may duplicate diagnostics but are not the streaming caller contract.
+- [ ] Add explicit structured-output strategy metadata and extracted-payload result surfaces as top-level non-streaming result `:structured-output` sibling to `:assistant-message`/`:logprobs`, plus first-class streaming `:structured-output-strategy` / `:structured-output-result` events in `psi.ai.schemas/StreamEventType`; provider-capture callbacks may duplicate diagnostics but are not the caller contract.
 - [ ] Preserve local validation authority after provider extraction; adapters must not expose extracted payloads as trusted validated workflow values or add an AI-level Malli validation seam.
 - [ ] Update provider/model documentation.
 - [ ] Add focused tests for model capability validation, OpenAI request shape, Anthropic request shape, fallback/unsupported behavior, strategy metadata, and extracted/raw payload handoff preservation for later workflow validation.

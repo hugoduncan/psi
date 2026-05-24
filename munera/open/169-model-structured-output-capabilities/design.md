@@ -239,16 +239,20 @@ Response handling must separate the synthetic tool from normal assistant tool ca
 
 The actual structured-output strategy is observable through an explicit metadata map, never inferred from model/provider names.
 
-For non-streaming calls, provider execution returns or associates:
+For non-streaming calls, provider execution returns a top-level `:structured-output` entry on the provider result map. This is a sibling of the existing result entries such as `:assistant-message` and `:logprobs`, not nested inside `:assistant-message` and not available only through provider captures. The assistant message remains the transcript/raw assistant content surface; `:structured-output` is AI/provider result metadata and extracted payload handoff data. For example, the current OpenAI non-streaming result shape becomes:
 
 ```edn
-{:structured-output
+{:assistant-message {...}
+ :logprobs nil
+ :structured-output
  {:strategy :provider-native ;; or :prompted-json, :repair-parse, :unsupported
   :native-mechanism :openai/chat-completions-json-schema-response-format
   :schema-id :psi.workflow/judge-review-result
   :schema-version 1
   :fallback-used? false}}
 ```
+
+Unsupported/no-fallback non-streaming requests that return a clear error result should also put structured-output failure metadata at this same top-level root when a result map is returned, so callers do not need a separate capture path to identify the selected `:unsupported` strategy/reason.
 
 For streaming calls, extend the AI stream event schema with a first-class structured-output strategy event:
 
@@ -265,10 +269,12 @@ This task must add `:structured-output-strategy` to `psi.ai.schemas/StreamEventT
 
 Provider adapters expose provider-extracted structured payloads separately from ordinary assistant text and tool calls. The payload surface is AI-owned extraction metadata, not the final validated workflow output.
 
-For non-streaming calls, the provider result includes or is associated with structured-output metadata shaped as:
+For non-streaming calls, the same top-level `:structured-output` provider-result key carries extracted payload metadata:
 
 ```edn
-{:structured-output
+{:assistant-message {...}
+ :logprobs nil
+ :structured-output
  {:strategy :provider-native
   :native-mechanism :anthropic/forced-tool-use
   :schema-id :psi.workflow/judge-review-result
@@ -279,9 +285,9 @@ For non-streaming calls, the provider result includes or is associated with stru
   :source :anthropic/tool-use}}    ;; e.g. :openai/message-json or :prompted-json/text
 ```
 
-For OpenAI Chat Completions JSON Schema response format, the payload is parsed from the assistant message content generated under the provider-native response format and attached at `[:structured-output :payload]` when extraction succeeds. The ordinary assistant text remains available for diagnostics/raw transcript needs, but downstream structured consumers read the extracted payload field rather than reparsing provider-specific message shapes.
+For OpenAI Chat Completions JSON Schema response format, the payload is parsed from the assistant message content generated under the provider-native response format and attached at top-level result path `[:structured-output :payload]` when extraction succeeds. The ordinary assistant text remains available for diagnostics/raw transcript needs, but downstream structured consumers read the extracted payload field rather than reparsing provider-specific message shapes.
 
-For Anthropic forced tool use, the matching synthetic structured-output `tool_use` block's `input` becomes `[:structured-output :payload]`, with `:source :anthropic/tool-use`. That synthetic tool use is removed from the ordinary assistant tool-call surface. Only non-synthetic tool calls remain visible as assistant tool calls; a response that lacks the forced synthetic tool, or returns some other selected tool while forced choice was requested, is reported as a provider anomaly/unsupported structured-output extraction according to existing error handling.
+For Anthropic forced tool use, the matching synthetic structured-output `tool_use` block's `input` becomes top-level result path `[:structured-output :payload]`, with `:source :anthropic/tool-use`. That synthetic tool use is removed from the ordinary assistant tool-call surface. Only non-synthetic tool calls remain visible as assistant tool calls; a response that lacks the forced synthetic tool, or returns some other selected tool while forced choice was requested, is reported as a provider anomaly/unsupported structured-output extraction according to existing error handling.
 
 For streaming calls, extend the AI stream event schema with a first-class structured-output result event emitted when the extraction result is known:
 

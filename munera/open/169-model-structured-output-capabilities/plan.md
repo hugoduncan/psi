@@ -40,7 +40,7 @@ Likely tests:
 6. Wire OpenAI Chat Completions provider-native request construction via `response_format` JSON Schema only when the resolved runtime model capability declares `:openai/chat-completions-json-schema-response-format`.
 7. Preserve Codex Responses fallback-only behavior: no unverified public OpenAI schema fields on `:openai-codex-responses`.
 8. Wire Anthropic forced synthetic tool use via `tools` + `tool_choice`, then extract the synthetic tool input as `[:structured-output :payload]` while excluding it from ordinary assistant tool calls.
-9. Emit/store strategy metadata for non-streaming calls, and for streaming calls emit first-class `:structured-output-strategy` and `:structured-output-result` events added to `psi.ai.schemas/StreamEventType`; provider-capture callbacks may duplicate metadata for diagnostics but are not the caller contract.
+9. Emit/store strategy metadata for non-streaming calls as a top-level `:structured-output` key in the provider result map, sibling to existing `:assistant-message`/`:logprobs` entries, and for streaming calls emit first-class `:structured-output-strategy` and `:structured-output-result` events added to `psi.ai.schemas/StreamEventType`; provider-capture callbacks may duplicate metadata for diagnostics but are not the caller contract.
 10. Keep local parse/coerce/validate in the caller/runtime after provider extraction; AI adapters return raw/extracted payload metadata, not final trusted workflow values, and this task does not add an AI-level Malli validation invocation seam.
 11. Update docs for capabilities, caveats, and fallback semantics.
 12. Run focused tests, then broader AI component tests if focused changes pass.
@@ -65,6 +65,6 @@ bb clojure:test:unit
 - OpenAI public Responses API support is intentionally deferred; adding a fourth API enum is larger than needed for this capability slice and would risk transport churn.
 - ChatGPT/Codex backend compatibility is unknown; it must not receive public Chat Completions/Responses schema fields.
 - Anthropic synthetic tool names must avoid user-tool collisions deterministically.
-- Strategy metadata must be explicit; callers must not infer provider-native use from provider/model names or outbound request shape. Streaming callers read first-class `:structured-output-strategy` and `:structured-output-result` events, not provider-capture callbacks.
+- Strategy metadata must be explicit; callers must not infer provider-native use from provider/model names or outbound request shape. Non-streaming callers read top-level result `:structured-output`; streaming callers read first-class `:structured-output-strategy` and `:structured-output-result` events, not provider-capture callbacks.
 - Provider-native enforcement does not replace local validation; provider adapters extract and report payloads, while workflow/runtime validation remains the final authority. Task 169 tests the handoff metadata/payload preservation, not workflow validation invocation.
 - Existing built-in and custom model descriptions may omit structured-output capability data. The task preserves load compatibility by defaulting omitted effective capabilities to unsupported; prompted fallback remains explicit opt-in so legacy models do not receive schema-prompt injection unexpectedly.
