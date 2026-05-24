@@ -90,3 +90,7 @@ Found one new actionable ambiguity after checking current AI stream schemas/prov
 ## 2026-05-23 — executed ambiguity follow-up repeat 5
 
 Completed the newly added ambiguity follow-up without executing implementation `steps.md` work. Chose first-class streaming events as the concrete metadata/result surface: task 169 must add `:structured-output-strategy` and `:structured-output-result` to `psi.ai.schemas/StreamEventType`, emit them on provider streams, and test them as the authoritative streaming caller contract. Provider request/response captures may duplicate metadata for diagnostics only. Updated `design.md`, `plan.md`, and `steps.md`, and marked the ambiguity design-step done.
+
+## 2026-05-23 — inconsistency review repeat 5
+
+Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, prior implementation notes, referenced workflow docs, and current AI model/provider/schema files for cross-artifact inconsistency after choosing first-class streaming structured-output events. Found no new actionable inconsistency feedback. The artifacts consistently require `:structured-output-strategy` and `:structured-output-result` as the authoritative streaming caller surface, allow provider captures only as diagnostics, keep OpenAI native support scoped to explicit `:openai-completions` Chat Completions `response_format`, keep Codex fallback-only, use Anthropic hidden synthetic forced-tool extraction, and preserve workflow/runtime as the final validation authority.
