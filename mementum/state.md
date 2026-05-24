@@ -15,6 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-23: Executed task 168 inconsistency follow-up repeat 3: aligned `doc/workflow-ir.md` compact suggested grammar so `llm-judge` includes `outputs?`, matching documented judge-local structured outputs; design-steps all checked.
 - 2026-05-23: Executed task 168 ambiguity follow-up repeat 3: specified one structured-output key per session step or LLM judge, one raw response -> one structured envelope for prompted/provider-native strategies, and workflow-runtime ownership/export for `:psi.workflow/judge-review-result`; design-steps all checked.
 - 2026-05-23: Executed task 168 inconsistency follow-up repeat 2: specified judge-local structured outputs as transition-evaluation-only data, not implicit parent step outputs; aligned design, grammar, IR, and user guide; design-steps all checked.
 - 2026-05-23: Executed task 168 ambiguity follow-up repeat 2: aligned `doc/workflow-ir.md` with normalized session/judge structured output IR shape, canonical envelope metadata, provider strategy/coercion notes, and downstream reference semantics; design-steps all checked.
