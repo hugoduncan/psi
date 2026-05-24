@@ -85,3 +85,8 @@ Completed the newly added inconsistency follow-up without executing implementati
 ## 2026-05-23 — ambiguity review repeat 5
 
 Found one new actionable ambiguity after checking current AI stream schemas/provider code: the design allows streaming structured-output strategy/result metadata either as new stream events or as an equivalent callback/capture surface, while `psi.ai.schemas/StreamEventType` currently has no structured-output event types. The task should choose the concrete streaming metadata/result surface before implementation so provider code, event schemas, docs, and tests have one target instead of leaving adapters to pick events vs captures ad hoc.
+
+
+## 2026-05-23 — executed ambiguity follow-up repeat 5
+
+Completed the newly added ambiguity follow-up without executing implementation `steps.md` work. Chose first-class streaming events as the concrete metadata/result surface: task 169 must add `:structured-output-strategy` and `:structured-output-result` to `psi.ai.schemas/StreamEventType`, emit them on provider streams, and test them as the authoritative streaming caller contract. Provider request/response captures may duplicate metadata for diagnostics only. Updated `design.md`, `plan.md`, and `steps.md`, and marked the ambiguity design-step done.

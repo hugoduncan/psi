@@ -17,7 +17,8 @@ Likely implementation targets:
 - `components/ai/src/psi/ai/providers/openai/chat_completions.clj`
 - `components/ai/src/psi/ai/providers/openai/codex_responses.clj`
 - `components/ai/src/psi/ai/providers/anthropic.clj`
-- `components/ai/src/psi/ai/streaming.clj` or adjacent stream event schemas if metadata is emitted as stream events
+- `components/ai/src/psi/ai/schemas.clj` (`StreamEventType` must include `:structured-output-strategy` and `:structured-output-result`)
+- `components/ai/src/psi/ai/streaming.clj` or adjacent stream event helpers
 - `components/ai/README.md`
 - `doc/custom-providers.md`
 
@@ -38,7 +39,7 @@ Likely tests:
 5. Wire OpenAI Chat Completions provider-native request construction via `response_format` JSON Schema only when model capability declares `:openai/chat-completions-json-schema-response-format`.
 6. Preserve Codex Responses fallback-only behavior: no unverified public OpenAI schema fields on `:openai-codex-responses`.
 7. Wire Anthropic forced synthetic tool use via `tools` + `tool_choice`, then extract the synthetic tool input as `[:structured-output :payload]` while excluding it from ordinary assistant tool calls.
-8. Emit/store strategy metadata for streaming and non-streaming calls, plus a structured-output result surface/event carrying provider-extracted payloads when available.
+8. Emit/store strategy metadata for non-streaming calls, and for streaming calls emit first-class `:structured-output-strategy` and `:structured-output-result` events added to `psi.ai.schemas/StreamEventType`; provider-capture callbacks may duplicate metadata for diagnostics but are not the caller contract.
 9. Keep local parse/coerce/validate in the caller/runtime after provider extraction; AI adapters return raw/extracted payload metadata, not final trusted workflow values, and this task does not add an AI-level Malli validation invocation seam.
 10. Update docs for capabilities, caveats, and fallback semantics.
 11. Run focused tests, then broader AI component tests if focused changes pass.
@@ -63,5 +64,5 @@ bb clojure:test:unit
 - OpenAI public Responses API support is intentionally deferred; adding a fourth API enum is larger than needed for this capability slice and would risk transport churn.
 - ChatGPT/Codex backend compatibility is unknown; it must not receive public Chat Completions/Responses schema fields.
 - Anthropic synthetic tool names must avoid user-tool collisions deterministically.
-- Strategy metadata must be explicit; callers must not infer provider-native use from provider/model names or outbound request shape.
+- Strategy metadata must be explicit; callers must not infer provider-native use from provider/model names or outbound request shape. Streaming callers read first-class `:structured-output-strategy` and `:structured-output-result` events, not provider-capture callbacks.
 - Provider-native enforcement does not replace local validation; provider adapters extract and report payloads, while workflow/runtime validation remains the final authority. Task 169 tests the handoff metadata/payload preservation, not workflow validation invocation.

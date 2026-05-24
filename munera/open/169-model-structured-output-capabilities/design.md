@@ -235,14 +235,16 @@ For non-streaming calls, provider execution returns or associates:
   :fallback-used? false}}
 ```
 
-For streaming calls, emit the same metadata in an early stream event after `:start` and before content deltas when possible:
+For streaming calls, extend the AI stream event schema with a first-class structured-output strategy event:
 
 ```edn
 {:type :structured-output-strategy
  :structured-output {...}}
 ```
 
-If the existing stream event schema makes a new event type too broad, the equivalent traceable surface may be a provider-capture/request metadata callback, but the implementation must document how callers read it. `:provider-native` is emitted only after the outbound request body actually includes the native schema constraint. Fallback-only requests emit `:prompted-json` when fallback is allowed. No-fallback unsupported requests emit or return `:unsupported` with a reason and must fail clearly rather than silently weakening the contract. `:repair-parse` is reserved for a later repair layer and should not be reported unless that layer actually ran.
+This task must add `:structured-output-strategy` to `psi.ai.schemas/StreamEventType` and provider streaming tests must assert that capable/fallback structured-output streaming requests emit this event. The event is emitted by the provider adapter after strategy selection and request construction, before provider content/tool deltas are exposed to callers. It is not represented only as a provider-capture callback. Provider request/response captures may include the same metadata for diagnostics, but captures are secondary and not the caller contract.
+
+`:provider-native` is emitted only after the outbound request body actually includes the native schema constraint. Fallback-only requests emit `:prompted-json` when fallback is allowed. No-fallback unsupported requests emit or return `:unsupported` with a reason and must fail clearly rather than silently weakening the contract. `:repair-parse` is reserved for a later repair layer and should not be reported unless that layer actually ran.
 
 ## Structured payload result surface
 
@@ -266,7 +268,7 @@ For OpenAI Chat Completions JSON Schema response format, the payload is parsed f
 
 For Anthropic forced tool use, the matching synthetic structured-output `tool_use` block's `input` becomes `[:structured-output :payload]`, with `:source :anthropic/tool-use`. That synthetic tool use is removed from the ordinary assistant tool-call surface. Only non-synthetic tool calls remain visible as assistant tool calls; a response that lacks the forced synthetic tool, or returns some other selected tool while forced choice was requested, is reported as a provider anomaly/unsupported structured-output extraction according to existing error handling.
 
-For streaming calls, emit a traceable structured-output event when the extraction result is known:
+For streaming calls, extend the AI stream event schema with a first-class structured-output result event emitted when the extraction result is known:
 
 ```edn
 {:type :structured-output-result
@@ -279,7 +281,7 @@ For streaming calls, emit a traceable structured-output event when the extractio
   :source :anthropic/tool-use}}
 ```
 
-The earlier strategy metadata event may still be emitted before deltas. The result event carries the extracted payload and may arrive near completion because Anthropic tool blocks and OpenAI message content are only complete at the end of the provider response. If adding a stream event type is too broad, the implementation must provide an equivalent documented callback/capture surface with the same fields.
+This task must add `:structured-output-result` to `psi.ai.schemas/StreamEventType`. The result event carries the extracted payload and may arrive near completion because Anthropic tool blocks and OpenAI message content are only complete at the end of the provider response. The earlier `:structured-output-strategy` event remains the request/strategy contract and must precede ordinary content/tool deltas when a structured-output request is accepted. Provider-capture callbacks may record equivalent diagnostic metadata, but callers consume the stream events as the authoritative streaming surface.
 
 ## AI/workflow validation boundary
 
@@ -300,7 +302,8 @@ Focused tests should prove:
 - fallback-only models report/use `:prompted-json` when fallback is allowed;
 - unsupported/no-fallback requests fail clearly;
 - AI provider tests prove extracted/raw payloads and strategy metadata are preserved for the existing caller/workflow validation layer; task 169 does not add or test a new AI-level Malli validation invocation seam;
-- strategy metadata distinguishes provider-native from prompted fallback.
+- strategy metadata distinguishes provider-native from prompted fallback;
+- streaming provider tests assert `:structured-output-strategy` and `:structured-output-result` events are valid `psi.ai.schemas/StreamEventType` values and are emitted on the streaming surface rather than only through provider-capture callbacks.
 
 ## Documentation requirements
 
