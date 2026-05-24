@@ -24,7 +24,7 @@ If Psi continues to model Anthropic native support only as forced tool use, work
 In scope:
 
 - Add an Anthropic native JSON Schema structured-output mechanism to the model capability vocabulary.
-- Implement Anthropic request construction for the documented JSON Schema output format/header on supported models/transports.
+- Implement Anthropic request construction for the documented JSON Schema output format/header on supported models/transports, including a provider-owned non-streaming execution path for Anthropic Messages.
 - Preserve the existing forced-tool implementation as a separate native mechanism or compatibility path rather than deleting it blindly.
 - Keep prompted JSON fallback distinct from both native Anthropic mechanisms.
 - Update built-in Anthropic model capability declarations to mark only verified/documented model ids as JSON Schema native-capable.
@@ -93,6 +93,14 @@ The current Psi catalog in `components/ai/src/psi/ai/models.clj` should be assig
 Do not mark older Claude 3.x or unverified model ids as JSON Schema native-capable unless verified during implementation.
 
 If Psi's catalog model ids differ from Anthropic's documented API ids, the implementation must map support using the actual ids in `components/ai/src/psi/ai/models.clj`.
+
+## Execution boundary
+
+Task 171 must add an Anthropic provider non-streaming execution path rather than limiting non-streaming work to helper-only extraction tests. The provider map should expose `:execute` for Anthropic Messages, and `psi.ai.core/execute-response` for an Anthropic model should return the same top-level shape used by OpenAI: `{:assistant-message ... :structured-output ...}` on success or `{:type :error ...}` on provider/runtime failure.
+
+The non-streaming path should share the Anthropic request construction and structured-output strategy selection rules with streaming, but it must send a non-streaming Messages request (`:stream` absent or false according to the Anthropic API requirement) and parse the ordinary Messages response body directly. It must not emulate non-streaming by consuming the streaming API in task 171.
+
+This task does not require adding non-streaming execution for providers or APIs other than Anthropic Messages, and it does not change workflow runtime consumption; task 170 still owns workflow integration.
 
 ## Request behavior
 
@@ -165,7 +173,7 @@ Streaming extraction:
 2. Built-in Anthropic model capabilities mark documented supported model ids as JSON Schema native-capable and leave unverified ids unsupported, fallback-only, or forced-tool-only as appropriate.
 3. Anthropic non-streaming request construction for JSON Schema native support includes the documented output-format/schema fields and required beta/header.
 4. Anthropic JSON Schema native request construction does not include synthetic forced-tool fields unless the forced-tool mechanism is selected.
-5. Anthropic JSON Schema native responses expose structured payload metadata on the task-169 top-level `:structured-output` result surface.
+5. Anthropic JSON Schema native non-streaming execution is supported through the Anthropic provider `:execute` path and exposes structured payload metadata on the task-169 top-level `:structured-output` result surface.
 6. Anthropic streaming JSON Schema native responses emit first-class `:structured-output-strategy` and `:structured-output-result` events.
 7. Existing Anthropic forced-tool structured-output tests continue to pass or are deliberately migrated to the forced-tool-specific mechanism.
 8. Prompted JSON fallback still works for fallback-only Anthropic capabilities and reports `:prompted-json`, not provider-native.

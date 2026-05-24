@@ -10,10 +10,11 @@ Implement Anthropic JSON Schema structured output as a separate native mechanism
    - `:anthropic/json-schema-output` adds `output_format` and the structured-output beta header;
    - `:anthropic/forced-tool-use` keeps the existing synthetic tool plus `tool_choice` path;
    - `:prompted-json` keeps prompt injection only.
-4. Update Anthropic streaming extraction so JSON Schema output text is accumulated and emitted as first-class `:structured-output-result` metadata with source `:anthropic/json-schema-output`.
-5. Add or update focused provider/model tests before broad verification.
-6. Update the named docs/task dependency targets from `design.md`: `components/ai/README.md`, `doc/custom-providers.md`, and `munera/open/170-workflow-provider-native-structured-output/design.md`.
-7. Add a guarded live smoke helper/test that uses the Anthropic provider `:api-key`/`ANTHROPIC_API_KEY` seam, skips without credentials, treats OAuth only as a token supplied through that seam, and records only non-secret outcome metadata.
+4. Add Anthropic provider non-streaming execution for Messages so `psi.ai.core/execute-response` can return top-level `:structured-output` for JSON Schema output.
+5. Update Anthropic streaming extraction so JSON Schema output text is accumulated and emitted as first-class `:structured-output-result` metadata with source `:anthropic/json-schema-output`.
+6. Add or update focused provider/model tests before broad verification.
+7. Update the named docs/task dependency targets from `design.md`: `components/ai/README.md`, `doc/custom-providers.md`, and `munera/open/170-workflow-provider-native-structured-output/design.md`.
+8. Add a guarded live smoke helper/test that uses the Anthropic provider `:api-key`/`ANTHROPIC_API_KEY` seam, skips without credentials, treats OAuth only as a token supplied through that seam, and records only non-secret outcome metadata.
 
 ## Decisions
 
@@ -25,6 +26,7 @@ Implement Anthropic JSON Schema structured output as a separate native mechanism
 ## Risks
 
 - Anthropic beta/header or request field names may change. Unit tests should pin the names used here, and live smoke results should record the observed behavior without secrets.
+- Anthropic currently exposes only streaming execution in the provider map; adding `:execute` must stay local to Anthropic Messages and avoid changing workflow runtime semantics owned by task 170.
 - Streaming JSON Schema output may arrive as ordinary text deltas; extraction must preserve text events while also emitting structured metadata at completion.
 - Existing task 169 forced-tool tests must be deliberately retargeted to a forced-tool-only model fixture or older catalog key.
 
