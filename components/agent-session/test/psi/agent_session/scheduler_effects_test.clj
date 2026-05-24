@@ -38,6 +38,26 @@
             (recur (inc i))))
         (is (= 0 (dispatch-effects/scheduler-timer-handle-count))))))
 
+  (testing "start-timer requires scheduler time source"
+    (let [[ctx session-id] (create-session-context)]
+      (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                            #"scheduler time-source"
+                            (dispatch-effects/execute-effect! (dissoc ctx :scheduler-time-source)
+                                                              {:effect/type :scheduler/start-timer
+                                                               :session-id session-id
+                                                               :schedule-id "sch-missing-time"
+                                                               :fire-at (java.time.Instant/parse "2026-04-21T18:01:00Z")})))))
+
+  (testing "start-timer rejects invalid scheduler time-source return"
+    (let [[ctx session-id] (create-session-context {:scheduler-time-source (fn [] "not-an-instant")})]
+      (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                            #"java.time.Instant"
+                            (dispatch-effects/execute-effect! ctx
+                                                              {:effect/type :scheduler/start-timer
+                                                               :session-id session-id
+                                                               :schedule-id "sch-invalid-time"
+                                                               :fire-at (java.time.Instant/parse "2026-04-21T18:01:00Z")})))))
+
   (testing "cancel-timer interrupts and removes handle"
     (let [now (java.time.Instant/parse "2026-04-21T18:01:00Z")
           [ctx session-id] (create-session-context {:scheduler-time-source (test-support/fixed-scheduler-time-source now)})]

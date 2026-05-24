@@ -7,4 +7,4 @@
 - [x] Add deterministic scheduler time-source test helpers.
 - [x] Update focused scheduler tests for deterministic create, `delay-ms`, `at`, delivery, and drain behavior.
 - [x] Run the focused scheduler verification suite from `design.md`.
-- [ ] Add focused tests proving missing/invalid `:scheduler-time-source` fails early at scheduler runtime boundaries (for example psi-tool create and timer/deliver/drain paths) instead of falling back to wall-clock/default time.
+- [x] Add focused tests proving missing/invalid `:scheduler-time-source` fails early at scheduler runtime boundaries (for example psi-tool create and timer/deliver/drain paths) instead of falling back to wall-clock/default time.

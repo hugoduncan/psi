@@ -93,3 +93,10 @@
 ## 2026-05-24 implementation review
 - Reviewed task-implementation-review skill, task artifacts, scheduler source, focused scheduler tests, wall-clock scan, and focused scheduler proof subset (17 tests, 195 assertions, 0 failures).
 - New actionable feedback: missing/invalid `:scheduler-time-source` fail-fast behavior is implemented by `scheduler-time/now` but not directly covered at scheduler runtime boundaries, so a regression could reintroduce fallback/default behavior unnoticed.
+
+## 2026-05-24 implementation review follow-up execution
+- Used the preloaded implementation-review result and completed the newly added follow-up item.
+- Added focused fail-fast coverage for missing/invalid `:scheduler-time-source` at psi-tool create, scheduler timer effect, deliver, and drain runtime boundaries.
+- Marked the follow-up checklist item complete in `steps.md`.
+- Focused follow-up proof passed: `clojure -M:test --focus psi.agent-session.psi-tool-scheduler-test --focus psi.agent-session.scheduler-effects-test --focus psi.agent-session.scheduler-handlers-test` => 9 tests, 164 assertions, 0 failures.
+- Full scheduler proof passed: `clojure -M:test --focus psi.agent-session.scheduler-test --focus psi.agent-session.scheduler-handlers-test --focus psi.agent-session.psi-tool-scheduler-test --focus psi.agent-session.scheduler-timer-seam-test --focus psi.agent-session.scheduler-effects-test --focus psi.agent-session.scheduler-end-to-end-test --focus psi.agent-session.scheduler-background-jobs-test --focus psi.agent-session.scheduler-resolvers-test --focus psi.agent-session.scheduler-tools-test --focus psi.agent-session.scheduler-lifecycle-test --focus psi.agent-session.scheduler-cancel-job-test --focus psi.agent-session.scheduler-context-shutdown-test --focus psi.agent-session.scheduler-dispatch-test` => 32 tests, 342 assertions, 0 failures.

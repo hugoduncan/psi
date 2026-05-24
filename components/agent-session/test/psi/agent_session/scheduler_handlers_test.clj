@@ -129,6 +129,37 @@
                (is (= :runtime/dispatch-event-with-effect-result (-> result :effects first :effect/type)))
                (is (= :session/submit-synthetic-user-prompt (-> result :effects first :event-type))))))))))
 
+(deftest scheduler-deliver-and-drain-require-time-source-when-delivered-at-omitted-test
+  (let [[ctx session-id] (test-support/make-session-ctx {})]
+    (with-registered-handlers
+      ctx
+      #(do
+         (apply-root-state-update!
+          ctx
+          (invoke-handler ctx :scheduler/create {:session-id session-id
+                                                 :schedule-id "sch-deliver-needs-time"
+                                                 :kind :message
+                                                 :message "wake up"
+                                                 :created-at (instant "2026-04-21T18:10:00Z")
+                                                 :fire-at (instant "2026-04-21T18:11:00Z")
+                                                 :delay-ms 1000}))
+         (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                               #"scheduler time-source"
+                               (invoke-handler (dissoc ctx :scheduler-time-source)
+                                               :scheduler/deliver
+                                               {:session-id session-id
+                                                :schedule-id "sch-deliver-needs-time"})))
+
+         (swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming true))))
+         (apply-root-state-update! ctx (invoke-handler ctx :scheduler/fired {:session-id session-id
+                                                                             :schedule-id "sch-deliver-needs-time"}))
+         (swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming false))))
+         (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                               #"scheduler time-source"
+                               (invoke-handler (dissoc ctx :scheduler-time-source)
+                                               :scheduler/drain-queue
+                                               {:session-id session-id})))))))
+
 (deftest scheduler-session-kind-fires-without-origin-idle-test
   (let [[ctx session-id] (test-support/make-session-ctx {:session-data {:is-streaming true}})]
     (with-registered-handlers

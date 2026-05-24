@@ -75,6 +75,34 @@
       (is (= fire-at (java.time.Instant/parse (:fire-at schedule))))
       (is (string? (:schedule-id schedule)))))
 
+  (testing "missing scheduler time source fails create instead of falling back to wall-clock"
+    (let [[ctx session-id] (create-session-context)
+          tool (tools/make-psi-tool (fn [_q] {}) {:ctx (dissoc ctx :scheduler-time-source)
+                                                  :session-id session-id})
+          result ((:execute tool) {"action" "scheduler"
+                                   "op" "create"
+                                   "kind" "message"
+                                   "message" "wake later"
+                                   "delay-ms" 1000})
+          parsed (read-string (:content result))]
+      (is (true? (:is-error result)))
+      (is (= :error (:psi-tool/overall-status parsed)))
+      (is (= :scheduler-time-source (get-in parsed [:psi-tool/error :data :boundary])))))
+
+  (testing "invalid scheduler time source fails create instead of falling back to wall-clock"
+    (let [[ctx session-id] (create-session-context)
+          tool (tools/make-psi-tool (fn [_q] {}) {:ctx (assoc ctx :scheduler-time-source (fn [] "not-an-instant"))
+                                                  :session-id session-id})
+          result ((:execute tool) {"action" "scheduler"
+                                   "op" "create"
+                                   "kind" "message"
+                                   "message" "wake later"
+                                   "delay-ms" 1000})
+          parsed (read-string (:content result))]
+      (is (true? (:is-error result)))
+      (is (= :error (:psi-tool/overall-status parsed)))
+      (is (= :scheduler-time-source (get-in parsed [:psi-tool/error :data :boundary])))))
+
   (testing "bounds rejection surfaces as scheduler error"
     (let [[ctx session-id] (create-session-context)
           tool (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
