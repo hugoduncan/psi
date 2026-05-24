@@ -15,6 +15,8 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-24: Executed task 171 implementation-review repeat 2 follow-up after no-action review; steps.md had no newly added unchecked actionable items, so only implementation.md records the pass.
+
 - 2026-05-24: Executed task 171 implementation-review repeat follow-up after no-action review; steps.md had no newly added unchecked actionable items, so only implementation.md records the pass.
 
 - 2026-05-24: Executed task 171 implementation-review follow-up: added Anthropic JSON Schema native parse-failure tests for non-streaming and streaming invalid/non-object output; focused Anthropic/model/user tests green (`35 tests, 221 assertions`).

@@ -51,3 +51,5 @@
 - 2026-05-24 executed task-implementation-review repeat follow-up: preloaded implementation review found no new actionable feedback, and `steps.md` has no newly added unchecked follow-up items. No implementation steps were executed.
 
 - 2026-05-24 task-implementation-review repeat 2: found no new actionable implementation feedback after rechecking the task artifacts, Anthropic structured-output helpers/request/header construction, non-streaming execute and streaming extraction paths, model capability assignment, docs/task-170 wording, live-smoke seam, and focused Anthropic/model/user verification. Existing parse-failure coverage remains implemented; no new `steps.md` follow-up items added. Verification: `clojure -M:test --focus psi.ai.providers.anthropic-structured-output-test --focus psi.ai.model-registry-test --focus psi.ai.user-models-test` => `35 tests, 221 assertions, 0 failures`.
+
+- 2026-05-24 executed task-implementation-review repeat 2 follow-up: preloaded implementation review found no new actionable feedback, and `steps.md` has no newly added unchecked follow-up items. No implementation steps were executed.
