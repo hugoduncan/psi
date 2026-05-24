@@ -138,6 +138,26 @@ rule SpawnedSessionInheritsThenDiverges {
     ensures: ParentAndChildConfigsCanDivergeAfterSpawn(parent.id, child.id)
 }
 
+rule SeedChildJournalAtSpawn {
+    when: CreateChildSession(context_id, parent_session_id, relation, config)
+    requires: config.preloaded_messages != null
+    requires: config.preloaded_messages.count > 0
+
+    ensures: child.journal = config.preloaded_messages
+    ensures: child.leaf_entry_id = LastEntryId(config.preloaded_messages)
+
+    @guidance
+        -- Callers supply preloaded_messages to pre-populate the child journal
+        -- before any user or assistant turns. This is the open extension point
+        -- for workflow step contributions: the workflow layer assembles prior
+        -- messages (DeltaMap, codebase structure, tier selection, etc.) as
+        -- SessionEntry values and passes them via config.preloaded_messages.
+        -- Parallel paths: SessionLoaded seeds from disk (resume),
+        -- ForkedSessionFileCreated seeds branch_entries (fork).
+        -- This rule covers the agent-spawn path.
+        -- preloaded_messages is optional — absence means empty journal (default behaviour).
+}
+
 rule WorkflowChildSessionPromptRebuiltFromStructuredState {
     when: CreateChildSession(context_id, parent_session_id, relation, config)
     requires: relation in {agent, automation}

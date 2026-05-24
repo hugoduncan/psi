@@ -99,10 +99,10 @@
 
 (defn initialize-child-session-state
   [state* parent-sd {:keys [child-session-id preloaded-messages] :as child-opts}]
-  (let [child-sd (child-session-base-state parent-sd child-opts)]
+  (let [child-sd (child-session-base-state parent-sd child-opts)
+        preloaded-journal (mapv persistence/message-entry (or preloaded-messages []))]
     (-> state*
         (assoc-in (state/session-data-path child-session-id) child-sd)
-        (assoc-in [:agent-session :sessions child-session-id :persistence]
-                  (persistence/persistence-state
-                   {:journal (mapv persistence/message-entry (or preloaded-messages []))}))
-        (init/initialize-session-slots child-session-id []))))
+        ;; initialize-session-slots overwrites :persistence :journal with its
+        ;; journal-entries arg — pass preloaded entries directly so they survive.
+        (init/initialize-session-slots child-session-id preloaded-journal))))
