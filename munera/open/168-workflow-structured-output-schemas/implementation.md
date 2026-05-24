@@ -93,3 +93,7 @@ Found one new actionable test-shaping issue: prompted JSON tests cover malformed
 ## 2026-05-23 — test-shaper follow-up
 
 Completed the newly added structured-output boundary test: syntactically valid non-object JSON arrays and scalars are rejected at the single-JSON-object envelope boundary with `:status :invalid`, parsed value retained for debugging, parse-error recorded, and no exposed `:value`. Focused verification green: `clojure -M:test --focus psi.workflow-runtime.structured-output-test`.
+
+## 2026-05-23 — code-shaper review
+
+Found one new actionable code-shaping issue: structured-output source/result predicates now exist in both workflow-runtime and workflow-step-materialization namespaces, duplicating the canonical source set and validity check across component boundaries. This drift-prone duplication should be consolidated into one shared lower helper or an explicit adapter so structured-output semantics have a single owner.
