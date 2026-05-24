@@ -63,3 +63,9 @@
 ## 2026-05-24 ambiguity review pass 4
 - Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, `implementation.md`, and sampled referenced scheduler source/tests for psi-tool create-time resolution, create dispatch, timer delay, delivery/drain timestamps, projection-only namespaces, and test helper seams.
 - No new actionable ambiguities found; existing design text and completed follow-ups already make the mandatory scheduler time-source ownership, explicit create instants, delivery/drain timestamp source, wall-clock scan boundary, test helper scope, and verification expectations concrete.
+
+## 2026-05-24 ambiguity follow-up execution pass 4
+- Used the preloaded ambiguity-review result: no new actionable ambiguities were added in the preceding review pass.
+- Checked `design-steps.md`; all ambiguity follow-up items were already complete.
+- Did not execute `steps.md` items, per instruction.
+- No design-step was blocked or left newly unchecked by this pass.
