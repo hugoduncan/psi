@@ -15,6 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-23: Reviewed task 169 implementation with task-implementation-review; found Anthropic fallback-only structured-output strategy is selected but not request-shaped with adapter-owned prompted-JSON instructions; added implementation follow-up.
 - 2026-05-23: Executed task 169 ambiguity follow-up repeat 14 after no-action review; no newly added unchecked design-steps existed, so only implementation.md was updated.
 
 - 2026-05-23: Reviewed task 169 design/plan/steps for ambiguities repeat 14; found no new actionable ambiguity feedback after rechecking task artifacts, workflow docs, and current AI model/provider/schema/user-model files. Commit 78f435e5.

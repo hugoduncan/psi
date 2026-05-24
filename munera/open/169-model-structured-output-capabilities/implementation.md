@@ -253,3 +253,7 @@ Completed the remaining streaming result/payload surface slice. OpenAI Chat Comp
 ## 2026-05-23 — broader verification
 
 Ran `bb clojure:test:unit`; all tests passed.
+
+## 2026-05-23 — implementation review
+
+Found one new actionable implementation issue: Anthropic request construction only handles `:provider-native` structured-output strategy. If a resolved Anthropic/custom `:anthropic-messages` model declares fallback-only `:strategies [:prompted-json]`, `select-strategy` reports `:prompted-json` but `build-request` does not append adapter-owned JSON-only/schema fallback instructions, so the checked prompted-JSON fallback step is only implemented for OpenAI/Codex paths.
