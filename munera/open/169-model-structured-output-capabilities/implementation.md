@@ -15,3 +15,7 @@ Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, current AI provi
 ## 2026-05-23 — executed inconsistency follow-ups
 
 No newly added unchecked `design-steps.md` items existed after the inconsistency review, so there were no actionable design follow-ups to execute. Did not execute implementation `steps.md` work.
+
+## 2026-05-23 — ambiguity review repeat
+
+Found actionable ambiguity feedback: the design does not specify the concrete AI result/event surface for provider-extracted structured payloads. In particular, Anthropic synthetic tool input must be hidden from ordinary tool-call output, but the task does not say where that payload appears for non-streaming results or streaming callers. The local-validation requirement is also ambiguous for this AI-only slice: the artifacts should state whether the AI component validates/coerces against the request schema itself or only returns extracted/raw structured payload plus strategy metadata for the workflow/runtime layer to validate in task 170.
