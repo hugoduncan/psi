@@ -43,11 +43,13 @@
   (testing "invalid structured output records raw output and validation errors instead of escaping surface resolution"
     (let [working-memory* (atom {:current-step-id "classify"})
           event-queue* (atom [])
-          raw-output "not json"]
+          raw-output "not json"
+          turn-opts* (atom nil)]
       (with-redefs [turn-execution/execute-actor-turn!
-                    (fn [_ctx session-id prompt]
+                    (fn [_ctx session-id prompt opts]
                       (is (= "child-session" session-id))
                       (is (= "Classify" prompt))
+                      (reset! turn-opts* opts)
                       {:status :ok
                        :assistant-text raw-output
                        :execution-result nil
@@ -81,6 +83,15 @@
         (is (= :invalid (get-in classification [:structured-output :status])))
         (is (seq (get-in classification [:structured-output :errors])))
         (is (= raw-output (get-in payload [:outputs :final-llm-reply])))
+        (is (= {:structured-output {:schema-id :psi.workflow/test-classification
+                                    :schema-version 1
+                                    :json-schema {:type "object"
+                                                  :required ["decision"]
+                                                  :properties {"decision" {:type "string"}}}
+                                    :strategy-preference :provider-native
+                                    :fallback-allowed? true
+                                    :strict? true}}
+               @turn-opts*))
         (is (= :actor/blocked (:event (first @event-queue*))))))))
 
 (deftest execute-session-step-text-output-remains-compatible-test

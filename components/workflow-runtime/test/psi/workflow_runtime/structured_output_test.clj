@@ -122,8 +122,7 @@
                         [:opts :structured-output :fallback-allowed?]))))
   (testing "missing JSON Schema fails before generation"
     (let [result (structured-output/structured-output-request :classification
-                                                              (assoc (dissoc classification-output-spec :json-schema)
-                                                                     :strategy-preference :provider-native))]
+                                                              (dissoc classification-output-spec :json-schema))]
       (is (false? (:ok? result)))
       (is (= :missing-json-schema (:reason result)))
       (is (= :classification (get-in result [:details :output-key]))))))

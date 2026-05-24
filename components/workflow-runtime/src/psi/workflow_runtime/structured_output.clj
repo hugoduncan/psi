@@ -101,28 +101,20 @@
   (let [fallback (or (:fallback output-spec) :prompted-json)
         require-native? (true? (:require-provider-native? output-spec))]
     (if-not (:json-schema output-spec)
-      (if (or (contains? output-spec :strategy-preference)
-              (contains? output-spec :fallback)
-              (contains? output-spec :require-provider-native?))
-        {:ok? false
-         :reason :missing-json-schema
-         :message "Workflow structured output requires an explicit JSON Schema"
-         :details (cond-> {:output-key output-key}
-                    (:schema-id output-spec) (assoc :schema-id (:schema-id output-spec))
-                    (:schema-version output-spec) (assoc :schema-version (:schema-version output-spec)))}
-        {:ok? true})
-      (if (or (contains? output-spec :strategy-preference)
-              (contains? output-spec :fallback)
-              (contains? output-spec :require-provider-native?))
-        {:ok? true
-         :opts {:structured-output
-                {:schema-id (:schema-id output-spec)
-                 :schema-version (:schema-version output-spec)
-                 :json-schema (:json-schema output-spec)
-                 :strategy-preference (or (:strategy-preference output-spec) :provider-native)
-                 :fallback-allowed? (and (not require-native?) (= :prompted-json fallback))
-                 :strict? true}}}
-        {:ok? true}))))
+      {:ok? false
+       :reason :missing-json-schema
+       :message "Workflow structured output requires an explicit JSON Schema"
+       :details (cond-> {:output-key output-key}
+                  (:schema-id output-spec) (assoc :schema-id (:schema-id output-spec))
+                  (:schema-version output-spec) (assoc :schema-version (:schema-version output-spec)))}
+      {:ok? true
+       :opts {:structured-output
+              {:schema-id (:schema-id output-spec)
+               :schema-version (:schema-version output-spec)
+               :json-schema (:json-schema output-spec)
+               :strategy-preference (or (:strategy-preference output-spec) :provider-native)
+               :fallback-allowed? (and (not require-native?) (= :prompted-json fallback))
+               :strict? true}}})))
 
 (defn- envelope-base
   [output-spec ai-structured-output]
