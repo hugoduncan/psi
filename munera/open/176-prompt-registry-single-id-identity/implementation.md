@@ -29,3 +29,11 @@
 ## 2026-05-24 inconsistency review
 - New actionable inconsistency: `design.md` now explicitly preserves extension-facing helpers/docs as single-id-only surfaces and limits temporary `ext-path` acceptance to lower-level seams, but `steps.md` still says to inventory prompt-registry APIs, projections, and callers that rely on composite `ext-path + id` identity. That wording is broad enough to imply the extension-facing API/docs themselves still rely on composite identity, which conflicts with the refined design split.
   - Added a `design-steps.md` follow-up to narrow the implementation inventory/remaining work so it targets only lower-level seams, projections, tests/helpers, and other composite-identity-dependent callers.
+
+## 2026-05-24 inconsistency follow-up execution
+- Completed the newly added `design-steps.md` item by narrowing `steps.md` implementation inventory/work wording to the remaining composite-identity-dependent surfaces only.
+- Re-checked the concrete caller split while making that change:
+  - extension-facing helper/API/docs surfaces in `extensions/api.clj` and `doc/extensions.md` already remain single-id-only
+  - built-in workflow registration in `workflow/bootstrap.clj` continues to supply owner provenance internally while targeting by contribution `id`
+  - lower-level dispatch and Pathom mutation seams in `dispatch_handlers/prompt_handlers.clj` and `mutations/prompts.clj` still explicitly carry `ext-path` and therefore remain the intended implementation inventory/follow-on migration targets
+- This pass updated design-follow-up artifacts only and did not execute implementation items from `steps.md`.
