@@ -31,3 +31,5 @@
 - 2026-05-24 executed inconsistency follow-up repeat 3: preloaded inconsistency review found no new actionable feedback, and `design-steps.md` has no unchecked follow-up items. No `steps.md` implementation items were executed.
 
 - 2026-05-24 ambiguity review repeat 4: found no new actionable ambiguity feedback after rechecking design/plan/steps/design-steps, prior implementation notes, current Anthropic/provider structured-output helpers, core non-streaming provider seam, model capability assignment code, AI/custom-provider docs, and task 170 dependency wording. Existing checked design-steps already resolve prior ambiguities around exact request/header shape, strict semantics, response/stream extraction, model assignment, mechanism selection, live-smoke seam, docs targets, and Anthropic non-streaming `:execute` scope; remaining unchecked `steps.md` items are implementation work, not design ambiguity.
+
+- 2026-05-24 executed ambiguity follow-up repeat 4: preloaded ambiguity review found no new actionable feedback, and `design-steps.md` has no unchecked follow-up items. No `steps.md` implementation items were executed.
