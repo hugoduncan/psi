@@ -69,16 +69,26 @@ Prompted fallback remains non-native:
 
 The adapter must not report `:provider-native` unless the outbound Anthropic request actually includes the selected provider-native schema constraint.
 
+If a model or user-model capability can express only one `:native-mechanism`, that mechanism is the selected provider-native path. Built-in models that support JSON Schema output should choose `:anthropic/json-schema-output` as their default because it constrains ordinary assistant output directly. Forced-tool compatibility is preserved by models or user-model overrides whose capability declares `:native-mechanism :anthropic/forced-tool-use`. Task 171 does not add a per-request override; a later task may add explicit mechanism preference if workflows need both paths from the same model entry.
+
 ## Model support policy
 
 Use current Anthropic documentation and/or live verification to determine which built-in Claude model ids receive `:anthropic/json-schema-output` capability.
 
-The initial expected supported set includes currently documented models such as:
+The current Psi catalog in `components/ai/src/psi/ai/models.clj` should be assigned as follows unless implementation-time documentation or live smoke proves otherwise:
 
-- Claude Sonnet 4.5 / 4.6;
-- Claude Opus 4.5 / 4.6 / 4.7;
-- Claude Haiku 4.5;
-- Claude Mythos Preview, if represented in Psi's model catalog.
+| Catalog key | API id | Structured-output capability |
+| --- | --- | --- |
+| `:claude-3-5-sonnet` | `claude-3-5-sonnet-20241022` | `:anthropic/forced-tool-use` native only; no JSON Schema output claim |
+| `:claude-3-5-haiku` | `claude-3-5-haiku-20241022` | `:anthropic/forced-tool-use` native only; no JSON Schema output claim |
+| `:sonnet-4` | `claude-sonnet-4-20250514` | `:anthropic/forced-tool-use` native only unless verified for JSON Schema output during implementation |
+| `:opus-4` | `claude-opus-4-20250514` | `:anthropic/forced-tool-use` native only unless verified for JSON Schema output during implementation |
+| `:sonnet-4.5` | `claude-sonnet-4-5` | `:anthropic/json-schema-output` native |
+| `:opus-4.5` | `claude-opus-4-5` | `:anthropic/json-schema-output` native |
+| `:sonnet-4.6` | `claude-sonnet-4-6` | `:anthropic/json-schema-output` native |
+| `:opus-4.6` | `claude-opus-4-6` | `:anthropic/json-schema-output` native |
+| `:haiku-4.5` | `claude-haiku-4-5` | `:anthropic/json-schema-output` native |
+| `:opus-4.7` | `claude-opus-4-7` | `:anthropic/json-schema-output` native |
 
 Do not mark older Claude 3.x or unverified model ids as JSON Schema native-capable unless verified during implementation.
 
@@ -89,26 +99,65 @@ If Psi's catalog model ids differ from Anthropic's documented API ids, the imple
 For a structured-output request against an Anthropic model whose resolved capability selects `:anthropic/json-schema-output`:
 
 1. Require explicit request `[:structured-output :json-schema]` as task 169 does.
-2. Add the documented Anthropic structured-output request fields for JSON Schema output.
-3. Add the required Anthropic beta/header if the API requires one.
+2. Add this Anthropic Messages request field at the top level:
+
+   ```edn
+   :output_format
+   {:type "json_schema"
+    :name (structured-output-name request)
+    :schema (:json-schema request)
+    :strict true}
+   ```
+
+   `:strict` follows the normalized request `:strict?` value and defaults true.
+3. Add `structured-outputs-2025-11-13` to the comma-separated `anthropic-beta` header. Preserve existing beta values for OAuth, prompt caching, and thinking; do not duplicate beta tokens.
 4. Do not add the synthetic forced structured-output tool unless the selected mechanism is `:anthropic/forced-tool-use`.
 5. Do not inject prompted-JSON fallback instructions unless strategy selection chooses `:prompted-json`.
 6. Record strategy metadata with `:strategy :provider-native` and `:native-mechanism :anthropic/json-schema-output`.
 
+For a structured-output request whose selected mechanism is `:anthropic/forced-tool-use`, keep the task-169 synthetic tool shape exactly: append a tool named `psi_structured_output__{structured-output-name}` with `:input_schema (:json-schema request)` and force `:tool_choice {:type "tool" :name tool-name}`. That request must not include `:output_format` or the structured-output beta solely for JSON Schema output.
+
 ## Response behavior
 
-For Anthropic JSON Schema output:
+For Anthropic JSON Schema output, the provider response is expected as ordinary assistant content constrained by `output_format` rather than as a synthetic `tool_use` block.
 
-- extract the provider-returned structured value into the same top-level non-streaming result surface introduced by task 169:
+Non-streaming extraction:
+
+- concatenate text content blocks from the assistant message;
+- parse the concatenated text as a JSON object;
+- expose the same top-level result surface introduced by task 169:
 
 ```edn
-[:structured-output :payload]
+{:assistant-message ...
+ :structured-output
+ {:strategy :provider-native
+  :native-mechanism :anthropic/json-schema-output
+  :source :anthropic/json-schema-output
+  :raw-payload "{...}"
+  :payload {...}}}
 ```
 
-- include raw provider content sufficient for debugging failures;
-- report `:source :anthropic/json-schema-output` or an equivalent precise source value;
-- preserve local parse/coerce/validate as the downstream authority;
-- for streaming, emit first-class `:structured-output-strategy` and `:structured-output-result` events matching task 169's stream contract.
+- preserve the raw provider content/message in the normal response/capture path for debugging;
+- if parsing fails or the value is not an object, still attach `:structured-output` with `:raw-payload`, `:source :anthropic/json-schema-output`, and a terse parse-failure marker such as `:parse-error? true`, but omit `:payload`; downstream local validation remains authoritative and must not treat the value as trusted.
+
+Streaming extraction:
+
+- emit `{:type :structured-output-strategy :structured-output strategy}` before provider content, as task 169 does;
+- pass through ordinary text stream events unchanged;
+- accumulate text deltas for JSON Schema native output;
+- on `message_delta` stop or `message_stop`, emit:
+
+```edn
+{:type :structured-output-result
+ :structured-output
+ {:strategy :provider-native
+  :native-mechanism :anthropic/json-schema-output
+  :source :anthropic/json-schema-output
+  :raw-payload "{...}"
+  :payload {...}}}
+```
+
+- if streaming parse fails, emit the same event with `:raw-payload` and `:parse-error? true` but without `:payload`.
 
 ## Acceptance
 
@@ -142,6 +191,14 @@ The live smoke should use a small schema, for example:
   }
 }
 ```
+
+Live smoke invocation and skip policy:
+
+- test namespace/name should make the opt-in nature obvious, e.g. `psi.ai.providers.anthropic-live-structured-output-test`;
+- run only when `PSI_LIVE_ANTHROPIC_STRUCTURED_OUTPUT=1` and either `ANTHROPIC_API_KEY` or the existing Anthropic OAuth resolution path is available;
+- default model id is the catalog `:sonnet-4.5` (`claude-sonnet-4-5`) unless implementation-time docs identify a better lowest-cost supported JSON Schema model;
+- skipped runs should report a terse skip reason such as `missing PSI_LIVE_ANTHROPIC_STRUCTURED_OUTPUT=1` or `missing Anthropic credentials`;
+- successful notes in `implementation.md` must include date, model key/id, native mechanism, schema name, and pass/fail/skip, but never token values, authorization headers, or raw secret-bearing request maps.
 
 The test must assert the response is obtained through the native JSON Schema mechanism, not through prompted JSON or forced-tool fallback.
 
