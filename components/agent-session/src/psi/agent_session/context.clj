@@ -83,9 +83,6 @@
 (defn- resolve-session-defaults [session-defaults resolved-cwd ui-type]
   (let [session-defaults (or session-defaults {})]
     (cond-> session-defaults
-      (contains? session-defaults :skills)
-      (-> (assoc :skill-ids (mapv :name (or (:skills session-defaults) [])))
-          (dissoc :skills))
       (not (contains? session-defaults :worktree-path))
       (assoc :worktree-path resolved-cwd)
       (some? ui-type) (assoc :ui-type ui-type))))

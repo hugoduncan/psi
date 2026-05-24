@@ -204,7 +204,7 @@
         ctx0          {:state*                       state*
                        :sc-env                       sc-env
                        :config                       {}
-                       :session-defaults             (or session-data {})
+                       :session-defaults             initial-sd
                        :extension-registry           ext-reg
                        :workflow-registry            wf-reg
                        :service-registry             (services/create-registry)

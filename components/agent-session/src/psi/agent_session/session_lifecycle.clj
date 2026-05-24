@@ -57,6 +57,9 @@
                (-> state
                    (assoc-in [:agent-session :sessions new-session-id :agent-ctx] (:agent-ctx fresh))
                    (assoc-in [:agent-session :sessions new-session-id :sc-session-id] (:sc-session-id fresh))))))
+    (when-let [startup-skills (seq (:skills (:session-defaults ctx)))]
+      ((requiring-resolve 'psi.agent-session.bootstrap/load-startup-resources-in!)
+       ctx new-session-id {:skills startup-skills}))
     (dispatch/dispatch! ctx :session/ensure-base-system-prompt {:session-id new-session-id} {:origin :core})
     (dispatch/dispatch! ctx :session/retarget-runtime-prompt-metadata {:session-id new-session-id} {:origin :core})
     (when session-name
