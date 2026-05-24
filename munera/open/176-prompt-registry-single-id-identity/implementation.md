@@ -12,3 +12,7 @@
 ## 2026-05-24 inconsistency follow-up execution
 - Rewrote `plan.md` and `steps.md` to match the current task design instead of the earlier scaffolding-only follow-up.
 - This pass completed the artifact-alignment follow-up and did not execute implementation work from `steps.md`.
+
+## 2026-05-24 ambiguity review
+- New actionable ambiguity: `design.md` requires explicit post-change targeting/compatibility behavior for callers that currently pass `ext-path + id`, but the task artifacts do not distinguish which already-single-id extension-facing API/doc surfaces are intentionally preserved versus which lower-level dispatch or Pathom mutation surfaces remain owner-qualified today and therefore need explicit migration or temporary compatibility rules. Without that surface-by-surface targeting statement, the compatibility scope is still ambiguous across concrete callers.
+  - Added a `design-steps.md` follow-up to make the surface-level targeting/compatibility contract explicit and avoid hidden divergence between extension API helpers, session dispatch handlers, query mutations, and docs.
