@@ -582,6 +582,8 @@
                               request-body)
         block-types        (atom {})
         structured-buffers (atom {})
+        prompted-json-buffer (atom "")
+        structured-result-emitted? (atom false)
         usage-acc   (atom {:input-tokens       0
                            :output-tokens      0
                            :cache-read-tokens  0
@@ -622,10 +624,15 @@
                                block-info)
                             (when-let [json-delta (:partial_json delta)]
                               (swap! structured-buffers update idx str json-delta))
-                            (consume-event! consume-fn
-                                            (content-block-delta-event (:type block-info)
-                                                                       idx
-                                                                       delta))))
+                            (do
+                              (when (and (= :prompted-json (:strategy strategy))
+                                         (= "text" (:type block-info))
+                                         (seq (:text delta)))
+                                (swap! prompted-json-buffer str (:text delta)))
+                              (consume-event! consume-fn
+                                              (content-block-delta-event (:type block-info)
+                                                                         idx
+                                                                         delta)))))
 
                         "content_block_stop"
                         (let [idx (:index event-data)
@@ -645,12 +652,22 @@
                           (update-output-usage! usage-acc (:usage event-data))
                           (when-let [reason (get-in event-data [:delta :stop_reason])]
                             (reset! done? true)
+                            (anthropic-structured-output/maybe-emit-prompted-json-result!
+                             consume-fn
+                             structured-result-emitted?
+                             strategy
+                             @prompted-json-buffer)
                             (consume-fn {:type   :done
                                          :reason (keyword reason)
                                          :usage  (usage-with-cost model usage-acc)})))
 
                         "message_stop"
                         (when-not @done?
+                          (anthropic-structured-output/maybe-emit-prompted-json-result!
+                           consume-fn
+                           structured-result-emitted?
+                           strategy
+                           @prompted-json-buffer)
                           (consume-fn {:type :done :reason :stop}))
 
                         nil)))))]

@@ -144,8 +144,8 @@
                   @events))))
 
 (deftest anthropic-streaming-prompted-json-fallback-structured-output-events-test
-  ;; Tests fallback-only Anthropic streaming emits a first-class strategy event
-  ;; without pretending provider extraction happened through the forced-tool result surface.
+  ;; Tests fallback-only Anthropic streaming preserves ordinary text deltas while
+  ;; also emitting a first-class parsed structured-output result.
   (let [model  (-> (models/get-model :sonnet-4.6)
                    (structured-output/with-structured-output-capability
                      {:supported? true
@@ -185,4 +185,9 @@
     (is (some #(and (= :text-delta (:type %))
                     (= "{\"ok\":true}" (:delta %)))
               @events))
-    (is (not-any? #(= :structured-output-result (:type %)) @events))))
+    (is (some #(and (= :structured-output-result (:type %))
+                    (= :prompted-json (get-in % [:structured-output :strategy]))
+                    (= :prompted-json/text (get-in % [:structured-output :source]))
+                    (= {:ok true} (get-in % [:structured-output :payload]))
+                    (= "{\"ok\":true}" (get-in % [:structured-output :raw-payload])))
+              @events))))

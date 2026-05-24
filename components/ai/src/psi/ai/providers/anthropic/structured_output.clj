@@ -29,11 +29,21 @@
   (and (= "tool_use" (:type block-info))
        (= structured-tool-name (:name block-info))))
 
-(defn maybe-emit-structured-result!
-  [consume-fn strategy raw-payload]
+(defn emit-structured-result!
+  [consume-fn strategy source raw-payload]
   (let [payload (structured-output/parse-json-object raw-payload)]
     (consume-fn {:type :structured-output-result
                  :structured-output (cond-> (assoc strategy
-                                                   :source :anthropic/tool-use
+                                                   :source source
                                                    :raw-payload raw-payload)
                                       payload (assoc :payload payload))})))
+
+(defn maybe-emit-structured-result!
+  [consume-fn strategy raw-payload]
+  (emit-structured-result! consume-fn strategy :anthropic/tool-use raw-payload))
+
+(defn maybe-emit-prompted-json-result!
+  [consume-fn emitted? strategy raw-text]
+  (when (and (= :prompted-json (:strategy strategy))
+             (compare-and-set! emitted? false true))
+    (emit-structured-result! consume-fn strategy :prompted-json/text raw-text)))

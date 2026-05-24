@@ -15,6 +15,8 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-23: Executed task 169 code-shaper follow-up: Anthropic prompted-JSON fallback streaming now preserves text deltas and emits parsed first-class `:structured-output-result` with `:source :prompted-json/text`; focused structured-output/model tests green.
+
 - 2026-05-23: Executed task 169 test-shaper follow-up: added prompted-JSON fallback streaming coverage; Codex now emits parsed `:structured-output-result` for fallback streaming, fallback-only Anthropic strategy/text behavior covered; focused structured-output/model tests green.
 
 - 2026-05-23: Executed task 169 test-review follow-up: Anthropic provider now loads, focused Anthropic structured-output test passes, combined OpenAI/Anthropic structured-output + model/user-model focused run passes; marked the verification follow-up done and committed 15b4b0ad.
