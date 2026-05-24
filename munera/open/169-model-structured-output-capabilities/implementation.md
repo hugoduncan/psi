@@ -77,3 +77,7 @@ Completed the newly added ambiguity follow-up without executing implementation `
 ## 2026-05-23 — inconsistency review repeat 4
 
 Found one new actionable inconsistency: task 169 now specifies prompted-JSON fallback as an adapter-owned deterministic request mutation, but referenced workflow structured-output docs still describe `:prompted-json` as the runtime prompting for JSON. Align the docs/task documentation target so the AI adapter owns fallback request shaping while workflow/runtime owns parse/coerce/validate and downstream exposure.
+
+## 2026-05-23 — executed inconsistency follow-up repeat 4
+
+Completed the newly added inconsistency follow-up without executing implementation `steps.md` work. Aligned `doc/workflow-ir.md` and `doc/workflow-grammar.md` with the finalized prompted-JSON fallback boundary: AI adapters own deterministic JSON-only/schema prompt injection and strategy reporting, while workflow runtime owns parsing, schema-guided coercion, validation, and downstream exposure of trusted structured values. Marked the design-step done.

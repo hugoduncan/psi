@@ -274,10 +274,12 @@ more than one `:source :session/structured-output` entry, and an LLM judge must
 not contain more than one `:source :judge/structured-output` entry. Compiler or
 IR validation should reject multiple structured entries clearly. One raw
 model/judge response maps to one structured envelope for the one declared key.
-For `:prompted-json`, the response is parsed as a single JSON object. For
-`:provider-native`, the provider is asked for a single schema-constrained object.
-Sibling JSON fields are not promoted into additional output keys; use a map
-schema plus downstream `:path` references instead.
+For `:prompted-json`, the AI adapter injects schema-guided JSON-only
+instructions into the outbound provider request, and the workflow runtime parses
+the returned text as a single JSON object. For `:provider-native`, the provider
+is asked for a single schema-constrained object. Sibling JSON fields are not
+promoted into additional output keys; use a map schema plus downstream `:path`
+references instead.
 
 ### Structured output runtime envelope
 
@@ -319,16 +321,19 @@ The strategy field is observable runtime metadata. The first slice should record
 at least one of:
 
 - `:provider-native` — the provider/API accepted a structured-output schema or mode directly
-- `:prompted-json` — the runtime prompted for one JSON object, parsed it, coerced it to Malli-domain data, and validated it
+- `:prompted-json` — the AI adapter injected a JSON-only/schema instruction, while workflow runtime parsed the result, coerced it to Malli-domain data, and validated it
 - `:repair-parse` — the runtime performed an explicit repair parse attempt
 - `:unsupported` — the runtime could not reasonably request the structured mode
 
-For `:prompted-json`, raw model text remains in `:raw-output`; parsed JSON is
-schema-guided into Malli-domain values before validation. Object keys may become
-keywords when the schema expects map keys, and enum strings may become keyword
-enum values when the declared enum contains the corresponding keyword. Coercion,
-parse, or validation failure records `:status :invalid`, `:errors`, and
-`:parsed-value` when a parsed value exists; it must not expose `:value`.
+For `:prompted-json`, the adapter-owned request shaping is limited to prompting
+for a single JSON object that matches the declared schema; it does not make the
+provider response trusted workflow data. Raw model text remains in
+`:raw-output`; workflow runtime parses JSON and schema-guides it into
+Malli-domain values before validation. Object keys may become keywords when the
+schema expects map keys, and enum strings may become keyword enum values when
+the declared enum contains the corresponding keyword. Coercion, parse, or
+validation failure records `:status :invalid`, `:errors`, and `:parsed-value`
+when a parsed value exists; it must not expose `:value`.
 
 Reusable schemas are owned by workflow-runtime code. The first standard reusable
 schema should live in `psi.workflow-runtime.structured-output-schemas` with id

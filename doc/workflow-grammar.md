@@ -217,9 +217,11 @@ the parent step's `{:step ... :output ...}` namespace. A later step that needs
 the same data must consume an explicitly declared session structured output or a
 future explicit promotion/export contract, not a hidden judge-output ref.
 
-Prompted fallback asks models for one JSON object for the one declared
-structured-output key. Schema-guided coercion maps JSON object keys and enum
-strings into the declared Malli-domain values before validation. Raw text is
-retained even when coercion and validation succeed. Provider-native structured
-output likewise requests one schema-constrained object and records it behind the
-single declared structured-output key.
+Prompted fallback means the AI adapter injects schema-guided JSON-only
+instructions into the provider request for one JSON object for the one declared
+structured-output key. Workflow runtime then parses the returned text and
+schema-guided coercion maps JSON object keys and enum strings into the declared
+Malli-domain values before validation. Raw text is retained even when coercion
+and validation succeed. Provider-native structured output likewise requests one
+schema-constrained object and records it behind the single declared
+structured-output key.

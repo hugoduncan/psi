@@ -15,6 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-23: Executed task 169 inconsistency follow-up repeat 4: aligned workflow structured-output docs so prompted-JSON fallback is AI-adapter-owned JSON-only/schema prompt injection, while workflow runtime owns parse/coerce/validate and trusted value exposure.
 - 2026-05-23: Executed task 169 ambiguity follow-up repeat 4: specified prompted-JSON fallback as adapter-owned schema-guided JSON-only instruction injection, with no provider-native fields, `:fallback-used? true`, and unsupported/no-fallback behavior that does not inject fallback instructions.
 - 2026-05-23: Reviewed task 169 design/plan/steps for ambiguities repeat 4; found fallback prompted-JSON request behavior ambiguity (adapter prompt injection vs caller-owned prompt vs metadata-only fallback); added design-step and committed ff8d6bd1.
 - 2026-05-23: Executed task 169 inconsistency follow-up repeat 3 after no-action review; no newly added unchecked design-steps existed, so only implementation.md was updated.
