@@ -15,6 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-23: Executed task 168 test-shaper follow-up: added focused boundary coverage that syntactically valid non-object JSON (array/scalars) is rejected as an invalid single-object structured envelope with parsed value/errors retained and no exposed `:value`.
 - 2026-05-23: Reviewed task 168 tests with task-test-review; added follow-ups for text-mode compatibility, IR structured-output semantic rejection, invalid/negative judge routing, and structured source-ref failure coverage.
 - 2026-05-23: Executed task 168 implementation-review follow-up: invalid session structured-output fail-fast now preserves raw output and invalid structured envelope by blocking before output-surface normalization; focused workflow tests green.
 - 2026-05-23: Completed task 168 broader verification pass: marked final implementation step done after `bb clojure:test:unit` passed across the unit suite; no deviations discovered.
