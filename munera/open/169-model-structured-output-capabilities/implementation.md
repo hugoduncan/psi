@@ -148,3 +148,7 @@ Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, prior implementa
 ## 2026-05-23 — executed inconsistency follow-ups repeat 8
 
 No newly added unchecked `design-steps.md` items existed after the preloaded inconsistency review, so there were no actionable design follow-ups to execute. Did not execute implementation `steps.md` work.
+
+## 2026-05-23 — ambiguity review repeat 9
+
+Found one new actionable ambiguity: the request contract still leaves JSON Schema availability undecided. It says adapters may derive `:json-schema` from `:schema`, or support the judge schema subset if conversion is too broad, while provider-native OpenAI/Anthropic request construction requires a JSON-Schema-compatible payload. The task should choose whether task 169 requires callers to supply `:json-schema`, implements a minimal Malli-to-JSON-Schema conversion subset, or fails `:unsupported` when only `:schema` is present so implementation and tests share one contract.
