@@ -186,6 +186,34 @@ Turn runtime owns population of `:execution-result/structured-output`:
 The workflow envelope builder consumes only the bounded turn result's top-level `:structured-output` key plus `:assistant-text` as raw output. If `:structured-output` is nil for a structured request, implementation should treat that as an explicit integration failure or invalid structured output rather than guessing the strategy from assistant text. Tests for task 170 should stub `execute-actor-turn!` / `execute-judge-turn!` with this top-level seam and include coverage proving provider metadata is read from `:structured-output`.
 
 
+
+## Turn-execution request input seam
+
+Workflow structured-output options enter turn execution through an explicit options argument on the intent-named turn functions:
+
+```clojure
+(execute-actor-turn! ctx session-id prompt opts)
+(execute-judge-turn! ctx session-id prompt opts)
+```
+
+The existing three-argument calls remain valid and mean `opts` is nil. The new four-argument aliases forward `opts` unchanged to `execute-session-turn!`, which already accepts prompt execution options. For task 170, callers pass the provider-neutral request map directly under `:structured-output`:
+
+```edn
+{:structured-output
+ {:schema-id schema-id
+  :schema-version schema-version
+  :json-schema json-schema
+  :strategy-preference strategy-preference
+  :fallback-allowed? fallback-allowed?
+  :strict? true}}
+```
+
+Session-step execution builds this opts map once from the structured `:outputs` entry and passes it to `execute-actor-turn!`. Ranked model fallback preserves the exact same opts map for every candidate; only the execution session model changes between attempts. Transport/provider availability failures may still advance to the next ranked candidate, but structured-output strategy failures such as fallback-forbidden `:unsupported-structured-output` are workflow contract failures, not ranked transport fallback triggers.
+
+LLM-judge execution builds the same opts map from the judge structured `:outputs` entry and passes it to the initial `execute-judge-turn!` call. Structured judge request-shaping failures, unsupported fallback-forbidden failures, and invalid structured output terminate with the structured judge failure surface; they do not enter prose no-match retry loops. The existing prose retry path remains only for judges without structured `:outputs` and continues to call `execute-judge-turn!` without structured-output opts. If a future structured retry policy is added, each structured retry must pass the same structured-output opts or an explicitly rebuilt equivalent from the same output spec; task 170 does not add such retries.
+
+Workflow code must not smuggle structured-output options through prompt text, child-session metadata, model ids, or provider-specific option keys. The only task-170 request path is the options map handed to `execute-actor-turn!` / `execute-judge-turn!`, then forwarded to `execute-session-turn!` and the lower prompt execution adapter.
+
 ## Structured-output failure surfaces
 
 Structured-output request-shaping failures and AI strategy-selection failures must use the existing workflow failure surfaces, with stable machine-readable reasons.
