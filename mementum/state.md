@@ -15,6 +15,8 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-24: Reviewed task 171 design/plan/steps for ambiguities repeat 3; found no new actionable ambiguity feedback after rechecking task artifacts, current Anthropic/model/core structured-output code, docs, and task 170 dependency wording. Commit 25a22bb7.
+
 - 2026-05-24: Executed task 171 inconsistency follow-up repeat 2: Anthropic JSON Schema `:output_format :strict` now follows normalized request `[:structured-output :strict?]`, defaults true only when omitted, honors explicit false, and design-steps are fully checked.
 
 - 2026-05-24: Executed task 171 inconsistency follow-up repeat: acceptance criterion 11 now matches the provider `:api-key`/`ANTHROPIC_API_KEY` live-smoke seam, with OAuth only when supplied through that seam; design-steps fully checked.
