@@ -27,6 +27,7 @@ Backlog:
 `munera/open/168-workflow-structured-output-schemas/`
 `munera/open/169-model-structured-output-capabilities/`
 `munera/open/170-workflow-provider-native-structured-output/`
+`munera/open/171-anthropic-native-json-schema-structured-output/`
 
 Notes:
 - `136` is complete and closed: built-in workflow now installs via explicit built-in paths — `register-built-in-tool-in!` / `register-built-in-command-in!` in the shared registries, direct `:session/register-prompt-contribution` dispatch for prompt contributions, and `register-built-in-lifecycle-callback!` / `invoke-built-in-lifecycle!` for session_switch; `ext/register-extension-in!` and `ext/create-extension-api` removed from bootstrap; `built-in:workflow` retained only as stable provenance identifier; 6 commits, lint clean, all affected workflow tests pass.
