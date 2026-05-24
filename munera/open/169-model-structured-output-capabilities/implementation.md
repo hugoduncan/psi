@@ -269,3 +269,7 @@ Found one new actionable test/verification issue: current focused structured-out
 ## 2026-05-23 — test-review follow-up
 
 Rechecked the preloaded Anthropic provider compile/load failure. The current Anthropic namespace loads successfully; `anthropic-error/oauth-auth-request?` is present and the focused Anthropic structured-output test now runs. Marked the follow-up complete after refreshing focused structured-output evidence. Verification: `clojure -M:test --focus psi.ai.providers.anthropic-structured-output-test` => 4 tests, 20 assertions, 0 failures; `clojure -M:test --focus psi.ai.providers.openai-structured-output-test --focus psi.ai.providers.anthropic-structured-output-test --focus psi.ai.model-registry-test --focus psi.ai.user-models-test` => 32 tests, 199 assertions, 0 failures.
+
+## 2026-05-23 — test-shaper review
+
+Found one new actionable test-shaping issue: streaming structured-output tests exercise provider-native OpenAI/Anthropic result events, but no focused test covers prompted-JSON fallback streaming (for Codex or a fallback-only Anthropic model). The design requires fallback structured-output streaming requests to expose first-class strategy/result surfaces, so the suite can pass while fallback streaming only emits strategy metadata or omits parsed result handoff.

@@ -14,3 +14,4 @@
 - [x] Run focused verification commands and record results in `implementation.md`.
 - [x] Implement and test prompted-JSON fallback request shaping for Anthropic Messages fallback-only structured-output capability: append the adapter-owned JSON-only/schema instruction to the outbound message content, avoid synthetic forced-tool/native fields, and report `:fallback-used? true`.
 - [x] Fix the Anthropic provider compile/load failure introduced by the error extraction, then rerun and record focused structured-output verification (`psi.ai.providers.openai-structured-output-test`, `psi.ai.providers.anthropic-structured-output-test`, model registry, and user models) so the task's test evidence is current.
+- [ ] Add focused prompted-JSON fallback streaming structured-output tests (Codex and/or fallback-only Anthropic) that assert first-class `:structured-output-strategy` and extracted `:structured-output-result` behavior, not just request prompt injection.
