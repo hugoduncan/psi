@@ -18,6 +18,7 @@
    [psi.shared-config.user :as user-cfg]
    [psi.session-state.state :as ss]
    [psi.agent-session.statechart :as sc]
+   [psi.agent-session.scheduler-time :as scheduler-time]
    [psi.tool-registry.defs :as tool-defs]
    [psi.turn-statechart.core :as turn-sc]))
 
@@ -209,14 +210,14 @@
 (defmethod execute-effect! :scheduler/start-timer [ctx effect]
   (let [schedule-id (:schedule-id effect)
         fire-at (:fire-at effect)
-        now-fn (or (:now-fn ctx) java.time.Instant/now)
+        scheduler-now (scheduler-time/now (:scheduler-time-source ctx))
         run-after-delay! (or (:scheduler-run-after-delay-fn ctx)
                              (fn [ctx* delay-ms f]
                                ((:daemon-thread-fn ctx*)
                                 (fn []
                                   (Thread/sleep ^long delay-ms)
                                   (f)))))
-        delay-ms (max 0 (.toMillis (java.time.Duration/between (now-fn) fire-at)))
+        delay-ms (max 0 (.toMillis (java.time.Duration/between scheduler-now fire-at)))
         callback (fn []
                    (try
                      (dispatch/dispatch! ctx :scheduler/fired {:session-id (effect-session-id ctx effect)

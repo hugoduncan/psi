@@ -14,6 +14,7 @@
    [psi.agent-session.prompt-recording]
    [psi.agent-session.prompt-request]
    [psi.agent-session.services :as services]
+   [psi.agent-session.scheduler-time :as scheduler-time]
    [psi.agent-session.turn]
    [psi.agent-session.workflow-judge]
    [psi.agent-session.context :as session-context]
@@ -36,6 +37,26 @@
     :journal :flush-state :turn-ctx
     :tool-output-stats :tool-call-attempts :tool-lifecycle-events
     :provider-requests :provider-replies})
+
+(defn fixed-scheduler-time-source
+  "Return a scheduler test time source fixed at `instant`."
+  [instant]
+  (fn [] instant))
+
+(defn atom-scheduler-time-source
+  "Return an advanceable scheduler test time source and backing atom."
+  [instant]
+  (let [instant* (atom instant)]
+    {:time-source (fn [] @instant*)
+     :instant* instant*}))
+
+(defn set-scheduler-instant!
+  [instant* instant]
+  (reset! instant* instant))
+
+(defn advance-scheduler-instant!
+  [instant* millis]
+  (swap! instant* #(.plusMillis ^java.time.Instant % millis)))
 
 (defn temp-cwd []
   (let [p (str (java.nio.file.Files/createTempDirectory
@@ -176,6 +197,7 @@
                        :tool-batch-executor          tool-batch-executor
                        :extension-run-fn-atom        (atom nil)
                        :scheduler-timers*            (atom {})
+                       :scheduler-time-source        (scheduler-time/system-time-source)
                        :apply-root-state-update-fn   ss/apply-root-state-update-in!
                        :read-session-state-fn        ss/get-state-value-in
                        :execute-dispatch-effect-fn   (fn [ctx effect] (dispatch-effects/execute-effect! ctx effect))

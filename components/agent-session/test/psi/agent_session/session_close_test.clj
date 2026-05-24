@@ -25,14 +25,16 @@
                                                   :schedule-id "sch-pending"
                                                   :label "pending"
                                                   :message "pending"
-                                                  :fire-at (.plusSeconds (java.time.Instant/now) 60)}
+                                                  :created-at (java.time.Instant/parse "2099-04-21T17:59:00Z")
+                                                  :fire-at (java.time.Instant/parse "2099-04-21T18:00:00Z")}
                                                  {:origin :core})
           _                (session/dispatch-in! ctx :scheduler/create
                                                  {:session-id session-id
                                                   :schedule-id "sch-queued"
                                                   :label "queued"
                                                   :message "queued"
-                                                  :fire-at (.plusSeconds (java.time.Instant/now) 60)}
+                                                  :created-at (java.time.Instant/parse "2099-04-21T17:59:00Z")
+                                                  :fire-at (java.time.Instant/parse "2099-04-21T18:00:00Z")}
                                                  {:origin :core})
           _                (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data :scheduler :schedules "sch-queued" :status] :queued)
           _                (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data :scheduler :queue] ["sch-queued"])
@@ -51,7 +53,8 @@
                                                   :schedule-id "sch-1"
                                                   :label "pending"
                                                   :message "pending"
-                                                  :fire-at (.plusSeconds (java.time.Instant/now) 60)}
+                                                  :created-at (java.time.Instant/parse "2099-04-21T17:59:00Z")
+                                                  :fire-at (java.time.Instant/parse "2099-04-21T18:00:00Z")}
                                                  {:origin :core})
           result           (session/close-session-in! ctx session-id)]
       (is (true? (:closed? result)))

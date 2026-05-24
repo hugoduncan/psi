@@ -43,7 +43,8 @@
       (kernel/clear-handlers!))))
 
 (deftest scheduler-create-cancel-fire-deliver-handlers-test
-  (let [[ctx session-id] (test-support/make-session-ctx {})]
+  (let [delivered-at (instant "2026-04-21T18:12:00Z")
+        [ctx session-id] (test-support/make-session-ctx {})]
     (with-registered-handlers
       ctx
       #(do
@@ -118,10 +119,13 @@
                                                                  :fire-at (instant "2026-04-21T18:11:00Z")
                                                                  :delay-ms 1000})]
              (apply-root-state-update! ctx create-r)
-             (let [result (invoke-handler ctx :scheduler/deliver {:session-id session-id :schedule-id "sch-2"})]
+             (let [result (invoke-handler ctx :scheduler/deliver {:session-id session-id
+                                                                  :schedule-id "sch-2"
+                                                                  :delivered-at delivered-at})]
                (apply-root-state-update! ctx result)
                (is (= :delivered (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-2" :status])))
                (is (= 1 (count (:effects result))))
+               (is (= delivered-at (-> result :effects first :event-data :user-msg :timestamp)))
                (is (= :runtime/dispatch-event-with-effect-result (-> result :effects first :effect/type)))
                (is (= :session/submit-synthetic-user-prompt (-> result :effects first :event-type))))))))))
 
@@ -222,7 +226,8 @@
              (is (= :prompt-submit (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-session-fail" :delivery-phase])))))))))
 
 (deftest scheduler-drain-and-statechart-idle-hooks-test
-  (let [[ctx session-id] (test-support/make-session-ctx {:session-data {:is-streaming true}})]
+  (let [drained-at (instant "2026-04-21T18:06:00Z")
+        [ctx session-id] (test-support/make-session-ctx {:session-data {:is-streaming true}})]
     (with-registered-handlers
       ctx
       #(do
@@ -247,11 +252,13 @@
            (swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming false))))
 
            (testing "drain-queue delivers one queued schedule when idle"
-             (let [result (invoke-handler ctx :scheduler/drain-queue {:session-id session-id})]
+             (let [result (invoke-handler ctx :scheduler/drain-queue {:session-id session-id
+                                                                      :delivered-at drained-at})]
                (apply-root-state-update! ctx result)
                (is (= ["sch-b"] (get-in (ss/get-session-data-in ctx session-id) [:scheduler :queue])))
                (is (= "sch-a" (get-in result [:return :schedule-id])))
                (is (= 1 (count (:effects result))))
+               (is (= drained-at (-> result :effects first :event-data :user-msg :timestamp)))
                (is (= :runtime/dispatch-event-with-effect-result (-> result :effects first :effect/type)))
                (is (= :session/submit-synthetic-user-prompt (-> result :effects first :event-type)))))
 

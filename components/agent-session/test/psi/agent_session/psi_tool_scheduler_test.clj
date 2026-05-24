@@ -15,7 +15,8 @@
      [ctx (:session-id sd)])))
 
 (deftest psi-tool-scheduler-create-list-cancel-test
-  (let [[ctx session-id] (create-session-context)
+  (let [fixed-now (java.time.Instant/parse "2026-04-21T18:00:00Z")
+        [ctx session-id] (create-session-context {:scheduler-time-source (test-support/fixed-scheduler-time-source fixed-now)})
         tool (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})]
     (testing "create adds a pending schedule"
       (let [result ((:execute tool) {"action" "scheduler"
@@ -34,6 +35,8 @@
         (is (= session-id (:origin-session-id schedule)))
         (is (= :pending (:status schedule)))
         (is (= "wake-test" (:label schedule)))
+        (is (= fixed-now (java.time.Instant/parse (:created-at schedule))))
+        (is (= (.plusMillis fixed-now 1000) (java.time.Instant/parse (:fire-at schedule))))
         (is (string? (:schedule-id schedule)))))
 
     (testing "list returns pending schedules"
@@ -54,18 +57,23 @@
         (is (= :cancel (:psi-tool/scheduler-op parsed)))
         (is (= :cancelled (get-in parsed [:psi-tool/scheduler :schedule :status]))))))
 
-  (testing "past absolute instant fires immediately as zero-delay pending schedule creation"
-    (let [[ctx session-id] (create-session-context)
+  (testing "absolute instant calculates delay from scheduler time source"
+    (let [fixed-now (java.time.Instant/parse "2026-04-21T18:00:00Z")
+          fire-at (.plusMillis fixed-now 5000)
+          [ctx session-id] (create-session-context {:scheduler-time-source (test-support/fixed-scheduler-time-source fixed-now)})
           tool (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
           result ((:execute tool) {"action" "scheduler"
                                    "op" "create"
                                    "kind" "message"
-                                   "message" "wake now"
-                                   "at" "2020-01-01T00:00:00Z"})
-          parsed (read-string (:content result))]
+                                   "message" "wake later"
+                                   "at" (str fire-at)})
+          parsed (read-string (:content result))
+          schedule (get-in parsed [:psi-tool/scheduler :schedule])]
       (is (false? (:is-error result)))
       (is (= :ok (:psi-tool/overall-status parsed)))
-      (is (string? (get-in parsed [:psi-tool/scheduler :schedule :schedule-id])))))
+      (is (= fixed-now (java.time.Instant/parse (:created-at schedule))))
+      (is (= fire-at (java.time.Instant/parse (:fire-at schedule))))
+      (is (string? (:schedule-id schedule)))))
 
   (testing "bounds rejection surfaces as scheduler error"
     (let [[ctx session-id] (create-session-context)

@@ -5,7 +5,8 @@
    [clojure.string :as str]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.scheduler :as scheduler]
-   [psi.agent-session.scheduler-runtime :as scheduler-runtime]))
+   [psi.agent-session.scheduler-runtime :as scheduler-runtime]
+   [psi.agent-session.scheduler-time :as scheduler-time]))
 
 (defn- psi-tool-error-summary
   ([e] (psi-tool-error-summary nil e))
@@ -30,14 +31,16 @@
                       {:phase :validate :action "scheduler" :field :at :input s}
                       e)))))
 
-(defn- now [] (java.time.Instant/now))
+(defn- scheduler-now!
+  [ctx]
+  (scheduler-time/now (:scheduler-time-source ctx)))
 
 (defn- millis-until
   [target now*]
   (max 0 (.toMillis (java.time.Duration/between now* target))))
 
 (defn- resolve-fire-time!
-  [{:keys [delay-ms at]}]
+  [ctx {:keys [delay-ms at]}]
   (cond
     (and delay-ms at)
     (throw (ex-info "scheduler create accepts either `delay-ms` or `at`, not both"
@@ -45,13 +48,13 @@
 
     delay-ms
     (let [validated (scheduler/validate-delay-ms! delay-ms)
-          created-at (now)]
+          created-at (scheduler-now! ctx)]
       {:created-at created-at
        :delay-ms validated
        :fire-at (.plusMillis created-at validated)})
 
     at
-    (let [created-at (now)
+    (let [created-at (scheduler-now! ctx)
           fire-at (parse-utc-instant! at)
           delay (millis-until fire-at created-at)]
       (when (pos? delay)
@@ -148,7 +151,7 @@
                                                 :action "scheduler"
                                                 :op op
                                                 :cap scheduler/default-max-pending-per-session})))
-                             (let [{:keys [created-at fire-at delay-ms]} (resolve-fire-time! {:delay-ms delay-ms :at at})
+                             (let [{:keys [created-at fire-at delay-ms]} (resolve-fire-time! ctx {:delay-ms delay-ms :at at})
                                    new-schedule-id (str "sch-" (java.util.UUID/randomUUID))
                                    schedule (dispatch/dispatch! ctx
                                                                 :scheduler/create

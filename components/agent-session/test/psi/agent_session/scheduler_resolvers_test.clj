@@ -21,6 +21,7 @@
                                                  :kind :message
                                                  :label "check-build"
                                                  :message "check build"
+                                                 :created-at (java.time.Instant/parse "2099-04-21T17:59:00Z")
                                                  :fire-at (java.time.Instant/parse "2099-04-21T18:00:00Z")}
                                                 {:origin :core})
           root-result     (session/query-in ctx session-id

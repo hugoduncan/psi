@@ -79,3 +79,13 @@
 - Checked `design-steps.md`; all design follow-up items were already complete.
 - Did not execute `steps.md` items, per instruction.
 - No design-step was blocked or left newly unchecked by this pass.
+
+## 2026-05-24 implementation pass
+- Added `psi.agent-session.scheduler-time` with mandatory zero-arity scheduler time-source validation and production `system-time-source`.
+- Runtime context now owns `:scheduler-time-source`; tests can override it through context opts and test support helpers.
+- Psi-tool scheduler create resolution now derives `:created-at`, `:fire-at`, and absolute-`at` delay calculations from the scheduler time source.
+- Scheduler create handler now requires explicit `:created-at` and `:fire-at`; no handler fallback to wall-clock time remains.
+- Scheduler timer delay calculation now uses `:scheduler-time-source` instead of generic `:now-fn`/wall-clock fallback.
+- Scheduler deliver/drain message construction now accepts explicit `:delivered-at` or resolves it from the scheduler time source.
+- Updated focused scheduler tests to pass explicit create instants and deterministic scheduler time sources for create, timer, delay-ms, absolute-at, delivery, and drain timestamp assertions.
+- Focused scheduler proof passed: 31 tests, 332 assertions, 0 failures.
