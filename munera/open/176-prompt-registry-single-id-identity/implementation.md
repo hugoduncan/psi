@@ -20,3 +20,9 @@
 ## 2026-05-24 follow-up execution pass
 - Used the preloaded implementation-review result plus current task artifacts to look for newly added actionable unchecked `steps.md` items.
 - Found no unchecked follow-up implementation items to execute; this pass was a no-op.
+
+## 2026-05-24 task-test-review pass
+- Re-read `design.md`, `plan.md`, `steps.md`, `implementation.md`, the prompt-registry contribution owner, affected dispatch/mutation/resolver seams, prompt assembly surfaces, and focused task tests.
+- Re-ran focused verification:
+  - `clojure -M:test --focus psi.prompt-registry.contributions-test --focus psi.agent-session.query-graph-tools-test --focus psi.agent-session.model-dispatch-test`
+- No new actionable test feedback found; the current proof set covers canonical single-id normalization, same-owner replace, cross-owner conflict, owner-checked update/unregister, canonical ordering, and the lower-level mutation/dispatch seams. `steps.md` unchanged.
