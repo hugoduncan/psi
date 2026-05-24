@@ -172,3 +172,7 @@ Found one new actionable inconsistency: the finalized request contract and plan 
 ## 2026-05-23 — executed inconsistency follow-up repeat 9
 
 Completed the newly added inconsistency follow-up without executing implementation `steps.md` work. Aligned the remaining `design.md` acceptance and design-constraint wording with the finalized explicit-`:json-schema` request contract: callers must supply provider-bound `:json-schema`, `:schema` is metadata only, and AI adapters do not convert Malli/domain schemas in task 169. Marked the design-step done.
+
+## 2026-05-23 — ambiguity review repeat 11
+
+Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, prior implementation notes, referenced workflow docs, and current AI model/provider/schema/user-model files for ambiguity. Found no new actionable ambiguity feedback. The task artifacts now give one concrete contract for built-in capability assignment, explicit caller-supplied `:json-schema`, omitted capability normalization, auth/transport override handling, fallback prompt injection, OpenAI/Anthropic native request shapes, top-level non-streaming `:structured-output`, first-class streaming structured-output events, and workflow/runtime final validation authority.
