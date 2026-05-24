@@ -73,3 +73,7 @@ Found one new actionable ambiguity: fallback strategy is required to be tested a
 ## 2026-05-23 — executed ambiguity follow-up repeat 4
 
 Completed the newly added ambiguity follow-up without executing implementation `steps.md` work. Specified that prompted-JSON fallback is an adapter-owned deterministic request mutation: when `:prompted-json` is selected, the adapter injects schema-guided JSON-only instructions while preserving caller text, avoids provider-native schema fields, and reports `:fallback-used? true`; no-fallback unsupported requests fail/report `:unsupported` without injecting fallback instructions. Updated `plan.md` and `steps.md` with the fallback request-shape target and marked the ambiguity design-step done.
+
+## 2026-05-23 — inconsistency review repeat 4
+
+Found one new actionable inconsistency: task 169 now specifies prompted-JSON fallback as an adapter-owned deterministic request mutation, but referenced workflow structured-output docs still describe `:prompted-json` as the runtime prompting for JSON. Align the docs/task documentation target so the AI adapter owns fallback request shaping while workflow/runtime owns parse/coerce/validate and downstream exposure.
