@@ -159,3 +159,7 @@
 - Marked the follow-up checklist item complete in `steps.md`.
 - Focused handler proof passed: `clojure -M:test --focus psi.agent-session.scheduler-handlers-test` => 9 tests, 62 assertions, 0 failures.
 - Full scheduler proof passed: `clojure -M:test --focus psi.agent-session.scheduler-test --focus psi.agent-session.scheduler-handlers-test --focus psi.agent-session.psi-tool-scheduler-test --focus psi.agent-session.scheduler-timer-seam-test --focus psi.agent-session.scheduler-effects-test --focus psi.agent-session.scheduler-end-to-end-test --focus psi.agent-session.scheduler-background-jobs-test --focus psi.agent-session.scheduler-resolvers-test --focus psi.agent-session.scheduler-tools-test --focus psi.agent-session.scheduler-lifecycle-test --focus psi.agent-session.scheduler-cancel-job-test --focus psi.agent-session.scheduler-context-shutdown-test --focus psi.agent-session.scheduler-dispatch-test` => 35 tests, 352 assertions, 0 failures.
+
+## 2026-05-24 code-shaper review pass 2
+- Reviewed code-shaper skill, task artifacts, scheduler source/tests, recent session-kind delivery fix, scheduler wall-clock scan boundary, and focused deterministic/fail-fast coverage.
+- No new actionable code-shaping feedback found; scheduler time-source flow is simple and explicit, delivery/drain/timer/create seams are consistent, and fail-fast validation is no longer swallowed by session-kind delivery error handling.
