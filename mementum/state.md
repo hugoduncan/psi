@@ -15,6 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-23: Executed task 169 ambiguity follow-up repeat 9: explicit request `:json-schema` is required as the provider-bound schema source; AI adapters do not convert Malli/domain `:schema`; schema-only structured-output requests report `:unsupported` without fallback prompt injection or native fields.
 - 2026-05-23: Reviewed task 169 design/plan/steps for ambiguities repeat 9; found JSON Schema source contract ambiguity: request contract still allows supplied `:json-schema`, adapter-derived conversion, or subset conversion/failure, but provider-native construction requires one concrete behavior; added design-step and committed e5fbabe1.
 - 2026-05-23: Executed task 169 inconsistency follow-up repeat 8 after no-action review; no newly added unchecked design-steps existed, so only implementation.md was updated.
 - 2026-05-23: Executed task 169 ambiguity follow-up repeat 8: non-streaming structured-output metadata/payload is authoritative at top-level provider result `:structured-output`, sibling to `:assistant-message`/`:logprobs`, not nested or capture-only.

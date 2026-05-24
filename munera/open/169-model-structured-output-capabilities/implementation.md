@@ -152,3 +152,7 @@ No newly added unchecked `design-steps.md` items existed after the preloaded inc
 ## 2026-05-23 — ambiguity review repeat 9
 
 Found one new actionable ambiguity: the request contract still leaves JSON Schema availability undecided. It says adapters may derive `:json-schema` from `:schema`, or support the judge schema subset if conversion is too broad, while provider-native OpenAI/Anthropic request construction requires a JSON-Schema-compatible payload. The task should choose whether task 169 requires callers to supply `:json-schema`, implements a minimal Malli-to-JSON-Schema conversion subset, or fails `:unsupported` when only `:schema` is present so implementation and tests share one contract.
+
+## 2026-05-23 — executed ambiguity follow-up repeat 9
+
+Completed the newly added ambiguity follow-up without executing implementation `steps.md` work. Chose explicit request `:json-schema` as the provider-bound schema source for task 169; AI adapters do not convert Malli/domain `:schema` in this slice. Schema-only structured-output requests must report `:unsupported` with a clear missing-JSON-Schema reason and must not inject fallback prompts or provider-native fields. Updated `design.md`, `plan.md`, and `steps.md`, and marked the ambiguity design-step done.

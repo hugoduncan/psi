@@ -174,7 +174,9 @@ The LLM request path should support a structured-output option equivalent to:
   :fallback-allowed? true}}
 ```
 
-Adapters may derive `:json-schema` from `:schema` if the conversion is part of this task. If conversion is too broad for the first cut, this task should support the subset of Malli schemas needed by `:psi.workflow/judge-review-result` and record unsupported schema forms clearly.
+For this task, `:json-schema` is the required provider-bound schema source. It must already be a JSON-Schema-compatible object that can be embedded in OpenAI `response_format`, Anthropic `input_schema`, or prompted-JSON fallback instructions. `:schema` may be present as caller/domain metadata for traceability, but AI adapters do not convert Malli/domain schemas to JSON Schema in task 169.
+
+If a structured-output request omits `:json-schema`, strategy selection must fail/report `:unsupported` with a clear reason such as `:missing-json-schema`, regardless of native capability or fallback policy. The adapter must not silently derive a partial schema, inject fallback instructions from `:schema`, or send provider-native schema fields without the explicit JSON Schema payload. Malli-to-JSON-Schema conversion remains a caller/workflow-runtime concern for task 170 or a later dedicated conversion slice.
 
 ## Prompted JSON fallback behavior
 
@@ -207,7 +209,7 @@ Use provider-native schema fields only on verified capable OpenAI platform trans
    :schema {...}}}}
 ```
 
-The schema source is request `[:structured-output :json-schema]`, or a supported Malli-to-JSON-Schema conversion if implemented for the requested schema subset.
+The schema source is request `[:structured-output :json-schema]`. Task 169 does not derive JSON Schema from `:schema`; if `:json-schema` is absent, no OpenAI native `response_format` is sent and the structured-output request reports `:unsupported`.
 
 Do not add public `/v1/responses` in this task. Do not send `response_format`, Responses-style `text.format`, or strict function schema fields to `:openai-codex-responses` unless a separate verification proves that backend accepts them. Codex/ChatGPT OAuth models such as `openai/gpt-5.5` remain `:prompted-json` fallback-only for this slice.
 
@@ -310,7 +312,7 @@ This task makes AI adapters responsible for request construction, native strateg
 
 AI adapters may parse JSON and may perform minimal shape checks needed to extract provider payloads safely, but they should not expose provider-native output as trusted workflow data merely because the provider accepted a schema. Malli coercion and final validation remain runtime/workflow responsibilities, completed in task 168 and wired to provider-native extraction in task 170.
 
-If an adapter implements a small Malli-to-JSON-Schema conversion or extraction-time parse helper in this slice, failures are reported as extraction/request errors or `:unsupported` strategy reasons. Successful extraction records raw/extracted payload plus strategy metadata; validated/coerced domain values are produced only by the caller/runtime validation layer before downstream workflow references can read them. Task 169 verification is therefore limited to preserving the payload/metadata handoff contract; task 170 or existing workflow-runtime tests prove final Malli validation is invoked when workflows consume that handoff.
+If an adapter implements an extraction-time parse helper in this slice, failures are reported as extraction/request errors or `:unsupported` strategy reasons. Successful extraction records raw/extracted payload plus strategy metadata; validated/coerced domain values are produced only by the caller/runtime validation layer before downstream workflow references can read them. Task 169 does not implement Malli-to-JSON-Schema conversion, and verification is therefore limited to preserving the explicit JSON Schema request contract plus payload/metadata handoff contract; task 170 or existing workflow-runtime tests prove final Malli validation is invoked when workflows consume that handoff.
 
 ## Testing requirements
 
@@ -339,5 +341,5 @@ Update model/provider documentation to explain:
 ## Risks
 
 - Provider APIs differ across model families and may change. Keep the capability model versionable and test request shapes closely.
-- JSON Schema conversion from Malli may be partial. Unsupported schema forms should fail explicitly rather than silently weakening constraints.
+- JSON Schema conversion from Malli is intentionally not implemented in this slice. Callers must supply `:json-schema`; schema-only requests fail as `:unsupported` rather than silently weakening constraints.
 - Native schema enforcement can still fail or produce refusal/error paths; callers must continue to handle invalid or absent structured outputs.
