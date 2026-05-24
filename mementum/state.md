@@ -15,6 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-23: Reviewed task 169 design/plan/steps for ambiguities repeat 8; found non-streaming structured-output metadata root ambiguity: design says provider execution returns/associates `:structured-output`, but current `execute-response` returns `{:assistant-message ... :logprobs ...}` with no exact root; added design-step and committed 08e6446d.
 - 2026-05-23: Reviewed task 169 design/plan/steps for inconsistencies repeat 7; found auth-path representation inconsistency: design requires final `:auth` in effective capability resolution and examples show `:auth :chatgpt-oauth`, but closed model schemas/plan/steps do not allow or populate it; added design-step and committed c1ff047a.
 - 2026-05-23: Executed task 169 ambiguity follow-up repeat 7: runtime auth/transport resolution is authoritative for structured-output capability; OAuth-backed `openai/gpt-5.5` mapped to Codex must clear/replace platform-native capability so strategy selection cannot inherit Chat Completions native support.
 - 2026-05-23: Reviewed task 169 design/plan/steps for ambiguities repeat 7; found auth-path/runtime transport override ambiguity for OAuth-backed `openai/gpt-5.5` inheriting platform Chat Completions native capability after `resolve-runtime-model` changes it to Codex; added design-step and committed 6ab439b9.
@@ -100,6 +101,7 @@ Focused OAuth routing tests ✅. bb tests previously ✅. 5 former test errors f
 
 ## Latest session notes
 
+- 2026-05-23: Task 169 ambiguity review repeat 8 found one actionable ambiguity: non-streaming structured-output metadata/payload must name the exact `execute-response` result root so implementation/tests do not diverge.
 - 2026-05-23: Task 169 ambiguity review repeat 7 found one actionable ambiguity: structured-output capability source must be defined after runtime auth/transport resolution so ChatGPT OAuth/Codex `gpt-5.5` cannot accidentally inherit platform-native OpenAI Chat Completions capability.
 - 2026-05-23: Task 169 inconsistency review repeat 6 found no new actionable inconsistency feedback; omitted structured-output capability data remains load-valid but effectively unsupported, prompted JSON fallback is explicit opt-in, streaming metadata uses first-class events, and workflow/runtime remains final validation authority.
 - 2026-05-23: Task 169 inconsistency review repeat 5 found no new actionable inconsistency feedback; design/plan/steps/docs remain aligned on first-class streaming structured-output events, OpenAI Chat Completions native-only support, Codex fallback-only, Anthropic synthetic forced-tool extraction, and workflow-owned final validation.
