@@ -1,0 +1,6 @@
+# Design follow-up steps
+
+- [ ] Add `plan.md` and `steps.md` before implementation, or explicitly mark task 170 as still design-only; the current task has implementation acceptance criteria but no execution approach/order artifacts to disambiguate what should be built first.
+- [ ] Choose the exact structured-output policy/request keys task 170 will add to workflow IR/output specs (for example `:json-schema`, `:strategy-preference`, `:fallback`, `:require-provider-native?`, or different canonical names) and update the design/docs/schema targets so implementation does not infer from “equivalent” wording.
+- [ ] Define the JSON Schema source boundary for workflows: task 169 requires explicit request `:json-schema`, while task 168/current workflow IR declares Malli `:schema`; specify whether task 170 converts Malli to JSON Schema, requires authored `:json-schema`, or resolves paired schemas from a registry.
+- [ ] Define the exact mapping from AI structured-output result metadata into the workflow structured-output envelope, including whether `:native-mechanism`, `:source`, `:raw-payload`, and provider `:payload` are persisted alongside envelope `:strategy` and `:value` for session steps and judges.
