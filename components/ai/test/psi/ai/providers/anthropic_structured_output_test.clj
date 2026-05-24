@@ -73,6 +73,34 @@
     (is (nil? (:tools body)))
     (is (nil? (:tool_choice body)))))
 
+(deftest anthropic-structured-output-prompted-json-fallback-request-shaping-test
+  ;; Tests Anthropic fallback-only structured-output behavior without synthetic
+  ;; forced-tool/native fields.
+  (let [model (-> (models/get-model :sonnet-4.6)
+                  (structured-output/with-structured-output-capability
+                    {:supported? true
+                     :strategies [:prompted-json]
+                     :native-mechanism nil}))
+        convo (-> (conv/create "sys")
+                  (conv/add-tool {:name "ordinary_tool"
+                                  :description "ordinary"
+                                  :parameters {:type "object"}})
+                  (conv/add-user-message "Review this"))
+        req   (#'anthropic/build-request convo model {:api-key "test-key"
+                                                      :structured-output judge-structured-output-request})
+        body  (json/parse-string (:body req) true)
+        text  (get-in body [:messages 0 :content 0 :text])
+        strategy (structured-output/select-strategy model judge-structured-output-request)]
+    (is (= :prompted-json (:strategy strategy)))
+    (is (true? (:fallback-used? strategy)))
+    (is (re-find #"Review this" text))
+    (is (re-find #"Structured output required" text))
+    (is (re-find #"JSON Schema" text))
+    (is (= 1 (count (:tools body))))
+    (is (= "ordinary_tool" (get-in body [:tools 0 :name])))
+    (is (= "object" (get-in body [:tools 0 :input_schema :type])))
+    (is (nil? (:tool_choice body)))))
+
 (deftest anthropic-streaming-structured-output-events-test
   ;; Tests streaming strategy and result metadata are emitted as first-class AI events.
   (let [model  (models/get-model :sonnet-4.6)

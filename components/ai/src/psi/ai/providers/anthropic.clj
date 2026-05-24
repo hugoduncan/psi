@@ -135,12 +135,35 @@
       (conj (pop acc) (update last-msg :content conj block))
       (conj acc {:role "user" :content [block]}))))
 
+(defn- append-fallback-instructions-to-user-blocks
+  [blocks fallback-request]
+  (if fallback-request
+    (let [last-text-index (last (keep-indexed (fn [idx block]
+                                                (when (= "text" (:type block))
+                                                  idx))
+                                              blocks))]
+      (if (some? last-text-index)
+        (mapv (fn [idx block]
+                (if (= idx last-text-index)
+                  (update block
+                          :text
+                          structured-output/append-fallback-instructions-to-text
+                          fallback-request)
+                  block))
+              (range)
+              blocks)
+        (conj (vec blocks)
+              (text-block (structured-output/json-only-instruction fallback-request)))))
+    blocks))
+
 (defn- transform-message
-  [canonical-id acc msg]
+  [canonical-id fallback-request acc msg]
   (case (:role msg)
     :user
     (conj acc {:role "user"
-               :content (user-content msg)})
+               :content (append-fallback-instructions-to-user-blocks
+                         (user-content msg)
+                         fallback-request)})
 
     :assistant
     (conj acc {:role "assistant"
@@ -153,11 +176,24 @@
 
 (defn transform-messages
   "Transform conversation messages to Anthropic API format."
-  [conversation]
-  (let [canonical-id (tool-id/canonical-tool-id-fn)]
-    (reduce (partial transform-message canonical-id)
-            []
-            (:messages conversation))))
+  ([conversation]
+   (transform-messages conversation nil))
+  ([conversation fallback-request]
+   (let [canonical-id     (tool-id/canonical-tool-id-fn)
+         last-user-index  (when fallback-request
+                            (last (keep-indexed (fn [idx msg]
+                                                  (when (= :user (:role msg))
+                                                    idx))
+                                                (:messages conversation))))]
+     (->> (:messages conversation)
+          (map-indexed vector)
+          (reduce (fn [acc [idx msg]]
+                    (transform-message canonical-id
+                                       (when (= idx last-user-index)
+                                         fallback-request)
+                                       acc
+                                       msg))
+                  [])))))
 
 ;; Extended thinking: budget_tokens per level. Adaptive thinking (Opus 4.7+): effort string.
 (def ^:private thinking-level->budget
@@ -299,6 +335,8 @@
         effort          (when (and thinking adaptive?)
                           (get thinking-level->effort (:thinking-level options)))
         api-key         (resolve-api-key options)
+        fallback-request (when (= :prompted-json (:strategy strategy))
+                           structured-request)
         tool-defs       (tool-definitions conversation)
         structured-tool (when (= :provider-native (:strategy strategy))
                           (anthropic-structured-output/structured-tool structured-request tool-defs))
@@ -308,7 +346,7 @@
         prompt-caching? (prompt-caching? conversation)
         body            (cond-> {:model      (:id model)
                                  :max_tokens (or (:max-tokens options) (:max-tokens model))
-                                 :messages   (transform-messages conversation)
+                                 :messages   (transform-messages conversation fallback-request)
                                  :stream     true}
                           (some? system-body) (assoc :system system-body)
                           ;; temperature is incompatible with extended thinking, and is a 400

@@ -12,4 +12,4 @@
 - [x] Update provider/model documentation.
 - [x] Add focused tests for model capability validation, OpenAI request shape, Anthropic request shape, fallback/unsupported behavior, missing-`:json-schema` schema-only rejection, strategy metadata, and extracted/raw payload handoff preservation for later workflow validation.
 - [x] Run focused verification commands and record results in `implementation.md`.
-- [ ] Implement and test prompted-JSON fallback request shaping for Anthropic Messages fallback-only structured-output capability: append the adapter-owned JSON-only/schema instruction to the outbound message content, avoid synthetic forced-tool/native fields, and report `:fallback-used? true`.
+- [x] Implement and test prompted-JSON fallback request shaping for Anthropic Messages fallback-only structured-output capability: append the adapter-owned JSON-only/schema instruction to the outbound message content, avoid synthetic forced-tool/native fields, and report `:fallback-used? true`.
