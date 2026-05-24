@@ -10,4 +10,4 @@
 - [x] Add focused tests for text-mode compatibility, valid structured session output, valid structured judge output, invalid output, downstream structured references, and provider strategy recording.
 - [x] Update workflow grammar/IR/user docs for structured output authoring, runtime state, validation failure, downstream references, and provider strategy.
 - [x] Run focused workflow tests and any broader practical verification.
-- [ ] Run a broader workflow/runtime test set after this first implementation slice.
+- [x] Run a broader workflow/runtime test set after this first implementation slice.

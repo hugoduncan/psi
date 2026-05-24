@@ -65,3 +65,7 @@ Completed the newly added inconsistency follow-up: aligned `doc/workflow-ir.md` 
 ## 2026-05-23 — implementation slice
 
 Implemented the first runtime structured-output slice: runtime-owned reusable `:psi.workflow/judge-review-result` schema, canonical prompted-JSON parse/coerce/validate envelopes, IR schema/semantic validation for session and judge `:outputs`, session-step fail-fast blocked result on invalid structured output, judge-local structured output routing via validated `:decision`, and downstream source refs that expose only valid structured `:value` fields. Added focused structured-output, source-resolution, and structured judge tests. Focused verification green: `clojure -M:test --focus psi.workflow-runtime.ir-test --focus psi.workflow-runtime.structured-output-test --focus psi.workflow-step-materialization.structured-source-resolution-test --focus psi.agent-session.workflow-judge-test`.
+
+## 2026-05-23 — broader verification pass
+
+Completed the remaining broad verification step after the first structured-output implementation slice. Ran `bb clojure:test:unit`; all unit tests passed, covering workflow runtime/loader/materialization/judge namespaces along with the broader unit suite. No implementation deviations discovered.
