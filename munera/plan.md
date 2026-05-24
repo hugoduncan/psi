@@ -24,8 +24,13 @@ Backlog:
 `munera/open/156-tui-resume-session-discovery-follow-up/`
 `munera/open/164-tui-idle-polling-elimination/`
 `munera/open/167-emacs-tool-details-show-full-call/`
+`munera/open/168-workflow-structured-output-schemas/`
+`munera/open/170-workflow-provider-native-structured-output/`
 
 Notes:
+
+- `169` is complete and closed: model/provider structured-output capability surface implemented; OpenAI Chat Completions native JSON Schema, Codex prompted-JSON fallback, Anthropic forced-tool native and fallback streaming/result surfaces, strategy metadata, model/user capability normalization, and focused structured-output/model tests green.
+- `171` is complete and closed: Anthropic JSON Schema native output implemented as `:anthropic/json-schema-output`; live OAuth smoke verified the beta request shape `output_format {:type "json_schema" :schema ...}` plus `structured-outputs-2025-11-13`, with `output_format.name`/`strict` omitted; review-implementation completed.
 - `136` is complete and closed: built-in workflow now installs via explicit built-in paths — `register-built-in-tool-in!` / `register-built-in-command-in!` in the shared registries, direct `:session/register-prompt-contribution` dispatch for prompt contributions, and `register-built-in-lifecycle-callback!` / `invoke-built-in-lifecycle!` for session_switch; `ext/register-extension-in!` and `ext/create-extension-api` removed from bootstrap; `built-in:workflow` retained only as stable provenance identifier; 6 commits, lint clean, all affected workflow tests pass.
 
 

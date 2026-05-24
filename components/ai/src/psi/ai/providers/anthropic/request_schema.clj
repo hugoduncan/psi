@@ -97,17 +97,27 @@
                                    [:type [:= "tokens"]]
                                    [:total pos-int?]]]])
 
+(def ^:private anthropic-output-format-schema
+  [:map {:closed true}
+   [:type [:= "json_schema"]]
+   [:schema map?]])
+
 (def ^:private anthropic-request-body-schema
   [:map {:closed true}
    [:model :string]
    [:max_tokens pos-int?]
    [:messages [:sequential anthropic-message-schema]]
-   [:stream [:= true]]
+   [:stream {:optional true} boolean?]
    [:system {:optional true} [:or :string [:sequential anthropic-system-block-schema]]]
    [:temperature {:optional true} number?]
    [:thinking {:optional true} anthropic-thinking-schema]
    [:output_config {:optional true} anthropic-output-config-schema]
-   [:tools {:optional true} [:sequential anthropic-tool-schema]]])
+   [:output_format {:optional true} anthropic-output-format-schema]
+   [:tools {:optional true} [:sequential anthropic-tool-schema]]
+   [:tool_choice {:optional true}
+    [:map {:closed true}
+     [:type [:= "tool"]]
+     [:name [:re "^[a-zA-Z0-9_-]{1,128}$"]]]]])
 
 (defn- request-shape-error-message
   [body explain]

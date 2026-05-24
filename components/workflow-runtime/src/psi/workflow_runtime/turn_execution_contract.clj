@@ -83,8 +83,8 @@
    inputs.
 
    Returns a canonical bounded result map:
-   - success: {:status :ok ... :assistant-message :assistant-text :execution-result}
-   - failure: {:status :error ... :assistant-message :assistant-text :execution-result :failure}"
+   - success: {:status :ok ... :assistant-message :assistant-text :execution-result :structured-output}
+   - failure: {:status :error ... :assistant-message :assistant-text :execution-result :structured-output :failure}"
   ([ctx session-id text]
    (execute-session-turn! ctx session-id text nil nil))
   ([ctx session-id text images]
@@ -93,29 +93,31 @@
    (let [execution-result (prompt-execution-result ctx session-id text images opts)
          assistant-message (:execution-result/assistant-message execution-result)
          assistant-text (assistant-message-text assistant-message)
+         structured-output (:execution-result/structured-output execution-result)
          {:keys [turn/outcome]} (turn-recording/classify-assistant-message assistant-message)]
      (cond-> {:status :ok
               :session-id session-id
               :turn-outcome outcome
               :assistant-message assistant-message
               :assistant-text assistant-text
-              :execution-result execution-result}
+              :execution-result execution-result
+              :structured-output structured-output}
        (= :turn.outcome/error outcome)
        (assoc :status :error
               :failure (execution-failure-payload session-id assistant-message))))))
 
 (defn execute-actor-turn!
   "Intent-named semantic alias for workflow actor-step callers.
-   Kept distinct from `execute-judge-turn!` so actor/judge callers share one
-   bounded contract today while retaining a stable place for caller-specific
-   divergence later if needed."
-  [ctx session-id prompt]
-  (execute-session-turn! ctx session-id prompt))
+   Accepts optional provider-neutral turn options as a fourth argument."
+  ([ctx session-id prompt]
+   (execute-session-turn! ctx session-id prompt))
+  ([ctx session-id prompt opts]
+   (execute-session-turn! ctx session-id prompt nil opts)))
 
 (defn execute-judge-turn!
   "Intent-named semantic alias for workflow judge callers.
-   Kept distinct from `execute-actor-turn!` so actor/judge callers share one
-   bounded contract today while retaining a stable place for caller-specific
-   divergence later if needed."
-  [ctx session-id prompt]
-  (execute-session-turn! ctx session-id prompt))
+   Accepts optional provider-neutral turn options as a fourth argument."
+  ([ctx session-id prompt]
+   (execute-session-turn! ctx session-id prompt))
+  ([ctx session-id prompt opts]
+   (execute-session-turn! ctx session-id prompt nil opts)))

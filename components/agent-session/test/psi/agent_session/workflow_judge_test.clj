@@ -232,3 +232,306 @@
       (is (= :result (:stage (ex-data ex))))
       (is (= :psi.agent-session.workflow-judge/execute-judge!
              (:caller (ex-data ex)))))))
+
+(def structured-review-judge-spec
+  {:type :llm
+   :session {:contributions [{:type :template
+                              :text "Return review JSON"
+                              :vars {}}]}
+   :outputs {:review {:source :judge/structured-output
+                      :mode :structured
+                      :schema-id :psi.workflow/judge-review-result
+                      :schema-version 1
+                      :schema [:map
+                               [:decision [:enum :clear :needs-work :unclear]]
+                               [:issues [:vector [:map
+                                                  [:severity [:enum :blocking :minor]]
+                                                  [:kind [:enum :ambiguity :inconsistency :missing-acceptance :scope-drift]]
+                                                  [:description :string]
+                                                  [:evidence :string]
+                                                  [:suggested-change :string]]]]
+                               [:confidence [:double {:min 0.0 :max 1.0}]]]
+                      :json-schema {:type "object"
+                                    :required ["decision" "issues" "confidence"]
+                                    :properties {"decision" {:type "string"}
+                                                 "issues" {:type "array"}
+                                                 "confidence" {:type "number"}}}}}
+   :projection :none})
+
+(defn- structured-judge-test-ctx []
+  {workflow-execution-adapter/adapter-key
+   (workflow-execution-adapter/create
+    {:create-child-session! (fn [_ctx _parent opts]
+                              {:psi.agent-session/session-id (:child-session-id opts)})})})
+
+(def structured-review-routing-table
+  {:clear {:goto :done}
+   :needs-work {:goto "step-2-build" :max-iterations 3}})
+
+(def structured-review-step-runs
+  {"step-2-build" {:step-id "step-2-build" :attempts [] :iteration-count 1}
+   "step-3-review" {:step-id "step-3-review" :attempts [] :iteration-count 1}})
+
+(deftest execute-judge-structured-output-test
+  ;; Tests LLM judges can return a schema-validated local structured output and
+  ;; route from its explicit decision field without prose matching.
+  (testing "structured judge output validates and routes by decision"
+    (let [turn-opts* (atom nil)]
+      (with-redefs [psi.session-persistence.core/messages-from-entries-in
+                    (fn [_ctx _sid] [])
+                    psi.workflow-runtime.turn-execution-contract/execute-judge-turn!
+                    (fn [_ctx sid _text opts]
+                      (reset! turn-opts* opts)
+                      (let [ai-structured-output {:strategy :prompted-json
+                                                  :source :prompted-json/text
+                                                  :payload {"decision" "clear"
+                                                            "issues" []
+                                                            "confidence" 0.8}
+                                                  :raw-payload "{\"decision\":\"clear\",\"issues\":[],\"confidence\":0.8}"}]
+                        {:status :ok
+                         :session-id sid
+                         :assistant-text "{\"decision\":\"clear\",\"issues\":[],\"confidence\":0.8}"
+                         :structured-output ai-structured-output}))]
+        (let [result (workflow-judge/execute-judge!
+                      (structured-judge-test-ctx) "parent-1" "actor-1"
+                      structured-review-judge-spec structured-review-routing-table
+                      {:current-step-id "step-3-review"
+                       :step-order step-order
+                       :step-runs structured-review-step-runs})]
+          (is (= :clear (:judge-event result)))
+          (is (= {:action :complete} (:routing-result result)))
+          (is (= :valid (get-in result [:judge-output :review :structured-output :status])))
+          (is (= :clear (get-in result [:judge-output :review :structured-output :value :decision])))
+          (is (= {:structured-output {:schema-id :psi.workflow/judge-review-result
+                                      :schema-version 1
+                                      :json-schema {:type "object"
+                                                    :required ["decision" "issues" "confidence"]
+                                                    :properties {"decision" {:type "string"}
+                                                                 "issues" {:type "array"}
+                                                                 "confidence" {:type "number"}}}
+                                      :strategy-preference :provider-native
+                                      :fallback-allowed? true
+                                      :strict? true}}
+                 @turn-opts*)))))))
+
+(deftest execute-judge-missing-turn-result-structured-output-fails-test
+  ;; Tests structured judge requests reject a missing bounded turn-result
+  ;; :structured-output seam instead of parsing raw assistant JSON with a
+  ;; synthetic/default strategy envelope.
+  (testing "structured judge fails when structured metadata seam is absent"
+    (with-redefs [psi.session-persistence.core/messages-from-entries-in
+                  (fn [_ctx _sid] [])
+                  psi.workflow-runtime.turn-execution-contract/execute-judge-turn!
+                  (fn [_ctx sid _text _opts]
+                    {:status :ok
+                     :session-id sid
+                     :assistant-text "{\"decision\":\"clear\",\"issues\":[],\"confidence\":0.9}"})]
+      (let [result (workflow-judge/execute-judge!
+                    (structured-judge-test-ctx) "parent-1" "actor-1"
+                    structured-review-judge-spec structured-review-routing-table
+                    {:current-step-id "step-3-review"
+                     :step-order step-order
+                     :step-runs structured-review-step-runs})
+            envelope (get-in result [:judge-output :review :structured-output])]
+        (is (nil? (:judge-event result)))
+        (is (= {:action :fail
+                :reason :invalid-structured-output
+                :output-key :review}
+               (select-keys (:routing-result result) [:action :reason :output-key])))
+        (is (= :invalid (:status envelope)))
+        (is (= :prompted-json (:strategy envelope)))
+        (is (= [{:type :missing-structured-output
+                 :message "Structured workflow generation did not return structured-output metadata"}]
+               (:errors envelope)))
+        (is (not (contains? envelope :value)))))))
+
+(deftest execute-judge-structured-output-success-uses-turn-result-metadata-test
+  ;; Tests successful structured judge envelopes are built from the top-level
+  ;; bounded turn-result :structured-output seam, preserving the actual strategy,
+  ;; source, and payload instead of parsing prose-only output.
+  (testing "structured judge records actual prompted-json metadata and payload from turn result"
+    (let [ai-structured-output {:strategy :prompted-json
+                                :source :prompted-json/text
+                                :fallback-used? true
+                                :payload {"decision" "needs-work"
+                                          "issues" [{"severity" "blocking"
+                                                     "kind" "ambiguity"
+                                                     "description" "unclear"
+                                                     "evidence" "design"
+                                                     "suggested-change" "clarify"}]
+                                          "confidence" 0.7}
+                                :raw-payload "{\"decision\":\"needs-work\"}"}]
+      (with-redefs [psi.session-persistence.core/messages-from-entries-in
+                    (fn [_ctx _sid] [])
+                    psi.workflow-runtime.turn-execution-contract/execute-judge-turn!
+                    (fn [_ctx sid _text _opts]
+                      {:status :ok
+                       :session-id sid
+                       :assistant-text "this prose is not JSON and must not be the source"
+                       :structured-output ai-structured-output
+                       :execution-result {:execution-result/structured-output ai-structured-output}})]
+        (let [result (workflow-judge/execute-judge!
+                      (structured-judge-test-ctx) "parent-1" "actor-1"
+                      structured-review-judge-spec structured-review-routing-table
+                      {:current-step-id "step-3-review"
+                       :step-order step-order
+                       :step-runs structured-review-step-runs})
+              envelope (get-in result [:judge-output :review :structured-output])]
+          (is (= :needs-work (:judge-event result)))
+          (is (= {:action :goto :target "step-2-build"} (:routing-result result)))
+          (is (= :valid (:status envelope)))
+          (is (= :prompted-json (:strategy envelope)))
+          (is (= :prompted-json/text (:source envelope)))
+          (is (true? (:fallback-used? envelope)))
+          (is (= (:payload ai-structured-output) (:payload envelope)))
+          (is (= (:raw-payload ai-structured-output) (:raw-payload envelope)))
+          (is (= :needs-work (get-in envelope [:value :decision])))
+          (is (= :blocking (get-in envelope [:value :issues 0 :severity]))))))))
+
+(deftest execute-judge-unsupported-structured-output-fails-test
+  ;; Tests fallback-forbidden AI strategy failures for structured judges return
+  ;; the terminal judge failure surface without prose no-match retries.
+  (testing "unsupported structured judge output fails with machine-readable reason"
+    (let [turn-prompts* (atom [])]
+      (with-redefs [psi.session-persistence.core/messages-from-entries-in
+                    (fn [_ctx _sid] [])
+                    psi.workflow-runtime.turn-execution-contract/execute-judge-turn!
+                    (fn [_ctx sid text _opts]
+                      (swap! turn-prompts* conj text)
+                      {:status :error
+                       :session-id sid
+                       :assistant-text ""
+                       :structured-output {:strategy :unsupported
+                                           :reason :unsupported-structured-output
+                                           :resolved-model {:provider "local" :id "fallback-only"}}
+                       :failure {:reason :unsupported-structured-output
+                                 :message "Resolved model cannot provide native structured output"}})]
+        (let [result (workflow-judge/execute-judge!
+                      (structured-judge-test-ctx) "parent-1" "actor-1"
+                      (assoc-in structured-review-judge-spec
+                                [:outputs :review :require-provider-native?]
+                                true)
+                      structured-review-routing-table
+                      {:current-step-id "step-3-review"
+                       :step-order step-order
+                       :step-runs structured-review-step-runs})]
+          (is (nil? (:judge-event result)))
+          (is (= {:action :fail
+                  :reason :unsupported-structured-output
+                  :output-key :review}
+                 (select-keys (:routing-result result) [:action :reason :output-key])))
+          (is (= {:strategy :unsupported
+                  :reason :unsupported-structured-output
+                  :resolved-model {:provider "local" :id "fallback-only"}}
+                 (get-in result [:routing-result :details :structured-output])))
+          (is (= ["Return review JSON"] @turn-prompts*)))))))
+
+(deftest execute-judge-fallback-none-unsupported-structured-output-fails-test
+  ;; Tests :fallback :none uses the same terminal judge failure surface as
+  ;; required-native when the AI layer reports unsupported structured output.
+  (testing "fallback none unsupported structured judge output fails with machine-readable reason"
+    (let [turn-prompts* (atom [])
+          turn-opts* (atom nil)]
+      (with-redefs [psi.session-persistence.core/messages-from-entries-in
+                    (fn [_ctx _sid] [])
+                    psi.workflow-runtime.turn-execution-contract/execute-judge-turn!
+                    (fn [_ctx sid text opts]
+                      (swap! turn-prompts* conj text)
+                      (reset! turn-opts* opts)
+                      {:status :error
+                       :session-id sid
+                       :assistant-text ""
+                       :structured-output {:strategy :unsupported
+                                           :reason :unsupported-structured-output
+                                           :resolved-model {:provider "local" :id "unsupported"}}
+                       :failure {:reason :unsupported-structured-output
+                                 :message "Resolved model cannot provide structured output without fallback"}})]
+        (let [result (workflow-judge/execute-judge!
+                      (structured-judge-test-ctx) "parent-1" "actor-1"
+                      (assoc-in structured-review-judge-spec
+                                [:outputs :review :fallback]
+                                :none)
+                      structured-review-routing-table
+                      {:current-step-id "step-3-review"
+                       :step-order step-order
+                       :step-runs structured-review-step-runs})]
+          (is (nil? (:judge-event result)))
+          (is (= {:action :fail
+                  :reason :unsupported-structured-output
+                  :output-key :review}
+                 (select-keys (:routing-result result) [:action :reason :output-key])))
+          (is (= {:strategy :unsupported
+                  :reason :unsupported-structured-output
+                  :resolved-model {:provider "local" :id "unsupported"}}
+                 (get-in result [:routing-result :details :structured-output])))
+          (is (false? (get-in @turn-opts* [:structured-output :fallback-allowed?])))
+          (is (not (get-in @turn-opts* [:structured-output :require-provider-native?])))
+          (is (= ["Return review JSON"] @turn-prompts*)))))))
+
+(deftest execute-judge-invalid-structured-output-fails-locally-test
+  (testing "invalid structured judge output fails locally without prose routing or retry"
+    (let [turn-prompts* (atom [])]
+      (with-redefs [psi.session-persistence.core/messages-from-entries-in
+                    (fn [_ctx _sid] [])
+                    psi.workflow-runtime.turn-execution-contract/execute-judge-turn!
+                    (fn
+                      ([_ctx sid text]
+                       (swap! turn-prompts* conj text)
+                       {:status :ok
+                        :session-id sid
+                        :assistant-text "APPROVED"})
+                      ([_ctx sid text _opts]
+                       (swap! turn-prompts* conj text)
+                       {:status :ok
+                        :session-id sid
+                        :assistant-text "APPROVED"}))]
+        (let [result (workflow-judge/execute-judge!
+                      (structured-judge-test-ctx) "parent-1" "actor-1"
+                      structured-review-judge-spec structured-review-routing-table
+                      {:current-step-id "step-3-review"
+                       :step-order step-order
+                       :step-runs structured-review-step-runs})]
+          (is (nil? (:judge-event result)))
+          (is (= {:action :fail
+                  :reason :invalid-structured-output
+                  :output-key :review}
+                 (select-keys (:routing-result result) [:action :reason :output-key])))
+          (is (= :invalid
+                 (get-in result [:routing-result :details :structured-output :status])))
+          (is (= :invalid (get-in result [:judge-output :review :structured-output :status])))
+          (is (= ["Return review JSON"] @turn-prompts*)))))))
+
+(deftest execute-judge-schema-valid-negative-decision-routes-test
+  (testing "schema-valid negative decision drives the configured non-clear branch"
+    (with-redefs [psi.session-persistence.core/messages-from-entries-in
+                  (fn [_ctx _sid] [])
+                  psi.workflow-runtime.turn-execution-contract/execute-judge-turn!
+                  (fn
+                    ([_ctx sid _text]
+                     {:status :ok
+                      :session-id sid
+                      :assistant-text "{\"decision\":\"needs-work\",\"issues\":[{\"severity\":\"blocking\",\"kind\":\"ambiguity\",\"description\":\"unclear\",\"evidence\":\"design\",\"suggested-change\":\"clarify\"}],\"confidence\":0.8}"})
+                    ([_ctx sid _text _opts]
+                     (let [ai-structured-output {:strategy :prompted-json
+                                                 :source :prompted-json/text
+                                                 :payload {"decision" "needs-work"
+                                                           "issues" [{"severity" "blocking"
+                                                                      "kind" "ambiguity"
+                                                                      "description" "unclear"
+                                                                      "evidence" "design"
+                                                                      "suggested-change" "clarify"}]
+                                                           "confidence" 0.8}
+                                                 :raw-payload "{\"decision\":\"needs-work\"}"}]
+                       {:status :ok
+                        :session-id sid
+                        :assistant-text "{\"decision\":\"needs-work\",\"issues\":[{\"severity\":\"blocking\",\"kind\":\"ambiguity\",\"description\":\"unclear\",\"evidence\":\"design\",\"suggested-change\":\"clarify\"}],\"confidence\":0.8}"
+                        :structured-output ai-structured-output})))]
+      (let [result (workflow-judge/execute-judge!
+                    (structured-judge-test-ctx) "parent-1" "actor-1"
+                    structured-review-judge-spec structured-review-routing-table
+                    {:current-step-id "step-3-review"
+                     :step-order step-order
+                     :step-runs structured-review-step-runs})]
+        (is (= :needs-work (:judge-event result)))
+        (is (= {:action :goto :target "step-2-build"} (:routing-result result)))
+        (is (= :needs-work (get-in result [:judge-output :review :structured-output :value :decision])))))))

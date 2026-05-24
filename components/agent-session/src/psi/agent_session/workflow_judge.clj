@@ -9,6 +9,7 @@
    [psi.workflow-judge :as workflow-judge]
    [psi.workflow-runtime.child-session-contract :as child-session-contract]
    [psi.workflow-runtime.execution-adapter :as execution-adapter]
+   [psi.workflow-runtime.structured-output :as structured-output]
    [psi.workflow-runtime.turn-execution-contract :as turn-execution]))
 
 ;;; Judge session execution — impure
@@ -65,22 +66,66 @@
         (#(execution-adapter/create-child-session! ctx parent-session-id %))
         (child-session-contract/assert-valid-result!
          :psi.agent-session.workflow-judge/execute-judge!))
-    ;; First attempt
-    (let [initial-result (turn-execution/execute-judge-turn! ctx judge-sid (judge-prompt judge-spec))]
-      (loop [attempt 0
-             last-output (str/trim (:assistant-text initial-result))]
-        (let [routing-result (workflow-judge/evaluate-routing last-output routing-table
-                                                              current-step-id step-order step-runs)]
-          (if (and (= :no-match (:action routing-result))
-                   (< attempt max-judge-retries))
-            ;; Retry: inject feedback into the same judge session
-            (let [retry-result (turn-execution/execute-judge-turn! ctx judge-sid
-                                                                   (judge-retry-feedback last-output expected-sigs))]
-              (recur (inc attempt)
-                     (str/trim (:assistant-text retry-result))))
-            ;; Matched, or retries exhausted
-            {:judge-session-id judge-sid
-             :judge-output     last-output
-             :judge-event      (when (not= :no-match (:action routing-result))
-                                 last-output)
-             :routing-result   routing-result}))))))
+    (let [structured-entry (structured-output/single-structured-output-entry (:outputs judge-spec))
+          request-result (when-let [[output-key output-spec] structured-entry]
+                           (structured-output/structured-output-request output-key output-spec))]
+      (if (false? (:ok? request-result))
+        {:judge-session-id judge-sid
+         :judge-output {(get-in request-result [:details :output-key])
+                        {:structured-output {:status :invalid
+                                             :errors [{:type (:reason request-result)
+                                                       :message (:message request-result)}]}}}
+         :judge-event nil
+         :routing-result {:action :fail
+                          :reason (:reason request-result)
+                          :output-key (get-in request-result [:details :output-key])
+                          :details (:details request-result)}}
+        (let [initial-result (if-let [opts (:opts request-result)]
+                               (turn-execution/execute-judge-turn! ctx judge-sid (judge-prompt judge-spec) opts)
+                               (turn-execution/execute-judge-turn! ctx judge-sid (judge-prompt judge-spec)))]
+          (loop [attempt 0
+                 last-output (str/trim (:assistant-text initial-result))
+                 last-structured-output (:structured-output initial-result)]
+            (if-let [[output-key output-spec] structured-entry]
+              (if (= :unsupported-structured-output (get-in last-structured-output [:reason]))
+                {:judge-session-id judge-sid
+                 :judge-output {output-key {:structured-output last-structured-output}}
+                 :judge-event nil
+                 :routing-result {:action :fail
+                                  :reason :unsupported-structured-output
+                                  :output-key output-key
+                                  :details {:structured-output last-structured-output}}}
+                (let [structured-result (if (some? last-structured-output)
+                                          (structured-output/output-result output-spec last-output last-structured-output)
+                                          (structured-output/missing-ai-structured-output-result output-spec last-output))
+                      judge-output {output-key structured-result}]
+                  (if (structured-output/valid-output-result? structured-result)
+                    (let [judge-event (get-in structured-result [:structured-output :value :decision])
+                          routing-result (workflow-judge/evaluate-routing judge-event routing-table
+                                                                          current-step-id step-order step-runs)]
+                      {:judge-session-id judge-sid
+                       :judge-output judge-output
+                       :judge-event judge-event
+                       :routing-result routing-result})
+                    {:judge-session-id judge-sid
+                     :judge-output judge-output
+                     :judge-event nil
+                     :routing-result (cond-> {:action :fail
+                                              :reason :invalid-structured-output
+                                              :output-key output-key}
+                                       (or (:opts request-result) last-structured-output)
+                                       (assoc :details {:structured-output (:structured-output structured-result)}))})))
+              (let [routing-result (workflow-judge/evaluate-routing last-output routing-table
+                                                                    current-step-id step-order step-runs)]
+                (if (and (= :no-match (:action routing-result))
+                         (< attempt max-judge-retries))
+                  (let [retry-result (turn-execution/execute-judge-turn! ctx judge-sid
+                                                                         (judge-retry-feedback last-output expected-sigs))]
+                    (recur (inc attempt)
+                           (str/trim (:assistant-text retry-result))
+                           (:structured-output retry-result)))
+                  {:judge-session-id judge-sid
+                   :judge-output     last-output
+                   :judge-event      (when (not= :no-match (:action routing-result))
+                                       last-output)
+                   :routing-result   routing-result})))))))))

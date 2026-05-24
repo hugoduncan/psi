@@ -288,8 +288,9 @@ What this teaches:
 
 - yielded text and structured handoff are distinct delegated contracts
 - `:yield :text` is the human-facing chaining surface
-- `:output :handoff` is the machine-facing orchestration surface
-- downstream orchestration should prefer declared handoff data over assuming delegated transcript export
+- delegated `:output :handoff` is the machine-facing orchestration surface for delegated workflow exports
+- session and LLM-judge steps may also declare structured `:outputs` for local validated model/judge data; see [`doc/workflow-grammar.md`](workflow-grammar.md) and [`doc/workflow-ir.md`](workflow-ir.md) for the formal schema, raw-output envelope, validation, and provider-strategy details
+- downstream orchestration should prefer declared structured outputs over parsing transcripts or assuming delegated transcript export
 
 ## Input and context flow
 
@@ -299,6 +300,7 @@ The most important authoring references in this guide are:
 - `:workflow-original` — carried original request/reference context
 - `{:from {:step "..." :yield :text}}` — prior step result used as the next ask, including delegate-step yielded text
 - `{:from {:step "..." :output :handoff}}` — prior delegated workflow's structured terminal handoff
+- `{:from {:step "..." :output :classification} :path [:next-action]}` — prior session-step structured output field, when that step declares a structured entry in `:outputs`
 - `{:from {:step "..." :output :transcript}}` with `:projection` — projected
   transcript/reference context
 
@@ -310,6 +312,13 @@ Interpretation:
   the next step's authored text
 - delegated `:output :handoff` refs are the stable way to consume machine-facing
   exported workflow data without parsing markdown heuristically downstream
+- session structured `:outputs` are the stable downstream-reference surface for
+  machine control flow to consume model-generated data through validated fields
+  instead of prose parsing; each session step may declare at most one structured
+  output key, with multiple values grouped as fields of one map schema
+- LLM-judge structured `:outputs` are judge-local data for transition evaluation;
+  they are not automatically exported as parent step `:output` refs, and each
+  judge may declare at most one structured output key
 - `:context` on a delegate step carries forwarded material without changing the
   delegated workflow's prompt string
 
@@ -330,13 +339,23 @@ This guide intentionally teaches the currently migrated example-led surfaces:
 - delegated `:prompt-string` and `:context`
 - canonical downstream delegated yielded-text consumption
 - canonical downstream delegated structured-handoff consumption through `:output :handoff`
+- session-step structured entries in `:outputs` for validated downstream
+  machine-facing data
+- LLM-judge structured entries in judge-local `:outputs` for validated transition
+  evaluation data
+- one structured-output key per session step or LLM judge; use one map schema
+  plus `:path` references for multiple fields
 - shared reference syntax for `:workflow-input`, `:workflow-original`, prior
-  step yields, delegated handoffs, and projected transcript context
+  step yields, delegated handoffs, structured output fields, and projected
+  transcript context
 
 It does not try to turn arbitrary delegate-local runtime envelopes or diagnostics
-into a broad author-facing output menu. This slice standardizes one structured
-export key, `:handoff`, and keeps other delegated internal details non-contractual.
-When you need the full formal surface, use the grammar/reference docs.
+into authoring contracts. Delegate handoffs remain the standardized delegated
+workflow export, session structured `:outputs` are the validated downstream
+model-data surface, and LLM-judge structured `:outputs` are validated
+judge-local transition data unless a future explicit export contract says
+otherwise. When you
+need the full formal surface, use the grammar/reference docs.
 
 ## Authoring guidelines
 

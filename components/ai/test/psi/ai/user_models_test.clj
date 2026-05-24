@@ -1,6 +1,7 @@
 (ns psi.ai.user-models-test
   (:require
    [clojure.test :refer [deftest testing is]]
+   [psi.ai.structured-output :as structured-output]
    [psi.ai.user-models :as user-models]))
 
 ;; ── API key resolution ───────────────────────────────────────────────────────
@@ -133,6 +134,32 @@
     (testing "each provider has auth entry"
       (is (contains? (:auth result) :local))
       (is (contains? (:auth result) :remote)))))
+
+(deftest parse-structured-output-capabilities-test
+  (testing "omitted structured-output capability remains valid and normalizes to unsupported"
+    (let [result (user-models/parse-models-config minimal-config)
+          capability (-> result :models first structured-output/effective-capability)]
+      (is (nil? (:error result)))
+      (is (= false (:supported? capability)))
+      (is (empty? (:strategies capability)))
+      (is (true? (:defaulted? capability)))))
+
+  (testing "explicit fallback-only structured-output capability is accepted"
+    (let [result (user-models/parse-models-config
+                  {:providers {"local"
+                               {:base-url "http://localhost:8080/v1"
+                                :api      :openai-completions
+                                :models   [{:id "json-model"
+                                            :capabilities
+                                            {:structured-output
+                                             {:supported? true
+                                              :strategies [:prompted-json]
+                                              :native-mechanism nil}}}]}}})
+          capability (-> result :models first structured-output/effective-capability)]
+      (is (nil? (:error result)))
+      (is (= true (:supported? capability)))
+      (is (= [:prompted-json] (:strategies capability)))
+      (is (nil? (:native-mechanism capability))))))
 
 ;; ── Invalid configs ──────────────────────────────────────────────────────────
 

@@ -6,14 +6,12 @@
             [psi.ai.content :as ai-content]
             [psi.ai.models :as models]
             [psi.ai.proxy :as proxy]
+            [psi.ai.providers.anthropic.error :as anthropic-error]
             [psi.ai.providers.anthropic.request-schema :as request-schema]
-            [psi.ai.providers.anthropic.request-support :as request-support])
-  (:import [java.io InputStream]
-           [java.util UUID]))
-
-(def ^:private anthropic-tool-id-pattern
-  "Anthropic requires tool_use.id to match ^[a-zA-Z0-9_-]+$."
-  #"^[a-zA-Z0-9_-]+$")
+            [psi.ai.providers.anthropic.request-support :as request-support]
+            [psi.ai.providers.anthropic.structured-output :as anthropic-structured-output]
+            [psi.ai.providers.anthropic.tool-id :as tool-id]
+            [psi.ai.structured-output :as structured-output]))
 
 (def ^:private anthropic-version "2023-06-01")
 (def ^:private claude-code-beta "claude-code-20250219")
@@ -22,43 +20,6 @@
 (def ^:private interleaved-thinking-beta "interleaved-thinking-2025-05-14")
 (def ^:private prompt-caching-beta "prompt-caching-2024-07-31")
 (def ^:private prompt-caching-scope-beta "prompt-caching-scope-2026-01-05")
-(defn- coerce-str
-  "Coerce any value to a string; nil and false become \"\"."
-  [x]
-  (str (or x "")))
-(defn- valid-anthropic-tool-id?
-  [id]
-  (and (string? id)
-       (boolean (re-matches anthropic-tool-id-pattern id))))
-(defn- fallback-anthropic-tool-id
-  []
-  (str "tool_" (UUID/randomUUID)))
-(defn- ensure-anthropic-tool-id
-  "Return an Anthropic-safe tool id (alnum, underscore, hyphen only).
-   Generates a fallback when id is nil/blank/invalid."
-  [id]
-  (let [s (coerce-str id)
-        sanitized (-> s
-                      (str/replace #"[^a-zA-Z0-9_-]" "_")
-                      (str/replace #"_+" "_")
-                      (str/replace #"-+" "-")
-                      (str/replace #"^[_-]+|[_-]+$" ""))]
-    (or (when (valid-anthropic-tool-id? s)
-          s)
-        (when (valid-anthropic-tool-id? sanitized)
-          sanitized)
-        (fallback-anthropic-tool-id))))
-
-(defn- canonical-tool-id-fn
-  []
-  (let [tool-id-map (atom {})]
-    (fn [raw-id]
-      (let [key (coerce-str raw-id)]
-        (or (get @tool-id-map key)
-            (let [canonical-id (ensure-anthropic-tool-id raw-id)]
-              (swap! tool-id-map assoc key canonical-id)
-              canonical-id))))))
-
 (defn- anthropic-cache-control
   [cache-control]
   (when (= :ephemeral (:type cache-control))
@@ -174,12 +135,35 @@
       (conj (pop acc) (update last-msg :content conj block))
       (conj acc {:role "user" :content [block]}))))
 
+(defn- append-fallback-instructions-to-user-blocks
+  [blocks fallback-request]
+  (if fallback-request
+    (let [last-text-index (last (keep-indexed (fn [idx block]
+                                                (when (= "text" (:type block))
+                                                  idx))
+                                              blocks))]
+      (if (some? last-text-index)
+        (mapv (fn [idx block]
+                (if (= idx last-text-index)
+                  (update block
+                          :text
+                          structured-output/append-fallback-instructions-to-text
+                          fallback-request)
+                  block))
+              (range)
+              blocks)
+        (conj (vec blocks)
+              (text-block (structured-output/json-only-instruction fallback-request)))))
+    blocks))
+
 (defn- transform-message
-  [canonical-id acc msg]
+  [canonical-id fallback-request acc msg]
   (case (:role msg)
     :user
     (conj acc {:role "user"
-               :content (user-content msg)})
+               :content (append-fallback-instructions-to-user-blocks
+                         (user-content msg)
+                         fallback-request)})
 
     :assistant
     (conj acc {:role "assistant"
@@ -192,11 +176,24 @@
 
 (defn transform-messages
   "Transform conversation messages to Anthropic API format."
-  [conversation]
-  (let [canonical-id (canonical-tool-id-fn)]
-    (reduce (partial transform-message canonical-id)
-            []
-            (:messages conversation))))
+  ([conversation]
+   (transform-messages conversation nil))
+  ([conversation fallback-request]
+   (let [canonical-id     (tool-id/canonical-tool-id-fn)
+         last-user-index  (when fallback-request
+                            (last (keep-indexed (fn [idx msg]
+                                                  (when (= :user (:role msg))
+                                                    idx))
+                                                (:messages conversation))))]
+     (->> (:messages conversation)
+          (map-indexed vector)
+          (reduce (fn [acc [idx msg]]
+                    (transform-message canonical-id
+                                       (when (= idx last-user-index)
+                                         fallback-request)
+                                       acc
+                                       msg))
+                  [])))))
 
 ;; Extended thinking: budget_tokens per level. Adaptive thinking (Opus 4.7+): effort string.
 (def ^:private thinking-level->budget
@@ -257,7 +254,7 @@
 
 (defn- beta-header
   ;; Adaptive thinking (Opus 4.7+) must NOT include interleaved-thinking-beta.
-  [oauth? thinking adaptive? prompt-caching?]
+  [oauth? thinking adaptive? prompt-caching? structured-output?]
   (let [extended-thinking? (and thinking (not adaptive?))
         betas (cond-> []
                 oauth?               (into [claude-code-beta
@@ -265,21 +262,22 @@
                                             context-management-beta
                                             prompt-caching-scope-beta])
                 extended-thinking?   (conj interleaved-thinking-beta)
-                prompt-caching?      (conj prompt-caching-beta))]
+                prompt-caching?      (conj prompt-caching-beta)
+                structured-output?   (conj anthropic-structured-output/json-schema-output-beta))]
     (when (seq betas)
       (->> betas
            distinct
            (str/join ",")))))
 
 (defn- request-headers
-  [api-key thinking adaptive? prompt-caching?]
+  [api-key thinking adaptive? prompt-caching? structured-output?]
   (let [oauth?       (oauth-api-key? api-key)
         base-headers {"Content-Type"      "application/json"
                       "anthropic-version" anthropic-version}
         headers      (if oauth?
                        (assoc base-headers "Authorization" (str "Bearer " api-key))
                        (assoc base-headers "x-api-key" api-key))
-        beta         (beta-header oauth? thinking adaptive? prompt-caching?)]
+        beta         (beta-header oauth? thinking adaptive? prompt-caching? structured-output?)]
     (cond-> headers
       beta (assoc "anthropic-beta" beta))))
 
@@ -328,41 +326,72 @@
                        :provider :anthropic})))
     api-key))
 
+(defn- request-body
+  [conversation model options stream?]
+  (let [structured-request (structured-output/structured-output-request options)
+        strategy           (structured-output/select-strategy model structured-request)
+        thinking           (thinking-param model options)
+        adaptive?          (adaptive-thinking? model)
+        effort             (when (and thinking adaptive?)
+                             (get thinking-level->effort (:thinking-level options)))
+        fallback-request   (when (= :prompted-json (:strategy strategy))
+                             structured-request)
+        tool-defs          (tool-definitions conversation)
+        structured-tool    (when (anthropic-structured-output/forced-tool-mechanism? strategy)
+                             (anthropic-structured-output/structured-tool structured-request tool-defs))
+        tool-defs          (cond-> (vec (or tool-defs []))
+                             structured-tool (conj structured-tool))
+        system-body        (system-prompt-body conversation)]
+    (cond-> {:model      (:id model)
+             :max_tokens (or (:max-tokens options) (:max-tokens model))
+             :messages   (transform-messages conversation fallback-request)}
+      stream? (assoc :stream true)
+      (some? system-body) (assoc :system system-body)
+      ;; temperature is incompatible with extended thinking, and is a 400
+      ;; error on adaptive-thinking models (Opus 4.7+) even when thinking=off
+      (and (not thinking)
+           (not adaptive?)) (assoc :temperature (or (:temperature options) 0.7))
+      thinking            (assoc :thinking thinking)
+      ;; adaptive thinking uses output_config.effort instead of budget_tokens
+      effort              (assoc :output_config {:effort effort})
+      (anthropic-structured-output/json-schema-output-mechanism? strategy)
+      (assoc :output_format (anthropic-structured-output/output-format structured-request))
+      (seq tool-defs)     (assoc :tools tool-defs)
+      structured-tool     (assoc :tool_choice {:type "tool"
+                                               :name (:name structured-tool)}))))
+
 (defn build-request
   "Build Anthropic API request map."
-  [conversation model options]
-  (let [thinking        (thinking-param model options)
-        adaptive?       (adaptive-thinking? model)
-        effort          (when (and thinking adaptive?)
-                          (get thinking-level->effort (:thinking-level options)))
-        api-key         (resolve-api-key options)
-        tool-defs       (tool-definitions conversation)
-        system-body     (system-prompt-body conversation)
-        prompt-caching? (prompt-caching? conversation)
-        body            (cond-> {:model      (:id model)
-                                 :max_tokens (or (:max-tokens options) (:max-tokens model))
-                                 :messages   (transform-messages conversation)
-                                 :stream     true}
-                          (some? system-body) (assoc :system system-body)
-                          ;; temperature is incompatible with extended thinking, and is a 400
-                          ;; error on adaptive-thinking models (Opus 4.7+) even when thinking=off
-                          (and (not thinking)
-                               (not adaptive?)) (assoc :temperature (or (:temperature options) 0.7))
-                          thinking            (assoc :thinking thinking)
-                          ;; adaptive thinking uses output_config.effort instead of budget_tokens
-                          effort              (assoc :output_config {:effort effort})
-                          (seq tool-defs)     (assoc :tools tool-defs))
-        body*           (request-schema/validate-request-body! body)
-        base-hdrs       (if (:no-auth-header options)
-                          ;; Strip auth headers when explicitly disabled
-                          (dissoc (request-headers api-key thinking adaptive? prompt-caching?)
-                                  "Authorization" "x-api-key")
-                          (request-headers api-key thinking adaptive? prompt-caching?))
-        headers         (if-let [custom (:headers options)]
-                          (merge base-hdrs custom)
-                          base-hdrs)]
-    {:headers headers
-     :body    (json/generate-string body*)}))
+  ([conversation model options]
+   (build-request conversation model options true))
+  ([conversation model options stream?]
+   (let [structured-request (structured-output/structured-output-request options)
+         strategy           (structured-output/select-strategy model structured-request)
+         thinking           (thinking-param model options)
+         adaptive?          (adaptive-thinking? model)
+         api-key            (resolve-api-key options)
+         prompt-caching?    (prompt-caching? conversation)
+         json-schema-output? (anthropic-structured-output/json-schema-output-mechanism? strategy)
+         body               (request-body conversation model options stream?)
+         body*              (request-schema/validate-request-body! body)
+         base-hdrs          (if (:no-auth-header options)
+                              ;; Strip auth headers when explicitly disabled
+                              (dissoc (request-headers api-key
+                                                       thinking
+                                                       adaptive?
+                                                       prompt-caching?
+                                                       json-schema-output?)
+                                      "Authorization" "x-api-key")
+                              (request-headers api-key
+                                               thinking
+                                               adaptive?
+                                               prompt-caching?
+                                               json-schema-output?))
+         headers            (if-let [custom (:headers options)]
+                              (merge base-hdrs custom)
+                              base-hdrs)]
+     {:headers headers
+      :body    (json/generate-string body*)})))
 
 (defn- safe-call!
   [f payload]
@@ -517,163 +546,6 @@
   (when event
     (consume-fn event)))
 
-(defn- body->text
-  [body]
-  (try
-    (cond
-      ;; Explicit nil → nil (not "") so callers can use (seq body-text) to
-      ;; distinguish "no body" from "empty body string".
-      (nil? body) nil
-      (string? body) body
-      (instance? InputStream body) (slurp (io/reader body))
-      :else (str body))
-    (catch Exception _ nil)))
-
-(defn- parse-json-text-safe
-  [text]
-  (when (seq text)
-    (try
-      (json/parse-string text true)
-      (catch Exception _
-        nil))))
-
-(defn- parsed-error-message
-  [parsed-body]
-  (or (get-in parsed-body [:error :message])
-      (get-in parsed-body [:message])))
-
-(defn- request-id-from-headers
-  [headers]
-  (or (get headers "request-id")
-      (get headers "Request-Id")
-      (get headers "x-request-id")
-      (get headers "X-Request-Id")
-      (get headers "X-Request-ID")))
-
-(defn- meaningful-error-message?
-  [s]
-  (and (string? s)
-       (not (str/blank? s))
-       (not (contains? #{"Error" "error" "Exception"} s))))
-
-(defn- fallback-status-message
-  [status]
-  (case status
-    400 "Anthropic rejected the request"
-    401 "Anthropic authentication failed"
-    403 "Anthropic authorization failed"
-    404 "Anthropic endpoint not found"
-    429 "Anthropic rate limit exceeded"
-    500 "Anthropic server error"
-    502 "Anthropic gateway error"
-    503 "Anthropic service unavailable"
-    "Anthropic request failed"))
-
-(defn- oauth-auth-request?
-  [request]
-  (let [headers (or (:headers request) {})
-        auth    (or (get headers "Authorization")
-                    (get headers "authorization"))]
-    (and (string? auth)
-         (str/starts-with? auth "Bearer "))))
-
-(defn- request-diagnostic-hint
-  [request]
-  (when (map? request)
-    (let [parsed         (request-support/parse-json-body-safe (:body request))
-          model-id       (when (map? parsed) (:model parsed))
-          beta           (get-in request [:headers "anthropic-beta"])
-          message-count  (when (map? parsed) (count (or (:messages parsed) [])))
-          tool-count     (when (map? parsed) (count (or (:tools parsed) [])))
-          parts          (cond-> []
-                           (string? model-id)      (conj (str "model=" model-id))
-                           (string? beta)          (conj (str "anthropic-beta=" beta))
-                           (number? message-count) (conj (str "messages=" message-count))
-                           (number? tool-count)    (conj (str "tools=" tool-count))
-                           (oauth-auth-request? request) (conj "auth=oauth"))]
-      (when (seq parts)
-        (str " request{" (str/join ", " parts) "}")))))
-
-(defn- augment-400-message
-  "Append diagnostic context to a generic 400 base-msg when Anthropic returns
-   no actionable error detail. Only applied when base-msg is the fallback
-   'Anthropic rejected the request' string."
-  [base-msg body-text oauth? request]
-  (if (= base-msg "Anthropic rejected the request")
-    (str base-msg
-         " ("
-         (if (str/blank? body-text)
-           "no error body returned"
-           "provider response omitted actionable details")
-         "; possible causes: model access, unsupported beta header, or invalid request payload"
-         (when oauth?
-           "; oauth token in use")
-         ")"
-         (or (request-diagnostic-hint request) ""))
-    base-msg))
-
-(defn- base-error-message
-  [{:keys [status fallback-message parsed-body]}]
-  (or (when-let [parsed-msg (some-> parsed-body parsed-error-message)]
-        (when (meaningful-error-message? parsed-msg)
-          parsed-msg))
-      (when (meaningful-error-message? fallback-message)
-        fallback-message)
-      (fallback-status-message status)))
-
-(defn- error-message
-  [{:keys [status headers body-text fallback-message request parsed-body]}]
-  (let [base-msg (base-error-message {:status status
-                                      :body-text body-text
-                                      :fallback-message fallback-message
-                                      :parsed-body parsed-body})
-        base-msg (cond-> base-msg
-                   (= 400 status) (augment-400-message body-text
-                                                       (oauth-auth-request? request)
-                                                       request))]
-    (str base-msg
-         (when status
-           (str " (status " status ")"))
-         (when-let [req-id (request-id-from-headers headers)]
-           (str " [request-id " req-id "]")))))
-
-(defn- error-from-response-data
-  [{:keys [status headers body-text fallback-message request]}]
-  (let [parsed-body (parse-json-text-safe body-text)]
-    (cond-> {:type :error
-             :error-message (error-message {:status status
-                                            :headers headers
-                                            :body-text body-text
-                                            :fallback-message fallback-message
-                                            :request request
-                                            :parsed-body parsed-body})
-             :headers headers}
-      status          (assoc :http-status status)
-      (seq body-text) (assoc :body-text body-text)
-      parsed-body     (assoc :body parsed-body))))
-
-(defn- error-context
-  ([body headers]
-   {:headers headers
-    :body-text (body->text body)})
-  ([body headers request]
-   (assoc (error-context body headers)
-          :request request)))
-
-(defn- exception->error
-  [e]
-  (let [data (ex-data e)]
-    (error-from-response-data
-     (merge (error-context (:body data) (:headers data))
-            {:status (:status data)
-             :fallback-message (or (ex-message e) (str e))}))))
-
-(defn- response->error
-  [response request]
-  (error-from-response-data
-   (merge (error-context (:body response) (:headers response) request)
-          {:status (:status response)})))
-
 (defn- stream-response
   [url request]
   (http/post url (merge request
@@ -697,7 +569,7 @@
         retry-status   (:status retry-response)]
     (if (error-status? retry-status)
       (emit-error! model options url consume-fn
-                   (response->error retry-response retry-request))
+                   (anthropic-error/response->error retry-response retry-request))
       (consume-stream-response! retry-response))))
 
 (defn- handle-400-response!
@@ -706,8 +578,8 @@
                      request
                      {:prompt-caching-beta prompt-caching-beta
                       :interleaved-thinking-beta interleaved-thinking-beta
-                      :oauth-auth-request? oauth-auth-request?})]
-    (let [first-error (response->error response request)]
+                      :oauth-auth-request? anthropic-error/oauth-auth-request?})]
+    (let [first-error (anthropic-error/response->error response request)]
       (capture-response! model options url (assoc first-error
                                                   :retrying-with-compatibility-fallback true
                                                   :retry-fallback-steps (:steps fallback)))
@@ -717,14 +589,24 @@
                                consume-stream-response!
                                (:request fallback)))
     (emit-error! model options url consume-fn
-                 (response->error response request))))
+                 (anthropic-error/response->error response request))))
 
 (defn stream-anthropic
   "Stream response from Anthropic API."
   [conversation model options consume-fn]
-  (let [url         (str (:base-url model) "/v1/messages")
-        request     (build-request conversation model options)
-        block-types (atom {})
+  (let [url                (str (:base-url model) "/v1/messages")
+        structured-request (structured-output/structured-output-request options)
+        strategy           (structured-output/select-strategy model structured-request)
+        request            (build-request conversation model options)
+        request-body       (request-support/parse-json-body-safe (:body request))
+        structured-tool-name (anthropic-structured-output/structured-tool-name-from-request
+                              strategy
+                              request-body)
+        block-types        (atom {})
+        structured-buffers (atom {})
+        prompted-json-buffer (atom "")
+        json-schema-output-buffer (atom "")
+        structured-result-emitted? (atom false)
         usage-acc   (atom {:input-tokens       0
                            :output-tokens      0
                            :cache-read-tokens  0
@@ -732,6 +614,9 @@
         done?       (atom false)]
     (try
       (capture-request! model options url request)
+      (when strategy
+        (consume-fn {:type :structured-output-strategy
+                     :structured-output strategy}))
       (letfn [(consume-stream-response! [response]
                 (with-open [reader (io/reader (:body response))]
                   (doseq [line (line-seq reader)]
@@ -746,30 +631,80 @@
                         "content_block_start"
                         (let [idx   (:index event-data)
                               block (:content_block event-data)]
-                          (swap! block-types assoc idx (:type block))
-                          (consume-fn (content-block-start-event idx block)))
+                          (swap! block-types assoc idx {:type (:type block)
+                                                        :name (:name block)})
+                          (when-not (anthropic-structured-output/structured-tool-block?
+                                     structured-tool-name
+                                     {:type (:type block) :name (:name block)})
+                            (consume-fn (content-block-start-event idx block))))
 
                         "content_block_delta"
-                        (consume-event! consume-fn
-                                        (content-block-delta-event (get @block-types (:index event-data))
-                                                                   (:index event-data)
-                                                                   (:delta event-data)))
+                        (let [idx (:index event-data)
+                              block-info (get @block-types idx)
+                              delta (:delta event-data)]
+                          (if (anthropic-structured-output/structured-tool-block?
+                               structured-tool-name
+                               block-info)
+                            (when-let [json-delta (:partial_json delta)]
+                              (swap! structured-buffers update idx str json-delta))
+                            (do
+                              (when (and (= "text" (:type block-info))
+                                         (seq (:text delta)))
+                                (cond
+                                  (= :prompted-json (:strategy strategy))
+                                  (swap! prompted-json-buffer str (:text delta))
+
+                                  (anthropic-structured-output/json-schema-output-mechanism? strategy)
+                                  (swap! json-schema-output-buffer str (:text delta))))
+                              (consume-event! consume-fn
+                                              (content-block-delta-event (:type block-info)
+                                                                         idx
+                                                                         delta)))))
 
                         "content_block_stop"
-                        (consume-fn (content-block-stop-event (get @block-types (:index event-data))
-                                                              (:index event-data)))
+                        (let [idx (:index event-data)
+                              block-info (get @block-types idx)]
+                          (if (anthropic-structured-output/structured-tool-block?
+                               structured-tool-name
+                               block-info)
+                            (anthropic-structured-output/maybe-emit-structured-result!
+                             consume-fn
+                             strategy
+                             (get @structured-buffers idx))
+                            (consume-fn (content-block-stop-event (:type block-info)
+                                                                  idx))))
 
                         "message_delta"
                         (do
                           (update-output-usage! usage-acc (:usage event-data))
                           (when-let [reason (get-in event-data [:delta :stop_reason])]
                             (reset! done? true)
+                            (anthropic-structured-output/maybe-emit-json-schema-output-result!
+                             consume-fn
+                             structured-result-emitted?
+                             strategy
+                             @json-schema-output-buffer)
+                            (anthropic-structured-output/maybe-emit-prompted-json-result!
+                             consume-fn
+                             structured-result-emitted?
+                             strategy
+                             @prompted-json-buffer)
                             (consume-fn {:type   :done
                                          :reason (keyword reason)
                                          :usage  (usage-with-cost model usage-acc)})))
 
                         "message_stop"
                         (when-not @done?
+                          (anthropic-structured-output/maybe-emit-json-schema-output-result!
+                           consume-fn
+                           structured-result-emitted?
+                           strategy
+                           @json-schema-output-buffer)
+                          (anthropic-structured-output/maybe-emit-prompted-json-result!
+                           consume-fn
+                           structured-result-emitted?
+                           strategy
+                           @prompted-json-buffer)
                           (consume-fn {:type :done :reason :stop}))
 
                         nil)))))]
@@ -786,15 +721,76 @@
 
             (error-status? status)
             (emit-error! model options url consume-fn
-                         (response->error response request))
+                         (anthropic-error/response->error response request))
 
             :else
             (consume-stream-response! response))))
       (catch Exception e
-        (let [err (exception->error e)]
+        (let [err (anthropic-error/exception->error e)]
           (capture-response! model options url err)
           (consume-fn err))))))
 
+(defn- execute-response
+  [url request]
+  (http/post url (merge request
+                        (proxy/request-proxy-options url)
+                        {:as :text :throw-exceptions false})))
+
+(defn- text-content-blocks
+  [content]
+  (->> content
+       (keep (fn [block]
+               (when (= "text" (:type block))
+                 {:type :text :text (or (:text block) "")})))
+       vec))
+
+(defn- response->assistant-message
+  [model body strategy]
+  (let [text  (apply str (keep (fn [block]
+                                 (when (= "text" (:type block))
+                                   (:text block)))
+                               (:content body)))
+        usage (when-let [usage (:usage body)]
+                {:input-tokens (or (:input_tokens usage) 0)
+                 :output-tokens (or (:output_tokens usage) 0)
+                 :cache-read-tokens (or (:cache_read_input_tokens usage) 0)
+                 :cache-write-tokens (or (:cache_creation_input_tokens usage) 0)})]
+    (cond-> {:assistant-message (cond-> {:role "assistant"
+                                         :content (text-content-blocks (:content body))
+                                         :stop-reason (keyword (or (:stop_reason body) "stop"))
+                                         :timestamp (java.time.Instant/now)}
+                                  (map? usage) (assoc :usage (assoc usage
+                                                                    :total-tokens (+ (:input-tokens usage)
+                                                                                     (:output-tokens usage)
+                                                                                     (:cache-read-tokens usage)
+                                                                                     (:cache-write-tokens usage))
+                                                                    :cost (models/calculate-cost model usage))))}
+      (anthropic-structured-output/json-schema-output-mechanism? strategy)
+      (assoc :structured-output
+             (anthropic-structured-output/structured-output-result
+              strategy
+              :anthropic/json-schema-output
+              text)))))
+
+(defn execute-anthropic
+  "Execute a non-streaming Anthropic Messages request."
+  [conversation model options]
+  (let [url                (str (:base-url model) "/v1/messages")
+        structured-request (structured-output/structured-output-request options)
+        strategy           (structured-output/select-strategy model structured-request)
+        request            (build-request conversation model options false)]
+    (try
+      (capture-request! model options url request)
+      (let [response (execute-response url request)]
+        (if (error-status? (:status response))
+          (anthropic-error/response->error response request)
+          (let [body (json/parse-string (:body response) true)]
+            (capture-response! model options url body)
+            (response->assistant-message model body strategy))))
+      (catch Exception e
+        (anthropic-error/exception->error e)))))
+
 (def provider
-  {:name   :anthropic
-   :stream stream-anthropic})
+  {:name    :anthropic
+   :stream  stream-anthropic
+   :execute execute-anthropic})

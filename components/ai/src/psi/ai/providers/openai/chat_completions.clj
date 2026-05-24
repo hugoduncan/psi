@@ -4,7 +4,8 @@
             [psi.ai.models :as models]
             [psi.ai.providers.openai.content :as content]
             [psi.ai.providers.openai.reasoning :as reasoning]
-            [psi.ai.providers.openai.transport :as transport]))
+            [psi.ai.providers.openai.transport :as transport]
+            [psi.ai.structured-output :as structured-output]))
 
 (defn- extract-reasoning-delta
   [delta]
@@ -87,39 +88,54 @@
 
 (defn transform-messages
   "Transform conversation messages to OpenAI chat completions format."
-  [conversation]
-  (->> (:messages conversation)
-       (reduce
-        (fn [acc msg]
-          (case (:role msg)
-            :user
-            (conj acc {:role    "user"
-                       :content (content/user-message-text msg)})
+  ([conversation]
+   (transform-messages conversation nil))
+  ([conversation fallback-request]
+   (let [last-user-index (when fallback-request
+                           (last (keep-indexed (fn [idx msg]
+                                                 (when (= :user (:role msg)) idx))
+                                               (:messages conversation))))]
+     (->> (:messages conversation)
+          (map-indexed vector)
+          (reduce
+           (fn [acc [idx msg]]
+             (case (:role msg)
+               :user
+               (let [text (content/user-message-text msg)]
+                 (conj acc {:role    "user"
+                            :content (if (= idx last-user-index)
+                                       (structured-output/append-fallback-instructions-to-text
+                                        text fallback-request)
+                                       text)}))
 
-            :assistant
-            (if (= :structured (get-in msg [:content :kind]))
-              (let [{:keys [text tool-calls]} (content/assistant-structured-content msg)
-                    base                     (cond-> {:role "assistant"}
-                                               (seq text) (assoc :content text))]
-                (conj acc
-                      (if (seq tool-calls)
-                        (assoc base :tool_calls (mapv content/chat-tool-call tool-calls))
-                        base)))
-              (conj acc {:role    "assistant"
-                         :content (get-in msg [:content :text] "")}))
+               :assistant
+               (if (= :structured (get-in msg [:content :kind]))
+                 (let [{:keys [text tool-calls]} (content/assistant-structured-content msg)
+                       base                     (cond-> {:role "assistant"}
+                                                  (seq text) (assoc :content text))]
+                   (conj acc
+                         (if (seq tool-calls)
+                           (assoc base :tool_calls (mapv content/chat-tool-call tool-calls))
+                           base)))
+                 (conj acc {:role    "assistant"
+                            :content (get-in msg [:content :text] "")}))
 
-            :tool-result
-            (conj acc {:role         "tool"
-                       :tool_call_id (:tool-call-id msg)
-                       :content      (content/tool-result-text msg)})
+               :tool-result
+               (conj acc {:role         "tool"
+                          :tool_call_id (:tool-call-id msg)
+                          :content      (content/tool-result-text msg)})
 
-            acc))
-        [])))
+               acc))
+           [])))))
 
 (defn build-request
   "Build OpenAI Chat Completions API request map."
   [conversation model options]
-  (let [base-messages (transform-messages conversation)
+  (let [structured-request (structured-output/structured-output-request options)
+        strategy           (structured-output/select-strategy model structured-request)
+        fallback-request   (when (= :prompted-json (:strategy strategy))
+                             structured-request)
+        base-messages      (transform-messages conversation fallback-request)
         messages      (if (:system-prompt conversation)
                         (cons {:role    "system"
                                :content (:system-prompt conversation)}
@@ -145,7 +161,16 @@
                         effort                      (assoc :reasoning_effort effort)
                         template-kw                 (assoc :chat_template_kwargs template-kw)
                         (:logprobs-enabled options) (assoc :logprobs true
-                                                           :top_logprobs (or (:top-logprobs options) 3)))]
+                                                           :top_logprobs (or (:top-logprobs options) 3))
+                        (and (= :provider-native (:strategy strategy))
+                             (= :openai/chat-completions-json-schema-response-format
+                                (:native-mechanism strategy)))
+                        (assoc :response_format
+                               {:type "json_schema"
+                                :json_schema
+                                {:name (structured-output/structured-output-name structured-request)
+                                 :strict (not (false? (:strict? structured-request)))
+                                 :schema (:json-schema structured-request)}}))]
     {:headers (cond-> {"Content-Type" "application/json"}
                 ;; Skip Authorization when :no-auth-header is set
                 ;; (e.g. local servers that reject auth headers)
@@ -186,12 +211,14 @@
 
 (defn- make-chat-stream-state
   []
-  {:stream-started?      (atom false)
-   :done?                (atom false)
-   :pending-finish-reason (atom nil)
-   :next-tool-index      (atom 0)
-   :tool-index-by-id     (atom {})
-   :tool-state           (atom {})})
+  {:stream-started?            (atom false)
+   :done?                      (atom false)
+   :pending-finish-reason      (atom nil)
+   :structured-result-emitted? (atom false)
+   :text-buffer                (atom "")
+   :next-tool-index            (atom 0)
+   :tool-index-by-id           (atom {})
+   :tool-state                 (atom {})})
 
 (defn- emit-stream-start!
   [consume-fn stream-started?]
@@ -318,12 +345,13 @@
 
 (defn- emit-chat-chunk!
   [stream-state consume-fn choice delta]
-  (let [{:keys [stream-started?]} stream-state
+  (let [{:keys [stream-started? text-buffer]} stream-state
         text-delta      (extract-text-delta delta)
         reasoning-delta (extract-reasoning-delta delta)]
     (when (and choice (= (:role delta) "assistant"))
       (emit-stream-start! consume-fn stream-started?))
     (when (seq text-delta)
+      (swap! text-buffer str text-delta)
       (emit-started-event! consume-fn stream-started?
                            {:type :text-delta
                             :content-index 0
@@ -341,14 +369,34 @@
                                (resolve-chat-tool-index stream-state tool-call fallback-idx)
                                tool-call))))
 
+(defn- emit-structured-output-result!
+  [stream-state consume-fn strategy source]
+  (let [{:keys [structured-result-emitted? text-buffer]} stream-state
+        raw-text @text-buffer
+        payload  (structured-output/parse-json-object raw-text)]
+    (when (and (contains? #{:provider-native :prompted-json} (:strategy strategy))
+               (compare-and-set! structured-result-emitted? false true))
+      (consume-fn {:type :structured-output-result
+                   :structured-output (cond-> (assoc strategy
+                                                     :source source
+                                                     :raw-text raw-text)
+                                        payload (assoc :payload payload
+                                                       :raw-payload payload))}))))
+
 (defn- finish-chat-chunk!
-  [stream-state consume-fn model chunk choice]
+  [stream-state consume-fn model chunk choice strategy]
   (let [{:keys [stream-started? done? pending-finish-reason]} stream-state]
     (cond
       (:usage chunk)
       (do
         (force-start-pending-chat-tools! stream-state consume-fn)
         (emit-chat-tool-ends! stream-state consume-fn)
+        (emit-structured-output-result! stream-state
+                                        consume-fn
+                                        strategy
+                                        (if (= :provider-native (:strategy strategy))
+                                          :openai/message-json
+                                          :prompted-json/text))
         (emit-chat-completion-finish! consume-fn
                                       stream-started?
                                       done?
@@ -366,23 +414,29 @@
         (reset! pending-finish-reason (keyword (:finish_reason choice)))))))
 
 (defn- flush-pending-chat-finish!
-  [stream-state consume-fn]
+  [stream-state consume-fn strategy]
   (let [{:keys [stream-started? done? pending-finish-reason]} stream-state]
     (when-let [reason @pending-finish-reason]
+      (emit-structured-output-result! stream-state
+                                      consume-fn
+                                      strategy
+                                      (if (= :provider-native (:strategy strategy))
+                                        :openai/message-json
+                                        :prompted-json/text))
       (emit-chat-completion-finish! consume-fn stream-started? done? reason nil)
       (reset! pending-finish-reason nil))))
 
 (defn- process-chat-sse-line!
-  [stream-state consume-fn model options url line]
+  [stream-state consume-fn model options url strategy line]
   (if-let [chunk (transport/parse-sse-line line)]
     (do
       (transport/capture-response! model options :openai-completions url chunk)
       (let [choice (first (:choices chunk))
             delta  (:delta choice)]
         (emit-chat-chunk! stream-state consume-fn choice delta)
-        (finish-chat-chunk! stream-state consume-fn model chunk choice)))
+        (finish-chat-chunk! stream-state consume-fn model chunk choice strategy)))
     (when (and line (.startsWith ^String line "data: ") (= "[DONE]" (.substring ^String line 6)))
-      (flush-pending-chat-finish! stream-state consume-fn))))
+      (flush-pending-chat-finish! stream-state consume-fn strategy))))
 
 (defn- non-streaming-request
   [conversation model options]
@@ -410,25 +464,39 @@
       (seq tool-calls) (into tool-calls))))
 
 (defn- completion-response->assistant-message
-  [model body]
-  (let [choice (first (:choices body))
-        message (:message choice)
-        stop-reason (keyword (or (:finish_reason choice) "stop"))
-        usage (when-let [usage (:usage body)]
-                (completions-usage-map model usage))
-        logprobs (or (extract-openai-logprob-delta choice)
-                     (extract-llama-logprob-delta body))]
-    {:assistant-message (cond-> {:role "assistant"
-                                 :content (completion-message->content message)
-                                 :stop-reason stop-reason
-                                 :timestamp (java.time.Instant/now)}
-                          (map? usage) (assoc :usage usage))
-     :logprobs logprobs}))
+  ([model body]
+   (completion-response->assistant-message model body nil))
+  ([model body strategy]
+   (let [choice (first (:choices body))
+         message (:message choice)
+         stop-reason (keyword (or (:finish_reason choice) "stop"))
+         usage (when-let [usage (:usage body)]
+                 (completions-usage-map model usage))
+         logprobs (or (extract-openai-logprob-delta choice)
+                      (extract-llama-logprob-delta body))
+         text (content/string-fragment (:content message))
+         payload (when (contains? #{:provider-native :prompted-json} (:strategy strategy))
+                   (structured-output/parse-json-object text))]
+     (cond-> {:assistant-message (cond-> {:role "assistant"
+                                          :content (completion-message->content message)
+                                          :stop-reason stop-reason
+                                          :timestamp (java.time.Instant/now)}
+                                   (map? usage) (assoc :usage usage))
+              :logprobs logprobs}
+       strategy (assoc :structured-output
+                       (cond-> strategy
+                         payload (assoc :payload payload
+                                        :raw-payload payload
+                                        :source (if (= :provider-native (:strategy strategy))
+                                                  :openai/message-json
+                                                  :prompted-json/text))))))))
 
 (defn execute-openai
   [conversation model options]
-  (let [url     (str (:base-url model) "/chat/completions")
-        request (non-streaming-request conversation model options)]
+  (let [url                (str (:base-url model) "/chat/completions")
+        structured-request (structured-output/structured-output-request options)
+        strategy           (structured-output/select-strategy model structured-request)
+        request            (non-streaming-request conversation model options)]
     (try
       (transport/capture-request! model options :openai-completions url request)
       (let [response (transport/execute-response url request)]
@@ -436,17 +504,22 @@
           (transport/response->error response)
           (let [body (json/parse-string (:body response) true)
                 _    (transport/capture-response! model options :openai-completions url body)]
-            (completion-response->assistant-message model body))))
+            (completion-response->assistant-message model body strategy))))
       (catch Exception e
         (transport/exception->error e)))))
 
 (defn stream-openai
   [conversation model options consume-fn]
-  (let [url          (str (:base-url model) "/chat/completions")
-        request      (build-request conversation model options)
-        stream-state (make-chat-stream-state)]
+  (let [url                (str (:base-url model) "/chat/completions")
+        structured-request (structured-output/structured-output-request options)
+        strategy           (structured-output/select-strategy model structured-request)
+        request            (build-request conversation model options)
+        stream-state       (make-chat-stream-state)]
     (try
       (transport/capture-request! model options :openai-completions url request)
+      (when strategy
+        (consume-fn {:type :structured-output-strategy
+                     :structured-output strategy}))
       (let [response (transport/stream-response url request)]
         (if (transport/error-status? (:status response))
           (transport/emit-error! model
@@ -457,7 +530,7 @@
                                  (transport/response->error response))
           (with-open [reader (io/reader (:body response))]
             (doseq [line (line-seq reader)]
-              (process-chat-sse-line! stream-state consume-fn model options url line)))))
+              (process-chat-sse-line! stream-state consume-fn model options url strategy line)))))
       (catch Exception e
         (transport/emit-error! model
                                options
