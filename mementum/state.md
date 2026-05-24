@@ -15,6 +15,8 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-24: Reviewed task 171 with test-shaper; found one actionable test-quality gap: Anthropic JSON Schema native non-streaming `:execute` tests assert extraction but do not capture the outbound request to prove `:stream` is absent/false. Added follow-up step and committed 11e76163.
+
 - 2026-05-24: Executed task 171 task-test-review follow-up: added focused Anthropic JSON Schema native beta-header composition coverage for structured-output + OAuth + prompt-caching + thinking betas with no duplicates; focused Anthropic/model/user tests green (`36 tests, 231 assertions`).
 
 - 2026-05-24: Reviewed task 171 tests with task-test-review; found one actionable test gap: no focused Anthropic JSON Schema native beta-header composition test proving structured-output beta composes with OAuth, prompt-caching, and thinking tokens without dropping/duplicating existing betas. Added follow-up step and committed cfb7db17.
@@ -108,10 +110,12 @@ Bootstrapped on 2026-04-02.
 Focused OAuth routing tests ✅. bb tests previously ✅. Task 169 focused structured-output/model tests ✅ (`clojure -M:test --focus psi.ai.providers.openai-structured-output-test --focus psi.ai.providers.anthropic-structured-output-test --focus psi.ai.model-registry-test --focus psi.ai.user-models-test` => 32 tests, 199 assertions). 5 former test errors fixed (commit 0b37b83f: NPE on nil session-file, SOE in git resolvers). Task 158 addressed persistence test garbage (still open but test-review showed no actionable feedback). Task 167 focused Emacs tool-output suite ✅ (`bb emacs:test --focus psi-tool-output-mode-test`, 313/313).
 
 ## Suggested next step
+- Execute task 171 test-shaper follow-up: add non-streaming `:execute` outbound request assertion proving `:stream` absent/false while returning top-level `:structured-output`.
 - Backlog: `105-agent-session-component-extraction-map`, `124-turn-execution-contract-extraction`, `149-reload-fixup-inventory-and-safety`, `141`/`144`/`147` workflow items
 
 ## Latest session notes
 
+- 2026-05-24: test-shaper review for task 171 found one actionable test-quality gap and added an unchecked `steps.md` follow-up; no code/tests executed in this review pass.
 - 2026-05-24: Re-reviewed task 171 implementation with task-implementation-review; found no new actionable implementation feedback, reran focused Anthropic/model/user tests green (`35 tests, 221 assertions`), appended implementation.md no-action note, and added no steps.md items.
 - 2026-05-24: task-implementation-review for task 171 read skill/task/code/tests/docs, reran focused Anthropic/model/user tests green, appended implementation.md note, added one unchecked steps.md follow-up, and committed.
 - 2026-05-23: Task 169 test-review follow-up complete: no code change needed; current Anthropic provider compile/load path is healthy, focused structured-output/model verification is refreshed, and task step is checked.
