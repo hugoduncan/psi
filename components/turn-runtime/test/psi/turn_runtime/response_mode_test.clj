@@ -4,6 +4,7 @@
    [psi.ai.core]
    [psi.agent-session.extensions :as ext]
    [psi.ai.models :as models]
+   [psi.ai.structured-output :as structured-output]
    [psi.agent-session.core :as session]
    [psi.agent-session.prompt-request :as prompt-request]
    [psi.agent-session.test-support :as test-support]
@@ -155,3 +156,67 @@
            (first @seen)))
     (is (= :succeeded (:status (second @seen))))
     (is (true? (:final? (second @seen))))))
+
+(deftest execute-prepared-request-unsupported-structured-output-preflights-before-provider-test
+  (testing "fallback-forbidden unsupported strategy fails before streaming provider request"
+    (let [[ctx session-id] (create-session-context {:persist? false})
+          _ (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data]
+                   (merge (ss/get-session-data-in ctx session-id)
+                          {:model {:provider "openai"
+                                   :id "fallback-only"
+                                   :capabilities {:structured-output structured-output/openai-codex-fallback-capability}}}))
+          prepared (assoc (prepared-request ctx session-id)
+                          :prepared-request/ai-options
+                          {:structured-output {:schema-id :psi.workflow/test
+                                               :schema-version 1
+                                               :json-schema {:type "object"}
+                                               :strategy-preference :provider-native
+                                               :fallback-allowed? false
+                                               :strict? true}})
+          stream-calls* (atom [])]
+      (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                    (fn [& _]
+                      (swap! stream-calls* conj :called)
+                      (throw (ex-info "provider stream should not be called" {})))]
+        (let [result (turn-runtime/execute-prepared-request!
+                      {:provider-registry (atom {})}
+                      ctx session-id prepared nil)]
+          (is (empty? @stream-calls*))
+          (is (= :turn.outcome/error (:execution-result/turn-outcome result)))
+          (is (= :unsupported-structured-output
+                 (get-in result [:execution-result/structured-output :reason])))
+          (is (= :fallback-not-allowed
+                 (get-in result [:execution-result/structured-output :ai-reason])))
+          (is (empty? (get-in result [:execution-result/provider-captures :request-captures]))))))))
+
+(deftest execute-prepared-request-unsupported-structured-output-non-streaming-preflights-before-provider-test
+  (testing "fallback-forbidden unsupported strategy fails before non-streaming provider request"
+    (let [[ctx session-id] (create-session-context {:persist? false})
+          _ (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data]
+                   (merge (ss/get-session-data-in ctx session-id)
+                          {:model {:provider "anthropic"
+                                   :id "unsupported"
+                                   :response-mode :non-streaming
+                                   :capabilities {:structured-output structured-output/unsupported-structured-output-capability}}}))
+          prepared (assoc (prepared-request ctx session-id)
+                          :prepared-request/ai-options
+                          {:structured-output {:schema-id :psi.workflow/test
+                                               :schema-version 1
+                                               :json-schema {:type "object"}
+                                               :strategy-preference :provider-native
+                                               :fallback-allowed? false
+                                               :strict? true}})
+          execute-calls* (atom [])]
+      (with-redefs [psi.ai.core/execute-response-in
+                    (fn [& _]
+                      (swap! execute-calls* conj :called)
+                      (throw (ex-info "provider execute should not be called" {})))]
+        (let [result (turn-runtime/execute-prepared-request!
+                      {:provider-registry (atom {})}
+                      ctx session-id prepared nil)]
+          (is (empty? @execute-calls*))
+          (is (= :unsupported-structured-output
+                 (get-in result [:execution-result/structured-output :reason])))
+          (is (= :structured-output-capability-omitted
+                 (get-in result [:execution-result/structured-output :ai-reason])))
+          (is (empty? (get-in result [:execution-result/provider-captures :request-captures]))))))))
