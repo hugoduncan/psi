@@ -81,3 +81,7 @@ Found one new actionable inconsistency: task 169 now specifies prompted-JSON fal
 ## 2026-05-23 — executed inconsistency follow-up repeat 4
 
 Completed the newly added inconsistency follow-up without executing implementation `steps.md` work. Aligned `doc/workflow-ir.md` and `doc/workflow-grammar.md` with the finalized prompted-JSON fallback boundary: AI adapters own deterministic JSON-only/schema prompt injection and strategy reporting, while workflow runtime owns parsing, schema-guided coercion, validation, and downstream exposure of trusted structured values. Marked the design-step done.
+
+## 2026-05-23 — ambiguity review repeat 5
+
+Found one new actionable ambiguity after checking current AI stream schemas/provider code: the design allows streaming structured-output strategy/result metadata either as new stream events or as an equivalent callback/capture surface, while `psi.ai.schemas/StreamEventType` currently has no structured-output event types. The task should choose the concrete streaming metadata/result surface before implementation so provider code, event schemas, docs, and tests have one target instead of leaving adapters to pick events vs captures ad hoc.
