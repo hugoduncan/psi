@@ -1,0 +1,1 @@
+- [ ] Clarify whether `plan.md`, `steps.md`, and `implementation.md` are intentionally absent for task 176 or must be created before execution/design review continues.
