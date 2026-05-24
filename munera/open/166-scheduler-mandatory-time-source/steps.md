@@ -10,3 +10,4 @@
 - [x] Add focused tests proving missing/invalid `:scheduler-time-source` fails early at scheduler runtime boundaries (for example psi-tool create and timer/deliver/drain paths) instead of falling back to wall-clock/default time.
 - [x] Move `:scheduler/deliver` delivered-at resolution until after the target schedule has been found and the path actually needs to construct a scheduled user message, preserving schedule-not-found/non-deliverable error precedence.
 - [x] Add positive scheduler handler coverage proving `:scheduler/deliver` and `:scheduler/drain-queue` without explicit `:delivered-at` stamp scheduled user messages with the supplied deterministic `:scheduler-time-source` instant.
+- [ ] Update scheduler lifecycle integration tests to install a deterministic `:scheduler-time-source` and assert scheduled user-message timestamps for deliver/drain paths that omit explicit `:delivered-at`.
