@@ -144,3 +144,7 @@ Completed the newly added ambiguity follow-up without executing implementation `
 ## 2026-05-23 — inconsistency review repeat 8
 
 Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, prior implementation notes, referenced workflow docs, and current AI model/provider/schema/user-model files for cross-artifact inconsistency after anchoring the non-streaming structured-output result root. Found no new actionable inconsistency feedback. The task artifacts consistently require top-level non-streaming `:structured-output` provider-result metadata/payload, first-class streaming structured-output events, resolver-derived auth/transport capability normalization without a runtime `:auth` field, omitted capabilities normalized to unsupported, explicit prompted-JSON opt-in/fallback shaping, OpenAI native support limited to explicit `:openai-completions` Chat Completions `response_format`, Codex fallback-only/unsupported behavior, Anthropic hidden synthetic forced-tool extraction, and workflow/runtime final validation authority.
+
+## 2026-05-23 — executed inconsistency follow-ups repeat 8
+
+No newly added unchecked `design-steps.md` items existed after the preloaded inconsistency review, so there were no actionable design follow-ups to execute. Did not execute implementation `steps.md` work.

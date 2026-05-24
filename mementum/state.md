@@ -15,6 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-23: Executed task 169 inconsistency follow-up repeat 8 after no-action review; no newly added unchecked design-steps existed, so only implementation.md was updated.
 - 2026-05-23: Executed task 169 ambiguity follow-up repeat 8: non-streaming structured-output metadata/payload is authoritative at top-level provider result `:structured-output`, sibling to `:assistant-message`/`:logprobs`, not nested or capture-only.
 - 2026-05-23: Reviewed task 169 design/plan/steps for ambiguities repeat 8; found non-streaming structured-output metadata root ambiguity: design says provider execution returns/associates `:structured-output`, but current `execute-response` returns `{:assistant-message ... :logprobs ...}` with no exact root; added design-step and committed 08e6446d.
 - 2026-05-23: Reviewed task 169 design/plan/steps for inconsistencies repeat 7; found auth-path representation inconsistency: design requires final `:auth` in effective capability resolution and examples show `:auth :chatgpt-oauth`, but closed model schemas/plan/steps do not allow or populate it; added design-step and committed c1ff047a.
