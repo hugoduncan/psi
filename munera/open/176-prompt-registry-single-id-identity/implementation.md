@@ -25,3 +25,7 @@
   - query/projection surfaces still expose `ext-path` for provenance and prompt-component selection still uses owner allowlisting by extension path
 - Updated `design.md` to make the surface-by-surface contract explicit: canonical identity is `id` alone, extension-facing helpers remain single-id-only, lower-level seams may only retain temporary `ext-path` acceptance as provenance/ownership metadata, and query/projection surfaces may expose owner provenance without making it identity.
 - Rewrote `plan.md` to focus on this ambiguity follow-up, marked the new `design-steps.md` item done, and kept `steps.md` aligned without executing implementation work from it.
+
+## 2026-05-24 inconsistency review
+- New actionable inconsistency: `design.md` now explicitly preserves extension-facing helpers/docs as single-id-only surfaces and limits temporary `ext-path` acceptance to lower-level seams, but `steps.md` still says to inventory prompt-registry APIs, projections, and callers that rely on composite `ext-path + id` identity. That wording is broad enough to imply the extension-facing API/docs themselves still rely on composite identity, which conflicts with the refined design split.
+  - Added a `design-steps.md` follow-up to narrow the implementation inventory/remaining work so it targets only lower-level seams, projections, tests/helpers, and other composite-identity-dependent callers.
