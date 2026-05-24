@@ -39,3 +39,8 @@ Completed the newly added ambiguity follow-up: aligned `doc/workflow-ir.md` with
 ## 2026-05-23 — inconsistency review repeat 2
 
 Found one new actionable inconsistency: judge structured outputs are described as judge-local data for transition evaluation, but the task docs also imply downstream `{:from {:step ... :output ...}}` references can read those judge-local fields. The source-ref grammar only has step output refs, and the task does not specify whether judge-local outputs are transition-context-only or promoted onto the parent step output surface.
+
+
+## 2026-05-23 — inconsistency follow-up repeat 2
+
+Completed the newly added inconsistency follow-up: specified judge-local structured outputs as transition-evaluation data only, not implicitly promoted through the parent step `{:step ... :output ...}` surface; aligned `design.md`, `doc/workflow-grammar.md`, `doc/workflow-ir.md`, and `doc/workflows.md`; marked the design-step done. Did not execute `steps.md` implementation items.

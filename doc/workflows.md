@@ -301,7 +301,6 @@ The most important authoring references in this guide are:
 - `{:from {:step "..." :yield :text}}` — prior step result used as the next ask, including delegate-step yielded text
 - `{:from {:step "..." :output :handoff}}` — prior delegated workflow's structured terminal handoff
 - `{:from {:step "..." :output :classification} :path [:next-action]}` — prior session-step structured output field, when that step declares a structured entry in `:outputs`
-- `{:from {:step "..." :output :review} :path [:decision]}` — prior LLM-judge structured output field, when that judge declares a structured entry in its own `:outputs`
 - `{:from {:step "..." :output :transcript}}` with `:projection` — projected
   transcript/reference context
 
@@ -313,9 +312,11 @@ Interpretation:
   the next step's authored text
 - delegated `:output :handoff` refs are the stable way to consume machine-facing
   exported workflow data without parsing markdown heuristically downstream
-- session and LLM-judge structured `:outputs` are the stable way for machine
-  control flow to consume model-generated data through validated fields instead
-  of prose parsing
+- session structured `:outputs` are the stable downstream-reference surface for
+  machine control flow to consume model-generated data through validated fields
+  instead of prose parsing
+- LLM-judge structured `:outputs` are judge-local data for transition evaluation;
+  they are not automatically exported as parent step `:output` refs
 - `:context` on a delegate step carries forwarded material without changing the
   delegated workflow's prompt string
 
@@ -336,16 +337,20 @@ This guide intentionally teaches the currently migrated example-led surfaces:
 - delegated `:prompt-string` and `:context`
 - canonical downstream delegated yielded-text consumption
 - canonical downstream delegated structured-handoff consumption through `:output :handoff`
-- session-step and LLM-judge structured entries in `:outputs` for validated
+- session-step structured entries in `:outputs` for validated downstream
   machine-facing data
+- LLM-judge structured entries in judge-local `:outputs` for validated transition
+  evaluation data
 - shared reference syntax for `:workflow-input`, `:workflow-original`, prior
   step yields, delegated handoffs, structured output fields, and projected
   transcript context
 
 It does not try to turn arbitrary delegate-local runtime envelopes or diagnostics
 into authoring contracts. Delegate handoffs remain the standardized delegated
-workflow export, while session and LLM-judge structured `:outputs` are the
-validated local model/judge data surface for downstream control flow. When you
+workflow export, session structured `:outputs` are the validated downstream
+model-data surface, and LLM-judge structured `:outputs` are validated
+judge-local transition data unless a future explicit export contract says
+otherwise. When you
 need the full formal surface, use the grammar/reference docs.
 
 ## Authoring guidelines

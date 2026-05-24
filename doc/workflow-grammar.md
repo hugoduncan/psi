@@ -196,16 +196,22 @@ session step output and `:source :judge/structured-output` for LLM judge
 output. Both forms require `:mode :structured` plus a Malli-compatible schema
 contract (`:schema-id`, `:schema-version`, and `:schema`).
 
-Downstream references use the normal source-spec shape:
+Downstream references to session structured outputs use the normal source-spec shape:
 
 ```clojure
-{:from {:step "review-design" :output :review}
- :path [:decision]}
+{:from {:step "classify-reproduction" :output :classification}
+ :path [:next-action]}
 ```
 
 The path is resolved against the validated structured `:value`, never by
 parsing prose. If the source output is missing, non-structured, invalid, or the
 path is absent, resolution fails clearly.
+
+Judge structured outputs are judge-local in this slice. They are available to
+the judge result and transition evaluation, but are not implicitly promoted into
+the parent step's `{:step ... :output ...}` namespace. A later step that needs
+the same data must consume an explicitly declared session structured output or a
+future explicit promotion/export contract, not a hidden judge-output ref.
 
 Prompted fallback asks models for JSON and then schema-guided coercion maps JSON
 object keys and enum strings into the declared Malli-domain values before

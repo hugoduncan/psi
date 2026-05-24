@@ -236,7 +236,7 @@ Illustrative common output keys:
 - invoke step: `:data`, `:summary`, `:result`
 - session step: commonly `:final-llm-reply`, `:transcript`, `:result`, plus any declared structured output keys
 - delegate step: no first-cut step-local outputs except explicitly declared boundary outputs such as `:handoff`
-- LLM judge: judge-local structured output keys under the judge's own `:outputs` map
+- LLM judge: judge-local structured output keys under the judge's own `:outputs` map for transition evaluation only
 
 The `:outputs` map should describe what logical output keys exist for a step or
 judge and, at minimum, give runtime a canonical local meaning for each key.
@@ -476,7 +476,8 @@ Illustrative normalized structured judge shape:
 Judge structured outputs are intended for judge routing, retry decisions, and
 review-loop control data. They do not replace the parent step's yielded value; a
 judge routes while the parent step still yields according to its own `:yields`
-form.
+form. Judge-local output keys are not implicitly promoted into the parent step's
+step-local `:outputs` map.
 
 ### Invoke judge
 
@@ -554,13 +555,19 @@ the runtime boundary.
 - `{:step s :output k}` -> step-local output surface `k` from prior step `s`
 - `{:step s :yield f}` -> yielded-value field `f` from prior step `s`
 
-For structured outputs, `{:step s :output k}` addresses the logical output key
-that declared `:source :session/structured-output` or a judge-local structured
-output that the runtime has surfaced for the parent step's transition context. A
+For session structured outputs, `{:step s :output k}` addresses the logical
+parent step output key that declared `:source :session/structured-output`. A
 source-spec `:path` is resolved against the validated structured `:value`, not
 against `:raw-output`, `:parsed-value`, or prose. Resolution must fail clearly
 when the source output is missing, non-structured, invalid, or lacks the requested
 path.
+
+Judge-local structured outputs declared with `:source :judge/structured-output`
+are available to the judge result and transition evaluation only in this slice.
+They are not valid downstream `{:step s :output k}` refs unless a future explicit
+promotion/export contract adds a named parent step output. The current source-ref
+grammar has no judge identifier, so implicit judge-output promotion would make
+the parent step output namespace ambiguous.
 
 Current implementation note:
 

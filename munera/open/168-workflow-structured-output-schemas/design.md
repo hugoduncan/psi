@@ -105,7 +105,7 @@ For session steps, the canonical first implementation shape is:
           :data :classification}}
 ```
 
-An LLM judge declares the same structured contract under its judge-local `:outputs` map. Judge output keys are local to the judge result and may be used by the step's transition evaluation; they are not a separate prose-parsing mechanism:
+An LLM judge declares the same structured contract under its judge-local `:outputs` map. Judge output keys are local to the judge result and may be used by the step's transition evaluation; they are not a separate prose-parsing mechanism and are not exported as parent step-local `:outputs`:
 
 ```edn
 {:name "review-design"
@@ -184,9 +184,11 @@ Downstream control flow must only consume `:value` when `:status` is `:valid`.
 
 ## Downstream reference contract
 
-The chosen reference form is the existing workflow source-spec shape: `{:from {:step step-name :output output-key} :path path}`. Structured output is addressed by the logical output key declared in `:outputs`; fields are addressed by `:path` into the validated structured `:value`.
+The chosen downstream reference form is the existing workflow source-spec shape: `{:from {:step step-name :output output-key} :path path}`. Downstream source refs address only the prior step-local `:outputs` surface. For session structured outputs, structured output is addressed by the logical output key declared in the parent step's `:outputs`; fields are addressed by `:path` into the validated structured `:value`.
 
-Example:
+Judge-local structured outputs are intentionally narrower in this slice: they are available to the judge result and parent step transition evaluation only. They are not implicitly promoted to the parent step's `{:step ... :output ...}` namespace, because the current source-ref grammar has no judge identifier and the parent step's output key space must remain explicit. If a later workflow step needs model/judge data, that data must be produced as a declared session-step structured output or promoted by an explicit future contract; prose parsing and implicit judge-output export are not part of this slice.
+
+Example session structured-output reference:
 
 ```edn
 {:from {:step "classify-reproduction"
