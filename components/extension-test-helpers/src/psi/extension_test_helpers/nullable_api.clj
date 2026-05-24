@@ -168,7 +168,7 @@
 
 (defn- register-prompt-contribution! [state params]
   (let [id    (str (:id params))
-        key   [(:ext-path params) id]
+        key   (prompt-contribution-key params)
         value (merge {:id id
                       :ext-path (:ext-path params)}
                      (:contribution params))]

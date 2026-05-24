@@ -31,6 +31,13 @@
 - Used the preloaded review result plus current task artifacts to execute any newly added actionable unchecked `steps.md` items.
 - Found no unchecked follow-up implementation items to execute; this pass was a no-op.
 
+## 2026-05-24 inconsistency follow-up execution pass
+- Used the preloaded inconsistency-review result to execute the newly added unchecked `design-steps.md` item.
+- Updated `components/extension-test-helpers/src/psi/extension_test_helpers/nullable_api.clj` so nullable prompt-contribution registration now stores entries under canonical single-id keys instead of composite `[ext-path id]` keys, matching the task's single-id targeting contract for register/update/unregister.
+- Marked the `design-steps.md` item done after focused verification passed:
+  - `clojure -M:test --focus psi.prompt-registry.contributions-test --focus psi.agent-session.query-graph-tools-test --focus psi.agent-session.model-dispatch-test`
+  - `clj-kondo --lint components/extension-test-helpers/src`
+
 ## 2026-05-24 inconsistency review pass
 - Re-read `design.md`, `plan.md`, `steps.md`, `implementation.md`, `design-steps.md`, the prompt-registry ownership code, lower dispatch/mutation seams, extension docs, and nullable extension test helpers.
 - Found one new actionable inconsistency: the task artifacts say nullable/test-helper infrastructure now models canonical single-id prompt-contribution identity, but `components/extension-test-helpers/src/psi/extension_test_helpers/nullable_api.clj` still registers contributions under composite `[ext-path id]` keys while update/unregister use single-id lookup.
