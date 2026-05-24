@@ -114,10 +114,10 @@ For a structured-output request against an Anthropic model whose resolved capabi
    {:type "json_schema"
     :name (structured-output-name request)
     :schema (:json-schema request)
-    :strict true}
+    :strict (normalized-structured-output-strict? request)}
    ```
 
-   `:strict` follows the normalized request `:strict?` value and defaults true.
+   `:strict` must reflect the normalized request `[:structured-output :strict?]` value, defaulting to `true` only when the caller omits `:strict?`. If the caller supplies `:strict? false`, the Anthropic request must send `:strict false`; tests must cover both the default-true and explicit-false cases.
 3. Add `structured-outputs-2025-11-13` to the comma-separated `anthropic-beta` header. Preserve existing beta values for OAuth, prompt caching, and thinking; do not duplicate beta tokens.
 4. Do not add the synthetic forced structured-output tool unless the selected mechanism is `:anthropic/forced-tool-use`.
 5. Do not inject prompted-JSON fallback instructions unless strategy selection chooses `:prompted-json`.
