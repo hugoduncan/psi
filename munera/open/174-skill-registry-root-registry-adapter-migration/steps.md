@@ -13,6 +13,7 @@
 - [x] Migrate `:session/set-skills` to replace the session's `:skill-ids` membership from supplied skill maps and avoid storing session `:skills`.
 - [x] Migrate session creation/defaults, child-session creation, scheduler-created sessions, and resume paths to use canonical `:skill-ids` directly or resolve supplied already-registered skill maps into `:skill-ids`.
   - [x] Migrate child-session base-state storage to persist `:skill-ids` instead of embedded `:skills` while still rebuilding prompt-visible skill vectors from root-registry definitions.
+  - [x] When child-session creation receives explicit skill maps, synchronously ensure those root skill definitions in the same root-state update before persisting canonical child `:skill-ids`.
   - [x] Re-verify create-child, scheduler-created top-level sessions, and representative workflow execution seams against canonical `:skill-ids` ownership after test-support root-registry seeding updates.
   - [x] Finish the remaining child/scheduler lifecycle fallout: align any still-missing create-child/workflow/scheduler assertions and runtime seams that assume embedded session `:skills` storage.
   - [x] Ensure child/workflow/scheduler test setup populates root-registry skill definitions whenever tests seed session `:skill-ids` or legacy test-only `:skills`, so projected skill reads and prompt rebuilds do not silently return empty sets.

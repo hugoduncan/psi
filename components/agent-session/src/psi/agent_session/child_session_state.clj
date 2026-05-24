@@ -47,7 +47,10 @@
                                 normalized-selection)
                                (vec (or parent-skills [])))
         root-state*          (if explicit-skills?
-                               (skill-storage/ensure-skill-registry root-state)
+                               (:root-state (skill-storage/set-skills-in-root-state
+                                             (skill-storage/ensure-skill-registry root-state)
+                                             (:session-id parent-sd)
+                                             resolved-skills))
                                root-state)
         build-opts           (default-child-system-prompt-build-opts
                               parent-sd resolved-tool-defs resolved-skills normalized-selection)
