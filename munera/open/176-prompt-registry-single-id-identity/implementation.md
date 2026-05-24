@@ -31,6 +31,12 @@
 - Used the preloaded review result plus current task artifacts to execute any newly added actionable unchecked `steps.md` items.
 - Found no unchecked follow-up implementation items to execute; this pass was a no-op.
 
+## 2026-05-24 ambiguity follow-up execution pass
+- Used the preloaded ambiguity-review result to execute the newly added unchecked `design-steps.md` item.
+- Clarified `design.md` so cross-owner duplicate registration failure is part of the required external contract at prompt-registry, lower dispatch, and Pathom mutation seams: callers now rely on the existing thrown ownership-conflict shape rather than a structured non-throwing failure result.
+- Aligned `plan.md` to preserve that thrown ownership-conflict contract while lower-level seams continue treating `ext-path` only as ownership/provenance metadata.
+- Marked the `design-steps.md` ambiguity follow-up item done; `steps.md` remained unchanged because this pass only refined task design/plan clarity and did not add implementation work.
+
 ## 2026-05-24 ambiguity review pass
 - Re-read `design.md`, `plan.md`, `steps.md`, `implementation.md`, the prompt-registry contribution owner, lower-level dispatch/mutation seams, extension prompt-contribution query surface, extension API helper docs, nullable extension API helper state, and focused prompt-registry / agent-session tests.
 - Found one new actionable ambiguity: `design.md` leaves the externally visible cross-owner duplicate contract open as either thrown error or structured failure, but `plan.md`/`steps.md` treat the contract as fully settled and do not say whether preserving the thrown conflict shape in the Pathom mutation / dispatch surfaces is required behavior or merely one implementation choice.

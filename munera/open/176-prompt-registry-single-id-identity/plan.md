@@ -2,8 +2,8 @@
 
 Implement the next concrete task-176 slice: move prompt-registry and its lower-level seams from composite `ext-path + id` identity to canonical single-id identity, then prove the new contract with focused tests.
 
-1. Change `components/prompt-registry` pure contribution ownership so canonical identity is string-coerced `id` alone, cross-owner duplicate registration becomes an explicit ownership conflict, same-owner duplicate registration replaces, and canonical ordering becomes `[priority id]`.
-2. Update affected lower-level session seams to treat `ext-path` only as owner/provenance metadata and ownership assertion:
+1. Change `components/prompt-registry` pure contribution ownership so canonical identity is string-coerced `id` alone, cross-owner duplicate registration becomes the required thrown ownership-conflict contract at registry/dispatch/mutation seams, same-owner duplicate registration replaces, and canonical ordering becomes `[priority id]`.
+2. Update affected lower-level session seams to treat `ext-path` only as owner/provenance metadata and ownership assertion while preserving that thrown ownership-conflict behavior rather than normalizing it into a structured non-throwing result:
    - dispatch handlers in `dispatch_handlers/prompt_handlers.clj`
    - Pathom prompt mutations in `mutations/prompts.clj`
    - prompt contribution projection ordering in resolvers/session surfaces that still sort locally

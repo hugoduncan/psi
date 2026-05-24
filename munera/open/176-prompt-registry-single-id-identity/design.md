@@ -61,8 +61,8 @@ The refined design makes the targeting/compatibility split explicit.
 
 - Same-owner duplicate registration by `id` replaces the existing contribution for that `id`.
 - Cross-owner duplicate registration by `id` is an explicit ownership conflict and must not silently coexist.
-- The preferred conflict contract is deterministic failure at registration time rather than coexistence or hidden owner-qualified fallback targeting.
-- The implementation may realize that failure as either a thrown error or a structured failure result at the low-level registry/dispatch seam, but the externally visible behavior must be unambiguous: the conflicting registration does not take effect.
+- The required external contract at prompt-registry, lower dispatch, and Pathom mutation seams is deterministic registration-time failure via the existing thrown ownership-conflict shape rather than a structured non-throwing failure result.
+- Callers at those seams must therefore treat cross-owner duplicate registration as an exceptional path; the conflicting registration does not take effect.
 
 ### Canonical targeting after the change
 
