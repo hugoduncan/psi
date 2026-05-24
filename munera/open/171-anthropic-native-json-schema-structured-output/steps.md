@@ -10,4 +10,4 @@
 - [x] Add guarded live Anthropic OAuth/API smoke coverage or an executable skip path with non-secret result recording.
 - [x] Update AI documentation and task 170 dependency wording for Anthropic JSON Schema native, forced-tool native, and prompted JSON fallback paths.
 - [x] Run focused structured-output/model tests and record results in implementation notes.
-- [ ] Add focused Anthropic JSON Schema native parse-failure tests for non-streaming and streaming invalid/non-object output, asserting `:parse-error? true`, preserved `:raw-payload`, and no `:payload`.
+- [x] Add focused Anthropic JSON Schema native parse-failure tests for non-streaming and streaming invalid/non-object output, asserting `:parse-error? true`, preserved `:raw-payload`, and no `:payload`.

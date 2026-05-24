@@ -15,6 +15,8 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-24: Executed task 171 implementation-review follow-up: added Anthropic JSON Schema native parse-failure tests for non-streaming and streaming invalid/non-object output; focused Anthropic/model/user tests green (`35 tests, 221 assertions`).
+
 - 2026-05-24: Reviewed task 171 implementation with task-implementation-review; found one actionable test gap: Anthropic JSON Schema native parse-failure behavior is implemented but lacks focused non-streaming/streaming invalid-output coverage. Added follow-up step and committed 9afb13e9.
 
 - 2026-05-24: Task 171 live Anthropic OAuth smoke passed after correcting the beta JSON Schema request shape: Anthropic rejects `output_format.name` and `output_format.strict`, so Psi now sends only `{:type "json_schema" :schema ...}` plus the structured-output beta header; focused Anthropic/model/user tests and live smoke are green.

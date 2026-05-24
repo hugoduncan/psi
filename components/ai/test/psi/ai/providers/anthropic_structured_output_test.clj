@@ -252,6 +252,81 @@
            (get-in result [:structured-output :native-mechanism])))
     (is (= "{\"ok\":true}" (get-in result [:structured-output :raw-payload])))))
 
+(deftest anthropic-json-schema-output-non-streaming-parse-failure-test
+  ;; Tests Anthropic JSON Schema native non-streaming invalid/non-object output
+  ;; preserves raw text and marks parse failure without a trusted payload.
+  (let [model  (models/get-model :sonnet-4.6)
+        convo  (-> (conv/create "sys")
+                   (conv/add-user-message "Review this"))
+        cases  [{:label "invalid-json"
+                 :text "not json"}
+                {:label "non-object-json"
+                 :text "[true]"}]]
+    (doseq [{:keys [label text]} cases]
+      (let [body   {:content [{:type "text" :text text}]
+                    :stop_reason "end_turn"
+                    :usage {:input_tokens 1 :output_tokens 1}}
+            result (with-redefs [http/post (fn [_url _req]
+                                             {:status 200
+                                              :body (json/generate-string body)})]
+                     ((:execute anthropic/provider)
+                      convo model {:api-key "test-key"
+                                   :structured-output judge-structured-output-request}))]
+        (is (= :anthropic/json-schema-output
+               (get-in result [:structured-output :source]))
+            label)
+        (is (= :anthropic/json-schema-output
+               (get-in result [:structured-output :native-mechanism]))
+            label)
+        (is (= text (get-in result [:structured-output :raw-payload])) label)
+        (is (true? (get-in result [:structured-output :parse-error?])) label)
+        (is (not (contains? (:structured-output result) :payload)) label)))))
+
+(deftest anthropic-streaming-json-schema-output-parse-failure-test
+  ;; Tests Anthropic JSON Schema native streaming invalid/non-object output emits
+  ;; a parse-failure result with raw text and no trusted payload.
+  (let [model (models/get-model :sonnet-4.6)
+        convo (-> (conv/create "sys")
+                  (conv/add-user-message "Review this"))
+        cases [{:label "invalid-json"
+                :text "not json"}
+               {:label "non-object-json"
+                :text "[true]"}]]
+    (doseq [{:keys [label text]} cases]
+      (let [events (atom [])
+            sse    (str (sse-line "message_start"
+                                  {:type "message_start"
+                                   :message {:usage {:input_tokens 1}}})
+                        (sse-line "content_block_start"
+                                  {:type "content_block_start"
+                                   :index 0
+                                   :content_block {:type "text"}})
+                        (sse-line "content_block_delta"
+                                  {:type "content_block_delta"
+                                   :index 0
+                                   :delta {:text text}})
+                        (sse-line "content_block_stop"
+                                  {:type "content_block_stop"
+                                   :index 0})
+                        (sse-line "message_delta"
+                                  {:type "message_delta"
+                                   :delta {:stop_reason "end_turn"}
+                                   :usage {:output_tokens 1}}))]
+        (with-redefs [http/post (fn [_url _req]
+                                  {:body (stream-body sse)})]
+          ((:stream anthropic/provider)
+           convo model {:api-key "test-key"
+                        :structured-output judge-structured-output-request}
+           (fn [ev] (swap! events conj ev))))
+        (let [result (some #(when (= :structured-output-result (:type %)) %) @events)
+              structured (:structured-output result)]
+          (is (some? result) label)
+          (is (= :anthropic/json-schema-output (:source structured)) label)
+          (is (= :anthropic/json-schema-output (:native-mechanism structured)) label)
+          (is (= text (:raw-payload structured)) label)
+          (is (true? (:parse-error? structured)) label)
+          (is (not (contains? structured :payload)) label))))))
+
 (deftest anthropic-streaming-json-schema-output-events-test
   ;; Tests JSON Schema native streaming preserves text events and emits a parsed
   ;; structured-output result sourced from ordinary assistant text.
