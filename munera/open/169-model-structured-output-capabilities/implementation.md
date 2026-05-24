@@ -98,3 +98,7 @@ Reviewed `design.md`, `plan.md`, `steps.md`, `design-steps.md`, prior implementa
 ## 2026-05-23 — executed inconsistency follow-ups repeat 5
 
 No newly added unchecked `design-steps.md` items existed after the preloaded inconsistency review, so there were no actionable design follow-ups to execute. Did not execute implementation `steps.md` work.
+
+## 2026-05-23 — ambiguity review repeat 6
+
+Found one new actionable ambiguity: the artifacts define explicit structured-output capability maps for native-capable, fallback-only, and unsupported models, but do not say how to interpret a model description that omits `:capabilities :structured-output` entirely. Existing built-in and custom model definitions currently have no such field, and `user_models.clj` uses a closed model schema, so implementation needs one clear rule for absent capability data: invalid config, default unsupported, default fallback-only, or migration/defaulting behavior.
