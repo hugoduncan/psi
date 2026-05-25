@@ -34,7 +34,9 @@
                        :spawn-mode :new-root
                        :session-file nil})
           sd1        (get-in state1 (state/session-data-path "new-1"))]
-      (is (= ["bash" "read" "edit"] (:tool-ids sd1)))))
+      (is (= ["bash" "read" "edit"] (:tool-ids sd1)))
+      (is (= (mapv :name (:tool-defs sd1)) (:tool-ids sd1))
+          ":tool-defs and :tool-ids co-propagate coherently through lifecycle")))
 
   (testing "new session inherits empty :tool-ids when parent has none set"
     (let [current-sd (model/initial-session {:worktree-path "/tmp/parent"})
