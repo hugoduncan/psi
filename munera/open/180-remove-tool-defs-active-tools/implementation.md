@@ -113,3 +113,15 @@
   1. **Minor gap — nil tool-source in `resolve-tool-defs`**: The function handles nil tool-source gracefully (returns `[]`), and this is a real runtime path (agent-ctx not yet initialized → `agent-tool-source-in` returns nil). The test covers empty `[]` but not nil. Adding one assertion makes the nil contract explicit and guards against future regression.
 
   **Verdict**: No critical issues. One minor defensive-coverage gap worth closing.
+
+- 2026-05-25 ψ code-shaper review (plan/steps): no actionable issues.
+
+  Assessed `resolve-tool-defs`, all 12 call sites, `child_session_state.clj`, `prompt_handlers.clj`, `session_mutations.clj`, `scheduler.clj`, `attempts.clj`, `statechart_runtime.clj`, `workflow_step_session_config/core.clj`, `psi_tool.clj`, `session_lifecycle.clj`, `context.clj`, `prompt_request.clj`, `child_session_contract.clj`, and session-state schema/init.
+
+  **Simplicity**: `resolve-tool-defs` is pure, single-responsibility. Each consumer follows a uniform pattern: acquire tool-source → resolve → use. No unnecessary indirection remains.
+
+  **Consistency**: 12 call sites all use `(tool-defs/resolve-tool-defs tool-source (:tool-ids sd))`. Tool-source acquisition is consistent via `agent-tool-source-in`. The one divergent site (`psi_tool.clj:refresh-live-tool-defs!`) is intentionally different (dev reload rebuilds from scratch) and commented.
+
+  **Robustness**: Nil/empty inputs handled gracefully. Contract boundary at `child_session_contract.clj` enforces `[:vector :string]`. Step-config → contract conversion in `attempts.clj` preserves nil semantics for parent fallback. Schema validates without removed fields.
+
+  **Noted (non-actionable)**: `child_session_state.clj:parent-tool-source` duplicates `agent-tool-source-in` logic — justified by operating on `root-state` snapshot (pure state transformation) rather than `ctx`. The step-config `:tool-defs` → contract `:tool-ids` naming seam is a documented design decision.
