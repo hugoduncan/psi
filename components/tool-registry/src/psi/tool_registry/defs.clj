@@ -73,6 +73,19 @@
      :active-tools (set ids)
      :tool-defs    normalized-defs}))
 
+(defn resolve-tool-defs
+  "Resolve tool-ids to tool definition maps from a tool-source collection.
+   Filters tool-source to only those tools whose `:name` is in tool-ids,
+   preserving tool-ids ordering. Returns `[]` for empty tool-ids.
+
+   Pure function — caller provides the tool-source (typically from the
+   runtime agent data which holds merged base+extension tools)."
+  [tool-source tool-ids]
+  (if (seq tool-ids)
+    (let [by-name (into {} (map (juxt :name identity)) tool-source)]
+      (into [] (keep #(get by-name %)) tool-ids))
+    []))
+
 (defn agent-core-tool
   "Project a canonical or richer tool map into the agent-core runtime shape.
    During migration this preserves structured `:parameters` data."

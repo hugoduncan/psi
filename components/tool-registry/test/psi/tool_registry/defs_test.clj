@@ -67,6 +67,40 @@
               :required ["p"]}
              (:parameters normalized))))))
 
+(deftest resolve-tool-defs-test
+  ;; Tests the resolve-tool-defs derivation API for tool-ids → tool-def maps
+  (testing "filters tool-source by tool-ids membership"
+    (let [source [{:name "bash" :description "B"}
+                  {:name "read" :description "R"}
+                  {:name "edit" :description "E"}]
+          result (tool-defs/resolve-tool-defs source ["bash" "edit"])]
+      (is (= [{:name "bash" :description "B"}
+              {:name "edit" :description "E"}]
+             result))))
+
+  (testing "preserves tool-ids ordering"
+    (let [source [{:name "bash" :description "B"}
+                  {:name "read" :description "R"}
+                  {:name "edit" :description "E"}]
+          result (tool-defs/resolve-tool-defs source ["edit" "bash"])]
+      (is (= ["edit" "bash"] (mapv :name result)))))
+
+  (testing "returns empty vector for empty tool-ids"
+    (let [source [{:name "bash" :description "B"}]]
+      (is (= [] (tool-defs/resolve-tool-defs source [])))
+      (is (= [] (tool-defs/resolve-tool-defs source nil)))))
+
+  (testing "unknown tool-ids are filtered out"
+    (let [source [{:name "bash" :description "B"}
+                  {:name "read" :description "R"}]
+          result (tool-defs/resolve-tool-defs source ["bash" "nonexistent" "read"])]
+      (is (= [{:name "bash" :description "B"}
+              {:name "read" :description "R"}]
+             result))))
+
+  (testing "returns empty vector for empty tool-source"
+    (is (= [] (tool-defs/resolve-tool-defs [] ["bash"])))))
+
 (deftest agent-core-tool-projection-test
   (let [tool {:name "x"
               :description "desc"
