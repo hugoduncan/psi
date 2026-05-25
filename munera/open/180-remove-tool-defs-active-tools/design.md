@@ -70,7 +70,7 @@ A single derivation function must exist to resolve `tool-ids → tool definition
 
 | Location | Current use | Migration path |
 |----------|-------------|----------------|
-| `child_session_state.clj` | Resolve child tool-defs from parent | Derive from parent `:tool-ids` via `resolve-tool-defs` with tool-source from runtime agent data |
+| `child_session_state.clj` | Resolve child tool-defs from parent; writes `:tool-defs tool-defs` into child session data map (line 98) | Derive from parent `:tool-ids` via `resolve-tool-defs` with tool-source from runtime agent data. Remove `:tool-defs tool-defs` from the `child-session-base-state*` data map — after `tool-authority-fields` removal, `derive-child-prompt-state` no longer returns `:tool-defs`, so this key must be removed (not left as `nil`). |
 | `prompt_handlers.clj:45-55` | Live tool-defs for prompt | Derive from `:tool-ids` via `resolve-tool-defs` |
 | `session_mutations.clj:512` | `:session/add-tool` reads current defs | Derive from `:tool-ids` via `resolve-tool-defs`, append new |
 | `prompt_request.clj:284` | Filter tool-defs for system prompt | Derive from `:tool-ids` via `resolve-tool-defs` |

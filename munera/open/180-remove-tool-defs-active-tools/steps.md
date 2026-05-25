@@ -25,14 +25,13 @@
   - `mutations/session.clj:89` — pass `:tool-ids` instead of `:tool-defs` in dispatch event.
   - `workflow_judge.clj:61` — pass `:tool-ids []` instead of `:tool-defs []`.
   - `auto_session_name.clj:224` — pass `:tool-ids []` instead of `:tool-defs []`.
-  - `child_session_state.clj` — accept `:tool-ids` from parent/event; derive resolved tool-defs via `resolve-tool-defs` for child state.
+  - `child_session_state.clj` — accept `:tool-ids` from parent/event; derive resolved tool-defs via `resolve-tool-defs` for child state. Remove `:tool-defs tool-defs` from the `child-session-base-state*` data map construction (line 98) — after `tool-authority-fields` removal, this key would be `nil`, violating AC 1.
   - All existing tests must pass.
 
 - [ ] **Remove fields from schema, lifecycle, and helpers**
   - `session_state/model.clj` — remove `:tool-defs` from schema and `initial-session` defaults. (`:active-tools` is not in schema or `initial-session` — it is only injected at runtime by `tool-authority-fields`, removed below.)
   - `session_state/init.clj` — remove `:tool-defs` from lifecycle `select-keys` (new/resume/fork).
   - `tool_registry/defs.clj` — remove `tool-authority-fields` entirely (this removes the runtime injection of both `:active-tools` and `:tool-defs`).
-  - `prompt_request.clj:279` — migrate `:active-tools` read site: derive `(set (:tool-ids session-data))` instead of `(:active-tools session-data)`.
   - `session_mutations.clj` `:session/set-active-tools` handler — replace `(tool-defs/tool-authority-fields ...)` + `merge` with direct `(assoc % :tool-ids (mapv :name normalized))`.
   - `:session/add-tool` handler — same: direct `assoc :tool-ids`.
   - Update/remove tests that assert on `:tool-defs`/`:active-tools` presence in session state.
