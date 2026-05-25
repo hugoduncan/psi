@@ -69,3 +69,17 @@
   1. **`child_session_state.clj` write site → resolved**: Updated consumer table migration path to explicitly mention removing `:tool-defs tool-defs` from the `child-session-base-state*` data map. Updated steps.md step 3 to include the removal with rationale (would be `nil` after `tool-authority-fields` removal, violating AC 1).
 
   2. **`prompt_request.clj:279` deduplication → resolved**: Removed the duplicate entry from step 4 ("Remove fields from schema, lifecycle, and helpers"). The migration lives in step 2 ("Migrate session-state read sites") where it belongs — it's a session-state read site, not a schema/lifecycle concern.
+
+- 2026-05-25 ψ implementation: all four steps completed and all tests green.
+
+  Implementation commits:
+  1. `6ffb9b4d` — introduce `resolve-tool-defs` derivation API with unit tests
+  2. `9e4a39ac` — migrate session-state read sites to `resolve-tool-defs`
+  3. `06e1450a` — migrate dispatch event/contract fields from `:tool-defs` to `:tool-ids`
+  4. `700de860` — remove `:tool-defs` from schema/lifecycle, remove `tool-authority-fields`
+  5. `283a6299` — fix test failures from migration
+
+  Key deviations from initial design:
+  - **Agent-core tool storage**: removed `agent-core-tools` projection from `dispatch_effects.clj` and replaced `agent-core-tools` with `normalize-tool-defs` in `session_runtime.clj`. Full canonical tool maps (including `:lambda-description`) are now stored in agent-core's data-atom. This is necessary because the agent-core data-atom is the tool-source for `resolve-tool-defs`, and prompt rendering needs `:lambda-description`. The `agent-core-tools` projection was stripping this metadata.
+  - **Nil vs empty tool-ids in `attempts.clj`**: changed `(mapv :name (or tool-defs []))` to `(when tool-defs (mapv :name tool-defs))` to preserve nil when the step config has no tools. This allows `child_session_state.clj` to fall back to the parent's `:tool-ids` via `(or tool-ids (:tool-ids parent-sd))`.
+  - **Test setup**: child session mutation tests now dispatch `:session/set-active-tools` on the parent session before creating child sessions, so the parent's agent-core has tools available for `resolve-tool-defs`.
