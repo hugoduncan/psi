@@ -61,6 +61,7 @@
     {:root-state                 root-state*
      :prompt-component-selection normalized-selection
      :tool-defs                  resolved-tool-defs
+     :tool-ids                   (mapv :name resolved-tool-defs)
      :skill-ids                  (mapv :name resolved-skills)
      :system-prompt-build-opts   build-opts
      :base-system-prompt         resolved-base-prompt
@@ -68,7 +69,7 @@
 
 (defn- child-session-base-state*
   [root-state parent-sd {:keys [child-session-id session-name thinking-level temperature model prompt-mode response-mode logprobs top-logprobs developer-prompt developer-prompt-source cache-breakpoints workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?] :as child-opts}]
-  (let [{:keys [root-state prompt-component-selection tool-defs skill-ids system-prompt-build-opts base-system-prompt system-prompt]}
+  (let [{:keys [root-state prompt-component-selection tool-defs tool-ids skill-ids system-prompt-build-opts base-system-prompt system-prompt]}
         (derive-child-prompt-state root-state parent-sd child-opts)
         normalized-developer-prompt-source (let [source (or developer-prompt-source (:developer-prompt-source parent-sd))]
                                              (when (not= :fallback source)
@@ -95,6 +96,7 @@
                         :developer-prompt-source    normalized-developer-prompt-source
                         :thinking-level             (or thinking-level :off)
                         :tool-defs                  tool-defs
+                        :tool-ids                   tool-ids
                         :skill-ids                  skill-ids
                         :system-prompt-build-opts   system-prompt-build-opts
                         :cache-breakpoints          (or cache-breakpoints

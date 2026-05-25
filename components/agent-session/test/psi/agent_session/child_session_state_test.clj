@@ -19,6 +19,7 @@
             :tool-defs [{:name "read" :description "Read"}
                         {:name "bash" :description "Bash"}
                         {:name "psi-tool" :description "Psi tool"}]
+            :tool-ids ["read" "bash" "psi-tool"]
             :skill-ids ["skill-a"]
             :prompt-contribution-ids ["ext-a"]
             :prompt-contributions [{:id "ext-a" :ext-path "/ext/a" :section "Ext" :content "A" :enabled true}]
@@ -237,3 +238,41 @@
              (get-in state1 [:agent-session :sessions "child-5" :turn])))
       (is (= init/initial-telemetry
              (get-in state1 [:agent-session :sessions "child-5" :telemetry]))))))
+
+(deftest child-session-tool-ids-coherence-test
+  (let [parent-sd  (parent-session-data)
+        root-state (root-state-with-parent-skills
+                    parent-sd
+                    [{:name "skill-a" :description "A"
+                      :file-path "/s/SKILL.md" :base-dir "/s"
+                      :source :user :disable-model-invocation false}])]
+
+    (testing "default inheritance: child tool-ids derived from parent tool-defs"
+      (let [child-sd (child-session-state/child-session-base-state
+                      root-state parent-sd
+                      {:child-session-id "child-tool-ids-1"})]
+        (is (= ["read" "bash" "psi-tool"] (:tool-ids child-sd)))
+        (is (= (mapv :name (:tool-defs child-sd)) (:tool-ids child-sd)))))
+
+    (testing "explicit tool-defs override: child tool-ids derived from override"
+      (let [override-tools [{:name "write" :description "Write"}
+                            {:name "edit" :description "Edit"}]
+            child-sd (child-session-state/child-session-base-state
+                      root-state parent-sd
+                      {:child-session-id "child-tool-ids-2"
+                       :tool-defs override-tools})]
+        (is (= ["write" "edit"] (:tool-ids child-sd)))
+        (is (= (mapv :name (:tool-defs child-sd)) (:tool-ids child-sd)))))
+
+    (testing "prompt-component-selection filtering: child tool-ids matches filtered tool-defs"
+      (let [selection {:agents-md? false
+                       :extension-prompt-contributions []
+                       :tool-names ["bash"]
+                       :skill-names ["skill-a"]
+                       :components #{:skills}}
+            child-sd (child-session-state/child-session-base-state
+                      root-state parent-sd
+                      {:child-session-id "child-tool-ids-3"
+                       :prompt-component-selection selection})]
+        (is (= ["bash"] (:tool-ids child-sd)))
+        (is (= (mapv :name (:tool-defs child-sd)) (:tool-ids child-sd)))))))
