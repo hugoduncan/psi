@@ -14,9 +14,29 @@ Task 179 introduced `:tool-ids` as the single authority and kept `:tool-defs`/`:
 ## Constraints
 
 - `:tool-ids` remains the sole authoritative membership field.
-- Tool definition payloads (the full maps with `:description`, `:parameters`, etc.) must still be available where needed (prompt assembly, provider requests, child session bootstrapping) — but derived on demand from `:tool-ids` + registry lookup rather than stored redundantly in session state.
+- Tool definition payloads (the full maps with `:description`, `:parameters`, etc.) must still be available where needed (prompt assembly, provider requests, child session bootstrapping) — but derived on demand from `:tool-ids` + a tool-def resolver rather than stored redundantly in session state.
 - The workflow child-session contract currently accepts `:tool-defs` as an optional input; this must migrate to `:tool-ids` (or derive internally).
 - No behavioural change to end users or AI providers — same tools appear in prompts, same tools are callable.
+
+### Base tool derivation
+
+Base tools (`read`, `bash`, `edit`, `write`, `psi-tool`) are assembled in `app_runtime.clj` and do **not** live in the tool-registry — they exist only as normalized maps in the runtime agent `data-atom`. Registering base tools in tool-registry remains out of scope (deferred per 179 design).
+
+Therefore, removing `:tool-defs` from session state requires an alternative derivation source for base tools. The derivation API (see below) must be able to resolve **all** tool-ids — both extension tools (from tool-registry) and base tools (from the runtime agent data). The runtime agent's `data-atom` already holds the full merged tool set after startup; this is the derivation source.
+
+### On-demand tool-def derivation API
+
+A single derivation function must exist to resolve `tool-ids → tool definition maps`. Without a named API, each consumer would independently implement ad-hoc lookup logic — recreating the consistency problem that `tool-authority-fields` was introduced to solve.
+
+**Function**: `psi.tool-registry.defs/resolve-tool-defs`
+**Signature**: `(resolve-tool-defs tool-source tool-ids) → [tool-def-map ...]`
+**Inputs**:
+- `tool-source` — a seq/collection of all known tool definition maps (from the runtime agent data, which includes both base and extension tools)
+- `tool-ids` — the authoritative `[:tool-ids ...]` vector from session state
+
+**Semantics**: Filters `tool-source` to only those tools whose `:name` is in `tool-ids`, preserving `tool-ids` ordering. Returns `[]` for empty `tool-ids`.
+
+**Rationale**: This is a pure function — it does not reach into an atom or registry. The caller provides the tool-source, which keeps the function testable and avoids coupling to runtime state. The runtime agent data (which already holds the merged base+extension tool set) is the canonical tool-source at call sites.
 
 ## Scope
 
@@ -24,14 +44,16 @@ Task 179 introduced `:tool-ids` as the single authority and kept `:tool-defs`/`:
 
 - Remove `:tool-defs` from session schema, `initial-session`, lifecycle `select-keys`.
 - Remove `:active-tools` from `tool-authority-fields` and all read sites.
-- Migrate all consumers that read `:tool-defs` from session state to instead derive tool definitions from `:tool-ids` + a registry/resolver lookup.
+- Introduce `psi.tool-registry.defs/resolve-tool-defs` as the single derivation API for `tool-ids → tool-def maps`.
+- Migrate all consumers that read `:tool-defs` from session state to instead derive tool definitions via `resolve-tool-defs` with a tool-source from the runtime agent data.
 - Migrate workflow child-session contract from `[:tool-defs {:optional true} ...]` to `[:tool-ids {:optional true} ...]`.
-- Update `tool-authority-fields` to return only `{:tool-ids ids}`.
+- Migrate dispatch event fields (`:session/create-child` event, `mutations/session.clj`, `workflow_judge.clj`) from `:tool-defs` to `:tool-ids` in the event contract — these are event/contract fields, not session-state reads.
+- Remove `tool-authority-fields` entirely — callers `assoc :tool-ids` directly (see design decision below).
 - Remove or update tests that assert on `:tool-defs`/`:active-tools` presence in session state.
 
 ### Out of scope
 
-- Registering base tools in tool-registry (deferred per 179 design — base tools still arrive as normalized maps at boundaries).
+- Registering base tools in tool-registry (deferred per 179 design — base tools still arrive as normalized maps at the runtime boundary and are available via the runtime agent data-atom).
 - Changing the provider-facing tool format (still JSON Schema maps).
 - Reworking how tools are discovered/registered by extensions.
 
@@ -44,36 +66,63 @@ Task 179 introduced `:tool-ids` as the single authority and kept `:tool-defs`/`:
 | `prompt_request.clj:279` | `:turn/active-tools (:active-tools session-data)` | Derive `(set (:tool-ids session-data))` |
 | `turn_runtime/request.clj:92` | `:active-tools (:turn/active-tools normalized-turn)` | Unchanged — consumes turn data, not session state directly |
 
-### :tool-defs (many read sites)
+### :tool-defs — session-state read sites
 
 | Location | Current use | Migration path |
 |----------|-------------|----------------|
-| `child_session_state.clj` | Resolve child tool-defs from parent | Derive from parent `:tool-ids` via registry lookup |
-| `context.clj:134` | Pass tool-defs to context builder | Derive from `:tool-ids` |
-| `prompt_handlers.clj:45-55` | Live tool-defs for prompt | Derive from `:tool-ids` |
-| `session_lifecycle.clj:126` | Session initialization | Remove — `:tool-ids` suffices |
-| `session_mutations.clj:512` | `:session/add-tool` reads current defs | Derive from `:tool-ids` + registry, append new |
-| `mutations/session.clj:89` | Workflow session creation | Use `:tool-ids` |
-| `prompt_request.clj:284` | Filter tool-defs for system prompt | Derive from `:tool-ids` |
-| `psi_tool.clj:515` | Check builtins | Derive from `:tool-ids` |
+| `child_session_state.clj` | Resolve child tool-defs from parent | Derive from parent `:tool-ids` via `resolve-tool-defs` with tool-source from runtime agent data |
+| `context.clj:134` | Pass tool-defs to context builder | Derive from `:tool-ids` via `resolve-tool-defs` |
+| `prompt_handlers.clj:45-55` | Live tool-defs for prompt | Derive from `:tool-ids` via `resolve-tool-defs` |
+| `session_mutations.clj:512` | `:session/add-tool` reads current defs | Derive from `:tool-ids` via `resolve-tool-defs`, append new |
+| `prompt_request.clj:284` | Filter tool-defs for system prompt | Derive from `:tool-ids` via `resolve-tool-defs` |
+| `psi_tool.clj:515` | Check builtins | Derive from `:tool-ids` via `resolve-tool-defs` |
 | `psi_tool_scheduler.clj:78` | Session config field | Use `:tool-ids` |
 | `scheduler_runtime.clj:44` | Tool count | `(count (:tool-ids ...))` |
-| `session_runtime.clj:38` | Runtime tool list | Derive from `:tool-ids` |
-| `workflow_judge.clj:61` | Empty tool-defs | Empty `:tool-ids` |
+| `session_runtime.clj:38` | Runtime tool list | Derive from `:tool-ids` via `resolve-tool-defs` |
 | `app_runtime.clj:364,468` | Session start / refresh | Derive at boundary |
 | `system_prompt.clj:391-392` | Prompt assembly input | Accept derived defs, not session field |
 | `session_state/init.clj` | Lifecycle select-keys | Remove |
 | `session_state/model.clj` | Schema + defaults | Remove |
-| `workflow_runtime/attempts.clj:70` | Step tool-defs | Derive from `:tool-ids` |
-| `workflow_runtime/child_session_contract.clj:15` | Contract schema | Migrate to `:tool-ids` |
-| `workflow_runtime/statechart_runtime.clj:90` | Step config | Derive from `:tool-ids` |
-| `workflow_step_session_config/core.clj:166,196` | Resolve step tools | Derive from `:tool-ids` + registry |
+| `workflow_runtime/attempts.clj:70` | Step tool-defs | Derive from `:tool-ids` via `resolve-tool-defs` |
+| `workflow_runtime/statechart_runtime.clj:90` | Step config | Derive from `:tool-ids` via `resolve-tool-defs` |
+| `workflow_step_session_config/core.clj:166,196` | Resolve step tools | Derive from `:tool-ids` via `resolve-tool-defs` |
+
+### :tool-defs — dispatch event/contract fields
+
+These consumers use `:tool-defs` as a dispatch event parameter or contract field, not as a session-state read. Migration must change the event contract and schema, not just remove session-state reads.
+
+| Location | Current use | Migration path |
+|----------|-------------|----------------|
+| `session_lifecycle.clj:126` | Destructures `:tool-defs` from `:session/create-child` event | Change event contract: accept `:tool-ids` instead of `:tool-defs`; handler passes `:tool-ids` to `child_session_state.clj` |
+| `mutations/session.clj:89` | Passes `:tool-defs` as dispatch event param to `:session/create-child` | Pass `:tool-ids` instead; callers (extension `create-child-session`) provide `:tool-ids` |
+| `workflow_judge.clj:61` | Passes `:tool-defs []` in child-session creation map | Pass `:tool-ids []` instead |
+| `child_session_contract.clj:15` | Contract schema has `[:tool-defs {:optional true} [:maybe [:vector :map]]]` | Replace with `[:tool-ids {:optional true} [:maybe [:vector :string]]]` |
+| `auto_session_name.clj:224` | Extension passes `:tool-defs []` to `psi.extension/create-child-session` | Pass `:tool-ids []` instead |
+
+## Design decisions
+
+### `tool-authority-fields` removal
+
+Task 179 introduced `tool-authority-fields` as the single derivation site returning `{:tool-ids :active-tools :tool-defs}`. Callers (`set-active-tools`, `add-tool`, `derive-child-prompt-state`) `merge` the result into session state.
+
+**Decision**: Remove `tool-authority-fields` entirely.
+
+**Rationale**: Once `:tool-defs` and `:active-tools` are removed from session state, the helper would return only `{:tool-ids ids}` — a trivial single-key map. A function whose sole purpose is `{:tool-ids (mapv :name defs)}` adds indirection without value. Callers should `assoc :tool-ids` directly:
+
+- `set-active-tools` handler: `(assoc % :tool-ids (mapv :name normalized))`
+- `add-tool` handler: `(assoc % :tool-ids (mapv :name normalized))`
+- `derive-child-prompt-state`: `(assoc result :tool-ids (mapv :name resolved-tool-defs))`
+
+The `merge` pattern in callers changes to a direct `assoc :tool-ids` — simpler and explicit.
 
 ## Acceptance criteria
 
 1. No session state map contains `:tool-defs` or `:active-tools` after initialization.
-2. `tool-authority-fields` returns only `{:tool-ids [...]}`.
-3. All prompt assembly, child session creation, and workflow step configuration produce identical tool payloads as before (derived on demand).
-4. Schema validates without `:tool-defs` or `:active-tools`.
-5. All existing tests pass (updated as needed).
-6. No regression in tool availability during sessions, workflows, or scheduled sessions.
+2. `tool-authority-fields` is removed; callers `assoc :tool-ids` directly.
+3. `resolve-tool-defs` is the single derivation API for `tool-ids → tool-def maps`.
+4. All prompt assembly, child session creation, and workflow step configuration produce identical tool payloads as before (derived on demand).
+5. Schema validates without `:tool-defs` or `:active-tools`.
+6. All existing tests pass (updated as needed).
+7. No regression in tool availability during sessions, workflows, or scheduled sessions.
+8. Dispatch event contract for `:session/create-child` uses `:tool-ids` (not `:tool-defs`).
+9. `child_session_contract.clj` schema uses `:tool-ids` (not `:tool-defs`).
