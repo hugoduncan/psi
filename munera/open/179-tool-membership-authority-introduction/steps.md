@@ -1,3 +1,12 @@
-- [ ] Implement authoritative session `:tool-ids` introduction in session model/init and direct mutation seams.
-- [ ] Align compatibility projections so persisted `:tool-defs` and `:active-tools` derive from canonical registry definitions plus `:tool-ids`.
-- [ ] Add focused verification for authority-first direct mutation and child-session compatibility normalization.
+- [x] Implement authoritative session `:tool-ids` introduction in session model/init and direct mutation seams.
+  - Added `:tool-ids` to schema, initial-session default, all three lifecycle select-keys
+  - `:session/set-active-tools` handler is now authority-first: derives `:tool-ids` → `:active-tools` → `:tool-defs`
+  - `:session/add-tool` handler now persists `:tool-ids` and derived fields (previously only fired runtime effect)
+  - Authority-feeding seams (`refresh-active-tools-in!`, `refresh-active-tools!`) verified: flow through `:session/set-active-tools`
+- [x] Align compatibility projections so persisted `:tool-defs` and `:active-tools` derive from canonical registry definitions plus `:tool-ids`.
+  - `:active-tools` = `(set tool-ids)` — derived from `:tool-ids`
+  - `:tool-defs` = normalized incoming tool-maps — derived, order matches `:tool-ids`
+  - Both are persisted as compatibility projections, not authority
+- [x] Add focused verification for authority-first direct mutation and child-session compatibility normalization.
+  - `psi.session-state.tool-authority-test`: schema, lifecycle propagation (new/resume/fork)
+  - `psi.agent-session.tool-authority-handlers-test`: set-active-tools, add-tool authority behavior
