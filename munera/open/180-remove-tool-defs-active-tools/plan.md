@@ -18,6 +18,9 @@ Bottom-up: introduce the derivation API first, then migrate consumers layer by l
 - Each consumer migration is verified by running existing tests — no new tests needed for migrations that preserve behaviour, only for the new `resolve-tool-defs` function.
 - `tool-authority-fields` is removed last (after all callers are migrated to `assoc :tool-ids` directly).
 
+- Scheduler API (`psi_tool_scheduler.clj`, `dispatch_handlers/scheduler.clj`) migrates from `:tool-defs` to `:tool-ids` — handler derives tool-defs internally via `resolve-tool-defs`. Persisted schedules with `:tool-defs` will need recreation (acceptable — not long-lived state).
+- `app_runtime.clj:364,468` are prompt build-opts construction sites using local variables, not session-state reads — excluded from migration scope.
+
 ## Risks
 
 | Risk | Mitigation |

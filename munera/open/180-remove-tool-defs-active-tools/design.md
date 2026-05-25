@@ -75,10 +75,10 @@ A single derivation function must exist to resolve `tool-ids → tool definition
 | `session_mutations.clj:512` | `:session/add-tool` reads current defs | Derive from `:tool-ids` via `resolve-tool-defs`, append new |
 | `prompt_request.clj:284` | Filter tool-defs for system prompt | Derive from `:tool-ids` via `resolve-tool-defs` |
 | `psi_tool.clj:515` | Check builtins | Derive from `:tool-ids` via `resolve-tool-defs` |
-| `psi_tool_scheduler.clj:78` | Session config field | Use `:tool-ids` |
+| `psi_tool_scheduler.clj:78` | `session-config-supported-keys` whitelist | Replace `:tool-defs` with `:tool-ids` in supported keys |
+| `dispatch_handlers/scheduler.clj:59` | Destructures `:tool-defs` from session-config, normalizes, dispatches `:session/set-active-tools` | Accept `:tool-ids` (strings); derive tool-defs via `resolve-tool-defs` before dispatching `:session/set-active-tools` with `:tool-maps` |
 | `scheduler_runtime.clj:44` | Tool count | `(count (:tool-ids ...))` |
 | `session_runtime.clj:38` | Runtime tool list | Derive from `:tool-ids` via `resolve-tool-defs` |
-| `app_runtime.clj:364,468` | Session start / refresh | Derive at boundary |
 | `session_state/init.clj` | Lifecycle select-keys | Remove |
 | `session_state/model.clj` | Schema + defaults | Remove |
 | `workflow_step_session_config/core.clj:166,196` | Reads parent session `:tool-defs` to resolve step tools | Read parent `:tool-ids` instead; derive tool-defs via `resolve-tool-defs` with tool-source from runtime agent data. Step-config continues to output `:tool-defs` (derived maps) — downstream pass-throughs unchanged. |
@@ -116,10 +116,21 @@ The `merge` pattern in callers changes to a direct `assoc :tool-ids` — simpler
 
 `workflow_step_session_config/core.clj:196` reads `:tool-defs` from the parent session and resolves step-specific tools via `resolve-step-tool-defs`. After migration, it reads `:tool-ids` from the parent session and derives tool-defs via `resolve-tool-defs` with a tool-source from the runtime agent data. The step-config map continues to output `:tool-defs` (derived full maps) — this is a local data structure, not session state. Downstream `statechart_runtime.clj:90` and `attempts.clj:70` are pass-throughs of step-config and do not need migration.
 
+### Scheduler session-config: accept `:tool-ids` (strings), derive internally
+
+`psi_tool_scheduler.clj:78` `session-config-supported-keys` and `dispatch_handlers/scheduler.clj:59` destructure `:tool-defs` from the AI-facing scheduler create API. This is a user-facing (AI-facing) contract.
+
+**Decision**: The scheduler accepts `:tool-ids` (string tool names) instead of `:tool-defs` (full maps). The scheduler handler (`dispatch_handlers/scheduler.clj`) derives tool-defs internally via `resolve-tool-defs` when it needs to dispatch `:session/set-active-tools` with `:tool-maps`.
+
+**Rationale**: The scheduler is a creation-time API — callers specify *which* tools, not *how* tools are defined. Tool-ids are the authoritative membership representation. Deriving full maps at the handler boundary is consistent with the overall design direction.
+
+**Persisted-schedule compatibility**: Existing persisted schedules that contain `:tool-defs` in their session-config will fail validation after migration. This is acceptable — schedules are recreated by users/AI and are not long-lived persistent state. If compatibility is needed, the scheduler handler can accept both keys during a transition period, but the default path is clean migration.
+
 ### Removed from consumer table
 
 - `workflow_runtime/attempts.clj:70` and `workflow_runtime/statechart_runtime.clj:90` — pass-throughs of step-config `:tool-defs`, not session-state reads. No migration needed.
 - `system_prompt.clj:391-392` — parameter docstring describing the `:tool-defs` input to `build-system-prompt`. Not a session-state read. The callers that pass tool-defs to this function are already listed separately.
+- `app_runtime.clj:364,468` — prompt build-opts construction sites using local `refreshed-tool-defs` variables. These build a local opts map with `:tool-defs` as a parameter to `build-system-prompt` — they never read `:tool-defs` from session state. Same category as `system_prompt.clj:391-392`. The callers that persist tool state are already covered by the `:session/set-active-tools` dispatch path.
 
 ## Acceptance criteria
 
