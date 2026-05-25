@@ -105,3 +105,11 @@
   1. **Stale `:tool-defs` in test fixtures → resolved**: Removed `:tool-defs []` from 6 mock session data helpers. Left `:tool-defs []` in `workflow_resolvers_test.clj:55` and `workflow_attempts_test.clj:34,66` — these are step-config inputs to `create-step-attempt-session!` which still accepts `:tool-defs` from step-config by design (the function converts to `:tool-ids` internally at line 70).
 
   2. **Dead `agent-core-tools` code → resolved**: Removed `agent-core-tool` and `agent-core-tools` from `tool_registry/defs.clj`, their re-exports from `agent_session/tool_defs.clj`, identity tests from `tool_defs_test.clj`, and `agent-core-tool-projection-test` from `defs_test.clj`. All tests green.
+
+- 2026-05-25 ψ test-shaper review: tests well-shaped overall — one minor gap.
+
+  **Overall**: Tests exhibit clarity (single-concern, explicit AAA), signal (behavior-focused assertions on state/effects, not implementation), robustness (deterministic, real impls via atoms), and economy (no redundant tests). Coverage spans: derivation API unit tests, handler mutations, child session state, lifecycle paths, contract validation, workflow step-config, scheduler, and full integration (child_session_mutation_test).
+
+  1. **Minor gap — nil tool-source in `resolve-tool-defs`**: The function handles nil tool-source gracefully (returns `[]`), and this is a real runtime path (agent-ctx not yet initialized → `agent-tool-source-in` returns nil). The test covers empty `[]` but not nil. Adding one assertion makes the nil contract explicit and guards against future regression.
+
+  **Verdict**: No critical issues. One minor defensive-coverage gap worth closing.
