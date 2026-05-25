@@ -56,9 +56,10 @@
    :label label})
 
 (defn- scheduled-session-config-dispatches
-  [ctx session-id {:keys [system-prompt thinking-level model cache-breakpoints developer-prompt developer-prompt-source skills tool-defs prompt-component-selection preloaded-messages]}]
-  (let [normalized-tool-defs (when (some? tool-defs)
-                               (tool-defs/normalize-tool-defs tool-defs))
+  [ctx session-id {:keys [system-prompt thinking-level model cache-breakpoints developer-prompt developer-prompt-source skills tool-ids prompt-component-selection preloaded-messages]}]
+  (let [tool-maps (when (some? tool-ids)
+                    (let [tool-source (ss/agent-tool-source-in ctx session-id)]
+                      (tool-defs/resolve-tool-defs tool-source tool-ids)))
         existing-base-prompt (:base-system-prompt (ss/get-session-data-in ctx session-id))
         base-events          (cond-> []
                                (some? system-prompt)
@@ -96,10 +97,10 @@
                                       :event-data {:session-id session-id
                                                    :skills (vec skills)}})
 
-                               (some? normalized-tool-defs)
+                               (some? tool-maps)
                                (conj {:event-type :session/set-active-tools
                                       :event-data {:session-id session-id
-                                                   :tool-maps normalized-tool-defs}})
+                                                   :tool-maps tool-maps}})
 
                                (contains? {:prompt-component-selection prompt-component-selection} :prompt-component-selection)
                                (conj {:event-type :session/set-prompt-component-selection

@@ -16,6 +16,12 @@
   [ctx session-id]
   (get-in @(:state* ctx) [:agent-session :sessions session-id :agent-ctx]))
 
+(defn agent-tool-source-in
+  "Return the tool-source (all known tool definition maps) for a session's agent.
+   The agent data-atom holds the merged base+extension tool set after startup."
+  [ctx session-id]
+  (some-> (agent-ctx-in ctx session-id) :data-atom deref :tools))
+
 (defn sc-session-id-in
   [ctx session-id]
   (get-in @(:state* ctx) [:agent-session :sessions session-id :sc-session-id]))

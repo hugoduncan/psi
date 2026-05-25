@@ -8,6 +8,7 @@
   (:require
    [psi.ai.model-registry :as model-registry]
    [psi.ai.model-selection :as model-selection]
+   [psi.session-state.state :as ss]
    [psi.skill-registry.registry :as skill-registry]
    [psi.skill-registry.root-storage :as skill-storage]
    [psi.tool-registry.defs :as tool-defs]
@@ -163,7 +164,8 @@
         parent-session-model (:model parent-session)
         parent-session-prompt-mode (:prompt-mode parent-session)
         session-skills (skill-storage/all-skills @(:state* ctx) parent-session)
-        session-tool-defs (vec (or (:tool-defs parent-session) []))
+        tool-source (ss/agent-tool-source-in ctx authoritative-parent-session-id)
+        session-tool-defs (tool-defs/resolve-tool-defs tool-source (:tool-ids parent-session))
         session-spec (:session step-def)
         developer-prompt (or (:system-prompt session-spec)
                              (:system-prompt base-meta))

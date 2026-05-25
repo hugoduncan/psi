@@ -36,6 +36,7 @@
    [psi.workflow-step-materialization.core :as workflow-step-materialization]
    [psi.workflow-step-session-config.core :as workflow-step-session-config]
    [psi.skill-registry.root-storage :as skill-storage]
+   [psi.tool-registry.defs :as tool-defs]
    [psi.agent-session.extension-workflow-runtime :as extension-workflow-runtime]
    [psi.history.resolvers :as history-resolvers]
    [psi.query.core :as query]
@@ -153,7 +154,9 @@
                         {:origin :mutations})
     (let [child-sd (ss/get-session-data-in ctx child-session-id)
           messages (vec (or preloaded-messages []))
-          fresh (session-runtime/create-runtime! ctx child-session-id {:session-data child-sd :messages messages :agent-initial (:agent-initial ctx)})
+          tool-source (ss/agent-tool-source-in ctx parent-session-id)
+          resolved-tool-defs (tool-defs/resolve-tool-defs tool-source (:tool-ids child-sd))
+          fresh (session-runtime/create-runtime! ctx child-session-id {:session-data child-sd :messages messages :agent-initial (:agent-initial ctx) :resolved-tool-defs resolved-tool-defs})
           result {:psi.agent-session/session-id child-session-id}]
       (swap! (:state* ctx)
              (fn [state]

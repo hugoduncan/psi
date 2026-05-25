@@ -41,7 +41,7 @@
                                                 (map :name)
                                                 vec)
                                        [])))
-     :tool-count (count (or (get session-config :tool-defs) []))
+     :tool-count (count (or (get session-config :tool-ids) []))
      :has-system-prompt? (boolean (get session-config :system-prompt))
      :has-developer-prompt? (boolean (get session-config :developer-prompt))
      :preloaded-message-count (count (or (get session-config :preloaded-messages) []))

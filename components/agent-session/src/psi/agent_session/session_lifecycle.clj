@@ -12,6 +12,7 @@
    [psi.session-state.state :as session]
    [psi.agent-session.extension-workflow-runtime :as extension-workflow-runtime]
    [psi.agent-session.workflow.runtime-state :as workflow-runtime-state]
+   [psi.tool-registry.defs :as tool-defs]
    [taoensso.timbre :as timbre]))
 
 (defn- invoke-built-in-lifecycle-logged!
@@ -49,9 +50,10 @@
     (let [sd    (session/get-session-data-in ctx new-session-id)
           fresh (runtime/create-runtime!
                  ctx new-session-id
-                 {:session-data  sd
-                  :messages      []
-                  :agent-initial (:agent-initial ctx)})]
+                 {:session-data       sd
+                  :messages           []
+                  :agent-initial      (:agent-initial ctx)
+                  :resolved-tool-defs []})]
       (swap! (:state* ctx)
              (fn [state]
                (-> state
@@ -165,11 +167,14 @@
                           (nil? (some-> thinking-entry :data :thinking-level))
                           (assoc :thinking-level source-thinking-level))
                   _     (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data] sd)
+                  tool-source (session/agent-tool-source-in ctx source-session-id)
+                  resolved-tool-defs (tool-defs/resolve-tool-defs tool-source (:tool-ids sd))
                   fresh (runtime/create-runtime!
                          ctx session-id
-                         {:session-data  sd
-                          :messages      messages
-                          :agent-initial (:agent-initial ctx)})]
+                         {:session-data       sd
+                          :messages           messages
+                          :agent-initial      (:agent-initial ctx)
+                          :resolved-tool-defs resolved-tool-defs})]
               (swap! (:state* ctx)
                      (fn [state]
                        (-> state
@@ -245,11 +250,14 @@
                           {:origin :core})
       ;; Replace runtime handles with fresh per-session instances.
       (let [sd    (session/get-session-data-in ctx new-session-id)
+            tool-source (session/agent-tool-source-in ctx parent-session-id)
+            resolved-tool-defs (tool-defs/resolve-tool-defs tool-source (:tool-ids sd))
             fresh (runtime/create-runtime!
                    ctx new-session-id
-                   {:session-data  sd
-                    :messages      messages
-                    :agent-initial (:agent-initial ctx)})]
+                   {:session-data       sd
+                    :messages           messages
+                    :agent-initial      (:agent-initial ctx)
+                    :resolved-tool-defs resolved-tool-defs})]
         (swap! (:state* ctx)
                (fn [state]
                  (-> state

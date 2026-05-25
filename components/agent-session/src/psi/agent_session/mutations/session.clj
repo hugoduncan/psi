@@ -10,7 +10,8 @@
    [psi.agent-session.dispatch :as dispatch]
    [psi.session-persistence.core :as persist]
    [psi.agent-session.session-runtime :as runtime]
-   [psi.session-state.state :as ss]))
+   [psi.session-state.state :as ss]
+   [psi.tool-registry.defs :as tool-defs]))
 
 (pco/defmutation set-session-name
   "Set the human-readable name of the current session."
@@ -127,11 +128,14 @@
                         {:origin :mutations})
     (let [sd       (ss/get-session-data-in agent-session-ctx child-sid)
           messages (vec (or preloaded-messages []))
+          tool-source (ss/agent-tool-source-in agent-session-ctx session-id)
+          resolved-tool-defs (tool-defs/resolve-tool-defs tool-source (:tool-ids sd))
           fresh    (runtime/create-runtime!
                     agent-session-ctx child-sid
-                    {:session-data  sd
-                     :messages      messages
-                     :agent-initial (:agent-initial agent-session-ctx)})]
+                    {:session-data       sd
+                     :messages           messages
+                     :agent-initial      (:agent-initial agent-session-ctx)
+                     :resolved-tool-defs resolved-tool-defs})]
       (swap! (:state* agent-session-ctx)
              (fn [state]
                (-> state

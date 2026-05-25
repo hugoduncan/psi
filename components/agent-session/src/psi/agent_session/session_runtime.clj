@@ -30,12 +30,12 @@
 (defn turn-state [] {:ctx nil})
 
 (defn- agent-initial-state
-  [session-data messages agent-initial]
+  [session-data messages agent-initial resolved-tool-defs]
   (merge
    (cond-> {:system-prompt   (or (:system-prompt session-data) "")
             :thinking-level  (or (:thinking-level session-data) :off)
             :tools           (tool-defs/agent-core-tools
-                              (:tool-defs session-data))
+                              (or resolved-tool-defs []))
             :messages        (vec (or messages []))
             :steering-queue  []
             :follow-up-queue []}
@@ -51,13 +51,13 @@
    - :session-data session data map used to seed the runtime agent state
    - :messages     agent transcript messages to preload into agent-core
    - :agent-initial additional agent-core initial state overrides"
-  [ctx session-id {:keys [session-data messages agent-initial]}]
+  [ctx session-id {:keys [session-data messages agent-initial resolved-tool-defs]}]
   (let [actions-fn    (or (:session-actions-fn ctx)
                           (throw (ex-info "Missing :session-actions-fn on ctx"
                                           {:session-id session-id})))
         sc-session-id (java.util.UUID/randomUUID)
         agent-ctx     (agent/create-context)
-        initial       (agent-initial-state session-data messages agent-initial)]
+        initial       (agent-initial-state session-data messages agent-initial resolved-tool-defs)]
     (sc/start-session! (:sc-env ctx) sc-session-id
                        {:ctx        ctx
                         :session-id session-id

@@ -9,7 +9,8 @@
    [psi.prompt-registry.root-storage :as prompt-storage]
    [psi.session-state.state :as session]
    [psi.skill-registry.root-storage :as skill-storage]
-   [psi.state-kernel.dispatch :as kernel]))
+   [psi.state-kernel.dispatch :as kernel]
+   [psi.tool-registry.defs :as tool-defs]))
 
 ;;; Prompt contribution pure helpers
 
@@ -42,7 +43,8 @@
            ;; request preparation and introspection can observe the split.
            selection (:prompt-component-selection sd)
            base    (if-let [build-opts (:system-prompt-build-opts sd)]
-                     (let [live-tool-defs (vec (or (:tool-defs sd) []))
+                     (let [tool-source    (session/agent-tool-source-in ctx session-id)
+                           live-tool-defs (tool-defs/resolve-tool-defs tool-source (:tool-ids sd))
                            selected-tools (or (some->> live-tool-defs seq (mapv :name))
                                               (:selected-tools build-opts))
                            live-skills    (skill-storage/all-skills @(:state* ctx) sd)]

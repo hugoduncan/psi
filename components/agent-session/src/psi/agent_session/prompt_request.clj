@@ -12,7 +12,8 @@
    [psi.provider-auth.core :as provider-auth]
    [psi.session-state.state :as ss]
    [psi.prompt-assets.system-prompt :as system-prompt]
-   [psi.skill-registry.root-storage :as skill-storage]))
+   [psi.skill-registry.root-storage :as skill-storage]
+   [psi.tool-registry.defs :as tool-defs]))
 
 (defn- assistant-tool-call-ids
   [message]
@@ -276,13 +277,15 @@
      :turn/thinking-level               (:thinking-level session-data)
      :turn/prompt-mode                  (:prompt-mode session-data)
      :turn/response-mode                (:response-mode session-data)
-     :turn/active-tools                 (:active-tools session-data)
+     :turn/active-tools                 (set (:tool-ids session-data))
      :turn/developer-prompt             (:developer-prompt session-data)
      :turn/developer-prompt-source      (:developer-prompt-source session-data)
      :turn/base-system-prompt           (:base-system-prompt session-data)
      :turn/sorted-prompt-contributions  (sorted-contributions ctx session-id session-data)
-     :turn/filtered-tool-defs           (system-prompt/filter-tool-defs (:tool-defs session-data)
-                                                                        (:prompt-component-selection session-data))}))
+     :turn/filtered-tool-defs           (let [tool-source (ss/agent-tool-source-in ctx session-id)
+                                              resolved    (tool-defs/resolve-tool-defs tool-source (:tool-ids session-data))]
+                                          (system-prompt/filter-tool-defs resolved
+                                                                          (:prompt-component-selection session-data)))}))
 
 (defn build-prepared-request
   "Build a prepared-request artifact from canonical session state.

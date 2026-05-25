@@ -198,9 +198,8 @@
   (register-core-handler!
    :session/set-active-tools
    (fn [_ctx {:keys [session-id tool-maps]}]
-     (let [normalized (tool-defs/normalize-tool-defs tool-maps)
-           fields     (tool-defs/tool-authority-fields normalized)]
-       {:root-state-update (session/session-update session-id #(merge % fields))
+     (let [normalized (tool-defs/normalize-tool-defs tool-maps)]
+       {:root-state-update (session/session-update session-id #(assoc % :tool-ids (mapv :name normalized)))
         :effects [{:effect/type :runtime/agent-set-tools
                    :tool-maps normalized}
                   {:effect/type :runtime/refresh-system-prompt
@@ -508,14 +507,14 @@
   (register-core-handler!
    :session/add-tool
    (fn [ctx {:keys [session-id tool]}]
-     (let [sd        (session/get-session-data-in ctx session-id)
-           current   (or (:tool-defs sd) [])
-           existing? (some #(= (:name %) (:name tool)) current)]
+     (let [sd           (session/get-session-data-in ctx session-id)
+           tool-source  (session/agent-tool-source-in ctx session-id)
+           current      (tool-defs/resolve-tool-defs tool-source (:tool-ids sd))
+           existing?    (some #(= (:name %) (:name tool)) current)]
        (if existing?
          {:return {:added? false :count (count current)}}
-         (let [normalized (tool-defs/normalize-tool-defs (conj (vec current) tool))
-               fields     (tool-defs/tool-authority-fields normalized)]
-           {:root-state-update (session/session-update session-id #(merge % fields))
+         (let [normalized (tool-defs/normalize-tool-defs (conj (vec current) tool))]
+           {:root-state-update (session/session-update session-id #(assoc % :tool-ids (mapv :name normalized)))
             :effects [{:effect/type :runtime/agent-set-tools
                        :tool-maps normalized}]
             :return {:added? true :count (count normalized)}}))))))
