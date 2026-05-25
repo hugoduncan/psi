@@ -99,7 +99,10 @@
              result))))
 
   (testing "returns empty vector for empty tool-source"
-    (is (= [] (tool-defs/resolve-tool-defs [] ["bash"])))))
+    (is (= [] (tool-defs/resolve-tool-defs [] ["bash"]))))
+
+  (testing "returns empty vector for nil tool-source"
+    (is (= [] (tool-defs/resolve-tool-defs nil ["bash"])))))
 
 (deftest provider-tool-projection-test
   (let [tool {:name "x"

@@ -56,5 +56,6 @@
   - Removed identity test lines from `tool_defs_test.clj`.
   - Removed `agent-core-tool-projection-test` from `defs_test.clj`.
 
-- [ ] **Add nil tool-source test to `resolve-tool-defs`**
+- [x] **Add nil tool-source test to `resolve-tool-defs`**
   - Add assertion to `resolve-tool-defs-test`: `(is (= [] (tool-defs/resolve-tool-defs nil ["bash"])))` — makes the nil contract explicit since `agent-tool-source-in` can return nil when agent-ctx is uninitialized.
+  - Committed: see below.
