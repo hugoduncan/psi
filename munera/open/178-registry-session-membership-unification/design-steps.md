@@ -1,0 +1,3 @@
+- [ ] Add `plan.md` that translates the umbrella design into a concrete review/decomposition approach, including the order for inventorying domains and deciding whether each lands in membership-id, derived-payload, runtime-adapter, or out-of-scope classification.
+- [ ] Add `steps.md` with explicit checklist items for the intended ambiguity-resolution work so future passes can distinguish missing task setup from completed review/decomposition work.
+- [ ] Clarify in `design.md` or `plan.md` whether this task itself should produce refined follow-on task directories/updates for each affected domain, or only leave architectural guidance for later manual task creation.

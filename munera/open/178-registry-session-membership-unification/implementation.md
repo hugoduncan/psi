@@ -1,0 +1,1 @@
+- 2026-05-24 ψ ambiguity review: found actionable ambiguity — task lacks required `plan.md` and `steps.md`, so execution approach, review/update order, and concrete follow-up decomposition remain unspecified beyond the umbrella design.
