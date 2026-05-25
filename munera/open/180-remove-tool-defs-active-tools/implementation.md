@@ -91,3 +91,9 @@
   - **Agent-core tool storage**: removed `agent-core-tools` projection from `dispatch_effects.clj` and replaced `agent-core-tools` with `normalize-tool-defs` in `session_runtime.clj`. Full canonical tool maps (including `:lambda-description`) are now stored in agent-core's data-atom. This is necessary because the agent-core data-atom is the tool-source for `resolve-tool-defs`, and prompt rendering needs `:lambda-description`. The `agent-core-tools` projection was stripping this metadata.
   - **Nil vs empty tool-ids in `attempts.clj`**: changed `(mapv :name (or tool-defs []))` to `(when tool-defs (mapv :name tool-defs))` to preserve nil when the step config has no tools. This allows `child_session_state.clj` to fall back to the parent's `:tool-ids` via `(or tool-ids (:tool-ids parent-sd))`.
   - **Test setup**: child session mutation tests now dispatch `:session/set-active-tools` on the parent session before creating child sessions, so the parent's agent-core has tools available for `resolve-tool-defs`.
+
+- 2026-05-25 ψ cleanup: completed both review follow-up items.
+
+  1. **Stale `:tool-defs` in test fixtures → resolved**: Removed `:tool-defs []` from 6 mock session data helpers. Left `:tool-defs []` in `workflow_resolvers_test.clj:55` and `workflow_attempts_test.clj:34,66` — these are step-config inputs to `create-step-attempt-session!` which still accepts `:tool-defs` from step-config by design (the function converts to `:tool-ids` internally at line 70).
+
+  2. **Dead `agent-core-tools` code → resolved**: Removed `agent-core-tool` and `agent-core-tools` from `tool_registry/defs.clj`, their re-exports from `agent_session/tool_defs.clj`, identity tests from `tool_defs_test.clj`, and `agent-core-tool-projection-test` from `defs_test.clj`. All tests green.

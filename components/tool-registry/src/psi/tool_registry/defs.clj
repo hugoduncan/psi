@@ -75,22 +75,6 @@
       (into [] (keep #(get by-name %)) tool-ids))
     []))
 
-(defn agent-core-tool
-  "Project a canonical or richer tool map into the agent-core runtime shape.
-   During migration this preserves structured `:parameters` data."
-  [tool]
-  (when-let [name (some-> (:name tool) str not-empty)]
-    {:name        name
-     :label       (or (some-> (:label tool) str not-empty)
-                      name)
-     :description (or (some-> (:description tool) str)
-                      "")
-     :parameters  (parse-parameters (:parameters tool))}))
-
-(defn agent-core-tools
-  [tools]
-  (mapv agent-core-tool (filter map? (or tools []))))
-
 (defn provider-tool
   "Project a canonical or richer tool map into provider-facing conversation shape."
   [tool]

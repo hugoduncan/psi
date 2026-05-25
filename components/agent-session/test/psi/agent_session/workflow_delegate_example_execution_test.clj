@@ -25,7 +25,6 @@
    :message-history []
    :is-streaming false
    :tool-results []
-   :tool-defs []
    :skills []
    :thinking-level :off
    :cwd "/tmp"

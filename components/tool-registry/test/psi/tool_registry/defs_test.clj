@@ -101,19 +101,6 @@
   (testing "returns empty vector for empty tool-source"
     (is (= [] (tool-defs/resolve-tool-defs [] ["bash"])))))
 
-(deftest agent-core-tool-projection-test
-  (let [tool {:name "x"
-              :description "desc"
-              :parameters {:type "object"
-                           :properties {"p" {:type "string"}}}}
-        projected (tool-defs/agent-core-tool tool)]
-    (is (= "x" (:name projected)))
-    (is (= "x" (:label projected)))
-    (is (= "desc" (:description projected)))
-    (is (= {:type "object"
-            :properties {"p" {:type "string"}}}
-           (:parameters projected)))))
-
 (deftest provider-tool-projection-test
   (let [tool {:name "x"
               :description "desc"
