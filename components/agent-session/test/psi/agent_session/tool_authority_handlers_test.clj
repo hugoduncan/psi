@@ -100,7 +100,9 @@
         (is (= #{"bash" "read" "write"} (:active-tools sd))
             ":active-tools derived from updated :tool-ids")
         (is (= 3 (count (:tool-defs sd)))
-            ":tool-defs includes all tools"))))
+            ":tool-defs includes all tools")
+        (is (= ["bash" "read" "write"] (mapv :name (:tool-defs sd)))
+            ":tool-defs order matches :tool-ids order"))))
 
   (testing "add-tool does not modify state when tool already exists"
     (let [agent-data-atom (atom {:tools [{:name "bash" :description "B"}]})

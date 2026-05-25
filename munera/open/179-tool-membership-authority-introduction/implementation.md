@@ -22,3 +22,4 @@
   - `child_session_state_test.clj`: added `child-session-tool-ids-coherence-test` covering default inheritance, explicit `:tool-defs` override, and prompt-component-selection filtering — all assert `(:tool-ids child-sd) = (mapv :name (:tool-defs child-sd))`
   - Parent test helper updated with `:tool-ids ["read" "bash" "psi-tool"]` for realistic parent state
   - Item 3 (`:session/add-tool` missing `:runtime/refresh-system-prompt`) left as documented minor asymmetry — intentional mid-turn behavior, not a coherence violation
+- 2026-05-25 ψ follow-up execution: added `:tool-defs` order parity assertion to `add-tool-persists-tool-ids-test`. The "add-tool appends new tool name to :tool-ids" testing block now asserts `(= ["bash" "read" "write"] (mapv :name (:tool-defs sd)))`, matching the order-parity assertion already present in `set-active-tools-persists-tool-ids-test`. All tests pass (2 tests, 11 assertions, 0 failures).

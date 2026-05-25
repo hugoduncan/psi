@@ -18,4 +18,5 @@
   - `child-session-tool-ids-coherence-test` covers all three paths: default inheritance, explicit `:tool-defs` override, prompt-component-selection filtering
   - Each path asserts `:tool-ids` equals `(mapv :name (:tool-defs child-sd))`
   - Parent test helper updated to include `:tool-ids` for realistic parent state
-- [ ] Assert `:tool-defs` order parity with `:tool-ids` in `add-tool-persists-tool-ids-test`: add `(is (= ["bash" "read" "write"] (mapv :name (:tool-defs sd))))` to the "add-tool appends new tool name to :tool-ids" testing block, matching the order-parity assertion already present in `set-active-tools-persists-tool-ids-test`.
+- [x] Assert `:tool-defs` order parity with `:tool-ids` in `add-tool-persists-tool-ids-test`: add `(is (= ["bash" "read" "write"] (mapv :name (:tool-defs sd))))` to the "add-tool appends new tool name to :tool-ids" testing block, matching the order-parity assertion already present in `set-active-tools-persists-tool-ids-test`.
+  - Added order-parity assertion to "add-tool appends new tool name to :tool-ids" testing block — 2 tests, 11 assertions, 0 failures
