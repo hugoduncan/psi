@@ -28,9 +28,7 @@
                              :content "tool: delegate"
                              :priority 200})
           summary          {:extension-loaded-count (count (ext/extensions-in reg))}
-          tool-def-names   (->> (:tool-defs (ss/get-session-data-in ctx session-id))
-                                (map :name)
-                                set)
+          tool-def-names   (set (:tool-ids (ss/get-session-data-in ctx session-id)))
           active-tool-names (->> (:tools (agent-core/get-data-in (ss/agent-ctx-in ctx session-id)))
                                  (map :name)
                                  set)]

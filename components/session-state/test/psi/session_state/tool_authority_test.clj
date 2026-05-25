@@ -18,14 +18,17 @@
 
   (testing "session without :tool-ids fails schema validation"
     (let [s (dissoc (model/initial-session) :tool-ids)]
-      (is (some? (model/explain-session s))))))
+      (is (some? (model/explain-session s)))))
+
+  (testing ":tool-defs is not in the session schema"
+    (let [s (model/initial-session)]
+      (is (not (contains? s :tool-defs))))))
 
 (deftest initialize-new-session-carries-tool-ids-test
   ;; new-session lifecycle path inherits :tool-ids from current session data
   (testing "new session inherits parent :tool-ids"
     (let [current-sd (assoc (model/initial-session {:worktree-path "/tmp/parent"})
-                            :tool-ids ["bash" "read" "edit"]
-                            :tool-defs [{:name "bash"} {:name "read"} {:name "edit"}])
+                            :tool-ids ["bash" "read" "edit"])
           state1     (init/initialize-new-session-state
                       {} current-sd
                       {:new-session-id "new-1"
@@ -35,8 +38,8 @@
                        :session-file nil})
           sd1        (get-in state1 (state/session-data-path "new-1"))]
       (is (= ["bash" "read" "edit"] (:tool-ids sd1)))
-      (is (= (mapv :name (:tool-defs sd1)) (:tool-ids sd1))
-          ":tool-defs and :tool-ids co-propagate coherently through lifecycle")))
+      (is (not (contains? sd1 :tool-defs))
+          ":tool-defs is not in session state")))
 
   (testing "new session inherits empty :tool-ids when parent has none set"
     (let [current-sd (model/initial-session {:worktree-path "/tmp/parent"})

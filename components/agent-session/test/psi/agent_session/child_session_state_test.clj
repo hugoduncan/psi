@@ -8,6 +8,11 @@
    [psi.session-state.state :as state]
    [psi.skill-registry.root-storage :as skill-storage]))
 
+(def ^:private parent-tool-defs
+  [{:name "read" :description "Read"}
+   {:name "bash" :description "Bash"}
+   {:name "psi-tool" :description "Psi tool"}])
+
 (defn- parent-session-data
   ([]
    (parent-session-data {}))
@@ -16,9 +21,6 @@
            {:session-id "parent"
             :worktree-path "/tmp/ws"
             :prompt-mode :lambda
-            :tool-defs [{:name "read" :description "Read"}
-                        {:name "bash" :description "Bash"}
-                        {:name "psi-tool" :description "Psi tool"}]
             :tool-ids ["read" "bash" "psi-tool"]
             :skill-ids ["skill-a"]
             :prompt-contribution-ids ["ext-a"]
@@ -28,19 +30,21 @@
             :developer-prompt "parent-dev"
             :developer-prompt-source :memory
             :system-prompt-build-opts {:context-files [{:path "/AGENTS.md" :content "Context text"}]
-                                       :tool-defs [{:name "read" :description "Read"}
-                                                   {:name "bash" :description "Bash"}
-                                                   {:name "psi-tool" :description "Psi tool"}]
+                                       :tool-defs parent-tool-defs
                                        :selected-tools ["read" "bash" "psi-tool"]}
             :base-system-prompt "parent-base"
             :system-prompt "parent-system"})
           overrides)))
 
 (defn- root-state-with-parent-skills
+  "Build a root-state with parent session data, an agent-ctx holding tool-source,
+   and registered skills."
   [parent-sd skills]
   (reduce (fn [root-state skill]
             (:root-state (skill-storage/register-skill-in-root-state root-state (:session-id parent-sd) skill)))
-          {:agent-session {:sessions {(:session-id parent-sd) {:data parent-sd}}}
+          {:agent-session {:sessions {(:session-id parent-sd)
+                                      {:data parent-sd
+                                       :agent-ctx {:data-atom (atom {:tools parent-tool-defs})}}}}
            :root-registries {:prompt-contributions {:entries-by-id {"ext-a" {:id "ext-a"
                                                                              :extension-id "/ext/a"
                                                                              :value {:id "ext-a"
@@ -91,14 +95,21 @@
       (is (= #{:system :tools} (:cache-breakpoints child-sd)))
       (is (= [{:id "ext-a" :ext-path "/ext/a" :section "Ext" :content "A" :enabled true}]
              (:prompt-contributions child-sd)))
-      (is (= {:provider "prov" :id "m"} (:model child-sd))))))
+      (is (= {:provider "prov" :id "m"} (:model child-sd))))
+
+    (testing ":tool-defs and :active-tools are not in session state"
+      (is (not (contains? child-sd :tool-defs)))
+      (is (not (contains? child-sd :active-tools))))))
 
 (deftest child-session-base-state-fallback-precedence-test
   (testing "explicit system prompt wins and becomes base prompt"
     (let [parent-sd (parent-session-data {:base-system-prompt "parent-base"
                                           :system-prompt "parent-system"})
+          root-state {:agent-session {:sessions {(:session-id parent-sd)
+                                                 {:data parent-sd
+                                                  :agent-ctx {:data-atom (atom {:tools parent-tool-defs})}}}}}
           child-sd (child-session-state/child-session-base-state
-                    {:agent-session {:sessions {(:session-id parent-sd) {:data parent-sd}}}}
+                    root-state
                     parent-sd
                     {:child-session-id "child-2"
                      :system-prompt "explicit prompt"})]
@@ -109,11 +120,14 @@
     (with-redefs [system-prompt/build-system-prompt (constantly nil)]
       (let [parent-sd (parent-session-data {:base-system-prompt "parent-base"
                                             :system-prompt "parent-system"})
+            root-state {:agent-session {:sessions {(:session-id parent-sd)
+                                                   {:data parent-sd
+                                                    :agent-ctx {:data-atom (atom {:tools parent-tool-defs})}}}}}
             child-sd (child-session-state/child-session-base-state
-                      {:agent-session {:sessions {(:session-id parent-sd) {:data parent-sd}}}}
+                      root-state
                       parent-sd
                       {:child-session-id "child-3"
-                       :tool-defs []
+                       :tool-ids []
                        :skills []})]
         (is (= "parent-base" (:base-system-prompt child-sd)))
         (is (= "parent-base" (:system-prompt child-sd)))))))
@@ -143,8 +157,8 @@
                     :include-runtime-metadata? false)
              (:prompt-component-selection child-sd))))
 
-    (testing "prompt-visible tools are filtered coherently"
-      (is (= ["read"] (mapv :name (:tool-defs child-sd)))))
+    (testing "child tool-ids are filtered by selection"
+      (is (= ["read"] (:tool-ids child-sd))))
 
     (testing "skills are filtered coherently"
       (is (= ["skill-a"] (:skill-ids child-sd)))
@@ -178,46 +192,44 @@
            (.indexOf (:base-system-prompt child-sd) "z-skill")))))
 
 (deftest child-session-base-state-temperature-test
-  (testing "non-nil temperature is stored in child session state"
-    (let [parent-sd (parent-session-data)
-          child-sd (child-session-state/child-session-base-state
-                    {:agent-session {:sessions {(:session-id parent-sd) {:data parent-sd}}}}
-                    parent-sd
-                    {:child-session-id "child-temp-1"
-                     :temperature 0.7})]
-      (is (= 0.7 (:temperature child-sd)))))
+  (let [parent-sd (parent-session-data)
+        root-state {:agent-session {:sessions {(:session-id parent-sd)
+                                               {:data parent-sd
+                                                :agent-ctx {:data-atom (atom {:tools parent-tool-defs})}}}}}]
+    (testing "non-nil temperature is stored in child session state"
+      (let [child-sd (child-session-state/child-session-base-state
+                      root-state parent-sd
+                      {:child-session-id "child-temp-1"
+                       :temperature 0.7})]
+        (is (= 0.7 (:temperature child-sd)))))
 
-  (testing "explicit 0.0 temperature is stored (falsy double must flow through)"
-    (let [parent-sd (parent-session-data)
-          child-sd (child-session-state/child-session-base-state
-                    {:agent-session {:sessions {(:session-id parent-sd) {:data parent-sd}}}}
-                    parent-sd
-                    {:child-session-id "child-temp-2"
-                     :temperature 0.0})]
-      (is (= 0.0 (:temperature child-sd)))
-      (is (contains? child-sd :temperature))))
+    (testing "explicit 0.0 temperature is stored (falsy double must flow through)"
+      (let [child-sd (child-session-state/child-session-base-state
+                      root-state parent-sd
+                      {:child-session-id "child-temp-2"
+                       :temperature 0.0})]
+        (is (= 0.0 (:temperature child-sd)))
+        (is (contains? child-sd :temperature))))
 
-  (testing "nil temperature is absent from child session state"
-    (let [parent-sd (parent-session-data)
-          child-sd (child-session-state/child-session-base-state
-                    {:agent-session {:sessions {(:session-id parent-sd) {:data parent-sd}}}}
-                    parent-sd
-                    {:child-session-id "child-temp-3"
-                     :temperature nil})]
-      (is (not (contains? child-sd :temperature)))))
+    (testing "nil temperature is absent from child session state"
+      (let [child-sd (child-session-state/child-session-base-state
+                      root-state parent-sd
+                      {:child-session-id "child-temp-3"
+                       :temperature nil})]
+        (is (not (contains? child-sd :temperature)))))
 
-  (testing "absent temperature key leaves temperature absent from child session state"
-    (let [parent-sd (parent-session-data)
-          child-sd (child-session-state/child-session-base-state
-                    {:agent-session {:sessions {(:session-id parent-sd) {:data parent-sd}}}}
-                    parent-sd
-                    {:child-session-id "child-temp-4"})]
-      (is (not (contains? child-sd :temperature))))))
+    (testing "absent temperature key leaves temperature absent from child session state"
+      (let [child-sd (child-session-state/child-session-base-state
+                      root-state parent-sd
+                      {:child-session-id "child-temp-4"})]
+        (is (not (contains? child-sd :temperature)))))))
 
 (deftest initialize-child-session-state-initializes-persistence-slots-test
   (let [messages [{:role "user" :content [{:type :text :text "hello"}]}]
         parent-sd (parent-session-data)
-        state0 {:agent-session {:sessions {(:session-id parent-sd) {:data parent-sd}}}}
+        state0 {:agent-session {:sessions {(:session-id parent-sd)
+                                           {:data parent-sd
+                                            :agent-ctx {:data-atom (atom {:tools parent-tool-defs})}}}}}
         state1   (child-session-state/initialize-child-session-state
                   state0
                   parent-sd
@@ -240,6 +252,7 @@
              (get-in state1 [:agent-session :sessions "child-5" :telemetry]))))))
 
 (deftest child-session-tool-ids-coherence-test
+  ;; Verifies :tool-ids is correctly derived from parent tool-source
   (let [parent-sd  (parent-session-data)
         root-state (root-state-with-parent-skills
                     parent-sd
@@ -247,24 +260,20 @@
                       :file-path "/s/SKILL.md" :base-dir "/s"
                       :source :user :disable-model-invocation false}])]
 
-    (testing "default inheritance: child tool-ids derived from parent tool-defs"
+    (testing "default inheritance: child tool-ids derived from parent tool-ids"
       (let [child-sd (child-session-state/child-session-base-state
                       root-state parent-sd
                       {:child-session-id "child-tool-ids-1"})]
-        (is (= ["read" "bash" "psi-tool"] (:tool-ids child-sd)))
-        (is (= (mapv :name (:tool-defs child-sd)) (:tool-ids child-sd)))))
+        (is (= ["read" "bash" "psi-tool"] (:tool-ids child-sd)))))
 
-    (testing "explicit tool-defs override: child tool-ids derived from override"
-      (let [override-tools [{:name "write" :description "Write"}
-                            {:name "edit" :description "Edit"}]
-            child-sd (child-session-state/child-session-base-state
+    (testing "explicit tool-ids override: child tool-ids derived from override"
+      (let [child-sd (child-session-state/child-session-base-state
                       root-state parent-sd
                       {:child-session-id "child-tool-ids-2"
-                       :tool-defs override-tools})]
-        (is (= ["write" "edit"] (:tool-ids child-sd)))
-        (is (= (mapv :name (:tool-defs child-sd)) (:tool-ids child-sd)))))
+                       :tool-ids ["bash" "read"]})]
+        (is (= ["bash" "read"] (:tool-ids child-sd)))))
 
-    (testing "prompt-component-selection filtering: child tool-ids matches filtered tool-defs"
+    (testing "prompt-component-selection filtering: child tool-ids matches filtered set"
       (let [selection {:agents-md? false
                        :extension-prompt-contributions []
                        :tool-names ["bash"]
@@ -274,5 +283,4 @@
                       root-state parent-sd
                       {:child-session-id "child-tool-ids-3"
                        :prompt-component-selection selection})]
-        (is (= ["bash"] (:tool-ids child-sd)))
-        (is (= (mapv :name (:tool-defs child-sd)) (:tool-ids child-sd)))))))
+        (is (= ["bash"] (:tool-ids child-sd)))))))

@@ -432,8 +432,11 @@
                            [s _ _] (workflow-runtime/create-run s {:definition-id "planner"
                                                                    :run-id "run-ext-1"
                                                                    :workflow-input {:input "plan it"}})
-                           s (assoc-in s [:agent-session :sessions session-id :data :tool-defs]
-                                       [{:name "read" :description "Read" :parameters {:type "object" :properties {}}}])
+                           s (assoc-in s [:agent-session :sessions session-id :data :tool-ids]
+                                       ["read"])
+                           ;; Set tool-source in agent data-atom for resolve-tool-defs
+                           _ (swap! (get-in s [:agent-session :sessions session-id :agent-ctx :data-atom])
+                                    assoc :tools [{:name "read" :description "Read" :parameters {:type "object" :properties {}}}])
                            s (assoc-in s [:agent-session :sessions session-id :data :system-prompt-build-opts]
                                        {:selected-tools ["read" "psi-tool"]})
                            s (assoc-in s [:agent-session :sessions session-id :data :prompt-contribution-ids]
@@ -485,9 +488,12 @@
                                   :disable-model-invocation false}
                            s (:root-state (skill-storage/set-skills-in-root-state s session-id [skill]))]
                        (-> s
-                           (assoc-in [:agent-session :sessions session-id :data :tool-defs]
-                                     [{:name "read" :description "Read"}
-                                      {:name "bash" :description "Bash"}])
+                           (assoc-in [:agent-session :sessions session-id :data :tool-ids]
+                                     ["read" "bash"])
+                           ;; Set tool-source in agent data-atom for resolve-tool-defs
+                           (update-in [:agent-session :sessions session-id :agent-ctx :data-atom]
+                                      (fn [a] (swap! a assoc :tools [{:name "read" :description "Read" :parameters {:type "object" :properties {}}}
+                                                                     {:name "bash" :description "Bash" :parameters {:type "object" :properties {}}}]) a))
                            (assoc-in [:agent-session :sessions session-id :data :prompt-contribution-ids]
                                      ["a"])
                            (assoc-in [:agent-session :sessions session-id :data :prompt-contributions]
@@ -520,7 +526,7 @@
                          :user-message {:role "user"
                                         :content [{:type :text :text "plan it"}]}})]
           (is (= :completed (:status result)))
-          (is (= ["read"] (mapv :name (:tool-defs child-sd))))
+          (is (= ["read"] (:tool-ids child-sd)))
           (is (= ["testing-best-practices"] (:skill-ids child-sd)))
           (is (= {:agents-md? false
                   :extension-prompt-contributions []

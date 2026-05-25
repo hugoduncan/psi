@@ -62,7 +62,7 @@
           :workflow-step-id step-id
           :attempt-id attempt-id
           :session-name (str step-id " attempt " attempt-id)
-          :tool-defs []
+          :tool-ids []
           :thinking-level :off})]
     (swap! (:state* ctx)
            (fn [state]
@@ -90,7 +90,7 @@
                                                :message-history []
                                                :is-streaming false
                                                :tool-results []
-                                               :tool-defs []
+                                               :tool-ids []
                                                :skills []
                                                :thinking-level :off
                                                :cwd "/tmp"
@@ -167,7 +167,7 @@
                                                :message-history []
                                                :is-streaming false
                                                :tool-results []
-                                               :tool-defs []
+                                               :tool-ids []
                                                :skills []
                                                :thinking-level :off
                                                :cwd "/tmp"

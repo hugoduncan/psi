@@ -161,7 +161,7 @@
                     vec)))
         (is (= {:session-name               "auto-session-name"
                 :system-prompt              "Infer a concise session title from the supplied conversation excerpt. Return title text only. No explanation. No quotes. No markdown."
-                :tool-defs                  []
+                :tool-ids                   []
                 :thinking-level             :off
                 :prompt-component-selection {:agents-md? false
                                              :extension-prompt-contributions []
@@ -175,7 +175,7 @@
                                            (= op 'psi.extension/create-child-session))
                                   (select-keys params [:session-name
                                                        :system-prompt
-                                                       :tool-defs
+                                                       :tool-ids
                                                        :thinking-level
                                                        :prompt-component-selection
                                                        :cache-breakpoints]))))

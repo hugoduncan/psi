@@ -13,7 +13,7 @@
                           :skill-ids ["s"]
                           :prompt-contribution-ids ["p2" "p1"]
                           :prompt-contributions [{:id "stale" :content "stale"}]
-                          :tool-defs [{:name "bash"}])
+                          :tool-ids ["bash"])
         state0     {:root-registries {:prompt-contributions {:entries-by-id {"p1" {:id "p1"
                                                                                    :extension-id "/ext/a"
                                                                                    :value {:id "p1" :ext-path "/ext/a" :section "A" :content "First" :enabled true}}
@@ -43,7 +43,7 @@
               {:id "p2" :ext-path "/ext/b" :section "B" :content "Second" :enabled true}]
              (prompt-storage/list-contributions state1 sd1)))
       (is (nil? (:skills sd1)))
-      (is (= [{:name "bash"}] (:tool-defs sd1))))
+      (is (= ["bash"] (:tool-ids sd1))))
     (testing "journal, telemetry, and flush slots are initialized"
       (let [persistence (get-in state1 [:agent-session :sessions "child-1" :persistence])]
         (is (= [] (:journal persistence)))

@@ -310,7 +310,7 @@
                                                                               :developer-prompt "dev layer"
                                                                               :developer-prompt-source :explicit
                                                                               :skills [{:name "test-skill" :description "d"}]
-                                                                              :tool-defs [{:name "read" :description "Read" :parameters {:type "object"}}]
+                                                                              :tool-ids ["read"]
                                                                               :prompt-component-selection {:tool-names ["read"]}
                                                                               :preloaded-messages [{:role "user"
                                                                                                     :content [{:type :text :text "seed"}]

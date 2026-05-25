@@ -98,8 +98,8 @@
                             {})
           {:keys [ctx]} result
           session-id (-> (ss/list-context-sessions-in ctx) first :session-id)
-          tool-names (set (map :name (:tool-defs (ss/get-session-data-in ctx session-id))))]
-      (is (contains? tool-names "edit-clj")))))
+          tool-ids (set (:tool-ids (ss/get-session-data-in ctx session-id)))]
+      (is (contains? tool-ids "edit-clj")))))
 
 (deftest startup-manifest-extension-tools-appear-in-final-system-prompt-test
   (testing "bootstrap startup rebuilds the final system prompt from refreshed session tool defs"
@@ -139,9 +139,9 @@
                             {})
           {:keys [ctx summary]} result
           session-id (-> (ss/list-context-sessions-in ctx) first :session-id)
-          tool-names (set (map :name (:tool-defs (ss/get-session-data-in ctx session-id))))]
+          tool-ids (set (:tool-ids (ss/get-session-data-in ctx session-id)))]
       (is (= 1 (:extension-loaded-count summary)))
-      (is (contains? tool-names "startup-local-tool")))))
+      (is (contains? tool-ids "startup-local-tool")))))
 
 (deftest startup-loads-non-local-manifest-extension-via-init-var-test
   (testing "bootstrap startup loads non-local manifest extensions through :psi/init"

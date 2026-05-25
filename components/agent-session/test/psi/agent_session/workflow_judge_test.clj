@@ -47,12 +47,12 @@
           (is (= "APPROVED" (:judge-output result)))
           (is (= "APPROVED" (:judge-event result)))
           (is (= {:action :complete} (:routing-result result)))
-          (is (= [] (:tool-defs (first @created-sessions*))))
+          (is (= [] (:tool-ids (first @created-sessions*))))
           (is (= "You are a judge." (:system-prompt (first @created-sessions*))))
           (is (= {:child-session-id (:child-session-id (first @created-sessions*))
                   :session-name "workflow judge"
                   :system-prompt "You are a judge."
-                  :tool-defs []
+                  :tool-ids []
                   :thinking-level :off
                   :preloaded-messages [{:role "user" :content "Build it"}
                                        {:role "assistant" :content [{:type :text :text "Done building."}]}]

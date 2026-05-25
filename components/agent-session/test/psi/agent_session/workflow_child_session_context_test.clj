@@ -31,7 +31,7 @@
                    :response-mode :non-streaming
                    :logprobs true
                    :top-logprobs 4
-                   :tool-defs []
+                   :tool-ids []
                    :thinking-level :off
                    :model {:provider "openai" :id "gpt-5"}
                    :skills []
@@ -73,7 +73,7 @@
           request {:child-session-id child-session-id
                    :session-name "workflow judge"
                    :system-prompt "judge system"
-                   :tool-defs []
+                   :tool-ids []
                    :thinking-level :off
                    :preloaded-messages [{:role "user" :content "judge this"}]
                    :workflow-owned? true}
@@ -101,7 +101,7 @@
                 parent-session-id
                 {:child-session-id "bad-child"
                  :session-name "workflow child"
-                 :tool-defs :not-a-vector
+                 :tool-ids :not-a-vector
                  :thinking-level :off})
                nil
                (catch clojure.lang.ExceptionInfo ex
