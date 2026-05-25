@@ -71,7 +71,6 @@ A single derivation function must exist to resolve `tool-ids → tool definition
 | Location | Current use | Migration path |
 |----------|-------------|----------------|
 | `child_session_state.clj` | Resolve child tool-defs from parent | Derive from parent `:tool-ids` via `resolve-tool-defs` with tool-source from runtime agent data |
-| `context.clj:134` | Pass tool-defs to context builder | Derive from `:tool-ids` via `resolve-tool-defs` |
 | `prompt_handlers.clj:45-55` | Live tool-defs for prompt | Derive from `:tool-ids` via `resolve-tool-defs` |
 | `session_mutations.clj:512` | `:session/add-tool` reads current defs | Derive from `:tool-ids` via `resolve-tool-defs`, append new |
 | `prompt_request.clj:284` | Filter tool-defs for system prompt | Derive from `:tool-ids` via `resolve-tool-defs` |
@@ -80,12 +79,9 @@ A single derivation function must exist to resolve `tool-ids → tool definition
 | `scheduler_runtime.clj:44` | Tool count | `(count (:tool-ids ...))` |
 | `session_runtime.clj:38` | Runtime tool list | Derive from `:tool-ids` via `resolve-tool-defs` |
 | `app_runtime.clj:364,468` | Session start / refresh | Derive at boundary |
-| `system_prompt.clj:391-392` | Prompt assembly input | Accept derived defs, not session field |
 | `session_state/init.clj` | Lifecycle select-keys | Remove |
 | `session_state/model.clj` | Schema + defaults | Remove |
-| `workflow_runtime/attempts.clj:70` | Step tool-defs | Derive from `:tool-ids` via `resolve-tool-defs` |
-| `workflow_runtime/statechart_runtime.clj:90` | Step config | Derive from `:tool-ids` via `resolve-tool-defs` |
-| `workflow_step_session_config/core.clj:166,196` | Resolve step tools | Derive from `:tool-ids` via `resolve-tool-defs` |
+| `workflow_step_session_config/core.clj:166,196` | Reads parent session `:tool-defs` to resolve step tools | Read parent `:tool-ids` instead; derive tool-defs via `resolve-tool-defs` with tool-source from runtime agent data. Step-config continues to output `:tool-defs` (derived maps) — downstream pass-throughs unchanged. |
 
 ### :tool-defs — dispatch event/contract fields
 
@@ -97,6 +93,7 @@ These consumers use `:tool-defs` as a dispatch event parameter or contract field
 | `mutations/session.clj:89` | Passes `:tool-defs` as dispatch event param to `:session/create-child` | Pass `:tool-ids` instead; callers (extension `create-child-session`) provide `:tool-ids` |
 | `workflow_judge.clj:61` | Passes `:tool-defs []` in child-session creation map | Pass `:tool-ids []` instead |
 | `child_session_contract.clj:15` | Contract schema has `[:tool-defs {:optional true} [:maybe [:vector :map]]]` | Replace with `[:tool-ids {:optional true} [:maybe [:vector :string]]]` |
+| `context.clj:134` | Destructures `:tool-defs` from validated contract request and passes to `:session/create-child` dispatch event | Pass `:tool-ids` instead of `:tool-defs`; upstream callers provide `:tool-ids` |
 | `auto_session_name.clj:224` | Extension passes `:tool-defs []` to `psi.extension/create-child-session` | Pass `:tool-ids []` instead |
 
 ## Design decisions
@@ -114,6 +111,15 @@ Task 179 introduced `tool-authority-fields` as the single derivation site return
 - `derive-child-prompt-state`: `(assoc result :tool-ids (mapv :name resolved-tool-defs))`
 
 The `merge` pattern in callers changes to a direct `assoc :tool-ids` — simpler and explicit.
+
+### Step-config output: `:tool-defs` (derived maps)
+
+`workflow_step_session_config/core.clj:196` reads `:tool-defs` from the parent session and resolves step-specific tools via `resolve-step-tool-defs`. After migration, it reads `:tool-ids` from the parent session and derives tool-defs via `resolve-tool-defs` with a tool-source from the runtime agent data. The step-config map continues to output `:tool-defs` (derived full maps) — this is a local data structure, not session state. Downstream `statechart_runtime.clj:90` and `attempts.clj:70` are pass-throughs of step-config and do not need migration.
+
+### Removed from consumer table
+
+- `workflow_runtime/attempts.clj:70` and `workflow_runtime/statechart_runtime.clj:90` — pass-throughs of step-config `:tool-defs`, not session-state reads. No migration needed.
+- `system_prompt.clj:391-392` — parameter docstring describing the `:tool-defs` input to `build-system-prompt`. Not a session-state read. The callers that pass tool-defs to this function are already listed separately.
 
 ## Acceptance criteria
 

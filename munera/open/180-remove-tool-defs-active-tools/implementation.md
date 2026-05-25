@@ -31,3 +31,13 @@
   3. **Step-config output field unspecified**: `workflow_step_session_config/core.clj:196` outputs `:tool-defs` in the step-config map. The design says to "Derive from `:tool-ids` via `resolve-tool-defs`" for this consumer, but doesn't specify what the step-config *outputs* after migration. If it outputs derived `:tool-defs` (maps), then downstream `statechart_runtime.clj:90` and `attempts.clj:70` don't need migration and shouldn't be in the consumer table. If it outputs `:tool-ids` (strings), then the whole downstream chain must change, and the child-session contract boundary must resolve tool-defs. The current design is internally inconsistent because it applies "derive via `resolve-tool-defs`" uniformly to all three, but the chain only needs one derivation point.
 
   4. **`system_prompt.clj:391-392` is not a consumer**: Listed as a session-state read site, but these lines are parameter documentation in the `build-system-prompt` function's docstring. The function already accepts `:tool-defs` as an input parameter — it doesn't read session state. Only the *callers* (e.g. `prompt_handlers.clj:55`) need to change what they pass. This entry should be removed from the consumer table — the callers are already listed separately.
+
+- 2026-05-25 ψ inconsistency follow-up: resolved all four inconsistencies in design.md.
+
+  1. **`context.clj:134` reclassified → resolved**: Moved from session-state read sites table to dispatch event/contract fields table. Migration path: "Pass `:tool-ids` instead of `:tool-defs`; upstream callers provide `:tool-ids`".
+
+  2. **`attempts.clj:70` and `statechart_runtime.clj:90` removed → resolved**: These are pass-throughs of step-config `:tool-defs` (a local data structure), not session-state reads. Removed from consumer table. Documented in "Removed from consumer table" design decision.
+
+  3. **Step-config output field decided → resolved**: `workflow_step_session_config/core.clj:196` outputs `:tool-defs` (derived full maps) in step-config. After migration, it reads parent `:tool-ids` and derives via `resolve-tool-defs`. Step-config continues to output `:tool-defs` — downstream pass-throughs unchanged. Added "Step-config output" design decision. Updated `workflow_step_session_config/core.clj:166,196` migration path in session-state table.
+
+  4. **`system_prompt.clj:391-392` removed → resolved**: Removed from consumer table — it's a docstring, not a session-state read. Documented in "Removed from consumer table" design decision.
