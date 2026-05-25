@@ -70,6 +70,14 @@
 
   2. **`prompt_request.clj:279` deduplication → resolved**: Removed the duplicate entry from step 4 ("Remove fields from schema, lifecycle, and helpers"). The migration lives in step 2 ("Migrate session-state read sites") where it belongs — it's a session-state read site, not a schema/lifecycle concern.
 
+- 2026-05-25 ψ plan/steps implementation review: two cleanup items found.
+
+  1. **Stale `:tool-defs` in test fixtures**: 8+ `valid-child-session` mock helpers across workflow test files (`workflow_execution_test_support.clj:76`, `workflow_execution_terminal_contract_test.clj:27`, `workflow_invoke_runtime_test.clj:59`, `workflow_resolvers_test.clj:55`, `workflow_attempts_test.clj:34,66`, `workflow_delegate_example_execution_test.clj:28`, `workflow_runtime/terminal_contract_execution_test.clj:27`, `workflow_runtime/ir_runtime_adoption_test.clj:52`) contain `:tool-defs []` in mock session data. Real session state no longer contains this key. Harmless (extra map key) but misleading for future readers and inconsistent with AC 1's intent.
+
+  2. **Dead code: `agent-core-tools`/`agent-core-tool`**: After `dispatch_effects.clj` was changed to pass full tool maps (`vec (:tool-maps effect)`) instead of projected maps (`agent-core-tools`), the `agent-core-tools` function in `tool_registry/defs.clj` and its re-export in `agent_session/tool_defs.clj` are no longer called from production code. Only one test (`tool_defs_test.clj:11`) references the re-export for identity checking.
+
+  Plan/steps quality: steps accurately describe what was done; all ACs met; all tests green. Plan.md has one stale reference (mentions `tool-authority-fields` as co-located, but it was removed) — cosmetic only.
+
 - 2026-05-25 ψ implementation: all four steps completed and all tests green.
 
   Implementation commits:

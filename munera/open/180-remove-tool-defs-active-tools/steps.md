@@ -45,3 +45,12 @@
   - Child session mutation tests — dispatch `:session/set-active-tools` on parent before creating child sessions.
   - Committed: `283a6299`
   - Full `bb test` green.
+
+- [ ] **Remove stale `:tool-defs` from test fixtures**
+  - Remove `:tool-defs []` from `valid-child-session` mock helpers in: `workflow_execution_test_support.clj`, `workflow_execution_terminal_contract_test.clj`, `workflow_invoke_runtime_test.clj`, `workflow_resolvers_test.clj`, `workflow_attempts_test.clj` (2 sites), `workflow_delegate_example_execution_test.clj`, `workflow_runtime/terminal_contract_execution_test.clj`, `workflow_runtime/ir_runtime_adoption_test.clj`.
+
+- [ ] **Remove dead `agent-core-tools` code**
+  - Remove `agent-core-tool` and `agent-core-tools` from `tool_registry/defs.clj`.
+  - Remove re-exports from `agent_session/tool_defs.clj`.
+  - Remove identity test from `tool_defs_test.clj`.
+  - Remove `agent-core-tool-projection-test` from `defs_test.clj` if it only tests the removed function.
