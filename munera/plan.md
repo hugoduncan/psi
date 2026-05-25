@@ -27,7 +27,7 @@ Backlog:
 `munera/open/167-emacs-tool-details-show-full-call/`
 `munera/open/168-workflow-structured-output-schemas/`
 `munera/open/170-workflow-provider-native-structured-output/`
-`munera/open/172-emacs-command-move-point-to-prompt-end/`
+`munera/open/178-registry-session-membership-unification/`
 
 Notes:
 
@@ -61,4 +61,5 @@ Notes:
 - `168` is complete and closed: tool-registry migrated onto root-registry storage; higher extension-detail projections now read canonical tool-registry data rather than legacy extension-local tool state.
 - `169` is complete and closed: workflow-registry migrated onto root-registry storage while preserving canonical compatibility path `[:workflows :definitions]`; higher semantic seams route through workflow-registry.
 - `176` is complete and closed: prompt-registry now uses canonical string-coerced single-id identity, same-owner duplicate registration replaces, cross-owner same-id registration throws explicit ownership conflict, update/unregister target by `id` with `ext-path` only as ownership assertion when supplied, nullable extension test helpers store canonical single-id keys, and prompt-contribution projections use shared canonical ordering; focused tests + targeted lint passed and later review loops found no actionable feedback.
+- `177` is complete and closed: prompt-registry prompt contributions now live in shared `root-registry` storage via the prompt-registry root-storage adapter; sessions own canonical `:prompt-contribution-ids` membership while session-local `:prompt-contributions` vectors are derived compatibility projection only; prompt read/introspection/workflow/bootstrap/nullable-helper seams were migrated to root-backed authority, lifecycle inheritance proofs were reshaped around membership + root-backed reads, targeted lint passed, and full `bb test` was green before close.
 - Close or replace tasks as scope sharpens; do not merge task contents.

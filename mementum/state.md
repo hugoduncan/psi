@@ -15,7 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
-- Registry unification arc through task 176 is complete in implementation/review terms:
+- Registry unification arc through task 177 is complete in implementation/review terms:
   - 164: registry semantics audit is the migration-rules source of truth and now includes post-migration guidance from 169–173
   - 165: root-registry target architecture captured
   - 166: standalone `root-registry` component built
@@ -28,6 +28,7 @@ Bootstrapped on 2026-04-02.
   - 173: skill registration-order semantics removed; registry/projection/model-visible skill-list surfaces use canonical exact skill-name ordering while duplicate-ignore and `:added?` / `:changed?` remain preserved
   - 174: skill-registry migrated to adapter-backed root-registry storage; canonical skill definitions now live in `root-registry` while sessions own membership through `:skill-ids`
   - 176: prompt-registry simplified toward root-registry semantics — canonical identity is now string-coerced `id` alone, cross-owner same-id coexistence is disallowed via explicit ownership conflict, and higher prompt-contribution projections were aligned to shared canonical ordering
+  - 177: prompt-registry migrated onto shared `root-registry` storage via `prompt-registry.root-storage`; sessions now own canonical prompt membership through `:prompt-contribution-ids`, while `:prompt-contributions` vectors remain derived compatibility projection only across new/resume/fork/child flows and higher read/introspection seams
 - Bootstrap simplification arc (159–163) complete:
   - 159: in-process bootstrap simplification
   - 160: removed mutation-mediated bootstrap resource loading
@@ -42,21 +43,23 @@ Bootstrapped on 2026-04-02.
 
 ## Test health
 
+- `bb test` is green after closing task 177.
 - `bb test` was green after closing task 173.
 - Focused registry/projection tests passed during tasks 169–173.
 - Task 176 recorded focused prompt-registry / projection verification passing:
   - `clojure -M:test --focus psi.prompt-registry.contributions-test --focus psi.agent-session.query-graph-tools-test --focus psi.agent-session.model-dispatch-test`
   - `clj-kondo --lint components/prompt-registry/src components/prompt-registry/test components/agent-session/src components/agent-session/test components/extension-test-helpers/src`
 - Task 176 review loops (implementation review, test review, test-shaper, code-shaper) recorded no new actionable feedback.
+- Task 177 recorded focused prompt/session/workflow/nullable-helper verification, targeted lint, and a final full `bb test` pass before close.
+- Tasks 176 and 177 review loops (implementation review, test review, test-shaper, code-shaper) recorded no new actionable feedback.
 - Focused structured-output/model tests passed during tasks 169 and 171.
 - Task 170 follow-up verification recorded focused workflow tests green for structured-output envelope propagation and failure-surface behavior.
 - Task 158 addressed persistence test garbage (still open but test-review showed no actionable feedback).
 
 ## Suggested next step
-- Registry unification arc: use task `164-registry-semantics-unification-audit` plus completed outcomes through `176` to choose the next cleanup target.
+- Registry unification arc: use task `164-registry-semantics-unification-audit` plus completed outcomes through `177` to choose the next cleanup target.
 - Likely next registry cleanup candidates:
-  - close or move task `176-prompt-registry-single-id-identity` once its Munera state matches the completed implementation/review outcome
-  - create the follow-on prompt-registry root-registry migration task now that prompt identity matches single-id ownership semantics more closely
+  - close or move any remaining Munera tasks whose implementation/review state is already complete
   - `skill-registry` shared-substrate/helper cleanup, now that insertion order is no longer semantic
   - prompt-registry normalization/shared collection-helper audit
   - remaining root-registry adopter polish if `164` identifies unresolved seams
@@ -210,3 +213,4 @@ Bootstrapped on 2026-04-02.
 - 2026-05-24: task 176 implementation completed and review loops recorded no actionable follow-up: prompt-registry helpers, lower dispatch/mutation seams, test helpers, and higher prompt-contribution projections now align to the single-id contract and shared canonical ordering. Focused prompt-registry / projection tests and targeted lint passed.
 - 2026-05-24: task 177 follow-up execution used the preloaded review result and found no newly added unchecked actionable `steps.md` items; recorded a no-op execution pass in the task `implementation.md` and left task steps unchanged.
 - 2026-05-24: task 177 later follow-up execution re-checked the preloaded review result plus current task artifacts and again found no newly added unchecked actionable `steps.md` items; recorded another no-op execution pass and left checklist state unchanged.
+- 2026-05-24: task 177 is now closed in Munera. The task directory moved to `munera/closed/`, `munera/plan.md` now records the completed prompt-registry root-registry migration, and `mementum/state.md` was updated to reflect prompt-registry root-backed authority plus a green post-close `bb test`.
