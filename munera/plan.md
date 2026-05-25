@@ -28,7 +28,6 @@ Backlog:
 `munera/open/168-workflow-structured-output-schemas/`
 `munera/open/170-workflow-provider-native-structured-output/`
 `munera/open/178-registry-session-membership-unification/`
-`munera/open/179-tool-membership-authority-introduction/`
 
 Notes:
 
