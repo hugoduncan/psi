@@ -62,17 +62,6 @@
   [tools]
   (mapv normalize-tool-def (filter map? (or tools []))))
 
-(defn tool-authority-fields
-  "Given normalized tool-defs, return the complete set of authority and derived
-   session fields: `:tool-ids` (authority), `:active-tools` (derived set),
-   `:tool-defs` (derived payload). Ensures the derivation invariant is defined
-   once — callers always get the complete field set or nothing."
-  [normalized-defs]
-  (let [ids (mapv :name normalized-defs)]
-    {:tool-ids     ids
-     :active-tools (set ids)
-     :tool-defs    normalized-defs}))
-
 (defn resolve-tool-defs
   "Resolve tool-ids to tool definition maps from a tool-source collection.
    Filters tool-source to only those tools whose `:name` is in tool-ids,
