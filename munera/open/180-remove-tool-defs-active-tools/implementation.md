@@ -92,6 +92,14 @@
   - **Nil vs empty tool-ids in `attempts.clj`**: changed `(mapv :name (or tool-defs []))` to `(when tool-defs (mapv :name tool-defs))` to preserve nil when the step config has no tools. This allows `child_session_state.clj` to fall back to the parent's `:tool-ids` via `(or tool-ids (:tool-ids parent-sd))`.
   - **Test setup**: child session mutation tests now dispatch `:session/set-active-tools` on the parent session before creating child sessions, so the parent's agent-core has tools available for `resolve-tool-defs`.
 
+- 2026-05-25 ψ test review (task-test-review skill):
+
+  **Overall**: Tests are well-formed, cover all design behaviours, and use real implementations (no mocks/stubs for core logic). All ACs are tested. One minor gap noted.
+
+  1. **Minor gap — scheduler delivery with tool-ids**: `scheduler_handlers_test.clj` creates a `:kind :session` schedule with `:tool-ids ["read"]` and verifies `:tool-count 1` in the summary, but the delivery test that exercises `scheduled-session-config-dispatches` → `resolve-tool-defs` → `:session/set-active-tools` uses a simple config without `:tool-ids`. The composed path works (each piece is individually tested), but there's no single test that exercises the full scheduler-session-delivery-with-tool-ids flow end-to-end.
+
+  **Verdict**: No critical issues. The minor gap is acceptable given the compositional testing strategy — each unit (`resolve-tool-defs`, `set-active-tools` handler, scheduler create/deliver) is well-tested independently.
+
 - 2026-05-25 ψ cleanup: completed both review follow-up items.
 
   1. **Stale `:tool-defs` in test fixtures → resolved**: Removed `:tool-defs []` from 6 mock session data helpers. Left `:tool-defs []` in `workflow_resolvers_test.clj:55` and `workflow_attempts_test.clj:34,66` — these are step-config inputs to `create-step-attempt-session!` which still accepts `:tool-defs` from step-config by design (the function converts to `:tool-ids` internally at line 70).
