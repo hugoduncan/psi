@@ -10,3 +10,5 @@
 - [x] Add focused verification for authority-first direct mutation and child-session compatibility normalization.
   - `psi.session-state.tool-authority-test`: schema, lifecycle propagation (new/resume/fork)
   - `psi.agent-session.tool-authority-handlers-test`: set-active-tools, add-tool authority behavior
+- [ ] Fix child-session `:tool-ids` coherence: `derive-child-prompt-state` in `child_session_state.clj` must return `:tool-ids (mapv :name resolved-tool-defs)` alongside `:tool-defs`, and `child-session-base-state*` must include `:tool-ids` in the child session-data map (matching the existing `:skill-ids` pattern).
+- [ ] Add child-session `:tool-ids` test coverage: assert `:tool-ids` coherence with `:tool-defs` in `child_session_state_test.clj` for default inheritance, explicit `:tool-defs` override, and prompt-component-selection filtering paths.
