@@ -110,16 +110,13 @@
 (deftest add-tool-persists-tool-ids-test
   ;; :session/add-tool must derive/persist :tool-ids when adding a new tool
   (testing "add-tool appends new tool name to :tool-ids"
-    (let [;; Provide a real agent-ctx with a data-atom containing current tools
-          agent-data-atom (atom {:tools [{:name "bash" :description "B"}
-                                         {:name "read" :description "R"}]})
-          session-data    (atom {:agent-session
+    (let [session-data    (atom {:agent-session
                                  {:sessions
                                   {"s1" {:data {:session-id "s1"
                                                 :tool-ids ["bash" "read"]
                                                 :active-tools #{"bash" "read"}
-                                                :tool-defs [{:name "bash"} {:name "read"}]}
-                                         :agent-ctx {:data-atom agent-data-atom}}}}})
+                                                :tool-defs [{:name "bash" :description "B"}
+                                                            {:name "read" :description "R"}]}}}}})
           seen-effects    (atom [])
           apply-fn        (fn [_ctx f] (swap! session-data f))
           execute-fn      (fn [_ctx effect] (swap! seen-effects conj effect))
@@ -147,14 +144,12 @@
             "agent-set-tools carries updated tool-maps"))))
 
   (testing "add-tool does not modify state when tool already exists"
-    (let [agent-data-atom (atom {:tools [{:name "bash" :description "B"}]})
-          session-data    (atom {:agent-session
+    (let [session-data    (atom {:agent-session
                                  {:sessions
                                   {"s1" {:data {:session-id "s1"
                                                 :tool-ids ["bash"]
                                                 :active-tools #{"bash"}
-                                                :tool-defs [{:name "bash"}]}
-                                         :agent-ctx {:data-atom agent-data-atom}}}}})
+                                                :tool-defs [{:name "bash" :description "B"}]}}}}})
           seen-effects    (atom [])
           apply-fn        (fn [_ctx f] (swap! session-data f))
           execute-fn      (fn [_ctx effect] (swap! seen-effects conj effect))

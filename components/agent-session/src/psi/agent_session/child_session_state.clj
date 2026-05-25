@@ -9,7 +9,8 @@
    [psi.session-state.init :as init]
    [psi.session-state.model :as session-data]
    [psi.session-state.state :as state]
-   [psi.skill-registry.root-storage :as skill-storage]))
+   [psi.skill-registry.root-storage :as skill-storage]
+   [psi.tool-registry.defs :as tool-defs]))
 
 (defn- default-child-system-prompt-build-opts
   [parent-sd resolved-tool-defs resolved-skills normalized-selection]
@@ -58,14 +59,13 @@
         resolved-base-prompt (or system-prompt
                                  (psi.prompt-assets.system-prompt/build-system-prompt build-opts)
                                  (:base-system-prompt parent-sd))]
-    {:root-state                 root-state*
-     :prompt-component-selection normalized-selection
-     :tool-defs                  resolved-tool-defs
-     :tool-ids                   (mapv :name resolved-tool-defs)
-     :skill-ids                  (mapv :name resolved-skills)
-     :system-prompt-build-opts   build-opts
-     :base-system-prompt         resolved-base-prompt
-     :system-prompt              (or system-prompt resolved-base-prompt (:system-prompt parent-sd))}))
+    (merge {:root-state                 root-state*
+            :prompt-component-selection normalized-selection
+            :skill-ids                  (mapv :name resolved-skills)
+            :system-prompt-build-opts   build-opts
+            :base-system-prompt         resolved-base-prompt
+            :system-prompt              (or system-prompt resolved-base-prompt (:system-prompt parent-sd))}
+           (tool-defs/tool-authority-fields resolved-tool-defs))))
 
 (defn- child-session-base-state*
   [root-state parent-sd {:keys [child-session-id session-name thinking-level temperature model prompt-mode response-mode logprobs top-logprobs developer-prompt developer-prompt-source cache-breakpoints workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?] :as child-opts}]

@@ -4,7 +4,6 @@
    steering/follow-up messages, compaction, runtime projections, interrupt,
    tool execution, skills, context usage, etc."
   (:require
-   [psi.agent-core.core :as agent]
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.journal-append-effect :as journal-append-effect]
@@ -199,14 +198,11 @@
   (register-core-handler!
    :session/set-active-tools
    (fn [_ctx {:keys [session-id tool-maps]}]
-     (let [tool-defs (tool-defs/normalize-tool-defs tool-maps)
-           tool-ids  (mapv :name tool-defs)]
-       {:root-state-update (session/session-update session-id #(assoc %
-                                                                      :tool-ids tool-ids
-                                                                      :active-tools (set tool-ids)
-                                                                      :tool-defs tool-defs))
+     (let [normalized (tool-defs/normalize-tool-defs tool-maps)
+           fields     (tool-defs/tool-authority-fields normalized)]
+       {:root-state-update (session/session-update session-id #(merge % fields))
         :effects [{:effect/type :runtime/agent-set-tools
-                   :tool-maps tool-defs}
+                   :tool-maps normalized}
                   {:effect/type :runtime/refresh-system-prompt
                    :session-id session-id}]})))
 
@@ -512,20 +508,17 @@
   (register-core-handler!
    :session/add-tool
    (fn [ctx {:keys [session-id tool]}]
-     (let [tools     (:tools (agent/get-data-in (session/agent-ctx-in ctx session-id)))
-           existing? (some #(= (:name %) (:name tool)) tools)]
+     (let [sd        (session/get-session-data-in ctx session-id)
+           current   (or (:tool-defs sd) [])
+           existing? (some #(= (:name %) (:name tool)) current)]
        (if existing?
-         {:return {:added? false :count (count tools)}}
-         (let [new-tools  (conj (vec tools) tool)
-               normalized (tool-defs/normalize-tool-defs new-tools)
-               tool-ids   (mapv :name normalized)]
-           {:root-state-update (session/session-update session-id #(assoc %
-                                                                          :tool-ids tool-ids
-                                                                          :active-tools (set tool-ids)
-                                                                          :tool-defs normalized))
+         {:return {:added? false :count (count current)}}
+         (let [normalized (tool-defs/normalize-tool-defs (conj (vec current) tool))
+               fields     (tool-defs/tool-authority-fields normalized)]
+           {:root-state-update (session/session-update session-id #(merge % fields))
             :effects [{:effect/type :runtime/agent-set-tools
                        :tool-maps normalized}]
-            :return {:added? true :count (count new-tools)}}))))))
+            :return {:added? true :count (count normalized)}}))))))
 
 (defn register!
   "Register all session mutation handlers. Called once during context creation."

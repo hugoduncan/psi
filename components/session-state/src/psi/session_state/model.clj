@@ -188,7 +188,7 @@
    [:prompt-templates [:vector prompt-template-schema]]
    [:prompt-contribution-ids {:optional true} [:vector :string]]
    [:prompt-contributions {:optional true} [:vector prompt-contribution-schema]]
-   [:tool-defs {:optional true} [:vector :map]]
+   [:tool-defs [:vector :map]]
    [:extensions [:map-of :string extension-schema]]
    [:session-entries [:vector session-entry-schema]]
    [:startup-bootstrap {:optional true}
