@@ -514,8 +514,7 @@
     {:status :ok :summary "live tool definitions unchanged (no session runtime provided)"}
     (let [agent-ctx  (session-state/agent-ctx-in ctx session-id)
           sd         (session-state/get-session-data-in ctx session-id)
-          ;; Rebuild tool-source from agent data (base tools) + extension registry
-          ;; to pick up any changes from code reload
+          ;; Rebuild tool-source from agent data + extension registry
           base-tools (or (session-state/agent-tool-source-in ctx session-id) [])
           ext-tools  (tool-registry/all-tools-in (:extension-registry ctx))
           tool-source (into (vec base-tools) ext-tools)
