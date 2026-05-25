@@ -30,10 +30,18 @@
              :include-runtime-metadata? (:include-runtime-metadata? normalized-selection)
              :include-context-files?    (:include-context-files? normalized-selection)))))
 
+(defn- parent-tool-source
+  "Get the tool-source (all known tool-def maps) from the parent session's agent data."
+  [root-state parent-sd]
+  (some-> (get-in root-state [:agent-session :sessions (:session-id parent-sd) :agent-ctx])
+          :data-atom deref :tools))
+
 (defn- derive-child-prompt-state
-  [root-state parent-sd {:keys [system-prompt tool-defs prompt-component-selection skills]}]
+  [root-state parent-sd {:keys [system-prompt tool-ids prompt-component-selection skills]}]
   (let [normalized-selection (psi.prompt-assets.system-prompt/normalize-prompt-component-selection prompt-component-selection)
-        parent-tool-defs     (or tool-defs (:tool-defs parent-sd))
+        tool-source          (parent-tool-source root-state parent-sd)
+        child-tool-ids       (or tool-ids (:tool-ids parent-sd))
+        parent-tool-defs     (tool-defs/resolve-tool-defs tool-source child-tool-ids)
         explicit-skills?     (some? skills)
         parent-skills        (if explicit-skills?
                                (vec skills)
@@ -59,17 +67,17 @@
         resolved-base-prompt (or system-prompt
                                  (psi.prompt-assets.system-prompt/build-system-prompt build-opts)
                                  (:base-system-prompt parent-sd))]
-    (merge {:root-state                 root-state*
-            :prompt-component-selection normalized-selection
-            :skill-ids                  (mapv :name resolved-skills)
-            :system-prompt-build-opts   build-opts
-            :base-system-prompt         resolved-base-prompt
-            :system-prompt              (or system-prompt resolved-base-prompt (:system-prompt parent-sd))}
-           (tool-defs/tool-authority-fields resolved-tool-defs))))
+    {:root-state                 root-state*
+     :prompt-component-selection normalized-selection
+     :tool-ids                   (mapv :name resolved-tool-defs)
+     :skill-ids                  (mapv :name resolved-skills)
+     :system-prompt-build-opts   build-opts
+     :base-system-prompt         resolved-base-prompt
+     :system-prompt              (or system-prompt resolved-base-prompt (:system-prompt parent-sd))}))
 
 (defn- child-session-base-state*
   [root-state parent-sd {:keys [child-session-id session-name thinking-level temperature model prompt-mode response-mode logprobs top-logprobs developer-prompt developer-prompt-source cache-breakpoints workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?] :as child-opts}]
-  (let [{:keys [root-state prompt-component-selection tool-defs tool-ids skill-ids system-prompt-build-opts base-system-prompt system-prompt]}
+  (let [{:keys [root-state prompt-component-selection tool-ids skill-ids system-prompt-build-opts base-system-prompt system-prompt]}
         (derive-child-prompt-state root-state parent-sd child-opts)
         normalized-developer-prompt-source (let [source (or developer-prompt-source (:developer-prompt-source parent-sd))]
                                              (when (not= :fallback source)
@@ -95,7 +103,6 @@
                         :developer-prompt           (or developer-prompt (:developer-prompt parent-sd))
                         :developer-prompt-source    normalized-developer-prompt-source
                         :thinking-level             (or thinking-level :off)
-                        :tool-defs                  tool-defs
                         :tool-ids                   tool-ids
                         :skill-ids                  skill-ids
                         :system-prompt-build-opts   system-prompt-build-opts

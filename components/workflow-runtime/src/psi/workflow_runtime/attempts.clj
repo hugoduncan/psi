@@ -67,7 +67,7 @@
                            :response-mode              response-mode
                            :logprobs                   logprobs
                            :top-logprobs               top-logprobs
-                           :tool-defs                  tool-defs
+                           :tool-ids                   (mapv :name (or tool-defs []))
                            :thinking-level             thinking-level
                            :model                      model
                            :skills                     skills
