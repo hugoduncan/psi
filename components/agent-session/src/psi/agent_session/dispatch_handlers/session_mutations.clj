@@ -199,9 +199,11 @@
   (register-core-handler!
    :session/set-active-tools
    (fn [_ctx {:keys [session-id tool-maps]}]
-     (let [tool-defs (tool-defs/normalize-tool-defs tool-maps)]
+     (let [tool-defs (tool-defs/normalize-tool-defs tool-maps)
+           tool-ids  (mapv :name tool-defs)]
        {:root-state-update (session/session-update session-id #(assoc %
-                                                                      :active-tools (->> tool-defs (map :name) set)
+                                                                      :tool-ids tool-ids
+                                                                      :active-tools (set tool-ids)
                                                                       :tool-defs tool-defs))
         :effects [{:effect/type :runtime/agent-set-tools
                    :tool-maps tool-defs}
@@ -512,11 +514,18 @@
    (fn [ctx {:keys [session-id tool]}]
      (let [tools     (:tools (agent/get-data-in (session/agent-ctx-in ctx session-id)))
            existing? (some #(= (:name %) (:name tool)) tools)]
-       (cond-> {:return {:added? (not existing?)
-                         :count  (if existing? (count tools) (inc (count tools)))}}
-         (not existing?)
-         (assoc :effects [{:effect/type :runtime/agent-set-tools
-                           :tool-maps (conj (vec tools) tool)}]))))))
+       (if existing?
+         {:return {:added? false :count (count tools)}}
+         (let [new-tools  (conj (vec tools) tool)
+               normalized (tool-defs/normalize-tool-defs new-tools)
+               tool-ids   (mapv :name normalized)]
+           {:root-state-update (session/session-update session-id #(assoc %
+                                                                          :tool-ids tool-ids
+                                                                          :active-tools (set tool-ids)
+                                                                          :tool-defs normalized))
+            :effects [{:effect/type :runtime/agent-set-tools
+                       :tool-maps normalized}]
+            :return {:added? true :count (count new-tools)}}))))))
 
 (defn register!
   "Register all session mutation handlers. Called once during context creation."

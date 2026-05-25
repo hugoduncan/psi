@@ -88,6 +88,7 @@
                                                  :auto-compaction-enabled
                                                  :scoped-models
                                                  :skill-ids
+                                                 :tool-ids
                                                  :prompt-templates
                                                  :prompt-contribution-ids
                                                  :prompt-contributions
@@ -144,6 +145,7 @@
                                                      :auto-compaction-enabled
                                                      :scoped-models
                                                      :skill-ids
+                                                     :tool-ids
                                                      :prompt-templates
                                                      :prompt-contribution-ids
                                                      :prompt-contributions
@@ -190,6 +192,7 @@
                                                            :auto-compaction-enabled
                                                            :scoped-models
                                                            :skill-ids
+                                                           :tool-ids
                                                            :prompt-templates
                                                            :prompt-contribution-ids
                                                            :prompt-contributions

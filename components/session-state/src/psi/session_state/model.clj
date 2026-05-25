@@ -184,6 +184,7 @@
    [:auto-compaction-enabled :boolean]
    [:scoped-models [:vector scoped-model-schema]]
    [:skill-ids [:vector :string]]
+   [:tool-ids [:vector :string]]
    [:prompt-templates [:vector prompt-template-schema]]
    [:prompt-contribution-ids {:optional true} [:vector :string]]
    [:prompt-contributions {:optional true} [:vector prompt-contribution-schema]]
@@ -275,6 +276,7 @@
      :auto-compaction-enabled false
      :scoped-models           []
      :skill-ids               []
+     :tool-ids                []
      :prompt-templates        []
      :prompt-contribution-ids []
      :prompt-contributions    []
