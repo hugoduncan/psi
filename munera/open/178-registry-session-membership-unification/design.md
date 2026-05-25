@@ -52,6 +52,12 @@ The task should leave behind a clear, implementation-guiding design that answers
 5. what compatibility projections remain and whether they should be removed
 6. how workflow/session shaping should narrow or inherit the domain
 
+For prompt contributions specifically, the design must distinguish authoritative membership from required projection state:
+
+- `:prompt-contribution-ids` is the authoritative session-owned membership surface
+- `:prompt-contributions` remains a derived compatibility/execution projection while prompt lifecycle seams still persist a materialized vector for refresh, introspection, and mutation-result contracts
+- child/new/resume/fork/session shaping should preserve that split explicitly rather than describing `:prompt-contribution-ids` as the only prompt-related session field that exists in practice
+
 The design should define a preferred invariant for future work:
 
 - registries own canonical definitions
@@ -96,6 +102,8 @@ If the answer is yes, the design should describe the migration shape and affecte
 - `design.md` inventories current registry/session patterns and identifies remaining asymmetries.
 - `design.md` explicitly resolves or frames the tool-session model question.
 - `design.md` identifies which current session fields are canonical membership, derived execution payload, or compatibility-only projection.
+- `design.md` states the prompt-domain lifecycle rule precisely: `:prompt-contribution-ids` is authoritative membership, while persisted `:prompt-contributions` remains required derived compatibility projection state until a later cleanup task removes that projection.
+- `design.md` states whether child-session prompt inheritance/filtering is driven from parent membership ids or from the parent derived contribution vector.
 - `design.md` decomposes any required implementation into recommended follow-on slices rather than mixing all changes into one vague umbrella.
 - `design.md` gives future migrations a clear rule for how bootstrap and session lifecycle surfaces should interact with registry-owned definitions.
 - this task leaves architectural guidance and follow-on recommendations, not same-pass creation/refinement of separate follow-on task directories.
