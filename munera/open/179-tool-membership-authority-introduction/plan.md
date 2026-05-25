@@ -21,9 +21,20 @@ Introduce singular session-owned tool authority as exact-name membership in `:to
 ## Direct seams to align in this slice
 
 - `:session/set-active-tools` handler becomes authority-first: normalize incoming tool maps, derive `:tool-ids`, persist `:tool-ids`, derive/persist compatibility `:active-tools`, then derive/persist `:tool-defs`.
+- `:session/add-tool` handler must also derive/persist `:tool-ids` (and derived `:tool-defs`/`:active-tools`) so that adding a tool through this path does not bypass the new authority field. Currently it only dispatches `:runtime/agent-set-tools` without updating session state fields.
 - Session model/init/default state must include `:tool-ids` so authority is explicit in canonical session data.
+- All three lifecycle paths in `session_state/init.clj` (`initialize-new-session-state`, `initialize-resumed-session-state`, `initialize-forked-session-state`) must add `:tool-ids` to their `select-keys` baseline field-copy sets.
 - Child-session state derivation must treat parent/child `:tool-defs` inputs as compatibility only: absent child override inherits parent `:tool-ids` first, while explicit child `:tool-defs` overrides normalize into child `:tool-ids` before any persisted compatibility projection.
 - Task artifacts should name workflow child-session creation, child-session state derivation, prompt rebuild, and runtime refresh seams as still temporarily compatible with derived `:tool-defs`, not authoritative.
+
+## Authority-feeding seams to verify (indirect, flow through `:session/set-active-tools`)
+
+- `refresh-active-tools-in!` in `extension_runtime.clj:112` — merges runtime+registry tools and dispatches `:session/set-active-tools`. Once the handler is authority-first, this path inherits correct behavior. Verify during implementation.
+- `refresh-active-tools!` in `workflow/bootstrap.clj:28` — same pattern as above. Verify during implementation.
+
+## `:active-tools` status
+
+`:active-tools` is ephemeral runtime state, not a persisted schema field. It does not appear in `agent-session-schema` or in any lifecycle `select-keys` set. This slice does not promote it to the schema. It remains a derived compatibility projection that is nil after resume until the next `:session/set-active-tools` dispatch.
 
 ## Artifact updates completed in this design follow-up
 

@@ -67,6 +67,46 @@ This slice does not yet replace the workflow child-session/public contract field
 - When child/session compatibility inputs provide explicit `:tool-defs`, those tool defs must be normalized into child `:tool-ids` immediately; the concrete `:tool-defs` payload may still be persisted for compatibility, but only as a projection derived from the same chosen tool names.
 - Prompt-component selection or workflow step tool filtering may still operate over the derived parent/child `:tool-defs` payload in this slice, but those filters do not create a second authority source. Any resulting child availability must still be representable as child `:tool-ids`.
 
+## Direct mutation seams
+
+### `:session/set-active-tools`
+
+Already identified. This handler becomes authority-first: normalize incoming tool maps → derive `:tool-ids` → persist `:tool-ids` → derive/persist compatibility `:active-tools` and `:tool-defs`.
+
+### `:session/add-tool`
+
+This handler (`session_mutations.clj:511`) is a direct tool-authority mutation seam. Currently it appends a tool to the runtime tool set via `:runtime/agent-set-tools` effect but never updates session `:tool-defs`, `:active-tools`, or (future) `:tool-ids`. In this slice, `:session/add-tool` must also derive and persist `:tool-ids` (and derived `:tool-defs`/`:active-tools`) so that adding a tool through this path does not bypass the new authority field. The handler must update session state with the new tool's name appended to `:tool-ids`, then derive `:tool-defs` and `:active-tools` from the updated `:tool-ids`.
+
+## Authority-feeding seams
+
+Two functions merge runtime+registry tools and dispatch `:session/set-active-tools`, making them indirect but critical authority-feeding paths:
+
+- `refresh-active-tools-in!` in `extension_runtime.clj:112` — called after manifest extension activation to refresh the session tool set.
+- `refresh-active-tools!` in `workflow/bootstrap.clj:28` — called during workflow bootstrap to refresh the session tool set.
+
+Both already flow through `:session/set-active-tools`, so once that handler is authority-first, these paths inherit correct authority behavior. They do not need separate authority logic, but they must be named as seams requiring verification during implementation to confirm they produce correct `:tool-ids` after the handler migration.
+
+## `:active-tools` persistence status
+
+`:active-tools` is **ephemeral runtime state**, not a persisted schema field:
+
+- It does not appear in `agent-session-schema` in `session_state/model.clj`.
+- It is not included in the `select-keys` baseline field-copy sets for any lifecycle path (new-session, resume-session, fork-session) in `session_state/init.clj`.
+- It is only written into the session map by the `:session/set-active-tools` handler at runtime.
+- After session resume, `:active-tools` will be nil until the next `:session/set-active-tools` dispatch.
+
+This slice does **not** add `:active-tools` to the session schema. It remains ephemeral and derived. The `:turn/active-tools` field in `prompt_request.clj` (line 279) reads from `:active-tools` and may be nil after resume; this is acceptable because tool bootstrap on resume will dispatch `:session/set-active-tools` before the first prompt, re-populating the derived field. This behavior should be documented but does not require a schema change.
+
+## Session lifecycle paths requiring `:tool-ids`
+
+Three lifecycle paths in `session_state/init.clj` copy specific field sets from baseline session data into new session state. All three must include `:tool-ids` in their `select-keys` sets:
+
+1. **`initialize-new-session-state`** — copies from current session data into a new root session. Currently copies `:tool-defs` but not `:tool-ids`.
+2. **`initialize-resumed-session-state`** — copies from current session data into a resumed session. Currently copies `:tool-defs` but not `:tool-ids`.
+3. **`initialize-forked-session-state`** — copies from parent session data into a forked session. Currently copies `:tool-defs` but not `:tool-ids`.
+
+All three must add `:tool-ids` to their `select-keys` baseline so that authority survives lifecycle transitions. The `model/initial-session` default must also include `:tool-ids []` so the field is always present.
+
 ## Desired outcome
 
 After this task:
