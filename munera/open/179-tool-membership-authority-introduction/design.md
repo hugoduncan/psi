@@ -52,10 +52,18 @@ After this task, session tool authority is singular:
 
 The derivation rule is:
 
-1. Start from canonical tool-registry definitions.
-2. Read session `:tool-ids` in order.
-3. Materialize session `:tool-defs` by resolving each id against the canonical registry and preserving `:tool-ids` order.
-4. Materialize compatibility `:active-tools` as the set view of those same ids.
+1. Read session `:tool-ids` in order.
+2. Materialize session `:tool-defs` by resolving each id against the available tool sources and preserving `:tool-ids` order.
+3. Materialize compatibility `:active-tools` as the set view of those same ids.
+
+Tool sources for `:tool-defs` materialization in this slice:
+
+- **Extension tools**: resolved from the canonical tool-registry (`tool-registry/get-tool-in`).
+- **Base tools** (`read`, `bash`, `edit`, `write`, `psi-tool`): resolved from the normalized incoming tool maps provided by the authority-setting dispatch. Base tools are assembled locally in `app-runtime` and are not registered in the tool-registry in this slice.
+
+In this compatibility slice, every authority-setting path (`:session/set-active-tools`, `:session/add-tool`) receives concrete tool maps that already contain both base and extension tools. The handler normalizes those maps, derives `:tool-ids` from the tool names, persists `:tool-ids` as authority, then persists the normalized incoming maps as derived `:tool-defs`. This means `:tool-defs` derivation uses the incoming tool maps as the materialization source, not registry-only lookup.
+
+A future slice may register base tools in the tool-registry (via `register-built-in-tool-in!`, which already exists but is unused in production) so that `:tool-defs` can be derived purely from registry lookup against `:tool-ids`. That change is out of scope for this slice.
 
 If a temporary compatibility input still arrives as concrete `:tool-defs`, that input must be normalized immediately into `:tool-ids`; it must not remain an alternate persisted authority path.
 
