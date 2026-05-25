@@ -32,6 +32,41 @@ It should:
 
 It should not yet fully migrate every lifecycle and workflow seam. Those broader inheritance/narrowing changes belong to the later follow-on described by task `178` as follow-on B.
 
+## Authority selected in this slice
+
+This task selects `:tool-ids` as the authoritative persisted session tool field.
+
+- `:tool-ids` is an ordered vector of exact tool names.
+- The shape is intentionally membership-only, not a richer selection map.
+- The current direct authority seam (`:session/set-active-tools`) already reduces incoming tool maps to exact tool names before persisting session state.
+- Current prompt/workflow narrowing semantics are allowlist-style exact-name filtering over concrete tool payloads, not per-tool persisted configuration, so they do not require a richer session-owned authority shape yet.
+- Broader workflow child-session narrowing remains deferred, but this slice still requires every authority-setting path to end by persisting `:tool-ids` so there is only one authoritative session surface.
+
+## Derived compatibility fields
+
+After this task, session tool authority is singular:
+
+- `:tool-ids` is authoritative.
+- `:tool-defs` is a derived execution/compatibility payload.
+- `:active-tools` is not authoritative and is retained only as a derived compatibility projection for seams that still expect active membership as a set.
+
+The derivation rule is:
+
+1. Start from canonical tool-registry definitions.
+2. Read session `:tool-ids` in order.
+3. Materialize session `:tool-defs` by resolving each id against the canonical registry and preserving `:tool-ids` order.
+4. Materialize compatibility `:active-tools` as the set view of those same ids.
+
+If a temporary compatibility input still arrives as concrete `:tool-defs`, that input must be normalized immediately into `:tool-ids`; it must not remain an alternate persisted authority path.
+
+## Interim child-session compatibility rule
+
+This slice does not yet replace the workflow child-session/public contract fields that still accept `:tool-defs`, but it does define how they interact with the new authority field.
+
+- When child-session creation receives no explicit tool override, child authority inherits the parent session `:tool-ids` first, and child `:tool-defs` is then derived from those inherited ids.
+- When child/session compatibility inputs provide explicit `:tool-defs`, those tool defs must be normalized into child `:tool-ids` immediately; the concrete `:tool-defs` payload may still be persisted for compatibility, but only as a projection derived from the same chosen tool names.
+- Prompt-component selection or workflow step tool filtering may still operate over the derived parent/child `:tool-defs` payload in this slice, but those filters do not create a second authority source. Any resulting child availability must still be representable as child `:tool-ids`.
+
 ## Desired outcome
 
 After this task:

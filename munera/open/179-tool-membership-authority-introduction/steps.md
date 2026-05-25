@@ -1,0 +1,3 @@
+- [ ] Implement authoritative session `:tool-ids` introduction in session model/init and direct mutation seams.
+- [ ] Align compatibility projections so persisted `:tool-defs` and `:active-tools` derive from canonical registry definitions plus `:tool-ids`.
+- [ ] Add focused verification for authority-first direct mutation and child-session compatibility normalization.
