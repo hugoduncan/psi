@@ -308,3 +308,20 @@ Disposition:
 
 - task 170 is already closed and needs no further action from this audit
 - stale plan ordering should be corrected separately as backlog hygiene
+
+### Task 172 disposition
+
+Reviewed `172-emacs-command-move-point-to-prompt-end` against its design, plan, steps, implementation notes, current Emacs command/docs/tests surfaces, and task-directory location.
+
+Evidence found:
+
+- all task `steps.md` items are checked
+- implementation notes record the completed command, focused test coverage, user-doc updates, and repeated no-action review passes after green verification
+- current repository state contains the described autoloaded command, keybinding/docs references, `user-error` behavior, helper delegation, and focused tests for point movement plus post-command send smoke
+- the task directory already exists under `munera/closed/`, not `munera/open/`
+- `munera/plan.md` still lists task 172 as open, so the remaining issue is orchestration drift rather than incomplete implementation
+
+Disposition:
+
+- task 172 is already closed and needs no further action from this audit
+- stale plan ordering should be corrected separately as backlog hygiene

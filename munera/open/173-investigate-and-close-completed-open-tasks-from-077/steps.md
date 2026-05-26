@@ -52,4 +52,7 @@
 - [x] Review task 170 artifacts and current repository evidence
 - [x] Record the 170 disposition in task 173 implementation notes
 - [x] Close 170 if justified, otherwise record why it remains open
+- [x] Review task 172 artifacts and current repository evidence
+- [x] Record the 172 disposition in task 173 implementation notes
+- [x] Close 172 if justified, otherwise record why it remains open
 - [ ] Continue to the next later-numbered open task and repeat
