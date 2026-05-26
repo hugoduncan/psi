@@ -1,0 +1,5 @@
+# 181 design follow-up steps
+
+- [ ] Resolve whether task 181 should be rescoped or closed: five of six lifecycle surfaces listed in scope are already migrated by tasks 179+180; the only remaining `:tool-defs` flow is the internal workflow step-config pipeline (`workflow_step_session_config/core.clj` → `statechart_runtime.clj` → `attempts.clj`), which task 180 explicitly documented as a local data structure, not session authority. Decide: (a) rescope to narrow step-config cleanup, (b) close as satisfied, or (c) document why the step-config pipeline still constitutes a scope gap.
+- [ ] Clarify the backward-compatibility mechanism for resuming sessions persisted before `:tool-ids` existed: is the implicit bootstrap-after-resume re-population (via `ensure-base-system-prompt` / `retarget-runtime-prompt-metadata`) the intended path, or does explicit migration logic belong in the resume handler?
+- [ ] Clarify what additional focused test coverage AC 6 requires beyond what tasks 179 and 180 already added (resolve-tool-defs unit tests, child-session mutation tests with parent set-active-tools dispatch).
