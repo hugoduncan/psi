@@ -15,6 +15,8 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-26: Reviewed task 172 design/plan/steps for ambiguities repeat 3; found one new actionable ambiguity: user-visible `M-x psi-emacs-move-point-to-prompt-end` docs scope is undecided even though Emacs README/docs list frontend commands. Added a design-step to choose docs update vs explicit out-of-scope. Commit 21572853.
+
 - 2026-05-26: Executed task 172 inconsistency follow-up repeat 3: completed the design-step by aligning plan.md/steps.md with acceptance criterion 6 via an explicit post-command prompt editing/submission smoke check; no implementation steps were executed.
 
 - 2026-05-25: Reviewed task 172 design/plan/steps for inconsistencies repeat 3; found one new actionable inconsistency: acceptance criterion 6 requires post-command prompt submission/editing behavior to still work, but plan/steps only list prompt-position/error/window-point tests. Added a design-step to align verification scope. Commit 6f0e8f55.
