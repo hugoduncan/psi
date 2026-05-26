@@ -7,3 +7,5 @@
 - 2026-05-25 inconsistency review: found no new actionable inconsistency feedback after checking design.md, plan.md, steps.md, design-steps.md, implementation.md, current `components/emacs-ui/psi-entry.el`, and related Emacs focus/window-point tests. Task artifacts are aligned on command name/autoload location, outside-session `user-error`, helper delegation, window-point synchronization, and focused test scope.
 
 - 2026-05-25 inconsistency follow-up execution: preloaded inconsistency review added no actionable design follow-up items. `design-steps.md` was already fully checked, so no task implementation `steps.md` items were executed; task artifacts remain aligned.
+
+- 2026-05-25 ambiguity review repeat: found no new actionable ambiguity feedback after rechecking design.md, plan.md, steps.md, design-steps.md, implementation.md, current `components/emacs-ui/psi-entry.el`/`psi.el`, Emacs frontend README, and existing focus/draft/window-point tests. Task artifacts remain clear on command name, `psi-entry.el` autoloaded location, outside-session `user-error`, helper delegation, prompt preservation, and selected/additional visible window point expectations.
