@@ -157,3 +157,20 @@ Disposition:
 
 - task 147 is materially complete and should be closed
 - closure is justified by the task's own acceptance evidence and repository state
+
+### Task 148 disposition
+
+Reviewed `148-runtime-reload-discovery-and-guidance` against its design, plan, steps, implementation notes, current docs/prompt guidance, current reload implementation surface, and task-directory location.
+
+Evidence found:
+
+- all task `steps.md` items are checked
+- implementation notes record the policy correction to worktree-authoritative source selection, warning-only mismatch diagnostics, removal of the temporary public attr, and focused verification
+- current repository surfaces reflect the described behavior: docs and prompt guidance mention worktree-authoritative reload and mismatch warnings, and the reload implementation includes loaded-source-path vs target-source-path warning reporting
+- the task directory already exists under `munera/closed/`, not `munera/open/`
+- `munera/plan.md` still contains stale note text claiming `141` is open, which confirms the remaining cleanup burden is plan-note hygiene rather than task-148 product work
+
+Disposition:
+
+- task 148 is already closed and needs no further action from this audit
+- related stale plan notes should be cleaned up separately as orchestration hygiene
