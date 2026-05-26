@@ -12,3 +12,5 @@
 - [x] Remove `:prompt-contributions []` seed from `nullable_api.clj` (line 37)
 - [x] Grep tests for `:prompt-contributions` assertions and update
 - [x] `bb test` — all green
+- [ ] Remove dead `prompt-contribution-schema` def from `session_state/model.clj` (line 66–76) — no longer referenced after `:prompt-contributions` schema entry removal
+- [ ] `bb test` — verify no regression after schema def removal

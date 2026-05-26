@@ -111,3 +111,17 @@ Reviewed all 9 changed test files against test-shaper skill criteria: clarity, s
 **Economy:** No redundant assertions within this task's changes. Pre-existing observation: `session_test.clj` is a strict subset of `model_test.clj` — both test the same `psi.session-state.model` functions with nearly identical assertions. `model_test.clj` is the superset (adds temperature, retry metadata, provider-error-kind tests). This duplication is pre-existing (not introduced by task 182) and out of scope, but worth noting for a future cleanup task.
 
 **Findings:** No actionable test-shaper issues within this task's scope.
+
+## Code-shaper review — 2026-05-25
+
+Reviewed all changed source and test files against code-shaper criteria: simplicity, consistency, robustness.
+
+**Simplicity:** Mechanical removal — no new abstractions, no mixed concerns. Each handler retains single responsibility. `next*` binding still used in all 4 handlers (feeds `effective-prompt`). Clean.
+
+**Consistency:** All 4 mutation handlers follow identical post-removal pattern: `sd → result → next* → base → prompt* → {:root-state-update ... :effects ...}`. Test absence assertions use identical pattern `(is (not (contains? sd :prompt-contributions)) "...")` across 6 sites. Naming, argument order, data shapes, idioms all consistent.
+
+**Robustness:** Schema removal enforces invariant via malli validation. `select-keys` in init.clj silently drops stale persisted data — sound backward compatibility. No orphaned bindings or requires.
+
+**Finding:**
+
+1. **Dead schema definition**: `prompt-contribution-schema` at `model.clj:66` is defined but no longer referenced anywhere — its sole consumer was the removed `[:prompt-contributions ...]` schema entry. `grep -rn 'prompt-contribution-schema' components/ --include='*.clj'` returns only the definition itself. Should be removed.
