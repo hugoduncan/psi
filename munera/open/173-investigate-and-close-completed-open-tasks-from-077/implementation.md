@@ -291,3 +291,20 @@ Disposition:
 
 - task 168 is already closed and needs no further action from this audit
 - stale plan ordering should be corrected separately as backlog hygiene
+
+### Task 170 disposition
+
+Reviewed `170-workflow-provider-native-structured-output` against its design, plan, steps, implementation notes, current workflow/turn-runtime structured-output code surfaces, and task-directory location.
+
+Evidence found:
+
+- all task `steps.md` items are checked
+- implementation notes record the completed provider-neutral request wiring, bounded turn-result seam, fallback-forbidden preflight, session-step/judge failure surfaces, persisted metadata coverage, and success-path seam coverage
+- current repository state contains the described `:missing-json-schema` handling, fallback-forbidden `:unsupported-structured-output` behavior, top-level bounded `:structured-output` seam, and workflow/judge focused tests
+- the task directory already exists under `munera/closed/`, not `munera/open/`
+- `munera/plan.md` still lists task 170 as open, so the remaining issue is orchestration drift rather than incomplete implementation
+
+Disposition:
+
+- task 170 is already closed and needs no further action from this audit
+- stale plan ordering should be corrected separately as backlog hygiene
