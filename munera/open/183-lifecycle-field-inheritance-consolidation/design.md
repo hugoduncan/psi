@@ -38,7 +38,7 @@ When a new field is added to the session schema, a developer must remember to up
 - Classify each inherited field by role: capability membership, preference, UI, prompt state, or identity
 - Apply the shared vocabulary to all three `init.clj` lifecycle functions
 - Document the child-session path's relationship to the shared vocabulary: which common-core fields it inherits from parent (7 of 17), which it intentionally defaults (10 of 17, including `:nucleus-prelude-override` which is consumed during prompt derivation rather than set as a standalone field), and the rationale for the divergence
-- Document the child-session's relationship to `prompt-state-fields` (all 4 derived via `derive-child-prompt-state`) and `model-identity-fields` (both inherited with parent fallback)
+- Document the child-session's relationship to `prompt-state-fields` (all 4 derived via `derive-child-prompt-state`) and `model-identity-fields` (`:model` falls back to parent, `:thinking-level` defaults to `:off`)
 - Classify each field group as authoritative (user/config-set) or runtime-derived (set after model resolution)
 
 ### Out of scope
@@ -123,7 +123,7 @@ The child-session path (`child_session_state.clj`) inherits only 7 of the 17 com
 - `:system-prompt-build-opts` — derived via `default-child-system-prompt-build-opts` (consumes parent's `:nucleus-prelude-override`)
 - `:prompt-component-selection` — normalized from child opts via `derive-child-prompt-state`
 
-**Model-identity fields** (both inherited with parent fallback):
+**Model-identity fields** (`:model` falls back to parent, `:thinking-level` defaults to `:off`):
 - `:model` — `(or model (:model parent-sd))`
 - `:thinking-level` — `(or thinking-level :off)` (explicit opts, not direct parent inheritance)
 

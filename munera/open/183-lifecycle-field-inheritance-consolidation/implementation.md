@@ -77,3 +77,9 @@ Reviewed design.md, plan.md, steps.md, design-steps.md, and implementation.md ag
 Found one actionable inconsistency:
 
 1. **Child-session model-identity header claims "both inherited with parent fallback" but `:thinking-level` defaults to `:off`**: The scope line says `model-identity-fields (both inherited with parent fallback)` and the child-session section header says `**Model-identity fields** (both inherited with parent fallback):`. But the body correctly documents `:thinking-level — (or thinking-level :off) (explicit opts, not direct parent inheritance)` and documentation requirement #5 correctly says "`:model` falls back to parent, `:thinking-level` defaults to `:off`". The header/scope parenthetical contradicts the body and the documentation requirement. Only `:model` uses parent fallback; `:thinking-level` uses `:off` as default. Two locations need correction: scope bullet and child-session model-identity section header.
+
+## 2026-05-26 inconsistency follow-up pass 2 — resolving design-steps
+
+### Step 6: Fix child-session model-identity "both inherited with parent fallback" wording
+
+**Resolution: corrected both locations.** Changed scope bullet parenthetical from `(both inherited with parent fallback)` to `(`:model` falls back to parent, `:thinking-level` defaults to `:off`)`. Changed child-session section header from `**Model-identity fields** (both inherited with parent fallback):` to `**Model-identity fields** (`:model` falls back to parent, `:thinking-level` defaults to `:off`):`. Both now match the body text and documentation requirement #5.
