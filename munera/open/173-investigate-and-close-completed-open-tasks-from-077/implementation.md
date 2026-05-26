@@ -318,10 +318,25 @@ Evidence found:
 - all task `steps.md` items are checked
 - implementation notes record the completed command, focused test coverage, user-doc updates, and repeated no-action review passes after green verification
 - current repository state contains the described autoloaded command, keybinding/docs references, `user-error` behavior, helper delegation, and focused tests for point movement plus post-command send smoke
-- the task directory already exists under `munera/closed/`, not `munera/open/`
-- `munera/plan.md` still lists task 172 as open, so the remaining issue is orchestration drift rather than incomplete implementation
+- the task directory already exists under `munera/open/`, not `munera/closed/`
+- `munera/plan.md` still lists task 172 as open, which is at least consistent with directory state even if implementation notes strongly suggest readiness for closure
 
 Disposition:
 
-- task 172 is already closed and needs no further action from this audit
-- stale plan ordering should be corrected separately as backlog hygiene
+- task 172 should remain open for now in this audit because its actual directory state is still open
+- this exposed an audit-method correction: earlier passes incorrectly inferred some open tasks were already closed from implementation notes and nearby evidence without first checking the authoritative `munera/open/` directory state
+
+### Audit method correction
+
+Rechecked actual `munera/open/` directory state after noticing inconsistencies between prior audit notes and the filesystem.
+
+Findings:
+
+- several tasks previously recorded in task 173 as already closed are in fact still present under `munera/open/`
+- this means the earlier audit method over-trusted implementation notes and code evidence when deciding already-closed status
+- directory state is authoritative for Munera open/closed classification and must be checked before recording a task as already closed
+
+Corrective rule going forward:
+
+- only treat a task as already closed when its directory is under `munera/closed/`
+- if a task appears implemented/completed but still lives under `munera/open/`, either close it in this audit or explicitly leave it open; do not describe it as already closed

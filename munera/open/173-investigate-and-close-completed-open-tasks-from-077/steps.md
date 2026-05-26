@@ -55,4 +55,5 @@
 - [x] Review task 172 artifacts and current repository evidence
 - [x] Record the 172 disposition in task 173 implementation notes
 - [x] Close 172 if justified, otherwise record why it remains open
+- [x] Reconcile audit method with actual munera/open directory state and fix any mistaken open/closed interpretations
 - [ ] Continue to the next later-numbered open task and repeat
