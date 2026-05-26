@@ -61,6 +61,26 @@ All steps complete. Mechanical removal of `:prompt-contributions` from:
 
 No deviations from the design. The implementation was purely mechanical — every site listed in the design was addressed exactly as planned.
 
+## Task test review — 2026-05-25
+
+Reviewed tests against task-test-review skill criteria: well-formedness, behaviour coverage, and infrastructure dependency quality.
+
+**Verification:** focused tests 51 tests, 431 assertions, 0 failures; `clj-kondo` 0 errors/warnings on all changed source and test files.
+
+**Behaviour coverage:** all 8 acceptance criteria have covering tests:
+- AC1 (no `:prompt-contributions` after init): `init_test.clj` ×3 lifecycle paths, `child_session_state_test.clj`, `workflow_execution_test.clj`, `child_session_mutation_test.clj` — all assert `(not (contains? sd :prompt-contributions))`
+- AC2 (handler writes removed): `model_dispatch_test.clj` dispatch + `eql_introspection_test.clj` resolver derivation — no test asserts `:prompt-contributions` presence in session state post-dispatch
+- AC3 (child-session): `child_session_state_test.clj`, `child_session_mutation_test.clj` assert absence + derivation
+- AC4 (lifecycle): `init_test.clj` new/resume/fork
+- AC5 (resolver derives on demand): `eql_introspection_test.clj` prompt contribution attrs
+- AC6 (schema validates): `model_test.clj` initial-session passes schema
+- AC7 (all tests pass): `bb test` green
+- AC8 (no regression): derivation proofs via `prompt-storage/list-contributions` in init, child-mutation, workflow, nullable tests
+
+**Infrastructure deps:** no mocks or stubs introduced. Tests use real dispatch, real root-registry storage, and nullable extension API. Pre-existing `with-redefs` in workflow/child tests target turn execution boundaries, not this task's changes.
+
+**Findings:** no new actionable test issues.
+
 ## Task implementation review — 2026-05-25
 
 Reviewed implementation against design, architecture, and skill criteria (`matches(code, design)`, `follows(code, architecture)`, `new_pattern`, `unnecessary_abstraction`, `structural_performance_issue`).
