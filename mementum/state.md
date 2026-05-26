@@ -15,6 +15,8 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-26: Reviewed task 172 design/plan/steps for ambiguities repeat 5; found no new actionable ambiguity feedback after rechecking task artifacts, current `psi-entry.el`, related focus/send/window-point tests, and Emacs frontend docs. Task artifacts remain clear; no design-steps were added.
+
 - 2026-05-26: Executed task 172 inconsistency follow-up repeat 5 after no-action review: design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the no-op pass.
 
 - 2026-05-26: Executed task 172 ambiguity follow-up repeat 4: clarified the exact post-command editing/submission smoke expectation. The test must append ` after` to initial prompt `before` after `psi-emacs-move-point-to-prompt-end`, submit via `psi-emacs-send-from-buffer` no-prefix normal non-slash path, assert exact dispatched text `before after`, and assert existing post-submit draft reset. Commit 8fa3d8e2.
