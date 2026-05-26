@@ -4,4 +4,7 @@
 - [x] Review task 105 artifacts and current repository evidence
 - [x] Record the 105 disposition in task 173 implementation notes
 - [x] Close 105 if justified, otherwise record why it remains open
+- [x] Review task 108 artifacts and current repository evidence
+- [x] Record the 108 disposition in task 173 implementation notes
+- [x] Close 108 if justified, otherwise record why it remains open
 - [ ] Continue to the next later-numbered open task and repeat

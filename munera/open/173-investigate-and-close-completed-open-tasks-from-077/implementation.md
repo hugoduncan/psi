@@ -44,3 +44,19 @@ Disposition:
 - task 105 is materially complete and should be closed
 - the task's acceptance was to establish and reconcile the extraction map, not to perform every extraction itself
 - later citations confirm it remains useful as a closed reference artifact rather than requiring continued open status
+
+### Task 108 disposition
+
+Reviewed `108-project-nrepl-testing-without-mocks` against its design, plan, steps, implementation notes, current `project-nrepl` component-local tests, and git history.
+
+Evidence found:
+
+- task `steps.md` remains entirely unchecked
+- current component-local tests still contain multiple `with-redefs` seams in exactly the areas the task set out to reshape, including `config_test.clj`, `client_test.clj`, `attach_test.clj`, `started_test.clj`, `commands_test.clj`, and also `ops_test.clj`
+- the recorded 2026-05-13 follow-up improved missing-config behavior and added focused proofs, but did not complete the broader testing-without-mocks reshaping described by the task acceptance
+- there is no evidence in current repository state that the mock-style seams have been removed or converted to nullable production-owned wrappers
+
+Disposition:
+
+- task 108 remains open
+- current evidence shows real incremental progress, but the task's own acceptance is still materially unmet
