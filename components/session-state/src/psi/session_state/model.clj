@@ -63,17 +63,6 @@
    [:kind session-entry-kind-schema]
    [:data {:optional true} :map]])
 
-(def prompt-contribution-schema
-  [:map
-   [:id :string]
-   [:ext-path :string]
-   [:section {:optional true} [:maybe :string]]
-   [:content :string]
-   [:priority {:optional true} :int]
-   [:enabled {:optional true} :boolean]
-   [:created-at inst?]
-   [:updated-at inst?]])
-
 (def cache-breakpoint-schema
   [:enum :system :tools])
 
