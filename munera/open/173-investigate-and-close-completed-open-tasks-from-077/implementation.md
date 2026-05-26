@@ -207,3 +207,20 @@ Disposition:
 
 - task 150 is materially complete and should be closed
 - closure is justified by the task's own acceptance evidence and repository state
+
+### Task 152 disposition
+
+Reviewed `152-retry-header-aware-backoff-and-ui-rate-limit-surfacing` against its design, plan, steps, implementation notes, current retry/state/projection code surfaces, and task-directory location.
+
+Evidence found:
+
+- all substantive retry behavior, projection, UI, and proof `steps.md` items are checked
+- the only remaining unchecked items are explicitly conditional cleanup notes (`If touched while evolving this task...`) rather than unmet acceptance work
+- implementation notes record the canonical retry metadata shape, header propagation, provider-aware delay selection, projection/RPC surfacing, Emacs/TUI rendering, review follow-ups, and green focused verification
+- current repository code contains the described retry normalization and display helpers (`compute-retry-metadata`, `retry-display-data`, `:provider-error/headers`, nested `:retry` projection)
+- the task directory already exists under `munera/closed/`, not `munera/open/`
+
+Disposition:
+
+- task 152 is already closed and needs no further action from this audit
+- the remaining conditional cleanup checkboxes should not be interpreted as incomplete acceptance work
