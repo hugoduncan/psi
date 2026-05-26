@@ -141,3 +141,19 @@ Disposition:
 
 - task 146 is already closed and needs no further action from this audit
 - the stale administrative unchecked step should not be interpreted as incomplete product work
+
+### Task 147 disposition
+
+Reviewed `147-workflow-child-session-creation-contract` against its design, plan, steps, implementation notes, and current repository state.
+
+Evidence found:
+
+- all task `steps.md` items are checked
+- implementation notes record the explicit `workflow-runtime.child-session-contract` owner, lower and higher boundary validation, attempt/judge proof ownership, realization-edge integration tests, and focused verification
+- the task's own notes show acceptance coverage for malformed request/result failures, attempt forwarding invariants, judge request semantics, and real child-session realization/runtime readiness
+- despite that, the task directory still remains under `munera/open/`
+
+Disposition:
+
+- task 147 is materially complete and should be closed
+- closure is justified by the task's own acceptance evidence and repository state
