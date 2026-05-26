@@ -23,3 +23,11 @@ One minor inconsistency found:
 Re-reviewed design.md, plan.md, and steps.md against current source after prior fixes were applied. Verified: all line numbers in design match current source; all 4 handler write sites, 3 init.clj select-keys sites, child_session_state.clj:114, model.clj:190+281, and nullable_api.clj:37 confirmed; resolver at session.clj:196 confirmed as output key not session-state read; backward compatibility claim sound (journal-based persistence, select-keys controls carry-forward, extra keys in persisted state harmlessly ignored). Steps enumerate all sites correctly.
 
 No new actionable ambiguities found.
+
+## Design inconsistency review (pass 2) — 2026-05-25
+
+Reviewed design.md, plan.md, steps.md, and implementation.md for cross-artifact inconsistencies. Verified write/read site inventories, line numbers, handler patterns, scope, acceptance criteria, backward compat, and context refs against current codebase.
+
+One actionable inconsistency found:
+
+1. **Plan summary understates non-handler site count**: Plan's summary paragraph says "stop writing it at 4 handler sites and 2 lifecycle/init sites". The design's persistence/init table lists 4 additional non-handler sites (child_session_state.clj, init.clj ×3 grouped as 1, model.clj, nullable_api.clj), and the plan's own detailed ordering describes 6 steps covering schema+defaults, 3 lifecycle select-keys, child-session, and test helper — all distinct from the 4 handler sites. The "2" in the summary is inconsistent with both the design inventory and the plan's own detailed steps.
