@@ -7,7 +7,6 @@ Backlog:
 `munera/open/166-scheduler-mandatory-time-source/`
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 `munera/open/108-project-nrepl-testing-without-mocks/`
-`munera/open/105-agent-session-component-extraction-map/`
 
 `munera/open/141-workflow-child-session-non-streaming-execution/`
 `munera/open/144-workflow-model-query-execution-fallback/`

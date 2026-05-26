@@ -25,3 +25,22 @@ Disposition:
 
 - task 077 is materially complete and should be closed
 - closure is justified by the task's own acceptance evidence, not merely by adjacent later work
+
+### Task 105 disposition
+
+Reviewed `105-agent-session-component-extraction-map` against its design, plan, steps, implementation notes, current extracted component surface, related child tasks, and current references from later extraction tasks.
+
+Evidence found:
+
+- all task `steps.md` items are checked
+- the task is explicitly an architectural umbrella/mapping task rather than an implementation task
+- the design and implementation notes record the candidate component map, residual `agent-session` core, extraction ordering, and child-task relationships
+- the child-task outcomes named by the task are now materially landed in the repository, including extracted components such as `provider-auth`, `project-nrepl`, `shared-config`, `prompt-registry`, `skill-registry`, `command-registry`, `tool-registry`, `turn-runtime`, and `workflow-registry`
+- superseded child `102` is closed, and the cited child tasks `100`, `104`, `106`, `107`, `109`, `111`, `112`, `113`, `114`, `115`, `116`, and `119` are all closed, matching the umbrella's recorded reconciliation work
+- later tasks continue to cite `105` as the umbrella architectural map, so its intended framing/reference role is in active use
+
+Disposition:
+
+- task 105 is materially complete and should be closed
+- the task's acceptance was to establish and reconcile the extraction map, not to perform every extraction itself
+- later citations confirm it remains useful as a closed reference artifact rather than requiring continued open status
