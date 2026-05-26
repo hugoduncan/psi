@@ -4,7 +4,7 @@
 
 Straight removal — no new APIs or derivation functions needed. The derivation path (`prompt-storage/list-contributions`) already exists and all consumers already use it. This task only removes the redundant persistence of the derived vector.
 
-The change is mechanical: remove the field from schema/defaults, stop writing it at 4 handler sites and 2 lifecycle/init sites, and update tests.
+The change is mechanical: remove the field from schema/defaults, stop writing it at 4 handler sites and all lifecycle/init/test-helper sites listed in the design, and update tests.
 
 ## Order
 
