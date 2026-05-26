@@ -108,3 +108,19 @@ Disposition:
 
 - task 143 is materially complete and should be closed
 - closure is justified by the task's own acceptance evidence and repository state
+
+### Task 144 disposition
+
+Reviewed `144-workflow-model-query-execution-fallback` against its design, plan, steps, implementation notes, and current repository state.
+
+Evidence found:
+
+- all task `steps.md` items are checked
+- implementation notes record the chosen ranked-sequence carrier, fallback-worthy failure classification seam, workflow-local ranked iteration, exhaustion contract, shaping follow-up, and focused verification
+- the task's own notes show acceptance coverage for ranked fallback success, concrete-model no-fallback behavior, terminal non-fallback failure, and empty/no-winner handling
+- despite that, the task directory still remains under `munera/open/`
+
+Disposition:
+
+- task 144 is materially complete and should be closed
+- closure is justified by the task's own acceptance evidence and repository state
