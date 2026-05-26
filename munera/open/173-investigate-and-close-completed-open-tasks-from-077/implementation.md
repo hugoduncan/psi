@@ -76,3 +76,19 @@ Disposition:
 
 - task 124 is already closed and needs no further action from this audit
 - this review also confirms the audit must inspect directory state directly rather than relying only on `munera/plan.md` or memory notes
+
+### Task 141 disposition
+
+Reviewed `141-workflow-child-session-non-streaming-execution` against its design, plan, steps, implementation notes, and current repository state.
+
+Evidence found:
+
+- all task `steps.md` items are checked
+- implementation notes record the workflow `:response-mode` propagation, the lower turn-runtime non-streaming execution seam, OpenAI non-streaming support, capture shaping, and repeated focused verification
+- the task describes a completed vertical slice whose acceptance is evidenced in its own notes and green focused proof runs
+- despite that, the task directory still remains under `munera/open/` and is still listed in `munera/plan.md`
+
+Disposition:
+
+- task 141 is materially complete and should be closed
+- closure is justified by its own acceptance evidence and repository state

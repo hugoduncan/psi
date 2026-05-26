@@ -8,7 +8,6 @@ Backlog:
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 `munera/open/108-project-nrepl-testing-without-mocks/`
 
-`munera/open/141-workflow-child-session-non-streaming-execution/`
 `munera/open/144-workflow-model-query-execution-fallback/`
 `munera/open/147-workflow-child-session-creation-contract/`
 `munera/open/001-post-wave-b-gordian-follow-on/`
