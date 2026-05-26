@@ -40,6 +40,8 @@ When the current buffer is an initialized Psi Emacs session buffer, the command 
 
 When invoked outside an initialized Psi Emacs session buffer, the command signals `user-error` with a short message such as `Not in an initialized Psi session buffer`. It must not create a Psi session, create prompt-entry state, or mutate unrelated buffers.
 
+The post-command editing/submission smoke test for acceptance criterion 6 should use the existing `psi-emacs-send-from-buffer` path, not a helper-only shortcut. In an initialized Psi Emacs session buffer, the test should insert a concrete prompt such as `before`, invoke `psi-emacs-move-point-to-prompt-end`, append a concrete suffix such as ` after`, then call `psi-emacs-send-from-buffer` with no prefix while stubbing/capturing the existing dispatch/send seam. The assertion should prove that the dispatched prompt text is exactly `before after`, the send behavior is the normal no-prefix steer path for non-slash input, and the draft/input area is consumed or reset according to existing `psi-emacs-send-from-buffer` semantics after successful dispatch.
+
 ## Acceptance criteria
 
 1. A named interactive Emacs command `psi-emacs-move-point-to-prompt-end` exists and can be called with `M-x` after loading the Psi Emacs frontend.
@@ -47,7 +49,7 @@ When invoked outside an initialized Psi Emacs session buffer, the command signal
 3. In a Psi Emacs session buffer with existing prompt text, invoking the command places point after the final prompt-entry character without changing the text.
 4. Invoking the command after point has been moved into earlier conversation output returns point to the prompt entry end.
 5. The command does not move point into generated output, divider text, overlays, or read-only session content.
-6. Existing prompt submission and editing behavior still works after the command runs.
+6. Existing prompt submission and editing behavior still works after the command runs: after invoking the command, appending text to the prompt and submitting with `psi-emacs-send-from-buffer` dispatches the exact edited prompt through the normal no-prefix non-slash send path and leaves the prompt draft in the existing post-submit consumed/reset state.
 7. Focused Emacs tests cover the empty-prompt, non-empty-prompt, and point-in-output cases.
 8. Focused Emacs tests cover the outside-initialized-Psi-buffer error path.
 9. Focused Emacs tests prove the command delegates to the existing focus-input behavior by checking the selected window point, and at least one additional visible window showing the same Psi buffer when practical in the existing test harness.

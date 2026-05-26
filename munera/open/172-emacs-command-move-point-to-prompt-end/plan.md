@@ -18,7 +18,7 @@ Add the public command as a small interactive wrapper around the existing prompt
 2. Check for initialized Psi state before delegating; raise `user-error` if missing.
 3. Delegate to `(psi-emacs--focus-input-area (current-buffer) (selected-window))`.
 4. Add focused Emacs tests for empty prompt, non-empty prompt, point in output, outside-session error, and visible-window point synchronization.
-5. Add an explicit post-command prompt editing/submission smoke check so acceptance criterion 6 is verified rather than assumed.
+5. Add an explicit post-command prompt editing/submission smoke check so acceptance criterion 6 is verified rather than assumed: in an initialized Psi buffer, insert `before`, invoke `psi-emacs-move-point-to-prompt-end`, append ` after`, call `psi-emacs-send-from-buffer` with no prefix, and assert the captured existing dispatch/send path receives exactly `before after` via the normal non-slash steer behavior and the draft area is consumed/reset as existing send semantics require.
 6. Update `components/emacs-ui/README.md` and `doc/emacs-ui.md` where they enumerate frontend commands so the new `M-x` command is discoverable in user docs.
 7. Run focused Emacs tests, then a broader Emacs test command if practical.
 

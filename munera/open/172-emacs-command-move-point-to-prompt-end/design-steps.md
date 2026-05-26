@@ -7,4 +7,4 @@
 - [x] Align plan/steps verification with acceptance criterion 6 by either adding an explicit post-command prompt editing/submission smoke check or narrowing the acceptance wording to prompt text preservation only.
 
 - [x] Decide whether the new user-visible `M-x psi-emacs-move-point-to-prompt-end` command requires updates to `components/emacs-ui/README.md` and/or `doc/emacs-ui.md`, or explicitly mark documentation changes out of scope.
-- [ ] Clarify the exact post-command prompt editing/submission smoke test expectation for acceptance criterion 6, including whether submission must go through the existing send/dispatch path and what prompt text/state should be asserted after invoking `psi-emacs-move-point-to-prompt-end`.
+- [x] Clarify the exact post-command prompt editing/submission smoke test expectation for acceptance criterion 6, including whether submission must go through the existing send/dispatch path and what prompt text/state should be asserted after invoking `psi-emacs-move-point-to-prompt-end`.
