@@ -241,3 +241,19 @@ Disposition:
 
 - task 156 is already closed and needs no further action from this audit
 - stale plan ordering should be cleaned up as backlog hygiene, not by reopening the task
+
+### Task 164 disposition
+
+Reviewed `164-tui-idle-polling-elimination` against its design, plan, steps, implementation notes, current TUI runtime/update code surfaces, and task-directory location.
+
+Evidence found:
+
+- all task `steps.md` items are checked
+- implementation notes record the proof-first inventory, explicit refresh-boundary trigger rules, idle self-poll removal, focused verification, and review follow-ups
+- current repository state reflects the described post-change shape: explicit refresh boundaries and no idle self-reschedule behavior remain the authoritative rule
+- the task directory already exists under `munera/closed/`, not `munera/open/`
+
+Disposition:
+
+- task 164 is already closed and needs no further action from this audit
+- this is another confirmed case of stale orchestration state rather than incomplete task implementation
