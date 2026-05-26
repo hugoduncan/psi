@@ -92,3 +92,19 @@ Disposition:
 
 - task 141 is materially complete and should be closed
 - closure is justified by its own acceptance evidence and repository state
+
+### Task 143 disposition
+
+Reviewed `143-workflow-session-inherit-delegating-session-preferences` against its design, plan, steps, implementation notes, and current repository state.
+
+Evidence found:
+
+- all task `steps.md` items are checked
+- implementation notes record the root-cause inventory, persisted `:parent-session-id` fix, step-session-config precedence correction, create/run/resume propagation, delegated sub-workflow preservation, and repeated focused verification
+- the task's own notes show acceptance coverage for the motivating two-session inheritance case, explicit override precedence, nil-parent compatibility fallback, and resume-path preservation
+- despite that, the task directory still remains under `munera/open/`
+
+Disposition:
+
+- task 143 is materially complete and should be closed
+- closure is justified by the task's own acceptance evidence and repository state
