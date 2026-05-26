@@ -242,7 +242,7 @@
               root-state' (cond-> (update-in root-state [root-state-key registry-id :entries-by-id] dissoc id)
                             (empty? ids')
                             (update-in [root-state-key registry-id :ids-by-extension] dissoc extension-id)
-                            (not (empty? ids'))
+                            (seq ids')
                             (assoc-in [root-state-key registry-id :ids-by-extension extension-id] ids'))]
           {:root-state root-state'
            :result (result :unregister registry-id true :ok
