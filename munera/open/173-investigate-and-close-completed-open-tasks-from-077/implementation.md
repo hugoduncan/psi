@@ -274,3 +274,20 @@ Disposition:
 
 - task 167 is already closed and needs no further action from this audit
 - stale plan ordering should be corrected separately as backlog hygiene
+
+### Task 168 disposition
+
+Reviewed `168-workflow-structured-output-schemas` against its design, plan, steps, implementation notes, current workflow structured-output code/docs surfaces, and task-directory location.
+
+Evidence found:
+
+- all task `steps.md` items are checked
+- implementation notes record the completed runtime slice, broad verification, invalid-output fail-fast fix, test-review follow-ups, single-JSON-object boundary proof, and duplicate-helper consolidation
+- current repository state contains the described reusable schema ownership, structured-output runtime helpers, source-resolution contract, and aligned docs
+- the task directory already exists under `munera/closed/`, not `munera/open/`
+- `munera/plan.md` still lists task 168 as open, so the remaining issue is orchestration drift rather than incomplete structured-output implementation
+
+Disposition:
+
+- task 168 is already closed and needs no further action from this audit
+- stale plan ordering should be corrected separately as backlog hygiene
