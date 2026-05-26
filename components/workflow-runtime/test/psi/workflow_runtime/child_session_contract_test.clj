@@ -11,7 +11,7 @@
                  :system-prompt "system"
                  :prompt-mode :lambda
                  :response-mode :non-streaming
-                 :tool-defs []
+                 :tool-ids []
                  :thinking-level :off
                  :model {:provider "openai" :id "gpt-5"}
                  :skills []

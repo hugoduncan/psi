@@ -7,6 +7,7 @@
    [com.fulcrologic.statecharts :as sc]
    [com.fulcrologic.statecharts.protocols :as sp]
    [psi.prompt-registry.contributions :as prompt-contributions]
+   [psi.prompt-registry.root-storage :as prompt-storage]
    [psi.session-persistence.core :as session-persistence]
    [psi.session-state.display-name :as display-name]
    [psi.workflow-registry.registry :as workflow-registry]))
@@ -14,6 +15,12 @@
 (defn agent-ctx-in
   [ctx session-id]
   (get-in @(:state* ctx) [:agent-session :sessions session-id :agent-ctx]))
+
+(defn agent-tool-source-in
+  "Return the tool-source (all known tool definition maps) for a session's agent.
+   The agent data-atom holds the merged base+extension tool set after startup."
+  [ctx session-id]
+  (some-> (agent-ctx-in ctx session-id) :data-atom deref :tools))
 
 (defn sc-session-id-in
   [ctx session-id]
@@ -163,7 +170,7 @@
   (prompt-contributions/sort-contributions coll))
 
 (defn list-prompt-contributions-in [ctx session-id]
-  (sorted-prompt-contributions (:prompt-contributions (get-session-data-in ctx session-id))))
+  (prompt-storage/list-contributions @(:state* ctx) (get-session-data-in ctx session-id)))
 
 (defn children-of-in
   [ctx parent-id]

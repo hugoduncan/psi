@@ -5,5 +5,6 @@
                                         :git/sha "38e6823"}
         org.commonmark/commonmark {:mvn/version "0.24.0"}
         psi/app-runtime     {:local/root "../app-runtime"}
+        psi/skill-registry  {:local/root "../skill-registry"}
         psi/session-journal {:local/root "../session-journal"}
         psi/ui-state        {:local/root "../ui-state"}}}

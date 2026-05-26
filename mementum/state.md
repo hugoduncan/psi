@@ -15,160 +15,56 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
-- 2026-05-26: Executed task 172 inconsistency follow-up repeat 7 after no-action review: design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the no-op pass.
-
-- 2026-05-26: Reviewed task 172 design/plan/steps for inconsistencies repeat 7; found no new actionable inconsistency feedback after rechecking task artifacts, current `psi-entry.el`, related focus/send/window-point tests, and Emacs frontend docs. Task artifacts remain aligned; no design-steps were added. Commit b90e6551.
-
-- 2026-05-26: Executed task 172 ambiguity follow-up repeat 7 after no-action review: design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the no-op pass.
-
-- 2026-05-26: Reviewed task 172 design/plan/steps for ambiguities repeat 7; found no new actionable ambiguity feedback after rechecking task artifacts, current `psi-entry.el`, related focus/send/window-point tests, and Emacs frontend docs. Task artifacts remain clear; no design-steps were added.
-
-- 2026-05-26: Reviewed task 172 design/plan/steps for ambiguities repeat 6; found no new actionable ambiguity feedback after rechecking task artifacts, current `psi-entry.el`, related focus/send/window-point tests, and Emacs frontend docs. Task artifacts remain clear; no design-steps were added.
-
-- 2026-05-26: Executed task 172 inconsistency follow-up repeat 6 after no-action review: design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the no-op pass.
-
-- 2026-05-26: Reviewed task 172 design/plan/steps for inconsistencies repeat 6; found no new actionable inconsistency feedback after rechecking task artifacts, current `psi-entry.el`, related focus/send/window-point tests, and Emacs frontend docs. Commit 3eacfd98.
-
-- 2026-05-26: Executed task 172 ambiguity follow-up repeat 5 after no-action review: design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the no-op pass.
-
-- 2026-05-26: Reviewed task 172 design/plan/steps for ambiguities repeat 5; found no new actionable ambiguity feedback after rechecking task artifacts, current `psi-entry.el`, related focus/send/window-point tests, and Emacs frontend docs. Task artifacts remain clear; no design-steps were added.
-
-- 2026-05-26: Executed task 172 inconsistency follow-up repeat 5 after no-action review: design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the no-op pass.
-
-- 2026-05-26: Executed task 172 ambiguity follow-up repeat 4: clarified the exact post-command editing/submission smoke expectation. The test must append ` after` to initial prompt `before` after `psi-emacs-move-point-to-prompt-end`, submit via `psi-emacs-send-from-buffer` no-prefix normal non-slash path, assert exact dispatched text `before after`, and assert existing post-submit draft reset. Commit 8fa3d8e2.
-
-- 2026-05-26: Reviewed task 172 design/plan/steps for ambiguities repeat 4; found one new actionable ambiguity: the required post-command prompt editing/submission smoke check does not define the exact send/dispatch path or asserted prompt text/state. Added a design-step to clarify the smoke-test expectation. Commit 799c57a3.
-
-- 2026-05-26: Executed task 172 ambiguity follow-up repeat 3: chose to update Emacs frontend user docs for the new `M-x psi-emacs-move-point-to-prompt-end` command; design/plan/steps now require README/doc command-list updates, design-step checked, no implementation steps executed.
-
-- 2026-05-26: Reviewed task 172 design/plan/steps for ambiguities repeat 3; found one new actionable ambiguity: user-visible `M-x psi-emacs-move-point-to-prompt-end` docs scope is undecided even though Emacs README/docs list frontend commands. Added a design-step to choose docs update vs explicit out-of-scope. Commit 21572853.
-
-- 2026-05-26: Executed task 172 inconsistency follow-up repeat 3: completed the design-step by aligning plan.md/steps.md with acceptance criterion 6 via an explicit post-command prompt editing/submission smoke check; no implementation steps were executed.
-
-- 2026-05-25: Reviewed task 172 design/plan/steps for inconsistencies repeat 3; found one new actionable inconsistency: acceptance criterion 6 requires post-command prompt submission/editing behavior to still work, but plan/steps only list prompt-position/error/window-point tests. Added a design-step to align verification scope. Commit 6f0e8f55.
-
-- 2026-05-25: Executed task 172 ambiguity follow-up repeat 2 after no-action review; design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the no-op pass.
-
-- 2026-05-25: Reviewed task 172 design/plan/steps for ambiguities repeat 2; found no new actionable ambiguity feedback after rechecking task artifacts, current `psi-entry.el`, related focus/window-point tests, and Emacs frontend docs. Task artifacts remain clear; no design-steps were added.
-
-- 2026-05-25: Executed task 172 ambiguity follow-up after no-action review; design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the no-op pass.
-
-- 2026-05-25: Executed task 172 inconsistency follow-up after no-action review; design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the no-op pass.
-
-- 2026-05-24: Executed task 170 code-shaper follow-up: structured workflow session-step and LLM-judge success paths now reject a nil bounded turn-result `:structured-output` seam for structured requests, producing `:invalid-structured-output` blocked/fail surfaces instead of parsing assistant JSON with synthetic prompted-JSON metadata; focused tests green (`29 tests, 168 assertions`).
-- `STATE.md` — project-local state file
-- `AGENTS.md` — bootstrap/system instructions
-
-## Current work state
-
-- 2026-05-24: Reviewed task 170 with code-shaper; found one actionable robustness gap: structured session-step/judge success paths can still accept a nil bounded turn-result `:structured-output` seam and parse raw assistant JSON with a synthetic/default `:prompted-json` envelope instead of failing on missing authoritative metadata. Added follow-up step.
-
-- 2026-05-24: Reviewed task 170 with test-shaper; found one actionable success-path seam coverage gap: no session-step or LLM-judge execution test feeds top-level bounded turn-result `:structured-output` success metadata and asserts the workflow envelope records actual strategy/source/payload from that seam. Added follow-up step.
-
-- 2026-05-24: Reviewed task 170 implementation with task-implementation-review; found one actionable gap: unsupported structured-output strategies (`:fallback-not-allowed` / unsupported capability) can still proceed to ordinary provider prose generation instead of terminal `:unsupported-structured-output` failure before generation. Added follow-up step.
-
-- 2026-05-24: Closed tasks 169 and 171 after implementation/review. Task 169 provides model/provider structured-output capabilities; task 171 adds live-verified Anthropic JSON Schema native output. Remaining adjacent workflow adoption is task 170.
-
-- 2026-05-24: Executed task 171 code-shaper follow-up: Anthropic 400 compatibility fallback now removes `:output_format` whenever all beta headers are stripped, so retries never send JSON Schema native fields without `structured-outputs-2025-11-13`; focused Anthropic/model/user tests green (`37 tests, 238 assertions`).
-
-- 2026-05-24: Reviewed task 171 with code-shaper; found one actionable robustness gap: Anthropic 400 compatibility fallback can strip all beta headers while leaving JSON Schema `:output_format`, creating an invalid retry without `structured-outputs-2025-11-13`. Added follow-up step.
-
-- 2026-05-24: Reviewed task 171 with test-shaper; found one actionable test-quality gap: Anthropic JSON Schema native non-streaming `:execute` tests assert extraction but do not capture the outbound request to prove `:stream` is absent/false. Added follow-up step and committed 11e76163.
-
-- 2026-05-24: Executed task 171 task-test-review follow-up: added focused Anthropic JSON Schema native beta-header composition coverage for structured-output + OAuth + prompt-caching + thinking betas with no duplicates; focused Anthropic/model/user tests green (`36 tests, 231 assertions`).
-
-- 2026-05-24: Reviewed task 171 tests with task-test-review; found one actionable test gap: no focused Anthropic JSON Schema native beta-header composition test proving structured-output beta composes with OAuth, prompt-caching, and thinking tokens without dropping/duplicating existing betas. Added follow-up step and committed cfb7db17.
-
-- 2026-05-24: Executed task 171 implementation-review repeat 2 follow-up after no-action review; steps.md had no newly added unchecked actionable items, so only implementation.md records the pass.
-
-- 2026-05-24: Executed task 171 implementation-review repeat follow-up after no-action review; steps.md had no newly added unchecked actionable items, so only implementation.md records the pass.
-
-- 2026-05-24: Executed task 171 implementation-review follow-up: added Anthropic JSON Schema native parse-failure tests for non-streaming and streaming invalid/non-object output; focused Anthropic/model/user tests green (`35 tests, 221 assertions`).
-
-- 2026-05-24: Reviewed task 171 implementation with task-implementation-review; found one actionable test gap: Anthropic JSON Schema native parse-failure behavior is implemented but lacks focused non-streaming/streaming invalid-output coverage. Added follow-up step and committed 9afb13e9.
-
-- 2026-05-24: Task 171 live Anthropic OAuth smoke passed after correcting the beta JSON Schema request shape: Anthropic rejects `output_format.name` and `output_format.strict`, so Psi now sends only `{:type "json_schema" :schema ...}` plus the structured-output beta header; focused Anthropic/model/user tests and live smoke are green.
-
-- 2026-05-24: Implemented task 171 Anthropic JSON Schema native structured output: capability enum/helper, Claude 4.5+ catalog assignment, request `output_format` + beta/header, strict semantics, forced-tool separation, Anthropic non-streaming execute, streaming/non-streaming extraction, docs/task-170 wording, guarded live skip path, and focused verification green.
-
-- 2026-05-24: Executed task 171 inconsistency follow-up repeat 4 after no-action review; design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the pass.
-
-- 2026-05-24: Reviewed task 171 design/plan/steps for inconsistencies repeat 4; found no new actionable inconsistency feedback after rechecking task artifacts, prior notes, current Anthropic/model/schema structured-output code, AI/custom-provider docs, and task 170 wording. Commit be164b91.
-
-- 2026-05-24: Executed task 171 ambiguity follow-up repeat 4 after no-action review; design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the pass.
-
-- 2026-05-24: Reviewed task 171 design/plan/steps for ambiguities repeat 4; found no new actionable ambiguity feedback after rechecking task artifacts, current Anthropic/provider structured-output helpers, core non-streaming seam, model capability code, docs, and task 170 wording. Commit 6c6fec73.
-
-- 2026-05-24: Executed task 171 inconsistency follow-up repeat 3 after no-action review; design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the pass.
-
-- 2026-05-24: Executed task 171 ambiguity follow-up repeat 3 after no-action review; design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the pass.
-
-- 2026-05-24: Reviewed task 171 design/plan/steps for ambiguities repeat 3; found no new actionable ambiguity feedback after rechecking task artifacts, current Anthropic/model/core structured-output code, docs, and task 170 dependency wording. Commit 25a22bb7.
-
-- 2026-05-24: Executed task 171 inconsistency follow-up repeat 2: Anthropic JSON Schema `:output_format :strict` now follows normalized request `[:structured-output :strict?]`, defaults true only when omitted, honors explicit false, and design-steps are fully checked.
-
-- 2026-05-24: Executed task 171 inconsistency follow-up repeat: acceptance criterion 11 now matches the provider `:api-key`/`ANTHROPIC_API_KEY` live-smoke seam, with OAuth only when supplied through that seam; design-steps fully checked.
-
-- 2026-05-24: Executed task 171 ambiguity follow-up: design/plan now name exact docs/task-170 dependency targets and define live-smoke credential seam as Anthropic provider `:api-key`/`ANTHROPIC_API_KEY`, with OAuth only via that seam; design-steps fully checked.
-
-- 2026-05-24: Re-reviewed task 171 refined design/plan/steps for ambiguities; found actionable gaps around exact documentation targets/task-170 wording and the concrete live-smoke credential/OAuth seam. Commit 619a4795.
-
-- 2026-05-24: Reviewed task 171 design for ambiguities; found actionable gaps around absent plan/steps plus exact Anthropic JSON Schema request/header, response/stream extraction, model mechanism assignment, JSON Schema vs forced-tool selection, and live smoke criteria. Commit e85104d8.
-
-- 2026-05-24: Created task 171 to update Anthropic structured-output support from task 169's forced-tool-only native assumption to the documented JSON Schema native output mechanism, with forced-tool and prompted-JSON kept as separate paths.
-
-- 2026-05-23: Executed task 169 code-shaper follow-up: Anthropic prompted-JSON fallback streaming now preserves text deltas and emits parsed first-class `:structured-output-result` with `:source :prompted-json/text`; focused structured-output/model tests green.
-
-- 2026-05-23: Executed task 169 test-shaper follow-up: added prompted-JSON fallback streaming coverage; Codex now emits parsed `:structured-output-result` for fallback streaming, fallback-only Anthropic strategy/text behavior covered; focused structured-output/model tests green.
-
-- 2026-05-23: Executed task 169 test-review follow-up: Anthropic provider now loads, focused Anthropic structured-output test passes, combined OpenAI/Anthropic structured-output + model/user-model focused run passes; marked the verification follow-up done and committed 15b4b0ad.
-
-- 2026-05-23: Reviewed task 169 implementation with task-implementation-review; found Anthropic fallback-only structured-output strategy is selected but not request-shaped with adapter-owned prompted-JSON instructions; added implementation follow-up.
-- 2026-05-23: Executed task 169 ambiguity follow-up repeat 14 after no-action review; no newly added unchecked design-steps existed, so only implementation.md was updated.
-
-- 2026-05-23: Reviewed task 169 design/plan/steps for ambiguities repeat 14; found no new actionable ambiguity feedback after rechecking task artifacts, workflow docs, and current AI model/provider/schema/user-model files. Commit 78f435e5.
-
-- 2026-05-23: Reviewed task 169 design/plan/steps for inconsistencies repeat 12; found no new actionable inconsistency feedback after rechecking task artifacts, workflow docs, and current AI model/provider/schema/user-model/provider files.
-
-- 2026-05-23: Reviewed task 169 design/plan/steps for ambiguities repeat 13; found no new actionable ambiguity feedback after rechecking task artifacts, workflow docs, and current AI model/provider/schema/user-model files.
-- 2026-05-23: Executed task 169 inconsistency follow-up repeat 11 after no-action review; no newly added unchecked design-steps existed, so implementation.md records the pass and commit 31fc49d4 captures it.
-- 2026-05-23: Reviewed task 169 design/plan/steps for inconsistencies repeat 11; found no new actionable inconsistency feedback after JSON Schema source, built-in capability assignment, and docs/code alignment checks.
-- 2026-05-23: Executed task 169 ambiguity follow-up repeat 12 after no-action review; no newly added unchecked design-steps existed, so only implementation.md was updated.
-- 2026-05-23: Executed task 169 inconsistency follow-up repeat 10 after no-action review; no newly added unchecked design-steps existed, so only implementation.md was updated.
-- 2026-05-23: Reviewed task 169 design/plan/steps for inconsistencies repeat 10; found no new actionable inconsistency feedback after JSON Schema source and built-in capability assignment clarifications.
-- 2026-05-23: Executed task 169 inconsistency follow-up repeat 9: design acceptance/constraints now require caller-supplied `:json-schema`; AI adapters do not convert Malli/domain `:schema` in task 169.
-- 2026-05-23: Executed task 169 ambiguity follow-up repeat 10: concrete built-in structured-output capability assignment is now explicit: Anthropic Messages native, named modern OpenAI Chat Completions native, Codex Responses fallback-only, unverified OpenAI entries omitted/unsupported.
-- 2026-05-23: Reviewed task 169 design/plan/steps for ambiguities repeat 10; found built-in capability assignment ambiguity: examples reference non-current model ids and artifacts do not say which existing built-ins should declare native/fallback/unsupported structured-output capability; added design-step and committed 60ad4361.
-- 2026-05-23: Executed task 169 ambiguity follow-up repeat 9: explicit request `:json-schema` is required as the provider-bound schema source; AI adapters do not convert Malli/domain `:schema`; schema-only structured-output requests report `:unsupported` without fallback prompt injection or native fields.
-- 2026-05-23: Reviewed task 169 design/plan/steps for ambiguities repeat 9; found JSON Schema source contract ambiguity: request contract still allows supplied `:json-schema`, adapter-derived conversion, or subset conversion/failure, but provider-native construction requires one concrete behavior; added design-step and committed e5fbabe1.
-- 2026-05-23: Executed task 169 inconsistency follow-up repeat 8 after no-action review; no newly added unchecked design-steps existed, so only implementation.md was updated.
-- 2026-05-23: Executed task 169 ambiguity follow-up repeat 8: non-streaming structured-output metadata/payload is authoritative at top-level provider result `:structured-output`, sibling to `:assistant-message`/`:logprobs`, not nested or capture-only.
-- 2026-05-23: Reviewed task 169 design/plan/steps for ambiguities repeat 8; found non-streaming structured-output metadata root ambiguity: design says provider execution returns/associates `:structured-output`, but current `execute-response` returns `{:assistant-message ... :logprobs ...}` with no exact root; added design-step and committed 6ab439b9.
-- 2026-05-23: Reviewed task 169 design/plan/steps for inconsistencies repeat 7; found auth-path representation inconsistency: design requires final `:auth` in effective capability resolution and examples show `:auth :chatgpt-oauth`, but closed model schemas/plan/steps do not allow or populate it; added design-step.
-- 2026-05-23: Executed task 169 ambiguity follow-up repeat 7: runtime auth/transport resolution is authoritative for structured-output capability; OAuth-backed `openai/gpt-5.5` mapped to Codex must clear/replace platform-native capability so strategy selection cannot inherit Chat Completions native support.
-- 2026-05-23: Reviewed task 169 design/plan/steps for ambiguities repeat 7; found auth-path/runtime transport override ambiguity for OAuth-backed `openai/gpt-5.5` inheriting platform Chat Completions native capability after `resolve-runtime-model` changes it to Codex; added design-step and committed 6ab439b9.
-- 2026-05-23: Executed task 169 ambiguity follow-up repeat 6: omitted structured-output capability data remains load-valid but normalizes to effective unsupported; prompted-JSON fallback is explicit opt-in, preventing surprise fallback prompt injection for legacy/custom models.
-- 2026-05-23: Reviewed task 169 design/plan/steps for ambiguities repeat 6; found absent structured-output capability semantics ambiguity for model descriptions that omit `:capabilities :structured-output` (current built-ins/custom schema omit it); added design-step and committed 54e1803c.
-- 2026-05-23: Executed task 169 ambiguity follow-up repeat 5: chose first-class AI stream events `:structured-output-strategy` and `:structured-output-result` as the authoritative streaming metadata/result surface; provider captures are diagnostics only.
-- 2026-05-23: Reviewed task 169 design/plan/steps for ambiguities repeat 5; found streaming structured-output metadata/result surface ambiguity (new stream events vs callback/capture while AI stream schemas lack event types); added design-step.
-- 2026-05-23: Executed task 169 inconsistency follow-up repeat 4: aligned workflow structured-output docs so prompted-JSON fallback is AI-adapter-owned JSON-only/schema prompt injection, while workflow runtime owns parse/coerce/validate and trusted value exposure.
-- 2026-05-23: Executed task 169 ambiguity follow-up repeat 4: specified prompted-JSON fallback as adapter-owned schema-guided JSON-only instruction injection, with no provider-native fields, `:fallback-used? true`, and unsupported/no-fallback behavior that does not inject fallback instructions.
-- 2026-05-23: Reviewed task 169 design/plan/steps for ambiguities repeat 4; found fallback prompted-JSON request behavior ambiguity (adapter prompt injection vs caller-owned prompt vs metadata-only fallback); added design-step and committed ff8d6bd1.
-- 2026-05-23: Executed task 169 inconsistency follow-up repeat 3 after no-action review; no newly added unchecked design-steps existed, so only implementation.md was updated.
-- 2026-05-23: Executed task 169 ambiguity follow-up repeat 3: clarified structured-output capability `:supported?` semantics as any declared path, distinguished provider-native by strategy/native mechanism, and specified fallback-only vs unsupported request-time behavior.
-- 2026-05-23: Reviewed task 169 design/plan/steps for ambiguities repeat 3; found capability `:supported?` ambiguity for fallback-only vs unsupported/provider-native semantics; added design-step and implementation note.
-- 2026-05-23: Executed task 169 inconsistency follow-up repeat 2 after no-action review; no newly added design-steps existed, no implementation steps were executed, and implementation.md records the pass.
-- 2026-05-23: Re-reviewed task 169 design/plan/steps for inconsistencies after validation-boundary clarification; found no new actionable inconsistency feedback; appended implementation note and committed 35a4a62d.
-- 2026-05-23: Executed task 169 ambiguity follow-up repeat 2: resolved validation-test ambiguity by specifying task 169 proves extracted/raw payload + strategy metadata handoff preservation for workflow/runtime validation, without adding an AI-level Malli validation seam.
-- 2026-05-23: Executed task 169 inconsistency follow-up repeat after no-action review; no new design-steps existed, so only implementation.md was updated. Commit 5c48d582.
-- 2026-05-23: Executed task 169 ambiguity follow-ups repeat: specified provider-extracted structured payload surface (`[:structured-output :payload]` and streaming `:structured-output-result`/equivalent capture), hid Anthropic synthetic tool input from ordinary tool calls, and clarified AI adapters extract/report payload metadata while workflow/runtime validation remains authoritative.
+- Registry unification arc through task 177 is complete in implementation/review terms:
+  - 164: registry semantics audit is the migration-rules source of truth and now includes post-migration guidance from 169–173
+  - 165: root-registry target architecture captured
+  - 166: standalone `root-registry` component built
+  - 167: command-registry migrated onto root-registry storage
+  - 168: tool-registry migrated onto root-registry storage; higher extension-detail projections read canonical tool-registry data
+  - 169: workflow-registry migrated onto root-registry storage while preserving canonical compatibility path `[:workflows :definitions]`; higher semantic seams route through workflow-registry
+  - 170: root-registry semantic alignment added distinct duplicate-rejecting `insert` versus replace-capable `register`, clarifying future adopter contracts
+  - 171: deterministic-operation-registry migrated to shared root-registry storage; canonical operations live in root-registry, while invoke-miss throwing, duplicate-throw translation, and extension projection synchronization remain adapter-owned
+  - 172: deterministic-operation registration-order semantics removed; public operation listing now preserves unordered membership/count coherence rather than insertion order
+  - 173: skill registration-order semantics removed; registry/projection/model-visible skill-list surfaces use canonical exact skill-name ordering while duplicate-ignore and `:added?` / `:changed?` remain preserved
+  - 174: skill-registry migrated to adapter-backed root-registry storage; canonical skill definitions now live in `root-registry` while sessions own membership through `:skill-ids`
+  - 176: prompt-registry simplified toward root-registry semantics — canonical identity is now string-coerced `id` alone, cross-owner same-id coexistence is disallowed via explicit ownership conflict, and higher prompt-contribution projections were aligned to shared canonical ordering
+  - 177: prompt-registry migrated onto shared `root-registry` storage via `prompt-registry.root-storage`; sessions now own canonical prompt membership through `:prompt-contribution-ids`, while `:prompt-contributions` vectors remain derived compatibility projection only across new/resume/fork/child flows and higher read/introspection seams
+- Bootstrap simplification arc (159–163) complete:
+  - 159: in-process bootstrap simplification
+  - 160: removed mutation-mediated bootstrap resource loading
+  - 161: single-pass startup, `bootstrap-in!` and `refresh-active-tools-in!` removed
+  - 162: `bootstrap-runtime-session!` collapsed to single `(ctx ai-model opts)` arity
+  - 163: `start-tui-runtime!` refactored — dead `ai-ctx` removed, nullable exec mode extracted
+- Structured-output arc status:
+  - task 169 is complete and closed: model/provider structured-output capability surface implemented
+  - task 171 is complete and closed: Anthropic JSON Schema native output implemented and live-verified
+  - task 170 remains the active adjacent workflow adoption slice; latest follow-ups clarified unsupported/fallback-forbidden behavior, top-level `:structured-output` turn-result seams, and success-path envelope propagation
+- Tasks 151, 145, 140, 139, 138, 136, 134, 130, 128, 125 also complete and closed
 
 ## Test health
 
-Focused OAuth routing tests ✅. bb tests previously ✅. Task 169 focused structured-output/model tests ✅ (`clojure -M:test --focus psi.ai.providers.openai-structured-output-test --focus psi.ai.providers.anthropic-structured-output-test --focus psi.ai.model-registry-test --focus psi.ai.user-models-test` => 32 tests, 199 assertions). 5 former test errors fixed (commit 0b37b83f: NPE on nil session-file, SOE in git resolvers). Task 158 addressed persistence test garbage (still open but test-review showed no actionable feedback). Task 167 focused Emacs tool-output suite ✅ (`bb emacs:test --focus psi-tool-output-mode-test`, 313/313).
+- `bb test` is green after closing task 177.
+- `bb test` was green after closing task 173.
+- Focused registry/projection tests passed during tasks 169–173.
+- Task 176 recorded focused prompt-registry / projection verification passing:
+  - `clojure -M:test --focus psi.prompt-registry.contributions-test --focus psi.agent-session.query-graph-tools-test --focus psi.agent-session.model-dispatch-test`
+  - `clj-kondo --lint components/prompt-registry/src components/prompt-registry/test components/agent-session/src components/agent-session/test components/extension-test-helpers/src`
+- Task 176 review loops (implementation review, test review, test-shaper, code-shaper) recorded no new actionable feedback.
+- Task 177 recorded focused prompt/session/workflow/nullable-helper verification, targeted lint, and a final full `bb test` pass before close.
+- Tasks 176 and 177 review loops (implementation review, test review, test-shaper, code-shaper) recorded no new actionable feedback.
+- Focused structured-output/model tests passed during tasks 169 and 171.
+- Task 170 follow-up verification recorded focused workflow tests green for structured-output envelope propagation and failure-surface behavior.
+- Task 158 addressed persistence test garbage (still open but test-review showed no actionable feedback).
 
 ## Suggested next step
-- Task 170 test-shaper follow-up is complete: session-step and LLM-judge success-path tests now prove bounded turn-result top-level `:structured-output` strategy/source/payload metadata is propagated into workflow envelopes; focused workflow tests and clj-kondo green.
+- Registry unification arc: use task `164-registry-semantics-unification-audit` plus completed outcomes through `177` to choose the next cleanup target.
+- Likely next registry cleanup candidates:
+  - close or move any remaining Munera tasks whose implementation/review state is already complete
+  - `skill-registry` shared-substrate/helper cleanup, now that insertion order is no longer semantic
+  - prompt-registry normalization/shared collection-helper audit
+  - remaining root-registry adopter polish if `164` identifies unresolved seams
+  - decide whether out-of-scope registries (`model-registry`, memory provider registry, extension handler registry) need a separate audit rather than direct adoption
+- Structured-output arc: task 170 remains the active adjacent workflow adoption slice; its test-shaper follow-up is complete and the remaining work is within that task.
 - Backlog: `105-agent-session-component-extraction-map`, `124-turn-execution-contract-extraction`, `149-reload-fixup-inventory-and-safety`, `141`/`144`/`147` workflow items
 
 ## Latest session notes
@@ -260,9 +156,7 @@ Focused OAuth routing tests ✅. bb tests previously ✅. Task 169 focused struc
 - 2026-05-22: Re-reviewed task 166 design/plan/steps for inconsistencies after thinking-proof clarification; no new actionable inconsistency feedback; committed review note 2ad29302.
 - 2026-05-23: Executed task 167 inconsistency follow-up: created missing `plan.md` and `steps.md` with Emacs/TUI implementation and verification checklist; marked the design-step done.
 - 2026-05-23: Executed task 167 inconsistency follow-up: aligned TUI verification with close-toggle acceptance by updating design/plan/steps to require toggled-closed TUI coverage; marked design-step done.
-
 - 2026-05-23: Reviewed task 167 design/plan/steps for ambiguities; added follow-up to clarify global-vs-row-local tool-detail toggle granularity before implementation.
-
 - 2026-05-23: Re-reviewed task 167 design/plan/steps for inconsistencies after global-toggle clarification; found no new actionable inconsistency feedback; appended implementation note and committed 77201055.
 - 2026-05-23: Executed task 167 inconsistency follow-up: aligned `spec/tool-output-rendering.allium` with the finalized expanded full-call contract and marked the design-step done; did not execute implementation `steps.md` items.
 - 2026-05-23: Re-reviewed task 167 design/plan/steps for ambiguities after spec alignment; found no new actionable ambiguity feedback and appended the implementation note.
@@ -280,9 +174,43 @@ Focused OAuth routing tests ✅. bb tests previously ✅. Task 169 focused struc
 - 2026-05-24: Task 166 implementation review pass 3 follow-up complete: `:scheduler/deliver` now validates schedule existence/deliverability before resolving `:scheduler-time-source`; missing/non-deliverable schedule errors preserve precedence. Full scheduler proof green: 33 tests, 344 assertions, 0 failures.
 - 2026-05-24: Code-shaper review for task 166 found one actionable robustness issue: session-kind `:scheduler/deliver` catches scheduler time-source validation failures and records failed schedules instead of fail-fast boundary behavior. Added follow-up to `steps.md` and committed review note (`ff6793da`).
 - 2026-05-24: Code-shaper review pass 2 for task 166 found no new actionable feedback after session-kind delivery time-source fail-fast fix; only review note appended.
-
-- 2026-05-25: Executed task 172 ambiguity follow-ups: design now names public command `psi-emacs-move-point-to-prompt-end`, locates it in `components/emacs-ui/psi-entry.el` with autoload discovery, specifies `user-error` outside initialized Psi session buffers, requires `psi-emacs--focus-input-area` delegation/window-point sync, and creates `plan.md`/`steps.md`; design-steps fully checked. Commit 8fc1f570.
-
-- 2026-05-26: Reviewed task 172 design/plan/steps for inconsistencies repeat 4; found no new actionable inconsistency feedback after rechecking task artifacts, current `psi-entry.el`, related focus/window-point tests, and Emacs frontend docs. Commit 9f180eb0.
-
-- 2026-05-26: Implemented task 172 Emacs prompt-end command: autoloaded `psi-emacs-move-point-to-prompt-end` delegates to existing focus-input helper with initialized-buffer `user-error` guard; focused ERT coverage added for prompt states, output recovery, visible windows, and post-command send/edit smoke; docs updated; focused selector green (6/6), `bb emacs:test` green (318/318), and `bb emacs:byte-compile` green.
+- 2026-05-21: task 167 follow-up execution pass found no newly added unchecked implementation items in `steps.md`; appended a no-op execution note to `implementation.md` and committed the pass
+- 2026-05-21: task 168 follow-up execution added the missing focused `get-tool-in` built-in `:ext-path` provenance assertion, marked the final unchecked step done, and re-verified focused tests + lint
+- 2026-05-21: task 168 later follow-up execution passes found no newly added unchecked implementation items after test review and test-shaper review; recorded no-op execution notes and committed each pass
+- 2026-05-21: task 168 initially failed full `bb test` after implementation because `extension-detail-in` still read legacy extension-local `:tools` state after tool ownership moved to `tool-registry`/`root-registry`; fixed by sourcing extension tool detail from `tool-registry/all-tools-in`, then closed 168
+- 2026-05-21: task 164 was updated with explicit registry migration guidance: future registry moves must inventory write seams plus all higher read/introspection/projection seams, add a higher-surface coherence test, and run full-suite verification before close; `workflow-registry` is now the recommended next root-registry-style migration target while `deterministic-operation-registry` remains deferred
+- 2026-05-22: task 173 ambiguity review follow-up found one additional design ambiguity: plan/steps only described the ordering-removal path despite design outcome A allowing keep-order if a real insertion-order dependency exists; added a `design-steps.md` follow-up and committed `66d6076b`.
+- 2026-05-22: task 173 ambiguity follow-up execution completed all `design-steps.md` items, clarified canonical skill ordering and affected surfaces, added explicit remove/keep branches to plan and steps, and committed `c366edc3`.
+- 2026-05-22: task 173 inconsistency review found one actionable mismatch: design outcome C remains viable, but plan/steps/task-164 update guidance only cover canonical name-sorted removal or keep-order branches; added `design-steps.md` follow-up and committed `9d417550`.
+- 2026-05-22: task 173 inconsistency follow-up execution completed the new `design-steps.md` item by keeping outcome C viable and adding matching plan/steps/task-164 guidance for registry-order-insensitive behavior with presentation-owned canonical sorting.
+- 2026-05-22: task 173 ambiguity review found no new actionable ambiguity feedback after checking the refined design/plan/steps plus representative skill registry, resolver, prompt, and TUI surfaces; appended a no-op review note and left `design-steps.md` unchanged.
+- 2026-05-22: task 173 ambiguity follow-up execution found no newly added unchecked `design-steps.md` items after the no-feedback ambiguity review; recorded the no-op pass in `implementation.md`.
+- 2026-05-22: task 173 inconsistency follow-up execution completed the newly added `design-steps.md` item by clarifying the design-review follow-up surface covers both ambiguity and inconsistency items; committed `0e6a6df8`.
+- 2026-05-22: task 173 ambiguity follow-up execution found no newly added unchecked `design-steps.md` items after the preloaded no-feedback ambiguity review; recorded the no-op pass and committed `732d2b15`.
+- 2026-05-22: task 173 inconsistency follow-up execution found no newly added unchecked `design-steps.md` items after the preloaded no-feedback inconsistency review; recorded the no-op pass.
+- 2026-05-22: task 173 ambiguity review pass re-read the task artifacts plus representative skill-order call sites and found no new actionable ambiguity feedback; appended a no-op review note and left `design-steps.md` unchanged.
+- 2026-05-22: task 173 ambiguity follow-up execution found no newly added unchecked `design-steps.md` items after the latest no-feedback ambiguity review; recorded the no-op pass.
+- 2026-05-22: task 173 inconsistency review found one new actionable mismatch: `design.md` classifies `psi.agent-session.prompt_request` with prompt/display ordered skill-list surfaces, but code shows it only does exact `/skill:name` lookup; added a `design-steps.md` follow-up and committed the pass.
+- 2026-05-22: task 173 inconsistency follow-up execution completed the new `design-steps.md` item: `prompt_request` is now classified only as exact `/skill:name` lookup expansion, while prompt lifecycle / `system_prompt` remain ordered skill-list render surfaces.
+- 2026-05-22: task 173 ambiguity review found one new actionable ambiguity: prompt-component / workflow `:skill-names` subset filtering order is unclear (caller-declared vs canonical name order vs inherited session order) and its branch B/C scope is unspecified; added a `design-steps.md` follow-up and committed `35d257dd`.
+- 2026-05-22: task 173 ambiguity follow-up execution completed the new `design-steps.md` item: prompt-component / workflow `:skill-names` is now specified as an allowlist, not an ordering directive; model-visible filtered skill subsets should use canonical skill-name order for branch B/C; committed `531dfda3`.
+- 2026-05-22: task 173 inconsistency review found one new actionable mismatch: workflow step `:session :skills` selection is not covered by the exact-lookup-only / `:skill-names` allowlist guidance even though it can determine child-session/model-visible skill order; added a `design-steps.md` follow-up.
+- 2026-05-22: task 173 inconsistency follow-up execution completed the workflow step `:session :skills` ordering item: workflow skill selection is allowlist/exact-name input, not an ordering directive; branch B/C must canonicalize selected subsets before model-visible child prompt rendering.
+- 2026-05-22: task 173 implementation selected branch B: `skill-registry` no longer treats registration order as behavior; registry read/result surfaces, prompt skill rendering/summaries, session skill resolver output, prompt-component selected subsets, and workflow-selected skill subsets now canonicalize by exact skill `:name`; focused verification and affected regressions passed, while full `bb lint` remains blocked by pre-existing root-registry warning.
+- 2026-05-22: task 173 implementation review found one actionable gap: `skills-by-source` / `:psi.skill/by-source` still expose per-source groups in raw session vector order and lack focused proof; added an unchecked `steps.md` follow-up and committed `149095cb`.
+- 2026-05-22: task 173 test-review follow-up execution added focused TUI coverage and safeguards for skill banner/autocomplete ordering with unsorted session skills; marked the final unchecked `steps.md` item done after focused TUI + resolver/prompt-assets tests and TUI lint passed.
+- 2026-05-22: task 173 code-shaper follow-up execution made `:session/register-skill` persist canonicalized duplicate/no-change registry results without prompt refresh, added focused dispatch proof, and marked the follow-up complete.
+- 2026-05-22: task 173 task-test-review found one new actionable test gap: `/skills` output and `/help` embedded Skills section are user-visible ordered skill-list command surfaces without focused proof against raw session-vector ordering; added a `steps.md` follow-up and committed `884e0bb4`.
+- 2026-05-22: task 173 task-test-review follow-up execution added focused `/skills` and `/help` command-surface ordering tests for unsorted raw session `:skills`; focused commands test and commands-test lint passed.
+- 2026-05-22: task 173 task-test-review re-read the branch B ordered-skill proof set (registry, prompt-assets, prompt-component/workflow selection, session resolver, dispatch duplicate canonicalization, TUI, and command surfaces), ran focused verification (133 tests, 656 assertions), and found no new actionable test feedback.
+- 2026-05-22: task 173 test-shaper review re-read the ordered-skill proof set and ran focused verification (154 tests, 783 assertions); no new actionable test-shaping feedback found, so `steps.md` remained unchanged.
+- 2026-05-22: task 173 test-shaper follow-up execution found no newly added unchecked `steps.md` items after the preloaded no-feedback test-shaper review; recorded the no-op pass.
+- 2026-05-22: task 173 code-shaper follow-up execution replaced TUI-local skill sorting in banner/autocomplete with shared `skill-registry/all-skills`, added the TUI dependency, verified focused TUI tests + TUI lint, and committed `7fe60e11`.
+- 2026-05-22: task 173 closed after review loops completed and full `bb test` passed; skill registration order is no longer semantic, canonical skill-name ordering now owns registry/projection/model-visible skill-list surfaces while duplicate-ignore and change reporting remain preserved.
+- 2026-05-22: task 174 ambiguity follow-up execution completed both newly added `design-steps.md` items: root-registry-backed skill adapter ownership/API boundary now lives in `components/skill-registry`, and lifecycle hydration timing is synchronous inside agent-session root-state updates for new/resume/fork/child paths.
+- 2026-05-24: task 176 created to simplify prompt-registry identity before any root-registry migration: remove composite `ext-path + id` identity and disallow cross-owner same-id coexistence.
+- 2026-05-24: task 176 design/review loops converged on the refined contract: canonical prompt contribution identity is string-coerced `id` alone; nil/blank ids remain accepted in this pass; same-owner duplicate registration replaces; cross-owner duplicate registration becomes explicit ownership conflict; lower-level seams may temporarily accept `ext-path` only as ownership/provenance metadata rather than as identity.
+- 2026-05-24: task 176 implementation completed and review loops recorded no actionable follow-up: prompt-registry helpers, lower dispatch/mutation seams, test helpers, and higher prompt-contribution projections now align to the single-id contract and shared canonical ordering. Focused prompt-registry / projection tests and targeted lint passed.
+- 2026-05-24: task 177 follow-up execution used the preloaded review result and found no newly added unchecked actionable `steps.md` items; recorded a no-op execution pass in the task `implementation.md` and left task steps unchanged.
+- 2026-05-24: task 177 later follow-up execution re-checked the preloaded review result plus current task artifacts and again found no newly added unchecked actionable `steps.md` items; recorded another no-op execution pass and left checklist state unchanged.
+- 2026-05-24: task 177 is now closed in Munera. The task directory moved to `munera/closed/`, `munera/plan.md` now records the completed prompt-registry root-registry migration, and `mementum/state.md` was updated to reflect prompt-registry root-backed authority plus a green post-close `bb test`.

@@ -221,7 +221,7 @@
   ((:mutate-session api) source-session-id 'psi.extension/create-child-session
                          {:session-name               "auto-session-name"
                           :system-prompt              system-prompt
-                          :tool-defs                  []
+                          :tool-ids                   []
                           :thinking-level             :off
                           :prompt-component-selection {:agents-md? false
                                                        :extension-prompt-contributions []

@@ -1,0 +1,45 @@
+- [x] Implement authoritative session `:tool-ids` introduction in session model/init and direct mutation seams.
+  - Added `:tool-ids` to schema, initial-session default, all three lifecycle select-keys
+  - `:session/set-active-tools` handler is now authority-first: derives `:tool-ids` → `:active-tools` → `:tool-defs`
+  - `:session/add-tool` handler now persists `:tool-ids` and derived fields (previously only fired runtime effect)
+  - Authority-feeding seams (`refresh-active-tools-in!`, `refresh-active-tools!`) verified: flow through `:session/set-active-tools`
+- [x] Align compatibility projections so persisted `:tool-defs` and `:active-tools` derive from canonical registry definitions plus `:tool-ids`.
+  - `:active-tools` = `(set tool-ids)` — derived from `:tool-ids`
+  - `:tool-defs` = normalized incoming tool-maps — derived, order matches `:tool-ids`
+  - Both are persisted as compatibility projections, not authority
+- [x] Add focused verification for authority-first direct mutation and child-session compatibility normalization.
+  - `psi.session-state.tool-authority-test`: schema, lifecycle propagation (new/resume/fork)
+  - `psi.agent-session.tool-authority-handlers-test`: set-active-tools, add-tool authority behavior
+- [x] Fix child-session `:tool-ids` coherence: `derive-child-prompt-state` in `child_session_state.clj` must return `:tool-ids (mapv :name resolved-tool-defs)` alongside `:tool-defs`, and `child-session-base-state*` must include `:tool-ids` in the child session-data map (matching the existing `:skill-ids` pattern).
+  - `derive-child-prompt-state` now returns `:tool-ids (mapv :name resolved-tool-defs)` in its result map
+  - `child-session-base-state*` destructures `:tool-ids` and includes it in the child session-data map
+  - Matches the existing `:skill-ids` derivation pattern exactly
+- [x] Add child-session `:tool-ids` test coverage: assert `:tool-ids` coherence with `:tool-defs` in `child_session_state_test.clj` for default inheritance, explicit `:tool-defs` override, and prompt-component-selection filtering paths.
+  - `child-session-tool-ids-coherence-test` covers all three paths: default inheritance, explicit `:tool-defs` override, prompt-component-selection filtering
+  - Each path asserts `:tool-ids` equals `(mapv :name (:tool-defs child-sd))`
+  - Parent test helper updated to include `:tool-ids` for realistic parent state
+- [x] Assert `:tool-defs` order parity with `:tool-ids` in `add-tool-persists-tool-ids-test`: add `(is (= ["bash" "read" "write"] (mapv :name (:tool-defs sd))))` to the "add-tool appends new tool name to :tool-ids" testing block, matching the order-parity assertion already present in `set-active-tools-persists-tool-ids-test`.
+  - Added order-parity assertion to "add-tool appends new tool name to :tool-ids" testing block — 2 tests, 11 assertions, 0 failures
+- [x] Assert effects in `set-active-tools-persists-tool-ids-test`: the test captures `seen-effects` but never asserts on them. Add assertions that the handler emits `:runtime/agent-set-tools` (with normalized tool-maps) and `:runtime/refresh-system-prompt` (with session-id). Remove dead `seen-effects` capture from the order-preservation testing block if effects are not relevant there, or assert there too for consistency.
+  - Added effect-type, tool-maps content, and session-id assertions to primary testing block
+  - Added `seen-effects` capture and effect-type assertion to order-preservation block (was missing capture entirely)
+  - Added empty-tools boundary test in same deftest (item 3 below)
+- [x] Assert effects in `add-tool-persists-tool-ids-test` success path: the success path captures `seen-effects` but only the duplicate path asserts on them. Add assertion that the success path emits `:runtime/agent-set-tools` with the updated tool-maps.
+  - Added effect-type and tool-maps content assertions to add-tool success path
+- [x] Add boundary test for `set-active-tools` with empty `tool-maps []`: verify that clearing all tools produces `:tool-ids []`, `:active-tools #{}`, `:tool-defs []`.
+  - Added "set-active-tools with empty tool-maps clears all tools" testing block — starts from non-empty state, dispatches empty tool-maps, asserts all three fields empty
+- [x] Assert `:tool-defs` coherence in at least one lifecycle propagation test in `tool_authority_test.clj`: add `(is (= (mapv :name (:tool-defs sd)) (:tool-ids sd)))` to the `initialize-new-session-carries-tool-ids-test` (or equivalent) to verify both authority and derived fields co-propagate through lifecycle transitions.
+  - Added coherence assertion to "new session inherits parent :tool-ids" testing block in `initialize-new-session-carries-tool-ids-test`
+- [x] Extract shared `tool-authority-fields` helper: create a pure function that takes normalized tool-defs and returns `{:tool-ids (mapv :name defs) :active-tools (set (mapv :name defs)) :tool-defs defs}`. Replace the inlined derivation in `set-active-tools` (session_mutations.clj:202–207), `add-tool` (session_mutations.clj:520–525), and `derive-child-prompt-state` (child_session_state.clj:64) with calls to this helper.
+  - `tool-defs/tool-authority-fields` added to `psi.tool-registry.defs` — single derivation site for all three fields
+  - `set-active-tools` handler uses `tool-authority-fields` via `merge`
+  - `add-tool` handler uses `tool-authority-fields` via `merge`
+  - `derive-child-prompt-state` uses `tool-authority-fields` via `merge` (added `psi.tool-registry.defs` require)
+- [x] Fix `add-tool` dual-authority read: change `add-tool` handler to read current tools from session `:tool-defs` (or `:tool-ids`) via session-data rather than from the runtime `data-atom` (`agent/get-data-in`), so the duplicate check and base tool list use the same authority surface that the handler writes to.
+  - `add-tool` now reads from `(:tool-defs (session/get-session-data-in ctx session-id))` instead of `(:tools (agent/get-data-in ...))`
+  - Duplicate check and base tool list both use session authority surface
+  - Removed unused `psi.agent-core.core` require from `session_mutations.clj`
+- [x] Make `:tool-defs` required in schema (or co-derive structurally): either promote `:tool-defs` from `{:optional true}` to required `[:vector :map]` in `agent-session-schema` (matching `:tool-ids`), or ensure the shared helper from the extraction step is the only path that sets these fields so partial writes are structurally impossible.
+  - Promoted `:tool-defs` from `{:optional true}` to required `[:vector :map]` in `agent-session-schema`
+  - `initial-session` already defaults `:tool-defs []` — no additional change needed
+  - Combined with the shared helper, partial writes are now both structurally impossible (helper returns all fields) and schema-enforced (both `:tool-ids` and `:tool-defs` required)

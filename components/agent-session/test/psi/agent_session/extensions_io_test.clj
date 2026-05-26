@@ -103,10 +103,10 @@
                                                               :extension? true
                                                               :enabled? true}}}
                     {:deps-realized? true})
-            tool-names (set (map :name (:tool-defs (ss/get-session-data-in ctx session-id))))]
+            tool-ids (set (:tool-ids (ss/get-session-data-in ctx session-id)))]
         (is (= ["manifest:psi/test-manifest-ext"] (:loaded result)))
         (is (contains? (tool-registry/tool-names-in reg) "manifest-runtime-tool"))
-        (is (contains? tool-names "manifest-runtime-tool"))))))
+        (is (contains? tool-ids "manifest-runtime-tool"))))))
 
 (deftest load-extension-missing-file-test
   (testing "returns error for missing file"

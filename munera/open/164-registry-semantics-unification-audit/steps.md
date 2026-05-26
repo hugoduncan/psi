@@ -1,0 +1,11 @@
+- [x] Audit `tool-registry` semantics and add evidence references
+- [x] Audit `command-registry` semantics and add evidence references
+- [x] Audit `skill-registry` semantics and add evidence references
+- [x] Audit `prompt-registry` semantics and add evidence references
+- [x] Audit `workflow-registry` semantics and add evidence references
+- [x] Audit `deterministic-operation-registry` semantics and add evidence references
+- [x] Classify each semantic axis as required / likely required / likely incidental / unknown
+- [x] Propose unification clusters and shared substrate boundaries
+- [x] Refine the design into an implementation-guiding artifact
+- [x] Add migration guidance from 167/168, including a stale-read-seam checklist for future registry migrations
+- [x] Record the recommended next root-registry migration target and sequencing guidance

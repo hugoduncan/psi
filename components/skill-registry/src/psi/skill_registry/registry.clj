@@ -9,7 +9,7 @@
   (and (string? skill-name)
        (not (str/blank? skill-name))))
 
-(defn- ensure-valid-skill!
+(defn ensure-valid-skill!
   [skill]
   (let [skill-name (:name skill)]
     (when-not (valid-skill-name? skill-name)
@@ -21,17 +21,19 @@
   skill)
 
 (defn all-skills
-  "Return the registered skills as a vector, preserving registration order."
+  "Return the registered skills in canonical skill-name order."
   [skills]
-  (vec (or skills [])))
+  (->> (or skills [])
+       (sort-by :name compare)
+       vec))
 
 (defn find-skill
   "Return the registered skill named `skill-name`, or nil when absent."
   [skills skill-name]
-  (some #(when (= (:name %) skill-name) %) (all-skills skills)))
+  (some #(when (= (:name %) skill-name) %) (or skills [])))
 
 (defn skill-names
-  "Return the registered skill names in registration order."
+  "Return the registered skill names in canonical skill-name order."
   [skills]
   (mapv :name (all-skills skills)))
 
@@ -41,23 +43,24 @@
   (count (all-skills skills)))
 
 (defn register-skill
-  "Register `skill` into the ordered registered-skill vector `skills`.
+  "Register `skill` into the registered-skill collection `skills`.
 
-   Canonical first-cut policy:
+   Policy:
    - `:name` must be a non-blank string
    - first registration per name wins
    - duplicate names are ignored
-   - first-registration order is preserved
+   - visible skill listing is canonical skill-name order
 
    Returns {:skills [...] :skill skill-map :added? boolean :changed? boolean :count n}."
   [skills skill]
-  (let [skills     (all-skills skills)
-        skill      (ensure-valid-skill! skill)
-        existing   (find-skill skills (:name skill))
-        added?     (nil? existing)
-        next-skills (if added?
-                      (conj skills skill)
-                      skills)]
+  (let [skills         (vec (or skills []))
+        ordered-skills (all-skills skills)
+        skill          (ensure-valid-skill! skill)
+        existing       (find-skill skills (:name skill))
+        added?         (nil? existing)
+        next-skills    (if added?
+                         (all-skills (conj skills skill))
+                         ordered-skills)]
     {:skills next-skills
      :skill (or existing skill)
      :added? added?

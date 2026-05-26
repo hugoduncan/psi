@@ -124,6 +124,17 @@
       (is (some #(= "/help" (:value %)) (:candidates ac)))
       (is (not-any? #(= "/logprobs" (:value %)) (:candidates ac))))))
 
+(deftest autocomplete-slash-skills-use-canonical-name-order-test
+  (testing "slash autocomplete does not expose raw session skill vector order"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (assoc (init-state)
+                           :skills [{:name "zeta"}
+                                    {:name "alpha"}
+                                    {:name "middle"}])
+          s1        (type-text update-fn state "/skill:")
+          values    (mapv :value (get-in s1 [:prompt-input-state :autocomplete :candidates]))]
+      (is (= ["/skill:alpha" "/skill:middle" "/skill:zeta"] values)))))
+
 (deftest autocomplete-slash-includes-extension-commands-test
   (testing "slash autocomplete includes extension command names"
     (let [update-fn (app/make-update (stub-agent-fn ""))

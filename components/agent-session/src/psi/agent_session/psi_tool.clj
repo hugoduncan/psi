@@ -14,6 +14,7 @@
    [psi.agent-session.workflow.runtime-state :as workflow-runtime-state]
    [psi.history.resolvers :as history-resolvers]
    [psi.state-kernel.dispatch :as kernel-dispatch]
+   [psi.tool-registry.defs :as tool-defs]
    [psi.tool-registry.registry :as tool-registry]
    [psi.project-nrepl.ops :as project-nrepl-ops]
    [psi.agent-session.psi-tool-scheduler :as psi-tool-scheduler]
@@ -511,10 +512,13 @@
 (defn- refresh-live-tool-defs! [ctx session-id]
   (if-not (and ctx session-id)
     {:status :ok :summary "live tool definitions unchanged (no session runtime provided)"}
-    (let [agent-ctx (session-state/agent-ctx-in ctx session-id)
-          builtins  (or (:tool-defs (session-state/get-session-data-in ctx session-id)) [])
-          ext-tools (tool-registry/all-tools-in (:extension-registry ctx))
-          tool-defs (vec (concat builtins ext-tools))]
+    (let [agent-ctx  (session-state/agent-ctx-in ctx session-id)
+          sd         (session-state/get-session-data-in ctx session-id)
+          ;; Rebuild tool-source from agent data + extension registry
+          base-tools (or (session-state/agent-tool-source-in ctx session-id) [])
+          ext-tools  (tool-registry/all-tools-in (:extension-registry ctx))
+          tool-source (into (vec base-tools) ext-tools)
+          tool-defs  (tool-defs/resolve-tool-defs tool-source (:tool-ids sd))]
       (when agent-ctx
         (agent/set-tools-in! agent-ctx tool-defs))
       {:status :ok :summary (str "refreshed live tool defs (" (count tool-defs) " tools)")})))

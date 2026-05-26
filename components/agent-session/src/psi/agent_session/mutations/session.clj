@@ -10,7 +10,8 @@
    [psi.agent-session.dispatch :as dispatch]
    [psi.session-persistence.core :as persist]
    [psi.agent-session.session-runtime :as runtime]
-   [psi.session-state.state :as ss]))
+   [psi.session-state.state :as ss]
+   [psi.tool-registry.defs :as tool-defs]))
 
 (pco/defmutation set-session-name
   "Set the human-readable name of the current session."
@@ -75,7 +76,7 @@
   "Create a child session for agent execution without switching active session.
   Returns the child session-id. The child shares the parent's context but has
   its own journal, telemetry, and session data."
-  [_ {:keys [psi/agent-session-ctx session-id session-name system-prompt response-mode tool-defs thinking-level model skills developer-prompt developer-prompt-source preloaded-messages cache-breakpoints prompt-component-selection workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?]}]
+  [_ {:keys [psi/agent-session-ctx session-id session-name system-prompt response-mode tool-ids thinking-level model skills developer-prompt developer-prompt-source preloaded-messages cache-breakpoints prompt-component-selection workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?]}]
   {::pco/op-name 'psi.extension/create-child-session
    ::pco/params  [:psi/agent-session-ctx :session-id]
    ::pco/output  [:psi.agent-session/session-id]}
@@ -86,8 +87,9 @@
                                  :child-session-id child-sid
                                  :session-name     session-name
                                  :system-prompt    system-prompt
-                                 :tool-defs        tool-defs
-                                 :thinking-level   thinking-level}
+                                 :tool-ids         tool-ids
+                                 :thinking-level   thinking-level
+                                 :skills           skills}
                           (some? response-mode)
                           (assoc :response-mode response-mode)
 
@@ -126,11 +128,14 @@
                         {:origin :mutations})
     (let [sd       (ss/get-session-data-in agent-session-ctx child-sid)
           messages (vec (or preloaded-messages []))
+          tool-source (ss/agent-tool-source-in agent-session-ctx session-id)
+          resolved-tool-defs (tool-defs/resolve-tool-defs tool-source (:tool-ids sd))
           fresh    (runtime/create-runtime!
                     agent-session-ctx child-sid
-                    {:session-data  sd
-                     :messages      messages
-                     :agent-initial (:agent-initial agent-session-ctx)})]
+                    {:session-data       sd
+                     :messages           messages
+                     :agent-initial      (:agent-initial agent-session-ctx)
+                     :resolved-tool-defs resolved-tool-defs})]
       (swap! (:state* agent-session-ctx)
              (fn [state]
                (-> state

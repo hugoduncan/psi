@@ -18,6 +18,48 @@
    :provider-requests     []
    :provider-replies      []})
 
+;;; Lifecycle field inheritance constants
+;;;
+;;; These constants define which session fields are inherited by each lifecycle
+;;; path (new, resume, fork). Each lifecycle function composes its select-keys
+;;; from these shared constants rather than maintaining independent key vectors.
+;;;
+;;; Adding or removing a lifecycle-inherited field requires changing one constant
+;;; here rather than updating 3 independent vectors.
+
+(def ^:private common-inherited-fields
+  "Fields inherited by all lifecycle paths (new, resume, fork).
+
+   Authoritative (user/config-set):
+     Capability membership: skill-ids, tool-ids, prompt-contribution-ids,
+                            prompt-templates, extensions
+     Preferences: auto-retry-enabled, auto-compaction-enabled, prompt-mode,
+                  nucleus-prelude-override, developer-prompt,
+                  developer-prompt-source, cache-breakpoints, scoped-models,
+                  tool-output-overrides
+     UI: ui-type
+
+   Runtime-derived (set after model resolution, transient):
+     Telemetry/context: context-tokens, context-window
+
+   Note: nucleus-prelude-override is carried as-is by init.clj lifecycle paths
+   but consumed during prompt derivation in child-session (not set as a
+   standalone child field — it flows into the child's system-prompt-build-opts)."
+  [:skill-ids :tool-ids :prompt-contribution-ids :prompt-templates :extensions
+   :auto-retry-enabled :auto-compaction-enabled :prompt-mode :nucleus-prelude-override
+   :developer-prompt :developer-prompt-source :cache-breakpoints :scoped-models
+   :tool-output-overrides :ui-type :context-tokens :context-window])
+
+(def ^:private prompt-state-fields
+  "Prompt assembly state — inherited by new and resume, not by fork.
+   Fork rebuilds prompt state from the parent through a different path."
+  [:base-system-prompt :system-prompt :system-prompt-build-opts :prompt-component-selection])
+
+(def ^:private model-identity-fields
+  "Model identity — inherited by new and fork, not by resume.
+   Resume takes model and thinking-level as explicit parameters."
+  [:model :thinking-level])
+
 (defn bounded-append
   [limit coll item]
   (let [v (conj (vec (or coll [])) item)
@@ -73,29 +115,9 @@
 (defn initialize-new-session-state
   [state* current-sd {:keys [new-session-id worktree-path session-name spawn-mode session-file scheduled-origin-session-id scheduled-from-schedule-id scheduled-from-label]}]
   (let [baseline (merge (model/initial-session)
-                        (select-keys current-sd [:model
-                                                 :thinking-level
-                                                 :base-system-prompt
-                                                 :system-prompt
-                                                 :prompt-mode
-                                                 :nucleus-prelude-override
-                                                 :cache-breakpoints
-                                                 :system-prompt-build-opts
-                                                 :prompt-component-selection
-                                                 :developer-prompt
-                                                 :developer-prompt-source
-                                                 :auto-retry-enabled
-                                                 :auto-compaction-enabled
-                                                 :scoped-models
-                                                 :skills
-                                                 :prompt-templates
-                                                 :prompt-contributions
-                                                 :tool-defs
-                                                 :extensions
-                                                 :context-tokens
-                                                 :context-window
-                                                 :ui-type
-                                                 :tool-output-overrides]))
+                        (select-keys current-sd (into common-inherited-fields
+                                                      (concat prompt-state-fields
+                                                              model-identity-fields))))
         next-sd  (assoc baseline
                         :session-id new-session-id
                         :session-file session-file
@@ -130,27 +152,8 @@
         updated-at    (or (some-> entries last :timestamp)
                           header-ts)
         baseline     (merge (model/initial-session)
-                            (select-keys current-sd [:base-system-prompt
-                                                     :system-prompt
-                                                     :prompt-mode
-                                                     :nucleus-prelude-override
-                                                     :cache-breakpoints
-                                                     :system-prompt-build-opts
-                                                     :prompt-component-selection
-                                                     :developer-prompt
-                                                     :developer-prompt-source
-                                                     :auto-retry-enabled
-                                                     :auto-compaction-enabled
-                                                     :scoped-models
-                                                     :skills
-                                                     :prompt-templates
-                                                     :prompt-contributions
-                                                     :tool-defs
-                                                     :extensions
-                                                     :context-tokens
-                                                     :context-window
-                                                     :ui-type
-                                                     :tool-output-overrides]))
+                            (select-keys current-sd (into common-inherited-fields
+                                                          prompt-state-fields)))
         next-sd      (assoc baseline
                             :session-id session-id
                             :session-file session-path
@@ -177,25 +180,8 @@
   (let [parent-session-id   (:session-id parent-sd)
         parent-session-file (:session-file parent-sd)
         baseline            (merge (model/initial-session)
-                                   (select-keys parent-sd [:model
-                                                           :thinking-level
-                                                           :prompt-mode
-                                                           :nucleus-prelude-override
-                                                           :cache-breakpoints
-                                                           :developer-prompt
-                                                           :developer-prompt-source
-                                                           :auto-retry-enabled
-                                                           :auto-compaction-enabled
-                                                           :scoped-models
-                                                           :skills
-                                                           :prompt-templates
-                                                           :prompt-contributions
-                                                           :tool-defs
-                                                           :extensions
-                                                           :context-tokens
-                                                           :context-window
-                                                           :ui-type
-                                                           :tool-output-overrides]))
+                                   (select-keys parent-sd (into common-inherited-fields
+                                                                model-identity-fields)))
         next-sd             (assoc baseline
                                    :session-id new-session-id
                                    :worktree-path (:worktree-path parent-sd)

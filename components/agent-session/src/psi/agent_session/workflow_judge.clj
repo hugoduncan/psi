@@ -58,7 +58,7 @@
          {:child-session-id   judge-sid
           :session-name       "workflow judge"
           :system-prompt      (:system-prompt judge-spec)
-          :tool-defs          []
+          :tool-ids           []
           :thinking-level     :off
           :preloaded-messages projected
           :workflow-owned?    true}

@@ -4,7 +4,6 @@
    steering/follow-up messages, compaction, runtime projections, interrupt,
    tool execution, skills, context usage, etc."
   (:require
-   [psi.agent-core.core :as agent]
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.journal-append-effect :as journal-append-effect]
@@ -14,7 +13,7 @@
    [psi.agent-session.post-tool :as post-tool]
    [psi.session-state.model :as session-data]
    [psi.session-state.state :as session]
-   [psi.skill-registry.registry :as skill-registry]
+   [psi.skill-registry.root-storage :as skill-storage]
    [psi.tool-registry.defs :as tool-defs]
    [psi.agent-session.tool-runtime-adapter :as tool-runtime-adapter]))
 
@@ -199,22 +198,21 @@
   (register-core-handler!
    :session/set-active-tools
    (fn [_ctx {:keys [session-id tool-maps]}]
-     (let [tool-defs (tool-defs/normalize-tool-defs tool-maps)]
-       {:root-state-update (session/session-update session-id #(assoc %
-                                                                      :active-tools (->> tool-defs (map :name) set)
-                                                                      :tool-defs tool-defs))
+     (let [normalized (tool-defs/normalize-tool-defs tool-maps)]
+       {:root-state-update (session/session-update session-id #(assoc % :tool-ids (mapv :name normalized)))
         :effects [{:effect/type :runtime/agent-set-tools
-                   :tool-maps tool-defs}
+                   :tool-maps normalized}
                   {:effect/type :runtime/refresh-system-prompt
                    :session-id session-id}]})))
 
   (register-core-handler!
    :session/set-skills
    (fn [_ctx {:keys [session-id skills]}]
-     {:root-state-update (session/session-update session-id #(assoc % :skills (vec (or skills []))))
-      :effects [{:effect/type :runtime/refresh-system-prompt
-                 :session-id session-id}]
-      :return {:skills (vec (or skills []))}}))
+     (let [{:keys [root-state skills]} (skill-storage/set-skills-in-root-state _ctx session-id skills)]
+       {:root-state-update (constantly root-state)
+        :effects [{:effect/type :runtime/refresh-system-prompt
+                   :session-id session-id}]
+        :return {:skills skills}})))
 
   (register-core-handler!
    :session/set-prompt-component-selection
@@ -438,14 +436,13 @@
   (register-core-handler!
    :session/register-skill
    (fn [ctx {:keys [session-id skill]}]
-     (let [skills  (:skills (session/get-session-data-in ctx session-id))
-           result  (skill-registry/register-skill skills skill)
-           changed? (:changed? result)]
-       (cond-> {:return (select-keys result [:added? :changed? :count])}
-         changed?
-         (assoc :root-state-update (session/session-update session-id #(assoc % :skills (:skills result)))
-                :effects [{:effect/type :runtime/refresh-system-prompt
-                           :session-id session-id}])))))
+     (let [{:keys [root-state added? changed? count skills]}
+           (skill-storage/register-skill-in-root-state @(:state* ctx) session-id skill)]
+       {:root-state-update (constantly root-state)
+        :return {:added? added? :changed? changed? :count count :skills skills}
+        :effects (when changed?
+                   [{:effect/type :runtime/refresh-system-prompt
+                     :session-id session-id}])})))
 
   (register-core-handler!
    :session/request-interrupt
@@ -510,13 +507,17 @@
   (register-core-handler!
    :session/add-tool
    (fn [ctx {:keys [session-id tool]}]
-     (let [tools     (:tools (agent/get-data-in (session/agent-ctx-in ctx session-id)))
-           existing? (some #(= (:name %) (:name tool)) tools)]
-       (cond-> {:return {:added? (not existing?)
-                         :count  (if existing? (count tools) (inc (count tools)))}}
-         (not existing?)
-         (assoc :effects [{:effect/type :runtime/agent-set-tools
-                           :tool-maps (conj (vec tools) tool)}]))))))
+     (let [sd           (session/get-session-data-in ctx session-id)
+           tool-source  (session/agent-tool-source-in ctx session-id)
+           current      (tool-defs/resolve-tool-defs tool-source (:tool-ids sd))
+           existing?    (some #(= (:name %) (:name tool)) current)]
+       (if existing?
+         {:return {:added? false :count (count current)}}
+         (let [normalized (tool-defs/normalize-tool-defs (conj (vec current) tool))]
+           {:root-state-update (session/session-update session-id #(assoc % :tool-ids (mapv :name normalized)))
+            :effects [{:effect/type :runtime/agent-set-tools
+                       :tool-maps normalized}]
+            :return {:added? true :count (count normalized)}}))))))
 
 (defn register!
   "Register all session mutation handlers. Called once during context creation."

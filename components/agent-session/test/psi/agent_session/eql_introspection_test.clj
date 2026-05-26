@@ -219,11 +219,14 @@
                             {:session-id session-id :ext-path "/ext/a" :id "c1"
                              :contribution {:content "Hint" :priority 10 :enabled true}}
                             {:origin :core})
+      ;; :prompt-contributions no longer persisted — resolver derives from registry
       (let [result (session/query-in ctx session-id [:psi.agent-session/base-system-prompt
                                                      :psi.agent-session/prompt-contributions
                                                      :psi.extension/prompt-contribution-count])]
         (is (= "" (:psi.agent-session/base-system-prompt result)))
-        (is (= 1 (count (:psi.agent-session/prompt-contributions result))))
+        (is (= ["c1"]
+               (mapv :psi.extension.prompt-contribution/id
+                     (:psi.agent-session/prompt-contributions result))))
         (is (= 1 (:psi.extension/prompt-contribution-count result))))))
 
   (testing "query-in resolves stats"

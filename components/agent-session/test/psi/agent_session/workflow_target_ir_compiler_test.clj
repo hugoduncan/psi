@@ -140,7 +140,7 @@
     (is (false? (target-compiler/target-authored-workflow-definition? {:steps {}})))))
 
 (deftest compile-target-judge-routing-and-loop-bounds-test
-  (testing "target authored judges, routing, and loop bounds compile into canonical IR"
+  (testing "target authored judges, routing, and self-loop control edges compile into canonical IR"
     (let [ir (target-compiler/compile-workflow-definition target-judged-definition)
           bad-ir {:version :workflow-ir/v1
                   :steps [{:name "build"
@@ -171,6 +171,11 @@
                             "REVISE" {:goto "build" :max-iterations 3}}
                        :max-iterations 5}]}
              ir))
+      (is (= {:valid? true
+              :structural-errors nil
+              :semantic-errors []}
+             (select-keys (workflow-ir/validate-workflow-ir ir)
+                          [:valid? :structural-errors :semantic-errors])))
       (is (= {:valid? false
               :structural-errors nil
               :semantic-errors [{:type :non-prior-step-ref

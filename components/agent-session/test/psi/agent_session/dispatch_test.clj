@@ -577,12 +577,21 @@
         summary            {:timestamp completed-at :prompt-count 1}]
     (testing "startup summary writes through dispatch handlers"
       (dispatch/dispatch! ctx :session/set-startup-bootstrap-summary {:session-id session-id :summary summary} {:origin :core})
-      (let [sd         (ss/get-session-data-in ctx session-id)
+      (let [sd          (ss/get-session-data-in ctx session-id)
             entries     (kernel/event-log-entries)
             event-types (mapv :event-type entries)]
         (is (= summary (:startup-bootstrap sd)))
-        (is (some #{:session/new-initialize} event-types))
-        (is (= :session/set-startup-bootstrap-summary (last event-types)))))))
+        (is (= :session/set-startup-bootstrap-summary
+               (last event-types))
+            {:event-types event-types})
+        (is (some #{:session/new-initialize} event-types)
+            {:event-types event-types})
+        (is (some #{:session/ensure-base-system-prompt} event-types)
+            {:event-types event-types})
+        (is (some #{:session/retarget-runtime-prompt-metadata} event-types)
+            {:event-types event-types})
+        (is (some #{:session/append-journal-entry} event-types)
+            {:event-types event-types})))))
 
 (deftest origin-logged-test
   (testing "log entry captures origin"

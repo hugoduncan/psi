@@ -309,7 +309,7 @@
           child-id  (:psi.agent-session/session-id
                      (mutate 'psi.extension/create-child-session
                              {:session-name "child"
-                              :tool-defs []
+                              :tool-ids []
                               :preloaded-messages [{:role "user" :content [{:type :text :text "hello child"}]}
                                                    {:role "assistant" :content [{:type :text :text "child reply"}]}]}))
           state     (atom {:transport {:ready? true :pending {}}
@@ -375,7 +375,7 @@
         (let [child-id (:psi.agent-session/session-id
                         (mutate 'psi.extension/create-child-session
                                 {:session-name "child"
-                                 :tool-defs []
+                                 :tool-ids []
                                  :thinking-level :off}))
               context-evt (some #(when (= "context/updated" (:event %)) %) @emitted)]
           (is (some? context-evt))
@@ -424,7 +424,7 @@
           (let [child-id (:psi.agent-session/session-id
                           (mutate 'psi.extension/create-child-session
                                   {:session-name "child"
-                                   :tool-defs []
+                                   :tool-ids []
                                    :thinking-level :off}))
                 context-evts (support/await-frames!
                               out-writer

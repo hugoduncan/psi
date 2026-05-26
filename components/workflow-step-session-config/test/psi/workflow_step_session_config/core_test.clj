@@ -86,13 +86,17 @@
                                                          :text "{{input}}"
                                                          :vars {"input" {:from {:step "step-1-planner" :output :final-llm-reply}}}}]}]
                                :workflow-file-meta {:framing-prompt "Coordinate a plan-build cycle."}}
-          _ (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data :skills]
-                   [{:name "testing-best-practices"
-                     :description "Testing"
-                     :file-path ""
-                     :base-dir ""
-                     :source :project
-                     :disable-model-invocation false}])
+          _ (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data :skill-ids]
+                   ["testing-best-practices"])
+          _ (swap! (:state* ctx) assoc-in [:root-registries :skills :entries-by-id "testing-best-practices"]
+                   {:id "testing-best-practices"
+                    :extension-id :psi.skill-registry/definitions
+                    :value {:name "testing-best-practices"
+                            :description "Testing"
+                            :file-path ""
+                            :base-dir ""
+                            :source :project
+                            :disable-model-invocation false}})
           workflow-run (workflow-run-for ctx
                                          [support/single-step-definition-with-meta
                                           support/builder-definition-with-meta
@@ -109,6 +113,50 @@
 
       (is (= ["read"] (mapv :name (:tool-defs builder-config))))
       (is (= ["testing-best-practices"] (mapv :name (:skills builder-config)))))))
+
+(deftest resolve-step-session-config-canonicalizes-workflow-selected-skills-test
+  (testing "workflow step :session :skills selects by exact name but does not define model-visible order"
+    (let [[ctx session-id] (support/create-session-context {:persist? false})
+          definition {:definition-id "skill-order"
+                      :name "skill-order"
+                      :steps [{:name "step-1"
+                               :type :session
+                               :tools ["read"]
+                               :skills ["z-skill" "a-skill"]
+                               :contributions [{:type :template
+                                                :text "{{input}}"
+                                                :vars {"input" {:from :workflow-input :path [:input]}}}]}]}
+          _ (swap! (:state* ctx)
+                   (fn [state]
+                     (-> state
+                         (assoc-in [:agent-session :sessions session-id :data :skill-ids]
+                                   ["z-skill" "a-skill"])
+                         (assoc-in [:root-registries :skills :entries-by-id "z-skill"]
+                                   {:id "z-skill"
+                                    :extension-id :psi.skill-registry/definitions
+                                    :value {:name "z-skill"
+                                            :description "Z"
+                                            :file-path ""
+                                            :base-dir ""
+                                            :source :project
+                                            :disable-model-invocation false}})
+                         (assoc-in [:root-registries :skills :entries-by-id "a-skill"]
+                                   {:id "a-skill"
+                                    :extension-id :psi.skill-registry/definitions
+                                    :value {:name "a-skill"
+                                            :description "A"
+                                            :file-path ""
+                                            :base-dir ""
+                                            :source :project
+                                            :disable-model-invocation false}}))))
+          workflow-run (workflow-run-for ctx
+                                         [definition]
+                                         {:definition-id "skill-order"
+                                          :run-id "run-skill-order"
+                                          :parent-session-id session-id
+                                          :workflow-input {:input "build it"}})
+          config (workflow-step-session-config/resolve-step-session-config ctx nil workflow-run "step-1")]
+      (is (= ["a-skill" "z-skill"] (mapv :name (:skills config)))))))
 
 (deftest resolve-step-session-config-prefers-delegating-session-over-context-defaults-test
   (testing "workflow child sessions inherit model and prompt-mode from the authoritative delegating session rather than the first context session"

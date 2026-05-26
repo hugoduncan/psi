@@ -35,7 +35,8 @@
    [psi.workflow-runtime.model :as workflow-model]
    [psi.workflow-step-materialization.core :as workflow-step-materialization]
    [psi.workflow-step-session-config.core :as workflow-step-session-config]
-   [psi.skill-registry.registry :as skill-registry]
+   [psi.skill-registry.root-storage :as skill-storage]
+   [psi.tool-registry.defs :as tool-defs]
    [psi.agent-session.extension-workflow-runtime :as extension-workflow-runtime]
    [psi.history.resolvers :as history-resolvers]
    [psi.query.core :as query]
@@ -81,10 +82,11 @@
     (:all-mutations ctx)))
 
 (defn- resolve-session-defaults [session-defaults resolved-cwd ui-type]
-  (cond-> (or session-defaults {})
-    (not (contains? (or session-defaults {}) :worktree-path))
-    (assoc :worktree-path resolved-cwd)
-    (some? ui-type) (assoc :ui-type ui-type)))
+  (let [session-defaults (or session-defaults {})]
+    (cond-> session-defaults
+      (not (contains? session-defaults :worktree-path))
+      (assoc :worktree-path resolved-cwd)
+      (some? ui-type) (assoc :ui-type ui-type))))
 
 (defn- initial-root-state [nrepl-runtime-atom recursion-ctx]
   {:agent-session {:sessions {}}
@@ -113,7 +115,7 @@
 
 (defn- create-workflow-child-session!
   [ctx parent-session-id request]
-  (let [{:keys [child-session-id session-name system-prompt prompt-mode response-mode logprobs top-logprobs tool-defs thinking-level temperature model skills
+  (let [{:keys [child-session-id session-name system-prompt prompt-mode response-mode logprobs top-logprobs tool-ids thinking-level temperature model skills
                 developer-prompt developer-prompt-source preloaded-messages
                 cache-breakpoints prompt-component-selection
                 workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?]}
@@ -130,8 +132,9 @@
                                                     (:worktree-path (:session-defaults ctx))
                                                     (:cwd ctx))
                                  :system-prompt system-prompt
-                                 :tool-defs tool-defs
-                                 :thinking-level thinking-level}
+                                 :tool-ids tool-ids
+                                 :thinking-level thinking-level
+                                 :skills skills}
                           (some? prompt-mode) (assoc :prompt-mode prompt-mode)
                           (some? response-mode) (assoc :response-mode response-mode)
                           (contains? {:logprobs logprobs} :logprobs) (assoc :logprobs logprobs)
@@ -149,9 +152,11 @@
                           (some? workflow-attempt-id) (assoc :workflow-attempt-id workflow-attempt-id)
                           (contains? {:workflow-owned? workflow-owned?} :workflow-owned?) (assoc :workflow-owned? workflow-owned?))
                         {:origin :mutations})
-    (let [sd (ss/get-session-data-in ctx child-session-id)
+    (let [child-sd (ss/get-session-data-in ctx child-session-id)
           messages (vec (or preloaded-messages []))
-          fresh (session-runtime/create-runtime! ctx child-session-id {:session-data sd :messages messages :agent-initial (:agent-initial ctx)})
+          tool-source (ss/agent-tool-source-in ctx parent-session-id)
+          resolved-tool-defs (tool-defs/resolve-tool-defs tool-source (:tool-ids child-sd))
+          fresh (session-runtime/create-runtime! ctx child-session-id {:session-data child-sd :messages messages :agent-initial (:agent-initial ctx) :resolved-tool-defs resolved-tool-defs})
           result {:psi.agent-session/session-id child-session-id}]
       (swap! (:state* ctx)
              (fn [state]
@@ -171,7 +176,8 @@
     :prompt-execution-result! (:workflow-prompt-execution-result-fn ctx)
     :get-session-data (:get-session-data-fn ctx)
     :list-context-sessions (:list-context-sessions-fn ctx)
-    :find-skill (:find-skill-fn ctx)
+    :find-skill (fn [adapter-ctx session-skills skill-name]
+                  ((:find-skill-fn ctx) adapter-ctx session-skills skill-name))
     :set-session-model! (fn [ctx session-id model scope]
                           (dispatch/dispatch! ctx :session/set-model
                                               (cond-> {:session-id session-id :model model}
@@ -205,7 +211,14 @@
    :resume-and-execute-workflow-run-fn #'workflow-execution/resume-and-execute-run!
    :get-session-data-fn #'ss/get-session-data-in
    :list-context-sessions-fn #'ss/list-context-sessions-in
-   :find-skill-fn #'skill-registry/find-skill
+   :find-skill-fn (fn [ctx session-skills skill-name]
+                    (or (some (fn [skill]
+                                (when (= skill-name (:name skill))
+                                  skill))
+                              session-skills)
+                        (skill-storage/find-skill @(:state* ctx)
+                                                  {:skill-ids (mapv :name (or session-skills []))}
+                                                  skill-name)))
    :resolve-workflow-step-session-config-fn #'workflow-step-session-config/resolve-step-session-config
    :materialize-workflow-step-session-conversation-fn #'workflow-step-materialization/materialize-step-session-conversation
    :split-workflow-step-session-conversation-fn #'workflow-step-materialization/split-step-session-conversation

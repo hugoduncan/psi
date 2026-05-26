@@ -1,0 +1,12 @@
+- [x] Audit current `workflow-registry` storage and public behavior
+- [x] Inventory all workflow-definition write seams
+- [x] Inventory all workflow-definition read/projection/introspection seams
+- [x] Identify the exact compatibility surface that must remain at the `workflow-registry` boundary
+- [x] Refactor `workflow-registry` internals to use `root-registry` storage
+- [x] Preserve current lookup, registration, removal, normalization, and sorted-read behavior
+- [x] Preserve or explicitly adapt the current tuple-shaped lower return contract
+- [x] Audit helper/test higher semantic seams that still write or read workflow definitions by direct `[:workflows :definitions ...]` shape
+- [x] Update higher workflow read/projection seams to stop reading legacy direct storage shape
+- [x] Add focused migration-guard tests for lower registry semantics and at least one higher consumer seam
+- [x] Verify migration does not leak raw root-registry semantics through the public `workflow-registry` API
+- [x] Record preserved adapter-owned compatibility behavior and seam-inventory findings in task artifacts

@@ -6,9 +6,11 @@
    reset-prompt-contributions, register-prompt-template."
   (:require
    [psi.prompt-assets.system-prompt :as sys-prompt]
-   [psi.prompt-registry.contributions :as contributions]
+   [psi.prompt-registry.root-storage :as prompt-storage]
    [psi.session-state.state :as session]
-   [psi.state-kernel.dispatch :as kernel]))
+   [psi.skill-registry.root-storage :as skill-storage]
+   [psi.state-kernel.dispatch :as kernel]
+   [psi.tool-registry.defs :as tool-defs]))
 
 ;;; Prompt contribution pure helpers
 
@@ -41,10 +43,11 @@
            ;; request preparation and introspection can observe the split.
            selection (:prompt-component-selection sd)
            base    (if-let [build-opts (:system-prompt-build-opts sd)]
-                     (let [live-tool-defs (vec (or (:tool-defs sd) []))
+                     (let [tool-source    (session/agent-tool-source-in ctx session-id)
+                           live-tool-defs (tool-defs/resolve-tool-defs tool-source (:tool-ids sd))
                            selected-tools (or (some->> live-tool-defs seq (mapv :name))
                                               (:selected-tools build-opts))
-                           live-skills    (vec (or (:skills sd) []))]
+                           live-skills    (skill-storage/all-skills @(:state* ctx) sd)]
                        (sys-prompt/build-system-prompt
                         (cond-> (assoc build-opts
                                        :prompt-mode (:prompt-mode sd :lambda)
@@ -80,16 +83,15 @@
    :session/register-prompt-contribution
    (fn [ctx {:keys [session-id ext-path id contribution]}]
      (let [sd      (session/get-session-data-in ctx session-id)
-           xs      (:prompt-contributions sd)
-           result  (contributions/register-contribution xs ext-path id contribution)
-           next*   (:contributions result)
+           result  (prompt-storage/register-contribution-in-root-state
+                    @(:state* ctx) session-id ext-path id contribution)
+           next*   (prompt-storage/list-contributions (:root-state result) sd)
            base    (or (:base-system-prompt sd) (:system-prompt sd) "")
            prompt* (effective-prompt base next* (:prompt-component-selection sd))]
        {:root-state-update
-        (session/session-update session-id
-                                #(assoc %
-                                        :prompt-contributions next*
-                                        :system-prompt prompt*))
+        (fn [_root-state]
+          (-> (:root-state result)
+              ((session/session-update session-id #(assoc % :system-prompt prompt*)))))
         :effects [{:effect/type :runtime/agent-set-system-prompt
                    :prompt prompt*}]
         :return {:registered?  (:registered? result)
@@ -100,18 +102,19 @@
    :session/update-prompt-contribution
    (fn [ctx {:keys [session-id ext-path id patch]}]
      (let [sd     (session/get-session-data-in ctx session-id)
-           xs     (:prompt-contributions sd)
-           result (contributions/update-contribution xs ext-path id patch)]
+           result (prompt-storage/update-contribution-in-root-state
+                   @(:state* ctx) session-id ext-path id patch)]
        (if-not (:updated? result)
          {:return {:updated? false
                    :contribution nil
                    :count (:count result)}}
-         (let [next*   (:contributions result)
+         (let [next*   (prompt-storage/list-contributions (:root-state result) sd)
                base    (or (:base-system-prompt sd) (:system-prompt sd) "")
                prompt* (effective-prompt base next* (:prompt-component-selection sd))]
-           {:root-state-update (session/session-update session-id #(assoc %
-                                                                          :prompt-contributions next*
-                                                                          :system-prompt prompt*))
+           {:root-state-update
+            (fn [_root-state]
+              (-> (:root-state result)
+                  ((session/session-update session-id #(assoc % :system-prompt prompt*)))))
             :effects [{:effect/type :runtime/agent-set-system-prompt
                        :prompt prompt*}]
             :return {:updated?     (:updated? result)
@@ -122,24 +125,35 @@
    :session/unregister-prompt-contribution
    (fn [ctx {:keys [session-id ext-path id]}]
      (let [sd     (session/get-session-data-in ctx session-id)
-           xs     (:prompt-contributions sd)
-           result (contributions/unregister-contribution xs ext-path id)]
+           result (prompt-storage/unregister-contribution-in-root-state
+                   @(:state* ctx) session-id ext-path id)]
        (if-not (:removed? result)
          {:return {:removed? false :count (:count result)}}
-         (let [next*   (:contributions result)
+         (let [next*   (prompt-storage/list-contributions (:root-state result) sd)
                base    (or (:base-system-prompt sd) (:system-prompt sd) "")
                prompt* (effective-prompt base next* (:prompt-component-selection sd))]
-           {:root-state-update (session/session-update session-id #(assoc %
-                                                                          :prompt-contributions next*
-                                                                          :system-prompt prompt*))
+           {:root-state-update
+            (fn [_root-state]
+              (-> (:root-state result)
+                  ((session/session-update session-id #(assoc % :system-prompt prompt*)))))
             :effects [{:effect/type :runtime/agent-set-system-prompt
                        :prompt prompt*}]
             :return {:removed? true :count (:count result)}})))))
 
   (kernel/register-handler!
    :session/reset-prompt-contributions
-   (fn [_ctx {:keys [session-id]}]
-     {:root-state-update (session/session-update session-id #(assoc % :prompt-contributions []))}))
+   (fn [ctx {:keys [session-id]}]
+     (let [sd      (session/get-session-data-in ctx session-id)
+           result  (prompt-storage/reset-prompt-contributions-in-root-state @(:state* ctx) session-id)
+           next*   (prompt-storage/list-contributions (:root-state result) sd)
+           base    (or (:base-system-prompt sd) (:system-prompt sd) "")
+           prompt* (effective-prompt base next* (:prompt-component-selection sd))]
+       {:root-state-update
+        (fn [_root-state]
+          (-> (:root-state result)
+              ((session/session-update session-id #(assoc % :system-prompt prompt*)))))
+        :effects [{:effect/type :runtime/agent-set-system-prompt
+                   :prompt prompt*}]})))
 
   (kernel/register-handler!
    :session/bootstrap-prompt-state

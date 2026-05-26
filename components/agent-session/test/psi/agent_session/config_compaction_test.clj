@@ -5,6 +5,7 @@
    [psi.agent-session.test-support :as test-support]
    [clojure.string :as str]
    [clojure.test :refer [deftest testing is]]
+   [psi.agent-session.bootstrap]
    [psi.agent-session.core :as session]
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.extensions :as ext]
@@ -65,10 +66,7 @@
           _                  (kernel/clear-event-log!)
           tool-maps  [{:name "read"} {:name "bash"}]]
       (session/dispatch-in! ctx :session/set-active-tools {:session-id session-id :tool-maps tool-maps} {:origin :core})
-      (is (= #{"read" "bash"} (:active-tools (ss/get-session-data-in ctx session-id))))
-      (is (= [{:name "read" :label "read" :description "" :parameters {:type "object" :properties {}} :lambda-description nil :source nil :ext-path nil :enabled? true}
-              {:name "bash" :label "bash" :description "" :parameters {:type "object" :properties {}} :lambda-description nil :source nil :ext-path nil :enabled? true}]
-             (:tool-defs (ss/get-session-data-in ctx session-id))))
+      (is (= ["read" "bash"] (:tool-ids (ss/get-session-data-in ctx session-id))))
       (let [entry (last (filter #(= :session/set-active-tools (:event-type %))
                                 (kernel/event-log-entries)))]
         (is (= :session/set-active-tools (:event-type entry)))
@@ -111,20 +109,33 @@
       (session/dispatch-in! ctx :session/register-prompt-template {:session-id session-id :template template} {:origin :core})
       (session/dispatch-in! ctx :session/register-skill {:session-id session-id :skill skill} {:origin :core})
       (session/consume-queued-input-text-in! ctx session-id)
-      (let [sd         (ss/get-session-data-in ctx session-id)
-            entries    (kernel/event-log-entries)
-            event-types (mapv :event-type entries)]
+      (let [sd          (ss/get-session-data-in ctx session-id)
+            entries      (kernel/event-log-entries)
+            event-types   (mapv :event-type entries)
+            event-indexes (zipmap event-types (range))]
         (is (= [] (:steering-messages sd)))
         (is (= [] (:follow-up-messages sd)))
         (is (= 1 (count (:prompt-templates sd))))
-        (is (= 1 (count (:skills sd))))
-        (is (= [:session/enqueue-steering-message
-                :session/enqueue-follow-up-message
-                :session/register-prompt-template
-                :session/refresh-system-prompt
-                :session/register-skill
-                :session/clear-queued-messages]
-               event-types)))))
+        (is (= ["coding"] (:skill-ids sd)))
+        (is (nil? (:skills sd)))
+        (is (some #{:session/enqueue-steering-message} event-types)
+            {:event-types event-types})
+        (is (some #{:session/enqueue-follow-up-message} event-types)
+            {:event-types event-types})
+        (is (some #{:session/register-prompt-template} event-types)
+            {:event-types event-types})
+        (is (some #{:session/refresh-system-prompt} event-types)
+            {:event-types event-types})
+        (is (some #{:session/register-skill} event-types)
+            {:event-types event-types})
+        (is (= :session/clear-queued-messages (last event-types))
+            {:event-types event-types})
+        (is (< (get event-indexes :session/enqueue-steering-message)
+               (get event-indexes :session/enqueue-follow-up-message)
+               (get event-indexes :session/register-prompt-template)
+               (get event-indexes :session/register-skill)
+               (get event-indexes :session/clear-queued-messages))
+            {:event-types event-types}))))
 
   (testing "register-skill refreshes the system prompt so newly added skills appear"
     (let [[ctx session-id] (create-session-context)
@@ -171,7 +182,9 @@
         (is (str/includes? (or before-prompt "") "λ tools.\nread → λf. content(f)"))
         (is (not (str/includes? (or before-prompt "") "coding → Use coding guidance @ /tmp/SKILL.md"))))
       (let [result (session/dispatch-in! ctx :session/register-skill {:session-id session-id :skill skill} {:origin :core})]
-        (is (= {:added? true :changed? true :count 1} result)))
+        (is (= {:added? true :changed? true :count 1
+                :skills [skill]}
+               result)))
       (let [after-prompt (:system-prompt (ss/get-session-data-in ctx session-id))]
         (is (str/includes? (or after-prompt "") "λ tools.\nread → λf. content(f)"))
         (is (str/includes? (or after-prompt "") "coding → Use coding guidance @ /tmp/SKILL.md")))))
@@ -224,10 +237,46 @@
             after-prompt  (:system-prompt (ss/get-session-data-in ctx session-id))
             sd            (ss/get-session-data-in ctx session-id)
             event-types   (mapv :event-type (kernel/event-log-entries))]
-        (is (= {:added? false :changed? false :count 1} result))
+        (is (= {:added? false :changed? false :count 1
+                :skills [skill]}
+               result))
         (is (= before-prompt after-prompt))
         (is (str/includes? (or after-prompt "") "λ tools.\nread → λf. content(f)"))
-        (is (= [skill] (:skills sd)))
+        (is (= ["coding"] (:skill-ids sd)))
+        (is (nil? (:skills sd)))
+        (is (= [:session/register-skill] event-types)))))
+
+  (testing "duplicate register-skill canonicalizes stored skills without refreshing the prompt"
+    (let [z-skill {:name "z-skill"
+                   :description "Z"
+                   :file-path "/tmp/z/SKILL.md"
+                   :base-dir "/tmp/z"
+                   :source :project
+                   :disable-model-invocation false}
+          a-skill {:name "a-skill"
+                   :description "A"
+                   :file-path "/tmp/a/SKILL.md"
+                   :base-dir "/tmp/a"
+                   :source :project
+                   :disable-model-invocation false}
+          [ctx session-id] (create-session-context)
+          _ (psi.agent-session.bootstrap/load-startup-resources-in! ctx session-id {:skills [z-skill a-skill]})
+          _ (session/dispatch-in! ctx :session/set-system-prompt {:session-id session-id :prompt "stable prompt"} {:origin :test})]
+      (kernel/clear-event-log!)
+      (let [before-prompt (:system-prompt (ss/get-session-data-in ctx session-id))
+            result        (session/dispatch-in! ctx :session/register-skill
+                                                {:session-id session-id
+                                                 :skill (assoc z-skill :description "Replacement attempt")}
+                                                {:origin :core})
+            after-prompt  (:system-prompt (ss/get-session-data-in ctx session-id))
+            sd            (ss/get-session-data-in ctx session-id)
+            event-types   (mapv :event-type (kernel/event-log-entries))]
+        (is (= {:added? false :changed? false :count 2
+                :skills [a-skill z-skill]}
+               result))
+        (is (= before-prompt after-prompt))
+        (is (= ["z-skill" "a-skill"] (:skill-ids sd)))
+        (is (nil? (:skills sd)))
         (is (= [:session/register-skill] event-types))))))
 
 ;; ── Auto-retry and compaction config ───────────────────────────────────────

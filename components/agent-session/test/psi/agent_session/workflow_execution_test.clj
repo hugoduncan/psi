@@ -10,6 +10,7 @@
    [psi.agent-session.workflow-execution-test-support :as support]
    [psi.shared-config.project :as project-prefs]
    [psi.shared-config.user :as user-config]
+   [psi.skill-registry.root-storage :as skill-storage]
    [psi.workflow-runtime.attempts]
    [psi.agent-session.workflow-execution :as workflow-execution]
    [psi.agent-session.workflow-judge]
@@ -431,12 +432,19 @@
                            [s _ _] (workflow-runtime/create-run s {:definition-id "planner"
                                                                    :run-id "run-ext-1"
                                                                    :workflow-input {:input "plan it"}})
-                           s (assoc-in s [:agent-session :sessions session-id :data :tool-defs]
-                                       [{:name "read" :description "Read" :parameters {:type "object" :properties {}}}])
+                           s (assoc-in s [:agent-session :sessions session-id :data :tool-ids]
+                                       ["read"])
+                           ;; Set tool-source in agent data-atom for resolve-tool-defs
+                           _ (swap! (get-in s [:agent-session :sessions session-id :agent-ctx :data-atom])
+                                    assoc :tools [{:name "read" :description "Read" :parameters {:type "object" :properties {}}}])
                            s (assoc-in s [:agent-session :sessions session-id :data :system-prompt-build-opts]
                                        {:selected-tools ["read" "psi-tool"]})
-                           s (assoc-in s [:agent-session :sessions session-id :data :prompt-contributions]
-                                       [contribution])]
+                           s (assoc-in s [:agent-session :sessions session-id :data :prompt-contribution-ids]
+                                       [(:id contribution)])
+                           s (assoc-in s [:root-registries :prompt-contributions :entries-by-id (:id contribution)]
+                                       {:id (:id contribution)
+                                        :extension-id (:ext-path contribution)
+                                        :value contribution})]
                        s)))]
       (with-redefs [psi.agent-session.turn/prompt-execution-result-in! (fn [_ctx _child-session-id _prompt]
                                                                          {:execution-result/assistant-message
@@ -451,9 +459,9 @@
                          :user-message {:role "user"
                                         :content [{:type :text :text "plan it"}]}})]
           (is (= :completed (:status result)))
-          (is (= [contribution]
-                 (mapv #(select-keys % [:id :ext-path :section :content :enabled :created-at :updated-at])
-                       (:prompt-contributions child-sd))))
+          (is (not (contains? child-sd :prompt-contributions))
+              ":prompt-contributions no longer persisted in session state")
+          (is (= [(:id contribution)] (:prompt-contribution-ids child-sd)))
           (is (str/includes? (:base-system-prompt child-sd) "λ engage(nucleus)."))
           (is (= "You are a planner." (:developer-prompt child-sd)))
           (is (str/includes? (:prepared-request/system-prompt prepared) "You are a planner."))
@@ -469,24 +477,32 @@
                      (let [[s _ _] (workflow-registry/register-definition state support/workflow-selection-definition)
                            [s _ _] (workflow-runtime/create-run s {:definition-id "planner-selection"
                                                                    :run-id "run-selection-1"
-                                                                   :workflow-input {:input "plan it"}})]
+                                                                   :workflow-input {:input "plan it"}})
+                           skill {:name "testing-best-practices"
+                                  :description "Testing guidance"
+                                  :file-path "/tmp/SKILL.md"
+                                  :base-dir "/tmp"
+                                  :source :project
+                                  :disable-model-invocation false}
+                           s (:root-state (skill-storage/set-skills-in-root-state s session-id [skill]))]
                        (-> s
-                           (assoc-in [:agent-session :sessions session-id :data :tool-defs]
-                                     [{:name "read" :description "Read"}
-                                      {:name "bash" :description "Bash"}])
-                           (assoc-in [:agent-session :sessions session-id :data :skills]
-                                     [{:name "testing-best-practices" :description "Testing"
-                                       :file-path "/s/SKILL.md"
-                                       :base-dir "/s"
-                                       :source :project
-                                       :disable-model-invocation false}])
-                           (assoc-in [:agent-session :sessions session-id :data :prompt-contributions]
-                                     [{:id "a"
-                                       :ext-path "/ext/a"
-                                       :content "A"
-                                       :enabled true
-                                       :created-at (java.time.Instant/parse "2026-04-22T12:00:00Z")
-                                       :updated-at (java.time.Instant/parse "2026-04-22T12:00:00Z")}])))))]
+                           (assoc-in [:agent-session :sessions session-id :data :tool-ids]
+                                     ["read" "bash"])
+                           ;; Set tool-source in agent data-atom for resolve-tool-defs
+                           (update-in [:agent-session :sessions session-id :agent-ctx :data-atom]
+                                      (fn [a] (swap! a assoc :tools [{:name "read" :description "Read" :parameters {:type "object" :properties {}}}
+                                                                     {:name "bash" :description "Bash" :parameters {:type "object" :properties {}}}]) a))
+                           (assoc-in [:agent-session :sessions session-id :data :prompt-contribution-ids]
+                                     ["a"])
+                           (assoc-in [:root-registries :prompt-contributions :entries-by-id "a"]
+                                     {:id "a"
+                                      :extension-id "/ext/a"
+                                      :value {:id "a"
+                                              :ext-path "/ext/a"
+                                              :content "A"
+                                              :enabled true
+                                              :created-at (java.time.Instant/parse "2026-04-22T12:00:00Z")
+                                              :updated-at (java.time.Instant/parse "2026-04-22T12:00:00Z")}})))))]
       (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
                     (fn [_ctx _child-session-id _prompt]
                       {:execution-result/assistant-message
@@ -501,8 +517,8 @@
                          :user-message {:role "user"
                                         :content [{:type :text :text "plan it"}]}})]
           (is (= :completed (:status result)))
-          (is (= ["read"] (mapv :name (:tool-defs child-sd))))
-          (is (= ["testing-best-practices"] (mapv :name (:skills child-sd))))
+          (is (= ["read"] (:tool-ids child-sd)))
+          (is (= ["testing-best-practices"] (:skill-ids child-sd)))
           (is (= {:agents-md? false
                   :extension-prompt-contributions []
                   :tool-names ["read"]

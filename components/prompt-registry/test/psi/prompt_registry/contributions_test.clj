@@ -4,12 +4,14 @@
    [psi.prompt-registry.contributions :as contributions]))
 
 (deftest normalize-identity-test
-  (testing "current first-cut behavior preserves string coercion for identity"
-    (is (= {:ext-path "/ext/a" :id "c1"}
+  (testing "canonical identity is string-coerced id alone"
+    (is (= {:id "c1"}
            (contributions/normalize-identity "/ext/a" "c1")))
-    (is (= {:ext-path "" :id ""}
+    (is (= {:id "c1"}
+           (contributions/normalize-identity "/ext/b" "c1")))
+    (is (= {:id ""}
            (contributions/normalize-identity nil nil)))
-    (is (= {:ext-path "" :id ""}
+    (is (= {:id ""}
            (contributions/normalize-identity "" "")))))
 
 (deftest normalize-contribution-test
@@ -64,7 +66,9 @@
            (contributions/all-contributions xs)))
     (is (= {:id "a" :ext-path "/ext/a" :priority 20}
            (contributions/find-contribution xs "/ext/a" "a")))
-    (is (nil? (contributions/find-contribution xs "/ext/missing" "a")))
+    (is (= {:id "a" :ext-path "/ext/a" :priority 20}
+           (contributions/find-contribution xs "/ext/missing" "a")))
+    (is (nil? (contributions/find-contribution xs "/ext/missing" "missing")))
     (is (= ["z" "a" "b"]
            (mapv :id (contributions/sort-contributions xs))))))
 
@@ -82,7 +86,7 @@
       (is (= (:contribution result)
              (first (:contributions result))))))
 
-  (testing "replacement resets created-at because canonical register rebuilds stored shape"
+  (testing "same-owner replacement resets created-at because canonical register rebuilds stored shape"
     (let [first-result (contributions/register-contribution [] "/ext/a" "c1" {:content "A"})
           original     (:contribution first-result)
           second-result (contributions/register-contribution (:contributions first-result)
@@ -92,10 +96,23 @@
       (is (true? (:replaced? second-result)))
       (is (= 1 (:count second-result)))
       (is (= "B" (:content replacement)))
+      (is (= "/ext/a" (:ext-path replacement)))
       (is (not= (:created-at original) (:created-at replacement)))
       (is (= (:created-at replacement) (:updated-at replacement)))))
 
-  (testing "current first-cut behavior preserves loose identity coercion"
+  (testing "cross-owner duplicate registration throws explicit ownership conflict"
+    (let [registered (contributions/register-contribution [] "/ext/a" "c1" {:content "A"})]
+      (try
+        (contributions/register-contribution (:contributions registered) "/ext/b" "c1" {:content "B"})
+        (is false "expected ownership conflict")
+        (catch clojure.lang.ExceptionInfo ex
+          (is (= :prompt-contribution/ownership-conflict
+                 (:kind (ex-data ex))))
+          (is (= "c1" (:id (ex-data ex))))
+          (is (= "/ext/a" (:owner (ex-data ex))))
+          (is (= "/ext/b" (:requested-owner (ex-data ex))))))))
+
+  (testing "current first-cut behavior preserves loose id coercion"
     (let [result (contributions/register-contribution [] nil nil {:content "A"})]
       (is (= "" (:ext-path (:contribution result))))
       (is (= "" (:id (:contribution result)))))))
@@ -108,6 +125,16 @@
       (is (nil? (:contribution result)))
       (is (= 0 (:count result)))
       (is (= [] (:contributions result)))))
+
+  (testing "owner mismatch does not update a contribution owned by another extension"
+    (let [registered (contributions/register-contribution [] "/ext/a" "c1" {:content "A"})
+          result     (contributions/update-contribution (:contributions registered)
+                                                        "/ext/b" "c1"
+                                                        {:content "B"})]
+      (is (false? (:updated? result)))
+      (is (false? (:changed? result)))
+      (is (nil? (:contribution result)))
+      (is (= 1 (:count result)))))
 
   (testing "hit updates only patchable fields and preserves created-at"
     (let [registered (contributions/register-contribution [] "/ext/a" "c1" {:content "A" :priority 10})
@@ -143,6 +170,14 @@
       (is (false? (:changed? result)))
       (is (nil? (:contribution result)))
       (is (= 0 (:count result)))))
+
+  (testing "owner mismatch does not remove a contribution owned by another extension"
+    (let [registered (contributions/register-contribution [] "/ext/a" "c1" {:content "A"})
+          result     (contributions/unregister-contribution (:contributions registered) "/ext/b" "c1")]
+      (is (false? (:removed? result)))
+      (is (false? (:changed? result)))
+      (is (nil? (:contribution result)))
+      (is (= 1 (:count result)))))
 
   (testing "hit removes the contribution and returns removed detail"
     (let [registered (contributions/register-contribution [] "/ext/a" "c1" {:content "A"})

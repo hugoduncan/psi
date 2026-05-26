@@ -19,7 +19,6 @@
    [psi.session-state.state :as ss]
    [psi.agent-session.statechart :as sc]
    [psi.agent-session.scheduler-time :as scheduler-time]
-   [psi.tool-registry.defs :as tool-defs]
    [psi.turn-statechart.core :as turn-sc]))
 
 (defonce ^:private scheduler-timer-handles* (atom {}))
@@ -102,7 +101,8 @@
 (defmethod execute-effect! :runtime/agent-set-system-prompt [ctx effect]
   (when-let [ac (effect-agent-ctx ctx effect)] (agent/set-system-prompt-in! ac (:prompt effect))))
 (defmethod execute-effect! :runtime/agent-set-tools [ctx effect]
-  (when-let [ac (effect-agent-ctx ctx effect)] (agent/set-tools-in! ac (tool-defs/agent-core-tools (:tool-maps effect)))))
+  (when-let [ac (effect-agent-ctx ctx effect)] (agent/set-tools-in! ac (vec (:tool-maps effect)))))
+
 (defmethod execute-effect! :runtime/agent-reset [ctx effect]
   (when-let [ac (effect-agent-ctx ctx effect)] (agent/reset-agent-in! ac)))
 (defmethod execute-effect! :runtime/agent-replace-messages [ctx effect]

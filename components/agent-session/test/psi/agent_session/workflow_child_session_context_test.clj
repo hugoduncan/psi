@@ -31,7 +31,7 @@
                    :response-mode :non-streaming
                    :logprobs true
                    :top-logprobs 4
-                   :tool-defs []
+                   :tool-ids []
                    :thinking-level :off
                    :model {:provider "openai" :id "gpt-5"}
                    :skills []
@@ -49,6 +49,8 @@
           agent-msgs (:messages (agent-core/get-data-in (ss/agent-ctx-in ctx child-session-id)))]
       (is (= {:psi.agent-session/session-id child-session-id} result))
       (is (= parent-session-id (:parent-session-id child-sd)))
+      (is (= [] (:skill-ids child-sd)))
+      (is (nil? (:skills child-sd)))
       (is (= "run-1" (:workflow-run-id child-sd)))
       (is (= "plan" (:workflow-step-id child-sd)))
       (is (= "attempt-1" (:workflow-attempt-id child-sd)))
@@ -71,7 +73,7 @@
           request {:child-session-id child-session-id
                    :session-name "workflow judge"
                    :system-prompt "judge system"
-                   :tool-defs []
+                   :tool-ids []
                    :thinking-level :off
                    :preloaded-messages [{:role "user" :content "judge this"}]
                    :workflow-owned? true}
@@ -80,6 +82,8 @@
           agent-msgs (:messages (agent-core/get-data-in (ss/agent-ctx-in ctx child-session-id)))]
       (is (= {:psi.agent-session/session-id child-session-id} result))
       (is (= parent-session-id (:parent-session-id child-sd)))
+      (is (= [] (:skill-ids child-sd)))
+      (is (nil? (:skills child-sd)))
       (is (= "workflow judge" (:session-name child-sd)))
       (is (= "judge system" (:system-prompt child-sd)))
       (is (true? (:workflow-owned? child-sd)))
@@ -97,7 +101,7 @@
                 parent-session-id
                 {:child-session-id "bad-child"
                  :session-name "workflow child"
-                 :tool-defs :not-a-vector
+                 :tool-ids :not-a-vector
                  :thinking-level :off})
                nil
                (catch clojure.lang.ExceptionInfo ex

@@ -19,6 +19,7 @@
    [psi.agent-session.psi-tool :as psi-tool]
    [psi.agent-session.tools :as builtins]
    [psi.prompt-assets.skills :as skills]
+   [psi.skill-registry.registry :as skill-registry]
    [psi.tool-registry.defs :as tool-defs]))
 
 (def ^:private default-tool-defs
@@ -217,7 +218,7 @@
 (defn filter-skills
   "Filter skill maps according to normalized prompt-component selection.
    When skills are disabled entirely, returns []. When :skill-names is absent,
-   returns the original skills."
+   returns the original skills in canonical skill-name order."
   [skills selection]
   (let [normalized (normalize-prompt-component-selection selection)]
     (cond
@@ -226,8 +227,8 @@
       (let [allowed (set (:skill-names normalized))]
         (->> skills
              (filter #(contains? allowed (:name %)))
-             vec))
-      :else (vec (or skills [])))))
+             skill-registry/all-skills))
+      :else (skill-registry/all-skills skills))))
 
 (def ^:private datetime-formatter
   (java.time.format.DateTimeFormatter/ofPattern

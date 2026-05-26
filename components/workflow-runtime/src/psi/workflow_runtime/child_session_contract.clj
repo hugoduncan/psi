@@ -12,7 +12,7 @@
    [:system-prompt {:optional true} [:maybe :string]]
    [:prompt-mode {:optional true} [:maybe keyword?]]
    [:response-mode {:optional true} [:maybe keyword?]]
-   [:tool-defs {:optional true} [:maybe [:vector :map]]]
+   [:tool-ids {:optional true} [:maybe [:vector :string]]]
    [:thinking-level {:optional true} [:maybe keyword?]]
    [:temperature {:optional true} [:maybe number?]]
    [:model {:optional true} [:maybe :map]]

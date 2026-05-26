@@ -112,7 +112,7 @@
 
   (kernel/register-handler!
    :session/create-child
-   (fn [ctx {:keys [session-id child-session-id session-name worktree-path system-prompt prompt-mode response-mode logprobs top-logprobs tool-defs thinking-level model skills developer-prompt developer-prompt-source preloaded-messages cache-breakpoints prompt-component-selection workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?]}]
+   (fn [ctx {:keys [session-id child-session-id session-name worktree-path system-prompt prompt-mode response-mode logprobs top-logprobs tool-ids thinking-level model skills developer-prompt developer-prompt-source preloaded-messages cache-breakpoints prompt-component-selection workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?]}]
      (let [parent-sd (or (session/get-session-data-in ctx session-id)
                          {:worktree-path worktree-path})]
        {:root-state-update #(child-session-state/initialize-child-session-state % parent-sd
@@ -123,7 +123,7 @@
                                                                                  :response-mode          response-mode
                                                                                  :logprobs               logprobs
                                                                                  :top-logprobs           top-logprobs
-                                                                                 :tool-defs              tool-defs
+                                                                                 :tool-ids               tool-ids
                                                                                  :thinking-level         thinking-level
                                                                                  :model                  model
                                                                                  :skills                 skills
@@ -139,7 +139,7 @@
         :effects [{:effect/type :projection/context-changed
                    :session-id child-session-id
                    :reason :session/create-child}]
-        :return child-session-id})))
+        :return-key (session/session-data-path child-session-id)})))
 
   (kernel/register-handler!
    :session/resume-missing-initialize

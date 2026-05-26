@@ -204,6 +204,26 @@
                :step "report"}]
              (:semantic-errors result)))))
 
+  (testing "semantic validation allows self-loop control edges while keeping data refs prior-only"
+    (let [self-loop-step {:name "build"
+                          :type :session
+                          :session {:contributions [{:type :template
+                                                     :text "Build {{input}}"
+                                                     :vars {"input" {:from :workflow-input :path [:input]}}}]}
+                          :outputs {:final-llm-reply {:source :session/final-llm-reply}}
+                          :yields {:type :text :text :final-llm-reply}
+                          :judge {:type :llm
+                                  :session {:contributions [{:type :template
+                                                             :text "REPEAT or DONE"
+                                                             :vars {}}]}}
+                          :on {"REPEAT" {:goto "build" :max-iterations 3}
+                               "DONE" {:goto :done}}}
+          ir {:version :workflow-ir/v1
+              :steps [self-loop-step]}
+          result (workflow-ir/validate-workflow-ir ir)]
+      (is (= {:valid? true :structural-errors nil :semantic-errors []}
+             result))))
+
   (testing "semantic validation rejects non-prior-step refs"
     (let [future-session-step (assoc valid-session-step
                                      :session {:contributions [{:type :template
@@ -214,6 +234,88 @@
           result (workflow-ir/validate-workflow-ir ir)]
       (is (false? (:valid? result)))
       (is (= :non-prior-step-ref (-> result :semantic-errors first :type)))))
+
+  (testing "semantic validation rejects self/future refs across delegate target and prompt-map surfaces"
+    (let [self-target-step {:name "self-target"
+                            :type :delegate
+                            :delegate {:target {:from {:step "self-target" :output :data}
+                                                :path [:workflow]}
+                                       :prompt-string {:type :map
+                                                       :fields {:report {:from {:step "discover" :output :data}}}}
+                                       :context [{:type :source
+                                                  :from :workflow-original}]}
+                            :outputs {:data {:source :delegate/data}}
+                            :yields {:type :delegated}}
+          future-prompt-map-step {:name "map-future"
+                                  :type :delegate
+                                  :delegate {:target "builder"
+                                             :prompt-string {:type :map
+                                                             :fields {:report {:from {:step "later" :output :data}}}}
+                                             :context [{:type :source
+                                                        :from :workflow-original}]}
+                                  :yields {:type :delegated}}
+          later-step (assoc valid-session-step
+                            :name "later"
+                            :session {:contributions [{:type :source
+                                                       :from :workflow-original}]})
+          self-result (workflow-ir/validate-workflow-ir
+                       {:version :workflow-ir/v1
+                        :steps [valid-invoke-step self-target-step]})
+          future-result (workflow-ir/validate-workflow-ir
+                         {:version :workflow-ir/v1
+                          :steps [valid-invoke-step future-prompt-map-step later-step]})]
+      (is (false? (:valid? self-result)))
+      (is (= :non-prior-step-ref (-> self-result :semantic-errors first :type)))
+      (is (false? (:valid? future-result)))
+      (is (= :non-prior-step-ref (-> future-result :semantic-errors first :type)))))
+
+  (testing "semantic validation rejects self/future refs across delegate context and judge-owned source surfaces"
+    (let [self-context-step {:name "self-context"
+                             :type :delegate
+                             :delegate {:target "builder"
+                                        :prompt-string {:type :template
+                                                        :text "Prompt"
+                                                        :vars {}}
+                                        :context [{:type :source
+                                                   :from {:step "self-context" :yield :text}}]}
+                             :yields {:type :delegated}}
+          future-judge-llm-step {:name "judge-llm-future"
+                                 :type :session
+                                 :session {:contributions [{:type :source
+                                                            :from :workflow-original}]}
+                                 :outputs {:final-llm-reply {:source :session/final-llm-reply}}
+                                 :yields {:type :text :text :final-llm-reply}
+                                 :judge {:type :llm
+                                         :session {:contributions [{:type :template
+                                                                    :text "{{later}}"
+                                                                    :vars {"later" {:from {:step "later" :output :data}}}}]}}
+                                 :on {"DONE" {:goto :done}}}
+          future-judge-invoke-step {:name "judge-invoke-future"
+                                    :type :session
+                                    :session {:contributions [{:type :source
+                                                               :from :workflow-original}]}
+                                    :outputs {:final-llm-reply {:source :session/final-llm-reply}}
+                                    :yields {:type :text :text :final-llm-reply}
+                                    :judge {:type :invoke
+                                            :invoke {:operation "workflow/classify-result"
+                                                     :args {:result {:from {:step "later" :output :data}}}}}
+                                    :on {"DONE" {:goto :done}}}
+          later-step (assoc valid-invoke-step :name "later")
+          self-result (workflow-ir/validate-workflow-ir
+                       {:version :workflow-ir/v1
+                        :steps [self-context-step]})
+          llm-result (workflow-ir/validate-workflow-ir
+                      {:version :workflow-ir/v1
+                       :steps [future-judge-llm-step later-step]})
+          invoke-result (workflow-ir/validate-workflow-ir
+                         {:version :workflow-ir/v1
+                          :steps [future-judge-invoke-step later-step]})]
+      (is (false? (:valid? self-result)))
+      (is (= :non-prior-step-ref (-> self-result :semantic-errors first :type)))
+      (is (false? (:valid? llm-result)))
+      (is (= :non-prior-step-ref (-> llm-result :semantic-errors first :type)))
+      (is (false? (:valid? invoke-result)))
+      (is (= :non-prior-step-ref (-> invoke-result :semantic-errors first :type)))))
 
   (testing "semantic validation rejects refs to undeclared output keys"
     (let [bad-session-step (assoc valid-session-step

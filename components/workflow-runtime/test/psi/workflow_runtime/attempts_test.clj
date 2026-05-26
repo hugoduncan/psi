@@ -118,7 +118,7 @@
                   :response-mode :non-streaming
                   :logprobs true
                   :top-logprobs 2
-                  :tool-defs [{:name "read"}]
+                  :tool-ids ["read"]
                   :thinking-level :off
                   :model {:provider "openai" :id "gpt-5"}
                   :skills [{:name "skill-a"}]

@@ -310,18 +310,18 @@
 ;; ============================================================
 
 (deftest format-skills-for-prompt-test
-  (testing "formats visible skills as XML"
-    (let [all-skills [{:name "alpha" :description "Alpha skill"
-                       :file-path "/alpha/SKILL.md" :base-dir "/alpha"
-                       :source :user :disable-model-invocation false}
-                      {:name "beta" :description "Beta skill"
+  (testing "formats visible skills as XML in canonical skill-name order"
+    (let [all-skills [{:name "beta" :description "Beta skill"
                        :file-path "/beta/SKILL.md" :base-dir "/beta"
-                       :source :project :disable-model-invocation false}]
+                       :source :project :disable-model-invocation false}
+                      {:name "alpha" :description "Alpha skill"
+                       :file-path "/alpha/SKILL.md" :base-dir "/alpha"
+                       :source :user :disable-model-invocation false}]
           result (skills/format-skills-for-prompt all-skills)]
       (is (str/includes? result "<available_skills>"))
       (is (str/includes? result "</available_skills>"))
-      (is (str/includes? result "<name>alpha</name>"))
-      (is (str/includes? result "<name>beta</name>"))
+      (is (< (str/index-of result "<name>alpha</name>")
+             (str/index-of result "<name>beta</name>")))
       (is (str/includes? result "<description>Alpha skill</description>"))
       (is (str/includes? result "<location>/alpha/SKILL.md</location>"))))
 
@@ -437,43 +437,44 @@
 ;; ============================================================
 
 (deftest skill-summary-test
-  (testing "summarizes skills"
-    (let [all-skills [{:name "a" :description "A" :source :user :disable-model-invocation false}
-                      {:name "b" :description "B" :source :project :disable-model-invocation false}
-                      {:name "c" :description "C" :source :user :disable-model-invocation true}]
+  (testing "summarizes skills in canonical skill-name order"
+    (let [all-skills [{:name "c" :description "C" :source :user :disable-model-invocation true}
+                      {:name "a" :description "A" :source :user :disable-model-invocation false}
+                      {:name "b" :description "B" :source :project :disable-model-invocation false}]
           summary (skills/skill-summary all-skills)]
       (is (= 3 (:skill-count summary)))
       (is (= 2 (:visible-count summary)))
       (is (= 1 (:hidden-count summary)))
-      (is (= 3 (count (:skills summary)))))))
+      (is (= ["a" "b" "c"] (mapv :name (:skills summary)))))))
 
 (deftest skill-names-test
-  (testing "returns name vector"
-    (let [all-skills [{:name "x" :description "X" :source :user :disable-model-invocation false}
-                      {:name "y" :description "Y" :source :user :disable-model-invocation false}]]
+  (testing "returns canonical name vector"
+    (let [all-skills [{:name "y" :description "Y" :source :user :disable-model-invocation false}
+                      {:name "x" :description "X" :source :user :disable-model-invocation false}]]
       (is (= ["x" "y"] (skills/skill-names all-skills))))))
 
 (deftest skills-by-source-test
-  (testing "groups by source"
-    (let [all-skills [{:name "a" :description "A" :source :user :disable-model-invocation false}
+  (testing "groups by source with each source group in canonical skill-name order"
+    (let [all-skills [{:name "z" :description "Z" :source :user :disable-model-invocation false}
                       {:name "b" :description "B" :source :project :disable-model-invocation false}
-                      {:name "c" :description "C" :source :user :disable-model-invocation false}]
+                      {:name "a" :description "A" :source :user :disable-model-invocation false}
+                      {:name "c" :description "C" :source :project :disable-model-invocation false}]
           grouped (skills/skills-by-source all-skills)]
-      (is (= 2 (count (:user grouped))))
-      (is (= 1 (count (:project grouped)))))))
+      (is (= ["a" "z"] (mapv :name (:user grouped))))
+      (is (= ["b" "c"] (mapv :name (:project grouped)))))))
 
 (deftest visible-hidden-skills-test
-  (testing "visible-skills excludes hidden"
-    (let [all-skills [{:name "v" :description "V" :source :user :disable-model-invocation false}
-                      {:name "h" :description "H" :source :user :disable-model-invocation true}]]
-      (is (= 1 (count (skills/visible-skills all-skills))))
-      (is (= "v" (:name (first (skills/visible-skills all-skills)))))))
+  (testing "visible-skills excludes hidden and returns canonical order"
+    (let [all-skills [{:name "z" :description "Z" :source :user :disable-model-invocation false}
+                      {:name "h" :description "H" :source :user :disable-model-invocation true}
+                      {:name "a" :description "A" :source :user :disable-model-invocation false}]]
+      (is (= ["a" "z"] (mapv :name (skills/visible-skills all-skills))))))
 
-  (testing "hidden-skills returns only hidden"
+  (testing "hidden-skills returns only hidden in canonical order"
     (let [all-skills [{:name "v" :description "V" :source :user :disable-model-invocation false}
-                      {:name "h" :description "H" :source :user :disable-model-invocation true}]]
-      (is (= 1 (count (skills/hidden-skills all-skills))))
-      (is (= "h" (:name (first (skills/hidden-skills all-skills))))))))
+                      {:name "z-hidden" :description "Z" :source :user :disable-model-invocation true}
+                      {:name "a-hidden" :description "A" :source :user :disable-model-invocation true}]]
+      (is (= ["a-hidden" "z-hidden"] (mapv :name (skills/hidden-skills all-skills)))))))
 
 (deftest enrich-skill-test
   (testing "adds is-available-to-model"
@@ -491,7 +492,19 @@
 ;; ============================================================
 
 (deftest skill-eql-introspection-test
-  (let [all-skills [{:name "alpha"
+  (let [all-skills [{:name "zeta"
+                     :description "Zeta skill"
+                     :file-path "/zeta/SKILL.md"
+                     :base-dir "/zeta"
+                     :source :user
+                     :disable-model-invocation false}
+                    {:name "gamma"
+                     :description "Gamma skill"
+                     :file-path "/gamma/SKILL.md"
+                     :base-dir "/gamma"
+                     :source :project
+                     :disable-model-invocation true}
+                    {:name "alpha"
                      :description "Alpha skill"
                      :file-path "/alpha/SKILL.md"
                      :base-dir "/alpha"
@@ -510,30 +523,30 @@
 
     (testing "query skill count via EQL"
       (let [result (session-core/query-in ctx session-id [:psi.skill/count])]
-        (is (= 2 (:psi.skill/count result)))))
+        (is (= 4 (:psi.skill/count result)))))
 
     (testing "query visible/hidden counts via EQL"
       (let [result (session-core/query-in ctx session-id [:psi.skill/visible-count
                                                           :psi.skill/hidden-count])]
-        (is (= 1 (:psi.skill/visible-count result)))
-        (is (= 1 (:psi.skill/hidden-count result)))))
+        (is (= 2 (:psi.skill/visible-count result)))
+        (is (= 2 (:psi.skill/hidden-count result)))))
 
     (testing "query skill names via EQL"
       (let [result (session-core/query-in ctx session-id [:psi.skill/names])]
-        (is (= ["alpha" "beta"] (:psi.skill/names result)))))
+        (is (= ["alpha" "beta" "gamma" "zeta"] (:psi.skill/names result)))))
 
     (testing "query skill summary via EQL"
       (let [result  (session-core/query-in ctx session-id [:psi.skill/summary])
             summary (:psi.skill/summary result)]
-        (is (= 2 (:skill-count summary)))
-        (is (= 1 (:visible-count summary)))
-        (is (= 1 (:hidden-count summary)))))
+        (is (= 4 (:skill-count summary)))
+        (is (= 2 (:visible-count summary)))
+        (is (= 2 (:hidden-count summary)))))
 
     (testing "query skills by source via EQL"
       (let [result  (session-core/query-in ctx session-id [:psi.skill/by-source])
             grouped (:psi.skill/by-source result)]
-        (is (= 1 (count (:user grouped))))
-        (is (= 1 (count (:project grouped))))))))
+        (is (= ["alpha" "zeta"] (mapv :name (:user grouped))))
+        (is (= ["beta" "gamma"] (mapv :name (:project grouped))))))))
 
 (deftest skill-detail-eql-test
   (let [all-skills [{:name "alpha"

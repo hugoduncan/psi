@@ -35,6 +35,15 @@
    :history-sync {:imported-count 1
                   :memory-entry-count 42}})
 
+(defn- wait-until
+  [pred]
+  (loop [attempt 0]
+    (if (pred)
+      true
+      (when (< attempt 100)
+        (Thread/sleep 20)
+        (recur (inc attempt))))))
+
 (deftest register-extension-run-fn-routes-through-prompt-lifecycle-test
   (let [ctx              (session/create-context (test-support/safe-context-opts {:persist? false}))
         sd               (session/new-session-in! ctx nil {})
@@ -60,7 +69,22 @@
       (let [run-fn @(:extension-run-fn-atom ctx)]
         (is (fn? run-fn))
         (run-fn "hello from extension" :test-source)
-        (Thread/sleep 50)
+        (is (wait-until
+             (fn []
+               (let [event-types (mapv :event-type (kernel/event-log-entries))
+                     messages    (->> (persist/all-entries-in ctx session-id)
+                                      (filter #(= :message (:kind %)))
+                                      (map #(get-in % [:data :message]))
+                                      vec)]
+                 (and (some #{:session/prompt-finish} event-types)
+                      (= 1 (count @sync-calls))
+                      (= 2 (count messages))))))
+            {:event-types (mapv :event-type (kernel/event-log-entries))
+             :messages (->> (persist/all-entries-in ctx session-id)
+                            (filter #(= :message (:kind %)))
+                            (map #(get-in % [:data :message]))
+                            vec)
+             :sync-calls @sync-calls})
         (let [entries   (kernel/event-log-entries)
               messages  (->> (persist/all-entries-in ctx session-id)
                              (filter #(= :message (:kind %)))

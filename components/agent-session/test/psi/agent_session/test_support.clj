@@ -19,7 +19,7 @@
    [psi.agent-session.workflow-judge]
    [psi.agent-session.context :as session-context]
    [psi.session-state.model :as session-data]
-   [psi.skill-registry.registry]
+   [psi.skill-registry.root-storage :as skill-storage]
    [psi.workflow-runtime.execution-adapter :as workflow-execution-adapter]
    [psi.workflow-step-materialization.core]
    [psi.workflow-step-session-config.core]
@@ -162,6 +162,10 @@
         initial-sd    (merge (assoc (session-data/initial-session {})
                                     :provider-error-replies [])
                              (or session-data {}))
+        initial-sd    (cond-> initial-sd
+                        (contains? initial-sd :skills)
+                        (-> (assoc :skill-ids (mapv :name (or (:skills initial-sd) [])))
+                            (dissoc :skills)))
         sid           (:session-id initial-sd)
         base-state    {:agent-session {:sessions {sid {:data          initial-sd
                                                        :agent-ctx     agent-ctx*
@@ -179,7 +183,19 @@
                                                        :turn {:ctx nil}}}}
                        :background-jobs {:store (bg-jobs/empty-state)}
                        :ui {:extension-ui @(ui-state/create-ui-state)}}
-        state*               (atom (merge base-state (or state {})))
+        state-with-skills    (if (contains? initial-sd :skill-ids)
+                               (let [seed-skills (or (:skills session-data)
+                                                     (mapv (fn [skill-id]
+                                                             {:name skill-id
+                                                              :description (str skill-id " description")
+                                                              :source :project
+                                                              :disable-model-invocation false})
+                                                           (:skill-ids initial-sd)))]
+                                 (-> (merge base-state (or state {}))
+                                     (skill-storage/set-skills-in-root-state sid seed-skills)
+                                     :root-state))
+                               (merge base-state (or state {})))
+        state*               (atom state-with-skills)
         ext-reg       (ext/create-registry)
         wf-reg        (extension-workflow-runtime/create-registry)
         sc-env        (session-sc/create-sc-env)
@@ -188,7 +204,7 @@
         ctx0          {:state*                       state*
                        :sc-env                       sc-env
                        :config                       {}
-                       :session-defaults             (or session-data {})
+                       :session-defaults             initial-sd
                        :extension-registry           ext-reg
                        :workflow-registry            wf-reg
                        :service-registry             (services/create-registry)
@@ -256,7 +272,7 @@
                                                          msg)))
                        :get-session-data-fn          ss/get-session-data-in
                        :list-context-sessions-fn     ss/list-context-sessions-in
-                       :find-skill-fn                psi.skill-registry.registry/find-skill
+                       :find-skill-fn                psi.skill-registry.root-storage/find-skill-in
                        :resolve-workflow-step-session-config-fn psi.workflow-step-session-config.core/resolve-step-session-config
                        :materialize-workflow-step-session-conversation-fn psi.workflow-step-materialization.core/materialize-step-session-conversation
                        :split-workflow-step-session-conversation-fn psi.workflow-step-materialization.core/split-step-session-conversation

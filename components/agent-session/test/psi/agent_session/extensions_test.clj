@@ -283,6 +283,48 @@
         (is (contains? (:tool-names s) "t1"))
         (is (contains? (:handler-events s) "e"))))))
 
+(deftest extension-introspection-operation-projection-test
+  (testing "operation projection surfaces remain coherent while runtime ownership is external"
+    (let [reg    (ext/create-registry)
+          op-reg (op-reg/create-registry)]
+      (ext/register-extension-in! reg "/ext/a")
+      (ext/register-extension-in! reg "/ext/b")
+      (ext/register-operation-in! reg "/ext/a" {:id "github/search"
+                                                :handler (fn [_] {:status :ok :data {}})})
+      (ext/register-operation-in! reg "/ext/b" {:id "jira/search"
+                                                :handler (fn [_] {:status :ok :data {}})})
+      (op-reg/register-operation-in! op-reg {:id "github/search"
+                                             :ext-path "/ext/a"
+                                             :handler (fn [_] {:status :ok :data {}})})
+      (op-reg/register-operation-in! op-reg {:id "jira/search"
+                                             :ext-path "/ext/b"
+                                             :handler (fn [_] {:status :ok :data {}})})
+      (is (= #{"github/search" "jira/search"}
+             (ext/operation-ids-in reg)))
+      (is (= {:path "/ext/a"
+              :handler-names #{}
+              :handler-count 0
+              :tool-names #{}
+              :tool-count 0
+              :operation-ids #{"github/search"}
+              :operation-count 1
+              :command-names #{}
+              :command-count 0
+              :flag-names #{}
+              :flag-count 0
+              :shortcut-count 0
+              :allowed-events (:allowed-events (ext/extension-detail-in reg "/ext/a"))}
+             (ext/extension-detail-in reg "/ext/a")))
+      (is (= [#{"github/search"} #{"jira/search"}]
+             (mapv :operation-ids (ext/extension-details-in reg))))
+      (is (= #{"github/search" "jira/search"}
+             (:operation-ids (ext/summary-in reg))))
+      (ext/unregister-extension-in! reg "/ext/a" op-reg)
+      (is (= #{"jira/search"}
+             (ext/operation-ids-in reg)))
+      (is (= #{"jira/search"}
+             (:operation-ids (ext/summary-in reg)))))))
+
 ;; ── Flag management ─────────────────────────────────────────────────────────
 
 (deftest flag-registration-test
@@ -508,7 +550,7 @@
                                            :handler (fn [_] {:status :ok :data {}})})
     (ext/unregister-extension-in! reg "/ext/a" op-reg)
     (is (= #{"/ext/b"} (set (ext/extensions-in reg))))
-    (is (= ["jira/search"] (op-reg/operation-ids-in op-reg)))
+    (is (= #{"jira/search"} (set (op-reg/operation-ids-in op-reg))))
     (is (thrown-with-msg?
          clojure.lang.ExceptionInfo
          #"not found"
@@ -525,8 +567,8 @@
      ext-path
      {:id "github/search-issues-by-label"
       :handler (fn [_] {:status :ok :data {:issues []}})})
-    (is (= ["github/search-issues-by-label"]
-           (op-reg/operation-ids-in op-registry)))
+    (is (= #{"github/search-issues-by-label"}
+           (set (op-reg/operation-ids-in op-registry))))
     (ext/reload-extensions-in! reg runtime-fns [])
     (is (= [] (ext/extensions-in reg)))
     (is (= [] (op-reg/operation-ids-in op-registry)))

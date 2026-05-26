@@ -6,7 +6,8 @@
    [psi.prompt-assets.skills :as skills]
    [psi.session-journal.store :as journal-store]
    [psi.agent-session.resolvers.support :as support]
-   [psi.skill-registry.registry :as skill-registry]))
+   [psi.skill-registry.registry :as skill-registry]
+   [psi.skill-registry.root-storage :as skill-storage]))
 
 ;; ── Prompt template introspection ────────────────────────
 
@@ -27,11 +28,12 @@
 (pco/defresolver prompt-template-detail-resolver
   "Resolve a single enriched prompt template by name.
    Seed input: {:psi.prompt-template/name \"template-name\"}"
-  [{:keys [psi/agent-session-ctx psi.agent-session/session-id psi.prompt-template/name]}]
+  [{:keys [psi/agent-session-ctx psi.agent-session/session-id]
+    template-name :psi.prompt-template/name}]
   {::pco/input  [:psi/agent-session-ctx :psi.agent-session/session-id :psi.prompt-template/name]
    ::pco/output [:psi.prompt-template/detail]}
   (let [templates (:prompt-templates (support/session-data agent-session-ctx session-id))
-        tpl       (pt/find-template templates name)]
+        tpl       (pt/find-template templates template-name)]
     {:psi.prompt-template/detail
      (when tpl (pt/enrich-template tpl))}))
 
@@ -47,8 +49,9 @@
                  :psi.skill/visible-count
                  :psi.skill/hidden-count
                  :psi.skill/by-source]}
-  (let [all-skills (:skills (support/session-data agent-session-ctx session-id))
-        summary    (skills/skill-summary all-skills)]
+  (let [session-data (support/session-data agent-session-ctx session-id)
+        all-skills   (skill-storage/all-skills @(:state* agent-session-ctx) session-data)
+        summary      (skills/skill-summary all-skills)]
     {:psi.skill/summary       summary
      :psi.skill/names         (skill-registry/skill-names all-skills)
      :psi.skill/count         (:skill-count summary)
@@ -59,11 +62,12 @@
 (pco/defresolver skill-detail-resolver
   "Resolve a single enriched skill by name.
    Seed input: {:psi.skill/name \"skill-name\"}"
-  [{:keys [psi/agent-session-ctx psi.agent-session/session-id psi.skill/name]}]
+  [{:keys [psi/agent-session-ctx psi.agent-session/session-id]
+    skill-name :psi.skill/name}]
   {::pco/input  [:psi/agent-session-ctx :psi.agent-session/session-id :psi.skill/name]
    ::pco/output [:psi.skill/detail]}
-  (let [all-skills (:skills (support/session-data agent-session-ctx session-id))
-        skill      (skill-registry/find-skill all-skills name)]
+  (let [session-data (support/session-data agent-session-ctx session-id)
+        skill        (skill-storage/find-skill @(:state* agent-session-ctx) session-data skill-name)]
     {:psi.skill/detail
      (when skill (skills/enrich-skill skill))}))
 

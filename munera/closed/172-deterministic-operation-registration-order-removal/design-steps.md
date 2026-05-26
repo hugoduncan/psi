@@ -1,0 +1,4 @@
+- [x] Add `plan.md` with the intended implementation approach for this task so ambiguity review can evaluate whether the design is being executed through a single unambiguous method.
+- [x] Add `steps.md` with an explicit execution checklist for this task so ambiguity review can evaluate coverage/completeness against the design acceptance and affected proof surfaces.
+- [x] Update `steps.md` so it explicitly names the required `components/agent-session/test/psi/agent_session/extensions_test.clj` unordered-membership proof pass called out in `design.md`, rather than leaving that higher-surface obligation implicit under a generic “higher proof surfaces” step.
+- [x] Clarify the task-`171` update obligation by naming which `munera/open/171-deterministic-operation-registry-shared-storage-migration/` artifact(s) must be edited after this task completes, and what minimum semantic change those edits must record so task `172` completion is unambiguous.

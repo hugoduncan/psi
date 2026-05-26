@@ -5,7 +5,7 @@ description: Repeatedly implement a Munera task in autonomous passes until no co
 {:terminal-contract {:handoff {:type :markdown-handoff-data}}
  :steps [{:name "implement-pass"
           :type :session
-          :tools ["read" "bash" "edit" "write"]
+          :tools ["read" "bash" "edit" "write" "edit-clj"]
           :skills ["work-independently" "clojure-coding-standards" "testing-without-mocks"]
           :contributions [{:type :source
                            :from :workflow-original}
@@ -29,29 +29,26 @@ Required procedure:
 End your final response with exactly one of:
 PASS_STATUS: MORE_WORK_REMAINS
 PASS_STATUS: IMPLEMENTATION_COMPLETE"
-                           :vars {"input" {:from :workflow-input}}}]}
-         {:name "implementation-status"
-          :type :session
-          :tools ["read" "bash"]
-          :contributions [{:type :source
-                           :from :workflow-original}
-                          {:type :source
-                           :from {:step "implement-pass" :yield :text}}
-                          {:type :template
-                           :text "Review the specific Munera task described by {{input}} and decide whether implementation work still remains. Independently inspect that task's artifacts, especially `design.md`, `plan.md`, `steps.md`, and `implementation.md`, and use the prior implementation-pass output as supporting context.
+                           :vars {"input" {:from :workflow-input
+                                            :path [:input]}}}]
+          :judge {:type :llm
+                  :contributions [{:type :source
+                                   :from :workflow-original}
+                                  {:type :template
+                                   :text "Review the specific Munera task described by {{input}} and decide whether implementation work still remains. Independently inspect that task's artifacts, especially `design.md`, `plan.md`, `steps.md`, and `implementation.md`.
 
 Respond with exactly one word: REPEAT or DONE.
 
-Return REPEAT if the task still has remaining unchecked implementation work, unmet acceptance criteria, missing verification, or newly discovered follow-up work that should be executed in another implementation pass.
-
-Return DONE only if the task implementation is complete enough for handoff: the implementation work is done, relevant verification has been run, and the task artifacts do not indicate remaining implementation work.
+Decision rules:
+- Respond REPEAT if `steps.md` still contains any unchecked implementation item (`- [ ]`) that is not explicitly marked as intentionally deferred or out of scope.
+- Respond REPEAT if the task artifacts record unmet acceptance criteria, missing verification, blocked implementation follow-up, or newly discovered concrete work for another implementation pass.
+- Respond DONE only if the implementation work is complete enough for handoff: no remaining unchecked implementation items, relevant verification has been run, and the task artifacts do not indicate remaining implementation work.
+- Trust the task artifacts over any incomplete or stale supporting context.
 
 Do not review the repository generically. Judge only the specific named task from the actor-step context."
-                           :vars {"input" {:from :workflow-input}}}]
-          :judge {:type :llm
-                  :contributions [{:type :template
-                                   :text "Respond exactly with one word: REPEAT or DONE."
-                                   :vars {}}]}
+                                   :vars {"input" {:from :workflow-input
+                                                    :path [:input]}}}]
+                  :prompt "Respond exactly with one word: REPEAT or DONE. Inspect the specific Munera task artifacts before deciding. If any unchecked implementation checklist item remains in `steps.md`, respond REPEAT."}
           :on {"REPEAT" {:goto "implement-pass"
                           :max-iterations 8}
                "DONE"   {:goto "final-summary"}}}
@@ -86,9 +83,10 @@ Output requirements:
   - `deviation_summary:`
 
 If a field is not available, omit it rather than inventing it."
-                           :vars {"input" {:from :workflow-input}}}]}]}
+                           :vars {"input" {:from :workflow-input
+                                            :path [:input]}}}]}]}
 
-Repeatedly executes autonomous implementation passes against a specific Munera task until the task appears complete. Each pass performs concrete implementation work, updates task artifacts, runs relevant verification, and commits changes. A control step judges REPEAT or DONE based on the current state of that specific task.
+Repeatedly executes autonomous implementation passes against a specific Munera task until the task appears complete. Each pass performs concrete implementation work, updates task artifacts, runs relevant verification, and commits changes. The implement-pass step carries an attached judge that decides REPEAT or DONE based on the current state of that specific task.
 
 Input shapes:
 - `{:input "munera/open/003-foo"}` for direct use

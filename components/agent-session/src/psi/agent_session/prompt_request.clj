@@ -8,10 +8,12 @@
    [psi.ai.model-registry :as model-registry]
    [psi.turn-runtime.request :as turn-request]
    [psi.prompt-assets.prompt-templates :as prompt-templates]
+   [psi.prompt-assets.skills :as prompt-skills]
    [psi.provider-auth.core :as provider-auth]
    [psi.session-state.state :as ss]
-   [psi.prompt-assets.skills :as skills]
-   [psi.prompt-assets.system-prompt :as system-prompt]))
+   [psi.prompt-assets.system-prompt :as system-prompt]
+   [psi.skill-registry.root-storage :as skill-storage]
+   [psi.tool-registry.defs :as tool-defs]))
 
 (defn- assistant-tool-call-ids
   [message]
@@ -180,16 +182,16 @@
     (model-registry/resolve-runtime-model ctx provider model-id)))
 
 (defn- sorted-contributions
-  [session-data]
-  (-> (:prompt-contributions session-data)
+  [ctx session-id session-data]
+  (-> (ss/list-prompt-contributions-in ctx session-id)
       (system-prompt/filter-prompt-contributions (:prompt-component-selection session-data))
       ss/sorted-prompt-contributions))
 
 (defn- input-expansion
-  [session-data text commands]
-  (let [loaded-skills (:skills session-data)
-        templates     (:prompt-templates session-data)]
-    (if-let [skill-result (skills/invoke-skill loaded-skills text)]
+  [root-state session-data text commands]
+  (let [templates (:prompt-templates session-data)
+        skills    (skill-storage/all-skills root-state session-data)]
+    (if-let [skill-result (prompt-skills/invoke-skill skills text)]
       {:text      (:content skill-result)
        :expansion {:kind :skill :name (:skill-name skill-result)}}
       (if-let [tpl-result (prompt-templates/invoke-template templates commands text)]
@@ -204,13 +206,13 @@
 
    Returns {:user-message message :expansion expansion?} or nil when the input
    message is nil or has no text block to expand."
-  [session-data user-message commands]
+  [root-state session-data user-message commands]
   (when-let [text (some->> (:content user-message)
                            (keep (fn [block]
                                    (when (= :text (:type block))
                                      (:text block))))
                            first)]
-    (let [{expanded-text :text expansion :expansion} (input-expansion session-data text commands)]
+    (let [{expanded-text :text expansion :expansion} (input-expansion root-state session-data text commands)]
       {:user-message (update user-message :content
                              (fn [blocks]
                                (let [replaced? (atom false)]
@@ -243,8 +245,8 @@
          not-empty)))
 
 (defn- expanded-turn-input
-  [session-data user-message commands]
-  (or (expand-user-message session-data user-message commands)
+  [root-state session-data user-message commands]
+  (or (expand-user-message root-state session-data user-message commands)
       {:user-message user-message
        :expansion nil}))
 
@@ -252,9 +254,10 @@
   [ctx session-id session-data user-message]
   (let [base-messages     (-> (session->provider-messages ctx session-id)
                               (replace-current-user-message user-message))
-        steering-messages (queued-steering-messages session-data user-message)]
-    {:messages (cond-> base-messages
-                 (seq steering-messages) (into steering-messages))
+        steering-messages (queued-steering-messages session-data user-message)
+        messages          (cond-> base-messages
+                            (seq steering-messages) (into steering-messages))]
+    {:messages (if (and user-message (empty? messages)) [user-message] messages)
      :queued-steering-messages steering-messages}))
 
 (defn- normalized-turn-input
@@ -274,13 +277,15 @@
      :turn/thinking-level               (:thinking-level session-data)
      :turn/prompt-mode                  (:prompt-mode session-data)
      :turn/response-mode                (:response-mode session-data)
-     :turn/active-tools                 (:active-tools session-data)
+     :turn/active-tools                 (set (:tool-ids session-data))
      :turn/developer-prompt             (:developer-prompt session-data)
      :turn/developer-prompt-source      (:developer-prompt-source session-data)
      :turn/base-system-prompt           (:base-system-prompt session-data)
-     :turn/sorted-prompt-contributions  (sorted-contributions session-data)
-     :turn/filtered-tool-defs           (system-prompt/filter-tool-defs (:tool-defs session-data)
-                                                                        (:prompt-component-selection session-data))}))
+     :turn/sorted-prompt-contributions  (sorted-contributions ctx session-id session-data)
+     :turn/filtered-tool-defs           (let [tool-source (ss/agent-tool-source-in ctx session-id)
+                                              resolved    (tool-defs/resolve-tool-defs tool-source (:tool-ids session-data))]
+                                          (system-prompt/filter-tool-defs resolved
+                                                                          (:prompt-component-selection session-data)))}))
 
 (defn build-prepared-request
   "Build a prepared-request artifact from canonical session state.
@@ -291,8 +296,9 @@
    - :runtime-opts
    - :runtime-model"
   [ctx session-id {:keys [turn-id user-message runtime-opts runtime-model commands]}]
-  (let [session-data (ss/get-session-data-in ctx session-id)
-        {:keys [user-message expansion]} (expanded-turn-input session-data user-message commands)
+  (let [root-state @(:state* ctx)
+        session-data (ss/get-session-data-in ctx session-id)
+        {:keys [user-message expansion]} (expanded-turn-input root-state session-data user-message commands)
         {:keys [messages queued-steering-messages]} (prepared-turn-messages ctx session-id session-data user-message)
         normalized-turn (normalized-turn-input ctx session-id session-data
                                                {:turn-id turn-id

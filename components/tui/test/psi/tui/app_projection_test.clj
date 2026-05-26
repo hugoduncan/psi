@@ -45,6 +45,17 @@
         [state _] (init-fn)]
     state))
 
+(deftest view-renders-skill-banner-in-canonical-name-order-test
+  (testing "skill banner does not expose raw session skill vector order"
+    (let [plain (ansi/strip-ansi
+                 (app/view (-> (init-state)
+                               (assoc :width 120)
+                               (assoc :skills [{:name "zeta"}
+                                               {:name "alpha"}
+                                               {:name "middle" :disable-model-invocation true}]))))]
+      (is (str/includes? plain "Skills: alpha, zeta"))
+      (is (not (str/includes? plain "Skills: zeta, alpha"))))))
+
 (deftest view-renders-open-slash-autocomplete-menu-test
   (testing "open slash autocomplete is visible in the prompt view"
     (let [state (-> (init-state)

@@ -63,17 +63,6 @@
    [:kind session-entry-kind-schema]
    [:data {:optional true} :map]])
 
-(def prompt-contribution-schema
-  [:map
-   [:id :string]
-   [:ext-path :string]
-   [:section {:optional true} [:maybe :string]]
-   [:content :string]
-   [:priority {:optional true} :int]
-   [:enabled {:optional true} :boolean]
-   [:created-at inst?]
-   [:updated-at inst?]])
-
 (def cache-breakpoint-schema
   [:enum :system :tools])
 
@@ -183,10 +172,10 @@
    [:auto-retry-enabled :boolean]
    [:auto-compaction-enabled :boolean]
    [:scoped-models [:vector scoped-model-schema]]
-   [:skills [:vector skill-schema]]
+   [:skill-ids [:vector :string]]
+   [:tool-ids [:vector :string]]
    [:prompt-templates [:vector prompt-template-schema]]
-   [:prompt-contributions {:optional true} [:vector prompt-contribution-schema]]
-   [:tool-defs {:optional true} [:vector :map]]
+   [:prompt-contribution-ids {:optional true} [:vector :string]]
    [:extensions [:map-of :string extension-schema]]
    [:session-entries [:vector session-entry-schema]]
    [:startup-bootstrap {:optional true}
@@ -273,10 +262,10 @@
      :auto-retry-enabled      (:auto-retry-enabled default-config)
      :auto-compaction-enabled false
      :scoped-models           []
-     :skills                  []
+     :skill-ids               []
+     :tool-ids                []
      :prompt-templates        []
-     :prompt-contributions    []
-     :tool-defs               []
+     :prompt-contribution-ids []
      :extensions              {}
      :session-entries         []
      :extension-last-prompt-source nil

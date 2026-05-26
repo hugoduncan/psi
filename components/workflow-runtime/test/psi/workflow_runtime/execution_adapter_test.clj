@@ -23,7 +23,7 @@
                                   ([_ctx _sid _text _images _opts] :ok))
       :get-session-data (fn [_ctx _sid] :ok)
       :list-context-sessions (fn [_ctx] :ok)
-      :find-skill (fn [_skills _skill-name] :ok)
+      :find-skill (fn [_ctx _skills _skill-name] :ok)
       :execute-judge! (fn [_ctx _parent _actor _judge-spec _routing-table _routing-context] :ok)})
     op-key)})
 

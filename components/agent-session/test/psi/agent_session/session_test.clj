@@ -26,7 +26,6 @@
       (is (= "" (:system-prompt s)))
       (is (= #{:system} (:cache-breakpoints s)))
       (is (= :console (:ui-type s)))
-      (is (= [] (:prompt-contributions s)))
       (is (= [] (:steering-messages s)))
       (is (= [] (:follow-up-messages s)))
       (is (= 0 (:retry-attempt s)))

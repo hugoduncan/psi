@@ -4,7 +4,8 @@
    [clojure.test :refer [deftest testing is use-fixtures]]
    [psi.ai.model-registry :as model-registry]
    [psi.agent-session.prompt-request :as prompt-request]
-   [psi.session-persistence.core :as persist]))
+   [psi.session-persistence.core :as persist]
+   [psi.skill-registry.root-storage :as skill-storage]))
 
 ;; ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -237,6 +238,33 @@
                      :content [{:type :text :text "done"}]}
           repairs   (prompt-request/tail-dangling-tool-result-repairs [assistant result])]
       (is (= [] repairs)))))
+
+(deftest build-prepared-request-expands-skill-invocation-into-user-message-test
+  (testing "skill expansion resolves from root-registry-backed session skill ids"
+    (let [skill {:name "lambda-compiler"
+                 :description "Compile lambda expressions"
+                 :file-path "components/agent-session/test/psi/agent_session/prompt_request_test.clj"
+                 :base-dir "/tmp"
+                 :source :project
+                 :disable-model-invocation false}
+          session-id "sid-1"
+          state {:agent-session {:sessions {session-id {:data {:session-id session-id
+                                                               :skill-ids ["lambda-compiler"]
+                                                               :messages []
+                                                               :thinking-level :off
+                                                               :model {:provider :openai :id "gpt-4.1"}}}}}}
+          state* (atom (:root-state (skill-storage/set-skills-in-root-state state session-id [skill])))
+          ctx {:state* state*}
+          prepared (prompt-request/build-prepared-request
+                    ctx
+                    session-id
+                    {:user-message {:role "user"
+                                    :content [{:type :text :text "/skill:lambda-compiler"}]}
+                     :runtime-opts {}})]
+      (is (= :skill (get-in prepared [:prepared-request/input-expansion :kind])))
+      (is (= "lambda-compiler" (get-in prepared [:prepared-request/input-expansion :name])))
+      (is (= "user" (-> prepared :prepared-request/user-message :role)))
+      (is (re-find #"lambda-compiler" (-> prepared :prepared-request/user-message :content first :text))))))
 
 ;; ── Temperature projection ──────────────────────────────────────────────────
 
