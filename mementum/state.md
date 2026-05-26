@@ -15,6 +15,8 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-25: Executed task 172 ambiguity follow-up repeat 2 after no-action review; design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the no-op pass.
+
 - 2026-05-25: Reviewed task 172 design/plan/steps for ambiguities repeat 2; found no new actionable ambiguity feedback after rechecking task artifacts, current `psi-entry.el`, related focus/window-point tests, and Emacs frontend docs. Task artifacts remain clear; no design-steps were added.
 
 - 2026-05-25: Executed task 172 ambiguity follow-up after no-action review; design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the no-op pass.
