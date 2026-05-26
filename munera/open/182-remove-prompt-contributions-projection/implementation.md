@@ -60,3 +60,18 @@ All steps complete. Mechanical removal of `:prompt-contributions` from:
 - `clj-kondo` lint: 0 errors, 0 warnings on all changed files
 
 No deviations from the design. The implementation was purely mechanical — every site listed in the design was addressed exactly as planned.
+
+## Task implementation review — 2026-05-25
+
+Reviewed implementation against design, architecture, and skill criteria (`matches(code, design)`, `follows(code, architecture)`, `new_pattern`, `unnecessary_abstraction`, `structural_performance_issue`).
+
+**Verification performed:**
+- Confirmed all 5 source files changed match the design's write/init site inventory exactly
+- Confirmed all 9 test files updated appropriately — assertions shifted from value presence to absence + registry-backed derivation
+- Grepped all `components/` source (non-test) for `:prompt-contributions` — only 3 references remain, all correct: root-registry bucket id (`root_storage.clj:9`), resolver output map key (`resolvers/session.clj:196`), build-opts parameter (`prompt_handlers.clj:55`)
+- Verified `next*` binding in all 4 prompt handlers is still used (feeds `effective-prompt`) — no dangling bindings
+- Verified `prompt-storage` require in `child_session_state.clj` is still used (`prompt-storage/prompt-ids`)
+- `clj-kondo` lint: 0 errors, 0 warnings on all changed source and test files
+- `bb test`: all green
+
+**Findings:** No new actionable issues. Implementation is mechanical, follows the task 180 pattern exactly, introduces no new patterns or abstractions, and has no structural performance concerns.
