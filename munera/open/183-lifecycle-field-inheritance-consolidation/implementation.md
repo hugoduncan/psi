@@ -34,3 +34,13 @@ Updated design.md: annotated `:nucleus-prelude-override` in the common-core clas
 ### Step 3: "Authoritative vs derived" AC
 
 **Resolution: integrated into role-category classification.** Rather than adding a separate authoritative/derived axis, annotated each role category as authoritative or runtime-derived directly in the classification. Capability membership, preferences, and UI are authoritative (user/config-set). Telemetry/context is runtime-derived (set after model resolution). Updated the AC to reference role-category groups with authoritative/derived annotations, replacing the undefined standalone criterion.
+
+## 2026-05-26 inconsistency review pass 1
+
+Reviewed design.md, design-steps.md, implementation.md against actual code in `init.clj` and `child_session_state.clj`. Verified field counts, set compositions, and cross-artifact consistency.
+
+Found two actionable inconsistencies:
+
+1. **Child-session inherited field count mismatch (header says 8, body lists 7)**: The "Inherited from parent" section header says "(8 fields)" but lists only 7 bullet points. The `:nucleus-prelude-override` note explicitly states it is "NOT set as a standalone field on the child session data map" — so it is consumed, not inherited as a field. Either the header should say "7 fields" (and the "Not inherited" section should become 10 fields, adding `:nucleus-prelude-override`), or `:nucleus-prelude-override` should be promoted to a bullet point if it counts as inherited. The same "8 of 17" count appears in scope (line 40) and child-session documentation requirement (line 170) — all three must be aligned.
+
+2. **Child-session documentation scope covers only common-core, ignores prompt-state and model-identity**: Scope says "Document the child-session path's relationship to the shared vocabulary: which common-core fields it inherits from parent (8 of 17)." The child-session documentation requirement (lines 170–172) only asks to list common-core inherited/defaulted fields. But child-session also inherits/derives all 4 prompt-state fields (`:base-system-prompt`, `:system-prompt`, `:system-prompt-build-opts`, `:prompt-component-selection` — via `derive-child-prompt-state`) and both model-identity fields (`:model`, `:thinking-level` — via explicit opts with parent fallback). The documentation requirement is incomplete: it should cover the child-session's relationship to all three constant groups, not just common-core.
