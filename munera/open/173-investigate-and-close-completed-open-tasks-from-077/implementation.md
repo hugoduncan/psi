@@ -174,3 +174,20 @@ Disposition:
 
 - task 148 is already closed and needs no further action from this audit
 - related stale plan notes should be cleaned up separately as orchestration hygiene
+
+### Task 149 disposition
+
+Reviewed `149-reload-fixup-inventory-and-safety` against its design, plan, steps, implementation notes, explicit inventory artifact, current reload fixup code, and task-directory location.
+
+Evidence found:
+
+- all task `steps.md` items are checked
+- the task includes the required explicit `inventory.md` classifying reload-sensitive surfaces, statuses, severities, and preferred fixup owners
+- implementation notes record the identified `breaks-psi` cases, the implemented fixups, focused proof, and updated guidance
+- current repository code contains the described query-env invalidation helpers and reload refresh calls
+- the task directory already exists under `munera/closed/`, not `munera/open/`
+
+Disposition:
+
+- task 149 is already closed and needs no further action from this audit
+- this confirms the audit should distinguish stale plan ordering from actual task directory state and implementation completion
