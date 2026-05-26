@@ -37,7 +37,8 @@ When a new field is added to the session schema, a developer must remember to up
 - Define named constants or helpers for the per-path extensions on top of the common set
 - Classify each inherited field by role: capability membership, preference, UI, prompt state, or identity
 - Apply the shared vocabulary to all three `init.clj` lifecycle functions
-- Document the child-session path's relationship to the shared vocabulary: which common-core fields it inherits from parent (8 of 17), which it intentionally defaults (9 of 17), and the rationale for the divergence
+- Document the child-session path's relationship to the shared vocabulary: which common-core fields it inherits from parent (7 of 17), which it intentionally defaults (10 of 17, including `:nucleus-prelude-override` which is consumed during prompt derivation rather than set as a standalone field), and the rationale for the divergence
+- Document the child-session's relationship to `prompt-state-fields` (all 4 derived via `derive-child-prompt-state`) and `model-identity-fields` (both inherited with parent fallback)
 - Classify each field group as authoritative (user/config-set) or runtime-derived (set after model resolution)
 
 ### Out of scope
@@ -93,9 +94,9 @@ Identity (carried from source because resume takes these as explicit params):
 
 ### Child-session inheritance divergence (intentional)
 
-The child-session path (`child_session_state.clj`) inherits only 8 of the 17 common-core fields from the parent session. The remaining 9 intentionally receive `initial-session` defaults. This divergence is correct and must be preserved — child sessions are ephemeral agent-spawned sessions with different semantics.
+The child-session path (`child_session_state.clj`) inherits only 7 of the 17 common-core fields from the parent session. The remaining 10 intentionally receive `initial-session` defaults (including `:nucleus-prelude-override`, which is consumed during prompt derivation rather than set as a standalone field). This divergence is correct and must be preserved — child sessions are ephemeral agent-spawned sessions with different semantics.
 
-**Inherited from parent** (8 fields):
+**Common-core: inherited from parent** (7 fields):
 - `:skill-ids` — derived via `derive-child-prompt-state` from parent skills
 - `:tool-ids` — derived via `derive-child-prompt-state` (or explicit child opts)
 - `:prompt-contribution-ids` — resolved from parent via `prompt-storage/prompt-ids`
@@ -104,9 +105,8 @@ The child-session path (`child_session_state.clj`) inherits only 8 of the 17 com
 - `:developer-prompt-source` — `(or developer-prompt-source (:developer-prompt-source parent-sd))`
 - `:cache-breakpoints` — `(or cache-breakpoints (:cache-breakpoints parent-sd) default)`
 
-Note: `:nucleus-prelude-override` is read from `parent-sd` inside `default-child-system-prompt-build-opts` and consumed during prompt derivation, but is NOT set as a standalone field on the child session data map. It flows into the child's `:system-prompt-build-opts` rather than being carried as-is.
-
-**Not inherited — intentional defaults** (9 fields):
+**Common-core: not inherited — intentional defaults** (10 fields):
+- `:nucleus-prelude-override` — read from `parent-sd` inside `default-child-system-prompt-build-opts` and consumed during prompt derivation, but NOT set as a standalone field on the child session data map; flows into the child's `:system-prompt-build-opts` rather than being carried as-is
 - `:prompt-templates` — child sessions don't inherit registered prompt templates (default `[]`)
 - `:extensions` — child sessions don't inherit active extensions (default `{}`)
 - `:auto-retry-enabled` — child sessions use config default, not parent's setting
@@ -117,7 +117,17 @@ Note: `:nucleus-prelude-override` is read from `parent-sd` inside `default-child
 - `:context-tokens` — runtime-derived, starts `nil`
 - `:context-window` — runtime-derived, starts `nil`
 
-The shared classification docstring in `child_session_state.clj` must note this intentional divergence: the child path references the common-core classification but deliberately inherits only the subset needed for prompt derivation and capability membership.
+**Prompt-state fields** (all 4 derived):
+- `:base-system-prompt` — derived via `derive-child-prompt-state` (built from parent or explicit system-prompt)
+- `:system-prompt` — derived via `derive-child-prompt-state`
+- `:system-prompt-build-opts` — derived via `default-child-system-prompt-build-opts` (consumes parent's `:nucleus-prelude-override`)
+- `:prompt-component-selection` — normalized from child opts via `derive-child-prompt-state`
+
+**Model-identity fields** (both inherited with parent fallback):
+- `:model` — `(or model (:model parent-sd))`
+- `:thinking-level` — `(or thinking-level :off)` (explicit opts, not direct parent inheritance)
+
+The shared classification docstring in `child_session_state.clj` must note this intentional divergence: the child path references the common-core classification but deliberately inherits only the subset needed for prompt derivation and capability membership. The documentation must cover the child-session's relationship to all three constant groups (`common-inherited-fields`, `prompt-state-fields`, `model-identity-fields`), not just common-core.
 
 ## Design
 
@@ -166,10 +176,11 @@ Each lifecycle function replaces its inline `select-keys` vector with a composit
 ### Child-session documentation
 
 `child_session_state.clj` constructs fields explicitly rather than via `select-keys`, so it cannot directly use the same constants. The docstring or comment must:
-1. Reference the shared classification constants by name
-2. List which 8 common-core fields are inherited from the parent and how (direct carry vs derivation)
-3. List which 9 common-core fields intentionally receive `initial-session` defaults and why
-4. Note that `:nucleus-prelude-override` is consumed during prompt derivation (fed into `:system-prompt-build-opts`) rather than carried as a standalone field
+1. Reference the shared classification constants by name (`common-inherited-fields`, `prompt-state-fields`, `model-identity-fields`)
+2. List which 7 common-core fields are inherited from the parent and how (direct carry vs derivation)
+3. List which 10 common-core fields intentionally receive `initial-session` defaults and why (including `:nucleus-prelude-override`, consumed during prompt derivation rather than set as a standalone field)
+4. Document the child-session's relationship to `prompt-state-fields`: all 4 are derived via `derive-child-prompt-state` (not carried as-is)
+5. Document the child-session's relationship to `model-identity-fields`: `:model` falls back to parent, `:thinking-level` defaults to `:off`
 
 ## Constraints
 
@@ -183,6 +194,6 @@ Each lifecycle function replaces its inline `select-keys` vector with a composit
 - Named constants define the per-path extensions (prompt-state, model-identity)
 - All three `init.clj` lifecycle functions compose their `select-keys` from these constants
 - A classification comment or docstring documents the role of each field group (capability membership, preferences, UI, telemetry/context, prompt state, identity) and annotates each group as authoritative or runtime-derived
-- `child_session_state.clj` references the shared classification in a comment or docstring, and documents which common-core fields are intentionally not inherited (with rationale)
+- `child_session_state.clj` references the shared classification in a comment or docstring, and documents the child-session's relationship to all three constant groups: which common-core fields are intentionally not inherited (with rationale), how prompt-state fields are derived, and how model-identity fields are resolved
 - No behavioural change — tests pass without modification
 - Adding or removing a lifecycle-inherited field requires changing one constant, not 3+ vectors
