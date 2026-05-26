@@ -15,6 +15,8 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-25: Executed task 172 ambiguity follow-up after no-action review; design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the no-op pass.
+
 - 2026-05-25: Executed task 172 inconsistency follow-up after no-action review; design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the no-op pass.
 
 - 2026-05-24: Executed task 170 code-shaper follow-up: structured workflow session-step and LLM-judge success paths now reject a nil bounded turn-result `:structured-output` seam for structured requests, producing `:invalid-structured-output` blocked/fail surfaces instead of parsing assistant JSON with synthetic prompted-JSON metadata; focused tests green (`29 tests, 168 assertions`).
