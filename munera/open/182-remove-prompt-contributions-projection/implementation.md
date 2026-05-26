@@ -31,3 +31,32 @@ Reviewed design.md, plan.md, steps.md, and implementation.md for cross-artifact 
 One actionable inconsistency found:
 
 1. **Plan summary understates non-handler site count**: Plan's summary paragraph says "stop writing it at 4 handler sites and 2 lifecycle/init sites". The design's persistence/init table lists 4 additional non-handler sites (child_session_state.clj, init.clj ×3 grouped as 1, model.clj, nullable_api.clj), and the plan's own detailed ordering describes 6 steps covering schema+defaults, 3 lifecycle select-keys, child-session, and test helper — all distinct from the 4 handler sites. The "2" in the summary is inconsistent with both the design inventory and the plan's own detailed steps.
+
+## Implementation — 2026-05-25
+
+All steps complete. Mechanical removal of `:prompt-contributions` from:
+
+**Source changes (commit a0ec01a9):**
+- `model.clj`: removed from schema and `initial-session` defaults
+- `init.clj`: removed from `select-keys` in new/resume/fork lifecycle paths
+- `prompt_handlers.clj`: removed `assoc-in ... :prompt-contributions` from 4 handler `root-state-update` fns (register, update, unregister, reset)
+- `child_session_state.clj`: removed persistence line and now-unused `prompt-contributions` let-binding
+- `nullable_api.clj`: removed `[]` seed from initial test helper state
+
+**Test changes (commit 8b5a7fe2):**
+- `model_test.clj`: removed default `[]` assertion
+- `init_test.clj`: removed stale seed data from test fixtures, replaced value assertions with `(not (contains? sd :prompt-contributions))`, kept `prompt-storage/list-contributions` derivation proofs
+- `session_test.clj`: removed default `[]` assertion
+- `eql_introspection_test.clj`: removed stale session-state write (resolver already derives from registry)
+- `child_session_state_test.clj`: removed seed data from `parent-session-data`, asserted absence
+- `workflow_execution_test.clj`: removed session-state writes, asserted ids + absence
+- `child_session_mutation_test.clj`: updated `normalized-sorted-contributions` helper to derive from root-state via `prompt-storage/list-contributions`, rewrote selection filter test with registry-backed data
+- `nullable_api_test.clj`: removed stale write and unused `state` binding
+- `root_storage_test.clj`: removed stale `:prompt-contributions` from test session data
+
+**Verification:**
+- Focused tests: 60 tests, 487 assertions, 0 failures
+- Full suite: `bb test` all green
+- `clj-kondo` lint: 0 errors, 0 warnings on all changed files
+
+No deviations from the design. The implementation was purely mechanical — every site listed in the design was addressed exactly as planned.
