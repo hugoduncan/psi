@@ -15,6 +15,46 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-26: Executed task 172 inconsistency follow-up repeat 7 after no-action review: design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the no-op pass.
+
+- 2026-05-26: Reviewed task 172 design/plan/steps for inconsistencies repeat 7; found no new actionable inconsistency feedback after rechecking task artifacts, current `psi-entry.el`, related focus/send/window-point tests, and Emacs frontend docs. Task artifacts remain aligned; no design-steps were added. Commit b90e6551.
+
+- 2026-05-26: Executed task 172 ambiguity follow-up repeat 7 after no-action review: design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the no-op pass.
+
+- 2026-05-26: Reviewed task 172 design/plan/steps for ambiguities repeat 7; found no new actionable ambiguity feedback after rechecking task artifacts, current `psi-entry.el`, related focus/send/window-point tests, and Emacs frontend docs. Task artifacts remain clear; no design-steps were added.
+
+- 2026-05-26: Reviewed task 172 design/plan/steps for ambiguities repeat 6; found no new actionable ambiguity feedback after rechecking task artifacts, current `psi-entry.el`, related focus/send/window-point tests, and Emacs frontend docs. Task artifacts remain clear; no design-steps were added.
+
+- 2026-05-26: Executed task 172 inconsistency follow-up repeat 6 after no-action review: design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the no-op pass.
+
+- 2026-05-26: Reviewed task 172 design/plan/steps for inconsistencies repeat 6; found no new actionable inconsistency feedback after rechecking task artifacts, current `psi-entry.el`, related focus/send/window-point tests, and Emacs frontend docs. Commit 3eacfd98.
+
+- 2026-05-26: Executed task 172 ambiguity follow-up repeat 5 after no-action review: design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the no-op pass.
+
+- 2026-05-26: Reviewed task 172 design/plan/steps for ambiguities repeat 5; found no new actionable ambiguity feedback after rechecking task artifacts, current `psi-entry.el`, related focus/send/window-point tests, and Emacs frontend docs. Task artifacts remain clear; no design-steps were added.
+
+- 2026-05-26: Executed task 172 inconsistency follow-up repeat 5 after no-action review: design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the no-op pass.
+
+- 2026-05-26: Executed task 172 ambiguity follow-up repeat 4: clarified the exact post-command editing/submission smoke expectation. The test must append ` after` to initial prompt `before` after `psi-emacs-move-point-to-prompt-end`, submit via `psi-emacs-send-from-buffer` no-prefix normal non-slash path, assert exact dispatched text `before after`, and assert existing post-submit draft reset. Commit 8fa3d8e2.
+
+- 2026-05-26: Reviewed task 172 design/plan/steps for ambiguities repeat 4; found one new actionable ambiguity: the required post-command prompt editing/submission smoke check does not define the exact send/dispatch path or asserted prompt text/state. Added a design-step to clarify the smoke-test expectation. Commit 799c57a3.
+
+- 2026-05-26: Executed task 172 ambiguity follow-up repeat 3: chose to update Emacs frontend user docs for the new `M-x psi-emacs-move-point-to-prompt-end` command; design/plan/steps now require README/doc command-list updates, design-step checked, no implementation steps executed.
+
+- 2026-05-26: Reviewed task 172 design/plan/steps for ambiguities repeat 3; found one new actionable ambiguity: user-visible `M-x psi-emacs-move-point-to-prompt-end` docs scope is undecided even though Emacs README/docs list frontend commands. Added a design-step to choose docs update vs explicit out-of-scope. Commit 21572853.
+
+- 2026-05-26: Executed task 172 inconsistency follow-up repeat 3: completed the design-step by aligning plan.md/steps.md with acceptance criterion 6 via an explicit post-command prompt editing/submission smoke check; no implementation steps were executed.
+
+- 2026-05-25: Reviewed task 172 design/plan/steps for inconsistencies repeat 3; found one new actionable inconsistency: acceptance criterion 6 requires post-command prompt submission/editing behavior to still work, but plan/steps only list prompt-position/error/window-point tests. Added a design-step to align verification scope. Commit 6f0e8f55.
+
+- 2026-05-25: Executed task 172 ambiguity follow-up repeat 2 after no-action review; design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the no-op pass.
+
+- 2026-05-25: Reviewed task 172 design/plan/steps for ambiguities repeat 2; found no new actionable ambiguity feedback after rechecking task artifacts, current `psi-entry.el`, related focus/window-point tests, and Emacs frontend docs. Task artifacts remain clear; no design-steps were added.
+
+- 2026-05-25: Executed task 172 ambiguity follow-up after no-action review; design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the no-op pass.
+
+- 2026-05-25: Executed task 172 inconsistency follow-up after no-action review; design-steps were already fully checked, so no task implementation steps were executed and implementation.md records the no-op pass.
+
 - 2026-05-24: Executed task 170 code-shaper follow-up: structured workflow session-step and LLM-judge success paths now reject a nil bounded turn-result `:structured-output` seam for structured requests, producing `:invalid-structured-output` blocked/fail surfaces instead of parsing assistant JSON with synthetic prompted-JSON metadata; focused tests green (`29 tests, 168 assertions`).
 - `STATE.md` — project-local state file
 - `AGENTS.md` — bootstrap/system instructions
@@ -240,3 +280,9 @@ Focused OAuth routing tests ✅. bb tests previously ✅. Task 169 focused struc
 - 2026-05-24: Task 166 implementation review pass 3 follow-up complete: `:scheduler/deliver` now validates schedule existence/deliverability before resolving `:scheduler-time-source`; missing/non-deliverable schedule errors preserve precedence. Full scheduler proof green: 33 tests, 344 assertions, 0 failures.
 - 2026-05-24: Code-shaper review for task 166 found one actionable robustness issue: session-kind `:scheduler/deliver` catches scheduler time-source validation failures and records failed schedules instead of fail-fast boundary behavior. Added follow-up to `steps.md` and committed review note (`ff6793da`).
 - 2026-05-24: Code-shaper review pass 2 for task 166 found no new actionable feedback after session-kind delivery time-source fail-fast fix; only review note appended.
+
+- 2026-05-25: Executed task 172 ambiguity follow-ups: design now names public command `psi-emacs-move-point-to-prompt-end`, locates it in `components/emacs-ui/psi-entry.el` with autoload discovery, specifies `user-error` outside initialized Psi session buffers, requires `psi-emacs--focus-input-area` delegation/window-point sync, and creates `plan.md`/`steps.md`; design-steps fully checked. Commit 8fc1f570.
+
+- 2026-05-26: Reviewed task 172 design/plan/steps for inconsistencies repeat 4; found no new actionable inconsistency feedback after rechecking task artifacts, current `psi-entry.el`, related focus/window-point tests, and Emacs frontend docs. Commit 9f180eb0.
+
+- 2026-05-26: Implemented task 172 Emacs prompt-end command: autoloaded `psi-emacs-move-point-to-prompt-end` delegates to existing focus-input helper with initialized-buffer `user-error` guard; focused ERT coverage added for prompt states, output recovery, visible windows, and post-command send/edit smoke; docs updated; focused selector green (6/6), `bb emacs:test` green (318/318), and `bb emacs:byte-compile` green.

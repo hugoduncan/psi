@@ -649,6 +649,96 @@ so the user sees the connecting affordance."
           (when (process-live-p mock-process)
             (delete-process mock-process)))))))
 
+(ert-deftest psi-move-point-to-prompt-end-keybinding-and-focus-empty-input ()
+  ;; The public command is bound and returns point to the empty prompt entry end.
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (should (eq #'psi-emacs-move-point-to-prompt-end
+                (key-binding (kbd "C-c C-e"))))
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (psi-emacs--ensure-startup-banner)
+    (setf (psi-emacs-state-draft-anchor psi-emacs--state)
+          (copy-marker (point-max) nil))
+    (psi-emacs--ensure-input-area)
+    (goto-char (point-min))
+    (psi-emacs-move-point-to-prompt-end)
+    (should (= (point) (psi-emacs--draft-end-position)))
+    (should (equal "" (psi-emacs--tail-draft-text)))))
+
+(ert-deftest psi-move-point-to-prompt-end-preserves-non-empty-input ()
+  ;; The public command focuses after existing prompt text without changing it.
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (psi-emacs--ensure-startup-banner)
+    (setf (psi-emacs-state-draft-anchor psi-emacs--state)
+          (copy-marker (point-max) nil))
+    (psi-emacs--ensure-input-area)
+    (goto-char (psi-emacs--draft-end-position))
+    (insert "existing prompt")
+    (goto-char (psi-emacs--input-start-position))
+    (psi-emacs-move-point-to-prompt-end)
+    (should (= (point) (psi-emacs--draft-end-position)))
+    (should (equal "existing prompt" (psi-emacs--tail-draft-text)))))
+
+(ert-deftest psi-move-point-to-prompt-end-recovers-from-output-point ()
+  ;; The public command moves point out of transcript output and into prompt input.
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (let ((inhibit-read-only t))
+      (psi-emacs--ensure-startup-banner)
+      (insert "User: old\nψ: output\n"))
+    (setf (psi-emacs-state-draft-anchor psi-emacs--state)
+          (copy-marker (point-max) nil))
+    (psi-emacs--ensure-input-area)
+    (goto-char (point-min))
+    (psi-emacs-move-point-to-prompt-end)
+    (should (= (point) (psi-emacs--draft-end-position)))
+    (let ((range (psi-emacs--input-range)))
+      (should (and (>= (point) (car range))
+                   (<= (point) (cdr range)))))))
+
+(ert-deftest psi-move-point-to-prompt-end-errors-outside-initialized-buffer ()
+  ;; The public command must not initialize ordinary buffers implicitly.
+  (with-temp-buffer
+    (should-error (psi-emacs-move-point-to-prompt-end)
+                  :type 'user-error)
+    (should-not (bound-and-true-p psi-emacs--state))))
+
+(ert-deftest psi-move-point-to-prompt-end-syncs-visible-window-points ()
+  ;; Delegating to focus-input-area synchronizes selected and additional windows.
+  (let ((buffer (generate-new-buffer " *psi-move-point-window-sync*"))
+        (original-window-config (current-window-configuration)))
+    (unwind-protect
+        (progn
+          (delete-other-windows)
+          (switch-to-buffer buffer)
+          (with-current-buffer buffer
+            (psi-emacs-mode)
+            (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+            (setf (psi-emacs-state-draft-anchor psi-emacs--state)
+                  (copy-marker (point-max) nil))
+            (psi-emacs--ensure-startup-banner)
+            (psi-emacs--ensure-input-area)
+            (goto-char (psi-emacs--draft-end-position))
+            (insert "window text"))
+          (let ((primary (selected-window))
+                (secondary (split-window-right)))
+            (set-window-buffer secondary buffer)
+            (set-window-point primary (point-min))
+            (set-window-point secondary (point-min))
+            (select-window primary)
+            (with-current-buffer buffer
+              (psi-emacs-move-point-to-prompt-end)
+              (let ((end (psi-emacs--draft-end-position)))
+                (should (= (point) end))
+                (should (= (window-point primary) end))
+                (should (= (window-point secondary) end))))))
+      (set-window-configuration original-window-config)
+      (when (buffer-live-p buffer)
+        (kill-buffer buffer)))))
+
 (provide 'psi-buffer-lifecycle-test)
 
 ;;; psi-buffer-lifecycle-test.el ends here

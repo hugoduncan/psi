@@ -19,7 +19,8 @@ Install directly from GitHub with `straight.el`:
 ```
 
 This installs the Emacs frontend files from the repo and makes
-`M-x psi-emacs-start` / `M-x psi-emacs-project` available.
+`M-x psi-emacs-start` / `M-x psi-emacs-project` /
+`M-x psi-emacs-move-point-to-prompt-end` available.
 
 ## Start
 
@@ -99,11 +100,13 @@ In `psi-emacs-mode`:
 - `C-c C-k` abort active streaming (`abort`)
 - `C-c C-r` reconnect (prompts before clearing edited buffer)
 - `C-c C-t` toggle tool-output view mode (collapsed ↔ expanded); also available as `M-x psi-emacs-toggle-tool-output-view`
+- `C-c C-e` move point to the end of the current psi prompt entry area (`M-x psi-emacs-move-point-to-prompt-end`)
 - `C-c m m` set model (`M-x psi-emacs-set-model`)
 - `C-c m n` cycle model next (`M-x psi-emacs-cycle-model-next`)
 - `C-c m p` cycle model previous (`M-x psi-emacs-cycle-model-prev`)
 - `C-c m t` set thinking level (`M-x psi-emacs-set-thinking-level`)
 - `C-c m c` cycle thinking level (`M-x psi-emacs-cycle-thinking-level`)
+- `M-x psi-emacs-move-point-to-prompt-end` move point to the end of the current psi prompt entry area
 
 Compose source rules:
 

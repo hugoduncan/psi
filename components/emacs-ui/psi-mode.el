@@ -21,6 +21,7 @@
 (declare-function psi-emacs-abort "psi-compose")
 (declare-function psi-emacs-reconnect "psi-lifecycle")
 (declare-function psi-emacs-toggle-tool-output-view "psi-tool-rows")
+(declare-function psi-emacs-move-point-to-prompt-end "psi-entry")
 (declare-function psi-emacs-set-model "psi-session-commands" (&optional provider model-id))
 (declare-function psi-emacs-cycle-model-next "psi-session-commands")
 (declare-function psi-emacs-cycle-model-prev "psi-session-commands")
@@ -166,6 +167,7 @@ instead of the entire buffer."
     (define-key map* (kbd "C-c C-k") #'psi-emacs-abort)
     (define-key map* (kbd "C-c C-r") #'psi-emacs-reconnect)
     (define-key map* (kbd "C-c C-t") #'psi-emacs-toggle-tool-output-view)
+    (define-key map* (kbd "C-c C-e") #'psi-emacs-move-point-to-prompt-end)
 
     ;; Model/thinking controls.
     (define-key map* (kbd "C-c m m") #'psi-emacs-set-model)

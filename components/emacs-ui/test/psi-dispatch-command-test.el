@@ -720,5 +720,39 @@ assistant/message result from canonical prompt execution should render without a
       (when (process-live-p (psi-emacs-state-process psi-emacs--state))
         (delete-process (psi-emacs-state-process psi-emacs--state))))))
 
+(ert-deftest psi-move-point-to-prompt-end-preserves-send-editing-flow ()
+  ;; After moving to prompt end, appending text and sending uses normal steer path
+  ;; and consumes the draft using existing send-from-buffer semantics.
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state (psi-test--spawn-long-lived-process)))
+    (unwind-protect
+        (progn
+          (setf (psi-emacs-state-run-state psi-emacs--state) 'streaming)
+          (psi-emacs--ensure-startup-banner)
+          (setf (psi-emacs-state-draft-anchor psi-emacs--state)
+                (copy-marker (point-max) nil))
+          (psi-emacs--ensure-input-area)
+          (goto-char (psi-emacs--draft-end-position))
+          (insert "before")
+          (goto-char (point-min))
+          (let ((rpc-calls nil))
+            (cl-letf (((symbol-value 'psi-emacs--send-request-function)
+                       (lambda (_state op params &optional _callback)
+                         (push (list op params) rpc-calls)
+                         t)))
+              (psi-emacs-move-point-to-prompt-end)
+              (insert " after")
+              (psi-emacs-send-from-buffer nil))
+            (setq rpc-calls (nreverse rpc-calls))
+            (should (equal '(("prompt_while_streaming"
+                              ((:message . "before after")
+                               (:behavior . "steer"))))
+                           rpc-calls))
+            (should (equal "" (psi-emacs--tail-draft-text)))
+            (should (= (point) (psi-emacs--draft-end-position)))))
+      (when (process-live-p (psi-emacs-state-process psi-emacs--state))
+        (delete-process (psi-emacs-state-process psi-emacs--state))))))
+
 (provide 'psi-dispatch-command-test)
 ;;; psi-dispatch-command-test.el ends here
