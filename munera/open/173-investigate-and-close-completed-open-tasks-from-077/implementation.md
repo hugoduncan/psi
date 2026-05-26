@@ -191,3 +191,19 @@ Disposition:
 
 - task 149 is already closed and needs no further action from this audit
 - this confirms the audit should distinguish stale plan ordering from actual task directory state and implementation completion
+
+### Task 150 disposition
+
+Reviewed `150-explicit-runtime-vs-persisted-session-graph-surface` against its design, plan, steps, implementation notes, current graph/docs guidance, and current repository state.
+
+Evidence found:
+
+- all task `steps.md` items are checked
+- implementation notes record the explicit runtime/persisted attr split, resolver naming changes, caller/doc migrations, graph discoverability updates, and review follow-up fixes
+- current repository surfaces teach the explicit names in docs and prompt/introspection guidance, and the task notes record green focused verification after the review follow-up
+- despite that, the task directory still remains under `munera/open/`
+
+Disposition:
+
+- task 150 is materially complete and should be closed
+- closure is justified by the task's own acceptance evidence and repository state
