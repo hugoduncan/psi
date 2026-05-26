@@ -43,4 +43,7 @@
 - [x] Review task 164 artifacts and current repository evidence
 - [x] Record the 164 disposition in task 173 implementation notes
 - [x] Close 164 if justified, otherwise record why it remains open
+- [x] Review task 167 artifacts and current repository evidence
+- [x] Record the 167 disposition in task 173 implementation notes
+- [x] Close 167 if justified, otherwise record why it remains open
 - [ ] Continue to the next later-numbered open task and repeat

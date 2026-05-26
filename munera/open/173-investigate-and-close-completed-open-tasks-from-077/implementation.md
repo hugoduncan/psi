@@ -257,3 +257,20 @@ Disposition:
 
 - task 164 is already closed and needs no further action from this audit
 - this is another confirmed case of stale orchestration state rather than incomplete task implementation
+
+### Task 167 disposition
+
+Reviewed `167-emacs-tool-details-show-full-call` against its design, plan, steps, implementation notes, current Emacs tool-detail rendering/tests, and task-directory location.
+
+Evidence found:
+
+- all Emacs-scoped task `steps.md` items are checked, including focused rendering edge cases and dedicated e2e coverage
+- implementation notes record the scoped shift away from TUI parity, the completed Emacs raw-fallback and nil/invalid-argument coverage, canonical parsed/raw comparison, dedicated e2e harness, and CI wiring
+- current repository state contains the described Emacs call-detail rendering, focused tests, and `bb emacs:tool-details:e2e` task/workflow wiring
+- the task directory already exists under `munera/closed/`, not `munera/open/`
+- `munera/plan.md` still lists task 167 as open, so the remaining issue is orchestration drift rather than unfinished implementation
+
+Disposition:
+
+- task 167 is already closed and needs no further action from this audit
+- stale plan ordering should be corrected separately as backlog hygiene
