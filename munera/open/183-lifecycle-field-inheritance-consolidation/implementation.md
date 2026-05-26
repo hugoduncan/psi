@@ -65,3 +65,7 @@ No new actionable ambiguities found:
 - No overlaps between the three constant groups; `into`+`concat` composition is sound.
 - All 9 steps cover all 7 acceptance criteria; plan decisions (constants in `init.clj`, `^:private`, documentation-only for child-session) align with design.
 - All 5 prior design-steps resolved and reflected in current design.md.
+
+## 2026-05-26 ambiguity follow-up pass 2 — no-op
+
+Preloaded ambiguity review pass 2 found no new actionable ambiguities. All 5 design-steps in design-steps.md were already checked from prior follow-up passes. No new unchecked items were added. No task artifact changes required.
