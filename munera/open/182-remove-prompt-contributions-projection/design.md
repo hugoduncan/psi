@@ -19,7 +19,7 @@ Session state currently persists both:
 - `:prompt-contribution-ids` — authoritative membership (vector of id strings)
 - `:prompt-contributions` — derived projection (vector of full contribution maps)
 
-The projection is written into session state at 7 sites and read back at 1 introspection site, but every write site already has the derived value from `prompt-storage/list-contributions` — it persists the vector redundantly rather than because any reader needs it from session state.
+The projection is written into session state at 4 handler sites and persisted/seeded at 4 additional lifecycle/init sites, but no site reads it back from session state — the resolver already derives on demand. Every handler write site already has the derived value from `prompt-storage/list-contributions` and persists the vector redundantly.
 
 ## Current write sites (`:prompt-contributions` into session state)
 
@@ -27,25 +27,25 @@ All in `prompt_handlers.clj`:
 
 | Handler | Line | Pattern |
 |---------|------|---------|
-| `:session/refresh-system-prompt` | 55 | `assoc :prompt-contributions nil` (clears on refresh) |
 | `:session/register-prompt-contribution` | 94 | `assoc-in ... :prompt-contributions next*` |
 | `:session/update-prompt-contribution` | 118 | `assoc-in ... :prompt-contributions next*` |
 | `:session/unregister-prompt-contribution` | 140 | `assoc-in ... :prompt-contributions next*` |
 | `:session/reset-prompt-contributions` | 157 | `assoc-in ... :prompt-contributions next*` |
 
-Plus persistence sites:
+Note: `:session/refresh-system-prompt` line 55 passes `:prompt-contributions nil` as a `build-system-prompt` build-opts parameter, not as a session-state write. Its `:root-state-update` writes only `:base-system-prompt` and `:system-prompt`. No changes needed in that handler for this task.
+
+Plus persistence/init sites:
 
 | Location | Pattern |
 |----------|---------|
 | `child_session_state.clj:114` | `assoc :prompt-contributions prompt-contributions` in child session data |
 | `session_state/init.clj:94,150,196` | `select-keys` includes `:prompt-contributions` in new/resume/fork lifecycle |
 | `session_state/model.clj:190,281` | schema definition and default `[]` |
+| `nullable_api.clj:37` | seeds `:prompt-contributions []` in nullable extension test helper initial state |
 
-## Current read site (`:prompt-contributions` from session state)
+## Current read sites (`:prompt-contributions` from session state)
 
-| Location | Pattern | Migration |
-|----------|---------|-----------|
-| `resolvers/session.clj:196` | Introspection — maps contributions to attrs | Derive from `prompt-storage/list-contributions` instead |
+None. The resolver at `resolvers/session.clj:196` already derives contributions via `ss/list-prompt-contributions-in` (which calls `prompt-storage/list-contributions`). The `:prompt-contributions` key at that line is an output map key in the `:prompt-layers` response, not a session-state read. No resolver migration is needed — removing the persisted field is sufficient.
 
 ## Derivation path already exists
 
@@ -54,7 +54,7 @@ Plus persistence sites:
 2. resolves each id against the root-backed prompt registry
 3. returns sorted contributions
 
-Every handler that currently writes `:prompt-contributions` already calls this function to produce the value — it then redundantly persists the result. The only read site (`resolvers/session.clj`) can call the same derivation function.
+Every handler that currently writes `:prompt-contributions` already calls this function to produce the value — it then redundantly persists the result. The resolver already derives on demand via this path — no migration needed.
 
 ## Scope
 
@@ -64,9 +64,11 @@ Every handler that currently writes `:prompt-contributions` already calls this f
 - Remove `:prompt-contributions` from `initial-session` defaults (`model.clj`)
 - Remove `:prompt-contributions` from lifecycle `select-keys` in `init.clj` (new/resume/fork)
 - Remove `:prompt-contributions` persistence from `child_session_state.clj`
-- Remove all `assoc-in ... :prompt-contributions` writes from `prompt_handlers.clj` — handlers already derive the value for prompt assembly; they just stop persisting it
-- Migrate `resolvers/session.clj` to derive contributions via `prompt-storage/list-contributions`
+- Remove all `assoc-in ... :prompt-contributions` writes from `prompt_handlers.clj` (4 handlers) — handlers already derive the value for prompt assembly; they just stop persisting it
+- Remove `:prompt-contributions []` seed from `nullable_api.clj` initial state
 - Update tests that assert on `:prompt-contributions` presence in session state
+
+Note: `resolvers/session.clj` already derives contributions on demand — no migration needed there.
 
 ### Out of scope
 
@@ -88,7 +90,7 @@ Every handler that currently writes `:prompt-contributions` already calls this f
 - All prompt handler write sites no longer persist `:prompt-contributions` into session state
 - Child-session creation no longer persists `:prompt-contributions`
 - Lifecycle paths (new/resume/fork) no longer copy `:prompt-contributions`
-- Session introspection resolver derives contributions on demand from registry + `:prompt-contribution-ids`
+- Session introspection resolver continues to derive contributions on demand (already does; no change needed)
 - Schema validates without `:prompt-contributions`
 - All existing tests pass (updated as needed)
 - No regression in prompt contribution availability during sessions, workflows, or child sessions
