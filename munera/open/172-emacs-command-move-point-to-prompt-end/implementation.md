@@ -21,3 +21,5 @@
 - 2026-05-25 ambiguity follow-up execution repeat 2: preloaded ambiguity review added no actionable design follow-up items. `design-steps.md` was already fully checked, so no task implementation `steps.md` items were executed; task artifacts remain unchanged.
 
 - 2026-05-25 inconsistency review repeat 3: found one new actionable inconsistency. Design acceptance criterion 6 requires existing prompt submission and editing behavior to still work after the command runs, but plan.md and steps.md only call out empty/non-empty/output/error/window-point tests and do not include any verification or explicit narrowing for post-command editing/submission behavior. Added a design follow-up to align the verification scope.
+
+- 2026-05-26 inconsistency follow-up execution repeat 3: completed the newly added design follow-up by keeping acceptance criterion 6 intact and aligning plan.md/steps.md to require an explicit post-command prompt editing/submission smoke check. No task implementation steps were executed.

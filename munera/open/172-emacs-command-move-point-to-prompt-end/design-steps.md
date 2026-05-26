@@ -4,4 +4,4 @@
 - [x] Define behavior when the command is invoked outside an initialized Psi Emacs session buffer, including whether it signals `user-error` or no-ops.
 - [x] Clarify whether the command should delegate to `psi-emacs--focus-input-area` and therefore update the selected/all visible window points, or only move point in the current buffer.
 - [x] Create `plan.md` and `steps.md` before implementation so the command location, tests, and verification order are explicit.
-- [ ] Align plan/steps verification with acceptance criterion 6 by either adding an explicit post-command prompt editing/submission smoke check or narrowing the acceptance wording to prompt text preservation only.
+- [x] Align plan/steps verification with acceptance criterion 6 by either adding an explicit post-command prompt editing/submission smoke check or narrowing the acceptance wording to prompt text preservation only.

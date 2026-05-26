@@ -18,7 +18,8 @@ Add the public command as a small interactive wrapper around the existing prompt
 2. Check for initialized Psi state before delegating; raise `user-error` if missing.
 3. Delegate to `(psi-emacs--focus-input-area (current-buffer) (selected-window))`.
 4. Add focused Emacs tests for empty prompt, non-empty prompt, point in output, outside-session error, and visible-window point synchronization.
-5. Run focused Emacs tests, then a broader Emacs test command if practical.
+5. Add an explicit post-command prompt editing/submission smoke check so acceptance criterion 6 is verified rather than assumed.
+6. Run focused Emacs tests, then a broader Emacs test command if practical.
 
 ## Risks
 
