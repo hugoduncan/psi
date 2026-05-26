@@ -83,7 +83,6 @@
                                              (when (not= :fallback source)
                                                source))
         ts (java.time.Instant/now)
-        prompt-contributions (prompt-storage/list-contributions root-state parent-sd)
         session-data
         (merge (session-data/initial-session
                 {:worktree-path (:worktree-path parent-sd)})
@@ -111,7 +110,6 @@
                                                         (:cache-breakpoints (session-data/initial-session)))
                         :prompt-component-selection prompt-component-selection
                         :prompt-contribution-ids    (prompt-storage/prompt-ids parent-sd)
-                        :prompt-contributions       prompt-contributions
                         :model                      (or model (:model parent-sd))
                         :created-at                 ts
                         :updated-at                 ts}

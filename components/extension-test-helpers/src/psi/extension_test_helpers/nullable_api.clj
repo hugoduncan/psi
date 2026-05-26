@@ -33,8 +33,7 @@
          :workflow-types       {}
          :workflows            {}
          :root-state           {:agent-session {:sessions {"nullable-session"
-                                                           {:data {:prompt-contribution-ids []
-                                                                   :prompt-contributions []}}}}
+                                                           {:data {:prompt-contribution-ids []}}}}
                                 :root-registries {}}
          :post-tool-processors []
          :services             []

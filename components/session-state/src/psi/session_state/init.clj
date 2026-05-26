@@ -91,7 +91,6 @@
                                                  :tool-ids
                                                  :prompt-templates
                                                  :prompt-contribution-ids
-                                                 :prompt-contributions
                                                  :extensions
                                                  :context-tokens
                                                  :context-window
@@ -147,7 +146,6 @@
                                                      :tool-ids
                                                      :prompt-templates
                                                      :prompt-contribution-ids
-                                                     :prompt-contributions
                                                      :extensions
                                                      :context-tokens
                                                      :context-window
@@ -193,7 +191,6 @@
                                                            :tool-ids
                                                            :prompt-templates
                                                            :prompt-contribution-ids
-                                                           :prompt-contributions
                                                            :extensions
                                                            :context-tokens
                                                            :context-window

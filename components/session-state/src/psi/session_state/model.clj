@@ -187,7 +187,6 @@
    [:tool-ids [:vector :string]]
    [:prompt-templates [:vector prompt-template-schema]]
    [:prompt-contribution-ids {:optional true} [:vector :string]]
-   [:prompt-contributions {:optional true} [:vector prompt-contribution-schema]]
    [:extensions [:map-of :string extension-schema]]
    [:session-entries [:vector session-entry-schema]]
    [:startup-bootstrap {:optional true}
@@ -278,7 +277,6 @@
      :tool-ids                []
      :prompt-templates        []
      :prompt-contribution-ids []
-     :prompt-contributions    []
      :extensions              {}
      :session-entries         []
      :extension-last-prompt-source nil

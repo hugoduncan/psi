@@ -91,7 +91,6 @@
        {:root-state-update
         (fn [_root-state]
           (-> (:root-state result)
-              (assoc-in (conj (session/session-data-path session-id) :prompt-contributions) next*)
               ((session/session-update session-id #(assoc % :system-prompt prompt*)))))
         :effects [{:effect/type :runtime/agent-set-system-prompt
                    :prompt prompt*}]
@@ -115,7 +114,6 @@
            {:root-state-update
             (fn [_root-state]
               (-> (:root-state result)
-                  (assoc-in (conj (session/session-data-path session-id) :prompt-contributions) next*)
                   ((session/session-update session-id #(assoc % :system-prompt prompt*)))))
             :effects [{:effect/type :runtime/agent-set-system-prompt
                        :prompt prompt*}]
@@ -137,7 +135,6 @@
            {:root-state-update
             (fn [_root-state]
               (-> (:root-state result)
-                  (assoc-in (conj (session/session-data-path session-id) :prompt-contributions) next*)
                   ((session/session-update session-id #(assoc % :system-prompt prompt*)))))
             :effects [{:effect/type :runtime/agent-set-system-prompt
                        :prompt prompt*}]
@@ -154,7 +151,6 @@
        {:root-state-update
         (fn [_root-state]
           (-> (:root-state result)
-              (assoc-in (conj (session/session-data-path session-id) :prompt-contributions) next*)
               ((session/session-update session-id #(assoc % :system-prompt prompt*)))))
         :effects [{:effect/type :runtime/agent-set-system-prompt
                    :prompt prompt*}]})))
