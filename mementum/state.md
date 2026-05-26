@@ -258,3 +258,5 @@ Focused OAuth routing tests ✅. bb tests previously ✅. Task 169 focused struc
 - 2026-05-24: Code-shaper review pass 2 for task 166 found no new actionable feedback after session-kind delivery time-source fail-fast fix; only review note appended.
 
 - 2026-05-25: Executed task 172 ambiguity follow-ups: design now names public command `psi-emacs-move-point-to-prompt-end`, locates it in `components/emacs-ui/psi-entry.el` with autoload discovery, specifies `user-error` outside initialized Psi session buffers, requires `psi-emacs--focus-input-area` delegation/window-point sync, and creates `plan.md`/`steps.md`; design-steps fully checked. Commit 8fc1f570.
+
+- 2026-05-26: Reviewed task 172 design/plan/steps for inconsistencies repeat 4; found no new actionable inconsistency feedback after rechecking task artifacts, current `psi-entry.el`, related focus/window-point tests, and Emacs frontend docs. Commit 9f180eb0.
