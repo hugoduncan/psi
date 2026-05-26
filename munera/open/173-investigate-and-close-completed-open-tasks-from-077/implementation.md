@@ -70,7 +70,7 @@ Evidence found:
 - all task `steps.md` items are checked
 - implementation notes record the extracted `turn_execution_contract` boundary, the routing of workflow actor/judge execution through it, the chosen boundary decisions, and focused verification
 - git history shows the implementation landed in commit `2949310e`
-- the task directory exists under `munera/open/`, not `munera/closed/`
+- the task directory exists under `munera/closed/`, not `munera/open/`
 
 Disposition:
 
@@ -86,12 +86,12 @@ Evidence found:
 - all task `steps.md` items are checked
 - implementation notes record the workflow `:response-mode` propagation, the lower turn-runtime non-streaming execution seam, OpenAI non-streaming support, capture shaping, and repeated focused verification
 - the task describes a completed vertical slice whose acceptance is evidenced in its own notes and green focused proof runs
-- despite that, the task directory still remains under `munera/open/` and is still listed in `munera/plan.md`
+- despite that, the task directory still remains under `munera/closed/` and was still listed as open in stale orchestration notes at audit time
 
 Disposition:
 
-- task 141 is materially complete and should be closed
-- closure is justified by its own acceptance evidence and repository state
+- task 141 is materially complete and was correctly closed during this audit
+- closure was justified by its own acceptance evidence and repository state
 
 ### Task 143 disposition
 
@@ -102,7 +102,7 @@ Evidence found:
 - all task `steps.md` items are checked
 - implementation notes record the root-cause inventory, persisted `:parent-session-id` fix, step-session-config precedence correction, create/run/resume propagation, delegated sub-workflow preservation, and repeated focused verification
 - the task's own notes show acceptance coverage for the motivating two-session inheritance case, explicit override precedence, nil-parent compatibility fallback, and resume-path preservation
-- despite that, the task directory still remains under `munera/open/`
+- despite that, the task directory had remained under `munera/open/` until closed by this audit
 
 Disposition:
 
@@ -118,7 +118,7 @@ Evidence found:
 - all task `steps.md` items are checked
 - implementation notes record the chosen ranked-sequence carrier, fallback-worthy failure classification seam, workflow-local ranked iteration, exhaustion contract, shaping follow-up, and focused verification
 - the task's own notes show acceptance coverage for ranked fallback success, concrete-model no-fallback behavior, terminal non-fallback failure, and empty/no-winner handling
-- despite that, the task directory still remains under `munera/open/`
+- despite that, the task directory had remained under `munera/open/` until closed by this audit
 
 Disposition:
 
@@ -134,13 +134,13 @@ Evidence found:
 - all substantive implementation/testing `steps.md` items are checked
 - the only remaining unchecked item is administrative (`Update munera/plan.md to include this task in backlog order if it should remain open after creation`)
 - implementation notes record shipped command/RPC scope handling, workflow transient scoping, focused proofs, picker-path parity, runtime parity review, and verification results
-- current repository state shows the task directory exists under `munera/open/`, not `munera/closed/`
-- `munera/plan.md` currently does not list task `146`, so the remaining administrative checkbox is stale rather than evidence of incomplete implementation
+- current repository state shows the task directory existed under `munera/open/` until closed by this audit
+- `munera/plan.md` did not list task `146`, so the remaining administrative checkbox was stale rather than evidence of incomplete implementation
 
 Disposition:
 
 - task 146 is materially complete and should be closed
-- the earlier task-173 note that described it as already closed was incorrect; directory state shows this audit should close it explicitly
+- the earlier task-173 note that described it as already closed was incorrect; directory state showed this audit should close it explicitly
 
 ### Task 147 disposition
 
@@ -151,7 +151,7 @@ Evidence found:
 - all task `steps.md` items are checked
 - implementation notes record the explicit `workflow-runtime.child-session-contract` owner, lower and higher boundary validation, attempt/judge proof ownership, realization-edge integration tests, and focused verification
 - the task's own notes show acceptance coverage for malformed request/result failures, attempt forwarding invariants, judge request semantics, and real child-session realization/runtime readiness
-- despite that, the task directory still remains under `munera/open/`
+- despite that, the task directory had remained under `munera/open/` until closed by this audit
 
 Disposition:
 
@@ -167,13 +167,13 @@ Evidence found:
 - all task `steps.md` items are checked
 - implementation notes record the policy correction to worktree-authoritative source selection, warning-only mismatch diagnostics, removal of the temporary public attr, and focused verification
 - current repository surfaces reflect the described behavior: docs and prompt guidance mention worktree-authoritative reload and mismatch warnings, and the reload implementation includes loaded-source-path vs target-source-path warning reporting
-- the task directory exists under `munera/open/`, not `munera/closed/`
-- `munera/plan.md` still contains stale note text claiming `141` is open, which confirms the remaining cleanup burden is plan-note hygiene rather than task-148 product work
+- the task directory existed under `munera/open/` until closed by this audit
+- `munera/plan.md` still contained stale note text claiming `141` was open, which confirmed the remaining cleanup burden was plan-note hygiene rather than task-148 product work
 
 Disposition:
 
 - task 148 is materially complete and should be closed
-- the earlier task-173 note that described it as already closed was incorrect; directory state shows this audit should close it explicitly
+- the earlier task-173 note that described it as already closed was incorrect; directory state showed this audit should close it explicitly
 
 ### Task 149 disposition
 
@@ -185,12 +185,12 @@ Evidence found:
 - the task includes the required explicit `inventory.md` classifying reload-sensitive surfaces, statuses, severities, and preferred fixup owners
 - implementation notes record the identified `breaks-psi` cases, the implemented fixups, focused proof, and updated guidance
 - current repository code contains the described query-env invalidation helpers and reload refresh calls
-- the task directory exists under `munera/open/`, not `munera/closed/`
+- the task directory existed under `munera/open/` until closed by this audit
 
 Disposition:
 
 - task 149 is materially complete and should be closed
-- the earlier task-173 note that described it as already closed was incorrect; directory state shows this audit should close it explicitly
+- the earlier task-173 note that described it as already closed was incorrect; directory state showed this audit should close it explicitly
 
 ### Task 150 disposition
 
@@ -201,12 +201,28 @@ Evidence found:
 - all task `steps.md` items are checked
 - implementation notes record the explicit runtime/persisted attr split, resolver naming changes, caller/doc migrations, graph discoverability updates, and review follow-up fixes
 - current repository surfaces teach the explicit names in docs and prompt/introspection guidance, and the task notes record green focused verification after the review follow-up
-- despite that, the task directory still remains under `munera/open/`
+- despite that, the task directory had remained under `munera/open/` until closed by this audit
 
 Disposition:
 
 - task 150 is materially complete and should be closed
 - closure is justified by the task's own acceptance evidence and repository state
+
+### Task 151 disposition
+
+Reviewed `151-metrics-extension` against its design, implementation notes, steps, current extension source tree, and registration/wiring surfaces.
+
+Evidence found:
+
+- all implementation, test, and verification checklist items in `steps.md` are checked
+- implementation notes record settled design decisions, standalone extension wiring, persistence behavior, self-tracking decisions, and verification results
+- current repository state contains the described standalone `extensions/metrics/` extension, catalog registration, `.psi/extensions.edn` enablement, deterministic operation `metrics/summary`, `/metrics` command, and focused tests
+- the task directory still remains under `munera/open/`
+
+Disposition:
+
+- task 151 is materially complete and should be closed
+- closure is justified by the task's own acceptance evidence and current repository state
 
 ### Task 152 disposition
 
@@ -218,12 +234,55 @@ Evidence found:
 - the only remaining unchecked items are explicitly conditional cleanup notes (`If touched while evolving this task...`) rather than unmet acceptance work
 - implementation notes record the canonical retry metadata shape, header propagation, provider-aware delay selection, projection/RPC surfacing, Emacs/TUI rendering, review follow-ups, and green focused verification
 - current repository code contains the described retry normalization and display helpers (`compute-retry-metadata`, `retry-display-data`, `:provider-error/headers`, nested `:retry` projection)
-- the task directory exists under `munera/open/`, not `munera/closed/`
+- the task directory existed under `munera/open/` until closed by this audit
 
 Disposition:
 
 - task 152 is materially complete and should be closed
 - the remaining conditional cleanup checkboxes should not be interpreted as incomplete acceptance work, and the earlier task-173 note that described it as already closed was incorrect
+
+### Task 154-add-temperature disposition
+
+Reviewed `154-add-temperature-as-workflow-step-config` against its steps and implementation notes.
+
+Evidence found:
+
+- all listed implementation and follow-up items in `steps.md` are checked
+- implementation notes record repeated review/test passes with green verification and no remaining actionable follow-up
+- current repository state shows the temperature pipeline, docs, and tests described by the task
+
+Disposition:
+
+- task `154-add-temperature-as-workflow-step-config` is materially complete and should be closed
+
+### Task 154-max-iterations disposition
+
+Reviewed `154-fix-workflow-max-iterations-error-surfacing` against its steps and implementation notes.
+
+Evidence found:
+
+- core implementation and review-follow-up items are checked
+- remaining unchecked items are only test-review follow-ups calling for additional defensive/documentation tests about nil/no-match/truncation behavior
+- implementation notes explicitly say the task is not closure-ready and identify remaining review-driven test gaps
+
+Disposition:
+
+- task `154-fix-workflow-max-iterations-error-surfacing` remains open
+- implementation is substantial, but the task's own recorded review state says closure is premature until those test-review follow-ups are resolved
+
+### Task 155 disposition
+
+Reviewed `155-tool-definition-owned-prompt-descriptions` against its steps and implementation notes.
+
+Evidence found:
+
+- all items in `steps.md` are checked
+- implementation notes record the ownership convergence, cwd-scoped helper preservation, refresh-path fix, and repeated green focused verification
+- no remaining unchecked actionable follow-up items are recorded
+
+Disposition:
+
+- task 155 is materially complete and should be closed
 
 ### Task 156 disposition
 
@@ -234,13 +293,41 @@ Evidence found:
 - all task `steps.md` items are checked
 - implementation notes record both the harness discovery root cause and the live resume rehydration fix, plus the re-enabled tmux scenario
 - current repository code contains the described absolute launcher fix and canonical navigation rehydration path for `:select-resume-session`
-- the task directory exists under `munera/open/`, not `munera/closed/`
-- `munera/plan.md` still lists task 156 as open, which is consistent with directory state even though implementation notes strongly suggest it is ready for closure
+- the task directory existed under `munera/open/` until closed by this audit
+- `munera/plan.md` listed task 156 as open, which was consistent with directory state even though implementation notes strongly suggested it was ready for closure
 
 Disposition:
 
 - task 156 is materially complete and should be closed
-- the earlier task-173 note that described it as already closed was incorrect; directory state shows this audit should close it explicitly
+- the earlier task-173 note that described it as already closed was incorrect; directory state showed this audit should close it explicitly
+
+### Task 157 disposition
+
+Reviewed `157-jar-owned-deps-release-startup` against its current artifact state.
+
+Evidence found:
+
+- `steps.md` contains all major execution items unchecked
+- implementation notes record release decisions only, with no evidence of the required packaging, launcher, smoke, or docs execution
+
+Disposition:
+
+- task 157 remains open
+- there is design/decision progress, but the implementation checklist is materially unmet
+
+### Task 158 disposition
+
+Reviewed `158-test-persistence-session-garbage` against its steps and implementation notes.
+
+Evidence found:
+
+- all checklist items in `steps.md` are checked
+- implementation notes record the non-persistence default convergence, isolated temp-root lifecycle, guardrails, cleanup proof, review follow-ups, and final no-action review passes
+- no remaining unchecked actionable follow-up items are present
+
+Disposition:
+
+- task 158 is materially complete and should be closed
 
 ### Task 164 disposition
 
@@ -251,12 +338,54 @@ Evidence found:
 - all task `steps.md` items are checked
 - implementation notes record the proof-first inventory, explicit refresh-boundary trigger rules, idle self-poll removal, focused verification, and review follow-ups
 - current repository state reflects the described post-change shape: explicit refresh boundaries and no idle self-reschedule behavior remain the authoritative rule
-- the task directory exists under `munera/open/`, not `munera/closed/`
+- the task directory existed under `munera/open/` until closed by this audit
 
 Disposition:
 
 - task 164 is materially complete and should be closed
-- the earlier task-173 note that described it as already closed was incorrect; directory state shows this audit should close it explicitly
+- the earlier task-173 note that described it as already closed was incorrect; directory state showed this audit should close it explicitly
+
+### Task 165 disposition
+
+Reviewed `165-openai-oauth-gpt-5-5-routing` against its steps and implementation notes.
+
+Evidence found:
+
+- all checklist items in `steps.md` are checked
+- implementation notes record the auth-aware runtime-resolution seam, propagated call sites, focused tests, full local verification, and live verification
+- no remaining unchecked actionable follow-up items are recorded
+
+Disposition:
+
+- task 165 is materially complete and should be closed
+
+### Task 166-emacs-rpc-event-garbage disposition
+
+Reviewed `166-emacs-rpc-event-garbage-reduction` against its steps and implementation notes.
+
+Evidence found:
+
+- all checklist items in `steps.md` are checked
+- implementation notes record full implementation, focused optimization proofs, review follow-ups, and repeated green verification
+- no remaining unchecked actionable follow-up items are present
+
+Disposition:
+
+- task `166-emacs-rpc-event-garbage-reduction` is materially complete and should be closed
+
+### Task 166-scheduler disposition
+
+Reviewed `166-scheduler-mandatory-time-source` against its steps and implementation notes.
+
+Evidence found:
+
+- all execution and follow-up items in `steps.md` are checked
+- implementation notes record the mandatory time-source boundary, fail-fast proofs, precedence fixes, deterministic delivery/drain timestamp proofs, and repeated green full scheduler verification
+- no remaining unchecked actionable follow-up items are present
+
+Disposition:
+
+- task `166-scheduler-mandatory-time-source` is materially complete and should be closed
 
 ### Task 167 disposition
 
@@ -267,13 +396,13 @@ Evidence found:
 - all Emacs-scoped task `steps.md` items are checked, including focused rendering edge cases and dedicated e2e coverage
 - implementation notes record the scoped shift away from TUI parity, the completed Emacs raw-fallback and nil/invalid-argument coverage, canonical parsed/raw comparison, dedicated e2e harness, and CI wiring
 - current repository state contains the described Emacs call-detail rendering, focused tests, and `bb emacs:tool-details:e2e` task/workflow wiring
-- the task directory exists under `munera/open/`, not `munera/closed/`
-- `munera/plan.md` still lists task 167 as open, which is consistent with directory state even though implementation notes strongly suggest it is ready for closure
+- the task directory existed under `munera/open/` until closed by this audit
+- `munera/plan.md` listed task 167 as open, which was consistent with directory state even though implementation notes strongly suggested it was ready for closure
 
 Disposition:
 
 - task 167 is materially complete and should be closed
-- the earlier task-173 note that described it as already closed was incorrect; directory state shows this audit should close it explicitly
+- the earlier task-173 note that described it as already closed was incorrect; directory state showed this audit should close it explicitly
 
 ### Task 168 disposition
 
@@ -284,13 +413,13 @@ Evidence found:
 - all task `steps.md` items are checked
 - implementation notes record the completed runtime slice, broad verification, invalid-output fail-fast fix, test-review follow-ups, single-JSON-object boundary proof, and duplicate-helper consolidation
 - current repository state contains the described reusable schema ownership, structured-output runtime helpers, source-resolution contract, and aligned docs
-- the task directory already exists under `munera/closed/`, not `munera/open/`
-- `munera/plan.md` still lists task 168 as open, so the remaining issue is orchestration drift rather than incomplete structured-output implementation
+- the task directory existed under `munera/open/` until closed by this audit
+- `munera/plan.md` listed task 168 as open, which was consistent with directory state even though implementation notes strongly suggested it was ready for closure
 
 Disposition:
 
-- task 168 is already closed and needs no further action from this audit
-- stale plan ordering should be corrected separately as backlog hygiene
+- task 168 is materially complete and should be closed
+- the earlier task-173 note that described it as already closed was incorrect; directory state showed this audit should close it explicitly
 
 ### Task 170 disposition
 
@@ -301,13 +430,13 @@ Evidence found:
 - all task `steps.md` items are checked
 - implementation notes record the completed provider-neutral request wiring, bounded turn-result seam, fallback-forbidden preflight, session-step/judge failure surfaces, persisted metadata coverage, and success-path seam coverage
 - current repository state contains the described `:missing-json-schema` handling, fallback-forbidden `:unsupported-structured-output` behavior, top-level bounded `:structured-output` seam, and workflow/judge focused tests
-- the task directory already exists under `munera/closed/`, not `munera/open/`
-- `munera/plan.md` still lists task 170 as open, so the remaining issue is orchestration drift rather than incomplete implementation
+- the task directory existed under `munera/open/` until closed by this audit
+- `munera/plan.md` listed task 170 as open, which was consistent with directory state even though implementation notes strongly suggested it was ready for closure
 
 Disposition:
 
-- task 170 is already closed and needs no further action from this audit
-- stale plan ordering should be corrected separately as backlog hygiene
+- task 170 is materially complete and should be closed
+- the earlier task-173 note that described it as already closed was incorrect; directory state showed this audit should close it explicitly
 
 ### Task 172 disposition
 
@@ -318,13 +447,13 @@ Evidence found:
 - all task `steps.md` items are checked
 - implementation notes record the completed command, focused test coverage, user-doc updates, and repeated no-action review passes after green verification
 - current repository state contains the described autoloaded command, keybinding/docs references, `user-error` behavior, helper delegation, and focused tests for point movement plus post-command send smoke
-- the task directory already exists under `munera/open/`, not `munera/closed/`
-- `munera/plan.md` still lists task 172 as open, which is at least consistent with directory state even if implementation notes strongly suggest readiness for closure
+- the task directory existed under `munera/open/` until closed by this audit
+- `munera/plan.md` listed task 172 as open, which was consistent with directory state even though implementation notes strongly suggested it was ready for closure
 
 Disposition:
 
-- task 172 should remain open for now in this audit because its actual directory state is still open
-- this exposed an audit-method correction: earlier passes incorrectly inferred some open tasks were already closed from implementation notes and nearby evidence without first checking the authoritative `munera/open/` directory state
+- task 172 is materially complete and should be closed
+- the earlier task-173 note that described it as already closed was incorrect; directory state showed this audit should close it explicitly
 
 ### Audit method correction
 
@@ -354,4 +483,4 @@ Actions taken:
 Result:
 
 - `munera/plan.md` now reflects the actual current open-task surface much more closely
-- the remaining open tasks in `munera/open/` now represent a smaller, more trustworthy backlog centered on genuinely open work such as `108`, `166`, `021`, `001`, `002`, `003`, `005`, `006`, `151`, `154`, `155`, `157`, `158`, `165`, and task `173` itself
+- the remaining open tasks in `munera/open/` now represent a smaller, more trustworthy backlog centered on genuinely open work such as `108`, `151`, `154`, `155`, `157`, `158`, `165`, and the two `166` tasks, plus older long-lived open tasks and task `173` itself
