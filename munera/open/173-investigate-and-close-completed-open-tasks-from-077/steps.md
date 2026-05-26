@@ -1,4 +1,4 @@
-- [ ] Review task 077 artifacts and current repository evidence
-- [ ] Record the 077 disposition in task 173 implementation notes
-- [ ] Close 077 if justified, otherwise record why it remains open
+- [x] Review task 077 artifacts and current repository evidence
+- [x] Record the 077 disposition in task 173 implementation notes
+- [x] Close 077 if justified, otherwise record why it remains open
 - [ ] Continue to the next later-numbered open task and repeat
