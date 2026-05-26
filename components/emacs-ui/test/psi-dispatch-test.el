@@ -81,6 +81,12 @@
     (psi-emacs-mode)
     (should (eq #'psi-emacs-interrupt (key-binding (kbd "C-c C-c"))))))
 
+(ert-deftest psi-move-point-to-prompt-end-keybinding-is-installed ()
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (should (eq #'psi-emacs-move-point-to-prompt-end
+                (key-binding (kbd "C-c C-e"))))))
+
 (ert-deftest psi-streaming-p-uses-explicit-run-state ()
   (with-temp-buffer
     (psi-emacs-mode)
