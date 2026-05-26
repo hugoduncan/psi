@@ -70,6 +70,32 @@ No new actionable ambiguities found:
 
 Preloaded ambiguity review pass 2 found no new actionable ambiguities. All 5 design-steps in design-steps.md were already checked from prior follow-up passes. No new unchecked items were added. No task artifact changes required.
 
+## 2026-05-25 implementation
+
+### Constants and lifecycle refactor (init.clj)
+
+Added three `^:private` constants after `initial-telemetry` with section comment:
+- `common-inherited-fields` (17 keys) — full classification docstring with authoritative/runtime-derived annotations
+- `prompt-state-fields` (4 keys) — new+resume only
+- `model-identity-fields` (2 keys) — new+fork only
+
+Replaced inline `select-keys` vectors in all three lifecycle functions with `into`/`concat` compositions. No deviations from design — the composed sets produce exactly the same key sets as the originals (verified by manual analysis: new=23, resume=21, fork=19).
+
+### Child-session documentation (child_session_state.clj)
+
+Added a classification comment after the ns form covering:
+- 7 common-core fields inherited from parent (with derivation mechanism for each)
+- 10 common-core fields intentionally defaulted (with rationale for each)
+- All 4 prompt-state fields (all derived, not carried as-is)
+- Both model-identity fields (`:model` falls back to parent, `:thinking-level` defaults to `:off`)
+
+No code changes to child_session_state.clj — documentation only, as planned.
+
+### Verification
+
+- `clj-paren-repair` + `clj-kondo --lint` clean on both files
+- `bb test` — full suite green, no test modifications required
+
 ## 2026-05-26 inconsistency review pass 2
 
 Reviewed design.md, plan.md, steps.md, design-steps.md, and implementation.md against actual code in `init.clj` and `child_session_state.clj`. Verified all field counts, set compositions, constant group boundaries, child-session inheritance paths, scope/AC/plan/steps alignment, and cross-artifact consistency.
