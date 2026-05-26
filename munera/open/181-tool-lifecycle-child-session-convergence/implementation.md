@@ -1,5 +1,18 @@
 # 181 implementation notes
 
+## Inconsistency review — 2026-05-25
+
+No actionable inconsistencies found across task files. Verified:
+
+- design.md scope analysis (all 6 lifecycle surfaces) matches codebase: `init.clj` select-keys includes `:tool-ids`, session schema/`initial-session` have no `:tool-defs`, `child_session_state.clj` derives `:tool-ids` from resolved tool-defs (not session state), `attempts.clj:70` converts step-config `:tool-defs` → `:tool-ids` at contract boundary, `statechart_runtime.clj:90` passes step-config `:tool-defs` as documented
+- design.md resume backward-compat claim matches `initialize-resumed-session-state` select-keys from `current-sd`
+- design.md test coverage references all exist: `tool_defs_test.clj`, `tool_authority_handlers_test.clj`, `child_session_state_test.clj` (including `child-session-tool-ids-coherence-test`), `child_session_mutation_test.clj`, `child_session_contract_test.clj`
+- design.md AC checkmarks consistent with scope analysis and code
+- implementation.md ambiguity follow-up properly corrects initial hypotheses (e.g. backward-compat is `select-keys` from `current-sd`, not `ensure-base-system-prompt`)
+- design-steps.md all resolved, decisions reflected in current design.md
+- task 180 design confirms "Step-config continues to output `:tool-defs` (derived maps) — this is a local data structure, not session state" — matches 181's claim
+- absence of plan.md/steps.md consistent with task being satisfied-by-prior-work (never executed)
+
 ## Ambiguity follow-up — 2026-05-25 (design-steps execution)
 
 Resolved all three design-steps from the ambiguity review. Updated design.md with:
