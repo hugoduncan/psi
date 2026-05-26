@@ -95,3 +95,19 @@ Reviewed implementation against design, architecture, and skill criteria (`match
 - `bb test`: all green
 
 **Findings:** No new actionable issues. Implementation is mechanical, follows the task 180 pattern exactly, introduces no new patterns or abstractions, and has no structural performance concerns.
+
+## Test-shaper review — 2026-05-25
+
+Reviewed all 9 changed test files against test-shaper skill criteria: clarity, signal, robustness, consistency, and economy.
+
+**Clarity:** All absence assertions use consistent message strings. `normalized-sorted-contributions` helper in `child_session_mutation_test.clj` compresses ceremony without hiding intent — takes `(root-state session-data)`, clearly named.
+
+**Signal:** 6 absence assertions across 4 test files each cover a distinct code path (new/resume/fork lifecycle, child-session, workflow child, mutation child). Derivation proofs via `prompt-storage/list-contributions` confirm behavioral equivalence at each path.
+
+**Robustness:** All tests deterministic, behavior-focused, no flakiness concerns. No new mocks or stubs introduced by this task.
+
+**Consistency:** All absence assertions use identical pattern `(is (not (contains? sd :prompt-contributions)) ":prompt-contributions no longer persisted in session state")`. Inline root-state construction in `create-child-session-selection-filters-extension-contributions-coherently-test` is deliberate — unit-level filtering test with explicit data, appropriate for its scope.
+
+**Economy:** No redundant assertions within this task's changes. Pre-existing observation: `session_test.clj` is a strict subset of `model_test.clj` — both test the same `psi.session-state.model` functions with nearly identical assertions. `model_test.clj` is the superset (adds temperature, retry metadata, provider-error-kind tests). This duplication is pre-existing (not introduced by task 182) and out of scope, but worth noting for a future cleanup task.
+
+**Findings:** No actionable test-shaper issues within this task's scope.
