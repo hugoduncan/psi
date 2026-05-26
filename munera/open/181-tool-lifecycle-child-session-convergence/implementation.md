@@ -1,5 +1,17 @@
 # 181 implementation notes
 
+## Ambiguity follow-up — 2026-05-25 (design-steps execution)
+
+Resolved all three design-steps from the ambiguity review. Updated design.md with:
+
+1. **Scope resolution → close as satisfied**: Added "Status: satisfied by tasks 179 + 180" header and "Scope analysis" section with per-surface accounting of all six lifecycle surfaces. All are already migrated. The remaining workflow step-config pipeline is a local data-passing concern (not session authority), explicitly documented as intentional in task 180's design.
+
+2. **Resume backward-compat → implicit bootstrap via `select-keys` from `current-sd`**: Added "Resume backward compatibility" section. The mechanism is not `ensure-base-system-prompt`/`retarget-runtime-prompt-metadata` (those handle prompt, not tools). It's `initialize-resumed-session-state` copying `:tool-ids` from the in-memory source session defaults (bootstrapped at app startup via `adopt-startup-plan-into-session!` → `:session/set-active-tools`). Pre-`:tool-ids` journals are handled correctly by construction. No explicit migration logic needed.
+
+3. **Test coverage → already satisfied**: Added "Test coverage" section listing the specific test files and scenarios from tasks 179+180 that cover AC 6. No additional focused test coverage needed.
+
+**Recommendation**: This task should be closed as satisfied by tasks 179 + 180. All acceptance criteria are met.
+
 ## Ambiguity review — 2026-05-25
 
 ### Finding: task scope substantially overlaps with already-completed work in tasks 179 and 180
