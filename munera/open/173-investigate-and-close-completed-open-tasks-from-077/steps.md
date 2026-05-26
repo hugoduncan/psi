@@ -19,4 +19,7 @@
 - [x] Review task 144 artifacts and current repository evidence
 - [x] Record the 144 disposition in task 173 implementation notes
 - [x] Close 144 if justified, otherwise record why it remains open
+- [x] Review task 146 artifacts and current repository evidence
+- [x] Record the 146 disposition in task 173 implementation notes
+- [x] Close 146 if justified, otherwise record why it remains open
 - [ ] Continue to the next later-numbered open task and repeat

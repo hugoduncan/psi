@@ -124,3 +124,20 @@ Disposition:
 
 - task 144 is materially complete and should be closed
 - closure is justified by the task's own acceptance evidence and repository state
+
+### Task 146 disposition
+
+Reviewed `146-model-scope-for-command-and-workflow-sessions` against its design, plan, steps, implementation notes, current repository state, and task-directory location.
+
+Evidence found:
+
+- all substantive implementation/testing `steps.md` items are checked
+- the only remaining unchecked item is administrative (`Update munera/plan.md to include this task in backlog order if it should remain open after creation`)
+- implementation notes record shipped command/RPC scope handling, workflow transient scoping, focused proofs, picker-path parity, runtime parity review, and verification results
+- current repository state shows the task directory already exists under `munera/closed/`, not `munera/open/`
+- `munera/plan.md` currently does not list task `146`, so the remaining administrative checkbox is stale rather than evidence of incomplete implementation
+
+Disposition:
+
+- task 146 is already closed and needs no further action from this audit
+- the stale administrative unchecked step should not be interpreted as incomplete product work
