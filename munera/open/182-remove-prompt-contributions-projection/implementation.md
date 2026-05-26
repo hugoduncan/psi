@@ -17,3 +17,9 @@ Reviewed design.md, implementation.md, and design-steps.md for cross-artifact in
 One minor inconsistency found:
 
 1. **Date typo in implementation.md**: The ambiguity review header says "2025-05-25" but the session date is 2026-05-25. Year is off by one.
+
+## Design ambiguity review (pass 2) — 2026-05-25
+
+Re-reviewed design.md, plan.md, and steps.md against current source after prior fixes were applied. Verified: all line numbers in design match current source; all 4 handler write sites, 3 init.clj select-keys sites, child_session_state.clj:114, model.clj:190+281, and nullable_api.clj:37 confirmed; resolver at session.clj:196 confirmed as output key not session-state read; backward compatibility claim sound (journal-based persistence, select-keys controls carry-forward, extra keys in persisted state harmlessly ignored). Steps enumerate all sites correctly.
+
+No new actionable ambiguities found.
