@@ -69,3 +69,11 @@ No new actionable ambiguities found:
 ## 2026-05-26 ambiguity follow-up pass 2 — no-op
 
 Preloaded ambiguity review pass 2 found no new actionable ambiguities. All 5 design-steps in design-steps.md were already checked from prior follow-up passes. No new unchecked items were added. No task artifact changes required.
+
+## 2026-05-26 inconsistency review pass 2
+
+Reviewed design.md, plan.md, steps.md, design-steps.md, and implementation.md against actual code in `init.clj` and `child_session_state.clj`. Verified all field counts, set compositions, constant group boundaries, child-session inheritance paths, scope/AC/plan/steps alignment, and cross-artifact consistency.
+
+Found one actionable inconsistency:
+
+1. **Child-session model-identity header claims "both inherited with parent fallback" but `:thinking-level` defaults to `:off`**: The scope line says `model-identity-fields (both inherited with parent fallback)` and the child-session section header says `**Model-identity fields** (both inherited with parent fallback):`. But the body correctly documents `:thinking-level — (or thinking-level :off) (explicit opts, not direct parent inheritance)` and documentation requirement #5 correctly says "`:model` falls back to parent, `:thinking-level` defaults to `:off`". The header/scope parenthetical contradicts the body and the documentation requirement. Only `:model` uses parent fallback; `:thinking-level` uses `:off` as default. Two locations need correction: scope bullet and child-session model-identity section header.
