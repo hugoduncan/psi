@@ -649,10 +649,12 @@ so the user sees the connecting affordance."
           (when (process-live-p mock-process)
             (delete-process mock-process)))))))
 
-(ert-deftest psi-move-point-to-prompt-end-focuses-empty-input ()
-  ;; The public command returns point to the empty prompt entry end.
+(ert-deftest psi-move-point-to-prompt-end-keybinding-and-focus-empty-input ()
+  ;; The public command is bound and returns point to the empty prompt entry end.
   (with-temp-buffer
     (psi-emacs-mode)
+    (should (eq #'psi-emacs-move-point-to-prompt-end
+                (key-binding (kbd "C-c C-e"))))
     (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
     (psi-emacs--ensure-startup-banner)
     (setf (psi-emacs-state-draft-anchor psi-emacs--state)
