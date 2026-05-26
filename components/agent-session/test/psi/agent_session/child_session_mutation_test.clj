@@ -10,6 +10,7 @@
    [psi.turn-runtime.request :as turn-request]
    [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]
+   [psi.prompt-registry.root-storage :as prompt-storage]
    [psi.query.core :as query]
    [psi.tool-registry.defs]))
 
@@ -22,8 +23,8 @@
      [ctx (:session-id sd)])))
 
 (defn- normalized-sorted-contributions
-  [session-data]
-  (-> (:prompt-contributions session-data)
+  [root-state session-data]
+  (-> (prompt-storage/list-contributions root-state session-data)
       (system-prompt/filter-prompt-contributions (:prompt-component-selection session-data))
       ss/sorted-prompt-contributions))
 
@@ -188,19 +189,22 @@
                                          :file-path "/s/SKILL.md" :base-dir "/s"
                                          :source :user :disable-model-invocation false}]}))
             child-sd (ss/get-session-data-in ctx child-id)]
+        (is (not (contains? child-sd :prompt-contributions))
+            ":prompt-contributions no longer persisted in session state")
+        (is (= ["work-on"] (:prompt-contribution-ids child-sd)))
         (is (= [{:id "work-on"
                  :ext-path "/ext/work-on"
                  :section "Extension Capabilities"
                  :content "tool: /work-on"
                  :enabled true}]
                (mapv #(select-keys % [:id :ext-path :section :content :enabled])
-                     (:prompt-contributions child-sd))))
+                     (prompt-storage/list-contributions @(:state* ctx) child-sd))))
         (is (str/includes? (:base-system-prompt child-sd) "λ engage(nucleus)."))
         (is (str/includes? (:base-system-prompt child-sd) "lambda-compiler"))
         (is (str/includes? (turn-request/effective-system-prompt
                             {:turn/base-system-prompt (:base-system-prompt child-sd)
                              :turn/developer-prompt (:developer-prompt child-sd)
-                             :turn/sorted-prompt-contributions (normalized-sorted-contributions child-sd)})
+                             :turn/sorted-prompt-contributions (normalized-sorted-contributions @(:state* ctx) child-sd)})
                            "tool: /work-on"))))))
 
 (deftest create-child-session-selection-filters-extension-contributions-coherently-test
@@ -208,17 +212,22 @@
     (let [child-sd {:base-system-prompt "base"
                     :developer-prompt nil
                     :prompt-component-selection {:extension-prompt-contributions ["/ext/a"]}
-                    :prompt-contributions [{:id "a" :ext-path "/ext/a" :content "A" :enabled true}
-                                           {:id "b" :ext-path "/ext/b" :content "B" :enabled true}]
-                    :tool-ids []}]
+                    :prompt-contribution-ids ["a" "b"]
+                    :tool-ids []}
+          root-state {:root-registries
+                      {:prompt-contributions
+                       {:entries-by-id {"a" {:id "a" :extension-id "/ext/a"
+                                             :value {:id "a" :ext-path "/ext/a" :content "A" :enabled true}}
+                                        "b" {:id "b" :extension-id "/ext/b"
+                                             :value {:id "b" :ext-path "/ext/b" :content "B" :enabled true}}}}}}]
       (is (str/includes? (turn-request/effective-system-prompt
                           {:turn/base-system-prompt (:base-system-prompt child-sd)
                            :turn/developer-prompt (:developer-prompt child-sd)
-                           :turn/sorted-prompt-contributions (normalized-sorted-contributions child-sd)}) "A"))
+                           :turn/sorted-prompt-contributions (normalized-sorted-contributions root-state child-sd)}) "A"))
       (is (not (str/includes? (turn-request/effective-system-prompt
                                {:turn/base-system-prompt (:base-system-prompt child-sd)
                                 :turn/developer-prompt (:developer-prompt child-sd)
-                                :turn/sorted-prompt-contributions (normalized-sorted-contributions child-sd)}) "B"))))))
+                                :turn/sorted-prompt-contributions (normalized-sorted-contributions root-state child-sd)}) "B"))))))
 
 (deftest create-child-session-nil-selection-rebuilds-full-base-prompt-without-parent-build-opts-test
   (testing "child nil selection rebuilds from structured state without requiring parent build opts"
@@ -296,7 +305,7 @@
             provider  (turn-request/build-provider-conversation
                        {:turn/base-system-prompt (:base-system-prompt child-sd)
                         :turn/developer-prompt (:developer-prompt child-sd)
-                        :turn/sorted-prompt-contributions (normalized-sorted-contributions child-sd)
+                        :turn/sorted-prompt-contributions (normalized-sorted-contributions @(:state* ctx) child-sd)
                         :turn/cache-breakpoints (set (or (:cache-breakpoints child-sd) #{}))
                         :turn/filtered-tool-defs child-tool-defs
                         :turn/messages []})]

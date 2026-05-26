@@ -24,7 +24,6 @@
             :tool-ids ["read" "bash" "psi-tool"]
             :skill-ids ["skill-a"]
             :prompt-contribution-ids ["ext-a"]
-            :prompt-contributions [{:id "ext-a" :ext-path "/ext/a" :section "Ext" :content "A" :enabled true}]
             :cache-breakpoints #{:system :tools}
             :model {:provider "prov" :id "m"}
             :developer-prompt "parent-dev"
@@ -93,8 +92,8 @@
 
     (testing "lower-level state is inherited"
       (is (= #{:system :tools} (:cache-breakpoints child-sd)))
-      (is (= [{:id "ext-a" :ext-path "/ext/a" :section "Ext" :content "A" :enabled true}]
-             (:prompt-contributions child-sd)))
+      (is (not (contains? child-sd :prompt-contributions))
+          ":prompt-contributions no longer persisted in session state")
       (is (= {:provider "prov" :id "m"} (:model child-sd))))
 
     (testing ":tool-defs and :active-tools are not in session state"

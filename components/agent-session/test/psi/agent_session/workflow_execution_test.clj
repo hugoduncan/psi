@@ -441,8 +441,6 @@
                                        {:selected-tools ["read" "psi-tool"]})
                            s (assoc-in s [:agent-session :sessions session-id :data :prompt-contribution-ids]
                                        [(:id contribution)])
-                           s (assoc-in s [:agent-session :sessions session-id :data :prompt-contributions]
-                                       [contribution])
                            s (assoc-in s [:root-registries :prompt-contributions :entries-by-id (:id contribution)]
                                        {:id (:id contribution)
                                         :extension-id (:ext-path contribution)
@@ -461,9 +459,9 @@
                          :user-message {:role "user"
                                         :content [{:type :text :text "plan it"}]}})]
           (is (= :completed (:status result)))
-          (is (= [contribution]
-                 (mapv #(select-keys % [:id :ext-path :section :content :enabled :created-at :updated-at])
-                       (:prompt-contributions child-sd))))
+          (is (not (contains? child-sd :prompt-contributions))
+              ":prompt-contributions no longer persisted in session state")
+          (is (= [(:id contribution)] (:prompt-contribution-ids child-sd)))
           (is (str/includes? (:base-system-prompt child-sd) "λ engage(nucleus)."))
           (is (= "You are a planner." (:developer-prompt child-sd)))
           (is (str/includes? (:prepared-request/system-prompt prepared) "You are a planner."))
@@ -496,13 +494,6 @@
                                                                      {:name "bash" :description "Bash" :parameters {:type "object" :properties {}}}]) a))
                            (assoc-in [:agent-session :sessions session-id :data :prompt-contribution-ids]
                                      ["a"])
-                           (assoc-in [:agent-session :sessions session-id :data :prompt-contributions]
-                                     [{:id "a"
-                                       :ext-path "/ext/a"
-                                       :content "A"
-                                       :enabled true
-                                       :created-at (java.time.Instant/parse "2026-04-22T12:00:00Z")
-                                       :updated-at (java.time.Instant/parse "2026-04-22T12:00:00Z")}])
                            (assoc-in [:root-registries :prompt-contributions :entries-by-id "a"]
                                      {:id "a"
                                       :extension-id "/ext/a"

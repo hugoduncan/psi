@@ -6,10 +6,8 @@
 (deftest prompt-contributions-use-root-registry-backed-authority-test
   ;; Proves the nullable extension API no longer treats any local prompt vector/map as authoritative.
   (testing "list/query surfaces read canonical prompt contributions from root-registry-backed state"
-    (let [{:keys [api state]} (nullable/create-nullable-extension-api {:path "/ext/a"})]
+    (let [{:keys [api]} (nullable/create-nullable-extension-api {:path "/ext/a"})]
       ((:register-prompt-contribution api) "c1" {:content "A" :priority 10 :enabled true})
-      (swap! state assoc-in [:root-state :agent-session :sessions "nullable-session" :data :prompt-contributions]
-             [{:id "stale" :ext-path "/ext/stale" :content "stale" :priority 0 :enabled true}])
       (is (= [{:id "c1"
                :ext-path "/ext/a"
                :content "A"

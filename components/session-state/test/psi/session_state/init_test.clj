@@ -12,7 +12,6 @@
                           :thinking-level :high
                           :skill-ids ["s"]
                           :prompt-contribution-ids ["p2" "p1"]
-                          :prompt-contributions [{:id "stale" :content "stale"}]
                           :tool-ids ["bash"])
         state0     {:root-registries {:prompt-contributions {:entries-by-id {"p1" {:id "p1"
                                                                                    :extension-id "/ext/a"
@@ -38,7 +37,8 @@
       (is (= :high (:thinking-level sd1)))
       (is (= ["s"] (:skill-ids sd1)))
       (is (= ["p2" "p1"] (:prompt-contribution-ids sd1)))
-      (is (= [{:id "stale" :content "stale"}] (:prompt-contributions sd1)))
+      (is (not (contains? sd1 :prompt-contributions))
+          ":prompt-contributions no longer persisted in session state")
       (is (= [{:id "p1" :ext-path "/ext/a" :section "A" :content "First" :enabled true}
               {:id "p2" :ext-path "/ext/b" :section "B" :content "Second" :enabled true}]
              (prompt-storage/list-contributions state1 sd1)))
@@ -65,8 +65,7 @@
 (deftest initialize-resumed-session-state-test
   (let [current-sd (assoc (model/initial-session {:worktree-path "/tmp/source"})
                           :skill-ids ["keep"]
-                          :prompt-contribution-ids ["from-current"]
-                          :prompt-contributions [{:id "stale" :content "stale"}])
+                          :prompt-contribution-ids ["from-current"])
         entries    [{:kind :session-info :data {:name "resumed name"}}
                     {:kind :message :data {:message {:role "user" :content "hi"}}}]
         state0     {:root-registries {:prompt-contributions {:entries-by-id {"from-current" {:id "from-current"
@@ -90,7 +89,8 @@
     (is (= :medium (:thinking-level sd1)))
     (is (= ["keep"] (:skill-ids sd1)))
     (is (= ["from-current"] (:prompt-contribution-ids sd1)))
-    (is (= [{:id "stale" :content "stale"}] (:prompt-contributions sd1)))
+    (is (not (contains? sd1 :prompt-contributions))
+        ":prompt-contributions no longer persisted in session state")
     (is (= [{:id "from-current" :ext-path "/ext/current" :section "Resume" :content "Current" :enabled true}]
            (prompt-storage/list-contributions state1 sd1)))
     (is (= entries (get-in state1 (state/session-journal-path "sid-r"))))
@@ -105,8 +105,7 @@
                    :worktree-path "/tmp/ws"
                    :model {:provider "prov" :id "m"}
                    :thinking-level :low
-                   :prompt-contribution-ids ["p2" "p1"]
-                   :prompt-contributions [{:id "stale" :content "stale"}]}
+                   :prompt-contribution-ids ["p2" "p1"]}
         branch-entries [{:kind :message :data {:message {:role "user" :content "hi"}}}]
         state0 {:agent-session {:sessions {"parent" {:agent-ctx ::agent :sc-session-id ::sc}}}
                 :root-registries {:prompt-contributions {:entries-by-id {"p1" {:id "p1"
@@ -127,7 +126,8 @@
     (is (= "/tmp/parent.ndedn" (:parent-session-path sd1)))
     (is (= :fork-head (:spawn-mode sd1)))
     (is (= ["p2" "p1"] (:prompt-contribution-ids sd1)))
-    (is (= [{:id "stale" :content "stale"}] (:prompt-contributions sd1)))
+    (is (not (contains? sd1 :prompt-contributions))
+        ":prompt-contributions no longer persisted in session state")
     (is (= [{:id "p1" :ext-path "/ext/a" :section "A" :content "First" :enabled true}
             {:id "p2" :ext-path "/ext/b" :section "B" :content "Second" :enabled true}]
            (prompt-storage/list-contributions state1 sd1)))

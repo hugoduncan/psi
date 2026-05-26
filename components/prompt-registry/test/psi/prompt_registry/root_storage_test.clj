@@ -51,8 +51,7 @@
         registered (root-storage/register-contribution-in-root-state
                     (:root-state registered) "s1" "/ext/a" "a" {:content "A" :priority 10})
         stale-sd    {:session-id "s1"
-                     :prompt-contribution-ids ["b" "a"]
-                     :prompt-contributions [{:id "stale" :ext-path "/ext/stale" :content "stale" :priority 0}]}
+                     :prompt-contribution-ids ["b" "a"]}
         listed      (root-storage/list-contributions (:root-state registered) stale-sd)]
     (is (= ["a" "b"] (mapv :id listed)))
     (is (= ["A" "B"] (mapv :content listed)))))
