@@ -224,3 +224,20 @@ Disposition:
 
 - task 152 is already closed and needs no further action from this audit
 - the remaining conditional cleanup checkboxes should not be interpreted as incomplete acceptance work
+
+### Task 156 disposition
+
+Reviewed `156-tui-resume-session-discovery-follow-up` against its design, plan, steps, implementation notes, current TUI/tmux resume code surfaces, and task-directory location.
+
+Evidence found:
+
+- all task `steps.md` items are checked
+- implementation notes record both the harness discovery root cause and the live resume rehydration fix, plus the re-enabled tmux scenario
+- current repository code contains the described absolute launcher fix and canonical navigation rehydration path for `:select-resume-session`
+- the task directory already exists under `munera/closed/`, not `munera/open/`
+- `munera/plan.md` still lists task 156 as open, so its remaining issue is orchestration-surface drift rather than incomplete implementation
+
+Disposition:
+
+- task 156 is already closed and needs no further action from this audit
+- stale plan ordering should be cleaned up as backlog hygiene, not by reopening the task
