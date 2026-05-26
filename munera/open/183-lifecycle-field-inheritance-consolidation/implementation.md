@@ -54,3 +54,14 @@ Found two actionable inconsistencies:
 ### Step 5: Expand child-session documentation scope
 
 **Resolution: expanded to all three constant groups.** Added prompt-state and model-identity subsections to the child-session inheritance divergence section, documenting how each field is derived or resolved. Updated scope to add a bullet for prompt-state and model-identity coverage. Updated child-session documentation requirement to include items 4 and 5 covering these groups. Updated acceptance criterion to require documentation of all three constant groups.
+
+## 2026-05-25 ambiguity review pass 2
+
+Reviewed design.md, plan.md, steps.md, design-steps.md, and implementation.md against actual code in `init.clj` and `child_session_state.clj`. Verified field counts, set compositions, constant group boundaries, child-session inheritance paths, and cross-artifact consistency.
+
+No new actionable ambiguities found:
+- Field counts (common 17, prompt-state 4, model-identity 2) match code `select-keys` vectors exactly; compositions produce correct totals (new=23, resume=21, fork=19).
+- Child-session 7-inherited/10-defaulted classification verified against `child-session-base-state*` code; `:nucleus-prelude-override` correctly classified as consumed-not-inherited.
+- No overlaps between the three constant groups; `into`+`concat` composition is sound.
+- All 9 steps cover all 7 acceptance criteria; plan decisions (constants in `init.clj`, `^:private`, documentation-only for child-session) align with design.
+- All 5 prior design-steps resolved and reflected in current design.md.
