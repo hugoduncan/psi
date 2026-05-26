@@ -212,6 +212,14 @@ With PREFIX, create and switch to a fresh dedicated buffer name."
     (psi-emacs--focus-input-area buffer window)
     buffer))
 
+;;;###autoload (autoload 'psi-emacs-move-point-to-prompt-end "psi" "Move point to the current psi prompt entry end." t)
+(defun psi-emacs-move-point-to-prompt-end ()
+  "Move point to the end of the current psi prompt entry area."
+  (interactive)
+  (unless psi-emacs--state
+    (user-error "Not in an initialized Psi session buffer"))
+  (psi-emacs--focus-input-area (current-buffer) (selected-window)))
+
 ;;;###autoload (autoload 'psi-emacs-project "psi" "Start or switch to a project-scoped psi buffer/session." t)
 (defun psi-emacs-project (&optional prefix)
   "Start psi frontend for the current project.

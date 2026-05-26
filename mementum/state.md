@@ -284,3 +284,5 @@ Focused OAuth routing tests ✅. bb tests previously ✅. Task 169 focused struc
 - 2026-05-25: Executed task 172 ambiguity follow-ups: design now names public command `psi-emacs-move-point-to-prompt-end`, locates it in `components/emacs-ui/psi-entry.el` with autoload discovery, specifies `user-error` outside initialized Psi session buffers, requires `psi-emacs--focus-input-area` delegation/window-point sync, and creates `plan.md`/`steps.md`; design-steps fully checked. Commit 8fc1f570.
 
 - 2026-05-26: Reviewed task 172 design/plan/steps for inconsistencies repeat 4; found no new actionable inconsistency feedback after rechecking task artifacts, current `psi-entry.el`, related focus/window-point tests, and Emacs frontend docs. Commit 9f180eb0.
+
+- 2026-05-26: Implemented task 172 Emacs prompt-end command: autoloaded `psi-emacs-move-point-to-prompt-end` delegates to existing focus-input helper with initialized-buffer `user-error` guard; focused ERT coverage added for prompt states, output recovery, visible windows, and post-command send/edit smoke; docs updated; focused selector green (6/6), `bb emacs:test` green (318/318), and `bb emacs:byte-compile` green.

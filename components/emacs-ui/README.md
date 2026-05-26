@@ -6,6 +6,7 @@ Entry commands:
 
 - `M-x psi-emacs-start` — global/default psi buffer (`*psi*` by default)
 - `M-x psi-emacs-project` — project-scoped psi buffer (`*psi:<project>*`)
+- `M-x psi-emacs-move-point-to-prompt-end` — return point to the current psi prompt entry end
 
 By default, subprocesses start from the directory where the start command is
 invoked. `psi-emacs-project` uses the detected project root as startup cwd.
