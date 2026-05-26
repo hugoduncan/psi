@@ -4,17 +4,10 @@ Open tasks in suggested execution order:
 
 Backlog:
 
-`munera/open/166-scheduler-mandatory-time-source/`
-`munera/open/166-emacs-rpc-event-garbage-reduction/`
-`munera/open/165-openai-oauth-gpt-5-5-routing/`
-`munera/open/158-test-persistence-session-garbage/`
-`munera/open/157-jar-owned-deps-release-startup/`
-`munera/open/155-tool-definition-owned-prompt-descriptions/`
-`munera/open/154-fix-workflow-max-iterations-error-surfacing/`
-`munera/open/154-add-temperature-as-workflow-step-config/`
-`munera/open/151-metrics-extension/`
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 `munera/open/108-project-nrepl-testing-without-mocks/`
+`munera/open/154-fix-workflow-max-iterations-error-surfacing/`
+`munera/open/157-jar-owned-deps-release-startup/`
 
 `munera/open/001-post-wave-b-gordian-follow-on/`
 `munera/open/002-compatibility-scaffold-removal/`

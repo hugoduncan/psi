@@ -479,8 +479,9 @@ Actions taken:
 - removed stale open-task backlog entries for tasks that were materially complete and still sitting in `munera/open/`
 - moved those completed task directories into `munera/closed/`
 - removed at least one stale note that still claimed task `141` was open
+- after a second reconciliation pass, removed newly stale plan entries for tasks `151`, `154-add-temperature-as-workflow-step-config`, `155`, `158`, `165`, and both `166` tasks after closing them during this audit
 
 Result:
 
 - `munera/plan.md` now reflects the actual current open-task surface much more closely
-- the remaining open tasks in `munera/open/` now represent a smaller, more trustworthy backlog centered on genuinely open work such as `108`, `151`, `154`, `155`, `157`, `158`, `165`, and the two `166` tasks, plus older long-lived open tasks and task `173` itself
+- the remaining open tasks in `munera/open/` are now a short, genuinely open set: `021`, `108`, `154-fix-workflow-max-iterations-error-surfacing`, `157`, the older long-lived `001`/`002`/`003`/`005`/`006` tasks, and task `173` itself
