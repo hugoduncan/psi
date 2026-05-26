@@ -15,6 +15,8 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-26: Reviewed task 172 design/plan/steps for ambiguities repeat 4; found one new actionable ambiguity: the required post-command prompt editing/submission smoke check does not define the exact send/dispatch path or asserted prompt text/state. Added a design-step to clarify the smoke-test expectation. Commit 799c57a3.
+
 - 2026-05-26: Executed task 172 ambiguity follow-up repeat 3: chose to update Emacs frontend user docs for the new `M-x psi-emacs-move-point-to-prompt-end` command; design/plan/steps now require README/doc command-list updates, design-step checked, no implementation steps executed.
 
 - 2026-05-26: Reviewed task 172 design/plan/steps for ambiguities repeat 3; found one new actionable ambiguity: user-visible `M-x psi-emacs-move-point-to-prompt-end` docs scope is undecided even though Emacs README/docs list frontend commands. Added a design-step to choose docs update vs explicit out-of-scope. Commit 21572853.
