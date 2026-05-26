@@ -37,8 +37,8 @@ When a new field is added to the session schema, a developer must remember to up
 - Define named constants or helpers for the per-path extensions on top of the common set
 - Classify each inherited field by role: capability membership, preference, UI, prompt state, or identity
 - Apply the shared vocabulary to all three `init.clj` lifecycle functions
-- Document the child-session path's relationship to the shared vocabulary (child-session may not directly use the same `select-keys` pattern because it constructs fields explicitly from opts + parent, but it should reference the same classification)
-- Ensure every field in the inheritance sets is documented as authoritative or derived
+- Document the child-session path's relationship to the shared vocabulary: which common-core fields it inherits from parent (8 of 17), which it intentionally defaults (9 of 17), and the rationale for the divergence
+- Classify each field group as authoritative (user/config-set) or runtime-derived (set after model resolution)
 
 ### Out of scope
 
@@ -50,30 +50,32 @@ When a new field is added to the session schema, a developer must remember to up
 
 ### Common core (17 keys — all three lifecycle paths)
 
-Capability membership:
+Each field is classified by role. Fields are either **authoritative** (set by user/config, persisted across sessions) or **runtime-derived** (set by the runtime after model resolution, transient telemetry).
+
+Capability membership (authoritative):
 - `:skill-ids` — authoritative skill membership
 - `:tool-ids` — authoritative tool membership
 - `:prompt-contribution-ids` — authoritative prompt membership
 - `:prompt-templates` — registered prompt templates
 - `:extensions` — active extension set
 
-Preferences:
+Preferences (authoritative):
 - `:auto-retry-enabled` — retry policy
 - `:auto-compaction-enabled` — compaction policy
 - `:prompt-mode` — lambda vs prose
-- `:nucleus-prelude-override` — custom prelude
+- `:nucleus-prelude-override` — custom prelude (carried as-is in init.clj paths; consumed during prompt derivation in child-session — see child-session note below)
 - `:developer-prompt` — developer-provided prompt
 - `:developer-prompt-source` — developer prompt origin
 - `:cache-breakpoints` — cache policy
 - `:scoped-models` — per-scope model overrides
 - `:tool-output-overrides` — per-tool output limits
 
-UI:
+UI (authoritative):
 - `:ui-type` — TUI vs RPC
 
-Telemetry/context:
-- `:context-tokens` — current context usage
-- `:context-window` — model context window size
+Telemetry/context (runtime-derived):
+- `:context-tokens` — current context usage (set after model resolution, not user-configured)
+- `:context-window` — model context window size (set after model resolution, not user-configured)
 
 ### new + resume only (4 keys)
 
@@ -89,6 +91,34 @@ Identity (carried from source because resume takes these as explicit params):
 - `:model`
 - `:thinking-level`
 
+### Child-session inheritance divergence (intentional)
+
+The child-session path (`child_session_state.clj`) inherits only 8 of the 17 common-core fields from the parent session. The remaining 9 intentionally receive `initial-session` defaults. This divergence is correct and must be preserved — child sessions are ephemeral agent-spawned sessions with different semantics.
+
+**Inherited from parent** (8 fields):
+- `:skill-ids` — derived via `derive-child-prompt-state` from parent skills
+- `:tool-ids` — derived via `derive-child-prompt-state` (or explicit child opts)
+- `:prompt-contribution-ids` — resolved from parent via `prompt-storage/prompt-ids`
+- `:prompt-mode` — `(or prompt-mode (:prompt-mode parent-sd))`
+- `:developer-prompt` — `(or developer-prompt (:developer-prompt parent-sd))`
+- `:developer-prompt-source` — `(or developer-prompt-source (:developer-prompt-source parent-sd))`
+- `:cache-breakpoints` — `(or cache-breakpoints (:cache-breakpoints parent-sd) default)`
+
+Note: `:nucleus-prelude-override` is read from `parent-sd` inside `default-child-system-prompt-build-opts` and consumed during prompt derivation, but is NOT set as a standalone field on the child session data map. It flows into the child's `:system-prompt-build-opts` rather than being carried as-is.
+
+**Not inherited — intentional defaults** (9 fields):
+- `:prompt-templates` — child sessions don't inherit registered prompt templates (default `[]`)
+- `:extensions` — child sessions don't inherit active extensions (default `{}`)
+- `:auto-retry-enabled` — child sessions use config default, not parent's setting
+- `:auto-compaction-enabled` — child sessions default to `false` (ephemeral, no compaction)
+- `:scoped-models` — child sessions don't inherit per-scope model overrides (default `[]`)
+- `:tool-output-overrides` — child sessions don't inherit per-tool output limits (default `{}`)
+- `:ui-type` — child sessions default to `:console` (agent-driven, not user-facing)
+- `:context-tokens` — runtime-derived, starts `nil`
+- `:context-window` — runtime-derived, starts `nil`
+
+The shared classification docstring in `child_session_state.clj` must note this intentional divergence: the child path references the common-core classification but deliberately inherits only the subset needed for prompt derivation and capability membership.
+
 ## Design
 
 ### Shared constants
@@ -98,7 +128,19 @@ Define in `session_state/init.clj` (or a new `session_state/inheritance.clj` if 
 ```clojure
 (def ^:private common-inherited-fields
   "Fields inherited by all lifecycle paths (new, resume, fork).
-   Capability membership, preferences, UI, and context telemetry."
+
+   Authoritative (user/config-set):
+     Capability membership: skill-ids, tool-ids, prompt-contribution-ids, prompt-templates, extensions
+     Preferences: auto-retry-enabled, auto-compaction-enabled, prompt-mode, nucleus-prelude-override,
+                  developer-prompt, developer-prompt-source, cache-breakpoints, scoped-models,
+                  tool-output-overrides
+     UI: ui-type
+
+   Runtime-derived (set after model resolution, transient):
+     Telemetry/context: context-tokens, context-window
+
+   Note: nucleus-prelude-override is carried as-is by init.clj paths but consumed
+   during prompt derivation in child-session (not set as standalone child field)."
   [:skill-ids :tool-ids :prompt-contribution-ids :prompt-templates :extensions
    :auto-retry-enabled :auto-compaction-enabled :prompt-mode :nucleus-prelude-override
    :developer-prompt :developer-prompt-source :cache-breakpoints :scoped-models
@@ -123,7 +165,11 @@ Each lifecycle function replaces its inline `select-keys` vector with a composit
 
 ### Child-session documentation
 
-`child_session_state.clj` constructs fields explicitly rather than via `select-keys`, so it cannot directly use the same constants. However, the design should add a docstring or comment that references the shared classification and explains which capability membership fields the child path inherits from the parent.
+`child_session_state.clj` constructs fields explicitly rather than via `select-keys`, so it cannot directly use the same constants. The docstring or comment must:
+1. Reference the shared classification constants by name
+2. List which 8 common-core fields are inherited from the parent and how (direct carry vs derivation)
+3. List which 9 common-core fields intentionally receive `initial-session` defaults and why
+4. Note that `:nucleus-prelude-override` is consumed during prompt derivation (fed into `:system-prompt-build-opts`) rather than carried as a standalone field
 
 ## Constraints
 
@@ -136,7 +182,7 @@ Each lifecycle function replaces its inline `select-keys` vector with a composit
 - A shared named constant defines the common inherited field set
 - Named constants define the per-path extensions (prompt-state, model-identity)
 - All three `init.clj` lifecycle functions compose their `select-keys` from these constants
-- A classification comment or docstring documents the role of each field group
-- `child_session_state.clj` references the shared classification in a comment or docstring
+- A classification comment or docstring documents the role of each field group (capability membership, preferences, UI, telemetry/context, prompt state, identity) and annotates each group as authoritative or runtime-derived
+- `child_session_state.clj` references the shared classification in a comment or docstring, and documents which common-core fields are intentionally not inherited (with rationale)
 - No behavioural change — tests pass without modification
 - Adding or removing a lifecycle-inherited field requires changing one constant, not 3+ vectors
