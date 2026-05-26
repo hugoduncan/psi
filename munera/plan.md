@@ -15,6 +15,7 @@ Backlog:
 `munera/open/001-post-wave-b-gordian-follow-on/`
 `munera/open/002-compatibility-scaffold-removal/`
 `munera/open/077-custom-provider-string-provider-auth-normalization/`
+`munera/open/173-investigate-and-close-completed-open-tasks-from-077/`
 `munera/open/003-prompt-lifecycle-architectural-convergence/`
 `munera/open/006-agent-tool-skill-prelude-follow-on/`
 `munera/open/005-canonical-dispatch-pipeline-trace-observability/`
