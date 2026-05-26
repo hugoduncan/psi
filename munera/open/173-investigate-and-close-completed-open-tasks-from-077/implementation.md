@@ -70,12 +70,12 @@ Evidence found:
 - all task `steps.md` items are checked
 - implementation notes record the extracted `turn_execution_contract` boundary, the routing of workflow actor/judge execution through it, the chosen boundary decisions, and focused verification
 - git history shows the implementation landed in commit `2949310e`
-- the task directory already exists under `munera/closed/`, not `munera/open/`
+- the task directory exists under `munera/open/`, not `munera/closed/`
 
 Disposition:
 
-- task 124 is already closed and needs no further action from this audit
-- this review also confirms the audit must inspect directory state directly rather than relying only on `munera/plan.md` or memory notes
+- task 124 is materially complete and should be closed
+- the earlier task-173 note that described it as already closed was incorrect; directory state shows this audit should close it explicitly
 
 ### Task 141 disposition
 
@@ -134,13 +134,13 @@ Evidence found:
 - all substantive implementation/testing `steps.md` items are checked
 - the only remaining unchecked item is administrative (`Update munera/plan.md to include this task in backlog order if it should remain open after creation`)
 - implementation notes record shipped command/RPC scope handling, workflow transient scoping, focused proofs, picker-path parity, runtime parity review, and verification results
-- current repository state shows the task directory already exists under `munera/closed/`, not `munera/open/`
+- current repository state shows the task directory exists under `munera/open/`, not `munera/closed/`
 - `munera/plan.md` currently does not list task `146`, so the remaining administrative checkbox is stale rather than evidence of incomplete implementation
 
 Disposition:
 
-- task 146 is already closed and needs no further action from this audit
-- the stale administrative unchecked step should not be interpreted as incomplete product work
+- task 146 is materially complete and should be closed
+- the earlier task-173 note that described it as already closed was incorrect; directory state shows this audit should close it explicitly
 
 ### Task 147 disposition
 
@@ -167,13 +167,13 @@ Evidence found:
 - all task `steps.md` items are checked
 - implementation notes record the policy correction to worktree-authoritative source selection, warning-only mismatch diagnostics, removal of the temporary public attr, and focused verification
 - current repository surfaces reflect the described behavior: docs and prompt guidance mention worktree-authoritative reload and mismatch warnings, and the reload implementation includes loaded-source-path vs target-source-path warning reporting
-- the task directory already exists under `munera/closed/`, not `munera/open/`
+- the task directory exists under `munera/open/`, not `munera/closed/`
 - `munera/plan.md` still contains stale note text claiming `141` is open, which confirms the remaining cleanup burden is plan-note hygiene rather than task-148 product work
 
 Disposition:
 
-- task 148 is already closed and needs no further action from this audit
-- related stale plan notes should be cleaned up separately as orchestration hygiene
+- task 148 is materially complete and should be closed
+- the earlier task-173 note that described it as already closed was incorrect; directory state shows this audit should close it explicitly
 
 ### Task 149 disposition
 
@@ -185,12 +185,12 @@ Evidence found:
 - the task includes the required explicit `inventory.md` classifying reload-sensitive surfaces, statuses, severities, and preferred fixup owners
 - implementation notes record the identified `breaks-psi` cases, the implemented fixups, focused proof, and updated guidance
 - current repository code contains the described query-env invalidation helpers and reload refresh calls
-- the task directory already exists under `munera/closed/`, not `munera/open/`
+- the task directory exists under `munera/open/`, not `munera/closed/`
 
 Disposition:
 
-- task 149 is already closed and needs no further action from this audit
-- this confirms the audit should distinguish stale plan ordering from actual task directory state and implementation completion
+- task 149 is materially complete and should be closed
+- the earlier task-173 note that described it as already closed was incorrect; directory state shows this audit should close it explicitly
 
 ### Task 150 disposition
 
@@ -218,12 +218,12 @@ Evidence found:
 - the only remaining unchecked items are explicitly conditional cleanup notes (`If touched while evolving this task...`) rather than unmet acceptance work
 - implementation notes record the canonical retry metadata shape, header propagation, provider-aware delay selection, projection/RPC surfacing, Emacs/TUI rendering, review follow-ups, and green focused verification
 - current repository code contains the described retry normalization and display helpers (`compute-retry-metadata`, `retry-display-data`, `:provider-error/headers`, nested `:retry` projection)
-- the task directory already exists under `munera/closed/`, not `munera/open/`
+- the task directory exists under `munera/open/`, not `munera/closed/`
 
 Disposition:
 
-- task 152 is already closed and needs no further action from this audit
-- the remaining conditional cleanup checkboxes should not be interpreted as incomplete acceptance work
+- task 152 is materially complete and should be closed
+- the remaining conditional cleanup checkboxes should not be interpreted as incomplete acceptance work, and the earlier task-173 note that described it as already closed was incorrect
 
 ### Task 156 disposition
 
@@ -234,13 +234,13 @@ Evidence found:
 - all task `steps.md` items are checked
 - implementation notes record both the harness discovery root cause and the live resume rehydration fix, plus the re-enabled tmux scenario
 - current repository code contains the described absolute launcher fix and canonical navigation rehydration path for `:select-resume-session`
-- the task directory already exists under `munera/closed/`, not `munera/open/`
-- `munera/plan.md` still lists task 156 as open, so its remaining issue is orchestration-surface drift rather than incomplete implementation
+- the task directory exists under `munera/open/`, not `munera/closed/`
+- `munera/plan.md` still lists task 156 as open, which is consistent with directory state even though implementation notes strongly suggest it is ready for closure
 
 Disposition:
 
-- task 156 is already closed and needs no further action from this audit
-- stale plan ordering should be cleaned up as backlog hygiene, not by reopening the task
+- task 156 is materially complete and should be closed
+- the earlier task-173 note that described it as already closed was incorrect; directory state shows this audit should close it explicitly
 
 ### Task 164 disposition
 
@@ -251,12 +251,12 @@ Evidence found:
 - all task `steps.md` items are checked
 - implementation notes record the proof-first inventory, explicit refresh-boundary trigger rules, idle self-poll removal, focused verification, and review follow-ups
 - current repository state reflects the described post-change shape: explicit refresh boundaries and no idle self-reschedule behavior remain the authoritative rule
-- the task directory already exists under `munera/closed/`, not `munera/open/`
+- the task directory exists under `munera/open/`, not `munera/closed/`
 
 Disposition:
 
-- task 164 is already closed and needs no further action from this audit
-- this is another confirmed case of stale orchestration state rather than incomplete task implementation
+- task 164 is materially complete and should be closed
+- the earlier task-173 note that described it as already closed was incorrect; directory state shows this audit should close it explicitly
 
 ### Task 167 disposition
 
@@ -267,13 +267,13 @@ Evidence found:
 - all Emacs-scoped task `steps.md` items are checked, including focused rendering edge cases and dedicated e2e coverage
 - implementation notes record the scoped shift away from TUI parity, the completed Emacs raw-fallback and nil/invalid-argument coverage, canonical parsed/raw comparison, dedicated e2e harness, and CI wiring
 - current repository state contains the described Emacs call-detail rendering, focused tests, and `bb emacs:tool-details:e2e` task/workflow wiring
-- the task directory already exists under `munera/closed/`, not `munera/open/`
-- `munera/plan.md` still lists task 167 as open, so the remaining issue is orchestration drift rather than unfinished implementation
+- the task directory exists under `munera/open/`, not `munera/closed/`
+- `munera/plan.md` still lists task 167 as open, which is consistent with directory state even though implementation notes strongly suggest it is ready for closure
 
 Disposition:
 
-- task 167 is already closed and needs no further action from this audit
-- stale plan ordering should be corrected separately as backlog hygiene
+- task 167 is materially complete and should be closed
+- the earlier task-173 note that described it as already closed was incorrect; directory state shows this audit should close it explicitly
 
 ### Task 168 disposition
 
