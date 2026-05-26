@@ -1,6 +1,6 @@
 # Implementation Notes
 
-## Design ambiguity review — 2025-05-25
+## Design ambiguity review — 2026-05-25
 
 Reviewed design.md against current source code. Found 3 actionable ambiguities:
 
