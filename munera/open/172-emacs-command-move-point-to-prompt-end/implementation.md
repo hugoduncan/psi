@@ -5,3 +5,5 @@
 - 2026-05-25 ambiguity follow-up execution: resolved the newly added design follow-ups without executing implementation `steps.md`. Design now names public command `psi-emacs-move-point-to-prompt-end`, locates it in `components/emacs-ui/psi-entry.el` with autoload discovery, specifies `user-error` outside initialized Psi session buffers, and requires delegation to `psi-emacs--focus-input-area` so visible window points synchronize. Created `plan.md` and `steps.md`; marked all design-steps complete.
 
 - 2026-05-25 inconsistency review: found no new actionable inconsistency feedback after checking design.md, plan.md, steps.md, design-steps.md, implementation.md, current `components/emacs-ui/psi-entry.el`, and related Emacs focus/window-point tests. Task artifacts are aligned on command name/autoload location, outside-session `user-error`, helper delegation, window-point synchronization, and focused test scope.
+
+- 2026-05-25 inconsistency follow-up execution: preloaded inconsistency review added no actionable design follow-up items. `design-steps.md` was already fully checked, so no task implementation `steps.md` items were executed; task artifacts remain aligned.
