@@ -60,3 +60,19 @@ Disposition:
 
 - task 108 remains open
 - current evidence shows real incremental progress, but the task's own acceptance is still materially unmet
+
+### Task 124 disposition
+
+Reviewed `124-turn-execution-contract-extraction` against its design, plan, steps, implementation notes, current repository state, and task-directory location.
+
+Evidence found:
+
+- all task `steps.md` items are checked
+- implementation notes record the extracted `turn_execution_contract` boundary, the routing of workflow actor/judge execution through it, the chosen boundary decisions, and focused verification
+- git history shows the implementation landed in commit `2949310e`
+- the task directory already exists under `munera/closed/`, not `munera/open/`
+
+Disposition:
+
+- task 124 is already closed and needs no further action from this audit
+- this review also confirms the audit must inspect directory state directly rather than relying only on `munera/plan.md` or memory notes
