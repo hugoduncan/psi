@@ -4,29 +4,19 @@ Open tasks in suggested execution order:
 
 Backlog:
 
-`munera/open/166-scheduler-mandatory-time-source/`
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 `munera/open/108-project-nrepl-testing-without-mocks/`
-`munera/open/105-agent-session-component-extraction-map/`
+`munera/open/154-fix-workflow-max-iterations-error-surfacing/`
+`munera/open/157-jar-owned-deps-release-startup/`
 
-`munera/open/141-workflow-child-session-non-streaming-execution/`
-`munera/open/144-workflow-model-query-execution-fallback/`
-`munera/open/147-workflow-child-session-creation-contract/`
 `munera/open/001-post-wave-b-gordian-follow-on/`
 `munera/open/002-compatibility-scaffold-removal/`
-`munera/open/077-custom-provider-string-provider-auth-normalization/`
+`munera/open/173-investigate-and-close-completed-open-tasks-from-077/`
 `munera/open/003-prompt-lifecycle-architectural-convergence/`
 `munera/open/006-agent-tool-skill-prelude-follow-on/`
 `munera/open/005-canonical-dispatch-pipeline-trace-observability/`
-`munera/open/149-reload-fixup-inventory-and-safety/`
 `munera/open/175-workflow-self-loop-control-edges/`
-`munera/open/150-explicit-runtime-vs-persisted-session-graph-surface/`
-`munera/open/152-retry-header-aware-backoff-and-ui-rate-limit-surfacing/`
-`munera/open/156-tui-resume-session-discovery-follow-up/`
-`munera/open/164-tui-idle-polling-elimination/`
-`munera/open/167-emacs-tool-details-show-full-call/`
-`munera/open/168-workflow-structured-output-schemas/`
-`munera/open/170-workflow-provider-native-structured-output/`
+
 Notes:
 
 - `169` is complete and closed: model/provider structured-output capability surface implemented; OpenAI Chat Completions native JSON Schema, Codex prompted-JSON fallback, Anthropic forced-tool native and fallback streaming/result surfaces, strategy metadata, model/user capability normalization, and focused structured-output/model tests green.
@@ -37,7 +27,6 @@ Notes:
 
 - `151` is complete and closed: `edit-clj` structural edit extension; `psi.edit-clj.core` (pure: parse, find-candidates, apply-line-filter, replace-in) + `psi.edit-clj.extension` (tool registration, I/O, JSON); wired into top-level `deps.edn`, `tests.edn`, and `psi-owned-extension-catalog`; `rewrite-clj/rewrite-clj 1.1.47` added to runtime+test deps; 19 tests, 73 assertions, 0 failures; 1776+169 broader suite green.
 - `140-workflow-ir-compilation-errors-actionable` is complete and closed: `"invalid value"` fallback test added to `format-structural-errors-test`; all 4 AC and 8 verification expectations met; 16 formatter tests, 63 assertions, 0 failures.
-- `141` is open: workflow-scoped child-session execution-mode support so workflow-owned child sessions can request `:response-mode :non-streaming`; intentionally narrower than a full session-wide streaming toggle.
 - `145` is complete and closed: logprob data moved out-of-band into `extensions.logprobs`.
 - `140` is complete and closed: logprob collection flag for OpenAI chat-completions endpoint;
   schema + request building + SSE extraction (OpenAI + llama.cpp) + turn accumulation +

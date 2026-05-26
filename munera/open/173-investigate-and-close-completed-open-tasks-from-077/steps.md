@@ -1,0 +1,64 @@
+- [x] Review task 077 artifacts and current repository evidence
+- [x] Record the 077 disposition in task 173 implementation notes
+- [x] Close 077 if justified, otherwise record why it remains open
+- [x] Review task 105 artifacts and current repository evidence
+- [x] Record the 105 disposition in task 173 implementation notes
+- [x] Close 105 if justified, otherwise record why it remains open
+- [x] Review task 108 artifacts and current repository evidence
+- [x] Record the 108 disposition in task 173 implementation notes
+- [x] Close 108 if justified, otherwise record why it remains open
+- [x] Review task 124 artifacts and current repository evidence
+- [x] Record the 124 disposition in task 173 implementation notes
+- [x] Close 124 if justified, otherwise record why it remains open
+- [x] Review task 141 artifacts and current repository evidence
+- [x] Record the 141 disposition in task 173 implementation notes
+- [x] Close 141 if justified, otherwise record why it remains open
+- [x] Review task 143 artifacts and current repository evidence
+- [x] Record the 143 disposition in task 173 implementation notes
+- [x] Close 143 if justified, otherwise record why it remains open
+- [x] Review task 144 artifacts and current repository evidence
+- [x] Record the 144 disposition in task 173 implementation notes
+- [x] Close 144 if justified, otherwise record why it remains open
+- [x] Review task 146 artifacts and current repository evidence
+- [x] Record the 146 disposition in task 173 implementation notes
+- [x] Close 146 if justified, otherwise record why it remains open
+- [x] Review task 147 artifacts and current repository evidence
+- [x] Record the 147 disposition in task 173 implementation notes
+- [x] Close 147 if justified, otherwise record why it remains open
+- [x] Review task 148 artifacts and current repository evidence
+- [x] Record the 148 disposition in task 173 implementation notes
+- [x] Close 148 if justified, otherwise record why it remains open
+- [x] Review task 149 artifacts and current repository evidence
+- [x] Record the 149 disposition in task 173 implementation notes
+- [x] Close 149 if justified, otherwise record why it remains open
+- [x] Review task 150 artifacts and current repository evidence
+- [x] Record the 150 disposition in task 173 implementation notes
+- [x] Close 150 if justified, otherwise record why it remains open
+- [x] Review task 152 artifacts and current repository evidence
+- [x] Record the 152 disposition in task 173 implementation notes
+- [x] Close 152 if justified, otherwise record why it remains open
+- [x] Review task 156 artifacts and current repository evidence
+- [x] Record the 156 disposition in task 173 implementation notes
+- [x] Close 156 if justified, otherwise record why it remains open
+- [x] Review task 164 artifacts and current repository evidence
+- [x] Record the 164 disposition in task 173 implementation notes
+- [x] Close 164 if justified, otherwise record why it remains open
+- [x] Review task 167 artifacts and current repository evidence
+- [x] Record the 167 disposition in task 173 implementation notes
+- [x] Close 167 if justified, otherwise record why it remains open
+- [x] Review task 168 artifacts and current repository evidence
+- [x] Record the 168 disposition in task 173 implementation notes
+- [x] Close 168 if justified, otherwise record why it remains open
+- [x] Review task 170 artifacts and current repository evidence
+- [x] Record the 170 disposition in task 173 implementation notes
+- [x] Close 170 if justified, otherwise record why it remains open
+- [x] Review task 172 artifacts and current repository evidence
+- [x] Record the 172 disposition in task 173 implementation notes
+- [x] Close 172 if justified, otherwise record why it remains open
+- [x] Reconcile audit method with actual munera/open directory state and fix any mistaken open/closed interpretations
+- [x] Reconcile stale munera/plan.md open-task entries against actual munera/open directory state
+- [x] Review remaining currently-open candidates 151, 154x2, 155, 157, 158, 165, and 166x2 using the corrected directory-authoritative method
+- [x] Reconcile munera/plan.md after closing additional completed tasks so only genuinely open tasks remain listed
+- [x] Review task 154-fix-workflow-max-iterations-error-surfacing with the corrected directory-authoritative method
+- [x] Review task 157-jar-owned-deps-release-startup with the corrected directory-authoritative method
+- [ ] Continue to the next later-numbered open task and repeat
