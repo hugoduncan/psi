@@ -21,6 +21,7 @@ This task covers one Emacs interactive command for the current Psi session buffe
 - It behaves consistently whether the prompt entry is empty or already contains text.
 - It uses the existing Emacs session buffer/prompt-entry model rather than introducing a second prompt representation.
 - It delegates to `psi-emacs--focus-input-area` so the selected window and any other visible windows showing the same Psi buffer have their window point synchronized to the prompt entry end.
+- User-facing Emacs frontend docs that enumerate commands are updated to mention the new `M-x psi-emacs-move-point-to-prompt-end` command.
 
 ## Out of scope
 
