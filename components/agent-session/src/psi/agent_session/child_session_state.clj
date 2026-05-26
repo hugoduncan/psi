@@ -12,6 +12,49 @@
    [psi.skill-registry.root-storage :as skill-storage]
    [psi.tool-registry.defs :as tool-defs]))
 
+;;; Child-session field inheritance classification
+;;;
+;;; The init.clj lifecycle paths (new, resume, fork) use shared constants
+;;; (common-inherited-fields, prompt-state-fields, model-identity-fields) to
+;;; compose their select-keys vectors. The child-session path constructs fields
+;;; explicitly with per-field logic (fallbacks, derivation, opts), so it does
+;;; not use select-keys composition. This comment documents the child-session's
+;;; relationship to those three constant groups.
+;;;
+;;; common-inherited-fields (17 keys in init.clj):
+;;;   Inherited from parent (7 of 17):
+;;;     :skill-ids              — derived via derive-child-prompt-state from parent skills
+;;;     :tool-ids               — derived via derive-child-prompt-state (or explicit child opts)
+;;;     :prompt-contribution-ids — resolved from parent via prompt-storage/prompt-ids
+;;;     :prompt-mode            — (or prompt-mode (:prompt-mode parent-sd))
+;;;     :developer-prompt       — (or developer-prompt (:developer-prompt parent-sd))
+;;;     :developer-prompt-source — (or developer-prompt-source (:developer-prompt-source parent-sd))
+;;;     :cache-breakpoints      — (or cache-breakpoints (:cache-breakpoints parent-sd) default)
+;;;   Not inherited — intentional defaults (10 of 17):
+;;;     :nucleus-prelude-override — consumed during prompt derivation inside
+;;;                                 default-child-system-prompt-build-opts; flows into the child's
+;;;                                 system-prompt-build-opts rather than being carried as a standalone field
+;;;     :prompt-templates       — child sessions don't inherit registered prompt templates (default [])
+;;;     :extensions             — child sessions don't inherit active extensions (default {})
+;;;     :auto-retry-enabled     — child sessions use config default, not parent's setting
+;;;     :auto-compaction-enabled — child sessions default to false (ephemeral, no compaction)
+;;;     :scoped-models          — child sessions don't inherit per-scope model overrides (default [])
+;;;     :tool-output-overrides  — child sessions don't inherit per-tool output limits (default {})
+;;;     :ui-type                — child sessions default to :console (agent-driven, not user-facing)
+;;;     :context-tokens         — runtime-derived, starts nil
+;;;     :context-window         — runtime-derived, starts nil
+;;;
+;;; prompt-state-fields (4 keys in init.clj):
+;;;   All 4 are derived (not carried as-is from parent):
+;;;     :base-system-prompt         — derived via derive-child-prompt-state
+;;;     :system-prompt              — derived via derive-child-prompt-state
+;;;     :system-prompt-build-opts   — derived via default-child-system-prompt-build-opts
+;;;     :prompt-component-selection — normalized from child opts via derive-child-prompt-state
+;;;
+;;; model-identity-fields (2 keys in init.clj):
+;;;     :model          — (or model (:model parent-sd)) — falls back to parent
+;;;     :thinking-level — (or thinking-level :off) — defaults to :off, not direct parent inheritance
+
 (defn- default-child-system-prompt-build-opts
   [parent-sd resolved-tool-defs resolved-skills normalized-selection]
   (let [cwd (:worktree-path parent-sd)
