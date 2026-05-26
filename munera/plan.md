@@ -27,8 +27,6 @@ Backlog:
 `munera/open/167-emacs-tool-details-show-full-call/`
 `munera/open/168-workflow-structured-output-schemas/`
 `munera/open/170-workflow-provider-native-structured-output/`
-`munera/open/178-registry-session-membership-unification/`
-
 Notes:
 
 - `169` is complete and closed: model/provider structured-output capability surface implemented; OpenAI Chat Completions native JSON Schema, Codex prompted-JSON fallback, Anthropic forced-tool native and fallback streaming/result surfaces, strategy metadata, model/user capability normalization, and focused structured-output/model tests green.
