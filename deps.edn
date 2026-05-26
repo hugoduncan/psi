@@ -124,6 +124,7 @@
                         "components/skill-registry/src"
                         "components/command-registry/src"
                         "components/tool-registry/src"
+                        "components/root-registry/src"
                         "components/deterministic-operation-registry/src"
                         "components/deterministic-operation-runtime/src"
                         "components/workflow-registry/src"
