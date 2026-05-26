@@ -455,6 +455,40 @@ Disposition:
 - task 172 is materially complete and should be closed
 - the earlier task-173 note that described it as already closed was incorrect; directory state showed this audit should close it explicitly
 
+### Task 154-fix-workflow-max-iterations disposition
+
+Reviewed `154-fix-workflow-max-iterations-error-surfacing` against its design, plan, steps, and implementation notes using the corrected directory-authoritative method.
+
+Evidence found:
+
+- the core implementation and first review-follow-up items are complete
+- however, `steps.md` still contains unchecked test-review follow-ups:
+  - empty-string `last-result-text` test
+  - >2000-char truncation test
+  - `[:failed]` vector target-form regression test
+  - end-to-end `:judge/no-match` error-message test or an explicit documented decision to keep the current nil-error behavior
+- implementation notes explicitly state the task was not closure-ready because these review-driven gaps remained
+
+Disposition:
+
+- task `154-fix-workflow-max-iterations-error-surfacing` remains open
+- it is close to done, but the task's own checklist and review notes still identify unresolved work, so this audit should not close it
+
+### Task 157 disposition
+
+Reviewed `157-jar-owned-deps-release-startup` against its design, plan, steps, and implementation notes using the corrected directory-authoritative method.
+
+Evidence found:
+
+- implementation notes only record release decisions and invariants
+- `steps.md` shows the main implementation checklist is still entirely unchecked across build packaging, launcher startup, packaging proofs, smoke coverage, docs, and coherence pass
+- there is no evidence in the task artifacts that the required release-shape implementation has been executed
+
+Disposition:
+
+- task 157 remains open
+- it has meaningful design progress, but implementation has not yet landed according to its own checklist
+
 ### Audit method correction
 
 Rechecked actual `munera/open/` directory state after noticing inconsistencies between prior audit notes and the filesystem.

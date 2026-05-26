@@ -59,4 +59,6 @@
 - [x] Reconcile stale munera/plan.md open-task entries against actual munera/open directory state
 - [x] Review remaining currently-open candidates 151, 154x2, 155, 157, 158, 165, and 166x2 using the corrected directory-authoritative method
 - [x] Reconcile munera/plan.md after closing additional completed tasks so only genuinely open tasks remain listed
+- [x] Review task 154-fix-workflow-max-iterations-error-surfacing with the corrected directory-authoritative method
+- [x] Review task 157-jar-owned-deps-release-startup with the corrected directory-authoritative method
 - [ ] Continue to the next later-numbered open task and repeat
