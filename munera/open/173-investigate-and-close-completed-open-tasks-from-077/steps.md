@@ -56,4 +56,5 @@
 - [x] Record the 172 disposition in task 173 implementation notes
 - [x] Close 172 if justified, otherwise record why it remains open
 - [x] Reconcile audit method with actual munera/open directory state and fix any mistaken open/closed interpretations
+- [x] Reconcile stale munera/plan.md open-task entries against actual munera/open directory state
 - [ ] Continue to the next later-numbered open task and repeat

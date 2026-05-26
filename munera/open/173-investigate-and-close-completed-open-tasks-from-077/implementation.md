@@ -332,7 +332,7 @@ Rechecked actual `munera/open/` directory state after noticing inconsistencies b
 
 Findings:
 
-- several tasks previously recorded in task 173 as already closed are in fact still present under `munera/open/`
+- several tasks previously recorded in task 173 as already closed were in fact still present under `munera/open/`
 - this means the earlier audit method over-trusted implementation notes and code evidence when deciding already-closed status
 - directory state is authoritative for Munera open/closed classification and must be checked before recording a task as already closed
 
@@ -340,3 +340,18 @@ Corrective rule going forward:
 
 - only treat a task as already closed when its directory is under `munera/closed/`
 - if a task appears implemented/completed but still lives under `munera/open/`, either close it in this audit or explicitly leave it open; do not describe it as already closed
+
+### Plan reconciliation outcome
+
+After correcting the method, reconciled `munera/plan.md` against actual `munera/open/` directory state.
+
+Actions taken:
+
+- removed stale open-task backlog entries for tasks that were materially complete and still sitting in `munera/open/`
+- moved those completed task directories into `munera/closed/`
+- removed at least one stale note that still claimed task `141` was open
+
+Result:
+
+- `munera/plan.md` now reflects the actual current open-task surface much more closely
+- the remaining open tasks in `munera/open/` now represent a smaller, more trustworthy backlog centered on genuinely open work such as `108`, `166`, `021`, `001`, `002`, `003`, `005`, `006`, `151`, `154`, `155`, `157`, `158`, `165`, and task `173` itself
