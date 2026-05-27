@@ -10,7 +10,7 @@
      :vars {"input" {:from :workflow-input, :path [:input]}}}]}
   {:name "review",
    :type :delegate,
-   :target "review-implementation",
+   :target "review-task-implementation",
    :prompt-string
    {:type :map,
     :fields {:input {:from {:step "resolve-worktree", :yield :text}}}},
@@ -27,4 +27,4 @@
      :vars {}}]}],
  :name "review-implementation-in-worktree",
  :description
- "Resolve worktree from a structured handoff, then review a Munera task implementation via the review-implementation workflow"}
+ "Resolve worktree from a structured handoff, then review a Munera task implementation via the review-task-implementation workflow"}
