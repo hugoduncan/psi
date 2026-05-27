@@ -1,0 +1,21 @@
+# Steps
+
+- [ ] Add canonical packaged built-in skill resource layout under `resources/psi/skills/`.
+- [ ] Include representative built-in skill resource fixture(s) and prove build packaging covers them.
+- [ ] Add runtime resource discovery for built-in skills.
+- [ ] Add materialization of built-in skill resources to managed readable filesystem paths under a psi-owned `~/.psi/agent/` cache subtree.
+- [ ] Use deterministic version/content-addressed built-in skill snapshots with reuse-on-match and refresh-on-build/resource-change semantics.
+- [ ] Preserve ordinary parsed skill shape with `:file-path` and `:base-dir` from materialized paths.
+- [ ] Integrate built-in skills into startup/discovery without requiring a source checkout.
+- [ ] Ensure built-in discovered skills register through canonical skill-registry/root-storage authority.
+- [ ] Implement explicit precedence-aware collision selection: `:extra-paths` > project > user-global > built-in.
+- [ ] Implement deterministic same-source tie handling and document/prove it.
+- [ ] Emit collision diagnostics naming the winning and shadowed definitions and their sources.
+- [ ] Preserve `/skill:name` invocation behavior for built-in skills.
+- [ ] Preserve canonical prompt-visible exact skill-name ordering.
+- [ ] Expose built-in skill provenance in relevant capability/introspection surfaces.
+- [ ] Update `README.md` and relevant skill/extensions/workflow docs.
+- [ ] Add focused tests for resource discovery, materialization, precedence, diagnostics, and invocation behavior.
+- [ ] Add non-source-tree packaged execution proof for built-in skill discoverability/readability.
+- [ ] Run targeted lint and affected test suites.
+- [ ] Run final broader verification appropriate to the touched surfaces.
