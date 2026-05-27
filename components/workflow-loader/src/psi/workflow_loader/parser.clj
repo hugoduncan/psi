@@ -1,79 +1,155 @@
 (ns psi.workflow-loader.parser
-  "Parse unified workflow definition files.
+  "Parse workflow definition files by explicit file kind.
 
-   File format:
-   1. YAML frontmatter (--- fenced) — name, description
-   2. Optional EDN config block — first non-whitespace char is `{`
-   3. Body text — system prompt (single-step) or framing prompt (multi-step)
+   Supported authored file kinds:
+   - `.md`  — single-step markdown workflow with required frontmatter + body
+   - `.edn` — multi-step target-authored workflow definition
 
-   Returns {:name :description :config :body} on success,
-   {:error ...} on failure."
+   Parsers return normalized authored maps or `{:error ...}`."
   (:require
    [clojure.edn :as edn]
    [clojure.string :as str]
    [psi.prompt-assets.prompt-templates :as pt]))
 
-(defn- parse-edn-prefix
-  "When `text` starts with `{` (after trimming leading whitespace),
-   read the first EDN form and return {:config <map> :remainder <string>}.
-   Returns nil when text does not start with `{`."
-  [text]
-  (let [trimmed (str/triml text)]
-    (when (str/starts-with? trimmed "{")
-      (let [rdr (java.io.PushbackReader. (java.io.StringReader. trimmed))
-            config (edn/read rdr)]
-        (when (map? config)
-          (let [consumed (- (count trimmed)
-                            (let [sb (StringBuilder.)]
-                              (loop []
-                                (let [ch (.read rdr)]
-                                  (if (neg? ch)
-                                    (count (str sb))
-                                    (do (.append sb (char ch))
-                                        (recur)))))))
-                remainder (str/trim (subs trimmed consumed))]
-            {:config config
-             :remainder remainder}))))))
+(def ^:private allowed-md-frontmatter-keys
+  #{:name
+    :description
+    :tools
+    :skills
+    :model
+    :thinking-level
+    :response-mode
+    :temperature
+    :logprobs
+    :top-logprobs
+    :prompt-component-selection})
 
-(defn parse-workflow-file
-  "Parse a unified workflow definition file.
+(def ^:private md-session-option-keys
+  [:tools
+   :skills
+   :model
+   :thinking-level
+   :response-mode
+   :temperature
+   :logprobs
+   :top-logprobs
+   :prompt-component-selection])
 
-   Returns a map with:
-   - :name        — workflow name (from frontmatter, required)
-   - :description — human-readable description (from frontmatter, required)
-   - :config      — EDN config map or nil
-   - :body        — prompt/system-prompt text or nil
+(defn- invalid
+  [message]
+  {:error message})
 
-   Returns {:error <string>} when the file cannot be parsed."
+(defn- trim-non-empty-string
+  [x]
+  (some-> x str str/trim not-empty))
+
+(defn- parse-edn-string
+  [raw]
+  (try
+    {:ok (edn/read-string raw)}
+    (catch Exception e
+      (invalid (str "Invalid EDN workflow definition: " (.getMessage e))))))
+
+(defn- unknown-frontmatter-keys
+  [frontmatter]
+  (->> (keys frontmatter)
+       (remove allowed-md-frontmatter-keys)
+       vec
+       not-empty))
+
+(defn- unsupported-frontmatter-error
+  [frontmatter]
+  (when-let [unknown-keys (unknown-frontmatter-keys frontmatter)]
+    (invalid (str "Unsupported markdown workflow frontmatter keys: "
+                  (pr-str unknown-keys)))))
+
+(defn- prompt-mode-error
+  [frontmatter]
+  (when (contains? frontmatter :prompt-mode)
+    (invalid "Unsupported markdown workflow frontmatter key: :prompt-mode")))
+
+(defn- body-starts-with-edn-map?
+  [body]
+  (str/starts-with? (str/triml (or body "")) "{"))
+
+(defn- single-step-frontmatter
+  [frontmatter]
+  (reduce (fn [acc key]
+            (if (contains? frontmatter key)
+              (assoc acc key (get frontmatter key))
+              acc))
+          {}
+          md-session-option-keys))
+
+(defn parse-markdown-workflow-file
+  "Parse a single-step markdown workflow file.
+
+   Returns:
+   {:workflow-kind :single-step-markdown
+    :name string
+    :description string
+    :session-config map
+    :body string}
+
+   Returns `{:error ...}` for invalid frontmatter/body authoring."
   [raw]
   (let [{:keys [frontmatter body]} (pt/extract-frontmatter (or raw ""))
-        name (some-> (:name frontmatter) str str/trim not-empty)
-        description (some-> (:description frontmatter) str str/trim not-empty)]
+        name (trim-non-empty-string (:name frontmatter))
+        description (trim-non-empty-string (:description frontmatter))
+        body-text (some-> body str/trim not-empty)]
     (cond
       (nil? name)
-      {:error "Missing required frontmatter key: name"}
+      (invalid "Missing required frontmatter key: name")
 
       (nil? description)
-      {:error "Missing required frontmatter key: description"}
+      (invalid "Missing required frontmatter key: description")
+
+      (prompt-mode-error frontmatter)
+      (prompt-mode-error frontmatter)
+
+      (unsupported-frontmatter-error frontmatter)
+      (unsupported-frontmatter-error frontmatter)
+
+      (nil? body-text)
+      (invalid "Standalone markdown workflow body must not be empty")
+
+      (body-starts-with-edn-map? body-text)
+      (invalid "Markdown workflow body must not begin with an EDN workflow definition block")
 
       :else
-      (let [edn-result (when (seq body)
-                         (try
-                           (parse-edn-prefix body)
-                           (catch Exception e
-                             {:parse-error (str "Invalid EDN config: " (.getMessage e))})))]
-        (cond
-          (:parse-error edn-result)
-          {:error (:parse-error edn-result)}
+      {:workflow-kind :single-step-markdown
+       :name name
+       :description description
+       :session-config (single-step-frontmatter frontmatter)
+       :body body-text})))
 
-          edn-result
-          {:name name
-           :description description
-           :config (:config edn-result)
-           :body (not-empty (:remainder edn-result))}
+(defn parse-edn-workflow-file
+  "Parse a multi-step EDN workflow file.
 
-          :else
-          {:name name
-           :description description
-           :config nil
-           :body (not-empty (str/trim (or body "")))})))))
+   Returns:
+   {:workflow-kind :multi-step-edn
+    :config map}
+
+   Returns `{:error ...}` on invalid EDN or non-map root."
+  [raw]
+  (let [{config :ok error :error} (parse-edn-string (or raw ""))]
+    (cond
+      error
+      {:error error}
+
+      (not (map? config))
+      (invalid "Workflow EDN file must contain a map root")
+
+      :else
+      {:workflow-kind :multi-step-edn
+       :config config})))
+
+(defn parse-workflow-file
+  "Parse a workflow file by extension.
+
+   `file-kind` must be `:md` or `:edn`."
+  [file-kind raw]
+  (case file-kind
+    :md (parse-markdown-workflow-file raw)
+    :edn (parse-edn-workflow-file raw)
+    (invalid (str "Unsupported workflow file kind: " (pr-str file-kind)))))

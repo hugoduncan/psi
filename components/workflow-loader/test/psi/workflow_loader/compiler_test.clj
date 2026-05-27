@@ -1,130 +1,196 @@
 (ns psi.workflow-loader.compiler-test
   (:require
+   [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
    [psi.workflow-loader.compiler :as compiler]
    [psi.workflow-registry.definition :as workflow-definition]))
 
-(def target-session-parsed
-  {:name "planner"
+(def markdown-parsed
+  {:workflow-kind :single-step-markdown
+   :name "planner"
    :description "Plans tasks"
-   :config {:steps [{:name "plan"
+   :session-config {:tools ["read" "bash"]
+                    :thinking-level :off}
+   :body "You are a planner."
+   :source-path "/tmp/planner.md"})
+
+(def edn-parsed
+  {:workflow-kind :multi-step-edn
+   :config {:name "plan-build-review"
+            :description "Plan, build, and review code changes"
+            :definition-id "plan-build-review"
+            :steps [{:name "plan"
                      :type :session
-                     :tools ["read" "bash"]
                      :contributions [{:type :template
-                                      :text "Plan {{task}}"
-                                      :vars {"task" {:from :workflow-input :path [:task]}}}]}]}
-   :body "You are a planner."})
-
-(def target-delegate-chain-parsed
-  {:name "plan-build-review"
-   :description "Plan, build, and review"
-   :config {:steps [{:name "plan"
-                     :type :delegate
-                     :target "planner"
-                     :prompt-string {:type :template
-                                     :text "{{input}}"
-                                     :vars {"input" {:from :workflow-input :path [:input]}}}}
-                    {:name "build"
-                     :type :delegate
-                     :target "builder"
-                     :prompt-string {:type :template
-                                     :text "Build {{plan}} / {{original}}"
-                                     :vars {"plan" {:from {:step "plan" :yield :text}}
-                                            "original" {:from :workflow-original :path [:original]}}}
-                     :context [{:type :source :from :workflow-original}]}
+                                      :text "{{input}}"
+                                      :vars {"input" {:from :workflow-input
+                                                      :path [:input]}}}]}
                     {:name "review"
-                     :type :session
-                     :contributions [{:type :source
-                                      :from {:step "build" :output :transcript}
-                                      :projection {:type :tail :turns 2 :tool-output false}}
-                                     {:type :template
-                                      :text "Review {{build}}"
-                                      :vars {"build" {:from {:step "build" :yield :text}}}}]}]}
-   :body "Coordinate a plan-build-review cycle."})
+                     :type :delegate
+                     :target "reviewer"
+                     :prompt-string {:type :template
+                                     :text "Review {{plan}}"
+                                     :vars {"plan" {:from {:step "plan"
+                                                           :yield :text}}}}}]}
+   :source-path "/tmp/plan-build-review.edn"})
 
-(def legacy-current-authored-parsed
-  {:name "legacy-plan-build-review"
-   :description "Plan, build, and review"
-   :config {:steps [{:name "plan" :workflow "planner" :prompt "$INPUT"}
-                    {:name "build" :workflow "builder" :prompt "Build: $INPUT"}]}
-   :body "Coordinate the cycle."})
-
-(deftest compile-target-authored-workflow-file-test
-  (testing "target-authored single-step workflow files compile and preserve metadata"
-    (let [{:keys [definition error]} (compiler/compile-workflow-file target-session-parsed)]
+(deftest compile-markdown-workflow-file-test
+  (testing "standalone markdown workflow compiles to exactly one canonical session step"
+    (let [{:keys [definition error]} (compiler/compile-workflow-file markdown-parsed)]
       (is (nil? error))
       (is (= "planner" (:definition-id definition)))
       (is (= "planner" (:name definition)))
       (is (= "Plans tasks" (:summary definition)))
-      (is (= "You are a planner." (get-in definition [:workflow-file-meta :framing-prompt])))
-      (is (workflow-definition/target-authored-workflow-definition? definition))
-      (is (= [:session] (mapv :type (:steps definition))))))
+      (is (= 1 (count (:steps definition))))
+      (is (= {:name "step"
+              :type :session
+              :tools ["read" "bash"]
+              :thinking-level :off
+              :contributions [{:type :template :text "You are a planner." :vars {}}]}
+             (first (:steps definition))))
+      (is (workflow-definition/target-authored-workflow-definition? definition))))
 
-  (testing "target-authored multi-step workflow files compile unchanged as authored definitions"
-    (let [{:keys [definition error]} (compiler/compile-workflow-file target-delegate-chain-parsed)]
-      (is (nil? error))
-      (is (= "plan-build-review" (:definition-id definition)))
-      (is (= [:delegate :delegate :session] (mapv :type (:steps definition))))
-      (is (= "planner" (get-in definition [:steps 0 :target])))
-      (is (= :text (get-in definition [:steps 1 :prompt-string :vars "plan" :from :yield])))
-      (is (= :tail (get-in definition [:steps 2 :contributions 0 :projection :type])))
-      (is (= "Coordinate a plan-build-review cycle."
-             (get-in definition [:workflow-file-meta :framing-prompt]))))))
+  (testing "batch compilation keeps markdown and edn successes together"
+    (let [{:keys [definitions errors]} (compiler/compile-workflow-files [markdown-parsed edn-parsed])]
+      (is (= 2 (count definitions)))
+      (is (empty? errors)))))
 
-(deftest compile-target-authored-errors-test
-  (testing "parser error is propagated"
-    (let [{:keys [error]} (compiler/compile-workflow-file {:error "bad file"})]
-      (is (= "bad file" error))))
-
-  (testing "missing workflow name fails clearly"
-    (let [{:keys [error]} (compiler/compile-workflow-file {:name nil :config {:steps []}})]
-      (is (= "Cannot compile: missing workflow name" error))))
-
-  (testing "legacy current-authored workflow files are rejected"
-    (let [{:keys [definition error]} (compiler/compile-workflow-file legacy-current-authored-parsed)]
-      (is (nil? definition))
-      (is (= "Workflow files must define target-authored `{:steps [...]}` config" error))))
-
-  (testing "target-authored compilation requires steps with explicit type"
-    (let [{:keys [definition error]}
+(deftest compile-edn-prompt-workflow-test
+  (testing "edn workflows require top-level name and description"
+    (let [{missing-name-error :error}
           (compiler/compile-workflow-file
-           {:name "bad-target"
-            :config {:steps [{:name "plan"
-                              :contributions []}]}})]
-      (is (nil? definition))
-      (is (= "Workflow files must define target-authored `{:steps [...]}` config" error)))))
+           {:workflow-kind :multi-step-edn
+            :config {:description "desc"
+                     :steps [{:name "plan"
+                              :type :session
+                              :contributions [{:type :template :text "hi" :vars {}}]}]}
+            :source-path "/tmp/orchestrator.edn"})
+          {blank-name-error :error}
+          (compiler/compile-workflow-file
+           {:workflow-kind :multi-step-edn
+            :config {:name "  "
+                     :description "desc"
+                     :steps [{:name "plan"
+                              :type :session
+                              :contributions [{:type :template :text "hi" :vars {}}]}]}
+            :source-path "/tmp/orchestrator.edn"})
+          {missing-description-error :error}
+          (compiler/compile-workflow-file
+           {:workflow-kind :multi-step-edn
+            :config {:name "orchestrator"
+                     :steps [{:name "plan"
+                              :type :session
+                              :contributions [{:type :template :text "hi" :vars {}}]}]}
+            :source-path "/tmp/orchestrator.edn"})
+          {blank-description-error :error}
+          (compiler/compile-workflow-file
+           {:workflow-kind :multi-step-edn
+            :config {:name "orchestrator"
+                     :description "  "
+                     :steps [{:name "plan"
+                              :type :session
+                              :contributions [{:type :template :text "hi" :vars {}}]}]}
+            :source-path "/tmp/orchestrator.edn"})]
+      (is (= "Workflow EDN files must define top-level `:name` as a string" missing-name-error))
+      (is (= "Workflow EDN files must define top-level `:name` as a non-blank string" blank-name-error))
+      (is (= "Workflow EDN files must define top-level `:description` as a string" missing-description-error))
+      (is (= "Workflow EDN files must define top-level `:description` as a non-blank string" blank-description-error))))
 
-(deftest compile-workflow-files-test
-  (testing "batch compilation separates target-authored successes from errors"
-    (let [result (compiler/compile-workflow-files
-                  [target-session-parsed
-                   {:error "bad parse"}
-                   legacy-current-authored-parsed
-                   target-delegate-chain-parsed])]
-      (is (= 2 (count (:definitions result))))
-      (is (= 2 (count (:errors result))))
-      (is (= ["planner" "plan-build-review"]
-             (mapv :name (:definitions result)))))))
+  (testing "session step prompt-workflow imports markdown body and default config with step-local override precedence"
+    (let [dir (io/file (System/getProperty "java.io.tmpdir") (str "wf-compiler-" (System/nanoTime)))
+          md-file (io/file dir "planner.md")]
+      (.mkdirs dir)
+      (spit md-file "---\nname: planner\ndescription: Plans tasks\ntools:\n  - read\nthinking-level: :low\n---\nYou are a planner.")
+      (try
+        (let [{:keys [definition error]}
+              (compiler/compile-workflow-file
+               {:workflow-kind :multi-step-edn
+                :config {:name "orchestrator"
+                         :description "Orchestrates a prompt workflow"
+                         :definition-id "orchestrator"
+                         :steps [{:name "plan"
+                                  :type :session
+                                  :prompt-workflow "planner.md"
+                                  :tools ["bash"]}]}
+                :source-path (.getAbsolutePath (io/file dir "orchestrator.edn"))})]
+          (is (nil? error))
+          (is (= ["bash"] (get-in definition [:steps 0 :tools])))
+          (is (= ":low" (get-in definition [:steps 0 :thinking-level])))
+          (is (= [{:type :template :text "You are a planner." :vars {}}]
+                 (get-in definition [:steps 0 :contributions]))))
+        (finally
+          (.delete md-file)
+          (.delete dir)))))
 
-(deftest validate-step-references-test
-  (testing "target-authored file loading no longer performs separate loader-time step-reference validation"
-    (is (= {:valid? true}
-           (compiler/validate-step-references [])))))
+  (testing "prompt-workflow rejects non-session step usage"
+    (let [{:keys [error]}
+          (compiler/compile-workflow-file
+           {:workflow-kind :multi-step-edn
+            :config {:name "orchestrator"
+                     :description "Orchestrates a prompt workflow"
+                     :steps [{:name "plan"
+                              :type :delegate
+                              :prompt-workflow "planner.md"}]}
+            :source-path "/tmp/orchestrator.edn"})]
+      (is (= "`:prompt-workflow` is allowed only on `:session` steps" error))))
 
-(deftest validate-no-name-collisions-test
-  (testing "no collisions"
-    (let [defs [(-> (compiler/compile-workflow-file target-session-parsed) :definition)
-                (-> (compiler/compile-workflow-file target-delegate-chain-parsed) :definition)]]
-      (is (true? (:valid? (compiler/validate-no-name-collisions defs))))))
+  (testing "prompt-workflow rejects dual prompt sources"
+    (let [{:keys [error]}
+          (compiler/compile-workflow-file
+           {:workflow-kind :multi-step-edn
+            :config {:name "orchestrator"
+                     :description "Orchestrates a prompt workflow"
+                     :steps [{:name "plan"
+                              :type :session
+                              :prompt-workflow "planner.md"
+                              :contributions [{:type :template :text "nope" :vars {}}]}]}
+            :source-path "/tmp/orchestrator.edn"})]
+      (is (= "`:prompt-workflow` cannot be combined with another authored prompt source" error))))
 
-  (testing "duplicate names detected from compiled target-authored definitions"
-    (let [defs [(-> (compiler/compile-workflow-file target-session-parsed) :definition)
-                (-> (compiler/compile-workflow-file target-session-parsed) :definition)]
-          result (compiler/validate-no-name-collisions defs)]
-      (is (false? (:valid? result)))
-      (is (= ["planner"] (:duplicates result))))))
+  (testing "prompt-workflow rejects missing referenced file"
+    (let [{:keys [error]}
+          (compiler/compile-workflow-file
+           {:workflow-kind :multi-step-edn
+            :config {:name "orchestrator"
+                     :description "Orchestrates a prompt workflow"
+                     :steps [{:name "plan"
+                              :type :session
+                              :prompt-workflow "missing.md"}]}
+            :source-path "/tmp/orchestrator.edn"})]
+      (is (re-find #"Referenced prompt workflow file not found" error))))
 
-(deftest validate-judge-routing-test
-  (testing "target-authored file loading delegates routing validation to the target compiler + IR path"
-    (is (= {:valid? true}
-           (compiler/validate-judge-routing [])))))
+  (testing "prompt-workflow rejects wrong-kind reference"
+    (let [{:keys [error]}
+          (compiler/compile-workflow-file
+           {:workflow-kind :multi-step-edn
+            :config {:name "orchestrator"
+                     :description "Orchestrates a prompt workflow"
+                     :steps [{:name "plan"
+                              :type :session
+                              :prompt-workflow "planner.edn"}]}
+            :source-path "/tmp/orchestrator.edn"})]
+      (is (re-find #"must reference a \.md file" error))))
+
+  (testing "prompt-workflow rejects absolute and escaping paths"
+    (let [{absolute-error :error}
+          (compiler/compile-workflow-file
+           {:workflow-kind :multi-step-edn
+            :config {:name "orchestrator"
+                     :description "Orchestrates a prompt workflow"
+                     :steps [{:name "plan"
+                              :type :session
+                              :prompt-workflow "/tmp/planner.md"}]}
+            :source-path "/tmp/orchestrator.edn"})
+          {escape-error :error}
+          (compiler/compile-workflow-file
+           {:workflow-kind :multi-step-edn
+            :config {:name "orchestrator"
+                     :description "Orchestrates a prompt workflow"
+                     :steps [{:name "plan"
+                              :type :session
+                              :prompt-workflow "../planner.md"}]}
+            :source-path "/tmp/orchestrator.edn"})]
+      (is (= "`:prompt-workflow` must be a relative .md path within the consuming workflow directory"
+             absolute-error))
+      (is (= "`:prompt-workflow` must be a relative .md path within the consuming workflow directory"
+             escape-error)))))

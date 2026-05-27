@@ -17,6 +17,10 @@ Backlog:
 `munera/open/005-canonical-dispatch-pipeline-trace-observability/`
 `munera/open/175-workflow-self-loop-control-edges/`
 
+Recently completed:
+
+`munera/closed/184-workflow-file-kinds-and-md-step-prompts/`
+
 Notes:
 
 - `169` is complete and closed: model/provider structured-output capability surface implemented; OpenAI Chat Completions native JSON Schema, Codex prompted-JSON fallback, Anthropic forced-tool native and fallback streaming/result surfaces, strategy metadata, model/user capability normalization, and focused structured-output/model tests green.

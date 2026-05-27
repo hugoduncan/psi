@@ -1,0 +1,26 @@
+{:steps
+ [{:top-logprobs 3,
+   :name "run",
+   :tools ["read"],
+   :type :session,
+   :response-mode :non-streaming,
+   :logprobs true,
+   :thinking-level :off,
+   :skills ["lambda-compiler"],
+   :contributions
+   [{:type :template,
+     :text "{{input}}",
+     :vars {"input" {:from :workflow-input}}}],
+   :model
+   {:type :model-query,
+    :require
+    [{:criterion :supports-text, :match :true}
+     {:criterion :locality, :equals :local}
+     {:criterion :latency-tier, :equals :low}
+     {:criterion :cost-tier, :one-of [:zero :low]}],
+    :prefer
+    [{:criterion :input-cost, :prefer :lower}
+     {:criterion :output-cost, :prefer :lower}]}}],
+ :name "local-logprobs",
+ :description
+ "Run a prompt with a local model, no tools, non-streaming, and logprobs, then report the perplexity"}

@@ -1,15 +1,28 @@
 (ns psi.workflow-loader.compiler
-  "Compile parsed workflow file data into canonical target-authored workflow definitions.
-
-   Accepts the output of `psi.workflow-loader.parser/parse-workflow-file` and produces
-   target-authored workflow-definition maps suitable for registration in the
-   deterministic workflow runtime.
-
-   Retirement status for task 090:
-   - checked-in `.psi/workflows/*.md` files are now target-authored only
-   - current-authored single-step and multi-step file compilation paths are removed"
+  "Compile parsed workflow file data into canonical target-authored workflow definitions."
   (:require
+   [clojure.java.io :as io]
+   [clojure.string :as str]
+   [psi.workflow-loader.parser :as parser]
    [psi.workflow-registry.definition :as workflow-definition]))
+
+(def ^:private prompt-defining-step-keys
+  #{:contributions :system-prompt})
+
+(def ^:private markdown-session-config-keys
+  [:tools
+   :skills
+   :model
+   :thinking-level
+   :response-mode
+   :temperature
+   :logprobs
+   :top-logprobs
+   :prompt-component-selection])
+
+(defn- invalid
+  [message]
+  {:error message})
 
 (defn- target-authored-config?
   [config]
@@ -18,38 +31,200 @@
        (every? map? (:steps config))
        (every? #(contains? % :type) (:steps config))))
 
-(defn- compile-target-authored-workflow-file
-  [{:keys [name description config body]}]
-  (let [workflow-definition (cond-> {:steps (:steps config)}
-                              name (assoc :definition-id name
-                                          :name name)
-                              description (assoc :summary description
-                                                 :description description)
-                              (contains? config :terminal-contract) (assoc :terminal-contract (:terminal-contract config))
-                              body (assoc :workflow-file-meta {:framing-prompt body}))]
-    (when-not (workflow-definition/target-authored-workflow-definition? workflow-definition)
-      (throw (ex-info "Target-authored workflow file must define `{:steps [...]}`"
-                      {:workflow-definition workflow-definition})))
-    workflow-definition))
+(defn- markdown-body->contribution
+  [body]
+  [{:type :template
+    :text body
+    :vars {}}])
+
+(defn- markdown-session-step
+  [{:keys [session-config body]}]
+  (cond-> {:name "step"
+           :type :session
+           :contributions (markdown-body->contribution body)}
+    true (merge session-config)))
+
+(defn- compile-markdown-workflow-file
+  [{:keys [name description source-path body] :as parsed}]
+  {:definition {:definition-id name
+                :name name
+                :summary description
+                :description description
+                :steps [(markdown-session-step parsed)]
+                :workflow-file-meta (cond-> {:file-kind :md
+                                             :framing-prompt body}
+                                      source-path (assoc :source-path source-path))}})
+
+(defn- slurp-workflow-file
+  [path]
+  (try
+    {:ok (slurp path)}
+    (catch Exception e
+      (invalid (str "Failed to read referenced prompt workflow `"
+                    path
+                    "`: "
+                    (.getMessage e))))))
+
+(defn- file-kind-from-path
+  [path]
+  (cond
+    (str/ends-with? path ".md") :md
+    (str/ends-with? path ".edn") :edn
+    :else nil))
+
+(defn- relative-prompt-workflow-path?
+  [prompt-workflow]
+  (and (string? prompt-workflow)
+       (not (str/blank? prompt-workflow))
+       (let [f (io/file prompt-workflow)]
+         (and (not (.isAbsolute f))
+              (not-any? #{".."} (str/split prompt-workflow #"/"))))))
+
+(defn- resolve-prompt-workflow-path
+  [workflow-path prompt-workflow]
+  (.getCanonicalPath
+   (io/file (.getParentFile (io/file workflow-path)) prompt-workflow)))
+
+(defn- read-prompt-workflow
+  [workflow-path prompt-workflow]
+  (let [resolved-path (resolve-prompt-workflow-path workflow-path prompt-workflow)
+        file-kind (file-kind-from-path resolved-path)]
+    (cond
+      (nil? file-kind)
+      (invalid (str "`:prompt-workflow` must reference a .md file: " (pr-str prompt-workflow)))
+
+      (not= :md file-kind)
+      (invalid (str "`:prompt-workflow` must reference a .md file, got `"
+                    prompt-workflow
+                    "`"))
+
+      (not (.exists (io/file resolved-path)))
+      (invalid (str "Referenced prompt workflow file not found: " (pr-str prompt-workflow)))
+
+      :else
+      (let [{raw :ok read-error :error} (slurp-workflow-file resolved-path)]
+        (if read-error
+          {:error (:error read-error)}
+          (let [parsed (parser/parse-workflow-file :md raw)]
+            (if (:error parsed)
+              (invalid (str "Referenced prompt workflow `"
+                            prompt-workflow
+                            "` is invalid: "
+                            (:error parsed)))
+              {:ok (assoc parsed :source-path resolved-path)})))))))
+
+(defn- prompt-source-conflict?
+  [step]
+  (some #(contains? step %) prompt-defining-step-keys))
+
+(defn- merge-markdown-session-config
+  [step markdown-session-config]
+  (reduce (fn [acc key]
+            (if (contains? acc key)
+              acc
+              (if (contains? markdown-session-config key)
+                (assoc acc key (get markdown-session-config key))
+                acc)))
+          step
+          markdown-session-config-keys))
+
+(defn- compile-prompt-workflow-step
+  [workflow-path step]
+  (let [prompt-workflow (:prompt-workflow step)]
+    (cond
+      (not= :session (:type step))
+      (invalid "`:prompt-workflow` is allowed only on `:session` steps")
+
+      (not (string? prompt-workflow))
+      (invalid "`:prompt-workflow` must be a relative .md file string")
+
+      (not (relative-prompt-workflow-path? prompt-workflow))
+      (invalid "`:prompt-workflow` must be a relative .md path within the consuming workflow directory")
+
+      (prompt-source-conflict? step)
+      (invalid "`:prompt-workflow` cannot be combined with another authored prompt source")
+
+      :else
+      (let [{referenced :ok reference-error :error}
+            (read-prompt-workflow workflow-path prompt-workflow)]
+        (if reference-error
+          {:error reference-error}
+          {:ok (-> step
+                   (dissoc :prompt-workflow)
+                   (merge-markdown-session-config (:session-config referenced))
+                   (assoc :contributions (markdown-body->contribution (:body referenced))))})))))
+
+(defn- compile-edn-steps
+  [workflow-path steps]
+  (loop [remaining steps
+         compiled []]
+    (if (empty? remaining)
+      {:ok compiled}
+      (let [step (first remaining)]
+        (if (contains? step :prompt-workflow)
+          (let [{compiled-step :ok step-error :error}
+                (compile-prompt-workflow-step workflow-path step)]
+            (if step-error
+              {:error step-error}
+              (recur (rest remaining) (conj compiled compiled-step))))
+          (recur (rest remaining) (conj compiled step)))))))
+
+(defn- compile-edn-workflow-file
+  [{:keys [config source-path]}]
+  (cond
+    (not (target-authored-config? config))
+    {:error "Workflow EDN files must define target-authored `{:steps [...]}` config"}
+
+    (not (string? (:name config)))
+    {:error "Workflow EDN files must define top-level `:name` as a string"}
+
+    (str/blank? (:name config))
+    {:error "Workflow EDN files must define top-level `:name` as a non-blank string"}
+
+    (not (string? (:description config)))
+    {:error "Workflow EDN files must define top-level `:description` as a string"}
+
+    (str/blank? (:description config))
+    {:error "Workflow EDN files must define top-level `:description` as a non-blank string"}
+
+    :else
+    (let [{compiled-steps :ok step-error :error}
+          (compile-edn-steps source-path (:steps config))
+          workflow-definition (cond-> (assoc config
+                                             :steps compiled-steps
+                                             :definition-id (or (:definition-id config)
+                                                                (:name config)))
+                                true (update :workflow-file-meta #(merge {:file-kind :edn}
+                                                                         %))
+                                source-path (update :workflow-file-meta assoc :source-path source-path))]
+      (cond
+        step-error
+        {:error step-error}
+
+        (not (workflow-definition/target-authored-workflow-definition? workflow-definition))
+        {:error "Target-authored workflow file must define `{:steps [...]}`"}
+
+        :else
+        {:definition workflow-definition}))))
 
 (defn compile-workflow-file
   "Compile a parsed workflow file into a canonical target-authored workflow definition.
 
    Returns {:definition <map>} on success, {:error <string>} on failure."
-  [{:keys [name config error] :as parsed}]
+  [{:keys [workflow-kind error] :as parsed}]
   (try
     (cond
       error
       {:error error}
 
-      (nil? name)
-      {:error "Cannot compile: missing workflow name"}
+      (= workflow-kind :single-step-markdown)
+      (compile-markdown-workflow-file parsed)
 
-      (target-authored-config? config)
-      {:definition (compile-target-authored-workflow-file parsed)}
+      (= workflow-kind :multi-step-edn)
+      (compile-edn-workflow-file parsed)
 
       :else
-      {:error "Workflow files must define target-authored `{:steps [...]}` config"})
+      {:error "Unknown parsed workflow kind"})
     (catch clojure.lang.ExceptionInfo e
       {:error (.getMessage e)})))
 
@@ -60,21 +235,18 @@
   (reduce (fn [acc parsed]
             (let [{:keys [definition error]} (compile-workflow-file parsed)]
               (if error
-                (update acc :errors conj {:name (:name parsed) :error error})
+                (update acc :errors conj {:name (:name parsed)
+                                          :error error
+                                          :source-path (:source-path parsed)})
                 (update acc :definitions conj definition))))
           {:definitions [] :errors []}
           parsed-files))
 
 (defn validate-step-references
-  "Target-authored workflow files use explicit IR validation and runtime compilation.
-   No separate file-loader-time workflow-name reference validation remains.
-   Returns {:valid? true}."
   [_definitions]
   {:valid? true})
 
 (defn validate-no-name-collisions
-  "Check that no two definitions share the same name.
-   Returns {:valid? true} or {:valid? false :duplicates [<name> ...]}."
   [definitions]
   (let [freqs (frequencies (map :name definitions))
         dups (into [] (comp (filter #(> (val %) 1)) (map key)) freqs)]
@@ -83,8 +255,5 @@
       {:valid? true})))
 
 (defn validate-judge-routing
-  "Target-authored workflow files are validated through the target compiler + IR path.
-   No separate current-grammar routing validation remains.
-   Returns {:valid? true}."
   [_definitions]
   {:valid? true})

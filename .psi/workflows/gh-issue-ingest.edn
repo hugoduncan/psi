@@ -1,0 +1,33 @@
+{:steps
+ [{:name "discover",
+   :type :invoke,
+   :operation "github/find-issue",
+   :args
+   {:labels ["enhancement" "triage"],
+    :input {:from :workflow-input, :path [:input]}},
+   :outputs
+   {:summary {:source :invoke/summary}, :data {:source :invoke/data}},
+   :yields {:type :text, :text :summary}}
+  {:name "run",
+   :type :session,
+   :tools ["read" "bash"],
+   :skills ["issue-feature-triage"],
+   :thinking-level :high,
+   :contributions
+   [{:type :source, :from {:step "discover", :yield :text}}
+    {:type :template,
+     :text
+     "You are executing a focused GitHub enhancement-triage workflow in this repository. The upstream discovery step has already selected the issue — its details appear in the context above.\n\nGoal:\n- Analyze the selected request with the `issue-feature-triage` skill.\n- Post a structured triage reply to the GitHub issue.\n\nUse the `issue-feature-triage` skill when shaping the analysis.\n\nRequired procedure:\n1. Read the selected issue.\n2. Analyze the request into intent, problem statement, scope, and acceptance criteria.\n3. Compose and post a concise structured GitHub reply.\n\nExecution constraints:\n- Do not create a Munera task.\n- Do not edit repository files as part of the issue-processing flow.\n- Do not invent requirements beyond what the issue supports.\n- Prefer one issue per run unless the input explicitly asks for batch processing.\n\nFinal response requirements:\n- Report the issue that was processed.\n- Summarize the posted triage briefly.\n- State whether the GitHub comment was posted.",
+     :vars {}}]}
+  {:name "edit-labels",
+   :type :invoke,
+   :operation "github/edit-labels",
+   :args
+   {:number
+    {:from {:step "discover", :output :data}, :path [:issue-number]},
+    :remove ["triage"],
+    :add ["waiting"],
+    :target "issue"}}],
+ :name "gh-issue-ingest",
+ :description
+ "Find labeled GitHub enhancement-ingest requests, triage them, reply on GitHub, and advance labels"}
