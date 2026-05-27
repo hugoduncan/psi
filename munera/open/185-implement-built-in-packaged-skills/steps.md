@@ -8,12 +8,13 @@
 - [ ] Preserve ordinary parsed skill shape with `:file-path` and `:base-dir` from materialized paths.
 - [ ] Integrate built-in skills into startup/discovery without requiring a source checkout.
 - [ ] Ensure built-in discovered skills register through canonical skill-registry/root-storage authority.
-- [ ] Implement explicit precedence-aware collision selection: `:extra-paths` > project > user-global > built-in.
-- [ ] Implement deterministic same-source tie handling and document/prove it.
+- [ ] Implement explicit precedence-aware collision selection over ordinary skill `:source` classes: `:path` > `:project` > `:user` > `:built-in`.
+- [ ] Keep `:disabled true` / `--no-skills` semantics coherent: suppress built-in, user-global, and project skill loading together while still loading `:extra-paths`.
+- [ ] Implement deterministic same-source tie handling and document/prove it: earlier configured source-container order wins, then lexicographically earlier canonical absolute skill file path wins within a source class.
 - [ ] Emit collision diagnostics naming the winning and shadowed definitions and their sources.
 - [ ] Preserve `/skill:name` invocation behavior for built-in skills.
 - [ ] Preserve canonical prompt-visible exact skill-name ordering.
-- [ ] Expose built-in skill provenance in relevant capability/introspection surfaces.
+- [ ] Expose built-in skill provenance in existing skill capability/introspection/read-model surfaces via `:source :built-in`, including grouped/introspection outputs and relevant EQL projections.
 - [ ] Update `README.md` and relevant skill/extensions/workflow docs.
 - [ ] Add focused tests for resource discovery, materialization, precedence, diagnostics, and invocation behavior.
 - [ ] Add non-source-tree packaged execution proof for built-in skill discoverability/readability.

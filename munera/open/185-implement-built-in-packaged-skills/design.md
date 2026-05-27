@@ -20,6 +20,14 @@ Task `184` also fixed the intended precedence contract:
 3. user-global skills
 4. psi-owned built-in packaged skills
 
+Task `185` sharpens how that contract maps onto the current discovery/runtime seams:
+
+- canonical collision winner selection changes from today's accidental first-discovered-wins behavior to explicit precedence-aware selection
+- source classes are represented in ordinary skill metadata as `:source` values `:path`, `:project`, `:user`, and `:built-in`
+- discovery/bootstrap/load order may be whatever is simplest for implementation, but the final selected skill set, diagnostics, and docs must reflect the explicit precedence contract rather than raw traversal order
+- when `--no-skills` / `:disabled true` is active, psi still loads only `:extra-paths`; built-in, user-global, and project skills are all suppressed together
+- current user-global path defaults under `~/.psi/agent/skills`; built-in materialization also lives under `~/.psi/agent/` but in a dedicated built-in cache subtree and remains the lowest-precedence source class rather than merging into ordinary user-global author-owned skills
+
 And it fixed the implementation direction:
 
 - psi-owned built-in skills are packaged as resources under `resources/psi/skills/<skill-name>/...`
@@ -63,12 +71,12 @@ Out of scope:
 6. Relative references from built-in `SKILL.md` files resolve the same way as for existing filesystem-backed skills.
 7. Resulting skill definitions register through canonical skill-registry/root-storage authority rather than a parallel ad hoc store.
 8. Collision resolution is explicit and deterministic: `:extra-paths` > project > user-global > built-in.
-9. Within the same source class, tie handling is deterministic and documented.
+9. Within the same source class, tie handling is deterministic and documented: exact skill-name collisions inside one source class are resolved by configured source-container order first, then by lexicographic canonical absolute skill file path within that container/traversal result, with the earlier candidate winning.
 10. Collision diagnostics identify both the winning and shadowed skill definitions and their sources.
 11. `/skill:name` continues to work for built-in skills.
 12. Prompt-visible skill lists preserve canonical exact skill-name ordering.
-13. Capability/introspection surfaces can distinguish built-in skill provenance at a high level.
-14. Docs explain built-in skill shipping, source precedence, overrides, and AI-readable materialized paths.
+13. Existing skill capability/introspection/read-model surfaces can distinguish built-in skill provenance at a high level by exposing built-ins as ordinary skills with `:source :built-in`; this applies at minimum to skill summary/detail maps, `:psi.skill/by-source`, grouped/introspection helper outputs, and any collision diagnostics that name sources.
+14. Docs explain built-in skill shipping, source precedence, overrides, same-source tie handling, and AI-readable materialized paths.
 15. Verification includes non-source-tree proof that built-in packaged skills remain discoverable and readable.
 
 ## Constraints

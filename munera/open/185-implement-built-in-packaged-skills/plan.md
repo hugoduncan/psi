@@ -32,13 +32,16 @@ Implement the task in small vertical slices that preserve current skill semantic
 - Ensure resulting skills flow into canonical skill-registry/root-storage authority.
 
 ### Slice 4 — precedence and diagnostics
-- Replace accidental source-order-only collision behavior with explicit precedence-aware selection.
-- Preserve deterministic same-source tie handling.
+- Replace accidental source-order-only collision behavior with explicit precedence-aware selection over ordinary skill `:source` classes: `:path` > `:project` > `:user` > `:built-in`.
+- Decouple final winner selection from raw discovery/bootstrap traversal order so implementation can load sources in any convenient sequence while preserving the canonical precedence contract.
+- Keep `:disabled true` / `--no-skills` behavior coherent by suppressing built-in, user-global, and project sources together while still loading `:extra-paths`.
+- Use deterministic same-source tie handling: for equal skill names inside one source class, earlier configured source-container order wins; if multiple candidates arise within the same container class, lexicographically earlier canonical absolute `SKILL.md` path wins.
 - Add diagnostics that identify both winner and shadowed definitions.
 
 ### Slice 5 — introspection and docs
-- Expose built-in provenance/source in skill capability/introspection surfaces where needed.
-- Update docs for shipping, overrides, and readable materialized paths.
+- Expose built-in provenance/source through existing skill read-models by representing built-ins as ordinary skills with `:source :built-in`.
+- Keep `skill-summary`, detail/enriched skill maps, `skills-by-source`, EQL/grouped projections, and collision diagnostics aligned around that provenance surface.
+- Update docs for shipping, overrides, same-source tie handling, and readable materialized paths.
 
 ### Slice 6 — verification
 - Add focused unit/integration tests for resource discovery, materialization, precedence, diagnostics, and `/skill:name` behavior.
