@@ -268,17 +268,27 @@
     (bytes->hex (.digest digest))))
 
 (defn- built-in-snapshot-id
-  [resource-root]
-  (subs (sha256-hex (str (version/version-string) "|" resource-root)) 0 16))
+  [resource-root resource-paths]
+  (subs (sha256-hex (str (version/version-string)
+                         "|"
+                         resource-root
+                         "|"
+                         (str/join "|" resource-paths)))
+        0
+        16))
+
+(declare built-in-skill-resource-paths)
 
 (defn built-in-snapshot-dir
   "Return the deterministic snapshot directory path for packaged built-in skills."
   ([] (built-in-snapshot-dir {}))
   ([opts]
-   (let [config        (merge default-config (:config opts))
-         cache-dir     (:built-in-cache-dir config)
-         resource-root (:built-in-resource-root config)]
-     (str (io/file cache-dir (built-in-snapshot-id resource-root))))))
+   (let [config         (merge default-config (:config opts))
+         cache-dir      (:built-in-cache-dir config)
+         resource-root  (:built-in-resource-root config)
+         resource-paths (or (:resource-paths-override opts)
+                            (built-in-skill-resource-paths opts))]
+     (str (io/file cache-dir (built-in-snapshot-id resource-root resource-paths))))))
 
 (defn built-in-skill-resource-paths
   "Enumerate packaged built-in SKILL.md resource paths under the configured resource root."

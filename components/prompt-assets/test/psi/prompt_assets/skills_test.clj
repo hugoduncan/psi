@@ -646,6 +646,14 @@
       (is (str/includes? (slurp skill-path) "work-independently"))
       (is (contains? #{true false} reused?))))
 
+  (testing "snapshot id changes when the packaged resource set changes"
+    (let [base-dir (skills/built-in-snapshot-dir {})
+          changed-dir (skills/built-in-snapshot-dir
+                       {:config {:built-in-resource-root "psi/skills"}
+                        :resource-paths-override ["psi/skills/work-independently/SKILL.md"
+                                                  "psi/skills/testing-without-mocks/SKILL.md"]})]
+      (is (not= base-dir changed-dir))))
+
   (testing "built-in discovery loads materialized packaged skills as ordinary file-backed skills"
     (let [{:keys [skills materialization]} (skills/built-in-skills-discovery {})
           built-in (some #(when (= "work-independently" (:name %)) %) skills)]
