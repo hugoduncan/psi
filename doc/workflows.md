@@ -63,11 +63,25 @@ The authoritative example set is:
 - `delegate-build-review` — executable delegate-heavy target-authored example proving canonical downstream delegated yielded-text consumption
 - `gh-bug-triage-modular` — richer target-authored orchestration example proving delegated yielded text plus structured delegated handoff consumption
 
-Note: this repository still contains many checked-in multi-step `.md` workflow
-artifacts from the pre-split contract. In this task they remain transitional
-compatibility-era examples. New authoring should treat `.md` as single-step and
-`.edn` as multi-step; a later migration task can move the legacy built-ins to
-`.edn`. 
+Note: this repository still contains transitional checked-in `.md` workflow
+artifacts from the pre-split contract. New authoring should treat `.md` as
+single-step and `.edn` as multi-step.
+
+The current remaining deferred-migration markdown wrappers are:
+
+- `gh-bug-discover-and-read.md`
+- `gh-bug-post-repro.md`
+- `gh-bug-reproduce.md`
+- `gh-issue-create-worktree.md`
+- `gh-issue-push-intent.md`
+- `gh-issue-task-intent.md`
+- `implement-task-in-worktree.md`
+
+Those files still begin with legacy EDN workflow maps and are intentionally
+tracked by the repo-corpus validation test as outstanding migration blockers,
+not as valid single-step markdown examples. A later migration task should move
+those orchestration workflows to `.edn` and leave only true standalone prompt
+workflows in `.md`.
 
 ## User-facing workflow commands
 
