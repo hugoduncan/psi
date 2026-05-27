@@ -10,3 +10,4 @@
 - [x] Align focused mixed-kind collision proof and residual docs/comments with the finalized mixed-kind duplicate-name load-error contract.
 - [x] Reject non-relative `:prompt-workflow` references so absolute paths and `..` escapes outside the consuming workflow authoring tree fail clearly, and add focused compiler proof for the relative-only contract.
 - [ ] Add focused proof that transitional checked-in multi-step `.psi/workflows/*.md` artifacts still parse/compile/load during this task's deferred-migration scope, so the repo-level validation suite covers the documented compatibility contract.
+  - Blocked: repo still has checked-in `planner.md`, `builder.md`, and `reviewer.md` as legacy EDN-bodied markdown, so the new standalone single-step `.md` contract cannot yet pass without a separate artifact migration slice.
