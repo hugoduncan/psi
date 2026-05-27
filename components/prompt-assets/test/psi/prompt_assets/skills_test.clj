@@ -285,6 +285,55 @@
           (is (= "Override" (:description selected)))
           (is (some #(= :collision (:type %)) diagnostics))))))
 
+  (testing "same-source ties prefer earlier configured container order"
+    (with-temp-skills*
+      {"shared" "---\nname: shared\ndescription: Earlier global\n---\nEarlier"}
+      (fn [earlier-global-dir]
+        (with-temp-skills*
+          {"shared" "---\nname: shared\ndescription: Later global\n---\nLater"}
+          (fn [later-global-dir]
+            (let [{:keys [skills diagnostics]}
+                  (skills/discover-skills
+                   {:global-skills-dirs  [(str earlier-global-dir) (str later-global-dir)]
+                    :project-skills-dirs ["/nonexistent"]})
+                  selected (some #(when (= "shared" (:name %)) %) skills)
+                  collision (some #(when (= :collision (:type %)) %) diagnostics)]
+              (is (= :user (:source selected)))
+              (is (= "Earlier global" (:description selected)))
+              (is (= (str earlier-global-dir "/shared/SKILL.md") (:file-path selected)))
+              (is (= {:name "shared"
+                      :source :user
+                      :path (str later-global-dir "/shared/SKILL.md")}
+                     (:shadowed collision)))))))))
+
+  (testing "same-source ties within one container prefer lexicographically earlier canonical skill path"
+    (let [dir (make-temp-dir "psi-same-source-tie")
+          alpha-dir (io/file dir "alpha-skill")
+          zeta-dir (io/file dir "zeta-skill")]
+      (.mkdirs alpha-dir)
+      (.mkdirs zeta-dir)
+      (spit (io/file alpha-dir "SKILL.md")
+            "---\nname: shared\ndescription: Alpha path\n---\nAlpha")
+      (spit (io/file zeta-dir "SKILL.md")
+            "---\nname: shared\ndescription: Zeta path\n---\nZeta")
+      (try
+        (let [{:keys [skills diagnostics]}
+              (skills/discover-skills
+               {:global-skills-dirs  [(str dir)]
+                :project-skills-dirs ["/nonexistent"]})
+              selected (some #(when (= "shared" (:name %)) %) skills)
+              collision (some #(when (= :collision (:type %)) %) diagnostics)]
+          (is (= :user (:source selected)))
+          (is (= "Alpha path" (:description selected)))
+          (is (= (.getCanonicalPath (io/file alpha-dir "SKILL.md"))
+                 (:file-path selected)))
+          (is (= {:name "shared"
+                  :source :user
+                  :path (.getCanonicalPath (io/file zeta-dir "SKILL.md"))}
+                 (:shadowed collision))))
+        (finally
+          (cleanup-dir! dir)))))
+
   (testing "disabled flag skips built-in, global, and project, keeps extra-paths"
     (with-temp-skills*
       {"global-skill" "---\nname: global-skill\ndescription: Global\n---\nBody"}
@@ -645,6 +694,15 @@
       (is (str/includes? skill-path "/.psi/agent/built-in-skills/"))
       (is (str/includes? (slurp skill-path) "work-independently"))
       (is (contains? #{true false} reused?))))
+
+  (testing "packaged build jar contains built-in skill resources"
+    (let [jar-path "./target/psi-0.1.2115-packaging-smoke.jar"]
+      (is (.exists (io/file jar-path)))
+      (with-open [zf (java.util.zip.ZipFile. jar-path)]
+        (let [entries (->> (enumeration-seq (.entries zf))
+                           (map #(.getName %))
+                           set)]
+          (is (contains? entries "psi/skills/work-independently/SKILL.md"))))))
 
   (testing "snapshot id changes when the packaged resource set changes"
     (let [base-dir (skills/built-in-snapshot-dir {})
