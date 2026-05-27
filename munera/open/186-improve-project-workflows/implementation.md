@@ -1,3 +1,13 @@
+## 2026-05-27 ambiguity review pass 2
+
+Reviewed design.md, plan.md, steps.md, design-steps.md, implementation.md, and referenced workflow files (review-implementation.edn, review-implementation-in-worktree.edn, review-task-until-clear.edn, review-step.edn, implement-task.edn) plus workflow-loader compiler source and tests.
+
+Found two new actionable ambiguities. Added follow-up items to design-steps.md.
+
+1. **`review-implementation-in-worktree` summary step will be stale after review-task-docs addition**: The `summary` step prompt hard-codes "four review passes" and names them explicitly (`task-implementation-review, task-test-review, test-shaper, code-shaper`). After slice 4 inserts `review-task-docs`, the chain becomes 5 passes. Acceptance criterion 5 only covers the top-level `:target` and `:description` fields — the `summary` step body is not mentioned in design, plan, or steps.
+
+2. **Loader test loading mechanism is unspecified**: The design says "load through `workflow-loader.core/load-workflows`" but the actual public function is `load-workflow-definitions`. More critically, the design does not specify whether tests call `load-workflow-definitions` with the real project root (environment-dependent), parse individual files via `compile-workflow-file`, or use temp-dir fixtures matching existing test patterns.
+
 ## 2026-05-27 ambiguity follow-up resolution (design-steps pass 1)
 
 Resolved all four design-steps items. Updated `design.md` with decisions:

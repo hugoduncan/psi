@@ -8,6 +8,12 @@
 
 - [x] **Add `review-implementation-in-worktree` description update to scope**: The design says update the `:target "review-implementation"` reference to `"review-task-implementation"` but does not mention updating the `:description` string (currently "…via the review-implementation workflow"). Add this to the acceptance criteria or the rename step.
 
+## Ambiguity follow-ups (pass 2)
+
+- [ ] **`review-implementation-in-worktree` summary step body is stale after review-task-docs addition**: The `summary` step prompt hard-codes "four review passes" and lists them as `task-implementation-review, task-test-review, test-shaper, code-shaper`. After slice 4 inserts `review-task-docs` as the 4th step, this becomes 5 passes. Update the design acceptance criterion 5 (or add a new criterion) and add a steps.md item in slice 4 to update the `summary` step body to reflect 5 passes and include `review-task-docs` in the named list.
+
+- [ ] **Loader test loading mechanism is unspecified**: The design says "load through `workflow-loader.core/load-workflows`" but the actual public function is `load-workflow-definitions` (not `load-workflows`). More critically, the design does not specify whether tests should: (a) call `load-workflow-definitions` with the real project root as worktree path (environment-dependent, not portable), (b) parse individual `.edn` files directly via `compiler/compile-workflow-file` with a real file path (portable, matches existing test patterns), or (c) use temp-dir fixtures. Clarify the chosen mechanism in the design's testing approach section and align the function name reference.
+
 ## Ambiguity follow-ups
 
 - [x] **Structured output authoring path for judge steps**: `compile-judge` in `target_ir_compiler.clj` does not compile `:outputs` on judge specs. Decide: (a) extend `compile-judge` to pass through judge `:outputs` so structured output can be declared on judge steps in the authoring format, or (b) declare structured output only on session step `:outputs` (not the judge), or (c) declare this out of scope for this task and note it as a prerequisite gap. Update the design with the chosen approach before implementation.
