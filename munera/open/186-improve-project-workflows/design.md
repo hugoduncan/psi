@@ -74,7 +74,7 @@ Scope: `design.md` only (plus any referenced concepts/code needed to evaluate th
 
 Loop: ambiguity-review → ambiguity-follow-up → inconsistency-review → inconsistency-follow-up → clarity-status → (REPEAT | DONE).
 
-Follow-up items written to `design-steps.md`. Does not touch `plan.md` or `steps.md`.
+Follow-up items written to `design-steps.md` (created on first write if absent). Does not touch `plan.md` or `steps.md`.
 
 Terminates when no new actionable ambiguity or inconsistency feedback remains.
 
@@ -112,10 +112,23 @@ Workflows that use judge steps with `REPEAT`/`DONE` or `PASS_STATUS: ...` signal
 
 - declare a `:structured-output` schema on judge steps where the judge emits a fixed enum signal
 - declare a `:structured-output` schema on actor steps where the result is consumed by a downstream step as machine-readable data (e.g. PASS_STATUS)
-- use `{:type :string :enum ["REPEAT" "DONE"]}` or similar JSON Schema shapes
 - not change workflow behavior, only make the output contract explicit and machine-verifiable
 
 Affected workflows: `review-task-design`, `review-task-plan`, `review-task-implementation`, `review-step`, `implement-task`.
+
+### Authoring path for judge step structured output
+
+`compile-judge` in `target_ir_compiler.clj` does not currently pass through `:outputs` from judge specs. The IR already supports `judge :outputs` (validated in `ir.clj`). **Decision: extend `compile-judge` to pass through `:outputs` so structured output can be declared directly on judge steps in the authoring format.** This is the minimal change that aligns the authoring path with the IR capability.
+
+### Schema shapes
+
+Structured output specs in the IR require `:schema-id`, `:schema-version`, `:schema` (Malli), and optionally `:json-schema` (JSON object). For judge routing signals:
+
+- Add a new reusable schema id `psi.workflow/judge-routing-result` (version 1) to `structured_output_schemas.clj`.
+- Malli shape: `[:enum "REPEAT" "DONE"]`
+- JSON Schema shape: `{:type "string" :enum ["REPEAT" "DONE"]}`
+- Use `{:source :judge/structured-output :mode :structured :schema-id :psi.workflow/judge-routing-result :schema-version 1 :schema [:enum "REPEAT" "DONE"] :json-schema {:type "string" :enum ["REPEAT" "DONE"]}}` as the output spec on judge steps that emit routing signals.
+- Actor steps emitting `PASS_STATUS` use `{:source :session/structured-output ...}` with an appropriate schema (e.g. `[:map [:status [:enum "PASS" "FAIL"]] [:reason :string]]`); a `psi.workflow/pass-status-result` schema id should be added alongside `judge-routing-result`.
 
 ## `.md` prompt extraction
 
@@ -134,10 +147,14 @@ The testing approach for workflow definitions is:
 
 - **Loader/compiler unit tests**: load each `.edn` + `.md` workflow definition through `workflow-loader.core/load-workflows` and assert: no load errors, correct step count, correct step names, correct step types, correct prompt-workflow references resolve.
 - **Step shape tests**: for workflows with judge steps, assert the compiled judge step has the expected `:on` routing keys.
-- **Structured output tests**: for steps with `:structured-output`, assert the schema is present and correct in the compiled step.
+- **Structured output tests**: for steps with `:structured-output`, assert the raw `:outputs` key is present and has the expected shape in the compiled EDN step (i.e. at the workflow-loader level, not the IR level). The workflow-loader compiler passes `:outputs` through as-is; IR structured output validation runs in `target_ir_compiler` at runtime. Loader tests do not invoke `target_ir_compiler` or `workflow-ir/validate`.
 - Tests live in `components/workflow-loader/test/` using existing test infrastructure.
 
-This does not require running workflows end-to-end; it validates the authoring artifacts compile correctly.
+This does not require running workflows end-to-end; it validates the authoring artifacts compile correctly at the loader level.
+
+## `design-steps.md` artifact lifecycle
+
+`design-steps.md` is a design-phase-only artifact created and written exclusively by the `review-task-design` workflow. It is created on first write if absent — the workflow does not require it to pre-exist. It is never written by `review-task-plan`, `review-task-implementation`, or any other review workflow. Follow-up items from plan/steps review are written to `steps.md`; follow-up items from implementation review are written to `implementation.md`.
 
 ## Ordering rationale
 
@@ -149,8 +166,9 @@ Refactors before new features, to avoid doing the same work twice:
 4. **Add `review-task-docs` skill** and wire into `review-task-implementation` as a new `review-step` delegation.
 5. **Create `review-task-design` workflow**, using `.md` prompt files from the start.
 6. **Create `create-task-plan` workflow**, using `.md` prompt files from the start.
-7. **Adopt structured output schemas** across affected workflows.
-8. **Add workflow loader/compiler tests** for all new and renamed workflows.
+7. **Extend `compile-judge` to pass through `:outputs`** in `target_ir_compiler.clj`. Prerequisite for judge step structured output authoring. Add `psi.workflow/judge-routing-result` and `psi.workflow/pass-status-result` schema ids to `structured_output_schemas.clj`.
+8. **Adopt structured output schemas** across affected workflows.
+9. **Add workflow loader/compiler tests** for all new and renamed workflows.
 
 ## Acceptance criteria
 
@@ -161,6 +179,7 @@ Refactors before new features, to avoid doing the same work twice:
 5. `review-implementation-in-worktree` delegates to `review-task-implementation`.
 6. `review-task-docs` skill exists with a clear review lambda.
 7. Substantial inline prompts in `review-task-plan`, `review-step`, `implement-task` are extracted to `.md` files.
-8. Structured output schemas are declared on judge steps and machine-readable actor steps in affected workflows.
-9. Loader/compiler tests pass for all new and renamed workflow definitions.
-10. `bb test` is green after all changes.
+8. `compile-judge` passes through `:outputs`; `psi.workflow/judge-routing-result` and `psi.workflow/pass-status-result` schema ids exist in `structured_output_schemas.clj`.
+9. Structured output schemas are declared on judge steps and machine-readable actor steps in affected workflows.
+10. Loader/compiler tests pass for all new and renamed workflow definitions; structured output assertions check the raw `:outputs` key at the loader level only.
+11. `bb test` is green after all changes.
