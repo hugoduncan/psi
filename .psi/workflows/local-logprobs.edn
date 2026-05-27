@@ -21,4 +21,4 @@
           :thinking-level :off
           :contributions [{:type :template
                            :text "{{input}}"
-                           :vars {"input" {:from :workflow-input}}}]}
+                           :vars {"input" {:from :workflow-input}}}]}]}

@@ -1,7 +1,3 @@
----
-name: implement-task
-description: Repeatedly implement a Munera task in autonomous passes until no concrete implementation work remains
----
 {:terminal-contract {:handoff {:type :markdown-handoff-data}}
  :steps [{:name "implement-pass"
           :type :session
@@ -30,7 +26,7 @@ End your final response with exactly one of:
 PASS_STATUS: MORE_WORK_REMAINS
 PASS_STATUS: IMPLEMENTATION_COMPLETE"
                            :vars {"input" {:from :workflow-input
-                                            :path [:input]}}}]
+                                           :path [:input]}}}]
           :judge {:type :llm
                   :contributions [{:type :source
                                    :from :workflow-original}
@@ -47,10 +43,10 @@ Decision rules:
 
 Do not review the repository generically. Judge only the specific named task from the actor-step context."
                                    :vars {"input" {:from :workflow-input
-                                                    :path [:input]}}}]
+                                                   :path [:input]}}}]
                   :prompt "Respond exactly with one word: REPEAT or DONE. Inspect the specific Munera task artifacts before deciding. If any unchecked implementation checklist item remains in `steps.md`, respond REPEAT."}
           :on {"REPEAT" {:goto "implement-pass"
-                          :max-iterations 8}
+                         :max-iterations 8}
                "DONE"   {:goto "final-summary"}}}
          {:name "final-summary"
           :type :session
@@ -84,12 +80,4 @@ Output requirements:
 
 If a field is not available, omit it rather than inventing it."
                            :vars {"input" {:from :workflow-input
-                                            :path [:input]}}}]}]}
-
-Repeatedly executes autonomous implementation passes against a specific Munera task until the task appears complete. Each pass performs concrete implementation work, updates task artifacts, runs relevant verification, and commits changes. The implement-pass step carries an attached judge that decides REPEAT or DONE based on the current state of that specific task.
-
-Input shapes:
-- `{:input "munera/open/003-foo"}` for direct use
-- `{:input "structured-handoff-text-containing-munera_task_path-and-optional-worktree/PR-fields"}` for pipeline use
-
-Child sessions inherit the invoking session's worktree — no worktree setup is needed when already in the correct worktree.
+                                           :path [:input]}}}]}]}
