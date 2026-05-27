@@ -2,7 +2,7 @@
 
 ## Approach
 
-Implement the task in small vertical slices that preserve current skill semantics while adding built-in packaged skills.
+Implement the task in small vertical slices that preserve current skill semantics while adding built-in packaged skill support.
 
 1. Add the packaged skill asset layout and ensure build/distribution includes it.
 2. Add runtime resource discovery and materialization to readable disk paths.

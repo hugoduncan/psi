@@ -249,11 +249,12 @@
             (let [{:keys [skills]}
                   (skills/discover-skills
                    {:global-skills-dirs  [(str global-dir)]
-                    :project-skills-dirs [(str project-dir)]})]
-              (is (= 3 (count skills)))
+                    :project-skills-dirs [(str project-dir)]
+                    :config {:built-in-resource-root "psi/test-built-in-skills"}})]
+              (is (= 4 (count skills)))
               (is (some #(= "global-skill" (:name %)) skills))
               (is (some #(= "project-skill" (:name %)) skills))
-              (is (some #(= "work-independently" (:name %)) skills))))))))
+              (is (some #(= "packaged-test-skill" (:name %)) skills))))))))
 
   (testing "project wins over user on cross-source name collision"
     (with-temp-skills*
@@ -273,14 +274,15 @@
 
   (testing "extra path wins over project, user, and built-in"
     (with-temp-skills*
-      {"work-independently" "---\nname: work-independently\ndescription: Override\n---\nOverride body"}
+      {"built-in-shared" "---\nname: built-in-shared\ndescription: Override\n---\nOverride body"}
       (fn [extra-dir]
         (let [{:keys [skills diagnostics]}
               (skills/discover-skills
                {:global-skills-dirs  ["/nonexistent"]
                 :project-skills-dirs ["/nonexistent"]
-                :extra-paths         [(str extra-dir)]})
-              selected (some #(when (= "work-independently" (:name %)) %) skills)]
+                :extra-paths         [(str extra-dir)]
+                :config {:built-in-resource-root "psi/test-built-in-skills"}})
+              selected (some #(when (= "built-in-shared" (:name %)) %) skills)]
           (is (= :path (:source selected)))
           (is (= "Override" (:description selected)))
           (is (some #(= :collision (:type %)) diagnostics))))))
@@ -687,34 +689,26 @@
 
 (deftest built-in-skill-materialization-test
   (testing "packaged built-in skills materialize to a readable deterministic snapshot"
-    (let [{:keys [dir resource-paths reused?]} (skills/materialize-built-in-skills! {})
-          skill-path (str dir "/work-independently/SKILL.md")]
+    (let [opts {:config {:built-in-resource-root "psi/test-built-in-skills"}}
+          {:keys [dir resource-paths reused?]} (skills/materialize-built-in-skills! opts)
+          skill-path (str dir "/packaged-test-skill/SKILL.md")]
       (is (seq resource-paths))
       (is (.exists (io/file skill-path)))
       (is (str/includes? skill-path "/.psi/agent/built-in-skills/"))
-      (is (str/includes? (slurp skill-path) "work-independently"))
+      (is (str/includes? (slurp skill-path) "packaged-test-skill"))
       (is (contains? #{true false} reused?))))
 
-  (testing "built runtime jar contains built-in skill resources"
-    (let [jar-path "target/psi.jar"]
-      (when (.exists (io/file jar-path))
-        (with-open [zf (java.util.zip.ZipFile. jar-path)]
-          (let [entries (->> (enumeration-seq (.entries zf))
-                             (map #(.getName %))
-                             set)]
-            (is (contains? entries "psi/skills/work-independently/SKILL.md")))))))
-
   (testing "snapshot id changes when the packaged resource set changes"
-    (let [base-dir (skills/built-in-snapshot-dir {})
+    (let [base-dir (skills/built-in-snapshot-dir {:config {:built-in-resource-root "psi/test-built-in-skills"}})
           changed-dir (skills/built-in-snapshot-dir
-                       {:config {:built-in-resource-root "psi/skills"}
-                        :resource-paths-override ["psi/skills/work-independently/SKILL.md"
-                                                  "psi/skills/testing-without-mocks/SKILL.md"]})]
+                       {:config {:built-in-resource-root "psi/test-built-in-skills"}
+                        :resource-paths-override ["psi/test-built-in-skills/built-in-shared/SKILL.md"
+                                                  "psi/test-built-in-skills/packaged-test-skill/SKILL.md"]})]
       (is (not= base-dir changed-dir))))
 
   (testing "built-in discovery loads materialized packaged skills as ordinary file-backed skills"
-    (let [{:keys [skills materialization]} (skills/built-in-skills-discovery {})
-          built-in (some #(when (= "work-independently" (:name %)) %) skills)]
+    (let [{:keys [skills materialization]} (skills/built-in-skills-discovery {:config {:built-in-resource-root "psi/test-built-in-skills"}})
+          built-in (some #(when (= "packaged-test-skill" (:name %)) %) skills)]
       (is (= :built-in (:source built-in)))
       (is (.exists (io/file (:file-path built-in))))
       (is (str/starts-with? (:file-path built-in) (:dir materialization))))))

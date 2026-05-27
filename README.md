@@ -128,33 +128,6 @@ For user-facing workflow usage, workflow file location, `/delegate`, and reload
 behavior, see:
 - [`doc/workflows.md`](doc/workflows.md)
 
-### Built-in skills
-
-Psi can ship psi-owned skills as packaged resources inside the released artifact.
-At runtime, those built-in skills are materialized to readable files under:
-
-```text
-~/.psi/agent/built-in-skills/<snapshot>/<skill-name>/SKILL.md
-```
-
-This preserves the ordinary file-based skill model: built-in skills still have
-real `:file-path` and `:base-dir` values, `/skill:name` works the same way, and
-relative references from `SKILL.md` resolve against the materialized skill
-directory.
-
-Skill source precedence is explicit:
-
-1. extra paths (`--skill` / runtime `:extra-paths`)
-2. project skills (`.psi/skills/`)
-3. user-global skills (`~/.psi/agent/skills/`)
-4. built-in packaged skills
-
-When multiple skills share the same exact name within one source class, the
-winner is selected deterministically by source-container order first, then by
-lexicographically earlier canonical absolute `SKILL.md` path.
-
-If `--no-skills` is active, psi still loads only explicit extra-path skills;
-project, user-global, and built-in packaged skills are all suppressed together.
 
 ### Extension API
 

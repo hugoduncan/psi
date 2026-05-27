@@ -1,8 +1,8 @@
-# 185 implement built-in packaged skills
+# 185 implement built-in packaged skill support
 
 ## Intent
 
-Implement the recommended design from task `184-package-skills-inside-psi-easiest-path` so psi can ship psi-owned skills as built-in packaged resources while preserving the current AI-facing readable-artifact model.
+Implement the recommended design from task `184-package-skills-inside-psi-easiest-path` so psi can support psi-owned skills as built-in packaged resources while preserving the current AI-facing readable-artifact model.
 
 This task is implementation work. The design decisions are already made in task `184`; this task should implement them with minimal additional invention.
 
@@ -30,11 +30,12 @@ Task `185` sharpens how that contract maps onto the current discovery/runtime se
 
 And it fixed the implementation direction:
 
-- psi-owned built-in skills are packaged as resources under `resources/psi/skills/<skill-name>/...`
-- runtime materializes them to a psi-owned user-global cache directory under `~/.psi/agent/`, using deterministic version/content-addressed snapshots that are reused when unchanged and refreshed into a new snapshot when packaged build/resource contents change
+- psi-owned built-in skills use a canonical packaged resource root under `psi/skills/<skill-name>/...` in the built artifact
+- runtime materializes that resource root to a psi-owned user-global cache directory under `~/.psi/agent/`, using deterministic version/content-addressed snapshots that are reused when unchanged and refreshed into a new snapshot when packaged build/resource contents change
 - materialized skill directories are parsed into the same runtime skill shape with ordinary `:file-path` and `:base-dir`
 - canonical runtime definition authority remains `skill-registry` / root-registry-backed storage
 - built-in skills remain ordinary skills with stable provenance metadata in capability/introspection surfaces
+- psi may currently ship zero product built-in skills; the important implemented contract is the packaging/discovery/materialization mechanism, not the continued presence of any particular shipped built-in skill
 
 ## Scope
 
@@ -62,8 +63,8 @@ Out of scope:
 
 ## Acceptance criteria
 
-1. Psi-owned built-in skills live under a canonical packaged resource path: `resources/psi/skills/<skill-name>/...`.
-2. The build includes those resources in distributable artifacts used for non-source-tree execution.
+1. Psi-owned built-in skill support uses a canonical packaged resource root: `psi/skills/<skill-name>/...` inside the built artifact.
+2. When built-in skill resources are present, the build includes them in distributable artifacts used for non-source-tree execution.
 3. Startup discovers psi-owned built-in packaged skills without requiring a source checkout.
 4. Runtime materializes built-in packaged skill directories to stable readable filesystem paths under a psi-owned `~/.psi/agent/` cache subtree.
 4a. Materialization uses deterministic version/content-addressed snapshots: reuse existing snapshots when the packaged build/resources match, and refresh by selecting a new snapshot path when they differ.

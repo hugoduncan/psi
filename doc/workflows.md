@@ -19,17 +19,6 @@ No extension manifest entry is required to enable `/delegate` or `.psi/workflows
 Optional workflow-adjacent extensions such as `psi/mementum` still use normal extension install manifests.
 For manifest details and install options, see [`doc/extensions-install.md`](extensions-install.md).
 
-## Built-in workflow-adjacent skills
-
-Psi may also ship psi-owned built-in skills as packaged resources. Those skills
-are materialized at runtime into readable files under `~/.psi/agent/built-in-skills/`
-so workflows and agents continue to use the normal file-backed skill model.
-
-Built-in packaged skills are lowest precedence beneath explicit extra paths,
-project-local `.psi/skills/`, and user-global `~/.psi/agent/skills/` overrides.
-This means a workflow that requests a skill by exact name can be overridden by a
-project or user skill with the same name without changing the workflow file.
-
 ## Where workflows live
 
 Workflow definitions are discovered from:

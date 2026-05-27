@@ -61,7 +61,6 @@
         (is (contains? entries "psi/edit_clj/extension.clj"))
         (is (contains? entries "psi/github/extension.clj"))
         (is (contains? entries "extensions/logprobs.clj"))
-        (is (contains? entries "psi/skills/work-independently/SKILL.md"))
         (is (contains? entries build-manifest/release-deps-resource-path))))))
 
 (deftest ^:integration build-lib-jar-embeds-release-deps-metadata

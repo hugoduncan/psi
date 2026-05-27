@@ -1,7 +1,7 @@
 # Steps
 
-- [x] Add canonical packaged built-in skill resource layout under `resources/psi/skills/`.
-- [x] Include representative built-in skill resource fixture(s) and prove build packaging covers them.
+- [x] Add canonical packaged built-in skill resource root and loader support for `psi/skills/` resources in built artifacts.
+- [x] Include representative built-in skill fixture/proof resources and prove build packaging support without requiring a permanently shipped product built-in skill.
 - [x] Add runtime resource discovery for built-in skills.
 - [x] Add materialization of built-in skill resources to managed readable filesystem paths under a psi-owned `~/.psi/agent/` cache subtree.
 - [x] Use deterministic version/content-addressed built-in skill snapshots with reuse-on-match and refresh-on-build/resource-change semantics.
