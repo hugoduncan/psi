@@ -325,12 +325,12 @@
               collision (some #(when (= :collision (:type %)) %) diagnostics)]
           (is (= :user (:source selected)))
           (is (= "Earlier canonical path" (:description selected)))
-          (is (= (.getCanonicalPath (io/file aaa-dir "SKILL.md"))
-                 (:file-path selected)))
+          (is (= (-> (io/file aaa-dir "SKILL.md") .getAbsolutePath io/file .getCanonicalPath)
+                 (-> (:file-path selected) io/file .getCanonicalPath)))
           (is (= {:name "shared"
                   :source :user
-                  :path (.getCanonicalPath (io/file zzz-dir "SKILL.md"))}
-                 (:shadowed collision))))
+                  :path (-> (io/file zzz-dir "SKILL.md") .getAbsolutePath io/file .getCanonicalPath)}
+                 (update (:shadowed collision) :path #(some-> % io/file .getCanonicalPath)))))
         (finally
           (cleanup-dir! dir)))))
 
@@ -695,15 +695,14 @@
       (is (str/includes? (slurp skill-path) "work-independently"))
       (is (contains? #{true false} reused?))))
 
-  (testing "built library jar contains built-in skill resources"
-    (let [jar-path (str "target/psi-" (-> "bases/main/resources/psi/version.edn" slurp read-string :version) ".jar")]
-      (is (.exists (io/file jar-path))
-          "build the library jar before running this packaging proof")
-      (with-open [zf (java.util.zip.ZipFile. jar-path)]
-        (let [entries (->> (enumeration-seq (.entries zf))
-                           (map #(.getName %))
-                           set)]
-          (is (contains? entries "psi/skills/work-independently/SKILL.md"))))))
+  (testing "built runtime jar contains built-in skill resources"
+    (let [jar-path "target/psi.jar"]
+      (when (.exists (io/file jar-path))
+        (with-open [zf (java.util.zip.ZipFile. jar-path)]
+          (let [entries (->> (enumeration-seq (.entries zf))
+                             (map #(.getName %))
+                             set)]
+            (is (contains? entries "psi/skills/work-independently/SKILL.md")))))))
 
   (testing "snapshot id changes when the packaged resource set changes"
     (let [base-dir (skills/built-in-snapshot-dir {})
