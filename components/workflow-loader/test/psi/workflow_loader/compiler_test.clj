@@ -119,4 +119,24 @@
                               :type :session
                               :prompt-workflow "planner.edn"}]}
             :source-path "/tmp/orchestrator.edn"})]
-      (is (re-find #"must reference a \.md file" error)))))
+      (is (re-find #"must reference a \.md file" error))))
+
+  (testing "prompt-workflow rejects absolute and escaping paths"
+    (let [{absolute-error :error}
+          (compiler/compile-workflow-file
+           {:workflow-kind :multi-step-edn
+            :config {:steps [{:name "plan"
+                              :type :session
+                              :prompt-workflow "/tmp/planner.md"}]}
+            :source-path "/tmp/orchestrator.edn"})
+          {escape-error :error}
+          (compiler/compile-workflow-file
+           {:workflow-kind :multi-step-edn
+            :config {:steps [{:name "plan"
+                              :type :session
+                              :prompt-workflow "../planner.md"}]}
+            :source-path "/tmp/orchestrator.edn"})]
+      (is (= "`:prompt-workflow` must be a relative .md path within the consuming workflow directory"
+             absolute-error))
+      (is (= "`:prompt-workflow` must be a relative .md path within the consuming workflow directory"
+             escape-error)))))

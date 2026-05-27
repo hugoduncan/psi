@@ -71,6 +71,14 @@
     (str/ends-with? path ".edn") :edn
     :else nil))
 
+(defn- relative-prompt-workflow-path?
+  [prompt-workflow]
+  (and (string? prompt-workflow)
+       (not (str/blank? prompt-workflow))
+       (let [f (io/file prompt-workflow)]
+         (and (not (.isAbsolute f))
+              (not-any? #{".."} (str/split prompt-workflow #"/"))))))
+
 (defn- resolve-prompt-workflow-path
   [workflow-path prompt-workflow]
   (.getCanonicalPath
@@ -128,6 +136,9 @@
 
       (not (string? prompt-workflow))
       (invalid "`:prompt-workflow` must be a relative .md file string")
+
+      (not (relative-prompt-workflow-path? prompt-workflow))
+      (invalid "`:prompt-workflow` must be a relative .md path within the consuming workflow directory")
 
       (prompt-source-conflict? step)
       (invalid "`:prompt-workflow` cannot be combined with another authored prompt source")
