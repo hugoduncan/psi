@@ -9,10 +9,11 @@
 
    Architecture
    ────────────
-   Discovery loads skills from ordered sources (first-discovered wins):
-     1. Global skills:  ~/.psi/agent/skills/
+   Discovery loads skills from explicit precedence classes:
+     1. Additional paths: CLI --skill <path>
      2. Project skills: .psi/skills/
-     3. Additional paths: CLI --skill <path>
+     3. Global skills:  ~/.psi/agent/skills/
+     4. Built-in packaged skills: psi jar resources materialized under ~/.psi/agent/
 
    Discovery rules within each directory:
      - Direct .md children in the directory root
@@ -32,7 +33,13 @@
    [clojure.java.io :as io]
    [clojure.string :as str]
    [psi.prompt-assets.prompt-templates :as pt]
-   [psi.skill-registry.registry :as skill-registry]))
+   [psi.skill-registry.registry :as skill-registry]
+   [psi.version :as version])
+  (:import
+   (java.io File)
+   (java.nio.file Files Path StandardCopyOption)
+   (java.nio.file.attribute FileAttribute)
+   (java.security MessageDigest)))
 
 ;; ============================================================
 ;; Config
@@ -41,6 +48,8 @@
 (def default-config
   {:global-skills-dirs  [(str (System/getProperty "user.home") "/.psi/agent/skills")]
    :project-skills-dirs [".psi/skills"]
+   :built-in-cache-dir  (str (System/getProperty "user.home") "/.psi/agent/built-in-skills")
+   :built-in-resource-root "psi/skills"
    :name-max-length     64
    :description-max-length 1024
    :compatibility-max-length 500})
@@ -241,14 +250,176 @@
           :diagnostics (vec (mapcat #(or (:diagnostics %) []) flat))})))))
 
 ;; ============================================================
+;; Built-in packaged skill materialization
+;; ============================================================
+
+(defn- canonical-file-path
+  [path]
+  (.getCanonicalPath (io/file path)))
+
+(defn- bytes->hex
+  [^bytes bs]
+  (apply str (map #(format "%02x" (bit-and % 0xff)) bs)))
+
+(defn- sha256-hex
+  [s]
+  (let [digest (MessageDigest/getInstance "SHA-256")]
+    (.update digest (.getBytes (str s) "UTF-8"))
+    (bytes->hex (.digest digest))))
+
+(defn- built-in-snapshot-id
+  [resource-root]
+  (subs (sha256-hex (str (version/version-string) "|" resource-root)) 0 16))
+
+(defn built-in-snapshot-dir
+  "Return the deterministic snapshot directory path for packaged built-in skills."
+  ([] (built-in-snapshot-dir {}))
+  ([opts]
+   (let [config        (merge default-config (:config opts))
+         cache-dir     (:built-in-cache-dir config)
+         resource-root (:built-in-resource-root config)]
+     (str (io/file cache-dir (built-in-snapshot-id resource-root))))))
+
+(defn built-in-skill-resource-paths
+  "Enumerate packaged built-in SKILL.md resource paths under the configured resource root."
+  ([] (built-in-skill-resource-paths {}))
+  ([opts]
+   (let [config        (merge default-config (:config opts))
+         resource-root (:built-in-resource-root config)
+         root-url      (io/resource resource-root)]
+     (cond
+       (nil? root-url)
+       []
+
+       (= "file" (.getProtocol root-url))
+       (let [root-file (io/file root-url)
+             root-path (.toPath root-file)]
+         (->> (file-seq root-file)
+              (filter #(.isFile ^File %))
+              (filter #(= "SKILL.md" (.getName ^File %)))
+              (map (fn [^File file]
+                     (str resource-root "/"
+                          (.toString (.relativize root-path (.toPath file))))))
+              sort
+              vec))
+
+       (= "jar" (.getProtocol root-url))
+       (let [jar-path (-> (.getPath root-url)
+                          (str/split #"!")
+                          first
+                          (str/replace-first #"^file:" ""))]
+         (with-open [jar (java.util.jar.JarFile. jar-path)]
+           (->> (enumeration-seq (.entries jar))
+                (map #(.getName ^java.util.jar.JarEntry %))
+                (filter #(str/starts-with? % (str resource-root "/")))
+                (filter #(str/ends-with? % "/SKILL.md"))
+                sort
+                vec)))
+
+       :else
+       []))))
+
+(defn- ensure-parent-dirs!
+  [path]
+  (Files/createDirectories (.getParent ^Path path) (make-array FileAttribute 0))
+  path)
+
+(defn materialize-built-in-skills!
+  "Materialize packaged built-in skill resources into a deterministic readable snapshot.
+
+   Returns {:dir path :resource-paths [...] :reused? boolean}."
+  ([] (materialize-built-in-skills! {}))
+  ([opts]
+   (let [resource-paths (built-in-skill-resource-paths opts)
+         snapshot-dir   (built-in-snapshot-dir opts)
+         snapshot-path  (.toPath (io/file snapshot-dir))
+         reused?        (.exists (io/file snapshot-dir))]
+     (when-not reused?
+       (Files/createDirectories snapshot-path (make-array FileAttribute 0))
+       (doseq [resource-path resource-paths]
+         (when-let [resource-url (io/resource resource-path)]
+           (let [resource-root (:built-in-resource-root (merge default-config (:config opts)))
+                 relative-path (subs resource-path (inc (count resource-root)))
+                 target-path   (.resolve snapshot-path relative-path)]
+             (ensure-parent-dirs! target-path)
+             (with-open [in (io/input-stream resource-url)]
+               (Files/copy in target-path (into-array StandardCopyOption [StandardCopyOption/REPLACE_EXISTING])))))))
+     {:dir snapshot-dir
+      :resource-paths resource-paths
+      :reused? reused?})))
+
+(defn built-in-skills-discovery
+  "Load materialized packaged built-in skills as ordinary file-backed skills."
+  ([] (built-in-skills-discovery {}))
+  ([opts]
+   (let [{:keys [dir] :as materialized} (materialize-built-in-skills! opts)
+         loaded (load-skills-from-dir dir :built-in true (merge default-config (:config opts)))]
+     (assoc loaded :materialization materialized))))
+
+;; ============================================================
 ;; Discovery — multi-source
 ;; ============================================================
+
+(def ^:private source-precedence
+  {:built-in 0
+   :user 1
+   :project 2
+   :path 3})
+
+(defn- candidate-container-order
+  [candidate]
+  (long (or (:container-order candidate) Long/MAX_VALUE)))
+
+(defn- candidate-sort-key
+  [candidate]
+  [(get source-precedence (:source candidate) -1)
+   (- (candidate-container-order candidate))
+   (canonical-file-path (:file-path candidate))])
+
+(defn- winning-candidate
+  [candidates]
+  (last (sort-by candidate-sort-key candidates)))
+
+(defn- collision-diagnostic
+  [winner shadowed]
+  {:type :collision
+   :message (str "Skill name collision: '" (:name winner) "' winner="
+                 (:source winner) " " (:file-path winner)
+                 "; shadowed=" (:source shadowed) " " (:file-path shadowed))
+   :path (:file-path shadowed)
+   :winner {:name (:name winner)
+            :source (:source winner)
+            :path (:file-path winner)}
+   :shadowed {:name (:name shadowed)
+              :source (:source shadowed)
+              :path (:file-path shadowed)}})
+
+(defn- load-path-candidates
+  [raw-path config]
+  (let [f (io/file raw-path)]
+    (cond
+      (not (.exists f))
+      {:skills [] :diagnostics [{:type :warning :message "Skill path does not exist" :path raw-path}]}
+
+      (.isDirectory f)
+      (load-skills-from-dir raw-path :path true config)
+
+      (and (.isFile f) (str/ends-with? (.getName f) ".md"))
+      (let [result (load-skill-from-file raw-path :path config)]
+        {:skills (if-let [skill (:skill result)] [skill] [])
+         :diagnostics (:diagnostics result)})
+
+      :else
+      {:skills [] :diagnostics [{:type :warning :message "Skill path is not a markdown file" :path raw-path}]})))
 
 (defn discover-skills
   "Discover skills from all configured sources.
    Returns {:skills [Skill] :diagnostics [Diagnostic]}.
 
-   First-discovered name wins; collisions produce a :collision diagnostic.
+   Canonical collision winner selection is explicit and precedence-aware:
+   :path > :project > :user > :built-in.
+   Within the same source class, earlier configured source-container order wins,
+   then lexicographically earlier canonical absolute skill file path.
 
    `opts` keys:
      :global-skills-dirs  — seq of global skill directories
@@ -258,53 +429,51 @@
      :config              — validation config overrides"
   ([] (discover-skills {}))
   ([opts]
-   (let [config     (merge default-config (:config opts))
-         skill-map  (atom {})
-         all-diags  (atom [])
-         collisions (atom [])
-
-         add-skills!
-         (fn [{:keys [skills diagnostics]}]
-           (swap! all-diags into diagnostics)
-           (doseq [skill skills]
-             (if-let [existing (get @skill-map (:name skill))]
-               (swap! collisions conj
-                      {:type    :collision
-                       :message (str "Skill name collision: '" (:name skill)
-                                     "' already loaded from " (:file-path existing))
-                       :path    (:file-path skill)})
-               (swap! skill-map assoc (:name skill) skill))))]
-
-     ;; 1. Global skills (unless disabled)
-     (when-not (:disabled opts)
-       (doseq [dir (or (:global-skills-dirs opts) (:global-skills-dirs default-config))]
-         (add-skills! (load-skills-from-dir dir :user true config))))
-
-     ;; 2. Project skills (unless disabled)
-     (when-not (:disabled opts)
-       (doseq [dir (or (:project-skills-dirs opts) (:project-skills-dirs default-config))]
-         (add-skills! (load-skills-from-dir dir :project true config))))
-
-     ;; 3. Extra paths (always loaded, even when disabled)
-     (doseq [raw-path (:extra-paths opts)]
-       (let [f (io/file raw-path)]
-         (cond
-           (not (.exists f))
-           (swap! all-diags conj {:type :warning :message "Skill path does not exist" :path raw-path})
-
-           (.isDirectory f)
-           (add-skills! (load-skills-from-dir raw-path :path true config))
-
-           (and (.isFile f) (str/ends-with? (.getName f) ".md"))
-           (add-skills! (let [result (load-skill-from-file raw-path :path config)]
-                          {:skills      (if (:skill result) [(:skill result)] [])
-                           :diagnostics (:diagnostics result)}))
-
-           :else
-           (swap! all-diags conj {:type :warning :message "Skill path is not a markdown file" :path raw-path}))))
-
-     {:skills      (vec (vals @skill-map))
-      :diagnostics (into (vec @all-diags) @collisions)})))
+   (let [config (merge default-config (:config opts))
+         global-dirs (or (:global-skills-dirs opts) (:global-skills-dirs default-config))
+         project-dirs (or (:project-skills-dirs opts) (:project-skills-dirs default-config))
+         source-results (concat
+                         (when-not (:disabled opts)
+                           [{:container-order 0
+                             :result (built-in-skills-discovery opts)}])
+                         (when-not (:disabled opts)
+                           (map-indexed (fn [idx dir]
+                                          {:container-order idx
+                                           :result (load-skills-from-dir dir :user true config)})
+                                        global-dirs))
+                         (when-not (:disabled opts)
+                           (map-indexed (fn [idx dir]
+                                          {:container-order idx
+                                           :result (load-skills-from-dir dir :project true config)})
+                                        project-dirs))
+                         (map-indexed (fn [idx raw-path]
+                                        {:container-order idx
+                                         :result (load-path-candidates raw-path config)})
+                                      (:extra-paths opts)))
+         diagnostics (vec (mapcat (comp :diagnostics :result) source-results))
+         candidates-by-name
+         (reduce (fn [acc {:keys [container-order result]}]
+                   (reduce (fn [acc2 skill]
+                             (update acc2 (:name skill) (fnil conj [])
+                                     (assoc skill :container-order container-order)))
+                           acc
+                           (:skills result)))
+                 {}
+                 source-results)
+         winners (->> candidates-by-name
+                      vals
+                      (map winning-candidate)
+                      skill-registry/all-skills)
+         collisions (->> candidates-by-name
+                         vals
+                         (mapcat (fn [candidates]
+                                   (let [winner (winning-candidate candidates)]
+                                     (for [candidate candidates
+                                           :when (not= (:file-path candidate) (:file-path winner))]
+                                       (collision-diagnostic winner candidate)))))
+                         vec)]
+     {:skills winners
+      :diagnostics (into diagnostics collisions)})))
 
 ;; ============================================================
 ;; Progressive Disclosure — system prompt formatting

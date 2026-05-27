@@ -250,11 +250,12 @@
                   (skills/discover-skills
                    {:global-skills-dirs  [(str global-dir)]
                     :project-skills-dirs [(str project-dir)]})]
-              (is (= 2 (count skills)))
+              (is (= 3 (count skills)))
               (is (some #(= "global-skill" (:name %)) skills))
-              (is (some #(= "project-skill" (:name %)) skills))))))))
+              (is (some #(= "project-skill" (:name %)) skills))
+              (is (some #(= "work-independently" (:name %)) skills))))))))
 
-  (testing "first-discovered wins on name collision"
+  (testing "project wins over user on cross-source name collision"
     (with-temp-skills*
       {"shared" "---\nname: shared\ndescription: Global version\n---\nGlobal"}
       (fn [global-dir]
@@ -265,23 +266,26 @@
                   (skills/discover-skills
                    {:global-skills-dirs  [(str global-dir)]
                     :project-skills-dirs [(str project-dir)]})]
-              (is (= 1 (count skills)))
-              (is (= "Global version" (:description (first skills))))
+              (is (= 2 (count skills)))
+              (is (= "Project version"
+                     (:description (some #(when (= "shared" (:name %)) %) skills))))
               (is (some #(= :collision (:type %)) diagnostics))))))))
 
-  (testing "extra-paths are loaded"
+  (testing "extra path wins over project, user, and built-in"
     (with-temp-skills*
-      {"extra" "---\nname: extra\ndescription: Extra skill\n---\nBody"}
+      {"work-independently" "---\nname: work-independently\ndescription: Override\n---\nOverride body"}
       (fn [extra-dir]
-        (let [{:keys [skills]}
+        (let [{:keys [skills diagnostics]}
               (skills/discover-skills
                {:global-skills-dirs  ["/nonexistent"]
                 :project-skills-dirs ["/nonexistent"]
-                :extra-paths         [(str extra-dir)]})]
-          (is (= 1 (count skills)))
-          (is (= :path (:source (first skills))))))))
+                :extra-paths         [(str extra-dir)]})
+              selected (some #(when (= "work-independently" (:name %)) %) skills)]
+          (is (= :path (:source selected)))
+          (is (= "Override" (:description selected)))
+          (is (some #(= :collision (:type %)) diagnostics))))))
 
-  (testing "disabled flag skips global/project, keeps extra-paths"
+  (testing "disabled flag skips built-in, global, and project, keeps extra-paths"
     (with-temp-skills*
       {"global-skill" "---\nname: global-skill\ndescription: Global\n---\nBody"}
       (fn [global-dir]
@@ -295,7 +299,20 @@
                     :extra-paths        [(str extra-dir)]
                     :disabled           true})]
               (is (= 1 (count skills)))
-              (is (= "extra" (:name (first skills))))))))))
+              (is (= "extra" (:name (first skills))))
+              (is (= :path (:source (first skills))))))))))
+
+  (testing "extra-paths are loaded"
+    (with-temp-skills*
+      {"extra" "---\nname: extra\ndescription: Extra skill\n---\nBody"}
+      (fn [extra-dir]
+        (let [{:keys [skills]}
+              (skills/discover-skills
+               {:global-skills-dirs  ["/nonexistent"]
+                :project-skills-dirs ["/nonexistent"]
+                :extra-paths         [(str extra-dir)]})]
+          (is (= 2 (count skills)))
+          (is (= :path (:source (some #(when (= "extra" (:name %)) %) skills))))))))
 
   (testing "non-existent extra path produces warning"
     (let [{:keys [diagnostics]}
@@ -618,6 +635,23 @@
 ;; ============================================================
 ;; End-to-end: discover + format + invoke
 ;; ============================================================
+
+(deftest built-in-skill-materialization-test
+  (testing "packaged built-in skills materialize to a readable deterministic snapshot"
+    (let [{:keys [dir resource-paths reused?]} (skills/materialize-built-in-skills! {})
+          skill-path (str dir "/work-independently/SKILL.md")]
+      (is (seq resource-paths))
+      (is (.exists (io/file skill-path)))
+      (is (str/includes? skill-path "/.psi/agent/built-in-skills/"))
+      (is (str/includes? (slurp skill-path) "work-independently"))
+      (is (contains? #{true false} reused?))))
+
+  (testing "built-in discovery loads materialized packaged skills as ordinary file-backed skills"
+    (let [{:keys [skills materialization]} (skills/built-in-skills-discovery {})
+          built-in (some #(when (= "work-independently" (:name %)) %) skills)]
+      (is (= :built-in (:source built-in)))
+      (is (.exists (io/file (:file-path built-in))))
+      (is (str/starts-with? (:file-path built-in) (:dir materialization))))))
 
 (deftest end-to-end-discover-format-invoke-test
   (testing "discover skills, format for prompt, then invoke one"
