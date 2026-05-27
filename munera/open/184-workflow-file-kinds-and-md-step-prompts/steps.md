@@ -8,3 +8,4 @@
 - [x] Update workflow authoring/reload docs to describe `.md` vs `.edn` workflow kinds, `.psi/workflows/` discovery, `:prompt-workflow` reuse, and the transitional status of existing checked-in multi-step `.md` built-ins/examples until a follow-on migration task moves them to `.edn`.
 - [x] Run focused verification for loader/compiler/runtime/doc-adjacent tests and record results.
 - [x] Align focused mixed-kind collision proof and residual docs/comments with the finalized mixed-kind duplicate-name load-error contract.
+- [ ] Reject non-relative `:prompt-workflow` references so absolute paths and `..` escapes outside the consuming workflow authoring tree fail clearly, and add focused compiler proof for the relative-only contract.
