@@ -2,27 +2,3 @@
 name: gh-bug-fix-and-pr
 description: Create a Munera task for a reproducible bug, refine the design, fix it, and create a PR
 ---
-{:steps [{:name      "discover"
-          :type      :invoke
-          :operation "github/find-issue"
-          :args      {:labels ["bug" "fix"]
-                      :input  nil}
-          :outputs   {:summary {:source :invoke/summary}
-                      :data    {:source :invoke/data}}
-          :yields    {:type :text :text :summary}}
-         {:name "run"
-          :type :session
-          :tools ["read" "bash" "edit" "write" "work-on"]
-          :skills ["munera-task-design" "work-independently"]
-          :thinking-level :high
-          :contributions [{:type :source
-                           :from {:step "discover" :yield :text}}
-                          {:type :template
-                           :text "You are the reproducible-bug implementation phase of a GitHub bug-triage workflow.\n\nGoal:\n- For a reproducible bug issue, create the Munera task in the issue worktree.\n- Refine the design until it is implementation-ready.\n- Implement the fix autonomously.\n- Push the branch and create a PR that mentions the original issue number.\n\nUse the `munera-task-design` skill when shaping the task.\nUse the `work-independently` skill once the design is clean and implementation begins.\n\nThe upstream discovery report above identifies the selected issue.\n\nInput expectations:\n- The upstream discover report includes the selected issue number, title, URL, and worktree description.\n- Find the existing issue worktree using the issue number from the discover report.\n- Read `gh issue view <number>` for the full issue body and any reproduction evidence in comments.\n\nRequired procedure:\n1. Read the discover report to identify the issue number, title, URL, and suggested worktree description.\n2. Locate the existing issue worktree for this issue (created during reproduction).\n3. Read the issue body and comments to confirm the reproduction evidence is present.\n4. In the issue worktree, orient in Munera by reading `munera/plan.md` and inspecting `munera/open/` and `munera/closed/`.\n5. Allocate the next canonical `NNN-slug` task id.\n6. Create a new task directory under `munera/open/NNN-slug/`.\n7. Write at least:\n   - `design.md`\n   - `steps.md`\n   - `implementation.md`\n8. Include issue provenance and concrete reproduction evidence in the task files.\n9. Use `munera-task-design` to refine the design until it is complete and unambiguous enough for implementation.\n10. If the design cannot be made clean without external decisions or missing information:\n    - preserve the design work\n    - commit and push the branch\n    - create a PR that explains the blocked state and references the original issue\n    - stop there\n11. If the design is clean:\n    - follow `work-independently`\n    - implement the fix in small, reviewable steps\n    - keep Munera task files synchronized\n    - run relevant verification\n    - commit and push the branch\n    - create a PR that references or closes the original issue\n\nOutput requirements:\n- Output a compact Markdown summary.\n- Include these headings exactly:\n  - `## Bug-Fix Outcome`\n  - `## Munera Task`\n  - `## Verification`\n  - `## Handoff Data`\n- Under `## Handoff Data`, include machine-friendly bullet lines for:\n  - `issue_number:`\n  - `worktree_path:`\n  - `branch_name:`\n  - `munera_task_path:`\n  - `result_type:`\n  - `pr_url:`\n- Set `result_type:` to either `design-only` or `implementation-complete`."
-                           :vars {}}]}
-         {:name      "edit-labels"
-          :type      :invoke
-          :operation "github/edit-labels"
-          :args      {:number {:from {:step "discover" :output :data} :path [:issue-number]}
-                      :remove ["fix"]
-                      :target "issue"}}]}

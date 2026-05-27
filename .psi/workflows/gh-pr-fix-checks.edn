@@ -1,0 +1,18 @@
+{:steps [{:name      "select"
+          :type      :invoke
+          :operation "github/find-pr"
+          :args      {:labels []
+                      :input  {:from :workflow-input :path [:input]}}
+          :outputs   {:summary {:source :invoke/summary}
+                      :data    {:source :invoke/data}}
+          :yields    {:type :text :text :summary}}
+         {:name "heal-checks"
+          :type :delegate
+          :target "gh-pr-heal-check-loop"
+          :prompt-string {:type :template
+                          :text "{{report}}"
+                          :vars {"report" {:from {:step "select" :yield :text}}}}
+          :context [{:type :source
+                     :from :workflow-original}
+                    {:type :source
+                     :from {:step "select" :yield :text}}]}]}

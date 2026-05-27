@@ -110,9 +110,10 @@
   [parsed-files]
   (->> parsed-files
        (reduce (fn [acc parsed]
-                 (if-let [n (parsed-workflow-name parsed)]
-                   (assoc acc [n (:file-kind parsed)] parsed)
-                   (assoc acc [(or (:source-path parsed) (gensym)) (:file-kind parsed)] parsed)))
+                 (let [workflow-name (parsed-workflow-name parsed)
+                       collision-key [(or workflow-name (:source-path parsed) (str (gensym)))
+                                      (:file-kind parsed)]]
+                   (assoc acc collision-key parsed)))
                {})
        vals
        vec))

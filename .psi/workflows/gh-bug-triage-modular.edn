@@ -1,0 +1,49 @@
+{:steps [{:name      "discover"
+          :type      :invoke
+          :operation "github/find-issue"
+          :args      {:labels ["bug" "triage"]
+                      :input  nil}
+          :outputs   {:summary {:source :invoke/summary}
+                      :data    {:source :invoke/data}}
+          :yields    {:type :text :text :summary}}
+         {:name "worktree"
+          :type :delegate
+          :target "gh-issue-create-worktree"
+          :outputs {:handoff {:source :delegate/handoff}}
+          :prompt-string {:type :template
+                          :text "{{discover_report}}"
+                          :vars {"discover_report" {:from {:step "discover" :yield :text}}}}
+          :context [{:type :source
+                     :from :workflow-original}
+                    {:type :source
+                     :from {:step "discover" :yield :text}}]}
+         {:name "reproduce"
+          :type :delegate
+          :target "gh-bug-reproduce"
+          :outputs {:handoff {:source :delegate/handoff}}
+          :prompt-string {:type :template
+                          :text "{{discover_report}}\n\n{{worktree_report}}"
+                          :vars {"discover_report" {:from {:step "discover" :yield :text}}
+                                 "worktree_report" {:from {:step "worktree" :yield :text}}}}
+          :context [{:type :source
+                     :from :workflow-original}
+                    {:type :source
+                     :from {:step "discover" :yield :text}}
+                    {:type :source
+                     :from {:step "worktree" :output :handoff}}]}
+         {:name "post-repro"
+          :type :delegate
+          :target "gh-bug-post-repro"
+          :outputs {:handoff {:source :delegate/handoff}}
+          :prompt-string {:type :map
+                          :fields {:issue_number {:from {:step "discover" :output :data}
+                                                  :path [:issue-number]}
+                                   :report       {:from {:step "reproduce" :yield :text}}}}
+          :context [{:type :source
+                     :from :workflow-original}
+                    {:type :source
+                     :from {:step "discover" :yield :text}}
+                    {:type :source
+                     :from {:step "worktree" :output :handoff}}
+                    {:type :source
+                     :from {:step "reproduce" :output :handoff}}]}]}

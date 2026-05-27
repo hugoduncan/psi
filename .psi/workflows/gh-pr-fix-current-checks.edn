@@ -1,0 +1,19 @@
+{:steps [{:name "resolve-current-pr"
+          :type :delegate
+          :target "builder"
+          :prompt-string {:type :template
+                          :text "Resolve the open GitHub PR associated with the current branch/worktree and prepare an authoritative handoff for check healing. Work independently.\n\nRequired procedure:\n1. Determine the current git branch in the current worktree.\n2. Resolve the open PR for that branch. Prefer branch-based discovery and use GitHub CLI as the authority.\n3. If there is no open PR for the current branch, stop and report that clearly.\n4. Read the resolved PR with `gh pr view <pr> --json number,title,body,url,headRefName,baseRefName,statusCheckRollup`.\n5. Emit a compact Markdown handoff with these headings exactly:\n   - `## Current Branch PR`\n   - `## Initial Check Snapshot`\n   - `## Handoff Data`\n6. Under `## Handoff Data`, include machine-friendly bullet lines for:\n   - `pr_number:`\n   - `pr_title:`\n   - `pr_url:`\n   - `pr_branch:`\n   - `pr_base_branch:`\n   - `worktree_description:`\n   - `initial_check_summary:`\n\nSet `worktree_description:` to a short branch-derived slug suitable for a branch-specific worktree. Keep `initial_check_summary` terse but informative."
+                          :vars {"input" {:from :workflow-input
+                                           :path [:input]}}}
+          :context [{:type :source
+                     :from :workflow-original}]}
+         {:name "heal-checks"
+          :type :delegate
+          :target "gh-pr-heal-check-loop"
+          :prompt-string {:type :template
+                          :text "{{report}}"
+                          :vars {"report" {:from {:step "resolve-current-pr" :yield :text}}}}
+          :context [{:type :source
+                     :from :workflow-original}
+                    {:type :source
+                     :from {:step "resolve-current-pr" :yield :text}}]}]}

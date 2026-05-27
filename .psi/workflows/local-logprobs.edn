@@ -1,0 +1,24 @@
+{:steps [{:name "run"
+          :type :session
+          :model {:type :model-query
+                  :require [{:criterion :supports-text
+                             :match :true}
+                            {:criterion :locality
+                             :equals :local}
+                            {:criterion :latency-tier
+                             :equals :low}
+                            {:criterion :cost-tier
+                             :one-of [:zero :low]}]
+                  :prefer [{:criterion :input-cost
+                            :prefer :lower}
+                           {:criterion :output-cost
+                            :prefer :lower}]}
+          :tools ["read"]
+          :skills ["lambda-compiler"]
+          :response-mode :non-streaming
+          :logprobs true
+          :top-logprobs 3
+          :thinking-level :off
+          :contributions [{:type :template
+                           :text "{{input}}"
+                           :vars {"input" {:from :workflow-input}}}]}
