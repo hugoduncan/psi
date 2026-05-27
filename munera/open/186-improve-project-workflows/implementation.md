@@ -1,3 +1,11 @@
+## 2026-05-27 inconsistency review pass 2
+
+Reviewed design.md, plan.md, steps.md, design-steps.md, implementation.md, and referenced workflow files (review-implementation.edn, review-implementation-in-worktree.edn, review-task-until-clear.edn, review-step.edn, implement-task.edn), workflow-loader core/compiler source and tests, and structured_output_schemas.clj.
+
+Found one actionable inconsistency. Added follow-up item to design-steps.md.
+
+1. **`steps.md` has 5 "Update AGENTS.md workflow/skills listing" items with no basis in design or plan, and no corresponding target**: design.md and plan.md make no mention of updating AGENTS.md. The workflow listing shown in the agent system prompt is dynamically generated at runtime by the workflow-loader extension from the loaded `.psi/workflows/` definitions — there is no static listing in AGENTS.md to update. Similarly, the skills listing is dynamically generated from `.psi/skills/`. These 5 steps.md items (slices 1, 2, 4, 5, 6) are inconsistent with how the system works and will waste implementer time.
+
 ## 2026-05-27 ambiguity follow-up pass 2
 
 Resolved both design-steps items from pass 2:

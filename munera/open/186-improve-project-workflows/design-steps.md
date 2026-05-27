@@ -1,3 +1,7 @@
+## Inconsistency follow-ups (pass 2)
+
+- [ ] **Remove spurious "Update AGENTS.md" steps from steps.md**: steps.md slices 1, 2, 4, 5, and 6 each contain an "Update AGENTS.md workflow listing" or "Update AGENTS.md skills listing" item. design.md and plan.md make no mention of AGENTS.md updates. The workflow listing and skills listing visible to the agent are dynamically generated at runtime from the loaded `.psi/workflows/` and `.psi/skills/` directories respectively — there is no static listing in AGENTS.md to update. Remove these 5 items from steps.md to avoid wasted implementer effort.
+
 ## Inconsistency follow-ups
 
 - [x] **Clarify relationship between existing `judge-review-result` schema and planned new schema ids**: `structured_output_schemas.clj` already has `psi.workflow/judge-review-result` (complex map). The design adds `psi.workflow/judge-routing-result` and `psi.workflow/pass-status-result` without mentioning the existing schema. Update the design to state whether `judge-review-result` is retained as-is, deprecated, or superseded by the new ids, and whether any of the new schemas are additive alongside it.
