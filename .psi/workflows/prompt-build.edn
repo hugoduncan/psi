@@ -1,29 +1,31 @@
-{:steps [{:name "compile-1"
-          :type :delegate
-          :target "prompt-compiler"
-          :prompt-string {:type :template
-                          :text "compile the prompt: {{input}}"
-                          :vars {"input" {:from :workflow-input
-                                          :path [:input]}}}
-          :context [{:type :source
-                     :from :workflow-original}]}
-         {:name "decompile"
-          :type :delegate
-          :target "prompt-decompiler"
-          :prompt-string {:type :template
-                          :text "decompile the EDN prompt: {{input}}"
-                          :vars {"input" {:from {:step "compile-1" :yield :text}}}}
-          :context [{:type :source
-                     :from :workflow-original}
-                    {:type :source
-                     :from {:step "compile-1" :yield :text}}]}
-         {:name "compile-2"
-          :type :delegate
-          :target "prompt-compiler"
-          :prompt-string {:type :template
-                          :text "compile the prompt: {{input}}"
-                          :vars {"input" {:from {:step "decompile" :yield :text}}}}
-          :context [{:type :source
-                     :from :workflow-original}
-                    {:type :source
-                     :from {:step "decompile" :yield :text}}]}]}
+{:steps
+ [{:name "compile-1",
+   :type :delegate,
+   :target "prompt-compiler",
+   :prompt-string
+   {:type :template,
+    :text "compile the prompt: {{input}}",
+    :vars {"input" {:from :workflow-input, :path [:input]}}},
+   :context [{:type :source, :from :workflow-original}]}
+  {:name "decompile",
+   :type :delegate,
+   :target "prompt-decompiler",
+   :prompt-string
+   {:type :template,
+    :text "decompile the EDN prompt: {{input}}",
+    :vars {"input" {:from {:step "compile-1", :yield :text}}}},
+   :context
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "compile-1", :yield :text}}]}
+  {:name "compile-2",
+   :type :delegate,
+   :target "prompt-compiler",
+   :prompt-string
+   {:type :template,
+    :text "compile the prompt: {{input}}",
+    :vars {"input" {:from {:step "decompile", :yield :text}}}},
+   :context
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "decompile", :yield :text}}]}],
+ :name "prompt-build",
+ :description "Build a new prompt"}

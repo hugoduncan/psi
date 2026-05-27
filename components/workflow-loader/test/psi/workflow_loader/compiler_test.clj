@@ -17,6 +17,7 @@
 (def edn-parsed
   {:workflow-kind :multi-step-edn
    :config {:name "plan-build-review"
+            :description "Plan, build, and review code changes"
             :definition-id "plan-build-review"
             :steps [{:name "plan"
                      :type :session
@@ -55,6 +56,46 @@
       (is (empty? errors)))))
 
 (deftest compile-edn-prompt-workflow-test
+  (testing "edn workflows require top-level name and description"
+    (let [{missing-name-error :error}
+          (compiler/compile-workflow-file
+           {:workflow-kind :multi-step-edn
+            :config {:description "desc"
+                     :steps [{:name "plan"
+                              :type :session
+                              :contributions [{:type :template :text "hi" :vars {}}]}]}
+            :source-path "/tmp/orchestrator.edn"})
+          {blank-name-error :error}
+          (compiler/compile-workflow-file
+           {:workflow-kind :multi-step-edn
+            :config {:name "  "
+                     :description "desc"
+                     :steps [{:name "plan"
+                              :type :session
+                              :contributions [{:type :template :text "hi" :vars {}}]}]}
+            :source-path "/tmp/orchestrator.edn"})
+          {missing-description-error :error}
+          (compiler/compile-workflow-file
+           {:workflow-kind :multi-step-edn
+            :config {:name "orchestrator"
+                     :steps [{:name "plan"
+                              :type :session
+                              :contributions [{:type :template :text "hi" :vars {}}]}]}
+            :source-path "/tmp/orchestrator.edn"})
+          {blank-description-error :error}
+          (compiler/compile-workflow-file
+           {:workflow-kind :multi-step-edn
+            :config {:name "orchestrator"
+                     :description "  "
+                     :steps [{:name "plan"
+                              :type :session
+                              :contributions [{:type :template :text "hi" :vars {}}]}]}
+            :source-path "/tmp/orchestrator.edn"})]
+      (is (= "Workflow EDN files must define top-level `:name` as a string" missing-name-error))
+      (is (= "Workflow EDN files must define top-level `:name` as a non-blank string" blank-name-error))
+      (is (= "Workflow EDN files must define top-level `:description` as a string" missing-description-error))
+      (is (= "Workflow EDN files must define top-level `:description` as a non-blank string" blank-description-error))))
+
   (testing "session step prompt-workflow imports markdown body and default config with step-local override precedence"
     (let [dir (io/file (System/getProperty "java.io.tmpdir") (str "wf-compiler-" (System/nanoTime)))
           md-file (io/file dir "planner.md")]
@@ -65,6 +106,7 @@
               (compiler/compile-workflow-file
                {:workflow-kind :multi-step-edn
                 :config {:name "orchestrator"
+                         :description "Orchestrates a prompt workflow"
                          :definition-id "orchestrator"
                          :steps [{:name "plan"
                                   :type :session
@@ -84,7 +126,9 @@
     (let [{:keys [error]}
           (compiler/compile-workflow-file
            {:workflow-kind :multi-step-edn
-            :config {:steps [{:name "plan"
+            :config {:name "orchestrator"
+                     :description "Orchestrates a prompt workflow"
+                     :steps [{:name "plan"
                               :type :delegate
                               :prompt-workflow "planner.md"}]}
             :source-path "/tmp/orchestrator.edn"})]
@@ -94,7 +138,9 @@
     (let [{:keys [error]}
           (compiler/compile-workflow-file
            {:workflow-kind :multi-step-edn
-            :config {:steps [{:name "plan"
+            :config {:name "orchestrator"
+                     :description "Orchestrates a prompt workflow"
+                     :steps [{:name "plan"
                               :type :session
                               :prompt-workflow "planner.md"
                               :contributions [{:type :template :text "nope" :vars {}}]}]}
@@ -105,7 +151,9 @@
     (let [{:keys [error]}
           (compiler/compile-workflow-file
            {:workflow-kind :multi-step-edn
-            :config {:steps [{:name "plan"
+            :config {:name "orchestrator"
+                     :description "Orchestrates a prompt workflow"
+                     :steps [{:name "plan"
                               :type :session
                               :prompt-workflow "missing.md"}]}
             :source-path "/tmp/orchestrator.edn"})]
@@ -115,7 +163,9 @@
     (let [{:keys [error]}
           (compiler/compile-workflow-file
            {:workflow-kind :multi-step-edn
-            :config {:steps [{:name "plan"
+            :config {:name "orchestrator"
+                     :description "Orchestrates a prompt workflow"
+                     :steps [{:name "plan"
                               :type :session
                               :prompt-workflow "planner.edn"}]}
             :source-path "/tmp/orchestrator.edn"})]
@@ -125,14 +175,18 @@
     (let [{absolute-error :error}
           (compiler/compile-workflow-file
            {:workflow-kind :multi-step-edn
-            :config {:steps [{:name "plan"
+            :config {:name "orchestrator"
+                     :description "Orchestrates a prompt workflow"
+                     :steps [{:name "plan"
                               :type :session
                               :prompt-workflow "/tmp/planner.md"}]}
             :source-path "/tmp/orchestrator.edn"})
           {escape-error :error}
           (compiler/compile-workflow-file
            {:workflow-kind :multi-step-edn
-            :config {:steps [{:name "plan"
+            :config {:name "orchestrator"
+                     :description "Orchestrates a prompt workflow"
+                     :steps [{:name "plan"
                               :type :session
                               :prompt-workflow "../planner.md"}]}
             :source-path "/tmp/orchestrator.edn"})]

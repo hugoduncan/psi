@@ -45,14 +45,15 @@
     true (merge session-config)))
 
 (defn- compile-markdown-workflow-file
-  [{:keys [name description source-path] :as parsed}]
-  {:definition (cond-> {:definition-id name
-                        :name name
-                        :summary description
-                        :description description
-                        :steps [(markdown-session-step parsed)]}
-                 source-path (assoc :workflow-file-meta {:source-path source-path
-                                                         :file-kind :md}))})
+  [{:keys [name description source-path body] :as parsed}]
+  {:definition {:definition-id name
+                :name name
+                :summary description
+                :description description
+                :steps [(markdown-session-step parsed)]
+                :workflow-file-meta (cond-> {:file-kind :md
+                                             :framing-prompt body}
+                                      source-path (assoc :source-path source-path))}})
 
 (defn- slurp-workflow-file
   [path]
@@ -174,13 +175,28 @@
     (not (target-authored-config? config))
     {:error "Workflow EDN files must define target-authored `{:steps [...]}` config"}
 
+    (not (string? (:name config)))
+    {:error "Workflow EDN files must define top-level `:name` as a string"}
+
+    (str/blank? (:name config))
+    {:error "Workflow EDN files must define top-level `:name` as a non-blank string"}
+
+    (not (string? (:description config)))
+    {:error "Workflow EDN files must define top-level `:description` as a string"}
+
+    (str/blank? (:description config))
+    {:error "Workflow EDN files must define top-level `:description` as a non-blank string"}
+
     :else
     (let [{compiled-steps :ok step-error :error}
           (compile-edn-steps source-path (:steps config))
-          workflow-definition (cond-> (assoc config :steps compiled-steps)
-                                source-path (update :workflow-file-meta #(merge {:source-path source-path
-                                                                                 :file-kind :edn}
-                                                                                %)))]
+          workflow-definition (cond-> (assoc config
+                                             :steps compiled-steps
+                                             :definition-id (or (:definition-id config)
+                                                                (:name config)))
+                                true (update :workflow-file-meta #(merge {:file-kind :edn}
+                                                                         %))
+                                source-path (update :workflow-file-meta assoc :source-path source-path))]
       (cond
         step-error
         {:error step-error}

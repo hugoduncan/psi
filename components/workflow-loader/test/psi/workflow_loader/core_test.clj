@@ -33,7 +33,7 @@
   "---\nname: builder\ndescription: Builds code\ntools:\n  - read\n  - bash\n---\nYou are a builder.")
 
 (def plan-build-edn
-  "{:name \"plan-build\"\n :definition-id \"plan-build\"\n :steps [{:name \"plan\"\n          :type :session\n          :contributions [{:type :template\n                           :text \"{{input}}\"\n                           :vars {\"input\" {:from :workflow-input :path [:input]}}}]}]}")
+  "{:name \"plan-build\"\n :description \"Plan and build without review\"\n :definition-id \"plan-build\"\n :steps [{:name \"plan\"\n          :type :session\n          :contributions [{:type :template\n                           :text \"{{input}}\"\n                           :vars {\"input\" {:from :workflow-input :path [:input]}}}]}]}")
 
 (deftest scan-directory-test
   (testing "scans directory for .md and .edn workflow files"
@@ -81,7 +81,7 @@
   (testing "mixed-kind duplicate names fail clearly and do not load either definition"
     (with-project-loader-result
       {"planner.md" planner-md
-       "planner.edn" "{:name \"planner\" :definition-id \"planner\" :steps [{:name \"step\" :type :session :contributions [{:type :template :text \"hi\" :vars {}}]}]}"}
+       "planner.edn" "{:name \"planner\" :description \"Plans tasks as EDN\" :definition-id \"planner\" :steps [{:name \"step\" :type :session :contributions [{:type :template :text \"hi\" :vars {}}]}]}"}
       (fn [_dir {:keys [definitions errors]}]
         (is (empty? definitions))
         (is (= 1 (count errors)))

@@ -1,7 +1,12 @@
-{:steps [{:name "compile"
-          :type :session
-          :tools ["read" "bash"]
-          :skills ["prompt-compiler"]
-          :contributions [{:type :template
-                           :text "Use the prompt-compiler skill.\nCompile the specified prompt to EDN.\n\nRequirements:\n- Return EDN\n- No prose\n- No markdown code fences\n- Keep output minimal and structurally valid\n\nInput:\n{{input}}"
-                           :vars {"input" {:from :workflow-input}}}]}]}
+{:steps
+ [{:name "compile",
+   :type :session,
+   :tools ["read" "bash"],
+   :skills ["prompt-compiler"],
+   :contributions
+   [{:type :template,
+     :text
+     "Use the prompt-compiler skill.\nCompile the specified prompt to EDN.\n\nRequirements:\n- Return EDN\n- No prose\n- No markdown code fences\n- Keep output minimal and structurally valid\n\nInput:\n{{input}}",
+     :vars {"input" {:from :workflow-input}}}]}],
+ :name "prompt-compiler",
+ :description "Compiles a prompt to EDN"}
