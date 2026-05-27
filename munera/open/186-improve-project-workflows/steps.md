@@ -51,6 +51,7 @@
 - [ ] Add `review-task-docs` step to `review-task-implementation.edn` between `review-test-shape` and `review-code-shape`
   - Step delegates to `review-step` with `{:skill "review-task-docs"}`
   - Include prior step context sources
+- [ ] Update `review-implementation-in-worktree.edn` `summary` step body: change "four review passes" → "five review passes"; update named list to `task-implementation-review, task-test-review, test-shaper, review-task-docs, code-shaper`
 - [ ] Update `AGENTS.md` skills listing to include `review-task-docs`
 - [ ] Verify `review-task-implementation` loads without error
 - [ ] Commit: `⚒ add review-task-docs skill and wire into review-task-implementation`

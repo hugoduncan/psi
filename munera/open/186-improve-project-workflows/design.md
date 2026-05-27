@@ -164,10 +164,12 @@ The extracted `.md` files live alongside the `.edn` workflow in `.psi/workflows/
 
 The testing approach for workflow definitions is:
 
-- **Loader/compiler unit tests**: load each `.edn` + `.md` workflow definition through `workflow-loader.core/load-workflows` and assert: no load errors, correct step count, correct step names, correct step types, correct prompt-workflow references resolve.
+- **Loader/compiler unit tests**: load each `.edn` + `.md` workflow definition through `workflow-loader.core/load-workflow-definitions` and assert: no load errors, correct step count, correct step names, correct step types, correct prompt-workflow references resolve.
 - **Step shape tests**: for workflows with judge steps, assert the compiled judge step has the expected `:on` routing keys.
 - **Structured output tests**: for steps with `:structured-output`, assert the raw `:outputs` key is present and has the expected shape in the compiled EDN step (i.e. at the workflow-loader level, not the IR level). The workflow-loader compiler passes `:outputs` through as-is; IR structured output validation runs in `target_ir_compiler` at runtime. Loader tests do not invoke `target_ir_compiler` or `workflow-ir/validate`.
 - Tests live in `components/workflow-loader/test/` using existing test infrastructure.
+
+**Loading mechanism**: tests use temp-dir fixtures matching the existing `core_test.clj` pattern — write `.edn` and `.md` files to a temp directory, call `load-workflow-definitions` with the temp dir (using `with-redefs` to override `global-workflow-dirs` and `project-workflow-dir`). Tests do not depend on the real project root or any installed workflow files. Individual `.md` prompt files referenced by `:prompt-workflow` are written into the same temp dir alongside their `.edn` workflow file.
 
 This does not require running workflows end-to-end; it validates the authoring artifacts compile correctly at the loader level.
 
@@ -195,7 +197,7 @@ Refactors before new features, to avoid doing the same work twice:
 2. `create-task-plan` workflow exists, creates `plan.md` and `steps.md` from `design.md`, single pass.
 3. `review-task-plan` workflow exists (renamed from `review-task-until-clear`), scoped to `plan.md`/`steps.md`.
 4. `review-task-implementation` workflow exists (renamed from `review-implementation`), includes docs review step.
-5. `review-implementation-in-worktree` delegates to `review-task-implementation`: both the `:target` reference (`"review-implementation"` → `"review-task-implementation"`) and the `:description` string (`"…via the review-implementation workflow"` → `"…via the review-task-implementation workflow"`) are updated.
+5. `review-implementation-in-worktree` delegates to `review-task-implementation`: both the `:target` reference (`"review-implementation"` → `"review-task-implementation"`) and the `:description` string (`"…via the review-implementation workflow"` → `"…via the review-task-implementation workflow"`) are updated. The `summary` step body is also updated to reflect 5 review passes and to include `review-task-docs` in the named list (`task-implementation-review, task-test-review, test-shaper, review-task-docs, code-shaper`).
 6. `review-task-docs` skill exists with a clear review lambda.
 7. Substantial inline prompts in `review-task-plan`, `review-step`, `implement-task` are extracted to `.md` files.
 8. `compile-judge` passes through `:outputs`; `psi.workflow/judge-routing-result` and `psi.workflow/pass-status-result` schema ids exist in `structured_output_schemas.clj`.

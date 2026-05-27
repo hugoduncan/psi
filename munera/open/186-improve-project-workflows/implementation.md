@@ -1,3 +1,13 @@
+## 2026-05-27 ambiguity follow-up pass 2
+
+Resolved both design-steps items from pass 2:
+
+1. **`review-implementation-in-worktree` summary step stale**: Extended AC 5 in design.md to explicitly require the `summary` step body be updated to "five review passes" with the full named list including `review-task-docs`. Added corresponding steps.md item to slice 4.
+
+2. **Loader test loading mechanism**: Corrected function name `load-workflows` → `load-workflow-definitions` in design testing approach section. Added explicit loading mechanism paragraph specifying temp-dir fixtures matching `core_test.clj` pattern (with-redefs, no real project root dependency, `.md` files written alongside `.edn` in temp dir).
+
+Both design-steps items marked done.
+
 ## 2026-05-27 ambiguity review pass 2
 
 Reviewed design.md, plan.md, steps.md, design-steps.md, implementation.md, and referenced workflow files (review-implementation.edn, review-implementation-in-worktree.edn, review-task-until-clear.edn, review-step.edn, implement-task.edn) plus workflow-loader compiler source and tests.
