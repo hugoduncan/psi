@@ -1,12 +1,11 @@
 (ns psi.workflow-loader.core
   "Discover, parse, compile, and validate workflow definitions from disk.
 
-   Scans `.psi/workflows/` directories (global + project) for `*.md` files,
-   parses them with `psi.workflow-loader.parser`, compiles with
-   `psi.workflow-loader.compiler`, and validates step references and name
-   collisions.
+   Scans `.psi/workflows/` directories (global + project) for `.md` and `.edn`
+   files, parses by file kind, compiles with `psi.workflow-loader.compiler`, and
+   validates name-collision policy.
 
-   Directory precedence (later wins on name collision):
+   Directory precedence (later wins on same-kind name collision):
    1. `~/.psi/workflows/`          (legacy global fallback)
    2. `~/.psi/agent/workflows/`    (preferred global)
    3. `<project>/.psi/workflows/`  (project-local)"
@@ -29,52 +28,51 @@
   (when worktree-path
     (str worktree-path "/.psi/workflows")))
 
-(defn- md-files-in-dir
-  "List .md files in a directory. Returns empty seq if dir doesn't exist."
+(defn- workflow-file-kind
+  [filename]
+  (cond
+    (str/ends-with? filename ".md") :md
+    (str/ends-with? filename ".edn") :edn
+    :else nil))
+
+(defn- workflow-files-in-dir
+  "List workflow definition files in a directory. Returns empty seq if dir doesn't exist."
   [dir-path]
   (let [dir (some-> dir-path io/file)]
     (if (and dir (.exists dir) (.isDirectory dir))
       (->> (.listFiles dir)
            (filter (fn [f]
                      (and (.isFile f)
-                          (str/ends-with? (.getName f) ".md"))))
+                          (some? (workflow-file-kind (.getName f))))))
            (sort-by #(.getName %))
            vec)
       [])))
 
 (defn- parse-file
-  "Parse a single workflow file. Returns parsed map with :source-path added."
+  "Parse a single workflow file. Returns parsed map with source metadata added."
   [file]
   (try
     (let [raw (slurp file)
-          parsed (parser/parse-workflow-file raw)]
-      (assoc parsed :source-path (.getAbsolutePath file)))
+          file-kind (workflow-file-kind (.getName file))
+          parsed (parser/parse-workflow-file file-kind raw)]
+      (assoc parsed
+             :source-path (.getAbsolutePath file)
+             :file-kind file-kind))
     (catch Exception e
       {:error (str "Failed to read file: " (.getMessage e))
-       :source-path (.getAbsolutePath file)})))
+       :source-path (.getAbsolutePath file)
+       :file-kind (workflow-file-kind (.getName file))})))
 
 (defn scan-directory
   "Scan a directory for workflow files. Returns seq of parsed workflow data."
   [dir-path]
-  (mapv parse-file (md-files-in-dir dir-path)))
+  (mapv parse-file (workflow-files-in-dir dir-path)))
 
 (defn- scan-all-directories
   [worktree-path]
   (let [dirs (concat (global-workflow-dirs)
                      [(project-workflow-dir worktree-path)])]
     (into [] (mapcat scan-directory) (remove nil? dirs))))
-
-(defn- merge-by-name
-  "Merge parsed files by name, later entries win (precedence order).
-   Returns a seq of parsed files with duplicates resolved."
-  [parsed-files]
-  (vals
-   (reduce (fn [acc parsed]
-             (if-let [n (:name parsed)]
-               (assoc acc n parsed)
-               (assoc acc (or (:source-path parsed) (gensym)) parsed)))
-           {}
-           parsed-files)))
 
 (defn- partition-parsed-files
   [parsed-files]
@@ -86,44 +84,62 @@
    :error (:error parsed)
    :source-path (:source-path parsed)})
 
-(defn- reference-validation-errors
-  [ref-result]
-  (when-not (:valid? ref-result)
-    (mapv (fn [{:keys [definition step missing]}]
-            {:name definition
-             :error (str "Step `" step "` references unknown workflow `" missing "`")})
-          (:errors ref-result))))
+(defn- mixed-kind-collision-errors
+  [parsed-files]
+  (->> parsed-files
+       (remove :error)
+       (group-by :name)
+       (keep (fn [[workflow-name entries]]
+               (when (and workflow-name
+                          (> (count (set (map :file-kind entries))) 1))
+                 {:name workflow-name
+                  :error (str "Workflow name `"
+                              workflow-name
+                              "` is defined by both `.md` and `.edn` files")
+                  :source-path (mapv :source-path entries)})))
+       vec))
 
-(defn- judge-validation-errors
-  [judge-result]
-  (when-not (:valid? judge-result)
-    (mapv (fn [{:keys [definition step error target]}]
-            {:name definition
-             :error (case error
-                      :on-without-judge
-                      (str "Step `" step "` has `:on` routing table but no `:judge`")
-                      :unknown-goto-target
-                      (str "Step `" step "` has `:goto` target `" target "` which is not a known step")
-                      (str "Step `" step "` has judge/routing error: " error))})
-          (:errors judge-result))))
+(defn- merge-by-name-and-kind
+  "Merge parsed files by [name kind], later entries win (precedence order).
+   Same-kind duplicates become warnings later; mixed-kind duplicates remain errors."
+  [parsed-files]
+  (vals
+   (reduce (fn [acc parsed]
+             (if-let [n (:name parsed)]
+               (assoc acc [n (:file-kind parsed)] parsed)
+               (assoc acc [(or (:source-path parsed) (gensym)) (:file-kind parsed)] parsed)))
+           {}
+           parsed-files)))
+
+(defn- duplicate-kind-warnings
+  [parsed-files]
+  (->> parsed-files
+       (group-by (juxt :name :file-kind))
+       (keep (fn [[[workflow-name file-kind] entries]]
+               (when (and workflow-name (> (count entries) 1))
+                 {:message (str "Duplicate workflow name `"
+                                workflow-name
+                                "` for `."
+                                (name file-kind)
+                                "` files — last definition wins")})))
+       vec))
 
 (defn- compile-and-validate
   [parsed-files]
   (let [{errored true valid false} (partition-parsed-files parsed-files)
-        {:keys [definitions errors]} (compiler/compile-workflow-files valid)
-        ref-result (compiler/validate-step-references definitions)
-        collision-result (compiler/validate-no-name-collisions definitions)
-        judge-result (compiler/validate-judge-routing definitions)]
+        merged-valid (merge-by-name-and-kind valid)
+        mixed-kind-errors (mixed-kind-collision-errors merged-valid)
+        safe-valid (if (seq mixed-kind-errors)
+                     (remove (fn [parsed]
+                               (some #(= (:name %) (:name parsed)) mixed-kind-errors))
+                             merged-valid)
+                     merged-valid)
+        {:keys [definitions errors]} (compiler/compile-workflow-files safe-valid)]
     {:definitions definitions
      :errors (vec (concat (map parsed-file-error errored)
-                          errors
-                          (reference-validation-errors ref-result)
-                          (judge-validation-errors judge-result)))
-     :warnings (if-not (:valid? collision-result)
-                 (mapv (fn [dup-name]
-                         {:message (str "Duplicate workflow name `" dup-name "` — last definition wins")})
-                       (:duplicates collision-result))
-                 [])}))
+                          mixed-kind-errors
+                          errors))
+     :warnings (duplicate-kind-warnings valid)}))
 
 (defn- definition-map
   [definitions]
@@ -138,7 +154,7 @@
 (defn load-workflow-definitions
   "Load all workflow definitions from disk.
 
-   Scans global + project directories, parses, merges by name (later wins),
+   Scans global + project directories, parses, applies same-kind precedence,
    compiles, and validates.
 
    Returns:
@@ -148,6 +164,5 @@
   [worktree-path]
   (-> worktree-path
       scan-all-directories
-      merge-by-name
       compile-and-validate
       load-result))

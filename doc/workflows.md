@@ -2,9 +2,14 @@
 
 Psi can delegate reusable tasks to named workflows.
 
-A workflow is a named prompt or orchestration loaded from `.psi/workflows/*.md`
-as a built-in core capability. Some workflows are single focused agents;
-others are multi-step flows that pass results from one step to the next.
+A workflow is a named prompt or orchestration loaded from `.psi/workflows/`
+as a built-in core capability.
+
+- `.md` files author single-step prompt workflows
+- `.edn` files author multi-step orchestration workflows
+
+Some workflows are single focused agents; others are multi-step flows that pass
+results from one step to the next.
 
 This document is the primary example-led guide for workflow authoring. It
 covers the user-facing workflow surface, how to enable and run workflows, and
@@ -14,7 +19,7 @@ the supported target-authored grammar.
 
 Workflow loading is built in.
 
-No extension manifest entry is required to enable `/delegate` or `.psi/workflows/*.md` discovery.
+No extension manifest entry is required to enable `/delegate` or `.psi/workflows/` discovery.
 
 Optional workflow-adjacent extensions such as `psi/mementum` still use normal extension install manifests.
 For manifest details and install options, see [`doc/extensions-install.md`](extensions-install.md).
@@ -24,8 +29,21 @@ For manifest details and install options, see [`doc/extensions-install.md`](exte
 Workflow definitions are discovered from:
 
 ```text
-.psi/workflows/*.md
+~/.psi/workflows/
+~/.psi/agent/workflows/
+<project>/.psi/workflows/
 ```
+
+Accepted file kinds:
+
+```text
+*.md   ; single-step prompt workflows
+*.edn  ; multi-step orchestration workflows
+```
+
+Within precedence-ordered roots, later same-kind duplicates win with a warning.
+Mixed-kind same-name collisions (`planner.md` plus `planner.edn`) are load
+errors.
 
 This repository includes many examples there, including:
 
@@ -39,10 +57,17 @@ This repository includes many examples there, including:
 
 The authoritative example set is:
 
-- `plan-build` — compact inline-session authoring example
-- `plan-build-review` — compact multi-step inline-session example
+- `planner` / `builder` / `reviewer` — single-step markdown prompt workflow examples
+- `plan-build` — compact multi-step orchestration example
+- `plan-build-review` — compact multi-step orchestration example
 - `delegate-build-review` — executable delegate-heavy target-authored example proving canonical downstream delegated yielded-text consumption
 - `gh-bug-triage-modular` — richer target-authored orchestration example proving delegated yielded text plus structured delegated handoff consumption
+
+Note: this repository still contains many checked-in multi-step `.md` workflow
+artifacts from the pre-split contract. In this task they remain transitional
+compatibility-era examples. New authoring should treat `.md` as single-step and
+`.edn` as multi-step; a later migration task can move the legacy built-ins to
+`.edn`. 
 
 ## User-facing workflow commands
 
@@ -71,7 +96,7 @@ the workflow name as the prompt text.
 
 ## Reloading workflow definitions
 
-When editing `.psi/workflows/*.md`, reload them without restarting psi:
+When editing workflow files under `.psi/workflows/`, reload them without restarting psi:
 
 ```text
 /delegate-reload
@@ -370,7 +395,7 @@ Prefer:
 
 Good first workflow authoring loop:
 
-1. create or edit `.psi/workflows/<name>.md`
+1. create or edit `.psi/workflows/<name>.md` for a single-step prompt workflow, or `.psi/workflows/<name>.edn` for a multi-step orchestration workflow
 2. run `/delegate-reload`
 3. invoke it with `/delegate <name> <prompt>`
 4. tighten the authoring shape or reference wiring

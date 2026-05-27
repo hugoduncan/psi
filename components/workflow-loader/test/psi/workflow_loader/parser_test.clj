@@ -1,133 +1,59 @@
 (ns psi.workflow-loader.parser-test
   (:require
-   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.workflow-loader.parser :as parser]))
 
-(deftest parse-workflow-file-test
-  (testing "body-only workflow files are no longer valid authored workflow files"
-    (let [raw "---\nname: planner\ndescription: Plans tasks\n---\nYou are a planner."
-          result (parser/parse-workflow-file raw)]
+(deftest parse-markdown-workflow-file-test
+  (testing "single-step markdown workflow parses required frontmatter and body"
+    (let [raw "---\nname: planner\ndescription: Plans tasks\nmodel: gpt-5\ntools:\n  - read\nskills:\n  - clojure-coding-standards\nresponse-mode: :non-streaming\nthinking-level: :off\nlogprobs: true\ntop-logprobs: 4\n---\nYou are a planner."
+          result (parser/parse-workflow-file :md raw)]
+      (is (= :single-step-markdown (:workflow-kind result)))
       (is (= "planner" (:name result)))
       (is (= "Plans tasks" (:description result)))
-      (is (nil? (:config result)))
-      (is (= "You are a planner." (:body result)))
-      (is (nil? (:error result)))))
-
-  (testing "single-step with non-steps EDN config remains parseable but is no longer a valid workflow compile shape"
-    (let [raw (str "---\nname: planner\ndescription: Plans tasks\n---\n"
-                   "{:tools [\"read\" \"bash\"]\n :thinking-level :off}\n\n"
-                   "You are a planner.")
-          result (parser/parse-workflow-file raw)]
-      (is (= "planner" (:name result)))
-      (is (= "Plans tasks" (:description result)))
-      (is (= {:tools ["read" "bash"] :thinking-level :off} (:config result)))
+      (is (= "gpt-5" (get-in result [:session-config :model])))
+      (is (= "" (get-in result [:session-config :tools])))
+      (is (= "" (get-in result [:session-config :skills])))
+      (is (= ":non-streaming" (get-in result [:session-config :response-mode])))
+      (is (= ":off" (get-in result [:session-config :thinking-level])))
+      (is (= "true" (get-in result [:session-config :logprobs])))
+      (is (= "4" (get-in result [:session-config :top-logprobs])))
       (is (= "You are a planner." (:body result)))))
 
-  (testing "single-step with non-steps EDN config only, no body remains parseable"
-    (let [raw "---\nname: planner\ndescription: Plans tasks\n---\n{:tools [\"read\"]}"
-          result (parser/parse-workflow-file raw)]
-      (is (= "planner" (:name result)))
-      (is (= {:tools ["read"]} (:config result)))
-      (is (nil? (:body result)))))
+  (testing "markdown workflow rejects missing name"
+    (let [result (parser/parse-workflow-file :md "---\ndescription: Plans tasks\n---\nBody")]
+      (is (= "Missing required frontmatter key: name" (:error result)))))
 
-  (testing "multi-step with steps in EDN config"
-    ;; Multi-step workflow with steps array
-    (let [raw (str "---\nname: plan-build-review\ndescription: Plan, build, and review\n---\n"
-                   "{:steps [{:name \"plan\" :workflow \"planner\" :prompt \"$INPUT\"}\n"
-                   "         {:name \"build\" :workflow \"builder\" :prompt \"Execute: $INPUT\"}]}\n\n"
-                   "Coordinate a plan-build-review cycle.")
-          result (parser/parse-workflow-file raw)]
-      (is (= "plan-build-review" (:name result)))
-      (is (= "Plan, build, and review" (:description result)))
-      (is (= 2 (count (get-in result [:config :steps]))))
-      (is (= "plan" (get-in result [:config :steps 0 :name])))
-      (is (= "planner" (get-in result [:config :steps 0 :workflow])))
-      (is (= "Coordinate a plan-build-review cycle." (:body result)))))
+  (testing "markdown workflow rejects missing description"
+    (let [result (parser/parse-workflow-file :md "---\nname: planner\n---\nBody")]
+      (is (= "Missing required frontmatter key: description" (:error result)))))
 
-  (testing "body with leading whitespace before non-EDN content"
-    ;; Body starts with whitespace then text, not EDN
-    (let [raw "---\nname: test\ndescription: Test\n---\n  Hello world."
-          result (parser/parse-workflow-file raw)]
-      (is (nil? (:config result)))
-      (is (= "Hello world." (:body result)))))
+  (testing "markdown workflow rejects unsupported frontmatter keys"
+    (let [result (parser/parse-workflow-file :md "---\nname: planner\ndescription: Plans\nlambda: nope\n---\nBody")]
+      (is (re-find #"Unsupported markdown workflow frontmatter keys" (:error result)))))
 
-  (testing "empty body"
-    ;; Frontmatter only, no body at all
-    (let [raw "---\nname: test\ndescription: Test\n---\n"
-          result (parser/parse-workflow-file raw)]
-      (is (nil? (:config result)))
-      (is (nil? (:body result)))))
+  (testing "markdown workflow rejects prompt-mode frontmatter"
+    (let [result (parser/parse-workflow-file :md "---\nname: planner\ndescription: Plans\nprompt-mode: :lambda\n---\nBody")]
+      (is (= "Unsupported markdown workflow frontmatter key: :prompt-mode" (:error result)))))
 
-  (testing "missing name returns error"
-    (let [raw "---\ndescription: Plans tasks\n---\nBody"
-          result (parser/parse-workflow-file raw)]
-      (is (string? (:error result)))
-      (is (re-find #"name" (:error result)))))
+  (testing "markdown workflow rejects empty body"
+    (let [result (parser/parse-workflow-file :md "---\nname: planner\ndescription: Plans\n---\n")]
+      (is (= "Standalone markdown workflow body must not be empty" (:error result)))))
 
-  (testing "missing description returns error"
-    (let [raw "---\nname: planner\n---\nBody"
-          result (parser/parse-workflow-file raw)]
-      (is (string? (:error result)))
-      (is (re-find #"description" (:error result)))))
+  (testing "markdown workflow rejects EDN workflow definition block body"
+    (let [result (parser/parse-workflow-file :md "---\nname: planner\ndescription: Plans\n---\n{:steps []}")]
+      (is (= "Markdown workflow body must not begin with an EDN workflow definition block" (:error result))))))
 
-  (testing "invalid EDN returns error"
-    (let [raw "---\nname: test\ndescription: Test\n---\n{:bad"
-          result (parser/parse-workflow-file raw)]
-      (is (string? (:error result)))
-      (is (re-find #"EDN" (:error result)))))
+(deftest parse-edn-workflow-file-test
+  (testing "edn workflow parses multi-step map"
+    (let [result (parser/parse-workflow-file :edn "{:name \"plan-build\" :steps [{:name \"plan\" :type :session :contributions [{:type :template :text \"hi\" :vars {}}]}]}")]
+      (is (= :multi-step-edn (:workflow-kind result)))
+      (is (= "plan-build" (get-in result [:config :name])))
+      (is (= :session (get-in result [:config :steps 0 :type])))))
 
-  (testing "EDN config with multiline body"
-    ;; Verifies body extraction preserves multiple paragraphs
-    (let [raw (str "---\nname: builder\ndescription: Builds code\n---\n"
-                   "{:tools [\"read\" \"bash\" \"edit\" \"write\"]}\n\n"
-                   "You are a builder agent.\n\n"
-                   "## Guidelines\n\n"
-                   "Follow the plan carefully.")
-          result (parser/parse-workflow-file raw)]
-      (is (= {:tools ["read" "bash" "edit" "write"]} (:config result)))
-      (is (str/starts-with? (:body result) "You are a builder agent."))
-      (is (str/includes? (:body result) "## Guidelines"))
-      (is (str/ends-with? (:body result) "Follow the plan carefully."))))
+  (testing "edn workflow rejects invalid edn"
+    (let [result (parser/parse-workflow-file :edn "{:steps [")]
+      (is (re-find #"Invalid EDN workflow definition" (:error result)))))
 
-  (testing "preserves existing agent profile format"
-    ;; Current .psi/agents/*.md files should parse cleanly
-    (let [raw (str "---\n"
-                   "name: planner\n"
-                   "description: Analyzes tasks, creates implementation plans\n"
-                   "lambda: λtask. analyze(task)\n"
-                   "tools: read,bash\n"
-                   "---\n\n"
-                   "You are a planning agent.")
-          result (parser/parse-workflow-file raw)]
-      (is (= "planner" (:name result)))
-      (is (= "Analyzes tasks, creates implementation plans" (:description result)))
-      ;; Extra frontmatter keys are ignored, body is preserved
-      (is (nil? (:config result)))
-      (is (= "You are a planning agent." (:body result))))))
-
-(deftest parse-edn-prefix-edge-cases
-  (testing "config with nested maps"
-    (let [raw (str "---\nname: x\ndescription: X\n---\n"
-                   "{:steps [{:name \"a-step\" :workflow \"a\" :prompt \"$INPUT\"}]}\n\nBody")
-          result (parser/parse-workflow-file raw)]
-      (is (= [{:name "a-step" :workflow "a" :prompt "$INPUT"}] (get-in result [:config :steps])))
-      (is (= "Body" (:body result)))))
-
-  (testing "config with keywords, sets, vectors"
-    (let [raw (str "---\nname: x\ndescription: X\n---\n"
-                   "{:thinking-level :high :tools [\"a\" \"b\"] :tags #{\"foo\"}}\n\nBody")
-          result (parser/parse-workflow-file raw)]
-      (is (= :high (get-in result [:config :thinking-level])))
-      (is (= ["a" "b"] (get-in result [:config :tools])))
-      (is (= #{"foo"} (get-in result [:config :tags])))))
-
-  (testing "body that starts with a non-map curly brace character"
-    ;; If body starts with `{` but reads as non-map, we get an error
-    ;; because sets/vectors are not valid config
-    (let [raw "---\nname: x\ndescription: X\n---\n#{:a :b}\nBody"
-          result (parser/parse-workflow-file raw)]
-      ;; A set starting with `{` will be read as EDN but isn't a map
-      ;; so config extraction should fail gracefully
-      (is (or (:error result)
-              (nil? (:config result)))))))
+  (testing "edn workflow rejects non-map root"
+    (let [result (parser/parse-workflow-file :edn "[:not-a-map]")]
+      (is (= "Workflow EDN file must contain a map root" (:error result))))))
