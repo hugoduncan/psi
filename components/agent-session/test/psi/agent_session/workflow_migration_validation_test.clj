@@ -103,7 +103,7 @@
                 (str workflow-name " should compile to a non-empty steps vector when present in the compiled corpus"))))))))
 
 (deftest checked-in-workflow-corpus-has-no-mixed-kind-collisions-test
-  (testing "the checked-in workflow corpus names every remaining mixed-kind collision explicitly"
+  (testing "the checked-in workflow corpus has no mixed-kind name collisions under the finalized split contract"
     (let [{:keys [files-by-name-and-kind]} (workflow-migration-view)
           mixed-kind-names (->> files-by-name-and-kind
                                 (keep (fn [[workflow-name kind->paths]]
@@ -111,38 +111,12 @@
                                           workflow-name)))
                                 sort
                                 vec)]
-      (is (seq mixed-kind-names)
-          "The current checked-in corpus should still exhibit explicit mixed-kind migration blockers until migration is completed")
-      (is (= ["allium-check"
-              "complexity-reduction-pr"
-              "gh-bug-fix-and-pr"
-              "gh-bug-request-more-info"
-              "gh-bug-triage"
-              "gh-issue-implement"
-              "gh-issue-ingest"
-              "gh-issue-intent"
-              "gh-issue-refine"
-              "gh-pr-fix-checks"
-              "gh-pr-fix-current-checks"
-              "gh-pr-heal-check-loop"
-              "gh-pr-refine"
-              "lambda-build"
-              "lambda-compiler"
-              "lambda-decompiler"
-              "lambda-fixpoint"
-              "local-logprobs"
-              "prompt-compiler"
-              "prompt-decompiler"
-              "review-design-turn"
-              "review-implementation"
-              "review-implementation-in-worktree"
-              "review-task-until-clear"]
-             mixed-kind-names)
-          (str "Checked-in workflow corpus mixed-kind blockers drifted: "
+      (is (empty? mixed-kind-names)
+          (str "Checked-in workflow corpus still has mixed-kind collisions: "
                (pr-str mixed-kind-names))))))
 
 (deftest checked-in-invalid-markdown-workflow-artifacts-are-explicitly-shaped-test
-  (testing "invalid checked-in markdown artifacts are named explicitly by contract shape"
+  (testing "remaining invalid checked-in markdown artifacts are named explicitly by contract shape"
     (let [{:keys [parse-errors]} (workflow-migration-view)
           empty-body-md-names (->> parse-errors
                                    (filter #(= "Standalone markdown workflow body must not be empty" (:error %)))
@@ -154,32 +128,8 @@
                                    (map (comp path->workflow-name :source-path))
                                    sort
                                    vec)]
-      (is (= ["allium-check"
-              "complexity-reduction-pr"
-              "gh-bug-fix-and-pr"
-              "gh-bug-request-more-info"
-              "gh-bug-triage"
-              "gh-issue-implement"
-              "gh-issue-ingest"
-              "gh-issue-intent"
-              "gh-issue-refine"
-              "gh-pr-fix-checks"
-              "gh-pr-fix-current-checks"
-              "gh-pr-heal-check-loop"
-              "gh-pr-refine"
-              "lambda-build"
-              "lambda-compiler"
-              "lambda-decompiler"
-              "lambda-fixpoint"
-              "local-logprobs"
-              "prompt-compiler"
-              "prompt-decompiler"
-              "review-design-turn"
-              "review-implementation"
-              "review-implementation-in-worktree"
-              "review-task-until-clear"]
-             empty-body-md-names)
-          (str "Empty-body markdown blockers drifted: " (pr-str empty-body-md-names)))
+      (is (empty? empty-body-md-names)
+          (str "Empty-body markdown blockers remain: " (pr-str empty-body-md-names)))
       (is (= ["gh-bug-discover-and-read"
               "gh-bug-post-repro"
               "gh-bug-reproduce"
