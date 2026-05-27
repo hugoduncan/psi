@@ -308,14 +308,14 @@
 
   (testing "same-source ties within one container prefer lexicographically earlier canonical skill path"
     (let [dir (make-temp-dir "psi-same-source-tie")
-          alpha-dir (io/file dir "alpha-skill")
-          zeta-dir (io/file dir "zeta-skill")]
-      (.mkdirs alpha-dir)
-      (.mkdirs zeta-dir)
-      (spit (io/file alpha-dir "SKILL.md")
-            "---\nname: shared\ndescription: Alpha path\n---\nAlpha")
-      (spit (io/file zeta-dir "SKILL.md")
-            "---\nname: shared\ndescription: Zeta path\n---\nZeta")
+          aaa-dir (io/file dir "aaa-shared")
+          zzz-dir (io/file dir "zzz-shared")]
+      (.mkdirs aaa-dir)
+      (.mkdirs zzz-dir)
+      (spit (io/file aaa-dir "SKILL.md")
+            "---\nname: shared\ndescription: Earlier canonical path\n---\nAlpha")
+      (spit (io/file zzz-dir "SKILL.md")
+            "---\nname: shared\ndescription: Later canonical path\n---\nZeta")
       (try
         (let [{:keys [skills diagnostics]}
               (skills/discover-skills
@@ -324,12 +324,12 @@
               selected (some #(when (= "shared" (:name %)) %) skills)
               collision (some #(when (= :collision (:type %)) %) diagnostics)]
           (is (= :user (:source selected)))
-          (is (= "Alpha path" (:description selected)))
-          (is (= (.getCanonicalPath (io/file alpha-dir "SKILL.md"))
+          (is (= "Earlier canonical path" (:description selected)))
+          (is (= (.getCanonicalPath (io/file aaa-dir "SKILL.md"))
                  (:file-path selected)))
           (is (= {:name "shared"
                   :source :user
-                  :path (.getCanonicalPath (io/file zeta-dir "SKILL.md"))}
+                  :path (.getCanonicalPath (io/file zzz-dir "SKILL.md"))}
                  (:shadowed collision))))
         (finally
           (cleanup-dir! dir)))))
@@ -695,9 +695,10 @@
       (is (str/includes? (slurp skill-path) "work-independently"))
       (is (contains? #{true false} reused?))))
 
-  (testing "packaged build jar contains built-in skill resources"
-    (let [jar-path "./target/psi-0.1.2115-packaging-smoke.jar"]
-      (is (.exists (io/file jar-path)))
+  (testing "built library jar contains built-in skill resources"
+    (let [jar-path (str "target/psi-" (-> "bases/main/resources/psi/version.edn" slurp read-string :version) ".jar")]
+      (is (.exists (io/file jar-path))
+          "build the library jar before running this packaging proof")
       (with-open [zf (java.util.zip.ZipFile. jar-path)]
         (let [entries (->> (enumeration-seq (.entries zf))
                            (map #(.getName %))

@@ -7,7 +7,7 @@
 - [x] Use deterministic version/content-addressed built-in skill snapshots with reuse-on-match and refresh-on-build/resource-change semantics.
 - [x] Preserve ordinary parsed skill shape with `:file-path` and `:base-dir` from materialized paths.
 - [x] Integrate built-in skills into startup/discovery without requiring a source checkout.
-- [ ] Ensure built-in discovered skills register through canonical skill-registry/root-storage authority.
+- [x] Ensure built-in discovered skills register through canonical skill-registry/root-storage authority.
 - [x] Implement explicit precedence-aware collision selection over ordinary skill `:source` classes: `:path` > `:project` > `:user` > `:built-in`.
 - [x] Keep `:disabled true` / `--no-skills` semantics coherent: suppress built-in, user-global, and project skill loading together while still loading `:extra-paths`.
 - [x] Implement deterministic same-source tie handling and document/prove it: earlier configured source-container order wins, then lexicographically earlier canonical absolute skill file path wins within a source class.

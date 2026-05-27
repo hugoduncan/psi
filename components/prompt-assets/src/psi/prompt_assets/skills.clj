@@ -382,13 +382,13 @@
 
 (defn- candidate-sort-key
   [candidate]
-  [(get source-precedence (:source candidate) -1)
-   (- (candidate-container-order candidate))
+  [(- (get source-precedence (:source candidate) -1))
+   (candidate-container-order candidate)
    (canonical-file-path (:file-path candidate))])
 
 (defn- winning-candidate
   [candidates]
-  (last (sort-by candidate-sort-key candidates)))
+  (first (sort-by candidate-sort-key candidates)))
 
 (defn- collision-diagnostic
   [winner shadowed]
