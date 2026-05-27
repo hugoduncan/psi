@@ -2,12 +2,10 @@
   "Workflow Loader — unified workflow definition discovery and delegate tool.
 
    Replaces the `agent` and `agent-chain` extensions with a single surface.
-   Discovers `.psi/workflows/*.md` files, parses/compiles them into canonical
-   workflow definitions, registers them with the deterministic workflow runtime,
-   and exposes a `delegate` tool and `/delegate` command.
-
-   File format: YAML frontmatter + optional EDN config + body text.
-   Single-step profiles and multi-step orchestrations use the same format.
+   Discovers `.psi/workflows/` definitions (`.md` single-step prompt workflows
+   and `.edn` multi-step orchestration workflows), parses/compiles them into
+   canonical workflow definitions, registers them with the deterministic
+   workflow runtime, and exposes a `delegate` tool and `/delegate` command.
 
    Tool: delegate(action, workflow, prompt, ...)
    Command: /delegate <workflow> [<prompt>]"

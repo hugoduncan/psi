@@ -78,10 +78,13 @@
                 (is (re-find #"Duplicate workflow name `planner` for `\.md` files"
                              (:message (first warnings)))))))))))
 
-  (testing "mixed-kind duplicate names currently remain transitional and later file-kind merge behavior still loads one definition"
+  (testing "mixed-kind duplicate names fail clearly and do not load either definition"
     (with-project-loader-result
       {"planner.md" planner-md
        "planner.edn" "{:name \"planner\" :definition-id \"planner\" :steps [{:name \"step\" :type :session :contributions [{:type :template :text \"hi\" :vars {}}]}]}"}
       (fn [_dir {:keys [definitions errors]}]
-        (is (= #{"planner"} (set (keys definitions))))
-        (is (empty? errors))))))
+        (is (empty? definitions))
+        (is (= 1 (count errors)))
+        (is (= "planner" (:name (first errors))))
+        (is (re-find #"defined by both `\.md` and `\.edn` files"
+                     (:error (first errors))))))))

@@ -88,8 +88,7 @@ are activated in this repo through `.psi/extensions.edn`.
 
 ## Built-in workflow capability
 
-Workflow definition discovery from `.psi/workflows/*.md`, canonical definition registration,
-and the unified delegation surface are now built-in core behavior rather than an installable extension.
+Workflow definition discovery from `.psi/workflows/` (`.md` single-step prompt workflows and `.edn` multi-step orchestration workflows), canonical definition registration, and the unified delegation surface are now built-in core behavior rather than an installable extension.
 
 Canonical higher-core ownership now lives under:
 
@@ -111,7 +110,7 @@ Built-in workflow surface:
   - `/delegate <workflow> <prompt>`
   - `/delegate-reload` — reloads workflow definitions and retires removed definitions
 - Config:
-  - `.psi/workflows/*.md`
+  - `.psi/workflows/` with `.md` single-step prompt workflows and `.edn` multi-step orchestration workflows
   - multi-step workflow files now author cross-step data flow through `:session`
     - `:session :input` owns `$INPUT`
     - `:session :reference` owns `$ORIGINAL`

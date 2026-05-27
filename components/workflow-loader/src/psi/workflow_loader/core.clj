@@ -84,11 +84,16 @@
    :error (:error parsed)
    :source-path (:source-path parsed)})
 
+(defn- parsed-workflow-name
+  [parsed]
+  (or (:name parsed)
+      (get-in parsed [:config :name])))
+
 (defn- mixed-kind-collision-errors
   [parsed-files]
   (->> parsed-files
        (remove :error)
-       (group-by :name)
+       (group-by parsed-workflow-name)
        (keep (fn [[workflow-name entries]]
                (when (and workflow-name
                           (> (count (set (map :file-kind entries))) 1))
@@ -103,13 +108,14 @@
   "Merge parsed files by [name kind], later entries win (precedence order).
    Same-kind duplicates become warnings later; mixed-kind duplicates remain errors."
   [parsed-files]
-  (vals
-   (reduce (fn [acc parsed]
-             (if-let [n (:name parsed)]
-               (assoc acc [n (:file-kind parsed)] parsed)
-               (assoc acc [(or (:source-path parsed) (gensym)) (:file-kind parsed)] parsed)))
-           {}
-           parsed-files)))
+  (->> parsed-files
+       (reduce (fn [acc parsed]
+                 (if-let [n (parsed-workflow-name parsed)]
+                   (assoc acc [n (:file-kind parsed)] parsed)
+                   (assoc acc [(or (:source-path parsed) (gensym)) (:file-kind parsed)] parsed)))
+               {})
+       vals
+       vec))
 
 (defn- duplicate-kind-warnings
   [parsed-files]
@@ -129,9 +135,10 @@
   (let [{errored true valid false} (partition-parsed-files parsed-files)
         merged-valid (merge-by-name-and-kind valid)
         mixed-kind-errors (mixed-kind-collision-errors merged-valid)
-        safe-valid (if (seq mixed-kind-errors)
+        colliding-names (set (map :name mixed-kind-errors))
+        safe-valid (if (seq colliding-names)
                      (remove (fn [parsed]
-                               (some #(= (:name %) (:name parsed)) mixed-kind-errors))
+                               (contains? colliding-names (parsed-workflow-name parsed)))
                              merged-valid)
                      merged-valid)
         {:keys [definitions errors]} (compiler/compile-workflow-files safe-valid)]
