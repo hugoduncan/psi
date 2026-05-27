@@ -1,0 +1,22 @@
+# Steps
+
+- [x] Add canonical packaged built-in skill resource root and loader support for `psi/skills/` resources in built artifacts.
+- [x] Include representative built-in skill fixture/proof resources and prove build packaging support without requiring a permanently shipped product built-in skill.
+- [x] Add runtime resource discovery for built-in skills.
+- [x] Add materialization of built-in skill resources to managed readable filesystem paths under a psi-owned `~/.psi/agent/` cache subtree.
+- [x] Use deterministic version/content-addressed built-in skill snapshots with reuse-on-match and refresh-on-build/resource-change semantics.
+- [x] Preserve ordinary parsed skill shape with `:file-path` and `:base-dir` from materialized paths.
+- [x] Integrate built-in skills into startup/discovery without requiring a source checkout.
+- [x] Ensure built-in discovered skills register through canonical skill-registry/root-storage authority.
+- [x] Implement explicit precedence-aware collision selection over ordinary skill `:source` classes: `:path` > `:project` > `:user` > `:built-in`.
+- [x] Keep `:disabled true` / `--no-skills` semantics coherent: suppress built-in, user-global, and project skill loading together while still loading `:extra-paths`.
+- [x] Implement deterministic same-source tie handling and document/prove it: earlier configured source-container order wins, then lexicographically earlier canonical absolute skill file path wins within a source class.
+- [x] Emit collision diagnostics naming the winning and shadowed definitions and their sources.
+- [x] Preserve `/skill:name` invocation behavior for built-in skills.
+- [x] Preserve canonical prompt-visible exact skill-name ordering.
+- [x] Expose built-in skill provenance in existing skill capability/introspection/read-model surfaces via `:source :built-in`, including grouped/introspection outputs and relevant EQL projections.
+- [x] Update `README.md` and relevant skill/extensions/workflow docs.
+- [x] Add focused tests for resource discovery, materialization, precedence, diagnostics, and invocation behavior.
+- [x] Add non-source-tree packaged execution proof for built-in skill discoverability/readability.
+- [x] Run targeted lint and affected test suites.
+- [x] Run final broader verification appropriate to the touched surfaces.

@@ -249,12 +249,14 @@
             (let [{:keys [skills]}
                   (skills/discover-skills
                    {:global-skills-dirs  [(str global-dir)]
-                    :project-skills-dirs [(str project-dir)]})]
-              (is (= 2 (count skills)))
+                    :project-skills-dirs [(str project-dir)]
+                    :config {:built-in-resource-root "psi/test-built-in-skills"}})]
+              (is (= 4 (count skills)))
               (is (some #(= "global-skill" (:name %)) skills))
-              (is (some #(= "project-skill" (:name %)) skills))))))))
+              (is (some #(= "project-skill" (:name %)) skills))
+              (is (some #(= "packaged-test-skill" (:name %)) skills))))))))
 
-  (testing "first-discovered wins on name collision"
+  (testing "project wins over user on cross-source name collision"
     (with-temp-skills*
       {"shared" "---\nname: shared\ndescription: Global version\n---\nGlobal"}
       (fn [global-dir]
@@ -265,23 +267,76 @@
                   (skills/discover-skills
                    {:global-skills-dirs  [(str global-dir)]
                     :project-skills-dirs [(str project-dir)]})]
-              (is (= 1 (count skills)))
-              (is (= "Global version" (:description (first skills))))
+              (is (= 2 (count skills)))
+              (is (= "Project version"
+                     (:description (some #(when (= "shared" (:name %)) %) skills))))
               (is (some #(= :collision (:type %)) diagnostics))))))))
 
-  (testing "extra-paths are loaded"
+  (testing "extra path wins over project, user, and built-in"
     (with-temp-skills*
-      {"extra" "---\nname: extra\ndescription: Extra skill\n---\nBody"}
+      {"built-in-shared" "---\nname: built-in-shared\ndescription: Override\n---\nOverride body"}
       (fn [extra-dir]
-        (let [{:keys [skills]}
+        (let [{:keys [skills diagnostics]}
               (skills/discover-skills
                {:global-skills-dirs  ["/nonexistent"]
                 :project-skills-dirs ["/nonexistent"]
-                :extra-paths         [(str extra-dir)]})]
-          (is (= 1 (count skills)))
-          (is (= :path (:source (first skills))))))))
+                :extra-paths         [(str extra-dir)]
+                :config {:built-in-resource-root "psi/test-built-in-skills"}})
+              selected (some #(when (= "built-in-shared" (:name %)) %) skills)]
+          (is (= :path (:source selected)))
+          (is (= "Override" (:description selected)))
+          (is (some #(= :collision (:type %)) diagnostics))))))
 
-  (testing "disabled flag skips global/project, keeps extra-paths"
+  (testing "same-source ties prefer earlier configured container order"
+    (with-temp-skills*
+      {"shared" "---\nname: shared\ndescription: Earlier global\n---\nEarlier"}
+      (fn [earlier-global-dir]
+        (with-temp-skills*
+          {"shared" "---\nname: shared\ndescription: Later global\n---\nLater"}
+          (fn [later-global-dir]
+            (let [{:keys [skills diagnostics]}
+                  (skills/discover-skills
+                   {:global-skills-dirs  [(str earlier-global-dir) (str later-global-dir)]
+                    :project-skills-dirs ["/nonexistent"]})
+                  selected (some #(when (= "shared" (:name %)) %) skills)
+                  collision (some #(when (= :collision (:type %)) %) diagnostics)]
+              (is (= :user (:source selected)))
+              (is (= "Earlier global" (:description selected)))
+              (is (= (str earlier-global-dir "/shared/SKILL.md") (:file-path selected)))
+              (is (= {:name "shared"
+                      :source :user
+                      :path (str later-global-dir "/shared/SKILL.md")}
+                     (:shadowed collision)))))))))
+
+  (testing "same-source ties within one container prefer lexicographically earlier canonical skill path"
+    (let [dir (make-temp-dir "psi-same-source-tie")
+          aaa-dir (io/file dir "aaa-shared")
+          zzz-dir (io/file dir "zzz-shared")]
+      (.mkdirs aaa-dir)
+      (.mkdirs zzz-dir)
+      (spit (io/file aaa-dir "SKILL.md")
+            "---\nname: shared\ndescription: Earlier canonical path\n---\nAlpha")
+      (spit (io/file zzz-dir "SKILL.md")
+            "---\nname: shared\ndescription: Later canonical path\n---\nZeta")
+      (try
+        (let [{:keys [skills diagnostics]}
+              (skills/discover-skills
+               {:global-skills-dirs  [(str dir)]
+                :project-skills-dirs ["/nonexistent"]})
+              selected (some #(when (= "shared" (:name %)) %) skills)
+              collision (some #(when (= :collision (:type %)) %) diagnostics)]
+          (is (= :user (:source selected)))
+          (is (= "Earlier canonical path" (:description selected)))
+          (is (= (-> (io/file aaa-dir "SKILL.md") .getAbsolutePath io/file .getCanonicalPath)
+                 (-> (:file-path selected) io/file .getCanonicalPath)))
+          (is (= {:name "shared"
+                  :source :user
+                  :path (-> (io/file zzz-dir "SKILL.md") .getAbsolutePath io/file .getCanonicalPath)}
+                 (update (:shadowed collision) :path #(some-> % io/file .getCanonicalPath)))))
+        (finally
+          (cleanup-dir! dir)))))
+
+  (testing "disabled flag skips built-in, global, and project, keeps extra-paths"
     (with-temp-skills*
       {"global-skill" "---\nname: global-skill\ndescription: Global\n---\nBody"}
       (fn [global-dir]
@@ -295,7 +350,20 @@
                     :extra-paths        [(str extra-dir)]
                     :disabled           true})]
               (is (= 1 (count skills)))
-              (is (= "extra" (:name (first skills))))))))))
+              (is (= "extra" (:name (first skills))))
+              (is (= :path (:source (first skills))))))))))
+
+  (testing "extra-paths are loaded"
+    (with-temp-skills*
+      {"extra" "---\nname: extra\ndescription: Extra skill\n---\nBody"}
+      (fn [extra-dir]
+        (let [{:keys [skills]}
+              (skills/discover-skills
+               {:global-skills-dirs  ["/nonexistent"]
+                :project-skills-dirs ["/nonexistent"]
+                :extra-paths         [(str extra-dir)]})]
+          (is (= 2 (count skills)))
+          (is (= :path (:source (some #(when (= "extra" (:name %)) %) skills))))))))
 
   (testing "non-existent extra path produces warning"
     (let [{:keys [diagnostics]}
@@ -618,6 +686,32 @@
 ;; ============================================================
 ;; End-to-end: discover + format + invoke
 ;; ============================================================
+
+(deftest built-in-skill-materialization-test
+  (testing "packaged built-in skills materialize to a readable deterministic snapshot"
+    (let [opts {:config {:built-in-resource-root "psi/test-built-in-skills"}}
+          {:keys [dir resource-paths reused?]} (skills/materialize-built-in-skills! opts)
+          skill-path (str dir "/packaged-test-skill/SKILL.md")]
+      (is (seq resource-paths))
+      (is (.exists (io/file skill-path)))
+      (is (str/includes? skill-path "/.psi/agent/built-in-skills/"))
+      (is (str/includes? (slurp skill-path) "packaged-test-skill"))
+      (is (contains? #{true false} reused?))))
+
+  (testing "snapshot id changes when the packaged resource set changes"
+    (let [base-dir (skills/built-in-snapshot-dir {:config {:built-in-resource-root "psi/test-built-in-skills"}})
+          changed-dir (skills/built-in-snapshot-dir
+                       {:config {:built-in-resource-root "psi/test-built-in-skills"}
+                        :resource-paths-override ["psi/test-built-in-skills/built-in-shared/SKILL.md"
+                                                  "psi/test-built-in-skills/packaged-test-skill/SKILL.md"]})]
+      (is (not= base-dir changed-dir))))
+
+  (testing "built-in discovery loads materialized packaged skills as ordinary file-backed skills"
+    (let [{:keys [skills materialization]} (skills/built-in-skills-discovery {:config {:built-in-resource-root "psi/test-built-in-skills"}})
+          built-in (some #(when (= "packaged-test-skill" (:name %)) %) skills)]
+      (is (= :built-in (:source built-in)))
+      (is (.exists (io/file (:file-path built-in))))
+      (is (str/starts-with? (:file-path built-in) (:dir materialization))))))
 
 (deftest end-to-end-discover-format-invoke-test
   (testing "discover skills, format for prompt, then invoke one"
