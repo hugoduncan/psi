@@ -7,7 +7,6 @@
 - [ ] Update `:name` field inside the EDN to `"review-task-implementation"`
 - [ ] Update `:description` field to reflect the new name
 - [ ] Update `review-implementation-in-worktree.edn`: change `:target "review-implementation"` → `"review-task-implementation"` and update `:description` string
-- [ ] Update `AGENTS.md` workflow listing (`review-implementation` → `review-task-implementation`, `review-implementation-in-worktree` description)
 - [ ] Verify workflow loads without error (loader smoke: `bb tasks` or focused loader test)
 - [ ] Commit: `⚒ rename review-implementation → review-task-implementation`
 
@@ -21,7 +20,6 @@
 - [ ] `inconsistency-review` step prompt: remove `design.md` references; change scope to `plan.md` and `steps.md` only
 - [ ] `inconsistency-follow-up` step prompt: change `design-steps.md` → `steps.md`; remove `design.md` references
 - [ ] `clarity-status` step prompt (actor + judge): remove `design.md` references; change scope to `plan.md` and `steps.md` only
-- [ ] Update `AGENTS.md` workflow listing (`review-task-until-clear` → `review-task-plan`)
 - [ ] Verify workflow loads without error
 - [ ] Commit: `⚒ rename review-task-until-clear → review-task-plan, narrow to plan/steps`
 
@@ -52,7 +50,6 @@
   - Step delegates to `review-step` with `{:skill "review-task-docs"}`
   - Include prior step context sources
 - [ ] Update `review-implementation-in-worktree.edn` `summary` step body: change "four review passes" → "five review passes"; update named list to `task-implementation-review, task-test-review, test-shaper, review-task-docs, code-shaper`
-- [ ] Update `AGENTS.md` skills listing to include `review-task-docs`
 - [ ] Verify `review-task-implementation` loads without error
 - [ ] Commit: `⚒ add review-task-docs skill and wire into review-task-implementation`
 
@@ -68,7 +65,6 @@
 - [ ] Create `review-task-design.edn` with loop structure: ambiguity-review → ambiguity-follow-up → inconsistency-review → inconsistency-follow-up → clarity-status (REPEAT/DONE) → final-summary
   - All steps reference their `.md` prompt files via `:prompt-workflow`
   - `clarity-status` has judge step routing `REPEAT` → `ambiguity-review`, `DONE` → `final-summary`
-- [ ] Update `AGENTS.md` workflow listing to include `review-task-design`
 - [ ] Verify workflow loads without error
 - [ ] Commit: `⚒ create review-task-design workflow`
 
@@ -78,7 +74,6 @@
 - [ ] Create `create-task-plan.edn` as a single-step workflow referencing `create-task-plan.md`
   - Tools: `read`, `bash`, `edit`, `write`
   - Skills: `work-independently`, `task-design`
-- [ ] Update `AGENTS.md` workflow listing to include `create-task-plan`
 - [ ] Verify workflow loads without error
 - [ ] Commit: `⚒ create create-task-plan workflow`
 

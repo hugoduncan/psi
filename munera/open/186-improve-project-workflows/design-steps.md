@@ -1,6 +1,6 @@
 ## Inconsistency follow-ups (pass 2)
 
-- [ ] **Remove spurious "Update AGENTS.md" steps from steps.md**: steps.md slices 1, 2, 4, 5, and 6 each contain an "Update AGENTS.md workflow listing" or "Update AGENTS.md skills listing" item. design.md and plan.md make no mention of AGENTS.md updates. The workflow listing and skills listing visible to the agent are dynamically generated at runtime from the loaded `.psi/workflows/` and `.psi/skills/` directories respectively — there is no static listing in AGENTS.md to update. Remove these 5 items from steps.md to avoid wasted implementer effort.
+- [x] **Remove spurious "Update AGENTS.md" steps from steps.md**: steps.md slices 1, 2, 4, 5, and 6 each contain an "Update AGENTS.md workflow listing" or "Update AGENTS.md skills listing" item. design.md and plan.md make no mention of AGENTS.md updates. The workflow listing and skills listing visible to the agent are dynamically generated at runtime from the loaded `.psi/workflows/` and `.psi/skills/` directories respectively — there is no static listing in AGENTS.md to update. Remove these 5 items from steps.md to avoid wasted implementer effort.
 
 ## Inconsistency follow-ups
 

@@ -1,3 +1,9 @@
+## 2026-05-27 inconsistency follow-up pass 2
+
+Executed the one newly added design-step from inconsistency review pass 2:
+
+- **Removed 5 spurious "Update AGENTS.md" steps from steps.md**: slices 1, 2, 4, 5, and 6 each had an "Update AGENTS.md workflow/skills listing" item with no basis in design or plan. The workflow and skills listings are dynamically generated at runtime — no static AGENTS.md listing exists. Removed all 5 items; design-step marked done.
+
 ## 2026-05-27 inconsistency review pass 2
 
 Reviewed design.md, plan.md, steps.md, design-steps.md, implementation.md, and referenced workflow files (review-implementation.edn, review-implementation-in-worktree.edn, review-task-until-clear.edn, review-step.edn, implement-task.edn), workflow-loader core/compiler source and tests, and structured_output_schemas.clj.
