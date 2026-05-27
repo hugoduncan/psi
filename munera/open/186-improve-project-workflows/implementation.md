@@ -7,6 +7,20 @@ Resolved all four design-steps items. Updated `design.md` with decisions:
 3. **`design-steps.md` lifecycle**: created on first write if absent, written only by `review-task-design`, never by plan/implementation review workflows. Added dedicated section to design.
 4. **Loader test scope**: assert raw `:outputs` key at loader level only (option a). No `target_ir_compiler` or `workflow-ir/validate` invocation in loader tests. Updated testing approach section in design.
 
+## 2026-05-27 inconsistency follow-up pass 1
+
+Resolved all four inconsistency design-steps items. Updated `design.md` with decisions:
+
+1. **`judge-review-result` schema relationship**: retained as-is, additive alongside new `judge-routing-result` and `pass-status-result`. Distinct purpose — richer review output vs binary routing signal. Added explicit clarification paragraph to schema shapes section.
+
+2. **`review-task-plan` prompt text changes**: added "Concrete prompt changes required" subsection to the `review-task-plan` workflow description in design. Enumerates all 7 changes needed across the 5 steps (`ambiguity-review`, `ambiguity-follow-up`, `inconsistency-review`, `inconsistency-follow-up`, `clarity-status`) plus `:name` and `:description` fields. Covers `design-steps.md` → `steps.md` redirection and `design.md` removal.
+
+3. **Prompt extraction scope coverage**: the concrete prompt changes in item 2 above make the `design-steps.md` → `steps.md` redirection explicit for the extraction step. No separate design section needed since the per-step enumeration already specifies the narrowed content.
+
+4. **`review-implementation-in-worktree` description**: updated acceptance criterion 5 to explicitly require both `:target` and `:description` string updates.
+
+All four design-steps marked done.
+
 ## 2026-05-27 inconsistency review pass 1
 
 Reviewed `design.md`, `design-steps.md`, and referenced workflow files (`review-task-until-clear.edn`, `review-implementation.edn`, `review-implementation-in-worktree.edn`, `review-step.edn`, `implement-task.edn`) and `structured_output_schemas.clj`.

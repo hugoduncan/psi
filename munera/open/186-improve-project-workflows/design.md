@@ -92,6 +92,24 @@ Scope: `plan.md` and `steps.md` (assumes `design.md` is already stable).
 
 Same loop structure as current `review-task-until-clear` but constrained to plan/steps artifacts. Follow-up items written to `steps.md` rather than `design-steps.md`.
 
+#### Concrete prompt changes required
+
+The following prompt-string changes must be made when renaming and narrowing `review-task-until-clear` → `review-task-plan`:
+
+1. **`ambiguity-review` step prompt**: Remove references to `design.md`. Change "review the task design, plan and steps for ambiguities" → "review the task plan and steps for ambiguities". Change "especially design.md, plan.md, steps.md" → "especially plan.md and steps.md". Remove any instruction to read `design.md`.
+
+2. **`ambiguity-follow-up` step prompt**: Remove references to `design.md`. Change "add unchecked follow-up items to design-steps.md" → "add unchecked follow-up items to steps.md". Change "Read and update the task's design.md, plan.md, steps.md, and implementation.md" → "Read and update the task's plan.md, steps.md, and implementation.md". Remove any instruction to write `design-steps.md`.
+
+3. **`inconsistency-review` step prompt**: Remove references to `design.md`. Change "review the task design, plan and steps for inconsistencies" → "review the task plan and steps for inconsistencies". Change "especially design.md, plan.md, steps.md" → "especially plan.md and steps.md". Remove any instruction to read `design.md`.
+
+4. **`inconsistency-follow-up` step prompt**: Remove references to `design-steps.md`. Change "add unchecked follow-up items to design-steps.md" → "add unchecked follow-up items to steps.md". Change "Read and update the task's steps.md, implementation.md, design.md, and plan.md" → "Read and update the task's steps.md, implementation.md, and plan.md". Remove any instruction to write `design-steps.md`.
+
+5. **`clarity-status` step prompt**: Remove references to `design.md`. Change "especially design.md, plan.md, steps.md" → "especially plan.md and steps.md".
+
+6. **`:name` field**: Change `"review-task-until-clear"` → `"review-task-plan"`.
+
+7. **`:description` field**: Update to reflect the narrowed scope, e.g. "Repeatedly review a Munera task plan and steps for ambiguities and inconsistencies, record terse notes, execute follow-up steps, and loop until no actionable feedback remains".
+
 ### `review-task-implementation` (renamed from `review-implementation`)
 
 Chain: task-implementation-review → task-test-review → test-shaper → **review-task-docs** → code-shaper.
@@ -129,6 +147,7 @@ Structured output specs in the IR require `:schema-id`, `:schema-version`, `:sch
 - JSON Schema shape: `{:type "string" :enum ["REPEAT" "DONE"]}`
 - Use `{:source :judge/structured-output :mode :structured :schema-id :psi.workflow/judge-routing-result :schema-version 1 :schema [:enum "REPEAT" "DONE"] :json-schema {:type "string" :enum ["REPEAT" "DONE"]}}` as the output spec on judge steps that emit routing signals.
 - Actor steps emitting `PASS_STATUS` use `{:source :session/structured-output ...}` with an appropriate schema (e.g. `[:map [:status [:enum "PASS" "FAIL"]] [:reason :string]]`); a `psi.workflow/pass-status-result` schema id should be added alongside `judge-routing-result`.
+- The existing `psi.workflow/judge-review-result` schema (a complex map with `:decision`, `:issues`, `:confidence`) is **retained as-is** and is not deprecated or superseded by the new ids. `judge-routing-result` is a distinct, narrower schema for binary `REPEAT`/`DONE` judge routing signals; `judge-review-result` is a richer schema for structured review output. They are additive — both coexist in `structured_output_schemas.clj`.
 
 ## `.md` prompt extraction
 
@@ -176,7 +195,7 @@ Refactors before new features, to avoid doing the same work twice:
 2. `create-task-plan` workflow exists, creates `plan.md` and `steps.md` from `design.md`, single pass.
 3. `review-task-plan` workflow exists (renamed from `review-task-until-clear`), scoped to `plan.md`/`steps.md`.
 4. `review-task-implementation` workflow exists (renamed from `review-implementation`), includes docs review step.
-5. `review-implementation-in-worktree` delegates to `review-task-implementation`.
+5. `review-implementation-in-worktree` delegates to `review-task-implementation`: both the `:target` reference (`"review-implementation"` → `"review-task-implementation"`) and the `:description` string (`"…via the review-implementation workflow"` → `"…via the review-task-implementation workflow"`) are updated.
 6. `review-task-docs` skill exists with a clear review lambda.
 7. Substantial inline prompts in `review-task-plan`, `review-step`, `implement-task` are extracted to `.md` files.
 8. `compile-judge` passes through `:outputs`; `psi.workflow/judge-routing-result` and `psi.workflow/pass-status-result` schema ids exist in `structured_output_schemas.clj`.
