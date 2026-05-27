@@ -7,6 +7,7 @@
    - preserving root precedence for same-kind duplicates
    - rejecting mixed-kind duplicate workflow names
    - broadening `/delegate-reload` documentation and any built-in discovery wording from `.psi/workflows/*.md` to `.psi/workflows/` plus file kind rules
+   - explicitly documenting that currently checked-in multi-step `.psi/workflows/*.md` built-ins/examples remain transitional compatibility artifacts during this task rather than being bulk-migrated here
 
 3. Split loader/compiler responsibilities by file kind:
    - `.md` parser/compiler path validates the new single-step markdown contract
@@ -28,4 +29,4 @@
    - `:prompt-workflow` path resolution and merge semantics
    - `/delegate-reload` + loader behavior across both file kinds
 
-7. Update user docs (`README.md` if needed, `doc/workflows.md`, and any workflow-authoring references touched by the implementation) so file-kind rules, discovery paths, standalone markdown workflow authoring, and `.edn` prompt-workflow reuse are explicit and synchronized with the implementation.
+7. Update user docs (`README.md` if needed, `doc/workflows.md`, and any workflow-authoring references touched by the implementation) so file-kind rules, discovery paths, standalone markdown workflow authoring, `.edn` prompt-workflow reuse, and the transitional status of existing checked-in multi-step `.md` workflows are explicit and synchronized with the implementation.

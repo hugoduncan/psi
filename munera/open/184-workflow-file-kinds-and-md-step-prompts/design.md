@@ -63,6 +63,26 @@ After this task:
 - adding arbitrary markdown includes outside the workflow system
 - changing unrelated prompt, skill, or delegate semantics except where required for this workflow contract
 - preserving backward compatibility for ambiguous mixed-definition same-name authoring across file kinds; this task chooses one explicit collision/error policy instead
+- bulk migration in this task of the repository's existing checked-in `.psi/workflows/*.md` multi-step built-ins/examples/tests to `.edn`; that artifact migration is explicitly deferred to follow-on implementation work after the loader/compiler can support both kinds
+
+## Repository artifact scope decision
+
+This task makes the file-kind contract canonical, but it does **not** require the repo to migrate all existing checked-in workflow artifacts in the same change.
+
+The explicit scope decision is:
+
+- implement mixed-kind loader/compiler/runtime/doc support now
+- preserve currently checked-in `.psi/workflows/*.md` multi-step workflows as compatibility-era artifacts during this task
+- update docs and implementation notes to state clearly that existing checked-in multi-step markdown workflows are transitional and will need later migration to `.edn`
+- add tests in this task for the new `.edn` multi-step and `.md` single-step contracts without requiring a full built-in workflow corpus rewrite
+
+Rationale:
+
+- the repository currently contains many checked-in multi-step `.md` workflows, and forcing a full migration here would enlarge the task far beyond the loader/compiler contract split
+- the main value of this task is establishing and proving the new singular authoring contract and prompt-workflow reuse seam
+- once both file kinds load correctly, a later bounded follow-on can migrate built-ins/examples/docs incrementally to `.edn` without blocking this contract-defining slice
+
+Therefore, acceptance for this task is based on supporting the new contracts and documenting the transitional repository state, not on eliminating every legacy checked-in multi-step `.md` artifact immediately.
 
 ## Workflow kinds
 
