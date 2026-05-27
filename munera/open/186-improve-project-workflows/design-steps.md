@@ -1,3 +1,13 @@
+## Inconsistency follow-ups
+
+- [ ] **Clarify relationship between existing `judge-review-result` schema and planned new schema ids**: `structured_output_schemas.clj` already has `psi.workflow/judge-review-result` (complex map). The design adds `psi.workflow/judge-routing-result` and `psi.workflow/pass-status-result` without mentioning the existing schema. Update the design to state whether `judge-review-result` is retained as-is, deprecated, or superseded by the new ids, and whether any of the new schemas are additive alongside it.
+
+- [ ] **Specify prompt text changes required to narrow `review-task-plan` scope**: The renamed `review-task-until-clear` → `review-task-plan` must redirect follow-up items from `design-steps.md` to `steps.md` and remove references to `design.md` review. The design says "constrained to plan/steps artifacts" but does not enumerate which step prompts change and how. Add a concrete list of prompt-string changes (or a reference to the new `.md` files) to the design or plan so the scope narrowing is unambiguous.
+
+- [ ] **Ensure `review-task-plan` prompt extraction covers the `design-steps.md` → `steps.md` redirection**: The `.md` prompt extraction step (ordering step 3) must not simply copy the existing inline prompts verbatim — the extracted `.md` files must reflect the narrowed scope (no `design.md` review, no `design-steps.md` writes). Make this explicit in the design's extraction section or in a plan step.
+
+- [ ] **Add `review-implementation-in-worktree` description update to scope**: The design says update the `:target "review-implementation"` reference to `"review-task-implementation"` but does not mention updating the `:description` string (currently "…via the review-implementation workflow"). Add this to the acceptance criteria or the rename step.
+
 ## Ambiguity follow-ups
 
 - [x] **Structured output authoring path for judge steps**: `compile-judge` in `target_ir_compiler.clj` does not compile `:outputs` on judge specs. Decide: (a) extend `compile-judge` to pass through judge `:outputs` so structured output can be declared on judge steps in the authoring format, or (b) declare structured output only on session step `:outputs` (not the judge), or (c) declare this out of scope for this task and note it as a prerequisite gap. Update the design with the chosen approach before implementation.
