@@ -1,1 +1,2 @@
 - [x] Specify the exact deterministic collision/precedence algorithm across built-in, user-global, project, and `:extra-paths` sources, including whether `discover-skills` loading order changes or collision resolution becomes explicit precedence-aware selection rather than first-discovered wins.
+- [ ] Align `steps.md` with the task's design-only scope and `plan.md` step-2 intent by replacing concrete implementation actions with a design-task checklist or by explicitly moving implementation work to a follow-up implementation task.
