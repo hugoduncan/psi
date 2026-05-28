@@ -1,3 +1,21 @@
+## 2026-05-28 inconsistency review pass 2
+
+Reviewed `design.md` against `plan.md`, `compiler.clj`, and the `.psi/workflows/` corpus.
+Found one actionable inconsistency. Added follow-up item to `design-steps.md`.
+
+1. **`design.md` includes `final-summary` in wiring scope; `plan.md` excludes it.**
+   `design.md` scope lines 71–73 and desired outcome list `final-summary` as a step to be
+   wired via `:prompt-workflow` for `review-task-plan.edn` (6 steps), `implement-task.edn`
+   (2 steps), and `review-task-design.edn` (6 steps). But `plan.md` explicitly records the
+   decision (from plan ambiguity follow-up pass 1) to exclude `final-summary` steps from
+   wiring in those three workflows, because they carry `:source` contributions
+   (`{:from :workflow-original}` and `{:from {:step "..." :yield :text}}`) that
+   `compile-prompt-workflow-step` would silently drop. Acceptance criterion 6 and the
+   desired outcome in `design.md` also say "all task 186 extracted `.md` files are
+   referenced" — but `implement-task-final-summary.md`, `review-task-plan-final-summary.md`,
+   and `review-task-design-final-summary.md` are intentionally NOT wired per `plan.md`.
+   `design.md` must be updated to reflect the exclusion decision.
+
 ## 2026-05-28 plan ambiguity follow-up pass 1
 
 Executed both follow-up items from plan ambiguity review pass 1.

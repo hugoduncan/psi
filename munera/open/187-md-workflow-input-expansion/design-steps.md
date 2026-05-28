@@ -50,6 +50,24 @@
   step 2 and step 3 to specify the chosen mechanism and any required changes to
   `compile-markdown-workflow-file`.
 
+## Inconsistency review pass 2
+
+- [ ] **Sync `design.md` wiring scope and desired outcome with `plan.md` final-summary exclusion**:
+  `design.md` lists `final-summary` in the step counts for `review-task-plan.edn` (6 steps),
+  `implement-task.edn` (2 steps), and `review-task-design.edn` (6 steps), and the desired outcome
+  says "all task 186 extracted `.md` files are wired". But `plan.md` records the decision to
+  **exclude** `final-summary` steps from wiring in those three workflows (they carry `:source`
+  contributions that `compile-prompt-workflow-step` would silently drop). Update `design.md` to:
+  - Reduce step counts to exclude `final-summary` (review-task-plan.edn: 5, implement-task.edn: 1,
+    review-task-design.edn: 5).
+  - Add an explicit exclusion note for `final-summary` in those three workflows, parallel to the
+    `review-step.edn` exclusion note.
+  - Update the desired outcome to clarify that the three `final-summary` `.md` files
+    (`implement-task-final-summary.md`, `review-task-plan-final-summary.md`,
+    `review-task-design-final-summary.md`) are not wired.
+  - Update acceptance criterion 6 to say "all task 186 extracted `.md` files **that do not carry
+    `:source` contributions** are referenced" (or equivalent precise wording).
+
 ## Inconsistency review pass 1
 
 - [x] **Resolve `review-task-plan.edn` step count vs. `.md` corpus mismatch**: design
