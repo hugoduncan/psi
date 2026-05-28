@@ -1,5 +1,5 @@
 ---
-name: create-task-plan
+name: create-task-plan-create-plan
 description: Create plan.md and steps.md for a Munera task from a stable design.md
 tools:
   - read
