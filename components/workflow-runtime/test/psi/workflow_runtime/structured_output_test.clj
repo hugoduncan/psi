@@ -173,3 +173,27 @@
         (let [result (structured-output/output-result judge-routing-spec raw)]
           (is (= :valid (get-in result [:structured-output :status])) raw)
           (is (= expected-value (get-in result [:structured-output :value])) raw))))))
+
+(deftest reusable-pass-status-result-schema-test
+  ;; Tests the psi.workflow/pass-status-result schema exported by the runtime
+  ;; and referenced by schema id/version. Validates representative valid and
+  ;; invalid JSON inputs.
+  (let [pass-status-spec {:source :judge/structured-output
+                          :mode :structured
+                          :schema-id schemas/pass-status-result-schema-id
+                          :schema-version schemas/pass-status-result-schema-version
+                          :schema schemas/pass-status-result-schema
+                          :json-schema schemas/pass-status-result-json-schema}]
+    (testing "valid pass-status-result JSON validates and exposes coerced value"
+      (let [result (structured-output/output-result
+                    pass-status-spec
+                    "{\"status\":\"PASS\",\"reason\":\"all checks green\"}")]
+        (is (= :valid (get-in result [:structured-output :status])))
+        (is (= "PASS" (get-in result [:structured-output :value :status])))
+        (is (= "all checks green" (get-in result [:structured-output :value :reason])))))
+    (testing "invalid pass-status-result JSON (missing :reason) is invalid"
+      (let [result (structured-output/output-result
+                    pass-status-spec
+                    "{\"status\":\"PASS\"}")]
+        (is (= :invalid (get-in result [:structured-output :status])))
+        (is (seq (get-in result [:structured-output :errors])))))))

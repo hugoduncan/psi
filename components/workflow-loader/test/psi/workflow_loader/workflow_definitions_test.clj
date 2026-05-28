@@ -398,3 +398,39 @@
          (is (contains? (:judge pass-step) :outputs))
          (is (= :psi.workflow/judge-routing-result
                 (get-in pass-step [:judge :outputs :routing-result :schema-id]))))))))
+
+;;; ---------------------------------------------------------------------------
+;;; review-implementation-in-worktree
+
+(deftest review-implementation-in-worktree-loads-test
+  (testing "review-implementation-in-worktree loads without error"
+    (load-edn-only
+     "review-implementation-in-worktree.edn"
+     (fn [{:keys [definitions errors]}]
+       (is (empty? errors))
+       (is (contains? definitions "review-implementation-in-worktree"))))))
+
+(deftest review-implementation-in-worktree-delegate-target-test
+  (testing "review-implementation-in-worktree has a delegate step targeting review-task-implementation"
+    (load-edn-only
+     "review-implementation-in-worktree.edn"
+     (fn [{:keys [definitions]}]
+       (let [steps (get-in definitions ["review-implementation-in-worktree" :steps])
+             delegate-step (first (filter #(= :delegate (:type %)) steps))]
+         (is (some? delegate-step) "should have a delegate step")
+         (is (= "review-task-implementation" (:target delegate-step))))))))
+
+(deftest review-implementation-in-worktree-summary-names-review-task-docs-test
+  (testing "review-implementation-in-worktree summary step body names review-task-docs"
+    (load-edn-only
+     "review-implementation-in-worktree.edn"
+     (fn [{:keys [definitions]}]
+       (let [steps (get-in definitions ["review-implementation-in-worktree" :steps])
+             summary-step (first (filter #(= "summary" (:name %)) steps))
+             summary-text (->> (:contributions summary-step)
+                               (filter #(= :template (:type %)))
+                               (map :text)
+                               (apply str))]
+         (is (some? summary-step) "should have a summary step")
+         (is (.contains summary-text "review-task-docs")
+             "summary step body should name review-task-docs"))))))

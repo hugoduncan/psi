@@ -1,3 +1,13 @@
+## 2026-05-28 task-test-review follow-up execution
+
+Executed both unchecked items from the task-test-review pass:
+
+1. **`reusable-pass-status-result-schema-test`** added to `structured_output_test.clj`: two `testing` blocks — valid JSON `{"status":"PASS","reason":"all checks green"}` validates to `:valid` with correct coerced values; invalid JSON missing `:reason` produces `:invalid` with errors. Focused test: 1 test, 5 assertions, 0 failures.
+
+2. **`review-implementation-in-worktree` loader tests** added to `workflow_definitions_test.clj`: three `deftest` forms — loads without error, delegate step targets `"review-task-implementation"`, summary step body contains `"review-task-docs"`. Fixed a formatter-induced paren nesting issue (new `deftest` forms were indented inside the previous `deftest` closing parens; corrected to top-level). Focused loader tests: 35 tests (+3), 72 assertions, 0 failures.
+
+`bb test` green (3 pre-existing failures, 0 new). `bb lint` 0 errors, 0 warnings.
+
 ## 2026-05-28 task-test-review pass
 
 Reviewed skill, task artifacts, `workflow_definitions_test.clj`, `target_ir_compiler_test.clj`, `structured_output_test.clj`, `workflow_judge_test.clj`, `structured_output_schemas.clj`, and all new/renamed workflow EDN files.

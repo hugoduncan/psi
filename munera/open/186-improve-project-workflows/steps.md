@@ -117,8 +117,8 @@
 
 ## Follow-up — task-test-review pass
 
-- [ ] Add `reusable-pass-status-result-schema-test` to `structured_output_test.clj`: use `output-result` with `pass-status-result-schema-id/version/schema` and representative JSON `{"status":"PASS","reason":"all checks green"}` → assert `:valid`, `:status :PASS`, `:reason "all checks green"`. Also assert invalid input (missing `:reason`) → `:invalid`. Run `bb test` green.
-- [ ] Add loader test for `review-implementation-in-worktree` to `workflow_definitions_test.clj`: loads without error, contains definition `"review-implementation-in-worktree"`, has a delegate step with `:target "review-task-implementation"`, and the summary step body contains `"review-task-docs"`. Run `bb test` green.
+- [x] Add `reusable-pass-status-result-schema-test` to `structured_output_test.clj`: use `output-result` with `pass-status-result-schema-id/version/schema` and representative JSON `{"status":"PASS","reason":"all checks green"}` → assert `:valid`, `:status :PASS`, `:reason "all checks green"`. Also assert invalid input (missing `:reason`) → `:invalid`. Run `bb test` green.
+- [x] Add loader test for `review-implementation-in-worktree` to `workflow_definitions_test.clj`: loads without error, contains definition `"review-implementation-in-worktree"`, has a delegate step with `:target "review-task-implementation"`, and the summary step body contains `"review-task-docs"`. Run `bb test` green.
 
 ## Final verification
 
