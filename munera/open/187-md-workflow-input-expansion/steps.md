@@ -52,6 +52,9 @@
   produces correct `:vars` entry
 - [ ] Add compiler test — `:prompt-workflow` step referencing a `.md` file with
   `{{input}}` compiles to a step whose contribution has the correct `:vars`
+- [ ] Add compiler test — `:tools` present on `.edn` step takes precedence over
+  `tools:` in referenced `.md` frontmatter; `.md` `tools:` fills in only when
+  `.edn` step omits `:tools`
 - [ ] `bb test` green
 
 ## Slice 3 — Wiring: four `.edn` workflows → `:prompt-workflow`
@@ -81,10 +84,10 @@
 - [ ] In `.psi/workflows/create-task-plan.edn`: replace inline contribution on
   the single step:
   - `create-plan` → `"create-task-plan-create-plan.md"`
-- [ ] For each wired `.edn` file: remove `:tools`, `:skills` step-level keys
-  that are now covered by the referenced `.md` frontmatter (merger is handled by
-  `merge-markdown-session-config` — verify the frontmatter carries the needed
-  keys and remove duplicates from `.edn` step)
+- [ ] For each wired `.edn` file: keep existing `:tools`/`:skills` values in the
+  `.edn` step — they take precedence over `.md` frontmatter via
+  `merge-markdown-session-config` (`.edn` present key wins; `.md` fills gaps
+  only). Do not remove them.
 - [ ] In `components/workflow-loader/test/psi/workflow_loader/workflow_definitions_test.clj`:
   **update** the four existing `deftest` blocks (`review-task-design-test`,
   `review-task-plan-test`, `implement-task-test`, `create-task-plan-test`) to use

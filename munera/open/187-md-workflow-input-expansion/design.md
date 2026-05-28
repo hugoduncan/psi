@@ -183,6 +183,24 @@ Any `{{varname}}` in the body that is neither a standard var nor declared in
 `vars:` frontmatter is a compile error at workflow load time, not a silent
 pass-through. This catches authoring mistakes early.
 
+### Session-config precedence: `.edn` over `.md` frontmatter
+
+When a step uses `:prompt-workflow`, session-config keys present in the `.edn`
+step (`:tools`, `:skills`, `:model`, `:thinking-level`, etc.) take precedence
+over those in the referenced `.md` frontmatter. The `.md` frontmatter provides
+defaults that fill in any keys absent from the `.edn` step.
+
+This is already the behaviour of `merge-markdown-session-config` — it only
+copies a key from the `.md` session-config when the step does not already
+contain it. No code change is required; the design records this as an explicit
+invariant.
+
+**Implication for wiring (Slice 3):** when converting `.edn` inline steps to
+`:prompt-workflow` references, keep the existing `:tools`/`:skills` values in
+the `.edn` step. They will continue to take precedence over the `.md`
+frontmatter, and callers can tune them per-step without modifying the shared
+`.md` file.
+
 ### No system-layer injection
 
 `compile-markdown-workflow-file` no longer sets `[:workflow-file-meta

@@ -27,6 +27,8 @@ Tests are written or updated within each slice before moving to the next.
 - `markdown-body->contribution` gains an optional `declared-vars` argument so
   `compile-prompt-workflow-step` can thread vars from referenced `.md` files.
 - `review-step.edn` is explicitly excluded from wiring (inline prompt retained).
+- `.edn` step `:tools`/`:skills` take precedence over `.md` frontmatter via
+  `merge-markdown-session-config`; wiring keeps existing `.edn` values in place.
 - **Final-summary steps in `implement-task.edn`, `review-task-plan.edn`, and
   `review-task-design.edn` are excluded from wiring** (option a). Each carries
   `:source` contributions referencing `:workflow-original` and step-output yields
