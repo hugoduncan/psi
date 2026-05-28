@@ -115,13 +115,9 @@
 
 (defn- read-prompt-workflow
   [workflow-path prompt-workflow]
-  (let [resolved-path (resolve-prompt-workflow-path workflow-path prompt-workflow)
-        file-kind (file-kind-from-path resolved-path)]
+  (let [resolved-path (resolve-prompt-workflow-path workflow-path prompt-workflow)]
     (cond
-      (nil? file-kind)
-      (invalid (str "`:prompt-workflow` must reference a .md file: " (pr-str prompt-workflow)))
-
-      (not= :md file-kind)
+      (not= :md (file-kind-from-path resolved-path))
       (invalid (str "`:prompt-workflow` must reference a .md file, got `"
                     prompt-workflow
                     "`"))
@@ -146,15 +142,10 @@
   (some #(contains? step %) prompt-defining-step-keys))
 
 (defn- merge-markdown-session-config
+  "Merge session-config keys from markdown-session-config into step,
+   giving step-level keys precedence (step wins on conflict)."
   [step markdown-session-config]
-  (reduce (fn [acc key]
-            (if (contains? acc key)
-              acc
-              (if (contains? markdown-session-config key)
-                (assoc acc key (get markdown-session-config key))
-                acc)))
-          step
-          markdown-session-config-keys))
+  (merge (select-keys markdown-session-config markdown-session-config-keys) step))
 
 (defn- compile-prompt-workflow-step
   [workflow-path step]

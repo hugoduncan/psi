@@ -10,7 +10,8 @@
                   :name "plan-build"
                   :description "Plan and build without review"
                   :session-config {}
-                  :body "Frame it."}
+                  :body "Frame it."
+                  :vars nil}
           {:keys [definition error]} (compiler/compile-workflow-file parsed)]
       (is (nil? error))
       (is (= "plan-build" (:definition-id definition)))

@@ -221,17 +221,17 @@
 
 ## code-shaper review follow-up (pass 2)
 
-- [ ] **Add `:vars nil` to `parsed` fixture in `compiler_target_authoring_test.clj`**: the
+- [x] **Add `:vars nil` to `parsed` fixture in `compiler_target_authoring_test.clj`**: the
   `compile-target-authored-workflow-file-test` fixture (line 11–14) is missing `:vars nil`,
   same shape divergence that was fixed in `compiler_test.clj`'s `markdown-parsed` fixture.
   Add `:vars nil` to keep the fixture aligned with the documented parser output shape.
 
-- [ ] **Simplify `merge-markdown-session-config` — replace `reduce` with `merge`/`select-keys`**:
+- [x] **Simplify `merge-markdown-session-config` — replace `reduce` with `merge`/`select-keys`**:
   `(reduce (fn [acc key] (if (contains? acc key) acc (if (contains? md-config key) (assoc ...) acc))) step keys)`
   is equivalent to `(merge (select-keys markdown-session-config markdown-session-config-keys) step)`.
   `merge` gives `step` precedence (later map wins) — the correct semantics. Replace the `reduce` form.
 
-- [ ] **Collapse redundant `nil`/`not= :md` file-kind guards in `read-prompt-workflow`**:
+- [x] **Collapse redundant `nil`/`not= :md` file-kind guards in `read-prompt-workflow`**:
   the two `cond` branches `(nil? file-kind)` and `(not= :md file-kind)` produce near-identical
   error messages and can be collapsed to `(not= :md (file-kind-from-path resolved-path))`.
   Remove the `file-kind` `let` binding and inline the call.

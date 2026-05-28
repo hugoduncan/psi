@@ -1,3 +1,23 @@
+## 2026-05-28 code-shaper follow-up (pass 2)
+
+Executed all three code-shaper (pass 2) follow-up items.
+
+1. **`compiler_target_authoring_test.clj` `parsed` fixture**: added `:vars nil` to align
+   fixture shape with the documented `parse-markdown-workflow-file` return contract.
+
+2. **`merge-markdown-session-config` simplified**: replaced the `reduce` form with
+   `(merge (select-keys markdown-session-config markdown-session-config-keys) step)`.
+   `merge` gives `step` precedence (later map wins) — correct semantics, simpler code.
+   Added docstring explaining the precedence rule.
+
+3. **`read-prompt-workflow` guards collapsed**: removed the separate `nil` and `not= :md`
+   `cond` branches and the `file-kind` `let` binding. Single branch:
+   `(not= :md (file-kind-from-path resolved-path))` handles both nil and `:edn` with
+   one error message.
+
+Focused compiler + parser + workflow-definitions + compiler-target-authoring tests:
+13 tests, 161 assertions, 0 failures. `clj-kondo`: 0 errors, 0 warnings.
+
 ## 2026-05-28 code-shaper review (pass 2)
 
 Three actionable issues found. HEAD `52fc773e`.
