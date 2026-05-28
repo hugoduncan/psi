@@ -59,22 +59,29 @@ have no effect at runtime.
 - Establish `{{input}}` and `{{original}}` as first-class conventions in `.md`
   workflow bodies:
   - `{{input}}` → `{:from :workflow-input :path [:input]}`
-  - `{{original}}` → `{:from :workflow-input :path [:original]}`
+  - `{{original}}` → `{:from :workflow-original}`
 - Support a `vars:` frontmatter key in `.md` workflow files for declaring
   arbitrary additional var bindings beyond the two standard ones.
 - Fix `markdown-body->contribution` to auto-wire standard vars and merge
   frontmatter-declared vars into the produced `:vars` map.
 - Update the parser to read and validate the `vars:` frontmatter key.
-- Complete the task 186 wiring gap: update all affected `.edn` workflows to
+- Complete the task 186 wiring gap: update the four affected `.edn` workflows to
   reference their extracted `.md` prompt files via `:prompt-workflow`, removing
-  the now-redundant inline prompt text.
+  the now-redundant inline prompt text:
+  - `review-task-plan.edn` (5 steps: ambiguity-review, ambiguity-follow-up, inconsistency-review, inconsistency-follow-up, clarity-status)
+  - `implement-task.edn` (2 steps: implement-pass, final-summary)
+  - `review-task-design.edn` (6 steps: ambiguity-review, ambiguity-follow-up, inconsistency-review, inconsistency-follow-up, clarity-status, final-summary)
+  - `create-task-plan.edn` (1 step: create-plan)
+  - `review-step.edn` is intentionally excluded (inline prompt retained per task 186 decision)
 - Add or update loader/compiler tests covering:
   - `{{input}}` expansion in single-step `.md` workflows
   - `{{original}}` expansion
-  - frontmatter `vars:` declarations
+  - frontmatter `vars:` declarations (EDN string syntax)
   - unknown `{{varname}}` tokens produce a compile-time error
   - `:prompt-workflow` references with `{{input}}` expand correctly
   - system layer does not receive the body text for single-step `.md` workflows
+  - update existing `compiler_target_authoring_test.clj` assertion to assert
+    `:framing-prompt` is absent (not present with value `"Frame it."`)
 
 ### Out of scope
 
@@ -98,34 +105,53 @@ After this task:
 - Single-step `.md` workflows no longer inject the body into the system/developer
   layer; the body is the user turn only, with vars expanded.
 - All task 186 extracted `.md` files are wired into their `.edn` workflows via
-  `:prompt-workflow`; duplicate inline prompt text is removed from the `.edn`
-  files.
+  `:prompt-workflow`; duplicate inline prompt text is removed from the four
+  target `.edn` files (`review-task-plan.edn`, `implement-task.edn`,
+  `review-task-design.edn`, `create-task-plan.edn`).
 - `bb test` is green.
 
 ## Design decisions
 
-### `{{input}}` as a convention, not a declaration
+### `{{input}}` and `{{original}}` as conventions, not declarations
 
 No frontmatter is required to use `{{input}}` or `{{original}}`. They are
 recognised automatically in any `.md` body by scanning for `{{varname}}`
 tokens and wiring to their standard source specs. This matches the universal
 intent of all existing `.md` files.
 
+Standard var source specs:
+- `{{input}}` → `{:from :workflow-input :path [:input]}`
+- `{{original}}` → `{:from :workflow-original}`
+
+`{{original}}` maps to `:workflow-original` (not `:workflow-input :path [:original]`)
+for consistency with all existing `.edn` workflows and to preserve the
+`resolve-source-ref` fallback behaviour: when `:workflow-original` is not
+explicitly set on the run, it falls back to
+`(get-in workflow-input [:original])` then to `workflow-input` itself.
+Using `:workflow-input :path [:original]` would return `nil` when `:original`
+is absent, which is the wrong behaviour for this convention.
+
 ### `vars:` frontmatter for non-standard bindings
+
+The `vars:` frontmatter value is an EDN string that reads as a map from var name
+string to a source-spec map. Supported `from` values match the same source-spec
+grammar used in `.edn` `:vars`.
 
 ```yaml
 ---
 name: my-step
-vars:
-  my-var:
-    from: workflow-input
-    path: [some-field]
+vars: '{"my-var" {:from :workflow-input :path [:some-field]}}'
 ---
 Body text with {{my-var}}.
 ```
 
-The `vars:` value is a map from var name string to a source-spec map. Supported
-`from` values match the same source-spec grammar used in `.edn` `:vars`.
+**Parsing approach**: the `vars:` frontmatter key is read as a scalar string by
+`parse-yaml-frontmatter` (existing behaviour). `parse-markdown-workflow-file`
+then calls `clojure.edn/read-string` on that string to produce the vars map.
+This avoids adding nested-map YAML parsing to the custom `parse-yaml-frontmatter`
+implementation, which only supports scalars and block sequences. Validation
+checks that the parsed value is a map and that each source-spec has a recognised
+`:from` value. An EDN parse failure is a compile-time error.
 
 ### Unknown vars → compile-time error
 
@@ -152,8 +178,10 @@ supported and flows through the normal `developer-prompt` path.
    d. Error on any remaining unresolved `{{varname}}` tokens.
 3. Update `compile-markdown-workflow-file` in `compiler.clj` to remove the
    `:framing-prompt body` entry from `workflow-file-meta`.
-4. The `:prompt-workflow` path already calls `markdown-body->contribution` via
-   the referenced `.md` body — no additional change needed there.
+4. Update `compile-prompt-workflow-step` in `compiler.clj` to pass
+   `(:vars referenced)` to `markdown-body->contribution` alongside `(:body referenced)`,
+   so frontmatter-declared vars from the referenced `.md` file are honoured.
+   `markdown-body->contribution` must accept an optional vars argument.
 5. Wire task 186 `.edn` files to use `:prompt-workflow` and remove inline
    prompt text.
 6. Update tests.
@@ -172,4 +200,8 @@ supported and flows through the normal `developer-prompt` path.
 6. All task 186 extracted `.md` files are referenced by their parent `.edn`
    workflows via `:prompt-workflow`; no duplicate inline prompt text remains in
    those `.edn` files.
-7. `bb test` is green after all changes.
+7. The existing `compiler_target_authoring_test.clj` assertion
+   `(get-in definition [:workflow-file-meta :framing-prompt])` is updated to
+   assert absence of `:framing-prompt` (i.e. the key is not present) rather
+   than asserting its value equals `"Frame it."`.
+8. `bb test` is green after all changes.

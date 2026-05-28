@@ -1,3 +1,28 @@
+## 2026-05-28 ambiguity follow-up pass 1
+
+Executed all five design-steps from ambiguity review pass 1. All resolved in design.md.
+
+1. **`vars:` parsing → EDN string**: chose option (b). `vars:` value is a scalar string
+   read via `clojure.edn/read-string`. No changes to `parse-yaml-frontmatter` required.
+   Design updated with EDN syntax example and parser rationale.
+
+2. **Implementation step 4 corrected**: design now states `compile-prompt-workflow-step`
+   must pass `(:vars referenced)` to `markdown-body->contribution`, and that
+   `markdown-body->contribution` must accept an optional vars argument.
+
+3. **`{{original}}` → `:workflow-original`**: changed from `:workflow-input :path [:original]`
+   to `{:from :workflow-original}` for consistency with `.edn` usage and to preserve the
+   `resolve-source-ref` fallback (avoids `nil` when `:original` absent from workflow-input).
+   Rationale documented in design.
+
+4. **Test update noted**: acceptance criterion 7 added — existing
+   `compiler_target_authoring_test.clj` `:framing-prompt` assertion must be updated to
+   assert absence. Also added to the scope's test list.
+
+5. **Wiring gap targets enumerated**: scope now explicitly lists the four `.edn` files and
+   their step counts. `review-step.edn` exclusion noted. Desired outcome updated to name
+   the four files.
+
 ## 2026-05-28 ambiguity review pass 1
 
 Reviewed `design.md` against `components/workflow-loader/src/psi/workflow_loader/compiler.clj`,
