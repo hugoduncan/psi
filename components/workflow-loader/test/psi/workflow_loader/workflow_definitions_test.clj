@@ -43,6 +43,14 @@
     {edn-filename (slurp-workflow-file edn-filename)}
     f))
 
+(defn- load-edn-with-md-refs
+  "Load an edn workflow and its referenced .md files from the real .psi/workflows dir."
+  [edn-filename md-filenames f]
+  (with-workflow-dir
+    (into {edn-filename (slurp-workflow-file edn-filename)}
+          (map (fn [md] [md (slurp-workflow-file md)]) md-filenames))
+    f))
+
 (defn- input-var-wired?
   "True if the contribution has :vars with 'input' wired to :workflow-input."
   [contribution]
@@ -61,8 +69,13 @@
 ;;; review-task-design
 
 (deftest review-task-design-test
-  (load-edn-only
+  (load-edn-with-md-refs
    "review-task-design.edn"
+   ["review-task-design-ambiguity-review.md"
+    "review-task-design-ambiguity-follow-up.md"
+    "review-task-design-inconsistency-review.md"
+    "review-task-design-inconsistency-follow-up.md"
+    "review-task-design-clarity-status.md"]
    (fn [{:keys [definitions errors]}]
      (testing "loads without error"
        (is (empty? errors))
@@ -96,8 +109,13 @@
 ;;; review-task-plan
 
 (deftest review-task-plan-test
-  (load-edn-only
+  (load-edn-with-md-refs
    "review-task-plan.edn"
+   ["review-task-plan-ambiguity-review.md"
+    "review-task-plan-ambiguity-follow-up.md"
+    "review-task-plan-inconsistency-review.md"
+    "review-task-plan-inconsistency-follow-up.md"
+    "review-task-plan-clarity-status.md"]
    (fn [{:keys [definitions errors]}]
      (testing "loads without error"
        (is (empty? errors))
@@ -153,8 +171,9 @@
 ;;; create-task-plan
 
 (deftest create-task-plan-test
-  (load-edn-only
+  (load-edn-with-md-refs
    "create-task-plan.edn"
+   ["create-task-plan-create-plan.md"]
    (fn [{:keys [definitions errors]}]
      (testing "loads without error"
        (is (empty? errors))
@@ -211,8 +230,9 @@
 ;;; implement-task
 
 (deftest implement-task-test
-  (load-edn-only
+  (load-edn-with-md-refs
    "implement-task.edn"
+   ["implement-task-implement-pass.md"]
    (fn [{:keys [definitions errors]}]
      (testing "loads without error"
        (is (empty? errors))
