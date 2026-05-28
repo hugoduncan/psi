@@ -1,3 +1,19 @@
+## 2026-05-28 task-implementation-review pass 5
+
+Reviewed skill, task artifacts (design.md, plan.md, steps.md, design-steps.md, implementation.md), all new/renamed workflow EDN files (`review-task-design.edn`, `review-task-plan.edn`, `review-task-implementation.edn`, `create-task-plan.edn`, `implement-task.edn`, `review-step.edn`, `review-implementation-in-worktree.edn`), `review-task-docs` skill, `structured_output_schemas.clj`, `workflow_definitions_test.clj`, `doc/workflows.md`, `README.md`, and `CHANGELOG.md`.
+
+No new actionable issues found. All 11 acceptance criteria satisfied. Key verifications:
+
+- All old workflow names (`review-implementation`, `review-task-until-clear`) have zero remaining references in `.psi/workflows/`.
+- `review-task-plan` prompts contain no `design.md` or `design-steps.md` references.
+- `{{input}}` vars are wired to `:workflow-input` in all actor steps across all new/renamed workflows.
+- `review-implementation-in-worktree` summary step names 5 passes including `review-task-docs`.
+- `compile-judge` passes through `:outputs`; both `judge-routing-result` and `pass-status-result` schema ids present and correct.
+- `review-step` restored to 3-step shape with judge on `review-status`; structured-output string-enum regression fixed (commit `dc0c7595`).
+- `CHANGELOG.md` `[Unreleased]` has entries for all 5 user-visible changes.
+- Loader tests: 32 tests, 66 assertions, 0 failures. `bb test` green. `bb lint` 0 errors, 0 warnings.
+- All steps.md items checked; all design-steps.md items checked.
+
 ## 2026-05-28 task-implementation-review pass 4
 
 Reviewed skill, task artifacts, all new/renamed workflow EDN files, `review-task-docs` skill, `structured_output_schemas.clj`, `target_ir_compiler.clj`, `workflow_definitions_test.clj`, `doc/workflows.md`, `README.md`, and `CHANGELOG.md`. Also reviewed post-pass-3 commits `8a4dde28`, `5d1cd647`, `dc0c7595` (review-step judge removal/restore cycle and structured-output string-enum regression fix).
