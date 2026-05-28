@@ -64,3 +64,33 @@ Found five actionable ambiguities. Added follow-up items to `design-steps.md`.
    `review-task-plan.edn` (5 steps), `implement-task.edn` (2 steps),
    `review-task-design.edn` (6 steps), `create-task-plan.edn` (1 step).
    (`review-step.edn` was intentionally left inline per task 186 impl notes.)
+
+## 2026-05-28 inconsistency review pass 1
+
+Reviewed `design.md` against `compiler.clj`, `parser.clj`,
+`compiler_target_authoring_test.clj`, and the current `.psi/workflows/` corpus.
+Found three actionable inconsistencies. Added follow-up items to `design-steps.md`.
+
+1. **`review-task-plan.edn` step count wrong**: design scope says 5 steps
+   (ambiguity-review, ambiguity-follow-up, inconsistency-review,
+   inconsistency-follow-up, clarity-status), but the actual file has 6 steps
+   including `final-summary`. No `review-task-plan-final-summary.md` exists.
+   The desired outcome says "all task 186 extracted `.md` files are referenced"
+   — yet `final-summary` in `review-task-plan.edn` has no `.md` counterpart and
+   is unaddressed. Inconsistency between the step count, the `.md` corpus, and
+   the desired outcome.
+
+2. **`allowed-md-frontmatter-keys` not updated in implementation path**: the
+   parser rejects unknown frontmatter keys via `unsupported-frontmatter-error`.
+   Adding `vars:` support requires adding `:vars` to `allowed-md-frontmatter-keys`
+   in `parser.clj`. Implementation step 1 says "read and validate the `vars:`
+   frontmatter key" but omits this prerequisite change. Without it, any `.md`
+   file using `vars:` will fail with an unsupported-key error before the new
+   parsing logic is reached.
+
+3. **Parsed result shape for `vars:` not specified**: implementation step 4
+   references `(:vars referenced)` on the parsed result, implying `parse-markdown-workflow-file`
+   must return a `:vars` key. The design never updates the documented return
+   shape (`{:workflow-kind :name :description :session-config :body}`). This
+   creates a gap between step 1 (parser) and step 4 (compiler): the compiler
+   assumes a `:vars` key that the parser contract does not define.

@@ -27,3 +27,24 @@
   to explicitly list the four `.edn` workflows to be wired:
   `review-task-plan.edn`, `implement-task.edn`, `review-task-design.edn`,
   `create-task-plan.edn`. Note that `review-step.edn` is intentionally excluded.
+
+## Inconsistency review pass 1
+
+- [ ] **Resolve `review-task-plan.edn` step count vs. `.md` corpus mismatch**: design
+  scope says 5 steps for `review-task-plan.edn` but the actual file has 6 (including
+  `final-summary`). No `review-task-plan-final-summary.md` exists. Decide: (a) create
+  `review-task-plan-final-summary.md` and update the step count to 6 in design scope
+  and desired outcome, or (b) keep `final-summary` inline in `review-task-plan.edn`
+  and explicitly note the exclusion (like `review-step.edn`). Update design scope and
+  desired outcome to match.
+
+- [ ] **Add `allowed-md-frontmatter-keys` update to implementation step 1**: the parser
+  rejects unknown frontmatter keys before any new parsing logic runs. Implementation
+  step 1 must explicitly include adding `:vars` to `allowed-md-frontmatter-keys` in
+  `parser.clj`. Update the implementation path to name this change.
+
+- [ ] **Specify updated `parse-markdown-workflow-file` return shape**: the design
+  references `(:vars referenced)` in step 4 but never states that the parsed result
+  gains a `:vars` key. Update the design (implementation path step 1 or the `vars:`
+  frontmatter section) to explicitly state that `parse-markdown-workflow-file` returns
+  `{... :vars <parsed-vars-map-or-nil>}` so the parser/compiler interface is unambiguous.
