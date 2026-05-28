@@ -4,7 +4,8 @@
    Each test loads a workflow through the full loader/compiler pipeline using
    temp-dir fixtures. Tests assert: no load errors, correct step count, correct
    step names, correct step types, and that :prompt-workflow references resolve.
-   For judge steps: assert expected :on routing keys and :outputs presence."
+   For judge steps: assert expected :on routing keys and :outputs presence.
+   For {{input}}-bearing steps: assert :vars wired to :workflow-input."
   (:require
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
@@ -36,53 +37,49 @@
         (doseq [f (.listFiles dir)] (.delete f))
         (.delete dir)))))
 
-(defn- load-edn-with-md-refs
-  "Load an edn workflow and all its referenced .md files from the real .psi/workflows dir."
-  [edn-filename md-filenames f]
-  (let [files (into {edn-filename (slurp-workflow-file edn-filename)}
-                    (map (fn [md] [md (slurp-workflow-file md)]) md-filenames))]
-    (with-workflow-dir files f)))
+(defn- load-edn-only
+  "Load a single edn workflow (no .md refs) from the real .psi/workflows dir."
+  [edn-filename f]
+  (with-workflow-dir
+    {edn-filename (slurp-workflow-file edn-filename)}
+    f))
+
+(defn- input-var-wired?
+  "True if the contribution has :vars with 'input' wired to :workflow-input."
+  [contribution]
+  (= {:from :workflow-input :path [:input]}
+     (get-in contribution [:vars "input"])))
+
+(defn- step-has-input-var-wired?
+  "True if any template contribution in step has 'input' wired to :workflow-input."
+  [step]
+  (some (fn [c]
+          (and (= :template (:type c))
+               (input-var-wired? c)))
+        (:contributions step)))
 
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-design
 
 (deftest review-task-design-loads-test
   (testing "review-task-design loads without error"
-    (load-edn-with-md-refs
+    (load-edn-only
      "review-task-design.edn"
-     ["review-task-design-ambiguity-review.md"
-      "review-task-design-ambiguity-follow-up.md"
-      "review-task-design-inconsistency-review.md"
-      "review-task-design-inconsistency-follow-up.md"
-      "review-task-design-clarity-status.md"
-      "review-task-design-final-summary.md"]
      (fn [{:keys [definitions errors]}]
        (is (empty? errors))
        (is (contains? definitions "review-task-design"))))))
 
 (deftest review-task-design-step-count-test
   (testing "review-task-design has 6 steps"
-    (load-edn-with-md-refs
+    (load-edn-only
      "review-task-design.edn"
-     ["review-task-design-ambiguity-review.md"
-      "review-task-design-ambiguity-follow-up.md"
-      "review-task-design-inconsistency-review.md"
-      "review-task-design-inconsistency-follow-up.md"
-      "review-task-design-clarity-status.md"
-      "review-task-design-final-summary.md"]
      (fn [{:keys [definitions]}]
        (is (= 6 (count (get-in definitions ["review-task-design" :steps]))))))))
 
 (deftest review-task-design-step-names-and-types-test
   (testing "review-task-design has correct step names and types"
-    (load-edn-with-md-refs
+    (load-edn-only
      "review-task-design.edn"
-     ["review-task-design-ambiguity-review.md"
-      "review-task-design-ambiguity-follow-up.md"
-      "review-task-design-inconsistency-review.md"
-      "review-task-design-inconsistency-follow-up.md"
-      "review-task-design-clarity-status.md"
-      "review-task-design-final-summary.md"]
      (fn [{:keys [definitions]}]
        (let [steps (get-in definitions ["review-task-design" :steps])]
          (is (= ["ambiguity-review"
@@ -95,34 +92,20 @@
          (is (= [:session :session :session :session :session :session]
                 (mapv :type steps))))))))
 
-(deftest review-task-design-prompt-workflow-resolves-test
-  (testing "review-task-design prompt-workflow references resolve to contributions"
-    (load-edn-with-md-refs
+(deftest review-task-design-input-vars-wired-test
+  (testing "review-task-design actor steps have {{input}} wired to :workflow-input"
+    (load-edn-only
      "review-task-design.edn"
-     ["review-task-design-ambiguity-review.md"
-      "review-task-design-ambiguity-follow-up.md"
-      "review-task-design-inconsistency-review.md"
-      "review-task-design-inconsistency-follow-up.md"
-      "review-task-design-clarity-status.md"
-      "review-task-design-final-summary.md"]
      (fn [{:keys [definitions]}]
        (let [steps (get-in definitions ["review-task-design" :steps])]
-         (doseq [step (take 5 steps)]
-           (is (seq (:contributions step))
-               (str "step " (:name step) " should have contributions from resolved .md")))
-         (is (not (some #(contains? % :prompt-workflow) steps))
-             "no step should retain :prompt-workflow after compilation"))))))
+         (doseq [step steps]
+           (is (step-has-input-var-wired? step)
+               (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))))))
 
 (deftest review-task-design-judge-routing-test
   (testing "review-task-design clarity-status judge has REPEAT/DONE routing"
-    (load-edn-with-md-refs
+    (load-edn-only
      "review-task-design.edn"
-     ["review-task-design-ambiguity-review.md"
-      "review-task-design-ambiguity-follow-up.md"
-      "review-task-design-inconsistency-review.md"
-      "review-task-design-inconsistency-follow-up.md"
-      "review-task-design-clarity-status.md"
-      "review-task-design-final-summary.md"]
      (fn [{:keys [definitions]}]
        (let [clarity-step (->> (get-in definitions ["review-task-design" :steps])
                                (filter #(= "clarity-status" (:name %)))
@@ -132,14 +115,8 @@
 
 (deftest review-task-design-judge-outputs-test
   (testing "review-task-design clarity-status judge has :outputs key with routing-result entry"
-    (load-edn-with-md-refs
+    (load-edn-only
      "review-task-design.edn"
-     ["review-task-design-ambiguity-review.md"
-      "review-task-design-ambiguity-follow-up.md"
-      "review-task-design-inconsistency-review.md"
-      "review-task-design-inconsistency-follow-up.md"
-      "review-task-design-clarity-status.md"
-      "review-task-design-final-summary.md"]
      (fn [{:keys [definitions]}]
        (let [clarity-step (->> (get-in definitions ["review-task-design" :steps])
                                (filter #(= "clarity-status" (:name %)))
@@ -153,38 +130,23 @@
 
 (deftest review-task-plan-loads-test
   (testing "review-task-plan loads without error"
-    (load-edn-with-md-refs
+    (load-edn-only
      "review-task-plan.edn"
-     ["review-task-plan-ambiguity-review.md"
-      "review-task-plan-ambiguity-follow-up.md"
-      "review-task-plan-inconsistency-review.md"
-      "review-task-plan-inconsistency-follow-up.md"
-      "review-task-plan-clarity-status.md"]
      (fn [{:keys [definitions errors]}]
        (is (empty? errors))
        (is (contains? definitions "review-task-plan"))))))
 
 (deftest review-task-plan-step-count-test
   (testing "review-task-plan has 6 steps"
-    (load-edn-with-md-refs
+    (load-edn-only
      "review-task-plan.edn"
-     ["review-task-plan-ambiguity-review.md"
-      "review-task-plan-ambiguity-follow-up.md"
-      "review-task-plan-inconsistency-review.md"
-      "review-task-plan-inconsistency-follow-up.md"
-      "review-task-plan-clarity-status.md"]
      (fn [{:keys [definitions]}]
        (is (= 6 (count (get-in definitions ["review-task-plan" :steps]))))))))
 
 (deftest review-task-plan-step-names-and-types-test
   (testing "review-task-plan has correct step names and types"
-    (load-edn-with-md-refs
+    (load-edn-only
      "review-task-plan.edn"
-     ["review-task-plan-ambiguity-review.md"
-      "review-task-plan-ambiguity-follow-up.md"
-      "review-task-plan-inconsistency-review.md"
-      "review-task-plan-inconsistency-follow-up.md"
-      "review-task-plan-clarity-status.md"]
      (fn [{:keys [definitions]}]
        (let [steps (get-in definitions ["review-task-plan" :steps])]
          (is (= ["ambiguity-review"
@@ -197,15 +159,20 @@
          (is (= [:session :session :session :session :session :session]
                 (mapv :type steps))))))))
 
+(deftest review-task-plan-input-vars-wired-test
+  (testing "review-task-plan actor steps have {{input}} wired to :workflow-input"
+    (load-edn-only
+     "review-task-plan.edn"
+     (fn [{:keys [definitions]}]
+       (let [steps (get-in definitions ["review-task-plan" :steps])]
+         (doseq [step steps]
+           (is (step-has-input-var-wired? step)
+               (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))))))
+
 (deftest review-task-plan-judge-routing-test
   (testing "review-task-plan clarity-status judge has REPEAT/DONE routing"
-    (load-edn-with-md-refs
+    (load-edn-only
      "review-task-plan.edn"
-     ["review-task-plan-ambiguity-review.md"
-      "review-task-plan-ambiguity-follow-up.md"
-      "review-task-plan-inconsistency-review.md"
-      "review-task-plan-inconsistency-follow-up.md"
-      "review-task-plan-clarity-status.md"]
      (fn [{:keys [definitions]}]
        (let [clarity-step (->> (get-in definitions ["review-task-plan" :steps])
                                (filter #(= "clarity-status" (:name %)))
@@ -215,13 +182,8 @@
 
 (deftest review-task-plan-judge-outputs-test
   (testing "review-task-plan clarity-status judge has :outputs key with routing-result entry"
-    (load-edn-with-md-refs
+    (load-edn-only
      "review-task-plan.edn"
-     ["review-task-plan-ambiguity-review.md"
-      "review-task-plan-ambiguity-follow-up.md"
-      "review-task-plan-inconsistency-review.md"
-      "review-task-plan-inconsistency-follow-up.md"
-      "review-task-plan-clarity-status.md"]
      (fn [{:keys [definitions]}]
        (let [clarity-step (->> (get-in definitions ["review-task-plan" :steps])
                                (filter #(= "clarity-status" (:name %)))
@@ -268,29 +230,96 @@
 
 (deftest create-task-plan-loads-test
   (testing "create-task-plan loads without error"
-    (load-edn-with-md-refs
+    (load-edn-only
      "create-task-plan.edn"
-     ["create-task-plan-create-plan.md"]
      (fn [{:keys [definitions errors]}]
        (is (empty? errors))
        (is (contains? definitions "create-task-plan"))))))
 
 (deftest create-task-plan-step-count-test
   (testing "create-task-plan has 1 step"
-    (load-edn-with-md-refs
+    (load-edn-only
      "create-task-plan.edn"
-     ["create-task-plan-create-plan.md"]
      (fn [{:keys [definitions]}]
        (is (= 1 (count (get-in definitions ["create-task-plan" :steps]))))))))
 
 (deftest create-task-plan-step-names-and-types-test
   (testing "create-task-plan has correct step name and type"
-    (load-edn-with-md-refs
+    (load-edn-only
      "create-task-plan.edn"
-     ["create-task-plan-create-plan.md"]
      (fn [{:keys [definitions]}]
        (let [steps (get-in definitions ["create-task-plan" :steps])]
          (is (= ["create-plan"] (mapv :name steps)))
          (is (= [:session] (mapv :type steps)))
          (is (seq (:contributions (first steps)))
-             "create-plan step should have contributions from resolved .md"))))))
+             "create-plan step should have contributions"))))))
+
+(deftest create-task-plan-input-vars-wired-test
+  (testing "create-task-plan create-plan step has {{input}} wired to :workflow-input"
+    (load-edn-only
+     "create-task-plan.edn"
+     (fn [{:keys [definitions]}]
+       (let [steps (get-in definitions ["create-task-plan" :steps])]
+         (doseq [step steps]
+           (is (step-has-input-var-wired? step)
+               (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))))))
+
+;;; ---------------------------------------------------------------------------
+;;; implement-task
+
+(deftest implement-task-loads-test
+  (testing "implement-task loads without error"
+    (load-edn-only
+     "implement-task.edn"
+     (fn [{:keys [definitions errors]}]
+       (is (empty? errors))
+       (is (contains? definitions "implement-task"))))))
+
+(deftest implement-task-step-count-test
+  (testing "implement-task has 2 steps"
+    (load-edn-only
+     "implement-task.edn"
+     (fn [{:keys [definitions]}]
+       (is (= 2 (count (get-in definitions ["implement-task" :steps]))))))))
+
+(deftest implement-task-step-names-and-types-test
+  (testing "implement-task has correct step names and types"
+    (load-edn-only
+     "implement-task.edn"
+     (fn [{:keys [definitions]}]
+       (let [steps (get-in definitions ["implement-task" :steps])]
+         (is (= ["implement-pass" "final-summary"] (mapv :name steps)))
+         (is (= [:session :session] (mapv :type steps))))))))
+
+(deftest implement-task-input-vars-wired-test
+  (testing "implement-task actor steps have {{input}} wired to :workflow-input"
+    (load-edn-only
+     "implement-task.edn"
+     (fn [{:keys [definitions]}]
+       (let [steps (get-in definitions ["implement-task" :steps])]
+         (doseq [step steps]
+           (is (step-has-input-var-wired? step)
+               (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))))))
+
+(deftest implement-task-judge-routing-test
+  (testing "implement-task implement-pass judge has REPEAT/DONE routing"
+    (load-edn-only
+     "implement-task.edn"
+     (fn [{:keys [definitions]}]
+       (let [pass-step (->> (get-in definitions ["implement-task" :steps])
+                            (filter #(= "implement-pass" (:name %)))
+                            first)]
+         (is (= #{"REPEAT" "DONE"} (set (keys (:on pass-step)))))
+         (is (some? (:judge pass-step))))))))
+
+(deftest implement-task-judge-outputs-test
+  (testing "implement-task implement-pass judge has :outputs key with routing-result entry"
+    (load-edn-only
+     "implement-task.edn"
+     (fn [{:keys [definitions]}]
+       (let [pass-step (->> (get-in definitions ["implement-task" :steps])
+                            (filter #(= "implement-pass" (:name %)))
+                            first)]
+         (is (contains? (:judge pass-step) :outputs))
+         (is (= :psi.workflow/judge-routing-result
+                (get-in pass-step [:judge :outputs :routing-result :schema-id]))))))))

@@ -1,7 +1,13 @@
 {:steps
  [{:name "create-plan",
    :type :session,
-   :prompt-workflow "create-task-plan-create-plan.md"}],
+   :tools ["read" "bash" "edit" "write"],
+   :skills ["work-independently" "task-design"],
+   :contributions
+   [{:type :template,
+     :text
+     "For the Munera task identified by {{input}}, create or update plan.md and steps.md from the stable design.md. Work independently.\n\nRequired procedure:\n1. Read design.md to understand the intent, scope, approach, and acceptance criteria.\n2. If design.md is not complete or has unresolved ambiguities, stop and say so explicitly — do not create plan.md yet.\n3. Create or update plan.md with:\n   - Approach: the implementation strategy and key decisions\n   - Risks: any known risks or blockers\n   - Slice order: the ordered sequence of implementation slices\n4. Create or update steps.md with a concrete implementation checklist:\n   - One checklist item per concrete action (`- [ ] ...`)\n   - Grouped by slice or phase\n   - Each item is specific enough to be independently executable and verifiable\n5. Commit the created/updated plan.md and steps.md.\n6. Summarize what was created and any open questions.\n\nOutput a concise summary including:\n- Whether plan.md and steps.md were created or updated\n- The main implementation slices identified\n- Any ambiguities in design.md that were noted but not blocking",
+     :vars {"input" {:from :workflow-input, :path [:input]}}}]}],
  :name "create-task-plan",
  :description
  "Given a stable design.md, create plan.md and steps.md for a Munera task"}

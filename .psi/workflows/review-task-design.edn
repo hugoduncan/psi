@@ -1,19 +1,48 @@
 {:steps
  [{:name "ambiguity-review",
    :type :session,
-   :prompt-workflow "review-task-design-ambiguity-review.md"}
+   :tools ["read" "bash" "edit" "write"],
+   :skills ["work-independently" "task-design"],
+   :contributions
+   [{:type :template,
+     :text
+     "For the Munera task identified by {{input}}, review the task design for ambiguities. Work independently. Read the task's design.md and any referenced concepts, code, or docs needed to evaluate the design. Do not review plan.md or steps.md. Then:\n\n1. append a terse review note to the task's implementation.md\n2. add unchecked follow-up items to design-steps.md for every new actionable ambiguity you found (create design-steps.md if it does not exist)\n3. avoid duplicating review notes or steps that already exist\n4. commit\n5. if there is no new actionable ambiguity feedback, say so explicitly\n\nEnd your final response with exactly one of:\nPASS_STATUS: ACTIONABLE_FEEDBACK\nPASS_STATUS: NO_ACTIONABLE_FEEDBACK",
+     :vars {"input" {:from :workflow-input, :path [:input]}}}]}
   {:name "ambiguity-follow-up",
    :type :session,
-   :prompt-workflow "review-task-design-ambiguity-follow-up.md"}
+   :tools ["read" "bash" "edit" "write"],
+   :skills ["work-independently"],
+   :contributions
+   [{:type :template,
+     :text
+     "For the Munera task identified by {{input}}, execute any newly added actionable follow-up items in design-steps.md for ambiguities. Work independently. Read the task's design-steps.md to identify unchecked items added by the preceding ambiguity-review pass. Read and update the task's design.md and implementation.md as needed. Complete any newly added unchecked design-steps when possible, updating design.md as you work. If a design-step is completed, mark it done in design-steps.md. If a design-step cannot yet be completed, leave it unchecked and record the blocking reason tersely in implementation.md. Do not execute items from steps.md. Do not touch plan.md or steps.md. Commit when done.",
+     :vars {"input" {:from :workflow-input, :path [:input]}}}]}
   {:name "inconsistency-review",
    :type :session,
-   :prompt-workflow "review-task-design-inconsistency-review.md"}
+   :tools ["read" "bash" "edit" "write"],
+   :skills ["work-independently" "task-design"],
+   :contributions
+   [{:type :template,
+     :text
+     "For the Munera task identified by {{input}}, review the task design for inconsistencies. Work independently. Read the task's design.md and any referenced concepts, code, or docs needed to evaluate the design. Do not review plan.md or steps.md. Focus on internal inconsistency within design.md and between design.md and referenced artifacts. Then:\n\n1. append a terse review note to the task's implementation.md\n2. add unchecked follow-up items to design-steps.md for every new actionable inconsistency you found (create design-steps.md if it does not exist)\n3. avoid duplicating review notes or steps that already exist\n4. commit. if there is no new actionable inconsistency feedback, say so explicitly\n\nEnd your final response with exactly one of:\nPASS_STATUS: ACTIONABLE_FEEDBACK\nPASS_STATUS: NO_ACTIONABLE_FEEDBACK",
+     :vars {"input" {:from :workflow-input, :path [:input]}}}]}
   {:name "inconsistency-follow-up",
    :type :session,
-   :prompt-workflow "review-task-design-inconsistency-follow-up.md"}
+   :tools ["read" "bash" "edit" "write"],
+   :skills ["work-independently"],
+   :contributions
+   [{:type :template,
+     :text
+     "For the Munera task identified by {{input}}, execute any newly added actionable follow-up items in design-steps.md for inconsistencies. Work independently. Read the task's design-steps.md to identify unchecked items added by the preceding inconsistency-review pass. Read and update the task's design.md and implementation.md as needed. Complete any newly added unchecked design-steps when possible, updating design.md as you work. If a design-step is completed, mark it done in design-steps.md. If a design-step cannot yet be completed, leave it unchecked and record the blocking reason tersely in implementation.md. Do not execute items from steps.md. Do not touch plan.md or steps.md. Commit when done.",
+     :vars {"input" {:from :workflow-input, :path [:input]}}}]}
   {:name "clarity-status",
    :type :session,
-   :prompt-workflow "review-task-design-clarity-status.md",
+   :tools ["read" "bash"],
+   :contributions
+   [{:type :template,
+     :text
+     "Review the Munera task identified by {{input}} and decide whether there is still actionable ambiguity or inconsistency follow-up remaining from the just-completed design review cycle. Independently inspect that specific task's design.md and design-steps.md only. Do not inspect plan.md or steps.md. This is an internal control step. Respond with exactly one word: REPEAT or DONE. Return REPEAT if there is still actionable ambiguity or inconsistency follow-up remaining from the review cycle, including newly added unchecked design-steps or unresolved review findings in design.md. Return DONE only if the task design has no remaining new actionable ambiguity or inconsistency feedback from the cycle.",
+     :vars {"input" {:from :workflow-input, :path [:input]}}}],
    :judge
    {:type :llm,
     :contributions
@@ -34,7 +63,15 @@
     "DONE" {:goto "final-summary"}}}
   {:name "final-summary",
    :type :session,
-   :prompt-workflow "review-task-design-final-summary.md"}],
+   :tools ["read" "bash"],
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "ambiguity-review", :yield :text}}
+    {:type :source, :from {:step "inconsistency-review", :yield :text}}
+    {:type :template,
+     :text
+     "Produce the user-facing final result for the Munera task identified by {{input}} after a design review. Independently inspect that specific task's design.md, design-steps.md, and implementation.md, and use the prior step outputs as supporting context.\n\nRespond with a concise summary for the user, not an internal control token. Include:\n- whether the design review loop completed cleanly\n- the key ambiguities or inconsistencies found and resolved in this run\n- the task artifact files updated (design.md, design-steps.md, implementation.md)\n- any commit ids created during the run that are evident from the provided step outputs\n- whether the design is now clear enough to proceed to plan creation\n\nDo not output REPEAT or DONE unless quoting prior workflow behavior.",
+     :vars {"input" {:from :workflow-input, :path [:input]}}}]}],
  :name "review-task-design",
  :description
  "Repeatedly review a Munera task design for ambiguities and inconsistencies, record terse notes, execute follow-up steps, and loop until no actionable feedback remains"}

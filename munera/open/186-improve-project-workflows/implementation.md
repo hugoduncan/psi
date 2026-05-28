@@ -1,3 +1,13 @@
+## 2026-05-27 follow-up execution pass 2
+
+All three review follow-up items completed:
+
+1. **`{{input}}` fix**: Switched `review-task-design.edn`, `review-task-plan.edn`, `create-task-plan.edn`, and `implement-task.edn` actor steps from `:prompt-workflow` to inline `:contributions` with `:vars {"input" {:from :workflow-input :path [:input]}}`. The `.md` prompt files remain on disk (they are valid standalone prompts) but are no longer referenced by these workflows. Scope extended to `implement-task` actor steps (both `implement-pass` and `final-summary`) which had the same bug.
+
+2. **Orphaned `.md` removal**: Deleted `review-step-review.md` and `review-step-follow-up.md` via `git rm`.
+
+3. **Loader test `:vars` assertions**: Added `step-has-input-var-wired?` helper and `*-input-vars-wired-test` deftest for `review-task-design`, `review-task-plan`, `create-task-plan`, and `implement-task`. Also added full `implement-task` test coverage (loads, step count, step names/types, judge routing, judge outputs). Removed now-unused `load-edn-with-md-refs` helper (all workflows use inline contributions; no `.md` refs needed in tests). `bb test` green, `bb lint` clean (0 errors, 0 warnings).
+
 ## 2026-05-27 task-implementation-review pass
 
 **`{{input}}` unsubstituted in `:prompt-workflow` steps** — `review-task-design`, `review-task-plan` (actor steps), and `create-task-plan` all use `:prompt-workflow` referencing `.md` files that contain `{{input}}`. The workflow-loader compiler expands `:prompt-workflow` to a `:template` contribution with `:vars {}` (empty). At runtime, `{{input}}` is rendered literally — the agent sees the string `{{input}}` instead of the task path. The same bug was fixed for `review-step` (commit `7d6b848e`) by switching to inline `:contributions` with explicit `:vars {"input" {:from :workflow-input :path [:input]}}`. The same fix is needed for `review-task-design`, `review-task-plan` actor steps, and `create-task-plan`. `implement-task` actor steps have the same issue but the judge step already uses inline contributions with correct `:vars` — the actor steps rely on `:workflow-original` for context, which may be sufficient if the original message contains the task path.
