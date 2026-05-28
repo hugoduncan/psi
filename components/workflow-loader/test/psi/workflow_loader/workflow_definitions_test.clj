@@ -265,6 +265,66 @@
                (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))))))
 
 ;;; ---------------------------------------------------------------------------
+;;; review-step
+
+(deftest review-step-loads-test
+  (testing "review-step loads without error"
+    (load-edn-only
+     "review-step.edn"
+     (fn [{:keys [definitions errors]}]
+       (is (empty? errors))
+       (is (contains? definitions "review-step"))))))
+
+(deftest review-step-step-count-test
+  (testing "review-step has 2 steps"
+    (load-edn-only
+     "review-step.edn"
+     (fn [{:keys [definitions]}]
+       (is (= 2 (count (get-in definitions ["review-step" :steps]))))))))
+
+(deftest review-step-step-names-and-types-test
+  (testing "review-step has correct step names and types"
+    (load-edn-only
+     "review-step.edn"
+     (fn [{:keys [definitions]}]
+       (let [steps (get-in definitions ["review-step" :steps])]
+         (is (= ["review" "follow-up"] (mapv :name steps)))
+         (is (= [:session :session] (mapv :type steps))))))))
+
+(deftest review-step-input-vars-wired-test
+  (testing "review-step steps have {{input}} wired to :workflow-input"
+    (load-edn-only
+     "review-step.edn"
+     (fn [{:keys [definitions]}]
+       (let [steps (get-in definitions ["review-step" :steps])]
+         (doseq [step steps]
+           (is (step-has-input-var-wired? step)
+               (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))))))
+
+(deftest review-step-judge-routing-test
+  (testing "review-step follow-up judge has REPEAT/DONE routing"
+    (load-edn-only
+     "review-step.edn"
+     (fn [{:keys [definitions]}]
+       (let [follow-up-step (->> (get-in definitions ["review-step" :steps])
+                                 (filter #(= "follow-up" (:name %)))
+                                 first)]
+         (is (= #{"REPEAT" "DONE"} (set (keys (:on follow-up-step)))))
+         (is (some? (:judge follow-up-step))))))))
+
+(deftest review-step-judge-outputs-test
+  (testing "review-step follow-up judge has :outputs key with judge-routing-result schema-id"
+    (load-edn-only
+     "review-step.edn"
+     (fn [{:keys [definitions]}]
+       (let [follow-up-step (->> (get-in definitions ["review-step" :steps])
+                                 (filter #(= "follow-up" (:name %)))
+                                 first)]
+         (is (contains? (:judge follow-up-step) :outputs))
+         (is (= :psi.workflow/judge-routing-result
+                (get-in follow-up-step [:judge :outputs :routing-result :schema-id]))))))))
+
+;;; ---------------------------------------------------------------------------
 ;;; implement-task
 
 (deftest implement-task-loads-test

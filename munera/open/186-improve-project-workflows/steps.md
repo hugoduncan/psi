@@ -129,4 +129,4 @@
 
 ## Follow-up — task-implementation-review pass 3
 
-- [ ] Add loader tests for `review-step` in `workflow_definitions_test.clj` covering the post-structural-fix shape: loads without error, 2 steps (`review`, `follow-up`), correct step types (`:session`, `:session`), judge on `follow-up` has REPEAT/DONE `:on` routing, judge `:outputs` has `judge-routing-result` schema-id. Run focused loader tests green and commit.
+- [x] Add loader tests for `review-step` in `workflow_definitions_test.clj` covering the post-structural-fix shape: loads without error, 2 steps (`review`, `follow-up`), correct step types (`:session`, `:session`), judge on `follow-up` has REPEAT/DONE `:on` routing, judge `:outputs` has `judge-routing-result` schema-id. Run focused loader tests green and commit.
