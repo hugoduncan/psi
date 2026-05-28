@@ -1,3 +1,15 @@
+## 2026-05-28 task-implementation-review pass 6
+
+Reviewed skill, task artifacts, all new/renamed workflow EDN files, `review-task-docs` skill, `structured_output_schemas.clj`, `target_ir_compiler.clj`, `workflow_definitions_test.clj`, `doc/workflows.md`, `README.md`, and `CHANGELOG.md`.
+
+No new actionable issues found. All 11 acceptance criteria satisfied. Key verifications:
+
+- `review-step.edn` has 3 steps (`review`, `follow-up`, `review-status`); judge on `review-status` with REPEAT/DONE routing and `judge-routing-result` `:outputs` — matches loader test assertions.
+- No orphaned `.md` prompt files in `.psi/workflows/` (`review-step-review.md`, `review-step-follow-up.md` absent).
+- `doc/workflows.md` is an authoring guide with curated authoring examples — not a workflow catalogue; new task-lifecycle workflows are not expected there. CHANGELOG covers all user-visible additions and renames.
+- `bb lint` clean (0 errors, 0 warnings). `bb test` green (confirmed via prior pass 5 and lint/test re-verification).
+- All steps.md items checked; all design-steps.md items checked.
+
 ## 2026-05-28 task-implementation-review pass 5
 
 Reviewed skill, task artifacts (design.md, plan.md, steps.md, design-steps.md, implementation.md), all new/renamed workflow EDN files (`review-task-design.edn`, `review-task-plan.edn`, `review-task-implementation.edn`, `create-task-plan.edn`, `implement-task.edn`, `review-step.edn`, `review-implementation-in-worktree.edn`), `review-task-docs` skill, `structured_output_schemas.clj`, `workflow_definitions_test.clj`, `doc/workflows.md`, `README.md`, and `CHANGELOG.md`.
