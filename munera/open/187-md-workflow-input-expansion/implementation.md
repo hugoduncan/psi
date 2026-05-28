@@ -1,3 +1,26 @@
+## 2026-05-28 review-task-docs (pass 2)
+
+No new actionable issues found.
+
+Reviewed `README.md`, `doc/workflows.md`, `doc/workflow-grammar.md`,
+`doc/workflow-grammar-concepts.md`, and `CHANGELOG.md` against the current
+implementation state (HEAD `f1ef7514`).
+
+- `doc/workflows.md` `.md` single-step authoring section: accurate and complete.
+  `{{input}}`/`{{original}}` auto-wiring, `vars:` EDN syntax, allowed `:from`
+  values, unknown-var compile-time error, and non-matching token pass-through are
+  all documented correctly and match the implementation.
+- `CHANGELOG.md`: three `Added` entries under `[Unreleased]` are present,
+  accurate, and cover all user-visible task-187 changes.
+- `README.md`: delegates to `doc/workflows.md`; no direct authoring surface to update.
+- No stale references to removed behaviours (`:framing-prompt` absent from all
+  user-facing docs).
+- Minor pre-existing gap noted (not a task-187 regression): the `.md` authoring
+  section documents `tools:` but does not enumerate all supported session-config
+  frontmatter keys (`skills`, `model`, `thinking-level`, `response-mode`,
+  `temperature`). This predates task 187; the section was entirely new in this
+  task and the omission is out of scope here.
+
 ## 2026-05-28 test-shaper review (pass 2)
 
 Two actionable gaps found.
