@@ -108,6 +108,25 @@
   updating (not just adding to) the existing `deftest` blocks to use `with-workflow-dir` with
   both the `.edn` and all referenced `.md` files.
 
+## Inconsistency follow-up (pass 3)
+
+- [ ] **Fix steps.md Slice 2 error mechanism**: update the Slice 2 step "Error (return
+  `{:error "..."}`) for any `{{varname}}` remaining…" to say "throw `ex-info`" — matching
+  `design.md` implementation path step 2d. The `return {:error}` wording contradicts the
+  design's chosen mechanism.
+
+- [ ] **Fix steps.md Slice 2 regex**: update the Slice 2 step's example regex from
+  `#"\{\{(\w+)\}\}"` to `#"\{\{([a-zA-Z][a-zA-Z0-9_-]*)\}\}"` — matching `design.md`
+  step 2a. The `\w+` pattern allows digit-leading names and does not allow hyphens; the
+  design's pattern requires a leading letter and allows hyphens.
+
+- [ ] **Resolve steps.md Slice 3 `:tools`/`:skills` removal vs design.md**: `steps.md`
+  line 84 directs removing `:tools`/`:skills` from wired `.edn` steps; `design.md` step 5
+  only says to remove inline prompt text. Decide: (a) update `design.md` to explicitly
+  authorize removing `:tools`/`:skills` step-level keys after wiring (with rationale that
+  the `.md` frontmatter should be authoritative), or (b) remove the `:tools`/`:skills`
+  removal instruction from `steps.md` Slice 3 and keep those keys in the `.edn` steps.
+
 ## Final check
 
 - [ ] Run `bb test` — all tests green

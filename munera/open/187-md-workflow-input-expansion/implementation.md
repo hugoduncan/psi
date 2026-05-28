@@ -1,3 +1,27 @@
+## 2026-05-28 inconsistency review pass 3
+
+Reviewed `plan.md` and `steps.md` against `design.md` and `compiler.clj`. Found three actionable
+inconsistencies.
+
+1. **steps.md Slice 2 error mechanism conflicts with design.md**: `steps.md` line 32 says
+   `Error (return {:error "..."})` for unknown `{{varname}}` tokens. `design.md` implementation
+   path step 2d explicitly says `throw ex-info` (caught by the existing
+   `catch clojure.lang.ExceptionInfo` in `compile-workflow-file`). These are different
+   mechanisms. Steps.md must be updated to match design.md.
+
+2. **steps.md Slice 2 regex differs from design.md**: `steps.md` specifies the scanning regex
+   as `#"\{\{(\w+)\}\}"` (allows digit-leading names, no hyphens). `design.md` step 2a specifies
+   `\{\{([a-zA-Z][a-zA-Z0-9_-]*)\}\}` (requires leading letter, allows hyphens). The patterns
+   diverge on both leading-digit and hyphen handling. Steps.md must match design.md's pattern.
+
+3. **steps.md Slice 3 adds `:tools`/`:skills` removal not present in design.md**: `steps.md`
+   line 84 says "remove `:tools`, `:skills` step-level keys that are now covered by the
+   referenced `.md` frontmatter". `design.md` implementation step 5 says only "Wire task 186
+   `.edn` files to use `:prompt-workflow` and remove inline prompt text" — no mention of removing
+   `:tools`/`:skills`. Since `merge-markdown-session-config` gives step-level keys precedence
+   over `.md` frontmatter, removing them changes runtime behaviour. Design.md must either
+   authorize this removal or steps.md must drop the step.
+
 ## 2026-05-28 inconsistency follow-up pass 2
 
 Executed the one follow-up item from inconsistency review pass 2. Resolved in `design.md`.
