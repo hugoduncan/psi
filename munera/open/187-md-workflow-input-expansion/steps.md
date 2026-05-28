@@ -57,24 +57,27 @@
 ## Slice 3 — Wiring: four `.edn` workflows → `:prompt-workflow`
 
 - [ ] In `.psi/workflows/review-task-design.edn`: replace inline
-  `:contributions` on each of the 6 steps with `:prompt-workflow "<filename>.md"`:
+  `:contributions` on each of the **5 non-final-summary steps** with
+  `:prompt-workflow "<filename>.md"` (final-summary kept inline — see plan.md):
   - `ambiguity-review` → `"review-task-design-ambiguity-review.md"`
   - `ambiguity-follow-up` → `"review-task-design-ambiguity-follow-up.md"`
   - `inconsistency-review` → `"review-task-design-inconsistency-review.md"`
   - `inconsistency-follow-up` → `"review-task-design-inconsistency-follow-up.md"`
   - `clarity-status` → `"review-task-design-clarity-status.md"`
-  - `final-summary` → `"review-task-design-final-summary.md"`
-- [ ] In `.psi/workflows/review-task-plan.edn`: same for its 6 steps:
+  - `final-summary` — **keep inline** (carries `:source` contributions with step-output
+    refs that cannot be expressed in `.md` frontmatter vars)
+- [ ] In `.psi/workflows/review-task-plan.edn`: same for its **5 non-final-summary steps**:
   - `ambiguity-review` → `"review-task-plan-ambiguity-review.md"`
   - `ambiguity-follow-up` → `"review-task-plan-ambiguity-follow-up.md"`
   - `inconsistency-review` → `"review-task-plan-inconsistency-review.md"`
   - `inconsistency-follow-up` → `"review-task-plan-inconsistency-follow-up.md"`
   - `clarity-status` → `"review-task-plan-clarity-status.md"`
-  - `final-summary` → `"review-task-plan-final-summary.md"`
-- [ ] In `.psi/workflows/implement-task.edn`: replace inline contributions on
-  both steps:
+  - `final-summary` — **keep inline** (same reason as review-task-design)
+- [ ] In `.psi/workflows/implement-task.edn`: replace inline contribution on
+  **implement-pass only** (final-summary kept inline):
   - `implement-pass` → `"implement-task-implement-pass.md"`
-  - `final-summary` → `"implement-task-final-summary.md"`
+  - `final-summary` — **keep inline** (carries `:source` contributions with
+    `:workflow-original` and `implement-pass` step-output yield)
 - [ ] In `.psi/workflows/create-task-plan.edn`: replace inline contribution on
   the single step:
   - `create-plan` → `"create-task-plan-create-plan.md"`
@@ -82,31 +85,28 @@
   that are now covered by the referenced `.md` frontmatter (merger is handled by
   `merge-markdown-session-config` — verify the frontmatter carries the needed
   keys and remove duplicates from `.edn` step)
-- [ ] In `components/workflow-loader/test/psi/workflow_loader/workflow_definitions_test.clj`
-  (or a new test file): add loader tests asserting each of the four wired `.edn`
-  workflows loads without error, has correct step count, and step contributions
-  have non-empty `:vars` with `"input"` wired
+- [ ] In `components/workflow-loader/test/psi/workflow_loader/workflow_definitions_test.clj`:
+  **update** the four existing `deftest` blocks (`review-task-design-test`,
+  `review-task-plan-test`, `implement-task-test`, `create-task-plan-test`) to use
+  `with-workflow-dir` with both the `.edn` and all referenced `.md` files (the
+  existing `load-edn-only` calls will error after wiring because the `.md` files
+  will be absent from the temp dir). Also add assertions that wired steps have
+  non-empty `:vars` with `"input"` wired.
 - [ ] `bb test` green
 
 ## Plan ambiguity follow-up (pass 1)
 
-- [ ] **Resolve final-summary wiring for implement-task, review-task-plan, review-task-design**:
-  the final-summary steps in these three `.edn` workflows carry `:source` contributions
-  (`{:type :source :from :workflow-original}` and step-output refs) that `compile-prompt-workflow-step`
-  would silently drop when wiring to `:prompt-workflow`. Decide and document in `plan.md`:
-  (a) exclude final-summary from wiring in these three workflows (keep inline like `review-step.edn`),
-  (b) extend the `.md` files to express the source references, or
-  (c) explicitly accept the behavior change (document the rationale).
-  Update `steps.md` Slice 3 wiring instructions to match the decision.
+- [x] **Resolve final-summary wiring for implement-task, review-task-plan, review-task-design**:
+  Decision: option (a) — exclude final-summary steps from wiring in these three workflows.
+  The step-output source refs (`:workflow-original`, step yields) are out of scope for `.md`
+  frontmatter vars; wiring would silently drop them. The three `.md` final-summary files exist
+  but are intentionally not referenced. Documented in `plan.md` under Key decisions.
+  Slice 3 wiring instructions updated below to reflect the exclusion.
 
-- [ ] **Update existing `workflow_definitions_test.clj` tests to work after wiring**:
-  the four existing `deftest` blocks (`review-task-design-test`, `review-task-plan-test`,
-  `implement-task-test`, `create-task-plan-test`) use `load-edn-only`, which only copies the
-  `.edn` file to a temp dir. After wiring, the `.edn` files reference `.md` files via
-  `:prompt-workflow`; `compile-prompt-workflow-step` will error if the `.md` files are absent.
-  Update the Slice 3 test step in `steps.md` to explicitly say: update (not just add) the
-  existing `deftest` blocks to use `with-workflow-dir` with both the `.edn` and all referenced
-  `.md` files, or use the real `.psi/workflows` dir directly.
+- [x] **Update existing `workflow_definitions_test.clj` tests to work after wiring**:
+  Documented in `plan.md` under Risks. Slice 3 test step updated below to explicitly require
+  updating (not just adding to) the existing `deftest` blocks to use `with-workflow-dir` with
+  both the `.edn` and all referenced `.md` files.
 
 ## Final check
 

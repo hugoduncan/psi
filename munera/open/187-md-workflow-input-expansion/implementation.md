@@ -1,3 +1,21 @@
+## 2026-05-28 plan ambiguity follow-up pass 1
+
+Executed both follow-up items from plan ambiguity review pass 1.
+
+1. **Final-summary wiring decision**: chose option (a) — exclude final-summary steps from
+   wiring in `implement-task.edn`, `review-task-plan.edn`, and `review-task-design.edn`.
+   Rationale: these steps carry `:source` contributions with step-output yield refs
+   (`{:from {:step "X" :yield :text}}`) which are out of scope for `.md` frontmatter vars.
+   Wiring would silently drop them. The three `.md` final-summary files exist but are
+   intentionally not referenced by their parent `.edn` workflows. `create-task-plan.edn`'s
+   single step has no source contributions and is wired normally.
+   Updated: `plan.md` (Key decisions + Risks), `steps.md` Slice 3 wiring instructions.
+
+2. **Test fixture gap**: documented in `plan.md` Risks. Updated Slice 3 test step in
+   `steps.md` to explicitly require updating (not just adding to) the four existing
+   `deftest` blocks to use `with-workflow-dir` with both the `.edn` and all referenced
+   `.md` files.
+
 ## 2026-05-28 plan ambiguity review pass 1
 
 Reviewed `plan.md` and `steps.md` against `compiler.clj`, `workflow_definitions_test.clj`,
