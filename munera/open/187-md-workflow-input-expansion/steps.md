@@ -129,4 +129,4 @@
 
 - [x] Run `bb test` — all tests green (3 pre-existing unrelated failures unchanged)
 - [x] Confirm all 8 acceptance criteria are satisfied (read design.md ACs 1–8)
-- [ ] Commit
+- [x] Commit
