@@ -1,3 +1,17 @@
+## 2026-05-27 implementation pass — all 9 slices complete
+
+All 9 ordered slices executed. Key deviations from initial design:
+
+1. **`:prompt-workflow` cannot combine with `:contributions`** — compiler rejects dual prompt sources. Steps that needed prior step context sources (e.g. `ambiguity-follow-up`) had their prompts updated to instruct the agent to read task files independently rather than relying on preloaded context. The `final-summary` steps that need prior step outputs kept inline contributions.
+
+2. **`create-task-plan.md` naming collision** — naming the step prompt file `create-task-plan.md` caused a mixed-kind name collision (both `.md` and `.edn` define `create-task-plan`). Renamed to `create-task-plan-create-plan.md` following the `<workflow>-<step>.md` convention.
+
+3. **`review-task-implementation` structured output** — delegate steps don't emit machine-readable judge signals so no `pass-status-result` schema was warranted. Evaluation was done and documented.
+
+4. **Test isolation** — `review-task-plan` final-summary step uses inline contributions (not `:prompt-workflow`), so it doesn't require a `.md` file in the temp dir test fixture.
+
+`bb test` green, `bb lint` clean.
+
 ## 2026-05-27 inconsistency follow-up pass 2
 
 Executed the one newly added design-step from inconsistency review pass 2:
