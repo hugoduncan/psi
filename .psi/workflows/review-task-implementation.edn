@@ -61,7 +61,34 @@
      :from {:step "review-task-implementation", :yield :text}}
     {:type :source, :from {:step "review-task-tests", :yield :text}}
     {:type :source, :from {:step "review-test-shape", :yield :text}}
-    {:type :source, :from {:step "review-task-docs", :yield :text}}]}],
+    {:type :source, :from {:step "review-task-docs", :yield :text}}]}
+  {:name "review-clarity-status",
+   :type :session,
+   :tools ["read" "bash"],
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :template,
+     :text
+     "Review the Munera task at {{input}} and decide whether the completed review cycle left any remaining new actionable follow-up work across implementation correctness, tests, test shape, docs, and code shape. Independently inspect the task artifacts — especially steps.md and implementation.md. This is an internal control step. Respond with exactly one word: REPEAT or DONE. Return REPEAT if there are unchecked follow-up items or unresolved review findings from this cycle. Return DONE if no actionable feedback remains.",
+     :vars {"input" {:from :workflow-input, :path [:input]}}}],
+   :judge
+   {:type :llm,
+    :contributions
+    [{:type :template,
+      :text
+      "Respond exactly with one word: REPEAT or DONE.\n\nUse the actor step context to identify the specific Munera task under review. Independently inspect that task's steps.md and implementation.md only.\n\nReturn REPEAT if any new actionable follow-up items remain unchecked from the review cycle. Return DONE only if the review cycle left no remaining actionable feedback.\n\nDo not review the repository generically. Judge only the specific named task.",
+      :vars {}}],
+    :outputs
+    {:routing-result
+     {:source :judge/structured-output,
+      :mode :structured,
+      :schema-id :psi.workflow/judge-routing-result,
+      :schema-version 1,
+      :schema [:enum "REPEAT" "DONE"],
+      :json-schema {:type "string", :enum ["REPEAT" "DONE"]}}}},
+   :on
+   {"REPEAT" {:goto "review-task-implementation", :max-iterations 3},
+    "DONE" {:goto :done}}}],
  :name "review-task-implementation",
  :description
  "Review a Munera task implementation, record terse notes, execute added follow-up steps, and repeat until no new actionable feedback remains"}
