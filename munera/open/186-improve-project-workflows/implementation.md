@@ -1,3 +1,20 @@
+## 2026-05-28 task-implementation-review pass 8
+
+Reviewed skill, task artifacts, all new/renamed workflow EDN files (`review-task-design.edn`, `review-task-plan.edn`, `review-task-implementation.edn`, `create-task-plan.edn`, `implement-task.edn`, `review-step.edn`, `review-implementation-in-worktree.edn`), `review-task-docs` skill, `structured_output_schemas.clj`, `target_ir_compiler.clj`, `structured_output.clj`, `structured_output_test.clj`, `workflow_definitions_test.clj`, `doc/workflows.md`, `README.md`, and `CHANGELOG.md`. Confirmed post-pass-7 commits (`9a7e18ef`, `01ce4df1`).
+
+No new actionable issues found. All 11 acceptance criteria satisfied. Key verifications:
+
+- All old workflow names have zero remaining references in `.psi/workflows/`.
+- `review-task-plan` prompts contain no `design.md` or `design-steps.md` references.
+- `{{input}}` vars wired to `:workflow-input` in all actor steps across all new/renamed workflows (including `final-summary` steps in `review-task-design` and `review-task-plan`).
+- `review-implementation-in-worktree` summary step names 5 passes including `review-task-docs`.
+- `compile-judge` passes through `:outputs`; both `judge-routing-result` and `pass-status-result` schema ids present and correct.
+- `structured-output-envelope-plain-text-validation-error-test` name and comment correctly reflect validation-error path (not parse-error); dead `{:ok? false}` branch documented with comment.
+- `review-step` orphaned `.md` files absent; 3-step shape with `review-status` judge confirmed.
+- `CHANGELOG.md` `[Unreleased]` has entries for all 5 user-visible changes.
+- Loader tests: 32 tests, 66 assertions, 0 failures. `bb test` green. `bb lint` 0 errors, 0 warnings.
+- All steps.md items checked; all design-steps.md items checked.
+
 ## 2026-05-28 task-implementation-review pass 7
 
 Reviewed skill, task artifacts, all new/renamed workflow EDN files, `structured_output.clj`, `structured_output_test.clj`, and post-pass-6 commit `d1a81113` (plain-text fallback for unquoted judge output).
