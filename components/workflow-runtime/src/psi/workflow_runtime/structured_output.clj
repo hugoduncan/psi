@@ -16,16 +16,13 @@
   (or (structured-output-schemas/schema-for schema-id schema-version)
       schema))
 
-(defn- parse-json-object
+(defn- parse-json-value
+  "Parse raw-output as JSON. Accepts any valid JSON value (object, string, number,
+   array, boolean). Schema-level constraints are enforced by malli validation
+   downstream, not here."
   [raw-output]
   (try
-    (let [parsed (json/parse-string raw-output)]
-      (if (map? parsed)
-        {:ok? true :parsed-value parsed}
-        {:ok? false
-         :parsed-value parsed
-         :errors [{:type :parse-error
-                   :message "Structured output must be a single JSON object"}]}))
+    {:ok? true :parsed-value (json/parse-string raw-output)}
     (catch Exception e
       {:ok? false
        :errors [{:type :parse-error
@@ -147,7 +144,7 @@
   [raw-output ai-structured-output]
   (if (contains? ai-structured-output :payload)
     {:ok? true :parsed-value (:payload ai-structured-output)}
-    (parse-json-object raw-output)))
+    (parse-json-value raw-output)))
 
 (defn structured-output-envelope
   ([output-spec raw-output]

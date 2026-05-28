@@ -69,8 +69,9 @@
       (is (not (contains? (:structured-output result) :value))))))
 
 (deftest structured-output-envelope-non-object-json-test
-  ;; Tests the prompted JSON boundary: syntactically valid JSON must still be a
-  ;; single object envelope, not an array/scalar value passed to schema checks.
+  ;; Tests the prompted JSON boundary: valid JSON that does not match the schema
+  ;; (e.g. arrays or scalars against a map schema) is rejected as invalid.
+  ;; parse-json-value accepts any valid JSON; schema mismatch is caught by malli.
   (testing "valid non-object JSON is rejected as an invalid structured envelope"
     (doseq [[raw parsed] [["[1,2,3]" [1 2 3]]
                           ["42" 42]
@@ -79,10 +80,7 @@
         (is (= :invalid (get-in result [:structured-output :status])) raw)
         (is (= :prompted-json (get-in result [:structured-output :strategy])) raw)
         (is (= parsed (get-in result [:structured-output :parsed-value])) raw)
-        (is (= [{:type :parse-error
-                 :message "Structured output must be a single JSON object"}]
-               (get-in result [:structured-output :errors]))
-            raw)
+        (is (seq (get-in result [:structured-output :errors])) raw)
         (is (not (contains? (:structured-output result) :value)) raw)))))
 
 (deftest reusable-judge-review-result-schema-test
@@ -151,3 +149,20 @@
               :evidence ["bb test"]
               :next-action :handoff-to-fix}
              (get-in result [:structured-output :value]))))))
+
+(deftest structured-output-envelope-string-enum-json-test
+  ;; Regression test: parse-json-value previously rejected non-object JSON
+  ;; (including plain strings) with a hard parse-error, making [:enum "REPEAT" "DONE"]
+  ;; judge schemas permanently invalid regardless of AI output.
+  ;; parse-json-value now accepts any valid JSON; malli validates the schema.
+  (testing "string enum JSON value validates correctly against [:enum ...] schema"
+    (let [judge-routing-spec {:source :judge/structured-output
+                              :mode :structured
+                              :schema-id :psi.workflow/judge-routing-result
+                              :schema-version 1
+                              :schema [:enum "REPEAT" "DONE"]
+                              :json-schema {:type "string" :enum ["REPEAT" "DONE"]}}]
+      (doseq [[raw expected-value] [["\"DONE\"" "DONE"] ["\"REPEAT\"" "REPEAT"]]]
+        (let [result (structured-output/output-result judge-routing-spec raw)]
+          (is (= :valid (get-in result [:structured-output :status])) raw)
+          (is (= expected-value (get-in result [:structured-output :value])) raw))))))

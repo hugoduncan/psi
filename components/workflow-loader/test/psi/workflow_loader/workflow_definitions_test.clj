@@ -276,11 +276,11 @@
        (is (contains? definitions "review-step"))))))
 
 (deftest review-step-step-count-test
-  (testing "review-step has 2 steps"
+  (testing "review-step has 3 steps"
     (load-edn-only
      "review-step.edn"
      (fn [{:keys [definitions]}]
-       (is (= 2 (count (get-in definitions ["review-step" :steps]))))))))
+       (is (= 3 (count (get-in definitions ["review-step" :steps]))))))))
 
 (deftest review-step-step-names-and-types-test
   (testing "review-step has correct step names and types"
@@ -288,8 +288,8 @@
      "review-step.edn"
      (fn [{:keys [definitions]}]
        (let [steps (get-in definitions ["review-step" :steps])]
-         (is (= ["review" "follow-up"] (mapv :name steps)))
-         (is (= [:session :session] (mapv :type steps))))))))
+         (is (= ["review" "follow-up" "review-status"] (mapv :name steps)))
+         (is (= [:session :session :session] (mapv :type steps))))))))
 
 (deftest review-step-input-vars-wired-test
   (testing "review-step steps have {{input}} wired to :workflow-input"
@@ -301,15 +301,28 @@
            (is (step-has-input-var-wired? step)
                (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))))))
 
-(deftest review-step-no-judge-test
-  (testing "review-step has no judge on any step (platform constraint: judge on terminal step never fires)"
+(deftest review-step-judge-routing-test
+  (testing "review-step review-status judge has REPEAT/DONE routing"
     (load-edn-only
      "review-step.edn"
      (fn [{:keys [definitions]}]
-       (let [steps (get-in definitions ["review-step" :steps])]
-         (doseq [step steps]
-           (is (nil? (:judge step))
-               (str "step " (:name step) " must not have a judge"))))))))
+       (let [status-step (->> (get-in definitions ["review-step" :steps])
+                              (filter #(= "review-status" (:name %)))
+                              first)]
+         (is (= #{"REPEAT" "DONE"} (set (keys (:on status-step)))))
+         (is (some? (:judge status-step))))))))
+
+(deftest review-step-judge-outputs-test
+  (testing "review-step review-status judge has :outputs with judge-routing-result schema-id"
+    (load-edn-only
+     "review-step.edn"
+     (fn [{:keys [definitions]}]
+       (let [status-step (->> (get-in definitions ["review-step" :steps])
+                              (filter #(= "review-status" (:name %)))
+                              first)]
+         (is (contains? (:judge status-step) :outputs))
+         (is (= :psi.workflow/judge-routing-result
+                (get-in status-step [:judge :outputs :routing-result :schema-id]))))))))
 
 (deftest review-step-skill-var-wired-test
   (testing "review-step review step has {{skill}} wired to :workflow-input"
