@@ -22,7 +22,8 @@
     :temperature
     :logprobs
     :top-logprobs
-    :prompt-component-selection})
+    :prompt-component-selection
+    :vars})
 
 (def ^:private md-session-option-keys
   [:tools
