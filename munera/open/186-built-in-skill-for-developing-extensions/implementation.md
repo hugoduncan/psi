@@ -15,3 +15,11 @@
   - tightened the verification definition so packaged-resource proof names both source-tree authoring and packaged resource presence
   - made the required higher discovery/listing verification explicit by naming representative resolver/discovery surfaces (`:psi.agent-session/skills` / `:psi.skill/by-source`) and `/skills` command visibility in `design.md`
   - updated `plan.md` and `steps.md` so implementation proof must cover both prompt-assets materialization/invocation and representative higher listing surfaces
+
+- 2026-05-28 implementation pass: added the built-in packaged skill source at `bases/main/resources/psi/skills/extension-development/SKILL.md` with repository-specific guidance for creating, modifying, and debugging psi extensions. The skill anchors on the canonical extension docs, capability/permission expectations, dispatch/handler/effect/resolver boundaries, manifest-installed versus built-in concerns, and the required GitHub extension API link.
+
+- 2026-05-28 implementation pass: added structural verification for the production built-in skill path and packaged resource via `psi.prompt-assets.skills-test`, proving source-tree authoring presence, packaged resource enumeration, built-in provenance, materialized readable `:file-path`, and normal `/skill:extension-development` invocation semantics without freezing the full prose.
+
+- 2026-05-28 implementation pass: added representative higher-surface proof in `psi.agent-session.resolvers-test` and `psi.agent-session.commands-test` so resolver discovery surfaces (`:psi.agent-session/skills`, `:psi.skill/by-source`) and `/skills` listing both expose `extension-development` as a built-in skill.
+
+- 2026-05-28 verification: `clojure -M:test --focus psi.prompt-assets.skills-test --focus psi.agent-session.resolvers-test --focus psi.agent-session.commands-test` passed (`95 tests, 476 assertions`). `clj-kondo --lint bases/main/resources components/prompt-assets/test/psi/prompt_assets/skills_test.clj components/agent-session/test/psi/agent_session/commands_test.clj components/agent-session/test/psi/agent_session/resolvers_test.clj` passed with 0 warnings.

@@ -13,6 +13,7 @@
    Each test asserts that a direct EQL query against a fresh session context
    returns a well-typed value for the target attribute — no resolver error."
   (:require
+   [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.core :as session]
@@ -23,6 +24,7 @@
    [psi.session-journal.store :as journal-store]
    [psi.agent-session.test-support :as test-support]
    [psi.ai.model-registry :as model-registry]
+   [psi.prompt-assets.skills :as prompt-skills]
    [psi.query.core :as query]))
 
 ;; ── helpers ─────────────────────────────────────────────
@@ -75,6 +77,23 @@
         result (session/query-in ctx session-id [:psi.agent-session/skills])]
     (is (= ["a-skill" "z-skill"]
            (mapv :name (:psi.agent-session/skills result))))))
+
+(deftest built-in-extension-development-skill-discovery-test
+  (let [discovered (:skills (prompt-skills/built-in-skills-discovery
+                             {:config {:built-in-resource-root "psi/skills"}}))
+        extension-skill (some #(when (= "extension-development" (:name %)) %) discovered)
+        [ctx session-id] (create-session-context {:persist? false})
+        _ (session/dispatch-in! ctx :session/set-skills {:session-id session-id
+                                                         :skills discovered}
+                                {:origin :test})
+        skills-result (session/query-in ctx session-id [:psi.agent-session/skills])
+        grouped-result (session/query-in ctx session-id [:psi.skill/by-source])]
+    (is (= :built-in (:source extension-skill)))
+    (is (.exists (io/file (:file-path extension-skill))))
+    (is (some #(= "extension-development" (:name %))
+              (:psi.agent-session/skills skills-result)))
+    (is (some #(= "extension-development" (:name %))
+              (:built-in (:psi.skill/by-source grouped-result))))))
 
 ;; ── :psi.agent-session/messages-count ───────────────────
 

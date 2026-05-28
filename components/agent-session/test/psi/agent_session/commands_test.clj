@@ -16,6 +16,7 @@
    [psi.ai.model-registry :as model-registry]
    [psi.memory.core :as memory]
    [psi.memory.store :as store]
+   [psi.prompt-assets.skills :as prompt-skills]
    [psi.query.core :as query]))
 
 ;; ── Test helper ─────────────────────────────────────────────
@@ -219,7 +220,16 @@
       (is (str/includes? message a-entry))
       (is (str/includes? message z-entry))
       (is (< (str/index-of message a-entry)
-             (str/index-of message z-entry))))))
+             (str/index-of message z-entry)))))
+  (testing "lists built-in extension-development as a built-in skill"
+    (let [built-ins (:skills (prompt-skills/built-in-skills-discovery
+                              {:config {:built-in-resource-root "psi/skills"}}))
+          [ctx session-id] (make-test-ctx {:skills built-ins})
+          result (commands/dispatch-in ctx session-id "/skills" cmd-opts)
+          message (:message result)
+          entry "  /skill:extension-development — Repository-specific guidance for creating, modifying, and debugging psi extensions. [built-in]"]
+      (is (= :text (:type result)))
+      (is (str/includes? message entry)))))
 
 (deftest dispatch-worktree-test
   (let [[ctx session-id] (make-test-ctx)
