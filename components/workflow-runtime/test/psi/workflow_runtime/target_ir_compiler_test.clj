@@ -288,12 +288,13 @@
 
 (deftest compile-judge-outputs-passthrough-test
   (testing "judge :outputs is passed through to compiled IR when present"
-    (let [outputs {:source :judge/structured-output
-                   :mode :structured
-                   :schema-id :psi.workflow/judge-routing-result
-                   :schema-version 1
-                   :schema [:enum "REPEAT" "DONE"]
-                   :json-schema {:type "string" :enum ["REPEAT" "DONE"]}}
+    (let [outputs {:routing-result
+                   {:source :judge/structured-output
+                    :mode :structured
+                    :schema-id :psi.workflow/judge-routing-result
+                    :schema-version 1
+                    :schema [:enum "REPEAT" "DONE"]
+                    :json-schema {:type "string" :enum ["REPEAT" "DONE"]}}}
           ir (target-compiler/compile-workflow-definition
               {:steps [{:name "review"
                         :type :session

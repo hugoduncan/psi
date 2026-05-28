@@ -100,7 +100,8 @@
                                           (structured-output/missing-ai-structured-output-result output-spec last-output))
                       judge-output {output-key structured-result}]
                   (if (structured-output/valid-output-result? structured-result)
-                    (let [judge-event (get-in structured-result [:structured-output :value :decision])
+                    (let [raw-value (get-in structured-result [:structured-output :value])
+                          judge-event (if (map? raw-value) (:decision raw-value) raw-value)
                           routing-result (workflow-judge/evaluate-routing judge-event routing-table
                                                                           current-step-id step-order step-runs)]
                       {:judge-session-id judge-sid

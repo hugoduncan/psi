@@ -131,7 +131,7 @@
          (is (some? (:judge clarity-step))))))))
 
 (deftest review-task-design-judge-outputs-test
-  (testing "review-task-design clarity-status judge has :outputs key"
+  (testing "review-task-design clarity-status judge has :outputs key with routing-result entry"
     (load-edn-with-md-refs
      "review-task-design.edn"
      ["review-task-design-ambiguity-review.md"
@@ -146,7 +146,7 @@
                                first)]
          (is (contains? (:judge clarity-step) :outputs))
          (is (= :psi.workflow/judge-routing-result
-                (get-in clarity-step [:judge :outputs :schema-id]))))))))
+                (get-in clarity-step [:judge :outputs :routing-result :schema-id]))))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-plan
@@ -214,7 +214,7 @@
          (is (some? (:judge clarity-step))))))))
 
 (deftest review-task-plan-judge-outputs-test
-  (testing "review-task-plan clarity-status judge has :outputs key"
+  (testing "review-task-plan clarity-status judge has :outputs key with routing-result entry"
     (load-edn-with-md-refs
      "review-task-plan.edn"
      ["review-task-plan-ambiguity-review.md"
@@ -228,7 +228,7 @@
                                first)]
          (is (contains? (:judge clarity-step) :outputs))
          (is (= :psi.workflow/judge-routing-result
-                (get-in clarity-step [:judge :outputs :schema-id]))))))))
+                (get-in clarity-step [:judge :outputs :routing-result :schema-id]))))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-implementation

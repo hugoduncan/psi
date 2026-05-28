@@ -37,10 +37,84 @@
 ;; YAML Frontmatter Extraction
 ;; ============================================================
 
+(defn- yaml-list-item?
+  "True if a trimmed YAML line is a list item (starts with `- `)."
+  [line]
+  (str/starts-with? (str/trim line) "- "))
+
+(defn- yaml-list-item-value
+  "Extract the value from a YAML list item line (`- value` → `\"value\"`)."
+  [line]
+  (str/trim (subs (str/trim line) 2)))
+
+(defn- parse-yaml-frontmatter
+  "Parse a YAML frontmatter string into a Clojure map.
+
+   Supports:
+   - Scalar values: `key: value`
+   - Inline-quoted scalars: `key: \"value\"`
+   - Block sequences:
+       key:
+         - item1
+         - item2
+
+   Does not depend on clj-yaml. Returns a keyword-keyed map."
+  [yaml-str]
+  (let [lines (str/split-lines yaml-str)]
+    (loop [remaining lines
+           result {}
+           current-key nil
+           current-list nil]
+      (if (empty? remaining)
+        ;; Flush any pending list
+        (if (and current-key current-list)
+          (assoc result current-key (vec (reverse current-list)))
+          result)
+        (let [line (first remaining)
+              rest-lines (rest remaining)
+              trimmed (str/trim line)]
+          (cond
+            ;; Blank line — flush pending list if any, reset
+            (str/blank? trimmed)
+            (if (and current-key current-list)
+              (recur rest-lines (assoc result current-key (vec (reverse current-list))) nil nil)
+              (recur rest-lines result nil nil))
+
+            ;; List item — accumulate into current list
+            (and current-key (yaml-list-item? trimmed))
+            (recur rest-lines result current-key (cons (yaml-list-item-value trimmed) current-list))
+
+            ;; Key: value line
+            :else
+            (let [colon-idx (str/index-of trimmed ":")]
+              (if (and colon-idx (pos? colon-idx))
+                (let [k (keyword (str/trim (subs trimmed 0 colon-idx)))
+                      v (str/trim (subs trimmed (inc colon-idx)))
+                      ;; Flush any pending list before starting a new key
+                      result' (if (and current-key current-list)
+                                (assoc result current-key (vec (reverse current-list)))
+                                result)]
+                  (if (str/blank? v)
+                    ;; Empty value — start a potential list
+                    (recur rest-lines result' k [])
+                    ;; Scalar value — strip surrounding quotes if present
+                    (let [v' (if (and (str/starts-with? v "\"") (str/ends-with? v "\""))
+                               (subs v 1 (dec (count v)))
+                               v)]
+                      (recur rest-lines (assoc result' k v') nil nil))))
+                ;; Not a key:value line and not a list item — skip
+                (recur rest-lines
+                       (if (and current-key current-list)
+                         (assoc result current-key (vec (reverse current-list)))
+                         result)
+                       nil nil)))))))))
+
 (defn extract-frontmatter
   "Extract YAML frontmatter and body from raw Markdown text.
    Frontmatter is delimited by --- fences at the start of the file.
-   Returns {:frontmatter <map-or-nil> :body <string>}."
+   Returns {:frontmatter <map-or-nil> :body <string>}.
+
+   Supports scalar values and block sequences in frontmatter."
   [raw]
   (let [trimmed (str/triml raw)]
     (if (str/starts-with? trimmed "---")
@@ -48,24 +122,8 @@
             end-idx     (str/index-of after-first "\n---")]
         (if end-idx
           (let [yaml-str (subs after-first 0 end-idx)
-                body     (str/trim (subs after-first (+ end-idx 4)))
-                ;; Simple key: value parsing (no dependency on clj-yaml)
-                pairs    (keep (fn [line]
-                                 (let [l (str/trim line)]
-                                   (when-not (str/blank? l)
-                                     (let [colon-idx (str/index-of l ":")]
-                                       (when (and colon-idx (pos? colon-idx))
-                                         [(str/trim (subs l 0 colon-idx))
-                                          (str/trim (subs l (inc colon-idx)))])))))
-                               (str/split-lines yaml-str))]
-            {:frontmatter (into {} (map (fn [[k v]]
-                                          [(keyword k)
-                                           ;; Strip surrounding quotes if present
-                                           (if (and (str/starts-with? v "\"")
-                                                    (str/ends-with? v "\""))
-                                             (subs v 1 (dec (count v)))
-                                             v)])
-                                        pairs))
+                body     (str/trim (subs after-first (+ end-idx 4)))]
+            {:frontmatter (parse-yaml-frontmatter yaml-str)
              :body        body})
           ;; No closing --- fence: treat entire content as body
           {:frontmatter nil

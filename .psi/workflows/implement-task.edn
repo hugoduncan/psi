@@ -14,12 +14,13 @@
     :prompt
     "Respond exactly with one word: REPEAT or DONE. Inspect the specific Munera task artifacts before deciding. If any unchecked implementation checklist item remains in `steps.md`, respond REPEAT.",
     :outputs
-    {:source :judge/structured-output,
-     :mode :structured,
-     :schema-id :psi.workflow/judge-routing-result,
-     :schema-version 1,
-     :schema [:enum "REPEAT" "DONE"],
-     :json-schema {:type "string", :enum ["REPEAT" "DONE"]}}},
+    {:routing-result
+     {:source :judge/structured-output,
+      :mode :structured,
+      :schema-id :psi.workflow/judge-routing-result,
+      :schema-version 1,
+      :schema [:enum "REPEAT" "DONE"],
+      :json-schema {:type "string", :enum ["REPEAT" "DONE"]}}}},
    :on
    {"REPEAT" {:goto "implement-pass", :max-iterations 8},
     "DONE" {:goto "final-summary"}}}
