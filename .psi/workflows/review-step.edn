@@ -19,25 +19,15 @@
     {:type :source, :from {:step "review", :yield :text}}
     {:type :template,
      :text
-     "Execute the newly added actionable follow-up items for the Munera task at {{input}}. Work independently. Read the task's steps.md to identify unchecked items added by the preceding review pass. Read the task's steps.md, implementation.md, design.md, and plan.md as needed. Complete the newly added unchecked steps when possible, updating task artifacts as you work. If a step is completed, mark it done in steps.md. If a step cannot yet be completed, leave it unchecked and record the blocking reason tersely in implementation.md. Commit.",
-     :vars {"input" {:from :workflow-input, :path [:input]}}}]}
-  {:name "review-status",
-   :type :session,
-   :tools ["read" "bash"],
-   :contributions
-   [{:type :source, :from :workflow-original}
-    {:type :source, :from {:step "review", :yield :text}}
-    {:type :source, :from {:step "follow-up", :yield :text}}
-    {:type :template,
-     :text
-     "Review the Munera task at {{input}} and decide whether the just-completed review cycle surfaced remaining new actionable follow-up work. Independently inspect the task artifacts, especially steps.md, implementation.md, design.md, and plan.md when present. This is an internal control step. Respond with exactly one word: REPEAT or DONE. Return REPEAT if the task still has new actionable follow-up work to address. Return DONE if the task has no remaining new actionable feedback from that cycle.",
+     "Execute the newly added actionable follow-up items for the Munera task at {{input}}. Work independently. Read the task's steps.md to identify unchecked items added by the preceding review pass. Read the task's steps.md, implementation.md, design.md, and plan.md as needed. Complete the newly added unchecked steps when possible, updating task artifacts as you work. If a step is completed, mark it done in steps.md. If a step cannot yet be completed, leave it unchecked and record the blocking reason tersely in implementation.md. Commit.\n\nEnd your final response with exactly one of:\nFOLLOWUP_STATUS: ITEMS_REMAINING\nFOLLOWUP_STATUS: ALL_DONE",
      :vars {"input" {:from :workflow-input, :path [:input]}}}],
    :judge
    {:type :llm,
     :contributions
-    [{:type :template,
+    [{:type :source, :from {:step "review", :yield :text}}
+     {:type :template,
       :text
-      "Respond exactly with one word: REPEAT or DONE.\n\nUse the actor step context to identify the specific Munera task under review. Independently inspect that task's artifacts, especially `steps.md`, `implementation.md`, `design.md`, and `plan.md` when present, to determine whether the review cycle surfaced any new actionable feedback that still needs work.\n\nReturn REPEAT if the task still has new actionable follow-up work to address. Return DONE only if the task has no remaining new actionable feedback from that cycle.\n\nDo not re-review the repository generically. Judge the specific Munera task named by the actor output.",
+      "Respond exactly with one word: REPEAT or DONE.\n\nThe review step output above ends with either:\n  PASS_STATUS: NO_ACTIONABLE_FEEDBACK — the review found nothing new to fix\n  PASS_STATUS: ACTIONABLE_FEEDBACK — the review found new issues\n\nThe follow-up step output ends with either:\n  FOLLOWUP_STATUS: ALL_DONE — all newly added items were completed\n  FOLLOWUP_STATUS: ITEMS_REMAINING — some items could not yet be completed\n\nRouting rules:\n- PASS_STATUS: NO_ACTIONABLE_FEEDBACK → DONE (nothing new was found, loop is complete)\n- PASS_STATUS: ACTIONABLE_FEEDBACK + FOLLOWUP_STATUS: ALL_DONE → DONE (issues found and fully resolved)\n- PASS_STATUS: ACTIONABLE_FEEDBACK + FOLLOWUP_STATUS: ITEMS_REMAINING → REPEAT (issues remain open)\n\nApply the rules strictly. Do not invent additional criteria.",
       :vars {}}],
     :outputs
     {:routing-result
