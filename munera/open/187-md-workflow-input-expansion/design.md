@@ -230,7 +230,14 @@ supported and flows through the normal `developer-prompt` path.
    so frontmatter-declared vars from the referenced `.md` file are honoured.
    `markdown-body->contribution` must accept an optional vars argument.
 5. Wire task 186 `.edn` files to use `:prompt-workflow` and remove inline
-   prompt text.
+   prompt text. Also remove `:tools` and `:skills` step-level keys from each
+   wired `.edn` step: these keys are identical to the corresponding `.md`
+   frontmatter values, so `merge-markdown-session-config` will supply them from
+   the `.md` file. Removing the duplicates makes the `.md` frontmatter the
+   single source of truth for session config on wired steps and eliminates
+   redundancy. (Runtime behaviour is unchanged because `merge-markdown-session-config`
+   only fills in keys absent from the step; when the step has them they take
+   precedence — but since the values are identical, removing them is safe.)
 6. Update tests.
 
 ## Acceptance criteria

@@ -23,13 +23,13 @@
   update `markdown-body->contribution` to accept an optional `declared-vars` map
   argument (default `nil`)
 - [ ] In `markdown-body->contribution`: scan body for all `{{varname}}` tokens
-  using a regex (e.g. `#"\{\{(\w+)\}\}"`)
+  using a regex (e.g. `#"\{\{([a-zA-Z][a-zA-Z0-9_-]*)\}\}"`)
 - [ ] Auto-wire `"input"` → `{:from :workflow-input :path [:input]}`
   and `"original"` → `{:from :workflow-original}` for any matching tokens found
 - [ ] Merge `declared-vars` into the auto-wired map (declared vars take
   precedence for non-standard names; standard vars always use their canonical
   source specs regardless of any override in `declared-vars`)
-- [ ] Error (return `{:error "..."}`) for any `{{varname}}` remaining after
+- [ ] Error (throw `ex-info`) for any `{{varname}}` remaining after
   merging standard and declared vars — i.e. any token not in the final vars map
 - [ ] In `compile-markdown-workflow-file`: remove `:framing-prompt body` from
   the `workflow-file-meta` map (leave `{:file-kind :md}` or no `:framing-prompt`
@@ -110,22 +110,18 @@
 
 ## Inconsistency follow-up (pass 3)
 
-- [ ] **Fix steps.md Slice 2 error mechanism**: update the Slice 2 step "Error (return
-  `{:error "..."}`) for any `{{varname}}` remaining…" to say "throw `ex-info`" — matching
-  `design.md` implementation path step 2d. The `return {:error}` wording contradicts the
-  design's chosen mechanism.
+- [x] **Fix steps.md Slice 2 error mechanism**: updated Slice 2 step to say "throw `ex-info`"
+  — matching `design.md` implementation path step 2d.
 
-- [ ] **Fix steps.md Slice 2 regex**: update the Slice 2 step's example regex from
-  `#"\{\{(\w+)\}\}"` to `#"\{\{([a-zA-Z][a-zA-Z0-9_-]*)\}\}"` — matching `design.md`
-  step 2a. The `\w+` pattern allows digit-leading names and does not allow hyphens; the
-  design's pattern requires a leading letter and allows hyphens.
+- [x] **Fix steps.md Slice 2 regex**: updated Slice 2 step's example regex to
+  `#"\{\{([a-zA-Z][a-zA-Z0-9_-]*)\}\}"` — matching `design.md` step 2a.
 
-- [ ] **Resolve steps.md Slice 3 `:tools`/`:skills` removal vs design.md**: `steps.md`
-  line 84 directs removing `:tools`/`:skills` from wired `.edn` steps; `design.md` step 5
-  only says to remove inline prompt text. Decide: (a) update `design.md` to explicitly
-  authorize removing `:tools`/`:skills` step-level keys after wiring (with rationale that
-  the `.md` frontmatter should be authoritative), or (b) remove the `:tools`/`:skills`
-  removal instruction from `steps.md` Slice 3 and keep those keys in the `.edn` steps.
+- [x] **Resolve steps.md Slice 3 `:tools`/`:skills` removal vs design.md**: chose option (a).
+  Verified that all wired `.edn` step `:tools`/`:skills` values are identical to the
+  corresponding `.md` frontmatter values — removing them produces identical runtime
+  behaviour (merge-markdown-session-config fills in from `.md` frontmatter when the step
+  key is absent). Updated `design.md` step 5 to explicitly authorize removing
+  `:tools`/`:skills` step-level keys after wiring, with rationale.
 
 ## Final check
 

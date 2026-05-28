@@ -1,3 +1,21 @@
+## 2026-05-28 inconsistency follow-up pass 3
+
+Executed all three follow-up items from inconsistency review pass 3.
+
+1. **steps.md Slice 2 error mechanism fixed**: updated Slice 2 step wording from
+   "return `{:error "..."}`" to "throw `ex-info`" — now matches `design.md` step 2d.
+
+2. **steps.md Slice 2 regex fixed**: updated Slice 2 example regex from `#"\{\{(\w+)\}\}"`
+   to `#"\{\{([a-zA-Z][a-zA-Z0-9_-]*)\}\}"` — now matches `design.md` step 2a.
+
+3. **steps.md Slice 3 `:tools`/`:skills` removal resolved**: chose option (a). Verified
+   that all wired `.edn` step `:tools`/`:skills` values are identical to the corresponding
+   `.md` frontmatter values across all four wiring targets (`review-task-design.edn`,
+   `review-task-plan.edn`, `implement-task.edn`, `create-task-plan.edn`). Removing them
+   from the `.edn` steps produces identical runtime behaviour — `merge-markdown-session-config`
+   fills in from `.md` frontmatter when the step key is absent. Updated `design.md` step 5
+   to explicitly authorize this removal with rationale.
+
 ## 2026-05-28 inconsistency review pass 3
 
 Reviewed `plan.md` and `steps.md` against `design.md` and `compiler.clj`. Found three actionable
