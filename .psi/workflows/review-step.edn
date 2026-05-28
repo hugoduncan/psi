@@ -7,7 +7,7 @@
    [{:type :source, :from :workflow-original}
     {:type :template,
      :text
-     "Review the Munera task at {{input}} using the {{skill}} skill. Work independently. Read the skill file at `.psi/skills/{{skill}}/SKILL.md` and apply it. Read the task artifacts and any code/tests/docs they reference. Then:\n\n1. append a terse review note to the task's implementation.md\n2. add unchecked follow-up items to the task's steps.md for every new actionable issue you found\n3. avoid duplicating review notes or steps that already exist\n4. commit. if there is no new actionable feedback, say so explicitly\n\nEnd your final response with exactly one of:\nPASS_STATUS: ACTIONABLE_FEEDBACK\nPASS_STATUS: NO_ACTIONABLE_FEEDBACK",
+     "Review the Munera task at {{input}} using the {{skill}} skill. Work independently. Read the skill file at `.psi/skills/{{skill}}/SKILL.md` and apply it. Read the task artifacts and any code/tests/docs they reference. Then:\n\n1. append a terse review note to the task's implementation.md\n2. add unchecked follow-up items to the task's steps.md for every new actionable issue you found\n3. avoid duplicating review notes or steps that already exist\n4. commit. if there is no new actionable feedback, say so explicitly",
      :vars {"input" {:from :workflow-input, :path [:input]},
             "skill" {:from :workflow-input, :path [:skill]}}}]}
   {:name "follow-up",
@@ -19,27 +19,8 @@
     {:type :source, :from {:step "review", :yield :text}}
     {:type :template,
      :text
-     "Execute the newly added actionable follow-up items for the Munera task at {{input}}. Work independently. Read the task's steps.md to identify unchecked items added by the preceding review pass. Read the task's steps.md, implementation.md, design.md, and plan.md as needed. Complete the newly added unchecked steps when possible, updating task artifacts as you work. If a step is completed, mark it done in steps.md. If a step cannot yet be completed, leave it unchecked and record the blocking reason tersely in implementation.md. Commit.\n\nEnd your final response with exactly one of:\nFOLLOWUP_STATUS: ITEMS_REMAINING\nFOLLOWUP_STATUS: ALL_DONE",
-     :vars {"input" {:from :workflow-input, :path [:input]}}}],
-   :judge
-   {:type :llm,
-    :contributions
-    [{:type :source, :from {:step "review", :yield :text}}
-     {:type :template,
-      :text
-      "Respond exactly with one word: REPEAT or DONE.\n\nThe review step output above ends with either:\n  PASS_STATUS: NO_ACTIONABLE_FEEDBACK — the review found nothing new to fix\n  PASS_STATUS: ACTIONABLE_FEEDBACK — the review found new issues\n\nThe follow-up step output ends with either:\n  FOLLOWUP_STATUS: ALL_DONE — all newly added items were completed\n  FOLLOWUP_STATUS: ITEMS_REMAINING — some items could not yet be completed\n\nRouting rules:\n- PASS_STATUS: NO_ACTIONABLE_FEEDBACK → DONE (nothing new was found, loop is complete)\n- PASS_STATUS: ACTIONABLE_FEEDBACK + FOLLOWUP_STATUS: ALL_DONE → DONE (issues found and fully resolved)\n- PASS_STATUS: ACTIONABLE_FEEDBACK + FOLLOWUP_STATUS: ITEMS_REMAINING → REPEAT (issues remain open)\n\nApply the rules strictly. Do not invent additional criteria.",
-      :vars {}}],
-    :outputs
-    {:routing-result
-     {:source :judge/structured-output,
-      :mode :structured,
-      :schema-id :psi.workflow/judge-routing-result,
-      :schema-version 1,
-      :schema [:enum "REPEAT" "DONE"],
-      :json-schema {:type "string", :enum ["REPEAT" "DONE"]}}}},
-   :on
-   {"REPEAT" {:goto "review", :max-iterations 6},
-    "DONE" {:goto :done}}}],
+     "Execute the newly added actionable follow-up items for the Munera task at {{input}}. Work independently. Read the task's steps.md to identify unchecked items added by the preceding review pass. Read the task's steps.md, implementation.md, design.md, and plan.md as needed. Complete the newly added unchecked steps when possible, updating task artifacts as you work. If a step is completed, mark it done in steps.md. If a step cannot yet be completed, leave it unchecked and record the blocking reason tersely in implementation.md. Commit.",
+     :vars {"input" {:from :workflow-input, :path [:input]}}}]}],
  :name "review-step",
  :description
- "Run a single named review skill against a Munera task, record terse notes, execute follow-up steps, and repeat until the review returns no actionable feedback"}
+ "Run a single named review skill against a Munera task, record terse notes, and execute any added follow-up steps"}
