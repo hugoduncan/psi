@@ -68,7 +68,7 @@ have no effect at runtime.
 - Complete the task 186 wiring gap: update the four affected `.edn` workflows to
   reference their extracted `.md` prompt files via `:prompt-workflow`, removing
   the now-redundant inline prompt text:
-  - `review-task-plan.edn` (5 steps: ambiguity-review, ambiguity-follow-up, inconsistency-review, inconsistency-follow-up, clarity-status)
+  - `review-task-plan.edn` (6 steps: ambiguity-review, ambiguity-follow-up, inconsistency-review, inconsistency-follow-up, clarity-status, final-summary)
   - `implement-task.edn` (2 steps: implement-pass, final-summary)
   - `review-task-design.edn` (6 steps: ambiguity-review, ambiguity-follow-up, inconsistency-review, inconsistency-follow-up, clarity-status, final-summary)
   - `create-task-plan.edn` (1 step: create-plan)
@@ -170,7 +170,15 @@ supported and flows through the normal `developer-prompt` path.
 ### Implementation path
 
 1. Update `parse-markdown-workflow-file` in `parser.clj` to read and validate
-   the `vars:` frontmatter key.
+   the `vars:` frontmatter key. This requires:
+   - Adding `:vars` to `allowed-md-frontmatter-keys` in `parser.clj` so the
+     unsupported-key guard does not reject `.md` files that use `vars:`.
+   - Calling `clojure.edn/read-string` on the raw `vars:` scalar string and
+     validating the result is a map with recognised `:from` values.
+   - Returning the parsed vars map (or `nil`) under a `:vars` key in the result,
+     so `parse-markdown-workflow-file` returns:
+     `{:workflow-kind :single-step-markdown :name string :description string
+       :session-config map :body string :vars map-or-nil}`.
 2. Update `markdown-body->contribution` in `compiler.clj` to:
    a. Scan body for all `{{varname}}` tokens.
    b. Auto-wire `input` and `original` to their standard source specs.

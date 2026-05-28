@@ -65,6 +65,24 @@ Found five actionable ambiguities. Added follow-up items to `design-steps.md`.
    `review-task-design.edn` (6 steps), `create-task-plan.edn` (1 step).
    (`review-step.edn` was intentionally left inline per task 186 impl notes.)
 
+## 2026-05-28 inconsistency follow-up pass 1
+
+Executed all three design-steps from inconsistency review pass 1. All resolved in design.md.
+
+1. **`review-task-plan.edn` step count → 6**: chose option (a). Created
+   `.psi/workflows/review-task-plan-final-summary.md` (parallel to
+   `review-task-design-final-summary.md`). Updated design scope step count from 5 to 6.
+   The `.md` file is now part of the task 186 wiring corpus for `review-task-plan.edn`.
+
+2. **`allowed-md-frontmatter-keys` added to implementation step 1**: updated the
+   implementation path to explicitly name adding `:vars` to `allowed-md-frontmatter-keys`
+   as a prerequisite sub-step within step 1.
+
+3. **`parse-markdown-workflow-file` return shape specified**: implementation step 1 now
+   explicitly documents the updated return shape:
+   `{:workflow-kind :single-step-markdown :name string :description string
+     :session-config map :body string :vars map-or-nil}`.
+
 ## 2026-05-28 inconsistency review pass 1
 
 Reviewed `design.md` against `compiler.clj`, `parser.clj`,
