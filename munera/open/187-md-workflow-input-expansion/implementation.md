@@ -1,3 +1,15 @@
+## 2026-05-28 task-implementation-review
+
+**Bug: standard-vars override protection violated.**
+`markdown-body->contribution` does `(merge standard-vars declared-vars)`, so
+`declared-vars` wins for `"input"` and `"original"`. The spec (steps.md Slice 2)
+says "standard vars always use their canonical source specs regardless of any
+override in `declared-vars`". Fix: `(merge declared-vars standard-vars)` so
+standard-vars always win. No test covers this case.
+
+No other actionable issues found. All three slices match design/spec. Tests
+cover all acceptance criteria. `bb test` green.
+
 ## 2026-05-28 implementation complete
 
 All three slices implemented and tests passing.
