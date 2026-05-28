@@ -1,0 +1,32 @@
+{:steps
+ [{:name "ambiguity-review",
+   :type :session,
+   :prompt-workflow "review-task-design-ambiguity-review.md"}
+  {:name "ambiguity-follow-up",
+   :type :session,
+   :prompt-workflow "review-task-design-ambiguity-follow-up.md"}
+  {:name "inconsistency-review",
+   :type :session,
+   :prompt-workflow "review-task-design-inconsistency-review.md"}
+  {:name "inconsistency-follow-up",
+   :type :session,
+   :prompt-workflow "review-task-design-inconsistency-follow-up.md"}
+  {:name "clarity-status",
+   :type :session,
+   :prompt-workflow "review-task-design-clarity-status.md",
+   :judge
+   {:type :llm,
+    :contributions
+    [{:type :template,
+      :text
+      "Respond exactly with one word: REPEAT or DONE.\n\nUse the actor step context to identify the Munera task under review. Independently inspect that specific task's design.md and design-steps.md only. Do not inspect plan.md or steps.md.\n\nReturn REPEAT if there is still actionable ambiguity or inconsistency follow-up remaining from the review cycle, including newly added unchecked design-steps or unresolved review findings. Return DONE only if the task design has no remaining new actionable ambiguity or inconsistency feedback from the cycle.\n\nDo not review the repository generically. Judge only the specific named task.",
+      :vars {}}]},
+   :on
+   {"REPEAT" {:goto "ambiguity-review", :max-iterations 6},
+    "DONE" {:goto "final-summary"}}}
+  {:name "final-summary",
+   :type :session,
+   :prompt-workflow "review-task-design-final-summary.md"}],
+ :name "review-task-design",
+ :description
+ "Repeatedly review a Munera task design for ambiguities and inconsistencies, record terse notes, execute follow-up steps, and loop until no actionable feedback remains"}
