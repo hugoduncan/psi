@@ -120,3 +120,9 @@
 - [x] `bb test` green (3 pre-existing skill-discovery failures, no new failures)
 - [x] `bb lint` clean (0 errors, 0 warnings)
 - [x] All acceptance criteria in `design.md` checked off
+
+## Follow-up — task-implementation-review pass
+
+- [ ] Fix `{{input}}` unsubstituted in `:prompt-workflow` steps: `review-task-design`, `review-task-plan` actor steps, and `create-task-plan` all compile to `:vars {}` so `{{input}}` is rendered literally at runtime. Fix by switching these steps from `:prompt-workflow` to inline `:contributions` with `:vars {"input" {:from :workflow-input :path [:input]}}` (same fix as `review-step` commit `7d6b848e`), or extend the workflow-loader compiler to support a `:vars` override alongside `:prompt-workflow`.
+- [ ] Remove orphaned `.md` files `review-step-review.md` and `review-step-follow-up.md` — extracted in slice 3 but abandoned when `review-step.edn` was fixed to use inline contributions; now unreferenced dead artifacts.
+- [ ] Add loader test assertion that `{{input}}`-bearing steps have `:vars` wired to `:workflow-input` (not `:vars {}`) to prevent silent regression.

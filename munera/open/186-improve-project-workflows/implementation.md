@@ -1,3 +1,11 @@
+## 2026-05-27 task-implementation-review pass
+
+**`{{input}}` unsubstituted in `:prompt-workflow` steps** — `review-task-design`, `review-task-plan` (actor steps), and `create-task-plan` all use `:prompt-workflow` referencing `.md` files that contain `{{input}}`. The workflow-loader compiler expands `:prompt-workflow` to a `:template` contribution with `:vars {}` (empty). At runtime, `{{input}}` is rendered literally — the agent sees the string `{{input}}` instead of the task path. The same bug was fixed for `review-step` (commit `7d6b848e`) by switching to inline `:contributions` with explicit `:vars {"input" {:from :workflow-input :path [:input]}}`. The same fix is needed for `review-task-design`, `review-task-plan` actor steps, and `create-task-plan`. `implement-task` actor steps have the same issue but the judge step already uses inline contributions with correct `:vars` — the actor steps rely on `:workflow-original` for context, which may be sufficient if the original message contains the task path.
+
+**Orphaned `.md` files for `review-step`** — `review-step-review.md` and `review-step-follow-up.md` were extracted in slice 3 but then abandoned when the fix reverted `review-step.edn` to inline contributions. These files are unreferenced dead artifacts.
+
+**Loader tests don't assert `:vars` wiring** — `workflow_definitions_test.clj` asserts that `:prompt-workflow` resolves to contributions but does not assert that `{{input}}` is wired to `:workflow-input` via `:vars`. The gap is invisible to the test suite.
+
 ## 2026-05-27 implementation pass — all 9 slices complete
 
 All 9 ordered slices executed. Key deviations from initial design:
