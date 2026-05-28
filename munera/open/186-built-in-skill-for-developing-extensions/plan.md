@@ -4,19 +4,21 @@
 
 Implement the task as a built-in packaged skill addition plus focused proof updates.
 
-1. Add the built-in skill resource at `psi/skills/extension-development/SKILL.md` with concise repository-specific guidance for creating, modifying, and debugging extensions.
+1. Add the built-in skill source file at `bases/main/resources/psi/skills/extension-development/SKILL.md` with concise repository-specific guidance for creating, modifying, and debugging extensions, preserving packaged resource identity `psi/skills/extension-development/SKILL.md`.
 2. Reuse the existing built-in skill materialization/discovery path in `components/prompt-assets/src/psi/prompt_assets/skills.clj` rather than introducing a new registration mechanism.
 3. Add or extend focused tests around packaged built-in skill discovery so verification proves:
-   - resource presence for `psi/skills/extension-development/SKILL.md`
+   - source-tree authoring path and packaged resource presence for `psi/skills/extension-development/SKILL.md`
    - runtime identity `:name "extension-development"`
    - built-in provenance `:source :built-in`
    - readable materialized `:file-path`
    - normal invocation/readability semantics
-4. Update any task-local documentation/proof notes needed to reflect the implemented identity and verification decisions.
+4. Add focused proof for representative higher discovery/listing surfaces already named in the design, such as resolver discovery output and `/skills` command visibility, so verification matches the stated discovery/listing acceptance target.
+5. Update any task-local documentation/proof notes needed to reflect the implemented identity and verification decisions.
 
 ## Key decisions
 
 - Canonical skill identity is `extension-development`.
+- Canonical source-tree authoring path is `bases/main/resources/psi/skills/extension-development/SKILL.md`.
 - Canonical packaged resource path is `psi/skills/extension-development/SKILL.md`.
 - Scope includes creating, modifying, and debugging extensions.
 - The minimum authoritative references should center on `doc/extension-api.md`, `doc/extensions.md`, `doc/extensions-install.md`, `doc/architecture.md`, and the built-in skill/discovery implementation seams.

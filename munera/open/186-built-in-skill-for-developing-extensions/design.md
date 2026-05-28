@@ -20,7 +20,7 @@ The skill should:
 
 - be available through the built-in packaged skill mechanism rather than requiring project-local installation
 - have the canonical runtime skill name `extension-development`
-- be packaged at built-in resource path `psi/skills/extension-development/SKILL.md`
+- be authored in the source tree at `bases/main/resources/psi/skills/extension-development/SKILL.md`, producing the packaged built-in resource path `psi/skills/extension-development/SKILL.md`
 - surface stable built-in provenance through the ordinary built-in skill discovery flow
 - present concise, actionable guidance for extension development in this repository
 - help the agent choose the correct seams for extension work
@@ -31,7 +31,7 @@ The skill should:
 ## In scope
 
 - define and add a new built-in skill for extension development
-- package it as the built-in resource `psi/skills/extension-development/SKILL.md`
+- author it in the source tree at `bases/main/resources/psi/skills/extension-development/SKILL.md`, producing the packaged built-in resource `psi/skills/extension-development/SKILL.md`
 - register/discover it with runtime skill identity `:name "extension-development"`
 - ensure the skill is discoverable as a psi-owned built-in skill
 - document the extension-development guidance inside the skill artifact itself
@@ -113,15 +113,16 @@ That broader scope matches the underlying problem: the project-specific extensio
 For this task, “discoverable and usable” should be proved through these structural surfaces rather than brittle assertion of exact guidance prose:
 
 1. **Packaged built-in resource presence**
-   - the built-in resource set includes `psi/skills/extension-development/SKILL.md`
+   - the source-tree authored file lives at `bases/main/resources/psi/skills/extension-development/SKILL.md`
+   - the built-in resource set includes packaged path `psi/skills/extension-development/SKILL.md`
    - built-in skill materialization/discovery can load it into the deterministic readable snapshot
 2. **Built-in provenance on discovery**
    - built-in skill discovery returns a skill with `:name "extension-development"` and `:source :built-in`
 3. **Ordinary readable-file semantics**
    - the discovered skill has a materialized readable `:file-path` pointing into the built-in snapshot, so it behaves like normal file-backed skills rather than a special unreadable registry-only object
 4. **Normal user/agent discovery surfaces**
-   - skill introspection/discovery surfaces that list skills can see `extension-development`
-   - command/UI-oriented skill listing surfaces remain able to present it as a built-in skill
+   - representative skill introspection/discovery surfaces such as `:psi.agent-session/skills` / `:psi.skill/by-source` can see `extension-development`
+   - representative command/UI-oriented skill listing surfaces such as `/skills` remain able to present it as a built-in skill
 5. **Invocation/readability surface**
    - the normal skill invocation/read path can read the skill content through the same semantics used for other skills, without requiring an extension-specific loader or special-case runtime path
 
