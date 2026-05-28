@@ -11,8 +11,8 @@
       (is (= "planner" (:name result)))
       (is (= "Plans tasks" (:description result)))
       (is (= "gpt-5" (get-in result [:session-config :model])))
-      (is (= "" (get-in result [:session-config :tools])))
-      (is (= "" (get-in result [:session-config :skills])))
+      (is (= ["read"] (get-in result [:session-config :tools])))
+      (is (= ["clojure-coding-standards"] (get-in result [:session-config :skills])))
       (is (= ":non-streaming" (get-in result [:session-config :response-mode])))
       (is (= ":off" (get-in result [:session-config :thinking-level])))
       (is (= "true" (get-in result [:session-config :logprobs])))
@@ -41,7 +41,47 @@
 
   (testing "markdown workflow rejects EDN workflow definition block body"
     (let [result (parser/parse-workflow-file :md "---\nname: planner\ndescription: Plans\n---\n{:steps []}")]
-      (is (= "Markdown workflow body must not begin with an EDN workflow definition block" (:error result))))))
+      (is (= "Markdown workflow body must not begin with an EDN workflow definition block" (:error result)))))
+
+  (testing "vars: EDN string parses to map, returned under :vars"
+    (let [raw "---\nname: my-step\ndescription: A step\nvars: '{\"my-var\" {:from :workflow-input :path [:some-field]}}'\n---\nBody with {{my-var}}."
+          result (parser/parse-workflow-file :md raw)]
+      (is (nil? (:error result)))
+      (is (= {"my-var" {:from :workflow-input :path [:some-field]}}
+             (:vars result)))))
+
+  (testing "missing vars: key returns :vars nil"
+    (let [raw "---\nname: planner\ndescription: Plans tasks\n---\nBody text."
+          result (parser/parse-workflow-file :md raw)]
+      (is (nil? (:error result)))
+      (is (nil? (:vars result)))))
+
+  (testing "vars: with non-map EDN string returns error"
+    (let [raw "---\nname: planner\ndescription: Plans\nvars: '[1 2 3]'\n---\nBody."
+          result (parser/parse-workflow-file :md raw)]
+      (is (re-find #"vars.*must be an EDN map" (:error result)))))
+
+  (testing "vars: with invalid EDN string returns error"
+    (let [raw "---\nname: planner\ndescription: Plans\nvars: '{bad edn'\n---\nBody."
+          result (parser/parse-workflow-file :md raw)]
+      (is (re-find #"Invalid `vars:`" (:error result)))))
+
+  (testing "vars: with unsupported :from value returns error"
+    (let [raw "---\nname: planner\ndescription: Plans\nvars: '{\"x\" {:from :workflow-runtime}}'\n---\nBody."
+          result (parser/parse-workflow-file :md raw)]
+      (is (re-find #"unsupported :from values" (:error result)))))
+
+  (testing "vars: with :from :workflow-original is accepted"
+    (let [raw "---\nname: my-step\ndescription: A step\nvars: '{\"x\" {:from :workflow-original}}'\n---\nBody with {{x}}."
+          result (parser/parse-workflow-file :md raw)]
+      (is (nil? (:error result)))
+      (is (= {"x" {:from :workflow-original}}
+             (:vars result)))))
+
+  (testing "vars: with map-valued :from is rejected"
+    (let [raw "---\nname: my-step\ndescription: A step\nvars: '{\"x\" {:from {:step \"y\" :yield :text}}}'\n---\nBody."
+          result (parser/parse-workflow-file :md raw)]
+      (is (re-find #"unsupported :from values" (:error result))))))
 
 (deftest parse-edn-workflow-file-test
   (testing "edn workflow parses multi-step map"

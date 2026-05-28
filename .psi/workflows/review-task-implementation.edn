@@ -33,6 +33,20 @@
     {:type :source,
      :from {:step "review-task-implementation", :yield :text}}
     {:type :source, :from {:step "review-task-tests", :yield :text}}]}
+  {:name "review-task-docs",
+   :type :delegate,
+   :target "review-step",
+   :prompt-string
+   {:type :map,
+    :fields
+    {:input {:from :workflow-input, :path [:input]},
+     :skill {:value "review-task-docs"}}},
+   :context
+   [{:type :source, :from :workflow-original}
+    {:type :source,
+     :from {:step "review-task-implementation", :yield :text}}
+    {:type :source, :from {:step "review-task-tests", :yield :text}}
+    {:type :source, :from {:step "review-test-shape", :yield :text}}]}
   {:name "review-code-shape",
    :type :delegate,
    :target "review-step",
@@ -46,8 +60,8 @@
     {:type :source,
      :from {:step "review-task-implementation", :yield :text}}
     {:type :source, :from {:step "review-task-tests", :yield :text}}
-    {:type :source,
-     :from {:step "review-test-shape", :yield :text}}]}],
- :name "review-implementation",
+    {:type :source, :from {:step "review-test-shape", :yield :text}}
+    {:type :source, :from {:step "review-task-docs", :yield :text}}]}],
+ :name "review-task-implementation",
  :description
  "Review a Munera task implementation, record terse notes, execute added follow-up steps, and repeat until no new actionable feedback remains"}

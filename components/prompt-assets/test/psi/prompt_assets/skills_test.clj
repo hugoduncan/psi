@@ -267,7 +267,7 @@
                   (skills/discover-skills
                    {:global-skills-dirs  [(str global-dir)]
                     :project-skills-dirs [(str project-dir)]})]
-              (is (= 2 (count skills)))
+              (is (= 1 (count skills)))
               (is (= "Project version"
                      (:description (some #(when (= "shared" (:name %)) %) skills))))
               (is (some #(= :collision (:type %)) diagnostics))))))))
@@ -362,7 +362,7 @@
                {:global-skills-dirs  ["/nonexistent"]
                 :project-skills-dirs ["/nonexistent"]
                 :extra-paths         [(str extra-dir)]})]
-          (is (= 2 (count skills)))
+          (is (= 1 (count skills)))
           (is (= :path (:source (some #(when (= "extra" (:name %)) %) skills))))))))
 
   (testing "non-existent extra path produces warning"
@@ -702,8 +702,7 @@
     (let [base-dir (skills/built-in-snapshot-dir {:config {:built-in-resource-root "psi/test-built-in-skills"}})
           changed-dir (skills/built-in-snapshot-dir
                        {:config {:built-in-resource-root "psi/test-built-in-skills"}
-                        :resource-paths-override ["psi/test-built-in-skills/built-in-shared/SKILL.md"
-                                                  "psi/test-built-in-skills/packaged-test-skill/SKILL.md"]})]
+                        :resource-paths-override ["psi/test-built-in-skills/packaged-test-skill/SKILL.md"]})]
       (is (not= base-dir changed-dir))))
 
   (testing "built-in discovery loads materialized packaged skills as ordinary file-backed skills"

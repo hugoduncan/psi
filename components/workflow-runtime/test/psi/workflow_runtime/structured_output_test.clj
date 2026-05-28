@@ -42,10 +42,12 @@
                       :next-action :handoff-to-fix}}
              (:structured-output result))))))
 
-(deftest structured-output-envelope-invalid-json-test
-  ;; Tests that malformed model output records invalid status and parse errors
-  ;; without exposing a structured value.
-  (testing "malformed JSON is invalid and records errors"
+(deftest structured-output-envelope-plain-text-validation-error-test
+  ;; Tests that plain-text model output (not valid JSON) is accepted by
+  ;; parse-json-value via the plain-text fallback (trimmed raw string, :ok? true),
+  ;; then rejected by malli schema validation.  This exercises the validation-error
+  ;; path, not a parse-error path — parse-json-value never returns :ok? false.
+  (testing "plain-text output fails malli validation and records errors"
     (let [result (structured-output/output-result classification-output-spec "not json")]
       (is (= :invalid (get-in result [:structured-output :status])))
       (is (= :prompted-json (get-in result [:structured-output :strategy])))
@@ -69,8 +71,9 @@
       (is (not (contains? (:structured-output result) :value))))))
 
 (deftest structured-output-envelope-non-object-json-test
-  ;; Tests the prompted JSON boundary: syntactically valid JSON must still be a
-  ;; single object envelope, not an array/scalar value passed to schema checks.
+  ;; Tests the prompted JSON boundary: valid JSON that does not match the schema
+  ;; (e.g. arrays or scalars against a map schema) is rejected as invalid.
+  ;; parse-json-value accepts any valid JSON; schema mismatch is caught by malli.
   (testing "valid non-object JSON is rejected as an invalid structured envelope"
     (doseq [[raw parsed] [["[1,2,3]" [1 2 3]]
                           ["42" 42]
@@ -79,10 +82,7 @@
         (is (= :invalid (get-in result [:structured-output :status])) raw)
         (is (= :prompted-json (get-in result [:structured-output :strategy])) raw)
         (is (= parsed (get-in result [:structured-output :parsed-value])) raw)
-        (is (= [{:type :parse-error
-                 :message "Structured output must be a single JSON object"}]
-               (get-in result [:structured-output :errors]))
-            raw)
+        (is (seq (get-in result [:structured-output :errors])) raw)
         (is (not (contains? (:structured-output result) :value)) raw)))))
 
 (deftest reusable-judge-review-result-schema-test
@@ -151,3 +151,49 @@
               :evidence ["bb test"]
               :next-action :handoff-to-fix}
              (get-in result [:structured-output :value]))))))
+
+(deftest structured-output-envelope-string-enum-json-test
+  ;; Regression test: parse-json-value previously rejected non-object JSON
+  ;; (including plain strings) with a hard parse-error, making [:enum "REPEAT" "DONE"]
+  ;; judge schemas permanently invalid regardless of AI output.
+  ;; parse-json-value now accepts:
+  ;;   - valid JSON values (including JSON-quoted strings like "\"DONE\"")
+  ;;   - plain-text fallback: if JSON parsing fails, the trimmed raw text is
+  ;;     treated as a plain string. This handles judge models that return DONE
+  ;;     (unquoted) rather than "DONE" (JSON string).
+  (testing "string enum JSON value validates correctly against [:enum ...] schema"
+    (let [judge-routing-spec {:source :judge/structured-output
+                              :mode :structured
+                              :schema-id :psi.workflow/judge-routing-result
+                              :schema-version 1
+                              :schema [:enum "REPEAT" "DONE"]
+                              :json-schema {:type "string" :enum ["REPEAT" "DONE"]}}]
+      (doseq [[raw expected-value] [["\"DONE\"" "DONE"] ["\"REPEAT\"" "REPEAT"]
+                                    ["DONE" "DONE"] ["REPEAT" "REPEAT"]]]
+        (let [result (structured-output/output-result judge-routing-spec raw)]
+          (is (= :valid (get-in result [:structured-output :status])) raw)
+          (is (= expected-value (get-in result [:structured-output :value])) raw))))))
+
+(deftest reusable-pass-status-result-schema-test
+  ;; Tests the psi.workflow/pass-status-result schema exported by the runtime
+  ;; and referenced by schema id/version. Validates representative valid and
+  ;; invalid JSON inputs.
+  (let [pass-status-spec {:source :session/structured-output
+                          :mode :structured
+                          :schema-id schemas/pass-status-result-schema-id
+                          :schema-version schemas/pass-status-result-schema-version
+                          :schema schemas/pass-status-result-schema
+                          :json-schema schemas/pass-status-result-json-schema}]
+    (testing "valid pass-status-result JSON validates and exposes coerced value"
+      (let [result (structured-output/output-result
+                    pass-status-spec
+                    "{\"status\":\"PASS\",\"reason\":\"all checks green\"}")]
+        (is (= :valid (get-in result [:structured-output :status])))
+        (is (= "PASS" (get-in result [:structured-output :value :status])))
+        (is (= "all checks green" (get-in result [:structured-output :value :reason])))))
+    (testing "invalid pass-status-result JSON (missing :reason) is invalid"
+      (let [result (structured-output/output-result
+                    pass-status-spec
+                    "{\"status\":\"PASS\"}")]
+        (is (= :invalid (get-in result [:structured-output :status])))
+        (is (seq (get-in result [:structured-output :errors])))))))

@@ -1,0 +1,29 @@
+## Inconsistency follow-ups (pass 2)
+
+- [x] **Remove spurious "Update AGENTS.md" steps from steps.md**: steps.md slices 1, 2, 4, 5, and 6 each contain an "Update AGENTS.md workflow listing" or "Update AGENTS.md skills listing" item. design.md and plan.md make no mention of AGENTS.md updates. The workflow listing and skills listing visible to the agent are dynamically generated at runtime from the loaded `.psi/workflows/` and `.psi/skills/` directories respectively — there is no static listing in AGENTS.md to update. Remove these 5 items from steps.md to avoid wasted implementer effort.
+
+## Inconsistency follow-ups
+
+- [x] **Clarify relationship between existing `judge-review-result` schema and planned new schema ids**: `structured_output_schemas.clj` already has `psi.workflow/judge-review-result` (complex map). The design adds `psi.workflow/judge-routing-result` and `psi.workflow/pass-status-result` without mentioning the existing schema. Update the design to state whether `judge-review-result` is retained as-is, deprecated, or superseded by the new ids, and whether any of the new schemas are additive alongside it.
+
+- [x] **Specify prompt text changes required to narrow `review-task-plan` scope**: The renamed `review-task-until-clear` → `review-task-plan` must redirect follow-up items from `design-steps.md` to `steps.md` and remove references to `design.md` review. The design says "constrained to plan/steps artifacts" but does not enumerate which step prompts change and how. Add a concrete list of prompt-string changes (or a reference to the new `.md` files) to the design or plan so the scope narrowing is unambiguous.
+
+- [x] **Ensure `review-task-plan` prompt extraction covers the `design-steps.md` → `steps.md` redirection**: The `.md` prompt extraction step (ordering step 3) must not simply copy the existing inline prompts verbatim — the extracted `.md` files must reflect the narrowed scope (no `design.md` review, no `design-steps.md` writes). Make this explicit in the design's extraction section or in a plan step.
+
+- [x] **Add `review-implementation-in-worktree` description update to scope**: The design says update the `:target "review-implementation"` reference to `"review-task-implementation"` but does not mention updating the `:description` string (currently "…via the review-implementation workflow"). Add this to the acceptance criteria or the rename step.
+
+## Ambiguity follow-ups (pass 2)
+
+- [x] **`review-implementation-in-worktree` summary step body is stale after review-task-docs addition**: The `summary` step prompt hard-codes "four review passes" and lists them as `task-implementation-review, task-test-review, test-shaper, code-shaper`. After slice 4 inserts `review-task-docs` as the 4th step, this becomes 5 passes. Update the design acceptance criterion 5 (or add a new criterion) and add a steps.md item in slice 4 to update the `summary` step body to reflect 5 passes and include `review-task-docs` in the named list.
+
+- [x] **Loader test loading mechanism is unspecified**: The design says "load through `workflow-loader.core/load-workflows`" but the actual public function is `load-workflow-definitions` (not `load-workflows`). More critically, the design does not specify whether tests should: (a) call `load-workflow-definitions` with the real project root as worktree path (environment-dependent, not portable), (b) parse individual `.edn` files directly via `compiler/compile-workflow-file` with a real file path (portable, matches existing test patterns), or (c) use temp-dir fixtures. Clarify the chosen mechanism in the design's testing approach section and align the function name reference.
+
+## Ambiguity follow-ups
+
+- [x] **Structured output authoring path for judge steps**: `compile-judge` in `target_ir_compiler.clj` does not compile `:outputs` on judge specs. Decide: (a) extend `compile-judge` to pass through judge `:outputs` so structured output can be declared on judge steps in the authoring format, or (b) declare structured output only on session step `:outputs` (not the judge), or (c) declare this out of scope for this task and note it as a prerequisite gap. Update the design with the chosen approach before implementation.
+
+- [x] **Structured output schema shapes**: The design specifies JSON Schema shapes (`{:type :string :enum ["REPEAT" "DONE"]}`) but the IR `structured-output-spec-schema` requires both `:schema` (Malli) and `:json-schema` (JSON object). Clarify whether a new reusable schema id (e.g. `psi.workflow/judge-routing-result`) should be added to `structured_output_schemas.clj`, and specify the Malli schema shape alongside the JSON Schema shape for each affected workflow step.
+
+- [x] **`design-steps.md` artifact creation contract**: `review-task-design` writes follow-up items to `design-steps.md` but the Munera protocol does not define this file. Specify: is `design-steps.md` created by the workflow on first write if absent, or must it pre-exist? Is it a task-design-phase-only artifact that is never written by `review-task-plan` or `review-task-implementation`? Add a sentence to the design clarifying the artifact's lifecycle and creation ownership.
+
+- [x] **Workflow loader test scope for structured output assertions**: The `workflow-loader` compiler passes `:outputs` through as-is; IR structured output validation runs in `target_ir_compiler` at runtime. Clarify whether loader tests for structured output should (a) only assert the raw `:outputs` key is present in the compiled EDN step, (b) also invoke `target_ir_compiler` and assert on the IR-compiled form, or (c) assert via `workflow-ir/validate` that the IR is valid. Update the testing approach section in the design with the chosen assertion depth.

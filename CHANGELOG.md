@@ -6,6 +6,18 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 
 ## [Unreleased]
 
+### Added
+- New `review-task-design` workflow: reviews `design.md` only for ambiguities and inconsistencies, loops until no actionable feedback remains. Invokable via `/delegate review-task-design`.
+- New `create-task-plan` workflow: given a stable `design.md`, creates `plan.md` and `steps.md` for a Munera task in a single pass. Invokable via `/delegate create-task-plan`.
+- `.md` single-step workflow bodies now support `{{input}}` and `{{original}}` template variables with automatic wiring — no frontmatter declaration needed. `{{input}}` expands to the workflow input text; `{{original}}` expands to the carried original request context.
+- `.md` single-step workflows now support a `vars:` frontmatter key (EDN string) for declaring custom variable bindings with `:from :workflow-input` (plus optional `:path`) or `:from :workflow-original` sources.
+- Unknown `{{varname}}` tokens in `.md` workflow bodies that are neither standard (`input`, `original`) nor declared in `vars:` produce a compile-time error at workflow load, catching typos and missing declarations before runtime.
+
+### Changed
+- `review-implementation` workflow renamed to `review-task-implementation`; the old name is no longer available. Update any saved `/delegate review-implementation` invocations to `/delegate review-task-implementation`.
+- `review-task-until-clear` workflow renamed to `review-task-plan` and narrowed to `plan.md`/`steps.md` review only (design review is now handled by `review-task-design`). The old name is no longer available.
+- `review-task-implementation` now includes a `review-task-docs` step that reviews user-facing documentation (`README.md`, `doc/`, changelog) as part of the implementation review chain.
+
 ### Fixed
 - OpenAI OAuth-backed `gpt-5.5` sessions now route through the ChatGPT/Codex transport, matching Codex account access instead of failing against the platform chat-completions quota path.
 

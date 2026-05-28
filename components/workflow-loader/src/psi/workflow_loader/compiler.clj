@@ -20,6 +20,15 @@
    :top-logprobs
    :prompt-component-selection])
 
+;;; Standard var source specs auto-wired for any .md workflow body.
+(def ^:private standard-vars
+  {"input"    {:from :workflow-input :path [:input]}
+   "original" {:from :workflow-original}})
+
+;;; Pattern matching {{varname}} tokens: leading letter, then letters/digits/underscores/hyphens.
+(def ^:private template-var-pattern
+  #"\{\{([a-zA-Z][a-zA-Z0-9_-]*)\}\}")
+
 (defn- invalid
   [message]
   {:error message})
@@ -31,28 +40,47 @@
        (every? map? (:steps config))
        (every? #(contains? % :type) (:steps config))))
 
-(defn- markdown-body->contribution
+(defn- scan-template-vars
+  "Return the set of var names referenced as {{varname}} tokens in body."
   [body]
-  [{:type :template
-    :text body
-    :vars {}}])
+  (->> (re-seq template-var-pattern body)
+       (map second)
+       set))
+
+(defn- markdown-body->contribution
+  "Produce a template contribution for body, auto-wiring standard vars and
+   merging declared-vars. Throws ex-info on unknown {{varname}} tokens."
+  ([body] (markdown-body->contribution body nil))
+  ([body declared-vars]
+   (let [referenced-names (scan-template-vars body)
+         merged-vars (merge declared-vars standard-vars)
+         wired-vars (select-keys merged-vars referenced-names)
+         unknown (seq (remove (set (keys merged-vars)) referenced-names))]
+     (when unknown
+       (throw (ex-info (str "Unknown {{varname}} tokens in workflow body: "
+                            (pr-str (sort unknown))
+                            ". Declare them in the `vars:` frontmatter or use"
+                            " standard vars {{input}} or {{original}}.")
+                       {:unknown-vars (sort unknown)})))
+     [{:type :template
+       :text body
+       :vars wired-vars}])))
 
 (defn- markdown-session-step
-  [{:keys [session-config body]}]
-  (cond-> {:name "step"
-           :type :session
-           :contributions (markdown-body->contribution body)}
-    true (merge session-config)))
+  [{:keys [session-config body vars]}]
+  (merge {:name "step"
+          :type :session
+          :contributions (markdown-body->contribution body vars)}
+         session-config))
 
 (defn- compile-markdown-workflow-file
-  [{:keys [name description source-path body] :as parsed}]
+  [{:keys [name description source-path] :as parsed}]
   {:definition {:definition-id name
                 :name name
                 :summary description
                 :description description
                 :steps [(markdown-session-step parsed)]
-                :workflow-file-meta (cond-> {:file-kind :md
-                                             :framing-prompt body}
+                :workflow-file-meta (cond-> {:file-kind :md}
                                       source-path (assoc :source-path source-path))}})
 
 (defn- slurp-workflow-file
@@ -87,13 +115,9 @@
 
 (defn- read-prompt-workflow
   [workflow-path prompt-workflow]
-  (let [resolved-path (resolve-prompt-workflow-path workflow-path prompt-workflow)
-        file-kind (file-kind-from-path resolved-path)]
+  (let [resolved-path (resolve-prompt-workflow-path workflow-path prompt-workflow)]
     (cond
-      (nil? file-kind)
-      (invalid (str "`:prompt-workflow` must reference a .md file: " (pr-str prompt-workflow)))
-
-      (not= :md file-kind)
+      (not= :md (file-kind-from-path resolved-path))
       (invalid (str "`:prompt-workflow` must reference a .md file, got `"
                     prompt-workflow
                     "`"))
@@ -118,15 +142,10 @@
   (some #(contains? step %) prompt-defining-step-keys))
 
 (defn- merge-markdown-session-config
+  "Merge session-config keys from markdown-session-config into step,
+   giving step-level keys precedence (step wins on conflict)."
   [step markdown-session-config]
-  (reduce (fn [acc key]
-            (if (contains? acc key)
-              acc
-              (if (contains? markdown-session-config key)
-                (assoc acc key (get markdown-session-config key))
-                acc)))
-          step
-          markdown-session-config-keys))
+  (merge (select-keys markdown-session-config markdown-session-config-keys) step))
 
 (defn- compile-prompt-workflow-step
   [workflow-path step]
@@ -152,7 +171,8 @@
           {:ok (-> step
                    (dissoc :prompt-workflow)
                    (merge-markdown-session-config (:session-config referenced))
-                   (assoc :contributions (markdown-body->contribution (:body referenced))))})))))
+                   (assoc :contributions (markdown-body->contribution (:body referenced)
+                                                                      (:vars referenced))))})))))
 
 (defn- compile-edn-steps
   [workflow-path steps]
@@ -190,12 +210,11 @@
     :else
     (let [{compiled-steps :ok step-error :error}
           (compile-edn-steps source-path (:steps config))
-          workflow-definition (cond-> (assoc config
-                                             :steps compiled-steps
-                                             :definition-id (or (:definition-id config)
-                                                                (:name config)))
-                                true (update :workflow-file-meta #(merge {:file-kind :edn}
-                                                                         %))
+          workflow-definition (cond-> (-> config
+                                          (assoc :steps compiled-steps
+                                                 :definition-id (or (:definition-id config)
+                                                                    (:name config)))
+                                          (update :workflow-file-meta #(merge {:file-kind :edn} %)))
                                 source-path (update :workflow-file-meta assoc :source-path source-path))]
       (cond
         step-error

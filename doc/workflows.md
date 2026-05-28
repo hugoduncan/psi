@@ -415,6 +415,62 @@ Good first workflow authoring loop:
 4. tighten the authoring shape or reference wiring
 5. reload and repeat
 
+## `.md` single-step workflow authoring
+
+`.md` single-step workflows support `{{input}}` and `{{original}}` template
+variables directly in the body — no frontmatter declaration is needed.
+
+- `{{input}}` — expands to the workflow's input text (the prompt string passed
+  to `/delegate`)
+- `{{original}}` — expands to the carried original request context
+  (`:workflow-original`)
+
+Minimal example:
+
+```markdown
+---
+name: my-workflow
+description: A simple single-step workflow
+tools:
+  - read
+  - bash
+---
+Perform the task described by {{input}}.
+```
+
+### Custom vars
+
+For custom variable bindings, declare a `vars:` key in the frontmatter as an
+EDN string. Each declared var must specify a `:from` source — either
+`:workflow-input` (with optional `:path`) or `:workflow-original`:
+
+```markdown
+---
+name: my-workflow
+description: Workflow with a custom var
+tools:
+  - read
+vars: '{"task-path" {:from :workflow-input :path [:task-path]}}'
+---
+Work on the task at {{task-path}}.
+Input summary: {{input}}.
+```
+
+Allowed `:from` values in `vars:`:
+
+- `:workflow-input` — the workflow input map; use `:path` to extract a nested field
+- `:workflow-original` — the carried original request context
+
+### Unknown vars produce a compile-time error
+
+Any `{{varname}}` token in the body that is neither a standard var (`input`,
+`original`) nor declared in `vars:` produces a compile-time error when the
+workflow file is loaded. This catches typos and missing declarations before
+runtime.
+
+Tokens that do not match the var pattern (e.g. `{{1bad}}`, `{{}}`) pass through
+literally and are not subject to this check.
+
 ## Related docs
 
 - [`doc/workflow-grammar.md`](workflow-grammar.md) — workflow grammar

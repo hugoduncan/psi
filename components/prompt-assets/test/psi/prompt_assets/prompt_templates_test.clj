@@ -89,7 +89,18 @@
     (let [raw "  ---\ndescription: with spaces\n---\nBody"
           {:keys [frontmatter body]} (pt/extract-frontmatter raw)]
       (is (= "with spaces" (:description frontmatter)))
-      (is (= "Body" body)))))
+      (is (= "Body" body))))
+
+  (testing "YAML block sequence for tools and skills"
+    (let [raw "---\nname: test\ndescription: A test\ntools:\n  - read\n  - bash\nskills:\n  - work-independently\n---\nBody"
+          {:keys [frontmatter]} (pt/extract-frontmatter raw)]
+      (is (= ["read" "bash"] (:tools frontmatter)))
+      (is (= ["work-independently"] (:skills frontmatter)))))
+
+  (testing "YAML block sequence with single item"
+    (let [raw "---\nname: test\ndescription: A test\ntools:\n  - read\n---\nBody"
+          {:keys [frontmatter]} (pt/extract-frontmatter raw)]
+      (is (= ["read"] (:tools frontmatter))))))
 
 ;; ============================================================
 ;; First Non-Empty Line

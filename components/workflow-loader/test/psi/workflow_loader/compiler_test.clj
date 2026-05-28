@@ -12,6 +12,7 @@
    :session-config {:tools ["read" "bash"]
                     :thinking-level :off}
    :body "You are a planner."
+   :vars nil
    :source-path "/tmp/planner.md"})
 
 (def edn-parsed
@@ -194,3 +195,192 @@
              absolute-error))
       (is (= "`:prompt-workflow` must be a relative .md path within the consuming workflow directory"
              escape-error)))))
+
+(deftest markdown-body-var-expansion-test
+  (testing "body with {{input}} produces :vars with input wired to :workflow-input"
+    (let [{:keys [definition error]}
+          (compiler/compile-workflow-file
+           {:workflow-kind :single-step-markdown
+            :name "step"
+            :description "A step"
+            :session-config {}
+            :body "Process {{input}} now."
+            :vars nil})]
+      (is (nil? error))
+      (is (= {"input" {:from :workflow-input :path [:input]}}
+             (get-in definition [:steps 0 :contributions 0 :vars])))))
+
+  (testing "body with {{original}} produces :vars with original wired to :workflow-original"
+    (let [{:keys [definition error]}
+          (compiler/compile-workflow-file
+           {:workflow-kind :single-step-markdown
+            :name "step"
+            :description "A step"
+            :session-config {}
+            :body "Original was {{original}}."
+            :vars nil})]
+      (is (nil? error))
+      (is (= {"original" {:from :workflow-original}}
+             (get-in definition [:steps 0 :contributions 0 :vars])))))
+
+  (testing "body with unknown {{foo}} not declared returns error"
+    (let [{:keys [error]}
+          (compiler/compile-workflow-file
+           {:workflow-kind :single-step-markdown
+            :name "step"
+            :description "A step"
+            :session-config {}
+            :body "Unknown {{foo}} token."
+            :vars nil})]
+      (is (re-find #"Unknown \{\{varname\}\} tokens" error))
+      (is (re-find #"\"foo\"" error)
+          "error message should name the specific unknown var")))
+
+  (testing "non-matching tokens like {{1bad}} and {{}} pass through without error"
+    (let [{:keys [definition error]}
+          (compiler/compile-workflow-file
+           {:workflow-kind :single-step-markdown
+            :name "step"
+            :description "A step"
+            :session-config {}
+            :body "Token {{1bad}} and {{}} are not vars."
+            :vars nil})]
+      (is (nil? error))
+      (is (= {} (get-in definition [:steps 0 :contributions 0 :vars]))
+          "non-matching tokens should not be treated as unknown vars")))
+
+  (testing "body with {{my-var}} declared in frontmatter vars produces correct :vars entry"
+    (let [{:keys [definition error]}
+          (compiler/compile-workflow-file
+           {:workflow-kind :single-step-markdown
+            :name "step"
+            :description "A step"
+            :session-config {}
+            :body "Use {{my-var}} here."
+            :vars {"my-var" {:from :workflow-input :path [:some-field]}}})]
+      (is (nil? error))
+      (is (= {"my-var" {:from :workflow-input :path [:some-field]}}
+             (get-in definition [:steps 0 :contributions 0 :vars])))))
+
+  (testing "no :framing-prompt in workflow-file-meta for single-step .md workflow"
+    (let [{:keys [definition error]}
+          (compiler/compile-workflow-file
+           {:workflow-kind :single-step-markdown
+            :name "step"
+            :description "A step"
+            :session-config {}
+            :body "Body text."
+            :vars nil})]
+      (is (nil? error))
+      (is (nil? (get-in definition [:workflow-file-meta :framing-prompt])))))
+
+  (testing ":prompt-workflow step referencing .md with {{input}} compiles with correct :vars"
+    (let [dir (io/file (System/getProperty "java.io.tmpdir") (str "wf-var-test-" (System/nanoTime)))
+          md-file (io/file dir "my-step.md")]
+      (.mkdirs dir)
+      (spit md-file "---\nname: my-step\ndescription: My step\ntools:\n  - read\n---\nProcess {{input}}.")
+      (try
+        (let [{:keys [definition error]}
+              (compiler/compile-workflow-file
+               {:workflow-kind :multi-step-edn
+                :config {:name "orchestrator"
+                         :description "Orchestrates"
+                         :definition-id "orchestrator"
+                         :steps [{:name "step"
+                                  :type :session
+                                  :prompt-workflow "my-step.md"}]}
+                :source-path (.getAbsolutePath (io/file dir "orchestrator.edn"))})]
+          (is (nil? error))
+          (is (= {"input" {:from :workflow-input :path [:input]}}
+                 (get-in definition [:steps 0 :contributions 0 :vars]))))
+        (finally
+          (.delete md-file)
+          (.delete dir)))))
+
+  (testing ".edn step :tools takes precedence over .md frontmatter tools"
+    (let [dir (io/file (System/getProperty "java.io.tmpdir") (str "wf-tools-test-" (System/nanoTime)))
+          md-file (io/file dir "my-step.md")]
+      (.mkdirs dir)
+      (spit md-file "---\nname: my-step\ndescription: My step\ntools:\n  - read\n---\nProcess {{input}}.")
+      (try
+        (let [{:keys [definition error]}
+              (compiler/compile-workflow-file
+               {:workflow-kind :multi-step-edn
+                :config {:name "orchestrator"
+                         :description "Orchestrates"
+                         :definition-id "orchestrator"
+                         :steps [{:name "step"
+                                  :type :session
+                                  :tools ["bash" "write"]
+                                  :prompt-workflow "my-step.md"}]}
+                :source-path (.getAbsolutePath (io/file dir "orchestrator.edn"))})]
+          (is (nil? error))
+          ;; .edn step tools take precedence
+          (is (= ["bash" "write"] (get-in definition [:steps 0 :tools]))))
+        (finally
+          (.delete md-file)
+          (.delete dir)))))
+
+  (testing ".md frontmatter tools fill in when .edn step omits :tools"
+    (let [dir (io/file (System/getProperty "java.io.tmpdir") (str "wf-tools-fill-test-" (System/nanoTime)))
+          md-file (io/file dir "my-step.md")]
+      (.mkdirs dir)
+      (spit md-file "---\nname: my-step\ndescription: My step\ntools:\n  - read\n---\nProcess {{input}}.")
+      (try
+        (let [{:keys [definition error]}
+              (compiler/compile-workflow-file
+               {:workflow-kind :multi-step-edn
+                :config {:name "orchestrator"
+                         :description "Orchestrates"
+                         :definition-id "orchestrator"
+                         :steps [{:name "step"
+                                  :type :session
+                                  :prompt-workflow "my-step.md"}]}
+                :source-path (.getAbsolutePath (io/file dir "orchestrator.edn"))})]
+          (is (nil? error))
+          ;; .md frontmatter fills in tools when step omits them
+          (is (= ["read"] (get-in definition [:steps 0 :tools]))))
+        (finally
+          (.delete md-file)
+          (.delete dir)))))
+
+  (testing "standard vars always win over declared vars override attempts"
+    ;; vars: frontmatter declaring {"input" {:from :workflow-original}} must NOT override
+    ;; the canonical standard-var spec — {{input}} must still resolve to :workflow-input.
+    (let [{:keys [definition error]}
+          (compiler/compile-workflow-file
+           {:workflow-kind :single-step-markdown
+            :name "step"
+            :description "A step"
+            :session-config {}
+            :body "Process {{input}}."
+            :vars {"input" {:from :workflow-original}}})]
+      (is (nil? error))
+      (is (= {"input" {:from :workflow-input :path [:input]}}
+             (get-in definition [:steps 0 :contributions 0 :vars])))))
+
+  (testing "vars: declared in .md frontmatter threads through :prompt-workflow"
+    ;; compile-prompt-workflow-step passes (:vars referenced) to markdown-body->contribution.
+    ;; A custom var declared in .md frontmatter vars: must appear in the compiled contribution.
+    (let [dir (io/file (System/getProperty "java.io.tmpdir") (str "wf-vars-threading-test-" (System/nanoTime)))
+          md-file (io/file dir "my-step.md")]
+      (.mkdirs dir)
+      (spit md-file "---\nname: my-step\ndescription: My step\ntools:\n  - read\nvars: '{\"my-var\" {:from :workflow-input :path [:some-field]}}'\n---\nUse {{my-var}} here.")
+      (try
+        (let [{:keys [definition error]}
+              (compiler/compile-workflow-file
+               {:workflow-kind :multi-step-edn
+                :config {:name "orchestrator"
+                         :description "Orchestrates"
+                         :definition-id "orchestrator"
+                         :steps [{:name "step"
+                                  :type :session
+                                  :prompt-workflow "my-step.md"}]}
+                :source-path (.getAbsolutePath (io/file dir "orchestrator.edn"))})]
+          (is (nil? error))
+          (is (= {"my-var" {:from :workflow-input :path [:some-field]}}
+                 (get-in definition [:steps 0 :contributions 0 :vars]))
+              "custom var declared in .md frontmatter vars: must be wired in compiled contribution"))
+        (finally
+          (.delete md-file)
+          (.delete dir))))))

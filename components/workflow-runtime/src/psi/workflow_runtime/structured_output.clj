@@ -2,6 +2,7 @@
   "Canonical workflow structured-output parsing, coercion, and validation."
   (:require
    [cheshire.core :as json]
+   [clojure.string :as str]
    [malli.core :as m]
    [psi.workflow-runtime.structured-output-schemas :as structured-output-schemas]
    [psi.workflow-step-materialization.structured-output :as structured-output-contract]))
@@ -16,20 +17,20 @@
   (or (structured-output-schemas/schema-for schema-id schema-version)
       schema))
 
-(defn- parse-json-object
+(defn- parse-json-value
+  "Parse raw-output as JSON. Accepts any valid JSON value (object, string, number,
+   array, boolean). Schema-level constraints are enforced by malli validation
+   downstream, not here.
+
+   Fallback: if raw-output is not valid JSON (e.g. the AI returned plain text
+   `DONE` rather than the JSON string `\"DONE\"`), treat the trimmed raw output
+   as a plain string. This handles the common case where a judge model outputs
+   an unquoted enum word. Schema validation downstream rejects non-conforming values."
   [raw-output]
   (try
-    (let [parsed (json/parse-string raw-output)]
-      (if (map? parsed)
-        {:ok? true :parsed-value parsed}
-        {:ok? false
-         :parsed-value parsed
-         :errors [{:type :parse-error
-                   :message "Structured output must be a single JSON object"}]}))
-    (catch Exception e
-      {:ok? false
-       :errors [{:type :parse-error
-                 :message (ex-message e)}]})))
+    {:ok? true :parsed-value (json/parse-string raw-output)}
+    (catch Exception _
+      {:ok? true :parsed-value (str/trim raw-output)})))
 
 (defn- map-entry-schema
   [schema key-name]
@@ -147,7 +148,7 @@
   [raw-output ai-structured-output]
   (if (contains? ai-structured-output :payload)
     {:ok? true :parsed-value (:payload ai-structured-output)}
-    (parse-json-object raw-output)))
+    (parse-json-value raw-output)))
 
 (defn structured-output-envelope
   ([output-spec raw-output]
@@ -162,6 +163,11 @@
               :errors [{:type :missing-schema
                         :message "Structured output declaration must include a schema or known schema-id/schema-version"}])
        (let [{:keys [ok? parsed-value errors]} (validation-input raw-output ai-structured-output)]
+         ;; ok? is always true for the raw-output path: parse-json-value uses a
+         ;; plain-text fallback and never returns {:ok? false}.  The ok? false
+         ;; branch below is only reachable via the :payload-absent path in
+         ;; ai-structured-output (i.e. when validation-input delegates to
+         ;; parse-json-value and a future caller explicitly passes {:ok? false}).
          (if-not ok?
            (cond-> (assoc base
                           :status :invalid
