@@ -1,3 +1,15 @@
+## 2026-05-28 task-test-review pass
+
+Reviewed skill, task artifacts, `workflow_definitions_test.clj`, `target_ir_compiler_test.clj`, `structured_output_test.clj`, `workflow_judge_test.clj`, `structured_output_schemas.clj`, and all new/renamed workflow EDN files.
+
+Two new actionable issues found:
+
+1. **`pass-status-result` schema has no validation test** — `structured_output_test.clj` tests `judge-review-result` and `judge-routing-result` (string-enum) with representative data but has no test for `psi.workflow/pass-status-result` (`[:map [:status [:enum "PASS" "FAIL"]] [:reason :string]]`). AC 8 requires the schema exists; the loader tests assert the `:schema-id` reference in workflow EDN but no test validates the schema itself against representative JSON. A `reusable-pass-status-result-schema-test` analogous to `reusable-judge-review-result-schema-test` is missing.
+
+2. **`review-implementation-in-worktree` has no loader test** — AC 5 requires it delegates to `review-task-implementation` and the summary step names 5 passes including `review-task-docs`. This structural invariant is unguarded: no loader test asserts the `:target` is `"review-task-implementation"` or that the summary step body contains the correct pass list. A regression (e.g. a future rename) would be invisible to the test suite.
+
+`bb test` green (3 pre-existing failures, 0 new). `bb lint` 0 errors, 0 warnings.
+
 ## 2026-05-28 task-implementation-review pass 12
 
 Reviewed skill, task artifacts, all workflow EDN files (`review-task-design.edn`, `review-task-plan.edn`, `review-task-implementation.edn`, `create-task-plan.edn`, `implement-task.edn`, `review-step.edn`, `review-implementation-in-worktree.edn`), `review-task-docs` skill, `structured_output_schemas.clj`, `structured_output.clj`, `workflow_judge_test.clj`, `workflow_definitions_test.clj`, `CHANGELOG.md`, `README.md`, and `doc/`.
