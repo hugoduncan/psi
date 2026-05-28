@@ -22,7 +22,14 @@
     [{:type :template,
       :text
       "Respond exactly with one word: REPEAT or DONE.\n\nUse the actor step context to identify the specific Munera task under review. Independently inspect that task's artifacts, especially `steps.md`, `implementation.md`, `design.md`, and `plan.md` when present, to determine whether the review cycle surfaced any new actionable feedback that still needs work.\n\nReturn REPEAT if the task still has new actionable follow-up work to address. Return DONE only if the task has no remaining new actionable feedback from that cycle.\n\nDo not re-review the repository generically. Judge the specific Munera task named by the actor output.",
-      :vars {}}]},
+      :vars {}}],
+    :outputs
+    {:source :judge/structured-output,
+     :mode :structured,
+     :schema-id :psi.workflow/judge-routing-result,
+     :schema-version 1,
+     :schema [:enum "REPEAT" "DONE"],
+     :json-schema {:type "string", :enum ["REPEAT" "DONE"]}}},
    :on
    {"REPEAT" {:goto "review", :max-iterations 6},
     "DONE" {:goto :done}}}],
