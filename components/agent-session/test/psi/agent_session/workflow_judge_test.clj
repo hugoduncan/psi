@@ -315,10 +315,15 @@
                  @turn-opts*)))))))
 
 (deftest execute-judge-missing-turn-result-structured-output-fails-test
-  ;; Tests structured judge requests reject a missing bounded turn-result
-  ;; :structured-output seam instead of parsing raw assistant JSON with a
-  ;; synthetic/default strategy envelope.
-  (testing "structured judge fails when structured metadata seam is absent"
+  ;; Tests that when a turn result has no :structured-output metadata but the
+  ;; assistant text is valid JSON matching the schema, the judge routes
+  ;; successfully by falling back to parse-json-value (plain-text fallback,
+  ;; always {:ok? true}).  The old contract (missing metadata → :invalid with
+  ;; :missing-structured-output error) was removed when workflow_judge.clj
+  ;; switched from missing-ai-structured-output-result to output-result, which
+  ;; enables plain-text judge responses (e.g. "DONE"/"REPEAT") to route without
+  ;; requiring provider-native structured-output metadata.
+  (testing "structured judge routes successfully when metadata absent but assistant text is valid JSON"
     (with-redefs [psi.session-persistence.core/messages-from-entries-in
                   (fn [_ctx _sid] [])
                   psi.workflow-runtime.turn-execution-contract/execute-judge-turn!
@@ -333,17 +338,12 @@
                      :step-order step-order
                      :step-runs structured-review-step-runs})
             envelope (get-in result [:judge-output :review :structured-output])]
-        (is (nil? (:judge-event result)))
-        (is (= {:action :fail
-                :reason :invalid-structured-output
-                :output-key :review}
-               (select-keys (:routing-result result) [:action :reason :output-key])))
-        (is (= :invalid (:status envelope)))
+        (is (= :clear (:judge-event result)))
+        (is (= {:action :complete} (:routing-result result)))
+        (is (= :valid (:status envelope)))
         (is (= :prompted-json (:strategy envelope)))
-        (is (= [{:type :missing-structured-output
-                 :message "Structured workflow generation did not return structured-output metadata"}]
-               (:errors envelope)))
-        (is (not (contains? envelope :value)))))))
+        (is (= :clear (get-in envelope [:value :decision])))
+        (is (= [] (get-in envelope [:value :issues])))))))
 
 (deftest execute-judge-structured-output-success-uses-turn-result-metadata-test
   ;; Tests successful structured judge envelopes are built from the top-level

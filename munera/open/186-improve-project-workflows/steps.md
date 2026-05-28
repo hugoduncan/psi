@@ -137,7 +137,7 @@
 
 ## Follow-up — task-implementation-review pass 11
 
-- [ ] Fix `execute-judge-missing-turn-result-structured-output-fails-test` in `workflow_judge_test.clj`: commit `d1a81113` changed `parse-json-value` to plain-text fallback (always `{:ok? true}`) and changed `workflow_judge.clj` to use `output-result` instead of `missing-ai-structured-output-result`. The test still asserts the old "fail if no structured-output metadata" contract. Update the test to assert the new contract: when turn result has no `:structured-output` metadata but assistant text is valid JSON matching the schema, the judge routes successfully (`:action :complete`). Run focused `workflow-judge-test` green, then `bb test` green.
+- [x] Fix `execute-judge-missing-turn-result-structured-output-fails-test` in `workflow_judge_test.clj`: commit `d1a81113` changed `parse-json-value` to plain-text fallback (always `{:ok? true}`) and changed `workflow_judge.clj` to use `output-result` instead of `missing-ai-structured-output-result`. The test still asserts the old "fail if no structured-output metadata" contract. Update the test to assert the new contract: when turn result has no `:structured-output` metadata but assistant text is valid JSON matching the schema, the judge routes successfully (`:action :complete`). Run focused `workflow-judge-test` green, then `bb test` green.
 
 ## Follow-up — task-implementation-review pass 7
 
