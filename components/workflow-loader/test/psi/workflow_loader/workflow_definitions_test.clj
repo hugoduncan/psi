@@ -1,11 +1,10 @@
 (ns psi.workflow-loader.workflow-definitions-test
   "Loader/compiler tests for new and renamed workflow definitions.
 
-   Each test loads a workflow through the full loader/compiler pipeline using
-   temp-dir fixtures. Tests assert: no load errors, correct step count, correct
-   step names, correct step types, and that :prompt-workflow references resolve.
-   For judge steps: assert expected :on routing keys and :outputs presence.
-   For {{input}}-bearing steps: assert :vars wired to :workflow-input."
+   Each workflow gets one deftest with testing blocks, one load-edn-only call.
+   Tests assert: no load errors, correct step count, correct step names and
+   types, :vars wired to :workflow-input for {{input}}-bearing steps, and for
+   judge steps: expected :on routing keys and :outputs presence."
   (:require
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
@@ -61,27 +60,16 @@
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-design
 
-(deftest review-task-design-loads-test
-  (testing "review-task-design loads without error"
-    (load-edn-only
-     "review-task-design.edn"
-     (fn [{:keys [definitions errors]}]
+(deftest review-task-design-test
+  (load-edn-only
+   "review-task-design.edn"
+   (fn [{:keys [definitions errors]}]
+     (testing "loads without error"
        (is (empty? errors))
-       (is (contains? definitions "review-task-design"))))))
-
-(deftest review-task-design-step-count-test
-  (testing "review-task-design has 6 steps"
-    (load-edn-only
-     "review-task-design.edn"
-     (fn [{:keys [definitions]}]
-       (is (= 6 (count (get-in definitions ["review-task-design" :steps]))))))))
-
-(deftest review-task-design-step-names-and-types-test
-  (testing "review-task-design has correct step names and types"
-    (load-edn-only
-     "review-task-design.edn"
-     (fn [{:keys [definitions]}]
-       (let [steps (get-in definitions ["review-task-design" :steps])]
+       (is (contains? definitions "review-task-design")))
+     (let [steps (get-in definitions ["review-task-design" :steps])]
+       (testing "has 6 steps with correct names and types"
+         (is (= 6 (count steps)))
          (is (= ["ambiguity-review"
                  "ambiguity-follow-up"
                  "inconsistency-review"
@@ -90,65 +78,33 @@
                  "final-summary"]
                 (mapv :name steps)))
          (is (= [:session :session :session :session :session :session]
-                (mapv :type steps))))))))
-
-(deftest review-task-design-input-vars-wired-test
-  (testing "review-task-design actor steps have {{input}} wired to :workflow-input"
-    (load-edn-only
-     "review-task-design.edn"
-     (fn [{:keys [definitions]}]
-       (let [steps (get-in definitions ["review-task-design" :steps])]
+                (mapv :type steps))))
+       (testing "actor steps have {{input}} wired to :workflow-input"
          (doseq [step steps]
            (is (step-has-input-var-wired? step)
-               (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))))))
-
-(deftest review-task-design-judge-routing-test
-  (testing "review-task-design clarity-status judge has REPEAT/DONE routing"
-    (load-edn-only
-     "review-task-design.edn"
-     (fn [{:keys [definitions]}]
-       (let [clarity-step (->> (get-in definitions ["review-task-design" :steps])
-                               (filter #(= "clarity-status" (:name %)))
-                               first)]
-         (is (= #{"REPEAT" "DONE"} (set (keys (:on clarity-step)))))
-         (is (some? (:judge clarity-step))))))))
-
-(deftest review-task-design-judge-outputs-test
-  (testing "review-task-design clarity-status judge has :outputs key with routing-result entry"
-    (load-edn-only
-     "review-task-design.edn"
-     (fn [{:keys [definitions]}]
-       (let [clarity-step (->> (get-in definitions ["review-task-design" :steps])
-                               (filter #(= "clarity-status" (:name %)))
-                               first)]
-         (is (contains? (:judge clarity-step) :outputs))
-         (is (= :psi.workflow/judge-routing-result
-                (get-in clarity-step [:judge :outputs :routing-result :schema-id]))))))))
+               (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))
+       (let [clarity-step (first (filter #(= "clarity-status" (:name %)) steps))]
+         (testing "clarity-status judge has REPEAT/DONE routing"
+           (is (= #{"REPEAT" "DONE"} (set (keys (:on clarity-step)))))
+           (is (some? (:judge clarity-step))))
+         (testing "clarity-status judge has :outputs with judge-routing-result schema-id"
+           (is (contains? (:judge clarity-step) :outputs))
+           (is (= :psi.workflow/judge-routing-result
+                  (get-in clarity-step [:judge :outputs :routing-result :schema-id])))))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-plan
 
-(deftest review-task-plan-loads-test
-  (testing "review-task-plan loads without error"
-    (load-edn-only
-     "review-task-plan.edn"
-     (fn [{:keys [definitions errors]}]
+(deftest review-task-plan-test
+  (load-edn-only
+   "review-task-plan.edn"
+   (fn [{:keys [definitions errors]}]
+     (testing "loads without error"
        (is (empty? errors))
-       (is (contains? definitions "review-task-plan"))))))
-
-(deftest review-task-plan-step-count-test
-  (testing "review-task-plan has 6 steps"
-    (load-edn-only
-     "review-task-plan.edn"
-     (fn [{:keys [definitions]}]
-       (is (= 6 (count (get-in definitions ["review-task-plan" :steps]))))))))
-
-(deftest review-task-plan-step-names-and-types-test
-  (testing "review-task-plan has correct step names and types"
-    (load-edn-only
-     "review-task-plan.edn"
-     (fn [{:keys [definitions]}]
-       (let [steps (get-in definitions ["review-task-plan" :steps])]
+       (is (contains? definitions "review-task-plan")))
+     (let [steps (get-in definitions ["review-task-plan" :steps])]
+       (testing "has 6 steps with correct names and types"
+         (is (= 6 (count steps)))
          (is (= ["ambiguity-review"
                  "ambiguity-follow-up"
                  "inconsistency-review"
@@ -157,109 +113,60 @@
                  "final-summary"]
                 (mapv :name steps)))
          (is (= [:session :session :session :session :session :session]
-                (mapv :type steps))))))))
-
-(deftest review-task-plan-input-vars-wired-test
-  (testing "review-task-plan actor steps have {{input}} wired to :workflow-input"
-    (load-edn-only
-     "review-task-plan.edn"
-     (fn [{:keys [definitions]}]
-       (let [steps (get-in definitions ["review-task-plan" :steps])]
+                (mapv :type steps))))
+       (testing "actor steps have {{input}} wired to :workflow-input"
          (doseq [step steps]
            (is (step-has-input-var-wired? step)
-               (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))))))
-
-(deftest review-task-plan-judge-routing-test
-  (testing "review-task-plan clarity-status judge has REPEAT/DONE routing"
-    (load-edn-only
-     "review-task-plan.edn"
-     (fn [{:keys [definitions]}]
-       (let [clarity-step (->> (get-in definitions ["review-task-plan" :steps])
-                               (filter #(= "clarity-status" (:name %)))
-                               first)]
-         (is (= #{"REPEAT" "DONE"} (set (keys (:on clarity-step)))))
-         (is (some? (:judge clarity-step))))))))
-
-(deftest review-task-plan-judge-outputs-test
-  (testing "review-task-plan clarity-status judge has :outputs key with routing-result entry"
-    (load-edn-only
-     "review-task-plan.edn"
-     (fn [{:keys [definitions]}]
-       (let [clarity-step (->> (get-in definitions ["review-task-plan" :steps])
-                               (filter #(= "clarity-status" (:name %)))
-                               first)]
-         (is (contains? (:judge clarity-step) :outputs))
-         (is (= :psi.workflow/judge-routing-result
-                (get-in clarity-step [:judge :outputs :routing-result :schema-id]))))))))
+               (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))
+       (let [clarity-step (first (filter #(= "clarity-status" (:name %)) steps))]
+         (testing "clarity-status judge has REPEAT/DONE routing"
+           (is (= #{"REPEAT" "DONE"} (set (keys (:on clarity-step)))))
+           (is (some? (:judge clarity-step))))
+         (testing "clarity-status judge has :outputs with judge-routing-result schema-id"
+           (is (contains? (:judge clarity-step) :outputs))
+           (is (= :psi.workflow/judge-routing-result
+                  (get-in clarity-step [:judge :outputs :routing-result :schema-id])))))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-implementation
 
-(deftest review-task-implementation-loads-test
-  (testing "review-task-implementation loads without error"
-    (with-workflow-dir
-      {"review-task-implementation.edn" (slurp-workflow-file "review-task-implementation.edn")}
-      (fn [{:keys [definitions errors]}]
-        (is (empty? errors))
-        (is (contains? definitions "review-task-implementation"))))))
-
-(deftest review-task-implementation-step-count-test
-  (testing "review-task-implementation has 5 steps"
-    (with-workflow-dir
-      {"review-task-implementation.edn" (slurp-workflow-file "review-task-implementation.edn")}
-      (fn [{:keys [definitions]}]
-        (is (= 5 (count (get-in definitions ["review-task-implementation" :steps]))))))))
-
-(deftest review-task-implementation-step-names-and-types-test
-  (testing "review-task-implementation has correct step names and types"
-    (with-workflow-dir
-      {"review-task-implementation.edn" (slurp-workflow-file "review-task-implementation.edn")}
-      (fn [{:keys [definitions]}]
-        (let [steps (get-in definitions ["review-task-implementation" :steps])]
-          (is (= ["review-task-implementation"
-                  "review-task-tests"
-                  "review-test-shape"
-                  "review-task-docs"
-                  "review-code-shape"]
-                 (mapv :name steps)))
-          (is (= [:delegate :delegate :delegate :delegate :delegate]
-                 (mapv :type steps))))))))
+(deftest review-task-implementation-test
+  (load-edn-only
+   "review-task-implementation.edn"
+   (fn [{:keys [definitions errors]}]
+     (testing "loads without error"
+       (is (empty? errors))
+       (is (contains? definitions "review-task-implementation")))
+     (let [steps (get-in definitions ["review-task-implementation" :steps])]
+       (testing "has 5 steps with correct names and types"
+         (is (= 5 (count steps)))
+         (is (= ["review-task-implementation"
+                 "review-task-tests"
+                 "review-test-shape"
+                 "review-task-docs"
+                 "review-code-shape"]
+                (mapv :name steps)))
+         (is (= [:delegate :delegate :delegate :delegate :delegate]
+                (mapv :type steps))))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; create-task-plan
 
-(deftest create-task-plan-loads-test
-  (testing "create-task-plan loads without error"
-    (load-edn-only
-     "create-task-plan.edn"
-     (fn [{:keys [definitions errors]}]
+(deftest create-task-plan-test
+  (load-edn-only
+   "create-task-plan.edn"
+   (fn [{:keys [definitions errors]}]
+     (testing "loads without error"
        (is (empty? errors))
-       (is (contains? definitions "create-task-plan"))))))
-
-(deftest create-task-plan-step-count-test
-  (testing "create-task-plan has 1 step"
-    (load-edn-only
-     "create-task-plan.edn"
-     (fn [{:keys [definitions]}]
-       (is (= 1 (count (get-in definitions ["create-task-plan" :steps]))))))))
-
-(deftest create-task-plan-step-names-and-types-test
-  (testing "create-task-plan has correct step name and type"
-    (load-edn-only
-     "create-task-plan.edn"
-     (fn [{:keys [definitions]}]
-       (let [steps (get-in definitions ["create-task-plan" :steps])]
+       (is (contains? definitions "create-task-plan")))
+     (let [steps (get-in definitions ["create-task-plan" :steps])]
+       (testing "has 1 step with correct name and type"
+         (is (= 1 (count steps)))
          (is (= ["create-plan"] (mapv :name steps)))
          (is (= [:session] (mapv :type steps)))
          (is (seq (:contributions (first steps)))
-             "create-plan step should have contributions"))))))
-
-(deftest create-task-plan-input-vars-wired-test
-  (testing "create-task-plan create-plan step has {{input}} wired to :workflow-input"
-    (load-edn-only
-     "create-task-plan.edn"
-     (fn [{:keys [definitions]}]
-       (let [steps (get-in definitions ["create-task-plan" :steps])]
+             "create-plan step should have contributions"))
+       (testing "create-plan step has {{input}} wired to :workflow-input"
          (doseq [step steps]
            (is (step-has-input-var-wired? step)
                (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))))))
@@ -267,170 +174,88 @@
 ;;; ---------------------------------------------------------------------------
 ;;; review-step
 
-(deftest review-step-loads-test
-  (testing "review-step loads without error"
-    (load-edn-only
-     "review-step.edn"
-     (fn [{:keys [definitions errors]}]
+(deftest review-step-test
+  (load-edn-only
+   "review-step.edn"
+   (fn [{:keys [definitions errors]}]
+     (testing "loads without error"
        (is (empty? errors))
-       (is (contains? definitions "review-step"))))))
-
-(deftest review-step-step-count-test
-  (testing "review-step has 3 steps"
-    (load-edn-only
-     "review-step.edn"
-     (fn [{:keys [definitions]}]
-       (is (= 3 (count (get-in definitions ["review-step" :steps]))))))))
-
-(deftest review-step-step-names-and-types-test
-  (testing "review-step has correct step names and types"
-    (load-edn-only
-     "review-step.edn"
-     (fn [{:keys [definitions]}]
-       (let [steps (get-in definitions ["review-step" :steps])]
+       (is (contains? definitions "review-step")))
+     (let [steps (get-in definitions ["review-step" :steps])]
+       (testing "has 3 steps with correct names and types"
+         (is (= 3 (count steps)))
          (is (= ["review" "follow-up" "review-status"] (mapv :name steps)))
-         (is (= [:session :session :session] (mapv :type steps))))))))
-
-(deftest review-step-input-vars-wired-test
-  (testing "review-step steps have {{input}} wired to :workflow-input"
-    (load-edn-only
-     "review-step.edn"
-     (fn [{:keys [definitions]}]
-       (let [steps (get-in definitions ["review-step" :steps])]
+         (is (= [:session :session :session] (mapv :type steps))))
+       (testing "steps have {{input}} wired to :workflow-input"
          (doseq [step steps]
            (is (step-has-input-var-wired? step)
-               (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))))))
-
-(deftest review-step-judge-routing-test
-  (testing "review-step review-status judge has REPEAT/DONE routing"
-    (load-edn-only
-     "review-step.edn"
-     (fn [{:keys [definitions]}]
-       (let [status-step (->> (get-in definitions ["review-step" :steps])
-                              (filter #(= "review-status" (:name %)))
-                              first)]
-         (is (= #{"REPEAT" "DONE"} (set (keys (:on status-step)))))
-         (is (some? (:judge status-step))))))))
-
-(deftest review-step-judge-outputs-test
-  (testing "review-step review-status judge has :outputs with judge-routing-result schema-id"
-    (load-edn-only
-     "review-step.edn"
-     (fn [{:keys [definitions]}]
-       (let [status-step (->> (get-in definitions ["review-step" :steps])
-                              (filter #(= "review-status" (:name %)))
-                              first)]
-         (is (contains? (:judge status-step) :outputs))
-         (is (= :psi.workflow/judge-routing-result
-                (get-in status-step [:judge :outputs :routing-result :schema-id]))))))))
-
-(deftest review-step-skill-var-wired-test
-  (testing "review-step review step has {{skill}} wired to :workflow-input"
-    (load-edn-only
-     "review-step.edn"
-     (fn [{:keys [definitions]}]
-       (let [review-step (->> (get-in definitions ["review-step" :steps])
-                              (filter #(= "review" (:name %)))
-                              first)]
-         (is (some (fn [c]
-                     (and (= :template (:type c))
-                          (= {:from :workflow-input :path [:skill]}
-                             (get-in c [:vars "skill"]))))
-                   (:contributions review-step))
-             "review step should have {{skill}} wired to :workflow-input"))))))
+               (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))
+       (testing "review step has {{skill}} wired to :workflow-input"
+         (let [review-step (first (filter #(= "review" (:name %)) steps))]
+           (is (some (fn [c]
+                       (and (= :template (:type c))
+                            (= {:from :workflow-input :path [:skill]}
+                               (get-in c [:vars "skill"]))))
+                     (:contributions review-step))
+               "review step should have {{skill}} wired to :workflow-input")))
+       (let [status-step (first (filter #(= "review-status" (:name %)) steps))]
+         (testing "review-status judge has REPEAT/DONE routing"
+           (is (= #{"REPEAT" "DONE"} (set (keys (:on status-step)))))
+           (is (some? (:judge status-step))))
+         (testing "review-status judge has :outputs with judge-routing-result schema-id"
+           (is (contains? (:judge status-step) :outputs))
+           (is (= :psi.workflow/judge-routing-result
+                  (get-in status-step [:judge :outputs :routing-result :schema-id])))))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; implement-task
 
-(deftest implement-task-loads-test
-  (testing "implement-task loads without error"
-    (load-edn-only
-     "implement-task.edn"
-     (fn [{:keys [definitions errors]}]
+(deftest implement-task-test
+  (load-edn-only
+   "implement-task.edn"
+   (fn [{:keys [definitions errors]}]
+     (testing "loads without error"
        (is (empty? errors))
-       (is (contains? definitions "implement-task"))))))
-
-(deftest implement-task-step-count-test
-  (testing "implement-task has 2 steps"
-    (load-edn-only
-     "implement-task.edn"
-     (fn [{:keys [definitions]}]
-       (is (= 2 (count (get-in definitions ["implement-task" :steps]))))))))
-
-(deftest implement-task-step-names-and-types-test
-  (testing "implement-task has correct step names and types"
-    (load-edn-only
-     "implement-task.edn"
-     (fn [{:keys [definitions]}]
-       (let [steps (get-in definitions ["implement-task" :steps])]
+       (is (contains? definitions "implement-task")))
+     (let [steps (get-in definitions ["implement-task" :steps])]
+       (testing "has 2 steps with correct names and types"
+         (is (= 2 (count steps)))
          (is (= ["implement-pass" "final-summary"] (mapv :name steps)))
-         (is (= [:session :session] (mapv :type steps))))))))
-
-(deftest implement-task-input-vars-wired-test
-  (testing "implement-task actor steps have {{input}} wired to :workflow-input"
-    (load-edn-only
-     "implement-task.edn"
-     (fn [{:keys [definitions]}]
-       (let [steps (get-in definitions ["implement-task" :steps])]
+         (is (= [:session :session] (mapv :type steps))))
+       (testing "actor steps have {{input}} wired to :workflow-input"
          (doseq [step steps]
            (is (step-has-input-var-wired? step)
-               (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))))))
-
-(deftest implement-task-judge-routing-test
-  (testing "implement-task implement-pass judge has REPEAT/DONE routing"
-    (load-edn-only
-     "implement-task.edn"
-     (fn [{:keys [definitions]}]
-       (let [pass-step (->> (get-in definitions ["implement-task" :steps])
-                            (filter #(= "implement-pass" (:name %)))
-                            first)]
-         (is (= #{"REPEAT" "DONE"} (set (keys (:on pass-step)))))
-         (is (some? (:judge pass-step))))))))
-
-(deftest implement-task-judge-outputs-test
-  (testing "implement-task implement-pass judge has :outputs key with routing-result entry"
-    (load-edn-only
-     "implement-task.edn"
-     (fn [{:keys [definitions]}]
-       (let [pass-step (->> (get-in definitions ["implement-task" :steps])
-                            (filter #(= "implement-pass" (:name %)))
-                            first)]
-         (is (contains? (:judge pass-step) :outputs))
-         (is (= :psi.workflow/judge-routing-result
-                (get-in pass-step [:judge :outputs :routing-result :schema-id]))))))))
+               (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))
+       (let [pass-step (first (filter #(= "implement-pass" (:name %)) steps))]
+         (testing "implement-pass judge has REPEAT/DONE routing"
+           (is (= #{"REPEAT" "DONE"} (set (keys (:on pass-step)))))
+           (is (some? (:judge pass-step))))
+         (testing "implement-pass judge has :outputs with judge-routing-result schema-id"
+           (is (contains? (:judge pass-step) :outputs))
+           (is (= :psi.workflow/judge-routing-result
+                  (get-in pass-step [:judge :outputs :routing-result :schema-id])))))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; review-implementation-in-worktree
 
-(deftest review-implementation-in-worktree-loads-test
-  (testing "review-implementation-in-worktree loads without error"
-    (load-edn-only
-     "review-implementation-in-worktree.edn"
-     (fn [{:keys [definitions errors]}]
+(deftest review-implementation-in-worktree-test
+  (load-edn-only
+   "review-implementation-in-worktree.edn"
+   (fn [{:keys [definitions errors]}]
+     (testing "loads without error"
        (is (empty? errors))
-       (is (contains? definitions "review-implementation-in-worktree"))))))
-
-(deftest review-implementation-in-worktree-delegate-target-test
-  (testing "review-implementation-in-worktree has a delegate step targeting review-task-implementation"
-    (load-edn-only
-     "review-implementation-in-worktree.edn"
-     (fn [{:keys [definitions]}]
-       (let [steps (get-in definitions ["review-implementation-in-worktree" :steps])
-             delegate-step (first (filter #(= :delegate (:type %)) steps))]
-         (is (some? delegate-step) "should have a delegate step")
-         (is (= "review-task-implementation" (:target delegate-step))))))))
-
-(deftest review-implementation-in-worktree-summary-names-review-task-docs-test
-  (testing "review-implementation-in-worktree summary step body names review-task-docs"
-    (load-edn-only
-     "review-implementation-in-worktree.edn"
-     (fn [{:keys [definitions]}]
-       (let [steps (get-in definitions ["review-implementation-in-worktree" :steps])
-             summary-step (first (filter #(= "summary" (:name %)) steps))
-             summary-text (->> (:contributions summary-step)
-                               (filter #(= :template (:type %)))
-                               (map :text)
-                               (apply str))]
-         (is (some? summary-step) "should have a summary step")
-         (is (.contains summary-text "review-task-docs")
-             "summary step body should name review-task-docs"))))))
+       (is (contains? definitions "review-implementation-in-worktree")))
+     (let [steps (get-in definitions ["review-implementation-in-worktree" :steps])]
+       (testing "has a delegate step targeting review-task-implementation"
+         (let [delegate-step (first (filter #(= :delegate (:type %)) steps))]
+           (is (some? delegate-step) "should have a delegate step")
+           (is (= "review-task-implementation" (:target delegate-step)))))
+       (testing "summary step body names review-task-docs"
+         (let [summary-step (first (filter #(= "summary" (:name %)) steps))
+               summary-text (->> (:contributions summary-step)
+                                 (filter #(= :template (:type %)))
+                                 (map :text)
+                                 (apply str))]
+           (is (some? summary-step) "should have a summary step")
+           (is (.contains summary-text "review-task-docs")
+               "summary step body should name review-task-docs")))))))

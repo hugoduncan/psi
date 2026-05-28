@@ -178,7 +178,7 @@
   ;; Tests the psi.workflow/pass-status-result schema exported by the runtime
   ;; and referenced by schema id/version. Validates representative valid and
   ;; invalid JSON inputs.
-  (let [pass-status-spec {:source :judge/structured-output
+  (let [pass-status-spec {:source :session/structured-output
                           :mode :structured
                           :schema-id schemas/pass-status-result-schema-id
                           :schema-version schemas/pass-status-result-schema-version
