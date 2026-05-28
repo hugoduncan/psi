@@ -535,3 +535,51 @@
         (is (= :needs-work (:judge-event result)))
         (is (= {:action :goto :target "step-2-build"} (:routing-result result)))
         (is (= :needs-work (get-in result [:judge-output :review :structured-output :value :decision])))))))
+
+(def string-enum-judge-spec
+  ;; [:enum "REPEAT" "DONE"] — structured-output value is a plain string, not a map.
+  ;; Bug 3 regression: old code did (:decision raw-value) which returns nil for strings.
+  {:type :llm
+   :session {:contributions [{:type :template
+                              :text "Respond with exactly one word: REPEAT or DONE."
+                              :vars {}}]}
+   :outputs {:routing-result
+             {:source :judge/structured-output
+              :mode :structured
+              :schema-id :psi.workflow/judge-routing-result
+              :schema-version 1
+              :schema [:enum "REPEAT" "DONE"]
+              :json-schema {:type "string" :enum ["REPEAT" "DONE"]}}}
+   :projection :none})
+
+(deftest execute-judge-string-enum-structured-output-test
+  ;; Regression test for bug 3: execute-judge! extracted :decision from the structured
+  ;; output value, which silently returns nil for [:enum "REPEAT" "DONE"] schemas where
+  ;; the validated value is a plain string.  The fix uses the string directly when the
+  ;; value is not a map.
+  (testing "string-enum structured output routes using the string value directly"
+    (with-redefs [psi.session-persistence.core/messages-from-entries-in
+                  (fn [_ctx _sid] [])
+                  psi.workflow-runtime.turn-execution-contract/execute-judge-turn!
+                  (fn [_ctx sid _text _opts]
+                    {:status :ok
+                     :session-id sid
+                     :assistant-text "\"DONE\""
+                     :structured-output {:strategy :prompted-json
+                                         :source :prompted-json/text
+                                         :payload "DONE"
+                                         :raw-payload "\"DONE\""}})]
+      (let [result (workflow-judge/execute-judge!
+                    (structured-judge-test-ctx) "parent-1" "actor-1"
+                    string-enum-judge-spec
+                    {"REPEAT" {:goto "step-1" :max-iterations 3}
+                     "DONE"   {:goto :next}}
+                    {:current-step-id "step-2"
+                     :step-order ["step-1" "step-2"]
+                     :step-runs {"step-1" {:step-id "step-1" :attempts [] :iteration-count 1}
+                                 "step-2" {:step-id "step-2" :attempts [] :iteration-count 1}}})]
+        ;; Pre-fix: judge-event was nil because (:decision "DONE") => nil
+        (is (= "DONE" (:judge-event result)))
+        (is (= {:action :complete} (:routing-result result)))
+        (is (= :valid (get-in result [:judge-output :routing-result :structured-output :status])))
+        (is (= "DONE" (get-in result [:judge-output :routing-result :structured-output :value])))))))
