@@ -1,3 +1,27 @@
+## 2026-05-28 code-shaper review (pass 2)
+
+Three actionable issues found. HEAD `52fc773e`.
+
+**1. `compiler_target_authoring_test.clj` `parsed` fixture is missing `:vars` key.**
+The `compile-target-authored-workflow-file-test` fixture (line 11–14) does not include
+`:vars nil`. `compiler_test.clj`'s `markdown-parsed` fixture was fixed in `f1ef7514` but
+`compiler_target_authoring_test.clj` was not updated. The same shape-divergence risk
+applies: a future compiler change that distinguishes `nil` from absent `:vars` would not
+be caught.
+
+**2. `merge-markdown-session-config` — nested `if` inside `reduce` is inconsistent idiom.**
+The inner `(if (contains? markdown-session-config key) (assoc ...) acc)` guard is
+necessary for correctness (avoids assigning `nil` for absent keys), but the whole function
+can be expressed more simply as `(merge (select-keys markdown-session-config
+markdown-session-config-keys) step)`. `merge` gives `step` precedence (later map wins),
+which is the correct semantics. The `reduce` form adds indirection without benefit.
+
+**3. `read-prompt-workflow` — redundant two-branch `nil`/`not= :md` file-kind check.**
+`file-kind-from-path` returns `nil`, `:md`, or `:edn`. Two separate `cond` branches handle
+`nil` and `(not= :md)` with nearly identical error messages. They can be collapsed to one:
+`(not= :md (file-kind-from-path resolved-path))`. The distinct error message for `nil` vs
+`:edn` adds no diagnostic value to the caller (both say "must reference a .md file").
+
 ## 2026-05-28 review-task-docs (pass 2)
 
 No new actionable issues found.
