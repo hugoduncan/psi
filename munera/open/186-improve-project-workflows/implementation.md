@@ -1,3 +1,13 @@
+## 2026-05-28 task-implementation-review pass 4
+
+Reviewed skill, task artifacts, all new/renamed workflow EDN files, `review-task-docs` skill, `structured_output_schemas.clj`, `target_ir_compiler.clj`, `workflow_definitions_test.clj`, `doc/workflows.md`, `README.md`, and `CHANGELOG.md`. Also reviewed post-pass-3 commits `8a4dde28`, `5d1cd647`, `dc0c7595` (review-step judge removal/restore cycle and structured-output string-enum regression fix).
+
+One new actionable issue found:
+
+**CHANGELOG missing entries for user-visible changes** — `[Unreleased]` has no entries for: (a) new workflows `review-task-design`, `create-task-plan`; (b) renamed workflows `review-task-implementation` (from `review-implementation`) and `review-task-plan` (from `review-task-until-clear`) — renames are breaking since old names are gone; (c) new `review-task-docs` review step in `review-task-implementation`. These are new commands/behaviours visible via `/delegate`. Per AGENTS.md changelog rule, user-visible changes require an `[Unreleased]` entry before the commit.
+
+`bb lint` clean (0 errors, 0 warnings). `bb test` green (exit 0, all dots).
+
 ## 2026-05-27 task-implementation-review pass 3
 
 Reviewed skill, task artifacts, `review-step.edn` (post-structural-fix commit `f18c2d21`), `workflow_definitions_test.clj`, and full `bb test` / `bb lint`.

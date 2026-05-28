@@ -127,6 +127,10 @@
 - [x] Remove orphaned `.md` files `review-step-review.md` and `review-step-follow-up.md` — extracted in slice 3 but abandoned when `review-step.edn` was fixed to use inline contributions; now unreferenced dead artifacts.
 - [x] Add loader test assertion that `{{input}}`-bearing steps have `:vars` wired to `:workflow-input` (not `:vars {}`) to prevent silent regression.
 
+## Follow-up — task-implementation-review pass 4
+
+- [ ] Add CHANGELOG `[Unreleased]` entries for user-visible changes: new workflows `review-task-design` (Added) and `create-task-plan` (Added); renamed workflows `review-task-implementation` (Changed, from `review-implementation`) and `review-task-plan` (Changed, from `review-task-until-clear`); new `review-task-docs` step in `review-task-implementation` chain (Changed).
+
 ## Follow-up — task-implementation-review pass 3
 
 - [x] Add loader tests for `review-step` in `workflow_definitions_test.clj` covering the post-structural-fix shape: loads without error, 2 steps (`review`, `follow-up`), correct step types (`:session`, `:session`), judge on `follow-up` has REPEAT/DONE `:on` routing, judge `:outputs` has `judge-routing-result` schema-id. Run focused loader tests green and commit.
