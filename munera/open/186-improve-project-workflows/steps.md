@@ -148,3 +148,9 @@
 
 - [x] Fix `structured-output-envelope-invalid-json-test` name and comment: `"not json"` no longer triggers a parse error (plain-text fallback returns `{:ok? true}` with value `"not json"`); the test now exercises the malli validation-error path, not a parse-error path. Update the test docstring/comment to reflect this. Verify `bb test` still green.
 - [x] Address dead `{:ok? false}` branch in `structured-output-envelope` / `validation-input`: `parse-json-value` now always returns `{:ok? true}`, making the `ok? false` branch unreachable for the `raw-output` path. Either remove the dead branch or add a comment that it is only reachable via the `:payload`-absent path in `ai-structured-output`.
+
+## Follow-up — test-shaper review pass
+
+- [ ] Consolidate `workflow_definitions_test.clj` per-workflow `deftest` explosion: merge each workflow's 4–6 separate `deftest` forms (loads, step-count, step-names-and-types, input-vars-wired, judge-routing, judge-outputs) into one `deftest` per workflow with `testing` blocks, one `load-edn-only` call per workflow. Preserves all assertions, eliminates 28+ redundant fixture setups. Run `bb test` green.
+- [ ] Fix `review-task-implementation` fixture inconsistency in `workflow_definitions_test.clj`: replace the inline `with-workflow-dir` call with `load-edn-only` to match the pattern used by all other workflows.
+- [ ] Fix `reusable-pass-status-result-schema-test` in `structured_output_test.clj`: change `:source :judge/structured-output` → `:source :session/structured-output` to match the design-specified usage of `pass-status-result` as an actor-step schema. Run `bb test` green.

@@ -1,3 +1,17 @@
+## 2026-05-28 test-shaper review pass
+
+Reviewed `workflow_definitions_test.clj`, `structured_output_test.clj`, and `workflow_judge_test.clj` (agent-session) against the test-shaper skill.
+
+Three actionable issues found:
+
+1. **`workflow_definitions_test.clj` — high test fragmentation across per-workflow deftest explosion**: Each of 7 workflows has 4–6 separate `deftest` forms (loads, step-count, step-names-and-types, input-vars-wired, judge-routing, judge-outputs). Each loads the same `.edn` file independently via `load-edn-only`. 35 tests × 1 file parse each = 35 redundant fixture setups for ~7 workflows. Economical: consolidate per-workflow into one `deftest` with `testing` blocks — same coverage, one parse per workflow, failures localize to the workflow. The current shape also violates `single_concern`: a loads-test and step-count-test are trivially subsumed by step-names-and-types-test.
+
+2. **`workflow_definitions_test.clj` — `review-task-implementation` uses `with-workflow-dir` directly instead of `load-edn-only`**: All other workflows use `load-edn-only`; `review-task-implementation` duplicates the same one-file map inline. Inconsistent fixture style with identical semantics. Change to `load-edn-only`.
+
+3. **`structured_output_test.clj` — `reusable-pass-status-result-schema-test` uses `:source :judge/structured-output` but `pass-status-result` is an actor-step schema**: Design specifies `pass-status-result` for actor steps emitting `PASS_STATUS` (`:source :session/structured-output`). The test spec uses `:judge/structured-output`. `output-result` does not validate `:source`, so the test passes, but the spec is misleading and misrepresents the intended usage. Update to `:source :session/structured-output`.
+
+`bb test` green (3 pre-existing failures, 0 new). `bb lint` 0 errors, 0 warnings.
+
 ## 2026-05-28 task-test-review follow-up execution
 
 Executed both unchecked items from the task-test-review pass:
