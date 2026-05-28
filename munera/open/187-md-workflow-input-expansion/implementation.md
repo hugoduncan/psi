@@ -1,3 +1,17 @@
+## 2026-05-28 implementation-review follow-up
+
+Fixed standard-vars override protection bug in `markdown-body->contribution`:
+changed `(merge standard-vars declared-vars)` to `(merge declared-vars standard-vars)`
+so that `"input"` and `"original"` always use their canonical source specs regardless
+of any `vars:` frontmatter declaration.
+
+Added compiler test `"standard vars always win over declared vars override attempts"`:
+passes `vars: {"input" {:from :workflow-original}}` alongside `{{input}}` in body;
+asserts compiled vars still resolve `"input"` to `{:from :workflow-input :path [:input]}`.
+
+Focused compiler + parser + workflow-definitions tests: 12 tests, 141 assertions, 0 failures.
+`clj-kondo`: 0 errors, 0 warnings.
+
 ## 2026-05-28 task-implementation-review
 
 **Bug: standard-vars override protection violated.**

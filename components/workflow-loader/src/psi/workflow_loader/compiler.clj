@@ -53,7 +53,7 @@
   ([body] (markdown-body->contribution body nil))
   ([body declared-vars]
    (let [referenced-names (scan-template-vars body)
-         merged-vars (merge standard-vars declared-vars)
+         merged-vars (merge declared-vars standard-vars)
          wired-vars (select-keys merged-vars referenced-names)
          unknown (seq (remove (set (keys merged-vars)) referenced-names))]
      (when unknown

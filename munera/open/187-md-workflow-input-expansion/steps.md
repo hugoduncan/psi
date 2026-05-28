@@ -127,12 +127,12 @@
 
 ## Implementation review follow-up
 
-- [ ] **Fix standard-vars override protection in `markdown-body->contribution`**: change
+- [x] **Fix standard-vars override protection in `markdown-body->contribution`**: change
   `(merge standard-vars declared-vars)` to `(merge declared-vars standard-vars)` so that
   `"input"` and `"original"` always use their canonical source specs regardless of any
   declaration in `vars:` frontmatter. Current code allows `declared-vars` to silently
   override standard vars, violating the spec.
-- [ ] **Add test for standard-vars override protection**: add a compiler test asserting that
+- [x] **Add test for standard-vars override protection**: add a compiler test asserting that
   a `.md` file with `vars: '{"input" {:from :workflow-original}}'` in frontmatter still
   compiles `{{input}}` to `{:from :workflow-input :path [:input]}` (standard spec wins).
 

@@ -326,4 +326,19 @@
           (is (= ["read"] (get-in definition [:steps 0 :tools]))))
         (finally
           (.delete md-file)
-          (.delete dir))))))
+          (.delete dir)))))
+
+  (testing "standard vars always win over declared vars override attempts"
+    ;; vars: frontmatter declaring {"input" {:from :workflow-original}} must NOT override
+    ;; the canonical standard-var spec — {{input}} must still resolve to :workflow-input.
+    (let [{:keys [definition error]}
+          (compiler/compile-workflow-file
+           {:workflow-kind :single-step-markdown
+            :name "step"
+            :description "A step"
+            :session-config {}
+            :body "Process {{input}}."
+            :vars {"input" {:from :workflow-original}}})]
+      (is (nil? error))
+      (is (= {"input" {:from :workflow-input :path [:input]}}
+             (get-in definition [:steps 0 :contributions 0 :vars]))))))
