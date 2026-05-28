@@ -1,3 +1,23 @@
+## 2026-05-28 task-test-review
+
+Reviewed all three slices (parser, compiler, wiring) against design ACs 1–8.
+Tests: 13 tests, 150 assertions, 0 failures (focused compiler + parser + workflow-definitions + compiler-target-authoring).
+
+Two actionable test gaps found:
+
+1. **`vars:` `:from :workflow-original` not tested as valid in parser** —
+   `parser_test.clj` only tests `{:from :workflow-input ...}` as a valid `:from`
+   value in `vars:`. The allowed set is `#{:workflow-input :workflow-original}` per
+   `parse-vars-frontmatter`, but `:workflow-original` has no positive acceptance test.
+
+2. **`vars:` map-valued `:from` (step-output ref) not tested as invalid in parser** —
+   `parse-vars-frontmatter` rejects any `:from` that is not `:workflow-input` or
+   `:workflow-original`. A map `:from` like `{:step "x" :yield :text}` is explicitly
+   out-of-scope per design but has no parser rejection test.
+
+No other actionable gaps: all 8 ACs are covered, standard-vars override protection
+is tested, `framing-prompt` absence is tested, wiring round-trips are tested.
+
 ## 2026-05-28 implementation-review follow-up
 
 Fixed standard-vars override protection bug in `markdown-body->contribution`:

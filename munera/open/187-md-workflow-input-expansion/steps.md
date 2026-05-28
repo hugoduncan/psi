@@ -141,3 +141,14 @@
 - [x] Run `bb test` — all tests green (3 pre-existing unrelated failures unchanged)
 - [x] Confirm all 8 acceptance criteria are satisfied (read design.md ACs 1–8)
 - [x] Commit
+
+## task-test-review follow-up
+
+- [ ] **Add parser test — `vars:` with `:from :workflow-original` is accepted**: add a
+  `parser_test.clj` test proving that `vars: '{"x" {:from :workflow-original}}'` parses
+  without error and returns `{"x" {:from :workflow-original}}` under `:vars`. Covers the
+  second valid `:from` value in `parse-vars-frontmatter`.
+- [ ] **Add parser test — `vars:` with map-valued `:from` is rejected**: add a
+  `parser_test.clj` test proving that `vars: '{"x" {:from {:step "y" :yield :text}}}'`
+  returns an error matching `#"unsupported :from values"`. Covers explicit rejection of
+  step-output refs per design.
