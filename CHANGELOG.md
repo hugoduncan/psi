@@ -6,6 +6,15 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 
 ## [Unreleased]
 
+### Added
+- New `review-task-design` workflow: reviews `design.md` only for ambiguities and inconsistencies, loops until no actionable feedback remains. Invokable via `/delegate review-task-design`.
+- New `create-task-plan` workflow: given a stable `design.md`, creates `plan.md` and `steps.md` for a Munera task in a single pass. Invokable via `/delegate create-task-plan`.
+
+### Changed
+- `review-implementation` workflow renamed to `review-task-implementation`; the old name is no longer available. Update any saved `/delegate review-implementation` invocations to `/delegate review-task-implementation`.
+- `review-task-until-clear` workflow renamed to `review-task-plan` and narrowed to `plan.md`/`steps.md` review only (design review is now handled by `review-task-design`). The old name is no longer available.
+- `review-task-implementation` now includes a `review-task-docs` step that reviews user-facing documentation (`README.md`, `doc/`, changelog) as part of the implementation review chain.
+
 ### Fixed
 - OpenAI OAuth-backed `gpt-5.5` sessions now route through the ChatGPT/Codex transport, matching Codex account access instead of failing against the platform chat-completions quota path.
 

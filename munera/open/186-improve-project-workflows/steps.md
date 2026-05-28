@@ -129,7 +129,7 @@
 
 ## Follow-up — task-implementation-review pass 4
 
-- [ ] Add CHANGELOG `[Unreleased]` entries for user-visible changes: new workflows `review-task-design` (Added) and `create-task-plan` (Added); renamed workflows `review-task-implementation` (Changed, from `review-implementation`) and `review-task-plan` (Changed, from `review-task-until-clear`); new `review-task-docs` step in `review-task-implementation` chain (Changed).
+- [x] Add CHANGELOG `[Unreleased]` entries for user-visible changes: new workflows `review-task-design` (Added) and `create-task-plan` (Added); renamed workflows `review-task-implementation` (Changed, from `review-implementation`) and `review-task-plan` (Changed, from `review-task-until-clear`); new `review-task-docs` step in `review-task-implementation` chain (Changed).
 
 ## Follow-up — task-implementation-review pass 3
 
