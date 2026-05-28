@@ -1,3 +1,17 @@
+## 2026-05-27 task-implementation-review pass 2
+
+Reviewed skill, task artifacts (design.md, plan.md, steps.md, design-steps.md, implementation.md), all new/renamed workflow EDN files (`review-task-design.edn`, `review-task-plan.edn`, `review-task-implementation.edn`, `create-task-plan.edn`, `implement-task.edn`, `review-step.edn`, `review-implementation-in-worktree.edn`), the `review-task-docs` skill, `structured_output_schemas.clj`, `target_ir_compiler.clj`, and `workflow_definitions_test.clj`.
+
+No new actionable issues found. All 11 acceptance criteria are satisfied. Key verifications:
+
+- All old workflow names (`review-implementation`, `review-task-until-clear`) have zero remaining references.
+- `review-task-plan` has no `design.md` or `design-steps.md` references in any step prompt.
+- All `{{input}}` template vars are wired to `:workflow-input` in all actor steps across all new/renamed workflows.
+- `review-implementation-in-worktree` summary step names 5 passes including `review-task-docs`.
+- `compile-judge` passes through `:outputs`; both `judge-routing-result` and `pass-status-result` schema ids present.
+- Focused loader tests: 25 tests, 53 assertions, 0 failures. Full `bb test` green. `bb lint` 0 errors, 0 warnings.
+- Unreferenced `.md` prompt files (`review-task-plan-*.md`, `review-task-design-*.md`, `implement-task-*.md`, `create-task-plan-create-plan.md`) are in sync with inline EDN text; their existence as standalone prompts is documented and intentional.
+
 ## 2026-05-27 follow-up execution pass 2
 
 All three review follow-up items completed:
