@@ -1,0 +1,175 @@
+# 187 `.md` workflow `{{input}}` expansion
+
+## Intent
+
+Make `{{input}}` (and `{{original}}`) in `.md` workflow files expand correctly at
+runtime, so `/delegate` prompt text reaches the child session as the rendered
+content — not as a literal token. Simultaneously remove the erroneous
+system-layer body injection from single-step `.md` workflows, and complete the
+task 186 wiring gap so the extracted `.md` prompt files are actually used.
+
+## Problem
+
+### 1. `{{input}}` is never expanded in `.md` files
+
+`markdown-body->contribution` always produces:
+```clojure
+{:type :template :text body :vars {}}
+```
+`:vars {}` is empty, so `render-template-contribution` never substitutes
+`{{input}}`. The child session receives the literal token `{{input}}` in its
+user turn instead of the actual `/delegate` prompt text.
+
+### 2. Body is incorrectly injected into the system layer
+
+`compile-markdown-workflow-file` stores the body in two places:
+
+```clojure
+:steps [(markdown-session-step parsed)]       ; body → contributions → user turn
+:workflow-file-meta {:framing-prompt body}    ; body → developer-prompt → system layer
+```
+
+The system-layer injection is wrong. Psi's system prompt is a structured
+composition pipeline (identity, capabilities, skills). Workflow body text is a
+task instruction — it belongs in the user turn, not in the system layer. The
+`framing-prompt` path bypasses system prompt composition and creates redundancy:
+the same body text ends up in both layers, and after the `{{input}}` fix the
+system layer would still show the literal token while the user turn has the
+expanded text.
+
+`.edn` multi-step workflow steps do not inject into the system layer at all;
+single-step `.md` doing so is an inconsistency. If a workflow genuinely needs a
+system-level identity override the right mechanism is the `:system-prompt`
+frontmatter key, not the body text.
+
+### 3. Task 186 wiring gap
+
+The `.md` prompt files extracted in task 186 are orphaned. None of the `.edn`
+workflow files were updated to reference them via `:prompt-workflow`. The `.edn`
+files still carry their original inline prompt text, so the extracted `.md` files
+have no effect at runtime.
+
+## Scope
+
+### In scope
+
+- Remove the `framing-prompt` injection from `compile-markdown-workflow-file`:
+  single-step `.md` workflows no longer push the body into the system/developer
+  layer. The body belongs in the user turn only.
+- Establish `{{input}}` and `{{original}}` as first-class conventions in `.md`
+  workflow bodies:
+  - `{{input}}` → `{:from :workflow-input :path [:input]}`
+  - `{{original}}` → `{:from :workflow-input :path [:original]}`
+- Support a `vars:` frontmatter key in `.md` workflow files for declaring
+  arbitrary additional var bindings beyond the two standard ones.
+- Fix `markdown-body->contribution` to auto-wire standard vars and merge
+  frontmatter-declared vars into the produced `:vars` map.
+- Update the parser to read and validate the `vars:` frontmatter key.
+- Complete the task 186 wiring gap: update all affected `.edn` workflows to
+  reference their extracted `.md` prompt files via `:prompt-workflow`, removing
+  the now-redundant inline prompt text.
+- Add or update loader/compiler tests covering:
+  - `{{input}}` expansion in single-step `.md` workflows
+  - `{{original}}` expansion
+  - frontmatter `vars:` declarations
+  - unknown `{{varname}}` tokens produce a compile-time error
+  - `:prompt-workflow` references with `{{input}}` expand correctly
+  - system layer does not receive the body text for single-step `.md` workflows
+
+### Out of scope
+
+- Backward compatibility with existing `.md` files that rely on `{{input}}`
+  being literal (no such use is intentional).
+- Changing how `.edn` inline template `:vars` work (`.edn` authoring is
+  unaffected).
+- Supporting step-output references (e.g. `{{step-name}}`) in `.md` frontmatter
+  vars — these require step-context resolution that `.md` files don't carry.
+- Migrating any remaining `.md` multi-step workflows that embed EDN blocks.
+
+## Desired outcome
+
+After this task:
+
+- Every `{{input}}` in a `.md` workflow body (single-step or `:prompt-workflow`
+  reference) is substituted with the workflow input at runtime.
+- Every `{{original}}` is substituted with the workflow original input.
+- Unknown `{{varname}}` tokens that are neither standard nor declared in
+  frontmatter `vars:` produce a clear compile-time error at workflow load.
+- Single-step `.md` workflows no longer inject the body into the system/developer
+  layer; the body is the user turn only, with vars expanded.
+- All task 186 extracted `.md` files are wired into their `.edn` workflows via
+  `:prompt-workflow`; duplicate inline prompt text is removed from the `.edn`
+  files.
+- `bb test` is green.
+
+## Design decisions
+
+### `{{input}}` as a convention, not a declaration
+
+No frontmatter is required to use `{{input}}` or `{{original}}`. They are
+recognised automatically in any `.md` body by scanning for `{{varname}}`
+tokens and wiring to their standard source specs. This matches the universal
+intent of all existing `.md` files.
+
+### `vars:` frontmatter for non-standard bindings
+
+```yaml
+---
+name: my-step
+vars:
+  my-var:
+    from: workflow-input
+    path: [some-field]
+---
+Body text with {{my-var}}.
+```
+
+The `vars:` value is a map from var name string to a source-spec map. Supported
+`from` values match the same source-spec grammar used in `.edn` `:vars`.
+
+### Unknown vars → compile-time error
+
+Any `{{varname}}` in the body that is neither a standard var nor declared in
+`vars:` frontmatter is a compile error at workflow load time, not a silent
+pass-through. This catches authoring mistakes early.
+
+### No system-layer injection
+
+`compile-markdown-workflow-file` no longer sets `[:workflow-file-meta
+:framing-prompt]`. The body belongs in the user turn — it is a task instruction,
+not system-level identity or capability context. Workflows that need a
+system-level override use the `:system-prompt` frontmatter key, which is already
+supported and flows through the normal `developer-prompt` path.
+
+### Implementation path
+
+1. Update `parse-markdown-workflow-file` in `parser.clj` to read and validate
+   the `vars:` frontmatter key.
+2. Update `markdown-body->contribution` in `compiler.clj` to:
+   a. Scan body for all `{{varname}}` tokens.
+   b. Auto-wire `input` and `original` to their standard source specs.
+   c. Merge any frontmatter `vars:` declarations.
+   d. Error on any remaining unresolved `{{varname}}` tokens.
+3. Update `compile-markdown-workflow-file` in `compiler.clj` to remove the
+   `:framing-prompt body` entry from `workflow-file-meta`.
+4. The `:prompt-workflow` path already calls `markdown-body->contribution` via
+   the referenced `.md` body — no additional change needed there.
+5. Wire task 186 `.edn` files to use `:prompt-workflow` and remove inline
+   prompt text.
+6. Update tests.
+
+## Acceptance criteria
+
+1. `{{input}}` in a single-step `.md` workflow body expands to the `/delegate`
+   prompt text at runtime.
+2. `{{original}}` expands to the workflow original input at runtime.
+3. `{{varname}}` declared in frontmatter `vars:` expands to the declared source
+   at runtime.
+4. An unknown `{{varname}}` (not standard, not declared) produces a
+   compile-time error at workflow load.
+5. Single-step `.md` workflows no longer inject the body into the
+   system/developer layer; `workflow-file-meta` carries no `:framing-prompt`.
+6. All task 186 extracted `.md` files are referenced by their parent `.edn`
+   workflows via `:prompt-workflow`; no duplicate inline prompt text remains in
+   those `.edn` files.
+7. `bb test` is green after all changes.
