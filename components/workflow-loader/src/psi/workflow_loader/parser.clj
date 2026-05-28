@@ -83,7 +83,13 @@
           md-session-option-keys))
 
 (defn- strip-yaml-single-quotes
-  "Strip surrounding YAML single-quote delimiters if present."
+  "Strip surrounding YAML single-quote delimiters if present.
+
+   Scope: only the outer `'...'` delimiters are removed. Interior `''` escape
+   sequences (YAML's way of encoding a literal single-quote inside a
+   single-quoted string) are NOT unescaped. This is safe in practice because
+   `vars:` values use EDN syntax where string literals use double-quotes, so
+   interior single-quotes never appear."
   [s]
   (if (and (str/starts-with? s "'") (str/ends-with? s "'") (> (count s) 1))
     (subs s 1 (dec (count s)))

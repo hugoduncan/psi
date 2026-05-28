@@ -68,10 +68,10 @@
 
 (defn- markdown-session-step
   [{:keys [session-config body vars]}]
-  (cond-> {:name "step"
-           :type :session
-           :contributions (markdown-body->contribution body vars)}
-    true (merge session-config)))
+  (merge {:name "step"
+          :type :session
+          :contributions (markdown-body->contribution body vars)}
+         session-config))
 
 (defn- compile-markdown-workflow-file
   [{:keys [name description source-path] :as parsed}]
@@ -219,12 +219,11 @@
     :else
     (let [{compiled-steps :ok step-error :error}
           (compile-edn-steps source-path (:steps config))
-          workflow-definition (cond-> (assoc config
-                                             :steps compiled-steps
-                                             :definition-id (or (:definition-id config)
-                                                                (:name config)))
-                                true (update :workflow-file-meta #(merge {:file-kind :edn}
-                                                                         %))
+          workflow-definition (cond-> (-> config
+                                          (assoc :steps compiled-steps
+                                                 :definition-id (or (:definition-id config)
+                                                                    (:name config)))
+                                          (update :workflow-file-meta #(merge {:file-kind :edn} %)))
                                 source-path (update :workflow-file-meta assoc :source-path source-path))]
       (cond
         step-error

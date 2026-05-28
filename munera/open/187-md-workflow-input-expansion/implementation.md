@@ -1,3 +1,22 @@
+## 2026-05-28 code-shaper follow-up
+
+Executed all three code-shaper follow-up items.
+
+1. **`markdown-session-step` — `cond-> ... true` removed**: replaced with
+   `(merge {:name "step" :type :session :contributions ...} session-config)`.
+
+2. **`compile-edn-workflow-file` — `cond-> ... true` removed**: threaded the
+   always-true `:file-kind :edn` update unconditionally via `->`, keeping only
+   the `source-path` conditional branch in `cond->`.
+
+3. **`strip-yaml-single-quotes` — `''` escape limitation documented**: added
+   docstring paragraph explaining that only outer delimiters are stripped, interior
+   `''` sequences are not unescaped, and why this is safe in practice (EDN string
+   values use double-quotes).
+
+Focused compiler + parser + workflow-definitions + compiler-target-authoring tests:
+13 tests, 156 assertions, 0 failures. `clj-kondo`: 0 errors, 0 warnings.
+
 ## 2026-05-28 code-shaper review
 
 Applied code-shaper (simplicity ∧ consistency ∧ robustness) to compiler.clj, parser.clj, and the wired `.md` workflow files. Reviewed committed HEAD — the working tree has three unstaged regressions in `review-task-plan-{ambiguity-review,ambiguity-follow-up,inconsistency-review}.md` (unrelated to task 187; not included below).
