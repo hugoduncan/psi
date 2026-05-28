@@ -356,4 +356,30 @@
             :vars {"input" {:from :workflow-original}}})]
       (is (nil? error))
       (is (= {"input" {:from :workflow-input :path [:input]}}
-             (get-in definition [:steps 0 :contributions 0 :vars]))))))
+             (get-in definition [:steps 0 :contributions 0 :vars])))))
+
+  (testing "vars: declared in .md frontmatter threads through :prompt-workflow"
+    ;; compile-prompt-workflow-step passes (:vars referenced) to markdown-body->contribution.
+    ;; A custom var declared in .md frontmatter vars: must appear in the compiled contribution.
+    (let [dir (io/file (System/getProperty "java.io.tmpdir") (str "wf-vars-threading-test-" (System/nanoTime)))
+          md-file (io/file dir "my-step.md")]
+      (.mkdirs dir)
+      (spit md-file "---\nname: my-step\ndescription: My step\ntools:\n  - read\nvars: '{\"my-var\" {:from :workflow-input :path [:some-field]}}'\n---\nUse {{my-var}} here.")
+      (try
+        (let [{:keys [definition error]}
+              (compiler/compile-workflow-file
+               {:workflow-kind :multi-step-edn
+                :config {:name "orchestrator"
+                         :description "Orchestrates"
+                         :definition-id "orchestrator"
+                         :steps [{:name "step"
+                                  :type :session
+                                  :prompt-workflow "my-step.md"}]}
+                :source-path (.getAbsolutePath (io/file dir "orchestrator.edn"))})]
+          (is (nil? error))
+          (is (= {"my-var" {:from :workflow-input :path [:some-field]}}
+                 (get-in definition [:steps 0 :contributions 0 :vars]))
+              "custom var declared in .md frontmatter vars: must be wired in compiled contribution"))
+        (finally
+          (.delete md-file)
+          (.delete dir))))))
