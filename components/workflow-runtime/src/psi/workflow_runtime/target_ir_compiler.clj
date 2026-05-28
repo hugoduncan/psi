@@ -110,7 +110,9 @@
                  :session (assoc session-config
                                  :contributions (mapv compile-contribution (:contributions judge)))}
           (contains? judge :projection)
-          (assoc :projection (:projection judge))))
+          (assoc :projection (:projection judge))
+          (contains? judge :outputs)
+          (assoc :outputs (:outputs judge))))
 
       :invoke
       {:type :invoke

@@ -286,6 +286,44 @@
       (is (= "Delegate target must be a workflow name string or workflow source-spec"
              (get-in compile-error [:message]))))))
 
+(deftest compile-judge-outputs-passthrough-test
+  (testing "judge :outputs is passed through to compiled IR when present"
+    (let [outputs {:source :judge/structured-output
+                   :mode :structured
+                   :schema-id :psi.workflow/judge-routing-result
+                   :schema-version 1
+                   :schema [:enum "REPEAT" "DONE"]
+                   :json-schema {:type "string" :enum ["REPEAT" "DONE"]}}
+          ir (target-compiler/compile-workflow-definition
+              {:steps [{:name "review"
+                        :type :session
+                        :contributions [{:type :template
+                                         :text "Review: {{input}}"
+                                         :vars {"input" {:from :workflow-input :path [:input]}}}]
+                        :judge {:type :llm
+                                :contributions [{:type :template
+                                                 :text "REPEAT or DONE?"
+                                                 :vars {}}]
+                                :outputs outputs}
+                        :on {"REPEAT" {:goto "review" :max-iterations 6}
+                             "DONE" {:goto :done}}}]})]
+      (is (= outputs (get-in ir [:steps 0 :judge :outputs])))))
+
+  (testing "judge without :outputs compiles without :outputs key"
+    (let [ir (target-compiler/compile-workflow-definition
+              {:steps [{:name "review"
+                        :type :session
+                        :contributions [{:type :template
+                                         :text "Review: {{input}}"
+                                         :vars {"input" {:from :workflow-input :path [:input]}}}]
+                        :judge {:type :llm
+                                :contributions [{:type :template
+                                                 :text "REPEAT or DONE?"
+                                                 :vars {}}]}
+                        :on {"REPEAT" {:goto "review" :max-iterations 6}
+                             "DONE" {:goto :done}}}]})]
+      (is (not (contains? (get-in ir [:steps 0 :judge]) :outputs))))))
+
 (deftest create-run-compiles-target-authored-definition-at-effective-definition-seam-test
   (testing "create-run compiles target-authored definitions at the effective-definition seam"
     (let [state {:workflows {:definitions {} :runs {} :run-order []}}
