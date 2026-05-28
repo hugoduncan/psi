@@ -152,3 +152,20 @@
   `parser_test.clj` test proving that `vars: '{"x" {:from {:step "y" :yield :text}}}'`
   returns an error matching `#"unsupported :from values"`. Covers explicit rejection of
   step-output refs per design.
+
+## test-shaper review follow-up
+
+- [ ] **Strengthen unknown-var error assertion**: in `compiler_test.clj` "body with unknown
+  {{foo}} not declared returns error", add a second `is` asserting the specific unknown var
+  name appears in the error message (e.g. `(re-find #"\"foo\"" error)` or
+  `(str/includes? error "foo")`).
+- [ ] **Add compiler test — non-pattern token passes through without error**: add a
+  `compiler_test.clj` test with a body containing a non-matching token like `{{1bad}}` or
+  `{{}}` and assert the compile succeeds (no error) and `:vars` is empty (token is not
+  treated as an unknown var). Covers design step 2a's pass-through guarantee.
+- [ ] **Separate wired-step assertion from final-summary in `workflow_definitions_test`**:
+  in `implement-task-test`, `review-task-design-test`, and `review-task-plan-test`, change
+  the `doseq` over all steps to only assert `step-has-input-var-wired?` for the wired
+  (non-final-summary) steps. Add a separate assertion for the `final-summary` step that
+  explicitly notes it is inline (not wired) — or at minimum filter out `final-summary`
+  from the wired-step assertion loop so the test is specific to what this task changed.

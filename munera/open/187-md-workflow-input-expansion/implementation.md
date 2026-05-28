@@ -1,3 +1,35 @@
+## 2026-05-28 test-shaper review
+
+Reviewed `parser_test.clj`, `compiler_test.clj`, `compiler_target_authoring_test.clj`, and
+`workflow_definitions_test.clj` against the test-shaper criteria (clarity, signal, robustness,
+economy). Three actionable gaps found.
+
+**1. Unknown-var error test has weak assertion — var name not verified.**
+`compiler_test.clj` "body with unknown {{foo}} not declared returns error" asserts only
+`re-find #"Unknown \{\{varname\}\} tokens"`. The actual error message includes the unknown
+var name (`"foo"`). The test passes even if the error message names the wrong var or omits
+the name entirely. The assertion should also verify the specific unknown var name appears in
+the error (e.g. `re-find #"\"foo\""` or `re-find #"foo"`).
+
+**2. Non-pattern-matching tokens not tested — pass-through behavior unverified.**
+Design step 2a states tokens that do not match `\{\{([a-zA-Z][a-zA-Z0-9_-]*)\}\}` (e.g.
+`{{1bad}}`, `{{}}`) pass through literally and are not subject to unknown-var errors. No
+test covers this. Without it, a regression that widens the scan pattern would not be caught.
+
+**3. `workflow_definitions_test` "actor steps have {{input}} wired" assertion covers
+final-summary steps, which are intentionally inline (not wired).** The `doseq` over all
+steps in `implement-task-test`, `review-task-design-test`, and `review-task-plan-test`
+asserts `step-has-input-var-wired?` for every step including `final-summary`. The
+`final-summary` steps happen to pass because the inline `.edn` contributions contain
+`{{input}}` — but this is incidental. The assertion does not specifically verify the
+prompt-workflow wiring mechanism. It would pass even if the wiring were broken and
+`final-summary` were the only step. The wired steps (non-final-summary) should be
+asserted separately and explicitly.
+
+No other actionable gaps: all 8 ACs are covered, standard-vars override protection is
+tested, `framing-prompt` absence is tested, parser valid/invalid `:from` values are tested,
+and `vars:` threading through `:prompt-workflow` is tested.
+
 ## 2026-05-28 task-test-review
 
 Reviewed all three slices (parser, compiler, wiring) against design ACs 1–8.
