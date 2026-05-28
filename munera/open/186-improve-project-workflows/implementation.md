@@ -1,3 +1,19 @@
+## 2026-05-28 task-implementation-review pass 9
+
+Reviewed skill, task artifacts (design.md, plan.md, steps.md, design-steps.md, implementation.md), all new/renamed workflow EDN files (`review-task-design.edn`, `review-task-plan.edn`, `review-task-implementation.edn`, `create-task-plan.edn`, `implement-task.edn`, `review-step.edn`, `review-implementation-in-worktree.edn`), `review-task-docs` skill, `structured_output_schemas.clj`, `structured_output.clj`, `structured_output_test.clj`, `workflow_definitions_test.clj`, `CHANGELOG.md`, `README.md`, and `doc/`.
+
+No new actionable issues found. All 11 acceptance criteria satisfied. Key verifications:
+
+- All old workflow names have zero remaining references in `.psi/workflows/`.
+- `review-task-plan` prompts contain no `design.md` or `design-steps.md` references.
+- All `{{input}}` vars wired to `:workflow-input` in all 6 steps of `review-task-design` and `review-task-plan`, including `final-summary`; same for `create-task-plan` and `implement-task`.
+- `review-step` all 3 steps have `{{input}}` wired; `review` step also has `{{skill}}` wired.
+- `review-implementation-in-worktree` summary step names 5 passes including `review-task-docs`.
+- `compile-judge` passes through `:outputs`; both `judge-routing-result` and `pass-status-result` schema ids present and correct.
+- `parse-json-value` plain-text fallback test name/comment correct; dead `{:ok? false}` branch documented.
+- All design-steps.md items checked; all steps.md items checked.
+- Loader tests: 32 tests, 66 assertions, 0 failures. `bb lint` 0 errors, 0 warnings.
+
 ## 2026-05-28 task-implementation-review pass 8
 
 Reviewed skill, task artifacts, all new/renamed workflow EDN files (`review-task-design.edn`, `review-task-plan.edn`, `review-task-implementation.edn`, `create-task-plan.edn`, `implement-task.edn`, `review-step.edn`, `review-implementation-in-worktree.edn`), `review-task-docs` skill, `structured_output_schemas.clj`, `target_ir_compiler.clj`, `structured_output.clj`, `structured_output_test.clj`, `workflow_definitions_test.clj`, `doc/workflows.md`, `README.md`, and `CHANGELOG.md`. Confirmed post-pass-7 commits (`9a7e18ef`, `01ce4df1`).
