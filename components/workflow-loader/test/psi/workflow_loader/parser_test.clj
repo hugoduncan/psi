@@ -69,6 +69,18 @@
   (testing "vars: with unsupported :from value returns error"
     (let [raw "---\nname: planner\ndescription: Plans\nvars: '{\"x\" {:from :workflow-runtime}}'\n---\nBody."
           result (parser/parse-workflow-file :md raw)]
+      (is (re-find #"unsupported :from values" (:error result)))))
+
+  (testing "vars: with :from :workflow-original is accepted"
+    (let [raw "---\nname: my-step\ndescription: A step\nvars: '{\"x\" {:from :workflow-original}}'\n---\nBody with {{x}}."
+          result (parser/parse-workflow-file :md raw)]
+      (is (nil? (:error result)))
+      (is (= {"x" {:from :workflow-original}}
+             (:vars result)))))
+
+  (testing "vars: with map-valued :from is rejected"
+    (let [raw "---\nname: my-step\ndescription: A step\nvars: '{\"x\" {:from {:step \"y\" :yield :text}}}'\n---\nBody."
+          result (parser/parse-workflow-file :md raw)]
       (is (re-find #"unsupported :from values" (:error result))))))
 
 (deftest parse-edn-workflow-file-test
