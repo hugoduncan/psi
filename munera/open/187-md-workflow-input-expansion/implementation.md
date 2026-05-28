@@ -1,3 +1,18 @@
+## 2026-05-28 code-shaper review
+
+Applied code-shaper (simplicity ∧ consistency ∧ robustness) to compiler.clj, parser.clj, and the wired `.md` workflow files. Reviewed committed HEAD — the working tree has three unstaged regressions in `review-task-plan-{ambiguity-review,ambiguity-follow-up,inconsistency-review}.md` (unrelated to task 187; not included below).
+
+**1. `markdown-session-step` — `cond-> ... true` is a no-op guard.**
+`(cond-> {:name "step" :type :session :contributions ...} true (merge session-config))` — the `true` branch is always taken; `cond->` adds no value. Should be `(merge {:name "step" ...} session-config)`.
+
+**2. `compile-edn-workflow-file` — second `cond-> ... true` no-op guard.**
+`(cond-> (assoc config ...) true (update :workflow-file-meta ...) source-path ...)` — the `true` branch is always taken. The always-true update should be unconditional; only the `source-path` branch belongs in `cond->`.
+
+**3. `strip-yaml-single-quotes` — undocumented limitation re YAML `''` escaping.**
+YAML single-quoted strings escape an interior `'` as `''`. The helper strips outer delimiters but does not unescape `''` → `'` inside. A value like `'{"k" "it''s"}'` produces `{"k" "it''s"}` (invalid EDN). Low risk in practice (EDN string values use double-quotes) but the function is silently wrong for that input and carries no comment stating the scope.
+
+No issues found in: `parse-vars-frontmatter` logic, `compile-prompt-workflow-step` vars threading, `markdown-body->contribution` merge order (standard-vars win correctly), test coverage shape, or the wired `.edn`/`.md` files at HEAD.
+
 ## 2026-05-28 review-task-docs follow-up
 
 Executed both unchecked `review-task-docs` follow-up items.

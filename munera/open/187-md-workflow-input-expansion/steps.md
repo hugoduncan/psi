@@ -170,6 +170,21 @@
   explicitly notes it is inline (not wired) — or at minimum filter out `final-summary`
   from the wired-step assertion loop so the test is specific to what this task changed.
 
+## code-shaper review follow-up
+
+- [ ] **Remove `cond-> ... true` no-op guard in `markdown-session-step`**: replace
+  `(cond-> {:name "step" :type :session :contributions ...} true (merge session-config))`
+  with `(merge {:name "step" :type :session :contributions ...} session-config)`.
+- [ ] **Remove `cond-> ... true` no-op guard in `compile-edn-workflow-file`**: the
+  `(cond-> (assoc config ...) true (update :workflow-file-meta ...) source-path ...)` form
+  has an always-true first branch. Apply the `:file-kind :edn` `update` unconditionally
+  and keep only the `source-path` conditional branch in `cond->`.
+- [ ] **Add comment to `strip-yaml-single-quotes` documenting the `''` escape limitation**:
+  YAML single-quoted strings escape interior `'` as `''`; the helper does not unescape
+  this. Add a comment stating the scope: only outer delimiters are stripped; interior `''`
+  sequences are not unescaped (safe in practice because `vars:` values use EDN syntax with
+  double-quoted strings).
+
 ## review-task-docs follow-up
 
 - [x] **Document `.md` authoring surface in `doc/workflows.md`**: add a section (or
