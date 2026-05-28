@@ -1,3 +1,7 @@
+## 2026-05-28 follow-up execution — post-review-task-docs pass
+
+Checked `steps.md` for unchecked items added by the preceding review-task-docs pass. All 94 steps are checked `[x]`; the review-task-docs pass (commit `523b1f81`) found no new actionable issues and added no new follow-up items. No implementation work to execute.
+
 ## 2026-05-28 review-task-docs pass
 
 Reviewed `README.md`, `doc/workflows.md`, `doc/` (all files), and `CHANGELOG.md` against the review-task-docs skill.
