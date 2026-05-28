@@ -135,6 +135,10 @@
 
 - [x] Add loader tests for `review-step` in `workflow_definitions_test.clj` covering the post-structural-fix shape: loads without error, 2 steps (`review`, `follow-up`), correct step types (`:session`, `:session`), judge on `follow-up` has REPEAT/DONE `:on` routing, judge `:outputs` has `judge-routing-result` schema-id. Run focused loader tests green and commit.
 
+## Follow-up — task-implementation-review pass 11
+
+- [ ] Fix `execute-judge-missing-turn-result-structured-output-fails-test` in `workflow_judge_test.clj`: commit `d1a81113` changed `parse-json-value` to plain-text fallback (always `{:ok? true}`) and changed `workflow_judge.clj` to use `output-result` instead of `missing-ai-structured-output-result`. The test still asserts the old "fail if no structured-output metadata" contract. Update the test to assert the new contract: when turn result has no `:structured-output` metadata but assistant text is valid JSON matching the schema, the judge routes successfully (`:action :complete`). Run focused `workflow-judge-test` green, then `bb test` green.
+
 ## Follow-up — task-implementation-review pass 7
 
 - [x] Fix `structured-output-envelope-invalid-json-test` name and comment: `"not json"` no longer triggers a parse error (plain-text fallback returns `{:ok? true}` with value `"not json"`); the test now exercises the malli validation-error path, not a parse-error path. Update the test docstring/comment to reflect this. Verify `bb test` still green.

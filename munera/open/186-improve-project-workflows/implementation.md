@@ -1,3 +1,11 @@
+## 2026-05-28 task-implementation-review pass 11
+
+Reviewed skill, task artifacts, workflow EDN files, `workflow_judge.clj`, `structured_output.clj`, `workflow_judge_test.clj`, and ran focused + full `bb test`.
+
+One new actionable issue found:
+
+**`execute-judge-missing-turn-result-structured-output-fails-test` is failing (5 assertions)** — commit `d1a81113` changed `parse-json-value` to use a plain-text fallback (always `{:ok? true}`) and changed `workflow_judge.clj` to use `output-result` instead of `missing-ai-structured-output-result`, explicitly so that plain-text `DONE`/`REPEAT` judge output routes correctly without structured-output metadata. The test still asserts the old contract (missing metadata → `:missing-structured-output` fail). The test must be updated to reflect the new contract: when the turn result has no `:structured-output` metadata but assistant text is valid JSON matching the schema, the judge routes successfully. `bb lint` 0 errors 0 warnings.
+
 ## 2026-05-28 task-implementation-review pass 10
 
 Reviewed skill, task artifacts, all new/renamed workflow EDN files, `review-task-docs` skill, `structured_output_schemas.clj`, `structured_output.clj`, `structured_output_test.clj`, `workflow_definitions_test.clj`, `CHANGELOG.md`, `README.md`, and `doc/`.
