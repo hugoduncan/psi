@@ -1,3 +1,15 @@
+## 2026-05-28 task-implementation-review pass 7
+
+Reviewed skill, task artifacts, all new/renamed workflow EDN files, `structured_output.clj`, `structured_output_test.clj`, and post-pass-6 commit `d1a81113` (plain-text fallback for unquoted judge output).
+
+Two minor actionable issues found:
+
+1. **`structured-output-envelope-invalid-json-test` comment/name is misleading after plain-text fallback** — `"not json"` no longer triggers a parse error; the fallback treats it as the plain string `"not json"`, which then fails malli validation. The test still passes (`:invalid` + `:errors`) but the comment "malformed JSON is invalid and records errors" implies a parse error path that no longer exists. Update the test name/comment to reflect the new behavior (validation error, not parse error).
+
+2. **`parse-json-value` `{:ok? false}` return is now unreachable** — the plain-text fallback always returns `{:ok? true}`. The `ok? false` branch in `structured-output-envelope` (via `validation-input`) is dead code for the `raw-output` path. Not harmful, but misleading. Either remove the dead branch or add a comment that it is only reachable via the `:payload` path.
+
+`bb test` green, `bb lint` 0 errors 0 warnings.
+
 ## 2026-05-28 task-implementation-review pass 6
 
 Reviewed skill, task artifacts, all new/renamed workflow EDN files, `review-task-docs` skill, `structured_output_schemas.clj`, `target_ir_compiler.clj`, `workflow_definitions_test.clj`, `doc/workflows.md`, `README.md`, and `CHANGELOG.md`.
