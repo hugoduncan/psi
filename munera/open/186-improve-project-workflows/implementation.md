@@ -1,3 +1,19 @@
+## 2026-05-28 task-implementation-review pass 12
+
+Reviewed skill, task artifacts, all workflow EDN files (`review-task-design.edn`, `review-task-plan.edn`, `review-task-implementation.edn`, `create-task-plan.edn`, `implement-task.edn`, `review-step.edn`, `review-implementation-in-worktree.edn`), `review-task-docs` skill, `structured_output_schemas.clj`, `structured_output.clj`, `workflow_judge_test.clj`, `workflow_definitions_test.clj`, `CHANGELOG.md`, `README.md`, and `doc/`.
+
+No new actionable issues found. All 11 acceptance criteria satisfied. Key verifications:
+
+- All old workflow names absent; all new/renamed workflows present and correct.
+- `review-task-plan` prompts contain no `design.md` or `design-steps.md` references.
+- All `{{input}}` vars wired to `:workflow-input` in all actor steps across all workflows; `review-step` `review` step also has `{{skill}}` wired.
+- `review-implementation-in-worktree` delegates to `review-task-implementation`; summary names 5 passes including `review-task-docs`.
+- `compile-judge` passes through `:outputs`; both `judge-routing-result` and `pass-status-result` schema ids present and correct.
+- `execute-judge-missing-turn-result-structured-output-fails-test` reflects new plain-text fallback routing contract (`:action :complete`, `:status :valid`).
+- `structured-output-envelope-plain-text-validation-error-test` name/comment correct; dead `{:ok? false}` branch documented.
+- CHANGELOG `[Unreleased]` has all 5 user-visible entries.
+- Loader tests: 32 tests covering all new/renamed workflows including `review-step` and `implement-task`. `bb test` green (3 pre-existing failures, 0 new). `bb lint` 0 errors, 0 warnings.
+
 ## 2026-05-28 follow-up execution — pass 11 item
 
 Fixed `execute-judge-missing-turn-result-structured-output-fails-test` in `workflow_judge_test.clj`. Updated test name, docstring, and assertions to reflect the new contract: when turn result has no `:structured-output` metadata but assistant text is valid JSON matching the schema, `output-result` → `parse-json-value` (plain-text fallback, always `{:ok? true}`) → malli validates → judge routes with `:action :complete`, `:judge-event :clear`, `:status :valid`. Old assertions (`:missing-structured-output` error, `:invalid` status) removed. `bb test` green, `bb lint` 0 errors 0 warnings.
