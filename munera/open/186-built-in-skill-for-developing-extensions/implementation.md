@@ -1,1 +1,9 @@
 - 2026-05-28 ambiguity review: found actionable planning gaps before implementation. The task currently has only `design.md`; `plan.md`, `steps.md`, and `implementation.md` were missing despite Munera requiring them before execution. Added `design-steps.md` follow-ups to define the canonical built-in skill identity/resource path, the minimum authoritative reference set (including the exact GitHub `doc/extension-api.md` URL and extension API / manifest / permission / dispatch seams), whether the skill covers modifying/debugging existing extensions in addition to creation, and the non-prose-fragile verification surfaces for "discoverable and usable" built-in provenance + ordinary readable-file semantics.
+
+- 2026-05-28 design-step follow-up: completed all ambiguity-review additions in `design-steps.md`.
+  - created missing `plan.md` and `steps.md` so the task now satisfies the required Munera artifact set before implementation work.
+  - decided canonical built-in skill identity: runtime name `extension-development`, packaged resource `psi/skills/extension-development/SKILL.md`, expected provenance `:source :built-in`.
+  - defined the minimum authoritative extension reference set around `doc/extension-api.md`, `doc/extensions.md`, `doc/extensions-install.md`, `doc/architecture.md`, and the built-in skill/discovery seams in `components/prompt-assets` plus discovery/listing seams in `components/agent-session`.
+  - fixed the external documentation URL to `https://github.com/hugoduncan/psi/blob/main/doc/extension-api.md`.
+  - clarified scope to include creating, modifying, and debugging extensions.
+  - defined sufficient verification as structural proof of packaged resource presence, built-in provenance, ordinary materialized file readability, normal discovery/listing visibility, and normal invocation/read semantics, while avoiding brittle full-prose assertions.
