@@ -157,4 +157,4 @@
 
 ## Follow-up — code-shaper review pass
 
-- [ ] Remove dead `:prompt` field from `implement-task.edn` judge: `compile-judge` in `target_ir_compiler.clj` silently drops `:prompt` (not in the `select-keys` list). The field has no runtime effect. Remove it from the judge map in `implement-task.edn`. Verify `bb test` green and `bb lint` clean.
+- [x] Remove dead `:prompt` field from `implement-task.edn` judge: `compile-judge` in `target_ir_compiler.clj` silently drops `:prompt` (not in the `select-keys` list). The field has no runtime effect. Remove it from the judge map in `implement-task.edn`. Verify `bb test` green and `bb lint` clean.

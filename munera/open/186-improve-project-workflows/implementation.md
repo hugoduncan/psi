@@ -1,3 +1,7 @@
+## 2026-05-28 code-shaper follow-up execution
+
+Removed dead `:prompt` field from `implement-task.edn` judge map. `compile-judge` never includes `:prompt` in its `select-keys` output, so the field had no runtime effect. Removed one key-value pair from the judge map. `bb test` green (3 pre-existing failures, 0 new). `bb lint` 0 errors, 0 warnings.
+
 ## 2026-05-28 code-shaper review pass
 
 Reviewed `target_ir_compiler.clj`, `structured_output_schemas.clj`, `structured_output.clj`, all new/renamed workflow EDN files, and `workflow_definitions_test.clj` against the code-shaper skill (simplicity ∧ consistency ∧ robustness).
