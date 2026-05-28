@@ -16,6 +16,7 @@ Backlog:
 `munera/open/006-agent-tool-skill-prelude-follow-on/`
 `munera/open/005-canonical-dispatch-pipeline-trace-observability/`
 `munera/open/175-workflow-self-loop-control-edges/`
+`munera/open/186-built-in-skill-for-developing-extensions/`
 
 Recently completed:
 
