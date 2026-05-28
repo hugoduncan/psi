@@ -1,3 +1,7 @@
+## 2026-05-28 follow-up execution — pass 11 item
+
+Fixed `execute-judge-missing-turn-result-structured-output-fails-test` in `workflow_judge_test.clj`. Updated test name, docstring, and assertions to reflect the new contract: when turn result has no `:structured-output` metadata but assistant text is valid JSON matching the schema, `output-result` → `parse-json-value` (plain-text fallback, always `{:ok? true}`) → malli validates → judge routes with `:action :complete`, `:judge-event :clear`, `:status :valid`. Old assertions (`:missing-structured-output` error, `:invalid` status) removed. `bb test` green, `bb lint` 0 errors 0 warnings.
+
 ## 2026-05-28 task-implementation-review pass 11
 
 Reviewed skill, task artifacts, workflow EDN files, `workflow_judge.clj`, `structured_output.clj`, `workflow_judge_test.clj`, and ran focused + full `bb test`.
