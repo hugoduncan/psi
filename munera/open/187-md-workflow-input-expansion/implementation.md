@@ -1,3 +1,14 @@
+## 2026-05-28 task-implementation-review (pass 2) follow-up
+
+Reverted all four `review-task-plan-*.md` files to use `steps.md` as the follow-up target.
+
+- `review-task-plan-ambiguity-review.md`: step 2 changed `design-steps.md` → `steps.md`
+- `review-task-plan-inconsistency-review.md`: step 2 changed `design-steps.md` → `steps.md`
+- `review-task-plan-ambiguity-follow-up.md`: read/write/mark-done targets all restored to `steps.md`; "design-steps" terminology removed throughout
+- `review-task-plan-inconsistency-follow-up.md`: read/write/mark-done targets all restored to `steps.md`; "design-steps" terminology removed throughout
+
+Internal inconsistency in follow-up files resolved: read target and write/mark-done target now both agree on `steps.md`.
+
 ## 2026-05-28 task-implementation-review (pass 2)
 
 **Bug: `review-task-plan-*` workflows write follow-ups to `design-steps.md` instead of `steps.md`.**

@@ -13,7 +13,7 @@ skills:
 For the Munera task identified by {{input}}, review the task plan and steps for ambiguities. Work independently. Read the task artifacts, especially plan.md, steps.md, and implementation.md, plus any referenced code/tests/docs. Then:
 
 1. append a terse review note to the task's implementation.md
-2. add unchecked follow-up items to design-steps.md for every new actionable ambiguity you found
+2. add unchecked follow-up items to steps.md for every new actionable ambiguity you found
 3. avoid duplicating review notes or steps that already exist
 4. commit
 5. if there is no new actionable ambiguity feedback, say so explicitly
