@@ -198,3 +198,7 @@
   entry under `[Unreleased]` covering: `{{input}}` and `{{original}}` auto-expansion in
   `.md` workflow bodies; the `vars:` frontmatter key for custom var bindings; compile-time
   error for unknown `{{varname}}` tokens in `.md` workflow files.
+
+## task-implementation-review follow-up (pass 2)
+
+- [ ] **Revert `review-task-plan-*` `.md` files to use `steps.md` as follow-up target**: commit `245d2152` changed all four `review-task-plan-*.md` bodies to write follow-ups to `design-steps.md` instead of `steps.md`. Revert the four files (`review-task-plan-ambiguity-review.md`, `review-task-plan-ambiguity-follow-up.md`, `review-task-plan-inconsistency-review.md`, `review-task-plan-inconsistency-follow-up.md`) to use `steps.md` as the follow-up target. Also fix the internal inconsistency in the follow-up files: the "read" target and "write/mark-done" target must both be `steps.md`.

@@ -1,3 +1,22 @@
+## 2026-05-28 task-implementation-review (pass 2)
+
+**Bug: `review-task-plan-*` workflows write follow-ups to `design-steps.md` instead of `steps.md`.**
+
+Commit `245d2152` ("update review-task-plan to use design-steps.md") changed all four
+`review-task-plan-*.md` files to use `design-steps.md` as the follow-up target. This is
+wrong: `design-steps.md` is a design-review artifact; plan-review follow-ups belong in
+`steps.md`. The change also introduced an internal inconsistency in the follow-up files:
+`ambiguity-follow-up.md` says "Read the task's steps.md to identify unchecked items" but
+then says "mark it done in design-steps.md" — the read and write targets disagree.
+
+This commit is outside task 187's original scope (task 187 wired the `.md` files into
+`.edn` workflows; the `design-steps.md` change is a content regression in the `.md`
+bodies). The four files must be reverted to use `steps.md` as the follow-up target.
+
+No other actionable issues found. All 8 acceptance criteria are satisfied. Core
+implementation (parser, compiler, wiring) is correct. Tests are comprehensive and green
+(3 pre-existing unrelated failures unchanged). Docs updated. CHANGELOG updated.
+
 ## 2026-05-28 code-shaper follow-up
 
 Executed all three code-shaper follow-up items.
