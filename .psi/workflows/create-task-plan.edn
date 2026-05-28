@@ -1,0 +1,7 @@
+{:steps
+ [{:name "create-plan",
+   :type :session,
+   :prompt-workflow "create-task-plan.md"}],
+ :name "create-task-plan",
+ :description
+ "Given a stable design.md, create plan.md and steps.md for a Munera task"}
