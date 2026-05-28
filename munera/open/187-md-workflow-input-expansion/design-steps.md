@@ -52,7 +52,7 @@
 
 ## Inconsistency review pass 2
 
-- [ ] **Sync `design.md` wiring scope and desired outcome with `plan.md` final-summary exclusion**:
+- [x] **Sync `design.md` wiring scope and desired outcome with `plan.md` final-summary exclusion**:
   `design.md` lists `final-summary` in the step counts for `review-task-plan.edn` (6 steps),
   `implement-task.edn` (2 steps), and `review-task-design.edn` (6 steps), and the desired outcome
   says "all task 186 extracted `.md` files are wired". But `plan.md` records the decision to

@@ -68,11 +68,19 @@ have no effect at runtime.
 - Complete the task 186 wiring gap: update the four affected `.edn` workflows to
   reference their extracted `.md` prompt files via `:prompt-workflow`, removing
   the now-redundant inline prompt text:
-  - `review-task-plan.edn` (6 steps: ambiguity-review, ambiguity-follow-up, inconsistency-review, inconsistency-follow-up, clarity-status, final-summary)
-  - `implement-task.edn` (2 steps: implement-pass, final-summary)
-  - `review-task-design.edn` (6 steps: ambiguity-review, ambiguity-follow-up, inconsistency-review, inconsistency-follow-up, clarity-status, final-summary)
+  - `review-task-plan.edn` (5 steps: ambiguity-review, ambiguity-follow-up, inconsistency-review, inconsistency-follow-up, clarity-status)
+  - `implement-task.edn` (1 step: implement-pass)
+  - `review-task-design.edn` (5 steps: ambiguity-review, ambiguity-follow-up, inconsistency-review, inconsistency-follow-up, clarity-status)
   - `create-task-plan.edn` (1 step: create-plan)
   - `review-step.edn` is intentionally excluded (inline prompt retained per task 186 decision)
+  - `final-summary` steps in `review-task-plan.edn`, `implement-task.edn`, and
+    `review-task-design.edn` are intentionally excluded from wiring: each carries
+    `:source` contributions referencing `:workflow-original` and step-output yields
+    (`{:from {:step "X" :yield :text}}`). Step-output refs are out of scope for `.md`
+    frontmatter vars; wiring would silently drop them. The three `.md` files
+    (`review-task-plan-final-summary.md`, `implement-task-final-summary.md`,
+    `review-task-design-final-summary.md`) exist but are not referenced by their
+    parent `.edn` workflows — this is intentional.
 - Add or update loader/compiler tests covering:
   - `{{input}}` expansion in single-step `.md` workflows
   - `{{original}}` expansion
@@ -104,10 +112,13 @@ After this task:
   frontmatter `vars:` produce a clear compile-time error at workflow load.
 - Single-step `.md` workflows no longer inject the body into the system/developer
   layer; the body is the user turn only, with vars expanded.
-- All task 186 extracted `.md` files are wired into their `.edn` workflows via
-  `:prompt-workflow`; duplicate inline prompt text is removed from the four
-  target `.edn` files (`review-task-plan.edn`, `implement-task.edn`,
-  `review-task-design.edn`, `create-task-plan.edn`).
+- All task 186 extracted `.md` files that do not carry `:source` contributions
+  are wired into their `.edn` workflows via `:prompt-workflow`; duplicate inline
+  prompt text is removed from the four target `.edn` files (`review-task-plan.edn`,
+  `implement-task.edn`, `review-task-design.edn`, `create-task-plan.edn`). The
+  three `final-summary` `.md` files (`review-task-plan-final-summary.md`,
+  `implement-task-final-summary.md`, `review-task-design-final-summary.md`) are
+  intentionally not wired.
 - `bb test` is green.
 
 ## Design decisions
@@ -233,9 +244,12 @@ supported and flows through the normal `developer-prompt` path.
    compile-time error at workflow load.
 5. Single-step `.md` workflows no longer inject the body into the
    system/developer layer; `workflow-file-meta` carries no `:framing-prompt`.
-6. All task 186 extracted `.md` files are referenced by their parent `.edn`
-   workflows via `:prompt-workflow`; no duplicate inline prompt text remains in
-   those `.edn` files.
+6. All task 186 extracted `.md` files that do not carry `:source` contributions
+   are referenced by their parent `.edn` workflows via `:prompt-workflow`; no
+   duplicate inline prompt text remains in those `.edn` files. The three
+   `final-summary` `.md` files (`review-task-plan-final-summary.md`,
+   `implement-task-final-summary.md`, `review-task-design-final-summary.md`) are
+   intentionally not wired.
 7. The existing `compiler_target_authoring_test.clj` assertion
    `(get-in definition [:workflow-file-meta :framing-prompt])` is updated to
    assert absence of `:framing-prompt` (i.e. the key is not present) rather

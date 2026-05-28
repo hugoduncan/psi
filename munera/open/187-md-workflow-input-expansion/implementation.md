@@ -1,3 +1,21 @@
+## 2026-05-28 inconsistency follow-up pass 2
+
+Executed the one follow-up item from inconsistency review pass 2. Resolved in `design.md`.
+
+1. **`design.md` wiring scope synced with `plan.md` final-summary exclusion**: updated
+   `design.md` in three places:
+   - Scope step counts reduced: `review-task-plan.edn` 6→5, `implement-task.edn` 2→1,
+     `review-task-design.edn` 6→5 (final-summary steps removed from each list).
+   - Added explicit exclusion note for `final-summary` steps in those three workflows,
+     parallel to the `review-step.edn` exclusion note, with rationale (`:source`
+     contributions carrying step-output yield refs that are out of scope for `.md`
+     frontmatter vars).
+   - Desired outcome updated: "all task 186 extracted `.md` files that do not carry
+     `:source` contributions are wired…" with explicit callout that the three
+     `final-summary` `.md` files are intentionally not wired.
+   - Acceptance criterion 6 updated to the same precise wording, naming the three
+     excluded files.
+
 ## 2026-05-28 inconsistency review pass 2
 
 Reviewed `design.md` against `plan.md`, `compiler.clj`, and the `.psi/workflows/` corpus.
