@@ -172,14 +172,14 @@
 
 ## review-task-docs follow-up
 
-- [ ] **Document `.md` authoring surface in `doc/workflows.md`**: add a section (or
+- [x] **Document `.md` authoring surface in `doc/workflows.md`**: add a section (or
   extend the existing single-step `.md` authoring paragraph) explaining: (a) `{{input}}`
   and `{{original}}` are auto-wired in any `.md` body — no frontmatter declaration
   needed; (b) the `vars:` frontmatter key (EDN string syntax) for custom var bindings
   with `:from :workflow-input` or `:from :workflow-original`; (c) unknown `{{varname}}`
   tokens that are neither standard nor declared in `vars:` produce a compile-time error
   at workflow load. Include a minimal `.md` authoring example showing `{{input}}` usage.
-- [ ] **Add `CHANGELOG.md` entry for new `.md` authoring capabilities**: add an `Added`
+- [x] **Add `CHANGELOG.md` entry for new `.md` authoring capabilities**: add an `Added`
   entry under `[Unreleased]` covering: `{{input}}` and `{{original}}` auto-expansion in
   `.md` workflow bodies; the `vars:` frontmatter key for custom var bindings; compile-time
   error for unknown `{{varname}}` tokens in `.md` workflow files.

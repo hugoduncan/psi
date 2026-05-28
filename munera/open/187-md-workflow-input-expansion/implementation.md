@@ -1,3 +1,18 @@
+## 2026-05-28 review-task-docs follow-up
+
+Executed both unchecked `review-task-docs` follow-up items.
+
+1. **`doc/workflows.md` — `.md` authoring surface documented**: added a new
+   "`.md` single-step workflow authoring" section in the Authoring guidelines area
+   covering: (a) `{{input}}` and `{{original}}` auto-wiring with no frontmatter
+   declaration needed; (b) the `vars:` frontmatter key (EDN string syntax) with a
+   minimal example; (c) allowed `:from` values (`:workflow-input`, `:workflow-original`);
+   (d) unknown-var compile-time error behaviour; (e) non-matching token pass-through.
+
+2. **`CHANGELOG.md` — `[Unreleased]` `Added` entries**: added three bullet points
+   covering `{{input}}`/`{{original}}` auto-wiring, the `vars:` frontmatter key, and
+   the compile-time unknown-var error.
+
 ## 2026-05-28 review-task-docs
 
 Reviewed `README.md`, `doc/workflows.md`, `doc/workflow-grammar.md`,
