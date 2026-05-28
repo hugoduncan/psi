@@ -1,3 +1,29 @@
+## 2026-05-28 implementation complete
+
+All three slices implemented and tests passing.
+
+**Slice 1 (Parser):** Added `:vars` to `allowed-md-frontmatter-keys`; added
+`strip-yaml-single-quotes` helper (YAML parser doesn't strip single quotes);
+added `parse-vars-frontmatter` to read EDN scalar, validate map, check `:from`
+values; updated `parse-markdown-workflow-file` return shape to include `:vars`.
+
+**Slice 2 (Compiler):** Added `standard-vars` and `template-var-pattern` constants;
+rewrote `markdown-body->contribution` to scan for `{{varname}}` tokens, auto-wire
+standard vars, merge declared vars, throw `ex-info` on unknowns; removed
+`:framing-prompt` from `compile-markdown-workflow-file`; updated
+`compile-prompt-workflow-step` to pass `(:vars referenced)`.
+
+**Slice 3 (Wiring):** Converted 5 steps in `review-task-design.edn`, 5 steps in
+`review-task-plan.edn`, 1 step in `implement-task.edn`, 1 step in
+`create-task-plan.edn` to `:prompt-workflow` references. Removed redundant
+`:tools`/`:skills` from wired steps. Updated `workflow_definitions_test.clj` to
+use new `load-edn-with-md-refs` helper for the four affected tests.
+
+**Deviation:** `strip-yaml-single-quotes` helper was not in the design but is
+required because `parse-yaml-frontmatter` does not strip YAML single-quote
+delimiters. The design example uses `vars: '{...}'` (single-quoted) which the
+YAML parser returns as `'...'` including the quotes.
+
 ## 2026-05-28 inconsistency follow-up pass 3
 
 Executed all three follow-up items from inconsistency review pass 3.
