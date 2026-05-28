@@ -301,28 +301,30 @@
            (is (step-has-input-var-wired? step)
                (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))))))
 
-(deftest review-step-judge-routing-test
-  (testing "review-step follow-up judge has REPEAT/DONE routing"
+(deftest review-step-no-judge-test
+  (testing "review-step has no judge on any step (platform constraint: judge on terminal step never fires)"
     (load-edn-only
      "review-step.edn"
      (fn [{:keys [definitions]}]
-       (let [follow-up-step (->> (get-in definitions ["review-step" :steps])
-                                 (filter #(= "follow-up" (:name %)))
-                                 first)]
-         (is (= #{"REPEAT" "DONE"} (set (keys (:on follow-up-step)))))
-         (is (some? (:judge follow-up-step))))))))
+       (let [steps (get-in definitions ["review-step" :steps])]
+         (doseq [step steps]
+           (is (nil? (:judge step))
+               (str "step " (:name step) " must not have a judge"))))))))
 
-(deftest review-step-judge-outputs-test
-  (testing "review-step follow-up judge has :outputs key with judge-routing-result schema-id"
+(deftest review-step-skill-var-wired-test
+  (testing "review-step review step has {{skill}} wired to :workflow-input"
     (load-edn-only
      "review-step.edn"
      (fn [{:keys [definitions]}]
-       (let [follow-up-step (->> (get-in definitions ["review-step" :steps])
-                                 (filter #(= "follow-up" (:name %)))
-                                 first)]
-         (is (contains? (:judge follow-up-step) :outputs))
-         (is (= :psi.workflow/judge-routing-result
-                (get-in follow-up-step [:judge :outputs :routing-result :schema-id]))))))))
+       (let [review-step (->> (get-in definitions ["review-step" :steps])
+                              (filter #(= "review" (:name %)))
+                              first)]
+         (is (some (fn [c]
+                     (and (= :template (:type c))
+                          (= {:from :workflow-input :path [:skill]}
+                             (get-in c [:vars "skill"]))))
+                   (:contributions review-step))
+             "review step should have {{skill}} wired to :workflow-input"))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; implement-task
