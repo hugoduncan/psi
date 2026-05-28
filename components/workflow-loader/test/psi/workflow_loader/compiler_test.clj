@@ -12,6 +12,7 @@
    :session-config {:tools ["read" "bash"]
                     :thinking-level :off}
    :body "You are a planner."
+   :vars nil
    :source-path "/tmp/planner.md"})
 
 (def edn-parsed

@@ -100,7 +100,8 @@
                  (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))
          (testing "final-summary step is inline (not prompt-workflow wired)"
            ;; final-summary carries :source contributions and is intentionally kept inline
-           (is (some? final-step) "final-summary step should exist")))
+           (is (some? final-step) "final-summary step should exist")
+           (is (seq (:contributions final-step)) "final-summary step should have inline contributions")))
        (let [clarity-step (first (filter #(= "clarity-status" (:name %)) steps))]
          (testing "clarity-status judge has REPEAT/DONE routing"
            (is (= #{"REPEAT" "DONE"} (set (keys (:on clarity-step)))))
@@ -145,7 +146,8 @@
                  (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))
          (testing "final-summary step is inline (not prompt-workflow wired)"
            ;; final-summary carries :source contributions and is intentionally kept inline
-           (is (some? final-step) "final-summary step should exist")))
+           (is (some? final-step) "final-summary step should exist")
+           (is (seq (:contributions final-step)) "final-summary step should have inline contributions")))
        (let [clarity-step (first (filter #(= "clarity-status" (:name %)) steps))]
          (testing "clarity-status judge has REPEAT/DONE routing"
            (is (= #{"REPEAT" "DONE"} (set (keys (:on clarity-step)))))
@@ -261,7 +263,8 @@
          (testing "final-summary step is inline (not prompt-workflow wired)"
            ;; final-summary carries :source contributions with :workflow-original and
            ;; implement-pass step-output yield refs; intentionally kept inline
-           (is (some? final-step) "final-summary step should exist")))
+           (is (some? final-step) "final-summary step should exist")
+           (is (seq (:contributions final-step)) "final-summary step should have inline contributions")))
        (let [pass-step (first (filter #(= "implement-pass" (:name %)) steps))]
          (testing "implement-pass judge has REPEAT/DONE routing"
            (is (= #{"REPEAT" "DONE"} (set (keys (:on pass-step)))))

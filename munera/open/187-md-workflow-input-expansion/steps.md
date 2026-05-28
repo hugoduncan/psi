@@ -209,11 +209,11 @@
 
 ## test-shaper review follow-up (pass 2)
 
-- [ ] **Add `:vars nil` to `markdown-parsed` fixture in `compiler_test.clj`**: the fixture
+- [x] **Add `:vars nil` to `markdown-parsed` fixture in `compiler_test.clj`**: the fixture
   is missing the `:vars` key that `parse-markdown-workflow-file` now returns. Add `:vars nil`
   so the fixture matches the actual parser output shape and prevents silent divergence.
 
-- [ ] **Strengthen `final-summary step is inline` assertion in three `workflow_definitions_test` tests**:
+- [x] **Strengthen `final-summary step is inline` assertion in three `workflow_definitions_test` tests**:
   in `review-task-design-test`, `review-task-plan-test`, and `implement-task-test`, change
   `(is (some? final-step) "final-summary step should exist")` to also assert
   `(is (seq (:contributions final-step)) "final-summary step should have inline contributions")`
