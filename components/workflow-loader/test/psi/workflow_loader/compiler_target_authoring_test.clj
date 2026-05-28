@@ -16,7 +16,7 @@
       (is (= "plan-build" (:definition-id definition)))
       (is (= "plan-build" (:name definition)))
       (is (= "Plan and build without review" (:summary definition)))
-      (is (= "Frame it." (get-in definition [:workflow-file-meta :framing-prompt])))
+      (is (nil? (get-in definition [:workflow-file-meta :framing-prompt])))
       (is (workflow-definition/target-authored-workflow-definition? definition))
       (is (= [:session]
              (mapv :type (:steps definition))))))
