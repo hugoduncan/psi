@@ -231,7 +231,22 @@
             :session-config {}
             :body "Unknown {{foo}} token."
             :vars nil})]
-      (is (re-find #"Unknown \{\{varname\}\} tokens" error))))
+      (is (re-find #"Unknown \{\{varname\}\} tokens" error))
+      (is (re-find #"\"foo\"" error)
+          "error message should name the specific unknown var")))
+
+  (testing "non-matching tokens like {{1bad}} and {{}} pass through without error"
+    (let [{:keys [definition error]}
+          (compiler/compile-workflow-file
+           {:workflow-kind :single-step-markdown
+            :name "step"
+            :description "A step"
+            :session-config {}
+            :body "Token {{1bad}} and {{}} are not vars."
+            :vars nil})]
+      (is (nil? error))
+      (is (= {} (get-in definition [:steps 0 :contributions 0 :vars]))
+          "non-matching tokens should not be treated as unknown vars")))
 
   (testing "body with {{my-var}} declared in frontmatter vars produces correct :vars entry"
     (let [{:keys [definition error]}

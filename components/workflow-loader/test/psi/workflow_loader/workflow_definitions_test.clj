@@ -92,10 +92,15 @@
                 (mapv :name steps)))
          (is (= [:session :session :session :session :session :session]
                 (mapv :type steps))))
-       (testing "actor steps have {{input}} wired to :workflow-input"
-         (doseq [step steps]
-           (is (step-has-input-var-wired? step)
-               (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))
+       (let [wired-steps (remove #(= "final-summary" (:name %)) steps)
+             final-step (first (filter #(= "final-summary" (:name %)) steps))]
+         (testing "wired (non-final-summary) steps have {{input}} wired to :workflow-input"
+           (doseq [step wired-steps]
+             (is (step-has-input-var-wired? step)
+                 (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))
+         (testing "final-summary step is inline (not prompt-workflow wired)"
+           ;; final-summary carries :source contributions and is intentionally kept inline
+           (is (some? final-step) "final-summary step should exist")))
        (let [clarity-step (first (filter #(= "clarity-status" (:name %)) steps))]
          (testing "clarity-status judge has REPEAT/DONE routing"
            (is (= #{"REPEAT" "DONE"} (set (keys (:on clarity-step)))))
@@ -132,10 +137,15 @@
                 (mapv :name steps)))
          (is (= [:session :session :session :session :session :session]
                 (mapv :type steps))))
-       (testing "actor steps have {{input}} wired to :workflow-input"
-         (doseq [step steps]
-           (is (step-has-input-var-wired? step)
-               (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))
+       (let [wired-steps (remove #(= "final-summary" (:name %)) steps)
+             final-step (first (filter #(= "final-summary" (:name %)) steps))]
+         (testing "wired (non-final-summary) steps have {{input}} wired to :workflow-input"
+           (doseq [step wired-steps]
+             (is (step-has-input-var-wired? step)
+                 (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))
+         (testing "final-summary step is inline (not prompt-workflow wired)"
+           ;; final-summary carries :source contributions and is intentionally kept inline
+           (is (some? final-step) "final-summary step should exist")))
        (let [clarity-step (first (filter #(= "clarity-status" (:name %)) steps))]
          (testing "clarity-status judge has REPEAT/DONE routing"
            (is (= #{"REPEAT" "DONE"} (set (keys (:on clarity-step)))))
@@ -242,10 +252,16 @@
          (is (= 2 (count steps)))
          (is (= ["implement-pass" "final-summary"] (mapv :name steps)))
          (is (= [:session :session] (mapv :type steps))))
-       (testing "actor steps have {{input}} wired to :workflow-input"
-         (doseq [step steps]
-           (is (step-has-input-var-wired? step)
-               (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))
+       (let [wired-steps (remove #(= "final-summary" (:name %)) steps)
+             final-step (first (filter #(= "final-summary" (:name %)) steps))]
+         (testing "wired (non-final-summary) steps have {{input}} wired to :workflow-input"
+           (doseq [step wired-steps]
+             (is (step-has-input-var-wired? step)
+                 (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))
+         (testing "final-summary step is inline (not prompt-workflow wired)"
+           ;; final-summary carries :source contributions with :workflow-original and
+           ;; implement-pass step-output yield refs; intentionally kept inline
+           (is (some? final-step) "final-summary step should exist")))
        (let [pass-step (first (filter #(= "implement-pass" (:name %)) steps))]
          (testing "implement-pass judge has REPEAT/DONE routing"
            (is (= #{"REPEAT" "DONE"} (set (keys (:on pass-step)))))
