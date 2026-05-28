@@ -1,3 +1,17 @@
+## 2026-05-28 code-shaper review pass
+
+Reviewed `target_ir_compiler.clj`, `structured_output_schemas.clj`, `structured_output.clj`, all new/renamed workflow EDN files, and `workflow_definitions_test.clj` against the code-shaper skill (simplicity ∧ consistency ∧ robustness).
+
+One new actionable issue found:
+
+1. **`implement-task.edn` judge has a dead `:prompt` field** — `compile-judge` in `target_ir_compiler.clj` does not handle `:prompt` (absent from the `select-keys` list for `:llm` judge session config). The field is silently dropped at compile time. The value `"Respond exactly with one word: REPEAT or DONE. Inspect the specific Munera task artifacts before deciding."` duplicates intent already expressed in the judge's `:contributions` template. Pre-existing since task 184; preserved through this task's slice 3 extraction and slice 7/8 structured output changes. Simplicity violation: dead authoring field with no runtime effect misleads future workflow authors about the judge authoring grammar. Fix: remove `:prompt` from `implement-task.edn` judge, or document the field as unsupported in the target-authored grammar and add a compile-time warning/error in `compile-judge`.
+
+Two pre-existing observations (no new steps needed):
+- `coerce-enum` is a silent pass-through for string-valued enums (`"REPEAT"`, `"PASS"`) — tries keyword coercion, falls back to original string. Works correctly; the new string-enum schemas expose this undocumented behavior but do not break it.
+- `judge-review-result` (pre-existing) has no `*-json-schema` def while the new `judge-routing-result` and `pass-status-result` schemas do — minor asymmetry in `structured_output_schemas.clj`, pre-existing gap not introduced by this task.
+
+`bb test` green (3 pre-existing failures, 0 new). `bb lint` 0 errors, 0 warnings.
+
 ## 2026-05-28 follow-up execution — post-review-task-docs pass
 
 Checked `steps.md` for unchecked items added by the preceding review-task-docs pass. All 94 steps are checked `[x]`; the review-task-docs pass (commit `523b1f81`) found no new actionable issues and added no new follow-up items. No implementation work to execute.

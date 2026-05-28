@@ -154,3 +154,7 @@
 - [x] Consolidate `workflow_definitions_test.clj` per-workflow `deftest` explosion: merge each workflow's 4–6 separate `deftest` forms (loads, step-count, step-names-and-types, input-vars-wired, judge-routing, judge-outputs) into one `deftest` per workflow with `testing` blocks, one `load-edn-only` call per workflow. Preserves all assertions, eliminates 28+ redundant fixture setups. Run `bb test` green.
 - [x] Fix `review-task-implementation` fixture inconsistency in `workflow_definitions_test.clj`: replace the inline `with-workflow-dir` call with `load-edn-only` to match the pattern used by all other workflows.
 - [x] Fix `reusable-pass-status-result-schema-test` in `structured_output_test.clj`: change `:source :judge/structured-output` → `:source :session/structured-output` to match the design-specified usage of `pass-status-result` as an actor-step schema. Run `bb test` green.
+
+## Follow-up — code-shaper review pass
+
+- [ ] Remove dead `:prompt` field from `implement-task.edn` judge: `compile-judge` in `target_ir_compiler.clj` silently drops `:prompt` (not in the `select-keys` list). The field has no runtime effect. Remove it from the judge map in `implement-task.edn`. Verify `bb test` green and `bb lint` clean.
