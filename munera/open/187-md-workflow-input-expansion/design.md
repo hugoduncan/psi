@@ -134,8 +134,7 @@ is absent, which is the wrong behaviour for this convention.
 ### `vars:` frontmatter for non-standard bindings
 
 The `vars:` frontmatter value is an EDN string that reads as a map from var name
-string to a source-spec map. Supported `from` values match the same source-spec
-grammar used in `.edn` `:vars`.
+string to a source-spec map.
 
 ```yaml
 ---
@@ -152,6 +151,20 @@ This avoids adding nested-map YAML parsing to the custom `parse-yaml-frontmatter
 implementation, which only supports scalars and block sequences. Validation
 checks that the parsed value is a map and that each source-spec has a recognised
 `:from` value. An EDN parse failure is a compile-time error.
+
+**Valid `:from` values for `vars:` frontmatter**: only keyword `:from` values
+that are handled by `resolve-source-ref` / `apply-source-spec` are permitted:
+
+- `:workflow-input` — the workflow input map (use `:path` to extract a field)
+- `:workflow-original` — the workflow original input (with fallback semantics)
+
+Step-output references (`{:from {:step ... :output ...}}`) and step-yield
+references (`{:from {:step ... :yield ...}}`) are **out of scope** for `.md`
+frontmatter — they require step-context resolution that `.md` files don't carry.
+`:workflow-runtime` is **not** a valid `:from` value here: it is only handled by
+`resolve-binding-ref`, not by `resolve-source-ref` / `apply-source-spec`.
+Validation must reject any `:from` value that is not `:workflow-input` or
+`:workflow-original`.
 
 ### Unknown vars → compile-time error
 
@@ -180,12 +193,27 @@ supported and flows through the normal `developer-prompt` path.
      `{:workflow-kind :single-step-markdown :name string :description string
        :session-config map :body string :vars map-or-nil}`.
 2. Update `markdown-body->contribution` in `compiler.clj` to:
-   a. Scan body for all `{{varname}}` tokens.
+   a. Scan body for all `{{varname}}` tokens using the pattern
+      `\{\{([a-zA-Z][a-zA-Z0-9_-]*)\}\}`. This pattern matches a leading letter
+      followed by zero or more letters, digits, underscores, or hyphens. Tokens
+      that do not match this pattern are not substituted and are not considered
+      unknown-var errors (they pass through literally).
    b. Auto-wire `input` and `original` to their standard source specs.
-   c. Merge any frontmatter `vars:` declarations.
-   d. Error on any remaining unresolved `{{varname}}` tokens.
+   c. Merge any frontmatter `vars:` declarations (passed as an optional second
+      argument, defaulting to `nil` / empty).
+   d. Error on any remaining unresolved `{{varname}}` tokens (matched by the
+      pattern above but not in the wired set): throw `ex-info` with a descriptive
+      message. `compile-workflow-file` already wraps all compilation in
+      `(catch clojure.lang.ExceptionInfo e {:error (.getMessage e)})`, so the
+      thrown exception is automatically converted to `{:error ...}` without
+      requiring `compile-markdown-workflow-file` to gain its own error-return
+      path. The standalone `.md` path and the `:prompt-workflow` path both
+      benefit from this single catch point.
 3. Update `compile-markdown-workflow-file` in `compiler.clj` to remove the
-   `:framing-prompt body` entry from `workflow-file-meta`.
+   `:framing-prompt body` entry from `workflow-file-meta`. No error-return path
+   needs to be added to `compile-markdown-workflow-file`: unknown-var errors
+   thrown by `markdown-body->contribution` propagate as `ex-info` and are caught
+   by the existing `catch clojure.lang.ExceptionInfo` in `compile-workflow-file`.
 4. Update `compile-prompt-workflow-step` in `compiler.clj` to pass
    `(:vars referenced)` to `markdown-body->contribution` alongside `(:body referenced)`,
    so frontmatter-declared vars from the referenced `.md` file are honoured.

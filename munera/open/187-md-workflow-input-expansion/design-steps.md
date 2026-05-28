@@ -30,19 +30,19 @@
 
 ## Ambiguity review pass 2
 
-- [ ] **Enumerate valid `:from` values for `vars:` frontmatter validation**: the design says
+- [x] **Enumerate valid `:from` values for `vars:` frontmatter validation**: the design says
   "supported `:from` values match the same source-spec grammar used in `.edn` :vars" but `.edn`
   :vars support step-output/step-yield refs (map `:from` values) which are explicitly out-of-scope
   for `.md` frontmatter. Decide and document the exact set of keyword `:from` values allowed in
   `vars:` frontmatter (e.g. `:workflow-input`, `:workflow-original` only, or also `:workflow-runtime`).
   Update the `vars:` frontmatter section and validation description in the design.
 
-- [ ] **Specify `{{varname}}` token scanning pattern**: `markdown-body->contribution` scans for
+- [x] **Specify `{{varname}}` token scanning pattern**: `markdown-body->contribution` scans for
   `{{varname}}` tokens but the character set valid in `varname` is never stated. Specify the
   pattern (e.g. `\{\{([a-zA-Z][a-zA-Z0-9_-]*)\}\}`) so the implementation is unambiguous for
   both auto-wiring and unknown-var error detection. Add to the implementation path step 2.
 
-- [ ] **Specify unknown-var error propagation mechanism**: `compile-markdown-workflow-file`
+- [x] **Specify unknown-var error propagation mechanism**: `compile-markdown-workflow-file`
   currently has no error-return path. If `markdown-body->contribution` signals an unknown-var
   error, the design must specify how it propagates: (a) throw `ex-info` (caught by the existing
   `try/catch ExceptionInfo` in `compile-workflow-file`), or (b) return `{:error ...}` requiring

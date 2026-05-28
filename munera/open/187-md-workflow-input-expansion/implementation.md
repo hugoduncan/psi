@@ -159,3 +159,26 @@ Found three actionable inconsistencies. Added follow-up items to `design-steps.m
    shape (`{:workflow-kind :name :description :session-config :body}`). This
    creates a gap between step 1 (parser) and step 4 (compiler): the compiler
    assumes a `:vars` key that the parser contract does not define.
+
+## 2026-05-28 ambiguity follow-up pass 2
+
+Executed all three design-steps from ambiguity review pass 2. All resolved in design.md.
+
+1. **Valid `:from` values for `vars:` frontmatter**: restricted to `:workflow-input` and
+   `:workflow-original` only. These are the only keyword `:from` values handled by
+   `resolve-source-ref` / `apply-source-spec`. `:workflow-runtime` is handled only by
+   `resolve-binding-ref` (a different code path) and is therefore invalid here. Step-output
+   and step-yield map `:from` refs are already out of scope per the design. The `vars:`
+   frontmatter section now states the exact allowed set and the rationale. Validation
+   must reject any other `:from` value.
+
+2. **`{{varname}}` token scanning pattern**: specified as `\{\{([a-zA-Z][a-zA-Z0-9_-]*)\}\}`.
+   Leading letter required; subsequent chars may be letters, digits, underscores, or hyphens.
+   Tokens not matching this pattern pass through literally and are not subject to unknown-var
+   errors. Added to implementation path step 2a.
+
+3. **Unknown-var error propagation**: chose option (a) — throw `ex-info` from
+   `markdown-body->contribution`. `compile-workflow-file` already wraps all compilation in
+   `(catch clojure.lang.ExceptionInfo e {:error (.getMessage e)})`, so no error-return path
+   needs to be added to `compile-markdown-workflow-file`. Implementation path steps 2d and 3
+   updated to document this mechanism explicitly.
