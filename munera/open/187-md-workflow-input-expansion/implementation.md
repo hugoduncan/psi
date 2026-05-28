@@ -1,3 +1,30 @@
+## 2026-05-28 review-task-docs
+
+Reviewed `README.md`, `doc/workflows.md`, `doc/workflow-grammar.md`,
+`doc/workflow-grammar-concepts.md`, and `CHANGELOG.md` against task 187 changes.
+
+Two actionable gaps found.
+
+**1. `doc/workflows.md` — `.md` authoring surface undocumented.**
+The doc covers `.md` single-step workflow authoring (step 1 of the authoring loop,
+`planner`/`builder`/`reviewer` as examples) but says nothing about the new
+`{{input}}`/`{{original}}` auto-wiring convention, the `vars:` frontmatter key for
+custom bindings, or the compile-time error for unknown `{{varname}}` tokens. These are
+user-visible authoring behaviours that belong in the `.md` authoring section of
+`doc/workflows.md`. At minimum: a short paragraph or example showing `{{input}}` usage
+in a `.md` body, the `vars:` frontmatter key syntax, and the unknown-var error.
+
+**2. `CHANGELOG.md` — no entry for user-visible `.md` workflow changes.**
+The `[Unreleased]` section has no entry for: `{{input}}`/`{{original}}` expansion in
+`.md` workflow bodies, the `vars:` frontmatter key, or the compile-time error for
+unknown vars. These are new user-visible authoring capabilities (extension capability
+class per changelog policy) and warrant an `Added` entry.
+
+No other gaps: `README.md` delegates to `doc/workflows.md` (no direct authoring docs
+to update). `doc/workflow-grammar.md` and `doc/workflow-grammar-concepts.md` cover the
+general template/vars surface and do not need `.md`-specific additions. The `:prompt-workflow`
+wiring change is internal (no user-facing authoring surface change).
+
 ## 2026-05-28 test-shaper review
 
 Reviewed `parser_test.clj`, `compiler_test.clj`, `compiler_target_authoring_test.clj`, and
