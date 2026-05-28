@@ -1,3 +1,24 @@
+## 2026-05-28 ambiguity review pass 2
+
+Reviewed design.md against compiler.clj, parser.clj, source_resolution.clj, and the .psi/workflows/ corpus.
+Found three actionable ambiguities. Added follow-up items to design-steps.md.
+
+1. **`vars:` valid `:from` values unspecified**: design says "supported `:from` values match the same
+   source-spec grammar used in `.edn` :vars" but `.edn` :vars support step-output/step-yield refs
+   (map `:from` values) which are explicitly out-of-scope for `.md` frontmatter vars. The design
+   contradicts itself. Validation must restrict `:from` to keyword-only values
+   (`:workflow-input`, `:workflow-original`, etc.) but the allowed set is never enumerated.
+
+2. **`{{varname}}` token scanning pattern unspecified**: `markdown-body->contribution` is described
+   as scanning for `{{varname}}` tokens but the character set valid in `varname` is never stated.
+   This affects both auto-wiring and the unknown-var error detection regex/pattern.
+
+3. **Unknown-var compile-time error propagation unspecified**: `compile-markdown-workflow-file`
+   currently has no error-return path — it always returns `{:definition ...}`. If
+   `markdown-body->contribution` needs to signal an unknown-var error, the design doesn't specify
+   the mechanism (throw `ex-info`, return `{:error ...}`, etc.) or how callers handle it.
+   The `:prompt-workflow` path already has `{:error ...}` handling; the standalone `.md` path does not.
+
 ## 2026-05-28 ambiguity follow-up pass 1
 
 Executed all five design-steps from ambiguity review pass 1. All resolved in design.md.
