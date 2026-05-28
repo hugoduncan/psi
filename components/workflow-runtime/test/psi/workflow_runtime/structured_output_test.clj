@@ -154,7 +154,11 @@
   ;; Regression test: parse-json-value previously rejected non-object JSON
   ;; (including plain strings) with a hard parse-error, making [:enum "REPEAT" "DONE"]
   ;; judge schemas permanently invalid regardless of AI output.
-  ;; parse-json-value now accepts any valid JSON; malli validates the schema.
+  ;; parse-json-value now accepts:
+  ;;   - valid JSON values (including JSON-quoted strings like "\"DONE\"")
+  ;;   - plain-text fallback: if JSON parsing fails, the trimmed raw text is
+  ;;     treated as a plain string. This handles judge models that return DONE
+  ;;     (unquoted) rather than "DONE" (JSON string).
   (testing "string enum JSON value validates correctly against [:enum ...] schema"
     (let [judge-routing-spec {:source :judge/structured-output
                               :mode :structured
@@ -162,7 +166,8 @@
                               :schema-version 1
                               :schema [:enum "REPEAT" "DONE"]
                               :json-schema {:type "string" :enum ["REPEAT" "DONE"]}}]
-      (doseq [[raw expected-value] [["\"DONE\"" "DONE"] ["\"REPEAT\"" "REPEAT"]]]
+      (doseq [[raw expected-value] [["\"DONE\"" "DONE"] ["\"REPEAT\"" "REPEAT"]
+                                    ["DONE" "DONE"] ["REPEAT" "REPEAT"]]]
         (let [result (structured-output/output-result judge-routing-spec raw)]
           (is (= :valid (get-in result [:structured-output :status])) raw)
           (is (= expected-value (get-in result [:structured-output :value])) raw))))))

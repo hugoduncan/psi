@@ -2,6 +2,7 @@
   "Canonical workflow structured-output parsing, coercion, and validation."
   (:require
    [cheshire.core :as json]
+   [clojure.string :as str]
    [malli.core :as m]
    [psi.workflow-runtime.structured-output-schemas :as structured-output-schemas]
    [psi.workflow-step-materialization.structured-output :as structured-output-contract]))
@@ -19,14 +20,17 @@
 (defn- parse-json-value
   "Parse raw-output as JSON. Accepts any valid JSON value (object, string, number,
    array, boolean). Schema-level constraints are enforced by malli validation
-   downstream, not here."
+   downstream, not here.
+
+   Fallback: if raw-output is not valid JSON (e.g. the AI returned plain text
+   `DONE` rather than the JSON string `\"DONE\"`), treat the trimmed raw output
+   as a plain string. This handles the common case where a judge model outputs
+   an unquoted enum word. Schema validation downstream rejects non-conforming values."
   [raw-output]
   (try
     {:ok? true :parsed-value (json/parse-string raw-output)}
-    (catch Exception e
-      {:ok? false
-       :errors [{:type :parse-error
-                 :message (ex-message e)}]})))
+    (catch Exception _
+      {:ok? true :parsed-value (str/trim raw-output)})))
 
 (defn- map-entry-schema
   [schema key-name]
