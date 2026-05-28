@@ -1,3 +1,14 @@
+## 2026-05-28 review-task-docs pass
+
+Reviewed `README.md`, `doc/workflows.md`, `doc/` (all files), and `CHANGELOG.md` against the review-task-docs skill.
+
+No new actionable issues found. Key verifications:
+
+- `CHANGELOG.md` `[Unreleased]` has all 5 user-visible entries: `review-task-design` (Added), `create-task-plan` (Added), `review-implementation` rename (Changed), `review-task-until-clear` rename (Changed), `review-task-docs` step in chain (Changed). Entries are accurate and use correct `/delegate` invocation syntax.
+- `README.md` Workflows section points to `doc/workflows.md` generically; no specific workflow names listed; no stale old-name references.
+- `doc/workflows.md` is an authoring-guide scoped to grammar examples, not a workflow catalogue. Task-lifecycle workflows (`review-task-design`, `create-task-plan`, etc.) are not expected there; their user-facing entry point is the CHANGELOG. No stale `review-implementation` or `review-task-until-clear` references anywhere in doc/.
+- No examples in any doc reference old workflow names or incorrect behaviour descriptions.
+
 ## 2026-05-28 test-shaper review pass
 
 Reviewed `workflow_definitions_test.clj`, `structured_output_test.clj`, and `workflow_judge_test.clj` (agent-session) against the test-shaper skill.
