@@ -117,6 +117,6 @@
 
 ## Final verification
 
-- [x] `bb test` green
-- [ ] `bb lint` clean (or pre-existing warnings only)
-- [ ] All acceptance criteria in `design.md` checked off
+- [x] `bb test` green (3 pre-existing skill-discovery failures, no new failures)
+- [x] `bb lint` clean (0 errors, 0 warnings)
+- [x] All acceptance criteria in `design.md` checked off
