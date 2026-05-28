@@ -1,3 +1,26 @@
+## 2026-05-28 test-shaper review (pass 2)
+
+Two actionable gaps found.
+
+**1. `markdown-parsed` fixture in `compiler_test.clj` is missing the `:vars` key.**
+The parser contract now returns `{... :vars map-or-nil}` for single-step markdown. The
+`markdown-parsed` fixture (used by `compile-markdown-workflow-file-test`) lacks `:vars`
+entirely. The test passes because `compile-workflow-file` treats absent `:vars` the same
+as `nil`, but the fixture silently diverges from the documented parser output shape. A
+future compiler change that distinguishes `nil` from absent would not be caught by this
+fixture. Add `:vars nil` to `markdown-parsed`.
+
+**2. `final-summary step is inline` assertion is vacuous in three `workflow_definitions_test` tests.**
+`review-task-design-test`, `review-task-plan-test`, and `implement-task-test` each assert
+`(some? final-step)` under the label "final-summary step is inline (not prompt-workflow wired)".
+This only checks the step exists — it does not verify the step is actually inline. A regression
+where `final-summary` got accidentally wired via `:prompt-workflow` would not be caught (the step
+would still exist). The assertion should verify `(seq (:contributions final-step))` to confirm
+inline contributions are present.
+
+No other actionable gaps. Economy: `review-task-design-test` and `review-task-plan-test` share
+near-identical structure — acceptable duplication given the parallel workflow shapes.
+
 ## 2026-05-28 task-test-review (pass 2)
 
 All 8 ACs have test coverage. Tests are well-formed, use real files / temp dirs, no mocks or stubs. One gap found:

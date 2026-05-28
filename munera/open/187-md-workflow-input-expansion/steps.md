@@ -206,3 +206,15 @@
 ## task-test-review follow-up (pass 2)
 
 - [x] **Add compiler test — `vars:` declared in `.md` frontmatter threads through `:prompt-workflow`**: add a `compiler_test.clj` test that writes a `.md` file with `vars: '{"my-var" {:from :workflow-input :path [:some-field]}}'` in frontmatter and `{{my-var}}` in the body, references it via `:prompt-workflow` from an `.edn` step, and asserts the compiled step's contribution `:vars` contains `{"my-var" {:from :workflow-input :path [:some-field]}}`. This exercises `compile-prompt-workflow-step` passing `(:vars referenced)` to `markdown-body->contribution` with a non-nil value — the only untested code path for `vars:` threading.
+
+## test-shaper review follow-up (pass 2)
+
+- [ ] **Add `:vars nil` to `markdown-parsed` fixture in `compiler_test.clj`**: the fixture
+  is missing the `:vars` key that `parse-markdown-workflow-file` now returns. Add `:vars nil`
+  so the fixture matches the actual parser output shape and prevents silent divergence.
+
+- [ ] **Strengthen `final-summary step is inline` assertion in three `workflow_definitions_test` tests**:
+  in `review-task-design-test`, `review-task-plan-test`, and `implement-task-test`, change
+  `(is (some? final-step) "final-summary step should exist")` to also assert
+  `(is (seq (:contributions final-step)) "final-summary step should have inline contributions")`
+  so the test actually verifies the step is inline rather than just present.
