@@ -202,3 +202,7 @@
 ## task-implementation-review follow-up (pass 2)
 
 - [x] **Revert `review-task-plan-*` `.md` files to use `steps.md` as follow-up target**: commit `245d2152` changed all four `review-task-plan-*.md` bodies to write follow-ups to `design-steps.md` instead of `steps.md`. Revert the four files (`review-task-plan-ambiguity-review.md`, `review-task-plan-ambiguity-follow-up.md`, `review-task-plan-inconsistency-review.md`, `review-task-plan-inconsistency-follow-up.md`) to use `steps.md` as the follow-up target. Also fix the internal inconsistency in the follow-up files: the "read" target and "write/mark-done" target must both be `steps.md`.
+
+## task-test-review follow-up (pass 2)
+
+- [ ] **Add compiler test — `vars:` declared in `.md` frontmatter threads through `:prompt-workflow`**: add a `compiler_test.clj` test that writes a `.md` file with `vars: '{"my-var" {:from :workflow-input :path [:some-field]}}'` in frontmatter and `{{my-var}}` in the body, references it via `:prompt-workflow` from an `.edn` step, and asserts the compiled step's contribution `:vars` contains `{"my-var" {:from :workflow-input :path [:some-field]}}`. This exercises `compile-prompt-workflow-step` passing `(:vars referenced)` to `markdown-body->contribution` with a non-nil value — the only untested code path for `vars:` threading.

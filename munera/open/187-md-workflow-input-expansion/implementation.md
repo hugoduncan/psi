@@ -1,3 +1,16 @@
+## 2026-05-28 task-test-review (pass 2)
+
+All 8 ACs have test coverage. Tests are well-formed, use real files / temp dirs, no mocks or stubs. One gap found:
+
+**`vars:` frontmatter threading through `:prompt-workflow` path is untested.**
+`compile-prompt-workflow-step` passes `(:vars referenced)` to `markdown-body->contribution`,
+but no test exercises this with a non-nil `vars` value. The only `:prompt-workflow` test
+uses `{{input}}` (a standard var) — custom `vars:` declared in a `.md` frontmatter and
+referenced via `:prompt-workflow` from an `.edn` step is not covered. A regression in
+`compile-prompt-workflow-step`'s vars-threading would not be caught.
+
+No other actionable gaps. All previous review follow-ups are complete.
+
 ## 2026-05-28 task-implementation-review (pass 2) follow-up
 
 Reverted all four `review-task-plan-*.md` files to use `steps.md` as the follow-up target.
