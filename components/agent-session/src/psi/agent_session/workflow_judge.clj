@@ -95,9 +95,12 @@
                                   :reason :unsupported-structured-output
                                   :output-key output-key
                                   :details {:structured-output last-structured-output}}}
-                (let [structured-result (if (some? last-structured-output)
-                                          (structured-output/output-result output-spec last-output last-structured-output)
-                                          (structured-output/missing-ai-structured-output-result output-spec last-output))
+                (let [;; Always use output-result, even when last-structured-output is nil.
+                      ;; When nil, validation-input calls parse-json-value which handles plain-text
+                      ;; judge responses (e.g. "DONE" or "REPEAT") via the fallback path.
+                      ;; missing-ai-structured-output-result would unconditionally produce :invalid,
+                      ;; preventing the judge from routing correctly.
+                      structured-result (structured-output/output-result output-spec last-output last-structured-output)
                       judge-output {output-key structured-result}]
                   (if (structured-output/valid-output-result? structured-result)
                     (let [raw-value (get-in structured-result [:structured-output :value])
