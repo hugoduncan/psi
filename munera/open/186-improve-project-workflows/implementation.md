@@ -1,3 +1,18 @@
+## 2026-05-28 task-implementation-review pass 10
+
+Reviewed skill, task artifacts, all new/renamed workflow EDN files, `review-task-docs` skill, `structured_output_schemas.clj`, `structured_output.clj`, `structured_output_test.clj`, `workflow_definitions_test.clj`, `CHANGELOG.md`, `README.md`, and `doc/`.
+
+No new actionable issues found. All 11 acceptance criteria satisfied. Key verifications:
+
+- All old workflow names absent from `.psi/workflows/`.
+- `review-task-plan` prompts contain no `design.md` or `design-steps.md` references.
+- All `{{input}}` vars wired to `:workflow-input` in all actor steps across all new/renamed workflows (including `review-status` in `review-step`, all three steps); judge contributions use `:vars {}` (correct — judges use actor context, not workflow-input).
+- Sub-step `.md` files (`review-task-design-*.md`, `review-task-plan-*.md`, `implement-task-*.md`, `create-task-plan-create-plan.md`) registered as standalone callable workflows — intentional design, content matches inline EDN text.
+- `compile-judge` passes through `:outputs`; both schema ids present and correct.
+- `parse-json-value` plain-text fallback test name/comment correct; dead `{:ok? false}` branch documented.
+- `review-implementation-in-worktree` delegates to `review-task-implementation`, summary names 5 passes.
+- `bb test` green (3 pre-existing failures, 0 new). `bb lint` 0 errors, 0 warnings.
+
 ## 2026-05-28 task-implementation-review pass 9
 
 Reviewed skill, task artifacts (design.md, plan.md, steps.md, design-steps.md, implementation.md), all new/renamed workflow EDN files (`review-task-design.edn`, `review-task-plan.edn`, `review-task-implementation.edn`, `create-task-plan.edn`, `implement-task.edn`, `review-step.edn`, `review-implementation-in-worktree.edn`), `review-task-docs` skill, `structured_output_schemas.clj`, `structured_output.clj`, `structured_output_test.clj`, `workflow_definitions_test.clj`, `CHANGELOG.md`, `README.md`, and `doc/`.
