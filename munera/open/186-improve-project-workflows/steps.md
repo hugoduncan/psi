@@ -126,3 +126,7 @@
 - [x] Fix `{{input}}` unsubstituted in `:prompt-workflow` steps: `review-task-design`, `review-task-plan` actor steps, and `create-task-plan` all compile to `:vars {}` so `{{input}}` is rendered literally at runtime. Fix by switching these steps from `:prompt-workflow` to inline `:contributions` with `:vars {"input" {:from :workflow-input :path [:input]}}` (same fix as `review-step` commit `7d6b848e`), or extend the workflow-loader compiler to support a `:vars` override alongside `:prompt-workflow`.
 - [x] Remove orphaned `.md` files `review-step-review.md` and `review-step-follow-up.md` — extracted in slice 3 but abandoned when `review-step.edn` was fixed to use inline contributions; now unreferenced dead artifacts.
 - [x] Add loader test assertion that `{{input}}`-bearing steps have `:vars` wired to `:workflow-input` (not `:vars {}`) to prevent silent regression.
+
+## Follow-up — task-implementation-review pass 3
+
+- [ ] Add loader tests for `review-step` in `workflow_definitions_test.clj` covering the post-structural-fix shape: loads without error, 2 steps (`review`, `follow-up`), correct step types (`:session`, `:session`), judge on `follow-up` has REPEAT/DONE `:on` routing, judge `:outputs` has `judge-routing-result` schema-id. Run focused loader tests green and commit.

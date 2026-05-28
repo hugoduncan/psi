@@ -1,3 +1,13 @@
+## 2026-05-27 task-implementation-review pass 3
+
+Reviewed skill, task artifacts, `review-step.edn` (post-structural-fix commit `f18c2d21`), `workflow_definitions_test.clj`, and full `bb test` / `bb lint`.
+
+One new actionable issue found:
+
+**`review-step` loader tests missing after structural fix** — commit `f18c2d21` (after pass 2) removed the `review-status` actor step, collapsed the judge onto `follow-up`, and introduced a new `FOLLOWUP_STATUS: ALL_DONE / ITEMS_REMAINING` signal contract. `review-step` now has 2 steps instead of 3, with different routing logic. `workflow_definitions_test.clj` has no tests for `review-step` (Slice 9 scope was new/renamed workflows only). The structural change is unguarded — a future regression would be invisible to the loader test suite. Add loader tests: loads without error, 2 steps, correct names/types, judge on `follow-up` has REPEAT/DONE routing and `:outputs` with `judge-routing-result`.
+
+`bb test` green, `bb lint` 0 errors 0 warnings.
+
 ## 2026-05-27 task-implementation-review pass 2
 
 Reviewed skill, task artifacts (design.md, plan.md, steps.md, design-steps.md, implementation.md), all new/renamed workflow EDN files (`review-task-design.edn`, `review-task-plan.edn`, `review-task-implementation.edn`, `create-task-plan.edn`, `implement-task.edn`, `review-step.edn`, `review-implementation-in-worktree.edn`), the `review-task-docs` skill, `structured_output_schemas.clj`, `target_ir_compiler.clj`, and `workflow_definitions_test.clj`.
