@@ -88,6 +88,26 @@
   have non-empty `:vars` with `"input"` wired
 - [ ] `bb test` green
 
+## Plan ambiguity follow-up (pass 1)
+
+- [ ] **Resolve final-summary wiring for implement-task, review-task-plan, review-task-design**:
+  the final-summary steps in these three `.edn` workflows carry `:source` contributions
+  (`{:type :source :from :workflow-original}` and step-output refs) that `compile-prompt-workflow-step`
+  would silently drop when wiring to `:prompt-workflow`. Decide and document in `plan.md`:
+  (a) exclude final-summary from wiring in these three workflows (keep inline like `review-step.edn`),
+  (b) extend the `.md` files to express the source references, or
+  (c) explicitly accept the behavior change (document the rationale).
+  Update `steps.md` Slice 3 wiring instructions to match the decision.
+
+- [ ] **Update existing `workflow_definitions_test.clj` tests to work after wiring**:
+  the four existing `deftest` blocks (`review-task-design-test`, `review-task-plan-test`,
+  `implement-task-test`, `create-task-plan-test`) use `load-edn-only`, which only copies the
+  `.edn` file to a temp dir. After wiring, the `.edn` files reference `.md` files via
+  `:prompt-workflow`; `compile-prompt-workflow-step` will error if the `.md` files are absent.
+  Update the Slice 3 test step in `steps.md` to explicitly say: update (not just add) the
+  existing `deftest` blocks to use `with-workflow-dir` with both the `.edn` and all referenced
+  `.md` files, or use the real `.psi/workflows` dir directly.
+
 ## Final check
 
 - [ ] Run `bb test` — all tests green

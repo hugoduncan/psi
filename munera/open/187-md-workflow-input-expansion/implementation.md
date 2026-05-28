@@ -1,3 +1,29 @@
+## 2026-05-28 plan ambiguity review pass 1
+
+Reviewed `plan.md` and `steps.md` against `compiler.clj`, `workflow_definitions_test.clj`,
+and the `.psi/workflows/` `.edn`/`.md` corpus. Found two actionable ambiguities.
+
+1. **Final-summary steps have `:source` contributions that would be silently dropped by wiring.**
+   `implement-task.edn`, `review-task-plan.edn`, and `review-task-design.edn` final-summary steps
+   each carry `{:type :source :from :workflow-original}` and `{:type :source :from {:step "X" :yield :text}}`
+   contributions alongside the template. `compile-prompt-workflow-step` replaces ALL `:contributions`
+   with the `.md` body. The `.md` final-summary files (`implement-task-final-summary.md`,
+   `review-task-plan-final-summary.md`, `review-task-design-final-summary.md`) contain only `{{input}}`
+   — no source references. Wiring as planned silently drops the step-output context that these
+   sessions depend on. The plan/steps are silent on this. Must decide: (a) exclude final-summary
+   steps from wiring (keep inline, like review-step.edn), (b) express the sources in the `.md` files
+   somehow, or (c) explicitly accept the behavior change. `create-task-plan.edn` is unaffected
+   (its single step has only a template contribution).
+
+2. **Existing `workflow_definitions_test.clj` tests use `load-edn-only` and will break after wiring.**
+   All four affected workflows (`review-task-design`, `review-task-plan`, `implement-task`,
+   `create-task-plan`) already have `deftest` blocks using `load-edn-only`, which copies only the
+   `.edn` file to a temp dir. After wiring, the `.edn` steps reference `.md` files via
+   `:prompt-workflow`; `compile-prompt-workflow-step` resolves them relative to the `.edn` path and
+   returns an error if not found. The existing tests would fail immediately. `steps.md` says
+   "add loader tests" but the existing tests must also be updated to use `with-workflow-dir` with
+   both the `.edn` and all referenced `.md` files. This is not mentioned anywhere in the plan.
+
 ## 2026-05-28 ambiguity review pass 2
 
 Reviewed design.md against compiler.clj, parser.clj, source_resolution.clj, and the .psi/workflows/ corpus.
