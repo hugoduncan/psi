@@ -163,6 +163,11 @@
               :errors [{:type :missing-schema
                         :message "Structured output declaration must include a schema or known schema-id/schema-version"}])
        (let [{:keys [ok? parsed-value errors]} (validation-input raw-output ai-structured-output)]
+         ;; ok? is always true for the raw-output path: parse-json-value uses a
+         ;; plain-text fallback and never returns {:ok? false}.  The ok? false
+         ;; branch below is only reachable via the :payload-absent path in
+         ;; ai-structured-output (i.e. when validation-input delegates to
+         ;; parse-json-value and a future caller explicitly passes {:ok? false}).
          (if-not ok?
            (cond-> (assoc base
                           :status :invalid

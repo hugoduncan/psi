@@ -42,10 +42,12 @@
                       :next-action :handoff-to-fix}}
              (:structured-output result))))))
 
-(deftest structured-output-envelope-invalid-json-test
-  ;; Tests that malformed model output records invalid status and parse errors
-  ;; without exposing a structured value.
-  (testing "malformed JSON is invalid and records errors"
+(deftest structured-output-envelope-plain-text-validation-error-test
+  ;; Tests that plain-text model output (not valid JSON) is accepted by
+  ;; parse-json-value via the plain-text fallback (trimmed raw string, :ok? true),
+  ;; then rejected by malli schema validation.  This exercises the validation-error
+  ;; path, not a parse-error path — parse-json-value never returns :ok? false.
+  (testing "plain-text output fails malli validation and records errors"
     (let [result (structured-output/output-result classification-output-spec "not json")]
       (is (= :invalid (get-in result [:structured-output :status])))
       (is (= :prompted-json (get-in result [:structured-output :strategy])))

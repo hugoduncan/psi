@@ -137,5 +137,5 @@
 
 ## Follow-up — task-implementation-review pass 7
 
-- [ ] Fix `structured-output-envelope-invalid-json-test` name and comment: `"not json"` no longer triggers a parse error (plain-text fallback returns `{:ok? true}` with value `"not json"`); the test now exercises the malli validation-error path, not a parse-error path. Update the test docstring/comment to reflect this. Verify `bb test` still green.
-- [ ] Address dead `{:ok? false}` branch in `structured-output-envelope` / `validation-input`: `parse-json-value` now always returns `{:ok? true}`, making the `ok? false` branch unreachable for the `raw-output` path. Either remove the dead branch or add a comment that it is only reachable via the `:payload`-absent path in `ai-structured-output`.
+- [x] Fix `structured-output-envelope-invalid-json-test` name and comment: `"not json"` no longer triggers a parse error (plain-text fallback returns `{:ok? true}` with value `"not json"`); the test now exercises the malli validation-error path, not a parse-error path. Update the test docstring/comment to reflect this. Verify `bb test` still green.
+- [x] Address dead `{:ok? false}` branch in `structured-output-envelope` / `validation-input`: `parse-json-value` now always returns `{:ok? true}`, making the `ok? false` branch unreachable for the `raw-output` path. Either remove the dead branch or add a comment that it is only reachable via the `:payload`-absent path in `ai-structured-output`.
