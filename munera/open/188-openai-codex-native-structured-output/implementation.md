@@ -78,7 +78,7 @@
     - non-streaming support is not yet verified and currently appears unsupported or at least rejected by the probed request shape.
   - This changes the task from capability discovery to implementation of native streaming Codex structured output. The remaining work is to update capability declaration, request shaping, and streaming extraction/tests to match the verified live contract while keeping non-streaming explicit and separate.
 - 2026-05-29: Implementation pass — native Codex capability slice.
-  - Added a distinct provider-native Codex mechanism in `components/ai/src/psi/ai/structured_output.clj`: `:openai/codex-responses-text-format-json-schema`, separate from OpenAI Chat Completions `response_format`.
+  - Added a distinct provider-native Codex mechanism in `components/ai/src/psi/ai/structured_output.clj`: `:openai/responses-text-format-json-schema`, separate from OpenAI Chat Completions `response_format`.
   - Updated built-in Codex model capability annotation in `components/ai/src/psi/ai/models.clj` and OAuth-routed runtime `gpt-5.5` capability assignment in `components/ai/src/psi/ai/model_registry.clj` so the resolved ChatGPT/Codex transport now advertises `[:provider-native :prompted-json]` with the new Codex mechanism.
   - Added `components/ai/src/psi/ai/providers/openai/codex_structured_output.clj` to keep Codex-specific request/result behavior local and distinct from Chat Completions and Anthropic paths.
   - Updated `components/ai/src/psi/ai/providers/openai/codex_responses.clj` request shaping to send native schemas only via Responses-style `text.format`, with `{"type":"json_schema","name":...,"schema":...,"strict":...}` nested under `text`, and to continue omitting Chat Completions-style top-level `response_format`.
@@ -91,3 +91,6 @@
   - Focused verification passed:
     - `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.openai-structured-output-test --focus psi.turn-runtime.response-mode-test`
     - Result: `22 tests, 141 assertions, 0 failures`.
+- 2026-05-29: task-implementation-review pass.
+  - Re-read the task artifacts, touched Codex structured-output code/tests, and reran focused model/provider/turn-runtime verification plus targeted ai lint.
+  - Found one actionable closeout issue: the untracked live probe scratch file `.tmp-codex-schema-probe.clj` remains in the worktree even though its evidence is already recorded in task artifacts.
