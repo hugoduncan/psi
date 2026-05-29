@@ -7,6 +7,7 @@
   (:require
    [clojure.string :as str]
    [com.wsscode.pathom3.connect.operation :as pco]
+   [psi.agent-session.workflow-run-retention :as workflow-run-retention]
    [psi.workflow-runtime.ir :as workflow-ir]
    [psi.workflow-runtime.core :as workflow-runtime]
    [psi.workflow-registry.registry :as workflow-registry]))
@@ -122,6 +123,7 @@
   (try
     (let [execute-fn (:execute-workflow-run-fn agent-session-ctx)
           exec-result (execute-fn agent-session-ctx session-id run-id)
+          _ (workflow-run-retention/apply-retention-cleanup! agent-session-ctx run-id)
           final-run (workflow-runtime/workflow-run-in @(:state* agent-session-ctx) run-id)
           ;; Extract terminal yielded text from the last completed step's
           ;; canonical output surface, but treat blank text as missing so callers
@@ -180,6 +182,7 @@
         (reset! (:state* agent-session-ctx) new-state)))
     (let [resume-fn (:resume-and-execute-workflow-run-fn agent-session-ctx)
           exec-result (resume-fn agent-session-ctx session-id run-id)
+          _ (workflow-run-retention/apply-retention-cleanup! agent-session-ctx run-id)
           final-run (workflow-runtime/workflow-run-in @(:state* agent-session-ctx) run-id)]
       {:psi.workflow/run-id run-id
        :psi.workflow/status (:status exec-result)
@@ -214,6 +217,7 @@
             (workflow-runtime/cancel-run @(:state* agent-session-ctx) run-id
                                          (or reason "cancelled"))]
         (reset! (:state* agent-session-ctx) new-state)
+        (workflow-run-retention/apply-retention-cleanup! agent-session-ctx run-id)
         {:psi.workflow/run-id run-id
          :psi.workflow/status (:status cancelled-run)
          :psi.workflow/error nil}))

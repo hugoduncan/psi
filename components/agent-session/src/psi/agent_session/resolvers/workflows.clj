@@ -94,9 +94,20 @@
        (keep :execution-session-id)
        vec))
 
+(defn- linked-session-ids
+  [workflow-run]
+  (->> (:step-runs workflow-run)
+       vals
+       (mapcat :attempts)
+       (mapcat (juxt :execution-session-id :judge-session-id))
+       (remove nil?)
+       distinct
+       vec))
+
 (defn- workflow-run->eql
   [workflow-run]
   (let [session-ids (execution-session-ids workflow-run)
+        linked-session-ids' (linked-session-ids workflow-run)
         ordered-step-runs (->> (get-in workflow-run [:effective-definition :step-order])
                                (map (fn [step-id]
                                       [step-id (get-in workflow-run [:step-runs step-id])]))
@@ -114,7 +125,8 @@
      :psi.workflow.run/effective-definition  (definition->eql (:effective-definition workflow-run))
      :psi.workflow.run/step-runs             ordered-step-runs
      :psi.workflow.run/history               (mapv history-entry->eql (:history workflow-run))
-     :psi.workflow.run/execution-session-ids session-ids}))
+     :psi.workflow.run/execution-session-ids session-ids
+     :psi.workflow.run/linked-session-ids    linked-session-ids'}))
 
 (pco/defresolver workflow-definitions-root
   [{:keys [psi/agent-session-ctx]}]

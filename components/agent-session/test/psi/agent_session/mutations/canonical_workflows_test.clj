@@ -2,7 +2,11 @@
   "Tests for canonical workflow Pathom mutations."
   (:require
    [clojure.test :refer [deftest is testing]]
+   [psi.agent-session.core :as session]
    [psi.agent-session.mutations.canonical-workflows :as cwf-mutations]
+   [psi.agent-session.test-support :as test-support]
+   [psi.agent-session.workflow-run-retention :as workflow-run-retention]
+   [psi.session-state.state :as ss]
    [psi.workflow-runtime.model :as workflow-model]
    [psi.workflow-registry.registry :as workflow-registry]))
 
@@ -10,10 +14,14 @@
   "Create a minimal ctx with a state atom for testing pure mutations."
   ([] (make-test-ctx {}))
   ([initial-state]
-   (let [state* (atom (merge {:workflows (workflow-model/initial-workflow-state)} initial-state))]
-     {:state* state*
-      :execute-workflow-run-fn (fn [_ _ _] {:status :completed :terminal? true :blocked? false :steps-executed []})
-      :resume-and-execute-workflow-run-fn (fn [_ _ _] {:status :completed :terminal? true :blocked? false :steps-executed []})})))
+   (let [ctx (merge
+              (session/create-context
+               (test-support/safe-context-opts {:persist? false}))
+              {:execute-workflow-run-fn (fn [_ _ _] {:status :completed :terminal? true :blocked? false :steps-executed []})
+               :resume-and-execute-workflow-run-fn (fn [_ _ _] {:status :completed :terminal? true :blocked? false :steps-executed []})})]
+     (swap! (:state* ctx) merge {:workflows (workflow-model/initial-workflow-state)})
+     (swap! (:state* ctx) merge initial-state)
+     ctx)))
 
 (def sample-definition
   {:definition-id "test-workflow"
@@ -206,6 +214,104 @@
           result (cwf-mutations/list-workflow-definitions {} {:psi/agent-session-ctx ctx})]
       (is (= 1 (:psi.workflow/definition-count result)))
       (is (= ["test-workflow"] (mapv :definition-id (:psi.workflow/definitions result)))))))
+
+(deftest workflow-run-retention-helpers-test
+  (testing "negative configured retention counts are rejected"
+    (let [ctx (make-test-ctx)]
+      (is (thrown-with-msg? clojure.lang.ExceptionInfo
+                            #"Invalid completed workflow run retention count"
+                            (workflow-run-retention/completed-workflow-run-retention-count
+                             (assoc ctx :config {:completed-workflow-run-retention-count -1}))))))
+
+  (testing "linked-session-ids includes execution and judge ids once each"
+    (let [workflow-run {:step-runs {"plan" {:attempts [{:execution-session-id "exec-1"
+                                                        :judge-session-id "judge-1"}
+                                                       {:execution-session-id "exec-1"
+                                                        :judge-session-id "judge-2"}]}}}]
+      (is (= ["exec-1" "judge-1" "judge-2"]
+             (workflow-run-retention/linked-session-ids workflow-run)))))
+
+  (testing "equal finished-at ordering uses later run-order creation as newer"
+    (let [finished-at (java.time.Instant/parse "2026-05-29T12:00:00Z")
+          state {:workflows {:runs {"run-1" {:run-id "run-1" :parent-session-id "parent" :status :completed :finished-at finished-at}
+                                    "run-2" {:run-id "run-2" :parent-session-id "parent" :status :completed :finished-at finished-at}}
+                             :run-order ["run-1" "run-2"]}}
+          result (workflow-run-retention/runs-to-retain-and-remove state "parent" 1)]
+      (is (= ["run-2"] (mapv :run-id (:kept-runs result))))
+      (is (= ["run-1"] (mapv :run-id (:removed-runs result)))))))
+
+(deftest workflow-run-retention-cleanup-test
+  (testing "default retention keeps only newest retained terminal run for one originating session and tree-closes linked workflow-owned sessions"
+    (let [ctx (make-test-ctx)
+          parent (session/new-session-in! ctx nil {})
+          parent-id (:session-id parent)
+          child-1 (session/new-session-in! ctx parent-id {:session-name "wf-1"})
+          child-1-id (:session-id child-1)
+          grandchild-1 (session/new-session-in! ctx child-1-id {:session-name "wf-1-child"})
+          grandchild-1-id (:session-id grandchild-1)
+          child-2 (session/new-session-in! ctx parent-id {:session-name "wf-2"})
+          child-2-id (:session-id child-2)
+          finished-1 (java.time.Instant/parse "2026-05-29T12:00:00Z")
+          finished-2 (java.time.Instant/parse "2026-05-29T12:01:00Z")]
+      (swap! (:state* ctx) assoc-in [:agent-session :sessions child-1-id :data :workflow-owned?] true)
+      (swap! (:state* ctx) assoc-in [:agent-session :sessions grandchild-1-id :data :workflow-owned?] true)
+      (swap! (:state* ctx) assoc-in [:agent-session :sessions grandchild-1-id :data :parent-session-id] child-1-id)
+      (swap! (:state* ctx) assoc-in [:agent-session :sessions child-2-id :data :workflow-owned?] true)
+      (swap! (:state* ctx) assoc-in [:workflows :runs]
+             {"run-1" {:run-id "run-1"
+                       :parent-session-id parent-id
+                       :status :completed
+                       :finished-at finished-1
+                       :step-runs {"plan" {:attempts [{:execution-session-id child-1-id}]}}}
+              "run-2" {:run-id "run-2"
+                       :parent-session-id parent-id
+                       :status :completed
+                       :finished-at finished-2
+                       :step-runs {"plan" {:attempts [{:execution-session-id child-2-id}]}}}})
+      (swap! (:state* ctx) assoc-in [:workflows :run-order] ["run-1" "run-2"])
+      (workflow-run-retention/apply-retention-cleanup! ctx "run-2")
+      (is (nil? (get-in @(:state* ctx) [:workflows :runs "run-1"])))
+      (is (some? (get-in @(:state* ctx) [:workflows :runs "run-2"])))
+      (is (nil? (ss/get-session-data-in ctx child-1-id)))
+      (is (nil? (ss/get-session-data-in ctx grandchild-1-id)))
+      (is (some? (ss/get-session-data-in ctx child-2-id)))
+      (is (some? (ss/get-session-data-in ctx parent-id)))))
+
+  (testing "retention 0 removes newly terminal retained runs immediately"
+    (let [ctx (assoc (make-test-ctx) :config {:completed-workflow-run-retention-count 0})
+          parent (session/new-session-in! ctx nil {})
+          parent-id (:session-id parent)
+          child (session/new-session-in! ctx parent-id {:session-name "wf"})
+          child-id (:session-id child)]
+      (swap! (:state* ctx) assoc-in [:agent-session :sessions child-id :data :workflow-owned?] true)
+      (swap! (:state* ctx) assoc-in [:workflows :runs]
+             {"run-1" {:run-id "run-1"
+                       :parent-session-id parent-id
+                       :status :completed
+                       :finished-at (java.time.Instant/parse "2026-05-29T12:00:00Z")
+                       :step-runs {"plan" {:attempts [{:execution-session-id child-id}]}}}})
+      (swap! (:state* ctx) assoc-in [:workflows :run-order] ["run-1"])
+      (workflow-run-retention/apply-retention-cleanup! ctx "run-1")
+      (is (nil? (get-in @(:state* ctx) [:workflows :runs "run-1"])))
+      (is (nil? (ss/get-session-data-in ctx child-id)))))
+
+  (testing "cleanup is isolated per originating parent session and non-terminal runs remain"
+    (let [ctx (make-test-ctx)
+          parent-a (session/new-session-in! ctx nil {})
+          parent-b (session/new-session-in! ctx nil {})
+          parent-a-id (:session-id parent-a)
+          parent-b-id (:session-id parent-b)]
+      (swap! (:state* ctx) assoc-in [:workflows :runs]
+             {"run-a1" {:run-id "run-a1" :parent-session-id parent-a-id :status :completed :finished-at (java.time.Instant/parse "2026-05-29T12:00:00Z") :step-runs {}}
+              "run-a2" {:run-id "run-a2" :parent-session-id parent-a-id :status :completed :finished-at (java.time.Instant/parse "2026-05-29T12:01:00Z") :step-runs {}}
+              "run-a3" {:run-id "run-a3" :parent-session-id parent-a-id :status :running :step-runs {}}
+              "run-b1" {:run-id "run-b1" :parent-session-id parent-b-id :status :completed :finished-at (java.time.Instant/parse "2026-05-29T12:00:30Z") :step-runs {}}})
+      (swap! (:state* ctx) assoc-in [:workflows :run-order] ["run-a1" "run-a2" "run-a3" "run-b1"])
+      (workflow-run-retention/apply-retention-cleanup! ctx "run-a2")
+      (is (nil? (get-in @(:state* ctx) [:workflows :runs "run-a1"])))
+      (is (some? (get-in @(:state* ctx) [:workflows :runs "run-a2"])))
+      (is (some? (get-in @(:state* ctx) [:workflows :runs "run-a3"])))
+      (is (some? (get-in @(:state* ctx) [:workflows :runs "run-b1"]))))))
 
 (deftest list-workflow-runs-test
   (testing "lists created runs"

@@ -64,10 +64,15 @@
      :attempt attempt
      :execution-session execution-session}))
 
+(defn- add-judge-session-id!
+  [ctx run-id judge-session-id]
+  (swap! (:state* ctx) assoc-in [:workflows :runs run-id :step-runs "plan" :attempts 0 :judge-session-id] judge-session-id))
+
 (deftest workflow-root-resolvers-test
   (testing "workflow definitions and runs are queryable from session root"
     (let [[ctx session-id] (create-session-context {:persist? false})
           {:keys [run-id execution-session]} (install-run-with-attempt! ctx session-id)
+          _ (add-judge-session-id! ctx run-id "judge-1")
           result (session/query-in ctx session-id
                                    [:psi.workflow/definition-count
                                     :psi.workflow/definition-ids
@@ -95,6 +100,7 @@
                                       :psi.workflow.run/workflow-input
                                       :psi.workflow.run/current-step-id
                                       :psi.workflow.run/execution-session-ids
+                                      :psi.workflow.run/linked-session-ids
                                       {:psi.workflow.run/step-runs
                                        [:psi.workflow.step-run/id
                                         :psi.workflow.step-run/status
@@ -118,6 +124,8 @@
       (is (= "plan" (:psi.workflow.run/current-step-id workflow-run)))
       (is (= [(:session-id execution-session)]
              (:psi.workflow.run/execution-session-ids workflow-run)))
+      (is (= #{(:session-id execution-session) "judge-1"}
+             (set (:psi.workflow.run/linked-session-ids workflow-run))))
       (is (= "plan" (:psi.workflow.step-run/id plan-step-run)))
       (is (= :running (:psi.workflow.step-run/status plan-step-run)))
       (is (= 1 (:psi.workflow.step-run/attempt-count plan-step-run)))
@@ -128,6 +136,7 @@
   (testing "workflow detail is queryable explicitly by run id"
     (let [[ctx session-id] (create-session-context {:persist? false})
           {:keys [run-id execution-session]} (install-run-with-attempt! ctx session-id)
+          _ (add-judge-session-id! ctx run-id "judge-1")
           run-result (session/query-in ctx
                                        [:psi.workflow.run/detail]
                                        {:psi.workflow.run/id run-id})
@@ -140,6 +149,8 @@
       (is (= 2 (count (:psi.workflow.run/step-runs run-detail))))
       (is (= [(:session-id execution-session)]
              (:psi.workflow.run/execution-session-ids run-detail)))
+      (is (= #{(:session-id execution-session) "judge-1"}
+             (set (:psi.workflow.run/linked-session-ids run-detail))))
       (is (= 2 (count (:psi.workflow.run/history run-detail))))
       (is (= :workflow/run-created
              (get-in run-detail [:psi.workflow.run/history 0 :psi.workflow.history/event])))
