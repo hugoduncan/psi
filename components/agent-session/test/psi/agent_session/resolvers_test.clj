@@ -14,6 +14,7 @@
    returns a well-typed value for the target attribute — no resolver error."
   (:require
    [clojure.java.io :as io]
+   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.core :as session]
@@ -93,6 +94,24 @@
     (is (some #(= "extension-development" (:name %))
               (:psi.agent-session/skills skills-result)))
     (is (some #(= "extension-development" (:name %))
+              (:built-in (:psi.skill/by-source grouped-result))))))
+
+(deftest built-in-workflow-skill-discovery-test
+  (let [discovered (:skills (prompt-skills/built-in-skills-discovery
+                             {:config {:built-in-resource-root "psi/skills"}}))
+        workflow-skill (some #(when (= "workflow" (:name %)) %) discovered)
+        [ctx session-id] (create-session-context {:persist? false})
+        _ (session/dispatch-in! ctx :session/set-skills {:session-id session-id
+                                                         :skills discovered}
+                                {:origin :test})
+        skills-result (session/query-in ctx session-id [:psi.agent-session/skills])
+        grouped-result (session/query-in ctx session-id [:psi.skill/by-source])]
+    (is (= :built-in (:source workflow-skill)))
+    (is (.exists (io/file (:file-path workflow-skill))))
+    (is (str/includes? (slurp (:file-path workflow-skill)) "doc/workflow-grammar.md"))
+    (is (some #(= "workflow" (:name %))
+              (:psi.agent-session/skills skills-result)))
+    (is (some #(= "workflow" (:name %))
               (:built-in (:psi.skill/by-source grouped-result))))))
 
 ;; ── :psi.agent-session/messages-count ───────────────────

@@ -229,6 +229,15 @@
           message (:message result)
           entry "  /skill:extension-development — Repository-specific guidance for creating, modifying, and debugging psi extensions. [built-in]"]
       (is (= :text (:type result)))
+      (is (str/includes? message entry))))
+  (testing "lists built-in workflow as a built-in skill"
+    (let [built-ins (:skills (prompt-skills/built-in-skills-discovery
+                              {:config {:built-in-resource-root "psi/skills"}}))
+          [ctx session-id] (make-test-ctx {:skills built-ins})
+          result (commands/dispatch-in ctx session-id "/skills" cmd-opts)
+          message (:message result)
+          entry "  /skill:workflow — Repository-specific guidance for understanding, creating, and updating psi workflows. [built-in]"]
+      (is (= :text (:type result)))
       (is (str/includes? message entry)))))
 
 (deftest dispatch-worktree-test
@@ -649,6 +658,14 @@
           [ctx session-id] (make-test-ctx {:skills built-ins})
           s (commands/format-help ctx session-id)
           entry "  /skill:extension-development — Repository-specific guidance for creating, modifying, and debugging psi extensions."]
+      (is (str/includes? s "── Skills"))
+      (is (str/includes? s entry))))
+  (testing "lists built-in workflow in the Skills section"
+    (let [built-ins (:skills (prompt-skills/built-in-skills-discovery
+                              {:config {:built-in-resource-root "psi/skills"}}))
+          [ctx session-id] (make-test-ctx {:skills built-ins})
+          s (commands/format-help ctx session-id)
+          entry "  /skill:workflow — Repository-specific guidance for understanding, creating, and updating psi workflows."]
       (is (str/includes? s "── Skills"))
       (is (str/includes? s entry)))))
 
