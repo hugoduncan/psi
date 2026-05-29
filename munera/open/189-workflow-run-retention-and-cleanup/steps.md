@@ -6,7 +6,7 @@
 - [ ] Add effective retention-count lookup from `[:config :completed-workflow-run-retention-count]` with default `1` when absent.
 - [ ] Add negative-retention validation so configured values below `0` are rejected before cleanup runs.
 - [ ] Add helper(s) to identify retained terminal workflow runs for one originating session using statuses `:completed`, `:failed`, and `:cancelled` only.
-- [ ] Add helper(s) to order retained terminal workflow runs newest-to-oldest by terminal transition time and split them into kept vs removed runs according to the effective retention count.
+- [ ] Add helper(s) to order retained terminal workflow runs newest-to-oldest by terminal transition time, using canonical workflow run creation order as the deterministic `:finished-at` tie-breaker, and split them into kept vs removed runs according to the effective retention count.
 
 ## Slice 2 — cleanup execution on terminal transition
 
@@ -29,6 +29,7 @@
 - [ ] Add a focused test proving the removed older retained run's linked workflow-owned session tree or trees are also removed in the default retention case.
 - [ ] Add a focused test proving cleanup removes multiple linked execution/judge workflow-owned session roots recorded on the same removed run.
 - [ ] Add a focused test proving explicit retention `2` keeps the two newest retained terminal runs for one originating session.
+- [ ] Add a focused test proving equal `:finished-at` retained terminal runs are ordered deterministically by canonical workflow run creation order, with later-created runs retained ahead of earlier-created runs.
 - [ ] Add a focused test proving explicit retention `0` removes a newly terminal retained run immediately and also removes its linked workflow-owned session trees.
 - [ ] Add a focused test proving non-terminal runs remain present even when retained terminal runs already exceed the retention count.
 - [ ] Add a focused test proving retention cleanup is isolated per originating agent session.

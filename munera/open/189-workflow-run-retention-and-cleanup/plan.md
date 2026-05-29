@@ -10,7 +10,7 @@ Key decisions:
 - Read the effective retention count from runtime context config at `[:config :completed-workflow-run-retention-count]`, defaulting to `1` when absent.
 - Reject negative configured counts at the configuration boundary before retention cleanup executes.
 - Trigger cleanup immediately when a workflow run transitions into a retained terminal status, so retention remains deterministic and does not depend on later background sweeps.
-- Determine removal candidates per originating agent session by ordering only retained terminal runs by terminal transition time, newest first, then dropping any runs beyond the effective retention count.
+- Determine removal candidates per originating agent session by ordering only retained terminal runs by terminal transition time, newest first, and when `:finished-at` ties occur break them by canonical workflow run creation order from `[:workflows :run-order]` so later-created runs are treated as newer; then drop any runs beyond the effective retention count.
 - Remove workflow runs through canonical workflow-run removal semantics rather than ad hoc state editing.
 - For each removed run, derive the authoritative linked workflow-owned root sessions from the run data itself as the deduplicated union of attempt `:execution-session-id` and `:judge-session-id` values.
 - Align higher workflow-run read/introspection projections to that same authoritative linked-session set by adding or updating a canonical linked-session id projection instead of leaving execution-only ids as the sole surface.
@@ -39,7 +39,7 @@ Likely implementation seam:
 
 1. Retention configuration and canonical terminal-retention helpers
    - Add effective retention-count lookup/defaulting and negative-value rejection.
-   - Add retained-terminal status predicate and per-originating-session keep/remove ordering helper based on terminal transition time.
+   - Add retained-terminal status predicate and per-originating-session keep/remove ordering helper based on terminal transition time, using canonical workflow run creation order as the deterministic `:finished-at` tie-breaker.
 
 2. Cleanup execution on terminal transition
    - Hook retention evaluation into the canonical workflow-run terminal transition path.

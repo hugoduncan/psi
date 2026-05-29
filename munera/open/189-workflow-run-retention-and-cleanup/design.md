@@ -60,6 +60,7 @@ After this task:
 - This task treats the canonical workflow runtime terminal statuses `:completed`, `:failed`, and `:cancelled` as the retained status set.
 - The system evaluates retention when a workflow run transitions into one of those retained terminal statuses.
 - Retention ordering uses terminal transition time: the retained terminal runs for that originating session are ordered from newest terminal transition to oldest terminal transition.
+- If multiple retained terminal runs for the same originating session share the same terminal transition time (`:finished-at`), the authoritative tie-breaker is canonical workflow run creation order from `[:workflows :run-order]`, with the later-created run treated as newer and retained ahead of earlier-created runs.
 - The system keeps the first `N` retained terminal runs in that ordering, where `N` is the effective retention count for the originating agent session.
 - Any older retained terminal runs beyond `N` are removed.
 - Non-terminal runs (`:pending`, `:running`, `:blocked`) are never candidates for this cleanup.
