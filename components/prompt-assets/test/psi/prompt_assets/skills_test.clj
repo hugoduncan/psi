@@ -218,7 +218,7 @@
                          "---\nname: direct\ndescription: Direct skill\n---\nDirect body")
       (try
         (let [{:keys [skills]} (skills/load-skills-from-dir (str dir) :user true)]
-          (is (= 1 (count skills)))
+          (is (some #(= "direct" (:name %)) skills))
           (is (= "direct" (:name (first skills)))))
         (finally (cleanup-dir! dir)))))
 
@@ -267,7 +267,7 @@
                   (skills/discover-skills
                    {:global-skills-dirs  [(str global-dir)]
                     :project-skills-dirs [(str project-dir)]})]
-              (is (= 1 (count skills)))
+              (is (some #(= "shared" (:name %)) skills))
               (is (= "Project version"
                      (:description (some #(when (= "shared" (:name %)) %) skills))))
               (is (some #(= :collision (:type %)) diagnostics))))))))
@@ -349,7 +349,7 @@
                     :project-skills-dirs ["/nonexistent"]
                     :extra-paths        [(str extra-dir)]
                     :disabled           true})]
-              (is (= 1 (count skills)))
+              (is (some #(= "extra" (:name %)) skills))
               (is (= "extra" (:name (first skills))))
               (is (= :path (:source (first skills))))))))))
 
@@ -362,7 +362,7 @@
                {:global-skills-dirs  ["/nonexistent"]
                 :project-skills-dirs ["/nonexistent"]
                 :extra-paths         [(str extra-dir)]})]
-          (is (= 1 (count skills)))
+          (is (some #(= "extra" (:name %)) skills))
           (is (= :path (:source (some #(when (= "extra" (:name %)) %) skills))))))))
 
   (testing "non-existent extra path produces warning"
@@ -697,6 +697,25 @@
       (is (str/includes? skill-path "/.psi/agent/built-in-skills/"))
       (is (str/includes? (slurp skill-path) "packaged-test-skill"))
       (is (contains? #{true false} reused?))))
+
+  (testing "production built-in skill packaging includes extension-development with readable file semantics"
+    (let [source-path "bases/main/resources/psi/skills/extension-development/SKILL.md"
+          resource-path "psi/skills/extension-development/SKILL.md"
+          opts {:config {:built-in-resource-root "psi/skills"}}
+          {:keys [dir resource-paths]} (skills/materialize-built-in-skills! opts)
+          built-in-path (str dir "/extension-development/SKILL.md")
+          {:keys [skills materialization]} (skills/built-in-skills-discovery opts)
+          built-in (some #(when (= "extension-development" (:name %)) %) skills)
+          invocation (skills/invoke-skill skills "/skill:extension-development verify")]
+      (is (.exists (io/file source-path)))
+      (is (some #(= resource-path %) resource-paths))
+      (is (.exists (io/file built-in-path)))
+      (is (= :built-in (:source built-in)))
+      (is (= "extension-development" (:name built-in)))
+      (is (str/starts-with? (:file-path built-in) (:dir materialization)))
+      (is (str/includes? (slurp (:file-path built-in)) "https://github.com/hugoduncan/psi/blob/main/doc/extension-api.md"))
+      (is (some? invocation))
+      (is (str/includes? (:content invocation) "Extension development"))))
 
   (testing "snapshot id changes when the packaged resource set changes"
     (let [base-dir (skills/built-in-snapshot-dir {:config {:built-in-resource-root "psi/test-built-in-skills"}})
