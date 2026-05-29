@@ -268,7 +268,10 @@
                        (assoc-in [:judge-results step-id] judge-result)
                        (assoc-in [:sessions (str step-id "-judge")] (:judge-session-id judge-result)))))
           (queue/enqueue-event! event-queue* working-memory*
-                                (if (= :no-match (:action routing-result)) :judge/no-match :judge/signal)
+                                (case (:action routing-result)
+                                  :no-match :judge/no-match
+                                  :fail :judge/failed
+                                  :judge/signal)
                                 (cond-> {}
                                   (:judge-event judge-result) (assoc :signal (:judge-event judge-result))))
           nil)

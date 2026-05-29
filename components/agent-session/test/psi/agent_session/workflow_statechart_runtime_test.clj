@@ -203,6 +203,31 @@
       (is (= "APPROVED" (:judge-event review-attempt)))
       (is (= "judge-r" (:judge-session-id review-attempt))))))
 
+(deftest judged-review-failing-judge-result-fails-run-instead-of-stranding-it-test
+  (let [[ctx session-id] (create-session-context)
+        _ (install-run! ctx judged-definition "run-judge-fail")
+        wf-ctx (runtime/create-workflow-context ctx session-id "run-judge-fail")]
+    (with-stubbed-runtime {:assistant-text "review-output"
+                           :judge-result {:judge-session-id "judge-fail"
+                                          :judge-output {:routing-result {:structured-output {:status :invalid
+                                                                                              :errors [{:type :invalid-structured-output
+                                                                                                        :message "bad judge output"}]}}}
+                                          :judge-event nil
+                                          :routing-result {:action :fail
+                                                           :reason :invalid-structured-output
+                                                           :output-key :routing-result}}}
+      #(runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
+    (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-judge-fail")
+          review-attempt (get-in run [:step-runs "review" :attempts 0])]
+      (is (= :failed (:status run)))
+      (is (= :invalid-structured-output (get-in run [:terminal-outcome :reason])))
+      (is (= "judge-fail" (:judge-session-id review-attempt)))
+      (is (nil? (:judge-event review-attempt)))
+      (is (= {:routing-result {:structured-output {:status :invalid
+                                                   :errors [{:type :invalid-structured-output
+                                                             :message "bad judge output"}]}}}
+             (:judge-output review-attempt))))))
+
 (deftest actor-success-does-not-retain-execution-result-in-pending-state-test
   (let [[ctx session-id] (create-session-context)
         _ (install-run! ctx linear-definition "run-no-pending-execution-result")

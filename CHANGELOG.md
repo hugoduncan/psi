@@ -17,6 +17,7 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 - `review-implementation` workflow renamed to `review-task-implementation`; the old name is no longer available. Update any saved `/delegate review-implementation` invocations to `/delegate review-task-implementation`.
 - `review-task-until-clear` workflow renamed to `review-task-plan` and narrowed to `plan.md`/`steps.md` review only (design review is now handled by `review-task-design`). The old name is no longer available.
 - `review-task-implementation` now includes a `review-task-docs` step that reviews user-facing documentation (`README.md`, `doc/`, changelog) as part of the implementation review chain.
+- Workflow runs now automatically retain only the newest retained terminal runs per originating session, defaulting to `1` kept run via `[:config :completed-workflow-run-retention-count]`; older retained terminal runs are removed from workflow listing/introspection along with their linked workflow-owned child-session trees.
 
 ### Fixed
 - OpenAI OAuth-backed `gpt-5.5` sessions now route through the ChatGPT/Codex transport, matching Codex account access instead of failing against the platform chat-completions quota path.
