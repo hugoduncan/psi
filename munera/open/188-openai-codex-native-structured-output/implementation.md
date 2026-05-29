@@ -20,3 +20,7 @@
   - Updated `design.md` to make the capability-selection seam explicit: the authoritative boundary is the resolved ChatGPT/Codex transport (`https://chatgpt.com/backend-api/codex/responses`) after URL/auth resolution, with `:api :openai-codex-responses` only a coarse routing input and not by itself permission to treat future public OpenAI Responses as the same capability.
   - Named the current runtime seam as the Codex provider request path in `components/ai/src/psi/ai/providers/openai/codex_responses.clj`, with model capability annotation required to remain coherent with that transport-specific contract.
   - Marked the ambiguity design-step done.
+- 2026-05-29: Inconsistency review pass.
+  - Found one actionable inconsistency: `design.md` frames the current-code boundary around built-in `gpt-5.4` on Codex versus `gpt-5.5` on Chat Completions, but current runtime/model-registry behavior already reroutes `gpt-5.5` to `:openai-codex-responses` under OAuth and assigns fallback-only Codex structured-output capability there.
+  - This conflicts with the design's current-code inventory and with wording that model capability coherence can be preserved in `components/ai/src/psi/ai/models.clj` alone; the real authoritative surface is transport-resolved runtime model selection plus provider URL/auth resolution.
+  - Added one unchecked `design-steps.md` follow-up; did not review `plan.md` or `steps.md`. 
