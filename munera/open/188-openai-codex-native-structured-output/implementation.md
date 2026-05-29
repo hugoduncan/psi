@@ -135,3 +135,7 @@
   - The preceding review pass found no new actionable implementation feedback and added no new unchecked actionable `steps.md` items.
   - No implementation steps were executed in this pass.
   - Left `steps.md` unchanged: the only remaining unchecked item is still conditional on future Codex non-streaming structured-output support, which current evidence does not establish (`stream: false` returned `400`) and which remains unimplemented pending separate verification.
+- 2026-05-29: task-implementation-review pass repeat.
+  - Re-read the task artifacts, Codex structured-output implementation, focused model/provider/turn-runtime/workflow structured-output tests, custom-provider docs, and changelog.
+  - Found one new actionable implementation issue: Codex native streaming result extraction uses `structured-output/parse-json-object`, so valid JSON values that are not objects (notably workflow judge string-enum schemas such as `"DONE"` for `[:enum "REPEAT" "DONE"]`) are emitted with no `:payload` and `:parse-error? true` despite being valid schema-constrained structured output. That conflicts with the task intent to preserve small workflow control schemas and with existing workflow validation support for non-object JSON values.
+  - Added an unchecked follow-up to `steps.md`; did not duplicate the existing conditional future non-streaming `:execute` item.

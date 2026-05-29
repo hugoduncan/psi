@@ -28,6 +28,7 @@
 - [x] Add or update model-registry tests covering the finalized Codex capability assignment for transport-resolved runtime models, including OAuth-routed `gpt-5.5`.
 - [x] Add or update Codex provider tests covering structured-output request shaping for the finalized native streaming capability outcome.
 - [x] Add or update Codex provider tests covering structured-output event extraction and top-level result surfaces for the finalized native streaming capability outcome.
+- [ ] Fix Codex native structured-output result extraction so valid non-object JSON payloads (for example string enum schemas such as `"DONE"`) are not reported as parse errors and have coherent top-level structured-output metadata/proof.
 - [x] Add focused tests proving Chat Completions-style `response_format` is not used on the Codex endpoint while Responses-style `text.format` is.
 - [ ] If non-streaming Codex support is later implemented, add focused tests for the `:execute` structured-output contract.
 - [x] Add a focused workflow or turn-runtime regression proving loop-control schemas remain intact and coherent on the finalized Codex capability path.
