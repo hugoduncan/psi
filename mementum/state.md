@@ -240,3 +240,5 @@ Bootstrapped on 2026-04-02.
 - 2026-05-29: Task 188 implementation-review repeat re-read skill/task/code/tests/docs/changelog, reran focused model/provider/turn-runtime tests and targeted AI lint green, and found no new actionable feedback; remaining unchecked Codex non-streaming `:execute` test item remains conditional future work.
 
 - 2026-05-29: Task 188 requested follow-up execution after latest no-action implementation review found no newly added actionable unchecked `steps.md` items; only the future/conditional Codex non-streaming `:execute` test remains unchecked, blocked by current `stream: false` 400 evidence and absent non-streaming support.
+
+- 2026-05-29: Task 188 latest requested follow-up execution found no newly added actionable unchecked `steps.md` items; the only remaining unchecked item is the conditional future Codex non-streaming `:execute` structured-output test, still blocked by recorded `stream: false` 400 evidence and absent non-streaming support.
