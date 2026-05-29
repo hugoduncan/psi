@@ -103,3 +103,8 @@
   - Marked the closeout `steps.md` items done.
   - Focused verification after closeout passed: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.openai-structured-output-test --focus psi.turn-runtime.response-mode-test` (`22 tests, 141 assertions, 0 failures`).
   - Targeted Clojure lint passed for touched AI code/tests: `clj-kondo --lint components/ai/src/psi/ai components/ai/test/psi/ai`. A broader attempt including `doc/custom-providers.md` was invalid because clj-kondo does not lint Markdown prose as Clojure.
+- 2026-05-29: task-implementation-review pass after closeout follow-up.
+  - Re-read the task artifacts, touched Codex structured-output code/tests/docs, and verified the finalized native streaming contract remains coherent: Codex uses Responses-style `text.format`, not Chat Completions `response_format`; non-streaming remains unimplemented; OAuth-routed `gpt-5.5` receives the Codex native mechanism at runtime.
+  - Reran focused verification: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.openai-structured-output-test --focus psi.turn-runtime.response-mode-test` (`22 tests, 141 assertions, 0 failures`).
+  - Reran targeted lint: `clj-kondo --lint components/ai/src/psi/ai components/ai/test/psi/ai` (0 errors, 0 warnings).
+  - Found no new actionable implementation feedback.
