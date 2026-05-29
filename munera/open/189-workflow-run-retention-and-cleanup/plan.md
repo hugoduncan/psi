@@ -13,9 +13,10 @@ Key decisions:
 - Determine removal candidates per originating agent session by ordering only retained terminal runs by terminal transition time, newest first, then dropping any runs beyond the effective retention count.
 - Remove workflow runs through canonical workflow-run removal semantics rather than ad hoc state editing.
 - For each removed run, derive the authoritative linked workflow-owned root sessions from the run data itself as the deduplicated union of attempt `:execution-session-id` and `:judge-session-id` values.
+- Align higher workflow-run read/introspection projections to that same authoritative linked-session set by adding or updating a canonical linked-session id projection instead of leaving execution-only ids as the sole surface.
 - Remove linked workflow-owned sessions with session-tree close semantics for each linked root, skipping missing, already-closed, or non-`workflow-owned?` sessions.
 - Keep the cleanup narrowly scoped: never infer cleanup targets from ancestry alone, never touch the originating parent session, and never remove non-terminal runs.
-- Prove behavior with focused workflow runtime / agent-session integration tests that cover retention ordering, defaulting, zero retention, per-originating-session isolation, multi-linked-session cleanup, subtree cleanup, and negative-config rejection.
+- Prove behavior with focused workflow runtime / agent-session integration tests that cover retention ordering, defaulting, zero retention, per-originating-session isolation, multi-linked-session cleanup, subtree cleanup, linked-session projection alignment, and negative-config rejection.
 
 Likely implementation seam:
 
@@ -49,5 +50,5 @@ Likely implementation seam:
    - Tree-close workflow-owned linked roots while skipping missing/non-workflow-owned roots.
 
 4. Focused proof and surface verification
-   - Add focused tests for default retention, explicit retention `2`, explicit retention `0`, non-terminal immunity, per-originating-session isolation, multi-linked-session cleanup, subtree cleanup, and negative-config rejection.
-   - Update any affected introspection/listing proofs if current expectations assume indefinite retention.
+   - Add focused tests for default retention, explicit retention `2`, explicit retention `0`, non-terminal immunity, per-originating-session isolation, multi-linked-session cleanup, subtree cleanup, canonical linked-session projection alignment, and negative-config rejection.
+   - Update any affected introspection/listing proofs if current expectations assume indefinite retention or currently expose execution-only linked-session ids.

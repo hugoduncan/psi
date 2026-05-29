@@ -18,6 +18,7 @@
 ## Slice 3 — linked workflow-owned session subtree cleanup
 
 - [ ] Add helper(s) to derive the authoritative linked session-root set for a removed workflow run as the deduplicated union of non-nil attempt `:execution-session-id` and `:judge-session-id` values.
+- [ ] Add or align a canonical workflow-run linked-session read projection derived from that same authoritative deduplicated execution-plus-judge id set.
 - [ ] For each removed workflow run, tree-close each linked root session only when that root still exists and is marked `:workflow-owned? true`.
 - [ ] Ensure linked-root cleanup skips missing, already-closed, duplicate, or non-workflow-owned session ids without broadening deletion scope.
 - [ ] Verify cleanup never closes the originating parent session or sessions belonging to retained or non-terminal workflow runs.
@@ -32,4 +33,5 @@
 - [ ] Add a focused test proving non-terminal runs remain present even when retained terminal runs already exceed the retention count.
 - [ ] Add a focused test proving retention cleanup is isolated per originating agent session.
 - [ ] Add a focused test proving negative configured retention counts are rejected.
+- [ ] Add or update focused workflow resolver/introspection tests proving the canonical linked-session projection includes both execution and judge linked ids, deduplicated.
 - [ ] Update any affected workflow introspection or listing tests whose current expectations assume historical retained terminal runs or workflow-owned child sessions remain indefinitely.
