@@ -108,3 +108,7 @@
   - Reran focused verification: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.openai-structured-output-test --focus psi.turn-runtime.response-mode-test` (`22 tests, 141 assertions, 0 failures`).
   - Reran targeted lint: `clj-kondo --lint components/ai/src/psi/ai components/ai/test/psi/ai` (0 errors, 0 warnings).
   - Found no new actionable implementation feedback.
+- 2026-05-29: Actionable follow-up execution after latest review pass.
+  - Re-read `steps.md`, `implementation.md`, `design.md`, and `plan.md` for `188-openai-codex-native-structured-output`.
+  - Found one remaining unchecked `steps.md` item: add focused `:execute` structured-output tests if non-streaming Codex support is later implemented.
+  - Blocked/not executed now: non-streaming Codex structured output has not been separately verified or implemented, and live discovery recorded `stream: false` returning `400`; leaving the conditional step unchecked until that separate capability exists.
