@@ -154,3 +154,8 @@
   - Reran focused verification: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.openai-structured-output-test --focus psi.turn-runtime.response-mode-test` (`23 tests, 148 assertions, 0 failures`).
   - Reran targeted lint: `clj-kondo --lint components/ai/src/psi/ai components/ai/test/psi/ai` (0 errors, 0 warnings).
   - Found no new actionable implementation feedback; left `steps.md` unchanged. The remaining unchecked non-streaming `:execute` test item is conditional on future Codex non-streaming structured-output implementation and is not current actionable work.
+- 2026-05-29: Actionable follow-up execution after no-action implementation review repeat.
+  - Re-read `steps.md`, `implementation.md`, `design.md`, and `plan.md` for `188-openai-codex-native-structured-output`.
+  - The preceding review pass found no new actionable implementation feedback and added no new unchecked actionable `steps.md` items.
+  - No implementation steps were executed in this pass.
+  - Remaining unchecked step is blocked: Codex non-streaming structured-output `:execute` support has not been verified or implemented; current live evidence recorded `stream: false` returning `400`, so focused `:execute` contract tests remain conditional future work.
