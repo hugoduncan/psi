@@ -70,6 +70,8 @@ Bootstrapped on 2026-04-02.
 ## Latest session notes
 
 - 2026-05-29: Task 188 is complete and ready in PR #132: built-in packaged `workflow` skill added at `bases/main/resources/psi/skills/workflow/SKILL.md`, project-local `.psi/skills/workflow/SKILL.md` removed in the same slice to avoid precedence shadowing, and focused proof added across built-in skill discovery/materialization, `:psi.agent-session/skills`, `:psi.skill/by-source`, `/skills`, and `/help` (`96 tests, 497 assertions`).
+- 2026-05-29: Task 188 independent implementation review re-read task artifacts/code/tests/docs/changelog, reran focused model/provider/turn-runtime tests and targeted AI lint green, and found no new actionable implementation feedback; remaining unchecked Codex non-streaming `:execute` test item remains conditional future work.
+
 - 2026-05-29: Task 188 latest implementation review re-read the task skill/artifacts, Codex structured-output code/tests/docs/changelog, reran focused model/provider/turn-runtime tests and targeted AI lint green, and found no new actionable feedback; the remaining unchecked Codex non-streaming `:execute` test item stays conditional on future verified support.
 
 - 2026-05-29: Task 188 requested follow-up execution found no newly added actionable unchecked steps; recorded the no-op in implementation.md and left the conditional future Codex non-streaming `:execute` test item blocked by current `stream: false` 400 evidence.
