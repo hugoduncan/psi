@@ -27,8 +27,8 @@
 
 - [x] Add a focused test proving the default retention case keeps only the newest retained terminal run after a second retained terminal run completes for the same originating session.
 - [x] Add a focused test proving the removed older retained run's linked workflow-owned session tree or trees are also removed in the default retention case.
-- [ ] Add a focused test proving cleanup removes multiple linked execution/judge workflow-owned session roots recorded on the same removed run.
-- [ ] Add a focused test proving explicit retention `2` keeps the two newest retained terminal runs for one originating session.
+- [x] Add a focused test proving cleanup removes multiple linked execution/judge workflow-owned session roots recorded on the same removed run.
+- [x] Add a focused test proving explicit retention `2` keeps the two newest retained terminal runs for one originating session.
 - [x] Add a focused test proving equal `:finished-at` retained terminal runs are ordered deterministically by canonical workflow run creation order, with later-created runs retained ahead of earlier-created runs.
 - [x] Add a focused test proving explicit retention `0` removes a newly terminal retained run immediately and also removes its linked workflow-owned session trees.
 - [x] Add a focused test proving non-terminal runs remain present even when retained terminal runs already exceed the retention count.

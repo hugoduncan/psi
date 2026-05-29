@@ -277,6 +277,67 @@
       (is (some? (ss/get-session-data-in ctx child-2-id)))
       (is (some? (ss/get-session-data-in ctx parent-id)))))
 
+  (testing "cleanup removes multiple linked execution and judge workflow-owned session roots recorded on one removed run"
+    (let [ctx (make-test-ctx)
+          parent (session/new-session-in! ctx nil {})
+          parent-id (:session-id parent)
+          old-exec (session/new-session-in! ctx parent-id {:session-name "old-exec"})
+          old-exec-id (:session-id old-exec)
+          old-exec-child (session/new-session-in! ctx old-exec-id {:session-name "old-exec-child"})
+          old-exec-child-id (:session-id old-exec-child)
+          old-judge (session/new-session-in! ctx parent-id {:session-name "old-judge"})
+          old-judge-id (:session-id old-judge)
+          old-judge-child (session/new-session-in! ctx old-judge-id {:session-name "old-judge-child"})
+          old-judge-child-id (:session-id old-judge-child)
+          retained-exec (session/new-session-in! ctx parent-id {:session-name "retained-exec"})
+          retained-exec-id (:session-id retained-exec)
+          finished-1 (java.time.Instant/parse "2026-05-29T12:00:00Z")
+          finished-2 (java.time.Instant/parse "2026-05-29T12:01:00Z")]
+      (doseq [session-id [old-exec-id old-exec-child-id old-judge-id old-judge-child-id retained-exec-id]]
+        (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data :workflow-owned?] true))
+      (swap! (:state* ctx) assoc-in [:agent-session :sessions old-exec-child-id :data :parent-session-id] old-exec-id)
+      (swap! (:state* ctx) assoc-in [:agent-session :sessions old-judge-child-id :data :parent-session-id] old-judge-id)
+      (swap! (:state* ctx) assoc-in [:workflows :runs]
+             {"run-1" {:run-id "run-1"
+                       :parent-session-id parent-id
+                       :status :completed
+                       :finished-at finished-1
+                       :step-runs {"plan" {:attempts [{:execution-session-id old-exec-id
+                                                       :judge-session-id old-judge-id}
+                                                      {:execution-session-id old-exec-id
+                                                       :judge-session-id old-judge-id}]}}}
+              "run-2" {:run-id "run-2"
+                       :parent-session-id parent-id
+                       :status :completed
+                       :finished-at finished-2
+                       :step-runs {"plan" {:attempts [{:execution-session-id retained-exec-id}]}}}})
+      (swap! (:state* ctx) assoc-in [:workflows :run-order] ["run-1" "run-2"])
+      (workflow-run-retention/apply-retention-cleanup! ctx "run-2")
+      (is (nil? (get-in @(:state* ctx) [:workflows :runs "run-1"])))
+      (is (nil? (ss/get-session-data-in ctx old-exec-id)))
+      (is (nil? (ss/get-session-data-in ctx old-exec-child-id)))
+      (is (nil? (ss/get-session-data-in ctx old-judge-id)))
+      (is (nil? (ss/get-session-data-in ctx old-judge-child-id)))
+      (is (some? (ss/get-session-data-in ctx retained-exec-id)))
+      (is (some? (ss/get-session-data-in ctx parent-id)))))
+
+  (testing "retention 2 keeps the two newest retained terminal runs for one originating session"
+    (let [ctx (assoc (make-test-ctx) :config {:completed-workflow-run-retention-count 2})
+          parent (session/new-session-in! ctx nil {})
+          parent-id (:session-id parent)
+          finished-1 (java.time.Instant/parse "2026-05-29T12:00:00Z")
+          finished-2 (java.time.Instant/parse "2026-05-29T12:01:00Z")
+          finished-3 (java.time.Instant/parse "2026-05-29T12:02:00Z")]
+      (swap! (:state* ctx) assoc-in [:workflows :runs]
+             {"run-1" {:run-id "run-1" :parent-session-id parent-id :status :completed :finished-at finished-1 :step-runs {}}
+              "run-2" {:run-id "run-2" :parent-session-id parent-id :status :completed :finished-at finished-2 :step-runs {}}
+              "run-3" {:run-id "run-3" :parent-session-id parent-id :status :failed :finished-at finished-3 :step-runs {}}})
+      (swap! (:state* ctx) assoc-in [:workflows :run-order] ["run-1" "run-2" "run-3"])
+      (workflow-run-retention/apply-retention-cleanup! ctx "run-3")
+      (is (nil? (get-in @(:state* ctx) [:workflows :runs "run-1"])))
+      (is (some? (get-in @(:state* ctx) [:workflows :runs "run-2"])))
+      (is (some? (get-in @(:state* ctx) [:workflows :runs "run-3"])))))
+
   (testing "retention 0 removes newly terminal retained runs immediately"
     (let [ctx (assoc (make-test-ctx) :config {:completed-workflow-run-retention-count 0})
           parent (session/new-session-in! ctx nil {})
