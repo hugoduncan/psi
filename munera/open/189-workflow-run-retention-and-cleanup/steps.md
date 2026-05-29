@@ -2,7 +2,7 @@
 
 ## Slice 1 — retention configuration and canonical helpers
 
-- [ ] Locate the canonical workflow-run terminal transition seam and confirm the authoritative terminal transition time surface used for newest-first retention ordering.
+- [x] Locate the canonical workflow-run terminal transition seam and confirm the authoritative terminal transition time surface used for newest-first retention ordering.
 - [x] Add effective retention-count lookup from `[:config :completed-workflow-run-retention-count]` with default `1` when absent.
 - [x] Add negative-retention validation so configured values below `0` are rejected before cleanup runs.
 - [x] Add helper(s) to identify retained terminal workflow runs for one originating session using statuses `:completed`, `:failed`, and `:cancelled` only.
