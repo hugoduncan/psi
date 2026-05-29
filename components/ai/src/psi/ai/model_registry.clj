@@ -190,7 +190,7 @@
             (get built-in/all-models :gpt-5.5))
         (assoc :api :openai-codex-responses
                :base-url "https://chatgpt.com/backend-api")
-        structured-output/with-openai-codex-fallback-capability)))
+        structured-output/with-openai-codex-native-capability)))
 
 (defn resolve-runtime-model
   "Resolve the runtime model map for provider/model-id, optionally considering

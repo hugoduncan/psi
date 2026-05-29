@@ -5,6 +5,7 @@
             [psi.ai.models :as models]
             [psi.ai.providers.openai.content :as content]
             [psi.ai.providers.openai.reasoning :as reasoning]
+            [psi.ai.providers.openai.codex-structured-output :as codex-structured-output]
             [psi.ai.providers.openai.transport :as transport]
             [psi.ai.structured-output :as structured-output]))
 
@@ -147,7 +148,10 @@
                              "parallel_tool_calls" true}
                       (:session-id options) (assoc "prompt_cache_key" (:session-id options))
                       (seq tools)           (assoc "tools" tools)
-                      reasoning             (assoc "reasoning" reasoning))]
+                      reasoning             (assoc "reasoning" reasoning)
+                      (codex-structured-output/native-mechanism? strategy)
+                      (assoc-in ["text" "format"]
+                                (codex-structured-output/text-format structured-request)))]
       {:headers headers
        :body    (json/generate-string body)})))
 
@@ -221,16 +225,11 @@
 
 (defn- emit-codex-structured-output-result!
   [{:keys [structured-result-emitted? text-buffer]} consume-fn strategy]
-  (let [raw-text @text-buffer
-        payload  (structured-output/parse-json-object raw-text)]
-    (when (and (= :prompted-json (:strategy strategy))
-               (compare-and-set! structured-result-emitted? false true))
-      (consume-fn {:type :structured-output-result
-                   :structured-output (cond-> (assoc strategy
-                                                     :source :prompted-json/text
-                                                     :raw-text raw-text)
-                                        payload (assoc :payload payload
-                                                       :raw-payload payload))}))))
+  (let [raw-text @text-buffer]
+    (codex-structured-output/maybe-emit-native-result!
+     consume-fn structured-result-emitted? strategy raw-text)
+    (codex-structured-output/maybe-emit-prompted-json-result!
+     consume-fn structured-result-emitted? strategy raw-text)))
 
 (defn- emit-codex-done!
   [{:keys [done? open-tool-indexes tool-args-by-index] :as stream-state} consume-fn model event strategy]

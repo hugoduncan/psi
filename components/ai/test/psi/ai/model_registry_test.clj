@@ -85,9 +85,10 @@
       (is (= :openai-codex-responses (:api model)))
       (is (= "https://chatgpt.com/backend-api" (:base-url model)))
       (is (= "gpt-5.5" (:id model)))
-      (is (= [:prompted-json]
+      (is (= [:provider-native :prompted-json]
              (get-in model [:capabilities :structured-output :strategies])))
-      (is (nil? (get-in model [:capabilities :structured-output :native-mechanism])))))
+      (is (= :openai/codex-responses-text-format-json-schema
+             (get-in model [:capabilities :structured-output :native-mechanism])))))
 
   (testing "other openai models preserve catalog transport under oauth"
     (let [ctx {:oauth-ctx (oauth/create-null-context {:credentials {:openai {:type :oauth
@@ -116,12 +117,13 @@
       (is (empty? (:strategies capability)))
       (is (true? (:defaulted? capability)))))
 
-  (testing "OpenAI Codex Responses models declare prompted JSON fallback only"
+  (testing "OpenAI Codex Responses models declare native streaming text.format support"
     (let [capability (-> (registry/find-model :openai "gpt-5.4")
                          structured-output/effective-capability)]
       (is (= true (:supported? capability)))
-      (is (= [:prompted-json] (:strategies capability)))
-      (is (nil? (:native-mechanism capability)))))
+      (is (= [:provider-native :prompted-json] (:strategies capability)))
+      (is (= :openai/codex-responses-text-format-json-schema
+             (:native-mechanism capability)))))
 
   (testing "older Anthropic Messages models declare forced-tool native support"
     (let [capability (-> (registry/find-model :anthropic "claude-sonnet-4-20250514")

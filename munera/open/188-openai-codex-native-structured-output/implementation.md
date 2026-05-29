@@ -48,9 +48,9 @@
   - Re-read `design-steps.md` and confirmed there are no newly added unchecked inconsistency follow-up items after the preceding review pass.
   - Therefore no task design/plan/steps changes were required and no implementation `steps.md` items were executed, because all `design-steps.md` items added by prior inconsistency-review passes were already completed.
   - Left `plan.md`, `steps.md`, and `design-steps.md` unchanged; recorded this no-op follow-up here to preserve the review/execution chain.
-- 2026-05-29: Implementation pass — baseline evidence + discovery constraint.
+- 2026-05-29: Implementation pass — baseline evidence + live capability discovery.
   - Completed Slice 1 evidence gathering by re-reading `structured_output.clj`, `models.clj`, `model_registry.clj`, `providers/openai/codex_responses.clj`, `providers/openai.clj`, `model_registry_test.clj`, and `providers/openai_structured_output_test.clj`.
-  - Reconfirmed the authoritative current boundary:
+  - Reconfirmed the pre-discovery baseline boundary:
     - Codex capability is explicit fallback-only `{:supported? true :strategies [:prompted-json] :native-mechanism nil}`.
     - static built-in `:openai-codex-responses` models inherit that fallback-only capability in `models.clj`.
     - OAuth-backed runtime `gpt-5.5` is rewritten in `model_registry.clj` to `:openai-codex-responses` with ChatGPT base URL and the same fallback-only capability.
@@ -59,5 +59,35 @@
   - Checked adjacent runtime proof surfaces:
     - `components/turn-runtime/test/psi/turn_runtime/response_mode_test.clj` already proves fallback-forbidden unsupported structured output preflights before provider execution.
     - `components/rpc/test/psi/rpc_prompt_test.clj` and provider transport capture show the live ChatGPT/Codex URL seam remains `https://chatgpt.com/backend-api/codex/responses`.
-  - Capability discovery is currently blocked by absent live ChatGPT OAuth/account credentials in this harness session: environment inspection found no available `OPENAI*`/`CHATGPT*`/OAuth variables or local token source to safely run a guarded native-schema probe against the ChatGPT/Codex backend.
-  - Because native support has not yet been verified, this pass did not change provider capability code. The next concrete slice is evidence-backed capability discovery when runnable credentials or a captured request/response fixture become available; until then the explicit fallback-only boundary remains the only justified implementation state.
+  - Live discovery was feasible using the current stored OpenAI OAuth credential from `psi.provider-auth.oauth.core/create-context` and `get-api-key`.
+    - Confirmed the token is present and contains `chatgpt_account_id`, so it is valid for the ChatGPT/Codex transport Psi uses.
+    - Ran guarded live probes directly against `https://chatgpt.com/backend-api/codex/responses` using a Codex-backed model id (`gpt-5.4`) and the same auth/header shape used by Psi's Codex provider path.
+  - Live probe results:
+    - Baseline streaming request with no schema returned `200` and emitted normal SSE lifecycle events (`response.created`, `response.in_progress`, ...), confirming the live endpoint/auth path.
+    - Responses-style schema request using `"text": {"format": {"type": "json_schema", "name": "probe_result", "schema": {...}, "strict": true}}` returned `200`.
+    - The `response.created` event echoed the accepted schema contract under `response.text.format`, including:
+      - `"type": "json_schema"`
+      - `"name": "probe_result"`
+      - the supplied JSON Schema
+      - `"strict": true`
+    - Chat Completions-style `response_format` request returned `400` with `{"detail":"Unsupported parameter: response_format"}`.
+    - All `stream: false` probes returned `400` with `{"detail":"Stream must be set to true"}`.
+  - Evidence-backed conclusion from live discovery:
+    - the ChatGPT/Codex endpoint used by Psi supports native schema-constrained structured output for streaming requests;
+    - the accepted native contract is Responses-style `text.format`, not Chat Completions-style `response_format`;
+    - non-streaming support is not yet verified and currently appears unsupported or at least rejected by the probed request shape.
+  - This changes the task from capability discovery to implementation of native streaming Codex structured output. The remaining work is to update capability declaration, request shaping, and streaming extraction/tests to match the verified live contract while keeping non-streaming explicit and separate.
+- 2026-05-29: Implementation pass — native Codex capability slice.
+  - Added a distinct provider-native Codex mechanism in `components/ai/src/psi/ai/structured_output.clj`: `:openai/codex-responses-text-format-json-schema`, separate from OpenAI Chat Completions `response_format`.
+  - Updated built-in Codex model capability annotation in `components/ai/src/psi/ai/models.clj` and OAuth-routed runtime `gpt-5.5` capability assignment in `components/ai/src/psi/ai/model_registry.clj` so the resolved ChatGPT/Codex transport now advertises `[:provider-native :prompted-json]` with the new Codex mechanism.
+  - Added `components/ai/src/psi/ai/providers/openai/codex_structured_output.clj` to keep Codex-specific request/result behavior local and distinct from Chat Completions and Anthropic paths.
+  - Updated `components/ai/src/psi/ai/providers/openai/codex_responses.clj` request shaping to send native schemas only via Responses-style `text.format`, with `{"type":"json_schema","name":...,"schema":...,"strict":...}` nested under `text`, and to continue omitting Chat Completions-style top-level `response_format`.
+  - Updated Codex streaming structured-output extraction so provider-native runs emit `:structured-output-result` with source `:openai/codex-text-format`, parsed payload when valid JSON object text is returned, and `:parse-error? true` when the text does not parse.
+  - Kept non-streaming Codex `:execute` unchanged and still unsupported; this matches live evidence that `stream: false` currently returns `400` on the ChatGPT/Codex endpoint.
+  - Updated focused tests:
+    - `components/ai/test/psi/ai/model_registry_test.clj` now proves both built-in Codex models and OAuth-routed runtime `gpt-5.5` advertise the native Codex mechanism.
+    - `components/ai/test/psi/ai/providers/openai_structured_output_test.clj` now proves Codex request shaping uses `text.format`, omits `response_format`, emits provider-native strategy/result events, and still preserves explicit prompted-JSON fallback behavior when the model capability is forced back to fallback-only.
+    - existing `components/turn-runtime/test/psi/turn_runtime/response_mode_test.clj` fallback-forbidden preflight proof remains green, preserving loop-control schema coherence when only fallback-only/unsupported capability is available.
+  - Focused verification passed:
+    - `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.openai-structured-output-test --focus psi.turn-runtime.response-mode-test`
+    - Result: `22 tests, 141 assertions, 0 failures`.

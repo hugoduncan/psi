@@ -25,6 +25,12 @@
    :strategies [:provider-native :prompted-json]
    :native-mechanism :anthropic/json-schema-output})
 
+(def openai-codex-native-capability
+  {:supported? true
+   :strategies [:provider-native :prompted-json]
+   :native-mechanism :openai/codex-responses-text-format-json-schema
+   :notes "Verified only for the ChatGPT/Codex responses transport with streaming text.format JSON Schema."})
+
 (def openai-codex-fallback-capability
   {:supported? true
    :strategies [:prompted-json]
@@ -60,6 +66,11 @@
   "Replace any model structured-output capability with effective unsupported."
   [model]
   (with-structured-output-capability model unsupported-structured-output-capability))
+
+(defn with-openai-codex-native-capability
+  "Replace any model structured-output capability with ChatGPT/Codex native streaming support."
+  [model]
+  (with-structured-output-capability model openai-codex-native-capability))
 
 (defn with-openai-codex-fallback-capability
   "Replace any model structured-output capability with Codex-safe fallback-only support."

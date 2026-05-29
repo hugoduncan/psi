@@ -585,7 +585,7 @@
       structured-output/anthropic-forced-tool-native-capability)
 
     :openai-codex-responses
-    structured-output/openai-codex-fallback-capability
+    structured-output/openai-codex-native-capability
 
     :openai-completions
     (when (contains? openai-chat-completions-native-model-keys model-key)
