@@ -124,6 +124,44 @@ Reloading:
 
 Use this during workflow authoring or prompt iteration.
 
+## Workflow-run retention and cleanup
+
+Psi automatically cleans up retained terminal workflow runs and their linked
+workflow-owned child-session trees.
+
+Retention applies per originating agent session. The retained terminal status set
+is `:completed`, `:failed`, and `:cancelled`. Non-terminal workflow runs remain
+present and are never removed by this cleanup.
+
+The effective retention count is read from runtime config at:
+
+```clojure
+[:config :completed-workflow-run-retention-count]
+```
+
+Behavior:
+
+- when the config key is absent, the default retention count is `1`
+- when the count is `2` or higher, psi keeps that many newest retained terminal
+  workflow runs for each originating session
+- when the count is `0`, a newly terminal retained run is removed immediately
+- negative values are invalid and are rejected
+
+Newest-first ordering uses workflow-run terminal transition time (`:finished-at`)
+with canonical workflow-run creation order as the deterministic tie-breaker when
+multiple runs share the same terminal timestamp.
+
+When an older retained terminal workflow run is removed, psi also tree-closes
+that run's linked workflow-owned child sessions. The cleanup target set is the
+canonical deduplicated union of linked execution-session ids and judge-session
+ids recorded on that run. Missing, already-closed, duplicate, or non
+workflow-owned linked roots are skipped.
+
+This changes user-visible workflow introspection and listing behavior: retained
+terminal workflow runs and their workflow-owned child sessions no longer remain
+indefinitely once newer retained terminal runs for the same originating session
+exist.
+
 ## Preferred authoring model
 
 Prefer the converged target workflow grammar for new examples and new workflow

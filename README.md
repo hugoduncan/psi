@@ -124,10 +124,16 @@ See:
 
 ### Workflows
 
-For user-facing workflow usage, workflow file location, `/delegate`, and reload
-behavior, see:
+For user-facing workflow usage, workflow file location, `/delegate`, reload
+behavior, and workflow-run retention/cleanup behavior, see:
 - [`doc/workflows.md`](doc/workflows.md)
 
+Workflow runs now automatically retain only the newest retained terminal runs
+per originating session. By default psi keeps `1` retained terminal workflow
+run per originating session, configurable via
+`[:config :completed-workflow-run-retention-count]`. When older retained
+terminal runs are removed, their linked workflow-owned child-session trees are
+also cleaned up.
 
 ### Extension API
 
