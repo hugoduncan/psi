@@ -19,4 +19,4 @@ For the Munera task identified by {{input}}, review the task design for inconsis
 
 End your final response with exactly one of:
 PASS_STATUS: ACTIONABLE_FEEDBACK
-PASS_STATUS: NO_ACTIONABLE_FEEDBACK
+PASS_STATUS: REVIEW_COMPLETE

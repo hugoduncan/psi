@@ -233,6 +233,19 @@
          (testing "review-status judge has REPEAT/DONE routing"
            (is (= #{"REPEAT" "DONE"} (set (keys (:on status-step)))))
            (is (some? (:judge status-step))))
+         (testing "review-status judge uses non-overlapping PASS_STATUS tokens"
+           (let [step-text (->> (:contributions status-step)
+                                (filter #(= :template (:type %)))
+                                (map :text)
+                                (apply str))
+                 judge-text (->> (get-in status-step [:judge :contributions])
+                                 (filter #(= :template (:type %)))
+                                 (map :text)
+                                 (apply str))]
+             (is (.contains step-text "PASS_STATUS: REVIEW_COMPLETE"))
+             (is (.contains step-text "PASS_STATUS: ACTIONABLE_FEEDBACK"))
+             (is (.contains judge-text "PASS_STATUS: REVIEW_COMPLETE"))
+             (is (.contains judge-text "PASS_STATUS: ACTIONABLE_FEEDBACK"))))
          (testing "review-status judge has :outputs with judge-routing-result schema-id"
            (is (contains? (:judge status-step) :outputs))
            (is (= :psi.workflow/judge-routing-result

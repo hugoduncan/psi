@@ -7,7 +7,7 @@
    [{:type :source, :from :workflow-original}
     {:type :template,
      :text
-     "Review the Munera task at {{input}} using the {{skill}} skill. Work independently. Read the skill file at `.psi/skills/{{skill}}/SKILL.md` and apply it. Read the task artifacts and any code/tests/docs they reference. Then:\n\n1. append a terse review note to the task's implementation.md\n2. add unchecked follow-up items to the task's steps.md for every new actionable issue you found\n3. avoid duplicating review notes or steps that already exist\n4. commit\n5. end your response with exactly one of:\nPASS_STATUS: ACTIONABLE_FEEDBACK\nPASS_STATUS: NO_ACTIONABLE_FEEDBACK",
+     "Review the Munera task at {{input}} using the {{skill}} skill. Work independently. Read the skill file at `.psi/skills/{{skill}}/SKILL.md` and apply it. Read the task artifacts and any code/tests/docs they reference. Then:\n\n1. append a terse review note to the task's implementation.md\n2. add unchecked follow-up items to the task's steps.md for every new actionable issue you found\n3. avoid duplicating review notes or steps that already exist\n4. commit\n5. end your response with exactly one of:\nPASS_STATUS: ACTIONABLE_FEEDBACK\nPASS_STATUS: REVIEW_COMPLETE",
      :vars {"input" {:from :workflow-input, :path [:input]},
             "skill" {:from :workflow-input, :path [:skill]}}}]}
   {:name "follow-up",
@@ -30,14 +30,14 @@
     {:type :source, :from {:step "follow-up", :yield :text}}
     {:type :template,
      :text
-     "Check whether the review step found new actionable feedback. This is an internal control step. Look at the review step output above for the PASS_STATUS token. Respond with exactly one word: REPEAT or DONE. Return DONE only if the review step output contains PASS_STATUS: NO_ACTIONABLE_FEEDBACK. Return REPEAT if the review step output contains PASS_STATUS: ACTIONABLE_FEEDBACK.",
+     "Check whether the review step found new actionable feedback. This is an internal control step. Look at the review step output above for the PASS_STATUS token. Respond with exactly one word: REPEAT or DONE. Return DONE only if the review step output contains PASS_STATUS: REVIEW_COMPLETE. Return REPEAT if the review step output contains PASS_STATUS: ACTIONABLE_FEEDBACK.",
      :vars {"input" {:from :workflow-input, :path [:input]}}}],
    :judge
    {:type :llm,
     :contributions
     [{:type :template,
       :text
-      "Respond exactly with one word: REPEAT or DONE.\n\nLook at the actor step output for the PASS_STATUS token emitted by the review step.\n\nReturn DONE if and only if the review step output contains PASS_STATUS: NO_ACTIONABLE_FEEDBACK.\nReturn REPEAT if the review step output contains PASS_STATUS: ACTIONABLE_FEEDBACK.\n\nDo not inspect task artifacts. Base your decision solely on the PASS_STATUS token.",
+      "Respond exactly with one word: REPEAT or DONE.\n\nLook at the actor step output for the PASS_STATUS token emitted by the review step.\n\nReturn DONE if and only if the review step output contains PASS_STATUS: REVIEW_COMPLETE.\nReturn REPEAT if the review step output contains PASS_STATUS: ACTIONABLE_FEEDBACK.\n\nDo not inspect task artifacts. Base your decision solely on the PASS_STATUS token.",
       :vars {}}],
     :outputs
     {:routing-result
