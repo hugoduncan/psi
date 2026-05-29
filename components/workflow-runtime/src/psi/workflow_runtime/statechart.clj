@@ -322,7 +322,9 @@
         routing-transitions (mapv #(judged-routing-transition % step-id)
                                   (compile-routing-transitions routing-table step-order step-id))
         ;; Fallback: if no signal matches and judge retries exhausted → fail
-        no-match-fail (ele/transition {:event :judge/no-match :target :failed})]
+        no-match-fail (ele/transition {:event :judge/no-match :target :failed})
+        judge-fail (ele/transition {:event :judge/failed :target :failed}
+                                   (dispatch-action :judge/record step-id))]
     (compile-step-shell
      step-id
      [(ele/on-entry {}
@@ -343,6 +345,7 @@
                            (dispatch-action :judge/enter step-id))
              (concat routing-transitions
                      [no-match-fail
+                      judge-fail
                       (make-cancel-transition)]))])))
 
 (defn- compile-step
