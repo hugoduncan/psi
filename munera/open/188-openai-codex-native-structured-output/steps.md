@@ -1,16 +1,16 @@
 # Slice 1 — Baseline evidence
 
-- [ ] Record in `implementation.md` the current authoritative Codex structured-output boundary, including fallback-only capability and the transport-resolved `gpt-5.5` runtime case.
-- [ ] Inspect `components/ai/src/psi/ai/structured_output.clj` and capture the current Codex capability/mechanism definitions relevant to this task.
-- [ ] Inspect `components/ai/src/psi/ai/model_registry.clj` and `components/ai/src/psi/ai/models.clj` to document how static model entries and OAuth-resolved runtime routing currently determine Codex structured-output behavior.
-- [ ] Inspect `components/ai/src/psi/ai/providers/openai/codex_responses.clj` and adjacent provider seams to inventory current request shaping, streaming extraction, result handoff, and non-streaming support.
-- [ ] Inspect the focused current tests in `components/ai/test/psi/ai/model_registry_test.clj` and `components/ai/test/psi/ai/providers/openai_structured_output_test.clj` to confirm the present fallback-only proofs.
+- [x] Record in `implementation.md` the current authoritative Codex structured-output boundary, including fallback-only capability and the transport-resolved `gpt-5.5` runtime case.
+- [x] Inspect `components/ai/src/psi/ai/structured_output.clj` and capture the current Codex capability/mechanism definitions relevant to this task.
+- [x] Inspect `components/ai/src/psi/ai/model_registry.clj` and `components/ai/src/psi/ai/models.clj` to document how static model entries and OAuth-resolved runtime routing currently determine Codex structured-output behavior.
+- [x] Inspect `components/ai/src/psi/ai/providers/openai/codex_responses.clj` and adjacent provider seams to inventory current request shaping, streaming extraction, result handoff, and non-streaming support.
+- [x] Inspect the focused current tests in `components/ai/test/psi/ai/model_registry_test.clj` and `components/ai/test/psi/ai/providers/openai_structured_output_test.clj` to confirm the present fallback-only proofs.
 
 # Slice 2 — Capability discovery
 
 - [ ] Determine whether `https://chatgpt.com/backend-api/codex/responses` supports native schema-constrained structured output for the transport Psi uses.
 - [ ] If live probing is feasible, add or run a guarded probe that exercises a minimal schema contract against the ChatGPT/Codex endpoint and captures the observed request/response evidence.
-- [ ] If live probing is not feasible, gather the strongest available code-path or fixture evidence and record the limitation explicitly in `implementation.md`.
+- [x] If live probing is not feasible, gather the strongest available code-path or fixture evidence and record the limitation explicitly in `implementation.md`.
 - [ ] Decide, based on evidence, whether the finalized Codex capability outcome is native support or explicit fallback-only.
 - [ ] If native support is verified and the exact contract is newly discovered, update `design.md` or task notes with the exact Codex request/response contract before code changes that depend on it.
 

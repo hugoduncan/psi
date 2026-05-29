@@ -48,3 +48,16 @@
   - Re-read `design-steps.md` and confirmed there are no newly added unchecked inconsistency follow-up items after the preceding review pass.
   - Therefore no task design/plan/steps changes were required and no implementation `steps.md` items were executed, because all `design-steps.md` items added by prior inconsistency-review passes were already completed.
   - Left `plan.md`, `steps.md`, and `design-steps.md` unchanged; recorded this no-op follow-up here to preserve the review/execution chain.
+- 2026-05-29: Implementation pass — baseline evidence + discovery constraint.
+  - Completed Slice 1 evidence gathering by re-reading `structured_output.clj`, `models.clj`, `model_registry.clj`, `providers/openai/codex_responses.clj`, `providers/openai.clj`, `model_registry_test.clj`, and `providers/openai_structured_output_test.clj`.
+  - Reconfirmed the authoritative current boundary:
+    - Codex capability is explicit fallback-only `{:supported? true :strategies [:prompted-json] :native-mechanism nil}`.
+    - static built-in `:openai-codex-responses` models inherit that fallback-only capability in `models.clj`.
+    - OAuth-backed runtime `gpt-5.5` is rewritten in `model_registry.clj` to `:openai-codex-responses` with ChatGPT base URL and the same fallback-only capability.
+    - Codex request shaping in `codex_responses.clj` adds prompted-JSON instructions to the last user message, sends no native schema fields, and emits structured-output results by parsing accumulated assistant text on stream completion.
+    - non-streaming Codex `:execute` remains intentionally unimplemented in `providers/openai.clj`.
+  - Checked adjacent runtime proof surfaces:
+    - `components/turn-runtime/test/psi/turn_runtime/response_mode_test.clj` already proves fallback-forbidden unsupported structured output preflights before provider execution.
+    - `components/rpc/test/psi/rpc_prompt_test.clj` and provider transport capture show the live ChatGPT/Codex URL seam remains `https://chatgpt.com/backend-api/codex/responses`.
+  - Capability discovery is currently blocked by absent live ChatGPT OAuth/account credentials in this harness session: environment inspection found no available `OPENAI*`/`CHATGPT*`/OAuth variables or local token source to safely run a guarded native-schema probe against the ChatGPT/Codex backend.
+  - Because native support has not yet been verified, this pass did not change provider capability code. The next concrete slice is evidence-backed capability discovery when runnable credentials or a captured request/response fixture become available; until then the explicit fallback-only boundary remains the only justified implementation state.
