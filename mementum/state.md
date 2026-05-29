@@ -70,6 +70,8 @@ Bootstrapped on 2026-04-02.
 ## Latest session notes
 
 - 2026-05-29: Task 188 is complete and ready in PR #132: built-in packaged `workflow` skill added at `bases/main/resources/psi/skills/workflow/SKILL.md`, project-local `.psi/skills/workflow/SKILL.md` removed in the same slice to avoid precedence shadowing, and focused proof added across built-in skill discovery/materialization, `:psi.agent-session/skills`, `:psi.skill/by-source`, `/skills`, and `/help` (`96 tests, 497 assertions`).
+- 2026-05-29: Task 188 follow-up execution after no-action review found no newly added actionable unchecked steps; the remaining unchecked non-streaming `:execute` test item is conditional on future verified Codex non-streaming support and remains blocked by current `stream: false` 400 evidence.
+
 - 2026-05-29: Task 188 post-closeout implementation review complete: re-read Codex structured-output task artifacts/code/tests/docs, reran focused model/provider/turn-runtime tests and targeted AI lint green, and found no new actionable feedback.
 
 - 2026-05-29: Task 188 closeout follow-up complete: removed the untracked Codex live-probe scratch file, documented the finalized ChatGPT/Codex native streaming structured-output mechanism in custom-provider docs and changelog, checked closeout steps, and re-verified focused model/provider/turn-runtime tests plus AI code/test lint green.
