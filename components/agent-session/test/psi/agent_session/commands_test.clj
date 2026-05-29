@@ -642,7 +642,15 @@
     (is (str/includes? s "/model [provider model-id [session|project|user]]"))
     (is (str/includes? s "~/.psi/agent/models.edn"))
     (is (str/includes? s ".psi/models.edn"))
-    (is (not (str/includes? s "/logprobs")))))
+    (is (not (str/includes? s "/logprobs"))))
+  (testing "lists built-in extension-development in the Skills section"
+    (let [built-ins (:skills (prompt-skills/built-in-skills-discovery
+                              {:config {:built-in-resource-root "psi/skills"}}))
+          [ctx session-id] (make-test-ctx {:skills built-ins})
+          s (commands/format-help ctx session-id)
+          entry "  /skill:extension-development — Repository-specific guidance for creating, modifying, and debugging psi extensions."]
+      (is (str/includes? s "── Skills"))
+      (is (str/includes? s entry)))))
 
 (deftest format-prompts-none-test
   (let [[ctx session-id] (make-test-ctx)
