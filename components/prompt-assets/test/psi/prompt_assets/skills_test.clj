@@ -717,6 +717,26 @@
       (is (some? invocation))
       (is (str/includes? (:content invocation) "Extension development"))))
 
+  (testing "production built-in skill packaging includes workflow with readable file semantics"
+    (let [source-path "bases/main/resources/psi/skills/workflow/SKILL.md"
+          resource-path "psi/skills/workflow/SKILL.md"
+          opts {:config {:built-in-resource-root "psi/skills"}}
+          {:keys [dir resource-paths]} (skills/materialize-built-in-skills! opts)
+          built-in-path (str dir "/workflow/SKILL.md")
+          {:keys [skills materialization]} (skills/built-in-skills-discovery opts)
+          built-in (some #(when (= "workflow" (:name %)) %) skills)
+          invocation (skills/invoke-skill skills "/skill:workflow update delegate workflow")]
+      (is (.exists (io/file source-path)))
+      (is (some #(= resource-path %) resource-paths))
+      (is (.exists (io/file built-in-path)))
+      (is (= :built-in (:source built-in)))
+      (is (= "workflow" (:name built-in)))
+      (is (str/starts-with? (:file-path built-in) (:dir materialization)))
+      (is (str/includes? (slurp (:file-path built-in)) "doc/workflow-grammar.md"))
+      (is (str/includes? (slurp (:file-path built-in)) ".psi/workflows/create-task-plan.edn"))
+      (is (some? invocation))
+      (is (str/includes? (:content invocation) "Workflow"))))
+
   (testing "snapshot id changes when the packaged resource set changes"
     (let [base-dir (skills/built-in-snapshot-dir {:config {:built-in-resource-root "psi/test-built-in-skills"}})
           changed-dir (skills/built-in-snapshot-dir
