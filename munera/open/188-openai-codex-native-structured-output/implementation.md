@@ -15,3 +15,8 @@
 - 2026-05-29: Ambiguity review pass.
   - Found one actionable ambiguity: the design names the ChatGPT/Codex endpoint as the target capability boundary, but it does not define the exact resolved runtime seam that distinguishes that endpoint from public OpenAI Responses for capability selection and testing.
   - Current code still assigns Codex structured-output capability by coarse `:api :openai-codex-responses` in `components/ai/src/psi/ai/models.clj`, while provider behavior also depends on ChatGPT OAuth/account context and Codex URL resolution in `spec/openai-provider.allium`; the design should name which resolved discriminator is authoritative so implementation does not accidentally treat multiple transports as one native-capability surface.
+- 2026-05-29: Executed ambiguity follow-up.
+  - Completed the new unchecked `design-steps.md` item without touching implementation `steps.md` or `plan.md`.
+  - Updated `design.md` to make the capability-selection seam explicit: the authoritative boundary is the resolved ChatGPT/Codex transport (`https://chatgpt.com/backend-api/codex/responses`) after URL/auth resolution, with `:api :openai-codex-responses` only a coarse routing input and not by itself permission to treat future public OpenAI Responses as the same capability.
+  - Named the current runtime seam as the Codex provider request path in `components/ai/src/psi/ai/providers/openai/codex_responses.clj`, with model capability annotation required to remain coherent with that transport-specific contract.
+  - Marked the ambiguity design-step done.
