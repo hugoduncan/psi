@@ -86,16 +86,40 @@ In current code terms, implementation/tests for this task should anchor capabili
 
 ### Approach A — preferred: verified native Codex capability
 
-If `https://chatgpt.com/backend-api/codex/responses` accepts a native schema-constrained request and yields a correspondingly structured response surface, then implement a first-class Codex native mechanism.
+Live discovery on 2026-05-29 verified that `https://chatgpt.com/backend-api/codex/responses` accepts native schema-constrained structured output for the streaming transport Psi uses.
+
+Observed positive contract:
+
+- requests must currently set `"stream": true`; attempts with `"stream": false` returned `400` with `{"detail":"Stream must be set to true"}`
+- the accepted native schema surface is Responses-style `text.format`, not Chat Completions-style `response_format`
+- a successful probe returned `200` and echoed the schema contract under:
+
+```json
+"text": {
+  "format": {
+    "type": "json_schema",
+    "name": "probe_result",
+    "schema": {...},
+    "strict": true
+  },
+  "verbosity": "low"
+}
+```
+
+Observed negative contract:
+
+- Chat Completions-style `response_format` is rejected on this endpoint with `400` and `{"detail":"Unsupported parameter: response_format"}`
+
+Therefore this task should implement a first-class Codex native mechanism using the verified Responses-style request surface rather than prompted fallback.
 
 That implementation should:
 
 1. introduce a Codex-native structured-output capability/mechanism name unless the protocol is proven identical to an existing OpenAI native mechanism;
-2. extend `codex_responses.clj` request construction to send the verified native schema fields;
+2. extend `codex_responses.clj` request construction to send the verified native schema fields under Responses-style `text.format`;
 3. extend Codex streaming extraction to emit first-class `:structured-output-strategy` and `:structured-output-result` events sourced from the true native response shape;
-4. add Codex non-streaming `:execute` support if the backend supports a non-streaming contract and if runtime seams benefit from it;
+4. treat Codex non-streaming `:execute` as a separate verified capability question, because the live probe currently showed `stream` is required and did not establish a supported non-streaming contract;
 5. update Codex-backed built-in model capabilities such as `gpt-5.4` to advertise real native support rather than fallback-only;
-6. add focused tests and guarded live verification for the request contract and result extraction contract.
+6. add focused tests and retain guarded live verification for the request contract and result extraction contract.
 
 ### Approach B — if Codex native support is not available
 
@@ -128,11 +152,11 @@ Out of scope:
 
 ## Acceptance
 
-1. There is one authoritative answer for the ChatGPT/Codex endpoint structured-output capability: either verified native mechanism with exact request/response contract, or explicit fallback-only unsupported-native status.
-2. If native capability is verified, Codex request construction, strategy selection, result extraction, and capability declarations are updated coherently.
-3. If native capability is not verified, code/docs/tests remain explicit that the ChatGPT/Codex endpoint is fallback-only and no provider-native capability is claimed.
-4. Focused tests cover Codex model capability assignment and Codex structured-output request/result behavior for the chosen capability outcome, including transport-resolved runtime model cases such as OAuth-routed `gpt-5.5` rather than only static built-in Codex catalog entries.
-5. If non-streaming Codex support is implemented, focused tests cover the `:execute` contract and top-level structured-output result surface.
+1. There is one authoritative answer for the ChatGPT/Codex endpoint structured-output capability, and this task now records verified native streaming schema support using Responses-style `text.format` on `https://chatgpt.com/backend-api/codex/responses`.
+2. Codex request construction, strategy selection, result extraction, and capability declarations are updated coherently for the verified native streaming contract.
+3. Chat Completions-style `response_format` is not used on the ChatGPT/Codex endpoint, and tests/documentation make that distinction explicit.
+4. If non-streaming Codex support is implemented, it is backed by separate verification; until then, the task remains explicit that live evidence currently supports only streaming native schema use and that `stream: false` returned `400` during discovery.
+5. Focused tests cover Codex model capability assignment and Codex structured-output request/result behavior for the finalized capability outcome, including transport-resolved runtime model cases such as OAuth-routed `gpt-5.5` rather than only static built-in Codex catalog entries.
 6. The existing OpenAI Chat Completions native structured-output path remains intact and clearly distinct.
 7. Workflow structured-output schemas remain intact and no control-loop schema is weakened or removed.
 

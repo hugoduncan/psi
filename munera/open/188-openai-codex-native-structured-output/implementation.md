@@ -94,3 +94,12 @@
 - 2026-05-29: task-implementation-review pass.
   - Re-read the task artifacts, touched Codex structured-output code/tests, and reran focused model/provider/turn-runtime verification plus targeted ai lint.
   - Found one actionable closeout issue: the untracked live probe scratch file `.tmp-codex-schema-probe.clj` remains in the worktree even though its evidence is already recorded in task artifacts.
+
+- 2026-05-29: Closeout follow-up execution.
+  - Executed the newly added actionable follow-up items from the preceding implementation review.
+  - Removed the untracked live-probe scratch file `.tmp-codex-schema-probe.clj`; the credential-access helper is no longer present in the worktree and the relevant live evidence remains recorded in this task file/design.
+  - Updated `doc/custom-providers.md` and `CHANGELOG.md` so the documented custom-model structured-output mechanism list and user-visible changelog reflect the finalized ChatGPT/Codex native streaming contract: `:openai/responses-text-format-json-schema` over Responses-style `text.format`, distinct from Chat Completions `response_format`, with non-streaming Codex structured output still not established.
+  - Re-reviewed `design.md`, `plan.md`, and `steps.md` for the final intent. They are aligned on native streaming Codex support, no Chat Completions `response_format` on the Codex endpoint, non-streaming left explicit/unimplemented pending separate verification, and transport-resolved runtime Codex models including OAuth-routed `gpt-5.5`.
+  - Marked the closeout `steps.md` items done.
+  - Focused verification after closeout passed: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.openai-structured-output-test --focus psi.turn-runtime.response-mode-test` (`22 tests, 141 assertions, 0 failures`).
+  - Targeted Clojure lint passed for touched AI code/tests: `clj-kondo --lint components/ai/src/psi/ai components/ai/test/psi/ai`. A broader attempt including `doc/custom-providers.md` was invalid because clj-kondo does not lint Markdown prose as Clojure.

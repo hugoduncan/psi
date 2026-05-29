@@ -28,7 +28,7 @@
 (def openai-codex-native-capability
   {:supported? true
    :strategies [:provider-native :prompted-json]
-   :native-mechanism :openai/codex-responses-text-format-json-schema
+   :native-mechanism :openai/responses-text-format-json-schema
    :notes "Verified only for the ChatGPT/Codex responses transport with streaming text.format JSON Schema."})
 
 (def openai-codex-fallback-capability

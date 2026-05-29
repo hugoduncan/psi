@@ -87,7 +87,7 @@
       (is (= "gpt-5.5" (:id model)))
       (is (= [:provider-native :prompted-json]
              (get-in model [:capabilities :structured-output :strategies])))
-      (is (= :openai/codex-responses-text-format-json-schema
+      (is (= :openai/responses-text-format-json-schema
              (get-in model [:capabilities :structured-output :native-mechanism])))))
 
   (testing "other openai models preserve catalog transport under oauth"
@@ -122,7 +122,7 @@
                          structured-output/effective-capability)]
       (is (= true (:supported? capability)))
       (is (= [:provider-native :prompted-json] (:strategies capability)))
-      (is (= :openai/codex-responses-text-format-json-schema
+      (is (= :openai/responses-text-format-json-schema
              (:native-mechanism capability)))))
 
   (testing "older Anthropic Messages models declare forced-tool native support"

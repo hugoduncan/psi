@@ -35,7 +35,7 @@
 
 # Slice 5 — Documentation and closeout
 
-- [ ] Update `implementation.md` with the final capability decision, evidence, code/test changes, and verification results.
-- [ ] Update any user-facing or internal AI documentation only if the finalized Codex capability boundary is discoverable and relevant beyond task-local notes.
-- [ ] Review `plan.md` and `steps.md` for consistency with the final design intent before closing the task.
-- [ ] Remove the untracked live-probe scratch file `.tmp-codex-schema-probe.clj` before close; keep the recorded evidence in `implementation.md` rather than a credential-access helper in the worktree.
+- [x] Update `implementation.md` with the final capability decision, evidence, code/test changes, and verification results.
+- [x] Update any user-facing or internal AI documentation only if the finalized Codex capability boundary is discoverable and relevant beyond task-local notes.
+- [x] Review `plan.md` and `steps.md` for consistency with the final design intent before closing the task.
+- [x] Remove the untracked live-probe scratch file `.tmp-codex-schema-probe.clj` before close; keep the recorded evidence in `implementation.md` rather than a credential-access helper in the worktree.

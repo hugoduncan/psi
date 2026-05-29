@@ -188,7 +188,7 @@
        (fn [ev] (swap! events conj ev))))
     (is (some #(and (= :structured-output-strategy (:type %))
                     (= :provider-native (get-in % [:structured-output :strategy]))
-                    (= :openai/codex-responses-text-format-json-schema
+                    (= :openai/responses-text-format-json-schema
                        (get-in % [:structured-output :native-mechanism])))
               @events))
     (is (some #(and (= :structured-output-result (:type %))

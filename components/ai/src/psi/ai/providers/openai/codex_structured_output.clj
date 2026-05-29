@@ -6,7 +6,7 @@
 (defn native-mechanism?
   [strategy]
   (and (= :provider-native (:strategy strategy))
-       (= :openai/codex-responses-text-format-json-schema
+       (= :openai/responses-text-format-json-schema
           (:native-mechanism strategy))))
 
 (defn text-format
