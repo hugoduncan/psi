@@ -503,7 +503,96 @@
                                                    :run-id "run-1"})
           result (cwf-mutations/list-workflow-runs {} {:psi/agent-session-ctx ctx})]
       (is (= 1 (:psi.workflow/run-count result)))
-      (is (= ["run-1"] (mapv :run-id (:psi.workflow/runs result)))))))
+      (is (= ["run-1"] (mapv :run-id (:psi.workflow/runs result))))))
+
+  (testing "list-workflow-runs reflects retention cleanup after execute terminalization"
+    (let [ctx (assoc (make-test-ctx)
+                     :execute-workflow-run-fn
+                     (fn [ctx* _session-id run-id]
+                       (swap! (:state* ctx*) assoc-in [:workflows :runs run-id :status] :completed)
+                       (swap! (:state* ctx*) assoc-in [:workflows :runs run-id :finished-at]
+                              (java.time.Instant/parse "2026-05-29T12:01:00Z"))
+                       {:status :completed :terminal? true :blocked? false :steps-executed []}))
+          parent (session/new-session-in! ctx nil {})
+          parent-id (:session-id parent)
+          old-child-id (workflow-owned-session! ctx parent-id "old-exec")]
+      (cwf-mutations/register-workflow-definition {} {:psi/agent-session-ctx ctx
+                                                      :definition sample-definition})
+      (install-terminal-run! ctx {:run-id "run-1"
+                                  :parent-id parent-id
+                                  :status :completed
+                                  :finished-at (java.time.Instant/parse "2026-05-29T12:00:00Z")
+                                  :linked-session-ids [old-child-id]})
+      (cwf-mutations/create-workflow-run {} {:psi/agent-session-ctx ctx
+                                             :session-id parent-id
+                                             :definition-id "test-workflow"
+                                             :workflow-input {:input "hello" :original "hello"}
+                                             :run-id "run-2"})
+      (cwf-mutations/execute-workflow-run {} {:psi/agent-session-ctx ctx
+                                              :session-id parent-id
+                                              :run-id "run-2"})
+      (let [result (cwf-mutations/list-workflow-runs {} {:psi/agent-session-ctx ctx})]
+        (is (= 1 (:psi.workflow/run-count result)))
+        (is (= ["run-2"] (mapv :run-id (:psi.workflow/runs result))))
+        (is (= [:completed] (mapv :status (:psi.workflow/runs result)))))))
+
+  (testing "list-workflow-runs reflects retention cleanup after resume terminalization"
+    (let [ctx (assoc (make-test-ctx)
+                     :resume-and-execute-workflow-run-fn
+                     (fn [ctx* _session-id run-id]
+                       (swap! (:state* ctx*) assoc-in [:workflows :runs run-id :status] :failed)
+                       (swap! (:state* ctx*) assoc-in [:workflows :runs run-id :finished-at]
+                              (java.time.Instant/parse "2026-05-29T12:02:00Z"))
+                       {:status :failed :terminal? true :blocked? false :steps-executed []}))
+          parent (session/new-session-in! ctx nil {})
+          parent-id (:session-id parent)
+          old-child-id (workflow-owned-session! ctx parent-id "old-blocked-exec")]
+      (cwf-mutations/register-workflow-definition {} {:psi/agent-session-ctx ctx
+                                                      :definition sample-definition})
+      (install-terminal-run! ctx {:run-id "run-1"
+                                  :parent-id parent-id
+                                  :status :completed
+                                  :finished-at (java.time.Instant/parse "2026-05-29T12:00:00Z")
+                                  :linked-session-ids [old-child-id]})
+      (cwf-mutations/create-workflow-run {} {:psi/agent-session-ctx ctx
+                                             :session-id parent-id
+                                             :definition-id "test-workflow"
+                                             :workflow-input {:input "old" :original "old"}
+                                             :run-id "run-2"})
+      (swap! (:state* ctx) assoc-in [:workflows :runs "run-2" :status] :blocked)
+      (cwf-mutations/resume-workflow-run {} {:psi/agent-session-ctx ctx
+                                             :session-id parent-id
+                                             :run-id "run-2"
+                                             :workflow-input {:input "new" :original "new"}})
+      (let [result (cwf-mutations/list-workflow-runs {} {:psi/agent-session-ctx ctx})]
+        (is (= 1 (:psi.workflow/run-count result)))
+        (is (= ["run-2"] (mapv :run-id (:psi.workflow/runs result))))
+        (is (= [:failed] (mapv :status (:psi.workflow/runs result)))))))
+
+  (testing "list-workflow-runs reflects retention cleanup after cancel terminalization"
+    (let [ctx (make-test-ctx)
+          parent (session/new-session-in! ctx nil {})
+          parent-id (:session-id parent)
+          old-child-id (workflow-owned-session! ctx parent-id "old-cancelled-exec")]
+      (cwf-mutations/register-workflow-definition {} {:psi/agent-session-ctx ctx
+                                                      :definition sample-definition})
+      (install-terminal-run! ctx {:run-id "run-1"
+                                  :parent-id parent-id
+                                  :status :completed
+                                  :finished-at (java.time.Instant/parse "2026-05-29T12:00:00Z")
+                                  :linked-session-ids [old-child-id]})
+      (cwf-mutations/create-workflow-run {} {:psi/agent-session-ctx ctx
+                                             :session-id parent-id
+                                             :definition-id "test-workflow"
+                                             :workflow-input {:input "hello" :original "hello"}
+                                             :run-id "run-2"})
+      (cwf-mutations/cancel-workflow-run {} {:psi/agent-session-ctx ctx
+                                             :run-id "run-2"
+                                             :reason "test cancel"})
+      (let [result (cwf-mutations/list-workflow-runs {} {:psi/agent-session-ctx ctx})]
+        (is (= 1 (:psi.workflow/run-count result)))
+        (is (= ["run-2"] (mapv :run-id (:psi.workflow/runs result))))
+        (is (= [:cancelled] (mapv :status (:psi.workflow/runs result))))))))
 
 (deftest terminal-outcome-error-message-test
   (testing "iteration-limit-reached produces actionable error with step, counts, signal, and last result"
