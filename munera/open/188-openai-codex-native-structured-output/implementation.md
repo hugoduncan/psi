@@ -148,3 +148,9 @@
   - Focused verification passed: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.openai-structured-output-test --focus psi.turn-runtime.response-mode-test` (`23 tests, 148 assertions, 0 failures`).
   - Targeted AI lint passed: `clj-kondo --lint components/ai/src/psi/ai components/ai/test/psi/ai` (0 errors, 0 warnings).
   - The remaining unchecked non-streaming `:execute` test item remains conditional on future verified Codex non-streaming structured-output support and is still blocked by current `stream: false` 400 evidence.
+- 2026-05-29: task-implementation-review pass after scalar-payload follow-up.
+  - Re-read the task artifacts, Codex structured-output implementation, focused model/provider/turn-runtime tests, custom-provider docs, and changelog.
+  - Verified the latest scalar-payload fix aligns with the task intent: Codex native streaming result extraction now parses any valid JSON value, so workflow loop-control string enums such as `"DONE"` produce a coherent `:payload` instead of `:parse-error? true`; object-only parsing remains preserved for existing object-only provider paths.
+  - Reran focused verification: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.openai-structured-output-test --focus psi.turn-runtime.response-mode-test` (`23 tests, 148 assertions, 0 failures`).
+  - Reran targeted lint: `clj-kondo --lint components/ai/src/psi/ai components/ai/test/psi/ai` (0 errors, 0 warnings).
+  - Found no new actionable implementation feedback; left `steps.md` unchanged. The remaining unchecked non-streaming `:execute` test item is conditional on future Codex non-streaming structured-output implementation and is not current actionable work.
