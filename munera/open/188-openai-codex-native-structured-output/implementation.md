@@ -1,0 +1,17 @@
+- 2026-05-29: Initial investigation for OAuth-backed review-loop schema behavior.
+  - Rechecked current model/provider/runtime code rather than assuming a `gpt-5.4` vs `gpt-5.5` schema difference.
+  - Found that the workflow control schema is already explicit and shared; the immediate narrow gap is Codex endpoint schema support.
+  - Current authoritative findings from code/tests:
+    - `components/ai/src/psi/ai/models.clj`: built-in `:gpt-5.4` uses `:openai-codex-responses`; built-in `:gpt-5.5` uses `:openai-completions`.
+    - `components/ai/src/psi/ai/models.clj`: built-in structured-output capability assignment marks `:openai-codex-responses` models as `openai-codex-fallback-capability`, while `:gpt-5.5` on `:openai-completions` is in the native-capable model-key set.
+    - `components/ai/src/psi/ai/structured_output.clj`: Codex capability is explicit fallback-only `{:supported? true :strategies [:prompted-json] :native-mechanism nil}`.
+    - `components/ai/src/psi/ai/providers/openai.clj`: non-streaming execution is not implemented for Codex.
+    - `components/ai/src/psi/ai/providers/openai/codex_responses.clj`: Codex streaming emits structured-output strategy metadata but request shaping/results still rely on prompted-JSON fallback semantics.
+    - `components/ai/test/psi/ai/providers/openai_structured_output_test.clj`: Codex structured-output request shaping intentionally injects prompted-JSON instructions and omits native schema request fields.
+  - User clarification narrowed the task:
+    - Codex CLI with API key talks to `https://api.openai.com/v1/responses`.
+    - Codex CLI with ChatGPT login/OAuth talks to `https://chatgpt.com/backend-api/codex/responses`.
+    - the task should focus specifically on supporting schemas on the ChatGPT/Codex endpoint rather than broad OpenAI identity/auth redesign.
+- 2026-05-29: Ambiguity review pass.
+  - Found one actionable ambiguity: the design names the ChatGPT/Codex endpoint as the target capability boundary, but it does not define the exact resolved runtime seam that distinguishes that endpoint from public OpenAI Responses for capability selection and testing.
+  - Current code still assigns Codex structured-output capability by coarse `:api :openai-codex-responses` in `components/ai/src/psi/ai/models.clj`, while provider behavior also depends on ChatGPT OAuth/account context and Codex URL resolution in `spec/openai-provider.allium`; the design should name which resolved discriminator is authoritative so implementation does not accidentally treat multiple transports as one native-capability surface.
