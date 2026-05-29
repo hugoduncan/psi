@@ -3,8 +3,10 @@
   (new / fork / resume / index)."
   (:require
    [clojure.test :refer [deftest testing is use-fixtures]]
-   [psi.agent-core.core]
+   [psi.agent-core.core :as agent]
    [psi.agent-session.core :as session]
+   [psi.agent-session.tool-plan :as tool-plan]
+   [psi.agent-session.tools :as tools]
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.extensions :as ext]
    [psi.session-persistence.core :as persist]
@@ -219,6 +221,36 @@
         (is (not= created-1 created-2) "new session gets distinct created-at")))))
 
 (deftest new-session-test
+  (testing "new-session-in! rehydrates live tools from inherited tool ids"
+    (let [[ctx sid-1] (create-session-context)
+          _           (session/dispatch-in! ctx :session/set-active-tools
+                                            {:session-id sid-1
+                                             :tool-maps [{:name "test-tool"
+                                                          :description "test tool"
+                                                          :execute (fn [_args _opts]
+                                                                     {:content "ok"
+                                                                      :is-error false})}]}
+                                            {:origin :test})
+          sd-2        (session/new-session-in! ctx sid-1 {})
+          sid-2       (:session-id sd-2)
+          tool-names  (->> (agent/get-data-in (ss/agent-ctx-in ctx sid-2))
+                           :tools
+                           (map :name)
+                           set)]
+      (is (contains? tool-names "test-tool"))))
+
+  (testing "new-session-in! preserves built-in bash execution through the live runtime"
+    (let [[ctx sid-1] (create-session-context)
+          _           (session/dispatch-in! ctx :session/set-active-tools
+                                            {:session-id sid-1
+                                             :tool-maps [tools/bash-tool]}
+                                            {:origin :test})
+          sd-2        (session/new-session-in! ctx sid-1 {})
+          sid-2       (:session-id sd-2)
+          result      (tool-plan/execute-tool-runtime-in! ctx sid-2 "bash" {"command" "printf 'ok'"} {:cwd (test-support/temp-cwd)})]
+      (is (false? (:is-error result)))
+      (is (= "ok" (:content result)))))
+
   (testing "new-session-in! resets session-id"
     (let [[ctx session-id] (create-session-context)
           old-id          session-id

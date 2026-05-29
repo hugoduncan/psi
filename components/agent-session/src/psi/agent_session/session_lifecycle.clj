@@ -47,13 +47,15 @@
                          :scheduled-from-schedule-id scheduled-from-schedule-id
                          :scheduled-from-label scheduled-from-label}
                         {:origin :core})
-    (let [sd    (session/get-session-data-in ctx new-session-id)
-          fresh (runtime/create-runtime!
-                 ctx new-session-id
-                 {:session-data       sd
-                  :messages           []
-                  :agent-initial      (:agent-initial ctx)
-                  :resolved-tool-defs []})]
+    (let [sd                 (session/get-session-data-in ctx new-session-id)
+          tool-source        (session/agent-tool-source-in ctx source-session-id)
+          resolved-tool-defs (tool-defs/resolve-tool-defs tool-source (:tool-ids sd))
+          fresh              (runtime/create-runtime!
+                              ctx new-session-id
+                              {:session-data       sd
+                               :messages           []
+                               :agent-initial      (:agent-initial ctx)
+                               :resolved-tool-defs resolved-tool-defs})]
       (swap! (:state* ctx)
              (fn [state]
                (-> state
