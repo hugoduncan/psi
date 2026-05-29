@@ -36,4 +36,4 @@
 - [x] Add a focused test proving negative configured retention counts are rejected.
 - [x] Add or update focused workflow resolver/introspection tests proving the canonical linked-session projection includes both execution and judge linked ids, deduplicated.
 - [ ] Update any affected workflow introspection or listing tests whose current expectations assume historical retained terminal runs or workflow-owned child sessions remain indefinitely.
-- [ ] Add focused mutation-level retention tests for canonical execute/resume/cancel terminalization paths so task proof shows retention cleanup is triggered from the public mutation seam, not only via direct `workflow-run-retention/apply-retention-cleanup!` helper calls.
+- [x] Add focused mutation-level retention tests for canonical execute/resume/cancel terminalization paths so task proof shows retention cleanup is triggered from the public mutation seam, not only via direct `workflow-run-retention/apply-retention-cleanup!` helper calls.

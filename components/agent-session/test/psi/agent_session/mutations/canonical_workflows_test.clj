@@ -35,6 +35,32 @@
                              :vars {"input" {:from :workflow-input :path [:input]}
                                     "original" {:from :workflow-input :path [:original]}}}]}]})
 
+(defn- workflow-owned-session!
+  [ctx parent-session-id session-name]
+  (let [sd (session/new-session-in! ctx parent-session-id {:session-name session-name})
+        session-id (:session-id sd)]
+    (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data :workflow-owned?] true)
+    session-id))
+
+(defn- install-terminal-run!
+  [ctx {:keys [run-id parent-id status finished-at linked-session-ids]
+        :or {linked-session-ids []}}]
+  (swap! (:state* ctx)
+         (fn [state]
+           (-> state
+               (assoc-in [:workflows :runs run-id]
+                         {:run-id run-id
+                          :parent-session-id parent-id
+                          :status status
+                          :finished-at finished-at
+                          :step-runs (cond-> {}
+                                       (seq linked-session-ids)
+                                       (assoc "plan"
+                                              {:attempts (mapv (fn [session-id]
+                                                                 {:execution-session-id session-id})
+                                                               linked-session-ids)}))})
+               (update-in [:workflows :run-order] (fnil conj []) run-id)))))
+
 (deftest register-workflow-definition-test
   (testing "registers a valid definition"
     (let [ctx (make-test-ctx)
@@ -239,6 +265,98 @@
           result (workflow-run-retention/runs-to-retain-and-remove state "parent" 1)]
       (is (= ["run-2"] (mapv :run-id (:kept-runs result))))
       (is (= ["run-1"] (mapv :run-id (:removed-runs result)))))))
+
+(deftest workflow-run-retention-mutation-seams-test
+  (testing "execute-workflow-run terminalization triggers retention cleanup from the public mutation seam"
+    (let [ctx (assoc (make-test-ctx)
+                     :execute-workflow-run-fn
+                     (fn [ctx* _session-id run-id]
+                       (swap! (:state* ctx*) assoc-in [:workflows :runs run-id :status] :completed)
+                       (swap! (:state* ctx*) assoc-in [:workflows :runs run-id :finished-at]
+                              (java.time.Instant/parse "2026-05-29T12:01:00Z"))
+                       {:status :completed :terminal? true :blocked? false :steps-executed []}))
+          parent (session/new-session-in! ctx nil {})
+          parent-id (:session-id parent)
+          old-child-id (workflow-owned-session! ctx parent-id "old-exec")]
+      (cwf-mutations/register-workflow-definition {} {:psi/agent-session-ctx ctx
+                                                      :definition sample-definition})
+      (install-terminal-run! ctx {:run-id "run-1"
+                                  :parent-id parent-id
+                                  :status :completed
+                                  :finished-at (java.time.Instant/parse "2026-05-29T12:00:00Z")
+                                  :linked-session-ids [old-child-id]})
+      (cwf-mutations/create-workflow-run {} {:psi/agent-session-ctx ctx
+                                             :session-id parent-id
+                                             :definition-id "test-workflow"
+                                             :workflow-input {:input "hello" :original "hello"}
+                                             :run-id "run-2"})
+      (cwf-mutations/execute-workflow-run {} {:psi/agent-session-ctx ctx
+                                              :session-id parent-id
+                                              :run-id "run-2"})
+      (is (nil? (get-in @(:state* ctx) [:workflows :runs "run-1"])))
+      (is (some? (get-in @(:state* ctx) [:workflows :runs "run-2"])))
+      (is (nil? (ss/get-session-data-in ctx old-child-id)))
+      (is (some? (ss/get-session-data-in ctx parent-id)))))
+
+  (testing "resume-workflow-run terminalization triggers retention cleanup from the public mutation seam"
+    (let [ctx (assoc (make-test-ctx)
+                     :resume-and-execute-workflow-run-fn
+                     (fn [ctx* _session-id run-id]
+                       (swap! (:state* ctx*) assoc-in [:workflows :runs run-id :status] :failed)
+                       (swap! (:state* ctx*) assoc-in [:workflows :runs run-id :finished-at]
+                              (java.time.Instant/parse "2026-05-29T12:02:00Z"))
+                       {:status :failed :terminal? true :blocked? false :steps-executed []}))
+          parent (session/new-session-in! ctx nil {})
+          parent-id (:session-id parent)
+          old-child-id (workflow-owned-session! ctx parent-id "old-blocked-exec")]
+      (cwf-mutations/register-workflow-definition {} {:psi/agent-session-ctx ctx
+                                                      :definition sample-definition})
+      (install-terminal-run! ctx {:run-id "run-1"
+                                  :parent-id parent-id
+                                  :status :completed
+                                  :finished-at (java.time.Instant/parse "2026-05-29T12:00:00Z")
+                                  :linked-session-ids [old-child-id]})
+      (cwf-mutations/create-workflow-run {} {:psi/agent-session-ctx ctx
+                                             :session-id parent-id
+                                             :definition-id "test-workflow"
+                                             :workflow-input {:input "old" :original "old"}
+                                             :run-id "run-2"})
+      (swap! (:state* ctx) assoc-in [:workflows :runs "run-2" :status] :blocked)
+      (cwf-mutations/resume-workflow-run {} {:psi/agent-session-ctx ctx
+                                             :session-id parent-id
+                                             :run-id "run-2"
+                                             :workflow-input {:input "new" :original "new"}})
+      (is (nil? (get-in @(:state* ctx) [:workflows :runs "run-1"])))
+      (is (some? (get-in @(:state* ctx) [:workflows :runs "run-2"])))
+      (is (= :failed (get-in @(:state* ctx) [:workflows :runs "run-2" :status])))
+      (is (nil? (ss/get-session-data-in ctx old-child-id)))
+      (is (some? (ss/get-session-data-in ctx parent-id)))))
+
+  (testing "cancel-workflow-run terminalization triggers retention cleanup from the public mutation seam"
+    (let [ctx (make-test-ctx)
+          parent (session/new-session-in! ctx nil {})
+          parent-id (:session-id parent)
+          old-child-id (workflow-owned-session! ctx parent-id "old-cancelled-exec")]
+      (cwf-mutations/register-workflow-definition {} {:psi/agent-session-ctx ctx
+                                                      :definition sample-definition})
+      (install-terminal-run! ctx {:run-id "run-1"
+                                  :parent-id parent-id
+                                  :status :completed
+                                  :finished-at (java.time.Instant/parse "2026-05-29T12:00:00Z")
+                                  :linked-session-ids [old-child-id]})
+      (cwf-mutations/create-workflow-run {} {:psi/agent-session-ctx ctx
+                                             :session-id parent-id
+                                             :definition-id "test-workflow"
+                                             :workflow-input {:input "hello" :original "hello"}
+                                             :run-id "run-2"})
+      (cwf-mutations/cancel-workflow-run {} {:psi/agent-session-ctx ctx
+                                             :run-id "run-2"
+                                             :reason "test cancel"})
+      (is (nil? (get-in @(:state* ctx) [:workflows :runs "run-1"])))
+      (is (some? (get-in @(:state* ctx) [:workflows :runs "run-2"])))
+      (is (= :cancelled (get-in @(:state* ctx) [:workflows :runs "run-2" :status])))
+      (is (nil? (ss/get-session-data-in ctx old-child-id)))
+      (is (some? (ss/get-session-data-in ctx parent-id))))))
 
 (deftest workflow-run-retention-cleanup-test
   (testing "default retention keeps only newest retained terminal run for one originating session and tree-closes linked workflow-owned sessions"
