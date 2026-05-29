@@ -31,3 +31,7 @@
   - Clarified that `model_registry.clj` runtime model resolution is part of the authoritative capability-selection surface alongside Codex URL/auth resolution, while `models.clj` must remain coherent but is not sufficient alone.
   - Expanded scope/acceptance wording so future implementation/tests cover transport-resolved Codex runtime models generally, not only static built-in Codex entries.
   - Marked the inconsistency design-step done.
+- 2026-05-29: Reviewed task plan/steps for ambiguities.
+  - Re-read `design.md`, `plan.md`, `steps.md`, `design-steps.md`, and `implementation.md`, plus referenced code/tests/spec/docs in `components/ai` and `spec/openai-provider.allium`.
+  - Found no new actionable ambiguity feedback.
+  - Existing open `steps.md` items remain intentional implementation/discovery work around evidence gathering, capability decision, and proof, not plan/step ambiguity.
