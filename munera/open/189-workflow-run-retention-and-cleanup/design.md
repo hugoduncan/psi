@@ -19,7 +19,7 @@ The system needs an automatic retention rule that applies when workflow runs rea
 - Default retention to `1` completed workflow run per originating session when no explicit value is configured.
 - Trigger cleanup automatically when a workflow run enters a retained terminal state.
 - Keep the newest retained completed workflow runs for that originating session and remove older completed workflow runs beyond the retention limit.
-- Remove the workflow-owned sessions associated with removed workflow runs.
+- Remove the workflow-owned session trees associated with removed workflow runs.
 - Ensure the cleanup only affects retained terminal workflow runs (`:completed`, `:failed`, `:cancelled`); active or otherwise non-terminal runs must not be removed.
 - Ensure cleanup is deterministic: when more than the retained count of completed runs exist for an originating session, the kept set is the most recently completed runs, with older completed runs removed first.
 - Cover the behavior with focused tests.
@@ -39,14 +39,14 @@ After this task:
 - If no explicit retention count is configured, the effective count is `1`.
 - When a workflow run enters a retained terminal status, the system keeps only the newest retained terminal runs for that originating session.
 - Older retained terminal workflow runs beyond the retention limit are removed automatically.
-- Sessions owned only by removed workflow runs are also removed automatically as part of the same cleanup behavior.
+- Workflow-owned session trees linked only to removed workflow runs are also removed automatically as part of the same cleanup behavior.
 - Non-terminal workflow runs are never removed by this cleanup, and terminal statuses outside the runtime workflow-run status set are out of scope.
 
 ## Definitions
 
 - **Originating agent session**: the parent session from which a workflow run was started.
 - **Retained terminal workflow run**: a workflow run whose status is one of the canonical workflow runtime terminal statuses covered by this task: `:completed`, `:failed`, or `:cancelled`. These are terminal within the workflow runtime and are the only statuses eligible for retention cleanup in this slice.
-- **Workflow-owned session**: a runtime session created for workflow execution and associated to a workflow run.
+- **Workflow-owned session**: a runtime session created by workflow execution and marked `:workflow-owned? true`, including execution child sessions referenced from step attempts via `:execution-session-id` and judge child sessions referenced via `:judge-session-id`.
 - **Retention count**: the number of retained terminal workflow runs to keep for one originating agent session.
 
 ## Behavior
@@ -73,21 +73,27 @@ After this task:
 
 ### Session cleanup
 
-- When a completed workflow run is removed by retention cleanup, its associated workflow-owned session is also removed.
+- When a retained terminal workflow run is removed by retention cleanup, cleanup first computes that run's authoritative workflow-owned root session set from the workflow run data itself.
+- The authoritative per-run linked session set is the union of all non-nil `:execution-session-id` values and all non-nil `:judge-session-id` values recorded across that run's step attempts.
+- Cleanup must ignore duplicate ids in that set and must not infer ownership from unrelated session ancestry alone.
+- For each linked workflow-owned session in that set, cleanup removes the whole workflow-owned subtree rooted at that linked session by using session-tree close semantics, not single-session-only close semantics.
+- Whole-tree cleanup is required because a workflow-owned execution or judge session may itself have workflow-owned descendants; retention cleanup must not leave such descendants orphaned in session state.
 - Cleanup must not remove sessions belonging to the originating parent session.
-- Cleanup must not remove sessions associated with retained completed runs.
+- Cleanup must not remove sessions associated with retained terminal runs.
 - Cleanup must not remove sessions for non-terminal runs.
+- Cleanup must only tree-close linked roots that are workflow-owned for the removed run. If a linked id is absent, already closed, or not workflow-owned, cleanup skips it rather than broadening deletion.
 
 ## Acceptance criteria
 
 1. Starting from an originating session with the default configuration, after two retained terminal workflow runs for that session exist, only the newest retained terminal workflow run remains and the older retained terminal workflow run is removed.
-2. Under the same default case, the workflow-owned session for the removed older retained terminal run is also removed.
-3. With retention explicitly configured to `2`, the two newest retained terminal workflow runs for an originating session are retained and older retained terminal runs are removed.
-4. With retention explicitly configured to `0`, a retained terminal workflow run is removed as soon as cleanup is applied, and its workflow-owned session is also removed.
-5. Non-terminal workflow runs are not removed, even if the number of older retained terminal runs already exceeds the retention count.
-6. Cleanup is isolated per originating agent session: terminalizing workflow runs in one parent session does not remove retained terminal workflow runs belonging to a different parent session.
-7. Invalid negative retention configuration at `[:config :completed-workflow-run-retention-count]` is rejected.
-8. Focused tests prove retention ordering, defaulting, per-session isolation, and workflow-session cleanup.
+2. Under the same default case, every linked workflow-owned session tree for the removed older retained terminal run is also removed.
+3. If a removed retained terminal run recorded multiple linked workflow-owned sessions across execution attempts and judge passes, cleanup removes all of their linked workflow-owned subtrees, not just one execution session.
+4. With retention explicitly configured to `2`, the two newest retained terminal workflow runs for an originating session are retained and older retained terminal runs are removed.
+5. With retention explicitly configured to `0`, a retained terminal workflow run is removed as soon as cleanup is applied, and all of its linked workflow-owned session trees are also removed.
+6. Non-terminal workflow runs are not removed, even if the number of older retained terminal runs already exceeds the retention count.
+7. Cleanup is isolated per originating agent session: terminalizing workflow runs in one parent session does not remove retained terminal workflow runs belonging to a different parent session.
+8. Invalid negative retention configuration at `[:config :completed-workflow-run-retention-count]` is rejected.
+9. Focused tests prove retention ordering, defaulting, per-session isolation, multi-session workflow cleanup, and subtree cleanup semantics.
 
 ## Notes for refinement
 
