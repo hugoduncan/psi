@@ -17,11 +17,11 @@ Backlog:
 `munera/open/005-canonical-dispatch-pipeline-trace-observability/`
 `munera/open/175-workflow-self-loop-control-edges/`
 `munera/open/186-built-in-skill-for-developing-extensions/`
-`munera/open/188-built-in-skill-for-writing-workflows/`
 
 Recently completed:
 
 `munera/closed/184-workflow-file-kinds-and-md-step-prompts/`
+`munera/closed/188-built-in-skill-for-writing-workflows/`
 
 Notes:
 

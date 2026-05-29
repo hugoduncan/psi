@@ -39,7 +39,7 @@ Bootstrapped on 2026-04-02.
   - task 169 is complete and closed: model/provider structured-output capability surface implemented
   - task 171 is complete and closed: Anthropic JSON Schema native output implemented and live-verified
   - task 170 remains the active adjacent workflow adoption slice; latest follow-ups clarified unsupported/fallback-forbidden behavior, top-level `:structured-output` turn-result seams, and success-path envelope propagation
-- Tasks 151, 145, 140, 139, 138, 136, 134, 130, 128, 125 also complete and closed
+- Tasks 188, 151, 145, 140, 139, 138, 136, 134, 130, 128, 125 also complete and closed
 
 ## Test health
 
@@ -65,9 +65,11 @@ Bootstrapped on 2026-04-02.
   - remaining root-registry adopter polish if `164` identifies unresolved seams
   - decide whether out-of-scope registries (`model-registry`, memory provider registry, extension handler registry) need a separate audit rather than direct adoption
 - Structured-output arc: task 170 remains the active adjacent workflow adoption slice; its test-shaper follow-up is complete and the remaining work is within that task.
-- Backlog: `105-agent-session-component-extraction-map`, `124-turn-execution-contract-extraction`, `149-reload-fixup-inventory-and-safety`, `141`/`144`/`147` workflow items
+- Backlog: `105-agent-session-component-extraction-map`, `124-turn-execution-contract-extraction`, `149-reload-fixup-inventory-and-safety`, `141`/`144`/`147` workflow items, `186-built-in-skill-for-developing-extensions`
 
 ## Latest session notes
+
+- 2026-05-29: Task 188 is complete and ready in PR #132: built-in packaged `workflow` skill added at `bases/main/resources/psi/skills/workflow/SKILL.md`, project-local `.psi/skills/workflow/SKILL.md` removed in the same slice to avoid precedence shadowing, and focused proof added across built-in skill discovery/materialization, `:psi.agent-session/skills`, `:psi.skill/by-source`, `/skills`, and `/help` (`96 tests, 497 assertions`).
 
 - 2026-05-24: Task 170 task-test-review follow-up complete: added end-to-end session-step and LLM-judge tests for `:fallback :none` unsupported structured output with `:require-provider-native?` omitted, proving both paths use the stable `:unsupported-structured-output` blocked/fail surfaces and pass fallback-forbidden opts; focused tests and clj-kondo green.
 
