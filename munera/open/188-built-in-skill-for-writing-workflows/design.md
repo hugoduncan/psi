@@ -130,6 +130,8 @@ At minimum it should point agents at the most relevant authoritative references 
 ### Workflow authoring and behavior docs
 
 - `doc/workflows.md`
+- `doc/workflow-grammar.md`
+- `doc/workflow-grammar-concepts.md`
 - `AGENTS.md` workflow/runtime/dispatch architecture guidance where relevant
 
 ### Existing workflow artifacts and packaged built-in patterns
@@ -199,7 +201,7 @@ Verification should cover at least:
    - if a temporary compatibility stub remains, its non-canonical role must be explicit and verified not to shadow the built-in skill incorrectly
 6. **Targeted authored-content anchors**
    - verification may assert the skill still identifies itself as the workflow authoring/update skill
-   - verification may assert presence of a few design-critical references such as `doc/workflows.md` or `.psi/workflows/`
+   - verification may assert presence of a few design-critical references such as `doc/workflows.md`, `doc/workflow-grammar.md`, `doc/workflow-grammar-concepts.md`, or `.psi/workflows/`
    - verification should avoid snapshotting the entire instructional prose
 
 ## Acceptance criteria
