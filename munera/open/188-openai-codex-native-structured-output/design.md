@@ -27,21 +27,29 @@ For Psi, the narrow gap to close is the second path: the ChatGPT/Codex backend c
 Authoritative current seams:
 
 - `components/ai/src/psi/ai/models.clj`
-  - `:gpt-5.4` is built in as `:openai-codex-responses`
-  - `:gpt-5.5` is built in as `:openai-completions`
+  - several built-in models, including `:gpt-5.4` and multiple `*-codex` variants, are built in directly as `:openai-codex-responses`
+  - built-in `:gpt-5.5` remains catalogued as `:openai-completions`
   - built-in capability assignment marks `:openai-codex-responses` models as fallback-only `openai-codex-fallback-capability`
+  - built-in capability assignment separately marks selected `:openai-completions` models, including built-in `:gpt-5.5`, as native-capable Chat Completions models
+- `components/ai/src/psi/ai/model_registry.clj`
+  - runtime model resolution is more authoritative than the built-in catalog alone for this task
+  - under OpenAI OAuth context, `resolve-runtime-model` reroutes `gpt-5.5` to `:openai-codex-responses`, sets the ChatGPT backend base URL, and replaces its structured-output capability with Codex fallback-only capability
+  - therefore current structured-output behavior for `gpt-5.5` depends on transport/auth-resolved runtime model selection, not only on the static `models.clj` entry
 - `components/ai/src/psi/ai/structured_output.clj`
   - Codex capability is explicit fallback-only `{:supported? true :strategies [:prompted-json] :native-mechanism nil}`
   - Chat Completions capability is modeled separately as native-capable
 - `components/ai/src/psi/ai/providers/openai/codex_responses.clj`
   - Codex request shaping currently relies on prompted-JSON fallback instructions
+  - Codex request construction requires a bearer token containing `chatgpt_account_id`, resolves the ChatGPT/Codex URL, and currently treats that resolved transport as prompted-JSON/fallback-only
   - Codex streaming emits structured-output strategy metadata but derives results from fallback parsing rather than a native provider contract
 - `components/ai/src/psi/ai/providers/openai.clj`
   - Codex non-streaming `:execute` is not implemented
+- `components/ai/test/psi/ai/model_registry_test.clj`
+  - focused runtime-model tests already prove that `gpt-5.5` stays `:openai-completions` without OAuth context but resolves to `:openai-codex-responses` with OAuth context, carrying fallback-only Codex structured-output capability there
 - `components/ai/test/psi/ai/providers/openai_structured_output_test.clj`
   - Codex tests currently assert fallback-only behavior and omission of native schema request fields
 
-So the existing boundary is clear: Psi already has one OpenAI native structured-output path, but Codex is not yet one of them.
+So the existing boundary is clear: Psi already has one OpenAI native structured-output path, but ChatGPT/Codex-transport execution is not yet one of them, including runtime-resolved Codex cases such as OAuth-routed `gpt-5.5`.
 
 ## Goal
 
@@ -74,7 +82,7 @@ Therefore the runtime decision seam to name and preserve is:
 2. only after that resolution, assign or select the effective structured-output capability for execution/tests;
 3. treat the ChatGPT/Codex transport capability as distinct from both OpenAI Chat Completions native capability and any future public OpenAI Responses capability.
 
-In current code terms, implementation/tests for this task should anchor capability selection at the resolved Codex request seam owned by `components/ai/src/psi/ai/providers/openai/codex_responses.clj` and its URL/auth resolution behavior, while keeping `components/ai/src/psi/ai/models.clj` capability annotation coherent with that transport-specific contract. If the existing coarse built-in `:api :openai-codex-responses` annotation remains, it must still be justified by the fact that all current models on that API resolve only to the ChatGPT/Codex OAuth transport; the task must not generalize beyond that fact.
+In current code terms, implementation/tests for this task should anchor capability selection at the resolved Codex request seam owned by `components/ai/src/psi/ai/providers/openai/codex_responses.clj` and its URL/auth resolution behavior, with `components/ai/src/psi/ai/model_registry.clj` runtime model resolution treated as part of the same authoritative surface. Static `components/ai/src/psi/ai/models.clj` capability annotation must remain coherent with that transport-specific contract, but it is not sufficient on its own because OAuth routing can transform built-in `:openai-completions` catalog entries such as `gpt-5.5` into effective `:openai-codex-responses` runtime models. If the existing coarse built-in `:api :openai-codex-responses` annotation remains, it must still be justified by the fact that all current models on that API resolve only to the ChatGPT/Codex OAuth transport; the task must not generalize beyond that fact.
 
 ### Approach A — preferred: verified native Codex capability
 
@@ -109,7 +117,8 @@ In scope:
 - implement native support only if verified;
 - otherwise preserve fallback-only semantics explicitly and evidence them;
 - add focused tests and, if feasible, guarded live smoke verification for Codex structured-output behavior;
-- keep the Codex capability separate from the existing Chat Completions native capability.
+- keep the Codex capability separate from the existing Chat Completions native capability;
+- cover transport-resolved Codex runtime models generally, including OAuth-routed `gpt-5.5`, rather than only models statically catalogued as Codex in `models.clj`.
 
 Out of scope:
 
@@ -122,7 +131,7 @@ Out of scope:
 1. There is one authoritative answer for the ChatGPT/Codex endpoint structured-output capability: either verified native mechanism with exact request/response contract, or explicit fallback-only unsupported-native status.
 2. If native capability is verified, Codex request construction, strategy selection, result extraction, and capability declarations are updated coherently.
 3. If native capability is not verified, code/docs/tests remain explicit that the ChatGPT/Codex endpoint is fallback-only and no provider-native capability is claimed.
-4. Focused tests cover Codex model capability assignment and Codex structured-output request/result behavior for the chosen capability outcome.
+4. Focused tests cover Codex model capability assignment and Codex structured-output request/result behavior for the chosen capability outcome, including transport-resolved runtime model cases such as OAuth-routed `gpt-5.5` rather than only static built-in Codex catalog entries.
 5. If non-streaming Codex support is implemented, focused tests cover the `:execute` contract and top-level structured-output result surface.
 6. The existing OpenAI Chat Completions native structured-output path remains intact and clearly distinct.
 7. Workflow structured-output schemas remain intact and no control-loop schema is weakened or removed.

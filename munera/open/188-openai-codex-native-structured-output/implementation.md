@@ -23,4 +23,11 @@
 - 2026-05-29: Inconsistency review pass.
   - Found one actionable inconsistency: `design.md` frames the current-code boundary around built-in `gpt-5.4` on Codex versus `gpt-5.5` on Chat Completions, but current runtime/model-registry behavior already reroutes `gpt-5.5` to `:openai-codex-responses` under OAuth and assigns fallback-only Codex structured-output capability there.
   - This conflicts with the design's current-code inventory and with wording that model capability coherence can be preserved in `components/ai/src/psi/ai/models.clj` alone; the real authoritative surface is transport-resolved runtime model selection plus provider URL/auth resolution.
-  - Added one unchecked `design-steps.md` follow-up; did not review `plan.md` or `steps.md`. 
+  - Added one unchecked `design-steps.md` follow-up; did not review `plan.md` or `steps.md`.
+- 2026-05-29: Executed inconsistency follow-up.
+  - Completed the newly added unchecked `design-steps.md` item without touching implementation `steps.md` or `plan.md`.
+  - Rechecked `components/ai/src/psi/ai/models.clj`, `components/ai/src/psi/ai/model_registry.clj`, `components/ai/src/psi/ai/providers/openai/codex_responses.clj`, `components/ai/src/psi/ai/providers/openai.clj`, `spec/openai-provider.allium`, and focused model/provider tests before editing task artifacts.
+  - Updated `design.md` so the current-code inventory now reflects both static built-in Codex catalog entries and OAuth-routed runtime Codex execution such as `gpt-5.5 -> :openai-codex-responses` with fallback-only capability.
+  - Clarified that `model_registry.clj` runtime model resolution is part of the authoritative capability-selection surface alongside Codex URL/auth resolution, while `models.clj` must remain coherent but is not sufficient alone.
+  - Expanded scope/acceptance wording so future implementation/tests cover transport-resolved Codex runtime models generally, not only static built-in Codex entries.
+  - Marked the inconsistency design-step done.
