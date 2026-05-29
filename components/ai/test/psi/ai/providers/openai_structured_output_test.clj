@@ -196,3 +196,48 @@
                     (= {:ok true} (get-in % [:structured-output :payload]))
                     (= :openai/codex-text-format (get-in % [:structured-output :source])))
               @events))))
+
+(deftest openai-codex-streaming-native-scalar-structured-output-events-test
+  ;; Tests native ChatGPT/Codex streaming preserves valid non-object JSON payloads
+  ;; such as workflow loop-control string enums.
+  (let [model   (models/get-model :gpt-5.3-codex)
+        token   (jwt-with-account-id "acc_test")
+        convo   (-> (conv/create "sys")
+                    (conv/add-user-message "Review this"))
+        request (assoc judge-structured-output-request
+                       :name "loop_control"
+                       :json-schema {:type "string"
+                                     :enum ["REPEAT" "DONE"]})
+        events  (atom [])
+        sse     (str "data: " (json/generate-string
+                               {:type "response.output_item.added"
+                                :item {:type "message"
+                                       :id "msg_1"
+                                       :role "assistant"
+                                       :status "in_progress"
+                                       :content []}}) "\n\n"
+                     "data: " (json/generate-string
+                               {:type "response.output_text.delta"
+                                :delta "\"DONE\""}) "\n\n"
+                     "data: " (json/generate-string
+                               {:type "response.completed"
+                                :response {:status "completed"
+                                           :usage {:input_tokens 1
+                                                   :output_tokens 1
+                                                   :total_tokens 2
+                                                   :input_tokens_details {:cached_tokens 0}}}}) "\n\n")]
+    (with-redefs [http/post (fn [_url _req]
+                              {:body (stream-body sse)})]
+      ((:stream openai/provider)
+       convo model {:api-key token
+                    :structured-output request}
+       (fn [ev] (swap! events conj ev))))
+    (let [result (some #(when (= :structured-output-result (:type %)) %) @events)
+          structured (:structured-output result)]
+      (is (some? result))
+      (is (= :provider-native (:strategy structured)))
+      (is (= :openai/responses-text-format-json-schema (:native-mechanism structured)))
+      (is (= :openai/codex-text-format (:source structured)))
+      (is (= "DONE" (:payload structured)))
+      (is (= "\"DONE\"" (:raw-payload structured)))
+      (is (not (:parse-error? structured))))))

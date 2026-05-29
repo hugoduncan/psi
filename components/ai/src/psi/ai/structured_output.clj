@@ -172,12 +172,22 @@
   [text request]
   (str (or text "") (json-only-instruction request)))
 
-(defn parse-json-object
-  "Parse text as a JSON object, returning nil when parsing fails or the value is not a map."
+(defn parse-json-value
+  "Parse text as a JSON value.
+
+   Returns {:parsed? true :payload value} when parsing succeeds, including
+   scalar, array, object, and nil JSON values. Returns nil when parsing fails
+   or text is blank."
   [text]
   (when (seq text)
     (try
-      (let [parsed (json/parse-string text true)]
-        (when (map? parsed) parsed))
+      {:parsed? true
+       :payload (json/parse-string text true)}
       (catch Exception _
         nil))))
+
+(defn parse-json-object
+  "Parse text as a JSON object, returning nil when parsing fails or the value is not a map."
+  [text]
+  (when-let [{:keys [payload]} (parse-json-value text)]
+    (when (map? payload) payload)))

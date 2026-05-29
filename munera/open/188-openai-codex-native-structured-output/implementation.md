@@ -139,3 +139,12 @@
   - Re-read the task artifacts, Codex structured-output implementation, focused model/provider/turn-runtime/workflow structured-output tests, custom-provider docs, and changelog.
   - Found one new actionable implementation issue: Codex native streaming result extraction uses `structured-output/parse-json-object`, so valid JSON values that are not objects (notably workflow judge string-enum schemas such as `"DONE"` for `[:enum "REPEAT" "DONE"]`) are emitted with no `:payload` and `:parse-error? true` despite being valid schema-constrained structured output. That conflicts with the task intent to preserve small workflow control schemas and with existing workflow validation support for non-object JSON values.
   - Added an unchecked follow-up to `steps.md`; did not duplicate the existing conditional future non-streaming `:execute` item.
+- 2026-05-29: Actionable follow-up execution for Codex scalar structured-output payloads.
+  - Executed the newly added unchecked follow-up item from the preceding implementation-review pass.
+  - Added `structured-output/parse-json-value` so callers can distinguish successful JSON parsing of scalar, array, object, and `null` values from parse failure, while preserving `parse-json-object` semantics for existing object-only provider paths.
+  - Updated Codex native structured-output result extraction to use JSON-value parsing so valid non-object payloads are emitted with coherent `:payload`, `:raw-payload`, `:source`, `:strategy`, and `:native-mechanism` metadata instead of `:parse-error? true`.
+  - Added focused Codex streaming coverage for a workflow loop-control style string enum schema returning `"DONE"`.
+  - Marked the scalar-payload follow-up step done in `steps.md`.
+  - Focused verification passed: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.openai-structured-output-test --focus psi.turn-runtime.response-mode-test` (`23 tests, 148 assertions, 0 failures`).
+  - Targeted AI lint passed: `clj-kondo --lint components/ai/src/psi/ai components/ai/test/psi/ai` (0 errors, 0 warnings).
+  - The remaining unchecked non-streaming `:execute` test item remains conditional on future verified Codex non-streaming structured-output support and is still blocked by current `stream: false` 400 evidence.
