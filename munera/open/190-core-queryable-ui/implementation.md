@@ -592,3 +592,14 @@ Verification:
 
 - `clojure -M:test --focus psi.agent-session.extensions-test` — 24 tests, 124 assertions, 0 failures.
 - `clj-kondo --lint components/agent-session/test/psi/agent_session/extensions_test.clj` — clean.
+
+## 2026-05-30 test review
+
+No new actionable test feedback after reviewing task artifacts, UI capability/provider normalization tests, resolver discovery tests, runtime extension API query coverage, nullable API coverage, RPC/TUI lifecycle tests, Emacs ERT coverage, and extension docs. The tests now cover each designed behaviour cluster: provider unavailable/error semantics, descriptor/invocation validation and defaulting, root-queryable discovery, real extension API querying without session-id input or allowed events, frontend lifecycle/provider attachment, legacy UI snapshot compatibility, and direct `psi-emacs-show-active` command behaviour. No new follow-up items were added.
+
+Verification:
+
+- `clojure -M:test --focus psi.agent-session.ui-capabilities-test` — 18 tests, 115 assertions, 0 failures.
+- `clojure -M:test --focus psi.agent-session.extensions-test` — 24 tests, 124 assertions, 0 failures.
+- `bb emacs:test` — 321 tests, 321 expected, 0 unexpected.
+- `clj-kondo --lint components/agent-session/test/psi/agent_session/extensions_test.clj components/agent-session/test/psi/agent_session/ui_capabilities_test.clj components/app-runtime/test/psi/app_runtime_test.clj components/rpc/test/psi/rpc_transport_test.clj` — clean.
