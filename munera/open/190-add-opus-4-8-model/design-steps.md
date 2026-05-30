@@ -15,3 +15,11 @@
 - [x] **Specify `:mid-system` compaction preservation mechanism** — Clarify whether `entry->message` in `compaction.clj` must be extended to handle `:mid-system` entries (returning a `{:role "system" ...}` message), or whether preservation is achieved via a different path. Update step 11 with the concrete change required.
 
 - [x] **Document `journal->provider-messages` ↔ `append-msg` contract** — Add a note to steps 4 and 10 specifying the exact message map shape that step 10 must produce so that step 4's `append-msg` `"system"` case can consume it without ambiguity (role key type: keyword vs string; content format).
+
+## From inconsistency review pass 2026-05-30
+
+- [ ] **Align `/effort` persistence with command syntax** — Decide whether `/effort` accepts an optional scope token (`/effort xhigh project|user|session`). If yes, update command syntax/help and acceptance criteria; if no, remove project/user persistence effects and shared-config scope from this task.
+
+- [ ] **Remove remaining `:xhigh` fallback wording** — Update the Part 3 effort table so Anthropic adaptive `:xhigh` unambiguously maps to `"highest"` with no fallback/warning in this slice, matching the architecture section.
+
+- [ ] **Resolve mid-system placement versus next-request inclusion** — Make the Anthropic placement rule, dispatch insertion point, provider validation, and acceptance criteria agree. In particular, specify whether an injected mid-system message may be final in the next generation request; if not, design how it is retained until a valid non-final position exists instead of being dropped.

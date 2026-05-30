@@ -34,3 +34,15 @@ Decisions recorded:
 - `:xhigh` adaptive effort always sends `"highest"`; unsupported-provider 400s surface directly, with no retry/fallback in this slice.
 - Mid-system compaction preservation is concretized via `compaction.clj/entry->message` returning a provider-style `{"role": "system", ...}` shape for `:mid-system` entries.
 - The exact `journal->provider-messages` → `append-msg` contract is now documented as `{:role "system" :content [{:type :text :text ...}]}`.
+
+---
+
+## Design inconsistency review pass — 2026-05-30
+
+**New actionable inconsistencies found:**
+
+1. **`/effort` persistence has no command surface** — Part 3 says `:session/set-effort-override` emits project/user persistence effects and shared-config should store `effort-override`, but `/effort` command syntax only accepts one value arg (`low|medium|high|xhigh|none`) and the acceptance criteria do not include scoped persistence. Either add optional scope syntax like `/speed`, or remove persistence from this slice.
+
+2. **`:xhigh` fallback contradiction remains in the effort table** — The Part 3 effort table still says Anthropic adaptive `:xhigh` maps to `"highest"` “when supported; else `"high"` with warning”, while the architecture section later says psi always sends `"highest"` with no transparent retry/fallback and provider 400s surface as-is. The earlier checked follow-up did not fully remove the contradictory table text.
+
+3. **Anthropic mid-system placement rules contradict validation/acceptance** — The background says inline system messages may not appear immediately after an assistant message and may not be the last message, but provider validation only drops final or consecutive system messages, and the acceptance criterion requires the next prepared Anthropic request to include the injected system message. If `inject-mid-system-message!` appends after the latest user turn before the next assistant response, that system message is final in the request and would be dropped by the stated validation rule.
