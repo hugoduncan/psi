@@ -86,3 +86,15 @@ Completed the newly added inconsistency follow-up items in `design-steps.md` by 
 - `/effort` accepts optional scope syntax `<value> [session|project|user]`; command help, persistence scope, shared-config, and acceptance criteria are aligned.
 - Anthropic adaptive `:xhigh` maps to `"highest"` with no transparent fallback or warning in this slice; provider 400s surface as-is.
 - Mid-system placement is aligned across the design: dispatch accepts injection only after the latest user turn with no pending mid-system entry, the next request may include that system message as the final message, Anthropic validation allows final system-after-user messages, and invalid placements are rejected before journal mutation.
+
+---
+
+## Design ambiguity review pass — 2026-05-30
+
+**New actionable ambiguities found:**
+
+1. **Anthropic request schema for `"highest"` effort** — The design requires adaptive Anthropic `:xhigh` / `/effort xhigh` to send `output_config.effort = "highest"`, but the existing Anthropic request schema only accepts `"low"|"medium"|"high"`. Specify that `request_schema.clj` must allow `"highest"`, or choose a different validation path, otherwise psi rejects the request before the provider can surface any 400.
+
+2. **Mid-system conversation message representation** — The design says `journal->provider-messages` emits provider-style `{:role "system" :content [{:type :text :text ...}]}` and `append-msg` should append it into the AI conversation, while the AI `Message` schema currently uses keyword roles and normalized `MessageContent` (`:kind`, not provider `:type`). Specify whether the conversation layer gets a `:system` message constructor/schema extension, or whether `append-msg` normalizes provider-style mid-system content before adding it.
+
+3. **Scoped clearing semantics for persisted `/speed normal` and `/effort none`** — The design says `/speed normal` clears the speed override and `/effort none` clears the effort override, while also supporting `project`/`user` persistence scopes. Decide whether scoped clears write explicit nil/normal values that mask lower-precedence config, delete the key to reveal lower layers, or set `:normal`/nil as persistent values; existing config update helpers merge keys and do not delete them.
