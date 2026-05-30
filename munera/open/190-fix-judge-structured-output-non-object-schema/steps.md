@@ -69,4 +69,4 @@
 
 ## Test review follow-ups
 
-- [ ] Add workflow-judge retry-exhaustion coverage asserting every structured-output retry call receives the original structured-output opts/schema, not just the first successful retry path.
+- [x] Add workflow-judge retry-exhaustion coverage asserting every structured-output retry call receives the original structured-output opts/schema, not just the first successful retry path.

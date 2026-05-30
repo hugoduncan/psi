@@ -508,18 +508,18 @@
 
 (deftest execute-judge-invalid-structured-output-fails-locally-test
   (testing "invalid structured judge output retries and then fails locally without prose routing"
-    (let [turn-prompts* (atom [])]
+    (let [turns* (atom [])]
       (with-redefs [psi.session-persistence.core/messages-from-entries-in
                     (fn [_ctx _sid] [])
                     psi.workflow-runtime.turn-execution-contract/execute-judge-turn!
                     (fn
                       ([_ctx sid text]
-                       (swap! turn-prompts* conj text)
+                       (swap! turns* conj {:text text :opts nil})
                        {:status :ok
                         :session-id sid
                         :assistant-text "APPROVED"})
-                      ([_ctx sid text _opts]
-                       (swap! turn-prompts* conj text)
+                      ([_ctx sid text opts]
+                       (swap! turns* conj {:text text :opts opts})
                        {:status :ok
                         :session-id sid
                         :assistant-text "APPROVED"}))]
@@ -528,7 +528,9 @@
                       structured-review-judge-spec structured-review-routing-table
                       {:current-step-id "step-3-review"
                        :step-order step-order
-                       :step-runs structured-review-step-runs})]
+                       :step-runs structured-review-step-runs})
+              turn-prompts (mapv :text @turns*)
+              structured-output-opts (mapv #(get-in % [:opts :structured-output]) @turns*)]
           (is (nil? (:judge-event result)))
           (is (= {:action :fail
                   :reason :invalid-structured-output
@@ -537,10 +539,18 @@
           (is (= :invalid
                  (get-in result [:routing-result :details :structured-output :status])))
           (is (= :invalid (get-in result [:judge-output :review :structured-output :status])))
-          (is (= 3 (count @turn-prompts*)))
-          (is (= "Return review JSON" (first @turn-prompts*)))
+          (is (= 3 (count @turns*)))
+          (is (= "Return review JSON" (first turn-prompts)))
           (is (every? #(re-find #"did not match any expected signal" %)
-                      (rest @turn-prompts*))))))))
+                      (rest turn-prompts)))
+          (is (every? some? structured-output-opts))
+          (is (apply = structured-output-opts))
+          (is (= (get-in (first @turns*) [:opts :structured-output :json-schema])
+                 {:type "object"
+                  :required ["decision" "issues" "confidence"]
+                  :properties {"decision" {:type "string"}
+                               "issues" {:type "array"}
+                               "confidence" {:type "number"}}})))))))
 
 (deftest execute-judge-schema-valid-negative-decision-routes-test
   (testing "schema-valid negative decision drives the configured non-clear branch"
