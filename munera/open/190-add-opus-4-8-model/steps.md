@@ -72,6 +72,7 @@
 - [x] Add `:psi.agent-session/model-supports-mid-system-messages` resolver using the shared capability predicate.
 - [x] Add `:session/inject-mid-system-message` dispatch handler with capability gating and placement validation that ignores non-conversational metadata after the latest user turn.
 - [x] Ensure invalid injection placements return `:invalid-placement` reason maps and do not mutate the journal.
+- [ ] Route successful mid-system injection through the standard journal append persistence path, or emit equivalent journal persistence IO, with coverage proving injected `:mid-system` entries are flushed beyond in-memory state.
 - [x] Add `inject-mid-system-message!` to the extension API with text-only and text/options arities.
 - [x] Add `psi.extension/inject-mid-system-message` Pathom mutation with optional `:source` and `:ext-path` provenance inference.
 - [x] Register the extension mutation in `all-mutations` and `session-scoped-extension-mutation-ops`.

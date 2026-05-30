@@ -886,3 +886,11 @@ Read `design-steps.md` for unchecked ambiguity follow-up items added by the prec
 **New actionable inconsistency found:**
 
 1. **Slice 4 test steps remain unchecked after implementation notes say tests were added** — `implementation.md` records that focused tests were added for journal projection, prepared-turn current-user replacement, conversation normalization, Anthropic inline system transform/schema acceptance, and OpenAI system-role transformation. But the matching Slice 4 test items in `steps.md` are still unchecked. Align the task state by either marking those test steps complete after verifying the tests exist/pass, or revising the implementation note if the tests are incomplete.
+
+---
+
+## Implementation review pass — 2026-05-30
+
+Actionable feedback found:
+
+1. **Mid-system injection bypasses journal persistence IO** — `:session/inject-mid-system-message` appends `:mid-system` with `persist/append-journal-entry-root-update` directly. That mutates in-memory journal state but bypasses the existing `:session/append-journal-entry` persistence IO path, so injected instructions may not be flushed to the session journal on disk. Route the append through the standard journal append handler/effect path or add an equivalent persistence effect, with coverage proving persisted journal IO is requested.
