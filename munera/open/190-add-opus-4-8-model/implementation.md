@@ -992,3 +992,11 @@ Verification:
 ## Inconsistency follow-up execution — 2026-05-30 (post-replay unchecked-item pass)
 
 Read `design-steps.md` for unchecked inconsistency follow-up items added by the preceding inconsistency-review pass. No unchecked design-step items were present (`unchecked count 0`), so there were no newly actionable design follow-ups to execute. No `design.md`, `plan.md`, or `steps.md` changes were required. Existing uncommitted test-file modifications were left untouched.
+
+---
+
+## Implementation review pass — 2026-05-30 (post-compaction replay preservation)
+
+Actionable feedback found:
+
+1. **Compaction replay can drop post-compaction history when preserved mid-system text exists** — `rebuild-messages-from-journal-entries` concatenates kept pre-compaction entries with entries after the compaction record, then applies `normalize-retained-suffix-for-mid-system` across the combined message list. If the journal has pre-cut `:mid-system`, a compaction entry, and later post-compaction user/assistant turns, normalization drops everything through the latest assistant, including the post-compaction turns that must remain in replay. Keep post-compaction entries intact while still avoiding retroactive insertion before already-retained assistant history, and add a replay test covering pre-cut `:mid-system` + compaction + later user/assistant history.
