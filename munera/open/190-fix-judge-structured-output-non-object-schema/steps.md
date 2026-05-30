@@ -17,7 +17,9 @@
 
 ## Slice 2 — Provider and envelope regression tests
 
-- [ ] Add or update an Anthropic structured-output result test asserting raw payload `"\"DONE\""` yields `:payload "DONE"` and no `:parse-error? true`.
+- [ ] Add or update Anthropic structured-output result tests asserting raw payloads for string, number, boolean, array, object, and `null` yield the corresponding `:payload` values and no `:parse-error? true`.
+- [ ] In Anthropic `null` tests, assert `(contains? structured-output :payload)` and `(nil? (:payload structured-output))`.
+- [ ] Update existing Anthropic parse-failure tests so valid non-object JSON values are expected to parse successfully; only invalid JSON remains a parse failure.
 - [ ] Add or update a structured-output envelope test asserting that the Anthropic string payload validates against `[:enum "REPEAT" "DONE"]` with `:status :valid` and `:value "DONE"`.
 - [ ] Add or update OpenAI chat-completions provider-native tests for string, number, boolean, array, object, and `null` payload extraction, with `:raw-payload` asserted as the raw JSON response text.
 - [ ] Ensure OpenAI chat-completions provider-native regression coverage exercises both streaming and non-streaming structured-output result paths, or records why an existing public seam covers both paths equivalently.

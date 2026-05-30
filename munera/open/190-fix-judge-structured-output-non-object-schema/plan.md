@@ -22,7 +22,8 @@ Implement the task as two narrow root-cause fixes plus focused regression covera
    - Preserve existing unsupported-structured-output failure behavior.
 
 4. Add focused regression tests, then run broader verification.
-   - Cover Anthropic bare string payload extraction and envelope validation against `[:enum "REPEAT" "DONE"]`.
+   - Cover Anthropic JSON Schema output payload extraction for string, number, boolean, array, object, and `null`, including present `:payload nil`; update existing Anthropic parse-failure expectations so only invalid JSON, not valid non-object JSON, is treated as parse failure.
+   - Cover Anthropic bare string envelope validation against `[:enum "REPEAT" "DONE"]`.
    - Cover OpenAI chat-completions provider-native and prompted-JSON payload preservation for string, number, boolean, array, object, and `null`, including present `:payload nil`.
    - Cover Codex `null` preservation if no existing test already protects it.
    - Cover prompted-JSON instruction wording.
