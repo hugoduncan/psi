@@ -1,6 +1,7 @@
 (ns psi.agent-session.commands-test
   (:require
    [psi.agent-session.test-support :as test-support]
+   [clojure.edn :as edn]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [com.fulcrologic.statecharts.chart :as chart]
@@ -17,7 +18,9 @@
    [psi.memory.core :as memory]
    [psi.memory.store :as store]
    [psi.prompt-assets.skills :as prompt-skills]
-   [psi.query.core :as query]))
+   [psi.query.core :as query]
+   [psi.shared-config.project :as project-prefs]
+   [psi.shared-config.user :as user-config]))
 
 ;; ── Test helper ─────────────────────────────────────────────
 (defn- create-session-context
@@ -481,6 +484,27 @@
       (is (= "✓ Speed mode set to normal [project]" (:message result)))
       (is (= :normal (:speed-mode (ss/get-session-data-in ctx session-id))))))
 
+  (testing "project/user scoped commands persist speed config, including explicit normal masks"
+    (let [cwd      (test-support/temp-cwd)
+          local-f  (project-prefs/project-local-preferences-file cwd)
+          user-f   (java.io.File. (str cwd "/user-home/.psi/agent/config.edn"))
+          _        (.mkdirs (.getParentFile local-f))
+          _        (.mkdirs (.getParentFile user-f))
+          [ctx session-id] (create-session-context {:cwd cwd :persist? false})]
+      (with-redefs [user-config/user-config-file (fn [] user-f)]
+        (commands/dispatch-in ctx session-id "/speed fast project" cmd-opts)
+        (is (= :fast (get-in (edn/read-string (slurp local-f))
+                             [:agent-session :speed-mode])))
+        (commands/dispatch-in ctx session-id "/speed normal project" cmd-opts)
+        (is (= :normal (get-in (edn/read-string (slurp local-f))
+                               [:agent-session :speed-mode])))
+        (commands/dispatch-in ctx session-id "/speed fast user" cmd-opts)
+        (is (= :fast (get-in (edn/read-string (slurp user-f))
+                             [:agent-session :speed-mode])))
+        (commands/dispatch-in ctx session-id "/speed normal user" cmd-opts)
+        (is (= :normal (get-in (edn/read-string (slurp user-f))
+                               [:agent-session :speed-mode]))))))
+
   (testing "unknown mode and scope report allowed values"
     (let [[ctx session-id] (make-test-ctx)]
       (is (= "Unknown speed mode: turbo. Allowed: normal, fast"
@@ -520,6 +544,31 @@
       (is (= :text (:type result)))
       (is (= "✓ Effort override set to xhigh [project]" (:message result)))
       (is (= :xhigh (:effort-override (ss/get-session-data-in ctx session-id))))))
+
+  (testing "project/user scoped commands persist effort config, including explicit nil masks"
+    (let [cwd      (test-support/temp-cwd)
+          local-f  (project-prefs/project-local-preferences-file cwd)
+          user-f   (java.io.File. (str cwd "/user-home/.psi/agent/config.edn"))
+          _        (.mkdirs (.getParentFile local-f))
+          _        (.mkdirs (.getParentFile user-f))
+          [ctx session-id] (create-session-context {:cwd cwd :persist? false})]
+      (with-redefs [user-config/user-config-file (fn [] user-f)]
+        (commands/dispatch-in ctx session-id "/effort xhigh project" cmd-opts)
+        (is (= :xhigh (get-in (edn/read-string (slurp local-f))
+                              [:agent-session :effort-override])))
+        (commands/dispatch-in ctx session-id "/effort none project" cmd-opts)
+        (is (contains? (:agent-session (edn/read-string (slurp local-f)))
+                       :effort-override))
+        (is (nil? (get-in (edn/read-string (slurp local-f))
+                          [:agent-session :effort-override])))
+        (commands/dispatch-in ctx session-id "/effort high user" cmd-opts)
+        (is (= :high (get-in (edn/read-string (slurp user-f))
+                             [:agent-session :effort-override])))
+        (commands/dispatch-in ctx session-id "/effort none user" cmd-opts)
+        (is (contains? (:agent-session (edn/read-string (slurp user-f)))
+                       :effort-override))
+        (is (nil? (get-in (edn/read-string (slurp user-f))
+                          [:agent-session :effort-override]))))))
 
   (testing "unknown effort and scope report allowed values"
     (let [[ctx session-id] (make-test-ctx)]

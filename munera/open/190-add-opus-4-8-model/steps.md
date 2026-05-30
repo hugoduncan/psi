@@ -103,4 +103,4 @@
 
 ## Test review follow-ups
 
-- [ ] Add scoped `/speed` and `/effort` persistence tests proving project/user scoped commands or session mutations write the expected config keys, including `/speed normal project|user` explicit `:normal` masks and `/effort none project|user` explicit nil masks.
+- [x] Add scoped `/speed` and `/effort` persistence tests proving project/user scoped commands or session mutations write the expected config keys, including `/speed normal project|user` explicit `:normal` masks and `/effort none project|user` explicit nil masks.
