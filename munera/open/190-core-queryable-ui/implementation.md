@@ -334,3 +334,7 @@ No newly added unchecked ambiguity follow-up items were present in `design-steps
 ## 2026-05-30 requested plan/steps inconsistency review
 
 No new actionable inconsistency feedback after re-reading `plan.md`, `steps.md`, `implementation.md`, `design.md`, `design-decisions.md`, `resolved-design-questions.md`, completed `design-steps.md`, and referenced extension-authoring docs. The implementation plan and checklist remain aligned on queryability-first scope, provider-derived runtime UI capability/action data, root-queryable `:psi.ui/...` attrs including diagnostics, available-only actions, stable unavailable make-visible descriptors, optional/constrained side-effecting invocation, frontend provider expectations, documentation re-verification, and final verification. No unchecked `design-steps.md` follow-up item was added because there is no new inconsistency feedback.
+
+## 2026-05-30 requested inconsistency follow-up execution
+
+No newly added unchecked inconsistency follow-up items were present in `design-steps.md` after the preceding inconsistency-review pass; all design follow-up steps are already complete. No design step was completed or blocked in this pass, and `plan.md` / `steps.md` required no updates.
