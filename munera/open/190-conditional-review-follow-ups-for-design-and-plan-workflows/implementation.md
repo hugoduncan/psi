@@ -1,0 +1,1 @@
+2026-05-30 ambiguity review: read design.md plus referenced review workflow definitions, prompt files, workflow-loader tests, and review-step routing tests. No new actionable design ambiguities found; the design is specific enough for plan creation.
