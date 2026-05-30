@@ -79,6 +79,7 @@ Bootstrapped on 2026-04-02.
 - Backlog: `105-agent-session-component-extraction-map`, `124-turn-execution-contract-extraction`, `149-reload-fixup-inventory-and-safety`, `141`/`144`/`147` workflow items, `186-built-in-skill-for-developing-extensions`
 
 ## Latest session notes
+- 2026-05-30: Task 190 plan/steps repeat inconsistency verification found no new actionable inconsistencies; implementation.md records the pass and design-steps.md was unchanged.
 
 - 2026-05-30: Task 190 follow-up completed the final unchecked streaming header item: `turn-runtime/make-provider-event-consumer` now forwards normalized `:provider-error/headers` from streaming `:error` events into `:turn/error`, and the accumulator preserves those headers for retry metadata when raw `:headers` is absent. Added focused coverage proving `Retry-After`/rate-limit metadata on provider-header-only background streaming errors drives retry scheduling. Verification: focused new test, full `psi.turn-runtime.response-mode-test` (`18 tests, 123 assertions`), and turn-runtime clj-kondo green. Committed `469f3a9b`.
 
