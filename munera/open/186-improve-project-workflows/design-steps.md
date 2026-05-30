@@ -1,3 +1,7 @@
+## Ambiguity follow-ups (pass 3)
+
+- [ ] **Clarify whether task 186 or task 189 is the source of truth for `review-step` routing semantics**: task 186 artifacts still describe/prove a 3-step `review` → `follow-up` → `review-status` shape with judge-step `judge-routing-result`, while current task 189 state and adjacent runtime/tests describe deterministic PASS_STATUS routing around the `follow-up` loop plus `workflow/pass-status-routing` / `workflow/constant-routing` semantics and duplicate-PASS_STATUS failure handling. Update task 186 design/plan/steps/implementation notes to explicitly choose one of: (a) adopt the current implemented 2-step deterministic routing contract and revise stale slice-8/slice-9 notes/tests references accordingly, or (b) declare task 189 the superseding routing authority and mark task 186’s older review-step routing notes as historical/non-authoritative.
+
 ## Inconsistency follow-ups (pass 2)
 
 - [x] **Remove spurious "Update AGENTS.md" steps from steps.md**: steps.md slices 1, 2, 4, 5, and 6 each contain an "Update AGENTS.md workflow listing" or "Update AGENTS.md skills listing" item. design.md and plan.md make no mention of AGENTS.md updates. The workflow listing and skills listing visible to the agent are dynamically generated at runtime from the loaded `.psi/workflows/` and `.psi/skills/` directories respectively — there is no static listing in AGENTS.md to update. Remove these 5 items from steps.md to avoid wasted implementer effort.

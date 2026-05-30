@@ -99,6 +99,74 @@
     (register-prompt-contribution!)
     result))
 
+(def ^:private pass-status-prefix "PASS_STATUS:")
+(def ^:private known-pass-status->route
+  {"REVIEW_COMPLETE" "DONE"
+   "ACTIONABLE_FEEDBACK" "REPEAT"})
+
+(defn- pass-status-line-value
+  [line]
+  (when-let [idx (str/index-of line pass-status-prefix)]
+    (when (= 0 idx)
+      (subs line (count pass-status-prefix)))))
+
+(defn- parse-pass-status-routing
+  [text]
+  (let [lines (str/split-lines (or text ""))
+        status-lines (keep (fn [line]
+                             (when-let [raw-value (pass-status-line-value line)]
+                               {:line line
+                                :raw-value raw-value
+                                :trimmed-value (str/trim raw-value)}))
+                           lines)]
+    (cond
+      (empty? status-lines)
+      {:status :error
+       :reason :missing-pass-status
+       :message "PASS_STATUS missing"
+       :details {:text text}}
+
+      (> (count status-lines) 1)
+      {:status :error
+       :reason :ambiguous-pass-status
+       :message "Multiple PASS_STATUS lines found"
+       :details {:text text
+                 :pass-status-lines (mapv :line status-lines)}}
+
+      :else
+      (let [{:keys [line raw-value trimmed-value]} (first status-lines)
+            route (get known-pass-status->route trimmed-value)
+            exact-known? (= raw-value (str " " trimmed-value))]
+        (if (and route exact-known?)
+          {:status :ok
+           :data route
+           :summary route}
+          {:status :error
+           :reason :malformed-pass-status
+           :message "PASS_STATUS line must contain exactly one known token"
+           :details {:text text
+                     :line line
+                     :value trimmed-value}})))))
+
+(defn- register-built-in-deterministic-operations!
+  [api]
+  (when-let [register-operation (:register-operation api)]
+    (register-operation
+     {:id "workflow/pass-status-routing"
+      :handler (fn [{:keys [args]}]
+                 (parse-pass-status-routing (:text args)))})
+    (register-operation
+     {:id "workflow/constant-routing"
+      :handler (fn [{:keys [args]}]
+                 (if (string? (:route args))
+                   {:status :ok
+                    :data (:route args)
+                    :summary (:route args)}
+                   {:status :error
+                    :reason :invalid-route
+                    :message "route must be a string"
+                    :details {:route (:route args)}}))})))
+
 (declare refresh-widgets!)
 
 ;;; Result injection
@@ -385,6 +453,8 @@
                                 rpc)
                               :loaded-definitions (or (runtime-state/loaded-definitions) {})
                               :widget-ids (or (runtime-state/widget-ids) #{})})
+
+  (register-built-in-deterministic-operations! api)
 
   ;; Load and register all workflow definitions
   (let [{:keys [registered-count errors]} (reload-definitions!)]

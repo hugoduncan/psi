@@ -21,6 +21,7 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 - Workflow runs now automatically retain only the newest retained terminal runs per originating session, defaulting to `1` kept run via `[:config :completed-workflow-run-retention-count]`; older retained terminal runs are removed from workflow listing/introspection along with their linked workflow-owned child-session trees.
 
 ### Fixed
+- `review-step` now routes review completion deterministically from the review actor's `PASS_STATUS:` line, so `PASS_STATUS: REVIEW_COMPLETE` stops without running no-op follow-up work and actionable feedback loops back through deterministic `follow-up` routing instead of an LLM/session status step.
 - OpenAI OAuth-backed `gpt-5.5` sessions now route through the ChatGPT/Codex transport, matching Codex account access instead of failing against the platform chat-completions quota path.
 
 ## [0.1.2137] - 2026-05-21

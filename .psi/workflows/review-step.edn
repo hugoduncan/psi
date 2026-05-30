@@ -9,7 +9,12 @@
      :text
      "Review the Munera task at {{input}} using the {{skill}} skill. Work independently. Read the skill file at `.psi/skills/{{skill}}/SKILL.md` and apply it. Read the task artifacts and any code/tests/docs they reference. Then:\n\n1. append a terse review note to the task's implementation.md\n2. add unchecked follow-up items to the task's steps.md for every new actionable issue you found\n3. avoid duplicating review notes or steps that already exist\n4. commit\n5. end your response with exactly one of:\nPASS_STATUS: ACTIONABLE_FEEDBACK\nPASS_STATUS: REVIEW_COMPLETE",
      :vars {"input" {:from :workflow-input, :path [:input]},
-            "skill" {:from :workflow-input, :path [:skill]}}}]}
+            "skill" {:from :workflow-input, :path [:skill]}}}],
+   :judge {:type :invoke
+           :operation "workflow/pass-status-routing"
+           :args {:text {:from {:step "review", :output :final-llm-reply}}}},
+   :on {"DONE" {:goto :done}
+        "REPEAT" {:goto "follow-up"}}}
   {:name "follow-up",
    :type :session,
    :tools ["read" "bash" "edit" "write"],
@@ -20,36 +25,11 @@
     {:type :template,
      :text
      "Execute the newly added actionable follow-up items for the Munera task at {{input}}. Work independently. Read the task's steps.md to identify unchecked items added by the preceding review pass. Read the task's steps.md, implementation.md, design.md, and plan.md as needed. Complete the newly added unchecked steps when possible, updating task artifacts as you work. If a step is completed, mark it done in steps.md. If a step cannot yet be completed, leave it unchecked and record the blocking reason tersely in implementation.md. Commit.",
-     :vars {"input" {:from :workflow-input, :path [:input]}}}]}
-  {:name "review-status",
-   :type :session,
-   :tools ["read" "bash"],
-   :contributions
-   [{:type :source, :from :workflow-original}
-    {:type :source, :from {:step "review", :yield :text}}
-    {:type :source, :from {:step "follow-up", :yield :text}}
-    {:type :template,
-     :text
-     "Check whether the review step found new actionable feedback. This is an internal control step. Look at the review step output above for the PASS_STATUS token. Respond with exactly one word: REPEAT or DONE. Return DONE only if the review step output contains PASS_STATUS: REVIEW_COMPLETE. Return REPEAT if the review step output contains PASS_STATUS: ACTIONABLE_FEEDBACK.",
      :vars {"input" {:from :workflow-input, :path [:input]}}}],
-   :judge
-   {:type :llm,
-    :contributions
-    [{:type :template,
-      :text
-      "Respond exactly with one word: REPEAT or DONE.\n\nLook at the actor step output for the PASS_STATUS token emitted by the review step.\n\nReturn DONE if and only if the review step output contains PASS_STATUS: REVIEW_COMPLETE.\nReturn REPEAT if the review step output contains PASS_STATUS: ACTIONABLE_FEEDBACK.\n\nDo not inspect task artifacts. Base your decision solely on the PASS_STATUS token.",
-      :vars {}}],
-    :outputs
-    {:routing-result
-     {:source :judge/structured-output,
-      :mode :structured,
-      :schema-id :psi.workflow/judge-routing-result,
-      :schema-version 1,
-      :schema [:enum "REPEAT" "DONE"],
-      :json-schema {:type "string", :enum ["REPEAT" "DONE"]}}}},
-   :on
-   {"REPEAT" {:goto "review", :max-iterations 6},
-    "DONE" {:goto :done}}}],
+   :judge {:type :invoke
+           :operation "workflow/constant-routing"
+           :args {:route "REPEAT"}},
+   :on {"REPEAT" {:goto "review", :max-iterations 6}}}],
  :name "review-step",
  :description
  "Run a single named review skill against a Munera task, record terse notes, execute follow-up steps, and repeat until the review returns no actionable feedback"}

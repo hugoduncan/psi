@@ -109,6 +109,12 @@
      :register-prompt-contribution
      (make-prompt-contribution-fn ctx session-id)
 
+     :register-operation
+     (fn [operation]
+       (if-let [register-op (:register-deterministic-operation-fn rfns)]
+         (register-op provenance-id operation)
+         {:id (:id operation)}))
+
      :on
      (fn [event-name handler-fn]
        (runtime-state/register-built-in-lifecycle-callback! event-name handler-fn))}))
