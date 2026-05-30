@@ -210,21 +210,22 @@
             (get-in entry [:data :message])))
         (entries-up-to-in ctx session-id entry-id)))
 
-(defn- assistant-message-entry?
+(defn- journal-persistence-anchor-entry?
   [entry]
-  (and (= :message (:kind entry))
-       (= "assistant" (get-in entry [:data :message :role]))))
+  (or (and (= :message (:kind entry))
+           (= "assistant" (get-in entry [:data :message :role])))
+      (= :mid-system (:kind entry))))
 
-(defn- has-assistant-message?
+(defn- has-journal-persistence-anchor?
   [entries]
-  (some assistant-message-entry? entries))
+  (some journal-persistence-anchor-entry? entries))
 
 (defn persistence-io-request
   [{:keys [entries flush-state session-id worktree-path parent-session-id parent-session-path]
     :as _request}]
   (let [{:keys [flushed? session-file]} flush-state
         entries (vec (or entries []))]
-    (when (and session-file (has-assistant-message? entries))
+    (when (and session-file (has-journal-persistence-anchor? entries))
       (if flushed?
         {:op :append-entry
          :session-id session-id

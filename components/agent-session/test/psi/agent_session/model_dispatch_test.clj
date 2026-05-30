@@ -81,8 +81,12 @@
       (is (= false (:psi.agent-session/model-supports-mid-system-messages
                     (session/query-in ctx session-id [:psi.agent-session/model-supports-mid-system-messages]))))))
 
-  (testing "dispatch appends mid-system only for supported models after latest conversational user"
-    (let [[ctx session-id] (create-session-context)]
+  (testing "dispatch persists mid-system through the canonical journal append path"
+    (let [[ctx session-id] (create-session-context)
+          session-file     (File/createTempFile "psi-mid-system-journal" ".ndedn")]
+      (ss/assoc-state-value-in! ctx
+                                (ss/state-path :flush-state session-id)
+                                {:flushed? true :session-file session-file})
       (session/set-model-in! ctx session-id (models/get-model :opus-4.8) :session)
       (session/dispatch-in! ctx :session/append-journal-entry
                             {:session-id session-id
@@ -92,11 +96,19 @@
                             {:session-id session-id
                              :entry (persist/model-entry :anthropic "claude-opus-4-8")}
                             {:origin :test})
+      (kernel/clear-event-log!)
       (is (= {:ok true}
              (session/inject-mid-system-message-in! ctx session-id "Prefer concise answers" {:source :test})))
-      (let [entry (last (persist/all-entries-in ctx session-id))]
+      (let [entry          (last (persist/all-entries-in ctx session-id))
+            injection-log  (last (kernel/event-log-entries))
+            persist-effect (first (:declared-effects injection-log))]
         (is (= :mid-system (:kind entry)))
-        (is (= {:text "Prefer concise answers" :source :test} (:data entry))))))
+        (is (= {:text "Prefer concise answers" :source :test} (:data entry)))
+        (is (= :session/inject-mid-system-message (:event-type injection-log)))
+        (is (= :persist/session-journal-io (:effect/type persist-effect)))
+        (is (= :append-entry (get-in persist-effect [:request :op])))
+        (is (= entry (get-in persist-effect [:request :entry])))
+        (is (re-find #"Prefer concise answers" (slurp session-file))))))
 
   (testing "dispatch rejects unsupported capability and invalid placements without journal mutation"
     (let [[ctx session-id] (create-session-context)

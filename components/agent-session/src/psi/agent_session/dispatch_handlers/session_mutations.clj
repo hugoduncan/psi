@@ -168,9 +168,22 @@
        (let [entries (persist/all-entries-in ctx session-id)]
          (if-let [placement-error (mid-system-placement-error entries)]
            {:return placement-error}
-           (let [entry (mid-system-entry text (or source :extension))]
-             {:root-state-update (persist/append-journal-entry-root-update session-id entry)
-              :return {:ok true}}))))))
+           (let [entry       (mid-system-entry text (or source :extension))
+                 next-entries (conj entries entry)
+                 flush-state  (session/get-state-value-in ctx (session/state-path :flush-state session-id))
+                 session-data (session/get-session-data-in ctx session-id)
+                 io-request   (persist/persistence-io-request {:entries next-entries
+                                                               :flush-state flush-state
+                                                               :session-id session-id
+                                                               :worktree-path (:worktree-path session-data)
+                                                               :parent-session-id (:parent-session-id session-data)
+                                                               :parent-session-path (:parent-session-path session-data)})]
+             (cond-> {:root-state-update (persist/append-journal-entry-root-update session-id entry)
+                      :return {:ok true}}
+               io-request
+               (assoc :effects [{:effect/type :persist/session-journal-io
+                                 :session-id session-id
+                                 :request io-request}]))))))))
 
   (register-core-handler!
    :session/set-cache-breakpoints

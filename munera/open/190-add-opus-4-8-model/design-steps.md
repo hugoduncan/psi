@@ -142,4 +142,4 @@
 
 ## From inconsistency review pass 2026-05-30 (steps/test-status alignment)
 
-- [ ] **Align Slice 4 test step completion with implementation notes** — `implementation.md` says focused tests were added for journal projection/current-user replacement/conversation normalization, Anthropic inline system transform/schema acceptance, and OpenAI system-role transformation, but the corresponding Slice 4 items in `steps.md` remain unchecked. Verify the tests exist/pass and mark those `steps.md` items complete, or revise the implementation note to accurately describe remaining work.
+- [x] **Align Slice 4 test step completion with implementation notes** — `implementation.md` says focused tests were added for journal projection/current-user replacement/conversation normalization, Anthropic inline system transform/schema acceptance, and OpenAI system-role transformation, but the corresponding Slice 4 items in `steps.md` remain unchecked. Verify the tests exist/pass and mark those `steps.md` items complete, or revise the implementation note to accurately describe remaining work.

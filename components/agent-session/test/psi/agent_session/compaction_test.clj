@@ -14,6 +14,13 @@
   {:role "assistant"
    :content [{:type :text :text text}]})
 
+(defn- system-message [text]
+  {:role "system"
+   :content [{:type :text :text text}]})
+
+(defn- mid-system-entry [text]
+  (session/make-entry :mid-system {:text text :source :test}))
+
 (defn- assistant-toolcall-message [name path]
   {:role "assistant"
    :content [{:type :tool-call
@@ -118,7 +125,83 @@
                    :tokens-before 50000}
           msgs    (compaction/rebuild-messages-from-entries result sd)]
       (is (= 3 (count msgs)))
-      (is (re-find #"Summary" (get-in msgs [0 :content 0 :text]))))))
+      (is (re-find #"Summary" (get-in msgs [0 :content 0 :text])))))
+
+  (testing "includes mid-system messages from kept entries after summary"
+    (let [u1      (persist/message-entry (user-message "u1"))
+          mid     (mid-system-entry "Use terse answers")
+          sd      (assoc (session/initial-session)
+                         :session-entries [u1 mid]
+                         :context-tokens 50000)
+          result  {:summary "Summary."
+                   :first-kept-entry-id (:id u1)
+                   :tokens-before 50000}
+          msgs    (compaction/rebuild-messages-from-entries result sd)]
+      (is (= ["user" "user" "system"] (mapv :role msgs)))
+      (is (= (system-message "Use terse answers")
+             (select-keys (nth msgs 2) [:role :content])))))
+
+  (testing "preserves pre-cut mid-system instructions after summary when no retained user boundary exists"
+    (let [u1     (persist/message-entry (user-message "u1"))
+          mid    (mid-system-entry "Continue using constraints")
+          sd     (assoc (session/initial-session)
+                        :session-entries [u1 mid]
+                        :context-tokens 50000)
+          result {:summary "Summary."
+                  :first-kept-entry-id nil
+                  :tokens-before 50000}
+          msgs   (compaction/rebuild-messages-from-entries result sd)]
+      (is (= ["user" "system"] (mapv :role msgs)))
+      (is (= (system-message "Continue using constraints")
+             (select-keys (second msgs) [:role :content])))))
+
+  (testing "attaches pre-cut mid-system instructions after latest retained pending user"
+    (let [u1     (persist/message-entry (user-message "u1"))
+          mid    (mid-system-entry "Keep JSON terse")
+          u2     (persist/message-entry (user-message "u2"))
+          sd     (assoc (session/initial-session)
+                        :session-entries [u1 mid u2]
+                        :context-tokens 50000)
+          result {:summary "Summary."
+                  :first-kept-entry-id (:id u2)
+                  :tokens-before 50000}
+          msgs   (compaction/rebuild-messages-from-entries result sd)]
+      (is (= ["user" "user" "system"] (mapv :role msgs)))
+      (is (= (system-message "Keep JSON terse")
+             (select-keys (nth msgs 2) [:role :content])))))
+
+  (testing "advances cut past completed retained exchanges before placing preserved mid-system"
+    (let [u1     (persist/message-entry (user-message "u1"))
+          mid    (mid-system-entry "Future-only instruction")
+          u2     (persist/message-entry (user-message "u2"))
+          a2     (persist/message-entry (assistant-text-message "a2"))
+          sd     (assoc (session/initial-session)
+                        :session-entries [u1 mid u2 a2]
+                        :context-tokens 50000)
+          result {:summary "Summary."
+                  :first-kept-entry-id (:id u2)
+                  :tokens-before 50000}
+          msgs   (compaction/rebuild-messages-from-entries result sd)]
+      (is (= ["user" "system"] (mapv :role msgs))
+          "retained user/assistant exchange is summarized rather than retroactively rewritten")
+      (is (= (system-message "Future-only instruction")
+             (select-keys (second msgs) [:role :content])))))
+
+  (testing "merges retained boundary mid-system entries with pre-cut instructions"
+    (let [u1     (persist/message-entry (user-message "u1"))
+          old    (mid-system-entry "Old active instruction")
+          new    (mid-system-entry "Boundary instruction")
+          u2     (persist/message-entry (user-message "u2"))
+          sd     (assoc (session/initial-session)
+                        :session-entries [u1 old new u2]
+                        :context-tokens 50000)
+          result {:summary "Summary."
+                  :first-kept-entry-id (:id new)
+                  :tokens-before 50000}
+          msgs   (compaction/rebuild-messages-from-entries result sd)]
+      (is (= ["user" "user" "system"] (mapv :role msgs)))
+      (is (= "Old active instruction\n\nBoundary instruction"
+             (get-in msgs [2 :content 0 :text]))))))
 
 ;; ── logprobs entries: compaction transparency ─────────────────────────────
 

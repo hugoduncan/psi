@@ -894,3 +894,56 @@ Read `design-steps.md` for unchecked ambiguity follow-up items added by the prec
 Actionable feedback found:
 
 1. **Mid-system injection bypasses journal persistence IO** — `:session/inject-mid-system-message` appends `:mid-system` with `persist/append-journal-entry-root-update` directly. That mutates in-memory journal state but bypasses the existing `:session/append-journal-entry` persistence IO path, so injected instructions may not be flushed to the session journal on disk. Route the append through the standard journal append handler/effect path or add an equivalent persistence effect, with coverage proving persisted journal IO is requested.
+
+---
+
+## Inconsistency follow-up execution — 2026-05-30 (steps/test-status alignment)
+
+Completed the newly added inconsistency follow-up item in `design-steps.md` by verifying the referenced Slice 4 tests exist and pass, then aligning `steps.md` with the implementation notes:
+
+- `prompt_request_test.clj` covers `journal->provider-messages` projection for `:mid-system` and current-user replacement preserving a pending `user → system` tail.
+- `conversation_test.clj` covers normalization of provider-style system messages into canonical AI `:system` messages.
+- `anthropic_test.clj` covers valid/invalid inline system transform behavior and local request schema acceptance for inline system messages.
+- `openai_test.clj` covers OpenAI chat-completions system-role transformation.
+
+Verification:
+
+- `clojure -M:test --focus psi.agent-session.prompt-request-test --focus psi.agent-session.conversation-test --focus psi.ai.providers.anthropic-test --focus psi.ai.providers.openai-test` — 65 tests, 322 assertions, 0 failures.
+
+Focused verification initially exposed that the current working tree referenced a missing Anthropic message-transform namespace; restored that namespace so tests could load and pass.
+
+---
+
+## Implementation pass — 2026-05-30 — Slice 4 compaction and persistence follow-up
+
+Completed the remaining Slice 4 mid-system compaction slice and addressed the implementation-review persistence concern:
+
+- Added `:mid-system` handling in `compaction/entry->message`, returning provider-style inline system messages.
+- Added compaction rebuild preservation for active pre-cut `:mid-system` entries by coalescing them at a valid next-generation boundary.
+- Added retained-suffix normalization so preserved instructions are not inserted before already-retained assistant history; completed retained user/assistant exchanges are treated as summarized for rebuilt-message purposes.
+- Merged retained boundary `:mid-system` entries with pre-cut active instructions to avoid adjacent system messages.
+- Added state-based compaction tests for summary-boundary attachment, retained pending-user attachment, cut advancement over completed user/assistant exchanges, and boundary mid-system merge.
+- Added/kept the extracted Anthropic `message_transform` namespace required by the working tree's Anthropic provider refactor.
+- Added persistence-effect coverage for `:session/inject-mid-system-message`; injected `:mid-system` entries now request `:persist/session-journal-io` when a flushed journal file is active.
+
+Verification:
+
+- `clj-paren-repair components/agent-session/src/psi/agent_session/compaction.clj components/agent-session/test/psi/agent_session/compaction_test.clj components/ai/src/psi/ai/providers/anthropic/message_transform.clj` — no changes needed.
+- `clojure -M:test --focus psi.agent-session.compaction-test --focus psi.ai.providers.anthropic-test` — 27 tests, 185 assertions, 0 failures.
+
+Remaining concrete work: run the broader focused Slice 4 verification after the persistence follow-up, then Slice 5 docs/changelog/coherence.
+
+## Follow-up implementation pass — 2026-05-30 — mid-system journal persistence
+
+Executed the newly added actionable implementation-review follow-up:
+
+- Changed `:session/inject-mid-system-message` so successful injections emit equivalent journal persistence IO instead of only mutating the in-memory journal. The handler now computes the same `persist/persistence-io-request` shape used by the canonical append path and declares `:persist/session-journal-io` when a session file should be updated.
+- Extended session-persistence IO gating so `:mid-system` entries are persistence anchors like assistant messages; injected instructions can therefore flush/append to disk even before the next assistant response.
+- Added focused coverage proving injected `:mid-system` entries are appended to the persisted session journal file and that the declared effect is `:persist/session-journal-io` with `:op :append-entry`.
+- Marked the Slice 4 journal persistence follow-up complete in `steps.md`.
+
+Verification:
+
+- `clojure -M:test --focus psi.agent-session.model-dispatch-test` — 12 tests, 152 assertions, 0 failures.
+- `clojure -M:test --focus psi.agent-session.commands-test --focus psi.agent-session.model-dispatch-test --focus psi.agent-session.extensions-test --focus psi.agent-session.prompt-request-test --focus psi.agent-session.conversation-test --focus psi.ai.providers.anthropic-test --focus psi.ai.providers.openai-test` — 153 tests, 822 assertions, 0 failures.
+- `clj-kondo --lint components/agent-session/src/psi/agent_session/dispatch_handlers/session_mutations.clj components/session-persistence/src/psi/session_persistence/core.clj components/agent-session/test/psi/agent_session/model_dispatch_test.clj components/agent-session/src/psi/agent_session/compaction.clj components/ai/src/psi/ai/providers/anthropic.clj components/ai/src/psi/ai/providers/anthropic/message_transform.clj components/agent-session/test/psi/agent_session/commands_test.clj components/ai/test/psi/ai/providers/openai_test.clj` — clean.
