@@ -29,3 +29,5 @@
 2026-05-30 — Ambiguity follow-up execution: re-read `design-steps.md` after the preceding ambiguity-review pass. No newly added unchecked ambiguity follow-up items are present; no `design.md` changes were needed and no blocking ambiguity follow-up remains.
 
 2026-05-30 — Design inconsistency review: found one new actionable inconsistency: `design.md` now requires non-object payload preservation for prompted-JSON structured-output results at the shared provider extraction sites, but referenced `psi.ai.structured-output/json-only-instruction` still tells prompted-JSON models to “Return exactly one JSON object,” which conflicts with bare string-enum/non-object schemas.
+
+2026-05-30 — Inconsistency follow-up: reconciled prompted-JSON fallback instructions with non-object structured-output schemas. `design.md` now includes `json-only-instruction` wording in scope, requires prompted-JSON instructions to request exactly one JSON value matching the supplied JSON Schema rather than exactly one JSON object, and extends acceptance/minimality wording accordingly. Marked the design-step complete.

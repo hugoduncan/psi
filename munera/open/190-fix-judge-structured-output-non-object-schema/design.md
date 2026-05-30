@@ -18,15 +18,18 @@ The `psi.agent-session.workflow-judge` structured-output branch immediately retu
 
 ## Scope
 
-### Primary fix — `parse-json-object` → `parse-json-value` at provider result sites
+### Primary fix — JSON value extraction at provider result sites and prompted-JSON instructions
 
 Replace every call to `parse-json-object` that extracts a structured-output payload at the provider result sites with `parse-json-value`, preserving the resulting `:payload` for any valid JSON type, including a successfully parsed JSON `null` value. Provider result code must test parse success via `:parsed?`/map presence rather than payload truthiness, so `:payload nil` is retained and not treated as absent or invalid.
 
 These extraction sites are shared by provider-native and prompted-JSON structured-output emission. Non-object payload preservation is required for both strategies wherever the same site emits `:structured-output` metadata; source labels and strategy metadata continue to distinguish provider-native from prompted-JSON results.
 
+Prompted-JSON fallback instructions must describe the required response as exactly one JSON value matching the supplied JSON Schema, not exactly one JSON object. The instruction still forbids Markdown fences, prose, and extra top-level text; it must allow scalar, array, object, boolean, number, string, and `null` outputs whenever the schema allows them.
+
 Affected files:
 - `components/ai/src/psi/ai/providers/anthropic/structured_output.clj` — `structured-output-result` (one call, currently used by Anthropic structured-output result emission)
 - `components/ai/src/psi/ai/providers/openai/chat_completions.clj` — two call sites that build provider structured-output results for provider-native and prompted-JSON strategies
+- `components/ai/src/psi/ai/structured_output.clj` — `json-only-instruction` wording for prompted-JSON fallback must say JSON value rather than JSON object
 
 The `parse-json-object` helper itself is not removed. After the three provider result-extraction call sites move to `parse-json-value`, no non-helper call sites are expected to remain; the helper is retained as the object-only parsing API for future callers and to avoid broad API cleanup in this slice.
 
@@ -38,7 +41,7 @@ In `psi.agent-session.workflow-judge`, when `valid-output-result?` returns false
 
 - `psi.workflow-runtime.structured-output/structured-output-envelope` and `validation-input` are **not changed** — they already handle `:payload` correctly for any JSON value.
 - `parse-json-object` is not removed from `psi.ai.structured-output`.
-- The fix is minimal across the two root causes: provider result-extraction changes are limited to the three shared structured-output payload extraction sites (covering both provider-native and prompted-JSON emission at those sites), and workflow-judge changes are limited to the structured-output validation-failure retry path.
+- The fix is minimal across the two root causes: provider result-extraction changes are limited to the three shared structured-output payload extraction sites (covering both provider-native and prompted-JSON emission at those sites) plus the prompted-JSON instruction wording that feeds those sites, and workflow-judge changes are limited to the structured-output validation-failure retry path.
 - Existing tests for the `structured-output-envelope` non-object JSON path (e.g. `structured-output-envelope-string-enum-json-test`, `structured-output-envelope-non-object-json-test`) must remain green.
 
 ## Acceptance criteria
@@ -47,5 +50,6 @@ In `psi.agent-session.workflow-judge`, when `valid-output-result?` returns false
 2. `psi.workflow-runtime.structured-output/structured-output-envelope` receiving that result with the judge routing schema (`[:enum "REPEAT" "DONE"]`) produces `:status :valid` and `:value "DONE"`.
 3. The OpenAI chat-completions structured-output result sites produce `:payload` for string, number, boolean, array, and `null` JSON values for both provider-native and prompted-JSON strategies emitted by those sites; `null` is represented by a present `:payload nil` and not by `:parse-error? true`.
 4. The judge retry loop fires on structured-output validation failure when `attempt < max-judge-retries`, matching the plain-text retry behavior, and each structured-output retry preserves the initial structured-output opts/schema when calling `execute-judge-turn!`.
-5. All existing structured-output and workflow-judge tests remain green.
-6. `bb test` green.
+5. Prompted-JSON fallback instructions request exactly one JSON value matching the supplied JSON Schema and do not require the top-level response to be a JSON object.
+6. All existing structured-output and workflow-judge tests remain green.
+7. `bb test` green.
