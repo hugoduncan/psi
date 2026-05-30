@@ -45,7 +45,7 @@
   [ctx parent-session-id run-id step-id step-def workflow-run]
   (let [invoke-spec (or (:invoke step-def)
                         (get-in step-def [:judge :invoke]))
-        args (workflow-source-resolution/resolve-invoke-args workflow-run (:args invoke-spec))
+        args (workflow-source-resolution/resolve-invoke-args workflow-run step-id (:args invoke-spec))
         operation-result (deterministic-op-registry/invoke-operation-in
                           (:deterministic-operation-registry ctx)
                           (:operation invoke-spec)

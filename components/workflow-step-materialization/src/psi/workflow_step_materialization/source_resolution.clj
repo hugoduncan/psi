@@ -158,13 +158,22 @@
   (mapv #(materialize-contribution workflow-run %) contributions))
 
 (defn resolve-invoke-args
-  [workflow-run args]
-  (into {}
-        (map (fn [[arg-k arg-v]]
-               [arg-k (if (source-spec? arg-v)
-                        (apply-source-spec workflow-run arg-v)
-                        arg-v)]))
-        args))
+  ([workflow-run args]
+   (resolve-invoke-args workflow-run nil args))
+  ([workflow-run step-id args]
+   (into {}
+         (map (fn [[arg-k arg-v]]
+                [arg-k (if (source-spec? arg-v)
+                         (apply-source-spec workflow-run
+                                            (cond-> arg-v
+                                              (and step-id
+                                                   (map? (:from arg-v))
+                                                   (= step-id (get-in arg-v [:from :step]))
+                                                   (contains? (get-in arg-v [:from]) :output))
+                                              (-> (assoc :value (resolve-source-ref workflow-run (:from arg-v)))
+                                                  (dissoc :from))))
+                         arg-v)]))
+         args)))
 
 (defn resolve-delegate-context
   [workflow-run context]

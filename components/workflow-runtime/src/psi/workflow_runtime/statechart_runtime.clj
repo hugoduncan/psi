@@ -256,7 +256,9 @@
                             routing-table
                             {:current-step-id step-id
                              :step-order (state/runtime-step-order workflow-run)
-                             :step-runs (get-in @(:state* ctx) [:workflows :runs run-id :step-runs])})
+                             :step-runs (get-in @(:state* ctx) [:workflows :runs run-id :step-runs])
+                             :workflow-run-id run-id
+                             :workflow-run workflow-run})
               routing-result (:routing-result judge-result)]
           (swap! working-memory*
                  (fn [wm]

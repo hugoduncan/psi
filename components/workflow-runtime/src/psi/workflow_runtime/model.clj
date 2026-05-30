@@ -157,7 +157,7 @@
    [:execution-error {:optional true} [:maybe :map]]
    [:blocked {:optional true} [:maybe :map]]
    [:judge-session-id {:optional true} [:maybe :string]]
-   [:judge-output {:optional true} [:maybe :string]]
+   [:judge-output {:optional true} [:maybe :any]]
    [:judge-event {:optional true} [:maybe :string]]
    [:created-at inst?]
    [:updated-at inst?]

@@ -1,0 +1,285 @@
+- 2026-05-29: Initial investigation for OAuth-backed review-loop schema behavior.
+  - Rechecked current model/provider/runtime code rather than assuming a `gpt-5.4` vs `gpt-5.5` schema difference.
+  - Found that the workflow control schema is already explicit and shared; the immediate narrow gap is Codex endpoint schema support.
+  - Current authoritative findings from code/tests:
+    - `components/ai/src/psi/ai/models.clj`: built-in `:gpt-5.4` uses `:openai-codex-responses`; built-in `:gpt-5.5` uses `:openai-completions`.
+    - `components/ai/src/psi/ai/models.clj`: built-in structured-output capability assignment marks `:openai-codex-responses` models as `openai-codex-fallback-capability`, while `:gpt-5.5` on `:openai-completions` is in the native-capable model-key set.
+    - `components/ai/src/psi/ai/structured_output.clj`: Codex capability is explicit fallback-only `{:supported? true :strategies [:prompted-json] :native-mechanism nil}`.
+    - `components/ai/src/psi/ai/providers/openai.clj`: non-streaming execution is not implemented for Codex.
+    - `components/ai/src/psi/ai/providers/openai/codex_responses.clj`: Codex streaming emits structured-output strategy metadata but request shaping/results still rely on prompted-JSON fallback semantics.
+    - `components/ai/test/psi/ai/providers/openai_structured_output_test.clj`: Codex structured-output request shaping intentionally injects prompted-JSON instructions and omits native schema request fields.
+  - User clarification narrowed the task:
+    - Codex CLI with API key talks to `https://api.openai.com/v1/responses`.
+    - Codex CLI with ChatGPT login/OAuth talks to `https://chatgpt.com/backend-api/codex/responses`.
+    - the task should focus specifically on supporting schemas on the ChatGPT/Codex endpoint rather than broad OpenAI identity/auth redesign.
+- 2026-05-29: Ambiguity review pass.
+  - Found one actionable ambiguity: the design names the ChatGPT/Codex endpoint as the target capability boundary, but it does not define the exact resolved runtime seam that distinguishes that endpoint from public OpenAI Responses for capability selection and testing.
+  - Current code still assigns Codex structured-output capability by coarse `:api :openai-codex-responses` in `components/ai/src/psi/ai/models.clj`, while provider behavior also depends on ChatGPT OAuth/account context and Codex URL resolution in `spec/openai-provider.allium`; the design should name which resolved discriminator is authoritative so implementation does not accidentally treat multiple transports as one native-capability surface.
+- 2026-05-29: Executed ambiguity follow-up.
+  - Completed the new unchecked `design-steps.md` item without touching implementation `steps.md` or `plan.md`.
+  - Updated `design.md` to make the capability-selection seam explicit: the authoritative boundary is the resolved ChatGPT/Codex transport (`https://chatgpt.com/backend-api/codex/responses`) after URL/auth resolution, with `:api :openai-codex-responses` only a coarse routing input and not by itself permission to treat future public OpenAI Responses as the same capability.
+  - Named the current runtime seam as the Codex provider request path in `components/ai/src/psi/ai/providers/openai/codex_responses.clj`, with model capability annotation required to remain coherent with that transport-specific contract.
+  - Marked the ambiguity design-step done.
+- 2026-05-29: Inconsistency review pass.
+  - Found one actionable inconsistency: `design.md` frames the current-code boundary around built-in `gpt-5.4` on Codex versus `gpt-5.5` on Chat Completions, but current runtime/model-registry behavior already reroutes `gpt-5.5` to `:openai-codex-responses` under OAuth and assigns fallback-only Codex structured-output capability there.
+  - This conflicts with the design's current-code inventory and with wording that model capability coherence can be preserved in `components/ai/src/psi/ai/models.clj` alone; the real authoritative surface is transport-resolved runtime model selection plus provider URL/auth resolution.
+  - Added one unchecked `design-steps.md` follow-up; did not review `plan.md` or `steps.md`.
+- 2026-05-29: Executed inconsistency follow-up.
+  - Completed the newly added unchecked `design-steps.md` item without touching implementation `steps.md` or `plan.md`.
+  - Rechecked `components/ai/src/psi/ai/models.clj`, `components/ai/src/psi/ai/model_registry.clj`, `components/ai/src/psi/ai/providers/openai/codex_responses.clj`, `components/ai/src/psi/ai/providers/openai.clj`, `spec/openai-provider.allium`, and focused model/provider tests before editing task artifacts.
+  - Updated `design.md` so the current-code inventory now reflects both static built-in Codex catalog entries and OAuth-routed runtime Codex execution such as `gpt-5.5 -> :openai-codex-responses` with fallback-only capability.
+  - Clarified that `model_registry.clj` runtime model resolution is part of the authoritative capability-selection surface alongside Codex URL/auth resolution, while `models.clj` must remain coherent but is not sufficient alone.
+  - Expanded scope/acceptance wording so future implementation/tests cover transport-resolved Codex runtime models generally, not only static built-in Codex entries.
+  - Marked the inconsistency design-step done.
+- 2026-05-29: Reviewed task plan/steps for ambiguities.
+  - Re-read `design.md`, `plan.md`, `steps.md`, `design-steps.md`, and `implementation.md`, plus referenced code/tests/spec/docs in `components/ai` and `spec/openai-provider.allium`.
+  - Found no new actionable ambiguity feedback.
+  - Existing open `steps.md` items remain intentional implementation/discovery work around evidence gathering, capability decision, and proof, not plan/step ambiguity.
+- 2026-05-29: Executed ambiguity follow-up after the latest ambiguity review.
+  - Re-read `design-steps.md` and confirmed there are no newly added unchecked ambiguity follow-up items after the preceding review pass.
+  - Therefore no task design/plan/steps changes were required and no implementation `steps.md` items were executed, because all `design-steps.md` items added by the prior ambiguity-review pass were already completed.
+  - Left `plan.md`, `steps.md`, and `design-steps.md` unchanged; recorded this no-op follow-up here to preserve the review/execution chain.
+- 2026-05-29: Reviewed task plan/steps for inconsistencies.
+  - Re-read `design.md`, `plan.md`, `steps.md`, `design-steps.md`, and `implementation.md`, plus referenced code/tests/spec/docs in `components/ai` and `spec/openai-provider.allium`.
+  - Found no new actionable inconsistency feedback.
+  - `plan.md` and `steps.md` stay aligned with the current design boundary: evidence first, then capability decision, then either native implementation or explicit fallback-only hardening, with transport-resolved Codex runtime models such as OAuth-routed `gpt-5.5` covered at the authoritative seam.
+  - Existing unchecked `steps.md` items remain intentional implementation/discovery work, not cross-artifact inconsistency.
+- 2026-05-29: Executed inconsistency follow-up after the latest inconsistency review.
+  - Re-read `design-steps.md` and confirmed there are no newly added unchecked inconsistency follow-up items after the preceding review pass.
+  - Therefore no task design/plan/steps changes were required and no implementation `steps.md` items were executed, because all `design-steps.md` items added by prior inconsistency-review passes were already completed.
+  - Left `plan.md`, `steps.md`, and `design-steps.md` unchanged; recorded this no-op follow-up here to preserve the review/execution chain.
+- 2026-05-29: Implementation pass — baseline evidence + live capability discovery.
+  - Completed Slice 1 evidence gathering by re-reading `structured_output.clj`, `models.clj`, `model_registry.clj`, `providers/openai/codex_responses.clj`, `providers/openai.clj`, `model_registry_test.clj`, and `providers/openai_structured_output_test.clj`.
+  - Reconfirmed the pre-discovery baseline boundary:
+    - Codex capability is explicit fallback-only `{:supported? true :strategies [:prompted-json] :native-mechanism nil}`.
+    - static built-in `:openai-codex-responses` models inherit that fallback-only capability in `models.clj`.
+    - OAuth-backed runtime `gpt-5.5` is rewritten in `model_registry.clj` to `:openai-codex-responses` with ChatGPT base URL and the same fallback-only capability.
+    - Codex request shaping in `codex_responses.clj` adds prompted-JSON instructions to the last user message, sends no native schema fields, and emits structured-output results by parsing accumulated assistant text on stream completion.
+    - non-streaming Codex `:execute` remains intentionally unimplemented in `providers/openai.clj`.
+  - Checked adjacent runtime proof surfaces:
+    - `components/turn-runtime/test/psi/turn_runtime/response_mode_test.clj` already proves fallback-forbidden unsupported structured output preflights before provider execution.
+    - `components/rpc/test/psi/rpc_prompt_test.clj` and provider transport capture show the live ChatGPT/Codex URL seam remains `https://chatgpt.com/backend-api/codex/responses`.
+  - Live discovery was feasible using the current stored OpenAI OAuth credential from `psi.provider-auth.oauth.core/create-context` and `get-api-key`.
+    - Confirmed the token is present and contains `chatgpt_account_id`, so it is valid for the ChatGPT/Codex transport Psi uses.
+    - Ran guarded live probes directly against `https://chatgpt.com/backend-api/codex/responses` using a Codex-backed model id (`gpt-5.4`) and the same auth/header shape used by Psi's Codex provider path.
+  - Live probe results:
+    - Baseline streaming request with no schema returned `200` and emitted normal SSE lifecycle events (`response.created`, `response.in_progress`, ...), confirming the live endpoint/auth path.
+    - Responses-style schema request using `"text": {"format": {"type": "json_schema", "name": "probe_result", "schema": {...}, "strict": true}}` returned `200`.
+    - The `response.created` event echoed the accepted schema contract under `response.text.format`, including:
+      - `"type": "json_schema"`
+      - `"name": "probe_result"`
+      - the supplied JSON Schema
+      - `"strict": true`
+    - Chat Completions-style `response_format` request returned `400` with `{"detail":"Unsupported parameter: response_format"}`.
+    - All `stream: false` probes returned `400` with `{"detail":"Stream must be set to true"}`.
+  - Evidence-backed conclusion from live discovery:
+    - the ChatGPT/Codex endpoint used by Psi supports native schema-constrained structured output for streaming requests;
+    - the accepted native contract is Responses-style `text.format`, not Chat Completions-style `response_format`;
+    - non-streaming support is not yet verified and currently appears unsupported or at least rejected by the probed request shape.
+  - This changes the task from capability discovery to implementation of native streaming Codex structured output. The remaining work is to update capability declaration, request shaping, and streaming extraction/tests to match the verified live contract while keeping non-streaming explicit and separate.
+- 2026-05-29: Implementation pass — native Codex capability slice.
+  - Added a distinct provider-native Codex mechanism in `components/ai/src/psi/ai/structured_output.clj`: `:openai/responses-text-format-json-schema`, separate from OpenAI Chat Completions `response_format`.
+  - Updated built-in Codex model capability annotation in `components/ai/src/psi/ai/models.clj` and OAuth-routed runtime `gpt-5.5` capability assignment in `components/ai/src/psi/ai/model_registry.clj` so the resolved ChatGPT/Codex transport now advertises `[:provider-native :prompted-json]` with the new Codex mechanism.
+  - Added `components/ai/src/psi/ai/providers/openai/codex_structured_output.clj` to keep Codex-specific request/result behavior local and distinct from Chat Completions and Anthropic paths.
+  - Updated `components/ai/src/psi/ai/providers/openai/codex_responses.clj` request shaping to send native schemas only via Responses-style `text.format`, with `{"type":"json_schema","name":...,"schema":...,"strict":...}` nested under `text`, and to continue omitting Chat Completions-style top-level `response_format`.
+  - Updated Codex streaming structured-output extraction so provider-native runs emit `:structured-output-result` with source `:openai/codex-text-format`, parsed payload when valid JSON object text is returned, and `:parse-error? true` when the text does not parse.
+  - Kept non-streaming Codex `:execute` unchanged and still unsupported; this matches live evidence that `stream: false` currently returns `400` on the ChatGPT/Codex endpoint.
+  - Updated focused tests:
+    - `components/ai/test/psi/ai/model_registry_test.clj` now proves both built-in Codex models and OAuth-routed runtime `gpt-5.5` advertise the native Codex mechanism.
+    - `components/ai/test/psi/ai/providers/openai_structured_output_test.clj` now proves Codex request shaping uses `text.format`, omits `response_format`, emits provider-native strategy/result events, and still preserves explicit prompted-JSON fallback behavior when the model capability is forced back to fallback-only.
+    - existing `components/turn-runtime/test/psi/turn_runtime/response_mode_test.clj` fallback-forbidden preflight proof remains green, preserving loop-control schema coherence when only fallback-only/unsupported capability is available.
+  - Focused verification passed:
+    - `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.openai-structured-output-test --focus psi.turn-runtime.response-mode-test`
+    - Result: `22 tests, 141 assertions, 0 failures`.
+- 2026-05-29: task-implementation-review pass.
+  - Re-read the task artifacts, touched Codex structured-output code/tests, and reran focused model/provider/turn-runtime verification plus targeted ai lint.
+  - Found one actionable closeout issue: the untracked live probe scratch file `.tmp-codex-schema-probe.clj` remains in the worktree even though its evidence is already recorded in task artifacts.
+
+- 2026-05-29: Closeout follow-up execution.
+  - Executed the newly added actionable follow-up items from the preceding implementation review.
+  - Removed the untracked live-probe scratch file `.tmp-codex-schema-probe.clj`; the credential-access helper is no longer present in the worktree and the relevant live evidence remains recorded in this task file/design.
+  - Updated `doc/custom-providers.md` and `CHANGELOG.md` so the documented custom-model structured-output mechanism list and user-visible changelog reflect the finalized ChatGPT/Codex native streaming contract: `:openai/responses-text-format-json-schema` over Responses-style `text.format`, distinct from Chat Completions `response_format`, with non-streaming Codex structured output still not established.
+  - Re-reviewed `design.md`, `plan.md`, and `steps.md` for the final intent. They are aligned on native streaming Codex support, no Chat Completions `response_format` on the Codex endpoint, non-streaming left explicit/unimplemented pending separate verification, and transport-resolved runtime Codex models including OAuth-routed `gpt-5.5`.
+  - Marked the closeout `steps.md` items done.
+  - Focused verification after closeout passed: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.openai-structured-output-test --focus psi.turn-runtime.response-mode-test` (`22 tests, 141 assertions, 0 failures`).
+  - Targeted Clojure lint passed for touched AI code/tests: `clj-kondo --lint components/ai/src/psi/ai components/ai/test/psi/ai`. A broader attempt including `doc/custom-providers.md` was invalid because clj-kondo does not lint Markdown prose as Clojure.
+- 2026-05-29: task-implementation-review pass after closeout follow-up.
+  - Re-read the task artifacts, touched Codex structured-output code/tests/docs, and verified the finalized native streaming contract remains coherent: Codex uses Responses-style `text.format`, not Chat Completions `response_format`; non-streaming remains unimplemented; OAuth-routed `gpt-5.5` receives the Codex native mechanism at runtime.
+  - Reran focused verification: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.openai-structured-output-test --focus psi.turn-runtime.response-mode-test` (`22 tests, 141 assertions, 0 failures`).
+  - Reran targeted lint: `clj-kondo --lint components/ai/src/psi/ai components/ai/test/psi/ai` (0 errors, 0 warnings).
+  - Found no new actionable implementation feedback.
+- 2026-05-29: Actionable follow-up execution after latest review pass.
+  - Re-read `steps.md`, `implementation.md`, `design.md`, and `plan.md` for `188-openai-codex-native-structured-output`.
+  - Found one remaining unchecked `steps.md` item: add focused `:execute` structured-output tests if non-streaming Codex support is later implemented.
+  - Blocked/not executed now: non-streaming Codex structured output has not been separately verified or implemented, and live discovery recorded `stream: false` returning `400`; leaving the conditional step unchecked until that separate capability exists.
+- 2026-05-29: task-implementation-review pass repeat after blocked non-streaming note.
+  - Re-read the task artifacts, Codex structured-output implementation, focused provider/model tests, docs, and changelog.
+  - Verified implementation still matches the task boundary: ChatGPT/Codex streaming uses Responses-style `text.format` with `:openai/responses-text-format-json-schema`, never Chat Completions `response_format`; OAuth-routed `gpt-5.5` receives the Codex native capability; non-streaming Codex `:execute` remains explicitly unimplemented pending separate verification.
+  - Reran focused verification: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.openai-structured-output-test --focus psi.turn-runtime.response-mode-test` (`22 tests, 141 assertions, 0 failures`).
+  - Reran targeted lint: `clj-kondo --lint components/ai/src/psi/ai components/ai/test/psi/ai` (0 errors, 0 warnings).
+  - Found no new actionable implementation feedback; existing unchecked non-streaming test item is conditional on future non-streaming implementation and is not current actionable work.
+- 2026-05-29: Actionable follow-up execution after no-action implementation review repeat.
+  - Re-read `steps.md`, `implementation.md`, `design.md`, and `plan.md` for `188-openai-codex-native-structured-output`.
+  - The preceding review pass found no new actionable implementation feedback.
+  - No newly added actionable unchecked `steps.md` items exist to execute now.
+  - The only remaining unchecked item is conditional on future non-streaming Codex structured-output support; current task evidence still records `stream: false` returning `400`, and Codex `:execute` structured output remains unimplemented pending separate verification.
+  - Left `steps.md` unchanged and did not mark the conditional future item complete.
+- 2026-05-29: task-implementation-review pass repeat after no-action follow-up.
+  - Re-read the task artifacts, Codex structured-output implementation, focused model/provider/turn-runtime tests, custom-provider docs, and changelog.
+  - Verified implementation remains aligned with the task boundary: ChatGPT/Codex streaming uses Responses-style `text.format` via `:openai/responses-text-format-json-schema`, Chat Completions `response_format` is not used on the Codex endpoint, OAuth-routed `gpt-5.5` receives the Codex native capability, and Codex non-streaming `:execute` remains explicitly unimplemented pending separate verification.
+  - Reran focused verification: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.openai-structured-output-test --focus psi.turn-runtime.response-mode-test` (`22 tests, 141 assertions, 0 failures`).
+  - Reran targeted lint: `clj-kondo --lint components/ai/src/psi/ai components/ai/test/psi/ai` (0 errors, 0 warnings).
+  - Found no new actionable implementation feedback; left `steps.md` unchanged. The remaining unchecked non-streaming test item is conditional on future non-streaming Codex structured-output implementation and is not current actionable work.
+- 2026-05-29: Actionable follow-up execution after latest no-action implementation review.
+  - Re-read `steps.md`, `implementation.md`, `design.md`, and `plan.md` for `188-openai-codex-native-structured-output`.
+  - The preceding review pass found no new actionable implementation feedback and added no new unchecked actionable `steps.md` items.
+  - No implementation steps were executed in this pass.
+  - Left `steps.md` unchanged: the only remaining unchecked item is still conditional on future Codex non-streaming structured-output support, which current evidence does not establish (`stream: false` returned `400`) and which remains unimplemented pending separate verification.
+- 2026-05-29: task-implementation-review pass repeat.
+  - Re-read the task artifacts, Codex structured-output implementation, focused model/provider/turn-runtime/workflow structured-output tests, custom-provider docs, and changelog.
+  - Found one new actionable implementation issue: Codex native streaming result extraction uses `structured-output/parse-json-object`, so valid JSON values that are not objects (notably workflow judge string-enum schemas such as `"DONE"` for `[:enum "REPEAT" "DONE"]`) are emitted with no `:payload` and `:parse-error? true` despite being valid schema-constrained structured output. That conflicts with the task intent to preserve small workflow control schemas and with existing workflow validation support for non-object JSON values.
+  - Added an unchecked follow-up to `steps.md`; did not duplicate the existing conditional future non-streaming `:execute` item.
+- 2026-05-29: Actionable follow-up execution for Codex scalar structured-output payloads.
+  - Executed the newly added unchecked follow-up item from the preceding implementation-review pass.
+  - Added `structured-output/parse-json-value` so callers can distinguish successful JSON parsing of scalar, array, object, and `null` values from parse failure, while preserving `parse-json-object` semantics for existing object-only provider paths.
+  - Updated Codex native structured-output result extraction to use JSON-value parsing so valid non-object payloads are emitted with coherent `:payload`, `:raw-payload`, `:source`, `:strategy`, and `:native-mechanism` metadata instead of `:parse-error? true`.
+  - Added focused Codex streaming coverage for a workflow loop-control style string enum schema returning `"DONE"`.
+  - Marked the scalar-payload follow-up step done in `steps.md`.
+  - Focused verification passed: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.openai-structured-output-test --focus psi.turn-runtime.response-mode-test` (`23 tests, 148 assertions, 0 failures`).
+  - Targeted AI lint passed: `clj-kondo --lint components/ai/src/psi/ai components/ai/test/psi/ai` (0 errors, 0 warnings).
+  - The remaining unchecked non-streaming `:execute` test item remains conditional on future verified Codex non-streaming structured-output support and is still blocked by current `stream: false` 400 evidence.
+- 2026-05-29: task-implementation-review pass after scalar-payload follow-up.
+  - Re-read the task artifacts, Codex structured-output implementation, focused model/provider/turn-runtime tests, custom-provider docs, and changelog.
+  - Verified the latest scalar-payload fix aligns with the task intent: Codex native streaming result extraction now parses any valid JSON value, so workflow loop-control string enums such as `"DONE"` produce a coherent `:payload` instead of `:parse-error? true`; object-only parsing remains preserved for existing object-only provider paths.
+  - Reran focused verification: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.openai-structured-output-test --focus psi.turn-runtime.response-mode-test` (`23 tests, 148 assertions, 0 failures`).
+  - Reran targeted lint: `clj-kondo --lint components/ai/src/psi/ai components/ai/test/psi/ai` (0 errors, 0 warnings).
+  - Found no new actionable implementation feedback; left `steps.md` unchanged. The remaining unchecked non-streaming `:execute` test item is conditional on future Codex non-streaming structured-output implementation and is not current actionable work.
+- 2026-05-29: Actionable follow-up execution after no-action implementation review repeat.
+  - Re-read `steps.md`, `implementation.md`, `design.md`, and `plan.md` for `188-openai-codex-native-structured-output`.
+  - The preceding review pass found no new actionable implementation feedback and added no new unchecked actionable `steps.md` items.
+  - No implementation steps were executed in this pass.
+  - Remaining unchecked step is blocked: Codex non-streaming structured-output `:execute` support has not been verified or implemented; current live evidence recorded `stream: false` returning `400`, so focused `:execute` contract tests remain conditional future work.
+- 2026-05-29: task-implementation-review pass repeat after scalar no-action follow-up.
+  - Re-read the task artifacts, Codex structured-output implementation, focused model/provider/turn-runtime tests, custom-provider docs, and changelog.
+  - Reran focused verification: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.openai-structured-output-test --focus psi.turn-runtime.response-mode-test` (`23 tests, 148 assertions, 0 failures`).
+  - Reran targeted lint: `clj-kondo --lint components/ai/src/psi/ai components/ai/test/psi/ai` (0 errors, 0 warnings).
+  - Found no new actionable implementation feedback; left `steps.md` unchanged. The remaining unchecked Codex non-streaming `:execute` test item is conditional on future verified non-streaming support and is not current actionable work.
+- 2026-05-29: Actionable follow-up execution after latest no-action implementation review.
+  - Re-read `steps.md`, `implementation.md`, `design.md`, and `plan.md` for `188-openai-codex-native-structured-output`.
+  - The preceding review pass found no new actionable implementation feedback and added no new unchecked actionable `steps.md` items.
+  - No implementation steps were executed in this pass.
+  - Left `steps.md` unchanged. The only remaining unchecked item is still conditional on future verified Codex non-streaming structured-output support; current recorded live evidence has `stream: false` returning `400`, and Codex non-streaming `:execute` structured output remains unimplemented pending separate verification.
+- 2026-05-29: task-implementation-review pass repeat after latest no-action follow-up.
+  - Re-read the task artifacts, Codex structured-output implementation, focused model/provider/turn-runtime tests, custom-provider docs, and changelog.
+  - Verified the implementation remains coherent with the design: ChatGPT/Codex streaming uses Responses-style `text.format` via `:openai/responses-text-format-json-schema`, Chat Completions `response_format` is not used on the Codex endpoint, OAuth-routed `gpt-5.5` receives the Codex native capability, scalar JSON values such as workflow string enums are preserved as payloads, and Codex non-streaming `:execute` remains explicitly unimplemented pending separate verification.
+  - Reran focused verification: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.openai-structured-output-test --focus psi.turn-runtime.response-mode-test` (`23 tests, 148 assertions, 0 failures`).
+  - Reran targeted lint: `clj-kondo --lint components/ai/src/psi/ai components/ai/test/psi/ai` (0 errors, 0 warnings).
+  - Found no new actionable implementation feedback; left `steps.md` unchanged. The remaining unchecked Codex non-streaming `:execute` test item is conditional on future verified non-streaming support and is not current actionable work.
+- 2026-05-29: Actionable follow-up execution after latest no-action implementation review.
+  - Re-read `steps.md`, `implementation.md`, `design.md`, and `plan.md` for `188-openai-codex-native-structured-output`.
+  - The preceding review pass found no new actionable implementation feedback and added no new unchecked actionable `steps.md` items.
+  - No implementation steps were executed in this pass.
+  - Left `steps.md` unchanged. The only remaining unchecked item is still conditional on future verified Codex non-streaming structured-output support; current recorded live evidence has `stream: false` returning `400`, and Codex non-streaming `:execute` structured output remains unimplemented pending separate verification.
+- 2026-05-29: task-implementation-review pass repeat after latest no-action follow-up.
+  - Re-read the task artifacts, Codex structured-output implementation, focused model/provider/turn-runtime tests, custom-provider docs, changelog, and related structured-output schema/accumulator seams.
+  - Verified the implementation still matches the task design: ChatGPT/Codex streaming advertises and uses the distinct `:openai/responses-text-format-json-schema` mechanism with Responses-style `text.format`; Chat Completions `response_format` is absent on the Codex endpoint; OAuth-routed `gpt-5.5` receives the Codex native capability; valid scalar JSON values such as workflow enum strings are preserved as payloads; and Codex non-streaming `:execute` remains explicitly unimplemented pending separate verification.
+  - Reran focused verification: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.openai-structured-output-test --focus psi.turn-runtime.response-mode-test` (`23 tests, 148 assertions, 0 failures`).
+  - Reran targeted lint: `clj-kondo --lint components/ai/src/psi/ai components/ai/test/psi/ai` (0 errors, 0 warnings).
+  - Found no new actionable implementation feedback; left `steps.md` unchanged. The remaining unchecked Codex non-streaming `:execute` test item is conditional on future verified non-streaming support and is not current actionable work.
+- 2026-05-29: Actionable follow-up execution after latest no-action implementation review.
+  - Re-read `steps.md`, `implementation.md`, `design.md`, and `plan.md` for `188-openai-codex-native-structured-output`.
+  - The preceding review pass found no new actionable implementation feedback and added no new unchecked actionable `steps.md` items.
+  - No implementation steps were executed in this pass.
+  - Left `steps.md` unchanged. The only remaining unchecked item is still conditional on future verified Codex non-streaming structured-output support; current recorded live evidence has `stream: false` returning `400`, and Codex non-streaming `:execute` structured output remains unimplemented pending separate verification.
+- 2026-05-29: task-implementation-review pass repeat.
+  - Re-read the task artifacts, Codex structured-output implementation, focused model/provider/turn-runtime tests, custom-provider docs, changelog, and scalar JSON parsing/result seams.
+  - Verified the implementation remains aligned with the design: ChatGPT/Codex streaming advertises and uses the distinct `:openai/responses-text-format-json-schema` mechanism with Responses-style `text.format`; Chat Completions `response_format` is absent from Codex requests; OAuth-routed `gpt-5.5` receives the Codex native capability; valid scalar JSON values such as workflow enum strings are preserved as payloads; and Codex non-streaming `:execute` remains explicitly unimplemented pending separate verification.
+  - Reran focused verification: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.openai-structured-output-test --focus psi.turn-runtime.response-mode-test` (`23 tests, 148 assertions, 0 failures`).
+  - Reran targeted lint: `clj-kondo --lint components/ai/src/psi/ai components/ai/test/psi/ai` (0 errors, 0 warnings).
+  - Found no new actionable implementation feedback; left `steps.md` unchanged. The remaining unchecked Codex non-streaming `:execute` test item is conditional on future verified non-streaming support and is not current actionable work.
+- 2026-05-29: Actionable follow-up execution after latest no-action implementation review.
+  - Re-read `steps.md`, `implementation.md`, `design.md`, and `plan.md` for `188-openai-codex-native-structured-output`.
+  - The preceding review pass found no new actionable implementation feedback and added no newly actionable unchecked `steps.md` items.
+  - No implementation steps were executed in this pass.
+  - Left `steps.md` unchanged. The only remaining unchecked item is still conditional on future verified Codex non-streaming structured-output support; current recorded live evidence has `stream: false` returning `400`, and Codex non-streaming `:execute` structured output remains unimplemented pending separate verification.
+- 2026-05-29: task-implementation-review pass repeat after latest no-action follow-up.
+  - Re-read the task artifacts, Codex structured-output implementation, focused model/provider/turn-runtime tests, custom-provider docs, changelog, and runtime capability seams.
+  - Verified the implementation still matches the task design: ChatGPT/Codex streaming advertises and uses the distinct `:openai/responses-text-format-json-schema` mechanism with Responses-style `text.format`; Chat Completions `response_format` is absent from Codex requests; OAuth-routed `gpt-5.5` receives the Codex native capability; valid scalar JSON payloads remain preserved; and Codex non-streaming `:execute` remains explicitly unimplemented pending separate verification.
+  - Reran focused verification: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.openai-structured-output-test --focus psi.turn-runtime.response-mode-test` (`23 tests, 148 assertions, 0 failures`).
+  - Reran targeted lint: `clj-kondo --lint components/ai/src/psi/ai components/ai/test/psi/ai` (0 errors, 0 warnings).
+  - Found no new actionable implementation feedback; left `steps.md` unchanged. The remaining unchecked Codex non-streaming `:execute` test item is conditional on future verified non-streaming support and is not current actionable work.
+- 2026-05-29: Actionable follow-up execution after newly requested review follow-up pass.
+  - Re-read `steps.md`, `implementation.md`, `design.md`, and `plan.md` for `188-openai-codex-native-structured-output`.
+  - Found no newly added actionable unchecked `steps.md` items from the preceding review pass.
+  - Left the remaining unchecked `:execute` test item open because it is explicitly conditional on future verified Codex non-streaming structured-output support; current recorded evidence has `stream: false` returning `400`, and Codex non-streaming `:execute` structured output remains unimplemented pending separate verification.
+- 2026-05-29: task-implementation-review pass repeat after requested independent review.
+  - Re-read the skill, task artifacts, Codex structured-output implementation, model/runtime capability seams, focused provider/model/turn-runtime tests, custom-provider docs, and changelog.
+  - Verified implementation remains aligned with the task design: ChatGPT/Codex streaming uses the distinct `:openai/responses-text-format-json-schema` mechanism with Responses-style `text.format`; Codex requests omit Chat Completions `response_format`; OAuth-routed `gpt-5.5` receives the Codex native capability; valid scalar JSON payloads are preserved; and Codex non-streaming `:execute` remains explicitly unimplemented pending separate verification.
+  - Reran focused verification: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.openai-structured-output-test --focus psi.turn-runtime.response-mode-test` (`23 tests, 148 assertions, 0 failures`).
+  - Reran targeted lint: `clj-kondo --lint components/ai/src/psi/ai components/ai/test/psi/ai` (0 errors, 0 warnings).
+  - Found no new actionable implementation feedback; left `steps.md` unchanged. The remaining unchecked Codex non-streaming `:execute` test item is conditional on future verified non-streaming support and is not current actionable work.
+- 2026-05-29: Actionable follow-up execution after latest no-action review.
+  - Re-read `steps.md`, `implementation.md`, `design.md`, and `plan.md` for `188-openai-codex-native-structured-output`.
+  - The preceding review pass found no new actionable implementation feedback and added no newly actionable unchecked `steps.md` items.
+  - No implementation steps were executed in this pass.
+  - Left `steps.md` unchanged. The only remaining unchecked item is still conditional on future verified Codex non-streaming structured-output support; current recorded live evidence has `stream: false` returning `400`, and Codex non-streaming `:execute` structured output remains unimplemented pending separate verification.
+- 2026-05-29: task-implementation-review pass repeat after latest requested review.
+  - Re-read the task-implementation-review skill, task artifacts, Codex structured-output implementation, model/runtime capability seams, focused provider/model/turn-runtime tests, custom-provider docs, and changelog.
+  - Verified implementation remains aligned with the task design: ChatGPT/Codex streaming advertises and uses the distinct `:openai/responses-text-format-json-schema` mechanism with Responses-style `text.format`; Codex requests omit Chat Completions `response_format`; OAuth-routed `gpt-5.5` receives the Codex native capability; valid scalar JSON payloads such as workflow enum strings are preserved; and Codex non-streaming `:execute` remains explicitly unimplemented pending separate verification.
+  - Reran focused verification: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.openai-structured-output-test --focus psi.turn-runtime.response-mode-test` (`23 tests, 148 assertions, 0 failures`).
+  - Reran targeted lint: `clj-kondo --lint components/ai/src/psi/ai components/ai/test/psi/ai` (0 errors, 0 warnings).
+  - Found no new actionable implementation feedback; left `steps.md` unchanged. The remaining unchecked Codex non-streaming `:execute` test item is conditional on future verified non-streaming support and is not current actionable work.
+- 2026-05-29: Actionable follow-up execution after latest no-action review pass.
+  - Re-read `steps.md`, `implementation.md`, `design.md`, and `plan.md` for `188-openai-codex-native-structured-output`.
+  - The preceding review pass found no new actionable implementation feedback and added no newly actionable unchecked `steps.md` items.
+  - No implementation steps were executed in this pass.
+  - Left `steps.md` unchanged. The only remaining unchecked item is the conditional future Codex non-streaming `:execute` structured-output test, still blocked by current recorded live evidence that `stream: false` returned `400` and by the absence of implemented Codex non-streaming structured-output support.
+- 2026-05-29: task-implementation-review pass repeat after requested review.
+  - Re-read the task-implementation-review skill, task artifacts, Codex structured-output implementation, model/runtime capability seams, focused provider/model/turn-runtime tests, custom-provider docs, and changelog.
+  - Verified implementation remains aligned with the task design: ChatGPT/Codex streaming uses the distinct `:openai/responses-text-format-json-schema` mechanism with Responses-style `text.format`; Codex requests omit Chat Completions `response_format`; OAuth-routed `gpt-5.5` receives the Codex native capability; valid scalar JSON payloads such as workflow enum strings are preserved; and Codex non-streaming `:execute` remains explicitly unimplemented pending separate verification.
+  - Reran focused verification: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.openai-structured-output-test --focus psi.turn-runtime.response-mode-test` (`23 tests, 148 assertions, 0 failures`).
+  - Reran targeted lint: `clj-kondo --lint components/ai/src/psi/ai components/ai/test/psi/ai` (0 errors, 0 warnings).
+  - Found no new actionable implementation feedback; left `steps.md` unchanged. The remaining unchecked Codex non-streaming `:execute` test item is conditional on future verified non-streaming support and is not current actionable work.
+- 2026-05-29: Actionable follow-up execution after latest requested review pass.
+  - Re-read `steps.md`, `implementation.md`, `design.md`, and `plan.md` for `188-openai-codex-native-structured-output`.
+  - The preceding review pass found no new actionable implementation feedback and did not add any newly actionable unchecked `steps.md` items.
+  - No implementation steps were executed in this pass.
+  - Left `steps.md` unchanged. The only remaining unchecked item is still the conditional future Codex non-streaming `:execute` structured-output test, blocked by current recorded evidence that `stream: false` returned `400` and by the absence of implemented Codex non-streaming structured-output support.
+- 2026-05-29: task-implementation-review pass repeat after requested review.
+  - Re-read the task-implementation-review skill, task artifacts, Codex structured-output implementation, model/runtime capability seams, focused provider/model/turn-runtime tests, custom-provider docs, changelog, and structured-output schema/result helpers.
+  - Verified implementation remains aligned with the task design: ChatGPT/Codex streaming uses the distinct `:openai/responses-text-format-json-schema` mechanism with Responses-style `text.format`; Codex requests omit Chat Completions `response_format`; OAuth-routed `gpt-5.5` receives the Codex native capability; valid scalar JSON payloads such as workflow enum strings are preserved; and Codex non-streaming `:execute` remains explicitly unimplemented pending separate verification.
+  - Reran focused verification: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.openai-structured-output-test --focus psi.turn-runtime.response-mode-test` (`23 tests, 148 assertions, 0 failures`).
+  - Reran targeted lint: `clj-kondo --lint components/ai/src/psi/ai components/ai/test/psi/ai` (0 errors, 0 warnings).
+  - Found no new actionable implementation feedback; left `steps.md` unchanged. The remaining unchecked Codex non-streaming `:execute` test item is conditional on future verified non-streaming support and is not current actionable work.
+- 2026-05-29: Actionable follow-up execution after latest requested review pass.
+  - Re-read `steps.md`, `implementation.md`, `design.md`, and `plan.md` for `188-openai-codex-native-structured-output`.
+  - The preceding review pass found no new actionable implementation feedback and did not add any newly actionable unchecked `steps.md` items.
+  - No implementation steps were executed in this pass.
+  - Left `steps.md` unchanged. The only remaining unchecked item is still the conditional future Codex non-streaming `:execute` structured-output test, blocked by current recorded evidence that `stream: false` returned `400` and by the absence of implemented Codex non-streaming structured-output support.
+- 2026-05-29: task-implementation-review pass after requested independent review.
+  - Re-read the task-implementation-review skill, task artifacts, Codex structured-output implementation, model/runtime capability seams, focused provider/model/turn-runtime tests, custom-provider docs, and changelog.
+  - Verified implementation remains aligned with the task design: ChatGPT/Codex streaming uses the distinct `:openai/responses-text-format-json-schema` mechanism with Responses-style `text.format`; Codex requests omit Chat Completions `response_format`; OAuth-routed `gpt-5.5` receives the Codex native capability; scalar JSON payloads such as workflow enum strings are preserved; and Codex non-streaming `:execute` remains explicitly unimplemented pending separate verification.
+  - Reran focused verification: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.openai-structured-output-test --focus psi.turn-runtime.response-mode-test` (`23 tests, 148 assertions, 0 failures`).
+  - Reran targeted lint: `clj-kondo --lint components/ai/src/psi/ai components/ai/test/psi/ai` (0 errors, 0 warnings).
+  - Found no new actionable implementation feedback; left `steps.md` unchanged. The remaining unchecked Codex non-streaming `:execute` test item is conditional on future verified non-streaming support and is not current actionable work.
+- 2026-05-29: Actionable follow-up execution after latest requested review pass.
+  - Re-read `steps.md`, `implementation.md`, `design.md`, and `plan.md` for `188-openai-codex-native-structured-output`.
+  - The preceding review pass found no new actionable implementation feedback and did not add any newly actionable unchecked `steps.md` items.
+  - No implementation steps were executed in this pass.
+  - Left `steps.md` unchanged. The only remaining unchecked item is still the conditional future Codex non-streaming `:execute` structured-output test, blocked by current recorded evidence that `stream: false` returned `400` and by the absence of implemented Codex non-streaming structured-output support.
+- 2026-05-29: task-implementation-review pass after requested independent review.
+  - Re-read the task-implementation-review skill, task artifacts, Codex structured-output implementation, model/runtime capability seams, focused provider/model/turn-runtime tests, custom-provider docs, and changelog.
+  - Verified implementation remains aligned with the task design: ChatGPT/Codex streaming uses the distinct `:openai/responses-text-format-json-schema` mechanism with Responses-style `text.format`; Codex requests omit Chat Completions `response_format`; OAuth-routed `gpt-5.5` receives the Codex native capability; scalar JSON payloads such as workflow enum strings are preserved; and Codex non-streaming `:execute` remains explicitly unimplemented pending separate verification.
+  - Reran focused verification: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.openai-structured-output-test --focus psi.turn-runtime.response-mode-test` (`23 tests, 148 assertions, 0 failures`).
+  - Reran targeted lint: `clj-kondo --lint components/ai/src/psi/ai components/ai/test/psi/ai components/turn-runtime/test/psi/turn_runtime/response_mode_test.clj` (0 errors, 0 warnings).
+  - Found no new actionable implementation feedback; left `steps.md` unchanged. The remaining unchecked Codex non-streaming `:execute` test item is conditional on future verified non-streaming support and is not current actionable work.
+- 2026-05-29: Actionable follow-up execution after newly added review pass.
+  - Re-read `steps.md`, `implementation.md`, `design.md`, and `plan.md` for `188-openai-codex-native-structured-output`.
+  - Found no newly added actionable unchecked `steps.md` items from the preceding review pass.
+  - No implementation steps were executed in this pass.
+  - Left `steps.md` unchanged. The only remaining unchecked item is the conditional future Codex non-streaming `:execute` structured-output test, still blocked by current recorded evidence that `stream: false` returned `400` and by the absence of implemented Codex non-streaming structured-output support.
+- 2026-05-29: Actionable follow-up execution after newly added review pass.
+  - Re-read `steps.md`, `implementation.md`, `design.md`, and `plan.md` for `188-openai-codex-native-structured-output`.
+  - Found no newly added actionable unchecked `steps.md` items from the preceding review pass.
+  - No implementation steps were executed in this pass.
+  - Left `steps.md` unchanged. The only remaining unchecked item is the conditional future Codex non-streaming `:execute` structured-output test, still blocked by current recorded evidence that `stream: false` returned `400` and by the absence of implemented Codex non-streaming structured-output support.

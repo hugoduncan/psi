@@ -7,7 +7,7 @@
    [{:type :source, :from :workflow-original}
     {:type :template,
      :text
-     "For the Munera task identified by {{input}}, review the task design, plan and steps for {{aspect}}. Work independently. Read the task artifacts, especially design.md, plan.md, steps.md, and implementation.md, plus any referenced code/tests/docs. Then:\n\n1. append a terse review note to the task's implementation.md\n2. add unchecked follow-up items to design-steps.md for every new actionable {{aspect}} you found\n3. avoid duplicating review notes or steps that already exist\n4. commit\n5. if there is no new actionable {{aspect}} feedback, say so explicitly\n\nEnd your final response with exactly one of:\nPASS_STATUS: ACTIONABLE_FEEDBACK\nPASS_STATUS: NO_ACTIONABLE_FEEDBACK",
+     "For the Munera task identified by {{input}}, review the task design, plan and steps for {{aspect}}. Work independently. Read the task artifacts, especially design.md, plan.md, steps.md, and implementation.md, plus any referenced code/tests/docs. Then:\n\n1. append a terse review note to the task's implementation.md\n2. add unchecked follow-up items to design-steps.md for every new actionable {{aspect}} you found\n3. avoid duplicating review notes or steps that already exist\n4. commit\n5. if there is no new actionable {{aspect}} feedback, say so explicitly\n\nEnd your final response with exactly one of:\nPASS_STATUS: ACTIONABLE_FEEDBACK\nPASS_STATUS: REVIEW_COMPLETE",
      :vars
      {"input" {:from :workflow-input, :path [:input]},
       "aspect" {:from :workflow-input, :path [:aspect]}}}]}

@@ -25,6 +25,12 @@
    :strategies [:provider-native :prompted-json]
    :native-mechanism :anthropic/json-schema-output})
 
+(def openai-codex-native-capability
+  {:supported? true
+   :strategies [:provider-native :prompted-json]
+   :native-mechanism :openai/responses-text-format-json-schema
+   :notes "Verified only for the ChatGPT/Codex responses transport with streaming text.format JSON Schema."})
+
 (def openai-codex-fallback-capability
   {:supported? true
    :strategies [:prompted-json]
@@ -60,6 +66,11 @@
   "Replace any model structured-output capability with effective unsupported."
   [model]
   (with-structured-output-capability model unsupported-structured-output-capability))
+
+(defn with-openai-codex-native-capability
+  "Replace any model structured-output capability with ChatGPT/Codex native streaming support."
+  [model]
+  (with-structured-output-capability model openai-codex-native-capability))
 
 (defn with-openai-codex-fallback-capability
   "Replace any model structured-output capability with Codex-safe fallback-only support."
@@ -161,12 +172,22 @@
   [text request]
   (str (or text "") (json-only-instruction request)))
 
-(defn parse-json-object
-  "Parse text as a JSON object, returning nil when parsing fails or the value is not a map."
+(defn parse-json-value
+  "Parse text as a JSON value.
+
+   Returns {:parsed? true :payload value} when parsing succeeds, including
+   scalar, array, object, and nil JSON values. Returns nil when parsing fails
+   or text is blank."
   [text]
   (when (seq text)
     (try
-      (let [parsed (json/parse-string text true)]
-        (when (map? parsed) parsed))
+      {:parsed? true
+       :payload (json/parse-string text true)}
       (catch Exception _
         nil))))
+
+(defn parse-json-object
+  "Parse text as a JSON object, returning nil when parsing fails or the value is not a map."
+  [text]
+  (when-let [{:keys [payload]} (parse-json-value text)]
+    (when (map? payload) payload)))

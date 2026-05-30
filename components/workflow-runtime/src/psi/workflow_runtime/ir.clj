@@ -341,9 +341,17 @@
            (map #(schema-error :step %) (structured-output/structured-output-entries (:outputs step)))
            (map #(schema-error :judge %) (structured-output/structured-output-entries (get-in step [:judge :outputs])))))))
 
-(defn- ref-errors [step-index current-step source-ref]
+(defn- invoke-judge-same-step-output-ref?
+  [step current-step source-ref]
+  (and (= current-step (:step source-ref))
+       (= :invoke (get-in step [:judge :type]))
+       (contains? source-ref :output)
+       (contains? (set (keys (:outputs step))) (:output source-ref))))
+
+(defn- ref-errors [step-index step source-ref]
   (when (map? source-ref)
-    (let [{target-step-name :step output-key :output yield-field :yield} source-ref
+    (let [current-step (:name step)
+          {target-step-name :step output-key :output yield-field :yield} source-ref
           current-index (get-in step-index [current-step :index])
           target (get step-index target-step-name)]
       (cond
@@ -351,6 +359,9 @@
         [{:type :missing-step-ref
           :step current-step
           :ref source-ref}]
+
+        (invoke-judge-same-step-output-ref? step current-step source-ref)
+        []
 
         (>= (:index target) current-index)
         [{:type :non-prior-step-ref
@@ -465,7 +476,7 @@
               skills-read-errors (skills-without-read-errors step)
               structured-cardinality-errors (structured-output-cardinality-errors step)
               reusable-schema-errors* (reusable-schema-errors step)
-              ref-errors* (mapcat #(ref-errors step-idx step-name %)
+              ref-errors* (mapcat #(ref-errors step-idx step %)
                                   (step-source-refs step))]
           (concat on-without-judge
                   judge-without-routing

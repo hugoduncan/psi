@@ -6,6 +6,7 @@
   (:require
    [psi.agent-session.core :as session]
    [psi.agent-session.workflow.bootstrap :as workflow-bootstrap]
+   [psi.agent-session.workflow.core]
    [psi.workflow-loader.core :as workflow-file-loader]
    [psi.workflow-registry.registry :as workflow-registry]))
 
@@ -28,13 +29,16 @@
                (recur))))))))
 
 (defn create-tui-context+session
-  [mutations]
-  (let [ctx (session/create-context {:persist? false
-                                     :mutations mutations
-                                     :ui-type :tui
-                                     :worktree-path workflow-extensions-cwd})
-        sd  (session/new-session-in! ctx nil {})]
-    [ctx (:session-id sd)]))
+  ([mutations]
+   (create-tui-context+session mutations {}))
+  ([mutations opts]
+   (let [ctx (session/create-context (merge {:persist? false
+                                             :mutations mutations
+                                             :ui-type :tui
+                                             :worktree-path workflow-extensions-cwd}
+                                            opts))
+         sd  (session/new-session-in! ctx nil {})]
+     [ctx (:session-id sd)])))
 
 (defn init-built-in-workflow!
   [ctx session-id]
@@ -49,3 +53,7 @@
              (fn [state]
                (first (workflow-registry/register-definition state d)))))
     definitions))
+
+(defn built-in-workflow-state
+  []
+  @@#'psi.agent-session.workflow.core/state)

@@ -68,32 +68,46 @@
         (is (not (re-find #"Structured output required"
                           (get-in body [:messages 1 :content]))))))))
 
-(deftest openai-codex-structured-output-fallback-request-shaping-test
-  ;; Tests Codex fallback-only structured-output behavior without unverified
-  ;; provider-native schema fields.
+(deftest openai-codex-structured-output-native-request-shaping-test
+  ;; Tests ChatGPT/Codex native streaming structured-output request construction
+  ;; uses Responses-style text.format and not Chat Completions response_format.
   (let [model (models/get-model :gpt-5.3-codex)
         token (jwt-with-account-id "acc_test")
         convo (-> (conv/create "sys")
                   (conv/add-user-message "Review this"))]
-    (testing "fallback allowed injects deterministic JSON-only instructions"
+    (testing "native-capable codex request includes text.format and omits response_format"
       (let [req  (#'openai/build-codex-request convo model {:api-key token
                                                             :structured-output judge-structured-output-request})
             body (json/parse-string (:body req) true)
             text (get-in body [:input 0 :content 0 :text])]
+        (is (= {:type "json_schema"
+                :name "judge_review_result"
+                :schema judge-json-schema
+                :strict true}
+               (get-in body [:text :format])))
+        (is (not (contains? body :response_format)))
         (is (re-find #"Review this" text))
-        (is (re-find #"Structured output required" text))
-        (is (re-find #"judge_review_result" text))
-        (is (nil? (get-in body [:text :format])))
-        (is (not (contains? body :response_format)))))
+        (is (not (re-find #"Structured output required" text)))))
 
-    (testing "fallback disallowed does not inject fallback instructions"
-      (let [request (assoc judge-structured-output-request :fallback-allowed? false)
-            req     (#'openai/build-codex-request convo model {:api-key token
-                                                               :structured-output request})
-            body    (json/parse-string (:body req) true)
-            text    (get-in body [:input 0 :content 0 :text])]
+    (testing "fallback disallowed becomes unsupported and does not inject fallback instructions"
+      (let [fallback-model (structured-output/with-openai-codex-fallback-capability model)
+            request        (assoc judge-structured-output-request :fallback-allowed? false)
+            req            (#'openai/build-codex-request convo fallback-model {:api-key token
+                                                                               :structured-output request})
+            body           (json/parse-string (:body req) true)
+            text           (get-in body [:input 0 :content 0 :text])]
         (is (not (re-find #"Structured output required" text)))
-        (is (nil? (get-in body [:text :format])))))))
+        (is (nil? (get-in body [:text :format])))))
+
+    (testing "fallback-only capability still avoids native fields and uses prompt injection"
+      (let [fallback-model (structured-output/with-openai-codex-fallback-capability model)
+            req            (#'openai/build-codex-request convo fallback-model {:api-key token
+                                                                               :structured-output judge-structured-output-request})
+            body           (json/parse-string (:body req) true)
+            text           (get-in body [:input 0 :content 0 :text])]
+        (is (nil? (get-in body [:text :format])))
+        (is (not (contains? body :response_format)))
+        (is (re-find #"Structured output required" text))))))
 
 (deftest openai-non-streaming-structured-output-result-metadata-test
   ;; Tests top-level structured-output metadata and extracted payload handoff.
@@ -141,9 +155,9 @@
                     (= :openai/message-json (get-in % [:structured-output :source])))
               @events))))
 
-(deftest openai-codex-streaming-prompted-json-structured-output-events-test
-  ;; Tests prompted-JSON fallback streaming emits both first-class strategy and
-  ;; parsed result handoff events, not only request prompt injection.
+(deftest openai-codex-streaming-native-structured-output-events-test
+  ;; Tests native ChatGPT/Codex streaming emits first-class provider-native
+  ;; strategy and structured result events from ordinary output text.
   (let [model  (models/get-model :gpt-5.3-codex)
         token  (jwt-with-account-id "acc_test")
         convo  (-> (conv/create "sys")
@@ -173,11 +187,57 @@
                     :structured-output judge-structured-output-request}
        (fn [ev] (swap! events conj ev))))
     (is (some #(and (= :structured-output-strategy (:type %))
-                    (= :prompted-json (get-in % [:structured-output :strategy]))
-                    (true? (get-in % [:structured-output :fallback-used?])))
+                    (= :provider-native (get-in % [:structured-output :strategy]))
+                    (= :openai/responses-text-format-json-schema
+                       (get-in % [:structured-output :native-mechanism])))
               @events))
     (is (some #(and (= :structured-output-result (:type %))
-                    (= :prompted-json (get-in % [:structured-output :strategy]))
+                    (= :provider-native (get-in % [:structured-output :strategy]))
                     (= {:ok true} (get-in % [:structured-output :payload]))
-                    (= :prompted-json/text (get-in % [:structured-output :source])))
+                    (= :openai/codex-text-format (get-in % [:structured-output :source])))
               @events))))
+
+(deftest openai-codex-streaming-native-scalar-structured-output-events-test
+  ;; Tests native ChatGPT/Codex streaming preserves valid non-object JSON payloads
+  ;; such as workflow loop-control string enums.
+  (let [model   (models/get-model :gpt-5.3-codex)
+        token   (jwt-with-account-id "acc_test")
+        convo   (-> (conv/create "sys")
+                    (conv/add-user-message "Review this"))
+        request (assoc judge-structured-output-request
+                       :name "loop_control"
+                       :json-schema {:type "string"
+                                     :enum ["REPEAT" "DONE"]})
+        events  (atom [])
+        sse     (str "data: " (json/generate-string
+                               {:type "response.output_item.added"
+                                :item {:type "message"
+                                       :id "msg_1"
+                                       :role "assistant"
+                                       :status "in_progress"
+                                       :content []}}) "\n\n"
+                     "data: " (json/generate-string
+                               {:type "response.output_text.delta"
+                                :delta "\"DONE\""}) "\n\n"
+                     "data: " (json/generate-string
+                               {:type "response.completed"
+                                :response {:status "completed"
+                                           :usage {:input_tokens 1
+                                                   :output_tokens 1
+                                                   :total_tokens 2
+                                                   :input_tokens_details {:cached_tokens 0}}}}) "\n\n")]
+    (with-redefs [http/post (fn [_url _req]
+                              {:body (stream-body sse)})]
+      ((:stream openai/provider)
+       convo model {:api-key token
+                    :structured-output request}
+       (fn [ev] (swap! events conj ev))))
+    (let [result (some #(when (= :structured-output-result (:type %)) %) @events)
+          structured (:structured-output result)]
+      (is (some? result))
+      (is (= :provider-native (:strategy structured)))
+      (is (= :openai/responses-text-format-json-schema (:native-mechanism structured)))
+      (is (= :openai/codex-text-format (:source structured)))
+      (is (= "DONE" (:payload structured)))
+      (is (= "\"DONE\"" (:raw-payload structured)))
+      (is (not (:parse-error? structured))))))

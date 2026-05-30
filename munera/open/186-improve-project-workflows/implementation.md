@@ -1,3 +1,9 @@
+## 2026-05-29 task-plan ambiguity review pass
+
+Reviewed task artifacts (`design.md`, `plan.md`, `steps.md`, `design-steps.md`, `implementation.md`), `.psi/workflows/review-step.edn`, `.psi/workflows/review-design-turn.edn`, and focused workflow loader/judge tests. Found one new actionable ambiguity.
+
+1. **Task scope/source of truth for review-step routing is ambiguous after task 189 behavior landed** — this task's artifacts still describe `review-step` slice 8 as judge-step structured output on a separate `review-status` step with loader proof for a 3-step shape, while current code and recent task-189 state describe/pass through deterministic PASS_STATUS routing semantics on the `follow-up -> review` loop and mention `workflow/pass-status-routing`, `workflow/constant-routing`, duplicate PASS_STATUS handling, and same-step structured status sourcing. The current task artifacts never state whether task 186 intentionally owns the older 3-step/judge-only shape as source of truth, or whether those newer deterministic-routing semantics are accepted follow-on evolution outside this task. Add a design follow-up to either (a) explicitly freeze task 186 to the current implemented 2-step deterministic routing contract and update design/plan/steps/notes accordingly, or (b) mark task 189 as the superseding authority for review-step routing and record that task 186's older review-step shape/testing notes are historical only.
+
 ## 2026-05-28 code-shaper follow-up execution
 
 Removed dead `:prompt` field from `implement-task.edn` judge map. `compile-judge` never includes `:prompt` in its `select-keys` output, so the field had no runtime effect. Removed one key-value pair from the judge map. `bb test` green (3 pre-existing failures, 0 new). `bb lint` 0 errors, 0 warnings.

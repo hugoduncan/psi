@@ -298,6 +298,28 @@
                                         :context [{:type :source
                                                    :from {:step "self-context" :yield :text}}]}
                              :yields {:type :delegated}}
+          same-step-judge-output-step {:name "judge-invoke-same-step-output"
+                                       :type :session
+                                       :session {:contributions [{:type :source
+                                                                  :from :workflow-original}]}
+                                       :outputs {:final-llm-reply {:source :session/final-llm-reply}}
+                                       :yields {:type :text :text :final-llm-reply}
+                                       :judge {:type :invoke
+                                               :invoke {:operation "workflow/classify-result"
+                                                        :args {:result {:from {:step "judge-invoke-same-step-output"
+                                                                               :output :final-llm-reply}}}}}
+                                       :on {"DONE" {:goto :done}}}
+          self-judge-yield-step {:name "judge-invoke-self-yield"
+                                 :type :session
+                                 :session {:contributions [{:type :source
+                                                            :from :workflow-original}]}
+                                 :outputs {:final-llm-reply {:source :session/final-llm-reply}}
+                                 :yields {:type :text :text :final-llm-reply}
+                                 :judge {:type :invoke
+                                         :invoke {:operation "workflow/classify-result"
+                                                  :args {:result {:from {:step "judge-invoke-self-yield"
+                                                                         :yield :text}}}}}
+                                 :on {"DONE" {:goto :done}}}
           future-judge-llm-step {:name "judge-llm-future"
                                  :type :session
                                  :session {:contributions [{:type :source
@@ -323,6 +345,12 @@
           self-result (workflow-ir/validate-workflow-ir
                        {:version :workflow-ir/v1
                         :steps [self-context-step]})
+          same-step-result (workflow-ir/validate-workflow-ir
+                            {:version :workflow-ir/v1
+                             :steps [same-step-judge-output-step]})
+          self-yield-result (workflow-ir/validate-workflow-ir
+                             {:version :workflow-ir/v1
+                              :steps [self-judge-yield-step]})
           llm-result (workflow-ir/validate-workflow-ir
                       {:version :workflow-ir/v1
                        :steps [future-judge-llm-step later-step]})
@@ -331,6 +359,10 @@
                           :steps [future-judge-invoke-step later-step]})]
       (is (false? (:valid? self-result)))
       (is (= :non-prior-step-ref (-> self-result :semantic-errors first :type)))
+      (is (= {:valid? true :structural-errors nil :semantic-errors []}
+             same-step-result))
+      (is (false? (:valid? self-yield-result)))
+      (is (= :non-prior-step-ref (-> self-yield-result :semantic-errors first :type)))
       (is (false? (:valid? llm-result)))
       (is (= :non-prior-step-ref (-> llm-result :semantic-errors first :type)))
       (is (false? (:valid? invoke-result)))

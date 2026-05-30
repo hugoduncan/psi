@@ -212,31 +212,41 @@
      (testing "loads without error"
        (is (empty? errors))
        (is (contains? definitions "review-step")))
-     (let [steps (get-in definitions ["review-step" :steps])]
-       (testing "has 3 steps with correct names and types"
-         (is (= 3 (count steps)))
-         (is (= ["review" "follow-up" "review-status"] (mapv :name steps)))
-         (is (= [:session :session :session] (mapv :type steps))))
+     (let [steps (get-in definitions ["review-step" :steps])
+           review-step (first (filter #(= "review" (:name %)) steps))
+           follow-up-step (first (filter #(= "follow-up" (:name %)) steps))]
+       (testing "has 2 steps with correct names and types"
+         (is (= 2 (count steps)))
+         (is (= ["review" "follow-up"] (mapv :name steps)))
+         (is (= [:session :session] (mapv :type steps))))
        (testing "steps have {{input}} wired to :workflow-input"
          (doseq [step steps]
            (is (step-has-input-var-wired? step)
                (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))
        (testing "review step has {{skill}} wired to :workflow-input"
-         (let [review-step (first (filter #(= "review" (:name %)) steps))]
-           (is (some (fn [c]
-                       (and (= :template (:type c))
-                            (= {:from :workflow-input :path [:skill]}
-                               (get-in c [:vars "skill"]))))
-                     (:contributions review-step))
-               "review step should have {{skill}} wired to :workflow-input")))
-       (let [status-step (first (filter #(= "review-status" (:name %)) steps))]
-         (testing "review-status judge has REPEAT/DONE routing"
-           (is (= #{"REPEAT" "DONE"} (set (keys (:on status-step)))))
-           (is (some? (:judge status-step))))
-         (testing "review-status judge has :outputs with judge-routing-result schema-id"
-           (is (contains? (:judge status-step) :outputs))
-           (is (= :psi.workflow/judge-routing-result
-                  (get-in status-step [:judge :outputs :routing-result :schema-id])))))))))
+         (is (some (fn [c]
+                     (and (= :template (:type c))
+                          (= {:from :workflow-input :path [:skill]}
+                             (get-in c [:vars "skill"]))))
+                   (:contributions review-step))
+             "review step should have {{skill}} wired to :workflow-input"))
+       (testing "review step uses deterministic invoke routing from final-llm-reply"
+         (is (= {:type :invoke
+                 :operation "workflow/pass-status-routing"
+                 :args {:text {:from {:step "review" :output :final-llm-reply}}}}
+                (:judge review-step)))
+         (is (= {"DONE" {:goto :done}
+                 "REPEAT" {:goto "follow-up"}}
+                (:on review-step))))
+       (testing "follow-up step uses deterministic constant loopback judge"
+         (is (= {:type :invoke
+                 :operation "workflow/constant-routing"
+                 :args {:route "REPEAT"}}
+                (:judge follow-up-step)))
+         (is (= {"REPEAT" {:goto "review" :max-iterations 6}}
+                (:on follow-up-step))))
+       (testing "legacy review-status session step is removed"
+         (is (nil? (first (filter #(= "review-status" (:name %)) steps)))))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; implement-task
@@ -298,3 +308,50 @@
            (is (some? summary-step) "should have a summary step")
            (is (.contains summary-text "review-task-docs")
                "summary step body should name review-task-docs")))))))
+
+;;; ---------------------------------------------------------------------------
+;;; review workflow set bootstrap/load proof
+
+(deftest review-workflow-set-loads-together-test
+  (load-edn-with-md-refs
+   "review-task-design.edn"
+   ["review-task-design-ambiguity-review.md"
+    "review-task-design-ambiguity-follow-up.md"
+    "review-task-design-inconsistency-review.md"
+    "review-task-design-inconsistency-follow-up.md"
+    "review-task-design-clarity-status.md"]
+   (fn [_]
+     (load-edn-with-md-refs
+      "review-task-plan.edn"
+      ["review-task-plan-ambiguity-review.md"
+       "review-task-plan-ambiguity-follow-up.md"
+       "review-task-plan-inconsistency-review.md"
+       "review-task-plan-inconsistency-follow-up.md"
+       "review-task-plan-clarity-status.md"]
+      (fn [_]
+        (with-workflow-dir
+          {"review-step.edn" (slurp-workflow-file "review-step.edn")
+           "review-task-implementation.edn" (slurp-workflow-file "review-task-implementation.edn")
+           "review-implementation-in-worktree.edn" (slurp-workflow-file "review-implementation-in-worktree.edn")
+           "review-design-turn.edn" (slurp-workflow-file "review-design-turn.edn")
+           "review-task-design.edn" (slurp-workflow-file "review-task-design.edn")
+           "review-task-design-ambiguity-review.md" (slurp-workflow-file "review-task-design-ambiguity-review.md")
+           "review-task-design-ambiguity-follow-up.md" (slurp-workflow-file "review-task-design-ambiguity-follow-up.md")
+           "review-task-design-inconsistency-review.md" (slurp-workflow-file "review-task-design-inconsistency-review.md")
+           "review-task-design-inconsistency-follow-up.md" (slurp-workflow-file "review-task-design-inconsistency-follow-up.md")
+           "review-task-design-clarity-status.md" (slurp-workflow-file "review-task-design-clarity-status.md")
+           "review-task-plan.edn" (slurp-workflow-file "review-task-plan.edn")
+           "review-task-plan-ambiguity-review.md" (slurp-workflow-file "review-task-plan-ambiguity-review.md")
+           "review-task-plan-ambiguity-follow-up.md" (slurp-workflow-file "review-task-plan-ambiguity-follow-up.md")
+           "review-task-plan-inconsistency-review.md" (slurp-workflow-file "review-task-plan-inconsistency-review.md")
+           "review-task-plan-inconsistency-follow-up.md" (slurp-workflow-file "review-task-plan-inconsistency-follow-up.md")
+           "review-task-plan-clarity-status.md" (slurp-workflow-file "review-task-plan-clarity-status.md")}
+          (fn [{:keys [definitions errors]}]
+            (testing "all review workflows load together without compilation errors"
+              (is (empty? errors))
+              (is (contains? definitions "review-step"))
+              (is (contains? definitions "review-design-turn"))
+              (is (contains? definitions "review-task-design"))
+              (is (contains? definitions "review-task-plan"))
+              (is (contains? definitions "review-task-implementation"))
+              (is (contains? definitions "review-implementation-in-worktree"))))))))))
