@@ -102,7 +102,25 @@
            ;; final-summary carries :source contributions and is intentionally kept inline
            (is (some? final-step) "final-summary step should exist")
            (is (seq (:contributions final-step)) "final-summary step should have inline contributions")))
-       (let [clarity-step (first (filter #(= "clarity-status" (:name %)) steps))]
+       (let [step-by-name (into {} (map (juxt :name identity) steps))
+             ambiguity-review (get step-by-name "ambiguity-review")
+             ambiguity-follow-up (get step-by-name "ambiguity-follow-up")
+             inconsistency-review (get step-by-name "inconsistency-review")
+             inconsistency-follow-up (get step-by-name "inconsistency-follow-up")
+             clarity-step (get step-by-name "clarity-status")]
+         (testing "per-reviewer follow-up steps route conditionally from deterministic PASS_STATUS"
+           (is (= "workflow/pass-status-routing" (get-in ambiguity-review [:judge :operation])))
+           (is (= {"REPEAT" {:goto "ambiguity-follow-up"}
+                   "DONE" {:goto "inconsistency-review"}}
+                  (:on ambiguity-review)))
+           (is (= "workflow/constant-routing" (get-in ambiguity-follow-up [:judge :operation])))
+           (is (= {"DONE" {:goto "inconsistency-review"}} (:on ambiguity-follow-up)))
+           (is (= "workflow/pass-status-routing" (get-in inconsistency-review [:judge :operation])))
+           (is (= {"REPEAT" {:goto "inconsistency-follow-up"}
+                   "DONE" {:goto "clarity-status"}}
+                  (:on inconsistency-review)))
+           (is (= "workflow/constant-routing" (get-in inconsistency-follow-up [:judge :operation])))
+           (is (= {"DONE" {:goto "clarity-status"}} (:on inconsistency-follow-up))))
          (testing "clarity-status judge has REPEAT/DONE routing"
            (is (= #{"REPEAT" "DONE"} (set (keys (:on clarity-step)))))
            (is (some? (:judge clarity-step))))
@@ -148,7 +166,25 @@
            ;; final-summary carries :source contributions and is intentionally kept inline
            (is (some? final-step) "final-summary step should exist")
            (is (seq (:contributions final-step)) "final-summary step should have inline contributions")))
-       (let [clarity-step (first (filter #(= "clarity-status" (:name %)) steps))]
+       (let [step-by-name (into {} (map (juxt :name identity) steps))
+             ambiguity-review (get step-by-name "ambiguity-review")
+             ambiguity-follow-up (get step-by-name "ambiguity-follow-up")
+             inconsistency-review (get step-by-name "inconsistency-review")
+             inconsistency-follow-up (get step-by-name "inconsistency-follow-up")
+             clarity-step (get step-by-name "clarity-status")]
+         (testing "per-reviewer follow-up steps route conditionally from deterministic PASS_STATUS"
+           (is (= "workflow/pass-status-routing" (get-in ambiguity-review [:judge :operation])))
+           (is (= {"REPEAT" {:goto "ambiguity-follow-up"}
+                   "DONE" {:goto "inconsistency-review"}}
+                  (:on ambiguity-review)))
+           (is (= "workflow/constant-routing" (get-in ambiguity-follow-up [:judge :operation])))
+           (is (= {"DONE" {:goto "inconsistency-review"}} (:on ambiguity-follow-up)))
+           (is (= "workflow/pass-status-routing" (get-in inconsistency-review [:judge :operation])))
+           (is (= {"REPEAT" {:goto "inconsistency-follow-up"}
+                   "DONE" {:goto "clarity-status"}}
+                  (:on inconsistency-review)))
+           (is (= "workflow/constant-routing" (get-in inconsistency-follow-up [:judge :operation])))
+           (is (= {"DONE" {:goto "clarity-status"}} (:on inconsistency-follow-up))))
          (testing "clarity-status judge has REPEAT/DONE routing"
            (is (= #{"REPEAT" "DONE"} (set (keys (:on clarity-step)))))
            (is (some? (:judge clarity-step))))
@@ -156,6 +192,28 @@
            (is (contains? (:judge clarity-step) :outputs))
            (is (= :psi.workflow/judge-routing-result
                   (get-in clarity-step [:judge :outputs :routing-result :schema-id])))))))))
+
+;;; ---------------------------------------------------------------------------
+;;; review task prompt artifact targets
+
+(deftest review-task-prompt-artifact-targets-test
+  ;; Tests review prompt artifact ownership: design review uses design-steps.md,
+  ;; plan review uses steps.md and never design-steps.md.
+  (testing "design review prompts target design-steps.md"
+    (doseq [filename ["review-task-design-ambiguity-review.md"
+                      "review-task-design-ambiguity-follow-up.md"
+                      "review-task-design-inconsistency-review.md"
+                      "review-task-design-inconsistency-follow-up.md"]]
+      (let [content (slurp-workflow-file filename)]
+        (is (.contains content "design-steps.md") filename))))
+  (testing "plan review prompts target steps.md rather than design-steps.md"
+    (doseq [filename ["review-task-plan-ambiguity-review.md"
+                      "review-task-plan-ambiguity-follow-up.md"
+                      "review-task-plan-inconsistency-review.md"
+                      "review-task-plan-inconsistency-follow-up.md"]]
+      (let [content (slurp-workflow-file filename)]
+        (is (.contains content "steps.md") filename)
+        (is (not (.contains content "design-steps.md")) filename)))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-implementation

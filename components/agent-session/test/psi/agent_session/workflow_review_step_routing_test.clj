@@ -226,3 +226,141 @@
                                                             :pass-status-lines ["PASS_STATUS: REVIEW_COMPLETE"
                                                                                 "PASS_STATUS: REVIEW_COMPLETE"]}}}}
                  (:terminal-outcome run))))))))
+
+(defn- conditional-review-definition
+  [definition-name]
+  {:definition-id definition-name
+   :name definition-name
+   :steps [{:name "ambiguity-review"
+            :type :session
+            :contributions [{:type :template :text "ambiguity-review"}]
+            :judge {:type :invoke
+                    :operation "workflow/pass-status-routing"
+                    :args {:text {:from {:step "ambiguity-review" :output :final-llm-reply}}}}
+            :on {"REPEAT" {:goto "ambiguity-follow-up"}
+                 "DONE" {:goto "inconsistency-review"}}}
+           {:name "ambiguity-follow-up"
+            :type :session
+            :contributions [{:type :template :text "ambiguity-follow-up"}]
+            :judge {:type :invoke
+                    :operation "workflow/constant-routing"
+                    :args {:route "DONE"}}
+            :on {"DONE" {:goto "inconsistency-review"}}}
+           {:name "inconsistency-review"
+            :type :session
+            :contributions [{:type :template :text "inconsistency-review"}]
+            :judge {:type :invoke
+                    :operation "workflow/pass-status-routing"
+                    :args {:text {:from {:step "inconsistency-review" :output :final-llm-reply}}}}
+            :on {"REPEAT" {:goto "inconsistency-follow-up"}
+                 "DONE" {:goto "clarity-status"}}}
+           {:name "inconsistency-follow-up"
+            :type :session
+            :contributions [{:type :template :text "inconsistency-follow-up"}]
+            :judge {:type :invoke
+                    :operation "workflow/constant-routing"
+                    :args {:route "DONE"}}
+            :on {"DONE" {:goto "clarity-status"}}}
+           {:name "clarity-status"
+            :type :session
+            :contributions [{:type :template :text "clarity-status"}]
+            :judge {:type :invoke
+                    :operation "workflow/constant-routing"
+                    :args {:route "DONE"}}
+            :on {"REPEAT" {:goto "ambiguity-review" :max-iterations 6}
+                 "DONE" {:goto "final-summary"}}}
+           {:name "final-summary"
+            :type :session
+            :contributions [{:type :template :text "final-summary"}]}]})
+
+(defn- create-conditional-review-run!
+  [ctx definition-name run-id]
+  (swap! (:state* ctx)
+         (fn [state]
+           (let [[s _ _] (workflow-runtime/create-run state {:definition (conditional-review-definition definition-name)
+                                                             :run-id run-id
+                                                             :workflow-input {:input "munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows"}})]
+             s))))
+
+(defn- execute-conditional-review-proof!
+  [definition-name run-id replies]
+  (let [[ctx session-id] (support/create-session-context {:persist? false})
+        prompts* (atom [])]
+    (register-review-routing-ops! ctx)
+    (create-conditional-review-run! ctx definition-name run-id)
+    (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
+                  (fn [_ctx child-session-id prompt]
+                    (swap! prompts* conj {:session-id child-session-id :prompt prompt})
+                    {:execution-result/assistant-message
+                     {:role "assistant"
+                      :content [{:type :text :text (get replies prompt prompt)}]
+                      :stop-reason :stop}})]
+      (let [result (workflow-execution/execute-run! ctx session-id run-id)
+            run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
+        {:result result
+         :run run
+         :prompts (mapv :prompt @prompts*)}))))
+
+(deftest design-review-conditional-follow-up-routing-test
+  ;; Tests design review per-reviewer PASS_STATUS routing while preserving the
+  ;; all-reviewers-before-cycle ordering.
+  (testing "design ambiguity REVIEW_COMPLETE skips ambiguity follow-up and still runs inconsistency review"
+    (let [{:keys [result prompts]} (execute-conditional-review-proof!
+                                    "review-task-design-proof" "design-skip-ambiguity"
+                                    {"ambiguity-review" "PASS_STATUS: REVIEW_COMPLETE"
+                                     "inconsistency-review" "PASS_STATUS: REVIEW_COMPLETE"})]
+      (is (= :completed (:status result)))
+      (is (= ["ambiguity-review" "inconsistency-review" "clarity-status" "final-summary"] prompts))))
+  (testing "design inconsistency REVIEW_COMPLETE skips inconsistency follow-up and still runs clarity-status"
+    (let [{:keys [result prompts]} (execute-conditional-review-proof!
+                                    "review-task-design-proof" "design-skip-inconsistency"
+                                    {"ambiguity-review" "PASS_STATUS: REVIEW_COMPLETE"
+                                     "inconsistency-review" "PASS_STATUS: REVIEW_COMPLETE"})]
+      (is (= :completed (:status result)))
+      (is (= ["ambiguity-review" "inconsistency-review" "clarity-status" "final-summary"] prompts))))
+  (testing "design ambiguity ACTIONABLE_FEEDBACK runs only ambiguity follow-up before inconsistency review"
+    (let [{:keys [result prompts]} (execute-conditional-review-proof!
+                                    "review-task-design-proof" "design-run-ambiguity"
+                                    {"ambiguity-review" "PASS_STATUS: ACTIONABLE_FEEDBACK"
+                                     "inconsistency-review" "PASS_STATUS: REVIEW_COMPLETE"})]
+      (is (= :completed (:status result)))
+      (is (= ["ambiguity-review" "ambiguity-follow-up" "inconsistency-review" "clarity-status" "final-summary"] prompts))))
+  (testing "design inconsistency ACTIONABLE_FEEDBACK runs inconsistency follow-up before clarity-status"
+    (let [{:keys [result prompts]} (execute-conditional-review-proof!
+                                    "review-task-design-proof" "design-run-inconsistency"
+                                    {"ambiguity-review" "PASS_STATUS: REVIEW_COMPLETE"
+                                     "inconsistency-review" "PASS_STATUS: ACTIONABLE_FEEDBACK"})]
+      (is (= :completed (:status result)))
+      (is (= ["ambiguity-review" "inconsistency-review" "inconsistency-follow-up" "clarity-status" "final-summary"] prompts)))))
+
+(deftest plan-review-conditional-follow-up-routing-test
+  ;; Tests plan review per-reviewer PASS_STATUS routing mirrors design review
+  ;; while preserving all-reviewers-before-cycle ordering.
+  (testing "plan ambiguity REVIEW_COMPLETE skips ambiguity follow-up and still runs inconsistency review"
+    (let [{:keys [result prompts]} (execute-conditional-review-proof!
+                                    "review-task-plan-proof" "plan-skip-ambiguity"
+                                    {"ambiguity-review" "PASS_STATUS: REVIEW_COMPLETE"
+                                     "inconsistency-review" "PASS_STATUS: REVIEW_COMPLETE"})]
+      (is (= :completed (:status result)))
+      (is (= ["ambiguity-review" "inconsistency-review" "clarity-status" "final-summary"] prompts))))
+  (testing "plan inconsistency REVIEW_COMPLETE skips inconsistency follow-up and still runs clarity-status"
+    (let [{:keys [result prompts]} (execute-conditional-review-proof!
+                                    "review-task-plan-proof" "plan-skip-inconsistency"
+                                    {"ambiguity-review" "PASS_STATUS: REVIEW_COMPLETE"
+                                     "inconsistency-review" "PASS_STATUS: REVIEW_COMPLETE"})]
+      (is (= :completed (:status result)))
+      (is (= ["ambiguity-review" "inconsistency-review" "clarity-status" "final-summary"] prompts))))
+  (testing "plan ambiguity ACTIONABLE_FEEDBACK runs only ambiguity follow-up before inconsistency review"
+    (let [{:keys [result prompts]} (execute-conditional-review-proof!
+                                    "review-task-plan-proof" "plan-run-ambiguity"
+                                    {"ambiguity-review" "PASS_STATUS: ACTIONABLE_FEEDBACK"
+                                     "inconsistency-review" "PASS_STATUS: REVIEW_COMPLETE"})]
+      (is (= :completed (:status result)))
+      (is (= ["ambiguity-review" "ambiguity-follow-up" "inconsistency-review" "clarity-status" "final-summary"] prompts))))
+  (testing "plan inconsistency ACTIONABLE_FEEDBACK runs inconsistency follow-up before clarity-status"
+    (let [{:keys [result prompts]} (execute-conditional-review-proof!
+                                    "review-task-plan-proof" "plan-run-inconsistency"
+                                    {"ambiguity-review" "PASS_STATUS: REVIEW_COMPLETE"
+                                     "inconsistency-review" "PASS_STATUS: ACTIONABLE_FEEDBACK"})]
+      (is (= :completed (:status result)))
+      (is (= ["ambiguity-review" "inconsistency-review" "inconsistency-follow-up" "clarity-status" "final-summary"] prompts)))))
