@@ -125,3 +125,8 @@ Completed the newly added per-kind invocation schema follow-up across `design.md
 ## 2026-05-30 design inconsistency review
 
 Found one new actionable inconsistency after re-reading `design.md` against its invocation/request schema: the active-session identity section says a runtime-global advertised action may carry `:psi.ui.request/session-id nil`, but descriptors/invocation data use `:psi.ui.invocation/session-id` and `:psi.ui.request/session-id` exists only on the later request payload. This leaves the descriptor/request boundary with two possible places for session correlation.
+
+
+## 2026-05-30 inconsistency follow-up
+
+Completed the newly added session/runtime correlation vocabulary follow-up in `design.md`: descriptor invocation data now uses only `:psi.ui.invocation/session-id` / `:psi.ui.invocation/runtime-id` or omits session id for runtime-global actions, while `:psi.ui.request/session-id` / `:psi.ui.request/runtime-id` are explicitly request-payload keys copied from descriptor invocation data by the later `:psi.ui/request-action` submission path.
