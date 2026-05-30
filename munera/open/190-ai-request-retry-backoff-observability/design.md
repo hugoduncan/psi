@@ -175,6 +175,31 @@ Canonical transcript/message state must observe these rules:
 
 Focused coverage should include a streaming retry case where the first attempt emits partial output and then fails retryably, and the succeeding retry produces the final response without mixing or duplicating the first attempt's partial output.
 
+### Caller-visible final error contract
+
+Provider-boundary retry outcomes must return structured final error data at the prepared-request boundary, not only prose. The caller-visible assistant error message and the `execute-prepared-request!` failure result should carry the same retry outcome metadata in `ex-data` / structured result data so tests and downstream projections can assert behavior without parsing human text.
+
+Minimum final error fields:
+
+- `:failure-reason` — one of `:non-retryable`, `:retry-exhausted`, or `:retry-cancelled` for provider-boundary retry outcomes;
+- `:retryable?` — whether the final provider cause was classified as retryable before the final outcome rule was applied;
+- `:error-kind` — shared provider-error classification for the final/last provider cause, including `:unknown` when classification cannot identify a retryable subtype;
+- `:http-status` — provider HTTP status when available;
+- `:provider-request-id` and `:turn-id` — request identity for joining the final error to retry telemetry;
+- `:retry-attempt` — zero-based attempt coordinate for the final provider execution attempt, or the suppressed next attempt for `:retry-cancelled` when cancellation happens during pending backoff;
+- `:attempt-count` — number of actual provider execution attempts started for this prepared request;
+- `:max-retries` — configured retry execution limit used for the decision;
+- `:last-error-message` and `:last-cause` / equivalent cause data — the last provider/request failure that determined the final outcome;
+- `:cancelled?` and/or `:exhausted?` when applicable.
+
+Outcome-specific requirements:
+
+- Terminal non-retryable failure: `:failure-reason :non-retryable`, `:retryable? false`, no retry schedule after the final attempt, and classification fields showing why retry was skipped. Unknown failures use this path with `:error-kind :unknown`.
+- Retry exhaustion: `:failure-reason :retry-exhausted`, `:retryable? true` for the last cause, `:exhausted? true`, `:attempt-count` equal to `1 + :max-retries` when retries were enabled and every attempt failed retryably, and the last provider cause preserved as the primary cause.
+- Retry cancellation: `:failure-reason :retry-cancelled`, `:cancelled? true`, `:retryable? true` for the failure that scheduled the pending retry, `:attempt-count` excluding the suppressed next attempt, and `:retry-attempt` identifying the suppressed next zero-based attempt when available.
+
+The human-facing error text may summarize these fields, but it is not authoritative. Focused tests should assert the structured failure data on the execution result and/or assistant error message, plus matching lifecycle telemetry/EQL projection, for non-retryable terminal failure, exhausted retries, and pending-backoff cancellation. Tests must not rely only on prose substrings to distinguish retry outcomes.
+
 ## Architectural intent
 
 Retry/backoff should live at the provider request execution boundary, not in higher workflow or UI code.
