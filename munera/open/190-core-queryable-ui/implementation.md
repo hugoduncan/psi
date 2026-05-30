@@ -641,3 +641,7 @@ No new actionable implementation feedback after re-reading task artifacts, UI ca
 ## 2026-05-30 requested task-test-review pass
 
 No new actionable test feedback after an independent `task-test-review` pass over the task artifacts, referenced code/tests/docs, UI capability/provider normalization coverage, extension API/nullability query tests, RPC/TUI lifecycle tests, and Emacs ERT coverage. Existing test-review/test-shaper follow-ups cover the prior gaps; no new unchecked `steps.md` item was added. Verification in this pass: `clojure -M:test --focus psi.agent-session.ui-capabilities-test --focus psi.agent-session.extensions-test --focus psi.app-runtime-test --focus psi.rpc-transport-test` — 84 tests, 419 assertions, 0 failures; `bb emacs:test` — 321 tests, 321 expected, 0 unexpected.
+
+## 2026-05-30 docs review
+
+Found one new actionable documentation issue after reviewing the task artifacts, implementation notes, `doc/extensions.md`, `doc/extension-api.md`, `doc/architecture.md`, `README.md`, `CHANGELOG.md`, and follow-up task 191: the extension docs say callers may "submit" a make-visible descriptor through the core UI action request path, but task 190 intentionally left side-effecting submission unimplemented and delegated it to `191-ui-action-invocation`. Update the docs to qualify the current surface as query/descriptor-only until task 191 lands, while still describing the planned request path without implying it is currently usable.
