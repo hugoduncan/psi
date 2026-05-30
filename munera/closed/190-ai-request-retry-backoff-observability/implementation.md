@@ -216,3 +216,5 @@ Verification:
 - `bb test` passed.
 
 2026-05-30 — Final implementation pass: re-read task design, plan, steps, and implementation notes; all implementation checklist items are complete. Ran broad verification again after the legacy retry quarantine and active retry status updates; `bb test` passed. No further concrete implementation work remains for task 190, so the task was moved from `munera/open/` to `munera/closed/` and removed from the open-task backlog in `munera/plan.md`.
+
+2026-05-30 — Implementation review: found two actionable gaps. Pending-backoff cancellation is only proven through injected test seams (`:provider-retry-cancelled?` / `:provider-retry-sleep-fn`); production retry sleep still uses a single `Thread/sleep` and is not wired to the real session abort/shutdown signal, so user abort during backoff may remain invisible until the delay completes. Retry EQL is also session-summary-only: it exposes nested provider-request summaries from a session query, but does not provide direct turn/request-level resolver entry points for callers that know a `turn-id` or `provider-request-id`.
