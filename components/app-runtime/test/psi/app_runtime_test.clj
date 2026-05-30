@@ -603,56 +603,8 @@
              messages)))))
 
 ;; moved to psi.main
-#_(deftest memory-runtime-opts-from-args-test
-    (is (= {:store-provider "in-memory"
-            :auto-store-fallback? false
-            :history-commit-limit 99
-            :retention-snapshots 12
-            :retention-deltas 34}
-           (#'app-runtime/memory-runtime-opts-from-args
-            ["--memory-store" "in-memory"
-             "--memory-store-fallback" "off"
-             "--memory-history-limit" "99"
-             "--memory-retention-snapshots" "12"
-             "--memory-retention-deltas" "34"])))
-    (is (= {}
-           (#'app-runtime/memory-runtime-opts-from-args
-            ["--memory-history-limit" "not-a-number"
-             "--memory-store-fallback" "maybe"]))))
-
 ;; moved to psi.main
-#_(deftest session-runtime-config-from-args-test
-    (testing "CLI flag sets timeout"
-      (is (= {:llm-stream-idle-timeout-ms 90000}
-             (#'app-runtime/session-runtime-config-from-args
-              ["--llm-idle-timeout-ms" "90000"]))))
-
-    (testing "env var is used when CLI flag is absent"
-      (with-redefs [app-runtime/llm-idle-timeout-ms-from-env (fn [] 42000)]
-        (is (= {:llm-stream-idle-timeout-ms 42000}
-               (#'app-runtime/session-runtime-config-from-args [])))))
-
-    (testing "CLI flag wins over env var"
-      (with-redefs [app-runtime/llm-idle-timeout-ms-from-env (fn [] 42000)]
-        (is (= {:llm-stream-idle-timeout-ms 90000}
-               (#'app-runtime/session-runtime-config-from-args
-                ["--llm-idle-timeout-ms" "90000"])))))
-
-    (testing "invalid CLI value does not fall back to env"
-      (with-redefs [app-runtime/llm-idle-timeout-ms-from-env (fn [] 42000)]
-        (is (= {}
-               (#'app-runtime/session-runtime-config-from-args
-                ["--llm-idle-timeout-ms" "not-a-number"]))))))
-
 ;; moved to psi.main
-#_(deftest rpc-trace-file-from-args-test
-    (is (= "/tmp/rpc-trace.ndedn"
-           (#'app-runtime/rpc-trace-file-from-args
-            ["--rpc-trace-file" "/tmp/rpc-trace.ndedn"])))
-    (is (nil? (#'app-runtime/rpc-trace-file-from-args
-               ["--rpc-trace-file" "   "])))
-    (is (nil? (#'app-runtime/rpc-trace-file-from-args []))))
-
 (deftest bootstrap-runtime-session-initial-context-index-has-single-session-test
   (with-redefs-fn (merge (app-test-support/bootstrap-stub-bindings)
                          {#'ext/discover-extension-paths (fn [& _] [])})
