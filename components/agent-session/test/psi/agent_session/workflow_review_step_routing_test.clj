@@ -63,11 +63,68 @@
                                                                               :skill "task-implementation-review"}})]
              s))))
 
+(def implement-task-definition
+  {:definition-id "implement-task-proof"
+   :name "implement-task-proof"
+   :steps [{:name "implement-pass"
+            :type :session
+            :contributions [{:type :template
+                             :text "Implement {{input}}"
+                             :vars {"input" {:from :workflow-input :path [:input]}}}]
+            :judge {:type :invoke
+                    :operation "workflow/pass-status-routing"
+                    :args {:text {:from {:step "implement-pass" :output :final-llm-reply}}}}
+            :on {"REPEAT" {:goto "implement-pass" :max-iterations 8}
+                 "DONE" {:goto "final-summary"}}}
+           {:name "final-summary"
+            :type :session
+            :contributions [{:type :template :text "Final summary"}]}]})
+
+(defn- create-implement-task-run!
+  [ctx run-id]
+  (swap! (:state* ctx)
+         (fn [state]
+           (let [[s _ _] (workflow-runtime/create-run state {:definition implement-task-definition
+                                                             :run-id run-id
+                                                             :workflow-input {:input "munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows"}})]
+             s))))
+
 (deftest review-step-definition-now-validates-with-same-step-invoke-judge-output-ref-test
   (testing "the authored deterministic review-step shape now compiles"
     (let [[ctx _session-id] (support/create-session-context {:persist? false})]
       (register-review-routing-ops! ctx)
       (is (some? (create-review-run! ctx "run-review-complete"))))))
+
+(deftest implement-task-implementation-complete-routes-to-final-summary-test
+  (testing "IMPLEMENTATION_COMPLETE terminates the implementation loop deterministically"
+    (let [[ctx session-id] (support/create-session-context {:persist? false})
+          prompts* (atom [])]
+      (register-review-routing-ops! ctx)
+      (create-implement-task-run! ctx "run-implement-complete")
+      (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
+                    (fn [_ctx child-session-id prompt]
+                      (swap! prompts* conj {:session-id child-session-id :prompt prompt})
+                      {:execution-result/assistant-message
+                       {:role "assistant"
+                        :content [{:type :text
+                                   :text (case prompt
+                                           "Implement munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows"
+                                           "No work remains\n\nPASS_STATUS: IMPLEMENTATION_COMPLETE"
+
+                                           "Final summary"
+                                           "final summary")}]
+                        :stop-reason :stop}})]
+        (let [result (workflow-execution/execute-run! ctx session-id "run-implement-complete")
+              run (workflow-runtime/workflow-run-in @(:state* ctx) "run-implement-complete")]
+          (is (= :completed (:status result)))
+          (is (= :completed (:status run)))
+          (is (= 1 (count (get-in run [:step-runs "implement-pass" :attempts]))))
+          (is (= 1 (count (get-in run [:step-runs "final-summary" :attempts]))))
+          (is (= {:status :ok :data "DONE" :summary "DONE"}
+                 (get-in run [:step-runs "implement-pass" :attempts 0 :judge-output :routing-result])))
+          (is (= ["Implement munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows"
+                  "Final summary"]
+                 (mapv :prompt @prompts*))))))))
 
 (deftest review-step-actionable-feedback-runs-follow-up-and-loops-back-via-constant-routing-test
   (testing "actionable review output executes follow-up and returns to review via invoke routing"

@@ -102,7 +102,9 @@
 (def ^:private pass-status-prefix "PASS_STATUS:")
 (def ^:private known-pass-status->route
   {"REVIEW_COMPLETE" "DONE"
-   "ACTIONABLE_FEEDBACK" "REPEAT"})
+   "ACTIONABLE_FEEDBACK" "REPEAT"
+   "IMPLEMENTATION_COMPLETE" "DONE"
+   "MORE_WORK_REMAINS" "REPEAT"})
 
 (defn- pass-status-line-value
   [line]

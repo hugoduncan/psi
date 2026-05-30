@@ -334,13 +334,12 @@
            (is (some? final-step) "final-summary step should exist")
            (is (seq (:contributions final-step)) "final-summary step should have inline contributions")))
        (let [pass-step (first (filter #(= "implement-pass" (:name %)) steps))]
-         (testing "implement-pass judge has REPEAT/DONE routing"
+         (testing "implement-pass routes deterministically from PASS_STATUS"
            (is (= #{"REPEAT" "DONE"} (set (keys (:on pass-step)))))
-           (is (some? (:judge pass-step))))
-         (testing "implement-pass judge has :outputs with judge-routing-result schema-id"
-           (is (contains? (:judge pass-step) :outputs))
-           (is (= :psi.workflow/judge-routing-result
-                  (get-in pass-step [:judge :outputs :routing-result :schema-id])))))))))
+           (is (= {:type :invoke
+                   :operation "workflow/pass-status-routing"
+                   :args {:text {:from {:step "implement-pass" :output :final-llm-reply}}}}
+                  (:judge pass-step)))))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; review-implementation-in-worktree
