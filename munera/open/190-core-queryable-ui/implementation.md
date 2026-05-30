@@ -603,3 +603,7 @@ Verification:
 - `clojure -M:test --focus psi.agent-session.extensions-test` — 24 tests, 124 assertions, 0 failures.
 - `bb emacs:test` — 321 tests, 321 expected, 0 unexpected.
 - `clj-kondo --lint components/agent-session/test/psi/agent_session/extensions_test.clj components/agent-session/test/psi/agent_session/ui_capabilities_test.clj components/app-runtime/test/psi/app_runtime_test.clj components/rpc/test/psi/rpc_transport_test.clj` — clean.
+
+## 2026-05-30 test-shaper review
+
+Found one new actionable test-shaping issue after reviewing task artifacts, UI capability/provider tests, RPC/TUI lifecycle tests, nullable/extension API coverage, graph discovery tests, Emacs ERT coverage, and docs: TUI provider lifecycle coverage proves normal frontend return clears the provider, but not the exceptional shutdown path. The implementation note/design require clearing/downgrading stale providers on TUI shutdown, and robust lifecycle tests should prove `start-tui-runtime!` clears the active UI provider even when `tui-start-fn!` throws so failed frontend startup cannot leave stale attached UI advertisements.
