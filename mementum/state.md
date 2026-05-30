@@ -185,6 +185,7 @@ Bootstrapped on 2026-04-02.
 
 - 2026-05-30: Task 190 third ambiguity review pass found two new actionable ambiguities: Anthropic local request schema must admit inline system messages in `messages`, and prepared-turn current-user replacement must handle a pending `:mid-system` entry after the user while preserving `user → system` order. Added unchecked follow-ups to `design-steps.md` and committed `12cf9fb2`.
 
+- 2026-05-30: Task 190 test-review follow-up added real extension API coverage proving `ext/create-extension-api` with `runtime-fns/make-extension-runtime-fns` can query documented `:psi.ui/...` capability/action attrs without explicit session-id input and with extension `allowed-events` empty; focused extension/UI/nullable tests and targeted lint passed.
 - 2026-05-30: Task 190 implementation-review follow-up fixed nested invocation descriptor key validation: `:psi.ui.action/invocation` maps now reject unqualified, foreign namespaced, and string keys before EQL exposure, failing closed to provider-error. Focused UI capability tests and targeted lint passed.
 
 - 2026-05-30: Task 190 implementation-review follow-up fixed RPC/Emacs pre-install provider semantics: RPC contexts can suppress static default UI provider, runtime installs the late-bound connection-correlated Emacs RPC provider before bootstrap, and pre-install/no-attached/bootstrap coverage plus targeted lint are green.
