@@ -87,3 +87,4 @@
 - [x] Run targeted lint for changed Clojure and Emacs Lisp files.
 - [x] Run broader verification required by project convention if focused changes touch shared runtime/query seams.
 - [x] Re-read changed plan, steps, docs, tests, and code for coherence with `design.md` acceptance criteria.
+- [ ] Add provider-error diagnostic redaction before exposing `:psi.ui/diagnostic`: redact stack traces, frontend object printed forms, tokens/secrets, secret-bearing paths/data, and arbitrary exception data; add focused tests proving bounded redacted output.
