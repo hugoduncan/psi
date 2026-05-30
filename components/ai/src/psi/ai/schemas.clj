@@ -164,6 +164,7 @@
    [:base-url string?]
    [:supports-reasoning boolean?]
    [:adaptive-thinking {:optional true} boolean?]
+   [:supports-mid-conversation-system-messages {:optional true} boolean?]
    [:supports-images boolean?]
    [:supports-text boolean?]
    [:context-window pos-int?]

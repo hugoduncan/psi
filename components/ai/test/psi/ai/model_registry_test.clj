@@ -53,6 +53,7 @@
       ;; Check known built-ins exist
       (is (some? (registry/find-model :anthropic "claude-sonnet-4-6")))
       (is (some? (registry/find-model :anthropic "claude-opus-4-7")))
+      (is (some? (registry/find-model :anthropic "claude-opus-4-8")))
       (is (some? (registry/find-model :openai "gpt-5.5")))
       (is (some? (registry/find-model :openai "gpt-5.4-mini")))))
 
@@ -135,6 +136,17 @@
   (testing "documented Claude 4.5+ catalog models declare Anthropic JSON Schema output"
     (let [capability (-> (registry/find-model :anthropic "claude-sonnet-4-6")
                          structured-output/effective-capability)]
+      (is (= true (:supported? capability)))
+      (is (= :anthropic/json-schema-output (:native-mechanism capability)))
+      (is (contains? (set (:strategies capability)) :provider-native))))
+
+  (testing "Claude Opus 4.8 is findable and declares native Anthropic JSON Schema output"
+    (let [model      (registry/find-model :anthropic "claude-opus-4-8")
+          capability (structured-output/effective-capability model)]
+      (is (some? model))
+      (is (= "Claude Opus 4.8" (:name model)))
+      (is (= true (:adaptive-thinking model)))
+      (is (= true (:supports-mid-conversation-system-messages model)))
       (is (= true (:supported? capability)))
       (is (= :anthropic/json-schema-output (:native-mechanism capability)))
       (is (contains? (set (:strategies capability)) :provider-native)))))

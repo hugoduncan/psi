@@ -226,3 +226,5 @@ Bootstrapped on 2026-04-02.
 - 2026-05-30: Task 190 plan/steps repeat independent ambiguity review found no new actionable ambiguities; implementation.md records the pass and design-steps.md was unchanged.
 
 - 2026-05-30: Task 190 ambiguity follow-up execution after latest no-new-feedback review found no unchecked ambiguity design-steps (`unchecked count 0`); implementation.md records the no-op pass and design/plan/steps were unchanged.
+
+- 2026-05-30: Task 190 Slice 1 implementation complete: added Claude Opus 4.8 model catalog metadata, native Anthropic JSON Schema registration, mid-system capability metadata/schema support, focused catalog tests, and gated Anthropic Models API tests. Focused AI tests and targeted clj-kondo passed. Next: Slice 2 speed-mode stack.

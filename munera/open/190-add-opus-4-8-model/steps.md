@@ -2,13 +2,13 @@
 
 ## Slice 1 — Model catalog and live model API tests
 
-- [ ] Add `:opus-4.8` to `components/ai/src/psi/ai/models.clj` with the design-specified Anthropic model attributes.
-- [ ] Add `:opus-4.8` to `anthropic-json-schema-native-model-keys`.
-- [ ] Add `:supports-mid-conversation-system-messages true` to the Opus 4.8 model metadata.
-- [ ] Add or update focused model catalog tests proving `claude-opus-4-8` is findable, adaptive-thinking enabled, listed for Anthropic, and JSON Schema native.
-- [ ] Add `components/ai/test/psi/ai/providers/anthropic_models_api_test.clj` with gated `GET /v1/models` coverage for `claude-opus-4-8`.
-- [ ] Add a gated `GET /v1/models/claude-opus-4-8` test asserting response `id` equals `claude-opus-4-8`.
-- [ ] Verify the new live API tests skip gracefully unless both `PSI_LIVE_ANTHROPIC_MODELS_API=1` and `ANTHROPIC_API_KEY` are present.
+- [x] Add `:opus-4.8` to `components/ai/src/psi/ai/models.clj` with the design-specified Anthropic model attributes.
+- [x] Add `:opus-4.8` to `anthropic-json-schema-native-model-keys`.
+- [x] Add `:supports-mid-conversation-system-messages true` to the Opus 4.8 model metadata.
+- [x] Add or update focused model catalog tests proving `claude-opus-4-8` is findable, adaptive-thinking enabled, listed for Anthropic, and JSON Schema native.
+- [x] Add `components/ai/test/psi/ai/providers/anthropic_models_api_test.clj` with gated `GET /v1/models` coverage for `claude-opus-4-8`.
+- [x] Add a gated `GET /v1/models/claude-opus-4-8` test asserting response `id` equals `claude-opus-4-8`.
+- [x] Verify the new live API tests skip gracefully unless both `PSI_LIVE_ANTHROPIC_MODELS_API=1` and `ANTHROPIC_API_KEY` are present.
 
 ## Slice 2 — Speed mode stack
 

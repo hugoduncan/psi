@@ -755,3 +755,22 @@ No new actionable inconsistencies found. Re-read `plan.md`, `steps.md`, `design-
 ## Inconsistency follow-up execution — 2026-05-30 (no-new-actionable pass)
 
 Read `design-steps.md` for unchecked inconsistency follow-up items added by the preceding inconsistency-review pass. No unchecked design-step items were present (`unchecked count 0`), so there were no newly actionable follow-ups to execute. No `design.md`, `plan.md`, or `steps.md` changes were required.
+
+---
+
+## Implementation pass — 2026-05-30 (Slice 1 model catalog)
+
+Completed Slice 1 model-catalog work:
+
+- Added built-in `:opus-4.8` catalog entry with `id` `claude-opus-4-8`, adaptive thinking, 1M context / 128k max tokens, placeholder Opus 4.7 pricing, and `:supports-mid-conversation-system-messages true`.
+- Added `:opus-4.8` to `anthropic-json-schema-native-model-keys`, so built-in structured-output capability resolves to `:anthropic/json-schema-output`.
+- Added optional `:supports-mid-conversation-system-messages` to the AI `Model` schema so the new model remains schema-valid before Slice 4 expands capability use.
+- Added focused catalog/model assertions in `psi.ai.core-test` and `psi.ai.model-registry-test`.
+- Added gated `^:integration` Anthropic Models API tests for list/retrieve coverage of `claude-opus-4-8`; without `PSI_LIVE_ANTHROPIC_MODELS_API=1` or `ANTHROPIC_API_KEY`, the tests pass via explicit skip assertions.
+
+Verification:
+
+- `clojure -M:test --focus psi.ai.core-test --focus psi.ai.model-registry-test --focus psi.ai.providers.anthropic-models-api-test` — 23 tests, 170 assertions, 0 failures.
+- `clj-kondo --lint components/ai/src/psi/ai/models.clj components/ai/src/psi/ai/schemas.clj components/ai/test/psi/ai/core_test.clj components/ai/test/psi/ai/model_registry_test.clj components/ai/test/psi/ai/providers/anthropic_models_api_test.clj` — clean.
+
+Next concrete work: Slice 2 speed-mode stack.

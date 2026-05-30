@@ -156,9 +156,27 @@
     :api :anthropic-messages
     :base-url "https://api.anthropic.com"
     :supports-reasoning true
-    ;; Opus 4.7 uses adaptive thinking — a different API protocol from
+    ;; Opus 4.7+ uses adaptive thinking — a different API protocol from
     ;; extended thinking (budget_tokens). See providers/anthropic.clj.
     :adaptive-thinking true
+    :supports-images true
+    :supports-text true
+    :context-window 1000000
+    :max-tokens 128000
+    :input-cost 5.0
+    :output-cost 25.0
+    :cache-read-cost 0.5
+    :cache-write-cost 6.25}
+
+   :opus-4.8
+   {:id "claude-opus-4-8"
+    :name "Claude Opus 4.8"
+    :provider :anthropic
+    :api :anthropic-messages
+    :base-url "https://api.anthropic.com"
+    :supports-reasoning true
+    :adaptive-thinking true
+    :supports-mid-conversation-system-messages true
     :supports-images true
     :supports-text true
     :context-window 1000000
@@ -574,7 +592,8 @@
     :sonnet-4.6
     :opus-4.6
     :haiku-4.5
-    :opus-4.7})
+    :opus-4.7
+    :opus-4.8})
 
 (defn- built-in-structured-output-capability
   [model-key model]
