@@ -1121,3 +1121,9 @@ Verification:
 ## Design ambiguity review pass — 2026-05-30 (plan/steps post-test-review verification)
 
 No new actionable ambiguities found. Re-read `plan.md`, `steps.md`, `design-steps.md`, and recent `implementation.md` notes, then checked referenced docs/code/test surfaces for the remaining plan/steps risk areas: Opus 4.8 catalog/docs, `/speed` and `/effort` scoped persistence/test follow-up, mid-system extension capability, Anthropic/OpenAI provider request shaping, shared-config startup semantics, and compaction replay preservation. The task plan and steps remain unambiguous: five vertical slices, Slice 5 owns user-facing docs/changelog and broad verification, and the scoped persistence test-review follow-up is already represented in the current task files rather than a new ambiguity. No duplicate `design-steps.md` item was added. Pre-existing uncommitted edits in `components/agent-session/test/psi/agent_session/commands_test.clj` and `components/ai/test/psi/ai/providers/openai_test.clj` were not touched by this ambiguity review.
+
+---
+
+## Ambiguity follow-up execution — 2026-05-30 (post-test-review unchecked-item pass)
+
+Read `design-steps.md` for unchecked ambiguity follow-up items added by the preceding ambiguity-review pass. No unchecked ambiguity design-step items were present (`unchecked count 0`), so there were no newly actionable ambiguity follow-ups to execute. No `design.md`, `plan.md`, or `steps.md` changes were required. Pre-existing uncommitted edits in `components/ai/test/psi/ai/providers/openai_test.clj` were left untouched.
