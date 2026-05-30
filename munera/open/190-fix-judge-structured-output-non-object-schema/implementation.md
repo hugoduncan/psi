@@ -45,3 +45,5 @@
 2026-05-30 — Ambiguity follow-up execution: re-read `design-steps.md` after the latest ambiguity-review pass (`dedb3e2b`). No newly added unchecked ambiguity follow-up items are present; `design.md` needed no changes and no blocking ambiguity design-step remains.
 
 2026-05-30 — Design inconsistency review: re-read current design against referenced provider result helpers, prompted-JSON instruction helper, workflow structured-output envelope/schema code, and workflow-judge retry seam. No new actionable inconsistencies found; existing inconsistency follow-ups are already captured and checked in `design-steps.md`.
+
+2026-05-30 — Inconsistency follow-up execution: re-read `design-steps.md` after the preceding inconsistency-review pass. No newly added unchecked inconsistency follow-up items are present; `design.md` needed no changes and no blocking inconsistency design-step remains.
