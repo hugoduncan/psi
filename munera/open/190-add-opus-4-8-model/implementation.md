@@ -468,3 +468,9 @@ Completed the newly added ambiguity follow-up item in `design-steps.md` by refin
 Decision recorded:
 - Kept the detailed conditional compaction attachment rule from Part 4 step 11.
 - Updated the Part 4 acceptance criterion to require tests for both conditional cases: pre-cut mid-system instructions coalesced after the summary user when retained history does not begin with a user, and reattached after the first retained user when retained history begins with a user.
+
+---
+
+## Design inconsistency review pass — 2026-05-30 (latest independent verification)
+
+No new actionable inconsistencies found. Re-read `design.md` and checked referenced artifacts for model/provider schemas, Anthropic request shaping/validation, prompt request projection/current-user replacement, compaction rebuild rules, session resolvers, and shared-config resolution. Existing design concerns are already resolved or captured in checked `design-steps.md`; no duplicate follow-up items were added.
