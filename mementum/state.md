@@ -68,6 +68,7 @@ Bootstrapped on 2026-04-02.
 
 ## Suggested next step
 - For task 191, structured-output non-object schema implementation/review is complete; PR is open for merge.
+- New task `190-core-queryable-ui` captures making UI capabilities/actions queryable from core for extensions, including discoverable "make UI visible" action descriptors.
 - Registry unification arc: use task `164-registry-semantics-unification-audit` plus completed outcomes through `177` to choose the next cleanup target.
 - Likely next registry cleanup candidates:
   - close or move any remaining Munera tasks whose implementation/review state is already complete

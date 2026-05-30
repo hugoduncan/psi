@@ -18,6 +18,7 @@ Backlog:
 `munera/open/175-workflow-self-loop-control-edges/`
 `munera/open/186-built-in-skill-for-developing-extensions/`
 `munera/open/189-workflow-run-retention-and-cleanup/`
+`munera/open/190-core-queryable-ui/`
 
 Recently completed:
 

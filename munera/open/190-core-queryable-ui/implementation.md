@@ -314,3 +314,7 @@ No new actionable ambiguity feedback after re-reading `plan.md`, `steps.md`, `im
 ## 2026-05-30 ambiguity follow-up execution
 
 No newly added unchecked ambiguity follow-up items were present in `design-steps.md`; all ambiguity design steps are already complete. No `design.md` change was needed, no design step was left blocked, and `plan.md` / `steps.md` required no updates.
+
+## 2026-05-30 plan/steps inconsistency review
+
+Found one new actionable inconsistency after re-reading `plan.md`, `steps.md`, `implementation.md`, `design.md`, `design-decisions.md`, and `resolved-design-questions.md`: `design.md`, `plan.md`, and `steps.md` require `:psi.ui/diagnostic` as a first-class root-queryable/provider-error attr, but the attr/resolver summaries in `design-decisions.md` and `resolved-design-questions.md` still list the initial UI attrs without `:psi.ui/diagnostic`. Those summaries should be aligned so implementation planning has one attr set.
