@@ -10,7 +10,7 @@ Initial attr set:
 - `:psi.ui/available?` — boolean, true when a concrete UI adapter is attached.
 - `:psi.ui/capabilities` — vector of capability keywords supported by the active UI/runtime.
 - `:psi.ui/actions` — vector of action descriptors.
-- `:psi.ui/make-visible-action` — nil or the descriptor satisfying `:psi.ui.capability/make-visible`.
+- `:psi.ui/make-visible-action` — always an action descriptor for `:psi.ui.capability/make-visible`; the descriptor is available when supported and unavailable with a machine-readable reason/message when unsupported, headless, or provider-error.
 
 The resolver should require only `:psi/agent-session-ctx` as input so these attrs are root-queryable. It should not require `:psi.agent-session/session-id`.
 
@@ -42,12 +42,22 @@ Action descriptors are pure data maps with this shape:
                             :psi.ui.invocation/command "psi-emacs-show-active"}}
 ```
 
-Optional unavailable fields:
+Unavailable fields are required whenever `:psi.ui.action/available?` is false:
 
 ```clojure
 {:psi.ui.action/available? false
- :psi.ui.action/unavailable-reason "No attached UI adapter can make itself visible."}
+ :psi.ui.action/unavailable-reason :psi.ui.unavailable.reason/no-attached-ui
+ :psi.ui.action/unavailable-message "No attached UI adapter can make itself visible."}
 ```
+
+`:psi.ui.action/unavailable-reason` values are machine-readable keywords in the `:psi.ui.unavailable.reason/...` namespace. The minimum vocabulary is:
+
+- `:psi.ui.unavailable.reason/no-provider`
+- `:psi.ui.unavailable.reason/no-attached-ui`
+- `:psi.ui.unavailable.reason/unsupported-capability`
+- `:psi.ui.unavailable.reason/provider-error`
+
+Provider-error cases may also include bounded serialisable diagnostic text on the root UI result, but descriptors must not expose frontend objects or stacktrace data by default.
 
 Keep descriptor keys fully namespaced so descriptors are self-describing in EQL results and docs.
 
@@ -108,9 +118,9 @@ For this task, TUI/console may return no `:psi.ui.capability/make-visible` and n
 Use both patterns:
 
 - Absence from `:psi.ui/capabilities` means the extension should not expect that behaviour.
-- `:psi.ui/make-visible-action` may return an unavailable descriptor with `:psi.ui.action/available? false` and `:psi.ui.action/unavailable-reason` for diagnostics and documentation.
+- `:psi.ui/make-visible-action` always returns a descriptor. When the active UI cannot currently perform the action, the descriptor has `:psi.ui.action/available? false`, a `:psi.ui.action/unavailable-reason` keyword from the `:psi.ui.unavailable.reason/...` namespace, and a bounded human-readable `:psi.ui.action/unavailable-message`.
 
-This gives extensions a simple capability-driven path while preserving explanatory introspection.
+This gives extensions a simple capability-driven path while preserving explanatory introspection through one stable action shape.
 
 ## 9. UI capabilities are derived on demand; requests use event subscription
 
