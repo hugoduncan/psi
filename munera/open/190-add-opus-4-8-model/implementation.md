@@ -548,3 +548,9 @@ Completed the newly added inconsistency follow-up item in `design-steps.md` by r
 
 - Updated the Part 4 resolver acceptance criterion so `:psi.agent-session/model-supports-mid-system-messages` must return true for both opus-4.8 and OpenAI chat-completions sessions, including custom/runtime-loaded OpenAI chat-completions model maps inferred from `:provider :openai` + `:api :openai-completions`.
 - The same criterion now explicitly requires false for Codex/responses models and unsupported Anthropic models, aligning acceptance with the model capability and resolver rules.
+
+---
+
+## Design ambiguity review pass — 2026-05-30 (final verification)
+
+No new actionable ambiguities found. Re-read `design.md` and checked referenced model catalog/schema, shared-config startup resolution, session request options, command/status display surfaces, provider request shaping/validation, OpenAI Codex effort path, extension mutation bridge, journal projection/current-user replacement, and compaction preservation rules. Existing ambiguity follow-ups in `design-steps.md` are already checked; no duplicate follow-up items were added.
