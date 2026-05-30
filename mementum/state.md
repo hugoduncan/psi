@@ -185,6 +185,7 @@ Bootstrapped on 2026-04-02.
 
 - 2026-05-30: Task 190 third ambiguity review pass found two new actionable ambiguities: Anthropic local request schema must admit inline system messages in `messages`, and prepared-turn current-user replacement must handle a pending `:mid-system` entry after the user while preserving `user → system` order. Added unchecked follow-ups to `design-steps.md` and committed `12cf9fb2`.
 
+- 2026-05-30: Task 190 requested code-shaper review found no new actionable code-shaping feedback after the same-namespace action descriptor key follow-up; focused UI/extension/runtime/RPC tests and targeted lint passed.
 - 2026-05-30: Task 190 code-shaper review found one new actionable robustness gap: action descriptors reject unqualified/foreign extra keys but still allow extra same-namespace non-schema `:psi.ui.action/...` keys at the untrusted provider boundary. Added an unchecked follow-up.
 - 2026-05-30: Task 190 invocation-key follow-up complete: provider invocation validation now rejects extra same-namespace non-schema `:psi.ui.invocation/...` keys for every supported invocation kind, with focused UI capability tests and targeted lint green.
 - 2026-05-30: Task 190 requested code-shaper review found no new distinct code-shaping feedback beyond the existing unchecked same-namespace invocation-key follow-up; focused UI/extension/runtime/RPC tests and targeted lint passed.

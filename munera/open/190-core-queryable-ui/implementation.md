@@ -712,3 +712,7 @@ Verification:
 
 - `clojure -M:test --focus psi.agent-session.ui-capabilities-test` — 21 tests, 135 assertions, 0 failures.
 - `clj-kondo --lint components/agent-session/src/psi/agent_session/ui_capabilities.clj components/agent-session/test/psi/agent_session/ui_capabilities_test.clj` — clean.
+
+## 2026-05-30 requested code-shaper review
+
+No new actionable code-shaping feedback after re-reading the code-shaper skill, task artifacts, UI capability normalization/resolver code, context/provider lifecycle seams, RPC/TUI provider wiring, nullable/extension API fixtures, focused tests, docs, and changelog. The prior closed-schema follow-ups for invocation and action descriptor keys are complete; the current implementation keeps the untrusted provider boundary fail-closed, keeps pure normalization in `ui-capabilities`, and leaves adapter lifecycle ownership in RPC/TUI wiring. Verification in this pass: `clojure -M:test --focus psi.agent-session.ui-capabilities-test --focus psi.agent-session.extensions-test --focus psi.app-runtime-test --focus psi.rpc-transport-test` — 86 tests, 427 assertions, 0 failures; targeted `clj-kondo` for reviewed UI/runtime/test files — clean. No new `steps.md` item was added.
