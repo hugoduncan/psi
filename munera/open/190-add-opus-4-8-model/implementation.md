@@ -138,3 +138,11 @@ Completed the two newly added inconsistency follow-up items in `design-steps.md`
 1. **Anthropic inline system request schema validation** — Part 4 adds `:system` to the AI `MessageRole` and requires Anthropic `transform-messages` to emit inline `{"role": "system", ...}` entries, but the local Anthropic request schema currently admits only `"user"` and `"assistant"` message roles. Specify that `request_schema.clj` must include an inline system message schema, or choose an explicit route that bypasses/normalizes validation, otherwise valid mid-system requests will be rejected before HTTP.
 
 2. **Mid-system projection versus current-user replacement** — `build-prepared-request` replaces the current persisted user message only when the last projected base message is a user. A valid pending `:mid-system` entry is appended after that user, so the base tail becomes system and the current user replacement/expansion path may no longer update the intended user turn. Specify how `replace-current-user-message` / prepared-turn assembly handles a pending mid-system entry while preserving order `user → system`.
+---
+
+## Ambiguity follow-up — 2026-05-30 (third pass)
+
+Completed the two newly added ambiguity follow-up items in `design-steps.md` by refining `design.md`:
+
+- Anthropic local request validation must now admit inline `{"role": "system", ...}` entries in the `messages` array via an explicit system-message schema, so valid mid-system requests are not rejected before HTTP/provider placement handling.
+- Prepared-turn assembly must treat a pending tail `... user, system` as an attached mid-system instruction: replace the preceding current user message, then preserve the system message after it, maintaining provider order `user → system`.

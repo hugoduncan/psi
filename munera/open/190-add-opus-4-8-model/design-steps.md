@@ -48,6 +48,6 @@
 
 ## From ambiguity review pass 2026-05-30 (third pass)
 
-- [ ] **Allow Anthropic inline system messages through request validation** — Update the design to specify how `request_schema.clj` admits inline `{"role": "system", ...}` messages in the Anthropic `messages` array, or explicitly state a different validation/normalization path, so mid-system requests are not rejected locally.
+- [x] **Allow Anthropic inline system messages through request validation** — Update the design to specify how `request_schema.clj` admits inline `{"role": "system", ...}` messages in the Anthropic `messages` array, or explicitly state a different validation/normalization path, so mid-system requests are not rejected locally.
 
-- [ ] **Define pending mid-system handling during current-user replacement** — Specify how prepared-turn assembly updates/replaces the current user message when a pending `:mid-system` entry follows it in the projected journal, preserving the valid provider order `user → system` rather than treating the system message as an unrelated tail.
+- [x] **Define pending mid-system handling during current-user replacement** — Specify how prepared-turn assembly updates/replaces the current user message when a pending `:mid-system` entry follows it in the projected journal, preserving the valid provider order `user → system` rather than treating the system message as an unrelated tail.

@@ -534,6 +534,16 @@ In `transform-message`, add a `:system` case:
 This emits `{"role": "system", "content": [...]}` inline in the `messages`
 array.  No beta header is required.
 
+`components/ai/src/psi/ai/providers/anthropic/request_schema.clj` must admit
+inline system messages in the local Anthropic request validator. Add a system
+message schema with `:role [:= "system"]` and text-block content only (the same
+text/cache-control block shape used for user text content), and include it in
+`anthropic-message-schema` alongside user and assistant messages. Mid-system
+requests must therefore pass psi's local request-shape gate; unsupported
+placement or capability failures are handled by the explicit placement logic and
+provider/model gates, not by rejecting the `"system"` role as an unknown local
+schema value.
+
 **Placement validation**: when assembling `transform-messages`, assert that every
 inline system message is preceded by a user message, allowing it to be the final
 message in the next generation request. Violations (consecutive system messages
@@ -607,6 +617,18 @@ This exact shape is the contract consumed by Part 4 step 4's `append-msg`
 `"system"` branch: string role key `"system"`, and `:content` as a vector of
 provider-style content blocks `{:type :text :text ...}`.
 
+Prepared-turn assembly must treat a pending mid-system entry after the current
+user turn as attached to that user turn. `replace-current-user-message` (or an
+equivalent helper in this assembly path) should detect the tail shape
+`... user, system` where the final system message came from a pending
+`:mid-system` entry, replace the preceding user message with the expanded/current
+`user-message`, and preserve the system message after it. The resulting order
+must remain `user → system`. If the tail is just `... user`, keep the existing
+replacement behaviour; if the tail is any other role sequence, do not infer a
+replacement target. This ensures template/skill expansion or cache-breakpoint
+updates to the current user turn are not skipped merely because a valid pending
+mid-system instruction is already attached to it.
+
 #### 11. Compaction (`components/agent-session/src/psi/agent_session/compaction.clj`)
 
 Mid-system messages must be preserved across compaction boundaries: they are
@@ -650,11 +672,17 @@ cache-control logic is required.
 - `inject-mid-system-message!` before any user turn, after an assistant turn, or
   after another pending mid-system entry returns `{:ok false :error
   :invalid-placement ...}` and does not modify the journal.
+- Anthropic `request_schema.clj` accepts inline `{"role": "system", ...}`
+  messages with text-block content in the `messages` array, so valid mid-system
+  requests are not rejected by local request validation.
 - Anthropic `transform-messages` emits `{"role": "system", ...}` for `:system`
   role messages; allows a system message that immediately follows a user message
   even when it is final in the generation request; drops (with warning) any
   system message at the beginning, immediately after another system message, or
   immediately after an assistant message.
+- Prepared-turn current-user replacement preserves an attached pending
+  mid-system tail by replacing `... user, system` as `... current-user, system`,
+  maintaining provider order `user → system`.
 - OpenAI chat-completions message transform maps `:system` → `"system"` string.
 - Compaction preserves both post-cut `:mid-system` entries and pre-cut active mid-system instructions (coalesced after the summary user turn).
 - Unit tests cover: model capability flag, resolver, dispatch handler (supported
