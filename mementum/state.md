@@ -147,3 +147,5 @@ Bootstrapped on 2026-04-02.
 
 - 2026-05-30: Task 190 second inconsistency follow-up complete: design now specifies `:psi.agent-session/speed-mode` resolver coerces nil session state to `:normal` while request shaping still treats nil/`:normal` as provider default, and `:supports-mid-conversation-system-messages` is optional model metadata with absent-as-false semantics. Both second-pass design-steps are checked.
 - 2026-05-30: Task 190 third ambiguity review pass found three new actionable ambiguities: persisted speed/effort startup wiring, mid-system capability lookup source under runtime model overrides, and mid-system journal `:source` provenance contract. Added unchecked follow-ups to `design-steps.md`.
+
+- 2026-05-30: Task 190 latest inconsistency follow-up completed and committed `d8b342ac`: design now requires plain adaptive Anthropic `thinking-level :xhigh` (nil `/effort` override) to send `output_config.effort = "highest"`, preserving the task goal that `:xhigh` is distinct from `:high`; `design-steps.md` is checked for the latest inconsistency item.
