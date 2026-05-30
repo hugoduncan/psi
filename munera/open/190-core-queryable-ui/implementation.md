@@ -250,3 +250,7 @@ No new actionable ambiguity feedback after re-reading `design.md`, `design-decis
 ## 2026-05-30 ambiguity follow-up execution
 
 No newly added unchecked ambiguity follow-up items were present in `design-steps.md`; all ambiguity design steps remain complete. No `design.md` change was needed, no design step was left blocked, and `plan.md` / `steps.md` were not touched.
+
+## 2026-05-30 design inconsistency review
+
+No new actionable inconsistency feedback after re-reading `design.md`, `design-decisions.md`, `resolved-design-questions.md`, referenced extension docs, and current UI/query/permission/frontend seams. The design remains aligned on runtime-scoped `:psi.ui/...` capability/action attrs, provider-derived state, unavailable/provider-error semantics, invocation/request boundaries, permission constraints, legacy UI-type compatibility, and documentation expectations. `plan.md` and `steps.md` were not reviewed.
