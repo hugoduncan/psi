@@ -137,8 +137,10 @@
            (is (= (constant-routing-judge "DONE")
                   (:judge inconsistency-follow-up)))
            (is (= {"DONE" {:goto "clarity-status"}} (:on inconsistency-follow-up))))
-         (testing "clarity-status judge has REPEAT/DONE routing"
-           (is (= #{"REPEAT" "DONE"} (set (keys (:on clarity-step)))))
+         (testing "clarity-status judge has full cycle routing"
+           (is (= {"REPEAT" {:goto "ambiguity-review" :max-iterations 6}
+                   "DONE" {:goto "final-summary"}}
+                  (:on clarity-step)))
            (is (some? (:judge clarity-step))))
          (testing "clarity-status judge has :outputs with judge-routing-result schema-id"
            (is (contains? (:judge clarity-step) :outputs))
@@ -205,8 +207,10 @@
            (is (= (constant-routing-judge "DONE")
                   (:judge inconsistency-follow-up)))
            (is (= {"DONE" {:goto "clarity-status"}} (:on inconsistency-follow-up))))
-         (testing "clarity-status judge has REPEAT/DONE routing"
-           (is (= #{"REPEAT" "DONE"} (set (keys (:on clarity-step)))))
+         (testing "clarity-status judge has full cycle routing"
+           (is (= {"REPEAT" {:goto "ambiguity-review" :max-iterations 6}
+                   "DONE" {:goto "final-summary"}}
+                  (:on clarity-step)))
            (is (some? (:judge clarity-step))))
          (testing "clarity-status judge has :outputs with judge-routing-result schema-id"
            (is (contains? (:judge clarity-step) :outputs))
