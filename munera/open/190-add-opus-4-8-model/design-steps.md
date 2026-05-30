@@ -63,3 +63,9 @@
 ## From inconsistency review pass 2026-05-30 (latest pass)
 
 - [x] **Align adaptive Anthropic `:xhigh` thinking-level differentiation** — Decide whether plain `thinking-level :xhigh` on adaptive Anthropic models should use `"highest"` when no `/effort` override is set (satisfying the task goal), or narrow the goal/acceptance criteria so only `/effort xhigh` is distinct. Update the mapping/resolution prose and tests accordingly.
+
+## From ambiguity review pass 2026-05-30 (latest pass)
+
+- [ ] **Specify explicit nil effort config resolution** — Define how `resolved-effort-override` distinguishes missing/invalid config from an explicit persisted nil after user/project config merging. State whether `:effort-override` is omitted from `system-defaults`, whether key presence/provenance is tracked before merge, or another mechanism preserves explicit nil masks.
+
+- [ ] **Define mid-system capability for custom OpenAI chat-completions models** — Decide whether `:supports-mid-conversation-system-messages` is inferred from runtime model API `:openai-completions`, or whether every OpenAI chat-completions model map (including custom/runtime-loaded models) must explicitly carry `true`; update resolver/dispatch expectations accordingly.

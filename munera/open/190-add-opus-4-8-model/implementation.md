@@ -198,3 +198,13 @@ Completed the newly added inconsistency follow-up item in `design-steps.md` by r
 - Plain adaptive Anthropic `thinking-level :xhigh` now satisfies the task goal without requiring `/effort xhigh`: when no effort override is set, adaptive-thinking models use the xhigh-aware level-derived mapping so `:xhigh` sends `output_config.effort = "highest"` while `:high` sends `"high"`.
 - `/effort xhigh` remains an explicit override path to the same adaptive Anthropic `"highest"` value; unsupported provider rejection still surfaces directly with no fallback.
 - Acceptance criteria now explicitly require the nil-override adaptive Anthropic case to distinguish `thinking-level :xhigh` from `:high`.
+
+---
+
+## Design ambiguity review pass — 2026-05-30 (latest pass)
+
+**New actionable ambiguities found:**
+
+1. **Explicit nil effort config through merged resolution** — The design requires `resolved-effort-override` to distinguish missing/invalid from explicit persisted nil after shared-config merging, but the current config resolver uses a flat `merge` over `system-defaults`, user, and project maps. Specify whether `:effort-override` is intentionally omitted from `system-defaults`, whether resolution tracks key presence/provenance before merge, or another mechanism preserves explicit nil masks; otherwise every resolved config may look explicitly nil or lower-precedence nil masks may be indistinguishable from absence.
+
+2. **Mid-system capability for custom/runtime OpenAI chat-completions models** — The design says all OpenAI chat-completions models support mid-conversation system messages while also making absent `:supports-mid-conversation-system-messages` mean false. Specify whether capability is inferred from runtime model API `:openai-completions`, or every built-in/custom/runtime OpenAI chat-completions model map must be explicitly annotated. Without this, custom OpenAI chat-completions models can be falsely gated off.
