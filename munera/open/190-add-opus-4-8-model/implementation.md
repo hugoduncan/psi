@@ -1199,3 +1199,11 @@ Read `design-steps.md` for unchecked inconsistency follow-up items added by the 
 ## Test-shaper review pass — 2026-05-30
 
 No new actionable test-shaping feedback found. Re-read the task artifacts and applied `.psi/skills/test-shaper/SKILL.md` against the referenced speed/effort command persistence tests, provider request-shaping tests, mid-system dispatch/persistence/projection tests, compaction replay tests, and docs/changelog acceptance surfaces. The current tests are behavior-focused, deterministic, reasonably localized, and cover the key partitions/boundaries added by the prior test-review follow-ups. Focused verification passed: `clojure -M:test --focus psi.agent-session.commands-speed-effort-test --focus psi.agent-session.model-dispatch-test --focus psi.agent-session.compaction-test --focus psi.ai.providers.anthropic-test --focus psi.ai.providers.openai-test` — 65 tests, 495 assertions, 0 failures. No duplicate `steps.md` follow-ups added.
+
+---
+
+## Docs review pass — 2026-05-30
+
+Actionable documentation feedback found:
+
+1. **`doc/configuration.md` overstates extension mutation support for speed/effort** — The "Speed and effort runtime settings" section says "Extension/runtime mutation surfaces use the same `:session`, `:project`, and `:user` scopes as model and thinking settings." The implemented surfaces expose slash commands plus internal/core `set-speed-mode-in!` / `set-effort-override-in!` dispatch wrappers; no `psi.extension/set-speed-mode` or `psi.extension/set-effort-override` Pathom extension mutations are registered. Update the docs to avoid promising extension mutation surfaces, or add and document the actual mutation names if that surface is intended. No duplicate existing follow-up covered this doc accuracy issue.
