@@ -1,11 +1,16 @@
-# 190 — Add Claude Opus 4.8 model
+# 190 — Add Claude Opus 4.8 + /speed command
 
 ## Goal
 
-Register `claude-opus-4-8` as a supported model in the psi model catalog so
-users can configure and use it via `model-id: "claude-opus-4-8"`.
+1. Register `claude-opus-4-8` as a supported model in the psi model catalog.
+2. Add a `/speed` command (analogous to `/thinking`) that controls a per-session
+   speed mode, propagated to providers that support it.
 
-## Context
+---
+
+## Part 1 — Claude Opus 4.8 model
+
+### Context
 
 The model catalog lives in `components/ai/src/psi/ai/models.clj`.  New
 Anthropic models follow the established pattern:
@@ -21,7 +26,7 @@ Anthropic models follow the established pattern:
 Opus 4.8 is the next Opus model after 4.7.  It uses the same adaptive-thinking
 API protocol and the same Anthropic Messages API transport.
 
-## Anthropic Models API
+### Anthropic Models API
 
 Anthropic exposes a models endpoint documented at
 https://docs.anthropic.com/en/api/models:
@@ -35,7 +40,7 @@ the model's `id`, `display_name`, and `created_at` fields.  Pricing and
 capability flags (context window, max tokens, adaptive-thinking) are not
 returned by the API and must be sourced from Anthropic's published documentation.
 
-## Scope
+### Scope
 
 Changes in `components/ai/src/psi/ai/models.clj`:
 
@@ -58,7 +63,7 @@ Both tests skip gracefully (pass with a skip message) when the env-var gate or
 API key is absent, following the same pattern as
 `anthropic_live_structured_output_test.clj`.
 
-## Model attributes
+### Model attributes
 
 | Attribute | Value |
 |---|---|
@@ -81,7 +86,123 @@ API key is absent, following the same pattern as
 Pricing mirrors Opus 4.7 as a placeholder; update once Anthropic publishes
 official pricing for 4.8.
 
-## Acceptance criteria
+---
+
+## Part 2 — `/speed` command
+
+### Background
+
+Anthropic offers a "fast mode" (research preview) via `speed: "fast"` in the
+request body.  Setting it yields up to 2.5× higher output tokens per second
+from the same model at premium pricing.  OpenAI exposes equivalent throughput
+control via `service_tier: "flex"` (lower priority / cheaper) or
+`service_tier: "auto"` (default).  The canonical psi abstraction is a
+per-session **speed mode** that maps onto each provider's native parameter.
+
+### Speed mode values
+
+| Value | Meaning | Anthropic | OpenAI |
+|---|---|---|---|
+| `:normal` | Default provider behaviour | omit `speed` | omit / `"default"` |
+| `:fast` | Higher throughput, premium pricing | `speed: "fast"` | `service_tier: "flex"` |
+
+`:normal` is the default (session starts with no speed override).
+
+### Architecture — full stack
+
+The speed mode follows the exact same path as `thinking-level`:
+
+```
+/speed command
+  → session/set-speed-mode dispatch handler
+    → :speed-mode stored in agent-session-schema
+      → session->request-options includes :speed-mode in ai-options
+        → provider build-request maps :speed-mode → native param
+```
+
+#### 1. Session state (`components/session-state/`)
+
+- Add `:speed-mode` to `agent-session-schema` as
+  `[:speed-mode {:optional true} [:maybe [:enum :normal :fast]]]`.
+- Add `speed-mode-schema` value `[:enum :normal :fast]`.
+- `initial-session` defaults `:speed-mode` to `nil` (provider default).
+
+#### 2. Dispatch handler (`components/agent-session/src/psi/agent_session/dispatch_handlers/session_mutations.clj`)
+
+New `:session/set-speed-mode` handler:
+- Stores `:speed-mode` on the session.
+- Emits optional `:persist/project-prefs-update` or `:persist/user-config-update`
+  effect when `scope` is `:project` or `:user` (same pattern as
+  `:session/set-thinking-level`).
+
+#### 3. Dispatch schema (`components/agent-session/src/psi/agent_session/dispatch_schema.clj`)
+
+Add `:runtime/agent-set-speed-mode` effect type to the effect schema.
+
+#### 4. Session settings (`components/agent-session/src/psi/agent_session/session_settings.clj`)
+
+Add `set-speed-mode-in!` delegating to `:session/set-speed-mode`.
+
+#### 5. `session->request-options` (`components/agent-session/src/psi/agent_session/prompt_request.clj`)
+
+Propagate `:speed-mode` from session data into `:turn/ai-options` when present
+and non-nil (same guard as `:temperature`).
+
+#### 6. Anthropic provider (`components/ai/src/psi/ai/providers/anthropic.clj`)
+
+In `build-request` (and streaming equivalent), when `:speed-mode` is `:fast`
+in options, add `speed: "fast"` to the request body.  Omit the key entirely
+for `:normal` or nil.
+
+#### 7. OpenAI provider (`components/ai/src/psi/ai/providers/openai/chat_completions.clj`)
+
+In `build-request`, when `:speed-mode` is `:fast`, add `service_tier: "flex"`.
+Omit for `:normal` or nil.  No change needed for Codex/responses API — it does
+not expose `service_tier`.
+
+#### 8. `/speed` command (`components/agent-session/src/psi/agent_session/commands.clj`)
+
+New `dispatch-speed-command` function:
+- No args → show current speed mode: `"Current speed mode: normal"`.
+- One arg (`normal` | `fast`) → validate, call `set-speed-mode-in!`, confirm.
+- Unknown arg → error with allowed values.
+
+Register in `exact-command-handlers` / `prefixed-command-prefixes` and
+`format-help` (same pattern as `/thinking`).
+
+#### 9. Footer / status (`components/app-runtime/src/psi/app_runtime/footer.clj`)
+
+Add `:psi.agent-session/speed-mode` to `footer-query`.  Display `• fast` in
+the footer context line when speed mode is `:fast`.
+
+#### 10. Resolvers (`components/agent-session/src/psi/agent_session/resolvers/session.clj`)
+
+Add `:psi.agent-session/speed-mode` resolver projecting from session state.
+
+#### 11. Persistence (`components/shared-config/`)
+
+Add `speed-mode` to the project/user config schema so `/speed fast project`
+persists across sessions (same as thinking-level).
+
+### Acceptance criteria — Part 2
+
+- `(session/query-in ctx sid [:psi.agent-session/speed-mode])` returns `:normal`
+  (nil coerced) or `:fast` after `/speed fast`.
+- `/speed` with no args prints the current mode.
+- `/speed fast` sets mode; `/speed normal` clears it.
+- `/speed unknown` returns an error listing allowed values.
+- Anthropic `build-request` includes `speed: "fast"` iff speed-mode is `:fast`;
+  omits it otherwise.
+- OpenAI chat-completions `build-request` includes `service_tier: "flex"` iff
+  speed-mode is `:fast`; omits it otherwise.
+- Footer displays `• fast` when speed mode is `:fast`.
+- Unit tests cover: command dispatch (all branches), Anthropic request shaping,
+  OpenAI request shaping, session state mutation, resolver projection.
+- `bb test` green.
+
+---
+
+## Combined acceptance criteria — Part 1
 
 - `(psi.ai.model-registry/find-model :anthropic "claude-opus-4-8")` returns a
   non-nil model map.
