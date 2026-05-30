@@ -951,3 +951,11 @@ Verification:
 ## Design ambiguity review pass — 2026-05-30 (plan/steps current no-new-actionable)
 
 No new actionable ambiguities found. Re-read `plan.md`, `steps.md`, `design-steps.md`, and recent `implementation.md` notes, then checked representative referenced implementation surfaces for the current task state: speed/effort session-transient semantics, mid-system provider/request-schema and extension persistence coverage, compaction preservation steps, and remaining Slice 5 docs/changelog/broad verification work. The plan and steps remain unambiguous: Slice 4 implementation/test work is complete in `steps.md`, Slice 5 owns the remaining docs/changelog/verification items, and all existing ambiguity follow-ups in `design-steps.md` are checked. No duplicate follow-up items were added.
+
+---
+
+## Implementation review pass — 2026-05-30 (compaction persistence/resume)
+
+Actionable feedback found:
+
+1. **Compacted mid-system preservation is runtime-only, not journal-replay-safe** — `compaction/rebuild-messages-from-entries` coalesces pre-cut `:mid-system` instructions into the replacement runtime message list, but the persisted journal only records the compaction entry with the original `:first-kept-entry-id`. `rebuild-messages-from-journal-entries` later reconstructs from the compaction entry and kept journal entries without applying the same preservation/coalescing rules, so a cold resume after compaction can drop pre-cut active mid-system instructions that the design says remain valid for the remainder of the session. Persist the preservation boundary/state or make journal replay use the same mid-system preservation semantics, with a resume/replay test.

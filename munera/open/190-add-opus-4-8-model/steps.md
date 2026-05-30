@@ -89,6 +89,7 @@
 - [x] Add tests for OpenAI chat-completions system-role transformation.
 - [x] Add nullable extension-helper integration coverage for `inject-mid-system-message!`.
 - [x] Add compaction tests covering summary-boundary attachment, retained pending-user attachment, cut advancement over completed user/assistant exchanges, and boundary mid-system merge.
+- [ ] Ensure compacted mid-system preservation survives journal replay/cold resume: pre-cut active `:mid-system` instructions must not be lost by `rebuild-messages-from-journal-entries` after a compaction entry.
 
 ## Slice 5 — Integration and coherence
 
