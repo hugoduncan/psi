@@ -494,3 +494,7 @@ Verification:
 
 - `clojure -M:test --focus psi.rpc-transport-test --focus psi.agent-session.ui-capabilities-test` — 25 tests, 139 assertions, 0 failures.
 - `clj-kondo --lint components/agent-session/src/psi/agent_session/context.clj components/app-runtime/src/psi/app_runtime.clj components/rpc/src/psi/rpc/runtime.clj bases/main/src/psi/main.clj components/rpc/test/psi/rpc_transport_test.clj` — clean.
+
+## 2026-05-30 implementation review
+
+Found one new actionable implementation issue after re-reading task artifacts, UI capability/provider code, RPC runtime wiring, docs, and focused tests: `emacs-rpc-provider` intends to downgrade nil or blank focused session ids to no-attached UI, but it checks `(not-empty (str ...))`, so whitespace-only focus ids (for example `"   "`) still advertise an available make-visible action with invalid session correlation. Normalize/trim the focused session id before advertising availability, and add coverage proving blank/whitespace focus state returns no-attached semantics.
