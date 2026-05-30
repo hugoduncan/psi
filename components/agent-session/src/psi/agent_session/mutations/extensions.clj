@@ -157,7 +157,7 @@
   "Append an extension-authored mid-conversation system instruction."
   [_ {:keys [psi/agent-session-ctx session-id text source ext-path]}]
   {::pco/op-name 'psi.extension/inject-mid-system-message
-   ::pco/params  [:psi/agent-session-ctx :session-id :text]
+   ::pco/params  [:psi/agent-session-ctx :session-id :text :source :ext-path]
    ::pco/output  [:psi.extension/ok?
                   :psi.extension/error
                   :psi.extension/reason]}

@@ -113,4 +113,4 @@
 
 ## Code-shaper follow-ups
 
-- [ ] Align `psi.extension/inject-mid-system-message` Pathom mutation `::pco/params` with its implemented optional provenance inputs (`:source` and `:ext-path`), and add/adjust coverage so the declared mutation contract includes those keys.
+- [x] Align `psi.extension/inject-mid-system-message` Pathom mutation `::pco/params` with its implemented optional provenance inputs (`:source` and `:ext-path`), and add/adjust coverage so the declared mutation contract includes those keys.

@@ -1243,3 +1243,18 @@ No new actionable documentation feedback found. Applied `.psi/skills/review-task
 Actionable feedback found:
 
 1. **Mid-system extension mutation declares an incomplete param contract** — `psi.agent-session.mutations.extensions/inject-mid-system-message` destructures and implements optional `:source` / `:ext-path` provenance inference, and the task step says the Pathom mutation has optional `:source` and `:ext-path`. But its `::pco/params` still lists only `[:psi/agent-session-ctx :session-id :text]`. That leaves the mutation introspection/contract inconsistent with the implementation and makes the provenance path less locally comprehensible. Include `:source` and `:ext-path` in the declared mutation params (or otherwise encode optional params consistently with existing Pathom mutation conventions) and add/adjust coverage that catches the declared contract.
+
+## Code-shaper follow-up — 2026-05-30
+
+Completed the newly added code-shaper follow-up:
+
+- Updated `psi.extension/inject-mid-system-message` Pathom mutation `::pco/params` to declare the implemented optional provenance inputs `:source` and `:ext-path` alongside `:text`, `:session-id`, and `:psi/agent-session-ctx`.
+- Added focused extension API coverage asserting the mutation contract includes `[:psi/agent-session-ctx :session-id :text :source :ext-path]`, so introspection stays aligned with the implemented provenance path.
+- Verification passed:
+  - `clojure -M:test --focus psi.agent-session.extensions-test` — 24 tests, 127 assertions, 0 failures.
+  - `clj-kondo --lint components/agent-session/src/psi/agent_session/mutations/extensions.clj components/agent-session/test/psi/agent_session/extensions_test.clj` — clean.
+## Implementation review pass — 2026-05-30
+
+No new actionable implementation feedback found. Applied `.psi/skills/task-implementation-review/SKILL.md`: re-read the task artifacts and checked the implemented Opus 4.8 model catalog, `/speed` and `/effort` session/config/provider stacks, mid-system dispatch/extension/provider/compaction paths, docs/changelog alignment, and current follow-up state. The only actionable implementation issue visible in this pass is already captured as the unchecked Code-shaper follow-up for `psi.extension/inject-mid-system-message` mutation `::pco/params`, so no duplicate `steps.md` item was added.
+
+---

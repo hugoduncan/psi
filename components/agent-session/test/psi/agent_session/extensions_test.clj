@@ -2,6 +2,8 @@
   "Tests for the extension registry, tool wrapping, introspection, and extension API."
   (:require
    [clojure.test :refer [deftest testing is]]
+   [com.wsscode.pathom3.connect.operation :as pco]
+   [psi.agent-session.mutations.extensions :as extension-mutations]
    [psi.deterministic-operation-runtime.core :as deterministic-op-runtime]
    [psi.deterministic-operation-registry.registry :as op-reg]
    [psi.state-kernel.dispatch :as kernel]
@@ -667,6 +669,12 @@
              ((:mutate api) 'psi.extension/test {:a 1 :ext-path "/custom"})))
       (is (= {:op 'psi.extension.workflow/create :params {:type :agent :ext-path "/ext/test"}}
              ((:mutate api) 'psi.extension.workflow/create {:type :agent})))))
+
+  (testing "mid-system mutation declares optional provenance params"
+    (is (= [:psi/agent-session-ctx :session-id :text :source :ext-path]
+           (-> extension-mutations/inject-mid-system-message
+               :config
+               ::pco/params))))
 
   (testing "API mid-system helper delegates to runtime mutation and normalizes result"
     (let [reg         (ext/create-registry)

@@ -79,6 +79,7 @@ Bootstrapped on 2026-04-02.
 - Backlog: `105-agent-session-component-extraction-map`, `124-turn-execution-contract-extraction`, `149-reload-fixup-inventory-and-safety`, `141`/`144`/`147` workflow items, `186-built-in-skill-for-developing-extensions`
 
 ## Latest session notes
+- 2026-05-30: Task 190 code-shaper follow-up complete: aligned `psi.extension/inject-mid-system-message` Pathom `::pco/params` with implemented optional `:source`/`:ext-path` provenance inputs, added contract coverage in `extensions_test.clj`, focused test/lint green, and checked the follow-up in `steps.md`.
 - 2026-05-30: Task 190 docs follow-up complete: aligned `doc/extension-api.md` mid-system examples and changelog with implemented extension API key `:inject-mid-system-message` (no bang), recorded implementation note, and checked the follow-up in `steps.md`.
 - 2026-05-30: Task 190 docs follow-up complete: corrected `doc/configuration.md` to state no `psi.extension/set-speed-mode` or `psi.extension/set-effort-override` mutation exists, direct users to `/speed` and `/effort`, recorded implementation note, and checked the follow-up in `steps.md`.
 - 2026-05-30: Task 190 docs review found actionable doc accuracy issue: `doc/configuration.md` claims extension/runtime mutation surfaces for speed/effort, but no `psi.extension/set-speed-mode` or `psi.extension/set-effort-override` mutations are registered. Added unchecked docs follow-up and implementation review note.
