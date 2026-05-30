@@ -59,3 +59,7 @@
 - [x] **Define mid-system capability lookup source** — Decide whether `model-supports-mid-system-messages` and injection gating read the reduced session model, catalog model, or runtime-resolved model with auth context; document the rule so OpenAI chat-completions and Codex/responses (including OAuth runtime overrides) are classified correctly.
 
 - [x] **Define the `:mid-system` source/provenance contract** — Specify what value is stored in `{:source ...}` for injected mid-system journal entries, and whether the extension API infers it from `ext-path`, accepts it from callers, or omits it.
+
+## From inconsistency review pass 2026-05-30 (latest pass)
+
+- [ ] **Align adaptive Anthropic `:xhigh` thinking-level differentiation** — Decide whether plain `thinking-level :xhigh` on adaptive Anthropic models should use `"highest"` when no `/effort` override is set (satisfying the task goal), or narrow the goal/acceptance criteria so only `/effort xhigh` is distinct. Update the mapping/resolution prose and tests accordingly.

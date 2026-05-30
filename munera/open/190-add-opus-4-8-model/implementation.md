@@ -180,3 +180,11 @@ Completed the three newly added ambiguity follow-up items in `design-steps.md` b
 ## Inconsistency follow-up — 2026-05-30 (latest pass)
 
 Read `design-steps.md` for newly added inconsistency-review follow-up items. No unchecked inconsistency follow-up items were present; the latest inconsistency review recorded no new actionable inconsistencies. No design changes were required for this pass.
+
+---
+
+## Design inconsistency review pass — 2026-05-30
+
+**New actionable inconsistency found:**
+
+1. **Adaptive Anthropic `thinking-level :xhigh` remains indistinct without `/effort` override** — The task goal requires `:xhigh` thinking level to be genuinely distinct from `:high` on providers that support it, and Part 3 introduces `thinking-level->effort-xhigh` mapping `:xhigh` to `"highest"` for adaptive Anthropic. But the request-resolution prose says that when no `:effort-override` is set, adaptive Anthropic falls back to the existing `thinking-level->effort-default` mapping, where `:xhigh` remains `"high"`. As written, only `/effort xhigh` becomes distinct; plain `/thinking xhigh` on Opus 4.7/4.8 does not.
