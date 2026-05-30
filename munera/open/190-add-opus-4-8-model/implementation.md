@@ -321,3 +321,13 @@ Read `design-steps.md` for newly added unchecked ambiguity follow-up items. No u
 **New actionable inconsistency found:**
 
 1. **OpenAI mid-system placement support conflicts with global injection restriction** — Part 4 states OpenAI chat-completions accepts inline `system` messages at any position and needs no special handling beyond pass-through, but the shared `:session/inject-mid-system-message` handler rejects injections unless the journal tail is the latest user turn with no pending `:mid-system`. As written, OpenAI-capable sessions are advertised as supporting a broader placement surface than the only first-class extension API permits. Align the design by either defining psi's extension API as the safe Anthropic-compatible subset for all providers, or by specifying provider-specific placement rules for OpenAI versus Anthropic.
+
+---
+
+## Ambiguity follow-up — 2026-05-30 (OpenAI placement + speed schema)
+
+Completed the two newly added follow-up items in `design-steps.md` by refining `design.md`.
+
+Decisions recorded:
+- Psi intentionally exposes the Anthropic-compatible placement subset for all providers. The shared `:session/inject-mid-system-message` handler enforces one set of placement rules regardless of provider. OpenAI's broader placement is a strict superset; the Anthropic-safe subset is always valid for both. No provider-specific placement relaxation is exposed through the extension API in this slice. Updated background, OpenAI provider section (step 6), and verified acceptance criteria are consistent.
+- Anthropic `request_schema.clj` must include `[:speed {:optional true} [:enum "fast"]]` in `anthropic-request-body-schema`, following the same pattern used for `"highest"` effort and inline system messages. Added the schema requirement to Part 2 step 6 and a matching acceptance criterion.

@@ -167,6 +167,13 @@ fast-mode beta header token `fast-mode-2026-02-01` via `beta-header` /
 
 Omit the body key and the beta token entirely for `:normal` or nil.
 
+`components/ai/src/psi/ai/providers/anthropic/request_schema.clj` must include
+`[:speed {:optional true} [:enum "fast"]]` in `anthropic-request-body-schema`
+so valid fast-mode requests are not rejected by `validate-request-body!` before
+the HTTP request is attempted.  This follows the same pattern used for
+`output_config.effort = "highest"` and inline system messages: the local schema
+is a psi request well-formedness gate, not the provider capability ceiling.
+
 #### 7. OpenAI provider (`components/ai/src/psi/ai/providers/openai/chat_completions.clj`)
 
 In `build-request`, when `:speed-mode` is `:fast`, add `service_tier: "flex"`.
@@ -266,6 +273,8 @@ Startup application rules:
 - `/speed fast bogus` returns an error listing allowed scopes.
 - Anthropic `build-request` includes `speed: "fast"` iff speed-mode is `:fast`;
   omits it otherwise.
+- Anthropic `request_schema.clj` accepts `speed: "fast"` in the request body
+  schema so valid fast-mode requests are not rejected by local validation.
 - OpenAI chat-completions `build-request` includes `service_tier: "flex"` iff
   speed-mode is `:fast`; omits it otherwise.
 - Footer displays `• fast` when speed mode is `:fast`.
@@ -547,6 +556,15 @@ turn that is about to be generated.
 any position; no special handling is needed beyond passing the message through.
 Codex/responses API does not support mid-conversation system messages.
 
+**Cross-provider injection API**: psi intentionally exposes the
+Anthropic-compatible placement subset for all providers.  The shared
+`:session/inject-mid-system-message` handler enforces the same placement rules
+(after latest user turn, no pending mid-system) regardless of provider.  OpenAI's
+broader placement capability is a strict superset; the Anthropic-safe subset is
+always valid for both providers.  This keeps one injection API, one set of
+placement rules, and one set of tests — provider-specific relaxation is not
+exposed through the extension API in this slice.
+
 ### Model capability flag
 
 A new boolean model attribute `:supports-mid-conversation-system-messages`
@@ -644,7 +662,11 @@ and drop the offending message rather than sending a malformed request.
 
 OpenAI already accepts `{"role": "system", ...}` objects in the messages array.
 Map the internal `:system` role → `"system"` string in the message transform.
-No other change needed.
+No other change needed.  Placement validation is not required in the OpenAI
+transform because the shared dispatch handler already enforces the
+Anthropic-compatible placement subset before the message reaches the journal;
+by the time the OpenAI provider assembles the request, the system message is
+guaranteed to follow a user message.
 
 #### 7. Dispatch handler — inject mid-system message
 
