@@ -134,3 +134,11 @@ Completed the newly added session/runtime correlation vocabulary follow-up in `d
 ## 2026-05-30 design ambiguity review
 
 Found two new actionable ambiguities after re-reading `design.md` against the current EQL/provider/frontend-mode seams: provider-error diagnostics mention optional `:psi.ui/diagnostic` data without declaring whether it is an EQL attr/output/discovery surface, and console/headless unavailable semantics leave console without a real make-visible mechanism able to be represented as either no provider, no attached UI, or attached UI with unsupported capability.
+
+
+## 2026-05-30 ambiguity follow-up
+
+Completed both newly added ambiguity follow-ups in `design.md`:
+
+- Made `:psi.ui/diagnostic` a first-class root-queryable/discoverable EQL output only for provider-error troubleshooting, with bounded serialisable text, default redaction requirements, nil/absent normal-case semantics, and guidance that extensions branch on reason keywords instead of diagnostics.
+- Clarified console/headless classification: a console runtime with a valid `:ui-type` but no real visibility mechanism is an attached UI with unsupported make-visible (`:psi.ui/type :console`, `:psi.ui/available? true`, no make-visible capability/action, and an unavailable make-visible descriptor reasoned as `:psi.ui.unavailable.reason/unsupported-capability`), while no provider remains headless/missing-provider and installed-but-unusable state remains no-attached-UI.
