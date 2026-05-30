@@ -71,6 +71,12 @@
    :operation "workflow/pass-status-routing"
    :args {:text {:from {:step step-name :output :final-llm-reply}}}})
 
+(defn- constant-routing-judge
+  [route]
+  {:type :invoke
+   :operation "workflow/constant-routing"
+   :args {:route route}})
+
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-design
 
@@ -120,14 +126,16 @@
            (is (= {"REPEAT" {:goto "ambiguity-follow-up"}
                    "DONE" {:goto "inconsistency-review"}}
                   (:on ambiguity-review)))
-           (is (= "workflow/constant-routing" (get-in ambiguity-follow-up [:judge :operation])))
+           (is (= (constant-routing-judge "DONE")
+                  (:judge ambiguity-follow-up)))
            (is (= {"DONE" {:goto "inconsistency-review"}} (:on ambiguity-follow-up)))
            (is (= (pass-status-judge-from-step "inconsistency-review")
                   (:judge inconsistency-review)))
            (is (= {"REPEAT" {:goto "inconsistency-follow-up"}
                    "DONE" {:goto "clarity-status"}}
                   (:on inconsistency-review)))
-           (is (= "workflow/constant-routing" (get-in inconsistency-follow-up [:judge :operation])))
+           (is (= (constant-routing-judge "DONE")
+                  (:judge inconsistency-follow-up)))
            (is (= {"DONE" {:goto "clarity-status"}} (:on inconsistency-follow-up))))
          (testing "clarity-status judge has REPEAT/DONE routing"
            (is (= #{"REPEAT" "DONE"} (set (keys (:on clarity-step)))))
@@ -186,14 +194,16 @@
            (is (= {"REPEAT" {:goto "ambiguity-follow-up"}
                    "DONE" {:goto "inconsistency-review"}}
                   (:on ambiguity-review)))
-           (is (= "workflow/constant-routing" (get-in ambiguity-follow-up [:judge :operation])))
+           (is (= (constant-routing-judge "DONE")
+                  (:judge ambiguity-follow-up)))
            (is (= {"DONE" {:goto "inconsistency-review"}} (:on ambiguity-follow-up)))
            (is (= (pass-status-judge-from-step "inconsistency-review")
                   (:judge inconsistency-review)))
            (is (= {"REPEAT" {:goto "inconsistency-follow-up"}
                    "DONE" {:goto "clarity-status"}}
                   (:on inconsistency-review)))
-           (is (= "workflow/constant-routing" (get-in inconsistency-follow-up [:judge :operation])))
+           (is (= (constant-routing-judge "DONE")
+                  (:judge inconsistency-follow-up)))
            (is (= {"DONE" {:goto "clarity-status"}} (:on inconsistency-follow-up))))
          (testing "clarity-status judge has REPEAT/DONE routing"
            (is (= #{"REPEAT" "DONE"} (set (keys (:on clarity-step)))))

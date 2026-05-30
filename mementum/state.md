@@ -15,6 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-30: Task 190 second test-shaper follow-up executed: workflow definition tests now assert each design/plan follow-up step uses the full `workflow/constant-routing` judge shape with `:args {:route "DONE"}`; focused workflow tests and targeted lint are green, and the new `steps.md` item is checked.
 - 2026-05-30: Task 190 test-shaper follow-up executed: workflow definition tests now assert each design/plan per-reviewer `workflow/pass-status-routing` judge reads that same step's own `:final-llm-reply`; focused workflow tests and targeted lint are green, and the new `steps.md` item is checked.
 - 2026-05-30: Task 190 plan inconsistency review pass re-read plan/steps/implementation/design artifacts plus workflow docs/definitions/prompts/tests and found no new actionable plan inconsistencies. Recorded review note only; no new `design-steps.md` follow-up items were needed.
 - 2026-05-30: Task 190 design ambiguity follow-up execution completed after the latest ambiguity-review pass: `design-steps.md` now exists, but its only item predates the preceding ambiguity review and is already checked from the earlier inconsistency follow-up; no newly added unchecked ambiguity items were executed. Recorded in `implementation.md`.
