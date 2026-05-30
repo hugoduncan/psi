@@ -47,3 +47,5 @@
 2026-05-30 — Design inconsistency review: re-read current design against referenced provider result helpers, prompted-JSON instruction helper, workflow structured-output envelope/schema code, and workflow-judge retry seam. No new actionable inconsistencies found; existing inconsistency follow-ups are already captured and checked in `design-steps.md`.
 
 2026-05-30 — Inconsistency follow-up execution: re-read `design-steps.md` after the preceding inconsistency-review pass. No newly added unchecked inconsistency follow-up items are present; `design.md` needed no changes and no blocking inconsistency design-step remains.
+
+2026-05-30 — Plan ambiguity review: found one actionable ambiguity in the OpenAI chat-completions provider-result slice. The plan/steps require switching parsed payload extraction to any JSON value, but referenced OpenAI code currently stores `:raw-payload` as the parsed payload while Anthropic/Codex store raw JSON text; the plan does not say whether OpenAI should preserve that legacy parsed `:raw-payload` shape or normalize it to raw text for scalar/array/null outputs.
