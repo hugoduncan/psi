@@ -440,3 +440,13 @@ Read `design-steps.md` for newly added unchecked ambiguity follow-up items after
 **New actionable inconsistency found:**
 
 1. **Compaction can place preserved mid-system instructions before retained user history** — Part 4 defines Anthropic-safe mid-system placement as immediately after the most recent user turn and before the assistant response being generated, and the injection API only permits the latest-user tail shape. But the compaction rule coalesces pre-cut active `:mid-system` entries immediately after the synthetic summary user turn, then carries retained post-cut history normally. If the retained post-cut history starts with a user turn, the rebuilt request becomes `summary user → system → retained user ...`, so the preserved system message is no longer attached to the most recent user turn / next assistant generation despite passing the weaker provider validation rule of “preceded by a user”. Align compaction preservation with the placement contract by specifying how to handle retained history that begins with a user (for example attach the coalesced instruction to the latest retained user before generation, define `user → system → user` as intentionally valid, or choose a cut/merge rule that preserves the latest-user tail invariant).
+
+---
+
+## Inconsistency follow-up — 2026-05-30 (compaction latest-user placement)
+
+Completed the newly added inconsistency follow-up item in `design-steps.md` by refining `design.md`:
+
+- Compaction now preserves active pre-cut `:mid-system` instructions by attaching the coalesced instruction to the first valid user boundary after compaction.
+- If retained post-cut history begins with a user turn, the coalesced instruction is reattached immediately after that retained user instead of after the synthetic summary user, avoiding `summary user → system → retained user`.
+- If retained boundary `:mid-system` entries are present, they merge into the same coalesced entry and move with the chosen attachment point, preserving order and avoiding consecutive system messages.

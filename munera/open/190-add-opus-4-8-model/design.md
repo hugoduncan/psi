@@ -864,16 +864,30 @@ The concrete preservation mechanism in this slice is:
    boundary merge rule below.
 3. Preserve pre-cut active `:mid-system` entries outside the summarised
    conversation by coalescing their text, in original order, into one retained
-   `:mid-system` entry immediately after the compaction summary user turn.
-4. If the retained post-cut history begins with one or more `:mid-system` entries,
-   merge those boundary entries into the same coalesced summary-boundary
-   `:mid-system` entry instead of emitting separate adjacent system messages.
-   The merged text order is: all pre-cut active mid-system instructions first,
-   then the post-cut boundary mid-system entries in journal order. The retained
+   `:mid-system` entry attached to the first valid user boundary after
+   compaction.
+4. The normal attachment point is immediately after the compaction summary user
+   turn. This is used when the retained post-cut history is empty, begins with an
+   assistant turn, or begins with one or more `:mid-system` entries that already
+   belong to the summary boundary.
+5. If the retained post-cut history begins with a user turn, do **not** emit the
+   coalesced instruction after the summary user. Instead, reattach the coalesced
+   instruction immediately after that first retained user turn, before any
+   retained assistant response to that user. This preserves the Anthropic-safe
+   invariant that an inline system message is attached to the most recent user at
+   its position, and it avoids rebuilding `summary user → system → retained user`.
+6. If the retained post-cut history begins with one or more `:mid-system` entries,
+   merge those boundary entries into the same coalesced boundary `:mid-system`
+   entry instead of emitting separate adjacent system messages. When the
+   attachment point is the summary user, the merged entry remains after the
+   summary user; when step 5 reattaches to the first retained user, the merged
+   entry moves with the coalesced instruction after that retained user. The
+   merged text order is: all pre-cut active mid-system instructions first, then
+   the post-cut boundary mid-system entries in journal order. The retained
    post-cut history then starts after those merged boundary entries. This
-   guarantees compaction never rebuilds `summary user → system → system`, while
-   preserving both pre-cut continuing instructions and post-cut pending
-   instructions.
+   guarantees compaction never rebuilds `summary user → system → system` or
+   `summary user → system → retained user`, while preserving both pre-cut
+   continuing instructions and post-cut pending instructions.
 
 #### 12. Cache interaction
 
