@@ -68,5 +68,5 @@
 
 ## Docs review follow-up
 
-- [ ] Update CHANGELOG.md [Unreleased] to mention the user-visible `review-task-design` and `review-task-plan` conditional per-reviewer follow-up behavior, including that plan-review follow-ups now target `steps.md` instead of `design-steps.md`.
-- [ ] Update doc/workflow-ir.md so its invoke-judge runtime support note reflects the current executed runtime support used by the review workflows, rather than saying invoke judges are only a documented future shape.
+- [x] Update CHANGELOG.md [Unreleased] to mention the user-visible `review-task-design` and `review-task-plan` conditional per-reviewer follow-up behavior, including that plan-review follow-ups now target `steps.md` instead of `design-steps.md`.
+- [x] Update doc/workflow-ir.md so its invoke-judge runtime support note reflects the current executed runtime support used by the review workflows, rather than saying invoke judges are only a documented future shape.
