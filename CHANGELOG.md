@@ -16,6 +16,7 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 - Unknown `{{varname}}` tokens in `.md` workflow bodies that are neither standard (`input`, `original`) nor declared in `vars:` produce a compile-time error at workflow load, catching typos and missing declarations before runtime.
 
 ### Changed
+- `review-task-design` and `review-task-plan` now run ambiguity/inconsistency follow-up steps only when that reviewer reports `PASS_STATUS: ACTIONABLE_FEEDBACK`; `PASS_STATUS: REVIEW_COMPLETE` skips the no-op follow-up while still continuing the remaining review cycle. Plan-review follow-ups now write to `steps.md` instead of `design-steps.md`.
 - `review-implementation` workflow renamed to `review-task-implementation`; the old name is no longer available. Update any saved `/delegate review-implementation` invocations to `/delegate review-task-implementation`.
 - `review-task-until-clear` workflow renamed to `review-task-plan` and narrowed to `plan.md`/`steps.md` review only (design review is now handled by `review-task-design`). The old name is no longer available.
 - `review-task-implementation` now includes a `review-task-docs` step that reviews user-facing documentation (`README.md`, `doc/`, changelog) as part of the implementation review chain.

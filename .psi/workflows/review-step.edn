@@ -12,7 +12,8 @@
             "skill" {:from :workflow-input, :path [:skill]}}}],
    :judge {:type :invoke
            :operation "workflow/pass-status-routing"
-           :args {:text {:from {:step "review", :output :final-llm-reply}}}},
+           :args {:text {:from {:step "review", :output :final-llm-reply}}
+                  :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}},
    :on {"DONE" {:goto :done}
         "REPEAT" {:goto "follow-up"}}}
   {:name "follow-up",
