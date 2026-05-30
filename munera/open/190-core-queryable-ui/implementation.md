@@ -282,3 +282,7 @@ No new actionable ambiguity feedback after re-reading `plan.md`, `steps.md`, `im
 ## 2026-05-30 ambiguity follow-up execution
 
 No newly added unchecked ambiguity follow-up items were present in `design-steps.md`; all design follow-up steps are already complete. No `design.md` changes were needed, no design step was left blocked, and `plan.md` / `steps.md` required no updates.
+
+## 2026-05-30 plan inconsistency review
+
+Found one new actionable inconsistency after re-reading `plan.md`, `steps.md`, `implementation.md`, `design.md`, completed `design-steps.md`, and referenced extension docs: `implementation.md` records the `doc/extensions.md`, `doc/extension-api.md`, and `doc/architecture.md` queryable-UI documentation updates as already completed design follow-ups, while `steps.md` Slice 8 still lists those same documentation updates as unchecked implementation work. The checklist should distinguish already-completed design-doc alignment from any remaining implementation-time doc verification/update work.
