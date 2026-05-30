@@ -326,3 +326,7 @@ Completed the newly added `:psi.ui/diagnostic` attr-summary alignment follow-up 
 ## 2026-05-30 requested plan/steps ambiguity review
 
 No new actionable ambiguity feedback after this requested independent pass over `plan.md`, `steps.md`, `implementation.md`, `design.md`, related design artifacts/docs, and sampled UI/query/runtime seams. Existing checklist items are actionable enough for implementation across discovery, model/validation, EQL discovery, provider lifetime, frontend provider behaviour, optional invocation handling, tests, docs, and verification; no unchecked `design-steps.md` follow-up item was added.
+
+## 2026-05-30 ambiguity follow-up execution
+
+No newly added unchecked ambiguity follow-up items were present in `design-steps.md` after the preceding ambiguity-review pass; all ambiguity design follow-up steps are already complete. No `design.md`, `plan.md`, or `steps.md` updates were needed, and no design step was left blocked.
