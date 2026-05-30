@@ -556,6 +556,44 @@
                      events)))
         (is (= :retry-cancelled (:failure-reason (last events))))))))
 
+(deftest execute-prepared-request-production-backoff-observes-active-turn-abort-test
+  ;; Production retry sleep polls the active turn abort state instead of one
+  ;; uninterruptible Thread/sleep.
+  (let [[ctx session-id] (create-session-context {:persist? false
+                                                  :config {:auto-retry-max-retries 2
+                                                           :auto-retry-base-delay-ms 1000
+                                                           :provider-retry-sleep-poll-ms 1}})
+        prepared         (prepared-request ctx session-id)
+        attempts*        (atom 0)
+        abort-thread*    (atom nil)]
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [& _]
+                    (swap! attempts* inc)
+                    (error-turn "Connection reset by peer"))]
+      (try
+        (let [abort-thread (Thread.
+                            (fn []
+                              (loop []
+                                (when (nil? (:retry (ss/get-session-data-in ctx session-id)))
+                                  (Thread/sleep 1)
+                                  (recur)))
+                              (turn-runtime/abort-active-turn-in! ctx session-id)))
+              _            (reset! abort-thread* abort-thread)
+              _            (.start abort-thread)
+              result       (turn-runtime/execute-prepared-request!
+                            {:provider-registry (atom {})} ctx session-id prepared nil)
+              outcome (:execution-result/retry-outcome result)
+              events  (provider-events ctx session-id)]
+          (is (= 1 @attempts*))
+          (is (= :retry-cancelled (:failure-reason outcome)))
+          (is (true? (:cancelled? outcome)))
+          (is (= ["provider_request_started" "provider_request_finished"
+                  "provider_retry_scheduled" "provider_request_cancelled"]
+                 (mapv :type events))))
+        (finally
+          (when-let [t @abort-thread*]
+            (.join t 1000)))))))
+
 (deftest execute-prepared-request-streaming-retry-discards-failed-partial-output-test
   ;; Failed streaming-attempt partial output is attempt-local; the successful
   ;; retry owns the final assistant content.

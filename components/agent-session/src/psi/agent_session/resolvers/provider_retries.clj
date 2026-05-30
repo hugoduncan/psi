@@ -46,6 +46,65 @@
        (group-by event-provider-request-id)
        (mapv provider-retry-summary->eql)))
 
+(defn- matching-provider-retry-summary
+  [agent-session-ctx session-id predicate]
+  (some #(when (predicate %) %)
+        (provider-retry-summaries agent-session-ctx session-id)))
+
+(pco/defresolver provider-retry-by-request-id
+  "Resolve one provider retry summary from an explicit provider request id."
+  [{:keys [psi/agent-session-ctx
+           psi.agent-session/session-id
+           psi.provider-request/id]}]
+  {::pco/input  [:psi/agent-session-ctx
+                 :psi.agent-session/session-id
+                 :psi.provider-request/id]
+   ::pco/output [:psi.provider-request/turn-id
+                 :psi.provider-request/retry-count
+                 :psi.provider-request/final-status
+                 :psi.provider-request/error-kind
+                 {:psi.provider-request/retry-attempts
+                  [:psi.provider-retry/attempt
+                   :psi.provider-retry/failed-attempt
+                   :psi.provider-retry/error-kind
+                   :psi.provider-retry/error-message
+                   :psi.provider-retry/http-status
+                   :psi.provider-retry/delay-ms
+                   :psi.provider-retry/delay-source
+                   :psi.provider-retry/resume-at
+                   :psi.provider-retry/rate-limit
+                   :psi.provider-retry/final?]}]}
+  (or (matching-provider-retry-summary agent-session-ctx session-id
+                                       #(= id (:psi.provider-request/id %)))
+      {}))
+
+(pco/defresolver provider-retry-by-turn-id
+  "Resolve one provider retry summary from an explicit turn id."
+  [{:keys [psi/agent-session-ctx
+           psi.agent-session/session-id
+           psi.provider-request/turn-id]}]
+  {::pco/input  [:psi/agent-session-ctx
+                 :psi.agent-session/session-id
+                 :psi.provider-request/turn-id]
+   ::pco/output [:psi.provider-request/id
+                 :psi.provider-request/retry-count
+                 :psi.provider-request/final-status
+                 :psi.provider-request/error-kind
+                 {:psi.provider-request/retry-attempts
+                  [:psi.provider-retry/attempt
+                   :psi.provider-retry/failed-attempt
+                   :psi.provider-retry/error-kind
+                   :psi.provider-retry/error-message
+                   :psi.provider-retry/http-status
+                   :psi.provider-retry/delay-ms
+                   :psi.provider-retry/delay-source
+                   :psi.provider-retry/resume-at
+                   :psi.provider-retry/rate-limit
+                   :psi.provider-retry/final?]}]}
+  (or (matching-provider-retry-summary agent-session-ctx session-id
+                                       #(= turn-id (:psi.provider-request/turn-id %)))
+      {}))
+
 (pco/defresolver agent-session-provider-retries
   "Resolve provider retry summaries from retained provider lifecycle events."
   [{:keys [psi/agent-session-ctx psi.agent-session/session-id]}]
@@ -76,4 +135,6 @@
      :psi.agent-session/provider-retries               (vec retried)}))
 
 (def resolvers
-  [agent-session-provider-retries])
+  [agent-session-provider-retries
+   provider-retry-by-request-id
+   provider-retry-by-turn-id])

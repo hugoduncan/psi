@@ -44,8 +44,12 @@
 
 (defn abort-active-turn-in!
   "Abort the currently active prepared-request turn for `session-id`, if any.
-   Cancels the stream handle and forces an aborted terminal turn result."
+   Cancels the stream handle and marks pending provider-retry backoff as
+   cancelled so retry sleep can stop before the next attempt."
   [ctx session-id]
+  (ss/apply-root-state-update-in!
+   ctx
+   (ss/session-update session-id #(assoc % :provider-retry-abort-requested? true)))
   (when-let [turn-ctx (trs/turn-context-in ctx session-id)]
     (stream/abort-turn! turn-ctx)
     true))
@@ -351,15 +355,40 @@
   [ctx session-id]
   (ss/apply-root-state-update-in!
    ctx
-   (ss/session-update session-id #(assoc %
-                                         :retry-attempt 0
-                                         :retry nil))))
+   (ss/session-update session-id #(-> %
+                                      (assoc :retry-attempt 0
+                                             :retry nil)
+                                      (dissoc :provider-retry-abort-requested?)))))
+
+(defn- active-turn-cancelled?
+  [ctx session-id]
+  (boolean
+   (when-let [turn-ctx (trs/turn-context-in ctx session-id)]
+     (some-> turn-ctx :turn-data deref :stream-handle stream/cancelled-stream-handle?))))
 
 (defn- provider-retry-cancelled?
   [ctx session-id]
   (boolean
-   (when-let [cancelled? (:provider-retry-cancelled? ctx)]
-     (cancelled? session-id))))
+   (or (active-turn-cancelled? ctx session-id)
+       (:provider-retry-abort-requested? (ss/get-session-data-in ctx session-id))
+       (when-let [cancelled? (:provider-retry-cancelled? ctx)]
+         (cancelled? session-id)))))
+
+(defn- retry-sleep-poll-ms
+  [ctx delay-ms]
+  (long (min (max 1 (long (or delay-ms 0)))
+             (max 1 (long (get-in ctx [:config :provider-retry-sleep-poll-ms] 250))))))
+
+(defn- interruptible-sleep-for-retry!
+  [ctx session-id delay-ms]
+  (let [deadline-ms (+ (System/currentTimeMillis) (long delay-ms))
+        poll-ms     (retry-sleep-poll-ms ctx delay-ms)]
+    (loop []
+      (let [remaining-ms (- deadline-ms (System/currentTimeMillis))]
+        (when (and (pos? remaining-ms)
+                   (not (provider-retry-cancelled? ctx session-id)))
+          (Thread/sleep (long (min poll-ms remaining-ms)))
+          (recur))))))
 
 (defn- sleep-for-retry!
   [ctx session-id delay-ms]
@@ -368,7 +397,7 @@
              (not (provider-retry-cancelled? ctx session-id)))
     (if-let [sleep-fn (:provider-retry-sleep-fn ctx)]
       (sleep-fn (long delay-ms))
-      (Thread/sleep (long delay-ms))))
+      (interruptible-sleep-for-retry! ctx session-id (long delay-ms))))
   (provider-retry-cancelled? ctx session-id))
 
 (defn- execute-provider-attempt!
@@ -462,6 +491,9 @@
                          :response-mode (response-mode-for ctx session-id prepared-request)}
         retry-enabled?  (:auto-retry-enabled (ss/get-session-data-in ctx session-id))
         max-retries     (long (get-in ctx [:config :auto-retry-max-retries] 3))]
+    (ss/apply-root-state-update-in!
+     ctx
+     (ss/session-update session-id #(dissoc % :provider-retry-abort-requested?)))
     (loop [retry-attempt (retry-attempt-for ctx session-id)]
       (let [attempt-data*  (assoc attempt-data :retry-attempt retry-attempt)
             attempt-result (execute-provider-attempt! ai-ctx ctx session-id prepared-request progress-queue attempt-data*)

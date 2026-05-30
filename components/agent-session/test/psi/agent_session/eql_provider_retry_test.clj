@@ -4,6 +4,22 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.test-support :as test-support]))
 
+(defn- retry-query
+  []
+  [:psi.provider-request/id
+   :psi.provider-request/turn-id
+   :psi.provider-request/retry-count
+   :psi.provider-request/final-status
+   {:psi.provider-request/retry-attempts
+    [:psi.provider-retry/attempt
+     :psi.provider-retry/failed-attempt
+     :psi.provider-retry/error-kind
+     :psi.provider-retry/error-message
+     :psi.provider-retry/delay-ms
+     :psi.provider-retry/delay-source
+     :psi.provider-retry/resume-at
+     :psi.provider-retry/rate-limit]}])
+
 (defn- create-session-context
   ([] (create-session-context {}))
   ([opts]
@@ -81,3 +97,50 @@
                                                  :reset-after-ms 3000
                                                  :reset-at 3042}}]
                (get-in r [:psi.agent-session/provider-retries 0 :psi.provider-request/retry-attempts])))))))
+
+(deftest provider-retry-direct-eql-introspection-test
+  (testing "provider retry detail resolves from explicit provider request id or turn id"
+    (let [[ctx session-id] (create-session-context)]
+      (test-support/update-state! ctx :provider-events
+                                  into
+                                  [{:type "provider_request_started"
+                                    :provider-request-id "request-1"
+                                    :turn-id "turn-1"
+                                    :retry-attempt 0}
+                                   {:type "provider_retry_scheduled"
+                                    :provider-request-id "request-1"
+                                    :turn-id "turn-1"
+                                    :failed-attempt 0
+                                    :retry-attempt 1
+                                    :error-kind :rate-limited
+                                    :error-message "rate limited"
+                                    :delay-ms 50
+                                    :delay-source :retry-after
+                                    :resume-at 100}
+                                   {:type "provider_request_finished"
+                                    :provider-request-id "request-1"
+                                    :turn-id "turn-1"
+                                    :retry-attempt 1
+                                    :status :failed
+                                    :final? true
+                                    :failure-reason :retry-exhausted
+                                    :error-kind :rate-limited}])
+      (let [by-request (session/query-in ctx session-id
+                                         (retry-query)
+                                         {:psi.provider-request/id "request-1"})
+            by-turn    (session/query-in ctx session-id
+                                         (retry-query)
+                                         {:psi.provider-request/turn-id "turn-1"})]
+        (is (= "turn-1" (:psi.provider-request/turn-id by-request)))
+        (is (= "request-1" (:psi.provider-request/id by-turn)))
+        (is (= :retry-exhausted (:psi.provider-request/final-status by-request)))
+        (is (= 1 (:psi.provider-request/retry-count by-turn)))
+        (is (= [{:psi.provider-retry/attempt 1
+                 :psi.provider-retry/failed-attempt 0
+                 :psi.provider-retry/error-kind :rate-limited
+                 :psi.provider-retry/error-message "rate limited"
+                 :psi.provider-retry/delay-ms 50
+                 :psi.provider-retry/delay-source :retry-after
+                 :psi.provider-retry/resume-at 100
+                 :psi.provider-retry/rate-limit nil}]
+               (:psi.provider-request/retry-attempts by-request)))))))
