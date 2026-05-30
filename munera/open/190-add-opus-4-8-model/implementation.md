@@ -331,3 +331,11 @@ Completed the two newly added follow-up items in `design-steps.md` by refining `
 Decisions recorded:
 - Psi intentionally exposes the Anthropic-compatible placement subset for all providers. The shared `:session/inject-mid-system-message` handler enforces one set of placement rules regardless of provider. OpenAI's broader placement is a strict superset; the Anthropic-safe subset is always valid for both. No provider-specific placement relaxation is exposed through the extension API in this slice. Updated background, OpenAI provider section (step 6), and verified acceptance criteria are consistent.
 - Anthropic `request_schema.clj` must include `[:speed {:optional true} [:enum "fast"]]` in `anthropic-request-body-schema`, following the same pattern used for `"highest"` effort and inline system messages. Added the schema requirement to Part 2 step 6 and a matching acceptance criterion.
+
+---
+
+## Design inconsistency review pass — 2026-05-30
+
+**New actionable inconsistency found:**
+
+1. **Effort override for extended-thinking models contradicts no-effort-sending rule** — Part 3 step 5 specifies an effort-override mapping for extended-thinking models (`:xhigh` → `"high"` for extended) and renames the current `thinking-level->effort` to `thinking-level->effort-default`. But the same section states extended-thinking models "do not send adaptive `output_config.effort`", and the current code only computes/applies effort `(when (and thinking adaptive?) ...)`. The override mapping for extended models has no sending path, and the renamed `thinking-level->effort-default` has no remaining consumer since adaptive models use the new `thinking-level->effort-xhigh` table. Either remove the extended-thinking effort-override mapping and the dead rename, or specify how effort-override is applied to extended-thinking models (e.g. as a budget multiplier or ignored with a warning).
