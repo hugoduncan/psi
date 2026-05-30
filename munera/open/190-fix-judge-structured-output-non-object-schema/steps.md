@@ -66,3 +66,7 @@
 - [x] Add direct OpenAI chat-completions streaming structured-output regression coverage for prompted-JSON and non-object/null payloads, or refactor streaming/non-streaming result construction through a shared helper so the existing payload matrix truly covers both paths. Refactored streaming and non-streaming Chat Completions structured-output result construction through a shared helper covered by the existing provider-native/prompted-JSON all-JSON-value payload matrix.
 - [x] Update structured-output workflow docs (`doc/workflow-grammar.md` and `doc/workflow-ir.md`) so prompted-JSON and provider-native structured-output descriptions say a single JSON value matching the declared JSON Schema, not only a JSON object, while preserving guidance that map schemas are needed for multiple named fields/path references.
 - [x] Reconcile `doc/workflow-ir.md` structured-output invalid-policy/default retry wording with the landed workflow-judge behavior: invalid structured-output judge turns retry by default up to the built-in judge retry limit, while unsupported structured output still fails immediately.
+
+## Test review follow-ups
+
+- [ ] Add workflow-judge retry-exhaustion coverage asserting every structured-output retry call receives the original structured-output opts/schema, not just the first successful retry path.
