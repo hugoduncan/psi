@@ -75,3 +75,17 @@ Likely areas to inspect during planning:
 - session targeting for tool calls from originating sessions and child workflow sessions;
 - whether async run handles are stored under workflow runtime state, agent-session state, extension state, or an external delegation registry;
 - any retention/cleanup behavior that might remove active run metadata too early.
+
+## Delegate list visibility and retention contract
+
+`delegate list` is scoped to the invoking/originating agent session, not global. A run is visible to a session only when the delegate tool's background-job registry has a `tool-name = "delegate"` workflow job whose `thread-id` equals the invoking `:psi.agent-session/session-id`. The background job is the authoritative session/owner marker for delegate-tool visibility.
+
+The canonical workflow run registry remains the authoritative source for workflow run identity, status, definition id, current step, creation time, and manageability. A listed delegate entry is formed by joining the same-session background job's `workflow-id` to the canonical workflow run's `run-id`.
+
+Visibility rules:
+
+- Non-terminal delegate background jobs (`:running` and `:pending-cancel`) must always be listed for the invoking session, even if workflow execution is still in progress.
+- Retained terminal delegate background jobs (`:completed`, `:failed`, `:cancelled`, `:timed-out`) should remain listed while the matching canonical workflow run still exists, because their run ids may still be valid for `continue` or `remove` according to workflow status.
+- Removed canonical workflow runs must not remain visible solely because terminal background-job history is retained.
+- Delegate jobs from unrelated sessions must not be listed, even if their canonical workflow runs still exist in the global workflow registry.
+- If a same-session delegate background job points at a missing canonical workflow run while still non-terminal, `delegate list` should surface an actionable inconsistency/error rather than silently returning an empty list.
