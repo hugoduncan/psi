@@ -41,13 +41,13 @@
 - [x] Honor parseable `Retry-After` / `X-Retry-After` as the scheduled delay with `:delay-source :retry-after`.
 - [x] Preserve rate-limit reset/limit/remaining header metadata in active retry projection, telemetry, and EQL-ready lifecycle captures.
 - [x] Fall back to configured exponential backoff with `:delay-source :exponential-backoff` when retry headers are absent or invalid.
-- [ ] Make pending retry backoff cancellable through the active session/turn abort signal or an equivalent coordinator-owned cancellable delay.
-- [ ] On pending-backoff cancellation, suppress the next provider execution attempt and clear active retry projection fields.
-- [ ] Emit `provider_request_cancelled` for pending-backoff cancellation with request identity, suppressed next attempt, last failed attempt, `:failure-reason :retry-cancelled`, and last error classification/cause.
-- [ ] Verify cancellation does not emit synthetic `provider_request_started` or `provider_request_finished` for the suppressed next attempt.
-- [ ] Ensure failed streaming attempt partial text/thinking/tool-call deltas remain attempt-local and are not committed to canonical transcript/message assembly when retrying.
-- [ ] Ensure a successful later streaming retry produces final assistant content without mixing or duplicating failed-attempt partial output.
-- [ ] Add focused tests for pending-backoff cancellation and streaming partial-output isolation.
+- [x] Make pending retry backoff cancellable through the active session/turn abort signal or an equivalent coordinator-owned cancellable delay.
+- [x] On pending-backoff cancellation, suppress the next provider execution attempt and clear active retry projection fields.
+- [x] Emit `provider_request_cancelled` for pending-backoff cancellation with request identity, suppressed next attempt, last failed attempt, `:failure-reason :retry-cancelled`, and last error classification/cause.
+- [x] Verify cancellation does not emit synthetic `provider_request_started` or `provider_request_finished` for the suppressed next attempt.
+- [x] Ensure failed streaming attempt partial text/thinking/tool-call deltas remain attempt-local and are not committed to canonical transcript/message assembly when retrying.
+- [x] Ensure a successful later streaming retry produces final assistant content without mixing or duplicating failed-attempt partial output.
+- [x] Add focused tests for pending-backoff cancellation and streaming partial-output isolation.
 - [x] Add focused tests for retry header delay source and invalid-header fallback.
 
 ## Slice 5 — Expose EQL/psi-tool retry introspection

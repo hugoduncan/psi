@@ -180,3 +180,10 @@ Verification:
 
 Verification:
 - `clojure -M:test --focus psi.agent-session.prompt-lifecycle-test/prompt-execution-result-retryable-error-enters-retrying-and-schedules-retry-test --focus psi.agent-session.prompt-lifecycle-test/prompt-provider-retry-after-tool-result-does-not-rerun-tool-test` passed (`2 tests, 9 assertions`).
+
+2026-05-30 — Implementation pass: completed the pending-backoff cancellation slice and added focused streaming partial-output isolation coverage. Provider-boundary retry now accepts an injected `:provider-retry-cancelled?` predicate checked before and after the retry delay; cancellation clears active retry state, suppresses the scheduled next provider execution attempt, emits a request-level `provider_request_cancelled` lifecycle event with `:failure-reason :retry-cancelled`, and returns structured retry-cancelled outcome metadata without emitting synthetic start/finish events for the suppressed retry attempt. Added a streaming retry proof using the real streaming accumulator path: the first attempt emits partial text then fails retryably, the retry succeeds, and the final assistant message contains only the successful retry content.
+
+Verification:
+- `clojure -M:test --focus psi.turn-runtime.response-mode-test/execute-prepared-request-cancels-pending-retry-backoff-test --focus psi.turn-runtime.response-mode-test/execute-prepared-request-streaming-retry-discards-failed-partial-output-test` passed (`2 tests, 18 assertions`).
+- `clojure -M:test --focus psi.turn-runtime.response-mode-test` passed (`15 tests, 100 assertions`).
+- `clj-kondo --lint components/turn-runtime/src components/turn-runtime/test components/agent-session/src/psi/agent_session/resolvers/provider_retries.clj` passed with no errors or warnings.

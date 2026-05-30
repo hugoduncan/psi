@@ -499,3 +499,80 @@
         (is (= 25 (:delay-ms scheduled)))
         (is (= :exponential-backoff (:delay-source scheduled)))
         (is (= 2025 (:resume-at scheduled)))))))
+
+(deftest execute-prepared-request-cancels-pending-retry-backoff-test
+  ;; Cancellation during provider-boundary backoff suppresses the next attempt
+  ;; and records a request-level cancellation event.
+  (let [cancelled?       (atom false)
+        active-in-sleep* (atom nil)
+        [ctx0 session-id] (create-session-context {:persist? false
+                                                   :config {:auto-retry-max-retries 2}})
+        ctx              (assoc ctx0
+                                :provider-retry-cancelled? (fn [_session-id] @cancelled?)
+                                :provider-retry-sleep-fn
+                                (fn [_delay-ms]
+                                  (reset! active-in-sleep*
+                                          (:retry (ss/get-session-data-in ctx0 session-id)))
+                                  (reset! cancelled? true)))
+        prepared         (prepared-request ctx session-id)
+        attempts*        (atom 0)]
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [& _]
+                    (swap! attempts* inc)
+                    (error-turn "Connection reset by peer"))]
+      (let [result  (turn-runtime/execute-prepared-request!
+                     {:provider-registry (atom {})} ctx session-id prepared nil)
+            outcome (:execution-result/retry-outcome result)
+            events  (provider-events ctx session-id)]
+        (is (= 1 @attempts*))
+        (is (= :retry-cancelled (:failure-reason outcome)))
+        (is (true? (:cancelled? outcome)))
+        (is (= 0 (:failed-attempt outcome)))
+        (is (= 1 (:retry-attempt outcome)))
+        (is (= 1 (:attempt-count outcome)))
+        (is (= :transport (:error-kind outcome)))
+        (is (= 1 (:retry-attempt @active-in-sleep*)))
+        (is (nil? (:retry (ss/get-session-data-in ctx session-id))))
+        (is (= ["provider_request_started" "provider_request_finished"
+                "provider_retry_scheduled" "provider_request_cancelled"]
+               (mapv :type events)))
+        (is (= [0]
+               (mapv :retry-attempt (filter #(= "provider_request_started" (:type %)) events))))
+        (is (empty?
+             (filter #(and (= "provider_request_finished" (:type %))
+                           (= 1 (:retry-attempt %)))
+                     events)))
+        (is (= :retry-cancelled (:failure-reason (last events))))))))
+
+(deftest execute-prepared-request-streaming-retry-discards-failed-partial-output-test
+  ;; Failed streaming-attempt partial output is attempt-local; the successful
+  ;; retry owns the final assistant content.
+  (let [[ctx session-id] (create-session-context {:persist? false
+                                                  :provider-retry-sleep? false
+                                                  :config {:auto-retry-max-retries 1}})
+        prepared         (prepared-request ctx session-id)
+        attempts*        (atom 0)]
+    (with-redefs [psi.turn-runtime.core/do-stream!
+                  (fn [_ai-ctx _conv _model _opts consume-fn]
+                    (if (= 1 (swap! attempts* inc))
+                      (do
+                        (consume-fn {:type :start})
+                        (consume-fn {:type :text-delta :content-index 0 :delta "partial failed "})
+                        (consume-fn {:type :error
+                                     :error-message "Connection reset by peer"}))
+                      (do
+                        (consume-fn {:type :start})
+                        (consume-fn {:type :text-delta :content-index 0 :delta "final answer"})
+                        (consume-fn {:type :done :reason :stop}))))]
+      (let [result (turn-runtime/execute-prepared-request!
+                    {:provider-registry (atom {})} ctx session-id prepared nil)]
+        (is (= 2 @attempts*))
+        (is (= :stop (:execution-result/stop-reason result)))
+        (is (= [{:type :text :text "final answer"}]
+               (get-in result [:execution-result/assistant-message :content])))
+        (is (not (re-find #"partial failed"
+                          (pr-str (:execution-result/assistant-message result)))))
+        (is (= ["provider_request_started" "provider_request_finished"
+                "provider_retry_scheduled" "provider_request_started"
+                "provider_request_finished"]
+               (mapv :type (provider-events ctx session-id))))))))
