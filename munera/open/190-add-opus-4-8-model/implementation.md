@@ -525,3 +525,9 @@ Completed the newly added inconsistency follow-up item in `design-steps.md` by r
 ## Design ambiguity review pass — 2026-05-30 (post-compaction verification)
 
 No new actionable ambiguities found. Re-read `design.md` and checked referenced model catalog/schema, Anthropic request schema/request shaping, prompt-request projection/current-user replacement, dispatch/session mutation surfaces, and compaction preservation rules; existing ambiguity follow-ups are already checked in `design-steps.md`, and no unduplicated ambiguity items were identified. `design-steps.md` was left unchanged.
+
+---
+
+## Ambiguity follow-up execution — 2026-05-30 (latest post-compaction pass)
+
+Read `design-steps.md` for newly added unchecked ambiguity follow-up items after the preceding ambiguity-review pass. No unchecked ambiguity items were present; all ambiguity follow-ups are already marked complete. No `design.md` changes were required. `plan.md` and `steps.md` were not touched.
