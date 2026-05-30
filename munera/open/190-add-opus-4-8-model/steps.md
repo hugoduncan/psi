@@ -110,3 +110,7 @@
 
 - [x] Align `doc/extension-api.md` mid-system examples with the implemented extension API key: docs currently show `(:inject-mid-system-message! api)`, while the public API map exposes `:inject-mid-system-message` without bang (or add/document a bang alias if that is the intended public surface).
 - [x] Correct `doc/configuration.md` speed/effort runtime-settings wording so it does not claim extension mutation surfaces exist for speed/effort unless actual documented mutation names are implemented.
+
+## Code-shaper follow-ups
+
+- [ ] Align `psi.extension/inject-mid-system-message` Pathom mutation `::pco/params` with its implemented optional provenance inputs (`:source` and `:ext-path`), and add/adjust coverage so the declared mutation contract includes those keys.

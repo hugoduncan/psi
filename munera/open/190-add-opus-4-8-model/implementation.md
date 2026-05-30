@@ -1235,3 +1235,11 @@ Completed the newly added docs review follow-up:
 ## Docs review pass — 2026-05-30 (final verification)
 
 No new actionable documentation feedback found. Applied `.psi/skills/review-task-docs/SKILL.md`: re-read `README.md`, `doc/configuration.md`, `doc/tui.md`, `doc/extension-api.md`, `doc/custom-providers.md`, `doc/rpc-edn-op-mapping-contract.md`, `doc/emacs-ui.md`, and `CHANGELOG.md`, then checked the implemented command/API/provider surfaces for Opus 4.8, `/speed`, `/effort`, and mid-system injection. The prior docs follow-ups are reflected: speed/effort docs no longer promise nonexistent extension mutations, mid-system examples use the implemented `:inject-mid-system-message` API key, and changelog/README/doc coverage is consistent with the implementation. No duplicate `steps.md` follow-ups added.
+
+---
+
+## Code-shaper review pass — 2026-05-30
+
+Actionable feedback found:
+
+1. **Mid-system extension mutation declares an incomplete param contract** — `psi.agent-session.mutations.extensions/inject-mid-system-message` destructures and implements optional `:source` / `:ext-path` provenance inference, and the task step says the Pathom mutation has optional `:source` and `:ext-path`. But its `::pco/params` still lists only `[:psi/agent-session-ctx :session-id :text]`. That leaves the mutation introspection/contract inconsistent with the implementation and makes the provenance path less locally comprehensible. Include `:source` and `:ext-path` in the declared mutation params (or otherwise encode optional params consistently with existing Pathom mutation conventions) and add/adjust coverage that catches the declared contract.
