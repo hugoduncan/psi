@@ -70,3 +70,4 @@
 ## Test review follow-ups
 
 - [x] Add workflow-judge retry-exhaustion coverage asserting every structured-output retry call receives the original structured-output opts/schema, not just the first successful retry path.
+- [ ] Add an integrated regression that builds an Anthropic native structured-output result for a bare string payload (for example `"\"DONE\""`) and passes that metadata to `psi.workflow-runtime.structured-output/output-result` with the judge routing schema, asserting `:status :valid`, `:value "DONE"`, and preserved Anthropic source/raw payload metadata.
