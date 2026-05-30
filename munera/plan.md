@@ -4,6 +4,7 @@ Open tasks in suggested execution order:
 
 Backlog:
 
+`munera/open/190-ai-request-retry-backoff-observability/`
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 `munera/open/108-project-nrepl-testing-without-mocks/`
 `munera/open/154-fix-workflow-max-iterations-error-surfacing/`
