@@ -699,27 +699,31 @@
 
 (deftest prompt-execution-result-retryable-error-enters-retrying-and-schedules-retry-test
   (testing "canonical prompt lifecycle should schedule retry/backoff for retryable provider errors"
-    (let [[ctx session-id] (create-session-context {:persist? false})
+    (let [[ctx session-id] (create-session-context {:persist? false
+                                                    :provider-retry-sleep? false})
           reg             (:extension-registry ctx)
           seen            (atom [])
           attempts        (atom 0)]
       (ext/register-extension-in! reg "/ext/provider-telemetry")
       (ext/register-handler-in! reg "/ext/provider-telemetry" "provider_retry_scheduled" #(swap! seen conj %))
-      (with-redefs [psi.turn-runtime.core/execute-prepared-request!
-                    (fn [_ai-ctx _ctx sid prepared _pq]
-                      (swap! attempts inc)
-                      {:execution-result/turn-id (:prepared-request/id prepared)
-                       :execution-result/session-id sid
-                       :execution-result/assistant-message {:role "assistant"
-                                                            :content [{:type :error :text "Connection reset by peer"}]
-                                                            :stop-reason :error
-                                                            :error-message "Connection reset by peer"
-                                                            :timestamp (java.time.Instant/now)}
-                       :execution-result/turn-outcome :turn.outcome/error
-                       :execution-result/tool-calls []
-                       :execution-result/error-message "Connection reset by peer"
-                       :execution-result/stop-reason :error})]
-        (psi.agent-session.turn/prompt-execution-result-in! ctx session-id "trigger transient connection error"))
-      (is (= :retrying (ss/sc-phase-in ctx session-id)))
+      (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                    (fn [_ai-ctx _ctx _sid {:keys [turn-id ai-model]}]
+                      (let [attempt (swap! attempts inc)]
+                        {:turn-id turn-id
+                         :model ai-model
+                         :ai-options {}
+                         :turn-ctx nil
+                         :assistant-message (if (= 1 attempt)
+                                              {:role "assistant"
+                                               :content [{:type :error :text "Connection reset by peer"}]
+                                               :stop-reason :error
+                                               :error-message "Connection reset by peer"
+                                               :timestamp (java.time.Instant/now)}
+                                              {:role "assistant"
+                                               :content [{:type :text :text "recovered"}]
+                                               :stop-reason :stop
+                                               :timestamp (java.time.Instant/now)})}))]
+        (let [result (psi.agent-session.turn/prompt-execution-result-in! ctx session-id "trigger transient connection error")]
+          (is (= :stop (:execution-result/stop-reason result)))))
       (is (= ["provider_retry_scheduled"] (mapv :type @seen)))
-      (is (= 1 @attempts)))))
+      (is (= 2 @attempts)))))

@@ -9,6 +9,7 @@
    [psi.ai.models :as models]
    [psi.ai.structured-output :as structured-output]
    [psi.agent-session.extensions :as ext]
+   [psi.session-state.model :as session-model]
    [psi.session-state.state :as ss]
    [psi.turn-runtime.accumulator :as accum]
    [psi.turn-runtime.recording :as recording]
@@ -294,70 +295,121 @@
   [ctx session-id]
   (or (:retry-attempt (ss/get-session-data-in ctx session-id)) 0))
 
+(defn- attempt-id-for
+  [provider-request-id retry-attempt]
+  (str provider-request-id "#attempt-" retry-attempt))
+
 (defn- dispatch-provider-event!
   [ctx event-name payload]
-  (when-let [reg (:extension-registry ctx)]
-    (ext/dispatch-in reg event-name (assoc payload :type event-name))))
+  (let [event (assoc payload :type event-name)]
+    (when-let [session-id (:session-id payload)]
+      (trs/append-provider-event-in! ctx session-id event))
+    (when-let [reg (:extension-registry ctx)]
+      (ext/dispatch-in reg event-name event))))
 
-(defn execute-prepared-request!
-  "Execute one prepared request through the live turn runtime.
-   Returns a shaped execution-result map."
-  [ai-ctx ctx session-id prepared-request progress-queue]
-  (let [turn-id         (:prepared-request/id prepared-request)
-        ai-conv         (:prepared-request/provider-conversation prepared-request)
-        ai-model        (or (:prepared-request/model prepared-request)
-                            (:model (ss/get-session-data-in ctx session-id))
-                            (models/get-model :sonnet-4.6))
-        provider-id     (provider-id-for ai-model)
-        model-id        (model-id-for ai-model)
-        retry-attempt   (retry-attempt-for ctx session-id)
-        base-ai-options (or (:prepared-request/ai-options prepared-request) {})
-        response-mode   (response-mode-for ctx session-id prepared-request)
-        preflight-result (unsupported-structured-output-before-generation
-                          turn-id ai-model base-ai-options)
-        _               (when-not preflight-result
-                          (dispatch-provider-event!
-                           ctx
-                           "provider_request_started"
-                           {:session-id session-id
-                            :turn-id turn-id
-                            :attempt-id turn-id
-                            :provider provider-id
-                            :model-id model-id
-                            :retry-attempt retry-attempt}))
-        {:keys [assistant-message logprobs structured-output]}
-        (or preflight-result
-            (if (= :non-streaming response-mode)
-              (execute-non-streaming-turn! ai-ctx ctx session-id
-                                           {:ai-conv ai-conv
-                                            :ai-model ai-model
-                                            :base-ai-options base-ai-options
-                                            :turn-id turn-id})
-              (execute-live-turn! ai-ctx ctx session-id
-                                  {:ai-conv         ai-conv
-                                   :ai-model        ai-model
-                                   :base-ai-options base-ai-options
-                                   :progress-queue  progress-queue
-                                   :turn-id         turn-id})))
-        outcome         (classify-assistant-message assistant-message)
-        _               (when (and (not preflight-result)
-                                   (not= :error (:stop-reason assistant-message)))
-                          (dispatch-provider-event!
-                           ctx
-                           "provider_request_finished"
-                           {:session-id session-id
-                            :turn-id turn-id
-                            :attempt-id turn-id
-                            :provider provider-id
-                            :model-id model-id
-                            :retry-attempt retry-attempt
-                            :status :succeeded
-                            :final? true}))]
+(defn- provider-error-fields
+  [assistant-message]
+  (let [stop-reason   (:stop-reason assistant-message)
+        error-message (:error-message assistant-message)
+        http-status   (:http-status assistant-message)
+        error-kind    (session-model/provider-error-kind stop-reason error-message http-status)]
+    {:stop-reason stop-reason
+     :error-message error-message
+     :http-status http-status
+     :error-kind error-kind
+     :retryable? (contains? #{:rate-limit :timeout :overloaded :provider-unavailable :transport} error-kind)}))
+
+(defn- failure-reason-for
+  [{:keys [retryable? retry-enabled? retry-attempt max-retries]}]
+  (cond
+    (not retryable?) :non-retryable
+    (not retry-enabled?) :retry-disabled
+    (>= retry-attempt max-retries) :retry-exhausted
+    :else nil))
+
+(defn- retry-metadata-for
+  [ctx assistant-message retry-attempt]
+  (let [base-ms              (get-in ctx [:config :auto-retry-base-delay-ms] 2000)
+        max-ms               (get-in ctx [:config :auto-retry-max-delay-ms] 60000)
+        exponential-delay-ms (session-model/exponential-backoff-ms retry-attempt base-ms max-ms)
+        now-fn               (or (:now-fn ctx) #(java.time.Instant/now))
+        now-ms               (.toEpochMilli ^java.time.Instant (now-fn))]
+    (session-model/retry-metadata (:provider-error/headers assistant-message)
+                                  retry-attempt
+                                  exponential-delay-ms
+                                  now-ms)))
+
+(defn- mark-active-retry!
+  [ctx session-id retry-metadata next-retry-attempt]
+  (ss/apply-root-state-update-in!
+   ctx
+   (ss/session-update session-id #(assoc %
+                                         :retry-attempt next-retry-attempt
+                                         :retry retry-metadata))))
+
+(defn- clear-active-retry!
+  [ctx session-id]
+  (ss/apply-root-state-update-in!
+   ctx
+   (ss/session-update session-id #(assoc % :retry nil))))
+
+(defn- sleep-for-retry!
+  [ctx delay-ms]
+  (when (and (not= false (:provider-retry-sleep? ctx))
+             (pos? (long (or delay-ms 0))))
+    (Thread/sleep (long delay-ms))))
+
+(defn- execute-provider-attempt!
+  [ai-ctx ctx session-id prepared-request progress-queue attempt-data]
+  (let [turn-id          (:prepared-request/id prepared-request)
+        ai-conv          (:prepared-request/provider-conversation prepared-request)
+        ai-model         (:ai-model attempt-data)
+        base-ai-options  (:base-ai-options attempt-data)
+        response-mode    (:response-mode attempt-data)
+        retry-attempt    (:retry-attempt attempt-data)
+        provider-id      (:provider-id attempt-data)
+        model-id         (:model-id attempt-data)
+        attempt-id       (attempt-id-for turn-id retry-attempt)
+        preflight-result (unsupported-structured-output-before-generation turn-id ai-model base-ai-options)
+        _                (when-not preflight-result
+                           (dispatch-provider-event!
+                            ctx
+                            "provider_request_started"
+                            {:session-id session-id
+                             :turn-id turn-id
+                             :provider-request-id turn-id
+                             :attempt-id attempt-id
+                             :provider provider-id
+                             :model-id model-id
+                             :retry-attempt retry-attempt}))]
+    (assoc (or preflight-result
+               (if (= :non-streaming response-mode)
+                 (execute-non-streaming-turn! ai-ctx ctx session-id
+                                              {:ai-conv ai-conv
+                                               :ai-model ai-model
+                                               :base-ai-options base-ai-options
+                                               :turn-id turn-id})
+                 (execute-live-turn! ai-ctx ctx session-id
+                                     {:ai-conv         ai-conv
+                                      :ai-model        ai-model
+                                      :base-ai-options base-ai-options
+                                      :progress-queue  progress-queue
+                                      :turn-id         turn-id})))
+           :preflight-result? (boolean preflight-result)
+           :attempt-id attempt-id)))
+
+(defn- execution-result
+  [ctx session-id prepared-request attempt-data attempt-result retry-outcome]
+  (let [turn-id           (:prepared-request/id prepared-request)
+        assistant-message (:assistant-message attempt-result)
+        outcome           (classify-assistant-message assistant-message)
+        retry-outcome*    (not-empty retry-outcome)]
     {:execution-result/turn-id             turn-id
      :execution-result/session-id          session-id
      :execution-result/prepared-request-id turn-id
-     :execution-result/model               ai-model
-     :execution-result/assistant-message   assistant-message
+     :execution-result/model               (:ai-model attempt-data)
+     :execution-result/assistant-message   (cond-> assistant-message
+                                             retry-outcome* (assoc :retry/outcome retry-outcome*))
      :execution-result/usage               (:usage assistant-message)
      :execution-result/provider-captures   (provider-captures-for-turn ctx session-id turn-id)
      :execution-result/turn-outcome        (:turn/outcome outcome)
@@ -365,5 +417,116 @@
      :execution-result/error-message       (:error-message assistant-message)
      :execution-result/http-status         (:http-status assistant-message)
      :execution-result/stop-reason         (:stop-reason assistant-message)
-     :execution-result/logprobs            logprobs
-     :execution-result/structured-output   structured-output}))
+     :execution-result/logprobs            (:logprobs attempt-result)
+     :execution-result/structured-output   (:structured-output attempt-result)
+     :execution-result/retry-outcome       retry-outcome*}))
+
+(defn execute-prepared-request!
+  "Execute one prepared request through the live turn runtime.
+   Returns a shaped execution-result map."
+  [ai-ctx ctx session-id prepared-request progress-queue]
+  (let [turn-id         (:prepared-request/id prepared-request)
+        ai-model        (or (:prepared-request/model prepared-request)
+                            (:model (ss/get-session-data-in ctx session-id))
+                            (models/get-model :sonnet-4.6))
+        attempt-data    {:ai-model ai-model
+                         :provider-id (provider-id-for ai-model)
+                         :model-id (model-id-for ai-model)
+                         :base-ai-options (or (:prepared-request/ai-options prepared-request) {})
+                         :response-mode (response-mode-for ctx session-id prepared-request)}
+        retry-enabled?  (:auto-retry-enabled (ss/get-session-data-in ctx session-id))
+        max-retries     (long (get-in ctx [:config :auto-retry-max-retries] 3))]
+    (loop [retry-attempt (retry-attempt-for ctx session-id)]
+      (let [attempt-data*  (assoc attempt-data :retry-attempt retry-attempt)
+            attempt-result (execute-provider-attempt! ai-ctx ctx session-id prepared-request progress-queue attempt-data*)
+            assistant-msg  (:assistant-message attempt-result)
+            preflight?     (:preflight-result? attempt-result)
+            error?         (= :error (:stop-reason assistant-msg))]
+        (if-not (and (not preflight?) error?)
+          (do
+            (when-not preflight?
+              (dispatch-provider-event!
+               ctx
+               "provider_request_finished"
+               {:session-id session-id
+                :turn-id turn-id
+                :provider-request-id turn-id
+                :attempt-id (:attempt-id attempt-result)
+                :provider (:provider-id attempt-data*)
+                :model-id (:model-id attempt-data*)
+                :retry-attempt retry-attempt
+                :status :succeeded
+                :final? true}))
+            (clear-active-retry! ctx session-id)
+            (execution-result ctx session-id prepared-request attempt-data* attempt-result nil))
+          (let [{:keys [retryable? error-kind error-message http-status stop-reason] :as error-fields}
+                (provider-error-fields assistant-msg)
+                failure-reason (failure-reason-for {:retryable? retryable?
+                                                    :retry-enabled? retry-enabled?
+                                                    :retry-attempt retry-attempt
+                                                    :max-retries max-retries})
+                final?         (boolean failure-reason)
+                retry-outcome  (cond-> (merge error-fields
+                                              {:failure-reason failure-reason
+                                               :provider-request-id turn-id
+                                               :turn-id turn-id
+                                               :retry-attempt retry-attempt
+                                               :attempt-count (inc retry-attempt)
+                                               :max-retries max-retries
+                                               :retry-enabled? (boolean retry-enabled?)
+                                               :last-error-message error-message})
+                                 (= :retry-exhausted failure-reason) (assoc :exhausted? true))]
+            (dispatch-provider-event!
+             ctx
+             "provider_request_finished"
+             (cond-> {:session-id session-id
+                      :turn-id turn-id
+                      :provider-request-id turn-id
+                      :attempt-id (:attempt-id attempt-result)
+                      :provider (:provider-id attempt-data*)
+                      :model-id (:model-id attempt-data*)
+                      :retry-attempt retry-attempt
+                      :status :failed
+                      :final? final?
+                      :retryable? retryable?
+                      :error-kind error-kind
+                      :stop-reason stop-reason
+                      :error-message error-message}
+               http-status (assoc :http-status http-status)
+               failure-reason (assoc :failure-reason failure-reason)
+               (= :retry-exhausted failure-reason) (assoc :exhausted? true)))
+            (if final?
+              (do
+                (clear-active-retry! ctx session-id)
+                (execution-result ctx session-id prepared-request attempt-data* attempt-result retry-outcome))
+              (let [next-attempt   (inc retry-attempt)
+                    retry-metadata (retry-metadata-for ctx assistant-msg retry-attempt)
+                    retry-state    (merge retry-metadata
+                                          {:failed-attempt retry-attempt
+                                           :retry-attempt next-attempt
+                                           :error-kind error-kind
+                                           :error-message error-message
+                                           :http-status http-status})]
+                (dispatch-provider-event!
+                 ctx
+                 "provider_retry_scheduled"
+                 (cond-> {:session-id session-id
+                          :turn-id turn-id
+                          :provider-request-id turn-id
+                          :provider (:provider-id attempt-data*)
+                          :model-id (:model-id attempt-data*)
+                          :failed-attempt retry-attempt
+                          :retry-attempt next-attempt
+                          :delay-ms (:delay-ms retry-metadata)
+                          :delay-source (:delay-source retry-metadata)
+                          :resume-at (:resume-at retry-metadata)
+                          :rate-limit (:rate-limit retry-metadata)
+                          :error-kind error-kind
+                          :error-message error-message
+                          :retryable? true}
+                   http-status (assoc :http-status http-status)))
+                (mark-active-retry! ctx session-id retry-state next-attempt)
+                (sleep-for-retry! ctx (:delay-ms retry-metadata))
+                (when-not (= false (:provider-retry-sleep? ctx))
+                  (clear-active-retry! ctx session-id))
+                (recur next-attempt)))))))))

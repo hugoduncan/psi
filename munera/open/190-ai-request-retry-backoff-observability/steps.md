@@ -2,20 +2,20 @@
 
 ## Slice 1 — Characterize current behavior and map retry seams
 
-- [ ] Run the existing focused failing proof for canonical prompt lifecycle retry scheduling and record the current failure in `implementation.md`.
-- [ ] Inspect `psi.turn-runtime.core/execute-prepared-request!` and identify the smallest common seam for streaming and non-streaming prepared provider request execution.
-- [ ] Inspect existing provider-error classification and retry metadata helpers, including HTTP status, exception data, stop reason, message, and retry header handling.
-- [ ] Inspect existing provider lifecycle telemetry emission and metrics consumers for `provider_request_started`, `provider_retry_scheduled`, and `provider_request_finished`.
-- [ ] Inspect existing session retry state/projection and app-runtime/TUI/Emacs-facing retry status derivation, including `sc-phase-in`.
-- [ ] Inspect existing provider request/reply telemetry captures and EQL/`psi-tool` resolver conventions for session-, turn-, and provider-request-level data.
-- [ ] Record the concrete root cause category in `implementation.md`: missing classification, scheduling, execution, stale attempt state, invisible telemetry, statechart bypass, or another cause.
+- [x] Run the existing focused failing proof for canonical prompt lifecycle retry scheduling and record the current failure in `implementation.md`.
+- [x] Inspect `psi.turn-runtime.core/execute-prepared-request!` and identify the smallest common seam for streaming and non-streaming prepared provider request execution.
+- [x] Inspect existing provider-error classification and retry metadata helpers, including HTTP status, exception data, stop reason, message, and retry header handling.
+- [x] Inspect existing provider lifecycle telemetry emission and metrics consumers for `provider_request_started`, `provider_retry_scheduled`, and `provider_request_finished`.
+- [x] Inspect existing session retry state/projection and app-runtime/TUI/Emacs-facing retry status derivation, including `sc-phase-in`.
+- [x] Inspect existing provider request/reply telemetry captures and EQL/`psi-tool` resolver conventions for session-, turn-, and provider-request-level data.
+- [x] Record the concrete root cause category in `implementation.md`: missing classification, scheduling, execution, stale attempt state, invisible telemetry, statechart bypass, or another cause.
 
 ## Slice 2 — Introduce provider-boundary retry coordinator
 
-- [ ] Add a focused unit seam for executing one prepared provider request through a controlled provider function that can fail retryably, fail terminally, or succeed by attempt.
-- [ ] Implement or extract a retry coordinator around prepared provider request execution that retries only the current prepared request and never reruns local tools or the whole agent loop.
-- [ ] Preserve fresh per-attempt provider execution state for each retry, including consumed streams and accumulation buffers.
-- [ ] Apply shared provider-error classification so explicit retryable kinds can retry and `:unknown` defaults to terminal non-retryable.
+- [x] Add a focused unit seam for executing one prepared provider request through a controlled provider function that can fail retryably, fail terminally, or succeed by attempt.
+- [x] Implement or extract a retry coordinator around prepared provider request execution that retries only the current prepared request and never reruns local tools or the whole agent loop.
+- [x] Preserve fresh per-attempt provider execution state for each retry, including consumed streams and accumulation buffers.
+- [x] Apply shared provider-error classification so explicit retryable kinds can retry and `:unknown` defaults to terminal non-retryable.
 - [ ] Implement `:auto-retry-enabled` gate semantics: classify and emit single-attempt lifecycle data, but do not schedule retry when disabled.
 - [ ] Implement `:auto-retry-max-retries` as retry-execution count after initial attempt, with zero-based `:retry-attempt` coordinates.
 - [ ] Return structured final failure metadata for non-retryable, retry-disabled, retry-exhausted, and retry-cancelled outcomes.
@@ -23,14 +23,14 @@
 
 ## Slice 3 — Preserve provider lifecycle telemetry and active retry visibility
 
-- [ ] Add explicit `:provider-request-id` to new provider lifecycle telemetry events while retaining `:turn-id`.
-- [ ] Ensure every actual provider execution attempt emits `provider_request_started` with zero-based `:retry-attempt` and a unique `:attempt-id`.
-- [ ] Ensure every actual provider execution attempt emits exactly one `provider_request_finished` with metrics-compatible `:status :succeeded` or `:status :failed`.
-- [ ] Ensure final failed attempts include `:final?`, `:failure-reason`, `:retryable?`, `:error-kind`, optional `:http-status`, and exhaustion metadata where applicable.
-- [ ] Ensure each scheduled retry emits `provider_retry_scheduled` with failed attempt, next `:retry-attempt`, error classification, delay ms, delay source, resume-at, and retry header metadata.
-- [ ] Retain provider lifecycle telemetry captures under session state as a distinct stream from raw provider HTTP request/reply captures.
-- [ ] Keep existing `/ext/provider-telemetry` dispatch behavior for metrics/log consumers unless a focused compatibility test proves a required adjustment.
-- [ ] Publish active retry state into existing session retry fields before pending backoff sleep begins.
+- [x] Add explicit `:provider-request-id` to new provider lifecycle telemetry events while retaining `:turn-id`.
+- [x] Ensure every actual provider execution attempt emits `provider_request_started` with zero-based `:retry-attempt` and a unique `:attempt-id`.
+- [x] Ensure every actual provider execution attempt emits exactly one `provider_request_finished` with metrics-compatible `:status :succeeded` or `:status :failed`.
+- [x] Ensure final failed attempts include `:final?`, `:failure-reason`, `:retryable?`, `:error-kind`, optional `:http-status`, and exhaustion metadata where applicable.
+- [x] Ensure each scheduled retry emits `provider_retry_scheduled` with failed attempt, next `:retry-attempt`, error classification, delay ms, delay source, resume-at, and retry header metadata.
+- [x] Retain provider lifecycle telemetry captures under session state as a distinct stream from raw provider HTTP request/reply captures.
+- [x] Keep existing `/ext/provider-telemetry` dispatch behavior for metrics/log consumers unless a focused compatibility test proves a required adjustment.
+- [x] Publish active retry state into existing session retry fields before pending backoff sleep begins.
 - [ ] Clear active retry fields when retry delay completes, the request succeeds, the request fails terminally/exhausted/disabled, or cancellation occurs.
 - [ ] Add focused tests proving app-runtime/TUI/Emacs-facing phase/status reports retrying while provider-boundary backoff is pending.
 - [ ] Add focused tests proving provider-boundary retry resume does not dispatch `:runtime/agent-start-loop` or rerun local tools.
@@ -51,17 +51,17 @@
 
 ## Slice 5 — Expose EQL/psi-tool retry introspection
 
-- [ ] Add or extend resolvers for session-level provider retry count and retried provider-request count projected from retained lifecycle telemetry.
-- [ ] Add or extend resolvers for grouped session provider retry summaries keyed by explicit `:provider-request-id`.
-- [ ] Add or extend turn/request-level resolvers for retry count, retry attempts, final status, and final error classification.
-- [ ] Add retry-attempt detail projection fields for attempt number, error kind, error message, HTTP status, delay ms, delay source, resume-at, and final marker where applicable.
-- [ ] Preserve compatibility fallback from `:turn-id` only for older retained telemetry lacking explicit `:provider-request-id`.
-- [ ] Add focused EQL/`psi-tool` tests proving session, turn, and provider-request retry questions are answerable after request completion.
+- [x] Add or extend resolvers for session-level provider retry count and retried provider-request count projected from retained lifecycle telemetry.
+- [x] Add or extend resolvers for grouped session provider retry summaries keyed by explicit `:provider-request-id`.
+- [x] Add or extend turn/request-level resolvers for retry count, retry attempts, final status, and final error classification.
+- [x] Add retry-attempt detail projection fields for attempt number, error kind, error message, HTTP status, delay ms, delay source, resume-at, and final marker where applicable.
+- [x] Preserve compatibility fallback from `:turn-id` only for older retained telemetry lacking explicit `:provider-request-id`.
+- [x] Add focused EQL/`psi-tool` tests proving session, turn, and provider-request retry questions are answerable after request completion.
 
 ## Slice 6 — Complete focused behavior coverage
 
-- [ ] Add or update an integration-style prompt lifecycle test proving a representative retryable connection/request failure is retried before the turn fails.
-- [ ] Add or update an integration-style prompt lifecycle test proving retryable failure followed by provider success returns success to the caller.
+- [x] Add or update an integration-style prompt lifecycle test proving a representative retryable connection/request failure is retried before the turn fails.
+- [x] Add or update an integration-style prompt lifecycle test proving retryable failure followed by provider success returns success to the caller.
 - [ ] Add or update a test proving repeated retryable failures through the maximum retry count return structured retry-exhausted failure preserving the last cause.
 - [ ] Add or update a test proving terminal provider/client errors are not retried and expose `:failure-reason :non-retryable`.
 - [ ] Add or update a tool-result-post test proving provider retry does not rerun a local tool whose result was already recorded.

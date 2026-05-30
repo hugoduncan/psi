@@ -148,7 +148,8 @@
            (mapv :type @seen)))
     (is (= {:session-id session-id
             :turn-id "turn-1"
-            :attempt-id "turn-1"
+            :provider-request-id "turn-1"
+            :attempt-id "turn-1#attempt-0"
             :provider "openai"
             :model-id "gpt-5.4"
             :retry-attempt 0
