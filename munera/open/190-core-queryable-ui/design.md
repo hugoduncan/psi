@@ -102,6 +102,27 @@ Invocation is a tagged union under `:psi.ui.action/invocation`. Supported design
 - `:bash-command` — argv-style command for tmux-style reveal actions.
 - `:mutation` — Pathom mutation symbol plus params, if an existing mutation is the cleanest path.
 
+Per-kind invocation schemas are normative for provider validation and request construction:
+
+- `:emacs-command`
+  - required: `:psi.ui.invocation/kind :emacs-command`, `:psi.ui.invocation/command` as a non-empty string naming the Emacs command.
+  - optional: `:psi.ui.invocation/session-id`, `:psi.ui.invocation/runtime-id`, and bounded serialisable `:psi.ui.invocation/args` vector for future commands that need simple scalar arguments.
+  - malformed provider output includes a missing/non-string/blank command, non-serialisable args, or frontend objects in any field.
+- `:ui-event`
+  - required: `:psi.ui.invocation/kind :ui-event`, `:psi.ui.invocation/event` as a namespaced keyword identifying an adapter-neutral UI event the active UI adapter subscribes to.
+  - optional/defaultable: `:psi.ui.invocation/payload` as a serialisable map, default `{}`; `:psi.ui.invocation/session-id`; `:psi.ui.invocation/runtime-id`.
+  - malformed provider output includes missing/non-keyword/unnamespaced events, non-map payloads, non-serialisable payload values, or executable handles in the payload.
+- `:bash-command`
+  - required: `:psi.ui.invocation/kind :bash-command`, `:psi.ui.invocation/argv` as a non-empty vector of non-empty strings.
+  - optional: `:psi.ui.invocation/session-id`, `:psi.ui.invocation/runtime-id`, and bounded serialisable `:psi.ui.invocation/env` map of string keys to string values when an adapter intentionally needs environment data.
+  - shell strings, interpolated command strings, empty argv entries, non-string argv values, non-string env values, and process objects are malformed provider output. The request executor must treat the argv vector as data and must not concatenate it into a shell string.
+- `:mutation`
+  - required: `:psi.ui.invocation/kind :mutation`, `:psi.ui.invocation/mutation` as a fully qualified symbol naming the Pathom mutation, and `:psi.ui.invocation/params` as a serialisable map, defaultable to `{}` only when omitted.
+  - optional: `:psi.ui.invocation/session-id`, `:psi.ui.invocation/runtime-id`.
+  - malformed provider output includes missing/unqualified/non-symbol mutation names, non-map params, non-serialisable param values, or mutation references that are not allowed by the constrained UI action request surface.
+
+Provider validation treats malformed invocation maps as invalid provider output and maps the whole UI capability result to `:psi.ui.unavailable.reason/provider-error`; it must not expose a partially malformed descriptor through EQL. Request-time validation is separate: if an extension submits a descriptor/request whose invocation data is malformed, stale, unsupported by the current active provider, no longer available, or no longer matches the active session/runtime correlation, the request is rejected with a `:psi.ui.result/status :rejected` or `:unsupported` result and a bounded reason/message rather than being reported as provider-error.
+
 The query and invocation paths may share the same descriptor model: querying returns the descriptor as pure data; invoking the descriptor is the side-effecting half. The implementation should prefer existing command/mutation/event/effect mechanisms over introducing a one-off UI callback path.
 
 ### Query surface
@@ -168,7 +189,7 @@ The resolver is responsible for normalizing and validating provider output befor
 - `:psi.ui/available?` is defaultable to false and must be coerced only from an explicit boolean; non-boolean values are invalid provider output.
 - `:psi.ui/capabilities` is defaultable to `[]`; entries must be keywords in the `:psi.ui.capability/...` namespace. Unknown or shorthand capability namespaces are invalid rather than silently contractual.
 - `:psi.ui/actions` is defaultable to `[]`; entries must be maps with namespaced descriptor keys, serialisable scalar/collection values, `:psi.ui.action/id`, `:psi.ui.action/capability`, `:psi.ui.action/label`, `:psi.ui.action/description`, and boolean `:psi.ui.action/available?`.
-- Available action descriptors require `:psi.ui.action/invocation`; the invocation map requires `:psi.ui.invocation/kind` and that kind must be one of the supported design kinds (`:emacs-command`, `:ui-event`, `:bash-command`, `:mutation`). Unknown invocation kinds are invalid provider output for this slice, because exposing them would create an uninvokable contract.
+- Available action descriptors require `:psi.ui.action/invocation`; the invocation map requires `:psi.ui.invocation/kind` and that kind must be one of the supported design kinds (`:emacs-command`, `:ui-event`, `:bash-command`, `:mutation`) with the required per-kind keys/value shapes defined above. Unknown invocation kinds and malformed per-kind invocation data are invalid provider output for this slice, because exposing them would create an uninvokable contract.
 - Unavailable action descriptors require `:psi.ui.action/unavailable-reason` as a `:psi.ui.unavailable.reason/...` keyword and `:psi.ui.action/unavailable-message` as bounded text.
 - Descriptor maps must be serialisable pure data. Functions, atoms, promises, channels, buffers, terminal handles, exceptions, and arbitrary Java objects are invalid provider output.
 - Duplicate action ids are invalid provider output unless implementation discovery finds an existing canonical merge convention; prefer rejecting duplicates for this slice.

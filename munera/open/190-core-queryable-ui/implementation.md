@@ -117,3 +117,7 @@ Completed both newly added inconsistency follow-ups:
 ## 2026-05-30 design ambiguity review
 
 Found one new actionable ambiguity after re-reading `design.md`, `design-decisions.md`, and current EQL/provider seams: descriptor validation must recognize `:emacs-command`, `:ui-event`, `:bash-command`, and `:mutation`, but the design does not define the per-invocation-kind required keys/value shapes beyond the Emacs example, leaving provider validation and extension request construction underdetermined for the non-Emacs supported kinds.
+
+## 2026-05-30 ambiguity follow-up
+
+Completed the newly added per-kind invocation schema follow-up across `design.md`, `design-decisions.md`, and `resolved-design-questions.md`: `:emacs-command` requires a non-empty command string, `:ui-event` requires a namespaced event keyword plus optional serialisable payload map, `:bash-command` requires a non-empty argv vector and forbids shell strings, and `:mutation` requires a qualified mutation symbol plus serialisable params. Provider-side malformed invocation data maps to provider-error unavailable semantics, while malformed/stale submitted request data is rejected at request time.

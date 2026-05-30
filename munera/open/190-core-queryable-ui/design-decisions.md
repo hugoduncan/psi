@@ -67,12 +67,12 @@ Use a tagged union in `:psi.ui.action/invocation`.
 
 Supported invocation kinds for the design:
 
-- `:emacs-command` — command name string to send to/evaluate in Emacs UI.
-- `:ui-event` — adapter-neutral event/action payload to send back to the active UI adapter.
-- `:bash-command` — shell command vector or string for tmux-style reveal actions.
-- `:mutation` — Pathom mutation symbol plus params, if an existing mutation is the cleanest path.
+- `:emacs-command` — requires `:psi.ui.invocation/command` as a non-empty Emacs command string; optional serialisable args/session/runtime correlation may be included.
+- `:ui-event` — requires `:psi.ui.invocation/event` as a namespaced keyword; optional `:psi.ui.invocation/payload` is a serialisable map defaulting to `{}`.
+- `:bash-command` — requires `:psi.ui.invocation/argv` as a non-empty vector of non-empty strings; optional `:psi.ui.invocation/env` is a string-to-string map. Shell strings are not valid for this slice.
+- `:mutation` — requires `:psi.ui.invocation/mutation` as a fully qualified symbol and `:psi.ui.invocation/params` as a serialisable map defaulting to `{}` when omitted.
 
-Resolver descriptor validation must recognize all supported design invocation kinds in this slice: `:emacs-command`, `:ui-event`, `:bash-command`, and `:mutation`. Initial adapters may advertise only `:emacs-command` for the Emacs make-visible action, and TUI/console may advertise no available make-visible action unless real target metadata exists, but provider output using any supported kind must validate without changing the query attrs.
+Resolver descriptor validation must recognize all supported design invocation kinds in this slice: `:emacs-command`, `:ui-event`, `:bash-command`, and `:mutation`, and must validate the per-kind required keys/value shapes. Initial adapters may advertise only `:emacs-command` for the Emacs make-visible action, and TUI/console may advertise no available make-visible action unless real target metadata exists, but provider output using any supported kind must validate without changing the query attrs. Malformed provider invocation data maps the whole UI capability result to provider-error unavailable semantics; malformed/stale submitted request invocation data is rejected at request time rather than treated as provider-error.
 
 ## 5. Invocation scope for this task
 

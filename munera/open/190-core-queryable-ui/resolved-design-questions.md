@@ -26,7 +26,7 @@ No design blockers remain. The task is ready for implementation planning.
    - `:psi.ui/make-visible-action`
    - resolver input only `:psi/agent-session-ctx`
 2. Action descriptors use fully namespaced pure-data maps under `:psi.ui.action/...` keys.
-3. Invocation is a tagged union under `:psi.ui.action/invocation`, initially allowing `:emacs-command`, `:ui-event`, `:bash-command`, and `:mutation` kinds.
+3. Invocation is a tagged union under `:psi.ui.action/invocation`, allowing `:emacs-command`, `:ui-event`, `:bash-command`, and `:mutation` kinds with explicit per-kind schemas: Emacs command string, UI event keyword plus optional payload map, bash argv vector plus optional env map, and qualified mutation symbol plus params map.
 4. Queryability and descriptor/event contract are required in this task; side-effecting generic invocation is optional and should become a follow-up if it is not small.
 5. Emacs make-visible should be a small command, proposed as `psi-emacs-show-active`, that shows/focuses the active Psi buffer using existing `pop-to-buffer` and prompt-focus behaviour.
 6. TUI/console should not claim make-visible unless real tmux target metadata and a safe command exist.
