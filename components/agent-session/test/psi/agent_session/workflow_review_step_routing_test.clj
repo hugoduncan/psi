@@ -284,79 +284,135 @@
                                                                                 "PASS_STATUS: REVIEW_COMPLETE"]}}}}
                  (:terminal-outcome run))))))))
 
+(defn- conditional-review-pass-status-args
+  [step-name opts]
+  (cond-> {:text {:from {:step step-name :output :final-llm-reply}}}
+    (:allowed-statuses opts) (assoc :allowed-statuses (:allowed-statuses opts))))
+
 (defn- conditional-review-definition
-  [definition-name]
-  {:definition-id definition-name
-   :name definition-name
-   :steps [{:name "ambiguity-review"
-            :type :session
-            :contributions [{:type :template :text "ambiguity-review"}]
-            :judge {:type :invoke
-                    :operation "workflow/pass-status-routing"
-                    :args {:text {:from {:step "ambiguity-review" :output :final-llm-reply}}}}
-            :on {"REPEAT" {:goto "ambiguity-follow-up"}
-                 "DONE" {:goto "inconsistency-review"}}}
-           {:name "ambiguity-follow-up"
-            :type :session
-            :contributions [{:type :template :text "ambiguity-follow-up"}]
-            :judge {:type :invoke
-                    :operation "workflow/constant-routing"
-                    :args {:route "DONE"}}
-            :on {"DONE" {:goto "inconsistency-review"}}}
-           {:name "inconsistency-review"
-            :type :session
-            :contributions [{:type :template :text "inconsistency-review"}]
-            :judge {:type :invoke
-                    :operation "workflow/pass-status-routing"
-                    :args {:text {:from {:step "inconsistency-review" :output :final-llm-reply}}}}
-            :on {"REPEAT" {:goto "inconsistency-follow-up"}
-                 "DONE" {:goto "clarity-status"}}}
-           {:name "inconsistency-follow-up"
-            :type :session
-            :contributions [{:type :template :text "inconsistency-follow-up"}]
-            :judge {:type :invoke
-                    :operation "workflow/constant-routing"
-                    :args {:route "DONE"}}
-            :on {"DONE" {:goto "clarity-status"}}}
-           {:name "clarity-status"
-            :type :session
-            :contributions [{:type :template :text "clarity-status"}]
-            :judge {:type :invoke
-                    :operation "workflow/constant-routing"
-                    :args {:route "DONE"}}
-            :on {"REPEAT" {:goto "ambiguity-review" :max-iterations 6}
-                 "DONE" {:goto "final-summary"}}}
-           {:name "final-summary"
-            :type :session
-            :contributions [{:type :template :text "final-summary"}]}]})
+  ([definition-name]
+   (conditional-review-definition definition-name {}))
+  ([definition-name opts]
+   {:definition-id definition-name
+    :name definition-name
+    :steps [{:name "ambiguity-review"
+             :type :session
+             :contributions [{:type :template :text "ambiguity-review"}]
+             :judge {:type :invoke
+                     :operation "workflow/pass-status-routing"
+                     :args (conditional-review-pass-status-args "ambiguity-review" opts)}
+             :on {"REPEAT" {:goto "ambiguity-follow-up"}
+                  "DONE" {:goto "inconsistency-review"}}}
+            {:name "ambiguity-follow-up"
+             :type :session
+             :contributions [{:type :template :text "ambiguity-follow-up"}]
+             :judge {:type :invoke
+                     :operation "workflow/constant-routing"
+                     :args {:route "DONE"}}
+             :on {"DONE" {:goto "inconsistency-review"}}}
+            {:name "inconsistency-review"
+             :type :session
+             :contributions [{:type :template :text "inconsistency-review"}]
+             :judge {:type :invoke
+                     :operation "workflow/pass-status-routing"
+                     :args (conditional-review-pass-status-args "inconsistency-review" opts)}
+             :on {"REPEAT" {:goto "inconsistency-follow-up"}
+                  "DONE" {:goto "clarity-status"}}}
+            {:name "inconsistency-follow-up"
+             :type :session
+             :contributions [{:type :template :text "inconsistency-follow-up"}]
+             :judge {:type :invoke
+                     :operation "workflow/constant-routing"
+                     :args {:route "DONE"}}
+             :on {"DONE" {:goto "clarity-status"}}}
+            {:name "clarity-status"
+             :type :session
+             :contributions [{:type :template :text "clarity-status"}]
+             :judge {:type :invoke
+                     :operation "workflow/constant-routing"
+                     :args {:route "DONE"}}
+             :on {"REPEAT" {:goto "ambiguity-review" :max-iterations 6}
+                  "DONE" {:goto "final-summary"}}}
+            {:name "final-summary"
+             :type :session
+             :contributions [{:type :template :text "final-summary"}]}]}))
 
 (defn- create-conditional-review-run!
-  [ctx definition-name run-id]
-  (swap! (:state* ctx)
-         (fn [state]
-           (let [[s _ _] (workflow-runtime/create-run state {:definition (conditional-review-definition definition-name)
-                                                             :run-id run-id
-                                                             :workflow-input {:input "munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows"}})]
-             s))))
+  ([ctx definition-name run-id]
+   (create-conditional-review-run! ctx definition-name run-id {}))
+  ([ctx definition-name run-id opts]
+   (swap! (:state* ctx)
+          (fn [state]
+            (let [[s _ _] (workflow-runtime/create-run state {:definition (conditional-review-definition definition-name opts)
+                                                              :run-id run-id
+                                                              :workflow-input {:input "munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows"}})]
+              s)))))
 
 (defn- execute-conditional-review-proof!
-  [definition-name run-id replies]
-  (let [[ctx session-id] (support/create-session-context {:persist? false})
-        prompts* (atom [])]
-    (register-review-routing-ops! ctx)
-    (create-conditional-review-run! ctx definition-name run-id)
-    (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
-                  (fn [_ctx child-session-id prompt]
-                    (swap! prompts* conj {:session-id child-session-id :prompt prompt})
-                    {:execution-result/assistant-message
-                     {:role "assistant"
-                      :content [{:type :text :text (get replies prompt prompt)}]
-                      :stop-reason :stop}})]
-      (let [result (workflow-execution/execute-run! ctx session-id run-id)
-            run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
-        {:result result
-         :run run
-         :prompts (mapv :prompt @prompts*)}))))
+  ([definition-name run-id replies]
+   (execute-conditional-review-proof! definition-name run-id replies {}))
+  ([definition-name run-id replies opts]
+   (let [[ctx session-id] (support/create-session-context {:persist? false})
+         prompts* (atom [])]
+     (register-review-routing-ops! ctx)
+     (create-conditional-review-run! ctx definition-name run-id opts)
+     (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
+                   (fn [_ctx child-session-id prompt]
+                     (swap! prompts* conj {:session-id child-session-id :prompt prompt})
+                     {:execution-result/assistant-message
+                      {:role "assistant"
+                       :content [{:type :text :text (get replies prompt prompt)}]
+                       :stop-reason :stop}})]
+       (let [result (workflow-execution/execute-run! ctx session-id run-id)
+             run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)]
+         {:result result
+          :run run
+          :prompts (mapv :prompt @prompts*)})))))
+
+(deftest conditional-review-invalid-implementation-status-fails-before-follow-up-test
+  (testing "design/plan review routing rejects implementation-only PASS_STATUS tokens"
+    (let [{:keys [result run prompts]} (execute-conditional-review-proof!
+                                        "review-task-design-proof"
+                                        "design-invalid-implementation-status"
+                                        {"ambiguity-review" "PASS_STATUS: IMPLEMENTATION_COMPLETE"}
+                                        {:allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]})]
+      (is (= :failed (:status result)))
+      (is (= :failed (:status run)))
+      (is (= ["ambiguity-review"] prompts))
+      (is (zero? (count (get-in run [:step-runs "ambiguity-follow-up" :attempts]))))
+      (is (= {:status :error
+              :reason :invalid-pass-status
+              :message "PASS_STATUS token is not valid for this workflow step"
+              :details {:text "PASS_STATUS: IMPLEMENTATION_COMPLETE"
+                        :line "PASS_STATUS: IMPLEMENTATION_COMPLETE"
+                        :value "IMPLEMENTATION_COMPLETE"
+                        :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}}
+             (get-in run [:step-runs "ambiguity-review" :attempts 0 :judge-output :routing-result])))))
+  (testing "implementation loop routing continues accepting implementation PASS_STATUS tokens"
+    (let [[ctx session-id] (support/create-session-context {:persist? false})
+          prompts* (atom [])]
+      (register-review-routing-ops! ctx)
+      (create-implement-task-run! ctx "run-implement-more-work")
+      (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
+                    (fn [_ctx child-session-id prompt]
+                      (swap! prompts* conj {:session-id child-session-id :prompt prompt})
+                      {:execution-result/assistant-message
+                       {:role "assistant"
+                        :content [{:type :text
+                                   :text (case (count @prompts*)
+                                           1 "PASS_STATUS: MORE_WORK_REMAINS"
+                                           2 "PASS_STATUS: IMPLEMENTATION_COMPLETE"
+                                           "Final summary")}]
+                        :stop-reason :stop}})]
+        (let [result (workflow-execution/execute-run! ctx session-id "run-implement-more-work")
+              run (workflow-runtime/workflow-run-in @(:state* ctx) "run-implement-more-work")]
+          (is (= :completed (:status result)))
+          (is (= :completed (:status run)))
+          (is (= 2 (count (get-in run [:step-runs "implement-pass" :attempts]))))
+          (is (= {:status :ok :data "REPEAT" :summary "REPEAT"}
+                 (get-in run [:step-runs "implement-pass" :attempts 0 :judge-output :routing-result])))
+          (is (= {:status :ok :data "DONE" :summary "DONE"}
+                 (get-in run [:step-runs "implement-pass" :attempts 1 :judge-output :routing-result]))))))))
 
 (deftest design-review-conditional-follow-up-routing-test
   ;; Tests design review per-reviewer PASS_STATUS routing while preserving the

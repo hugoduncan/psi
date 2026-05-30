@@ -15,6 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-30: Task 190 code-shaper follow-up executed: design/plan per-reviewer `workflow/pass-status-routing` judges now pass `:allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]`; globally known implementation tokens now fail those review steps with deterministic `:invalid-pass-status`, while callers that omit `:allowed-statuses` preserve global token behavior. Focused workflow tests and targeted lint are green; code-shaper follow-up item is checked.
 - 2026-05-30: Task 190 docs review follow-ups completed and committed (`accfd3d8`): CHANGELOG [Unreleased] now documents user-visible conditional per-reviewer follow-up behavior and plan-review `steps.md` targeting; `doc/workflow-ir.md` now reflects executed invoke-judge runtime support. All docs follow-up items are checked.
 - 2026-05-30: Task 190 docs review applied `review-task-docs`: found actionable documentation follow-ups for CHANGELOG user-visible conditional design/plan review behavior plus `doc/workflow-ir.md` invoke-judge runtime support note; added unchecked `steps.md` items and recorded review note.
 - 2026-05-30: Task 190 third test-shaper follow-up executed: workflow definition tests now assert the full actual `clarity-status` `:on` map for both design/plan workflows (`REPEAT` → `ambiguity-review` with `:max-iterations 6`, `DONE` → `final-summary`); focused workflow tests and targeted lint are green, and the new `steps.md` item is checked.

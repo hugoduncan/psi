@@ -73,4 +73,4 @@
 - [x] Update the suggested documentation grammar in doc/workflow-ir.md so the invoke-judge comment no longer says current runtime executes LLM judges only.
 ## Code-shaper follow-up
 
-- [ ] Constrain design/plan per-reviewer PASS_STATUS routing to the statuses valid for those review steps, so context-invalid tokens such as `IMPLEMENTATION_COMPLETE` or `MORE_WORK_REMAINS` fail deterministically instead of being accepted by the global `workflow/pass-status-routing` token union.
+- [x] Constrain design/plan per-reviewer PASS_STATUS routing to the statuses valid for those review steps, so context-invalid tokens such as `IMPLEMENTATION_COMPLETE` or `MORE_WORK_REMAINS` fail deterministically instead of being accepted by the global `workflow/pass-status-routing` token union.
