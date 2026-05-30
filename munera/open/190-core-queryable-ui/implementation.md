@@ -286,3 +286,7 @@ No newly added unchecked ambiguity follow-up items were present in `design-steps
 ## 2026-05-30 plan inconsistency review
 
 Found one new actionable inconsistency after re-reading `plan.md`, `steps.md`, `implementation.md`, `design.md`, completed `design-steps.md`, and referenced extension docs: `implementation.md` records the `doc/extensions.md`, `doc/extension-api.md`, and `doc/architecture.md` queryable-UI documentation updates as already completed design follow-ups, while `steps.md` Slice 8 still lists those same documentation updates as unchecked implementation work. The checklist should distinguish already-completed design-doc alignment from any remaining implementation-time doc verification/update work.
+
+## 2026-05-30 inconsistency follow-up execution
+
+Completed the newly added `steps.md` Slice 8 documentation-checklist alignment follow-up. The implementation checklist now treats `doc/extensions.md`, `doc/extension-api.md`, and `doc/architecture.md` as post-implementation re-verification/final-sync items, because their queryable-UI design-doc alignment was already completed during earlier design follow-up passes. No design step remains blocked.

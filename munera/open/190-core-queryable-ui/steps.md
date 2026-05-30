@@ -78,10 +78,10 @@
 
 ## Slice 8 — Documentation and verification
 
-- [ ] Update `doc/extensions.md` with capability/action querying guidance and make-visible descriptor semantics.
-- [ ] Update `doc/extension-api.md` with the `:psi.ui/...` attrs, descriptor fields, unavailable semantics, and compatibility-only role of UI-type.
-- [ ] Update `doc/architecture.md` to qualify or replace UI-type branching guidance with capability/action querying.
-- [ ] Update README only if an existing extension-facing pointer needs to mention the new queryable UI surface.
+- [ ] Re-verify `doc/extensions.md` after implementation and update only for implementation-time drift from the already-completed design-doc alignment of capability/action querying guidance and make-visible descriptor semantics.
+- [ ] Re-verify `doc/extension-api.md` after implementation and update only for implementation-time drift from the already-completed design-doc alignment of the `:psi.ui/...` attrs, descriptor fields, unavailable semantics, and compatibility-only role of UI-type.
+- [ ] Re-verify `doc/architecture.md` after implementation and update only for implementation-time drift from the already-completed design-doc alignment that qualifies UI-type branching guidance in favour of capability/action querying.
+- [ ] Update README only if implementation adds or changes an extension-facing pointer that needs to mention the new queryable UI surface.
 - [ ] Append implementation decisions, side-effecting invocation status, and any follow-up task reference to `implementation.md`.
 - [ ] Run focused tests for affected resolver/runtime/frontend namespaces.
 - [ ] Run targeted lint for changed Clojure and Emacs Lisp files.
