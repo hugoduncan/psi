@@ -33,27 +33,27 @@
 
 ## Slice 3 — Effort override and adaptive `:xhigh`
 
-- [ ] Add optional `:effort-override` to `agent-session-schema`, with initial sessions defaulting to nil.
-- [ ] Add a `:session/set-effort-override` dispatch handler that stores the session value and emits project/user config persistence effects for scoped updates.
-- [ ] Add `set-effort-override-in!` to session settings.
-- [ ] Propagate non-nil `:effort-override` from session data into `:turn/ai-options` in `session->request-options`.
-- [ ] Add shared-config schema support for persisted `effort-override`, including explicit nil clears.
-- [ ] Add a presence-aware `resolved-effort-override` accessor that distinguishes absent/invalid values from explicit nil and explicit effort keywords.
-- [ ] Apply resolved persisted effort defaults to newly created root sessions only when the accessor reports presence.
-- [ ] Implement `/effort` command parsing for no args, `<low|medium|high|xhigh|none>`, and `<value> <session|project|user>`.
-- [ ] Ensure `/effort none session` clears in-memory state to nil while `/effort none project|user` persists explicit nil as a higher-precedence mask.
-- [ ] Add `:psi.agent-session/effort-override` resolver.
-- [ ] Update `effective-reasoning-effort` display mapping so `thinking-level :xhigh` displays distinctly as `xhigh`.
-- [ ] Add footer query/display support for `• effort:<value>` when an override is active and thinking is on.
-- [ ] Update Anthropic adaptive effort mapping so level-derived and override `:xhigh` send `"highest"`.
-- [ ] Ensure Anthropic extended-thinking models keep budget-token behavior and silently ignore effort override rather than sending `output_config.effort`.
-- [ ] Allow `output_config.effort = "highest"` in the Anthropic request schema.
-- [ ] Update OpenAI chat-completions `reasoning-effort` to accept `:effort-override`, mapping `:xhigh` to provider ceiling `"high"`.
-- [ ] Update Codex/responses reasoning shaping to call the shared reasoning-effort path instead of reading `thinking-level->effort` directly.
-- [ ] Ensure all providers omit effort override when `thinking-level` is `:off`.
-- [ ] Add tests for effort command success/error branches and scope handling.
-- [ ] Add tests for effort session mutation, resolver projection, startup config masks, and cold resume transience.
-- [ ] Add tests for Anthropic adaptive `:xhigh`/override shaping, OpenAI chat-completions shaping, and Codex/responses shaping.
+- [x] Add optional `:effort-override` to `agent-session-schema`, with initial sessions defaulting to nil.
+- [x] Add a `:session/set-effort-override` dispatch handler that stores the session value and emits project/user config persistence effects for scoped updates.
+- [x] Add `set-effort-override-in!` to session settings.
+- [x] Propagate non-nil `:effort-override` from session data into `:turn/ai-options` in `session->request-options`.
+- [x] Add shared-config schema support for persisted `effort-override`, including explicit nil clears.
+- [x] Add a presence-aware `resolved-effort-override` accessor that distinguishes absent/invalid values from explicit nil and explicit effort keywords.
+- [x] Apply resolved persisted effort defaults to newly created root sessions only when the accessor reports presence.
+- [x] Implement `/effort` command parsing for no args, `<low|medium|high|xhigh|none>`, and `<value> <session|project|user>`.
+- [x] Ensure `/effort none session` clears in-memory state to nil while `/effort none project|user` persists explicit nil as a higher-precedence mask.
+- [x] Add `:psi.agent-session/effort-override` resolver.
+- [x] Update `effective-reasoning-effort` display mapping so `thinking-level :xhigh` displays distinctly as `xhigh`.
+- [x] Add footer query/display support for `• effort:<value>` when an override is active and thinking is on.
+- [x] Update Anthropic adaptive effort mapping so level-derived and override `:xhigh` send `"highest"`.
+- [x] Ensure Anthropic extended-thinking models keep budget-token behavior and silently ignore effort override rather than sending `output_config.effort`.
+- [x] Allow `output_config.effort = "highest"` in the Anthropic request schema.
+- [x] Update OpenAI chat-completions `reasoning-effort` to accept `:effort-override`, mapping `:xhigh` to provider ceiling `"high"`.
+- [x] Update Codex/responses reasoning shaping to call the shared reasoning-effort path instead of reading `thinking-level->effort` directly.
+- [x] Ensure all providers omit effort override when `thinking-level` is `:off`.
+- [x] Add tests for effort command success/error branches and scope handling.
+- [x] Add tests for effort session mutation, resolver projection, startup config masks, and cold resume transience.
+- [x] Add tests for Anthropic adaptive `:xhigh`/override shaping, OpenAI chat-completions shaping, and Codex/responses shaping.
 
 ## Slice 4 — Mid-conversation system messages
 

@@ -297,6 +297,21 @@
           opts (prompt-request/session->request-options {} sd {})]
       (is (= 1.5 (:temperature opts))))))
 
+(deftest session-effort-override-propagates-to-request-options-test
+  ;; session->request-options includes effort overrides only when present.
+  (is (not (contains? (prompt-request/session->request-options
+                       nil
+                       {:model {:provider :anthropic}
+                        :effort-override nil}
+                       {})
+                      :effort-override)))
+  (is (= :xhigh
+         (:effort-override (prompt-request/session->request-options
+                            nil
+                            {:model {:provider :anthropic}
+                             :effort-override :xhigh}
+                            {})))))
+
 (deftest session-speed-mode-propagates-to-request-options-test
   ;; Speed mode is canonical session data and is only projected when an override is present.
   (testing "speed mode is omitted when session state is nil"

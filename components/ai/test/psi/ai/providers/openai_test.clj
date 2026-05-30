@@ -341,7 +341,11 @@
            (#'openai/codex-reasoning model {:thinking-level :high})))
     (is (= {"effort" "minimal" "summary" "auto"}
            (#'openai/codex-reasoning model {:thinking-level :minimal})))
-    (is (nil? (#'openai/codex-reasoning model {:thinking-level :off})))
+    (is (= {"effort" "high" "summary" "auto"}
+           (#'openai/codex-reasoning model {:thinking-level :medium
+                                            :effort-override :xhigh})))
+    (is (nil? (#'openai/codex-reasoning model {:thinking-level :off
+                                               :effort-override :xhigh})))
     (is (= {"effort" "medium" "summary" "auto"}
            (#'openai/codex-reasoning model {})))))
 
@@ -570,6 +574,13 @@
     (testing "explicit thinking level maps to expected reasoning effort"
       (let [req  (#'openai/build-request convo model {:api-key "sk-test"
                                                       :thinking-level :high})
+            body (json/parse-string (:body req) true)]
+        (is (= "high" (:reasoning_effort body)))))
+
+    (testing "effort override maps xhigh to provider ceiling"
+      (let [req  (#'openai/build-request convo model {:api-key "sk-test"
+                                                      :thinking-level :medium
+                                                      :effort-override :xhigh})
             body (json/parse-string (:body req) true)]
         (is (= "high" (:reasoning_effort body)))))
 

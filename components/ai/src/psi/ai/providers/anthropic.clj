@@ -201,7 +201,10 @@
   {:off nil :minimal 1024 :low 2048 :medium 8000 :high 16000 :xhigh 32000})
 
 (def ^:private thinking-level->effort
-  {:off nil :minimal "low" :low "low" :medium "medium" :high "high" :xhigh "high"})
+  {:off nil :minimal "low" :low "low" :medium "medium" :high "high" :xhigh "highest"})
+
+(def ^:private effort-override->effort
+  {:low "low" :medium "medium" :high "high" :xhigh "highest"})
 
 (defn- adaptive-thinking?
   [model]
@@ -335,7 +338,8 @@
         thinking           (thinking-param model options)
         adaptive?          (adaptive-thinking? model)
         effort             (when (and thinking adaptive?)
-                             (get thinking-level->effort (:thinking-level options)))
+                             (or (get effort-override->effort (:effort-override options))
+                                 (get thinking-level->effort (:thinking-level options))))
         fallback-request   (when (= :prompted-json (:strategy strategy))
                              structured-request)
         tool-defs          (tool-definitions conversation)

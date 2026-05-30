@@ -107,6 +107,20 @@
                    persist-effect (conj persist-effect))})))
 
   (register-core-handler!
+   :session/set-effort-override
+   (fn [_ctx {:keys [session-id effort scope]}]
+     (let [persist-effect (case scope
+                            :project {:effect/type :persist/project-prefs-update
+                                      :prefs {:effort-override effort}}
+                            :user    {:effect/type :persist/user-config-update
+                                      :prefs {:effort-override effort}}
+                            nil)]
+       {:root-state-update (session/session-update session-id #(assoc % :effort-override effort))
+        :return {:effort-override effort}
+        :effects (cond-> []
+                   persist-effect (conj persist-effect))})))
+
+  (register-core-handler!
    :session/set-worktree-path
    (fn [_ctx {:keys [session-id worktree-path]}]
      {:root-state-update (session/session-update session-id #(assoc % :worktree-path (str worktree-path)))}))

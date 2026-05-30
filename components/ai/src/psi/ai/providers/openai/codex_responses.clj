@@ -80,13 +80,9 @@
 
 (defn codex-reasoning
   [model options]
-  (when (:supports-reasoning model)
-    (let [effort (get reasoning/thinking-level->effort
-                      (:thinking-level options)
-                      "medium")]
-      (when effort
-        {"effort" effort
-         "summary" "auto"}))))
+  (when-let [effort (reasoning/reasoning-effort model options)]
+    {"effort" effort
+     "summary" "auto"}))
 
 (defn- codex-usage->usage-map
   [usage]

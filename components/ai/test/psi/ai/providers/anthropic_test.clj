@@ -168,13 +168,22 @@
       (is (nil? (:temperature body))
           "temperature must be absent even with thinking off on adaptive models")))
 
-  (testing "xhigh effort maps to high for adaptive thinking"
+  (testing "xhigh effort maps to highest for adaptive thinking"
     (let [model   (models/get-model :opus-4.7)
           convo   (conv/create "sys")
           req     (#'anthropic/build-request convo model {:thinking-level :xhigh
                                                           :api-key "test-key"})
           body    (json/parse-string (:body req) true)]
-      (is (= "high" (get-in body [:output_config :effort])))))
+      (is (= "highest" (get-in body [:output_config :effort])))))
+
+  (testing "effort override wins for adaptive thinking"
+    (let [model   (models/get-model :opus-4.7)
+          convo   (conv/create "sys")
+          req     (#'anthropic/build-request convo model {:thinking-level :high
+                                                          :effort-override :xhigh
+                                                          :api-key "test-key"})
+          body    (json/parse-string (:body req) true)]
+      (is (= "highest" (get-in body [:output_config :effort])))))
 
   (testing "medium effort level passes through"
     (let [model   (models/get-model :opus-4.7)

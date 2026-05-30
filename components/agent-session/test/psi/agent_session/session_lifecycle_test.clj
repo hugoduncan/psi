@@ -460,10 +460,11 @@
         (is (= 200000 (:psi.agent-session/context-window result)))
         (is (= 0.11 (:psi.agent-session/context-fraction result))))))
 
-  (testing "resume-session-in! treats speed mode as cold-resume transient"
+  (testing "resume-session-in! treats speed mode and effort override as cold-resume transient"
     (let [initial-model {:provider "anthropic" :id "claude-opus-4-8" :reasoning true}
           [ctx session-id] (create-session-context {:session-defaults {:model initial-model
-                                                                       :speed-mode :fast}})
+                                                                       :speed-mode :fast
+                                                                       :effort-override :xhigh}})
           f             (File/createTempFile "psi-resume-speed-transient" ".ndedn")]
       (.deleteOnExit f)
       (journal-store/flush-journal! f "sess-resume-speed" "/tmp/project" nil [])
@@ -472,6 +473,7 @@
             ctx        (retarget ctx sd)
             result     (session/query-in ctx resumed-id [:psi.agent-session/speed-mode])]
         (is (nil? (:speed-mode (ss/get-session-data-in ctx resumed-id))))
+        (is (nil? (:effort-override (ss/get-session-data-in ctx resumed-id))))
         (is (= :normal (:psi.agent-session/speed-mode result))))))
 
   (testing "resume-session-in! restores persisted worktree-path and runtime prompt metadata from header"

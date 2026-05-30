@@ -76,7 +76,8 @@
 
 (deftest bootstrap-runtime-session-applies-presence-aware-speed-preferences-test
   (let [cwd (test-support/temp-cwd)]
-    (project-prefs/update-agent-session! cwd {:speed-mode :normal})
+    (project-prefs/update-agent-session! cwd {:speed-mode :normal
+                                              :effort-override :xhigh})
     (with-redefs-fn (app-test-support/bootstrap-stub-bindings)
       (fn []
         (let [{:keys [ctx]} (app-test-support/bootstrap-fresh-session!
@@ -86,5 +87,8 @@
               session-id (-> (ss/list-context-sessions-in ctx) first :session-id)
               sd         (ss/get-session-data-in ctx session-id)]
           (is (= :normal (:speed-mode sd)))
+          (is (= :xhigh (:effort-override sd)))
           (is (= :normal (:psi.agent-session/speed-mode
-                          (session/query-in ctx session-id [:psi.agent-session/speed-mode])))))))))
+                          (session/query-in ctx session-id [:psi.agent-session/speed-mode]))))
+          (is (= :xhigh (:psi.agent-session/effort-override
+                         (session/query-in ctx session-id [:psi.agent-session/effort-override])))))))))

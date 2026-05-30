@@ -34,6 +34,16 @@
                          scope (assoc :scope scope))
                        {:origin :core})))
 
+(defn set-effort-override-in!
+  "Set the effort override for `session-id`. Optional `scope` controls persistence."
+  ([ctx session-id effort]
+   (dispatch/dispatch! ctx :session/set-effort-override {:session-id session-id :effort effort} {:origin :core}))
+  ([ctx session-id effort scope]
+   (dispatch/dispatch! ctx :session/set-effort-override
+                       (cond-> {:session-id session-id :effort effort}
+                         scope (assoc :scope scope))
+                       {:origin :core})))
+
 (defn cycle-model-in!
   "Cycle to the next available scoped model for `session-id`."
   [ctx session-id direction]

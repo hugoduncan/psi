@@ -810,3 +810,21 @@ Verification:
 - `clj-kondo --lint components/session-state/src/psi/session_state/init.clj components/agent-session/test/psi/agent_session/session_lifecycle_test.clj` — clean.
 
 Slice 2 is now complete. Next concrete work: Slice 3 effort override and adaptive `:xhigh` stack.
+
+## Implementation pass — 2026-05-30 — Slice 3 effort override
+
+Implemented Slice 3 effort override stack:
+
+- Added session-state `:effort-override` schema/default, dispatch mutation, core/session-settings API, request-options propagation, EQL resolver, startup config resolution, and cold-resume transience exclusion.
+- Added `/effort` command module with `low|medium|high|xhigh|none` plus optional `session|project|user` scope; wired command list/help/dispatch.
+- Updated adaptive Anthropic effort shaping so level-derived `:xhigh` and override `:xhigh` send `output_config.effort = "highest"`; local Anthropic request schema now accepts `"highest"`.
+- Updated OpenAI chat-completions and Codex/responses to share effort override mapping, with `:xhigh` capped to provider `"high"`.
+- Updated display surfaces so effective reasoning `:xhigh` remains visible as `xhigh`, and footer appends `• effort:<value>` while thinking is on.
+- Added focused coverage for command branches, request option projection, shared-config explicit nil presence, startup application, cold-resume transience, Anthropic adaptive xhigh/override shaping, OpenAI chat-completions override shaping, and Codex/responses override shaping.
+
+Verification:
+
+- `clojure -M:test --focus psi.agent-session.commands-test --focus psi.agent-session.prompt-request-test --focus psi.shared-config.resolution-test --focus psi.ai.providers.anthropic-test --focus psi.ai.providers.openai-test --focus psi.app-runtime-bootstrap-test --focus psi.agent-session.session-lifecycle-test` — 131 tests, 685 assertions, 0 failures.
+- `clj-kondo --lint` on modified source/test paths — clean.
+
+Slice 3 is complete. Next concrete work: Slice 4 mid-conversation system messages.

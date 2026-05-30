@@ -121,6 +121,12 @@
   ([ctx session-id mode scope]
    (settings/set-speed-mode-in! ctx session-id mode scope)))
 
+(defn set-effort-override-in!
+  ([ctx session-id effort]
+   (settings/set-effort-override-in! ctx session-id effort))
+  ([ctx session-id effort scope]
+   (settings/set-effort-override-in! ctx session-id effort scope)))
+
 (defn cycle-model-in!
   [ctx session-id direction]
   (settings/cycle-model-in! ctx session-id direction))

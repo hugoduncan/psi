@@ -161,6 +161,9 @@
       (some? (:speed-mode session-data))
       (assoc :speed-mode (:speed-mode session-data))
 
+      (some? (:effort-override session-data))
+      (assoc :effort-override (:effort-override session-data))
+
       (:logprobs-enabled session-data)
       (assoc :logprobs-enabled true
              :top-logprobs (or (:top-logprobs session-data) 3))

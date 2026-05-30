@@ -13,7 +13,7 @@
    :low "low"
    :medium "medium"
    :high "high"
-   :xhigh "high"})
+   :xhigh "xhigh"})
 
 (defn- string-value
   [x]

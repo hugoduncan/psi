@@ -12,6 +12,9 @@
 (def speed-mode-schema
   [:enum :normal :fast])
 
+(def effort-override-schema
+  [:enum :low :medium :high :xhigh])
+
 (def ui-type-schema
   [:enum :console :tui :emacs])
 
@@ -141,6 +144,7 @@
    [:model {:optional true} [:maybe model-schema]]
    [:thinking-level thinking-level-schema]
    [:speed-mode {:optional true} [:maybe speed-mode-schema]]
+   [:effort-override {:optional true} [:maybe effort-override-schema]]
    [:is-streaming :boolean]
    [:is-compacting :boolean]
    [:interrupt-pending :boolean]
@@ -248,6 +252,7 @@
      :model                   nil
      :thinking-level          :off
      :speed-mode              nil
+     :effort-override         nil
      :is-streaming            false
      :is-compacting           false
      :interrupt-pending       false

@@ -291,6 +291,7 @@ Available: " (str/join ", " (map name (keys all))))
                                   {:reasoning (:supports-reasoning effective-model)})
         effective-prompt-mode    (config-res/resolved-prompt-mode cfg)
         resolved-speed-mode      (config-res/resolved-speed-mode cfg)
+        resolved-effort-override (config-res/resolved-effort-override cfg)
         nucleus-prelude-override (config-res/resolved-nucleus-prelude-override cfg)
         session-defaults         (cond-> {:model {:provider  (name (:provider effective-model))
                                                   :id        (:id effective-model)
@@ -300,7 +301,9 @@ Available: " (str/join ", " (map name (keys all))))
                                           :nucleus-prelude-override nucleus-prelude-override
                                           :ui-type                  (or ui-type :console)}
                                    (:present? resolved-speed-mode)
-                                   (assoc :speed-mode (:value resolved-speed-mode)))
+                                   (assoc :speed-mode (:value resolved-speed-mode))
+                                   (:present? resolved-effort-override)
+                                   (assoc :effort-override (:value resolved-effort-override)))
         ctx                      (session/create-context
                                   {:session-defaults session-defaults
                                    :config session-config

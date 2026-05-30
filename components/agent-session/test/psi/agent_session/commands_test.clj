@@ -490,6 +490,46 @@
       (is (= "Usage: /speed OR /speed <normal|fast> [session|project|user]"
              (:message (commands/dispatch-in ctx session-id "/speed fast project extra" cmd-opts)))))))
 
+(deftest dispatch-effort-command-test
+  ;; The /effort command exposes nil session state as none and supports scoped updates.
+  (testing "no args shows none by default"
+    (let [[ctx session-id] (make-test-ctx)
+          result (commands/dispatch-in ctx session-id "/effort" cmd-opts)]
+      (is (= :text (:type result)))
+      (is (= "Current effort override: none" (:message result)))
+      (is (nil? (:effort-override (ss/get-session-data-in ctx session-id))))))
+
+  (testing "xhigh sets in-memory effort override"
+    (let [[ctx session-id] (make-test-ctx)
+          result (commands/dispatch-in ctx session-id "/effort xhigh" cmd-opts)]
+      (is (= :text (:type result)))
+      (is (= "✓ Effort override set to xhigh" (:message result)))
+      (is (= :xhigh (:effort-override (ss/get-session-data-in ctx session-id))))))
+
+  (testing "none clears in-memory effort override to nil"
+    (let [[ctx session-id] (make-test-ctx {:session-defaults {:effort-override :high}})
+          result (commands/dispatch-in ctx session-id "/effort none session" cmd-opts)]
+      (is (= :text (:type result)))
+      (is (= "✓ Effort override set to none [session]" (:message result)))
+      (is (nil? (:effort-override (ss/get-session-data-in ctx session-id))))))
+
+  (testing "project-scoped xhigh stores override in current session"
+    (let [cwd (test-support/temp-cwd)
+          [ctx session-id] (make-test-ctx {:cwd cwd})
+          result (commands/dispatch-in ctx session-id "/effort xhigh project" cmd-opts)]
+      (is (= :text (:type result)))
+      (is (= "✓ Effort override set to xhigh [project]" (:message result)))
+      (is (= :xhigh (:effort-override (ss/get-session-data-in ctx session-id))))))
+
+  (testing "unknown effort and scope report allowed values"
+    (let [[ctx session-id] (make-test-ctx)]
+      (is (= "Unknown effort override: turbo. Allowed: low, medium, high, xhigh, none"
+             (:message (commands/dispatch-in ctx session-id "/effort turbo" cmd-opts))))
+      (is (= "Unknown effort scope: bogus. Allowed: session, project, user"
+             (:message (commands/dispatch-in ctx session-id "/effort xhigh bogus" cmd-opts))))
+      (is (= "Usage: /effort OR /effort <low|medium|high|xhigh|none> [session|project|user]"
+             (:message (commands/dispatch-in ctx session-id "/effort high project extra" cmd-opts)))))))
+
 (deftest dispatch-logprobs-command-removed-test
   (let [[ctx session-id] (make-test-ctx)]
     (is (nil? (commands/dispatch-in ctx session-id "/logprobs" cmd-opts)))

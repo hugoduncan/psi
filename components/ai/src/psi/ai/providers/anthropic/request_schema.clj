@@ -92,7 +92,7 @@
 (def ^:private anthropic-output-config-schema
   "output_config — used with adaptive thinking to specify effort level."
   [:map {:closed true}
-   [:effort [:enum "low" "medium" "high"]]
+   [:effort [:enum "low" "medium" "high" "highest"]]
    [:task_budget {:optional true} [:map
                                    [:type [:= "tokens"]]
                                    [:total pos-int?]]]])

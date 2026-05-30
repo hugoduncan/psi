@@ -46,7 +46,7 @@
    but consumed during prompt derivation in child-session (not set as a
    standalone child field — it flows into the child's system-prompt-build-opts)."
   [:skill-ids :tool-ids :prompt-contribution-ids :prompt-templates :extensions
-   :auto-retry-enabled :auto-compaction-enabled :prompt-mode :speed-mode :nucleus-prelude-override
+   :auto-retry-enabled :auto-compaction-enabled :prompt-mode :speed-mode :effort-override :nucleus-prelude-override
    :developer-prompt :developer-prompt-source :cache-breakpoints :scoped-models
    :tool-output-overrides :ui-type :context-tokens :context-window])
 
@@ -54,9 +54,10 @@
   "Fields inherited by resume.
 
    Resume intentionally excludes session-transient request overrides such as
-   speed-mode. A cold journal resume reconstructs model/thinking-level from
-   journal entries but does not restore lightweight request overrides."
-  (vec (remove #{:speed-mode} common-inherited-fields)))
+   speed-mode and effort-override. A cold journal resume reconstructs
+   model/thinking-level from journal entries but does not restore lightweight
+   request overrides."
+  (vec (remove #{:speed-mode :effort-override} common-inherited-fields)))
 
 (def ^:private prompt-state-fields
   "Prompt assembly state — inherited by new and resume, not by fork.

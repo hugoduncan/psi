@@ -110,6 +110,18 @@
                {:nucleus-prelude-override :custom})))
     (is (nil? (config-resolution/resolved-nucleus-prelude-override {})))))
 
+(deftest resolved-effort-override-test
+  ;; resolved-effort-override preserves explicit nil masks and effort keywords.
+  (testing "valid values preserve presence"
+    (is (= {:present? true :value nil}
+           (config-resolution/resolved-effort-override {:effort-override nil})))
+    (is (= {:present? true :value :xhigh}
+           (config-resolution/resolved-effort-override {:effort-override :xhigh}))))
+  (testing "missing and invalid values are absent"
+    (is (nil? (config-resolution/resolved-effort-override {})))
+    (is (nil? (config-resolution/resolved-effort-override {:effort-override "xhigh"})))
+    (is (nil? (config-resolution/resolved-effort-override {:effort-override :turbo})))))
+
 (deftest resolved-speed-mode-test
   ;; Speed resolution is presence-aware so explicit :normal can mask lower layers.
   (testing "returns presence-aware valid speed modes"
