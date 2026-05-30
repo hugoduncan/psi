@@ -78,6 +78,7 @@ Bootstrapped on 2026-04-02.
 
 ## Latest session notes
 
+- 2026-05-30: Task 190 docs review follow-up completed: `doc/workflow-ir.md` suggested grammar now states both `llm-judge` and `invoke-judge` are current executed runtime IR, matching the invoke-judge runtime support note; the new `steps.md` item is checked.
 - 2026-05-30: Task 190 independent implementation verification pass found no unchecked task/design follow-up steps and no further concrete implementation slice. Re-verified workflow topology, prompt artifact targets, focused workflow routing tests, and targeted lint green; implementation remains complete pending review/closure.
 - 2026-05-30: Task 190 independent implementation verification pass re-read task artifacts/workflow definitions/tests, found no unchecked task/design follow-up steps and no concrete implementation work remaining, and reran focused workflow tests plus targeted lint green. Implementation remains complete pending review/closure.
 - 2026-05-30: Task 190 independent implementation verification pass found no unchecked task/design follow-up steps and no concrete implementation work remaining. Re-verified plan/design prompt artifact targets, focused workflow routing tests, and targeted lint green; implementation remains complete pending review/closure.

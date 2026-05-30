@@ -730,7 +730,7 @@ control-flow ::= :judge judge-spec
                | :on outcome-map
                | :max-iterations pos-int
 
-judge-spec ::= llm-judge | invoke-judge   ;; invoke-judge is documented IR shape; current runtime executes llm-judge only
+judge-spec ::= llm-judge | invoke-judge   ;; both forms are current executed runtime IR
 
 llm-judge ::= {:type :llm
                :session judge-session-spec

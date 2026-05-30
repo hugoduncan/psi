@@ -127,3 +127,5 @@
 
 
 2026-05-30 docs review: applied review-task-docs. Re-read task artifacts, affected workflow definitions/prompts/tests, README.md, CHANGELOG.md, doc/workflows.md, doc/workflow-grammar.md, and doc/workflow-ir.md. Found one new actionable documentation issue: the suggested grammar block in doc/workflow-ir.md still comments that invoke judges are only a documented shape and that current runtime executes LLM judges only, contradicting the current invoke-judge runtime support note and implementation.
+
+2026-05-30 docs review follow-up execution: updated the suggested documentation grammar in `doc/workflow-ir.md` so `judge-spec ::= llm-judge | invoke-judge` now states both forms are current executed runtime IR, aligning the grammar comment with the runtime support note for deterministic invoke judges. Marked the new docs follow-up item done in `steps.md`.
