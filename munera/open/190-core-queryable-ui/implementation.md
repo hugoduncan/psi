@@ -302,3 +302,7 @@ No newly added unchecked ambiguity follow-up items were present in `design-steps
 ## 2026-05-30 plan/steps inconsistency review
 
 No new actionable inconsistency feedback after re-reading `plan.md`, `steps.md`, `implementation.md`, `design.md`, `design-decisions.md`, `resolved-design-questions.md`, completed `design-steps.md`, and referenced extension docs. The implementation plan and checklist remain aligned on queryability-first scope, provider-derived runtime UI state, available-only actions, stable unavailable make-visible descriptors, optional/constrained invocation, frontend provider expectations, documentation re-verification, and verification sequencing. No `design-steps.md` items were added because there is no new inconsistency feedback.
+
+## 2026-05-30 inconsistency follow-up execution
+
+No newly added unchecked inconsistency follow-up items were present in `design-steps.md`; all design follow-up steps are already complete. No design step was completed or blocked in this pass, and `plan.md` / `steps.md` required no updates.
