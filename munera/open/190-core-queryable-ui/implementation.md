@@ -616,3 +616,7 @@ Verification:
 
 - `clojure -M:test --focus psi.app-runtime-test/start-tui-runtime-clears-tui-ui-provider-when-frontend-throws-test --focus psi.app-runtime-test/start-tui-runtime-installs-and-clears-tui-ui-provider-test` — 2 tests, 8 assertions, 0 failures.
 - `clj-kondo --lint components/app-runtime/test/psi/app_runtime_test.clj` — clean.
+
+## 2026-05-30 test-shaper review
+
+Found one new actionable test-shaping issue after reviewing task artifacts, UI capability/provider tests, runtime lifecycle tests, nullable/extension API coverage, Emacs ERT coverage, docs, and provider normalization code: provider-result collection shape validation is not executable. The design/provider contract requires `:psi.ui/capabilities` and `:psi.ui/actions` to be vectors, but current normalization tests only cover valid vectors and malformed entries; they do not prove non-vector collections such as lists or sets fail closed. Because `normalize-provider-result` currently vectorizes these fields before validating their shape, this contract drift can pass silently. Add focused provider normalization coverage for non-vector capabilities/actions and fix normalization if the tests expose drift.
