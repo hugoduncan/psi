@@ -570,3 +570,12 @@ Verification:
 ## 2026-05-30 test review
 
 Found one new actionable test issue after reviewing task artifacts, UI capability/provider tests, lifecycle tests, nullable coverage, Emacs ERT coverage, and the invocation schema contract: provider normalization tests cover valid `:ui-event` and `:mutation` invocations only when optional `:psi.ui.invocation/payload` / `:psi.ui.invocation/params` are present, but the design/checklist require those fields to be optional/defaulted to `{}` when omitted. Add focused coverage for omitted payload/params defaulting (and fix implementation if the test exposes drift) so the descriptor contract is executable.
+
+## 2026-05-30 invocation defaulting test follow-up
+
+Completed the newly added test-review follow-up for omitted optional invocation maps. Provider normalization now defaults omitted `:psi.ui.invocation/payload` for `:ui-event` invocations and omitted `:psi.ui.invocation/params` for `:mutation` invocations to `{}` before exposing descriptors through EQL. Added focused provider normalization coverage for both omitted-field cases and marked the Slice 8 follow-up item complete.
+
+Verification:
+
+- `clojure -M:test --focus psi.agent-session.ui-capabilities-test` — 18 tests, 115 assertions, 0 failures.
+- `clj-kondo --lint components/agent-session/src/psi/agent_session/ui_capabilities.clj components/agent-session/test/psi/agent_session/ui_capabilities_test.clj` — clean.

@@ -204,6 +204,19 @@
   (let [ids (map :psi.ui.action/id actions)]
     (not= (count ids) (count (set ids)))))
 
+(defn- normalize-invocation
+  [inv]
+  (case (:psi.ui.invocation/kind inv)
+    :ui-event (update inv :psi.ui.invocation/payload #(or % {}))
+    :mutation (update inv :psi.ui.invocation/params #(or % {}))
+    inv))
+
+(defn- normalize-action
+  [action]
+  (if (:psi.ui.action/available? action)
+    (update action :psi.ui.action/invocation normalize-invocation)
+    action))
+
 (defn- diagnostic-source
   [x]
   (if (instance? Throwable x)
@@ -288,7 +301,7 @@
 
         :else
         (let [capability-set (set capabilities)
-              actions (filterv :psi.ui.action/available? raw-actions)
+              actions (filterv :psi.ui.action/available? (mapv normalize-action raw-actions))
               make-visible-actions (filterv #(= make-visible-action-id (:psi.ui.action/id %)) actions)
               incoherent-unavailable? (and (false? available?)
                                            (or (seq capabilities) (seq actions)))

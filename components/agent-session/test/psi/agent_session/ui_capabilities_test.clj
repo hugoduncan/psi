@@ -220,6 +220,28 @@
             (valid-provider-result invocation)))
           (str "expected provider error for malformed invocation: " (pr-str invocation))))))
 
+(deftest provider-normalization-defaulted-invocation-maps-test
+  ;; Tests that optional UI event payload and mutation params are defaulted to
+  ;; empty maps in exposed descriptors when providers omit them.
+  (let [ui-event-result (ui-capabilities/normalize-provider-result
+                         (valid-provider-result
+                          {:psi.ui.invocation/kind :ui-event
+                           :psi.ui.invocation/event :psi.ui/show-active}))
+        mutation-result (ui-capabilities/normalize-provider-result
+                         (valid-provider-result
+                          {:psi.ui.invocation/kind :mutation
+                           :psi.ui.invocation/mutation 'psi.ui/show-active}))]
+    (is (= {:psi.ui.invocation/kind :ui-event
+            :psi.ui.invocation/event :psi.ui/show-active
+            :psi.ui.invocation/payload {}}
+           (get-in ui-event-result
+                   [:psi.ui/make-visible-action :psi.ui.action/invocation])))
+    (is (= {:psi.ui.invocation/kind :mutation
+            :psi.ui.invocation/mutation 'psi.ui/show-active
+            :psi.ui.invocation/params {}}
+           (get-in mutation-result
+                   [:psi.ui/make-visible-action :psi.ui.action/invocation])))))
+
 (deftest provider-normalization-duplicate-action-ids-test
   ;; Tests that duplicate action ids are rejected rather than merged.
   (let [action (ui-capabilities/make-visible-action

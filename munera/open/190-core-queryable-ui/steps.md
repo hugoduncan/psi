@@ -96,4 +96,4 @@
 - [x] Ensure TUI contexts do not expose a default attached TUI provider before the TUI frontend/state is installed, and clear or downgrade the provider on TUI shutdown; add pre-start/bootstrap/shutdown coverage.
 - [x] Reject provider action descriptors with extra unqualified/foreign keys before exposing them through EQL, and add focused coverage for fail-closed provider-error semantics.
 - [x] Reject provider action invocation maps with extra unqualified/foreign keys before exposing them through EQL, and add focused coverage for fail-closed provider-error semantics.
-- [ ] Add provider normalization tests for omitted optional `:ui-event` payload and `:mutation` params defaulting to `{}`; fix implementation if coverage exposes contract drift.
+- [x] Add provider normalization tests for omitted optional `:ui-event` payload and `:mutation` params defaulting to `{}`; fix implementation if coverage exposes contract drift.
