@@ -4,7 +4,6 @@ Open tasks in suggested execution order:
 
 Backlog:
 
-`munera/open/192-add-opus-4-8-model/`
 `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 `munera/open/108-project-nrepl-testing-without-mocks/`
 `munera/open/154-fix-workflow-max-iterations-error-surfacing/`
@@ -22,6 +21,7 @@ Backlog:
 
 Recently completed:
 
+`munera/closed/192-add-opus-4-8-model/`
 `munera/closed/190-ai-request-retry-backoff-observability/`
 `munera/closed/184-workflow-file-kinds-and-md-step-prompts/`
 `munera/closed/188-built-in-skill-for-writing-workflows/`
