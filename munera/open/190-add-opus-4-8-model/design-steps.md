@@ -127,3 +127,7 @@
 
 - [x] **Align compaction mid-system reattachment with next-generation placement** — The current conditional rule reattaches pre-cut active `:mid-system` instructions after the first retained user when retained history begins with a user, which can place the instruction before an already-retained assistant response. Specify whether compaction may retroactively insert mid-system instructions into retained history, should instead attach them to the latest retained user / next-generation boundary, should alter cut/merge rules, or should explicitly relax the placement contract for compacted history.
 
+
+## From inconsistency review pass 2026-05-30 (OpenAI resolver acceptance)
+
+- [ ] **Align mid-system resolver acceptance with OpenAI support** — Part 4 requires OpenAI chat-completions models to report mid-conversation system support via explicit metadata or runtime `:provider :openai` + `:api :openai-completions` inference, but the resolver acceptance criterion says the query is true for opus-4.8 and false otherwise. Update the acceptance criterion/tests to require true for opus-4.8 and OpenAI chat-completions, and false for Codex/responses and unsupported Anthropic models.

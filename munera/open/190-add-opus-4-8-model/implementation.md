@@ -531,3 +531,11 @@ No new actionable ambiguities found. Re-read `design.md` and checked referenced 
 ## Ambiguity follow-up execution — 2026-05-30 (latest post-compaction pass)
 
 Read `design-steps.md` for newly added unchecked ambiguity follow-up items after the preceding ambiguity-review pass. No unchecked ambiguity items were present; all ambiguity follow-ups are already marked complete. No `design.md` changes were required. `plan.md` and `steps.md` were not touched.
+
+---
+
+## Design inconsistency review pass — 2026-05-30 (OpenAI resolver acceptance)
+
+**New actionable inconsistency found:**
+
+1. **Mid-system resolver acceptance contradicts OpenAI support requirement** — Part 4 requires all OpenAI chat-completions models, including custom/runtime-loaded maps inferred from `:provider :openai` + `:api :openai-completions`, to report mid-conversation system support. But the resolver acceptance criterion says `(session/query-in ... [:psi.agent-session/model-supports-mid-system-messages])` returns `true` when an opus-4.8 session is active and `false` otherwise, which would make OpenAI chat-completions sessions false despite the immediately preceding OpenAI support requirement. Align the acceptance criterion to include OpenAI chat-completions true cases and unsupported Anthropic/Codex false cases.
