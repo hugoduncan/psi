@@ -1,6 +1,7 @@
 (ns psi.workflow-runtime.structured-output-test
   (:require
    [clojure.test :refer [deftest is testing]]
+   [psi.ai.providers.anthropic.structured-output :as anthropic-structured-output]
    [psi.workflow-runtime.structured-output :as structured-output]
    [psi.workflow-runtime.structured-output-schemas :as schemas]))
 
@@ -152,6 +153,14 @@
               :next-action :handoff-to-fix}
              (get-in result [:structured-output :value]))))))
 
+(def judge-routing-spec
+  {:source :judge/structured-output
+   :mode :structured
+   :schema-id :psi.workflow/judge-routing-result
+   :schema-version 1
+   :schema [:enum "REPEAT" "DONE"]
+   :json-schema {:type "string" :enum ["REPEAT" "DONE"]}})
+
 (deftest structured-output-envelope-string-enum-json-test
   ;; Regression test: parse-json-value previously rejected non-object JSON
   ;; (including plain strings) with a hard parse-error, making [:enum "REPEAT" "DONE"]
@@ -162,17 +171,31 @@
   ;;     treated as a plain string. This handles judge models that return DONE
   ;;     (unquoted) rather than "DONE" (JSON string).
   (testing "string enum JSON value validates correctly against [:enum ...] schema"
-    (let [judge-routing-spec {:source :judge/structured-output
-                              :mode :structured
-                              :schema-id :psi.workflow/judge-routing-result
-                              :schema-version 1
-                              :schema [:enum "REPEAT" "DONE"]
-                              :json-schema {:type "string" :enum ["REPEAT" "DONE"]}}]
-      (doseq [[raw expected-value] [["\"DONE\"" "DONE"] ["\"REPEAT\"" "REPEAT"]
-                                    ["DONE" "DONE"] ["REPEAT" "REPEAT"]]]
-        (let [result (structured-output/output-result judge-routing-spec raw)]
-          (is (= :valid (get-in result [:structured-output :status])) raw)
-          (is (= expected-value (get-in result [:structured-output :value])) raw))))))
+    (doseq [[raw expected-value] [["\"DONE\"" "DONE"] ["\"REPEAT\"" "REPEAT"]
+                                  ["DONE" "DONE"] ["REPEAT" "REPEAT"]]]
+      (let [result (structured-output/output-result judge-routing-spec raw)]
+        (is (= :valid (get-in result [:structured-output :status])) raw)
+        (is (= expected-value (get-in result [:structured-output :value])) raw)))))
+
+(deftest structured-output-envelope-anthropic-native-string-payload-test
+  ;; Integrated regression: Anthropic native JSON Schema output returns provider
+  ;; metadata containing a bare string payload, and the workflow envelope validates
+  ;; that metadata directly against the judge routing schema instead of reparsing
+  ;; the full assistant text.
+  (let [ai-metadata (anthropic-structured-output/structured-output-result
+                     {:strategy :provider-native
+                      :native-mechanism :anthropic/json-schema-output}
+                     :anthropic/json-schema-output
+                     "\"DONE\"")
+        result (structured-output/output-result judge-routing-spec nil ai-metadata)
+        envelope (:structured-output result)]
+    (is (= :valid (:status envelope)))
+    (is (= "DONE" (:value envelope)))
+    (is (= :provider-native (:strategy envelope)))
+    (is (= :anthropic/json-schema-output (:source envelope)))
+    (is (= :anthropic/json-schema-output (:native-mechanism envelope)))
+    (is (= "DONE" (:payload envelope)))
+    (is (= "\"DONE\"" (:raw-payload envelope)))))
 
 (deftest reusable-pass-status-result-schema-test
   ;; Tests the psi.workflow/pass-status-result schema exported by the runtime
