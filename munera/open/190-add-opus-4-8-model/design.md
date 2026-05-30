@@ -692,11 +692,14 @@ a Pathom mutation:
 
 - op-name: `psi.extension/inject-mid-system-message`
 - params: `[:psi/agent-session-ctx :session-id :text]`, with optional `:source`
+  and optional `:ext-path`
 - output: `[:psi.extension/ok? :psi.extension/error :psi.extension/reason]`
-- behavior: dispatch `:session/inject-mid-system-message` with `{:session-id
-  session-id :text text :source source}` and return the dispatch result mapped to
-  the output keys (`{:ok true}` becomes `{:psi.extension/ok? true}`, while error
-  maps preserve `:error` and `:reason`).
+- behavior: derive `effective-source` as `:source` when supplied, otherwise from
+  `:ext-path` when present, otherwise `:extension`; dispatch
+  `:session/inject-mid-system-message` with `{:session-id session-id :text text
+  :source effective-source}` and return the dispatch result mapped to the output
+  keys (`{:ok true}` becomes `{:psi.extension/ok? true}`, while error maps
+  preserve `:error` and `:reason`).
 
 Register the mutation in `all-mutations`, and add
 `'psi.extension/inject-mid-system-message` to
@@ -708,13 +711,15 @@ the Pathom-shaped payload back to the compact result contract:
 :error :invalid-placement :reason ...}`.
 
 Source/provenance contract: `:source` is optional metadata on the journal entry.
-If callers omit it, the extension API must infer a stable source from the current
-extension provenance (`ext-path`/extension id) and pass that to dispatch. The
-options arity is only for explicit override by trusted/internal callers. Dispatch
-stores the resulting string/keyword as provided in `{:text text :source source}`;
-if no source can be inferred, it stores `:extension` rather than rejecting the
-injection. Tests should assert provenance presence and should not depend on a
-provider-specific source value beyond this contract.
+If callers omit it, provenance inference happens at the extension mutation
+surface: `create-extension-api` / `mutate-ext-required` supplies `:ext-path` for
+extension calls, and the Pathom mutation converts that `:ext-path` into the
+source passed to dispatch. The options arity is only for explicit override by
+trusted/internal callers and wins over `:ext-path`. Dispatch stores the resulting
+string/keyword as provided in `{:text text :source source}`; if neither
+`:source` nor `:ext-path` is available, the mutation passes `:extension` rather
+than rejecting the injection. Tests should assert provenance presence and should
+not depend on a provider-specific source value beyond this contract.
 
 #### 9. EQL resolver (`components/agent-session/src/psi/agent_session/resolvers/session.clj`)
 

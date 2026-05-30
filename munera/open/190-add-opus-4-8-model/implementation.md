@@ -277,3 +277,13 @@ Completed the newly added inconsistency follow-up item in `design-steps.md` by r
 ## Design ambiguity review pass — 2026-05-30 (latest verification pass)
 
 No new actionable ambiguities found. Re-read `design.md` against the referenced shared-config resolution/startup path, extension mutation/runtime EQL bridge, session-state/model schemas, provider message transforms, conversation assembly, and existing `design-steps.md`; all actionable ambiguity concerns identified in this pass are already resolved in the current design or previously captured and checked.
+
+---
+
+## Inconsistency follow-up — 2026-05-30 (source provenance mutation params)
+
+Completed the newly added inconsistency follow-up item in `design-steps.md` by refining `design.md`:
+
+- `psi.extension/inject-mid-system-message` Pathom mutation params now include optional `:ext-path` as well as optional `:source`.
+- Provenance inference is explicitly owned by the extension mutation surface: explicit `:source` wins, otherwise `:ext-path` becomes the source, otherwise the mutation passes `:extension` to dispatch.
+- Dispatch continues to store the already-derived source value; tests should assert provenance presence without depending on a provider-specific source string.

@@ -84,4 +84,4 @@
 
 ## From inconsistency review pass 2026-05-30 (source provenance pass)
 
-- [ ] **Align mid-system source inference with mutation params** — The design says omitted `:source` is inferred from extension provenance (`ext-path`/extension id), but the specified `psi.extension/inject-mid-system-message` Pathom mutation params omit `:ext-path`. Add optional `:ext-path` to the mutation params and define inference there, or require the extension API helper to materialize `:source` before calling the mutation.
+- [x] **Align mid-system source inference with mutation params** — The design says omitted `:source` is inferred from extension provenance (`ext-path`/extension id), but the specified `psi.extension/inject-mid-system-message` Pathom mutation params omit `:ext-path`. Add optional `:ext-path` to the mutation params and define inference there, or require the extension API helper to materialize `:source` before calling the mutation.
