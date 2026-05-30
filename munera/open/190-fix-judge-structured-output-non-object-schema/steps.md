@@ -64,3 +64,4 @@
 ## Implementation review follow-ups
 
 - [x] Add direct OpenAI chat-completions streaming structured-output regression coverage for prompted-JSON and non-object/null payloads, or refactor streaming/non-streaming result construction through a shared helper so the existing payload matrix truly covers both paths. Refactored streaming and non-streaming Chat Completions structured-output result construction through a shared helper covered by the existing provider-native/prompted-JSON all-JSON-value payload matrix.
+- [ ] Update structured-output workflow docs (`doc/workflow-grammar.md` and `doc/workflow-ir.md`) so prompted-JSON and provider-native structured-output descriptions say a single JSON value matching the declared JSON Schema, not only a JSON object, while preserving guidance that map schemas are needed for multiple named fields/path references.
