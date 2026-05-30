@@ -158,7 +158,7 @@
   "Return deterministic prompted-JSON fallback instructions for request."
   [request]
   (let [schema-text (json/generate-string (:json-schema request))]
-    (str "\n\nStructured output required. Return exactly one JSON object matching "
+    (str "\n\nStructured output required. Return exactly one JSON value matching "
          "the supplied JSON Schema. Do not wrap the JSON in Markdown fences, "
          "do not add prose, and do not emit extra top-level text.\n"
          "Name: " (structured-output-name request) "\n"

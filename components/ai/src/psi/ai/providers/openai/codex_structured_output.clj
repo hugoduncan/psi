@@ -18,15 +18,16 @@
 
 (defn structured-output-result
   [strategy source raw-payload]
-  (if-let [{:keys [payload]} (structured-output/parse-json-value raw-payload)]
-    (assoc strategy
-           :source source
-           :raw-payload raw-payload
-           :payload payload)
-    (assoc strategy
-           :source source
-           :raw-payload raw-payload
-           :parse-error? true)))
+  (let [parse-result (structured-output/parse-json-value raw-payload)]
+    (if (:parsed? parse-result)
+      (assoc strategy
+             :source source
+             :raw-payload raw-payload
+             :payload (:payload parse-result))
+      (assoc strategy
+             :source source
+             :raw-payload raw-payload
+             :parse-error? true))))
 
 (defn emit-structured-result!
   [consume-fn strategy source raw-payload]

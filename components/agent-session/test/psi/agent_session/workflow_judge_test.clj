@@ -468,8 +468,46 @@
           (is (not (get-in @turn-opts* [:structured-output :require-provider-native?])))
           (is (= ["Return review JSON"] @turn-prompts*)))))))
 
+(deftest execute-judge-invalid-structured-output-retry-then-succeeds-test
+  ;; Tests structured-output validation failures retry with the original opts and
+  ;; can recover to a valid routed judge result.
+  (testing "structured judge output retries with structured opts and routes when retry is valid"
+    (let [turns* (atom [])]
+      (with-redefs [psi.session-persistence.core/messages-from-entries-in
+                    (fn [_ctx _sid] [])
+                    psi.workflow-runtime.turn-execution-contract/execute-judge-turn!
+                    (fn [_ctx sid text opts]
+                      (swap! turns* conj {:text text :opts opts})
+                      (if (= 1 (count @turns*))
+                        {:status :ok
+                         :session-id sid
+                         :assistant-text "APPROVED"}
+                        (let [ai-structured-output {:strategy :prompted-json
+                                                    :source :prompted-json/text
+                                                    :payload {"decision" "clear"
+                                                              "issues" []
+                                                              "confidence" 0.8}
+                                                    :raw-payload "{\"decision\":\"clear\",\"issues\":[],\"confidence\":0.8}"}]
+                          {:status :ok
+                           :session-id sid
+                           :assistant-text "{\"decision\":\"clear\",\"issues\":[],\"confidence\":0.8}"
+                           :structured-output ai-structured-output})))]
+        (let [result (workflow-judge/execute-judge!
+                      (structured-judge-test-ctx) "parent-1" "actor-1"
+                      structured-review-judge-spec structured-review-routing-table
+                      {:current-step-id "step-3-review"
+                       :step-order step-order
+                       :step-runs structured-review-step-runs})]
+          (is (= :clear (:judge-event result)))
+          (is (= {:action :complete} (:routing-result result)))
+          (is (= 2 (count @turns*)))
+          (is (= (get-in (first @turns*) [:opts :structured-output])
+                 (get-in (second @turns*) [:opts :structured-output])))
+          (is (re-find #"did not match any expected signal"
+                       (:text (second @turns*)))))))))
+
 (deftest execute-judge-invalid-structured-output-fails-locally-test
-  (testing "invalid structured judge output fails locally without prose routing or retry"
+  (testing "invalid structured judge output retries and then fails locally without prose routing"
     (let [turn-prompts* (atom [])]
       (with-redefs [psi.session-persistence.core/messages-from-entries-in
                     (fn [_ctx _sid] [])
@@ -499,7 +537,10 @@
           (is (= :invalid
                  (get-in result [:routing-result :details :structured-output :status])))
           (is (= :invalid (get-in result [:judge-output :review :structured-output :status])))
-          (is (= ["Return review JSON"] @turn-prompts*)))))))
+          (is (= 3 (count @turn-prompts*)))
+          (is (= "Return review JSON" (first @turn-prompts*)))
+          (is (every? #(re-find #"did not match any expected signal" %)
+                      (rest @turn-prompts*))))))))
 
 (deftest execute-judge-schema-valid-negative-decision-routes-test
   (testing "schema-valid negative decision drives the configured non-clear branch"
