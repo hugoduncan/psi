@@ -153,6 +153,25 @@
      :psi.extension/event-name (:event-name result)
      :psi.extension/delay-ms   (:delay-ms result)}))
 
+(pco/defmutation inject-mid-system-message
+  "Append an extension-authored mid-conversation system instruction."
+  [_ {:keys [psi/agent-session-ctx session-id text source ext-path]}]
+  {::pco/op-name 'psi.extension/inject-mid-system-message
+   ::pco/params  [:psi/agent-session-ctx :session-id :text :source :ext-path]
+   ::pco/output  [:psi.extension/ok?
+                  :psi.extension/error
+                  :psi.extension/reason]}
+  (let [effective-source (or source ext-path :extension)
+        result           (dispatch/dispatch! agent-session-ctx
+                                             :session/inject-mid-system-message
+                                             {:session-id session-id
+                                              :text text
+                                              :source effective-source}
+                                             {:origin :mutations})]
+    {:psi.extension/ok?    (boolean (:ok result))
+     :psi.extension/error  (:error result)
+     :psi.extension/reason (:reason result)}))
+
 (def all-mutations
   [register-tool
    register-command
@@ -163,4 +182,5 @@
    add-extension
    notify
    append-message
-   schedule-event])
+   schedule-event
+   inject-mid-system-message])

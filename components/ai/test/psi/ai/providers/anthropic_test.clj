@@ -168,10 +168,28 @@
       (is (nil? (:temperature body))
           "temperature must be absent even with thinking off on adaptive models")))
 
-  (testing "xhigh effort maps to high for adaptive thinking"
+  (testing "xhigh effort maps to highest for adaptive thinking"
     (let [model   (models/get-model :opus-4.7)
           convo   (conv/create "sys")
           req     (#'anthropic/build-request convo model {:thinking-level :xhigh
+                                                          :api-key "test-key"})
+          body    (json/parse-string (:body req) true)]
+      (is (= "highest" (get-in body [:output_config :effort])))))
+
+  (testing "effort override wins for adaptive thinking"
+    (let [model   (models/get-model :opus-4.7)
+          convo   (conv/create "sys")
+          req     (#'anthropic/build-request convo model {:thinking-level :high
+                                                          :effort-override :xhigh
+                                                          :api-key "test-key"})
+          body    (json/parse-string (:body req) true)]
+      (is (= "highest" (get-in body [:output_config :effort])))))
+
+  (testing "non-xhigh effort override wins over a different thinking level"
+    (let [model   (models/get-model :opus-4.7)
+          convo   (conv/create "sys")
+          req     (#'anthropic/build-request convo model {:thinking-level :medium
+                                                          :effort-override :high
                                                           :api-key "test-key"})
           body    (json/parse-string (:body req) true)]
       (is (= "high" (get-in body [:output_config :effort])))))
@@ -720,3 +738,56 @@
               {:type "text"
                :text "tail"}]
              (get-in out [0 :content]))))))
+
+(deftest transform-messages-handles-inline-system-placement-test
+  ;; Anthropic inline system messages are allowed only immediately after user messages.
+  (testing "valid user-system tail is emitted"
+    (let [convo {:messages [{:role :user :content {:kind :text :text "q"}}
+                            {:role :system :content {:kind :text :text "Use short answers."}}]}
+          out   (anthropic/transform-messages convo)]
+      (is (= [{:role "user" :content [{:type "text" :text "q"}]}
+              {:role "system" :content [{:type "text" :text "Use short answers."}]}]
+             out))))
+
+  (testing "invalid beginning, consecutive, and after-assistant systems are dropped"
+    (let [convo {:messages [{:role :system :content {:kind :text :text "drop first"}}
+                            {:role :user :content {:kind :text :text "q"}}
+                            {:role :system :content {:kind :text :text "keep"}}
+                            {:role :system :content {:kind :text :text "drop consecutive"}}
+                            {:role :assistant :content {:kind :text :text "a"}}
+                            {:role :system :content {:kind :text :text "drop after assistant"}}]}
+          out   (anthropic/transform-messages convo)]
+      (is (= ["user" "system" "assistant"] (mapv :role out)))
+      (is (= "keep" (get-in out [1 :content 0 :text]))))))
+
+(deftest anthropic-request-schema-accepts-inline-system-message-test
+  ;; Local validation accepts valid inline system messages; placement is enforced separately.
+  (testing "anthropic-request-schema-accepts-inline-system-message"
+    (let [body {:model "claude-opus-4-8"
+                :max_tokens 1024
+                :messages [{:role "user"
+                            :content [{:type "text" :text "q"}]}
+                           {:role "system"
+                            :content [{:type "text" :text "Use short answers."}]}]}]
+      (is (= body (request-schema/validate-request-body! body))))))
+
+(deftest anthropic-speed-mode-request-shaping-test
+  ;; Fast speed mode is both a body parameter and a beta header; default modes omit both.
+  (let [model (models/get-model :sonnet-4.6)
+        convo (-> (conv/create "sys") (conv/add-user-message "hi"))]
+    (testing "fast speed mode adds speed body key and beta header"
+      (let [req  (#'anthropic/build-request convo model {:api-key "test-key"
+                                                         :speed-mode :fast})
+            body (json/parse-string (:body req) true)
+            beta (get-in req [:headers "anthropic-beta"])]
+        (is (= "fast" (:speed body)))
+        (is (re-find #"fast-mode-2026-02-01" beta))))
+
+    (testing "normal and nil speed modes omit speed body key and beta header"
+      (doseq [opts [{:api-key "test-key"}
+                    {:api-key "test-key" :speed-mode :normal}]]
+        (let [req  (#'anthropic/build-request convo model opts)
+              body (json/parse-string (:body req) true)
+              beta (get-in req [:headers "anthropic-beta"])]
+          (is (not (contains? body :speed)))
+          (is (not (re-find #"fast-mode-2026-02-01" (or beta "")))))))))

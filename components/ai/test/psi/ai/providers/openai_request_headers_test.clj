@@ -118,3 +118,19 @@
         (is (= "psi" (get-in req [:headers "X-Project"])))
         (is (= "Bearer sk-test" (get-in req [:headers "Authorization"])))
         (is (= "application/json" (get-in req [:headers "Content-Type"])))))))
+
+(deftest speed-mode-fast-adds-service-tier-flex-test
+  ;; OpenAI chat-completions maps psi :fast to the alternate flex service tier.
+  (let [convo (-> (conv/create "sys") (conv/add-user-message "hi"))
+        model (models/get-model :gpt-4o)]
+    (testing "fast speed mode adds service_tier flex"
+      (let [req  (#'openai/build-request convo model {:api-key "sk-test" :speed-mode :fast})
+            body (json/parse-string (:body req) true)]
+        (is (= "flex" (:service_tier body)))))
+
+    (testing "normal and nil speed modes omit service_tier"
+      (doseq [opts [{:api-key "sk-test"}
+                    {:api-key "sk-test" :speed-mode :normal}]]
+        (let [req  (#'openai/build-request convo model opts)
+              body (json/parse-string (:body req) true)]
+          (is (not (contains? body :service_tier))))))))

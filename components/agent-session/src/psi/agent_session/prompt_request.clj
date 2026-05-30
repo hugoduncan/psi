@@ -102,9 +102,16 @@
           (recur (next remaining) (conj repaired message))))
       repaired)))
 
+(defn- mid-system-provider-message
+  [entry]
+  (let [text (get-in entry [:data :text])]
+    {:role "system"
+     :content [{:type :text :text (or text "")}]}))
+
 (defn journal->provider-messages
   "Project persisted journal entries into agent/provider message maps.
    :message entries become provider messages directly.
+   :mid-system entries become inline system messages.
    :logprobs entries are persisted but not projected into provider messages.
    Dangling assistant tool uses are repaired with synthetic error tool results
    in the provider-facing projection so interrupted sessions remain usable."
@@ -112,8 +119,10 @@
   (repair-dangling-tool-uses
    (into []
          (keep (fn [entry]
-                 (when (= :message (:kind entry))
-                   (get-in entry [:data :message]))))
+                 (case (:kind entry)
+                   :message (get-in entry [:data :message])
+                   :mid-system (mid-system-provider-message entry)
+                   nil)))
          journal)))
 
 (defn session->provider-messages
@@ -157,6 +166,12 @@
 
       (some? (:temperature session-data))
       (assoc :temperature (:temperature session-data))
+
+      (some? (:speed-mode session-data))
+      (assoc :speed-mode (:speed-mode session-data))
+
+      (some? (:effort-override session-data))
+      (assoc :effort-override (:effort-override session-data))
 
       (:logprobs-enabled session-data)
       (assoc :logprobs-enabled true
@@ -226,11 +241,21 @@
 
 (defn- replace-current-user-message
   [base-messages user-message]
-  (if (and user-message
-           (seq base-messages)
-           (= "user" (:role (peek base-messages))))
-    (conj (pop (vec base-messages)) user-message)
-    base-messages))
+  (let [messages (vec base-messages)]
+    (cond
+      (not (and user-message (seq messages)))
+      base-messages
+
+      (= "user" (:role (peek messages)))
+      (conj (pop messages) user-message)
+
+      (and (= "system" (:role (peek messages)))
+           (<= 2 (count messages))
+           (= "user" (:role (nth messages (- (count messages) 2)))))
+      (assoc messages (- (count messages) 2) user-message)
+
+      :else
+      base-messages)))
 
 (defn- queued-steering-messages
   [session-data user-message]

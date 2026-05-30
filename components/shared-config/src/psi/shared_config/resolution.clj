@@ -55,6 +55,26 @@
   (let [v (:thinking-level cfg)]
     (if (keyword? v) v :off)))
 
+(defn resolved-speed-mode
+  "Return {:present? true :value mode} for valid configured speed mode.
+   Missing or invalid values return nil. Explicit :normal is preserved so it can
+   mask lower-precedence :fast values while still shaping provider-default requests."
+  [cfg]
+  (when (contains? cfg :speed-mode)
+    (let [v (:speed-mode cfg)]
+      (when (#{:normal :fast} v)
+        {:present? true :value v}))))
+
+(defn resolved-effort-override
+  "Return {:present? true :value effort-or-nil} for valid configured effort override.
+   Missing or invalid values return nil. Explicit nil is preserved so it can mask
+   lower-precedence effort overrides."
+  [cfg]
+  (when (contains? cfg :effort-override)
+    (let [v (:effort-override cfg)]
+      (when (or (nil? v) (#{:low :medium :high :xhigh} v))
+        {:present? true :value v}))))
+
 (defn resolved-prompt-mode
   "Return :lambda or :prose."
   [cfg]

@@ -8,7 +8,8 @@
      - Stub/default compaction + branch-summary fns
      - Message rebuild helpers used after compaction and on resume"
   (:require
-   [cheshire.core :as json]))
+   [cheshire.core :as json]
+   [clojure.string :as str]))
 
 ;; ============================================================
 ;; Message helpers
@@ -50,6 +51,12 @@
      (get-in entry [:data :summary])
      (:timestamp entry))
 
+    :mid-system
+    {:role      "system"
+     :content   [{:type :text
+                  :text (or (get-in entry [:data :text]) "")}]
+     :timestamp (:timestamp entry)}
+
     :compaction
     (make-summary-message
      "Previous conversation summary:"
@@ -60,7 +67,7 @@
 
 (defn- message-like-entry?
   [entry]
-  (contains? #{:message :custom-message :branch-summary} (:kind entry)))
+  (contains? #{:message :custom-message :branch-summary :mid-system} (:kind entry)))
 
 (defn- turn-start-entry?
   [entry]
@@ -455,24 +462,107 @@
 ;; Message rebuild helpers
 ;; ============================================================
 
+(defn- mid-system-entry-text
+  [entry]
+  (when (= :mid-system (:kind entry))
+    (or (get-in entry [:data :text]) "")))
+
+(defn- coalesced-system-message
+  [texts timestamp]
+  {:role      "system"
+   :content   [{:type :text
+                :text (str/join "\n\n" texts)}]
+   :timestamp timestamp})
+
+(defn- split-kept-entries
+  [result session-data]
+  (let [entries (vec (:session-entries session-data))]
+    (if-let [kept-id (:first-kept-entry-id result)]
+      (let [kept-index (first (keep-indexed (fn [idx entry]
+                                              (when (= (:id entry) kept-id)
+                                                idx))
+                                            entries))]
+        (if kept-index
+          [(subvec entries 0 kept-index) (subvec entries kept-index)]
+          [entries []]))
+      [entries []])))
+
+(defn- split-boundary-mid-system-entries
+  [entries]
+  (let [boundary (take-while #(= :mid-system (:kind %)) entries)]
+    [(vec boundary) (vec (drop (count boundary) entries))]))
+
+(defn- last-role-index
+  [messages role]
+  (last (keep-indexed (fn [idx msg]
+                        (when (= role (:role msg))
+                          idx))
+                      messages)))
+
+(defn- normalize-retained-suffix-for-mid-system
+  [messages]
+  ;; Preserved mid-system instructions must attach to the next generation
+  ;; boundary, not to already-generated retained assistant/tool-result history.
+  ;; Dropping everything through the last retained assistant and its contiguous
+  ;; tool results mirrors advancing the compaction cut past completed retained
+  ;; exchanges.
+  (let [messages (vec messages)]
+    (if-let [last-assistant-index (last-role-index messages "assistant")]
+      (let [trailing-tool-result-indexes (take-while #(= "toolResult" (:role (nth messages %)))
+                                                     (range (inc last-assistant-index) (count messages)))
+            drop-through-index          (or (last trailing-tool-result-indexes)
+                                            last-assistant-index)]
+        (subvec messages (inc drop-through-index)))
+      messages)))
+
+(defn- insert-after-latest-user
+  [messages system-message]
+  (if-let [last-user-index (last-role-index messages "user")]
+    (vec (concat (subvec messages 0 (inc last-user-index))
+                 [system-message]
+                 (subvec messages (inc last-user-index))))
+    (into [system-message] messages)))
+
+(defn- rebuild-kept-entry-messages-with-mid-system-preservation
+  [pre-cut kept-entries summary-msg]
+  (let [[boundary-mid-entries kept-entries*] (split-boundary-mid-system-entries kept-entries)
+        preserved-texts (vec (keep mid-system-entry-text pre-cut))
+        boundary-texts  (vec (keep mid-system-entry-text boundary-mid-entries))
+        retained-msgs   (->> kept-entries* (keep entry->message) vec)
+        texts           (vec (concat preserved-texts boundary-texts))]
+    (if (seq texts)
+      (let [retained-msgs* (normalize-retained-suffix-for-mid-system retained-msgs)
+            system-msg     (coalesced-system-message texts (:timestamp summary-msg))]
+        (if (last-role-index retained-msgs* "user")
+          (insert-after-latest-user retained-msgs* system-msg)
+          (into [system-msg] retained-msgs*)))
+      retained-msgs)))
+
+(defn- rebuild-kept-messages-with-mid-system-preservation
+  [result session-data summary-msg]
+  (let [[pre-cut kept-entries] (split-kept-entries result session-data)]
+    (rebuild-kept-entry-messages-with-mid-system-preservation
+     pre-cut
+     kept-entries
+     summary-msg)))
+
 (defn rebuild-messages-from-entries
   "Given a compaction `result` and current `session-data`, return the
    vector of agent messages that should replace the agent message list.
 
    Inserts a synthetic user summary message, then all kept messages.
-   Includes :message, :custom-message, and :branch-summary entry kinds."
+   Includes :message, :custom-message, :branch-summary, and :mid-system
+   entry kinds. Preserves active pre-cut and boundary :mid-system entries by
+   coalescing them at a valid next-generation boundary."
   [result session-data]
   (let [summary-msg (make-summary-message
                      "Previous conversation summary:"
                      (:summary result)
                      (java.time.Instant/now))
-        kept-entries (if-let [kept-id (:first-kept-entry-id result)]
-                       (drop-while #(not= (:id %) kept-id)
-                                   (:session-entries session-data))
-                       [])
-        kept-msgs (->> kept-entries
-                       (keep entry->message)
-                       vec)]
+        kept-msgs   (rebuild-kept-messages-with-mid-system-preservation
+                     result
+                     session-data
+                     summary-msg)]
     (into [summary-msg] kept-msgs)))
 
 (defn rebuild-messages-from-journal-entries
@@ -501,8 +591,13 @@
             kept-before (if first-kept-id
                           (drop-while #(not= (:id %) first-kept-id) before)
                           [])
+            pre-cut (if first-kept-id
+                      (take-while #(not= (:id %) first-kept-id) before)
+                      before)
             after (subvec entries (inc compaction-idx))
-            kept-msgs (->> (concat kept-before after)
-                           (keep entry->message)
-                           vec)]
-        (into (if summary-msg [summary-msg] []) kept-msgs)))))
+            kept-msgs (rebuild-kept-entry-messages-with-mid-system-preservation
+                       pre-cut
+                       (vec kept-before)
+                       summary-msg)
+            after-msgs (->> after (keep entry->message) vec)]
+        (into (if summary-msg [summary-msg] []) (concat kept-msgs after-msgs))))))

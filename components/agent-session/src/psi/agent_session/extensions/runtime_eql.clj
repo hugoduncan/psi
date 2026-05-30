@@ -36,6 +36,7 @@
     'psi.extension.tool/chain
     'psi.extension/notify
     'psi.extension/append-message
+    'psi.extension/inject-mid-system-message
     'psi.extension/send-prompt
     'psi.extension/schedule-event})
 

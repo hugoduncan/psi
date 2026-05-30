@@ -42,8 +42,10 @@ team to use the same defaults.
 ```edn
 {:version 1
  :agent-session {:model-provider           "anthropic"
-                 :model-id                 "claude-sonnet-4-6"
+                 :model-id                 "claude-opus-4-8"
                  :thinking-level           :medium
+                 :speed-mode               :normal
+                 :effort-override          nil
                  :prompt-mode              :lambda
                  :nucleus-prelude-override nil}}
 ```
@@ -95,6 +97,8 @@ layers.
 | `:model-provider` | string | — | Provider name: `"anthropic"` or `"openai"` |
 | `:model-id` | string | — | Model id string (e.g. `"claude-sonnet-4-6"`) |
 | `:thinking-level` | keyword | `:off` | Extended thinking budget — see below |
+| `:speed-mode` | keyword | — | Optional throughput-tier override — `:normal` or `:fast` |
+| `:effort-override` | keyword or nil | — | Optional provider reasoning-effort override — `:low`, `:medium`, `:high`, `:xhigh`, or nil |
 | `:prompt-mode` | keyword | `:lambda` | System prompt style — `:lambda` or `:prose` |
 | `:nucleus-prelude-override` | string | — | Replace the nucleus prelude block in the system prompt |
 | `:llm-stream-idle-timeout-ms` | positive integer | `600000` | Milliseconds without provider stream progress before the backend aborts the run |
@@ -167,7 +171,38 @@ transport implementations.
 | `:xhigh` | Maximum budget |
 
 The level is clamped to what the selected model supports. Models that do not
-support reasoning ignore levels above `:off`.
+support reasoning ignore levels above `:off`. For Anthropic adaptive-thinking
+models such as Claude Opus 4.7 and Claude Opus 4.8, `:xhigh` is distinct from
+`:high` and sends the provider effort value `"highest"`; if the provider rejects
+that preview value, psi surfaces the provider error without retrying as `:high`.
+
+### `:speed-mode` values
+
+| Value | Meaning | Provider mapping |
+|-------|---------|------------------|
+| `:normal` | Provider default throughput tier | no native speed parameter |
+| `:fast` | Provider alternate throughput tier | Anthropic `speed: "fast"` with the fast-mode beta header; OpenAI chat-completions `service_tier: "flex"` |
+
+`:normal` and a missing value both omit native provider speed parameters.
+`/speed normal session` clears the session override; `/speed normal project` and
+`/speed normal user` persist an explicit `:normal` mask at that scope. Speed mode
+is session-transient on cold resume; persisted project/user config applies when a
+new root session is created, not when a journal is resumed.
+
+### `:effort-override` values
+
+| Value | Meaning |
+|-------|---------|
+| nil | No override; derive effort from `:thinking-level` |
+| `:low` | Force low provider effort while thinking is enabled |
+| `:medium` | Force medium provider effort while thinking is enabled |
+| `:high` | Force high provider effort while thinking is enabled |
+| `:xhigh` | Force maximum psi effort; Anthropic adaptive models send `"highest"`, OpenAI transports cap to `"high"` |
+
+The effort override is only sent when thinking is enabled. `/effort none` clears
+the in-memory override; `/effort none project` and `/effort none user` persist an
+explicit nil mask at that scope. Effort override is session-transient on cold
+resume; persisted project/user config applies when a new root session is created.
 
 ### `:prompt-mode` values
 
@@ -211,6 +246,25 @@ Default scope: `:project`.
 ```
 
 Default scope: `:project`.
+
+### Speed and effort runtime settings
+
+The interactive commands are:
+
+```text
+/speed                         # show current effective speed mode
+/speed fast                    # session-local alternate throughput tier
+/speed normal project          # persist explicit project default/provider default
+/effort                        # show current effort override
+/effort xhigh                  # session-local effort override
+/effort none user              # persist explicit user-level clear/mask
+```
+
+There is currently no extension EQL mutation named `psi.extension/set-speed-mode`
+or `psi.extension/set-effort-override`. Use the interactive `/speed` and
+`/effort` commands for these runtime settings; their optional scope arguments
+use the same `:session`, `:project`, and `:user` meanings as model and thinking
+settings.
 
 ### `psi.extension/set-prompt-mode`
 

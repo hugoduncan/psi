@@ -115,6 +115,29 @@
   [ctx session-id level]
   (settings/set-thinking-level-in! ctx session-id level))
 
+(defn set-speed-mode-in!
+  ([ctx session-id mode]
+   (settings/set-speed-mode-in! ctx session-id mode))
+  ([ctx session-id mode scope]
+   (settings/set-speed-mode-in! ctx session-id mode scope)))
+
+(defn set-effort-override-in!
+  ([ctx session-id effort]
+   (settings/set-effort-override-in! ctx session-id effort))
+  ([ctx session-id effort scope]
+   (settings/set-effort-override-in! ctx session-id effort scope)))
+
+(defn inject-mid-system-message-in!
+  ([ctx session-id text]
+   (dispatch/dispatch! ctx :session/inject-mid-system-message
+                       {:session-id session-id :text text}
+                       {:origin :core}))
+  ([ctx session-id text opts]
+   (dispatch/dispatch! ctx :session/inject-mid-system-message
+                       (cond-> {:session-id session-id :text text}
+                         (contains? opts :source) (assoc :source (:source opts)))
+                       {:origin :core})))
+
 (defn cycle-model-in!
   [ctx session-id direction]
   (settings/cycle-model-in! ctx session-id direction))

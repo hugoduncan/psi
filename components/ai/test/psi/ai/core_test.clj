@@ -56,6 +56,15 @@
       (is (= :anthropic-messages (:api model)))
       (is (= true (:adaptive-thinking model)))))
 
+  (testing "Claude Opus 4.8 model validation"
+    (let [model (models/get-model :opus-4.8)]
+      (is (schemas/valid? schemas/Model model))
+      (is (= "claude-opus-4-8" (:id model)))
+      (is (= :anthropic (:provider model)))
+      (is (= :anthropic-messages (:api model)))
+      (is (= true (:adaptive-thinking model)))
+      (is (= true (:supports-mid-conversation-system-messages model)))))
+
   (testing "GPT-5 Codex family models are registered"
     (doseq [k [:gpt-5.2-codex :gpt-5.3-codex :gpt-5.3-codex-spark :gpt-5.4]]
       (let [model (models/get-model k)]

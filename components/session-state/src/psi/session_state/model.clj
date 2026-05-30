@@ -9,6 +9,12 @@
 (def thinking-level-schema
   [:enum :off :minimal :low :medium :high :xhigh])
 
+(def speed-mode-schema
+  [:enum :normal :fast])
+
+(def effort-override-schema
+  [:enum :low :medium :high :xhigh])
+
 (def ui-type-schema
   [:enum :console :tui :emacs])
 
@@ -52,7 +58,7 @@
    [:shortcuts {:optional true} [:set :string]]])
 
 (def session-entry-kind-schema
-  [:enum :message :thinking-level :model :compaction :branch-summary
+  [:enum :message :mid-system :thinking-level :model :compaction :branch-summary
    :custom :custom-message :label :session-info :logprobs])
 
 (def session-entry-schema
@@ -137,6 +143,8 @@
    [:response-mode {:optional true} [:maybe response-mode-schema]]
    [:model {:optional true} [:maybe model-schema]]
    [:thinking-level thinking-level-schema]
+   [:speed-mode {:optional true} [:maybe speed-mode-schema]]
+   [:effort-override {:optional true} [:maybe effort-override-schema]]
    [:is-streaming :boolean]
    [:is-compacting :boolean]
    [:interrupt-pending :boolean]
@@ -243,6 +251,8 @@
      :workflow-owned?         false
      :model                   nil
      :thinking-level          :off
+     :speed-mode              nil
+     :effort-override         nil
      :is-streaming            false
      :is-compacting           false
      :interrupt-pending       false

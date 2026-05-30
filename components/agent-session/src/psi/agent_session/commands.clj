@@ -25,6 +25,8 @@
   (:require
    [clojure.string :as str]
    [psi.agent-session.background-jobs :as bg-jobs]
+   [psi.agent-session.commands.effort :as effort-command]
+   [psi.agent-session.commands.speed :as speed-command]
    [psi.agent-session.core :as session]
    [psi.app-runtime.background-job-view :as app-bg-view]
    [psi.agent-session.extensions.runtime-fns :as ext-runtime-fns]
@@ -129,6 +131,8 @@
          "  /logout  — logout from an OAuth provider\n"
          "  /model [provider model-id [session|project|user]] — show current model or set model\n"
          "  /thinking [level] — show current thinking level or set level\n"
+         "  /speed [normal|fast [session|project|user]] — show or set speed mode\n"
+         "  /effort [low|medium|high|xhigh|none [session|project|user]] — show or set effort override\n"
          "  /remember [text] — capture a memory note for future ψ\n"
          "  /worktree — show git worktree context\n"
          "  /reload-models — reload custom model definitions from ~/.psi/agent/models.edn and .psi/models.edn\n"
@@ -664,7 +668,7 @@
    "/project-repl" :project-repl})
 
 (def ^:private prefixed-command-prefixes
-  ["/tree" "/jobs" "/job" "/cancel-job" "/remember" "/model" "/thinking" "/login" "/project-repl"])
+  ["/tree" "/jobs" "/job" "/cancel-job" "/remember" "/model" "/thinking" "/speed" "/effort" "/login" "/project-repl"])
 
 (defn- exact-command-handler
   [trimmed]
@@ -688,6 +692,8 @@
     "/remember" (dispatch-remember-command ctx session-id trimmed)
     "/model" (dispatch-model-command ctx session-id trimmed)
     "/thinking" (dispatch-thinking-command ctx session-id trimmed)
+    "/speed" (speed-command/dispatch-command ctx session-id trimmed)
+    "/effort" (effort-command/dispatch-command ctx session-id trimmed)
     "/login" (dispatch-login-command ctx session-id oauth-ctx ai-model trimmed)
     "/project-repl" (project-nrepl-commands/dispatch-project-nrepl-command ctx session-id trimmed)
     nil))

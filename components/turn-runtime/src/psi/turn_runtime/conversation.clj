@@ -98,6 +98,21 @@
                           {:kind :text :text text}
                           (boolean (:is-error msg)))))
 
+(defn- append-system-msg [conv msg]
+  (let [text-blocks (->> (:content msg)
+                         (keep (fn [block]
+                                 (when (= :text (:type block))
+                                   (cond-> {:type :text
+                                            :text (or (:text block) "")}
+                                     (:cache-control block)
+                                     (assoc :cache-control (:cache-control block))))))
+                         vec)
+        system-content (if (seq text-blocks)
+                         text-blocks
+                         (or (some #(when (= :text (:type %)) (:text %)) (:content msg))
+                             (str (:content msg))))]
+    (conv/add-system-message conv system-content)))
+
 (defn- append-msg
   [conv msg]
   (if (:custom-type msg)
@@ -106,6 +121,7 @@
       "user"       (append-user-msg conv msg)
       "assistant"  (append-assistant-msg conv msg)
       "toolResult" (append-tool-result-msg conv msg)
+      "system"     (append-system-msg conv msg)
       conv)))
 
 (defn- add-tools-to-conv [conv agent-tools tools-cache?]

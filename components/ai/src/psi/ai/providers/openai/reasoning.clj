@@ -20,9 +20,12 @@
   "Return provider reasoning effort string for MODEL/OPTIONS, or nil when disabled."
   [model options]
   (when (:supports-reasoning model)
-    (get thinking-level->effort
-         (:thinking-level options)
-         "medium")))
+    (when-let [effort (get thinking-level->effort
+                           (:thinking-level options)
+                           "medium")]
+      (or (get {:low "low" :medium "medium" :high "high" :xhigh "high"}
+               (:effort-override options))
+          effort))))
 
 (defn chat-template-kwargs
   "Return OpenAI-compatible chat_template_kwargs overrides for MODEL/OPTIONS,

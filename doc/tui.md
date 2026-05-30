@@ -55,8 +55,30 @@ repo-local startup.
 ## In-session commands
 
 `/status` `/history` `/new` `/resume` `/tree [session-id]` `/worktree` `/help` `/quit` `/skills` `/prompts` `/remember [text]`
+`/model <provider> <model-id>` `/thinking <off|minimal|low|medium|high|xhigh>` `/speed [normal|fast [session|project|user]]` `/effort [low|medium|high|xhigh|none [session|project|user]]`
 `/project-repl` `/project-repl start` `/project-repl attach` `/project-repl stop` `/project-repl eval <code>` `/project-repl interrupt`
 `/skill:<name>` plus any extension commands such as `/work-on`, `/work-done`, `/work-rebase`, `/work-status`
+
+
+### Model, speed, and effort commands
+
+- `/model anthropic claude-opus-4-8` selects Claude Opus 4.8, an Anthropic
+  adaptive-thinking model with native JSON Schema structured output and
+  mid-conversation system-message support.
+- `/speed` prints the effective speed mode. `/speed fast` selects the provider's
+  alternate throughput tier for the current session. Add `project` or `user` to
+  persist the setting; `/speed normal session` clears the session override.
+  Anthropic maps fast mode to `speed: "fast"`; OpenAI chat-completions maps it
+  to `service_tier: "flex"`.
+- `/effort` prints the active reasoning-effort override (`none` when unset).
+  `/effort xhigh` overrides provider effort while thinking is enabled without
+  changing `/thinking`; `/effort none` clears the override. Add `project` or
+  `user` to persist the value or explicit clear.
+
+The footer shows `• fast` when speed mode is fast and appends
+`• effort:<value>` to the thinking label when an effort override is active.
+Speed and effort are not restored from cold journal resume; project/user config
+only applies to newly created root sessions.
 
 ### Multi-session commands
 

@@ -6,6 +6,7 @@
    [clojure.test :refer [deftest testing is]]
    [psi.agent-core.core :as agent]
    [psi.agent-session.bootstrap :as bootstrap]
+   [psi.ai.models :as models]
    [psi.agent-session.core :as session]
    [psi.state-kernel.dispatch :as kernel]
    [psi.session-persistence.core :as persist]
@@ -52,6 +53,104 @@
       (is (= :high (:thinking-level (ss/get-session-data-in ctx session-id)))))))
 
 ;; ── Thinking level ──────────────────────────────────────────────────────────
+
+(deftest mid-system-capability-dispatch-test
+  ;; Tests runtime model capability resolution and dispatch gating for
+  ;; mid-conversation system-message injection.
+  (testing "resolver reports explicit Opus 4.8 and inferred OpenAI chat-completions support"
+    (let [[ctx session-id] (create-session-context)]
+      (session/set-model-in! ctx session-id (models/get-model :opus-4.8) :session)
+      (is (= true (:psi.agent-session/model-supports-mid-system-messages
+                   (session/query-in ctx session-id [:psi.agent-session/model-supports-mid-system-messages]))))
+      (session/set-model-in! ctx session-id (models/get-model :gpt-4o) :session)
+      (is (= true (:psi.agent-session/model-supports-mid-system-messages
+                   (session/query-in ctx session-id [:psi.agent-session/model-supports-mid-system-messages]))))
+      (session/set-model-in! ctx session-id (assoc (models/get-model :gpt-4o)
+                                                   :id "custom-openai-chat"
+                                                   :supports-mid-conversation-system-messages nil)
+                             :session)
+      (is (= true (:psi.agent-session/model-supports-mid-system-messages
+                   (session/query-in ctx session-id [:psi.agent-session/model-supports-mid-system-messages]))))
+      (session/set-model-in! ctx session-id (assoc (models/get-model :gpt-4o)
+                                                   :id "custom-openai-chat-disabled"
+                                                   :supports-mid-conversation-system-messages false)
+                             :session)
+      (is (= false (:psi.agent-session/model-supports-mid-system-messages
+                    (session/query-in ctx session-id [:psi.agent-session/model-supports-mid-system-messages]))))))
+
+  (testing "resolver reports unsupported Anthropic and OpenAI Codex transports as false"
+    (let [[ctx session-id] (create-session-context)]
+      (session/set-model-in! ctx session-id (models/get-model :claude-3-5-sonnet) :session)
+      (is (= false (:psi.agent-session/model-supports-mid-system-messages
+                    (session/query-in ctx session-id [:psi.agent-session/model-supports-mid-system-messages]))))
+      (session/set-model-in! ctx session-id (models/get-model :gpt-5-codex) :session)
+      (is (= false (:psi.agent-session/model-supports-mid-system-messages
+                    (session/query-in ctx session-id [:psi.agent-session/model-supports-mid-system-messages]))))))
+
+  (testing "dispatch persists mid-system through the canonical journal append path"
+    (let [[ctx session-id] (create-session-context)
+          session-file     (File/createTempFile "psi-mid-system-journal" ".ndedn")]
+      (ss/assoc-state-value-in! ctx
+                                (ss/state-path :flush-state session-id)
+                                {:flushed? true :session-file session-file})
+      (session/set-model-in! ctx session-id (models/get-model :opus-4.8) :session)
+      (session/dispatch-in! ctx :session/append-journal-entry
+                            {:session-id session-id
+                             :entry (persist/message-entry {:role "user" :content "question"})}
+                            {:origin :test})
+      (session/dispatch-in! ctx :session/append-journal-entry
+                            {:session-id session-id
+                             :entry (persist/model-entry :anthropic "claude-opus-4-8")}
+                            {:origin :test})
+      (kernel/clear-event-log!)
+      (is (= {:ok true}
+             (session/inject-mid-system-message-in! ctx session-id "Prefer concise answers" {:source :test})))
+      (let [entry          (last (persist/all-entries-in ctx session-id))
+            injection-log  (last (kernel/event-log-entries))
+            persist-effect (first (:declared-effects injection-log))]
+        (is (= :mid-system (:kind entry)))
+        (is (= {:text "Prefer concise answers" :source :test} (:data entry)))
+        (is (= :session/inject-mid-system-message (:event-type injection-log)))
+        (is (= :persist/session-journal-io (:effect/type persist-effect)))
+        (is (= :append-entry (get-in persist-effect [:request :op])))
+        (is (= entry (get-in persist-effect [:request :entry])))
+        (is (re-find #"Prefer concise answers" (slurp session-file))))))
+
+  (testing "dispatch rejects unsupported capability and invalid placements without journal mutation"
+    (let [[ctx session-id] (create-session-context)
+          count-before    #(count (persist/all-entries-in ctx session-id))]
+      (session/set-model-in! ctx session-id (models/get-model :claude-3-5-sonnet) :session)
+      (is (= {:ok false :error :capability-not-supported}
+             (session/inject-mid-system-message-in! ctx session-id "instruction")))
+      (is (= 2 (count-before)))
+
+      (session/set-model-in! ctx session-id (models/get-model :opus-4.8) :session)
+      (let [n (count-before)]
+        (is (= {:ok false :error :invalid-placement :reason :no-preceding-user}
+               (session/inject-mid-system-message-in! ctx session-id "instruction")))
+        (is (= n (count-before))))
+
+      (session/dispatch-in! ctx :session/append-journal-entry
+                            {:session-id session-id
+                             :entry (persist/message-entry {:role "user" :content "question"})}
+                            {:origin :test})
+      (is (= {:ok true}
+             (session/inject-mid-system-message-in! ctx session-id "one")))
+      (let [n (count-before)]
+        (is (= {:ok false :error :invalid-placement :reason :pending-mid-system}
+               (session/inject-mid-system-message-in! ctx session-id "two")))
+        (is (= n (count-before))))
+
+      (let [[ctx2 session-id2] (create-session-context)]
+        (session/set-model-in! ctx2 session-id2 (models/get-model :opus-4.8) :session)
+        (session/dispatch-in! ctx2 :session/append-journal-entry
+                              {:session-id session-id2
+                               :entry (persist/message-entry {:role "assistant" :content "answer"})}
+                              {:origin :test})
+        (let [n (count (persist/all-entries-in ctx2 session-id2))]
+          (is (= {:ok false :error :invalid-placement :reason :after-assistant}
+                 (session/inject-mid-system-message-in! ctx2 session-id2 "late")))
+          (is (= n (count (persist/all-entries-in ctx2 session-id2)))))))))
 
 (deftest model-thinking-dispatch-test
   (testing "set-model-in! routes through dispatch log"

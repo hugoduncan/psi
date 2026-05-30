@@ -290,15 +290,22 @@ Available: " (str/join ", " (map name (keys all))))
                                       (config-res/resolved-thinking-level cfg))
                                   {:reasoning (:supports-reasoning effective-model)})
         effective-prompt-mode    (config-res/resolved-prompt-mode cfg)
+        resolved-speed-mode      (config-res/resolved-speed-mode cfg)
+        resolved-effort-override (config-res/resolved-effort-override cfg)
         nucleus-prelude-override (config-res/resolved-nucleus-prelude-override cfg)
+        session-defaults         (cond-> {:model {:provider  (name (:provider effective-model))
+                                                  :id        (:id effective-model)
+                                                  :reasoning (:supports-reasoning effective-model)}
+                                          :thinking-level           effective-thinking-level
+                                          :prompt-mode              effective-prompt-mode
+                                          :nucleus-prelude-override nucleus-prelude-override
+                                          :ui-type                  (or ui-type :console)}
+                                   (:present? resolved-speed-mode)
+                                   (assoc :speed-mode (:value resolved-speed-mode))
+                                   (:present? resolved-effort-override)
+                                   (assoc :effort-override (:value resolved-effort-override)))
         ctx                      (session/create-context
-                                  {:session-defaults {:model {:provider  (name (:provider effective-model))
-                                                              :id        (:id effective-model)
-                                                              :reasoning (:supports-reasoning effective-model)}
-                                                      :thinking-level           effective-thinking-level
-                                                      :prompt-mode              effective-prompt-mode
-                                                      :nucleus-prelude-override nucleus-prelude-override
-                                                      :ui-type                  (or ui-type :console)}
+                                  {:session-defaults session-defaults
                                    :config session-config
                                    :event-queue event-queue
                                    :oauth-ctx oauth-ctx

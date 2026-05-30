@@ -25,6 +25,8 @@
    :psi.agent-session/model-id
    :psi.agent-session/model-reasoning
    :psi.agent-session/thinking-level
+   :psi.agent-session/speed-mode
+   :psi.agent-session/effort-override
    :psi.agent-session/effective-reasoning-effort
    :psi.ui/statuses])
 
@@ -120,14 +122,18 @@
         effort-label     (or (string-value (:psi.agent-session/effective-reasoning-effort d))
                              (when (not= "off" thinking-label)
                                thinking-label))
+        effort-override-label (when (and (not= "off" thinking-label)
+                                         (:psi.agent-session/effort-override d))
+                                (str " • effort:" (name (:psi.agent-session/effort-override d))))
+        speed-label      (when (= :fast (:psi.agent-session/speed-mode d)) " • fast")
         model-label      (or model-id "no-model")
         provider-label   (or model-provider "no-provider")
         right-base       (if model-reasoning?
                            (if (= "off" thinking-label)
                              (str model-label " • thinking off")
-                             (str model-label " • thinking " effort-label))
+                             (str model-label " • thinking " effort-label effort-override-label))
                            model-label)]
-    (str "(" provider-label ") " right-base)))
+    (str "(" provider-label ") " right-base speed-label)))
 
 (defn- path-text
   [d fallback-worktree-path]
@@ -298,6 +304,8 @@
                      :id                         (:psi.agent-session/model-id d)
                      :reasoning                  (boolean (:psi.agent-session/model-reasoning d))
                      :thinking-level             thinking-level
+                     :speed-mode                 (:psi.agent-session/speed-mode d)
+                     :effort-override            (:psi.agent-session/effort-override d)
                      :effective-reasoning-effort (:psi.agent-session/effective-reasoning-effort d)
                      :text                       model-text*}
       :footer/statuses statuses*

@@ -135,9 +135,17 @@ run per originating session, configurable via
 terminal runs are removed, their linked workflow-owned child-session trees are
 also cleaned up.
 
+### Model controls
+
+Psi includes Claude Opus 4.8 (`claude-opus-4-8`) in the Anthropic model catalog.
+Interactive sessions support `/speed` for provider throughput-tier selection and
+`/effort` for provider reasoning-effort override; see [`doc/tui.md`](doc/tui.md)
+and [`doc/configuration.md`](doc/configuration.md).
+
 ### Extension API
 
-For extension-facing runtime/query details (including memory durability operations), see:
+For extension-facing runtime/query details (including memory durability operations and
+mid-conversation system-message injection), see:
 - [`doc/extension-api.md`](doc/extension-api.md)
 
 This includes the preferred workflow public-data display convention for

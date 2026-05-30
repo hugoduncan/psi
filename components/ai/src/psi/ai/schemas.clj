@@ -17,7 +17,7 @@
   [:enum :anthropic-messages :openai-completions :openai-codex-responses])
 
 (def MessageRole
-  [:enum :user :assistant :tool-result])
+  [:enum :user :assistant :tool-result :system])
 
 (def StopReason
   [:enum :stop :length :tool-use :error :aborted])
@@ -164,6 +164,7 @@
    [:base-url string?]
    [:supports-reasoning boolean?]
    [:adaptive-thinking {:optional true} boolean?]
+   [:supports-mid-conversation-system-messages {:optional true} boolean?]
    [:supports-images boolean?]
    [:supports-text boolean?]
    [:context-window pos-int?]

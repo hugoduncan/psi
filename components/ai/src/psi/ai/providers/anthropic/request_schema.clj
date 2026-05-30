@@ -54,10 +54,16 @@
    [:role [:= "assistant"]]
    [:content [:sequential anthropic-assistant-content-block-schema]]])
 
+(def ^:private anthropic-system-message-schema
+  [:map {:closed true}
+   [:role [:= "system"]]
+   [:content [:sequential anthropic-text-block-schema]]])
+
 (def ^:private anthropic-message-schema
   [:or
    anthropic-user-message-schema
-   anthropic-assistant-message-schema])
+   anthropic-assistant-message-schema
+   anthropic-system-message-schema])
 
 (def ^:private anthropic-tool-schema
   [:map {:closed true}
@@ -92,7 +98,7 @@
 (def ^:private anthropic-output-config-schema
   "output_config — used with adaptive thinking to specify effort level."
   [:map {:closed true}
-   [:effort [:enum "low" "medium" "high"]]
+   [:effort [:enum "low" "medium" "high" "highest"]]
    [:task_budget {:optional true} [:map
                                    [:type [:= "tokens"]]
                                    [:total pos-int?]]]])
@@ -109,6 +115,7 @@
    [:messages [:sequential anthropic-message-schema]]
    [:stream {:optional true} boolean?]
    [:system {:optional true} [:or :string [:sequential anthropic-system-block-schema]]]
+   [:speed {:optional true} [:enum "fast"]]
    [:temperature {:optional true} number?]
    [:thinking {:optional true} anthropic-thinking-schema]
    [:output_config {:optional true} anthropic-output-config-schema]

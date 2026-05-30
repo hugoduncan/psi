@@ -3,14 +3,13 @@
             [clojure.string :as str]
             [clj-http.client :as http]
             [cheshire.core :as json]
-            [psi.ai.content :as ai-content]
             [psi.ai.models :as models]
             [psi.ai.proxy :as proxy]
             [psi.ai.providers.anthropic.error :as anthropic-error]
+            [psi.ai.providers.anthropic.message-transform :as message-transform]
             [psi.ai.providers.anthropic.request-schema :as request-schema]
             [psi.ai.providers.anthropic.request-support :as request-support]
             [psi.ai.providers.anthropic.structured-output :as anthropic-structured-output]
-            [psi.ai.providers.anthropic.tool-id :as tool-id]
             [psi.ai.structured-output :as structured-output]))
 
 (def ^:private anthropic-version "2023-06-01")
@@ -31,176 +30,17 @@
     (assoc payload :cache_control cache-control*)
     payload))
 
-(defn- text-block
-  ([text]
-   {:type "text"
-    :text (or text "")})
-  ([text cache-control]
-   (with-cache-control (text-block text)
-     cache-control)))
-
-(defn- user-text-blocks
-  [content]
-  (->> (ai-content/text-blocks content)
-       (map (fn [block]
-              (text-block (:text block)
-                          (:cache-control block))))
-       vec))
-
-(defn- provider-text-blocks
-  [content]
-  (->> content
-       (keep (fn [block]
-               (when (= :text (:type block))
-                 (text-block (:text block)
-                             (:cache-control block)))))
-       vec))
-
-(defn- user-content
-  [msg]
-  (let [content (:content msg)]
-    (cond
-      (and (map? content)
-           (= :text (:kind content)))
-      [(text-block (:text content)
-                   (:cache-control content))]
-
-      (and (map? content)
-           (= :structured (:kind content)))
-      (user-text-blocks (:blocks content))
-
-      (and (sequential? content)
-           (seq content))
-      (provider-text-blocks content)
-
-      :else
-      ;; Last-resort coercion: wrap whatever arrived as a plain text block so
-      ;; the message list is never empty and the API call can still proceed.
-      [(text-block (ai-content/content-text content))])))
-
-(defn- assistant-thinking-block
-  [block]
-  (cond-> {:type     "thinking"
-           :thinking (or (:text block) "")}
-    (some? (:signature block)) (assoc :signature (:signature block))))
-
-(defn- assistant-tool-use-block
-  [canonical-id block]
-  (with-cache-control {:type  "tool_use"
-                       :id    (canonical-id (:id block))
-                       :name  (:name block)
-                       :input (if (map? (:input block))
-                                (:input block)
-                                {})}
-    (:cache-control block)))
-
-(defn- assistant-block
-  [canonical-id block]
-  (case (:kind block)
-    :thinking
-    (assistant-thinking-block block)
-
-    :text
-    (text-block (:text block)
-                (:cache-control block))
-
-    :tool-call
-    (assistant-tool-use-block canonical-id block)
-
-    ;; Intentional fallback: unknown block kinds are stringified as plain text
-    ;; rather than dropped, so future block types degrade gracefully.
-    (text-block (str block))))
-
-(defn- assistant-content
-  [msg canonical-id]
-  (if (= :structured (get-in msg [:content :kind]))
-    (let [{:keys [blocks]} (ai-content/assistant-content-parts msg)]
-      (mapv (partial assistant-block canonical-id)
-            blocks))
-    [(text-block (or (ai-content/content-text msg) ""))]))
-
-(defn- tool-result-block
-  [msg canonical-id]
-  (cond-> {:type        "tool_result"
-           :tool_use_id (canonical-id (:tool-call-id msg))
-           :content     (or (ai-content/content-text (:content msg)) "")}
-    (:is-error msg) (assoc :is_error true)))
-
-(defn- append-tool-result
-  [acc block]
-  (let [last-msg (peek acc)]
-    (if (and (= "user" (:role last-msg))
-             (every? #(= "tool_result" (:type %))
-                     (:content last-msg)))
-      (conj (pop acc) (update last-msg :content conj block))
-      (conj acc {:role "user" :content [block]}))))
-
-(defn- append-fallback-instructions-to-user-blocks
-  [blocks fallback-request]
-  (if fallback-request
-    (let [last-text-index (last (keep-indexed (fn [idx block]
-                                                (when (= "text" (:type block))
-                                                  idx))
-                                              blocks))]
-      (if (some? last-text-index)
-        (mapv (fn [idx block]
-                (if (= idx last-text-index)
-                  (update block
-                          :text
-                          structured-output/append-fallback-instructions-to-text
-                          fallback-request)
-                  block))
-              (range)
-              blocks)
-        (conj (vec blocks)
-              (text-block (structured-output/json-only-instruction fallback-request)))))
-    blocks))
-
-(defn- transform-message
-  [canonical-id fallback-request acc msg]
-  (case (:role msg)
-    :user
-    (conj acc {:role "user"
-               :content (append-fallback-instructions-to-user-blocks
-                         (user-content msg)
-                         fallback-request)})
-
-    :assistant
-    (conj acc {:role "assistant"
-               :content (assistant-content msg canonical-id)})
-
-    :tool-result
-    (append-tool-result acc (tool-result-block msg canonical-id))
-
-    acc))
-
-(defn transform-messages
-  "Transform conversation messages to Anthropic API format."
-  ([conversation]
-   (transform-messages conversation nil))
-  ([conversation fallback-request]
-   (let [canonical-id     (tool-id/canonical-tool-id-fn)
-         last-user-index  (when fallback-request
-                            (last (keep-indexed (fn [idx msg]
-                                                  (when (= :user (:role msg))
-                                                    idx))
-                                                (:messages conversation))))]
-     (->> (:messages conversation)
-          (map-indexed vector)
-          (reduce (fn [acc [idx msg]]
-                    (transform-message canonical-id
-                                       (when (= idx last-user-index)
-                                         fallback-request)
-                                       acc
-                                       msg))
-                  [])))))
+(def transform-messages message-transform/transform-messages)
 
 ;; Extended thinking: budget_tokens per level. Adaptive thinking (Opus 4.7+): effort string.
 (def ^:private thinking-level->budget
   {:off nil :minimal 1024 :low 2048 :medium 8000 :high 16000 :xhigh 32000})
 
 (def ^:private thinking-level->effort
-  {:off nil :minimal "low" :low "low" :medium "medium" :high "high" :xhigh "high"})
+  {:off nil :minimal "low" :low "low" :medium "medium" :high "high" :xhigh "highest"})
+
+(def ^:private effort-override->effort
+  {:low "low" :medium "medium" :high "high" :xhigh "highest"})
 
 (defn- adaptive-thinking?
   [model]
@@ -254,7 +94,7 @@
 
 (defn- beta-header
   ;; Adaptive thinking (Opus 4.7+) must NOT include interleaved-thinking-beta.
-  [oauth? thinking adaptive? prompt-caching? structured-output?]
+  [oauth? thinking adaptive? prompt-caching? structured-output? speed-mode]
   (let [extended-thinking? (and thinking (not adaptive?))
         betas (cond-> []
                 oauth?               (into [claude-code-beta
@@ -263,6 +103,7 @@
                                             prompt-caching-scope-beta])
                 extended-thinking?   (conj interleaved-thinking-beta)
                 prompt-caching?      (conj prompt-caching-beta)
+                (= :fast speed-mode) (conj "fast-mode-2026-02-01")
                 structured-output?   (conj anthropic-structured-output/json-schema-output-beta))]
     (when (seq betas)
       (->> betas
@@ -270,14 +111,14 @@
            (str/join ",")))))
 
 (defn- request-headers
-  [api-key thinking adaptive? prompt-caching? structured-output?]
+  [api-key thinking adaptive? prompt-caching? structured-output? speed-mode]
   (let [oauth?       (oauth-api-key? api-key)
         base-headers {"Content-Type"      "application/json"
                       "anthropic-version" anthropic-version}
         headers      (if oauth?
                        (assoc base-headers "Authorization" (str "Bearer " api-key))
                        (assoc base-headers "x-api-key" api-key))
-        beta         (beta-header oauth? thinking adaptive? prompt-caching? structured-output?)]
+        beta         (beta-header oauth? thinking adaptive? prompt-caching? structured-output? speed-mode)]
     (cond-> headers
       beta (assoc "anthropic-beta" beta))))
 
@@ -333,7 +174,8 @@
         thinking           (thinking-param model options)
         adaptive?          (adaptive-thinking? model)
         effort             (when (and thinking adaptive?)
-                             (get thinking-level->effort (:thinking-level options)))
+                             (or (get effort-override->effort (:effort-override options))
+                                 (get thinking-level->effort (:thinking-level options))))
         fallback-request   (when (= :prompted-json (:strategy strategy))
                              structured-request)
         tool-defs          (tool-definitions conversation)
@@ -347,6 +189,7 @@
              :messages   (transform-messages conversation fallback-request)}
       stream? (assoc :stream true)
       (some? system-body) (assoc :system system-body)
+      (= :fast (:speed-mode options)) (assoc :speed "fast")
       ;; temperature is incompatible with extended thinking, and is a 400
       ;; error on adaptive-thinking models (Opus 4.7+) even when thinking=off
       (and (not thinking)
@@ -380,13 +223,15 @@
                                                        thinking
                                                        adaptive?
                                                        prompt-caching?
-                                                       json-schema-output?)
+                                                       json-schema-output?
+                                                       (:speed-mode options))
                                       "Authorization" "x-api-key")
                               (request-headers api-key
                                                thinking
                                                adaptive?
                                                prompt-caching?
-                                               json-schema-output?))
+                                               json-schema-output?
+                                               (:speed-mode options)))
          headers            (if-let [custom (:headers options)]
                               (merge base-hdrs custom)
                               base-hdrs)]

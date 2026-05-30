@@ -46,9 +46,18 @@
    but consumed during prompt derivation in child-session (not set as a
    standalone child field — it flows into the child's system-prompt-build-opts)."
   [:skill-ids :tool-ids :prompt-contribution-ids :prompt-templates :extensions
-   :auto-retry-enabled :auto-compaction-enabled :prompt-mode :nucleus-prelude-override
+   :auto-retry-enabled :auto-compaction-enabled :prompt-mode :speed-mode :effort-override :nucleus-prelude-override
    :developer-prompt :developer-prompt-source :cache-breakpoints :scoped-models
    :tool-output-overrides :ui-type :context-tokens :context-window])
+
+(def ^:private resume-inherited-fields
+  "Fields inherited by resume.
+
+   Resume intentionally excludes session-transient request overrides such as
+   speed-mode and effort-override. A cold journal resume reconstructs
+   model/thinking-level from journal entries but does not restore lightweight
+   request overrides."
+  (vec (remove #{:speed-mode :effort-override} common-inherited-fields)))
 
 (def ^:private prompt-state-fields
   "Prompt assembly state — inherited by new and resume, not by fork.
@@ -152,7 +161,7 @@
         updated-at    (or (some-> entries last :timestamp)
                           header-ts)
         baseline     (merge (model/initial-session)
-                            (select-keys current-sd (into common-inherited-fields
+                            (select-keys current-sd (into resume-inherited-fields
                                                           prompt-state-fields)))
         next-sd      (assoc baseline
                             :session-id session-id

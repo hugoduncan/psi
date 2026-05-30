@@ -5,6 +5,7 @@
    [com.wsscode.pathom3.connect.operation :as pco]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.message-text :as message-text]
+   [psi.agent-session.model-capabilities :as model-capabilities]
    [psi.agent-session.resolvers.support :as support]
    [psi.session-state.model :as session]
    [psi.session-state.state :as ss]
@@ -123,12 +124,16 @@
   {::pco/input  [:psi/agent-session-ctx :psi.agent-session/session-id]
    ::pco/output [:psi.agent-session/model
                  :psi.agent-session/thinking-level
+                 :psi.agent-session/speed-mode
+                 :psi.agent-session/effort-override
                  :psi.agent-session/prompt-mode
                  :psi.agent-session/ui-type]}
   (let [sd (support/session-data agent-session-ctx session-id)]
     {:psi.agent-session/model          (:model sd)
-     :psi.agent-session/thinking-level (:thinking-level sd)
-     :psi.agent-session/prompt-mode    (:prompt-mode sd)
+     :psi.agent-session/thinking-level  (:thinking-level sd)
+     :psi.agent-session/speed-mode      (or (:speed-mode sd) :normal)
+     :psi.agent-session/effort-override (:effort-override sd)
+     :psi.agent-session/prompt-mode     (:prompt-mode sd)
      :psi.agent-session/ui-type        (:ui-type sd)}))
 
 ;; ── Queues and message counts ───────────────────────────
@@ -448,7 +453,7 @@
    :low "low"
    :medium "medium"
    :high "high"
-   :xhigh "high"})
+   :xhigh "xhigh"})
 
 (defn- effective-reasoning-effort
   [model thinking-level]
@@ -468,6 +473,14 @@
      (boolean (:reasoning model))
      :psi.agent-session/effective-reasoning-effort
      (effective-reasoning-effort model level)}))
+
+(pco/defresolver agent-session-model-mid-system-support
+  "Resolve whether the runtime active model supports mid-conversation system messages."
+  [{:keys [psi/agent-session-ctx psi.agent-session/session-id]}]
+  {::pco/input  [:psi/agent-session-ctx :psi.agent-session/session-id]
+   ::pco/output [:psi.agent-session/model-supports-mid-system-messages]}
+  {:psi.agent-session/model-supports-mid-system-messages
+   (model-capabilities/session-supports-mid-system-messages? agent-session-ctx session-id)})
 
 (defn- runtime-model-catalog
   "Return deterministic runtime model catalog for frontend selectors."
@@ -618,6 +631,7 @@
    agent-session-model-provider
    agent-session-model-id
    agent-session-model-reasoning
+   agent-session-model-mid-system-support
    agent-session-model-catalog
    agent-session-authenticated-providers
    agent-session-rpc-trace

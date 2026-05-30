@@ -2,6 +2,8 @@
   "Tests for the extension registry, tool wrapping, introspection, and extension API."
   (:require
    [clojure.test :refer [deftest testing is]]
+   [com.wsscode.pathom3.connect.operation :as pco]
+   [psi.agent-session.mutations.extensions :as extension-mutations]
    [psi.deterministic-operation-runtime.core :as deterministic-op-runtime]
    [psi.deterministic-operation-registry.registry :as op-reg]
    [psi.state-kernel.dispatch :as kernel]
@@ -667,6 +669,30 @@
              ((:mutate api) 'psi.extension/test {:a 1 :ext-path "/custom"})))
       (is (= {:op 'psi.extension.workflow/create :params {:type :agent :ext-path "/ext/test"}}
              ((:mutate api) 'psi.extension.workflow/create {:type :agent})))))
+
+  (testing "mid-system mutation declares optional provenance params"
+    (is (= [:psi/agent-session-ctx :session-id :text :source :ext-path]
+           (-> extension-mutations/inject-mid-system-message
+               :config
+               ::pco/params))))
+
+  (testing "API mid-system helper delegates to runtime mutation and normalizes result"
+    (let [reg         (ext/create-registry)
+          _           (ext/register-extension-in! reg "/ext/test")
+          calls       (atom [])
+          runtime-fns {:mutate-fn (fn [op params]
+                                    (swap! calls conj {:op op :params params})
+                                    {:psi.extension/ok? true})}
+          api         (ext/create-extension-api reg "/ext/test" runtime-fns)]
+      (is (= {:ok true :error nil :reason nil}
+             ((:inject-mid-system-message api) "Use shorter answers")))
+      (is (= {:ok true :error nil :reason nil}
+             ((:inject-mid-system-message api) "Use citations" {:source :trusted})))
+      (is (= [{:op 'psi.extension/inject-mid-system-message
+               :params {:text "Use shorter answers" :ext-path "/ext/test"}}
+              {:op 'psi.extension/inject-mid-system-message
+               :params {:text "Use citations" :source :trusted :ext-path "/ext/test"}}]
+             @calls))))
 
   (testing "API session lifecycle helpers delegate to runtime mutate fn"
     (let [reg         (ext/create-registry)
