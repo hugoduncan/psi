@@ -97,3 +97,8 @@ Completed the newly added invocation/permission follow-up in `design.md`: extens
 ## 2026-05-30 design ambiguity review
 
 Found one new actionable ambiguity after re-reading `design.md`, the extension API docs, and current extension UI/query seams: the design says extension guidance should avoid/replace UI-type branching, while existing extension APIs and docs expose `:ui-type` / `:psi.agent-session/ui-type`; it does not define whether those legacy UI-type surfaces remain supported diagnostic compatibility, are deprecated, or should be hidden from extension guidance.
+
+
+## 2026-05-30 ambiguity follow-up
+
+Completed the newly added legacy UI-type compatibility follow-up in `design.md`: existing `:ui-type`, `:psi.agent-session/ui-type`, and session `:ui-type` surfaces remain supported as diagnostic/compatibility data, while new extension-authoring guidance for UI behaviour must use capability/action queries in the `:psi.ui/...` namespace. Any future deprecation/removal is explicitly out of scope for this task and belongs in a separate migration task.

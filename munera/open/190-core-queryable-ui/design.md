@@ -190,6 +190,20 @@ Expected frontend handling:
 
 Extensions must not branch on `:emacs`, `:tui`, or `:console` to decide behaviour. They should branch on capabilities and action availability.
 
+### Legacy UI-type compatibility
+
+Existing UI-type surfaces remain supported as diagnostic and compatibility data in this slice:
+
+- extension API `:ui-type`
+- EQL attr `:psi.agent-session/ui-type`
+- session state `:ui-type`
+
+They are not removed or hidden by this task, because current adapters, tests, and debugging/introspection workflows still use them to report the concrete frontend shape (`:console`, `:tui`, `:emacs`, or related runtime-specific values). They should continue to reflect the session/runtime UI type as they do today and existing callers should not break.
+
+However, UI-type surfaces are no longer the normative extension-authoring contract for deciding UI behaviour. New extension guidance and examples for UI availability, capability checks, and make-visible behaviour must use the capability/action graph attrs in the `:psi.ui/...` namespace. In particular, extensions should query `:psi.ui/capabilities`, `:psi.ui/actions`, and `:psi.ui/make-visible-action` and branch on `:psi.ui.capability/...` plus descriptor availability rather than on `:psi.agent-session/ui-type` or API `:ui-type`.
+
+Documentation should qualify any remaining mention of `:ui-type` / `:psi.agent-session/ui-type` as compatibility diagnostics or low-level introspection. It should not present UI-type branching as the recommended way for extension authors to discover invokable UI behaviour. If a future cleanup deprecates or removes these legacy surfaces, that belongs in a separate migration task with compatibility tests and release notes; this task only reclassifies them while adding the capability-driven contract.
+
 ### Extension usage
 
 An extension should be able to query the graph and decide:
