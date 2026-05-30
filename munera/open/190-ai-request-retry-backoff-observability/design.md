@@ -313,6 +313,23 @@ Examples with the default `:auto-retry-max-retries 3`:
 
 Thus the maximum number of provider execution attempts for a retryable request is `1 + :auto-retry-max-retries` when retries are enabled. Setting `:auto-retry-max-retries` to `0` means execute the provider request once and never schedule a retry. Existing policy fields and UI/session projections that expose `:retry-attempt` must preserve the zero-based attempt coordinate; any display text may describe retry execution number separately only as a projection.
 
+### Retry enabled flag semantics
+
+The existing `:auto-retry-enabled` session flag is the top-level gate for provider-boundary retry execution. When it is false, the provider request boundary still classifies provider/request failures and emits the normal per-attempt lifecycle telemetry for the single actual provider execution attempt, but it must not schedule a retry delay, must not emit `provider_retry_scheduled`, must not enter or project active `:retrying` / retry-in UI state, and must not sleep before returning the final failure.
+
+A retryable failure while `:auto-retry-enabled` is false is a terminal skipped-retry outcome, not retry exhaustion. The caller-visible final error data and EQL/telemetry projection should preserve the fact that the underlying cause was retryable while reporting that retry execution was disabled:
+
+- `:failure-reason :retry-disabled`;
+- `:retryable? true` for the classified provider cause;
+- `:error-kind`, `:http-status`, `:last-error-message`, and last cause fields from the failed provider attempt;
+- `:attempt-count 1` and final `:retry-attempt 0` because only the initial provider execution attempt started;
+- `:max-retries` set to the configured `:auto-retry-max-retries` value for observability, even though it was not used to schedule retries;
+- `:retry-enabled? false` when a result/projection exposes policy metadata.
+
+This differs from `:auto-retry-max-retries 0` with retry enabled. With `:auto-retry-enabled true` and `:auto-retry-max-retries 0`, the retry coordinator is active and classifies the retryable failure as eligible, but the allowed retry-execution budget is already exhausted after attempt `0`; the final outcome is `:failure-reason :retry-exhausted`, `:retryable? true`, `:exhausted? true`, `:attempt-count 1`, and `:max-retries 0`. Neither disabled retry nor zero max retries emits `provider_retry_scheduled` or active retry UI state, because no pending retry delay exists.
+
+Terminal non-retryable and unknown failures keep `:failure-reason :non-retryable` regardless of the enabled flag, because no retry would be scheduled even when retry execution is enabled. Unknown failures therefore continue to report `:error-kind :unknown` and `:retryable? false` rather than `:retry-disabled`.
+
 ## Acceptance criteria
 
 - A focused audit identifies the current retry/backoff path and records whether the bug was missing classification, missing scheduling, missing execution, stale attempt state, invisible telemetry, or another concrete cause.
