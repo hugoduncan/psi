@@ -13,8 +13,6 @@
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
    [psi.agent-session.test-support :as test-support]))
 
-;; ── Registry isolation ──────────────────────────────────────────────────────
-
 (deftest registry-isolation-test
   (testing "two registries are independent"
     (let [reg-a (ext/create-registry)
@@ -22,8 +20,6 @@
       (ext/register-extension-in! reg-a "/ext/a")
       (is (= 1 (ext/extension-count-in reg-a)))
       (is (= 0 (ext/extension-count-in reg-b))))))
-
-;; ── Extension registration ──────────────────────────────────────────────────
 
 (deftest register-extension-test
   (testing "register-extension-in! adds path"
@@ -51,8 +47,6 @@
       (ext/register-extension-in! reg "/ext/foo")
       (is (= ["/ext/foo"] (ext/extensions-in reg)))
       (is (= 1 (ext/extension-count-in reg))))))
-
-;; ── Handler registration ─────────────────────────────────────────────────────
 
 (deftest handler-registration-test
   (testing "register-handler-in! adds handler"
