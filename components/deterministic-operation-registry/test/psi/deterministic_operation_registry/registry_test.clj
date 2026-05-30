@@ -19,16 +19,37 @@
     (is (= "github/search-issues-by-label"
            (:id (reg/get-operation-in registry "github/search-issues-by-label"))))))
 
-(deftest duplicate-operation-id-rejected-test
-  ;; Proves duplicate registration throws and preserves membership/count.
+(deftest same-owner-operation-id-replaces-test
+  ;; Proves same-owner re-registration refreshes the runtime handler while
+  ;; preserving membership/count. This keeps reload-code idempotent for built-in
+  ;; operations whose handlers are re-created after namespace reload.
   (let [registry (reg/create-registry)
-        operation {:id "github/search-issues-by-label"
-                   :handler (fn [_] {:status :ok :data {}})}]
-    (reg/register-operation-in! registry operation)
+        first-handler (fn [_] {:status :ok :data :first})
+        second-handler (fn [_] {:status :ok :data :second})]
+    (reg/register-operation-in! registry {:id "github/search-issues-by-label"
+                                          :ext-path "github"
+                                          :handler first-handler})
+    (reg/register-operation-in! registry {:id "github/search-issues-by-label"
+                                          :ext-path "github"
+                                          :handler second-handler})
+    (is (= 1 (reg/operation-count-in registry)))
+    (is (= #{"github/search-issues-by-label"}
+           (set (reg/operation-ids-in registry))))
+    (is (= second-handler
+           (:handler (reg/get-operation-in registry "github/search-issues-by-label"))))))
+
+(deftest cross-owner-duplicate-operation-id-rejected-test
+  ;; Proves cross-owner duplicate registration throws and preserves membership/count.
+  (let [registry (reg/create-registry)]
+    (reg/register-operation-in! registry {:id "github/search-issues-by-label"
+                                          :ext-path "github"
+                                          :handler (fn [_] {:status :ok :data {}})})
     (is (thrown-with-msg?
          clojure.lang.ExceptionInfo
          #"already registered"
-         (reg/register-operation-in! registry operation)))
+         (reg/register-operation-in! registry {:id "github/search-issues-by-label"
+                                               :ext-path "other"
+                                               :handler (fn [_] {:status :ok :data {}})})))
     (is (= 1 (reg/operation-count-in registry)))
     (is (= #{"github/search-issues-by-label"}
            (set (reg/operation-ids-in registry))))))
@@ -127,11 +148,8 @@
            (set (reg/operation-ids-in registry))))
     (is (= #{"ops/a" "ops/b" "ops/c"}
            (set (map :id (reg/all-operations-in registry)))))
-    (is (thrown-with-msg?
-         clojure.lang.ExceptionInfo
-         #"already registered"
-         (reg/register-operation-in! registry
-                                     (assoc operation-b :handler (fn [_] {:status :ok :data :b2})))))
+    (reg/register-operation-in! registry
+                                (assoc operation-b :handler (fn [_] {:status :ok :data :b2})))
     (is (= 3 (reg/operation-count-in registry)))
     (is (= #{"ops/a" "ops/b" "ops/c"}
            (set (reg/operation-ids-in registry))))

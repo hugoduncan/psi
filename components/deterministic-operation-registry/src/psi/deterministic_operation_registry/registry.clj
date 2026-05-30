@@ -49,11 +49,11 @@
            (fn [state]
              (let [root-state (ensure-root-registry-declared (:root-state state))
                    {:keys [root-state result]}
-                   (root-registry/insert root-state registry-id (operation-entry operation*))]
+                   (root-registry/register root-state registry-id (operation-entry operation*))]
                (if (:ok? result)
                  (assoc state :root-state root-state)
                  (case (:failure-kind result)
-                   :duplicate-id
+                   :ownership-conflict
                    (throw (ex-info "Deterministic operation id already registered"
                                    {:operation-id (:id operation*)
                                     :existing (lower-entry->operation (:previous-entry result))
