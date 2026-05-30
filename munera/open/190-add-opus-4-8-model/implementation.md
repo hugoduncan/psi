@@ -605,3 +605,14 @@ Read `design-steps.md` for newly added unchecked inconsistency follow-up items a
 **New actionable ambiguity found:**
 
 1. **Plan slice count contradicts slice list** — `plan.md` says to implement the task as four vertical slices, but the slice order lists five numbered items and `steps.md` has five slice sections, with integration/coherence as Slice 5. Decide whether integration/coherence is intended to be a fifth slice or a final non-slice pass, and align `plan.md`/`steps.md` wording so execution order is unambiguous.
+
+---
+
+## Ambiguity follow-up — 2026-05-30 (plan/steps slice count)
+
+Completed the newly added ambiguity follow-up item in `design-steps.md` by aligning `plan.md` with the existing slice list and `steps.md` structure.
+
+Decision recorded:
+- Integration/coherence is Slice 5, not a separate unnumbered final pass.
+- `plan.md` now says the task has five vertical slices and explicitly identifies the fifth slice as the integration/coherence slice.
+- `steps.md` already used five slice sections, so no `steps.md` changes were required.

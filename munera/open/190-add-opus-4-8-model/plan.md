@@ -2,7 +2,7 @@
 
 ## Approach
 
-Implement the task as four vertical slices, keeping each slice independently testable and aligned with the stable design.
+Implement the task as five vertical slices, keeping each slice independently testable and aligned with the stable design. The fifth slice is the integration/coherence slice, not a separate unnumbered cleanup pass.
 
 Key decisions from the design:
 

@@ -134,4 +134,4 @@
 
 ## From ambiguity review pass 2026-05-30 (plan/steps verification)
 
-- [ ] **Align plan slice count with slice list** — `plan.md` says the task will be implemented as four vertical slices, but the slice order and `steps.md` define five slices including the integration/coherence pass. Decide whether integration/coherence is a fifth slice or a non-slice final pass, and update `plan.md`/`steps.md` wording so implementors have one unambiguous execution structure.
+- [x] **Align plan slice count with slice list** — `plan.md` says the task will be implemented as four vertical slices, but the slice order and `steps.md` define five slices including the integration/coherence pass. Decide whether integration/coherence is a fifth slice or a non-slice final pass, and update `plan.md`/`steps.md` wording so implementors have one unambiguous execution structure.
