@@ -65,3 +65,8 @@
 - [x] Strengthen `review-task-design` and `review-task-plan` workflow definition tests to assert each per-reviewer `workflow/pass-status-routing` judge sources `:text` from that same step's own `:final-llm-reply` output, not just the operation id and route table.
 - [x] Strengthen `review-task-design` and `review-task-plan` workflow definition tests to assert each follow-up step uses the full `workflow/constant-routing` judge shape with `:args {:route "DONE"}`, not just the operation id and `:on` route table.
 - [x] Strengthen `review-task-design` and `review-task-plan` workflow definition tests to assert the full actual `clarity-status` `:on` map: `REPEAT` goes to `ambiguity-review` with `:max-iterations 6`, and `DONE` goes to `final-summary`.
+
+## Docs review follow-up
+
+- [ ] Update CHANGELOG.md [Unreleased] to mention the user-visible `review-task-design` and `review-task-plan` conditional per-reviewer follow-up behavior, including that plan-review follow-ups now target `steps.md` instead of `design-steps.md`.
+- [ ] Update doc/workflow-ir.md so its invoke-judge runtime support note reflects the current executed runtime support used by the review workflows, rather than saying invoke judges are only a documented future shape.
