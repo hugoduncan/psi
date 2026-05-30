@@ -142,3 +142,7 @@ Completed both newly added ambiguity follow-ups in `design.md`:
 
 - Made `:psi.ui/diagnostic` a first-class root-queryable/discoverable EQL output only for provider-error troubleshooting, with bounded serialisable text, default redaction requirements, nil/absent normal-case semantics, and guidance that extensions branch on reason keywords instead of diagnostics.
 - Clarified console/headless classification: a console runtime with a valid `:ui-type` but no real visibility mechanism is an attached UI with unsupported make-visible (`:psi.ui/type :console`, `:psi.ui/available? true`, no make-visible capability/action, and an unavailable make-visible descriptor reasoned as `:psi.ui.unavailable.reason/unsupported-capability`), while no provider remains headless/missing-provider and installed-but-unusable state remains no-attached-UI.
+
+## 2026-05-30 design inconsistency review
+
+Found one new actionable inconsistency after re-reading `design.md` against referenced extension-authoring docs: `design.md` makes capability/action `:psi.ui/...` queries the normative UI-behaviour contract and says docs must not recommend UI-type branching, but `doc/architecture.md` still explicitly recommends `:psi.agent-session/ui-type` for "runtime UI surface detection (extension/UI branching)".
