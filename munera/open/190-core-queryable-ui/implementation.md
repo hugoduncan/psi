@@ -150,3 +150,7 @@ Found one new actionable inconsistency after re-reading `design.md` against refe
 ## 2026-05-30 inconsistency follow-up
 
 Completed the newly added extension-authoring documentation follow-up in `doc/architecture.md`: EQL introspection guidance now recommends the `:psi.ui/...` capability/action query surface for extension UI behaviour, says to branch on `:psi.ui.capability/...` and action descriptor availability, and reclassifies `:psi.agent-session/ui-type` as runtime UI type diagnostics/compatibility data rather than the normative extension-authoring contract for invokable UI behaviour.
+
+## 2026-05-30 design ambiguity review
+
+No new actionable ambiguity feedback after re-reading `design.md`, referenced design artifacts/docs, and current UI/query/frontend seams. The design now defines provider ownership/lifetime, runtime-scoped query semantics, descriptor/request boundaries, unsupported/error cases, invocation schemas, legacy UI-type compatibility, and console/headless classification clearly enough for implementation planning.
