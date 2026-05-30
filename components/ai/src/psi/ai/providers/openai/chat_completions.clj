@@ -369,20 +369,24 @@
                                (resolve-chat-tool-index stream-state tool-call fallback-idx)
                                tool-call))))
 
+(defn- structured-output-result
+  [strategy source raw-text]
+  (when (contains? #{:provider-native :prompted-json} (:strategy strategy))
+    (let [parse-result (structured-output/parse-json-value raw-text)]
+      (cond-> (assoc strategy
+                     :source source
+                     :raw-text raw-text)
+        (:parsed? parse-result) (assoc :payload (:payload parse-result)
+                                       :raw-payload raw-text)
+        (not parse-result) (assoc :parse-error? true)))))
+
 (defn- emit-structured-output-result!
   [stream-state consume-fn strategy source]
-  (let [{:keys [structured-result-emitted? text-buffer]} stream-state
-        raw-text     @text-buffer
-        parse-result (structured-output/parse-json-value raw-text)]
-    (when (and (contains? #{:provider-native :prompted-json} (:strategy strategy))
-               (compare-and-set! structured-result-emitted? false true))
-      (consume-fn {:type :structured-output-result
-                   :structured-output (cond-> (assoc strategy
-                                                     :source source
-                                                     :raw-text raw-text)
-                                        (:parsed? parse-result) (assoc :payload (:payload parse-result)
-                                                                       :raw-payload raw-text)
-                                        (not parse-result) (assoc :parse-error? true))}))))
+  (let [{:keys [structured-result-emitted? text-buffer]} stream-state]
+    (when (compare-and-set! structured-result-emitted? false true)
+      (when-let [result (structured-output-result strategy source @text-buffer)]
+        (consume-fn {:type :structured-output-result
+                     :structured-output result})))))
 
 (defn- finish-chat-chunk!
   [stream-state consume-fn model chunk choice strategy]
@@ -475,9 +479,7 @@
                  (completions-usage-map model usage))
          logprobs (or (extract-openai-logprob-delta choice)
                       (extract-llama-logprob-delta body))
-         text (content/string-fragment (:content message))
-         parse-result (when (contains? #{:provider-native :prompted-json} (:strategy strategy))
-                        (structured-output/parse-json-value text))]
+         text (content/string-fragment (:content message))]
      (cond-> {:assistant-message (cond-> {:role "assistant"
                                           :content (completion-message->content message)
                                           :stop-reason stop-reason
@@ -485,14 +487,11 @@
                                    (map? usage) (assoc :usage usage))
               :logprobs logprobs}
        strategy (assoc :structured-output
-                       (cond-> (assoc strategy
-                                      :source (if (= :provider-native (:strategy strategy))
-                                                :openai/message-json
-                                                :prompted-json/text))
-                         (:parsed? parse-result) (assoc :payload (:payload parse-result)
-                                                        :raw-payload text)
-                         (and (contains? #{:provider-native :prompted-json} (:strategy strategy))
-                              (not parse-result)) (assoc :parse-error? true)))))))
+                       (structured-output-result strategy
+                                                 (if (= :provider-native (:strategy strategy))
+                                                   :openai/message-json
+                                                   :prompted-json/text)
+                                                 text))))))
 
 (defn execute-openai
   [conversation model options]

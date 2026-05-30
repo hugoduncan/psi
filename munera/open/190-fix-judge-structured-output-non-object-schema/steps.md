@@ -63,4 +63,4 @@
 
 ## Implementation review follow-ups
 
-- [ ] Add direct OpenAI chat-completions streaming structured-output regression coverage for prompted-JSON and non-object/null payloads, or refactor streaming/non-streaming result construction through a shared helper so the existing payload matrix truly covers both paths.
+- [x] Add direct OpenAI chat-completions streaming structured-output regression coverage for prompted-JSON and non-object/null payloads, or refactor streaming/non-streaming result construction through a shared helper so the existing payload matrix truly covers both paths. Refactored streaming and non-streaming Chat Completions structured-output result construction through a shared helper covered by the existing provider-native/prompted-JSON all-JSON-value payload matrix.

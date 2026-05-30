@@ -113,17 +113,17 @@
 
 (defn- openai-chat-result-payload
   [strategy raw]
-  (let [model (models/get-model :gpt-5)
-        body  {:choices [{:finish_reason "stop"
-                          :message {:role "assistant"
-                                    :content raw}}]}]
-    (:structured-output
-     (#'psi.ai.providers.openai.chat-completions/completion-response->assistant-message
-      model body strategy))))
+  (#'psi.ai.providers.openai.chat-completions/structured-output-result
+   strategy
+   (if (= :provider-native (:strategy strategy))
+     :openai/message-json
+     :prompted-json/text)
+   raw))
 
 (deftest openai-chat-completions-structured-output-json-value-payloads-test
-  ;; Tests the non-streaming Chat Completions result helper preserves every JSON
-  ;; value for provider-native and prompted-JSON strategies with raw text payload.
+  ;; Tests the shared Chat Completions result helper used by both streaming and
+  ;; non-streaming result paths preserves every JSON value for provider-native
+  ;; and prompted-JSON strategies with raw text payload.
   (let [cases [{:label "string" :raw "\"DONE\"" :expected "DONE"}
                {:label "number" :raw "42" :expected 42}
                {:label "boolean" :raw "true" :expected true}
