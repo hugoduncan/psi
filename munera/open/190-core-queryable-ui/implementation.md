@@ -511,3 +511,15 @@ Verification:
 ## 2026-05-30 implementation review
 
 Found one new actionable implementation issue after re-reading task artifacts, UI capability/provider code, app-runtime TUI startup wiring, RPC lifecycle fixes, docs, and focused tests: TUI contexts still install the default attached `:tui` provider during context creation, before the TUI frontend/state is actually attached, and there is no TUI shutdown clear/downgrade path. This mirrors the already-fixed RPC pre-install/stale-provider class: bootstrap/extension queries during TUI startup can observe `:psi.ui/available? true` for an attached TUI before `tui-start-fn!` runs, and the provider can remain attached after the TUI exits if the ctx is queried. Align TUI provider installation/lifetime with the design's adapter-owned late install/clear semantics and add pre-start/bootstrap/shutdown coverage.
+
+## 2026-05-30 TUI provider lifecycle follow-up
+
+Completed the newly added implementation-review follow-up for TUI provider lifetime. `start-tui-runtime!` now suppresses the context default static TUI provider, so bootstrap/pre-frontend queries see missing-provider semantics instead of an attached TUI. After the TUI focus state exists and before handing control to the frontend, app-runtime installs the adapter-owned attached-but-unsupported TUI provider. The provider is cleared in a `finally` after `tui-start-fn!` returns or throws, preventing stale attached TUI advertisements after shutdown.
+
+Added app-runtime coverage for explicit default-provider suppression, bootstrap-time no-provider semantics, frontend-time attached unsupported semantics, and shutdown provider clearing.
+
+Verification:
+
+- `clojure -M:test --focus psi.app-runtime-test/start-tui-runtime-installs-and-clears-tui-ui-provider-test --focus psi.app-runtime-test/create-runtime-session-context-can-suppress-default-tui-ui-provider-test` — 2 tests, 6 assertions, 0 failures.
+- `clojure -M:test --focus psi.app-runtime-test --focus psi.agent-session.ui-capabilities-test` — 45 tests, 222 assertions, 0 failures.
+- `clj-kondo --lint components/app-runtime/src/psi/app_runtime.clj components/app-runtime/test/psi/app_runtime_test.clj` — clean.

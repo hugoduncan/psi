@@ -61,6 +61,7 @@
    [psi.session-state.state :as ss]
    [psi.agent-session.state-accessors :as sa]
    [psi.agent-session.runtime :as runtime]
+   [psi.agent-session.ui-capabilities :as ui-capabilities]
    [psi.provider-auth.oauth.core :as oauth]
    [psi.app-runtime.background-job-ui :as background-job-ui]
    [psi.app-runtime.cli :as cli]
@@ -627,7 +628,8 @@ Available: " (str/join ", " (map name (keys all))))
                                                    :session-root            (:session-root startup-opts)
                                                    :ui-type                 :tui
                                                    :persist?                true
-                                                   :thinking-level-override (:thinking-level-override startup-opts)})
+                                                   :thinking-level-override (:thinking-level-override startup-opts)
+                                                   :install-default-ui-capability-provider? false})
          ctx (maybe-install-nullable-execution-mode ctx)
          {:keys [startup-rehydrate session-id]}
          (bootstrap-runtime-session! ctx ai-model {:memory-runtime-opts memory-runtime-opts
@@ -635,6 +637,8 @@ Available: " (str/join ", " (map name (keys all))))
 
          ;; TUI-local focus atom — tracks active session-id
          tui-focus* (atom session-id)
+
+         _ (ui-capabilities/install-provider! ctx (ui-capabilities/unsupported-attached-provider :tui))
 
          ;; Expose state for nREPL introspection
          _         (reset! session-state {:ctx ctx :ai-model ai-model
@@ -695,5 +699,8 @@ Available: " (str/join ", " (map name (keys all))))
                     :fork-session-fn! fork-session-fn!
                     :current-context-widget (tui-session-nav/current-context-widget ctx session-id)})]
 
-     (tui-start-fn! run-agent-fn tui-opts))))
+     (try
+       (tui-start-fn! run-agent-fn tui-opts)
+       (finally
+         (ui-capabilities/clear-provider! ctx))))))
 ;; RPC runtime moved to psi.rpc.
