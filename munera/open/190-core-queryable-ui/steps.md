@@ -73,7 +73,7 @@
 - [x] Add Emacs provider tests proving the supported make-visible descriptor includes `:emacs-command` invocation with command `psi-emacs-show-active`.
 - [x] Add TUI tests proving make-visible is omitted unless a real safe reveal mechanism is present.
 - [x] Add console tests proving attached console without visibility mechanism is available but unsupported for make-visible.
-- [ ] Add regression tests proving existing UI contribution snapshot/query behaviour and legacy UI-type surfaces still pass.
+- [x] Add regression tests proving existing UI contribution snapshot/query behaviour and legacy UI-type surfaces still pass.
 - [ ] If invocation helper is implemented, add request validation and result-shape tests.
 
 ## Slice 8 — Documentation and verification

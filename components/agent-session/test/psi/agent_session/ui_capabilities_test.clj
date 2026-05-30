@@ -204,3 +204,49 @@
       (is (contains? result :psi.ui/make-visible-action))
       (is (= :psi.ui.unavailable.reason/provider-error
              (get-in result [:psi.ui/make-visible-action :psi.ui.action/unavailable-reason]))))))
+
+(deftest ui-capability-query-coexists-with-extension-ui-and-legacy-ui-type-test
+  ;; Tests that the new queryable UI attrs compose with existing extension UI
+  ;; snapshot attrs and legacy UI-type diagnostics.
+  (let [ctx (create-ctx {:ui-type :console})
+        session-id (:session-id (session/new-session-in! ctx nil {}))]
+    (session/dispatch-in! ctx
+                          :session/ui-set-widget
+                          {:extension-id "ext-a"
+                           :widget-id "w1"
+                           :placement :below-editor
+                           :content ["hello"]}
+                          {:origin :test})
+    (session/dispatch-in! ctx
+                          :session/ui-set-status
+                          {:extension-id "ext-a"
+                           :text "ready"}
+                          {:origin :test})
+    (let [result (session/query-in ctx
+                                   session-id
+                                   [:psi.agent-session/ui-type
+                                    :psi.ui/type
+                                    :psi.ui/available?
+                                    :psi.ui/capabilities
+                                    :psi.ui/actions
+                                    :psi.ui/make-visible-action
+                                    :psi.ui/widgets
+                                    :psi.ui/statuses
+                                    :psi.ui/dialog-queue-empty?])]
+      (is (= :console (:psi.agent-session/ui-type result)))
+      (is (= :console (:psi.ui/type result)))
+      (is (= true (:psi.ui/available? result)))
+      (is (= [] (:psi.ui/capabilities result)))
+      (is (= [] (:psi.ui/actions result)))
+      (is (= :psi.ui.unavailable.reason/unsupported-capability
+             (get-in result [:psi.ui/make-visible-action :psi.ui.action/unavailable-reason])))
+      (is (= [{:extension-id "ext-a"
+               :widget-id "w1"
+               :placement :below-editor
+               :content ["hello"]
+               :content-lines [{:text "hello"}]}]
+             (:psi.ui/widgets result)))
+      (is (= [{:extension-id "ext-a"
+               :text "ready"}]
+             (:psi.ui/statuses result)))
+      (is (true? (:psi.ui/dialog-queue-empty? result))))))

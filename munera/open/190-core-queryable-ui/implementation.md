@@ -401,3 +401,14 @@ Verification:
 - `clojure -M:test --focus psi.agent-session.ui-capabilities-test` — 11 tests, 57 assertions, 0 failures.
 - `clojure -M:test --focus psi.agent-session.ui-capabilities-test --focus psi.agent-session.graph-surface-test` — 33 tests, 2360 assertions, 0 failures.
 - `clj-kondo --lint components/agent-session/test/psi/agent_session/ui_capabilities_test.clj` — clean.
+
+## 2026-05-30 UI snapshot compatibility regression pass
+
+Added a focused regression test proving the new `:psi.ui/...` capability/action query attrs compose with existing extension UI contribution snapshot attrs and the legacy `:psi.agent-session/ui-type` diagnostic surface in one session query. The test uses real dispatch/query state, not mocks, and covers widget/status snapshots alongside attached-console unsupported make-visible semantics.
+
+Verification:
+
+- `clojure -M:test --focus psi.agent-session.ui-capabilities-test` — 12 tests, 66 assertions, 0 failures.
+- `clojure -M:test --focus psi.agent-session.ui-capabilities-test --focus psi.agent-session.graph-surface-test --focus psi.agent-session.resolvers-test` — 57 tests, 2505 assertions, 0 failures.
+- `clj-kondo --lint components/agent-session/test/psi/agent_session/ui_capabilities_test.clj` — clean.
+- `clj-kondo --lint components/agent-session/test/psi/agent_session/ui_capabilities_test.clj components/agent-session/test/psi/agent_session/graph_surface_test.clj components/agent-session/test/psi/agent_session/resolvers_test.clj` — clean.
