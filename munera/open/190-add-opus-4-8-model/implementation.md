@@ -188,3 +188,13 @@ Read `design-steps.md` for newly added inconsistency-review follow-up items. No 
 **New actionable inconsistency found:**
 
 1. **Adaptive Anthropic `thinking-level :xhigh` remains indistinct without `/effort` override** — The task goal requires `:xhigh` thinking level to be genuinely distinct from `:high` on providers that support it, and Part 3 introduces `thinking-level->effort-xhigh` mapping `:xhigh` to `"highest"` for adaptive Anthropic. But the request-resolution prose says that when no `:effort-override` is set, adaptive Anthropic falls back to the existing `thinking-level->effort-default` mapping, where `:xhigh` remains `"high"`. As written, only `/effort xhigh` becomes distinct; plain `/thinking xhigh` on Opus 4.7/4.8 does not.
+
+---
+
+## Inconsistency follow-up — 2026-05-30 (adaptive xhigh differentiation)
+
+Completed the newly added inconsistency follow-up item in `design-steps.md` by refining `design.md`:
+
+- Plain adaptive Anthropic `thinking-level :xhigh` now satisfies the task goal without requiring `/effort xhigh`: when no effort override is set, adaptive-thinking models use the xhigh-aware level-derived mapping so `:xhigh` sends `output_config.effort = "highest"` while `:high` sends `"high"`.
+- `/effort xhigh` remains an explicit override path to the same adaptive Anthropic `"highest"` value; unsupported provider rejection still surfaces directly with no fallback.
+- Acceptance criteria now explicitly require the nil-override adaptive Anthropic case to distinguish `thinking-level :xhigh` from `:high`.

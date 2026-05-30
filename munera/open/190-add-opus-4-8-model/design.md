@@ -305,9 +305,11 @@ lower-priority / cheaper tier rather than a latency upgrade.
 
 The effort override is separate from `thinking-level`: setting `/effort xhigh`
 does not change the thinking level; it overrides what effort value is sent for
-the current level.  When no effort override is set, the existing
-`thinking-level->effort` mapping applies unchanged (preserving backward
-compatibility).
+the current level.  When no effort override is set, the provider still derives
+reasoning effort from `thinking-level`; for adaptive Anthropic models that
+level-derived mapping must make plain `thinking-level :xhigh` distinct by
+sending `"highest"` rather than collapsing to the `:high` value.  Other provider
+ceilings remain unchanged unless they support a higher native tier.
 
 ### Architecture — full stack
 
@@ -349,13 +351,18 @@ thinking-level->effort-xhigh:
 In `request-body` / `build-request`, resolve effort as:
 1. If `:effort-override` is present in options, use it directly mapped to the
    provider string (`:xhigh` → `"highest"` for adaptive, `"high"` for extended).
-2. Otherwise fall back to the existing `thinking-level->effort-default` mapping.
+2. Otherwise use the level-derived mapping for the active Anthropic thinking
+   mode.  Adaptive-thinking models must use `thinking-level->effort-xhigh`, so
+   plain `thinking-level :xhigh` sends `"highest"` while `:high` sends `"high"`.
+   Extended-thinking models keep their existing budget-based distinction and do
+   not send adaptive `output_config.effort`.
 
 `"highest"` has **no transparent retry fallback in this slice**. Psi should
-always send `"highest"` for adaptive Anthropic `:xhigh`, and if a model/API
-combination rejects it with a 400, that provider error should surface to the
-user as-is. Remove any implied "fallback with warning" behaviour from code,
-tests, and docs in this task.
+always send `"highest"` for adaptive Anthropic `:xhigh` whether it comes from an
+explicit `/effort xhigh` override or from plain `thinking-level :xhigh`, and if a
+model/API combination rejects it with a 400, that provider error should surface
+to the user as-is. Remove any implied "fallback with warning" behaviour from
+code, tests, and docs in this task.
 
 Because provider rejection is the intended unsupported-value surface,
 `components/ai/src/psi/ai/providers/anthropic/request_schema.clj` must accept
@@ -462,9 +469,10 @@ resolved config. Startup application rules:
 - `/effort unknown` returns error listing allowed values.
 - `/effort xhigh bogus` returns an error listing allowed scopes.
 - Anthropic adaptive `build-request`: when effort-override is `:xhigh`,
-  `output_config.effort` is `"highest"`; when `:high`, `"high"`; when nil,
-  falls back to level-derived value; local request schema validation permits
-  `"highest"` so any unsupported-value failure comes from the provider.
+  `output_config.effort` is `"highest"`; when effort-override is `:high`, it is
+  `"high"`; when override is nil, level-derived `thinking-level :xhigh` sends
+  `"highest"` while `:high` sends `"high"`; local request schema validation
+  permits `"highest"` so any unsupported-value failure comes from the provider.
 - OpenAI chat-completions `reasoning-effort`: when effort-override is `:xhigh`, returns `"high"`
   (ceiling); when `:medium`, returns `"medium"`; when nil, falls back to
   level-derived value.
