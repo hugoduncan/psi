@@ -98,6 +98,8 @@ Bootstrapped on 2026-04-02.
 - 2026-05-30: Task 190 independent implementation verification pass re-read task artifacts/workflow definitions/tests, found no unchecked task/design follow-up steps and no concrete implementation work remaining, and reran focused workflow tests plus targeted lint green. Implementation remains complete pending review/closure.
 - 2026-05-30: Task 190 independent implementation verification pass found no unchecked task/design follow-up steps and no concrete implementation work remaining. Re-verified plan/design prompt artifact targets, focused workflow routing tests, and targeted lint green; implementation remains complete pending review/closure.
 - 2026-05-30: Task 190 independent implementation pass found no remaining concrete implementation work. Re-verified plan/design prompt artifact targets, focused workflow routing tests, and targeted lint green; implementation remains complete pending review/closure.
+- 2026-05-30: Task 190 latest ambiguity review pass found three new actionable design ambiguities: missing extension mutation bridge for `inject-mid-system-message!`, explicit `:normal` speed config presence semantics, and current-session state after scoped `/speed normal`. Added unchecked `design-steps.md` follow-ups.
+
 - 2026-05-30: Task 190 latest ambiguity review pass found two new actionable ambiguities: explicit nil `:effort-override` config resolution through merged shared-config, and mid-system capability semantics for custom/runtime OpenAI chat-completions models. Added unchecked follow-ups to `design-steps.md`.
 - 2026-05-30: Task 190 latest inconsistency follow-up pass found no unchecked inconsistency design-steps; implementation.md records that no design changes were required.
 
