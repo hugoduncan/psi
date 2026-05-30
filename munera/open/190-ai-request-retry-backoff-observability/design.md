@@ -199,6 +199,26 @@ When the retry delay completes and the next provider attempt starts, pending del
 
 This preserves the old statechart retry visibility contract but replaces the old statechart retry engine. The statechart may still expose `:retrying` / retry metadata as a projection of provider-boundary retry activity; it must not restart the whole agent loop or rerun local tools as the retry mechanism for this task. If implementation chooses a different active surface, it must document that replacement and add focused coverage proving app-runtime/TUI/Emacs-facing retry status remains visible while a provider retry delay is pending.
 
+## Retry limit semantics
+
+The configured retry limit is retry-count oriented, not total-attempt oriented. `:auto-retry-max-retries` names the maximum number of retry executions allowed after the first provider execution attempt fails. It does not include the initial provider execution attempt.
+
+Canonical mapping:
+
+- first provider execution attempt uses `:retry-attempt 0`;
+- first retry execution attempt uses `:retry-attempt 1`;
+- the retry execution attempt with `:retry-attempt N` is allowed only when `N <= :auto-retry-max-retries`;
+- no retry is scheduled after a failure from attempt `N` when `N >= :auto-retry-max-retries`; that failure is final and should be recorded as `:status :failed`, `:final? true`, and `:exhausted? true` / `:failure-reason :retry-exhausted` when the failure was otherwise retryable.
+
+Examples with the default `:auto-retry-max-retries 3`:
+
+- attempt `0` fails retryably → schedule retry attempt `1`;
+- attempt `1` fails retryably → schedule retry attempt `2`;
+- attempt `2` fails retryably → schedule retry attempt `3`;
+- attempt `3` fails retryably → do not schedule attempt `4`; surface exhausted retries with the last failure cause.
+
+Thus the maximum number of provider execution attempts for a retryable request is `1 + :auto-retry-max-retries` when retries are enabled. Setting `:auto-retry-max-retries` to `0` means execute the provider request once and never schedule a retry. Existing policy fields and UI/session projections that expose `:retry-attempt` must preserve the zero-based attempt coordinate; any display text may describe retry execution number separately only as a projection.
+
 ## Acceptance criteria
 
 - A focused audit identifies the current retry/backoff path and records whether the bug was missing classification, missing scheduling, missing execution, stale attempt state, invisible telemetry, or another concrete cause.
