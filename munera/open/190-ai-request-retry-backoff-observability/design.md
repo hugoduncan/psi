@@ -105,6 +105,7 @@ Minimum visibility requirements:
 
 - each provider request attempt is identifiable;
 - retry scheduling records the failure classification and backoff delay;
+- attempt numbering follows the existing provider telemetry contract: `:retry-attempt` is zero-based (`0` for the first provider execution attempt, `1` for the first retry execution attempt);
 - final failure indicates whether retry was skipped as terminal or exhausted after attempts;
 - successful retry-after-failure leaves evidence that earlier attempts failed and a later attempt succeeded;
 - active retry delay remains visible through existing app-runtime/TUI/Emacs-facing retry status projections or an explicitly documented replacement;
@@ -128,6 +129,8 @@ Recommended EQL/introspection shape:
   - `:psi.provider-retry/delay-source`
   - `:psi.provider-retry/resume-at`
   - `:psi.provider-retry/final?`
+
+Retry detail resolvers may expose a user-friendly `:psi.provider-retry/attempt` value, but if they do it must be explicitly documented as either a projection alias of the zero-based `:retry-attempt` or a display ordinal. Internal telemetry, metrics aggregation, existing session/UI projections, and resolver joins must preserve `:retry-attempt` as the canonical attempt coordinate.
 
 Exact attribute names should follow the existing resolver/attribute conventions discovered during implementation, but the information above must be queryable through `psi-tool`.
 
@@ -156,22 +159,24 @@ The implementation should prefer repairing and simplifying the current mechanism
 
 ## Retry history storage and EQL projection
 
-Completed provider retry history has one authoritative source: session-owned provider telemetry captures retained in the agent-session root state. The retry coordinator at the prepared provider-request boundary must emit the canonical provider telemetry events for every attempt and schedule decision, and those captures are the durable records from which retry history is projected. Do not maintain a second completed-retry ledger in UI state, workflow state, or provider-local mutable state.
+Completed provider retry history has one authoritative source: session-owned provider lifecycle telemetry captures retained in the agent-session root state. The retry coordinator at the prepared provider-request boundary must emit the canonical provider telemetry events for every attempt and schedule decision, and those retained lifecycle captures are the durable records from which retry history is projected. Do not maintain a second completed-retry ledger in UI state, workflow state, or provider-local mutable state.
+
+This is distinct from the existing HTTP provider request/reply capture streams. `:provider-requests` and `:provider-replies` continue to store outbound HTTP request and inbound reply/debug captures. Provider lifecycle events (`provider_request_started`, `provider_retry_scheduled`, `provider_request_finished`) should be retained as their own session telemetry stream, for example `:provider-events`, because they describe logical request-attempt lifecycle and retry decisions rather than raw HTTP payloads. The same lifecycle event payloads may still be dispatched through `/ext/provider-telemetry` for metrics/log consumers; EQL retry projection reads from the retained session lifecycle event stream, not from extension dispatch side effects and not from raw HTTP captures.
 
 The authoritative record identity is hierarchical:
 
 - `session-id` identifies the owning agent session;
 - `turn-id` identifies the prepared provider request / turn execution;
 - `provider-request-id` is the telemetry request identifier for the request lifecycle, using the existing provider telemetry request id when present and otherwise the prepared request id;
-- `attempt` is a one-based attempt number for each provider execution attempt for that request.
+- `:retry-attempt` is the existing zero-based provider telemetry attempt index for each provider execution attempt for that request; first attempt is `0`, first retry execution is `1`.
 
-Telemetry records must include enough data for resolvers to reconstruct request retry summaries without parsing prose:
+Telemetry lifecycle events must include enough data for resolvers to reconstruct request retry summaries without parsing prose:
 
-- `provider_request_started` for every attempt, including session id, turn/request id, provider/model when known, and attempt number;
-- `provider_retry_scheduled` for every retry delay, including session id, turn/request id, failed attempt number, error kind/classification, error message, optional HTTP status, delay ms, delay source, and resume-at timestamp when available;
-- `provider_request_finished` for every terminal attempt outcome, including session id, turn/request id, attempt number, final status (`:succeeded`, `:terminal`, or `:exhausted`), and the final error classification/cause when failing.
+- `provider_request_started` for every attempt, including session id, turn/request id, provider/model when known, and `:retry-attempt`;
+- `provider_retry_scheduled` for every retry delay, including session id, turn/request id, the next `:retry-attempt` to execute, the failed attempt number when distinct/available, error kind/classification, error message, optional HTTP status, delay ms, delay source, and resume-at timestamp when available;
+- `provider_request_finished` for every attempt outcome, including session id, turn/request id, `:retry-attempt`, metrics-compatible `:status` (`:succeeded` or `:failed`), `:final?`, and the final error classification/cause when failing. Exhaustion is represented as a failed final attempt with explicit exhaustion metadata such as `:exhausted? true` or `:failure-reason :retry-exhausted`, not by replacing `:status :failed` with a new status.
 
-EQL / `psi-tool` retry answers are projections over those telemetry captures. Existing provider telemetry resolvers should be extended where possible rather than introducing a parallel read model. Minimum queryable projections are:
+EQL / `psi-tool` retry answers are projections over retained provider lifecycle telemetry captures. Existing provider telemetry resolvers should be extended where possible rather than introducing a parallel read model. Minimum queryable projections are:
 
 - session-level retry summary: provider retry count, retried provider-request count, and grouped provider retry request summaries for a session;
 - turn/request-level detail: retry count, ordered retry attempts/scheduled delays, final retry status, and final error classification;
@@ -187,7 +192,7 @@ During a pending retry delay:
 
 - session phase/status visible to app-runtime projections must indicate retry/backoff activity, preserving the existing `:retrying` semantics where those projections depend on it;
 - session retry data must include the current failed attempt, the next attempt number, error kind/classification, error message, delay ms, delay source, and resume-at timestamp;
-- `:retry-attempt` must reflect the next provider attempt to be executed, not a replay of the whole agent loop;
+- `:retry-attempt` must preserve existing zero-based semantics and reflect the next provider execution attempt to be executed, not a replay of the whole agent loop;
 - active retry state must be observable before the sleep begins, so UI projections can render retry-in/backoff status while waiting.
 
 When the retry delay completes and the next provider attempt starts, pending delay fields should be cleared or marked inactive while preserving completed retry history in provider telemetry. When the request finally succeeds, fails terminally, or exhausts retries, active retry fields must be cleared so TUI/Emacs/app-runtime do not continue to show a stale backoff.
