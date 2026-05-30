@@ -93,4 +93,5 @@ Bootstrapped on 2026-04-02.
 
 - 2026-05-29: Task 189 inconsistency follow-up complete: aligned `review-step` structured status routing to source the validated `:review-result` value via `:path [:status]`, documented that raw structured-output envelope internals are not part of the workflow ref contract, and marked the design-step done.
 
+- 2026-05-30: Task 190 follow-up final-marker gap is complete: provider retry EQL `:psi.provider-retry/final?` now matches scheduled retry attempts by final lifecycle `:retry-attempt`, including cancelled suppressed attempts; focused retry/EQL tests and targeted lint passed.
 - 2026-05-30: Task 190 is closed. Final pass re-read task artifacts, confirmed all implementation checklist items complete, reran broad `bb test` green, moved `munera/open/190-ai-request-retry-backoff-observability/` to `munera/closed/190-ai-request-retry-backoff-observability/`, and updated `munera/plan.md`. Provider-boundary retry/backoff observability work is implementation-complete.

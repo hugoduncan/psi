@@ -18,7 +18,8 @@
      :psi.provider-retry/delay-ms
      :psi.provider-retry/delay-source
      :psi.provider-retry/resume-at
-     :psi.provider-retry/rate-limit]}])
+     :psi.provider-retry/rate-limit
+     :psi.provider-retry/final?]}])
 
 (defn- create-session-context
   ([] (create-session-context {}))
@@ -80,7 +81,8 @@
                                      :psi.provider-retry/delay-ms
                                      :psi.provider-retry/delay-source
                                      :psi.provider-retry/resume-at
-                                     :psi.provider-retry/rate-limit]}]}])]
+                                     :psi.provider-retry/rate-limit
+                                     :psi.provider-retry/final?]}]}])]
         (is (= 1 (:psi.agent-session/provider-retry-count r)))
         (is (= 1 (:psi.agent-session/provider-retried-request-count r)))
         (is (= "turn-retry" (get-in r [:psi.agent-session/provider-retries 0 :psi.provider-request/id])))
@@ -95,7 +97,8 @@
                  :psi.provider-retry/rate-limit {:limit 100
                                                  :remaining 0
                                                  :reset-after-ms 3000
-                                                 :reset-at 3042}}]
+                                                 :reset-at 3042}
+                 :psi.provider-retry/final? true}]
                (get-in r [:psi.agent-session/provider-retries 0 :psi.provider-request/retry-attempts])))))))
 
 (deftest provider-retry-direct-eql-introspection-test
@@ -142,5 +145,57 @@
                  :psi.provider-retry/delay-ms 50
                  :psi.provider-retry/delay-source :retry-after
                  :psi.provider-retry/resume-at 100
-                 :psi.provider-retry/rate-limit nil}]
+                 :psi.provider-retry/rate-limit nil
+                 :psi.provider-retry/final? true}]
+               (:psi.provider-request/retry-attempts by-request)))))))
+
+(deftest provider-retry-cancelled-final-marker-test
+  (testing "provider retry detail marks a cancelled suppressed retry attempt as final"
+    (let [[ctx session-id] (create-session-context)]
+      (test-support/update-state! ctx :provider-events
+                                  into
+                                  [{:type "provider_request_started"
+                                    :provider-request-id "request-cancelled"
+                                    :turn-id "turn-cancelled"
+                                    :retry-attempt 0}
+                                   {:type "provider_request_finished"
+                                    :provider-request-id "request-cancelled"
+                                    :turn-id "turn-cancelled"
+                                    :retry-attempt 0
+                                    :status :failed
+                                    :final? false
+                                    :error-kind :transport
+                                    :error-message "connection reset"}
+                                   {:type "provider_retry_scheduled"
+                                    :provider-request-id "request-cancelled"
+                                    :turn-id "turn-cancelled"
+                                    :failed-attempt 0
+                                    :retry-attempt 1
+                                    :error-kind :transport
+                                    :error-message "connection reset"
+                                    :delay-ms 25
+                                    :delay-source :exponential-backoff
+                                    :resume-at 125}
+                                   {:type "provider_request_cancelled"
+                                    :provider-request-id "request-cancelled"
+                                    :turn-id "turn-cancelled"
+                                    :retry-attempt 1
+                                    :last-failed-attempt 0
+                                    :cancelled? true
+                                    :final? true
+                                    :failure-reason :retry-cancelled
+                                    :error-kind :transport}])
+      (let [by-request (session/query-in ctx session-id
+                                         (retry-query)
+                                         {:psi.provider-request/id "request-cancelled"})]
+        (is (= :retry-cancelled (:psi.provider-request/final-status by-request)))
+        (is (= [{:psi.provider-retry/attempt 1
+                 :psi.provider-retry/failed-attempt 0
+                 :psi.provider-retry/error-kind :transport
+                 :psi.provider-retry/error-message "connection reset"
+                 :psi.provider-retry/delay-ms 25
+                 :psi.provider-retry/delay-source :exponential-backoff
+                 :psi.provider-retry/resume-at 125
+                 :psi.provider-retry/rate-limit nil
+                 :psi.provider-retry/final? true}]
                (:psi.provider-request/retry-attempts by-request)))))))

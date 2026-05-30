@@ -27,14 +27,15 @@
 
 (defn- provider-retry-summary->eql
   [[provider-request-id events]]
-  (let [events*   (sort-by (juxt #(or (:retry-attempt %) -1) :timestamp) events)
-        schedules (filter #(= "provider_retry_scheduled" (:type %)) events*)
-        finals    (filter :final? events*)
-        final     (last finals)]
+  (let [events*       (sort-by (juxt #(or (:retry-attempt %) -1) :timestamp) events)
+        schedules     (filter #(= "provider_retry_scheduled" (:type %)) events*)
+        finals        (filter :final? events*)
+        final         (last finals)
+        final-attempt (:retry-attempt final)]
     {:psi.provider-request/id             provider-request-id
      :psi.provider-request/turn-id        (:turn-id (first events*))
      :psi.provider-request/retry-count    (count schedules)
-     :psi.provider-request/retry-attempts (mapv #(retry-schedule->eql % (= % final)) schedules)
+     :psi.provider-request/retry-attempts (mapv #(retry-schedule->eql % (= (:retry-attempt %) final-attempt)) schedules)
      :psi.provider-request/final-status   (or (:failure-reason final)
                                               (:status final))
      :psi.provider-request/error-kind     (:error-kind final)}))
