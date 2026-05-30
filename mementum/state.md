@@ -185,6 +185,7 @@ Bootstrapped on 2026-04-02.
 
 - 2026-05-30: Task 190 third ambiguity review pass found two new actionable ambiguities: Anthropic local request schema must admit inline system messages in `messages`, and prepared-turn current-user replacement must handle a pending `:mid-system` entry after the user while preserving `user → system` order. Added unchecked follow-ups to `design-steps.md` and committed `12cf9fb2`.
 
+- 2026-05-30: Task 190 requested code-shaper review found no new distinct code-shaping feedback beyond the existing unchecked same-namespace invocation-key follow-up; focused UI/extension/runtime/RPC tests and targeted lint passed.
 - 2026-05-30: Task 190 docs follow-up complete: `doc/extensions.md` and `doc/extension-api.md` now state task 190 is query/descriptor-only and side-effecting UI descriptor submission is deferred to `191-ui-action-invocation`; the new steps item is checked.
 - 2026-05-30: Task 190 implementation-review pass found no new distinct actionable issue beyond the existing unchecked provider collection-shape follow-up; targeted UI/query/RPC/TUI verification and lint passed, while broad app-runtime focus exposed unrelated commit-checks/TUI test interference.
 - 2026-05-30: Task 190 test-shaper review found one new actionable test-quality gap: provider normalization lacks executable coverage that non-vector `:psi.ui/capabilities` / `:psi.ui/actions` fail closed, while implementation vectorizes before validation. Added an unchecked follow-up to cover/fix collection-shape drift.
