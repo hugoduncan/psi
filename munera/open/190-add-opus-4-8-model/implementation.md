@@ -1163,3 +1163,9 @@ Verification:
 - `clojure -M:test --focus psi.ai.providers.anthropic-test --focus psi.ai.providers.openai-test` — 46 tests, 258 assertions, 0 failures.
 - `clojure -M:test --focus psi.agent-session.commands-test` — 50 tests, 200 assertions, 0 failures.
 - `clj-kondo --lint components/agent-session/test/psi/agent_session/commands_test.clj components/agent-session/test/psi/agent_session/commands_speed_effort_test.clj components/ai/test/psi/ai/providers/anthropic_test.clj components/ai/test/psi/ai/providers/openai_test.clj` — clean.
+
+---
+
+## Design ambiguity review pass — 2026-05-30 (plan/steps no-new-actionable after effort coverage)
+
+No new actionable ambiguities found. Re-read `plan.md`, `steps.md`, `design-steps.md`, and recent `implementation.md` notes, then checked representative referenced code/tests/docs for Opus 4.8, `/speed`, `/effort`, mid-system injection, provider request shaping, shared-config startup/resume semantics, compaction replay, docs/changelog, and the latest effort-override test follow-up. The task plan and steps remain unambiguous: five vertical slices, Slice 5 owns documentation/changelog and broad verification, all `steps.md` and `design-steps.md` items are checked, and the latest test-review follow-up has been completed. No duplicate follow-up item was added.
