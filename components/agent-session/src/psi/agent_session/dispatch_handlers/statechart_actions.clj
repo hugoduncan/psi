@@ -82,6 +82,7 @@
         stop-reason   (or (:stop-reason assistant-msg) (:stopReason assistant-msg))]
     (and (= :agent-end (:type pending-agent-event))
          (map? assistant-msg)
+         (not (:retry/outcome assistant-msg))
          (or (= :error stop-reason) (= "error" stop-reason))
          (or (:provider-error/headers pending-agent-event)
              (:error-message assistant-msg)
