@@ -101,3 +101,9 @@
 ## From ambiguity review pass 2026-05-30 (effort display)
 
 - [x] **Update `effective-reasoning-effort` resolver for adaptive `:xhigh` and effort override** — The existing `effective-reasoning-effort` resolver in `resolvers/session.clj` (used by footer and `/status`) has its own `thinking-level->reasoning-effort` map where `:xhigh` → `"high"`. The design changes the actual Anthropic adaptive effort for `:xhigh` to `"highest"` and adds an effort override, but does not specify updating this display resolver. Decide whether the resolver should (a) incorporate the effort override and adaptive `:xhigh` → `"highest"`, becoming provider/model-aware, or (b) remain a simple thinking-level display where the `• effort:xhigh` suffix is the only override signal.
+
+## From inconsistency review pass 2026-05-30 (independent)
+
+- [ ] **Align Codex/responses effort override with actual code path** — Part 3 step 6 says to update `reasoning-effort` in `reasoning.clj` to accept `:effort-override`, and says Codex/responses must use the same mapping instead of reading `thinking-level->effort` directly. But `codex_responses.clj/codex-reasoning` reads `reasoning/thinking-level->effort` directly via `(get reasoning/thinking-level->effort ...)` and does NOT call `reasoning/reasoning-effort`. Specify that `codex-reasoning` must be changed to call the updated `reasoning-effort` function (or an equivalent shared function incorporating the effort override) rather than reading the map directly, so the override actually reaches the Codex request path.
+
+- [ ] **Move `/speed fast` provider-semantics paragraph from Part 3 to Part 2** — The paragraph defining the canonical user-facing meaning of `/speed fast` ("use the provider's non-default alternate throughput tier") and noting the Anthropic/OpenAI semantic difference is in Part 3 (effort section). Move or duplicate it into Part 2 (speed section) so Part 2 is self-contained for the speed feature.
