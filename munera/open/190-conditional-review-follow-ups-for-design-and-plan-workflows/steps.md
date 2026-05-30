@@ -74,4 +74,4 @@
 ## Code-shaper follow-up
 
 - [x] Constrain design/plan per-reviewer PASS_STATUS routing to the statuses valid for those review steps, so context-invalid tokens such as `IMPLEMENTATION_COMPLETE` or `MORE_WORK_REMAINS` fail deterministically instead of being accepted by the global `workflow/pass-status-routing` token union.
-- [ ] Constrain the generic `review-step` workflow PASS_STATUS invoke judge to `ACTIONABLE_FEEDBACK` / `REVIEW_COMPLETE`, and add/update focused assertions so implementation-only tokens fail for review-step while `implement-task` continues to accept implementation statuses.
+- [x] Constrain the generic `review-step` workflow PASS_STATUS invoke judge to `ACTIONABLE_FEEDBACK` / `REVIEW_COMPLETE`, and add/update focused assertions so implementation-only tokens fail for review-step while `implement-task` continues to accept implementation statuses.

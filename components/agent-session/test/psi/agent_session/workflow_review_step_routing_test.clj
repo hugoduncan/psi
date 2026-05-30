@@ -22,7 +22,8 @@
                                     "skill" {:from :workflow-input :path [:skill]}}}]
             :judge {:type :invoke
                     :operation "workflow/pass-status-routing"
-                    :args {:text {:from {:step "review" :output :final-llm-reply}}}}
+                    :args {:text {:from {:step "review" :output :final-llm-reply}}
+                           :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}}
             :on {"DONE" {:goto :done}
                  "REPEAT" {:goto "follow-up"}}}
            {:name "follow-up"
@@ -125,6 +126,35 @@
           (is (= ["Implement munera/open/190-conditional-review-follow-ups-for-design-and-plan-workflows"
                   "Final summary"]
                  (mapv :prompt @prompts*))))))))
+
+(deftest review-step-invalid-implementation-status-fails-before-follow-up-test
+  (testing "implementation-only PASS_STATUS tokens are invalid for generic review-step routing"
+    (let [[ctx session-id] (support/create-session-context {:persist? false})
+          prompts* (atom [])]
+      (register-review-routing-ops! ctx)
+      (create-review-run! ctx "run-review-invalid-implementation-status")
+      (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
+                    (fn [_ctx child-session-id prompt]
+                      (swap! prompts* conj {:session-id child-session-id :prompt prompt})
+                      {:execution-result/assistant-message
+                       {:role "assistant"
+                        :content [{:type :text :text "PASS_STATUS: IMPLEMENTATION_COMPLETE"}]
+                        :stop-reason :stop}})]
+        (let [result (workflow-execution/execute-run! ctx session-id "run-review-invalid-implementation-status")
+              run (workflow-runtime/workflow-run-in @(:state* ctx) "run-review-invalid-implementation-status")]
+          (is (= :failed (:status result)))
+          (is (= :failed (:status run)))
+          (is (= ["Review munera/open/189-deterministic-review-step-routing with task-implementation-review"]
+                 (mapv :prompt @prompts*)))
+          (is (zero? (count (get-in run [:step-runs "follow-up" :attempts]))))
+          (is (= {:status :error
+                  :reason :invalid-pass-status
+                  :message "PASS_STATUS token is not valid for this workflow step"
+                  :details {:text "PASS_STATUS: IMPLEMENTATION_COMPLETE"
+                            :line "PASS_STATUS: IMPLEMENTATION_COMPLETE"
+                            :value "IMPLEMENTATION_COMPLETE"
+                            :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}}
+                 (get-in run [:step-runs "review" :attempts 0 :judge-output :routing-result]))))))))
 
 (deftest review-step-actionable-feedback-runs-follow-up-and-loops-back-via-constant-routing-test
   (testing "actionable review output executes follow-up and returns to review via invoke routing"

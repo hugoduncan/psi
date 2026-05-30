@@ -316,9 +316,7 @@
                    (:contributions review-step))
              "review step should have {{skill}} wired to :workflow-input"))
        (testing "review step uses deterministic invoke routing from final-llm-reply"
-         (is (= {:type :invoke
-                 :operation "workflow/pass-status-routing"
-                 :args {:text {:from {:step "review" :output :final-llm-reply}}}}
+         (is (= (pass-status-judge-from-step "review" ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"])
                 (:judge review-step)))
          (is (= {"DONE" {:goto :done}
                  "REPEAT" {:goto "follow-up"}}
