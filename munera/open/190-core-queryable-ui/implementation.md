@@ -262,3 +262,7 @@ No newly added unchecked inconsistency follow-up items were present in `design-s
 ## 2026-05-30 design ambiguity review
 
 No new actionable ambiguity feedback after re-reading `design.md`, referenced task design artifacts/docs, and current UI/query/runtime/frontend seams. The design remains specific enough for implementation planning on runtime provider ownership/lifetime, EQL discovery/output semantics, unavailable/provider-error normalization, action descriptor validation, invocation/request boundaries, permission constraints, legacy UI-type compatibility, and frontend mode classification. No `design-steps.md` items were added because there is no new ambiguity feedback.
+
+## 2026-05-30 ambiguity follow-up execution
+
+No newly added unchecked ambiguity follow-up items were present in `design-steps.md`; all ambiguity design steps remain complete. No `design.md` change was needed, no design step was left blocked, and `plan.md` / `steps.md` were not touched.
