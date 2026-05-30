@@ -1229,3 +1229,9 @@ Completed the newly added docs review follow-up:
 - Updated `doc/extension-api.md` mid-system examples to call the implemented public API key `(:inject-mid-system-message api)` instead of the non-existent bang key.
 - Updated the Unreleased changelog entry to name the public extension API helper key `:inject-mid-system-message` alongside the Pathom mutation `psi.extension/inject-mid-system-message`.
 - Chose documentation alignment rather than adding a bang alias, preserving the implemented public API surface and avoiding an additional compatibility alias.
+
+---
+
+## Docs review pass — 2026-05-30 (final verification)
+
+No new actionable documentation feedback found. Applied `.psi/skills/review-task-docs/SKILL.md`: re-read `README.md`, `doc/configuration.md`, `doc/tui.md`, `doc/extension-api.md`, `doc/custom-providers.md`, `doc/rpc-edn-op-mapping-contract.md`, `doc/emacs-ui.md`, and `CHANGELOG.md`, then checked the implemented command/API/provider surfaces for Opus 4.8, `/speed`, `/effort`, and mid-system injection. The prior docs follow-ups are reflected: speed/effort docs no longer promise nonexistent extension mutations, mid-system examples use the implemented `:inject-mid-system-message` API key, and changelog/README/doc coverage is consistent with the implementation. No duplicate `steps.md` follow-ups added.
