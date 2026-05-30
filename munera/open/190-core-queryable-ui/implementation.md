@@ -318,3 +318,7 @@ No newly added unchecked ambiguity follow-up items were present in `design-steps
 ## 2026-05-30 plan/steps inconsistency review
 
 Found one new actionable inconsistency after re-reading `plan.md`, `steps.md`, `implementation.md`, `design.md`, `design-decisions.md`, and `resolved-design-questions.md`: `design.md`, `plan.md`, and `steps.md` require `:psi.ui/diagnostic` as a first-class root-queryable/provider-error attr, but the attr/resolver summaries in `design-decisions.md` and `resolved-design-questions.md` still list the initial UI attrs without `:psi.ui/diagnostic`. Those summaries should be aligned so implementation planning has one attr set.
+
+## 2026-05-30 inconsistency follow-up execution
+
+Completed the newly added `:psi.ui/diagnostic` attr-summary alignment follow-up from `design-steps.md`. Updated `design-decisions.md` and `resolved-design-questions.md` so both list `:psi.ui/diagnostic` in the root-queryable `:psi.ui/...` attr set and describe it as bounded redacted provider-error troubleshooting data that is nil/absent for normal states. Marked the design step complete. No blocking follow-up remains.

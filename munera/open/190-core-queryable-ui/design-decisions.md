@@ -11,8 +11,9 @@ Initial attr set:
 - `:psi.ui/capabilities` — vector of capability keywords supported by the active UI/runtime.
 - `:psi.ui/actions` — vector of action descriptors.
 - `:psi.ui/make-visible-action` — always an action descriptor for `:psi.ui.capability/make-visible`; the descriptor is available when supported and unavailable with a machine-readable reason/message when unsupported, headless, or provider-error.
+- `:psi.ui/diagnostic` — nil/absent except provider-error cases; when present, bounded redacted serialisable diagnostic text for resolver/provider troubleshooting.
 
-The resolver should require only `:psi/agent-session-ctx` as input so these attrs are root-queryable. It should not require `:psi.agent-session/session-id`.
+The resolver should require only `:psi/agent-session-ctx` as input so these attrs are root-queryable. It should not require `:psi.agent-session/session-id`. All six `:psi.ui/...` attrs above belong in resolver output and root-queryable/discovery metadata so implementation has one attr set across task artifacts.
 
 The existing `extension-ui-resolver` may either be extended or split into a dedicated UI capability resolver. Prefer a dedicated resolver if it keeps extension-contribution snapshot attrs separate from UI capability/action attrs.
 
@@ -57,7 +58,7 @@ Unavailable fields are required whenever `:psi.ui.action/available?` is false:
 - `:psi.ui.unavailable.reason/unsupported-capability`
 - `:psi.ui.unavailable.reason/provider-error`
 
-Provider-error cases may also include bounded serialisable diagnostic text on the root UI result, but descriptors must not expose frontend objects or stacktrace data by default.
+Provider-error cases may also include bounded serialisable diagnostic text on the root UI result via `:psi.ui/diagnostic`, but descriptors must not expose frontend objects or stacktrace data by default. `:psi.ui/diagnostic` is troubleshooting data only; extensions should branch on unavailable reason keywords instead.
 
 Keep descriptor keys fully namespaced so descriptors are self-describing in EQL results and docs.
 
