@@ -227,7 +227,7 @@ Concrete UI action request contract for this slice, if side-effecting invocation
   - `:psi.ui.request/runtime-id` — runtime correlation id if the runtime already exposes one.
   - `:psi.ui.request/timeout-ms` — requester timeout for acknowledgement waits.
   - `:psi.ui.request/metadata` — bounded serialisable metadata for diagnostics.
-- Extension-facing submission API: extensions submit through the existing core dispatch/effect boundary exposed to extensions, not through frontend namespaces. If no public extension dispatch helper exists at implementation time, this task should expose descriptors only and open the side-effecting follow-up rather than introducing a frontend-specific shortcut.
+- Extension-facing submission API: extensions submit through a dedicated core-owned UI action request helper exposed at the same extension boundary as graph queries, not through frontend namespaces. The helper constructs and submits only `:psi.ui/request-action` events from previously discovered descriptor data. It is intentionally permission-free for this slice and is not governed by extension manifest `allowed-events`, because the request surface is a constrained core UI affordance rather than arbitrary extension-origin dispatch. Permission-free does not mean unvalidated: the helper/resolver path must reject unknown action ids, unavailable descriptors, malformed invocation data, unsupported invocation kinds, stale session/runtime correlation, and requests that no longer match the active provider's current capabilities. If this dedicated helper is not practical during implementation, this task must expose descriptors only and open a follow-up for permission-aware side-effecting invocation rather than routing extensions through the generic permission-gated dispatch API.
 - Acknowledgement/result shape:
 
 ```clojure
@@ -247,7 +247,7 @@ Rejected/unsupported/failed results include `:psi.ui.result/reason` as a machine
 - The "make UI visible" capability/action is represented as pure data when supported and as an explicit absent/unavailable state when unsupported/headless.
 - Emacs advertises a supported make-visible action.
 - TUI and console advertise make-visible only when a real mechanism exists, such as tmux; otherwise they are capability-driven unavailable cases.
-- Querying/invoking does not require extension permissions in this slice.
+- Querying does not require extension permissions in this slice. Side-effecting invocation requires no manifest `allowed-events` permission only if implemented through the dedicated constrained `:psi.ui/request-action` submission helper described above; otherwise invocation remains descriptor-only and a follow-up task owns permission-aware submission.
 - The design or implementation records the UI request event/subscription contract and whether side-effecting invocation is completed in this task or split to a follow-up.
 - Tests cover:
   - nullable extension API/query behaviour,

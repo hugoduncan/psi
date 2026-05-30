@@ -89,3 +89,7 @@ Completed the newly added provider installation/lifetime follow-up in `design.md
 ## 2026-05-30 design inconsistency review
 
 Found one new actionable inconsistency after re-reading `design.md` against current extension dispatch/permission seams: the design requires UI action invocation to be available through a core-owned dispatch/request path without extension permissions, but also says extensions submit through the existing core dispatch/effect boundary, where extension-origin events can be permission-gated by manifest `allowed-events`. The design should explicitly define how `:psi.ui/request-action` remains permission-free for this slice or limit the slice to descriptor-only queryability and a follow-up for permission-aware invocation.
+
+## 2026-05-30 inconsistency follow-up
+
+Completed the newly added invocation/permission follow-up in `design.md`: extension submission now uses a dedicated constrained UI action request helper for `:psi.ui/request-action`, explicitly outside manifest `allowed-events` for this slice while still validating action id, descriptor availability, invocation shape, supported kind, active-provider coherence, and session/runtime correlation. If that helper is not practical during implementation, the slice must remain descriptor-only and defer permission-aware invocation to a follow-up rather than using generic permission-gated dispatch.
