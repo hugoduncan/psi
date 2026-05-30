@@ -779,12 +779,20 @@ The concrete preservation mechanism in this slice is:
 1. Extend `entry->message` to handle `:mid-system` entries by returning a
    provider-style message map `{:role "system" :content [{:type :text :text
    ...}]}` so post-compaction message rebuilds can retain them.
-2. Carry forward post-cut `:mid-system` journal entries normally.
+2. Carry forward post-cut `:mid-system` journal entries normally, except for the
+   boundary merge rule below.
 3. Preserve pre-cut active `:mid-system` entries outside the summarised
    conversation by coalescing their text, in original order, into one retained
-   `:mid-system` entry immediately after the compaction summary user turn. This
-   avoids consecutive inline system messages after compaction while preserving
-   their continuing instruction effect.
+   `:mid-system` entry immediately after the compaction summary user turn.
+4. If the retained post-cut history begins with one or more `:mid-system` entries,
+   merge those boundary entries into the same coalesced summary-boundary
+   `:mid-system` entry instead of emitting separate adjacent system messages.
+   The merged text order is: all pre-cut active mid-system instructions first,
+   then the post-cut boundary mid-system entries in journal order. The retained
+   post-cut history then starts after those merged boundary entries. This
+   guarantees compaction never rebuilds `summary user → system → system`, while
+   preserving both pre-cut continuing instructions and post-cut pending
+   instructions.
 
 #### 12. Cache interaction
 

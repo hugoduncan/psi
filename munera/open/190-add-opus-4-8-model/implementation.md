@@ -255,3 +255,11 @@ Read `design-steps.md` for newly added unchecked ambiguity follow-up items. No u
 **New actionable inconsistency found:**
 
 1. **Compaction can create consecutive mid-system messages at the summary boundary** — Part 4 says compaction preserves pre-cut active `:mid-system` entries by coalescing them into one retained `:mid-system` immediately after the compaction summary user turn, and also carries post-cut `:mid-system` entries forward normally. If the cut leaves a pending post-cut `:mid-system` at the beginning of retained history while older pre-cut mid-system instructions are coalesced, the rebuilt request can become `summary user → coalesced system → post-cut system`, contradicting both the “avoids consecutive inline system messages” preservation claim and the Anthropic placement validator that drops consecutive system messages.
+
+---
+
+## Inconsistency follow-up — 2026-05-30 (compaction boundary)
+
+Completed the newly added inconsistency follow-up item in `design-steps.md` by refining `design.md`:
+
+- Compaction now has an explicit boundary merge rule for retained post-cut `:mid-system` entries. If pre-cut active mid-system instructions are coalesced after the summary user turn and the retained post-cut history begins with one or more `:mid-system` entries, those boundary entries are merged into the same summary-boundary `:mid-system` entry, preserving pre-cut text first and post-cut boundary text next. This guarantees the rebuilt provider message sequence never creates `summary user → system → system` at the compaction boundary.

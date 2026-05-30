@@ -80,4 +80,4 @@
 
 ## From inconsistency review pass 2026-05-30 (compaction boundary)
 
-- [ ] **Resolve compaction boundary consecutive mid-system case** — Specify how compaction handles a retained post-cut `:mid-system` immediately after the summary boundary when pre-cut active mid-system instructions are also coalesced. Either merge/coalesce the boundary messages, forbid/snap cut points that split a user→mid-system pair, or otherwise guarantee rebuilt provider messages never contain consecutive inline system messages.
+- [x] **Resolve compaction boundary consecutive mid-system case** — Specify how compaction handles a retained post-cut `:mid-system` immediately after the summary boundary when pre-cut active mid-system instructions are also coalesced. Either merge/coalesce the boundary messages, forbid/snap cut points that split a user→mid-system pair, or otherwise guarantee rebuilt provider messages never contain consecutive inline system messages.
