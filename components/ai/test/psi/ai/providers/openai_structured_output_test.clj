@@ -143,6 +143,16 @@
                  :prompted-json/text)
                (:source result)) label)))))
 
+(deftest openai-chat-completions-structured-output-parse-failure-preserves-raw-payload-test
+  ;; Tests Chat Completions result metadata retains raw provider text at the
+  ;; canonical raw-payload key even when JSON parsing fails.
+  (let [raw    "not json"
+        result (openai-chat-result-payload {:strategy :provider-native} raw)]
+    (is (= raw (:raw-text result)))
+    (is (= raw (:raw-payload result)))
+    (is (:parse-error? result))
+    (is (not (contains? result :payload)))))
+
 (deftest openai-codex-structured-output-null-payload-test
   ;; Tests Codex structured-output result preserves JSON null as present payload.
   (let [result (#'psi.ai.providers.openai.codex-structured-output/structured-output-result

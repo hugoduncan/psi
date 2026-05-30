@@ -74,5 +74,5 @@
 
 ## Code-shaper review follow-ups
 
-- [ ] Normalize `psi.ai.providers.openai.chat-completions/structured-output-result` metadata so raw provider text is always preserved at `:raw-payload` (including parse failures), matching Anthropic/Codex, and add a parse-failure regression for the OpenAI helper.
+- [x] Normalize `psi.ai.providers.openai.chat-completions/structured-output-result` metadata so raw provider text is always preserved at `:raw-payload` (including parse failures), matching Anthropic/Codex, and add a parse-failure regression for the OpenAI helper.
 

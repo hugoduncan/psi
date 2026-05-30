@@ -375,9 +375,9 @@
     (let [parse-result (structured-output/parse-json-value raw-text)]
       (cond-> (assoc strategy
                      :source source
-                     :raw-text raw-text)
-        (:parsed? parse-result) (assoc :payload (:payload parse-result)
-                                       :raw-payload raw-text)
+                     :raw-text raw-text
+                     :raw-payload raw-text)
+        (:parsed? parse-result) (assoc :payload (:payload parse-result))
         (not parse-result) (assoc :parse-error? true)))))
 
 (defn- emit-structured-output-result!
