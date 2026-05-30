@@ -195,6 +195,40 @@
               (is (nil? (ui-capabilities/provider @after-return-ctx*))
                   "TUI provider is cleared when the frontend exits"))))))))
 
+(deftest start-tui-runtime-clears-tui-ui-provider-when-frontend-throws-test
+  (app-test-support/with-session-state-restore
+    (fn []
+      (with-redefs-fn (main-bootstrap-stub-bindings)
+        (fn []
+          (let [started-query*  (atom nil)
+                after-throw-ctx* (atom nil)
+                tui-start!      (fn [_run-agent-fn opts]
+                                  (let [query-fn (:query-fn opts)]
+                                    (reset! started-query* (query-fn ui-capabilities/ui-attrs))
+                                    (throw (ex-info "frontend failed" {}))))]
+            (with-redefs [app-runtime/bootstrap-runtime-session!
+                          (fn [ctx _ai-model _opts]
+                            (let [sid (:session-id (session/new-session-in! ctx nil {}))]
+                              {:ctx ctx
+                               :session-id sid
+                               :templates []
+                               :skills []
+                               :startup-rehydrate {}}))]
+              (is (thrown-with-msg?
+                   clojure.lang.ExceptionInfo
+                   #"frontend failed"
+                   (app-runtime/start-tui-runtime! tui-start! :ignored {} {} {:session-root nil})))
+              (reset! after-throw-ctx* (:ctx @app-runtime/session-state))
+              (is (= ui-capabilities/unsupported-capability-reason
+                     (get-in @started-query* [:psi.ui/make-visible-action :psi.ui.action/unavailable-reason]))
+                  "TUI frontend observes the attached provider before the exceptional exit")
+              (is (nil? (ui-capabilities/provider @after-throw-ctx*))
+                  "TUI provider is cleared when the frontend throws")
+              (is (= ui-capabilities/no-provider-reason
+                     (get-in (session/query-in @after-throw-ctx* nil ui-capabilities/ui-attrs)
+                             [:psi.ui/make-visible-action :psi.ui.action/unavailable-reason]))
+                  "post-throw queries cannot observe stale attached TUI advertisements"))))))))
+
 (deftest start-tui-runtime-extension-command-after-new-targets-new-session-test
   (app-test-support/with-session-state-restore
     (fn []

@@ -607,3 +607,12 @@ Verification:
 ## 2026-05-30 test-shaper review
 
 Found one new actionable test-shaping issue after reviewing task artifacts, UI capability/provider tests, RPC/TUI lifecycle tests, nullable/extension API coverage, graph discovery tests, Emacs ERT coverage, and docs: TUI provider lifecycle coverage proves normal frontend return clears the provider, but not the exceptional shutdown path. The implementation note/design require clearing/downgrading stale providers on TUI shutdown, and robust lifecycle tests should prove `start-tui-runtime!` clears the active UI provider even when `tui-start-fn!` throws so failed frontend startup cannot leave stale attached UI advertisements.
+
+## 2026-05-30 test-review follow-up execution
+
+Completed the TUI exceptional lifecycle coverage follow-up. Added `start-tui-runtime-clears-tui-ui-provider-when-frontend-throws-test`, which proves the attached TUI provider is visible during frontend startup, `start-tui-runtime!` propagates the frontend exception, the active provider is cleared in the `finally`, and post-throw UI capability queries return no-provider semantics rather than stale attached TUI advertisements.
+
+Verification:
+
+- `clojure -M:test --focus psi.app-runtime-test/start-tui-runtime-clears-tui-ui-provider-when-frontend-throws-test --focus psi.app-runtime-test/start-tui-runtime-installs-and-clears-tui-ui-provider-test` — 2 tests, 8 assertions, 0 failures.
+- `clj-kondo --lint components/app-runtime/test/psi/app_runtime_test.clj` — clean.
