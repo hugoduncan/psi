@@ -635,3 +635,9 @@ Decision recorded:
 - Removed per-feature docs ownership wording from plan Slices 2, 3, and 4.
 - Expanded plan Slice 5 to explicitly own README, `doc/`, and changelog updates for Opus 4.8, `/speed`, `/effort`, and mid-system extension capability.
 - Marked the docs-ownership design-step complete.
+
+---
+
+## Design ambiguity review pass — 2026-05-30 (plan/steps independent verification)
+
+No new actionable ambiguities found. Re-read `plan.md`, `steps.md`, `design-steps.md`, and the latest `implementation.md` notes, then spot-checked referenced code surfaces for Anthropic request validation, prompt-request journal projection/current-user replacement, and compaction rebuild. The plan/steps now present one unambiguous five-slice execution structure with documentation/changelog owned by Slice 5; existing ambiguity follow-ups in `design-steps.md` are checked and were not duplicated.
