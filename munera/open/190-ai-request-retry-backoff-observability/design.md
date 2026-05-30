@@ -204,6 +204,21 @@ EQL / `psi-tool` retry answers are projections over retained provider lifecycle 
 
 If implementation discovers that the existing telemetry retention is insufficient for completed EQL answers after a request finishes, the smallest acceptable storage change is to retain the same canonical telemetry capture data under session state and still project EQL from that retained telemetry. UI/app-runtime active retry state is not authoritative for completed retry history.
 
+### Provider request identity in telemetry and EQL
+
+Provider lifecycle telemetry must carry an explicit `:provider-request-id` field on every `provider_request_started`, `provider_retry_scheduled`, and `provider_request_finished` event. This field is the canonical provider request grouping key for retry history, metrics joins, and EQL projections. For the prepared-request execution covered by this task, `:provider-request-id` is normally equal to the prepared request `turn-id`; if a future provider/request layer supplies a more specific stable provider request id, that value may be used, but it must remain stable across all retry attempts for the same prepared provider request.
+
+Telemetry events should also continue to include `:turn-id` for compatibility with existing consumers and for joins back to turn/session state. EQL must project `:psi.provider-request/id` from the explicit `:provider-request-id`, not by guessing from `:attempt-id` and not by parsing event text. When older retained telemetry lacks `:provider-request-id`, resolvers may use `:turn-id` as a compatibility fallback only for historical data; newly emitted retry lifecycle events for this task must include both fields so grouping is unambiguous.
+
+Identity roles are therefore:
+
+- `:turn-id` — the prepared request / turn execution id and compatibility join to existing turn state;
+- `:provider-request-id` — the stable provider request lifecycle id used to group all attempts and scheduled delays for one provider request; equal to `:turn-id` for current prepared requests unless an existing stable request id is already present;
+- `:retry-attempt` — the zero-based attempt coordinate within a provider request;
+- `:attempt-id` — the unique concrete execution-attempt id, derived from `:provider-request-id` plus `:retry-attempt` when retries occur.
+
+Session-, turn-, and request-level retry EQL projections must group lifecycle events by `:provider-request-id` and order attempt details by `:retry-attempt`. A query by turn may find provider retry summaries where `:turn-id` matches the requested turn, but the returned provider request entity id remains the explicit `:provider-request-id`.
+
 ## Active retry/backoff visibility
 
 Provider-boundary retry must keep the existing app-runtime/TUI/Emacs retry projection accurate while a retry delay is pending. The retry coordinator owns execution and timing, but it must publish active retry state into the existing session retry fields before sleeping and clear them when the delay ends or the request reaches a terminal outcome.
