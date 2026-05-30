@@ -579,3 +579,7 @@ Verification:
 
 - `clojure -M:test --focus psi.agent-session.ui-capabilities-test` — 18 tests, 115 assertions, 0 failures.
 - `clj-kondo --lint components/agent-session/src/psi/agent_session/ui_capabilities.clj components/agent-session/test/psi/agent_session/ui_capabilities_test.clj` — clean.
+
+## 2026-05-30 test review
+
+Found one new actionable test issue after reviewing task artifacts, UI capability/provider tests, lifecycle tests, nullable API coverage, and extension API query paths: the checklist marks extension-query coverage complete, but no real `ext/create-extension-api` + `runtime-fns/make-extension-runtime-fns` test queries the new `:psi.ui/...` attrs. Existing coverage exercises `session/query-in` directly and the nullable helper, which does not prove extension code can discover UI capabilities/actions through the actual extension API without session-id input or permissions. Add focused real extension API coverage for querying the documented UI capability attrs.

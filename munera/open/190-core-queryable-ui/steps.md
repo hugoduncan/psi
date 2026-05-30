@@ -97,3 +97,4 @@
 - [x] Reject provider action descriptors with extra unqualified/foreign keys before exposing them through EQL, and add focused coverage for fail-closed provider-error semantics.
 - [x] Reject provider action invocation maps with extra unqualified/foreign keys before exposing them through EQL, and add focused coverage for fail-closed provider-error semantics.
 - [x] Add provider normalization tests for omitted optional `:ui-event` payload and `:mutation` params defaulting to `{}`; fix implementation if coverage exposes contract drift.
+- [ ] Add focused real extension API coverage proving `ext/create-extension-api` with `runtime-fns/make-extension-runtime-fns` can query the documented `:psi.ui/...` capability/action attrs without explicit session-id input or extension permissions.
