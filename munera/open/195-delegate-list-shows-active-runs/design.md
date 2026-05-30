@@ -138,6 +138,23 @@ Timed-out delegate background jobs are a delegate-tool retention state, not a ca
 A retained `:timed-out` background job pointing at a missing canonical workflow run should be hidden like other terminal retained jobs whose canonical run has been removed; it should not create a synthetic `:timed-out` workflow run.
 
 
+## Delegate background-job identity for attempts and continuations
+
+Delegate background-job `tool-call-id` is an execution-attempt identity, not the canonical workflow management identity. The surfaced management id for `delegate list`, `continue`, and `remove` remains the canonical workflow `run-id` carried in `workflow-id`.
+
+Any delegate workflow execution attempt that creates a background job must use a background-job `tool-call-id` that is unique for that attempt, rather than deriving it solely as `delegate/<run-id>` whenever another retained background job for the same canonical run may already exist. A valid shape is `delegate/<run-id>/<attempt-id>` (for example an attempt sequence, timestamp, UUID, or other durable unique attempt token). The exact token format is not user-facing, but it must be stable enough for background-job registry diagnostics and unique under the registry's one-job-per-`tool-call-id` rule. `job-id` remains globally unique as required by the background-job registry.
+
+The canonical `workflow-id` stored on each delegate background job must continue to be the workflow run id being managed:
+
+- an initial async delegate run stores `workflow-id = <new run-id>` and may use either the first attempt-specific `tool-call-id` or the legacy `delegate/<run-id>` only if that id cannot collide with retained history;
+- resuming a blocked canonical run stores `workflow-id = <same blocked run-id>` but must create a new attempt-specific `tool-call-id` when any prior retained job for that run may exist;
+- continuing a terminal run by creating a new canonical workflow run stores `workflow-id = <new continuation run-id>` for the new job, while provenance such as `continued-from` may point back to the prior run separately if the implementation records it.
+
+`delegate list` must not use `tool-call-id` as the management id and must not require a one-to-one relationship between `tool-call-id` and canonical `workflow-id`. Duplicate eligible jobs for the same `workflow-id` are interpreted using the duplicate-job reduction rules above: retained terminal attempt history plus one newer non-terminal attempt is valid and lists as one run; multiple non-terminal attempts for the same canonical run remain an actionable duplicate-job inconsistency.
+
+A resumed/continued attempt must not replace or mutate retained terminal attempt history merely to satisfy the background-job registry uniqueness constraint. If an implementation chooses an alternative cleanup strategy instead of attempt-specific ids, it must first intentionally remove or retire the old retained job before starting the new attempt, and the resulting state must still satisfy the same duplicate/list visibility rules without leaving a registry-level `tool-call-id` collision.
+
+
 ## Delegate remove cleanup contract
 
 For runs surfaced by `delegate list`, `delegate remove` uses the listed canonical `run-id` as its target and removes the canonical workflow run from the workflow run registry. When the target is backed by a same-session delegate background job that is still non-terminal (`:running` or `:pending-cancel`), a successful remove must also resolve the delegate background-job side of the relationship so that a later `delegate list` cannot see a non-terminal same-session job pointing at a missing canonical workflow run.
