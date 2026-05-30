@@ -89,6 +89,7 @@ Visibility rules:
 - Removed canonical workflow runs must not remain visible solely because terminal background-job history is retained.
 - Delegate jobs from unrelated sessions must not be listed, even if their canonical workflow runs still exist in the global workflow registry.
 - If a same-session delegate background job points at a missing canonical workflow run while still non-terminal, `delegate list` should surface an actionable inconsistency/error rather than silently returning an empty list.
+- If a same-session non-terminal delegate workflow background job has a missing, nil, non-string, or blank `workflow-id`, `delegate list` should surface an actionable inconsistency/tool error for the malformed delegate job. It must not silently ignore the job, coerce the malformed id into an empty result, or report that no visible runs exist. The error should identify the delegate background job enough to diagnose or clean up the corrupted state without inventing a canonical workflow run id.
 
 Timed-out delegate background jobs are a delegate-tool retention state, not a canonical workflow-run status. Canonical workflow runs continue to use the workflow runtime status set (`:pending`, `:running`, `:blocked`, `:completed`, `:failed`, `:cancelled`). When a retained same-session delegate background job has `:status :timed-out` and its canonical workflow run still exists, `delegate list` should include the entry with:
 
