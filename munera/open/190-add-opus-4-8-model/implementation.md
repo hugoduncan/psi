@@ -128,3 +128,13 @@ Completed the two newly added inconsistency follow-up items in `design-steps.md`
 
 - `:psi.agent-session/speed-mode` is now explicitly a display/effective resolver: nil session state is coerced to `:normal`, including after `/speed normal session`, while request shaping still treats nil/`:normal` as provider default.
 - `:supports-mid-conversation-system-messages` is now optional model metadata; absent is semantically false at schema/capability resolver surfaces, so unsupported models may omit it or set `false`.
+
+---
+
+## Design ambiguity review pass — 2026-05-30 (third pass)
+
+**New actionable ambiguities found:**
+
+1. **Anthropic inline system request schema validation** — Part 4 adds `:system` to the AI `MessageRole` and requires Anthropic `transform-messages` to emit inline `{"role": "system", ...}` entries, but the local Anthropic request schema currently admits only `"user"` and `"assistant"` message roles. Specify that `request_schema.clj` must include an inline system message schema, or choose an explicit route that bypasses/normalizes validation, otherwise valid mid-system requests will be rejected before HTTP.
+
+2. **Mid-system projection versus current-user replacement** — `build-prepared-request` replaces the current persisted user message only when the last projected base message is a user. A valid pending `:mid-system` entry is appended after that user, so the base tail becomes system and the current user replacement/expansion path may no longer update the intended user turn. Specify how `replace-current-user-message` / prepared-turn assembly handles a pending mid-system entry while preserving order `user → system`.

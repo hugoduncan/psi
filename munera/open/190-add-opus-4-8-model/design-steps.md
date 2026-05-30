@@ -45,3 +45,9 @@
 - [x] **Align `/speed` resolver default with nil session state** — Decide whether `:psi.agent-session/speed-mode` resolver coerces nil to `:normal` (matching acceptance criteria and display semantics) or whether acceptance should allow nil. Update the resolver/design text accordingly, including `/speed normal session` behaviour.
 
 - [x] **Specify mid-system capability flag schema/default semantics** — Decide whether `:supports-mid-conversation-system-messages` is optional in `Model` with absent treated as false, or required on every model map. Align the schema step with the acceptance criterion that unsupported models may have the flag false or absent.
+
+## From ambiguity review pass 2026-05-30 (third pass)
+
+- [ ] **Allow Anthropic inline system messages through request validation** — Update the design to specify how `request_schema.clj` admits inline `{"role": "system", ...}` messages in the Anthropic `messages` array, or explicitly state a different validation/normalization path, so mid-system requests are not rejected locally.
+
+- [ ] **Define pending mid-system handling during current-user replacement** — Specify how prepared-turn assembly updates/replaces the current user message when a pending `:mid-system` entry follows it in the projected journal, preserving the valid provider order `user → system` rather than treating the system message as an unrelated tail.
