@@ -113,3 +113,7 @@ Completed both newly added inconsistency follow-ups:
 
 - Aligned `resolved-design-questions.md` with `design.md` for invocation permissions: query remains permission-free, but side-effecting invocation is permission-free only through the dedicated constrained `:psi.ui/request-action` helper outside manifest `allowed-events`; otherwise the slice must expose descriptors only and defer permission-aware submission.
 - Aligned `design-decisions.md` invocation-kind guidance with `design.md`: resolver descriptor validation must recognize all supported design invocation kinds (`:emacs-command`, `:ui-event`, `:bash-command`, `:mutation`) in this slice, even if only Emacs initially advertises an available make-visible action.
+
+## 2026-05-30 design ambiguity review
+
+Found one new actionable ambiguity after re-reading `design.md`, `design-decisions.md`, and current EQL/provider seams: descriptor validation must recognize `:emacs-command`, `:ui-event`, `:bash-command`, and `:mutation`, but the design does not define the per-invocation-kind required keys/value shapes beyond the Emacs example, leaving provider validation and extension request construction underdetermined for the non-Emacs supported kinds.
