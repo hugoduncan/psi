@@ -83,3 +83,4 @@
 
 - [x] Wire provider-boundary pending-backoff cancellation to the real session/turn abort or shutdown signal and make production retry delay interruptible/polling rather than a single uninterruptible `Thread/sleep`.
 - [x] Add direct EQL/`psi-tool` provider retry resolvers and tests for callers querying by `turn-id` or explicit `provider-request-id`, not only nested session-level retry summaries.
+- [ ] Add focused EQL coverage for `:psi.provider-retry/final?` and fix provider retry attempt final-marker semantics so final/cancelled lifecycle events can mark the corresponding retry attempt detail when applicable.
