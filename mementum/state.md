@@ -190,3 +190,4 @@ Bootstrapped on 2026-04-02.
 - 2026-05-30: Task 190 inconsistency follow-up completed: `psi.extension/inject-mid-system-message` mutation params now include optional `:ext-path`; provenance inference is owned by the extension mutation surface (`:source` > `:ext-path` > `:extension`), and the source-provenance design-step is checked.
 
 - 2026-05-30: Task 190 inconsistency review found one new actionable design inconsistency: compaction reattaches preserved pre-cut `:mid-system` instructions after the first retained user even when a retained assistant response follows, retroactively changing history rather than attaching to the next-generation/latest-user boundary. Added unchecked `design-steps.md` follow-up and committed `b39786ee`.
+- 2026-05-30: Task 190 inconsistency follow-up execution found no unchecked inconsistency design-steps after the post-final independent no-op review; implementation.md records the no-op pass and design/design-steps were unchanged.

@@ -591,3 +591,9 @@ Read `design-steps.md` for newly added unchecked ambiguity follow-up items after
 ## Design inconsistency review pass — 2026-05-30 (post-final independent no-op)
 
 No new actionable inconsistencies found. Re-read `design.md` only for design scope and checked referenced artifacts needed for consistency: model catalog/schema, Anthropic request shaping/schema, OpenAI reasoning/Codex request paths, session-state schemas, prompt request projection/current-user replacement, conversation assembly, compaction rebuild rules, shared-config resolution semantics, and extension mutation/runtime EQL surfaces. Existing inconsistency follow-ups in `design-steps.md` are already checked; no duplicate follow-up items were added.
+
+---
+
+## Inconsistency follow-up execution — 2026-05-30 (post-final independent no-op)
+
+Read `design-steps.md` for newly added unchecked inconsistency follow-up items after the preceding inconsistency-review pass. No unchecked design-step items were present; all inconsistency follow-ups are already marked complete. No `design.md` changes were required. `plan.md` and `steps.md` were not touched.
