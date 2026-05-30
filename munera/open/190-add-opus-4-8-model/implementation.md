@@ -352,3 +352,11 @@ Decision: option (a) — removed the rename and the dead extended-thinking effor
 - Effort override for adaptive models uses a separate `effort-override->effort` mapping `{:low "low" :medium "medium" :high "high" :xhigh "highest"}`, applied only when the model is adaptive-thinking.
 - Effort override is silently inapplicable to extended-thinking models because they use `budget_tokens`, not `output_config.effort`. No dead table, no dead mapping, no special handling needed.
 - Extended-thinking `:xhigh` distinction is already provided by `thinking-level->budget {:xhigh 32000}` vs `:high 16000` (Part 3 step 11, unchanged).
+
+---
+
+## Design ambiguity review pass — 2026-05-30 (independent, effort display)
+
+**New actionable ambiguity found:**
+
+1. **`effective-reasoning-effort` resolver not updated for adaptive `:xhigh` or effort override** — The existing `effective-reasoning-effort` resolver in `resolvers/session.clj` (used by footer and `/status`) has its own `thinking-level->reasoning-effort` map where `:xhigh` → `"high"`. The design changes the actual Anthropic adaptive effort for `:xhigh` to `"highest"` and adds an effort override, but does not specify updating this display resolver. Part 3 step 8 adds a new `• effort:xhigh` footer suffix for the override case, but the existing `thinking high` display from the resolver remains stale when plain `thinking-level :xhigh` on adaptive models actually sends `"highest"`. Decide whether the `effective-reasoning-effort` resolver should (a) incorporate the effort override and the new adaptive `:xhigh` → `"highest"` value, becoming provider/model-aware, or (b) remain a simple thinking-level-derived display where the `• effort:xhigh` suffix is the only override signal, accepting that `thinking high` is shown even when `"highest"` is actually sent.
