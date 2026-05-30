@@ -519,3 +519,9 @@ Completed the newly added inconsistency follow-up item in `design-steps.md` by r
 - Compaction must not retroactively insert preserved mid-system instructions before already-retained assistant responses.
 - When preserved pre-cut or boundary `:mid-system` instructions need placement, compaction normalizes the retained suffix by advancing the cut past completed retained user/assistant exchanges until the suffix is empty or ends at a pending latest user boundary.
 - Preserved instructions attach after the summary user only when no pending retained user boundary exists, or after the latest retained pending user when one exists; tests must cover the cut-normalization case that avoids `retained user → system → retained assistant`.
+
+---
+
+## Design ambiguity review pass — 2026-05-30 (post-compaction verification)
+
+No new actionable ambiguities found. Re-read `design.md` and checked referenced model catalog/schema, Anthropic request schema/request shaping, prompt-request projection/current-user replacement, dispatch/session mutation surfaces, and compaction preservation rules; existing ambiguity follow-ups are already checked in `design-steps.md`, and no unduplicated ambiguity items were identified. `design-steps.md` was left unchanged.
