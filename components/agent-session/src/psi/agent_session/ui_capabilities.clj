@@ -202,11 +202,35 @@
   (let [ids (map :psi.ui.action/id actions)]
     (not= (count ids) (count (set ids)))))
 
+(defn- diagnostic-source
+  [x]
+  (if (instance? Throwable x)
+    (str (some-> x class .getName) ": " (.getMessage ^Throwable x))
+    (str x)))
+
+(defn- redact-diagnostic-text
+  [text]
+  (-> text
+      ;; Stacktrace frames can expose local source paths and implementation details.
+      (str/replace #"(?m)\s+at\s+[A-Za-z0-9_.$/<>-]+\([^)]*\)" " [STACKTRACE_REDACTED]")
+      ;; Frontend/runtime object printed forms are not serialisable UI data.
+      (str/replace #"#<[^>]*>" "[OBJECT_REDACTED]")
+      (str/replace #"#object\[[^\]]*\]" "[OBJECT_REDACTED]")
+      ;; Secret-bearing paths should not be surfaced through graph diagnostics.
+      (str/replace #"(?i)(?:~|/)[^\s,;]*?(?:secret|token|password|credential|\.ssh|id_rsa)[^\s,;]*" "[PATH_REDACTED]")
+      ;; Common inline key/value secret forms.
+      (str/replace #"(?i)\b([A-Za-z0-9_.-]*(?:token|secret|password|api[-_]?key|credential)[A-Za-z0-9_.-]*\s*[:=]\s*)\S+" "$1[REDACTED]")
+      ;; Common bearer/API-token-looking values even when the key is omitted.
+      (str/replace #"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]+" "Bearer [REDACTED]")
+      (str/replace #"\b(?:sk|pk)-[A-Za-z0-9_-]{12,}\b" "[REDACTED_TOKEN]")
+      (str/replace #"[\r\n\t]+" " ")
+      (str/replace #"\s+" " ")
+      str/trim))
+
 (defn- diagnostic-text
   [x]
-  (subs (str/replace (str x) #"[\r\n\t]+" " ")
-        0
-        (min 512 (count (str/replace (str x) #"[\r\n\t]+" " ")))))
+  (let [redacted (redact-diagnostic-text (diagnostic-source x))]
+    (subs redacted 0 (min 512 (count redacted)))))
 
 (defn provider-error-result
   ([message]
@@ -288,7 +312,7 @@
                :psi.ui/make-visible-action make-visible
                :psi.ui/diagnostic nil})))))
     (catch Throwable t
-      (provider-error-result "provider normalization failed" (diagnostic-text (.getMessage t))))))
+      (provider-error-result "provider normalization failed" (diagnostic-text t)))))
 
 (defn resolve-ui
   "Call the current provider at query time and normalize the result."
@@ -297,5 +321,5 @@
     (try
       (normalize-provider-result (provider-fn ctx))
       (catch Throwable t
-        (provider-error-result "provider threw" (diagnostic-text (.getMessage t)))))
+        (provider-error-result "provider threw" (diagnostic-text t))))
     (missing-provider-result)))

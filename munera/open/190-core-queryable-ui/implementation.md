@@ -439,3 +439,12 @@ Closed the remaining conditional checklist items after confirming side-effecting
 ## 2026-05-30 implementation review
 
 Found one new actionable implementation issue after reviewing task artifacts, changed UI capability/provider code, RPC/Emacs wiring, docs, and focused tests: provider-error diagnostics are bounded but not redacted. `diagnostic-text` normalizes and truncates exception/provider messages, yet the design and checklist require redaction of stack traces, frontend object printed forms, tokens, secret-bearing paths/data, and arbitrary exception data before exposing `:psi.ui/diagnostic` through EQL. Focused verification remained green: `clojure -M:test --focus psi.agent-session.ui-capabilities-test --focus psi.agent-session.graph-surface-test --focus psi.rpc-invariants-test`; targeted `clj-kondo` green.
+
+## 2026-05-30 provider-error diagnostic redaction follow-up
+
+Completed the newly added implementation-review follow-up for provider-error diagnostics. `:psi.ui/diagnostic` now derives from a bounded redaction path that includes provider-error class/message only, avoids arbitrary `ex-data`, collapses stacktrace frames, redacts Emacs/frontend object printed forms, token/secret/password/API-key values, bearer/token-looking values, and secret-bearing paths before truncation. Added focused tests proving bounded diagnostics and redaction of stack frames, frontend object forms, token/secret values, secret-bearing paths, and arbitrary exception data.
+
+Verification:
+
+- `clojure -M:test --focus psi.agent-session.ui-capabilities-test` — 14 tests, 82 assertions, 0 failures.
+- `clj-kondo --lint components/agent-session/src/psi/agent_session/ui_capabilities.clj components/agent-session/test/psi/agent_session/ui_capabilities_test.clj` — clean.

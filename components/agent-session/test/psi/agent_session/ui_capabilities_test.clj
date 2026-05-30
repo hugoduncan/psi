@@ -155,6 +155,31 @@
       (is (provider-error? result))
       (is (string? (:psi.ui/diagnostic result))))))
 
+(deftest provider-error-diagnostic-redaction-test
+  ;; Tests that provider-error diagnostics are bounded and redact stack frames,
+  ;; frontend object forms, token/secret values, secret-bearing paths, and
+  ;; arbitrary exception data before exposure through EQL.
+  (let [ctx (create-ctx {})
+        diagnostic-message (str "token=abc123 password: hunter2 Bearer secret-token "
+                                "/tmp/secret-token/path #<buffer *psi*> "
+                                "#object[emacs.Buffer 0xabc \"buf\"] "
+                                "\n at psi.ui.Secret.invoke(Secret.java:42) "
+                                "sk-abcdefghijklmnopqrstuvwxyz")]
+    (ui-capabilities/install-provider!
+     ctx
+     (fn [_]
+       (throw (ex-info diagnostic-message
+                       {:token "exception-data-token"
+                        :secret-path "/home/me/.ssh/id_rsa"}))))
+    (let [diagnostic (:psi.ui/diagnostic (session/query-in ctx ui-query))]
+      (is (string? diagnostic))
+      (is (<= (count diagnostic) 512))
+      (is (not (re-find #"abc123|hunter2|secret-token|abcdefghijklmnopqrstuvwxyz" diagnostic)))
+      (is (not (re-find #"/tmp/secret-token|\.ssh|id_rsa" diagnostic)))
+      (is (not (re-find #"#<buffer|#object|Secret\.java|\s+at\s+" diagnostic)))
+      (is (not (re-find #"exception-data-token|secret-path" diagnostic)))
+      (is (re-find #"REDACTED|STACKTRACE_REDACTED|OBJECT_REDACTED" diagnostic)))))
+
 (deftest provider-normalization-invocation-kind-test
   ;; Tests the supported invocation-kind schemas without mocks.
   (let [valid-invocations [{:psi.ui.invocation/kind :emacs-command
