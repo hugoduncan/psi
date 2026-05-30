@@ -360,3 +360,16 @@ Decision: option (a) — removed the rename and the dead extended-thinking effor
 **New actionable ambiguity found:**
 
 1. **`effective-reasoning-effort` resolver not updated for adaptive `:xhigh` or effort override** — The existing `effective-reasoning-effort` resolver in `resolvers/session.clj` (used by footer and `/status`) has its own `thinking-level->reasoning-effort` map where `:xhigh` → `"high"`. The design changes the actual Anthropic adaptive effort for `:xhigh` to `"highest"` and adds an effort override, but does not specify updating this display resolver. Part 3 step 8 adds a new `• effort:xhigh` footer suffix for the override case, but the existing `thinking high` display from the resolver remains stale when plain `thinking-level :xhigh` on adaptive models actually sends `"highest"`. Decide whether the `effective-reasoning-effort` resolver should (a) incorporate the effort override and the new adaptive `:xhigh` → `"highest"` value, becoming provider/model-aware, or (b) remain a simple thinking-level-derived display where the `• effort:xhigh` suffix is the only override signal, accepting that `thinking high` is shown even when `"highest"` is actually sent.
+
+---
+
+## Ambiguity follow-up — 2026-05-30 (effort display resolver)
+
+Completed the newly added ambiguity follow-up item in `design-steps.md` by refining `design.md`.
+
+Decision: option (b) with a display correction — keep the resolver provider-agnostic but update the display map.
+
+- `effective-reasoning-effort` remains a simple thinking-level display resolver, not provider/model-aware.
+- Updated `thinking-level->reasoning-effort` map: `:xhigh` → `"xhigh"` (was `"high"`), so the footer shows `thinking xhigh` when `thinking-level` is `:xhigh`, accurately reflecting the now-distinct level.
+- The `• effort:xhigh` footer suffix (Part 3 step 8) remains the separate signal for an explicit `/effort` override.
+- No effort override or provider-specific wire values are incorporated into this resolver.

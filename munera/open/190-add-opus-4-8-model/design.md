@@ -443,6 +443,16 @@ value) appended to the thinking label, e.g. `thinking high • effort:xhigh`.
 
 Add `:psi.agent-session/effort-override` resolver.
 
+Update the existing `effective-reasoning-effort` resolver's
+`thinking-level->reasoning-effort` map so `:xhigh` maps to `"xhigh"` instead of
+`"high"`.  This resolver is a **display/UI resolver** — it shows the
+user-visible thinking level label, not the provider-specific wire value.  Now
+that `:xhigh` is genuinely distinct from `:high`, the display must reflect that:
+the footer shows `thinking xhigh` when `thinking-level` is `:xhigh`.  The
+resolver remains provider-agnostic; it does not incorporate the effort override
+or provider-specific effort strings.  The `• effort:xhigh` footer suffix (Part 3
+step 8) is the separate, explicit signal for an active `/effort` override.
+
 #### 10. Persistence (`components/shared-config/`)
 
 Add `effort-override` to project/user config schema.
