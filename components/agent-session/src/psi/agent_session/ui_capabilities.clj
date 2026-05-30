@@ -174,6 +174,7 @@
   [inv]
   (and (map? inv)
        (serializable-value? inv)
+       (every? #(namespaced-as? % "psi.ui.invocation") (keys inv))
        (case (:psi.ui.invocation/kind inv)
          :emacs-command (valid-emacs-command? inv)
          :ui-event (valid-ui-event? inv)

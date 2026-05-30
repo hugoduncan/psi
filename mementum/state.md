@@ -185,6 +185,8 @@ Bootstrapped on 2026-04-02.
 
 - 2026-05-30: Task 190 third ambiguity review pass found two new actionable ambiguities: Anthropic local request schema must admit inline system messages in `messages`, and prepared-turn current-user replacement must handle a pending `:mid-system` entry after the user while preserving `user → system` order. Added unchecked follow-ups to `design-steps.md` and committed `12cf9fb2`.
 
+- 2026-05-30: Task 190 implementation-review follow-up fixed nested invocation descriptor key validation: `:psi.ui.action/invocation` maps now reject unqualified, foreign namespaced, and string keys before EQL exposure, failing closed to provider-error. Focused UI capability tests and targeted lint passed.
+
 - 2026-05-30: Task 190 implementation-review follow-up fixed RPC/Emacs pre-install provider semantics: RPC contexts can suppress static default UI provider, runtime installs the late-bound connection-correlated Emacs RPC provider before bootstrap, and pre-install/no-attached/bootstrap coverage plus targeted lint are green.
 - 2026-05-30: Task 190 implementation-review follow-up fixed contradictory unavailable UI provider advertisements: provider normalization now treats `:psi.ui/available? false` with capabilities or available actions as provider-error semantics, with focused coverage and targeted lint green. Commit `79b5e7be`.
 - 2026-05-30: Task 190 implementation-review follow-up updated `create-nullable-extension-api` to support documented UI capability queries including `:psi.ui/diagnostic`, returning the nullable attached-console unsupported-make-visible map with nil diagnostic; added nullable API coverage and included extension-test-helpers tests in Kaocha config. Focused nullable/API tests and targeted lint passed.

@@ -247,6 +247,19 @@
              :psi.ui/actions [(assoc base-action extra-key "leaked-adapter-data")]}))
           (str "expected provider-error for extra action key: " (pr-str extra-key))))))
 
+(deftest provider-normalization-foreign-invocation-keys-test
+  ;; Tests that nested invocation maps reject unqualified and foreign keys rather
+  ;; than exposing adapter-local data through EQL.
+  (doseq [extra-key [:handler :foreign.ui/handler "frontend-object"]]
+    (is (provider-error?
+         (ui-capabilities/normalize-provider-result
+          (valid-provider-result
+           (assoc {:psi.ui.invocation/kind :emacs-command
+                   :psi.ui.invocation/command "psi-emacs-show-active"}
+                  extra-key
+                  "leaked-adapter-data"))))
+        (str "expected provider-error for extra invocation key: " (pr-str extra-key)))))
+
 (deftest provider-normalization-capability-action-coherence-test
   ;; Tests that make-visible capability/action mismatches fail closed.
   (is (provider-error?
