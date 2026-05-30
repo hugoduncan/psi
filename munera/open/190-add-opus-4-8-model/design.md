@@ -1,10 +1,14 @@
-# 190 — Add Claude Opus 4.8 + /speed command
+# 190 — Add Claude Opus 4.8 + /speed + /effort commands
 
 ## Goal
 
 1. Register `claude-opus-4-8` as a supported model in the psi model catalog.
 2. Add a `/speed` command (analogous to `/thinking`) that controls a per-session
    speed mode, propagated to providers that support it.
+3. Add an `/effort` command that directly controls the provider reasoning-effort
+   string, orthogonal to thinking on/off.
+4. Make `:xhigh` thinking level genuinely distinct from `:high` on all providers
+   that support it.
 
 ---
 
@@ -198,6 +202,149 @@ persists across sessions (same as thinking-level).
 - Footer displays `• fast` when speed mode is `:fast`.
 - Unit tests cover: command dispatch (all branches), Anthropic request shaping,
   OpenAI request shaping, session state mutation, resolver projection.
+- `bb test` green.
+
+---
+
+## Part 3 — `/effort` command and `:xhigh` differentiation
+
+### Background — current state
+
+The `thinking-level` abstraction (`off/minimal/low/medium/high/xhigh`) serves
+two roles simultaneously: it controls whether reasoning is enabled, and it
+controls how much computation the provider applies.  This conflation causes a
+gap:
+
+- **Anthropic extended thinking** (pre-4.7 models): `:xhigh` is already
+  distinct — `budget_tokens: 32000` vs `16000` for `:high`.
+- **Anthropic adaptive thinking** (Opus 4.7+): `output_config.effort` accepts
+  `"low"/"medium"/"high"`.  Currently `:xhigh` maps to `"high"` — identical
+  to `:high`.  No `"highest"` value exists in the current API.
+- **OpenAI** `reasoning_effort` accepts `"low"/"medium"/"high"`.  Same ceiling;
+  `:xhigh` maps to `"high"` today.
+
+The `/effort` command introduces a direct, provider-level effort override that
+is independent of the thinking on/off level.  It also lays the groundwork for
+`:xhigh` to become genuinely distinct when providers add higher effort tiers.
+
+### Effort override values
+
+| Value | Anthropic adaptive `output_config.effort` | OpenAI `reasoning_effort` |
+|---|---|---|
+| `:low` | `"low"` | `"low"` |
+| `:medium` | `"medium"` | `"medium"` |
+| `:high` | `"high"` | `"high"` |
+| `:xhigh` | `"highest"` (when supported; else `"high"` with warning) | `"high"` (API ceiling) |
+
+The effort override is **only applied when thinking is enabled** (i.e.
+`thinking-level` ≠ `:off`).  When thinking is off the effort parameter is
+irrelevant and is not sent.
+
+The effort override is separate from `thinking-level`: setting `/effort xhigh`
+does not change the thinking level; it overrides what effort value is sent for
+the current level.  When no effort override is set, the existing
+`thinking-level->effort` mapping applies unchanged (preserving backward
+compatibility).
+
+### Architecture — full stack
+
+#### 1. Session state (`components/session-state/`)
+
+Add `:effort-override` to `agent-session-schema`:
+```
+[:effort-override {:optional true} [:maybe [:enum :low :medium :high :xhigh]]]
+```
+`initial-session` defaults `:effort-override` to `nil` (use level-derived
+effort).
+
+#### 2. Dispatch handler (`components/agent-session/src/psi/agent_session/dispatch_handlers/session_mutations.clj`)
+
+New `:session/set-effort-override` handler:
+- Stores `:effort-override` on the session.
+- Emits optional persist effect for `:project` / `:user` scope.
+
+#### 3. Session settings (`components/agent-session/src/psi/agent_session/session_settings.clj`)
+
+Add `set-effort-override-in!`.
+
+#### 4. `session->request-options` (`components/agent-session/src/psi/agent_session/prompt_request.clj`)
+
+Propagate `:effort-override` from session data into `:turn/ai-options` when
+non-nil.
+
+#### 5. Anthropic provider (`components/ai/src/psi/ai/providers/anthropic.clj`)
+
+Rename the private `thinking-level->effort` table to
+`thinking-level->effort-default`.  Add `thinking-level->effort-xhigh` for
+the adaptive path:
+
+```
+thinking-level->effort-xhigh:
+  {:off nil :minimal "low" :low "low" :medium "medium" :high "high" :xhigh "highest"}
+```
+
+In `request-body` / `build-request`, resolve effort as:
+1. If `:effort-override` is present in options, use it directly mapped to the
+   provider string (`:xhigh` → `"highest"` for adaptive, `"high"` for extended).
+2. Otherwise fall back to the existing `thinking-level->effort-default` mapping.
+
+When `"highest"` is sent and the model does not yet support it (detectable via
+a 400 response), the provider error surface already handles this — no special
+retry logic is needed at design time.
+
+#### 6. OpenAI provider (`components/ai/src/psi/ai/providers/openai/reasoning.clj`)
+
+Update `reasoning-effort` to accept an optional `:effort-override` from
+options.  When present, map it: `:xhigh` → `"high"` (API ceiling); others
+pass through directly.  When absent, use the existing `thinking-level->effort`
+table.
+
+#### 7. `/effort` command (`components/agent-session/src/psi/agent_session/commands.clj`)
+
+New `dispatch-effort-command`:
+- No args → show current effort override: `"Current effort override: none"` or
+  `"Current effort override: xhigh"`.
+- One arg (`low`|`medium`|`high`|`xhigh`|`none`) → validate, call
+  `set-effort-override-in!`, confirm.  `none` clears the override (nil).
+- Unknown arg → error listing allowed values.
+
+Register in `prefixed-command-prefixes` and `format-help`.
+
+#### 8. Footer / status (`components/app-runtime/src/psi/app_runtime/footer.clj`)
+
+Add `:psi.agent-session/effort-override` to `footer-query`.  When an effort
+override is active and thinking is on, display `• effort:xhigh` (or the active
+value) appended to the thinking label, e.g. `thinking high • effort:xhigh`.
+
+#### 9. Resolvers (`components/agent-session/src/psi/agent_session/resolvers/session.clj`)
+
+Add `:psi.agent-session/effort-override` resolver.
+
+#### 10. Persistence (`components/shared-config/`)
+
+Add `effort-override` to project/user config schema.
+
+#### 11. `:xhigh` budget for extended thinking — no change needed
+
+`thinking-level->budget {:xhigh 32000}` already differentiates `:xhigh` from
+`:high` (16000) for extended-thinking models.  No change.
+
+### Acceptance criteria — Part 3
+
+- `/effort` with no args prints current override (`none` when unset).
+- `/effort xhigh` sets override; `/effort none` clears it.
+- `/effort unknown` returns error listing allowed values.
+- Anthropic adaptive `build-request`: when effort-override is `:xhigh`,
+  `output_config.effort` is `"highest"`; when `:high`, `"high"`; when nil,
+  falls back to level-derived value.
+- OpenAI `reasoning-effort`: when effort-override is `:xhigh`, returns `"high"`
+  (ceiling); when `:medium`, returns `"medium"`; when nil, falls back to
+  level-derived value.
+- Effort override is omitted from the request when thinking-level is `:off`.
+- Footer shows `• effort:xhigh` when override is active and thinking is on.
+- Unit tests cover: command dispatch (all branches), Anthropic request shaping
+  (override present / absent / xhigh), OpenAI request shaping (override present
+  / absent / xhigh ceiling), session state mutation, resolver projection.
 - `bb test` green.
 
 ---
