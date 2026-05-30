@@ -1027,3 +1027,18 @@ Verification:
 - Targeted lint: `clj-kondo --lint components/ai/src components/ai/test components/agent-session/src components/agent-session/test components/session-state/src components/shared-config/src components/shared-config/test components/app-runtime/src components/app-runtime/test` — no errors/warnings; existing info-level assertion-message notes only.
 - RPC test lint: `clj-kondo --lint components/rpc/test/psi/rpc_events_test.clj components/rpc/test/psi/rpc_test.clj` — clean.
 - Full verification: `bb test` — passed.
+
+## Follow-up implementation pass — 2026-05-30 — compaction replay post-history preservation
+
+Executed the newly added actionable implementation-review follow-up for compaction replay:
+
+- Changed `rebuild-messages-from-journal-entries` so mid-system preservation/coalescing is applied only to the kept pre-compaction segment recorded by the compaction boundary.
+- Post-compaction journal entries are now replayed after the preserved/normalized boundary messages without being passed through retained-suffix normalization, so later user/assistant history is not dropped.
+- Added replay coverage for pre-cut `:mid-system`, a compaction entry, and later post-compaction user/assistant history.
+- Marked the Slice 4 replay post-history follow-up step complete in `steps.md`.
+
+Verification:
+
+- `clj-paren-repair components/agent-session/src/psi/agent_session/compaction.clj components/agent-session/test/psi/agent_session/compaction_test.clj` — no changes needed.
+- `clojure -M:test --focus psi.agent-session.compaction-test` — 5 tests, 45 assertions, 0 failures.
+- `clj-kondo --lint components/agent-session/src/psi/agent_session/compaction.clj components/agent-session/test/psi/agent_session/compaction_test.clj` — clean.

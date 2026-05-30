@@ -273,4 +273,26 @@
           msgs (compaction/rebuild-messages-from-journal-entries [u1 mid u2 a2 comp])]
       (is (= ["user" "system"] (mapv :role msgs)))
       (is (= (system-message "Future-only replay instruction")
-             (select-keys (second msgs) [:role :content]))))))
+             (select-keys (second msgs) [:role :content])))))
+
+  (testing "preserves post-compaction history while replaying preserved mid-system instructions"
+    (let [u1   (persist/message-entry (user-message "u1"))
+          mid  (mid-system-entry "Future instructions survive")
+          u2   (persist/message-entry (user-message "u2"))
+          a2   (persist/message-entry (assistant-text-message "a2"))
+          comp (persist/compaction-entry
+                {:summary "Summary before u2"
+                 :first-kept-entry-id (:id u2)
+                 :tokens-before 123
+                 :details nil}
+                false)
+          u3   (persist/message-entry (user-message "u3"))
+          a3   (persist/message-entry (assistant-text-message "a3"))
+          msgs (compaction/rebuild-messages-from-journal-entries [u1 mid u2 a2 comp u3 a3])]
+      (is (= ["user" "system" "user" "assistant"] (mapv :role msgs)))
+      (is (= (system-message "Future instructions survive")
+             (select-keys (second msgs) [:role :content])))
+      (is (= (user-message "u3")
+             (select-keys (nth msgs 2) [:role :content])))
+      (is (= (assistant-text-message "a3")
+             (select-keys (nth msgs 3) [:role :content]))))))

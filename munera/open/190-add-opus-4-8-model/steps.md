@@ -90,7 +90,7 @@
 - [x] Add nullable extension-helper integration coverage for `inject-mid-system-message!`.
 - [x] Add compaction tests covering summary-boundary attachment, retained pending-user attachment, cut advancement over completed user/assistant exchanges, and boundary mid-system merge.
 - [x] Ensure compacted mid-system preservation survives journal replay/cold resume: pre-cut active `:mid-system` instructions must not be lost by `rebuild-messages-from-journal-entries` after a compaction entry.
-- [ ] Fix compaction journal replay so mid-system preservation does not drop post-compaction journal entries after the latest replayed assistant turn; add replay coverage with pre-cut `:mid-system`, a compaction entry, and later post-compaction user/assistant history.
+- [x] Fix compaction journal replay so mid-system preservation does not drop post-compaction journal entries after the latest replayed assistant turn; add replay coverage with pre-cut `:mid-system`, a compaction entry, and later post-compaction user/assistant history.
 
 ## Slice 5 — Integration and coherence
 

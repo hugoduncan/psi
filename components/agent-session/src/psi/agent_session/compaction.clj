@@ -591,6 +591,7 @@
             after (subvec entries (inc compaction-idx))
             kept-msgs (rebuild-kept-entry-messages-with-mid-system-preservation
                        pre-cut
-                       (vec (concat kept-before after))
-                       summary-msg)]
-        (into (if summary-msg [summary-msg] []) kept-msgs)))))
+                       (vec kept-before)
+                       summary-msg)
+            after-msgs (->> after (keep entry->message) vec)]
+        (into (if summary-msg [summary-msg] []) (concat kept-msgs after-msgs))))))
