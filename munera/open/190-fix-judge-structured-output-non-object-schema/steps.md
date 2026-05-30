@@ -19,8 +19,10 @@
 
 - [ ] Add or update an Anthropic structured-output result test asserting raw payload `"\"DONE\""` yields `:payload "DONE"` and no `:parse-error? true`.
 - [ ] Add or update a structured-output envelope test asserting that the Anthropic string payload validates against `[:enum "REPEAT" "DONE"]` with `:status :valid` and `:value "DONE"`.
-- [ ] Add or update OpenAI chat-completions provider-native tests for string, number, boolean, array, and `null` payload extraction, with `:raw-payload` asserted as the raw JSON response text.
-- [ ] Add or update OpenAI chat-completions prompted-JSON tests for string, number, boolean, array, and `null` payload extraction, with `:raw-payload` asserted as the raw JSON response text.
+- [ ] Add or update OpenAI chat-completions provider-native tests for string, number, boolean, array, object, and `null` payload extraction, with `:raw-payload` asserted as the raw JSON response text.
+- [ ] Ensure OpenAI chat-completions provider-native regression coverage exercises both streaming and non-streaming structured-output result paths, or records why an existing public seam covers both paths equivalently.
+- [ ] Add or update OpenAI chat-completions prompted-JSON tests for string, number, boolean, array, object, and `null` payload extraction, with `:raw-payload` asserted as the raw JSON response text.
+- [ ] Ensure OpenAI chat-completions prompted-JSON regression coverage exercises both streaming and non-streaming structured-output result paths, or records why an existing public seam covers both paths equivalently.
 - [ ] In OpenAI `null` tests, assert `(contains? structured-output :payload)` and `(nil? (:payload structured-output))`.
 - [ ] Add or update a Codex structured-output result test asserting JSON `null` yields a present `:payload nil` and no parse error.
 - [ ] Add or update a prompted-JSON instruction test asserting the text says “JSON value” and does not require a top-level JSON object.
