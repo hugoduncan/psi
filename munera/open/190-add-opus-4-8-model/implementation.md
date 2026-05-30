@@ -641,3 +641,9 @@ Decision recorded:
 ## Design ambiguity review pass — 2026-05-30 (plan/steps independent verification)
 
 No new actionable ambiguities found. Re-read `plan.md`, `steps.md`, `design-steps.md`, and the latest `implementation.md` notes, then spot-checked referenced code surfaces for Anthropic request validation, prompt-request journal projection/current-user replacement, and compaction rebuild. The plan/steps now present one unambiguous five-slice execution structure with documentation/changelog owned by Slice 5; existing ambiguity follow-ups in `design-steps.md` are checked and were not duplicated.
+
+---
+
+## Ambiguity follow-up execution — 2026-05-30 (post-plan verification no-op)
+
+Read `design-steps.md` for newly added unchecked ambiguity follow-up items after the preceding ambiguity-review pass. No unchecked ambiguity items were present; all ambiguity follow-ups are already marked complete. No `design.md` changes were required. `plan.md` and `steps.md` were already aligned with the current five-slice execution structure, so they were not changed.
