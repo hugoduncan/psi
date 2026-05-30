@@ -147,10 +147,13 @@
           :done                     (turn-sc/send-event! turn-ctx :turn/done
                                                          {:reason (:reason event)
                                                           :usage  (:usage event)})
-          :error                    (turn-sc/send-event! turn-ctx :turn/error
-                                                         (cond-> {:error-message (:error-message event)}
-                                                           (:http-status event) (assoc :http-status (:http-status event))
-                                                           (:headers event) (assoc :headers (:headers event))))
+          :error                    (let [headers (or (:provider-error/headers event)
+                                                      (:headers event))]
+                                      (turn-sc/send-event! turn-ctx :turn/error
+                                                           (cond-> {:error-message (:error-message event)}
+                                                             (:http-status event) (assoc :http-status (:http-status event))
+                                                             headers (assoc :headers headers
+                                                                            :provider-error/headers headers))))
           nil)))))
 
 (defn await-assistant-message!

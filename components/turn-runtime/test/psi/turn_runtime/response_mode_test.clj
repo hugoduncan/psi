@@ -595,6 +595,46 @@
         (is (= {:limit 100 :remaining 0 :reset-after-ms 3000 :reset-at 4000}
                (:rate-limit scheduled)))))))
 
+(deftest execute-prepared-request-streaming-error-event-provider-headers-drive-retry-test
+  ;; Background streaming :error events may already carry normalized provider
+  ;; headers rather than raw :headers; the turn error path must preserve them so
+  ;; retry metadata can honor provider Retry-After / rate-limit details.
+  (let [[ctx0 session-id] (create-session-context {:persist? false
+                                                   :provider-retry-sleep? false
+                                                   :config {:auto-retry-base-delay-ms 10
+                                                            :auto-retry-max-retries 1}})
+        ctx              (assoc ctx0 :now-fn #(java.time.Instant/ofEpochMilli 1000))
+        prepared         (prepared-request ctx session-id)
+        attempts*        (atom 0)]
+    (with-redefs [psi.turn-runtime.core/do-stream!
+                  (fn [_ai-ctx _conv _model _opts consume-fn]
+                    (if (= 1 (swap! attempts* inc))
+                      (do
+                        (consume-fn {:type :start})
+                        (consume-fn {:type :error
+                                     :error-message "rate limited"
+                                     :http-status 429
+                                     :provider-error/headers {"Retry-After" "4"
+                                                              "RateLimit-Limit" "50"
+                                                              "RateLimit-Remaining" "0"
+                                                              "RateLimit-Reset" "5"}}))
+                      (do
+                        (consume-fn {:type :start})
+                        (consume-fn {:type :text-delta :content-index 0 :delta "recovered"})
+                        (consume-fn {:type :done :reason :stop}))))]
+      (let [result    (turn-runtime/execute-prepared-request!
+                       {:provider-registry (atom {})} ctx session-id prepared nil)
+            scheduled (first (filter #(= "provider_retry_scheduled" (:type %))
+                                     (provider-events ctx session-id)))]
+        (is (= 2 @attempts*))
+        (is (= :stop (:execution-result/stop-reason result)))
+        (is (= [{:type :text :text "recovered"}]
+               (get-in result [:execution-result/assistant-message :content])))
+        (is (= 4000 (:delay-ms scheduled)))
+        (is (= :retry-after (:delay-source scheduled)))
+        (is (= {:limit 50 :remaining 0 :reset-after-ms 5000 :reset-at 6000}
+               (:rate-limit scheduled)))))))
+
 (deftest execute-prepared-request-production-backoff-observes-active-turn-abort-test
   ;; Production retry sleep polls the active turn abort state instead of one
   ;; uninterruptible Thread/sleep.

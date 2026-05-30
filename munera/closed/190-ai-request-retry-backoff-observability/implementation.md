@@ -266,3 +266,10 @@ Verification:
 - `clj-kondo --lint components/ai/src/psi/ai/streaming.clj components/ai/test/psi/ai/core_test.clj components/agent-session/test/psi/agent_session/prompt_lifecycle_telemetry_test.clj` passed with no errors or warnings.
 
 2026-05-30 — Implementation review: found one new actionable gap after re-reading the async streaming metadata follow-up. `psi.ai.streaming/exception->error-event` now preserves both `:headers` and `:provider-error/headers`, but `psi.turn-runtime.core/make-provider-event-consumer` forwards only `:headers` from streaming `:error` events into the turn statechart. A normal background streaming provider exception whose ex-data contains only normalized `:provider-error/headers` can therefore still lose retry-header metadata before provider-boundary retry calculates delay. Add focused coverage for that shape and forward `:provider-error/headers` as a header source in the turn-runtime streaming error consumer.
+
+2026-05-30 — Implementation-review follow-up complete: added focused coverage for background streaming `:error` events that carry only normalized `:provider-error/headers`, proving `Retry-After` and rate-limit metadata drive provider-boundary retry scheduling. Updated `turn-runtime/make-provider-event-consumer` to forward normalized provider headers into `:turn/error`, and updated the turn accumulator error path to preserve `:provider-error/headers` even when raw `:headers` is absent. Marked the follow-up step done.
+
+Verification:
+- `clojure -M:test --focus psi.turn-runtime.response-mode-test/execute-prepared-request-streaming-error-event-provider-headers-drive-retry-test` passed (`1 tests, 6 assertions`).
+- `clojure -M:test --focus psi.turn-runtime.response-mode-test` passed (`18 tests, 123 assertions`).
+- `clj-kondo --lint components/turn-runtime/src components/turn-runtime/test` passed with no errors or warnings.
