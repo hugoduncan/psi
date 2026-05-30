@@ -426,3 +426,9 @@ No new actionable inconsistencies found. Re-read `design.md` against referenced 
 ## Design ambiguity review pass — 2026-05-30 (latest independent verification)
 
 No new actionable ambiguities found. Re-read `design.md` and checked the referenced shared-config resolution defaults/accessors, extension mutation/runtime EQL bridge, prompt request journal projection/current-user replacement, provider request schema/request shaping, OpenAI Codex reasoning path, and existing `design-steps.md`; all ambiguity concerns identified in this pass are already resolved or already captured in checked follow-up items. No duplicate `design-steps.md` items were added.
+
+---
+
+## Ambiguity follow-up execution — 2026-05-30 (post-review pass)
+
+Read `design-steps.md` for newly added unchecked ambiguity follow-up items after the preceding ambiguity-review pass. No unchecked ambiguity items were present; all ambiguity follow-ups are already marked complete. No `design.md` changes were required. `plan.md` and `steps.md` were not touched.
