@@ -226,3 +226,7 @@ No new actionable inconsistency feedback after re-reading `design.md`, `design-d
 ## 2026-05-30 inconsistency follow-up execution
 
 No newly added unchecked inconsistency follow-up items were present in `design-steps.md`; all inconsistency design steps remain complete. No `design.md` change was needed, no design step was left blocked, and `plan.md` / `steps.md` were not touched.
+
+## 2026-05-30 design ambiguity review
+
+No new actionable ambiguity feedback after this independent pass over `design.md`, `design-decisions.md`, `resolved-design-questions.md`, extension docs, and current UI/query/runtime seams. The design already specifies the runtime-scoped provider/query contract, active-provider lifetime, unavailable/error normalization, action descriptor validation, invocation/request boundaries, UI-type compatibility, documentation expectations, and frontend mode classification sufficiently for planning.
