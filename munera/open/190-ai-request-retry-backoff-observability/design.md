@@ -86,6 +86,21 @@ For exhausted retries:
 - the final surface should indicate that retry attempts were exhausted;
 - telemetry/logs/metrics should show all attempts and scheduled backoffs.
 
+### Provider retry header handling and delay source
+
+Provider-boundary retry must preserve the existing retry-header semantics instead of using exponential backoff unconditionally. When a provider/request failure includes retry-relevant headers, the retry coordinator must carry those headers from the streaming or non-streaming failure value into the shared retry metadata calculation before scheduling the delay.
+
+Header handling requirements:
+
+- `Retry-After` / `X-Retry-After` is authoritative when present and parseable. It may be seconds or an RFC-1123 timestamp, following the existing shared retry metadata helper semantics.
+- Rate-limit reset headers such as `RateLimit-Reset` / `X-RateLimit-Reset`, plus available limit/remaining headers, should be retained in retry metadata for display and introspection when present.
+- If `Retry-After` is present and parseable, scheduled delay metadata must use that value and set `:delay-source :retry-after`.
+- If `Retry-After` is absent or invalid, scheduling falls back to the configured exponential backoff delay and sets `:delay-source :exponential-backoff`.
+- Header-derived metadata must be included in the active retry projection, `provider_retry_scheduled` telemetry, and EQL retry projections: delay ms, delay source, resume-at, and rate-limit details when available.
+- Streaming and non-streaming provider failure paths must expose headers in the same logical error shape, for example under the existing `:provider-error/headers` field, so the retry boundary does not need provider-specific header parsing.
+
+Invalid or unparseable retry headers must not make a retryable failure terminal by themselves. They only cause delay calculation to fall back to configured exponential backoff while preserving the original error classification.
+
 ### Visibility and introspection
 
 Retry behavior must be inspectable without source-code debugging. Logs/metrics/transcript output are useful, but `psi-tool` / EQL introspection is a required surface.
