@@ -1181,3 +1181,9 @@ Read `design-steps.md` for unchecked ambiguity follow-up items added by the prec
 ## Design inconsistency review pass — 2026-05-30 (plan/steps post-effort-coverage verification)
 
 No new actionable inconsistencies found. Re-read `plan.md`, `steps.md`, `design-steps.md`, and latest `implementation.md` notes, then checked the task state against representative referenced surfaces for Opus 4.8, `/speed`, `/effort`, mid-system injection, docs/changelog ownership, verification evidence, and follow-up completion. `plan.md` and `steps.md` remain aligned on five vertical slices, Slice 5 owns user-facing docs/changelog plus broad verification, all `steps.md` and `design-steps.md` items are checked, and no duplicate follow-up item was added.
+
+---
+
+## Test review pass — 2026-05-30 (final independent verification)
+
+No new actionable test feedback found. Re-read `design.md`, `plan.md`, `steps.md`, `design-steps.md`, and `implementation.md`; checked the referenced speed/effort command persistence tests, provider effort request-shaping tests, mid-system capability/dispatch/persistence tests, prompt-request/conversation/provider transform tests, compaction replay tests, and docs/changelog-owned acceptance surfaces. Focused verification passed: `clojure -M:test --focus psi.agent-session.commands-speed-effort-test --focus psi.agent-session.model-dispatch-test --focus psi.agent-session.compaction-test --focus psi.ai.providers.anthropic-test --focus psi.ai.providers.openai-test` — 65 tests, 495 assertions, 0 failures. No duplicate `steps.md` follow-ups added.
