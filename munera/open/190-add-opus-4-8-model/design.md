@@ -263,6 +263,24 @@ Startup application rules:
 - Explicit persisted `:fast` → store/apply `:speed-mode :fast` for the new
   session.
 
+#### 13. Session resume — speed mode is session-transient
+
+Speed mode is **not** restored on session resume.  The existing resume path
+(`session_lifecycle.clj/resume-session-in!`) restores model and thinking-level
+from journal entries (`:kind :model`, `:kind :thinking-level`), but this task
+does not add a `:speed-mode` journal entry kind.  When a session is resumed from
+disk, speed mode starts at `nil` (provider default / `:normal` display).
+
+When resume occurs from a live source session (hot switch), the source session's
+in-memory `:speed-mode` carries over via `source-sd` fallback, but this is
+incidental — a cold resume from a persisted journal file will not restore speed
+mode.
+
+This is intentional for this slice: speed mode is a lightweight override that is
+easy to re-set, and persisted project/user config will be applied on *new*
+session creation (step 12) but not on resume.  A future task may add
+`:speed-mode` journal entries if resume fidelity becomes important.
+
 ### Acceptance criteria — Part 2
 
 - `(session/query-in ctx sid [:psi.agent-session/speed-mode])` returns `:normal`
@@ -285,6 +303,8 @@ Startup application rules:
 - OpenAI chat-completions `build-request` includes `service_tier: "flex"` iff
   speed-mode is `:fast`; omits it otherwise.
 - Footer displays `• fast` when speed mode is `:fast`.
+- Speed mode is session-transient: not restored on cold session resume from disk;
+  persisted project/user config is applied only on new session creation.
 - Unit tests cover: command dispatch (all branches), Anthropic request shaping,
   OpenAI request shaping, session state mutation, resolver projection.
 - `bb test` green.
@@ -523,6 +543,14 @@ session-default construction path) must include the accessor result in
 `thinking-level->budget {:xhigh 32000}` already differentiates `:xhigh` from
 `:high` (16000) for extended-thinking models.  No change.
 
+#### 12. Session resume — effort override is session-transient
+
+Effort override is **not** restored on session resume, for the same reasons as
+speed mode (Part 2 step 13).  No `:effort-override` journal entry kind is added
+in this task.  On cold resume, effort override starts at `nil` (level-derived
+defaults).  Persisted project/user config is applied only on new session creation
+(step 10a), not on resume.
+
 ### Acceptance criteria — Part 3
 
 - `/effort` with no args prints current override (`none` when unset).
@@ -546,6 +574,8 @@ session-default construction path) must include the accessor result in
   level-derived value.
 - Effort override is omitted from the request when thinking-level is `:off` for all supported providers.
 - Footer shows `• effort:xhigh` when override is active and thinking is on.
+- Effort override is session-transient: not restored on cold session resume from
+  disk; persisted project/user config is applied only on new session creation.
 - Unit tests cover: command dispatch (all branches), Anthropic request shaping
   (override present / absent / xhigh), OpenAI chat-completions and Codex/responses
   request shaping (override present / absent / xhigh ceiling), session state

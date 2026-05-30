@@ -400,3 +400,17 @@ Completed the two newly added inconsistency follow-up items in `design-steps.md`
 **New actionable ambiguity found:**
 
 1. **Speed/effort not restored on session resume** — The existing session resume path (`session_lifecycle.clj/resume-session-in!`) restores model and thinking-level from journal entries (`:kind :model` and `:kind :thinking-level`). The design adds `:speed-mode` and `:effort-override` to session state and specifies startup config application for *newly created root sessions* (Part 2 step 12, Part 3 step 10a), but does not add journal entry kinds for speed/effort changes, nor does it specify how resume restores them. If a user sets `/speed fast project` and then resumes a session, the resume path reads journal entries (which lack speed/effort kinds) and falls back to the source session's in-memory state — not the persisted project config. Decide whether (a) speed/effort changes should be recorded as journal entries (`:speed-mode` and `:effort-override` kinds) so resume restores them like thinking-level, (b) the resume path should re-read shared-config for speed/effort, or (c) speed/effort are intentionally session-transient and lost on resume (with explicit documentation of that limitation).
+
+---
+
+## Ambiguity follow-up — 2026-05-30 (session resume)
+
+Completed the newly added ambiguity follow-up item in `design-steps.md` by refining `design.md`.
+
+Decision: option (c) — speed/effort are intentionally session-transient and not restored on cold session resume.
+
+- No `:speed-mode` or `:effort-override` journal entry kinds are added in this task. Resume from a persisted journal file starts with nil speed/effort (provider defaults).
+- Hot resume from a live source session incidentally carries over in-memory values via `source-sd` fallback, but this is not a guaranteed contract.
+- Persisted project/user config is applied only on new session creation (Part 2 step 12, Part 3 step 10a), not on resume.
+- Added Part 2 step 13 and Part 3 step 12 documenting the session-transient constraint.
+- Added acceptance criteria entries for both Part 2 and Part 3 stating speed/effort are not restored on cold resume.
