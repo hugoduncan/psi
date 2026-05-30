@@ -269,9 +269,16 @@ Normalized structured output spec shape:
  :on-invalid? invalid-policy}
 ```
 
-The first implementation's minimum invalid policy is fail-fast. If `:on-invalid`
-is omitted, runtime treats it as `{:action :fail-fast}`. Bounded retry/repair may
-be added only when explicit in `:on-invalid` and proven by tests.
+Invalid structured-output handling depends on the structured output source. For
+session-step structured outputs, the first implementation's minimum invalid
+policy is fail-fast: if `:on-invalid` is omitted, runtime treats it as
+`{:action :fail-fast}`. For LLM judge structured outputs, invalid generated
+structured output is retried by default up to the built-in judge retry limit using
+judge retry feedback; each retry preserves the original structured-output
+options/schema. Unsupported structured output still fails immediately with
+`:unsupported-structured-output` rather than retrying. Explicit `:on-invalid`
+retry/repair policy beyond this built-in judge retry behavior may be added only
+when proven by tests.
 
 Cardinality is constrained in the normalized IR: a session step must not contain
 more than one `:source :session/structured-output` entry, and an LLM judge must
