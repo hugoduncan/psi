@@ -49,7 +49,7 @@ Bootstrapped on 2026-04-02.
   - task 169 is complete and closed: model/provider structured-output capability surface implemented
   - task 171 is complete and closed: Anthropic JSON Schema native output implemented and live-verified
   - task 170 remains the active adjacent workflow adoption slice; latest follow-ups clarified unsupported/fallback-forbidden behavior, top-level `:structured-output` turn-result seams, and success-path envelope propagation
-- Tasks 188, 151, 145, 140, 139, 138, 136, 134, 130, 128, 125 also complete and closed
+- Tasks 194, 188, 151, 145, 140, 139, 138, 136, 134, 130, 128, 125 also complete and closed
 
 ## Test health
 
@@ -68,7 +68,7 @@ Bootstrapped on 2026-04-02.
 
 ## Suggested next step
 - For task 191, structured-output non-object schema implementation/review is complete; PR is open for merge.
-- New task `190-core-queryable-ui` captures making UI capabilities/actions queryable from core for extensions, including discoverable "make UI visible" action descriptors.
+- Task `194-core-queryable-ui` is complete and closed; it made UI capabilities/actions queryable from core for extensions, including discoverable "make UI visible" action descriptors.
 - Registry unification arc: use task `164-registry-semantics-unification-audit` plus completed outcomes through `177` to choose the next cleanup target.
 - Likely next registry cleanup candidates:
   - close or move any remaining Munera tasks whose implementation/review state is already complete
