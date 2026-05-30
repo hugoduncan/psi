@@ -121,3 +121,7 @@ Found one new actionable ambiguity after re-reading `design.md`, `design-decisio
 ## 2026-05-30 ambiguity follow-up
 
 Completed the newly added per-kind invocation schema follow-up across `design.md`, `design-decisions.md`, and `resolved-design-questions.md`: `:emacs-command` requires a non-empty command string, `:ui-event` requires a namespaced event keyword plus optional serialisable payload map, `:bash-command` requires a non-empty argv vector and forbids shell strings, and `:mutation` requires a qualified mutation symbol plus serialisable params. Provider-side malformed invocation data maps to provider-error unavailable semantics, while malformed/stale submitted request data is rejected at request time.
+
+## 2026-05-30 design inconsistency review
+
+Found one new actionable inconsistency after re-reading `design.md` against its invocation/request schema: the active-session identity section says a runtime-global advertised action may carry `:psi.ui.request/session-id nil`, but descriptors/invocation data use `:psi.ui.invocation/session-id` and `:psi.ui.request/session-id` exists only on the later request payload. This leaves the descriptor/request boundary with two possible places for session correlation.
