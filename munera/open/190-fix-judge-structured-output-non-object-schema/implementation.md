@@ -13,3 +13,5 @@
 2026-05-30 — Ambiguity follow-up execution: re-read `design-steps.md`; there are no newly added unchecked ambiguity follow-up items to execute, so `design.md` needed no change and no blocking design-step remains.
 
 2026-05-30 — Design inconsistency review: found one new actionable inconsistency: the design's enum-schema examples/acceptance use keyword enum values (`[:enum :REPEAT :DONE]` and expected `:DONE`), while the referenced reusable judge-routing schema/tests use string enum values (`[:enum "REPEAT" "DONE"]` and expected `"DONE"`).
+
+2026-05-30 — Inconsistency follow-up: reconciled the non-object judge enum value type with referenced runtime schema/tests. `design.md` now names the judge routing schema as `[:enum "REPEAT" "DONE"]` and expects `:value "DONE"`, matching `psi.workflow-runtime.structured-output-schemas/judge-routing-result-schema` and existing tests. Marked the design-step complete.
