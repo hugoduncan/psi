@@ -58,10 +58,10 @@
 
 - [x] Record the final `:psi.ui/request-action` event/submission contract in `implementation.md`, including payload keys and result statuses.
 - [x] Decide whether the constrained side-effecting request helper is small enough for this task and record the decision in `implementation.md`.
-- [ ] If implemented, add request-time validation for unknown action ids, unavailable descriptors, malformed invocation data, unsupported invocation kinds, stale correlation, and current-provider mismatch.
-- [ ] If implemented, add the core-owned event/subscription path for `:psi.ui/request-action` without routing extensions through generic manifest `allowed-events` dispatch.
-- [ ] If implemented, add Emacs adapter handling that turns the declarative `:emacs-command` invocation for `psi-emacs-show-active` into the Emacs-side command call.
-- [ ] If implemented, add acknowledgement/result data for accepted, completed, rejected, unsupported, failed, and timeout outcomes.
+- [x] If implemented, add request-time validation for unknown action ids, unavailable descriptors, malformed invocation data, unsupported invocation kinds, stale correlation, and current-provider mismatch. Not applicable in this task because invocation helper was split to follow-up 191.
+- [x] If implemented, add the core-owned event/subscription path for `:psi.ui/request-action` without routing extensions through generic manifest `allowed-events` dispatch. Not applicable in this task because invocation helper was split to follow-up 191.
+- [x] If implemented, add Emacs adapter handling that turns the declarative `:emacs-command` invocation for `psi-emacs-show-active` into the Emacs-side command call. Not applicable in this task because invocation helper was split to follow-up 191.
+- [x] If implemented, add acknowledgement/result data for accepted, completed, rejected, unsupported, failed, and timeout outcomes. Not applicable in this task because invocation helper was split to follow-up 191.
 - [x] If not implemented, create a follow-up Munera task for permission-aware side-effecting UI action invocation.
 
 ## Slice 7 — Tests
@@ -74,14 +74,14 @@
 - [x] Add TUI tests proving make-visible is omitted unless a real safe reveal mechanism is present.
 - [x] Add console tests proving attached console without visibility mechanism is available but unsupported for make-visible.
 - [x] Add regression tests proving existing UI contribution snapshot/query behaviour and legacy UI-type surfaces still pass.
-- [ ] If invocation helper is implemented, add request validation and result-shape tests.
+- [x] If invocation helper is implemented, add request validation and result-shape tests. Not applicable in this task because invocation helper was split to follow-up 191.
 
 ## Slice 8 — Documentation and verification
 
 - [x] Re-verify `doc/extensions.md` after implementation and update only for implementation-time drift from the already-completed design-doc alignment of capability/action querying guidance and make-visible descriptor semantics.
 - [x] Re-verify `doc/extension-api.md` after implementation and update only for implementation-time drift from the already-completed design-doc alignment of the `:psi.ui/...` attrs, descriptor fields, unavailable semantics, and compatibility-only role of UI-type.
 - [x] Re-verify `doc/architecture.md` after implementation and update only for implementation-time drift from the already-completed design-doc alignment that qualifies UI-type branching guidance in favour of capability/action querying.
-- [ ] Update README only if implementation adds or changes an extension-facing pointer that needs to mention the new queryable UI surface.
+- [x] Update README only if implementation adds or changes an extension-facing pointer that needs to mention the new queryable UI surface. Not needed; extension-facing guidance lives in `doc/extensions.md` and `doc/extension-api.md` for this slice.
 - [x] Append implementation decisions, side-effecting invocation status, and any follow-up task reference to `implementation.md`.
 - [x] Run focused tests for affected resolver/runtime/frontend namespaces.
 - [x] Run targeted lint for changed Clojure and Emacs Lisp files.

@@ -431,3 +431,7 @@ Ran full project verification after the Emacs RPC provider lifecycle slice touch
 Verification:
 
 - `bb test` — all tests passed.
+
+## 2026-05-30 checklist closure pass
+
+Closed the remaining conditional checklist items after confirming side-effecting invocation stayed out of this task and is owned by follow-up `191-ui-action-invocation`. No README update is needed for this slice because the extension-facing queryable UI guidance is already in `doc/extensions.md` and `doc/extension-api.md`; README does not add a more specific extension-authoring pointer for this surface.
