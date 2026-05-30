@@ -59,3 +59,8 @@
 - [x] Run `bb test`.
 - [x] Update `implementation.md` with notable decisions, verification commands, and results.
 - [x] Re-read `design.md`, `plan.md`, and `steps.md` to ensure the implementation plan still matches the stable design.
+
+
+## Implementation review follow-ups
+
+- [ ] Add direct OpenAI chat-completions streaming structured-output regression coverage for prompted-JSON and non-object/null payloads, or refactor streaming/non-streaming result construction through a shared helper so the existing payload matrix truly covers both paths.
