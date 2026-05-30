@@ -67,6 +67,26 @@
     (= q [:psi.agent-session/ui-type])
     {:psi.agent-session/ui-type (or ui-type :console)}
 
+    ;; Runtime UI capabilities
+    (= q [:psi.ui/type
+          :psi.ui/available?
+          :psi.ui/capabilities
+          :psi.ui/actions
+          :psi.ui/make-visible-action])
+    (let [ui-type* (or ui-type :console)]
+      {:psi.ui/type ui-type*
+       :psi.ui/available? true
+       :psi.ui/capabilities []
+       :psi.ui/actions []
+       :psi.ui/make-visible-action
+       {:psi.ui.action/id :psi.ui.action/make-visible
+        :psi.ui.action/capability :psi.ui.capability/make-visible
+        :psi.ui.action/label "Show Psi UI"
+        :psi.ui.action/description "Bring the active Psi UI to the foreground."
+        :psi.ui.action/available? false
+        :psi.ui.action/unavailable-reason :psi.ui.unavailable.reason/unsupported-capability
+        :psi.ui.action/unavailable-message "The attached UI does not support making itself visible."}})
+
     ;; Extension workflows
     (and (vector? q)
          (some (fn [x]

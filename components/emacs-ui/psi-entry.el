@@ -212,6 +212,33 @@ With PREFIX, create and switch to a fresh dedicated buffer name."
     (psi-emacs--focus-input-area buffer window)
     buffer))
 
+(defun psi-emacs--active-buffer ()
+  "Return the active live Psi buffer, preferring the current buffer."
+  (cond
+   ((and psi-emacs--state (derived-mode-p 'psi-emacs-mode))
+    (current-buffer))
+   ((hash-table-p psi-emacs--state-by-buffer)
+    (catch 'buffer
+      (maphash (lambda (buffer state)
+                 (when (and (buffer-live-p buffer) state)
+                   (throw 'buffer buffer)))
+               psi-emacs--state-by-buffer)
+      nil))))
+
+;;;###autoload (autoload 'psi-emacs-show-active "psi" "Show the active Psi UI buffer." t)
+(defun psi-emacs-show-active ()
+  "Bring the active Psi buffer to the foreground and focus its prompt."
+  (interactive)
+  (let ((buffer (or (psi-emacs--active-buffer)
+                    (user-error "No active Psi buffer"))))
+    (let ((window (pop-to-buffer buffer)))
+      (when (window-live-p window)
+        (select-window window)
+        (when (display-graphic-p)
+          (select-frame-set-input-focus (window-frame window))))
+      (psi-emacs--focus-input-area buffer window)
+      buffer)))
+
 ;;;###autoload (autoload 'psi-emacs-move-point-to-prompt-end "psi" "Move point to the current psi prompt entry end." t)
 (defun psi-emacs-move-point-to-prompt-end ()
   "Move point to the end of the current psi prompt entry area."

@@ -22,6 +22,7 @@
    [psi.agent-session.resolvers :as resolvers]
    [psi.agent-session.services :as services]
    [psi.agent-session.scheduler-time :as scheduler-time]
+   [psi.agent-session.ui-capabilities :as ui-capabilities]
    [psi.session-state.model :as session]
    [psi.session-state.state :as ss]
    [psi.agent-session.statechart :as sc]
@@ -290,6 +291,11 @@
                      :tool-batch-executor tool-batch-executor
                      :extension-run-fn-atom (atom nil)
                      :background-job-ui-refresh-fn (atom nil)
+                     :ui-capability-provider* (atom (when-let [ui-type (:ui-type resolved-defaults)]
+                                                      (case ui-type
+                                                        :emacs ui-capabilities/emacs-make-visible-provider
+                                                        (:tui :console) (ui-capabilities/unsupported-attached-provider ui-type)
+                                                        nil)))
                      :scheduler-timers* (atom {})
                      :scheduler-time-source (or scheduler-time-source
                                                 (scheduler-time/system-time-source))

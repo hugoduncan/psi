@@ -370,3 +370,24 @@ No new actionable inconsistency feedback after re-reading `plan.md`, `steps.md`,
 ## 2026-05-30 requested inconsistency follow-up execution
 
 No newly added unchecked inconsistency follow-up items were present in `design-steps.md` after the preceding inconsistency-review pass (`9cc33cc0`); all design follow-up steps are already complete. No design step was completed or blocked in this pass, and `plan.md` / `steps.md` required no updates.
+
+## 2026-05-30 implementation pass
+
+Implemented the queryability-first slice:
+
+- Added `psi.agent-session.ui-capabilities` as the core-owned pure data model/normalization boundary for `:psi.ui/...` capability/action attrs.
+- Added provider slot `:ui-capability-provider*` to agent-session context with install/clear helpers. Resolvers dereference it at query time, so adapters can replace it after ctx creation without storing advertised capabilities/actions in root state.
+- Added a dedicated `ui-capabilities-resolver` separate from the existing extension UI contribution snapshot resolver. It exposes `:psi.ui/type`, `:psi.ui/available?`, `:psi.ui/capabilities`, `:psi.ui/actions`, `:psi.ui/make-visible-action`, and `:psi.ui/diagnostic` from only `:psi/agent-session-ctx`.
+- Added normalization/validation for available-only `:psi.ui/actions`, stable unavailable make-visible descriptors, provider-error diagnostics, invocation kinds `:emacs-command`, `:ui-event`, `:bash-command`, and `:mutation`, duplicate action ids, and make-visible capability/action coherence.
+- Wired default runtime providers by `ui-type`: Emacs advertises `:psi.ui.capability/make-visible` with `{:psi.ui.invocation/kind :emacs-command :psi.ui.invocation/command "psi-emacs-show-active"}`; TUI and console are attached-but-unsupported unless a future provider installs real reveal metadata; missing provider remains headless/no-provider.
+- Added interactive Emacs command `psi-emacs-show-active`, which locates an active Psi buffer, `pop-to-buffer`s it, selects/focuses its window/frame, and focuses the prompt.
+- Updated nullable extension API query fixture so extension tests can query the new capability/action attrs without mocks.
+- Added `CHANGELOG.md` entry for the extension-visible query surface.
+
+Side-effecting invocation was not implemented in this slice. The final request contract remains the one in `design.md` (`:psi.ui/request-action` with `:psi.ui.request/...` and `:psi.ui.result/...` keys), and follow-up task `191-ui-action-invocation` now owns permission-aware/constrained descriptor submission and adapter execution.
+
+Verification:
+
+- `clojure -M:test --focus psi.agent-session.ui-capabilities-test --focus psi.agent-session.graph-surface-test` — 27 tests, 2332 assertions, 0 failures.
+- `clj-kondo --lint components/agent-session/src/psi/agent_session/ui_capabilities.clj components/agent-session/src/psi/agent_session/context.clj components/agent-session/src/psi/agent_session/resolvers/extensions.clj components/extension-test-helpers/src/psi/extension_test_helpers/nullable_api.clj components/agent-session/test/psi/agent_session/ui_capabilities_test.clj components/agent-session/test/psi/agent_session/graph_surface_test.clj` — clean.
+- `bb emacs:byte-compile` — clean.

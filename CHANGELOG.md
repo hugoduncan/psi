@@ -12,6 +12,7 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 - New `/speed` command and persisted `:speed-mode` config select a provider throughput tier (`:fast` maps to Anthropic `speed: "fast"` and OpenAI chat-completions `service_tier: "flex"`).
 - New `/effort` command and persisted `:effort-override` config control provider reasoning effort independently of `/thinking`; Anthropic adaptive `:xhigh` now sends `"highest"` while OpenAI transports cap to provider-supported `"high"`.
 - Extensions can inject mid-conversation system instructions through the `:inject-mid-system-message` extension API helper / `psi.extension/inject-mid-system-message`, gated by the queryable `:psi.agent-session/model-supports-mid-system-messages` capability.
+- Extensions can now query runtime UI capability/action attrs under `:psi.ui/...`, including a discoverable make-visible action descriptor for Emacs and explicit unsupported/headless states for other UI modes.
 - OpenAI OAuth-backed ChatGPT/Codex sessions now support provider-native structured outputs for streaming requests using Responses-style `text.format` JSON Schema, while remaining distinct from Chat Completions `response_format`.
 - New `review-task-design` workflow: reviews `design.md` only for ambiguities and inconsistencies, loops until no actionable feedback remains. Invokable via `/delegate review-task-design`.
 - New `create-task-plan` workflow: given a stable `design.md`, creates `plan.md` and `steps.md` for a Munera task in a single pass. Invokable via `/delegate create-task-plan`.

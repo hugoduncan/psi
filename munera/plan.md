@@ -19,6 +19,7 @@ Backlog:
 `munera/open/186-built-in-skill-for-developing-extensions/`
 `munera/open/189-workflow-run-retention-and-cleanup/`
 `munera/open/190-core-queryable-ui/`
+`munera/open/191-ui-action-invocation/`
 
 Recently completed:
 
