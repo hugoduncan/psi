@@ -25,7 +25,7 @@ Key decisions from the design:
 ## Slice order
 
 1. **Model catalog and live model API tests** — Add Opus 4.8 catalog metadata, structured-output capability registration, mid-system model flag, unit coverage, and gated Anthropic Models API tests.
-2. **Speed mode stack** — Add session schema/state, scoped command, persistence/config startup resolution, request-option propagation, provider request shaping, resolver/footer/docs, and speed tests.
-3. **Effort override and xhigh stack** — Add session schema/state, scoped command, persistence/config startup resolution, request-option propagation, Anthropic/OpenAI/Codex effort shaping, resolver/footer/docs, and effort tests.
-4. **Mid-conversation system messages** — Add schemas, journal projection, conversation/provider transforms, dispatch and extension mutation/API, EQL capability resolver, prepared-turn preservation, compaction preservation, docs, and focused tests.
-5. **Integration and coherence pass** — Run focused tests per slice, then broader lint/test verification, update user-facing docs/changelog if behavior is user-visible, and record implementation notes.
+2. **Speed mode stack** — Add session schema/state, scoped command, persistence/config startup resolution, request-option propagation, provider request shaping, resolver/footer, and speed tests.
+3. **Effort override and xhigh stack** — Add session schema/state, scoped command, persistence/config startup resolution, request-option propagation, Anthropic/OpenAI/Codex effort shaping, resolver/footer, and effort tests.
+4. **Mid-conversation system messages** — Add schemas, journal projection, conversation/provider transforms, dispatch and extension mutation/API, EQL capability resolver, prepared-turn preservation, compaction preservation, and focused tests.
+5. **Integration and coherence pass** — Own all user-facing documentation updates for the task: update README and `doc/` for Opus 4.8, `/speed`, `/effort`, and mid-system extension capability; add changelog entries for user-visible behavior; run focused tests per slice; then broader lint/test verification; and record implementation notes.

@@ -624,3 +624,14 @@ Decision recorded:
 **New actionable inconsistency found:**
 
 1. **Documentation ownership differs between plan and steps** — `plan.md` describes Slice 2, Slice 3, and Slice 4 as including docs for `/speed`, `/effort`, and mid-system support respectively, while `steps.md` has no per-feature doc items in those slices and instead puts all README/`doc/` updates in Slice 5 integration/coherence. Align the plan/steps so documentation work has one execution owner: either keep docs in Slice 5 only, or add explicit per-slice documentation steps.
+---
+
+## Inconsistency follow-up — 2026-05-30 (plan/steps docs ownership)
+
+Completed the newly added inconsistency follow-up item in `design-steps.md` by aligning documentation ownership between `plan.md` and `steps.md`.
+
+Decision recorded:
+- Documentation belongs to Slice 5 integration/coherence, matching the existing `steps.md` structure.
+- Removed per-feature docs ownership wording from plan Slices 2, 3, and 4.
+- Expanded plan Slice 5 to explicitly own README, `doc/`, and changelog updates for Opus 4.8, `/speed`, `/effort`, and mid-system extension capability.
+- Marked the docs-ownership design-step complete.

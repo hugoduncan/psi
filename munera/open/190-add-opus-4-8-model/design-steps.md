@@ -138,4 +138,4 @@
 
 ## From inconsistency review pass 2026-05-30 (plan/steps docs ownership)
 
-- [ ] **Align documentation ownership between plan and steps** — `plan.md` lists docs work inside Slice 2 (`/speed`), Slice 3 (`/effort`), and Slice 4 (mid-system), but `steps.md` only schedules docs in Slice 5 integration/coherence. Decide whether docs belong to the feature slices or to Slice 5, and update `plan.md` / `steps.md` so implementors have one consistent execution structure.
+- [x] **Align documentation ownership between plan and steps** — `plan.md` lists docs work inside Slice 2 (`/speed`), Slice 3 (`/effort`), and Slice 4 (mid-system), but `steps.md` only schedules docs in Slice 5 integration/coherence. Decide whether docs belong to the feature slices or to Slice 5, and update `plan.md` / `steps.md` so implementors have one consistent execution structure.
