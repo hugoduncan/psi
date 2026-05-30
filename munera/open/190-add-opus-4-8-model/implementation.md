@@ -1042,3 +1042,9 @@ Verification:
 - `clj-paren-repair components/agent-session/src/psi/agent_session/compaction.clj components/agent-session/test/psi/agent_session/compaction_test.clj` — no changes needed.
 - `clojure -M:test --focus psi.agent-session.compaction-test` — 5 tests, 45 assertions, 0 failures.
 - `clj-kondo --lint components/agent-session/src/psi/agent_session/compaction.clj components/agent-session/test/psi/agent_session/compaction_test.clj` — clean.
+
+---
+
+## Ambiguity follow-up execution — 2026-05-30 (post-replay unchecked-item pass)
+
+Read `design-steps.md` for unchecked ambiguity follow-up items added by the preceding ambiguity-review pass. No unchecked ambiguity design-step items were present (`unchecked count 0`), so there were no newly actionable ambiguity follow-ups to execute. No `design.md`, `plan.md`, or `steps.md` changes were required. Existing uncommitted implementation/test changes were left untouched.
