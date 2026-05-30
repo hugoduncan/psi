@@ -70,3 +70,9 @@ Decisions recorded:
 - `inject-mid-system-message!` rejects invalid placements before mutating the journal. It only accepts injection after the latest user turn and before any pending assistant response or pending mid-system entry; invalid timing returns `{:ok false :error :invalid-placement :reason ...}`.
 - Pre-cut mid-system instructions remain active after compaction. Compaction must preserve them by coalescing their text, in order, into one retained `:mid-system` entry immediately after the compaction summary user turn; post-cut entries are carried forward normally.
 
+
+---
+
+## Design inconsistency review pass — 2026-05-30
+
+No new actionable inconsistencies found beyond the existing unchecked `design-steps.md` follow-ups. Re-read `design.md` against the referenced model/provider/session-state/request/compaction command surfaces; remaining concerns are already captured and were not duplicated.
