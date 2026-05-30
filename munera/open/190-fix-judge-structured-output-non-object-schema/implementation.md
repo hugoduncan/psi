@@ -19,3 +19,5 @@
 2026-05-30 — Design ambiguity review: re-read current design after enum reconciliation plus referenced provider extraction, structured-output envelope, and workflow-judge retry code. No new actionable ambiguities found.
 
 2026-05-30 — Ambiguity follow-up execution: re-read `design-steps.md` after the preceding ambiguity-review pass. No newly added unchecked ambiguity items are present; no `design.md` changes were needed and no blocking ambiguity follow-up remains.
+
+2026-05-30 — Design inconsistency review: found one new actionable inconsistency: `design.md` describes the three provider extraction edits as native structured-output payload sites and frames the intent around provider-native output, but referenced Anthropic/OpenAI code shows the same `parse-json-object` extraction helpers also emit prompted-JSON structured-output results at those call sites.
