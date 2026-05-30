@@ -74,12 +74,26 @@ Action descriptors should be stable pure data with fully namespaced keys. The ma
                             :psi.ui.invocation/command "psi-emacs-show-active"}}
 ```
 
-Optional unavailable fields:
+Unavailable action fields are normative when an action object is returned:
 
 ```clojure
-{:psi.ui.action/available? false
- :psi.ui.action/unavailable-reason "No attached UI adapter can make itself visible."}
+{:psi.ui.action/id :psi.ui.action/make-visible
+ :psi.ui.action/capability :psi.ui.capability/make-visible
+ :psi.ui.action/label "Show Psi UI"
+ :psi.ui.action/description "Bring the active Psi UI to the foreground."
+ :psi.ui.action/available? false
+ :psi.ui.action/unavailable-reason :psi.ui.unavailable.reason/no-attached-ui
+ :psi.ui.action/unavailable-message "No attached UI adapter can make itself visible."}
 ```
+
+Unavailable reasons are machine-readable keywords in the `:psi.ui.unavailable.reason/...` namespace. The minimum reason vocabulary for this slice is:
+
+- `:psi.ui.unavailable.reason/no-provider` — no adapter capability provider is installed.
+- `:psi.ui.unavailable.reason/no-attached-ui` — a provider is installed but reports no available UI.
+- `:psi.ui.unavailable.reason/unsupported-capability` — a UI is attached but does not support the requested capability.
+- `:psi.ui.unavailable.reason/provider-error` — the provider threw or returned invalid data.
+
+The human-readable `:psi.ui.action/unavailable-message` is required whenever `:psi.ui.action/available?` is false. Provider-error cases may also include `:psi.ui/diagnostic` with bounded, serialisable diagnostic text for logs/debugging; diagnostics must not expose frontend objects or stacktrace data by default.
 
 Invocation is a tagged union under `:psi.ui.action/invocation`. Supported design kinds are:
 
@@ -109,6 +123,16 @@ UI capability attrs use the existing `:psi.ui/...` namespace already used by ext
 - `:psi.ui/make-visible-action`
 
 Resolver input should be only `:psi/agent-session-ctx` so these attrs are root-queryable and runtime-scoped. Implementation may extend the existing extension UI resolver or add a dedicated UI capability resolver; prefer a dedicated resolver if it keeps contribution snapshot state separate from capability/action state.
+
+Exact unsupported/headless/provider-error semantics:
+
+- Missing provider: `:psi.ui/type nil`, `:psi.ui/available? false`, `:psi.ui/capabilities []`, `:psi.ui/actions []`; `:psi.ui/make-visible-action` returns an unavailable make-visible descriptor with reason `:psi.ui.unavailable.reason/no-provider`.
+- Provider reports no attached UI: `:psi.ui/type` may be nil or the known adapter type, `:psi.ui/available? false`, `:psi.ui/capabilities []`, `:psi.ui/actions []`; `:psi.ui/make-visible-action` returns an unavailable make-visible descriptor with reason `:psi.ui.unavailable.reason/no-attached-ui`.
+- Attached UI without make-visible support: `:psi.ui/available? true`; `:psi.ui.capability/make-visible` is absent from `:psi.ui/capabilities`; `:psi.ui/actions` omits an available make-visible descriptor; `:psi.ui/make-visible-action` returns an unavailable make-visible descriptor with reason `:psi.ui.unavailable.reason/unsupported-capability`.
+- Provider error or invalid provider result: resolver catches the failure and returns unavailable data rather than dropping attrs from the EQL result. `:psi.ui/available? false`, `:psi.ui/capabilities []`, `:psi.ui/actions []`, `:psi.ui/make-visible-action` returns an unavailable descriptor with reason `:psi.ui.unavailable.reason/provider-error`, and the root UI map may include bounded `:psi.ui/diagnostic` text.
+- Supported make-visible: `:psi.ui.capability/make-visible` is present in `:psi.ui/capabilities`; `:psi.ui/actions` contains the available descriptor; `:psi.ui/make-visible-action` returns that same descriptor.
+
+The convenience attr `:psi.ui/make-visible-action` must return a descriptor object in all cases, available or unavailable, so extension code can inspect one stable shape. Capability presence remains stricter than descriptor presence: `:psi.ui.capability/make-visible` is present only when the active UI currently supports making itself visible.
 
 ### Frontend registration/adaptation
 
@@ -163,6 +187,31 @@ Preferred shape: the same action descriptor returned by query can be sent to a c
 - an existing command or mutation reference.
 
 If implementing generic action invocation would broaden the task too far, this task must still define the descriptor shape, the event/request contract, and create a follow-up task for side-effecting invocation.
+
+Concrete UI action request contract for this slice, if side-effecting invocation is implemented:
+
+- Dispatch event name: `:psi.ui/request-action`.
+- Required payload keys:
+  - `:psi.ui.request/id` — unique request id for acknowledgement correlation.
+  - `:psi.ui.request/action-id` — action keyword, for example `:psi.ui.action/make-visible`.
+  - `:psi.ui.request/invocation` — the descriptor's `:psi.ui.action/invocation` map, copied as data.
+  - `:psi.ui.request/session-id` — active agent session id when known; nil is allowed only for runtime-global actions.
+  - `:psi.ui.request/source` — keyword identifying the requester, for example `:extension` or `:psi-tool`.
+- Optional payload keys:
+  - `:psi.ui.request/capability` — requested capability keyword.
+  - `:psi.ui.request/runtime-id` — runtime correlation id if the runtime already exposes one.
+  - `:psi.ui.request/timeout-ms` — requester timeout for acknowledgement waits.
+  - `:psi.ui.request/metadata` — bounded serialisable metadata for diagnostics.
+- Extension-facing submission API: extensions submit through the existing core dispatch/effect boundary exposed to extensions, not through frontend namespaces. If no public extension dispatch helper exists at implementation time, this task should expose descriptors only and open the side-effecting follow-up rather than introducing a frontend-specific shortcut.
+- Acknowledgement/result shape:
+
+```clojure
+{:psi.ui.result/request-id request-id
+ :psi.ui.result/action-id :psi.ui.action/make-visible
+ :psi.ui.result/status :accepted} ; one of :accepted :completed :rejected :unsupported :failed :timeout
+```
+
+Rejected/unsupported/failed results include `:psi.ui.result/reason` as a machine-readable keyword and `:psi.ui.result/message` as bounded human-readable text. The active UI adapter owns translating accepted requests into frontend effects and may emit completion asynchronously. The query descriptor remains authoritative for discoverability; the request result is authoritative only for that invocation attempt.
 
 ## Acceptance criteria
 
