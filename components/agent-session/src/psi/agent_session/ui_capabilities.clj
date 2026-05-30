@@ -213,10 +213,35 @@
 (defn- valid-unavailable-reason? [reason]
   (namespaced-as? reason "psi.ui.unavailable.reason"))
 
+(def available-action-keys
+  #{:psi.ui.action/id
+    :psi.ui.action/capability
+    :psi.ui.action/label
+    :psi.ui.action/description
+    :psi.ui.action/available?
+    :psi.ui.action/invocation})
+
+(def unavailable-action-keys
+  #{:psi.ui.action/id
+    :psi.ui.action/capability
+    :psi.ui.action/label
+    :psi.ui.action/description
+    :psi.ui.action/available?
+    :psi.ui.action/unavailable-reason
+    :psi.ui.action/unavailable-message})
+
+(defn- action-keys-allowed?
+  [action]
+  (let [allowed-keys (if (:psi.ui.action/available? action)
+                       available-action-keys
+                       unavailable-action-keys)]
+    (every? allowed-keys (keys action))))
+
 (defn- valid-action? [action]
   (and (map? action)
        (serializable-value? action)
        (every? #(namespaced-as? % "psi.ui.action") (keys action))
+       (action-keys-allowed? action)
        (namespaced-as? (:psi.ui.action/id action) "psi.ui.action")
        (namespaced-as? (:psi.ui.action/capability action) "psi.ui.capability")
        (bounded-string? (:psi.ui.action/label action))

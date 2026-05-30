@@ -298,6 +298,29 @@
              :psi.ui/actions [(assoc base-action extra-key "leaked-adapter-data")]}))
           (str "expected provider-error for extra action key: " (pr-str extra-key))))))
 
+(deftest provider-normalization-same-namespace-action-keys-test
+  ;; Tests that action descriptor schemas are closed even for same-namespace
+  ;; extras, so provider-local data cannot appear under plausible contract keys.
+  (let [available-action (ui-capabilities/make-visible-action
+                          {:psi.ui.invocation/kind :emacs-command
+                           :psi.ui.invocation/command "psi-emacs-show-active"})
+        unavailable-action (ui-capabilities/unavailable-make-visible-action
+                            :psi.ui.unavailable.reason/unsupported-capability
+                            "The attached UI does not support making itself visible.")]
+    (doseq [[description action extra-key]
+            [["available action" available-action :psi.ui.action/frontend-object]
+             ["available action" available-action :psi.ui.action/unavailable-reason]
+             ["unavailable action" unavailable-action :psi.ui.action/frontend-object]
+             ["unavailable action" unavailable-action :psi.ui.action/invocation]]]
+      (is (provider-error?
+           (ui-capabilities/normalize-provider-result
+            {:psi.ui/type :emacs
+             :psi.ui/available? true
+             :psi.ui/capabilities [:psi.ui.capability/make-visible]
+             :psi.ui/actions [(assoc action extra-key "adapter-local-data")]}))
+          (str "expected provider-error for extra " description " key: "
+               (pr-str extra-key))))))
+
 (deftest provider-normalization-foreign-invocation-keys-test
   ;; Tests that nested invocation maps reject unqualified and foreign keys rather
   ;; than exposing adapter-local data through EQL.

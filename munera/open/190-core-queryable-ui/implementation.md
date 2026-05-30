@@ -703,3 +703,12 @@ Found one new actionable code-shaping issue after applying `code-shaper` to the 
 ## 2026-05-30 requested code-shaper review
 
 No new distinct code-shaping feedback beyond the existing unchecked same-namespace action-descriptor key follow-up. Re-read task artifacts, UI capability/provider normalization code, resolver/provider lifecycle seams, RPC/TUI runtime wiring, nullable/extension API tests, docs, and changelog. The implementation remains locally shaped around pure normalization plus adapter-owned provider lifetime, consistent `:psi.ui/...` data shapes, and fail-closed provider errors; the remaining robustness gap is the already-recorded closed-schema validation for extra same-namespace `:psi.ui.action/...` descriptor keys. Verification in this pass: `clojure -M:test --focus psi.agent-session.ui-capabilities-test --focus psi.agent-session.graph-surface-test --focus psi.app-runtime-test --focus psi.rpc-transport-test --focus psi.agent-session.extensions-test` — 107 tests, 3400 assertions, 0 failures; targeted `clj-kondo` passed for reviewed UI/runtime/test files.
+
+## 2026-05-30 same-namespace action descriptor key follow-up
+
+Completed the code-shaper follow-up for closed action descriptor schemas. Provider action validation now rejects extra `:psi.ui.action/...` keys that are not declared for the available or unavailable descriptor shape, rather than accepting same-namespace adapter-local data. Added focused provider-normalization coverage for extra same-namespace keys on both available and unavailable action descriptors. Marked the `steps.md` item complete.
+
+Verification:
+
+- `clojure -M:test --focus psi.agent-session.ui-capabilities-test` — 21 tests, 135 assertions, 0 failures.
+- `clj-kondo --lint components/agent-session/src/psi/agent_session/ui_capabilities.clj components/agent-session/test/psi/agent_session/ui_capabilities_test.clj` — clean.
