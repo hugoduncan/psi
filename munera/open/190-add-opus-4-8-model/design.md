@@ -201,6 +201,19 @@ Add `:psi.agent-session/speed-mode` resolver projecting from session state.
 Add `speed-mode` to the project/user config schema so `/speed fast project`
 persists across sessions (same as thinking-level).
 
+Scoped clearing uses **explicit persistent defaults**, not key deletion.  This
+matches the existing merge-only project/user config update helpers and gives the
+selected scope a stable value that masks lower-precedence layers:
+
+- `/speed normal session` clears the in-memory session override (`nil` in
+  session state).
+- `/speed normal project` writes `{:speed-mode :normal}` to project prefs.
+- `/speed normal user` writes `{:speed-mode :normal}` to user config.
+
+When effective config is applied to a new session, persisted `:normal` is
+interpreted as provider default/no native speed parameter, but it still wins over
+lower-precedence `:fast` values.
+
 ### Acceptance criteria — Part 2
 
 - `(session/query-in ctx sid [:psi.agent-session/speed-mode])` returns `:normal`
@@ -209,6 +222,8 @@ persists across sessions (same as thinking-level).
 - `/speed fast` sets mode; `/speed normal` clears it.
 - `/speed fast project` persists the setting to project prefs; `session` leaves
   it in-memory only; `user` writes user config.
+- `/speed normal project|user` persists explicit `:normal` at that scope, masking
+  lower-precedence `:fast` values while still omitting provider speed params.
 - `/speed unknown` returns an error listing allowed values.
 - `/speed fast bogus` returns an error listing allowed scopes.
 - Anthropic `build-request` includes `speed: "fast"` iff speed-mode is `:fast`;
@@ -317,6 +332,13 @@ combination rejects it with a 400, that provider error should surface to the
 user as-is. Remove any implied "fallback with warning" behaviour from code,
 tests, and docs in this task.
 
+Because provider rejection is the intended unsupported-value surface,
+`components/ai/src/psi/ai/providers/anthropic/request_schema.clj` must accept
+`output_config.effort = "highest"` in `anthropic-output-config-schema` alongside
+`"low"`, `"medium"`, and `"high"`.  The local request schema is a psi request
+well-formedness gate, not the Anthropic capability ceiling for this value; it
+must not reject `"highest"` before the HTTP request is attempted.
+
 #### 6. OpenAI providers
 
 `/effort` applies to both OpenAI transports that currently send reasoning effort:
@@ -364,6 +386,19 @@ Add `:psi.agent-session/effort-override` resolver.
 
 Add `effort-override` to project/user config schema.
 
+Scoped clearing uses **explicit persistent nil**, not key deletion.  This keeps
+persistence compatible with the existing merge-only update helpers and lets the
+chosen higher-precedence layer mask lower-precedence effort overrides:
+
+- `/effort none session` clears the in-memory session override (`nil` in
+  session state).
+- `/effort none project` writes `{:effort-override nil}` to project prefs.
+- `/effort none user` writes `{:effort-override nil}` to user config.
+
+When effective config is applied to a new session, an explicit nil means “no
+effort override; use thinking-level-derived provider defaults” and should not
+fall through to a lower-precedence project/user override.
+
 #### 11. `:xhigh` budget for extended thinking — no change needed
 
 `thinking-level->budget {:xhigh 32000}` already differentiates `:xhigh` from
@@ -375,11 +410,14 @@ Add `effort-override` to project/user config schema.
 - `/effort xhigh` sets override; `/effort none` clears it.
 - `/effort xhigh project` persists the override to project prefs; `session` leaves
   it in-memory only; `user` writes user config.
+- `/effort none project|user` persists explicit nil at that scope, masking
+  lower-precedence effort overrides while restoring level-derived defaults.
 - `/effort unknown` returns error listing allowed values.
 - `/effort xhigh bogus` returns an error listing allowed scopes.
 - Anthropic adaptive `build-request`: when effort-override is `:xhigh`,
   `output_config.effort` is `"highest"`; when `:high`, `"high"`; when nil,
-  falls back to level-derived value.
+  falls back to level-derived value; local request schema validation permits
+  `"highest"` so any unsupported-value failure comes from the provider.
 - OpenAI chat-completions `reasoning-effort`: when effort-override is `:xhigh`, returns `"high"`
   (ceiling); when `:medium`, returns `"medium"`; when nil, falls back to
   level-derived value.
@@ -465,9 +503,17 @@ Add `:mid-system` to `session-entry-kind-schema`.
 
 In `append-msg`, handle `"system"` role by appending the projected provider
 message produced by `journal->provider-messages`: `{:role "system" :content
-[{:type :text :text "..."}]}`. These messages then pass through
-`agent-messages->ai-conversation` transparently alongside user and assistant
-turns.
+[{:type :text :text "..."}]}`.
+
+The AI conversation representation remains schema-normalized, not
+provider-shaped.  Add `:system` to `psi.ai.schemas/MessageRole` and add/use a
+conversation helper (for example `conv/add-system-message`) that appends a
+schema-valid AI message with keyword role `:system` and normalized text content
+`{:kind :text :text ...}`.  The `append-msg` `"system"` branch is responsible
+for normalizing provider-style text blocks (`{:type :text :text ...}`) into
+that canonical `MessageContent` shape before appending.  Provider-specific
+transformers later turn the canonical `:system` message back into provider
+wire shape.
 
 #### 5. Anthropic provider (`components/ai/src/psi/ai/providers/anthropic.clj`)
 
@@ -587,7 +633,8 @@ cache-control logic is required.
 - `(session/query-in ctx sid [:psi.agent-session/model-supports-mid-system-messages])`
   returns `true` when an opus-4.8 session is active, `false` otherwise.
 - `inject-mid-system-message!` on an opus-4.8 session appends a `:mid-system`
-  journal entry and the next `build-prepared-request` includes a
+  journal entry, conversation assembly normalizes it to a schema-valid
+  `:system` AI message, and the next `build-prepared-request` includes a
   `{"role": "system", ...}` message in the Anthropic messages array.
 - `inject-mid-system-message!` on a non-supporting model returns
   `{:ok false :error :capability-not-supported}` and does not modify the journal.

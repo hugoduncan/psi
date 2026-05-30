@@ -98,3 +98,14 @@ Completed the newly added inconsistency follow-up items in `design-steps.md` by 
 2. **Mid-system conversation message representation** — The design says `journal->provider-messages` emits provider-style `{:role "system" :content [{:type :text :text ...}]}` and `append-msg` should append it into the AI conversation, while the AI `Message` schema currently uses keyword roles and normalized `MessageContent` (`:kind`, not provider `:type`). Specify whether the conversation layer gets a `:system` message constructor/schema extension, or whether `append-msg` normalizes provider-style mid-system content before adding it.
 
 3. **Scoped clearing semantics for persisted `/speed normal` and `/effort none`** — The design says `/speed normal` clears the speed override and `/effort none` clears the effort override, while also supporting `project`/`user` persistence scopes. Decide whether scoped clears write explicit nil/normal values that mask lower-precedence config, delete the key to reveal lower layers, or set `:normal`/nil as persistent values; existing config update helpers merge keys and do not delete them.
+
+---
+
+## Ambiguity follow-up — 2026-05-30
+
+Completed the three newly added ambiguity follow-up items in `design-steps.md` by refining `design.md`.
+
+Decisions recorded:
+- Anthropic adaptive `"highest"` effort is admitted by local request schema validation; unsupported-value rejection, if any, must come from the provider HTTP response rather than psi preflight.
+- Mid-system provider-style journal projection is normalized inside conversation assembly: `append-msg` converts `{:type :text}` blocks to canonical AI `{:kind :text}` content and appends a schema-valid `:system` message after `MessageRole` is extended.
+- Scoped clears use explicit persisted defaults compatible with merge-only config helpers: `/speed normal project|user` writes `:speed-mode :normal`; `/effort none project|user` writes `:effort-override nil`; these higher-precedence explicit values mask lower-precedence settings.

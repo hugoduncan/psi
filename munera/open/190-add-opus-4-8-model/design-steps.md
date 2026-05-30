@@ -34,8 +34,8 @@
 
 ## From ambiguity review pass 2026-05-30 (second pass)
 
-- [ ] **Allow or reroute Anthropic `"highest"` validation** — Update the design to specify how `output_config.effort = "highest"` passes request validation for adaptive Anthropic requests (`request_schema.clj` enum update or an explicit alternative), so provider rejection can surface as intended.
+- [x] **Allow or reroute Anthropic `"highest"` validation** — Update the design to specify how `output_config.effort = "highest"` passes request validation for adaptive Anthropic requests (`request_schema.clj` enum update or an explicit alternative), so provider rejection can surface as intended.
 
-- [ ] **Define mid-system AI conversation representation** — Decide how a projected mid-system provider-style map is represented inside `psi.ai.conversation`: add/describe a `:system` message path compatible with `Message` schema, or require `append-msg` to normalize `{:type :text}` provider blocks into schema-valid content before appending.
+- [x] **Define mid-system AI conversation representation** — Decide how a projected mid-system provider-style map is represented inside `psi.ai.conversation`: add/describe a `:system` message path compatible with `Message` schema, or require `append-msg` to normalize `{:type :text}` provider blocks into schema-valid content before appending.
 
-- [ ] **Specify persisted clear semantics for speed/effort overrides** — Clarify what `/speed normal project|user` and `/effort none project|user` write or delete in shared-config, including how clears interact with lower-precedence user/project settings and the current merge-only config update helpers.
+- [x] **Specify persisted clear semantics for speed/effort overrides** — Clarify what `/speed normal project|user` and `/effort none project|user` write or delete in shared-config, including how clears interact with lower-precedence user/project settings and the current merge-only config update helpers.
