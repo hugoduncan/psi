@@ -1140,3 +1140,9 @@ Actionable test feedback found:
 ## Design inconsistency review pass — 2026-05-30 (post-test-review plan/steps)
 
 No new actionable inconsistencies found. Re-read `plan.md`, `steps.md`, `design-steps.md`, and latest `implementation.md` notes, then checked referenced task/code/doc/test surfaces for Opus 4.8, `/speed`, `/effort`, mid-system injection, docs/changelog ownership, final verification evidence, and current follow-up status. The only unchecked task item is the already-recorded test-review follow-up for non-`xhigh` effort override request-shaping coverage; it is test feedback rather than a plan/steps inconsistency, so no duplicate `design-steps.md` item was added. Existing uncommitted test-file changes were not touched.
+
+---
+
+## Inconsistency follow-up execution — 2026-05-30 (post-test-review unchecked-item pass)
+
+Read `design-steps.md` for unchecked inconsistency follow-up items added by the preceding inconsistency-review pass. No unchecked design-step items were present (`unchecked count 0`), so there were no newly actionable inconsistency follow-ups to execute. No `design.md`, `plan.md`, or `steps.md` changes were required. Existing uncommitted test-file changes were left untouched.
