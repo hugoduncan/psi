@@ -1068,3 +1068,9 @@ Completed the newly added inconsistency follow-up item in `design-steps.md`:
 - Marked the corresponding `design-steps.md` follow-up complete.
 
 Pre-existing uncommitted modifications in `components/agent-session/test/psi/agent_session/commands_test.clj` and `components/ai/test/psi/ai/providers/openai_test.clj` were not changed by this follow-up.
+
+---
+
+## Implementation review pass — 2026-05-30 (final-state verification)
+
+No new actionable implementation feedback found. Re-read the task artifacts and representative implementation/test/doc surfaces for Opus 4.8, `/speed`, `/effort`, mid-system injection, provider shaping, shared-config startup, compaction replay, docs/changelog, and the latest verification notes. The previously flagged stale full-suite concern is already resolved by the recorded post-follow-up `bb test` pass; no duplicate `steps.md` item was added. Focused regression check during review passed: `clojure -M:test --focus psi.agent-session.model-dispatch-test --focus psi.agent-session.prompt-request-test --focus psi.agent-session.compaction-test --focus psi.agent-session.extensions-test --focus psi.ai.providers.anthropic-test --focus psi.ai.providers.openai-test --focus psi.shared-config.resolution-test --focus psi.app-runtime-bootstrap-test` — 114 tests, 668 assertions, 0 failures. Pre-existing uncommitted edits in `components/agent-session/test/psi/agent_session/commands_test.clj` and `components/ai/test/psi/ai/providers/openai_test.clj` were not touched.
