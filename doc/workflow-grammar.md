@@ -227,12 +227,16 @@ the same data must consume an explicitly declared session structured output or a
 future explicit promotion/export contract, not a hidden judge-output ref.
 
 Prompted fallback means the AI adapter injects schema-guided JSON-only
-instructions into the provider request for one JSON object for the one declared
-structured-output key. Workflow runtime then parses the returned text and
-schema-guided coercion maps JSON object keys and enum strings into the declared
-Malli-domain values before validation. Raw text is retained even when coercion
-and validation succeed. Provider-native structured output likewise requests one
-schema-constrained object and records it behind the single declared
+instructions into the provider request for one JSON value matching the declared
+JSON Schema for the one declared structured-output key. Workflow runtime then
+parses the returned text and schema-guided coercion maps JSON object keys and
+enum strings into the declared Malli-domain values when the value is an object,
+and also validates scalar, array, boolean, number, string, and `null` values when
+the schema allows them. Raw text is retained even when coercion and validation
+succeed. Provider-native structured output likewise requests one
+schema-constrained JSON value and records it behind the single declared
 structured-output key. If native support is required or fallback is `:none`, an
 unsupported resolved model/transport fails with `:unsupported-structured-output`
-instead of retrying as prose.
+instead of retrying as prose. Authors who need multiple named fields or
+`:path`-addressable subvalues should use a map/object schema for that one JSON
+value.

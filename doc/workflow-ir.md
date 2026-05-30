@@ -293,9 +293,11 @@ than silently degrading to prose.
 
 For `:prompted-json`, the AI adapter injects schema-guided JSON-only
 instructions into the outbound provider request, and the workflow runtime parses
-the returned text as a single JSON object. For `:provider-native`, the provider
-is asked for a single schema-constrained object. Sibling JSON fields are not
-promoted into additional output keys; use a map schema plus downstream `:path`
+the returned text as a single JSON value matching the declared JSON Schema. For
+`:provider-native`, the provider is asked for a single schema-constrained JSON
+value. Scalar, array, object, boolean, number, string, and `null` values are all
+valid when the schema allows them. Sibling JSON fields are not promoted into
+additional output keys; use a map/object schema plus downstream `:path`
 references instead.
 
 ### Structured output runtime envelope
@@ -349,14 +351,15 @@ at least one of:
 - `:unsupported` — the runtime could not reasonably request the structured mode
 
 For `:prompted-json`, the adapter-owned request shaping is limited to prompting
-for a single JSON object that matches the declared schema; it does not make the
+for a single JSON value that matches the declared schema; it does not make the
 provider response trusted workflow data. Raw model text remains in
 `:raw-output`; workflow runtime parses JSON and schema-guides it into
 Malli-domain values before validation. Object keys may become keywords when the
 schema expects map keys, and enum strings may become keyword enum values when
-the declared enum contains the corresponding keyword. Coercion, parse, or
-validation failure records `:status :invalid`, `:errors`, and `:parsed-value`
-when a parsed value exists; it must not expose `:value`.
+the declared enum contains the corresponding keyword. Non-object JSON values are
+preserved and validated directly when the schema allows them. Coercion, parse,
+or validation failure records `:status :invalid`, `:errors`, and
+`:parsed-value` when a parsed value exists; it must not expose `:value`.
 
 Reusable schemas are owned by workflow-runtime code. The first standard reusable
 schema should live in `psi.workflow-runtime.structured-output-schemas` with id
