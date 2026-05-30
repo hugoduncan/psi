@@ -32,22 +32,23 @@
 - [x] Keep existing `/ext/provider-telemetry` dispatch behavior for metrics/log consumers unless a focused compatibility test proves a required adjustment.
 - [x] Publish active retry state into existing session retry fields before pending backoff sleep begins.
 - [x] Clear active retry fields when retry delay completes, the request succeeds, or the request fails terminally/exhausted/disabled; cancellation clearing remains pending with cancellation support.
-- [ ] Add focused tests proving app-runtime/TUI/Emacs-facing phase/status reports retrying while provider-boundary backoff is pending.
+- [x] Add focused tests proving app-runtime/TUI/Emacs-facing phase/status reports retrying while provider-boundary backoff is pending.
 - [ ] Add focused tests proving provider-boundary retry resume does not dispatch `:runtime/agent-start-loop` or rerun local tools.
 
 ## Slice 4 — Handle provider headers, cancellation, and streaming isolation
 
 - [ ] Normalize streaming and non-streaming provider failure values so retry-relevant headers are available to retry metadata calculation, for example under `:provider-error/headers`.
-- [ ] Honor parseable `Retry-After` / `X-Retry-After` as the scheduled delay with `:delay-source :retry-after`.
-- [ ] Preserve rate-limit reset/limit/remaining header metadata in active retry projection, telemetry, and EQL-ready lifecycle captures.
-- [ ] Fall back to configured exponential backoff with `:delay-source :exponential-backoff` when retry headers are absent or invalid.
+- [x] Honor parseable `Retry-After` / `X-Retry-After` as the scheduled delay with `:delay-source :retry-after`.
+- [x] Preserve rate-limit reset/limit/remaining header metadata in active retry projection, telemetry, and EQL-ready lifecycle captures.
+- [x] Fall back to configured exponential backoff with `:delay-source :exponential-backoff` when retry headers are absent or invalid.
 - [ ] Make pending retry backoff cancellable through the active session/turn abort signal or an equivalent coordinator-owned cancellable delay.
 - [ ] On pending-backoff cancellation, suppress the next provider execution attempt and clear active retry projection fields.
 - [ ] Emit `provider_request_cancelled` for pending-backoff cancellation with request identity, suppressed next attempt, last failed attempt, `:failure-reason :retry-cancelled`, and last error classification/cause.
 - [ ] Verify cancellation does not emit synthetic `provider_request_started` or `provider_request_finished` for the suppressed next attempt.
 - [ ] Ensure failed streaming attempt partial text/thinking/tool-call deltas remain attempt-local and are not committed to canonical transcript/message assembly when retrying.
 - [ ] Ensure a successful later streaming retry produces final assistant content without mixing or duplicating failed-attempt partial output.
-- [ ] Add focused tests for retry header delay source, invalid-header fallback, pending-backoff cancellation, and streaming partial-output isolation.
+- [ ] Add focused tests for pending-backoff cancellation and streaming partial-output isolation.
+- [x] Add focused tests for retry header delay source and invalid-header fallback.
 
 ## Slice 5 — Expose EQL/psi-tool retry introspection
 

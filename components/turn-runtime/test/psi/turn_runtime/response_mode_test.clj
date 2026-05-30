@@ -381,16 +381,20 @@
         (is (nil? (:retry (ss/get-session-data-in ctx session-id))))))))
 
 (deftest execute-prepared-request-clears-active-retry-state-before-retry-attempt-test
-  ;; Active retry fields are visible during backoff and cleared before the next provider attempt starts.
-  (let [during-retry*    (atom nil)
-        attempt-retries* (atom [])
+  ;; Active retry fields are visible through the existing retrying phase during
+  ;; backoff and cleared before the next provider attempt starts.
+  (let [during-retry*     (atom nil)
+        phase-during*     (atom nil)
+        attempt-retries*  (atom [])
         [ctx0 session-id] (create-session-context {:persist? false})
-        ctx              (assoc ctx0 :provider-retry-sleep-fn
-                                (fn [_delay-ms]
-                                  (reset! during-retry*
-                                          (:retry (ss/get-session-data-in ctx0 session-id)))))
-        prepared         (prepared-request ctx session-id)
-        attempts*        (atom 0)]
+        ctx               (assoc ctx0 :provider-retry-sleep-fn
+                                 (fn [_delay-ms]
+                                   (reset! during-retry*
+                                           (:retry (ss/get-session-data-in ctx0 session-id)))
+                                   (reset! phase-during*
+                                           (ss/sc-phase-in ctx0 session-id))))
+        prepared          (prepared-request ctx session-id)
+        attempts*         (atom 0)]
     (with-redefs [psi.turn-runtime.core/execute-live-turn!
                   (fn [& _]
                     (swap! attempt-retries* conj (:retry (ss/get-session-data-in ctx session-id)))
@@ -408,7 +412,90 @@
                     {:provider-registry (atom {})} ctx session-id prepared nil)]
         (is (= :stop (:execution-result/stop-reason result)))
         (is (= 2 @attempts*))
+        (is (= :retrying @phase-during*))
         (is (= :transport (:error-kind @during-retry*)))
         (is (= 1 (:retry-attempt @during-retry*)))
         (is (= [nil nil] @attempt-retries*))
         (is (nil? (:retry (ss/get-session-data-in ctx session-id))))))))
+
+(deftest execute-prepared-request-retry-after-header-drives-delay-test
+  ;; Provider Retry-After headers are authoritative for retry delay metadata.
+  (let [[ctx0 session-id] (create-session-context {:persist? false
+                                                   :provider-retry-sleep? false
+                                                   :config {:auto-retry-base-delay-ms 10
+                                                            :auto-retry-max-retries 1}})
+        ctx              (assoc ctx0 :now-fn #(java.time.Instant/ofEpochMilli 1000))
+        prepared         (prepared-request ctx session-id)
+        attempts*        (atom 0)]
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [& _]
+                    (if (= 1 (swap! attempts* inc))
+                      (assoc (error-turn "rate limit exceeded")
+                             :assistant-message {:role "assistant"
+                                                 :content [{:type :error :text "rate limit exceeded"}]
+                                                 :stop-reason :error
+                                                 :error-message "rate limit exceeded"
+                                                 :http-status 429
+                                                 :provider-error/headers {"Retry-After" "5"
+                                                                          "RateLimit-Limit" "100"
+                                                                          "RateLimit-Remaining" "0"
+                                                                          "RateLimit-Reset" "3"}
+                                                 :timestamp (java.time.Instant/now)})
+                      {:turn-id "turn-1"
+                       :model {:provider "openai" :id "gpt-test"}
+                       :ai-options {}
+                       :turn-ctx nil
+                       :assistant-message {:role "assistant"
+                                           :content [{:type :text :text "recovered"}]
+                                           :stop-reason :stop
+                                           :timestamp (java.time.Instant/now)}}))]
+      (let [result    (turn-runtime/execute-prepared-request!
+                       {:provider-registry (atom {})} ctx session-id prepared nil)
+            scheduled (first (filter #(= "provider_retry_scheduled" (:type %))
+                                     (provider-events ctx session-id)))]
+        (is (= :stop (:execution-result/stop-reason result)))
+        (is (= 2 @attempts*))
+        (is (= 5000 (:delay-ms scheduled)))
+        (is (= :retry-after (:delay-source scheduled)))
+        (is (= 6000 (:resume-at scheduled)))
+        (is (= {:limit 100 :remaining 0 :reset-after-ms 3000 :reset-at 4000}
+               (:rate-limit scheduled)))))))
+
+(deftest execute-prepared-request-invalid-retry-after-falls-back-test
+  ;; Invalid Retry-After headers preserve retryability and fall back to exponential backoff.
+  (let [[ctx0 session-id] (create-session-context {:persist? false
+                                                   :provider-retry-sleep? false
+                                                   :config {:auto-retry-base-delay-ms 25
+                                                            :auto-retry-max-delay-ms 1000
+                                                            :auto-retry-max-retries 1}})
+        ctx              (assoc ctx0 :now-fn #(java.time.Instant/ofEpochMilli 2000))
+        prepared         (prepared-request ctx session-id)
+        attempts*        (atom 0)]
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [& _]
+                    (if (= 1 (swap! attempts* inc))
+                      (assoc (error-turn "provider overloaded")
+                             :assistant-message {:role "assistant"
+                                                 :content [{:type :error :text "provider overloaded"}]
+                                                 :stop-reason :error
+                                                 :error-message "provider overloaded"
+                                                 :http-status 503
+                                                 :provider-error/headers {"Retry-After" "not-a-date"}
+                                                 :timestamp (java.time.Instant/now)})
+                      {:turn-id "turn-1"
+                       :model {:provider "openai" :id "gpt-test"}
+                       :ai-options {}
+                       :turn-ctx nil
+                       :assistant-message {:role "assistant"
+                                           :content [{:type :text :text "recovered"}]
+                                           :stop-reason :stop
+                                           :timestamp (java.time.Instant/now)}}))]
+      (let [result    (turn-runtime/execute-prepared-request!
+                       {:provider-registry (atom {})} ctx session-id prepared nil)
+            scheduled (first (filter #(= "provider_retry_scheduled" (:type %))
+                                     (provider-events ctx session-id)))]
+        (is (= :stop (:execution-result/stop-reason result)))
+        (is (= 2 @attempts*))
+        (is (= 25 (:delay-ms scheduled)))
+        (is (= :exponential-backoff (:delay-source scheduled)))
+        (is (= 2025 (:resume-at scheduled)))))))
