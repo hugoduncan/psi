@@ -39,3 +39,9 @@
 - [x] **Define mid-system AI conversation representation** — Decide how a projected mid-system provider-style map is represented inside `psi.ai.conversation`: add/describe a `:system` message path compatible with `Message` schema, or require `append-msg` to normalize `{:type :text}` provider blocks into schema-valid content before appending.
 
 - [x] **Specify persisted clear semantics for speed/effort overrides** — Clarify what `/speed normal project|user` and `/effort none project|user` write or delete in shared-config, including how clears interact with lower-precedence user/project settings and the current merge-only config update helpers.
+
+## From inconsistency review pass 2026-05-30 (second pass)
+
+- [ ] **Align `/speed` resolver default with nil session state** — Decide whether `:psi.agent-session/speed-mode` resolver coerces nil to `:normal` (matching acceptance criteria and display semantics) or whether acceptance should allow nil. Update the resolver/design text accordingly, including `/speed normal session` behaviour.
+
+- [ ] **Specify mid-system capability flag schema/default semantics** — Decide whether `:supports-mid-conversation-system-messages` is optional in `Model` with absent treated as false, or required on every model map. Align the schema step with the acceptance criterion that unsupported models may have the flag false or absent.

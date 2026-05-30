@@ -109,3 +109,13 @@ Decisions recorded:
 - Anthropic adaptive `"highest"` effort is admitted by local request schema validation; unsupported-value rejection, if any, must come from the provider HTTP response rather than psi preflight.
 - Mid-system provider-style journal projection is normalized inside conversation assembly: `append-msg` converts `{:type :text}` blocks to canonical AI `{:kind :text}` content and appends a schema-valid `:system` message after `MessageRole` is extended.
 - Scoped clears use explicit persisted defaults compatible with merge-only config helpers: `/speed normal project|user` writes `:speed-mode :normal`; `/effort none project|user` writes `:effort-override nil`; these higher-precedence explicit values mask lower-precedence settings.
+
+---
+
+## Design inconsistency review pass — 2026-05-30
+
+**New actionable inconsistencies found:**
+
+1. **`/speed` resolver/default semantics conflict** — Session state intentionally stores `:speed-mode nil` for provider default and `/speed normal session` clears back to nil, but the acceptance criteria require `(session/query-in ... [:psi.agent-session/speed-mode])` to return `:normal` when unset. The resolver section only says to project from session state, which would expose nil unless it explicitly coerces nil to `:normal`.
+
+2. **Mid-system capability flag requiredness is inconsistent** — Part 4 says `:supports-mid-conversation-system-messages` defaults false and acceptance allows Codex/responses and pre-4.8 Anthropic models to have the flag `false` or absent, but the model-schema step says to add a boolean model attribute to the closed `Model` schema. Specify whether the schema key is optional with absent-as-false semantics, or required on every model map.
