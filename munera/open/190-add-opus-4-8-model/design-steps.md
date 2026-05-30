@@ -54,8 +54,8 @@
 
 ## From ambiguity review pass 2026-05-30 (third pass)
 
-- [ ] **Specify persisted speed/effort startup wiring** — Add the config-resolution accessors and app-runtime/session-default application path for persisted `:speed-mode` and `:effort-override`, including how explicit `:normal` and nil values mask lower-precedence settings when a new session starts.
+- [x] **Specify persisted speed/effort startup wiring** — Add the config-resolution accessors and app-runtime/session-default application path for persisted `:speed-mode` and `:effort-override`, including how explicit `:normal` and nil values mask lower-precedence settings when a new session starts.
 
-- [ ] **Define mid-system capability lookup source** — Decide whether `model-supports-mid-system-messages` and injection gating read the reduced session model, catalog model, or runtime-resolved model with auth context; document the rule so OpenAI chat-completions and Codex/responses (including OAuth runtime overrides) are classified correctly.
+- [x] **Define mid-system capability lookup source** — Decide whether `model-supports-mid-system-messages` and injection gating read the reduced session model, catalog model, or runtime-resolved model with auth context; document the rule so OpenAI chat-completions and Codex/responses (including OAuth runtime overrides) are classified correctly.
 
-- [ ] **Define the `:mid-system` source/provenance contract** — Specify what value is stored in `{:source ...}` for injected mid-system journal entries, and whether the extension API infers it from `ext-path`, accepts it from callers, or omits it.
+- [x] **Define the `:mid-system` source/provenance contract** — Specify what value is stored in `{:source ...}` for injected mid-system journal entries, and whether the extension API infers it from `ext-path`, accepts it from callers, or omits it.

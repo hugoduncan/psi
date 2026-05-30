@@ -219,6 +219,26 @@ When effective config is applied to a new session, persisted `:normal` is
 interpreted as provider default/no native speed parameter, but it still wins over
 lower-precedence `:fast` values.
 
+#### 12. Startup config application
+
+Shared-config resolution must expose a typed `resolved-speed-mode` accessor. The
+merged config map must preserve explicit `:normal` values from the winning scope
+rather than treating them as absent. `app-runtime/create-runtime-session-context`
+(or the equivalent startup/session-default construction path) must read that
+accessor and include `:speed-mode` in `:session-defaults` for newly created root
+sessions.
+
+Startup application rules:
+
+- Missing/invalid config value → no session override (`nil` in session state),
+  and the resolver displays `:normal`.
+- Explicit persisted `:normal` → store/apply `:speed-mode :normal` for the new
+  session as a higher-precedence mask over lower-precedence `:fast`; request
+  shaping still treats `nil` and `:normal` equivalently and omits native speed
+  params.
+- Explicit persisted `:fast` → store/apply `:speed-mode :fast` for the new
+  session.
+
 ### Acceptance criteria — Part 2
 
 - `(session/query-in ctx sid [:psi.agent-session/speed-mode])` returns `:normal`
@@ -404,6 +424,28 @@ When effective config is applied to a new session, an explicit nil means “no
 effort override; use thinking-level-derived provider defaults” and should not
 fall through to a lower-precedence project/user override.
 
+#### 10a. Startup config application
+
+Shared-config resolution must expose a typed `resolved-effort-override` accessor
+that can distinguish three cases in the already-merged config: missing/invalid,
+explicit nil, and an explicit effort keyword. Because project/user config maps are
+merged before this accessor runs, the winning higher-precedence layer is the only
+value that matters; an explicit nil from that layer masks lower-precedence effort
+overrides.
+
+`app-runtime/create-runtime-session-context` (or the equivalent
+session-default construction path) must include the accessor result in
+`:session-defaults` for newly created root sessions when the key is present in the
+resolved config. Startup application rules:
+
+- Missing/invalid config value → no session override (`nil` in session state) and
+  no persisted mask.
+- Explicit persisted nil → apply `:effort-override nil` as the winning explicit
+  mask; the request uses thinking-level-derived provider defaults and does not
+  fall through to lower-precedence config.
+- Explicit `:low`/`:medium`/`:high`/`:xhigh` → store/apply that keyword on the
+  new session.
+
 #### 11. `:xhigh` budget for extended thinking — no change needed
 
 `thinking-level->budget {:xhigh 32000}` already differentiates `:xhigh` from
@@ -584,10 +626,16 @@ New `:session/inject-mid-system-message` handler in
 Add `inject-mid-system-message!` to the extension API:
 ```clojure
 inject-mid-system-message!
-(fn [text]
-  (mutate-ext-required :inject-mid-system-message
-                       'psi.extension/inject-mid-system-message
-                       {:text text}))
+(fn
+  ([text]
+   (mutate-ext-required :inject-mid-system-message
+                        'psi.extension/inject-mid-system-message
+                        {:text text}))
+  ([text opts]
+   (mutate-ext-required :inject-mid-system-message
+                        'psi.extension/inject-mid-system-message
+                        (cond-> {:text text}
+                          (:source opts) (assoc :source (:source opts))))))
 ```
 Extensions call this to append updated instructions mid-conversation.  The
 function returns `{:ok true}`, `{:ok false :error :capability-not-supported}`
@@ -595,16 +643,36 @@ when the active model does not support the feature, or `{:ok false :error
 :invalid-placement :reason ...}` for the invalid timing cases enforced by the
 dispatch handler.
 
+Source/provenance contract: `:source` is optional metadata on the journal entry.
+If callers omit it, the extension API must infer a stable source from the current
+extension provenance (`ext-path`/extension id) and pass that to dispatch. The
+options arity is only for explicit override by trusted/internal callers. Dispatch
+stores the resulting string/keyword as provided in `{:text text :source source}`;
+if no source can be inferred, it stores `:extension` rather than rejecting the
+injection. Tests should assert provenance presence and should not depend on a
+provider-specific source value beyond this contract.
+
 #### 9. EQL resolver (`components/agent-session/src/psi/agent_session/resolvers/session.clj`)
 
 Add `:psi.agent-session/model-supports-mid-system-messages` resolver:
 - Input: `[:psi/agent-session-ctx :psi.agent-session/session-id]`
-- Output: boolean derived from the active model's
+- Output: boolean derived from the runtime-resolved active model's
   `:supports-mid-conversation-system-messages` flag, treating an absent flag as
   `false`.
 
+Capability lookup rule: both this resolver and
+`:session/inject-mid-system-message` must resolve support from the same
+runtime-resolved model view used for request execution, not merely from the
+reduced `:model` map stored in session state. Given the session provider/id, use
+`model-registry/resolve-runtime-model` (with the available OAuth/auth runtime
+context when the call site has one) and then read
+`:supports-mid-conversation-system-messages`; fall back to the stored session
+model only when runtime resolution cannot produce a model. This keeps OpenAI
+chat-completions models classified as supporting inline system messages while
+Codex/responses runtime overrides remain classified as unsupported.
+
 This is the queryable capability surface extensions use before calling
-`inject-mid-system-message!`.
+`inject-mid-system-message!`, and dispatch gating must match it exactly.
 
 #### 10. `prompt_request.clj` — journal projection
 
