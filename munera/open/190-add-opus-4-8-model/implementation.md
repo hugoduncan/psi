@@ -158,3 +158,19 @@ Completed the two newly added ambiguity follow-up items in `design-steps.md` by 
 2. **Mid-system capability lookup source under runtime model overrides** — The design says the resolver and dispatch handler derive support from the active model's `:supports-mid-conversation-system-messages` flag, but session state currently stores a reduced model map and runtime resolution can change OpenAI transport/capabilities (for example OAuth-backed `gpt-5.5` becoming Codex/responses). Specify whether capability checks use the stored session model, catalog lookup by provider/id, or runtime `resolve-runtime-model` with auth context so OpenAI chat-completions versus Codex/responses are classified correctly.
 
 3. **Mid-system journal `:source` contract** — The dispatch handler stores `{:text text :source source}` for `:mid-system` entries and the extension API exposes `(inject-mid-system-message! text)`, but no source value or provenance rule is defined. Specify whether `source` is optional, inferred from `ext-path`, caller-supplied via an arity/options map, or omitted from the journal schema/tests.
+
+---
+
+## Design inconsistency review pass — 2026-05-30
+
+No new actionable inconsistencies found. Re-read `design.md` against referenced config startup, runtime model resolution, request assembly, schema, and persistence artifacts; the remaining unresolved items in `design-steps.md` are ambiguity/specification gaps rather than internal contradictions, so no duplicate follow-up steps were added.
+
+---
+
+## Ambiguity follow-up — 2026-05-30 (third pass, startup/capability/provenance)
+
+Completed the three newly added ambiguity follow-up items in `design-steps.md` by refining `design.md`:
+
+- Persisted `speed-mode` / `effort-override` now have explicit shared-config accessor and app-runtime/session-default startup wiring. Explicit `:normal` speed and explicit nil effort are higher-precedence masks, while request shaping still treats provider-default values as omitted native params.
+- Mid-system capability checks now use the runtime-resolved active model (with OAuth/auth context where available), falling back to the stored session model only if runtime resolution fails, so OpenAI chat-completions and Codex/responses runtime overrides classify correctly.
+- `:mid-system` journal provenance is optional but expected: the extension API infers it from extension provenance when omitted, trusted/internal callers may pass `{:source ...}`, and dispatch stores the resulting source with a `:extension` fallback.
