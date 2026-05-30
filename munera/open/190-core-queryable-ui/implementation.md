@@ -130,3 +130,7 @@ Found one new actionable inconsistency after re-reading `design.md` against its 
 ## 2026-05-30 inconsistency follow-up
 
 Completed the newly added session/runtime correlation vocabulary follow-up in `design.md`: descriptor invocation data now uses only `:psi.ui.invocation/session-id` / `:psi.ui.invocation/runtime-id` or omits session id for runtime-global actions, while `:psi.ui.request/session-id` / `:psi.ui.request/runtime-id` are explicitly request-payload keys copied from descriptor invocation data by the later `:psi.ui/request-action` submission path.
+
+## 2026-05-30 design ambiguity review
+
+Found two new actionable ambiguities after re-reading `design.md` against the current EQL/provider/frontend-mode seams: provider-error diagnostics mention optional `:psi.ui/diagnostic` data without declaring whether it is an EQL attr/output/discovery surface, and console/headless unavailable semantics leave console without a real make-visible mechanism able to be represented as either no provider, no attached UI, or attached UI with unsupported capability.
