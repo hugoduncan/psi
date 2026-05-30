@@ -90,3 +90,4 @@
 - [x] Add provider-error diagnostic redaction before exposing `:psi.ui/diagnostic`: redact stack traces, frontend object printed forms, tokens/secrets, secret-bearing paths/data, and arbitrary exception data; add focused tests proving bounded redacted output.
 - [x] Update `create-nullable-extension-api` so documented UI capability queries that include `:psi.ui/diagnostic` return the nullable unsupported-console UI capability map, and add coverage for that query shape.
 - [x] Validate and cover provider results that set `:psi.ui/available? false` while advertising capabilities or available actions; they must not expose contradictory available action descriptors through EQL.
+- [ ] Ensure RPC/Emacs contexts do not expose the default static Emacs make-visible provider before the late-bound RPC UI capability provider is installed; add coverage for bootstrap/pre-install unavailable semantics.

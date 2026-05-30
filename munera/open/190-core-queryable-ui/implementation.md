@@ -476,3 +476,12 @@ Verification:
 
 - `clojure -M:test --focus psi.agent-session.ui-capabilities-test` — 15 tests, 90 assertions, 0 failures.
 - `clj-kondo --lint components/agent-session/src/psi/agent_session/ui_capabilities.clj components/agent-session/test/psi/agent_session/ui_capabilities_test.clj` — clean.
+
+## 2026-05-30 implementation review
+
+Found one new actionable implementation issue after re-reading task artifacts, UI capability/provider code, RPC runtime wiring, extension docs, and focused tests: RPC/Emacs contexts still install the default static `:emacs` make-visible provider during `create-context` before `psi.rpc.runtime/start-runtime!` installs the late-bound RPC provider. Because `start-runtime!` bootstraps the session before replacing that provider, extension/bootstrap queries can observe an available Emacs make-visible action without RPC focus-session correlation or a confirmed attached frontend, contradicting the design's late-install/no-stale-provider lifecycle. Ensure the RPC path does not expose the static default Emacs provider before the connection-local provider is installed, and add coverage for the pre-install/bootstrap semantics.
+
+Verification:
+
+- `clojure -M:test --focus psi.agent-session.ui-capabilities-test --focus psi.agent-session.graph-surface-test --focus psi.extension-test-helpers.nullable-api-test` — 40 tests, 2399 assertions, 0 failures.
+- `clj-kondo --lint components/agent-session/src/psi/agent_session/ui_capabilities.clj components/agent-session/src/psi/agent_session/context.clj components/agent-session/src/psi/agent_session/resolvers/extensions.clj components/rpc/src/psi/rpc/runtime.clj components/extension-test-helpers/src/psi/extension_test_helpers/nullable_api.clj components/agent-session/test/psi/agent_session/ui_capabilities_test.clj components/agent-session/test/psi/agent_session/graph_surface_test.clj components/extension-test-helpers/test/psi/extension_test_helpers/nullable_api_test.clj` — clean.
