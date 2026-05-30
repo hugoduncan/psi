@@ -18,3 +18,7 @@ Found one actionable inconsistency: `design.md` mixes unnamespaced `:ui.capabili
 ## 2026-05-30 inconsistency follow-up
 
 Completed the vocabulary alignment follow-up in `design.md`: normative examples and extension usage now use `:psi.ui.capability/make-visible`, and the older `:ui.capability/...` shorthand is explicitly non-normative and not a contract for implementation, tests, or extension guidance.
+
+## 2026-05-30 design ambiguity review
+
+Found two new actionable ambiguities after re-reading `design.md` and the current UI/query seams: unsupported/headless/provider-error return semantics for `:psi.ui/make-visible-action` remain underspecified, and the UI action request contract still names a route without an exact payload/submission/result shape if invocation is implemented in this slice.
