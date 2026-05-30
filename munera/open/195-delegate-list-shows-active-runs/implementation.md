@@ -58,3 +58,5 @@
 
 
 2026-05-30 ambiguity follow-up: clarified deterministic newest selection for terminal-only duplicate eligible delegate workflow background jobs. Terminal-only duplicate groups choose the displayed background status by newest `completed-at`, then `completed-seq`, then `job-seq`, then lexicographic `job-id`; missing ordering fields lose to present values. Marked the ambiguity design-step complete.
+
+2026-05-30 design inconsistency review: re-read design.md, existing design-steps.md/history, task-design guidance, delegate workflow list/run/continue/remove implementation, delegate text projection, orchestration background-job provenance, background-job state/runtime/resolver surfaces, canonical workflow run resolver/remove/status model, and workflow docs/retention contract. No new actionable design inconsistencies found beyond already captured and resolved visibility, retained terminal/timed-out handling, malformed workflow-id, active remove cleanup, provenance/read-surface, duplicate-job, and terminal duplicate ordering rules. design-steps.md unchanged.
