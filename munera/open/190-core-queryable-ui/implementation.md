@@ -72,3 +72,8 @@ Completed both newly added ambiguity follow-ups in `design.md`:
 ## 2026-05-30 design inconsistency review
 
 Found one new actionable inconsistency: `design.md` says the UI capability/action model is owned by core/runtime state, but later requirements and acceptance criteria say advertised capabilities/actions must be derived on demand and not stored in root state. The ownership wording should be aligned to core/runtime contract/provider ownership rather than implying persisted root-state ownership.
+
+## 2026-05-30 inconsistency follow-up
+
+Completed the newly added model-ownership wording follow-up in `design.md`: the UI capability/action model is now described as core/runtime-owned at the query/provider contract boundary, while advertised capabilities/actions are explicitly derived on demand and not stored or cached in root state.
+

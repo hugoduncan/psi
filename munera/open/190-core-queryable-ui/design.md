@@ -25,7 +25,7 @@ This task adds a runtime-scoped, core-owned query surface for UI capabilities an
 
 In scope:
 
-- Define a serialisable UI capability/action model owned by core/runtime state, not by a concrete frontend namespace and not by individual agent sessions.
+- Define a serialisable UI capability/action model owned by the core/runtime query and provider contract, not by persisted root-state advertisements, a concrete frontend namespace, or individual agent sessions.
 - Expose UI information through the Pathom/EQL graph used by extensions and `psi-tool`, using a `:psi.ui/...` attribute namespace unless implementation discovery shows a stronger existing convention.
 - Include at least one discoverable action descriptor for making the UI visible when a frontend supports it.
 - Keep capabilities separate from actions so extensions can reason about what is possible without branching on concrete UI type.
@@ -236,7 +236,7 @@ Rejected/unsupported/failed results include `:psi.ui.result/reason` as a machine
 
 ## Acceptance criteria
 
-- A runtime-scoped, core-owned, serialisable UI capability/action model exists and is documented in code or task implementation notes; capabilities/actions are derived on demand rather than cached in root state.
+- A runtime-scoped, core-owned, serialisable UI capability/action model exists and is documented in code or task implementation notes; core owns the query/provider contract, while advertised capabilities/actions are derived on demand rather than stored or cached in root state.
 - EQL exposes UI availability, capabilities, and actions through `:psi.ui/...` attrs unless implementation discovery justifies different names.
 - Graph discovery surfaces include the new UI attrs/resolvers.
 - Capabilities are exposed separately from action descriptors.
