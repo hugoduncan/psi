@@ -873,3 +873,8 @@ Remaining Slice 4 work: compaction preservation and tests, plus any broader focu
 ## Design ambiguity review pass — 2026-05-30 (plan/steps current implementation-state verification)
 
 No new actionable ambiguities found. Re-read `plan.md`, `steps.md`, `design-steps.md`, and recent `implementation.md` notes, then checked representative referenced implementation/test surfaces for the current Slice 4 state: mid-system capability resolver/dispatch/extension mutation wiring, provider message transforms, prompt-request projection/current-user replacement, and the still-open compaction/doc verification steps. The plan and steps remain unambiguous: Slice 4 has completed capability/injection/API work, compaction preservation and related tests remain explicitly unchecked, and Slice 5 owns docs/changelog plus broad verification. Existing ambiguity follow-ups in `design-steps.md` are checked; no duplicate follow-up items were added.
+---
+
+## Ambiguity follow-up execution — 2026-05-30 (current implementation-state no-op)
+
+Read `design-steps.md` for unchecked ambiguity follow-up items added by the preceding ambiguity-review pass. No unchecked ambiguity design-step items were present (`unchecked count 0`), so there were no newly actionable ambiguity follow-ups to execute. No `design.md`, `plan.md`, or `steps.md` changes were required; the remaining unchecked work in `steps.md` is implementation/test work, not design ambiguity follow-up work.
