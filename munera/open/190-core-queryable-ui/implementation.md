@@ -154,3 +154,7 @@ Completed the newly added extension-authoring documentation follow-up in `doc/ar
 ## 2026-05-30 design ambiguity review
 
 No new actionable ambiguity feedback after re-reading `design.md`, referenced design artifacts/docs, and current UI/query/frontend seams. The design now defines provider ownership/lifetime, runtime-scoped query semantics, descriptor/request boundaries, unsupported/error cases, invocation schemas, legacy UI-type compatibility, and console/headless classification clearly enough for implementation planning.
+
+## 2026-05-30 ambiguity follow-up execution
+
+No newly added unchecked ambiguity follow-up items remained in `design-steps.md`; no `design.md` changes were needed and no ambiguity steps were left blocked.
