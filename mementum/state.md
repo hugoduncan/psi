@@ -79,6 +79,7 @@ Bootstrapped on 2026-04-02.
 - Backlog: `105-agent-session-component-extraction-map`, `124-turn-execution-contract-extraction`, `149-reload-fixup-inventory-and-safety`, `141`/`144`/`147` workflow items, `186-built-in-skill-for-developing-extensions`
 
 ## Latest session notes
+- 2026-05-30: Task 190 test review found actionable coverage gap: scoped `/speed` and `/effort` tests prove command/session state but not project/user persistence writes or explicit default masks. Added unchecked follow-up in `steps.md` and committed review note (`b8d39a66`).
 - 2026-05-30: Task 190 inconsistency follow-up complete: reran final-state `bb test` after the latest compaction replay code/test follow-up, full suite passed, and checked the post-final full-suite verification item in `design-steps.md`. Commit `ca2c68b6`.
 - 2026-05-30: Task 190 plan/steps inconsistency review found one new actionable inconsistency: Slice 5 `bb test` verification is checked/recorded before the later compaction replay post-history code/test follow-up, so final-state full-suite verification evidence is stale. Added unchecked `design-steps.md` follow-up and implementation review note.
 - 2026-05-30: Task 190 Slice 5 integration/coherence pass complete: README/doc/configuration/doc/tui/doc/extension-api/CHANGELOG updated for Opus 4.8, `/speed`, `/effort`, and mid-system extension injection; RPC xhigh display tests aligned; focused tests, targeted lint, and full `bb test` green.
