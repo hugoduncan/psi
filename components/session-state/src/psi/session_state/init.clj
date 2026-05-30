@@ -50,6 +50,14 @@
    :developer-prompt :developer-prompt-source :cache-breakpoints :scoped-models
    :tool-output-overrides :ui-type :context-tokens :context-window])
 
+(def ^:private resume-inherited-fields
+  "Fields inherited by resume.
+
+   Resume intentionally excludes session-transient request overrides such as
+   speed-mode. A cold journal resume reconstructs model/thinking-level from
+   journal entries but does not restore lightweight request overrides."
+  (vec (remove #{:speed-mode} common-inherited-fields)))
+
 (def ^:private prompt-state-fields
   "Prompt assembly state — inherited by new and resume, not by fork.
    Fork rebuilds prompt state from the parent through a different path."
@@ -152,7 +160,7 @@
         updated-at    (or (some-> entries last :timestamp)
                           header-ts)
         baseline     (merge (model/initial-session)
-                            (select-keys current-sd (into common-inherited-fields
+                            (select-keys current-sd (into resume-inherited-fields
                                                           prompt-state-fields)))
         next-sd      (assoc baseline
                             :session-id session-id

@@ -794,3 +794,19 @@ Verification:
 - `clj-kondo --lint` on all modified source/test paths — clean.
 
 Remaining Slice 2 work: add cold-resume transience proof and decide whether any additional session mutation/persistence assertions are needed before moving to Slice 3.
+
+## Implementation pass — 2026-05-30 (Slice 2 speed cold-resume transience)
+
+Completed the remaining Slice 2 transience proof:
+
+- Split resume inheritance in `session_state/init.clj` so cold journal resume excludes session-transient `:speed-mode` while preserving common lifecycle inheritance for new/fork paths.
+- Added session lifecycle coverage proving a source session with `:speed-mode :fast` resumes a cold journal with canonical session `:speed-mode nil` and resolver display `:normal`.
+- Marked the Slice 2 speed session mutation/resolver/startup/cold-resume test step complete.
+
+Verification:
+
+- `clj-paren-repair components/session-state/src/psi/session_state/init.clj components/agent-session/test/psi/agent_session/session_lifecycle_test.clj` — no changes needed.
+- `clojure -M:test --focus psi.agent-session.session-lifecycle-test` — 11 tests, 119 assertions, 0 failures.
+- `clj-kondo --lint components/session-state/src/psi/session_state/init.clj components/agent-session/test/psi/agent_session/session_lifecycle_test.clj` — clean.
+
+Slice 2 is now complete. Next concrete work: Slice 3 effort override and adaptive `:xhigh` stack.

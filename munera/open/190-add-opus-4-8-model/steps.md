@@ -28,7 +28,7 @@
 - [x] Add OpenAI chat-completions request shaping for `service_tier: "flex"` only when speed mode is `:fast`.
 - [x] Confirm Codex/responses request shaping omits speed mode.
 - [x] Add tests for speed command success/error branches and scope handling.
-- [ ] Add tests for speed session mutation, resolver projection, startup config masks, and cold resume transience.
+- [x] Add tests for speed session mutation, resolver projection, startup config masks, and cold resume transience.
 - [x] Add tests for Anthropic and OpenAI speed request shaping.
 
 ## Slice 3 — Effort override and adaptive `:xhigh`
