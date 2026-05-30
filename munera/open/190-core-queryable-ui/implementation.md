@@ -53,3 +53,7 @@ Completed both newly added ambiguity follow-ups in `design.md`:
 ## 2026-05-30 design inconsistency review
 
 Found one new actionable inconsistency: `resolved-design-questions.md` still describes unsupported states as using optional unavailable descriptors for diagnostics, while `design.md` and `design-decisions.md` now require `:psi.ui/make-visible-action` to always return an available or unavailable descriptor.
+
+## 2026-05-30 inconsistency follow-up
+
+Completed the newly added inconsistency follow-up in `resolved-design-questions.md`: unsupported states now match the current unavailable make-visible contract, with `:psi.ui/make-visible-action` always returning a descriptor and unavailable descriptors required rather than optional diagnostics.

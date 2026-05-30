@@ -30,7 +30,7 @@ No design blockers remain. The task is ready for implementation planning.
 4. Queryability and descriptor/event contract are required in this task; side-effecting generic invocation is optional and should become a follow-up if it is not small.
 5. Emacs make-visible should be a small command, proposed as `psi-emacs-show-active`, that shows/focuses the active Psi buffer using existing `pop-to-buffer` and prompt-focus behaviour.
 6. TUI/console should not claim make-visible unless real tmux target metadata and a safe command exist.
-7. Unsupported states use both absence of capability for normal extension logic and optional unavailable descriptors for diagnostics.
+7. Unsupported states use both absence of capability for normal extension logic and required unavailable descriptors for stable inspection: `:psi.ui/make-visible-action` always returns a descriptor, and unsupported/headless/provider-error cases return an unavailable descriptor with `:psi.ui.action/available? false`, a `:psi.ui.unavailable.reason/...` keyword, and `:psi.ui.action/unavailable-message`.
 8. UI capabilities/actions are derived on demand from the currently attached UI adapter/request channel. UI action requests use a core-owned event/subscription path: core emits a declarative UI request, active UI adapters subscribe and execute if they currently support it. Root state, if used, is limited to existing extension UI contribution state and optional request/result diagnostics.
 9. Docs to update: `doc/extensions.md`, `doc/extension-api.md`, and `doc/architecture.md`; README only if an existing pointer needs adjustment.
 
