@@ -115,6 +115,17 @@
                   {:role    :user
                    :content (normalize-user-content content)}))
 
+(defn add-system-message
+  "Add a mid-conversation system message to conversation.
+
+   CONTENT uses the same text normalization accepted by add-user-message. This
+   represents inline system messages in the conversation message stream; the
+   base system prompt remains on the conversation root."
+  [conversation content]
+  (append-message conversation
+                  {:role    :system
+                   :content (normalize-user-content content)}))
+
 (defn add-assistant-message
   "Add assistant message to conversation"
   [conversation message-data]

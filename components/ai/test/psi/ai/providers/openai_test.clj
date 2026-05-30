@@ -34,6 +34,17 @@
     (is (= "line one\nline two"
            (get-in codex-items [0 "content" 0 "text"])))))
 
+(deftest chat-completions-system-message-transform-test
+  ;; OpenAI chat completions receives inline system messages as wire role "system".
+  (testing "chat-completions-system-message-transform"
+    (let [convo (-> (conv/create "sys")
+                    (conv/add-user-message "q")
+                    (conv/add-system-message "Use short answers."))
+          messages (#'openai/transform-messages convo)]
+      (is (= [{:role "user" :content "q"}
+              {:role "system" :content "Use short answers."}]
+             messages)))))
+
 (deftest codex-streaming-test
   (testing "codex model streams via chatgpt backend and emits normalized events"
     (let [model      (models/get-model :gpt-5.3-codex)

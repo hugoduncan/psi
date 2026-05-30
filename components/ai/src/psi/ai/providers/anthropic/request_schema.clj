@@ -54,10 +54,16 @@
    [:role [:= "assistant"]]
    [:content [:sequential anthropic-assistant-content-block-schema]]])
 
+(def ^:private anthropic-system-message-schema
+  [:map {:closed true}
+   [:role [:= "system"]]
+   [:content [:sequential anthropic-text-block-schema]]])
+
 (def ^:private anthropic-message-schema
   [:or
    anthropic-user-message-schema
-   anthropic-assistant-message-schema])
+   anthropic-assistant-message-schema
+   anthropic-system-message-schema])
 
 (def ^:private anthropic-tool-schema
   [:map {:closed true}

@@ -57,17 +57,17 @@
 
 ## Slice 4 — Mid-conversation system messages
 
-- [ ] Add `:system` to `psi.ai.schemas/MessageRole`.
-- [ ] Add optional `:supports-mid-conversation-system-messages` boolean metadata to the model schema with absent-as-false semantics.
-- [ ] Add `:mid-system` to `session-entry-kind-schema`.
-- [ ] Extend journal-to-provider projection to emit `:mid-system` entries as `{:role "system" ...}` provider-style text messages in conversation order.
-- [ ] Update prepared-turn current-user replacement to preserve a pending `... user, system` tail as `... current-user, system`.
-- [ ] Add or update AI conversation helpers so system messages are represented as schema-valid keyword-role `:system` messages with normalized text content.
-- [ ] Extend turn-runtime conversation `append-msg` to normalize projected provider-style system text blocks into canonical AI messages.
-- [ ] Extend Anthropic message transformation to emit inline `{"role":"system"}` messages for internal `:system` messages.
-- [ ] Add Anthropic transform placement validation that allows `user → system` even when system is final, and drops/logs invalid beginning, consecutive-system, or after-assistant system messages.
-- [ ] Add Anthropic request schema support for inline system messages with text-block content.
-- [ ] Extend OpenAI chat-completions message transformation to map internal `:system` to wire role `"system"`.
+- [x] Add `:system` to `psi.ai.schemas/MessageRole`.
+- [x] Add optional `:supports-mid-conversation-system-messages` boolean metadata to the model schema with absent-as-false semantics.
+- [x] Add `:mid-system` to `session-entry-kind-schema`.
+- [x] Extend journal-to-provider projection to emit `:mid-system` entries as `{:role "system" ...}` provider-style text messages in conversation order.
+- [x] Update prepared-turn current-user replacement to preserve a pending `... user, system` tail as `... current-user, system`.
+- [x] Add or update AI conversation helpers so system messages are represented as schema-valid keyword-role `:system` messages with normalized text content.
+- [x] Extend turn-runtime conversation `append-msg` to normalize projected provider-style system text blocks into canonical AI messages.
+- [x] Extend Anthropic message transformation to emit inline `{"role":"system"}` messages for internal `:system` messages.
+- [x] Add Anthropic transform placement validation that allows `user → system` even when system is final, and drops/logs invalid beginning, consecutive-system, or after-assistant system messages.
+- [x] Add Anthropic request schema support for inline system messages with text-block content.
+- [x] Extend OpenAI chat-completions message transformation to map internal `:system` to wire role `"system"`.
 - [ ] Add a shared model-supports-mid-system predicate using runtime-resolved model data, explicit metadata, and OpenAI chat-completions API-shape inference.
 - [ ] Add `:psi.agent-session/model-supports-mid-system-messages` resolver using the shared capability predicate.
 - [ ] Add `:session/inject-mid-system-message` dispatch handler with capability gating and placement validation that ignores non-conversational metadata after the latest user turn.

@@ -3,6 +3,7 @@
             [clojure.string :as str]
             [clj-http.client :as http]
             [cheshire.core :as json]
+            [taoensso.timbre :as timbre]
             [psi.ai.content :as ai-content]
             [psi.ai.models :as models]
             [psi.ai.proxy :as proxy]
@@ -20,7 +21,6 @@
 (def ^:private interleaved-thinking-beta "interleaved-thinking-2025-05-14")
 (def ^:private prompt-caching-beta "prompt-caching-2024-07-31")
 (def ^:private prompt-caching-scope-beta "prompt-caching-scope-2026-01-05")
-(def ^:private fast-mode-beta "fast-mode-2026-02-01")
 (defn- anthropic-cache-control
   [cache-control]
   (when (= :ephemeral (:type cache-control))
@@ -173,7 +173,28 @@
     :tool-result
     (append-tool-result acc (tool-result-block msg canonical-id))
 
+    :system
+    (conj acc {:role "system"
+               :content (user-content msg)})
+
     acc))
+
+(defn- valid-inline-system-placement?
+  [acc]
+  (= "user" (:role (peek acc))))
+
+(defn- transform-message-with-placement
+  [canonical-id fallback-request acc idx msg]
+  (if (= :system (:role msg))
+    (if (valid-inline-system-placement? acc)
+      (transform-message canonical-id fallback-request acc msg)
+      (do
+        (timbre/warn {:role (:role msg)
+                      :index idx
+                      :previous-role (:role (peek acc))}
+                     "Dropping invalid Anthropic inline system message placement")
+        acc))
+    (transform-message canonical-id fallback-request acc msg)))
 
 (defn transform-messages
   "Transform conversation messages to Anthropic API format."
@@ -189,11 +210,13 @@
      (->> (:messages conversation)
           (map-indexed vector)
           (reduce (fn [acc [idx msg]]
-                    (transform-message canonical-id
-                                       (when (= idx last-user-index)
-                                         fallback-request)
-                                       acc
-                                       msg))
+                    (transform-message-with-placement
+                     canonical-id
+                     (when (= idx last-user-index)
+                       fallback-request)
+                     acc
+                     idx
+                     msg))
                   [])))))
 
 ;; Extended thinking: budget_tokens per level. Adaptive thinking (Opus 4.7+): effort string.
@@ -267,7 +290,7 @@
                                             prompt-caching-scope-beta])
                 extended-thinking?   (conj interleaved-thinking-beta)
                 prompt-caching?      (conj prompt-caching-beta)
-                (= :fast speed-mode) (conj fast-mode-beta)
+                (= :fast speed-mode) (conj "fast-mode-2026-02-01")
                 structured-output?   (conj anthropic-structured-output/json-schema-output-beta))]
     (when (seq betas)
       (->> betas

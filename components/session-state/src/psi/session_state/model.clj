@@ -58,7 +58,7 @@
    [:shortcuts {:optional true} [:set :string]]])
 
 (def session-entry-kind-schema
-  [:enum :message :thinking-level :model :compaction :branch-summary
+  [:enum :message :mid-system :thinking-level :model :compaction :branch-summary
    :custom :custom-message :label :session-info :logprobs])
 
 (def session-entry-schema

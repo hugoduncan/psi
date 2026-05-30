@@ -730,6 +730,38 @@
                :text "tail"}]
              (get-in out [0 :content]))))))
 
+(deftest transform-messages-handles-inline-system-placement-test
+  ;; Anthropic inline system messages are allowed only immediately after user messages.
+  (testing "valid user-system tail is emitted"
+    (let [convo {:messages [{:role :user :content {:kind :text :text "q"}}
+                            {:role :system :content {:kind :text :text "Use short answers."}}]}
+          out   (anthropic/transform-messages convo)]
+      (is (= [{:role "user" :content [{:type "text" :text "q"}]}
+              {:role "system" :content [{:type "text" :text "Use short answers."}]}]
+             out))))
+
+  (testing "invalid beginning, consecutive, and after-assistant systems are dropped"
+    (let [convo {:messages [{:role :system :content {:kind :text :text "drop first"}}
+                            {:role :user :content {:kind :text :text "q"}}
+                            {:role :system :content {:kind :text :text "keep"}}
+                            {:role :system :content {:kind :text :text "drop consecutive"}}
+                            {:role :assistant :content {:kind :text :text "a"}}
+                            {:role :system :content {:kind :text :text "drop after assistant"}}]}
+          out   (anthropic/transform-messages convo)]
+      (is (= ["user" "system" "assistant"] (mapv :role out)))
+      (is (= "keep" (get-in out [1 :content 0 :text]))))))
+
+(deftest anthropic-request-schema-accepts-inline-system-message-test
+  ;; Local validation accepts valid inline system messages; placement is enforced separately.
+  (testing "anthropic-request-schema-accepts-inline-system-message"
+    (let [body {:model "claude-opus-4-8"
+                :max_tokens 1024
+                :messages [{:role "user"
+                            :content [{:type "text" :text "q"}]}
+                           {:role "system"
+                            :content [{:type "text" :text "Use short answers."}]}]}]
+      (is (= body (request-schema/validate-request-body! body))))))
+
 (deftest anthropic-speed-mode-request-shaping-test
   ;; Fast speed mode is both a body parameter and a beta header; default modes omit both.
   (let [model (models/get-model :sonnet-4.6)

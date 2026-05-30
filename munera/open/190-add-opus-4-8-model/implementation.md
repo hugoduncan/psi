@@ -828,3 +828,23 @@ Verification:
 - `clj-kondo --lint` on modified source/test paths — clean.
 
 Slice 3 is complete. Next concrete work: Slice 4 mid-conversation system messages.
+
+## Implementation pass — 2026-05-30 — Slice 4 mid-system foundation
+
+Implemented the first concrete Slice 4 mid-conversation system-message slice:
+
+- Added `:system` to the AI message role schema and `conv/add-system-message` for schema-valid inline system messages.
+- Added `:mid-system` to the session journal entry-kind schema.
+- Extended journal projection so `:mid-system` entries emit provider-style `{:role "system" :content [{:type :text :text ...}]}` messages while ignoring intervening non-conversational metadata.
+- Updated prepared-turn current-user replacement to preserve a pending `... user, system` tail as `... current-user, system`.
+- Extended turn-runtime conversation assembly to normalize provider-style system text blocks into canonical AI `:system` messages.
+- Extended Anthropic transformation/schema support for inline system messages, with placement validation that allows final `user → system` requests and drops/logs invalid beginning, consecutive-system, or after-assistant system messages.
+- Extended OpenAI chat-completions transformation to map internal `:system` messages to wire role `"system"`.
+- Added focused tests for journal projection, current-user replacement, conversation normalization, Anthropic transform/schema acceptance, and OpenAI transform.
+
+Verification:
+
+- `clojure -M:test --focus psi.agent-session.prompt-request-test --focus psi.agent-session.conversation-test --focus psi.ai.providers.anthropic-test --focus psi.ai.providers.openai-test` — 65 tests, 322 assertions, 0 failures.
+- `clj-kondo --lint` on modified source/test paths — clean.
+
+Remaining Slice 4 work: shared mid-system capability predicate/resolver, dispatch injection handler, extension API/Pathom mutation wiring, compaction preservation, and their focused tests.

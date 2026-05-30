@@ -125,6 +125,10 @@
                           :tool_call_id (:tool-call-id msg)
                           :content      (content/tool-result-text msg)})
 
+               :system
+               (conj acc {:role "system"
+                          :content (content/user-message-text msg)})
+
                acc))
            [])))))
 

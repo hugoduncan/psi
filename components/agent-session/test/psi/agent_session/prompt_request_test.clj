@@ -218,6 +218,42 @@
       (is (= ["assistant" "toolResult" "user"] (mapv :role messages)))
       (is (= "done" (get-in (second messages) [:content 0 :text]))))))
 
+(deftest journal->provider-messages-projects-mid-system-test
+  ;; Mid-system journal entries project to inline system provider messages and
+  ;; metadata entries between user and mid-system are ignored by provider projection.
+  (testing "journal->provider-messages-projects-mid-system"
+    (let [user-entry {:kind :message
+                      :data {:message {:role "user"
+                                       :content [{:type :text :text "question"}]}}}
+          metadata-entry {:kind :thinking-level
+                          :data {:thinking-level :high}}
+          mid-system-entry {:kind :mid-system
+                            :data {:text "Use short answers." :source :test}}
+          messages (prompt-request/journal->provider-messages
+                    [user-entry metadata-entry mid-system-entry])]
+      (is (= ["user" "system"] (mapv :role messages)))
+      (is (= [{:type :text :text "Use short answers."}]
+             (:content (second messages)))))))
+
+(deftest replace-current-user-message-preserves-pending-mid-system-tail-test
+  ;; Prepared-turn assembly replaces the current user even when a pending
+  ;; mid-system message is attached after it.
+  (testing "replace-current-user-message-preserves-pending-mid-system-tail"
+    (let [base-messages [{:role "assistant"
+                          :content [{:type :text :text "previous"}]}
+                         {:role "user"
+                          :content [{:type :text :text "raw"}]}
+                         {:role "system"
+                          :content [{:type :text :text "Use short answers."}]}]
+          expanded-user {:role "user"
+                         :content [{:type :text :text "expanded"}]}
+          messages (#'prompt-request/replace-current-user-message
+                    base-messages
+                    expanded-user)]
+      (is (= ["assistant" "user" "system"] (mapv :role messages)))
+      (is (= "expanded" (get-in messages [1 :content 0 :text])))
+      (is (= "Use short answers." (get-in messages [2 :content 0 :text]))))))
+
 (deftest tail-dangling-tool-result-repairs-test
   (testing "returns repair for dangling trailing assistant tool call"
     (let [assistant {:role "assistant"

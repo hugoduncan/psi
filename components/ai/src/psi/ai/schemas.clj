@@ -17,7 +17,7 @@
   [:enum :anthropic-messages :openai-completions :openai-codex-responses])
 
 (def MessageRole
-  [:enum :user :assistant :tool-result])
+  [:enum :user :assistant :tool-result :system])
 
 (def StopReason
   [:enum :stop :length :tool-use :error :aborted])

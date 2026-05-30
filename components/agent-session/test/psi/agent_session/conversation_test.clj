@@ -58,6 +58,24 @@
       (is (= {:kind :text :text "u2"}
              (dissoc (:content (second (:messages conv))) :cache-control))))))
 
+(deftest system-provider-messages-become-canonical-ai-system-messages-test
+  ;; Inline system provider messages are normalized into schema-valid AI
+  ;; conversation messages, not passed through as provider-shaped content.
+  (testing "system-provider-messages-become-canonical-ai-system-messages"
+    (let [messages [{:role "user" :content [{:type :text :text "q"}]}
+                    {:role "system"
+                     :content [{:type :text
+                                :text "Use short answers."
+                                :cache-control {:type :ephemeral}}]}]
+          conv (#'conv-translate/agent-messages->ai-conversation
+                "sys" messages [] {})
+          system-msg (second (:messages conv))]
+      (is (= [:user :system] (mapv :role (:messages conv))))
+      (is (= {:kind :text
+              :text "Use short answers."
+              :cache-control {:type :ephemeral}}
+             (:content system-msg))))))
+
 (deftest cache-breakpoints-are-projected-into-ai-conversation-test
   ;; System and tools cache breakpoints are applied to the provider conversation.
   ;; The entire system prompt is now one cacheable block (time+cwd frozen).
