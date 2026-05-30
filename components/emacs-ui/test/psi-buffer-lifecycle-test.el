@@ -533,7 +533,6 @@
             (when (buffer-live-p stderr)
               (kill-buffer stderr))))))))
 
-
 (ert-deftest psi-footer-update-does-not-insert-newline-into-draft ()
   "Upserting the projection block must not corrupt in-progress draft text.
 
@@ -549,8 +548,6 @@ starts with \"\\n\" so the extra call was both redundant and harmful."
       (psi-emacs--ensure-startup-banner)
       (setf (psi-emacs-state-draft-anchor psi-emacs--state)
             (copy-marker (point-max) nil))
-      ;; Establish input separator and seed an initial footer (simulates
-      ;; show-connecting-affordances at startup).
       (psi-emacs--ensure-input-area)
       (setf (psi-emacs-state-projection-footer psi-emacs--state) "connecting...")
       (psi-emacs--upsert-projection-block)
@@ -561,7 +558,6 @@ starts with \"\\n\" so the extra call was both redundant and harmful."
         ;; Now simulate footer/updated arriving from the backend (RPC connected).
         (setf (psi-emacs-state-projection-footer psi-emacs--state) "idle · claude-3-5-sonnet")
         (psi-emacs--upsert-projection-block)
-        ;; Draft text must be exactly what the user typed — no injected newline.
         (should (equal draft-before (psi-emacs--tail-draft-text)))
         (should (equal "hello" (psi-emacs--tail-draft-text)))))))
 
@@ -606,7 +602,6 @@ the seed during handshaking and disconnected states."
                            (null (psi-emacs-state-projection-footer state))
                            (null (psi-emacs--region-bounds 'projection 'main)))
                   (psi-emacs--show-connecting-affordances (current-buffer))))
-              ;; With transport ready, show-connecting-affordances must NOT have fired.
               (should (null (psi-emacs-state-projection-footer psi-emacs--state))))
           (when (process-live-p mock-process)
             (delete-process mock-process)))))))
@@ -740,7 +735,6 @@ so the user sees the connecting affordance."
         (kill-buffer buffer)))))
 
 (ert-deftest psi-show-active-focuses-current-psi-buffer-prompt-after-pop-to-buffer ()
-  "The public make-visible command focuses the current Psi buffer prompt."
   (let ((buffer (generate-new-buffer " *psi-show-active-current*"))
         (original-window-config (current-window-configuration)))
     (unwind-protect
@@ -770,7 +764,6 @@ so the user sees the connecting affordance."
         (kill-buffer buffer)))))
 
 (ert-deftest psi-show-active-falls-back-to-tracked-active-buffer ()
-  "The public make-visible command can show a tracked Psi buffer from elsewhere."
   (let ((buffer (generate-new-buffer " *psi-show-active-tracked*"))
         (psi-emacs--state-by-buffer (make-hash-table :test #'eq))
         (focused nil))
@@ -795,7 +788,6 @@ so the user sees the connecting affordance."
         (kill-buffer buffer)))))
 
 (ert-deftest psi-show-active-errors-when-no-active-psi-buffer-exists ()
-  "The public make-visible command fails clearly without an active Psi buffer."
   (let ((psi-emacs--state-by-buffer (make-hash-table :test #'eq)))
     (with-temp-buffer
       (should-error (psi-emacs-show-active)
