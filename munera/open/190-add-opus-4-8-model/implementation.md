@@ -208,3 +208,30 @@ Completed the newly added inconsistency follow-up item in `design-steps.md` by r
 1. **Explicit nil effort config through merged resolution** — The design requires `resolved-effort-override` to distinguish missing/invalid from explicit persisted nil after shared-config merging, but the current config resolver uses a flat `merge` over `system-defaults`, user, and project maps. Specify whether `:effort-override` is intentionally omitted from `system-defaults`, whether resolution tracks key presence/provenance before merge, or another mechanism preserves explicit nil masks; otherwise every resolved config may look explicitly nil or lower-precedence nil masks may be indistinguishable from absence.
 
 2. **Mid-system capability for custom/runtime OpenAI chat-completions models** — The design says all OpenAI chat-completions models support mid-conversation system messages while also making absent `:supports-mid-conversation-system-messages` mean false. Specify whether capability is inferred from runtime model API `:openai-completions`, or every built-in/custom/runtime OpenAI chat-completions model map must be explicitly annotated. Without this, custom OpenAI chat-completions models can be falsely gated off.
+
+---
+
+## Design ambiguity review pass — 2026-05-30 (latest pass)
+
+**New actionable ambiguities found:**
+
+1. **Extension mutation surface for `inject-mid-system-message!`** — The extension API is specified to call `mutate-ext-required` with `psi.extension/inject-mid-system-message`, and the design adds a dispatch handler, but it does not specify the Pathom mutation that bridges that extension op to dispatch, its params/output shape, or adding the op to the session-scoped extension mutation routing set. Without that surface the API function has no registered mutation to invoke.
+
+2. **Explicit `:normal` speed config through merged resolution** — Startup rules distinguish missing/invalid speed config from explicit persisted `:normal` speed masks, but the design does not specify the exact `resolved-speed-mode` return shape or whether `:speed-mode` is omitted from `system-defaults`. If a system default of `:normal` is introduced, the startup path cannot tell missing from explicit persisted `:normal` and may incorrectly store a session override.
+
+3. **Current-session state after scoped default clears** — `/speed normal project|user` is specified both as clearing the speed override and as persisting explicit `:normal` that masks lower-precedence layers; the session mutation also says it stores `:speed-mode` on the session. Specify whether the current session stores nil or `:normal` after scoped `/speed normal`, so resolver/state tests and request-option propagation assert the intended canonical shape.
+
+---
+
+## Ambiguity follow-up — 2026-05-30 (latest pass)
+
+Completed the two newly added ambiguity follow-up items in `design-steps.md` by refining `design.md`:
+
+- `resolved-effort-override` now preserves explicit persisted nil masks without extra provenance by omitting `:effort-override` from `shared-config.resolution/system-defaults` and using key presence after the normal user/project merge to distinguish absence from explicit nil. Invalid present values are treated as missing at startup.
+- Mid-system support for OpenAI chat-completions is now inferred from the runtime-resolved model API shape (`:provider :openai`, `:api :openai-completions`) as well as explicit capability metadata. Resolver and dispatch gating must use the same predicate, so custom/runtime-loaded OpenAI chat-completions models are not falsely gated off, while Codex/responses remain unsupported.
+
+Additional latest-pass follow-ups completed after re-reading the current `design-steps.md`:
+
+- Specified the extension mutation bridge for `inject-mid-system-message!`: Pathom op name, params/output, dispatch mapping, `all-mutations` registration, and `runtime_eql` session-scoped routing.
+- Specified `resolved-speed-mode` presence semantics: omit `:speed-mode` from `system-defaults`, use key presence after merge, and return a presence-aware accessor result so explicit persisted `:normal` masks are distinguishable from absence.
+- Clarified scoped `/speed normal project|user` current-session state: it stores explicit `:normal` in the current session after persisting the scoped default, while unscoped/session `/speed normal` clears to nil; both shapes omit provider speed params and resolve/display as `:normal`.

@@ -66,6 +66,14 @@
 
 ## From ambiguity review pass 2026-05-30 (latest pass)
 
-- [ ] **Specify explicit nil effort config resolution** — Define how `resolved-effort-override` distinguishes missing/invalid config from an explicit persisted nil after user/project config merging. State whether `:effort-override` is omitted from `system-defaults`, whether key presence/provenance is tracked before merge, or another mechanism preserves explicit nil masks.
+- [x] **Specify explicit nil effort config resolution** — Define how `resolved-effort-override` distinguishes missing/invalid config from an explicit persisted nil after user/project config merging. State whether `:effort-override` is omitted from `system-defaults`, whether key presence/provenance is tracked before merge, or another mechanism preserves explicit nil masks.
 
-- [ ] **Define mid-system capability for custom OpenAI chat-completions models** — Decide whether `:supports-mid-conversation-system-messages` is inferred from runtime model API `:openai-completions`, or whether every OpenAI chat-completions model map (including custom/runtime-loaded models) must explicitly carry `true`; update resolver/dispatch expectations accordingly.
+- [x] **Define mid-system capability for custom OpenAI chat-completions models** — Decide whether `:supports-mid-conversation-system-messages` is inferred from runtime model API `:openai-completions`, or whether every OpenAI chat-completions model map (including custom/runtime-loaded models) must explicitly carry `true`; update resolver/dispatch expectations accordingly.
+
+## From ambiguity review pass 2026-05-30 (latest pass)
+
+- [x] **Specify extension mutation surface for mid-system injection** — Add the `psi.extension/inject-mid-system-message` Pathom mutation/routing details that bridge the extension API call to `:session/inject-mid-system-message`, including params, output shape, and session-scoped extension mutation registration.
+
+- [x] **Specify explicit `:normal` speed config resolution** — Define how `resolved-speed-mode` distinguishes missing/invalid config from an explicit persisted `:normal` after user/project config merging. State whether `:speed-mode` is omitted from `system-defaults`, whether key presence/provenance is tracked before merge, or another mechanism preserves explicit `:normal` masks.
+
+- [x] **Clarify current-session state for scoped `/speed normal`** — Decide whether `/speed normal project|user` stores nil or `:normal` in the current session state after persisting the scoped explicit default, and align command, handler, resolver, request-options, and tests with that decision.

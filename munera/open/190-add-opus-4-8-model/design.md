@@ -212,8 +212,12 @@ selected scope a stable value that masks lower-precedence layers:
 
 - `/speed normal session` clears the in-memory session override (`nil` in
   session state).
-- `/speed normal project` writes `{:speed-mode :normal}` to project prefs.
-- `/speed normal user` writes `{:speed-mode :normal}` to user config.
+- `/speed normal project` writes `{:speed-mode :normal}` to project prefs and
+  stores `:speed-mode :normal` on the current session as the active explicit
+  scoped default.
+- `/speed normal user` writes `{:speed-mode :normal}` to user config and stores
+  `:speed-mode :normal` on the current session as the active explicit scoped
+  default.
 
 When effective config is applied to a new session, persisted `:normal` is
 interpreted as provider default/no native speed parameter, but it still wins over
@@ -221,12 +225,18 @@ lower-precedence `:fast` values.
 
 #### 12. Startup config application
 
-Shared-config resolution must expose a typed `resolved-speed-mode` accessor. The
-merged config map must preserve explicit `:normal` values from the winning scope
-rather than treating them as absent. `app-runtime/create-runtime-session-context`
-(or the equivalent startup/session-default construction path) must read that
-accessor and include `:speed-mode` in `:session-defaults` for newly created root
-sessions.
+Shared-config resolution must expose a typed `resolved-speed-mode` accessor.
+`:speed-mode` must be omitted from `shared-config.resolution/system-defaults` so
+`(contains? cfg :speed-mode)` distinguishes a persisted explicit `:normal` mask
+from absence after the normal user/project merge. The accessor returns a
+presence-aware result such as `{:present? true :value :normal}` or nil/absent for
+missing/invalid values; callers must not infer persistence presence from the
+value alone. The merged config map must preserve explicit `:normal` values from
+the winning scope rather than treating them as absent.
+`app-runtime/create-runtime-session-context` (or the equivalent
+startup/session-default construction path) must read that accessor and include
+`:speed-mode` in `:session-defaults` for newly created root sessions only when
+`present?` is true.
 
 Startup application rules:
 
@@ -244,7 +254,10 @@ Startup application rules:
 - `(session/query-in ctx sid [:psi.agent-session/speed-mode])` returns `:normal`
   (nil coerced) or `:fast` after `/speed fast`.
 - `/speed` with no args prints the current mode.
-- `/speed fast` sets mode; `/speed normal` clears it.
+- `/speed fast` sets mode; `/speed normal` clears the session override to nil.
+- `/speed normal project|user` persists and stores explicit session value
+  `:normal`; the resolver reports `:normal` and request shaping omits provider
+  speed params for both nil and `:normal`.
 - `/speed fast project` persists the setting to project prefs; `session` leaves
   it in-memory only; `user` writes user config.
 - `/speed normal project|user` persists explicit `:normal` at that scope, masking
@@ -435,15 +448,34 @@ fall through to a lower-precedence project/user override.
 
 Shared-config resolution must expose a typed `resolved-effort-override` accessor
 that can distinguish three cases in the already-merged config: missing/invalid,
-explicit nil, and an explicit effort keyword. Because project/user config maps are
-merged before this accessor runs, the winning higher-precedence layer is the only
-value that matters; an explicit nil from that layer masks lower-precedence effort
-overrides.
+explicit nil, and an explicit effort keyword.
+
+Concrete resolution rule: `:effort-override` must be intentionally omitted from
+`shared-config.resolution/system-defaults`. After the normal flat precedence
+merge (`system-defaults < user < project`), the accessor uses
+`(contains? cfg :effort-override)` to distinguish a persisted explicit nil from
+absence and returns a presence-aware result such as `{:present? true :value nil}`
+or `{:present? true :value :xhigh}`; missing/invalid returns nil/absent. This
+preserves nil masks without introducing a separate provenance data structure:
+
+- no user/project key -> merged config does not contain `:effort-override`;
+- lower-precedence `:effort-override :xhigh` and no higher key -> merged value is
+  `:xhigh`;
+- lower-precedence `:effort-override :xhigh` and higher-precedence
+  `:effort-override nil` -> merged value is nil and key presence records the
+  explicit clear/mask.
+
+Invalid present values are treated as missing for startup application (no session
+override is applied), but they still should be validated/rejected by the command
+and config schemas before being written by psi-owned paths. Because project/user
+config maps are merged before this accessor runs, the winning higher-precedence
+layer is the only value that matters; an explicit nil from that layer masks
+lower-precedence effort overrides.
 
 `app-runtime/create-runtime-session-context` (or the equivalent
 session-default construction path) must include the accessor result in
-`:session-defaults` for newly created root sessions when the key is present in the
-resolved config. Startup application rules:
+`:session-defaults` for newly created root sessions only when the accessor reports
+`present? true`. Startup application rules:
 
 - Missing/invalid config value → no session override (`nil` in session state) and
   no persisted mask.
@@ -524,7 +556,9 @@ EQL so extensions and workflows can introspect before injecting.
 Models that support it:
 - `:opus-4.8` — `true`
 - All other Anthropic models — `false` for now (add as Anthropic confirms)
-- All OpenAI chat-completions models — `true` (already supported by the API)
+- All OpenAI chat-completions models — supported by API-shape inference
+  (`:provider :openai`, `:api :openai-completions`) even if a custom/runtime
+  model map omits the explicit flag
 - Codex/responses models — `false`
 
 ### New internal message kind: `:mid-system`
@@ -549,9 +583,15 @@ Add `:system` to `MessageRole` enum.
 Add optional `:supports-mid-conversation-system-messages` boolean metadata to
 the `Model` schema in `schemas.clj`:
 `[:supports-mid-conversation-system-messages {:optional true} boolean?]`.
-Absent means false at every read/capability surface.  Set `true` on `:opus-4.8`
-and all OpenAI chat-completions models.  Other models may either omit the key or
-set it explicitly to `false`; both forms are semantically equivalent.
+Absent explicit metadata means false except for OpenAI chat-completions API-shape
+inference: any runtime-resolved model with `:provider :openai` and
+`:api :openai-completions` is treated as supporting mid-conversation system
+messages even when custom/runtime-loaded metadata omits the flag.  Set `true` on
+`:opus-4.8`; built-in OpenAI chat-completions models may also be annotated
+`true` for discoverability, but resolver/dispatch correctness must not depend on
+that annotation.  Other models may either omit the key or set it explicitly to
+`false`; both forms are semantically equivalent unless the OpenAI chat-completions
+API inference applies.
 
 #### 3. Session state (`components/session-state/src/psi/session_state/model.clj`)
 
@@ -629,9 +669,10 @@ New `:session/inject-mid-system-message` handler in
   request and must be retained.
 - Emits no runtime effects (journal-only; no notify, no steering message).
 
-#### 8. Extension API (`components/agent-session/src/psi/agent_session/extensions/api.clj`)
+#### 8. Extension API and mutation surface
 
-Add `inject-mid-system-message!` to the extension API:
+In `components/agent-session/src/psi/agent_session/extensions/api.clj`, add
+`inject-mid-system-message!` to the extension API:
 ```clojure
 inject-mid-system-message!
 (fn
@@ -645,11 +686,26 @@ inject-mid-system-message!
                         (cond-> {:text text}
                           (:source opts) (assoc :source (:source opts))))))
 ```
-Extensions call this to append updated instructions mid-conversation.  The
-function returns `{:ok true}`, `{:ok false :error :capability-not-supported}`
-when the active model does not support the feature, or `{:ok false :error
-:invalid-placement :reason ...}` for the invalid timing cases enforced by the
-dispatch handler.
+
+In `components/agent-session/src/psi/agent_session/mutations/extensions.clj`, add
+a Pathom mutation:
+
+- op-name: `psi.extension/inject-mid-system-message`
+- params: `[:psi/agent-session-ctx :session-id :text]`, with optional `:source`
+- output: `[:psi.extension/ok? :psi.extension/error :psi.extension/reason]`
+- behavior: dispatch `:session/inject-mid-system-message` with `{:session-id
+  session-id :text text :source source}` and return the dispatch result mapped to
+  the output keys (`{:ok true}` becomes `{:psi.extension/ok? true}`, while error
+  maps preserve `:error` and `:reason`).
+
+Register the mutation in `all-mutations`, and add
+`'psi.extension/inject-mid-system-message` to
+`extensions/runtime_eql.clj`'s `session-scoped-extension-mutation-ops` so runtime
+extension calls receive the active session id automatically. Extensions call this
+to append updated instructions mid-conversation. The API helper should translate
+the Pathom-shaped payload back to the compact result contract:
+`{:ok true}`, `{:ok false :error :capability-not-supported}`, or `{:ok false
+:error :invalid-placement :reason ...}`.
 
 Source/provenance contract: `:source` is optional metadata on the journal entry.
 If callers omit it, the extension API must infer a stable source from the current
@@ -664,20 +720,26 @@ provider-specific source value beyond this contract.
 
 Add `:psi.agent-session/model-supports-mid-system-messages` resolver:
 - Input: `[:psi/agent-session-ctx :psi.agent-session/session-id]`
-- Output: boolean derived from the runtime-resolved active model's
-  `:supports-mid-conversation-system-messages` flag, treating an absent flag as
-  `false`.
+- Output: boolean derived from the runtime-resolved active model. It is true when
+  `:supports-mid-conversation-system-messages` is explicitly true, or when the
+  runtime-resolved model has `:provider :openai` and `:api :openai-completions`.
+  It is false for absent flags on all other API shapes, explicit false, and
+  Codex/responses models.
 
 Capability lookup rule: both this resolver and
 `:session/inject-mid-system-message` must resolve support from the same
 runtime-resolved model view used for request execution, not merely from the
 reduced `:model` map stored in session state. Given the session provider/id, use
 `model-registry/resolve-runtime-model` (with the available OAuth/auth runtime
-context when the call site has one) and then read
-`:supports-mid-conversation-system-messages`; fall back to the stored session
-model only when runtime resolution cannot produce a model. This keeps OpenAI
-chat-completions models classified as supporting inline system messages while
-Codex/responses runtime overrides remain classified as unsupported.
+context when the call site has one) and then apply one predicate:
+`true? (:supports-mid-conversation-system-messages model)` OR
+`(and (= :openai (:provider model)) (= :openai-completions (:api model)))`.
+Fall back to the stored session model only when runtime resolution cannot produce
+a model, and apply the same predicate to that fallback map. This keeps built-in,
+custom, and OAuth/runtime-loaded OpenAI chat-completions models classified as
+supporting inline system messages without requiring every model map to carry the
+explicit flag, while Codex/responses runtime overrides remain classified as
+unsupported.
 
 This is the queryable capability surface extensions use before calling
 `inject-mid-system-message!`, and dispatch gating must match it exactly.
@@ -735,8 +797,8 @@ cache-control logic is required.
 ### Acceptance criteria — Part 4
 
 - `:opus-4.8` model map has `:supports-mid-conversation-system-messages true`.
-- All OpenAI chat-completions models have `:supports-mid-conversation-system-messages true`.
-- Codex/responses models and pre-4.8 Anthropic models have the flag `false` or absent.
+- All OpenAI chat-completions models are reported as supporting mid-conversation system messages, either by explicit `:supports-mid-conversation-system-messages true` metadata or by runtime `:provider :openai` + `:api :openai-completions` inference, including custom/runtime-loaded model maps that omit the flag.
+- Codex/responses models and pre-4.8 Anthropic models have the flag `false` or absent and are reported as unsupported.
 - `(session/query-in ctx sid [:psi.agent-session/model-supports-mid-system-messages])`
   returns `true` when an opus-4.8 session is active, `false` otherwise.
 - `inject-mid-system-message!` on an opus-4.8 session appends a `:mid-system`
