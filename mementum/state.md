@@ -67,7 +67,7 @@ Bootstrapped on 2026-04-02.
 - Task 158 addressed persistence test garbage (still open but test-review showed no actionable feedback).
 
 ## Suggested next step
-- For task 190, one new inconsistency design follow-up is open: reconcile native-only wording with referenced provider code, because the three provider extraction sites are shared by provider-native and prompted-JSON structured-output result emission.
+- For task 190, all current inconsistency and ambiguity design follow-ups are complete; next step is whichever review/build workflow is requested for the task.
 - Registry unification arc: use task `164-registry-semantics-unification-audit` plus completed outcomes through `177` to choose the next cleanup target.
 - Likely next registry cleanup candidates:
   - close or move any remaining Munera tasks whose implementation/review state is already complete
