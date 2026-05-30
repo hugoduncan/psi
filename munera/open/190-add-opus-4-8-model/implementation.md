@@ -647,3 +647,9 @@ No new actionable ambiguities found. Re-read `plan.md`, `steps.md`, `design-step
 ## Ambiguity follow-up execution — 2026-05-30 (post-plan verification no-op)
 
 Read `design-steps.md` for newly added unchecked ambiguity follow-up items after the preceding ambiguity-review pass. No unchecked ambiguity items were present; all ambiguity follow-ups are already marked complete. No `design.md` changes were required. `plan.md` and `steps.md` were already aligned with the current five-slice execution structure, so they were not changed.
+
+---
+
+## Design inconsistency review pass — 2026-05-30 (plan/steps post-docs verification)
+
+No new actionable inconsistencies found. Re-read `plan.md`, `steps.md`, `design-steps.md`, and recent `implementation.md` notes, then checked `design.md` for the plan/steps-owned surfaces: five-slice execution structure, Slice 5 documentation/changelog ownership, speed/effort scoped persistence/startup/resume semantics, mid-system extension/projection/compaction rules, and verification expectations. `plan.md` and `steps.md` remain aligned; all existing inconsistency follow-ups in `design-steps.md` are checked, so no duplicate follow-up items were added.
