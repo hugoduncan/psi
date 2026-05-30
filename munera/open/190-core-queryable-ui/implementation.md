@@ -507,3 +507,7 @@ Verification:
 
 - `clojure -M:test --focus psi.agent-session.ui-capabilities-test` — 15 tests, 107 assertions, 0 failures.
 - `clj-kondo --lint components/agent-session/src/psi/agent_session/ui_capabilities.clj components/agent-session/test/psi/agent_session/ui_capabilities_test.clj` — clean.
+
+## 2026-05-30 implementation review
+
+Found one new actionable implementation issue after re-reading task artifacts, UI capability/provider code, app-runtime TUI startup wiring, RPC lifecycle fixes, docs, and focused tests: TUI contexts still install the default attached `:tui` provider during context creation, before the TUI frontend/state is actually attached, and there is no TUI shutdown clear/downgrade path. This mirrors the already-fixed RPC pre-install/stale-provider class: bootstrap/extension queries during TUI startup can observe `:psi.ui/available? true` for an attached TUI before `tui-start-fn!` runs, and the provider can remain attached after the TUI exits if the ctx is queried. Align TUI provider installation/lifetime with the design's adapter-owned late install/clear semantics and add pre-start/bootstrap/shutdown coverage.

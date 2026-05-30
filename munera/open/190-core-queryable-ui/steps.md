@@ -92,3 +92,4 @@
 - [x] Validate and cover provider results that set `:psi.ui/available? false` while advertising capabilities or available actions; they must not expose contradictory available action descriptors through EQL.
 - [x] Ensure RPC/Emacs contexts do not expose the default static Emacs make-visible provider before the late-bound RPC UI capability provider is installed; add coverage for bootstrap/pre-install unavailable semantics.
 - [x] Normalize/trim Emacs RPC focused session ids before advertising make-visible availability, and cover nil/blank/whitespace focus state as no-attached UI.
+- [ ] Ensure TUI contexts do not expose a default attached TUI provider before the TUI frontend/state is installed, and clear or downgrade the provider on TUI shutdown; add pre-start/bootstrap/shutdown coverage.
