@@ -290,3 +290,7 @@ Found one new actionable inconsistency after re-reading `plan.md`, `steps.md`, `
 ## 2026-05-30 inconsistency follow-up execution
 
 Completed the newly added `steps.md` Slice 8 documentation-checklist alignment follow-up. The implementation checklist now treats `doc/extensions.md`, `doc/extension-api.md`, and `doc/architecture.md` as post-implementation re-verification/final-sync items, because their queryable-UI design-doc alignment was already completed during earlier design follow-up passes. No design step remains blocked.
+
+## 2026-05-30 plan/steps ambiguity review
+
+No new actionable ambiguity feedback after re-reading `plan.md`, `steps.md`, `implementation.md`, `design.md`, referenced design artifacts/docs, and sampled current UI/query/runtime/frontend seams. The implementation plan and checklist are clear enough to execute across discovery, model/validation, EQL discovery, runtime provider lifetime, frontend provider behaviour, optional invocation split, tests, docs, and verification; no new `design-steps.md` follow-up item was added.
