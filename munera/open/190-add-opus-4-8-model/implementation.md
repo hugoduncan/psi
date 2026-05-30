@@ -235,3 +235,9 @@ Additional latest-pass follow-ups completed after re-reading the current `design
 - Specified the extension mutation bridge for `inject-mid-system-message!`: Pathom op name, params/output, dispatch mapping, `all-mutations` registration, and `runtime_eql` session-scoped routing.
 - Specified `resolved-speed-mode` presence semantics: omit `:speed-mode` from `system-defaults`, use key presence after merge, and return a presence-aware accessor result so explicit persisted `:normal` masks are distinguishable from absence.
 - Clarified scoped `/speed normal project|user` current-session state: it stores explicit `:normal` in the current session after persisting the scoped default, while unscoped/session `/speed normal` clears to nil; both shapes omit provider speed params and resolve/display as `:normal`.
+
+---
+
+## Design ambiguity review pass — 2026-05-30 (verification pass)
+
+No new actionable ambiguities found. Re-read `design.md`, referenced extension mutation/runtime EQL surfaces, shared-config startup resolution, current-session speed clearing semantics, provider request assembly, and existing `design-steps.md`; the actionable ambiguity concerns are already captured in existing follow-up items and have no unduplicated additions for this pass.
