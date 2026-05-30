@@ -878,3 +878,11 @@ No new actionable ambiguities found. Re-read `plan.md`, `steps.md`, `design-step
 ## Ambiguity follow-up execution — 2026-05-30 (current implementation-state no-op)
 
 Read `design-steps.md` for unchecked ambiguity follow-up items added by the preceding ambiguity-review pass. No unchecked ambiguity design-step items were present (`unchecked count 0`), so there were no newly actionable ambiguity follow-ups to execute. No `design.md`, `plan.md`, or `steps.md` changes were required; the remaining unchecked work in `steps.md` is implementation/test work, not design ambiguity follow-up work.
+
+---
+
+## Design inconsistency review pass — 2026-05-30 (steps/test-status alignment)
+
+**New actionable inconsistency found:**
+
+1. **Slice 4 test steps remain unchecked after implementation notes say tests were added** — `implementation.md` records that focused tests were added for journal projection, prepared-turn current-user replacement, conversation normalization, Anthropic inline system transform/schema acceptance, and OpenAI system-role transformation. But the matching Slice 4 test items in `steps.md` are still unchecked. Align the task state by either marking those test steps complete after verifying the tests exist/pass, or revising the implementation note if the tests are incomplete.
