@@ -392,3 +392,11 @@ Completed the two newly added inconsistency follow-up items in `design-steps.md`
 
 - Part 3 step 6 now explicitly specifies that `codex-reasoning` must be changed to call the updated `reasoning-effort` function (or equivalent shared function incorporating effort override) rather than reading `reasoning/thinking-level->effort` directly, so the effort override actually reaches the Codex request path.
 - The `/speed fast` provider-semantics paragraph (canonical user-facing meaning and Anthropic/OpenAI mapping difference) is now in Part 2 after the speed mode values table, making Part 2 self-contained. The duplicate in Part 3 has been removed.
+
+---
+
+## Design ambiguity review pass — 2026-05-30 (session resume/journal gap)
+
+**New actionable ambiguity found:**
+
+1. **Speed/effort not restored on session resume** — The existing session resume path (`session_lifecycle.clj/resume-session-in!`) restores model and thinking-level from journal entries (`:kind :model` and `:kind :thinking-level`). The design adds `:speed-mode` and `:effort-override` to session state and specifies startup config application for *newly created root sessions* (Part 2 step 12, Part 3 step 10a), but does not add journal entry kinds for speed/effort changes, nor does it specify how resume restores them. If a user sets `/speed fast project` and then resumes a session, the resume path reads journal entries (which lack speed/effort kinds) and falls back to the source session's in-memory state — not the persisted project config. Decide whether (a) speed/effort changes should be recorded as journal entries (`:speed-mode` and `:effort-override` kinds) so resume restores them like thinking-level, (b) the resume path should re-read shared-config for speed/effort, or (c) speed/effort are intentionally session-transient and lost on resume (with explicit documentation of that limitation).
