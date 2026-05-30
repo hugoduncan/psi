@@ -69,6 +69,8 @@ Bootstrapped on 2026-04-02.
 
 ## Latest session notes
 
+- 2026-05-30: Task 190 follow-up completed the final unchecked streaming header item: `turn-runtime/make-provider-event-consumer` now forwards normalized `:provider-error/headers` from streaming `:error` events into `:turn/error`, and the accumulator preserves those headers for retry metadata when raw `:headers` is absent. Added focused coverage proving `Retry-After`/rate-limit metadata on provider-header-only background streaming errors drives retry scheduling. Verification: focused new test, full `psi.turn-runtime.response-mode-test` (`18 tests, 123 assertions`), and turn-runtime clj-kondo green. Committed `469f3a9b`.
+
 - 2026-05-30: Task 190 implementation review found one new actionable gap after the async streaming metadata follow-up: `psi.ai.streaming/exception->error-event` now preserves normalized `:provider-error/headers`, but `turn-runtime/make-provider-event-consumer` forwards only `:headers` from streaming `:error` events into `:turn/error`. Added task follow-up to cover background streaming errors carrying only `:provider-error/headers` and forward those headers before retry metadata calculation. Committed `294b836a`.
 
 - 2026-05-30: Task 190 review follow-up completed async streaming exception metadata preservation: `psi.ai.streaming/exception->error-event` now carries `:headers`, `:provider-error/headers`, `:http-status`, and `:status` from provider exception ex-data through the background streaming future path. Focused AI/turn-runtime/prompt telemetry tests and targeted clj-kondo passed.
