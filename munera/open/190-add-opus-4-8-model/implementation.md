@@ -1261,3 +1261,11 @@ Completed the newly added code-shaper follow-up:
 No new actionable implementation feedback found. Applied `.psi/skills/task-implementation-review/SKILL.md`: re-read the task artifacts and checked the implemented Opus 4.8 model catalog, `/speed` and `/effort` session/config/provider stacks, mid-system dispatch/extension/provider/compaction paths, docs/changelog alignment, and current follow-up state. The prior mid-system mutation params issue is already fixed and checked in `steps.md`; no duplicate follow-up item was added.
 
 ---
+
+## Code-shaper review pass — 2026-05-30 (capability predicate)
+
+Actionable code-shaping feedback found:
+
+1. **Mid-system capability predicate ignores explicit false** — `psi.agent-session.model-capabilities/supports-mid-system-messages?` returns true whenever the runtime model has `:provider :openai` and `:api :openai-completions`, even if the model map explicitly carries `:supports-mid-conversation-system-messages false`. The design says OpenAI chat-completions inference covers absent/custom metadata, but also says explicit false is unsupported. This makes capability precedence less locally comprehensible and prevents a runtime/custom model from deliberately disabling mid-system injection. Shape the predicate so explicit false wins before API-shape inference, and add a focused resolver/dispatch predicate test for an OpenAI chat-completions model with the flag explicitly false.
+
+---
