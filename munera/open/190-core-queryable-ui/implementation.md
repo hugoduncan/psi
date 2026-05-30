@@ -448,3 +448,7 @@ Verification:
 
 - `clojure -M:test --focus psi.agent-session.ui-capabilities-test` — 14 tests, 82 assertions, 0 failures.
 - `clj-kondo --lint components/agent-session/src/psi/agent_session/ui_capabilities.clj components/agent-session/test/psi/agent_session/ui_capabilities_test.clj` — clean.
+
+## 2026-05-30 implementation review
+
+Found one new actionable implementation issue after re-reading task artifacts, implementation notes, UI capability/provider code, nullable extension API fixture, docs, and focused tests: the nullable extension API only recognizes the exact five-attr UI capability query without `:psi.ui/diagnostic`, while `doc/extension-api.md` recommends querying `:psi.ui/diagnostic` with the capability/action attrs and the real EQL surface exposes it. Extension tests that follow the documented query against `create-nullable-extension-api` currently get `{}` instead of the unsupported-console UI capability map. Add nullable API support and coverage for documented UI capability queries including diagnostics.
