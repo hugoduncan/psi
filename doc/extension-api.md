@@ -94,8 +94,8 @@ Extensions can append a provider-safe mid-conversation system instruction to the
 active session with:
 
 ```clojure
-((:inject-mid-system-message! api) "Use the updated budget for the next reply")
-((:inject-mid-system-message! api)
+((:inject-mid-system-message api) "Use the updated budget for the next reply")
+((:inject-mid-system-message api)
  "Prefer concise answers for the next reply"
  {:source :my-extension})
 ```

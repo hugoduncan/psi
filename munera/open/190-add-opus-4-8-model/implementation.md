@@ -1221,3 +1221,11 @@ Completed the newly added docs review follow-up:
 ## Docs review pass — 2026-05-30 (extension API key)
 
 Actionable docs issue found: `doc/extension-api.md` documents calling `(:inject-mid-system-message! api)`, but `create-extension-api` exposes the helper in the public API map as `:inject-mid-system-message` (without bang). The examples should use the actual public key or the implementation should expose the documented bang alias; as written, copy/pasted docs fail with a nil function lookup. Existing docs-review follow-ups only covered speed/effort config wording, so this is new and not duplicated.
+
+## Docs follow-up — 2026-05-30 (extension API key)
+
+Completed the newly added docs review follow-up:
+
+- Updated `doc/extension-api.md` mid-system examples to call the implemented public API key `(:inject-mid-system-message api)` instead of the non-existent bang key.
+- Updated the Unreleased changelog entry to name the public extension API helper key `:inject-mid-system-message` alongside the Pathom mutation `psi.extension/inject-mid-system-message`.
+- Chose documentation alignment rather than adding a bang alias, preserving the implemented public API surface and avoiding an additional compatibility alias.
