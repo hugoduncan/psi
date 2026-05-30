@@ -16,10 +16,10 @@
 - [x] Implement or extract a retry coordinator around prepared provider request execution that retries only the current prepared request and never reruns local tools or the whole agent loop.
 - [x] Preserve fresh per-attempt provider execution state for each retry, including consumed streams and accumulation buffers.
 - [x] Apply shared provider-error classification so explicit retryable kinds can retry and `:unknown` defaults to terminal non-retryable.
-- [ ] Implement `:auto-retry-enabled` gate semantics: classify and emit single-attempt lifecycle data, but do not schedule retry when disabled.
-- [ ] Implement `:auto-retry-max-retries` as retry-execution count after initial attempt, with zero-based `:retry-attempt` coordinates.
-- [ ] Return structured final failure metadata for non-retryable, retry-disabled, retry-exhausted, and retry-cancelled outcomes.
-- [ ] Add focused tests for retry success-after-failure, retry exhaustion, terminal non-retryable no-retry, unknown no-retry, retry-disabled, and zero-max-retries exhaustion.
+- [x] Implement `:auto-retry-enabled` gate semantics: classify and emit single-attempt lifecycle data, but do not schedule retry when disabled.
+- [x] Implement `:auto-retry-max-retries` as retry-execution count after initial attempt, with zero-based `:retry-attempt` coordinates.
+- [x] Return structured final failure metadata for non-retryable, retry-disabled, and retry-exhausted outcomes; retry-cancelled remains pending with cancellation support.
+- [x] Add focused tests for retry success-after-failure, retry exhaustion, terminal non-retryable no-retry, unknown no-retry, retry-disabled, and zero-max-retries exhaustion.
 
 ## Slice 3 — Preserve provider lifecycle telemetry and active retry visibility
 
@@ -31,7 +31,7 @@
 - [x] Retain provider lifecycle telemetry captures under session state as a distinct stream from raw provider HTTP request/reply captures.
 - [x] Keep existing `/ext/provider-telemetry` dispatch behavior for metrics/log consumers unless a focused compatibility test proves a required adjustment.
 - [x] Publish active retry state into existing session retry fields before pending backoff sleep begins.
-- [ ] Clear active retry fields when retry delay completes, the request succeeds, the request fails terminally/exhausted/disabled, or cancellation occurs.
+- [x] Clear active retry fields when retry delay completes, the request succeeds, or the request fails terminally/exhausted/disabled; cancellation clearing remains pending with cancellation support.
 - [ ] Add focused tests proving app-runtime/TUI/Emacs-facing phase/status reports retrying while provider-boundary backoff is pending.
 - [ ] Add focused tests proving provider-boundary retry resume does not dispatch `:runtime/agent-start-loop` or rerun local tools.
 
@@ -62,8 +62,8 @@
 
 - [x] Add or update an integration-style prompt lifecycle test proving a representative retryable connection/request failure is retried before the turn fails.
 - [x] Add or update an integration-style prompt lifecycle test proving retryable failure followed by provider success returns success to the caller.
-- [ ] Add or update a test proving repeated retryable failures through the maximum retry count return structured retry-exhausted failure preserving the last cause.
-- [ ] Add or update a test proving terminal provider/client errors are not retried and expose `:failure-reason :non-retryable`.
+- [x] Add or update a test proving repeated retryable failures through the maximum retry count return structured retry-exhausted failure preserving the last cause.
+- [x] Add or update a test proving terminal provider/client errors are not retried and expose `:failure-reason :non-retryable`.
 - [ ] Add or update a tool-result-post test proving provider retry does not rerun a local tool whose result was already recorded.
 - [ ] Add or update a test proving first-attempt successful provider requests preserve existing behavior and telemetry.
 - [ ] Ensure tests use controlled provider/request seams and injectable/controlled backoff timing instead of real network calls or slow sleeps.

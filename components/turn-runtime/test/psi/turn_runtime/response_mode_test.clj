@@ -19,11 +19,29 @@
      [ctx (:session-id sd)])))
 
 (defn- prepared-request
+  ([ctx session-id]
+   (prepared-request ctx session-id "turn-1"))
+  ([ctx session-id turn-id]
+   (prompt-request/build-prepared-request
+    ctx session-id {:turn-id turn-id
+                    :user-message {:role "user"
+                                   :content [{:type :text :text "hello"}]}})))
+
+(defn- provider-events
   [ctx session-id]
-  (prompt-request/build-prepared-request
-   ctx session-id {:turn-id "turn-1"
-                   :user-message {:role "user"
-                                  :content [{:type :text :text "hello"}]}}))
+  (get-in @(:state* ctx) [:agent-session :sessions session-id :telemetry :provider-events]))
+
+(defn- error-turn
+  [message]
+  {:turn-id "turn-1"
+   :model {:provider "openai" :id "gpt-test"}
+   :ai-options {}
+   :turn-ctx nil
+   :assistant-message {:role "assistant"
+                       :content [{:type :error :text message}]
+                       :stop-reason :error
+                       :error-message message
+                       :timestamp (java.time.Instant/now)}})
 
 (deftest execute-prepared-request-non-streaming-uses-execute-path-test
   (testing "workflow-owned child session with :response-mode :non-streaming uses ai/execute-response-in"
@@ -221,3 +239,176 @@
           (is (= :structured-output-capability-omitted
                  (get-in result [:execution-result/structured-output :ai-reason])))
           (is (empty? (get-in result [:execution-result/provider-captures :request-captures]))))))))
+
+(deftest execute-prepared-request-terminal-provider-error-is-not-retried-test
+  ;; Terminal provider/client failures are classified and returned without retry scheduling.
+  (let [[ctx session-id] (create-session-context {:persist? false
+                                                  :provider-retry-sleep? false})
+        prepared         (prepared-request ctx session-id)
+        attempts*        (atom 0)]
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [& _]
+                    (swap! attempts* inc)
+                    (assoc (error-turn "invalid api key")
+                           :assistant-message {:role "assistant"
+                                               :content [{:type :error :text "invalid api key"}]
+                                               :stop-reason :error
+                                               :error-message "invalid api key"
+                                               :http-status 401
+                                               :timestamp (java.time.Instant/now)}))]
+      (let [result  (turn-runtime/execute-prepared-request!
+                     {:provider-registry (atom {})} ctx session-id prepared nil)
+            outcome (:execution-result/retry-outcome result)]
+        (is (= 1 @attempts*))
+        (is (= :non-retryable (:failure-reason outcome)))
+        (is (= :auth (:error-kind outcome)))
+        (is (false? (:retryable? outcome)))
+        (is (= :non-retryable
+               (get-in result [:execution-result/assistant-message :retry/outcome :failure-reason])))
+        (is (= ["provider_request_started" "provider_request_finished"]
+               (mapv :type (provider-events ctx session-id))))
+        (is (nil? (:retry (ss/get-session-data-in ctx session-id))))))))
+
+(deftest execute-prepared-request-unknown-provider-error-is-not-retried-test
+  ;; Unknown provider failures use the conservative terminal/non-retryable default.
+  (let [[ctx session-id] (create-session-context {:persist? false
+                                                  :provider-retry-sleep? false})
+        prepared         (prepared-request ctx session-id)
+        attempts*        (atom 0)]
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [& _]
+                    (swap! attempts* inc)
+                    (error-turn "mysterious provider failure"))]
+      (let [result  (turn-runtime/execute-prepared-request!
+                     {:provider-registry (atom {})} ctx session-id prepared nil)
+            outcome (:execution-result/retry-outcome result)]
+        (is (= 1 @attempts*))
+        (is (= :non-retryable (:failure-reason outcome)))
+        (is (= :unknown (:error-kind outcome)))
+        (is (false? (:retryable? outcome)))
+        (is (= ["provider_request_started" "provider_request_finished"]
+               (mapv :type (provider-events ctx session-id))))))))
+
+(deftest execute-prepared-request-retry-disabled-classifies-without-scheduling-test
+  ;; Disabled retry records one failed attempt and exposes a skipped-retry outcome.
+  (let [[ctx session-id] (create-session-context {:persist? false
+                                                  :provider-retry-sleep? false
+                                                  :config {:auto-retry-max-retries 3}})
+        _               (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data]
+                               (assoc (ss/get-session-data-in ctx session-id)
+                                      :auto-retry-enabled false))
+        prepared         (prepared-request ctx session-id)
+        attempts*        (atom 0)]
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [& _]
+                    (swap! attempts* inc)
+                    (error-turn "Connection reset by peer"))]
+      (let [result  (turn-runtime/execute-prepared-request!
+                     {:provider-registry (atom {})} ctx session-id prepared nil)
+            outcome (:execution-result/retry-outcome result)]
+        (is (= 1 @attempts*))
+        (is (= :retry-disabled (:failure-reason outcome)))
+        (is (= :transport (:error-kind outcome)))
+        (is (true? (:retryable? outcome)))
+        (is (false? (:retry-enabled? outcome)))
+        (is (= 1 (:attempt-count outcome)))
+        (is (= 0 (:retry-attempt outcome)))
+        (is (= 3 (:max-retries outcome)))
+        (is (= ["provider_request_started" "provider_request_finished"]
+               (mapv :type (provider-events ctx session-id))))
+        (is (nil? (:retry (ss/get-session-data-in ctx session-id))))))))
+
+(deftest execute-prepared-request-zero-max-retries-exhausts-without-scheduling-test
+  ;; Enabled retry with zero allowed retry executions returns retry-exhausted, not retry-disabled.
+  (let [[ctx session-id] (create-session-context {:persist? false
+                                                  :provider-retry-sleep? false
+                                                  :config {:auto-retry-max-retries 0}})
+        prepared         (prepared-request ctx session-id)
+        attempts*        (atom 0)]
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [& _]
+                    (swap! attempts* inc)
+                    (error-turn "Connection reset by peer"))]
+      (let [result  (turn-runtime/execute-prepared-request!
+                     {:provider-registry (atom {})} ctx session-id prepared nil)
+            outcome (:execution-result/retry-outcome result)]
+        (is (= 1 @attempts*))
+        (is (= :retry-exhausted (:failure-reason outcome)))
+        (is (true? (:retryable? outcome)))
+        (is (true? (:exhausted? outcome)))
+        (is (= 0 (:max-retries outcome)))
+        (is (= ["provider_request_started" "provider_request_finished"]
+               (mapv :type (provider-events ctx session-id))))))))
+
+(deftest execute-prepared-request-retry-exhaustion-preserves-last-cause-test
+  ;; Retryable failures run through the configured retry count then return structured exhaustion data.
+  (let [[ctx session-id] (create-session-context {:persist? false
+                                                  :provider-retry-sleep? false
+                                                  :config {:auto-retry-max-retries 2}})
+        prepared         (prepared-request ctx session-id)
+        attempts*        (atom 0)]
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [& _]
+                    (let [attempt (swap! attempts* inc)]
+                      (assoc (error-turn (str "Connection reset by peer " attempt))
+                             :assistant-message {:role "assistant"
+                                                 :content [{:type :error :text (str "Connection reset by peer " attempt)}]
+                                                 :stop-reason :error
+                                                 :error-message (str "Connection reset by peer " attempt)
+                                                 :timestamp (java.time.Instant/now)})))]
+      (let [result  (turn-runtime/execute-prepared-request!
+                     {:provider-registry (atom {})} ctx session-id prepared nil)
+            outcome (:execution-result/retry-outcome result)
+            events  (provider-events ctx session-id)]
+        (is (= 3 @attempts*))
+        (is (= :retry-exhausted (:failure-reason outcome)))
+        (is (= :transport (:error-kind outcome)))
+        (is (= "Connection reset by peer 3" (:last-error-message outcome)))
+        (is (= 3 (:attempt-count outcome)))
+        (is (= 2 (:retry-attempt outcome)))
+        (is (true? (:exhausted? outcome)))
+        (is (= ["provider_request_started" "provider_request_finished"
+                "provider_retry_scheduled" "provider_request_started"
+                "provider_request_finished" "provider_retry_scheduled"
+                "provider_request_started" "provider_request_finished"]
+               (mapv :type events)))
+        (is (= [0 1 2]
+               (mapv :retry-attempt (filter #(= "provider_request_started" (:type %)) events))))
+        (is (= [1 2]
+               (mapv :retry-attempt (filter #(= "provider_retry_scheduled" (:type %)) events))))
+        (is (= :retry-exhausted
+               (:failure-reason (last events))))
+        (is (nil? (:retry (ss/get-session-data-in ctx session-id))))))))
+
+(deftest execute-prepared-request-clears-active-retry-state-before-retry-attempt-test
+  ;; Active retry fields are visible during backoff and cleared before the next provider attempt starts.
+  (let [during-retry*    (atom nil)
+        attempt-retries* (atom [])
+        [ctx0 session-id] (create-session-context {:persist? false})
+        ctx              (assoc ctx0 :provider-retry-sleep-fn
+                                (fn [_delay-ms]
+                                  (reset! during-retry*
+                                          (:retry (ss/get-session-data-in ctx0 session-id)))))
+        prepared         (prepared-request ctx session-id)
+        attempts*        (atom 0)]
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [& _]
+                    (swap! attempt-retries* conj (:retry (ss/get-session-data-in ctx session-id)))
+                    (if (= 1 (swap! attempts* inc))
+                      (error-turn "Connection reset by peer")
+                      {:turn-id "turn-1"
+                       :model {:provider "openai" :id "gpt-test"}
+                       :ai-options {}
+                       :turn-ctx nil
+                       :assistant-message {:role "assistant"
+                                           :content [{:type :text :text "recovered"}]
+                                           :stop-reason :stop
+                                           :timestamp (java.time.Instant/now)}}))]
+      (let [result (turn-runtime/execute-prepared-request!
+                    {:provider-registry (atom {})} ctx session-id prepared nil)]
+        (is (= :stop (:execution-result/stop-reason result)))
+        (is (= 2 @attempts*))
+        (is (= :transport (:error-kind @during-retry*)))
+        (is (= 1 (:retry-attempt @during-retry*)))
+        (is (= [nil nil] @attempt-retries*))
+        (is (nil? (:retry (ss/get-session-data-in ctx session-id))))))))

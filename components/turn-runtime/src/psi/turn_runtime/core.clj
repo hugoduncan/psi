@@ -351,13 +351,17 @@
   [ctx session-id]
   (ss/apply-root-state-update-in!
    ctx
-   (ss/session-update session-id #(assoc % :retry nil))))
+   (ss/session-update session-id #(assoc %
+                                         :retry-attempt 0
+                                         :retry nil))))
 
 (defn- sleep-for-retry!
   [ctx delay-ms]
   (when (and (not= false (:provider-retry-sleep? ctx))
              (pos? (long (or delay-ms 0))))
-    (Thread/sleep (long delay-ms))))
+    (if-let [sleep-fn (:provider-retry-sleep-fn ctx)]
+      (sleep-fn (long delay-ms))
+      (Thread/sleep (long delay-ms)))))
 
 (defn- execute-provider-attempt!
   [ai-ctx ctx session-id prepared-request progress-queue attempt-data]
