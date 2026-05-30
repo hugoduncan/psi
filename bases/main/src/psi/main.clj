@@ -177,6 +177,7 @@
                                (app-runtime/create-runtime-session-context ai-model {:event-queue             (java.util.concurrent.LinkedBlockingQueue.)
                                                                                      :session-config          session-config
                                                                                      :ui-type                 :emacs
+                                                                                     :install-default-ui-capability-provider? false
                                                                                      :thinking-level-override thinking-level}))
         :bootstrap-fn!       (fn [ctx session-id ai-model memory-runtime-opts]
                                (app-runtime/bootstrap-runtime-session! ctx ai-model {:memory-runtime-opts memory-runtime-opts

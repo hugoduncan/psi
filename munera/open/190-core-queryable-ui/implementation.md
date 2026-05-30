@@ -485,3 +485,12 @@ Verification:
 
 - `clojure -M:test --focus psi.agent-session.ui-capabilities-test --focus psi.agent-session.graph-surface-test --focus psi.extension-test-helpers.nullable-api-test` — 40 tests, 2399 assertions, 0 failures.
 - `clj-kondo --lint components/agent-session/src/psi/agent_session/ui_capabilities.clj components/agent-session/src/psi/agent_session/context.clj components/agent-session/src/psi/agent_session/resolvers/extensions.clj components/rpc/src/psi/rpc/runtime.clj components/extension-test-helpers/src/psi/extension_test_helpers/nullable_api.clj components/agent-session/test/psi/agent_session/ui_capabilities_test.clj components/agent-session/test/psi/agent_session/graph_surface_test.clj components/extension-test-helpers/test/psi/extension_test_helpers/nullable_api_test.clj` — clean.
+
+## 2026-05-30 RPC pre-install provider follow-up
+
+Completed the newly added implementation-review follow-up for RPC/Emacs pre-install provider semantics. Agent-session context creation now accepts `:install-default-ui-capability-provider?` (default true) so RPC runtime contexts can preserve legacy `:ui-type :emacs` diagnostics without installing the static Emacs make-visible provider. The main RPC session factory disables that default provider, and `psi.rpc.runtime/start-runtime!` now creates the RPC connection state and installs the late-bound `emacs-rpc-provider` before bootstrap runs, so bootstrap/extension queries observe the connection-correlated descriptor rather than a static startup advertisement. Added coverage for no-provider pre-install semantics, no-attached installation semantics, and bootstrap-time observation of the RPC provider with session correlation.
+
+Verification:
+
+- `clojure -M:test --focus psi.rpc-transport-test --focus psi.agent-session.ui-capabilities-test` — 25 tests, 139 assertions, 0 failures.
+- `clj-kondo --lint components/agent-session/src/psi/agent_session/context.clj components/app-runtime/src/psi/app_runtime.clj components/rpc/src/psi/rpc/runtime.clj bases/main/src/psi/main.clj components/rpc/test/psi/rpc_transport_test.clj` — clean.

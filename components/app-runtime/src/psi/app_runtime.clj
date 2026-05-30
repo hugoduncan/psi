@@ -272,8 +272,9 @@ Available: " (str/join ", " (map name (keys all))))
    - :ui-type runtime UI type hint (:console | :tui | :emacs)
    - :thinking-level-override explicit thinking level (CLI/env); overrides config when set
    - :persist? optional persistence toggle (defaults true; primarily for tests)
-   - :session-root optional explicit persisted session root (primarily for tests)"
-  [ai-model {:keys [event-queue session-config cwd ui-type thinking-level-override persist? session-root]}]
+   - :session-root optional explicit persisted session root (primarily for tests)
+   - :install-default-ui-capability-provider? optional context default UI provider toggle (defaults true)"
+  [ai-model {:keys [event-queue session-config cwd ui-type thinking-level-override persist? session-root install-default-ui-capability-provider?]}]
   (let [cwd                      (or cwd (System/getProperty "user.dir"))
         ;; Initialize model registry with user-global + project-local custom models
         _                        (model-registry/init!
@@ -313,6 +314,9 @@ Available: " (str/join ", " (map name (keys all))))
                                    :persist? (if (some? persist?) persist? true)
                                    :session-root session-root
                                    :ui-type ui-type
+                                   :install-default-ui-capability-provider? (if (some? install-default-ui-capability-provider?)
+                                                                              install-default-ui-capability-provider?
+                                                                              true)
                                    :mutations mutations/all-mutations})
         recursion-ctx            (recursion/create-hosted-context ctx (ss/state-path :recursion))
         ctx                      (assoc ctx :recursion-ctx recursion-ctx)

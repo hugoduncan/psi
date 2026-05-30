@@ -93,16 +93,16 @@
         (System/setOut (java.io.PrintStream. System/err true))
         (let [ai-model      (resolve-model model-key)
               {:keys [ctx oauth-ctx session-id]} (session-ctx-factory ai-model session-config)
-              _             (bootstrap-fn! ctx session-id ai-model memory-runtime-opts)
-              trace-file*   (normalize-trace-file rpc-trace-file)
-              _             (session/dispatch-in! ctx :session/set-rpc-trace {:session-id session-id :enabled? (boolean trace-file*) :file trace-file*} {:origin :core})
-              trace-fn      (make-trace-fn ctx)
               state         (rpc.state/make-rpc-state {:session-id session-id
                                                        :err *err*})
               _             (ui-capabilities/install-provider!
                              ctx
                              (ui-capabilities/emacs-rpc-provider
                               (fn [] (rpc.state/focus-session-id state))))
+              _             (bootstrap-fn! ctx session-id ai-model memory-runtime-opts)
+              trace-file*   (normalize-trace-file rpc-trace-file)
+              _             (session/dispatch-in! ctx :session/set-rpc-trace {:session-id session-id :enabled? (boolean trace-file*) :file trace-file*} {:origin :core})
+              trace-fn      (make-trace-fn ctx)
               deps          (make-rpc-deps {:ctx ctx
                                             :ai-model ai-model
                                             :ui-type :emacs

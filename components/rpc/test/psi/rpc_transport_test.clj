@@ -5,6 +5,7 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
    [psi.agent-session.test-support :as test-support]
+   [psi.agent-session.ui-capabilities :as ui-capabilities]
    [psi.rpc :as rpc]
    [psi.rpc.transport :as rpc.transport]
    [psi.rpc-test-support :as support]))
@@ -94,6 +95,65 @@
         (is (= 1 (count frames)))
         (is (= :response (:kind (first frames))))
         (is (= "handshake" (:op (first frames))))))))
+
+(deftest rpc-start-runtime-installs-rpc-provider-before-bootstrap-test
+  (testing "bootstrap observes the late-bound RPC provider, not the static Emacs default"
+    (let [out            (java.io.StringWriter.)
+          err            (java.io.StringWriter.)
+          session-state* (atom nil)
+          created-session-id* (atom nil)
+          bootstrap-result* (atom nil)]
+      (binding [*in*  (java.io.StringReader. "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n")
+                *out* out
+                *err* err]
+        (rpc/start-runtime!
+         {:model-key :claude-sonnet
+          :memory-runtime-opts {}
+          :session-config {}
+          :rpc-trace-file nil
+          :session-state* session-state*
+          :nrepl-runtime (atom nil)
+          :resolve-model (fn [_]
+                           {:provider :anthropic :id "stub" :name "Stub" :supports-reasoning true})
+          :session-ctx-factory (fn [_ai-model _session-config]
+                                 (let [ctx (session/create-context
+                                            (test-support/safe-context-opts
+                                             {:ui-type :emacs
+                                              :install-default-ui-capability-provider? false}))
+                                       sd  (session/new-session-in! ctx nil {})]
+                                   (reset! created-session-id* (:session-id sd))
+                                   {:ctx ctx :oauth-ctx nil :session-id (:session-id sd)}))
+          :bootstrap-fn! (fn [ctx _session-id _ai-model _memory-runtime-opts]
+                           (reset! bootstrap-result* (session/query-in ctx [:psi.ui/type
+                                                                            :psi.ui/available?
+                                                                            :psi.ui/capabilities
+                                                                            :psi.ui/actions
+                                                                            :psi.ui/make-visible-action]))
+                           nil)
+          :on-new-session! (fn [_source-session-id]
+                             {:messages [] :tool-calls {} :tool-order []})}))
+      (let [action (:psi.ui/make-visible-action @bootstrap-result*)]
+        (is (= :emacs (:psi.ui/type @bootstrap-result*)))
+        (is (= true (:psi.ui/available? @bootstrap-result*)))
+        (is (= [:psi.ui.capability/make-visible]
+               (:psi.ui/capabilities @bootstrap-result*)))
+        (is (= [action] (:psi.ui/actions @bootstrap-result*)))
+        (is (= @created-session-id*
+               (get-in action [:psi.ui.action/invocation :psi.ui.invocation/session-id])))))))
+
+(deftest rpc-context-can-start-before-late-bound-provider-install-test
+  (testing "RPC context factory can suppress the static Emacs provider until runtime installs one"
+    (let [ctx (session/create-context
+               (test-support/safe-context-opts
+                {:ui-type :emacs
+                 :install-default-ui-capability-provider? false}))]
+      (is (= :psi.ui.unavailable.reason/no-provider
+             (get-in (session/query-in ctx [:psi.ui/make-visible-action])
+                     [:psi.ui/make-visible-action :psi.ui.action/unavailable-reason])))
+      (ui-capabilities/install-provider! ctx (ui-capabilities/no-attached-provider :emacs))
+      (is (= :psi.ui.unavailable.reason/no-attached-ui
+             (get-in (session/query-in ctx [:psi.ui/make-visible-action])
+                     [:psi.ui/make-visible-action :psi.ui.action/unavailable-reason]))))))
 
 (deftest run-stdio-loop-trace-fn-captures-inbound-and-outbound-test
   (let [traces  (atom [])

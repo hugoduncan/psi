@@ -256,11 +256,12 @@
 
 (defn- create-context* [{:keys [session-defaults compaction-fn branch-summary-fn agent-initial config cwd persist? session-root event-queue oauth-ctx recursion-ctx nrepl-runtime-atom ui-type mutations
                                 create-workflow-child-session-fn execute-workflow-run-fn resume-and-execute-workflow-run-fn
-                                scheduler-time-source
+                                scheduler-time-source install-default-ui-capability-provider?
                                 get-session-data-fn list-context-sessions-fn find-skill-fn
                                 resolve-workflow-step-session-config-fn materialize-workflow-step-session-conversation-fn
                                 split-workflow-step-session-conversation-fn execute-workflow-judge-fn]
-                         :or {persist? true mutations []}
+                         :or {persist? true mutations []
+                              install-default-ui-capability-provider? true}
                          :as opts}]
   (let [resolved-cwd (or cwd (System/getProperty "user.dir"))
         resolved-defaults (resolve-session-defaults session-defaults resolved-cwd ui-type)
@@ -291,11 +292,12 @@
                      :tool-batch-executor tool-batch-executor
                      :extension-run-fn-atom (atom nil)
                      :background-job-ui-refresh-fn (atom nil)
-                     :ui-capability-provider* (atom (when-let [ui-type (:ui-type resolved-defaults)]
-                                                      (case ui-type
-                                                        :emacs ui-capabilities/emacs-make-visible-provider
-                                                        (:tui :console) (ui-capabilities/unsupported-attached-provider ui-type)
-                                                        nil)))
+                     :ui-capability-provider* (atom (when install-default-ui-capability-provider?
+                                                      (when-let [ui-type (:ui-type resolved-defaults)]
+                                                        (case ui-type
+                                                          :emacs ui-capabilities/emacs-make-visible-provider
+                                                          (:tui :console) (ui-capabilities/unsupported-attached-provider ui-type)
+                                                          nil))))
                      :scheduler-timers* (atom {})
                      :scheduler-time-source (or scheduler-time-source
                                                 (scheduler-time/system-time-source))
