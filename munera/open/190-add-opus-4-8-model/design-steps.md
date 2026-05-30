@@ -81,3 +81,7 @@
 ## From inconsistency review pass 2026-05-30 (compaction boundary)
 
 - [x] **Resolve compaction boundary consecutive mid-system case** — Specify how compaction handles a retained post-cut `:mid-system` immediately after the summary boundary when pre-cut active mid-system instructions are also coalesced. Either merge/coalesce the boundary messages, forbid/snap cut points that split a user→mid-system pair, or otherwise guarantee rebuilt provider messages never contain consecutive inline system messages.
+
+## From inconsistency review pass 2026-05-30 (source provenance pass)
+
+- [ ] **Align mid-system source inference with mutation params** — The design says omitted `:source` is inferred from extension provenance (`ext-path`/extension id), but the specified `psi.extension/inject-mid-system-message` Pathom mutation params omit `:ext-path`. Add optional `:ext-path` to the mutation params and define inference there, or require the extension API helper to materialize `:source` before calling the mutation.

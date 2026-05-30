@@ -158,3 +158,5 @@ Bootstrapped on 2026-04-02.
 - 2026-05-30: Task 190 latest inconsistency follow-up completed and committed `d8b342ac`: design now requires plain adaptive Anthropic `thinking-level :xhigh` (nil `/effort` override) to send `output_config.effort = "highest"`, preserving the task goal that `:xhigh` is distinct from `:high`; `design-steps.md` is checked for the latest inconsistency item.
 
 - 2026-05-30: Task 190 ambiguity follow-up no-op pass: `design-steps.md` had no unchecked ambiguity follow-up items, so no design changes were needed; implementation.md records the pass.
+
+- 2026-05-30: Task 190 source-provenance inconsistency review found one new actionable design inconsistency: `inject-mid-system-message!` source inference requires extension provenance, but the specified Pathom mutation params omit `:ext-path`. Added unchecked follow-up to `design-steps.md` and implementation review note.

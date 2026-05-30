@@ -263,3 +263,11 @@ Read `design-steps.md` for newly added unchecked ambiguity follow-up items. No u
 Completed the newly added inconsistency follow-up item in `design-steps.md` by refining `design.md`:
 
 - Compaction now has an explicit boundary merge rule for retained post-cut `:mid-system` entries. If pre-cut active mid-system instructions are coalesced after the summary user turn and the retained post-cut history begins with one or more `:mid-system` entries, those boundary entries are merged into the same summary-boundary `:mid-system` entry, preserving pre-cut text first and post-cut boundary text next. This guarantees the rebuilt provider message sequence never creates `summary user → system → system` at the compaction boundary.
+
+---
+
+## Design inconsistency review pass — 2026-05-30
+
+**New actionable inconsistency found:**
+
+1. **Mid-system source inference needs `ext-path` but mutation params omit it** — Part 4 requires omitted `:source` to be inferred from extension provenance (`ext-path`/extension id), and `create-extension-api`/`mutate-ext-required` normally adds `:ext-path` to extension mutations. But the specified `psi.extension/inject-mid-system-message` Pathom mutation params list only `[:psi/agent-session-ctx :session-id :text]` plus optional `:source`, so the mutation surface as written has no declared provenance input to infer from. Align the API/mutation contract by accepting optional `:ext-path` (or by having the API helper materialize `:source` before mutation) and specifying which layer performs the inference.
