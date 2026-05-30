@@ -1187,3 +1187,9 @@ No new actionable inconsistencies found. Re-read `plan.md`, `steps.md`, `design-
 ## Test review pass — 2026-05-30 (final independent verification)
 
 No new actionable test feedback found. Re-read `design.md`, `plan.md`, `steps.md`, `design-steps.md`, and `implementation.md`; checked the referenced speed/effort command persistence tests, provider effort request-shaping tests, mid-system capability/dispatch/persistence tests, prompt-request/conversation/provider transform tests, compaction replay tests, and docs/changelog-owned acceptance surfaces. Focused verification passed: `clojure -M:test --focus psi.agent-session.commands-speed-effort-test --focus psi.agent-session.model-dispatch-test --focus psi.agent-session.compaction-test --focus psi.ai.providers.anthropic-test --focus psi.ai.providers.openai-test` — 65 tests, 495 assertions, 0 failures. No duplicate `steps.md` follow-ups added.
+
+---
+
+## Inconsistency follow-up execution — 2026-05-30 (post-effort-coverage unchecked-item pass)
+
+Read `design-steps.md` for unchecked inconsistency follow-up items added by the preceding inconsistency-review pass. No unchecked design-step items were present (`unchecked count 0`), so there were no newly actionable inconsistency follow-ups to execute. No `design.md`, `plan.md`, or `steps.md` changes were required.
