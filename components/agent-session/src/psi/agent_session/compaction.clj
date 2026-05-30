@@ -517,10 +517,9 @@
                  (subvec messages (inc last-user-index))))
     (into [system-message] messages)))
 
-(defn- rebuild-kept-messages-with-mid-system-preservation
-  [result session-data summary-msg]
-  (let [[pre-cut kept-entries] (split-kept-entries result session-data)
-        [boundary-mid-entries kept-entries*] (split-boundary-mid-system-entries kept-entries)
+(defn- rebuild-kept-entry-messages-with-mid-system-preservation
+  [pre-cut kept-entries summary-msg]
+  (let [[boundary-mid-entries kept-entries*] (split-boundary-mid-system-entries kept-entries)
         preserved-texts (vec (keep mid-system-entry-text pre-cut))
         boundary-texts  (vec (keep mid-system-entry-text boundary-mid-entries))
         retained-msgs   (->> kept-entries* (keep entry->message) vec)
@@ -532,6 +531,14 @@
           (insert-after-latest-user retained-msgs* system-msg)
           (into [system-msg] retained-msgs*)))
       retained-msgs)))
+
+(defn- rebuild-kept-messages-with-mid-system-preservation
+  [result session-data summary-msg]
+  (let [[pre-cut kept-entries] (split-kept-entries result session-data)]
+    (rebuild-kept-entry-messages-with-mid-system-preservation
+     pre-cut
+     kept-entries
+     summary-msg)))
 
 (defn rebuild-messages-from-entries
   "Given a compaction `result` and current `session-data`, return the
@@ -578,8 +585,12 @@
             kept-before (if first-kept-id
                           (drop-while #(not= (:id %) first-kept-id) before)
                           [])
+            pre-cut (if first-kept-id
+                      (take-while #(not= (:id %) first-kept-id) before)
+                      before)
             after (subvec entries (inc compaction-idx))
-            kept-msgs (->> (concat kept-before after)
-                           (keep entry->message)
-                           vec)]
+            kept-msgs (rebuild-kept-entry-messages-with-mid-system-preservation
+                       pre-cut
+                       (vec (concat kept-before after))
+                       summary-msg)]
         (into (if summary-msg [summary-msg] []) kept-msgs)))))

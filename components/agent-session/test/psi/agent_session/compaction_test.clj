@@ -242,4 +242,35 @@
           u3   (persist/message-entry (user-message "u3"))
           msgs (compaction/rebuild-messages-from-journal-entries [u1 a1 u2 a2 comp u3])]
       (is (= 4 (count msgs)))
-      (is (re-find #"Previous conversation summary" (get-in msgs [0 :content 0 :text]))))))
+      (is (re-find #"Previous conversation summary" (get-in msgs [0 :content 0 :text])))))
+
+  (testing "preserves pre-cut active mid-system instructions on journal replay"
+    (let [u1   (persist/message-entry (user-message "u1"))
+          mid  (mid-system-entry "Keep future answers terse")
+          u2   (persist/message-entry (user-message "u2"))
+          comp (persist/compaction-entry
+                {:summary "Summary before u2"
+                 :first-kept-entry-id (:id u2)
+                 :tokens-before 123
+                 :details nil}
+                false)
+          msgs (compaction/rebuild-messages-from-journal-entries [u1 mid u2 comp])]
+      (is (= ["user" "user" "system"] (mapv :role msgs)))
+      (is (= (system-message "Keep future answers terse")
+             (select-keys (nth msgs 2) [:role :content])))))
+
+  (testing "normalizes completed retained exchanges before replaying preserved mid-system instructions"
+    (let [u1   (persist/message-entry (user-message "u1"))
+          mid  (mid-system-entry "Future-only replay instruction")
+          u2   (persist/message-entry (user-message "u2"))
+          a2   (persist/message-entry (assistant-text-message "a2"))
+          comp (persist/compaction-entry
+                {:summary "Summary before u2"
+                 :first-kept-entry-id (:id u2)
+                 :tokens-before 123
+                 :details nil}
+                false)
+          msgs (compaction/rebuild-messages-from-journal-entries [u1 mid u2 a2 comp])]
+      (is (= ["user" "system"] (mapv :role msgs)))
+      (is (= (system-message "Future-only replay instruction")
+             (select-keys (second msgs) [:role :content]))))))
