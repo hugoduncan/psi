@@ -174,3 +174,7 @@ No new actionable ambiguity feedback after re-reading `design.md`, referenced ta
 ## 2026-05-30 ambiguity follow-up execution
 
 No newly added unchecked ambiguity follow-up items were present in `design-steps.md`; all ambiguity design steps are already complete. No `design.md` change was needed, and no ambiguity follow-up item remains blocked.
+
+## 2026-05-30 design inconsistency review
+
+Found one new actionable inconsistency after re-reading `design.md`, `design-decisions.md`, `doc/extensions.md`, and `doc/extension-api.md`: the design makes `:psi.ui/...` capability/action queries the normative extension-authoring surface and explicitly lists both docs for update, but `doc/extensions.md` still documents only existing `:psi.ui/*` contribution snapshot attrs and `doc/extension-api.md` has no UI capability/action guidance, leaving referenced extension docs inconsistent with the designed contract.
