@@ -54,7 +54,7 @@ Minimum fields:
 
 - A single active UI type/identity when known, but extension logic must be capability-driven rather than UI-type-driven.
 - A runtime-level attached/available boolean, if this is distinct from the UI identity.
-- A collection of capability keywords, for example `:ui.capability/visible`, `:ui.capability/make-visible`, or similar project-consistent names.
+- A collection of capability keywords in the resolved `:psi.ui.capability/...` namespace, for example `:psi.ui.capability/visible` and `:psi.ui.capability/make-visible`. The shorthand `:ui.capability/...` form is non-normative and must not be used as a contract in implementation, tests, or extension guidance.
 - A collection of action descriptors.
 
 Capabilities and actions are separate concepts:
@@ -146,7 +146,7 @@ Extensions must not branch on `:emacs`, `:tui`, or `:console` to decide behaviou
 An extension should be able to query the graph and decide:
 
 1. whether a UI is available,
-2. whether `:ui.capability/make-visible` or its final equivalent is present,
+2. whether `:psi.ui.capability/make-visible` is present,
 3. whether a make-visible action exists and is available,
 4. what invocation data to use or present.
 

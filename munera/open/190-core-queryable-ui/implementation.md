@@ -14,3 +14,7 @@ Completed both ambiguity follow-ups in `design.md`:
 ## 2026-05-30 design inconsistency review
 
 Found one actionable inconsistency: `design.md` mixes unnamespaced `:ui.capability/make-visible` examples/extension guidance with the resolved `:psi.ui.capability/make-visible` vocabulary used by descriptors and design decisions, leaving extension authors/tests with two possible capability keywords.
+
+## 2026-05-30 inconsistency follow-up
+
+Completed the vocabulary alignment follow-up in `design.md`: normative examples and extension usage now use `:psi.ui.capability/make-visible`, and the older `:ui.capability/...` shorthand is explicitly non-normative and not a contract for implementation, tests, or extension guidance.
