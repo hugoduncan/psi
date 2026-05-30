@@ -5,6 +5,7 @@
    [clojure.string :as str]
    [psi.agent-session.core :as session]
    [psi.agent-session.state-accessors :as sa]
+   [psi.agent-session.ui-capabilities :as ui-capabilities]
    [psi.rpc.events :as rpc.events]
    [psi.rpc.session :as rpc.session]
    [psi.rpc.state :as rpc.state]
@@ -98,6 +99,10 @@
               trace-fn      (make-trace-fn ctx)
               state         (rpc.state/make-rpc-state {:session-id session-id
                                                        :err *err*})
+              _             (ui-capabilities/install-provider!
+                             ctx
+                             (ui-capabilities/emacs-rpc-provider
+                              (fn [] (rpc.state/focus-session-id state))))
               deps          (make-rpc-deps {:ctx ctx
                                             :ai-model ai-model
                                             :ui-type :emacs
@@ -108,10 +113,13 @@
                                                   :ai-model ai-model
                                                   :oauth-ctx oauth-ctx
                                                   :nrepl-runtime nrepl-runtime})
-          (rpc.transport/run-stdio-loop! {:request-handler request-handler
-                                          :state state
-                                          :out protocol-out
-                                          :trace-fn trace-fn
-                                          :handshake-server-info-fn (get-in deps [:transport :handshake-server-info-fn])})))
+          (try
+            (rpc.transport/run-stdio-loop! {:request-handler request-handler
+                                            :state state
+                                            :out protocol-out
+                                            :trace-fn trace-fn
+                                            :handshake-server-info-fn (get-in deps [:transport :handshake-server-info-fn])})
+            (finally
+              (ui-capabilities/clear-provider! ctx)))))
       (finally
         (System/setOut original-systemout)))))

@@ -53,6 +53,29 @@
                      {:psi.ui.invocation/kind :emacs-command
                       :psi.ui.invocation/command "psi-emacs-show-active"})]})
 
+(defn emacs-rpc-provider
+  "Provider for an Emacs RPC connection with late-bound active session state.
+
+   active-session-id-fn is called at query time. When it returns nil or blank,
+   the connection is present but has no usable active Psi UI state, so the
+   provider reports no-attached rather than advertising a stale make-visible
+   action. When it returns a session id, the descriptor includes that id as
+   invocation correlation data."
+  [active-session-id-fn]
+  (fn [_ctx]
+    (if-let [session-id (not-empty (str (or (active-session-id-fn) "")))]
+      {:psi.ui/type :emacs
+       :psi.ui/available? true
+       :psi.ui/capabilities [make-visible-capability]
+       :psi.ui/actions [(make-visible-action
+                         {:psi.ui.invocation/kind :emacs-command
+                          :psi.ui.invocation/command "psi-emacs-show-active"
+                          :psi.ui.invocation/session-id session-id})]}
+      {:psi.ui/type :emacs
+       :psi.ui/available? false
+       :psi.ui/capabilities []
+       :psi.ui/actions []})))
+
 (defn unsupported-attached-provider
   "Provider for an attached UI that has no make-visible mechanism."
   [ui-type]

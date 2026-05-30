@@ -58,6 +58,31 @@
     (is (true? (:psi.ui.action/available? action)))
     (is (nil? (:psi.ui/diagnostic result)))))
 
+(deftest emacs-rpc-provider-active-session-lifecycle-test
+  ;; Tests that the Emacs RPC provider derives current active-session state at
+  ;; query time and downgrades to no-attached when that state is unavailable.
+  (let [active-session-id* (atom "s1")
+        ctx (create-ctx {})]
+    (ui-capabilities/install-provider!
+     ctx
+     (ui-capabilities/emacs-rpc-provider #(deref active-session-id*)))
+    (let [result (session/query-in ctx ui-query)
+          action (:psi.ui/make-visible-action result)]
+      (is (= :emacs (:psi.ui/type result)))
+      (is (= true (:psi.ui/available? result)))
+      (is (= [:psi.ui.capability/make-visible]
+             (:psi.ui/capabilities result)))
+      (is (= "s1"
+             (get-in action [:psi.ui.action/invocation :psi.ui.invocation/session-id]))))
+    (reset! active-session-id* nil)
+    (let [result (session/query-in ctx ui-query)]
+      (is (= :emacs (:psi.ui/type result)))
+      (is (= false (:psi.ui/available? result)))
+      (is (= [] (:psi.ui/capabilities result)))
+      (is (= [] (:psi.ui/actions result)))
+      (is (= :psi.ui.unavailable.reason/no-attached-ui
+             (get-in result [:psi.ui/make-visible-action :psi.ui.action/unavailable-reason]))))))
+
 (deftest console-provider-query-behaviour-test
   ;; Tests that attached console UI is available but unsupported for make-visible.
   (let [ctx (create-ctx {:ui-type :console})

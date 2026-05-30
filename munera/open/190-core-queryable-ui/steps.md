@@ -47,9 +47,9 @@
 ## Slice 5 — Frontend providers
 
 - [x] Add Emacs/RPC provider installation that reports `:psi.ui/type :emacs`, available true, make-visible capability, and the Emacs command invocation descriptor when an active Psi UI is attached.
-- [ ] Add unavailable/no-attached Emacs provider behaviour when the RPC/Emacs connection exists but no usable active Psi buffer/session is known.
+- [x] Add unavailable/no-attached Emacs provider behaviour when the RPC/Emacs connection exists but no usable active Psi buffer/session is known.
 - [x] Add interactive Emacs command `psi-emacs-show-active` that locates the active/current Psi buffer, calls `pop-to-buffer`, focuses the prompt, and selects/focuses the frame/window as needed.
-- [ ] Wire Emacs detach/shutdown/lost-active-buffer handling to clear or downgrade the provider so stale buffers are not advertised.
+- [x] Wire Emacs detach/shutdown/lost-active-buffer handling to clear or downgrade the provider so stale buffers are not advertised.
 - [x] Add TUI provider behaviour only if existing state includes real safe reveal target metadata; otherwise ensure TUI omits make-visible capability and exposes unsupported make-visible via the convenience attr.
 - [x] Add console provider behaviour for attached console without visibility mechanism: type `:console`, available true, no make-visible capability/actions, unsupported make-visible convenience descriptor.
 - [x] Ensure headless/no-UI mode leaves the provider absent or reports no attached UI according to the implementation seam.
@@ -85,5 +85,5 @@
 - [x] Append implementation decisions, side-effecting invocation status, and any follow-up task reference to `implementation.md`.
 - [x] Run focused tests for affected resolver/runtime/frontend namespaces.
 - [x] Run targeted lint for changed Clojure and Emacs Lisp files.
-- [ ] Run broader verification required by project convention if focused changes touch shared runtime/query seams.
+- [x] Run broader verification required by project convention if focused changes touch shared runtime/query seams.
 - [x] Re-read changed plan, steps, docs, tests, and code for coherence with `design.md` acceptance criteria.

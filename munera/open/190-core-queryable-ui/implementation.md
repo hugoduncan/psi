@@ -412,3 +412,22 @@ Verification:
 - `clojure -M:test --focus psi.agent-session.ui-capabilities-test --focus psi.agent-session.graph-surface-test --focus psi.agent-session.resolvers-test` — 57 tests, 2505 assertions, 0 failures.
 - `clj-kondo --lint components/agent-session/test/psi/agent_session/ui_capabilities_test.clj` — clean.
 - `clj-kondo --lint components/agent-session/test/psi/agent_session/ui_capabilities_test.clj components/agent-session/test/psi/agent_session/graph_surface_test.clj components/agent-session/test/psi/agent_session/resolvers_test.clj` — clean.
+
+## 2026-05-30 Emacs RPC provider lifecycle pass
+
+Added an Emacs RPC UI capability provider that derives active session state at query time from the RPC connection focus-session atom rather than advertising a static startup descriptor. When a focused session id is present, the make-visible descriptor remains available and now carries `:psi.ui.invocation/session-id` correlation data. When the RPC connection exists but no active/focused session id is known, the provider returns attached Emacs type with `:psi.ui/available? false`, empty capabilities/actions, and the stable unavailable make-visible descriptor reasoned as `:psi.ui.unavailable.reason/no-attached-ui`.
+
+`psi.rpc.runtime/start-runtime!` installs this late-bound Emacs RPC provider after creating the RPC state and clears the active provider when the stdio loop exits, preventing detached/stopped RPC frontends from continuing to advertise stale make-visible actions. The default `:ui-type :emacs` context provider remains for non-RPC/test contexts that intentionally model an attached Emacs UI.
+
+Verification:
+
+- `clojure -M:test --focus psi.agent-session.ui-capabilities-test --focus psi.agent-session.graph-surface-test --focus psi.rpc-invariants-test` — 40 tests, 2414 assertions, 0 failures.
+- `clj-kondo --lint components/agent-session/src/psi/agent_session/ui_capabilities.clj components/rpc/src/psi/rpc/runtime.clj components/agent-session/test/psi/agent_session/ui_capabilities_test.clj` — clean.
+
+## 2026-05-30 broader verification pass
+
+Ran full project verification after the Emacs RPC provider lifecycle slice touched shared runtime/query seams.
+
+Verification:
+
+- `bb test` — all tests passed.
