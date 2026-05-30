@@ -71,8 +71,8 @@
 
 ## Slice 7 — Review and cleanup
 
-- [ ] Remove, disable, or clearly quarantine obsolete whole-agent-loop retry behavior from the canonical prompt lifecycle path so it cannot duplicate provider-boundary retries.
-- [ ] Simplify duplicated retry policy code after provider-boundary retry is authoritative.
+- [x] Remove, disable, or clearly quarantine obsolete whole-agent-loop retry behavior from the canonical prompt lifecycle path so it cannot duplicate provider-boundary retries.
+- [x] Simplify duplicated retry policy code after provider-boundary retry is authoritative.
 - [x] Update `implementation.md` with implementation decisions, discovered runtime seams, and verification commands/results.
 - [x] Update user-facing docs and changelog if retry behavior, metrics, EQL/`psi-tool`, TUI, or Emacs-visible surfaces changed.
 - [x] Run targeted retry, turn-runtime, provider telemetry, EQL, app-runtime/TUI/Emacs projection, and prompt lifecycle tests.
