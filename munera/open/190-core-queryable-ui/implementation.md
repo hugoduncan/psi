@@ -467,3 +467,12 @@ Verification:
 ## 2026-05-30 implementation review
 
 Found one new actionable implementation issue after re-reading task artifacts, UI capability normalization/provider code, RPC lifecycle wiring, docs, and focused tests: provider normalization can expose contradictory unavailable/available UI state. If a provider returns `:psi.ui/available? false` while also returning capabilities and available actions, `normalize-provider-result` currently preserves `available? false` but can still expose `:psi.ui.capability/make-visible` and an available make-visible descriptor. The design's no-attached/provider-error semantics require unavailable providers to expose empty capabilities/actions and a stable unavailable make-visible descriptor, while supported make-visible implies `:psi.ui/available? true`. Add validation/coverage so unavailable provider results with capabilities or available actions fail closed to provider-error or normalize to the explicit unavailable state.
+
+## 2026-05-30 unavailable-provider advertisement follow-up
+
+Completed the newly added implementation-review follow-up for contradictory provider output. Provider normalization now treats `:psi.ui/available? false` with advertised capabilities or available actions as invalid provider output and fails closed to provider-error semantics, ensuring EQL exposes `:psi.ui/available? false`, empty capabilities/actions, and the stable provider-error unavailable make-visible descriptor rather than contradictory available action data. Added focused coverage for unavailable providers that advertise make-visible capability/action data.
+
+Verification:
+
+- `clojure -M:test --focus psi.agent-session.ui-capabilities-test` — 15 tests, 90 assertions, 0 failures.
+- `clj-kondo --lint components/agent-session/src/psi/agent_session/ui_capabilities.clj components/agent-session/test/psi/agent_session/ui_capabilities_test.clj` — clean.

@@ -288,8 +288,13 @@
         (let [capability-set (set capabilities)
               actions (filterv :psi.ui.action/available? raw-actions)
               make-visible-actions (filterv #(= make-visible-action-id (:psi.ui.action/id %)) actions)
+              incoherent-unavailable? (and (false? available?)
+                                           (or (seq capabilities) (seq actions)))
               incoherent-action? (some #(not (contains? capability-set (:psi.ui.action/capability %))) actions)]
           (cond
+            incoherent-unavailable?
+            (provider-error-result "provider returned unavailable UI with capabilities or available actions")
+
             incoherent-action?
             (provider-error-result "provider returned an available action without its capability")
 

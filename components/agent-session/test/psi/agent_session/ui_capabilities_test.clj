@@ -242,6 +242,26 @@
                            {:psi.ui.invocation/kind :emacs-command
                             :psi.ui.invocation/command "psi-emacs-show-active"})]}))))
 
+(deftest provider-normalization-unavailable-with-advertisements-test
+  ;; Tests that unavailable provider results cannot expose contradictory
+  ;; capabilities or available action descriptors.
+  (let [action (ui-capabilities/make-visible-action
+                {:psi.ui.invocation/kind :emacs-command
+                 :psi.ui.invocation/command "psi-emacs-show-active"})]
+    (doseq [provider-result [{:psi.ui/type :emacs
+                              :psi.ui/available? false
+                              :psi.ui/capabilities [:psi.ui.capability/make-visible]
+                              :psi.ui/actions []}
+                             {:psi.ui/type :emacs
+                              :psi.ui/available? false
+                              :psi.ui/capabilities [:psi.ui.capability/make-visible]
+                              :psi.ui/actions [action]}]]
+      (let [result (ui-capabilities/normalize-provider-result provider-result)]
+        (is (= false (:psi.ui/available? result)))
+        (is (= [] (:psi.ui/capabilities result)))
+        (is (= [] (:psi.ui/actions result)))
+        (is (provider-error? result))))))
+
 (deftest provider-exception-query-behaviour-test
   ;; Tests that provider exceptions do not drop requested UI attrs.
   (let [ctx (create-ctx {})]
