@@ -130,4 +130,4 @@
 
 ## From inconsistency review pass 2026-05-30 (OpenAI resolver acceptance)
 
-- [ ] **Align mid-system resolver acceptance with OpenAI support** — Part 4 requires OpenAI chat-completions models to report mid-conversation system support via explicit metadata or runtime `:provider :openai` + `:api :openai-completions` inference, but the resolver acceptance criterion says the query is true for opus-4.8 and false otherwise. Update the acceptance criterion/tests to require true for opus-4.8 and OpenAI chat-completions, and false for Codex/responses and unsupported Anthropic models.
+- [x] **Align mid-system resolver acceptance with OpenAI support** — Part 4 requires OpenAI chat-completions models to report mid-conversation system support via explicit metadata or runtime `:provider :openai` + `:api :openai-completions` inference, but the resolver acceptance criterion says the query is true for opus-4.8 and false otherwise. Update the acceptance criterion/tests to require true for opus-4.8 and OpenAI chat-completions, and false for Codex/responses and unsupported Anthropic models.

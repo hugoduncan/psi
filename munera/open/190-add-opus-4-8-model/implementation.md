@@ -539,3 +539,12 @@ Read `design-steps.md` for newly added unchecked ambiguity follow-up items after
 **New actionable inconsistency found:**
 
 1. **Mid-system resolver acceptance contradicts OpenAI support requirement** — Part 4 requires all OpenAI chat-completions models, including custom/runtime-loaded maps inferred from `:provider :openai` + `:api :openai-completions`, to report mid-conversation system support. But the resolver acceptance criterion says `(session/query-in ... [:psi.agent-session/model-supports-mid-system-messages])` returns `true` when an opus-4.8 session is active and `false` otherwise, which would make OpenAI chat-completions sessions false despite the immediately preceding OpenAI support requirement. Align the acceptance criterion to include OpenAI chat-completions true cases and unsupported Anthropic/Codex false cases.
+
+---
+
+## Inconsistency follow-up — 2026-05-30 (OpenAI resolver acceptance)
+
+Completed the newly added inconsistency follow-up item in `design-steps.md` by refining `design.md`:
+
+- Updated the Part 4 resolver acceptance criterion so `:psi.agent-session/model-supports-mid-system-messages` must return true for both opus-4.8 and OpenAI chat-completions sessions, including custom/runtime-loaded OpenAI chat-completions model maps inferred from `:provider :openai` + `:api :openai-completions`.
+- The same criterion now explicitly requires false for Codex/responses models and unsupported Anthropic models, aligning acceptance with the model capability and resolver rules.

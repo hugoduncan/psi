@@ -924,7 +924,10 @@ cache-control logic is required.
 - All OpenAI chat-completions models are reported as supporting mid-conversation system messages, either by explicit `:supports-mid-conversation-system-messages true` metadata or by runtime `:provider :openai` + `:api :openai-completions` inference, including custom/runtime-loaded model maps that omit the flag.
 - Codex/responses models and pre-4.8 Anthropic models have the flag `false` or absent and are reported as unsupported.
 - `(session/query-in ctx sid [:psi.agent-session/model-supports-mid-system-messages])`
-  returns `true` when an opus-4.8 session is active, `false` otherwise.
+  returns `true` when an opus-4.8 session is active and when an OpenAI
+  chat-completions session is active (including custom/runtime-loaded model maps
+  inferred from `:provider :openai` + `:api :openai-completions`), and returns
+  `false` for Codex/responses models and unsupported Anthropic models.
 - `inject-mid-system-message!` on an opus-4.8 session appends a `:mid-system`
   journal entry, conversation assembly normalizes it to a schema-valid
   `:system` AI message, and the next `build-prepared-request` includes a
