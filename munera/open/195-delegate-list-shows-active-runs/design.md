@@ -105,9 +105,18 @@ Visibility rules:
 - If multiple eligible same-session delegate workflow background jobs reference the same canonical `workflow-id`, `delegate list` should surface at most one list entry for that canonical workflow run id. The canonical workflow run remains the single management identity; duplicate background jobs must not produce duplicate run rows or alternate management ids.
 - Duplicate eligible jobs for the same `workflow-id` are valid only when they can be reduced to one manageable entry without hiding an active-job contradiction:
   - if exactly one duplicate job is non-terminal, list the canonical run once and use that non-terminal delegate/background status as the displayed background status; retained terminal duplicates for the same run are historical noise and should not create extra entries or override the active delegate status;
-  - if all duplicate jobs are terminal retained history, list the canonical run once while the canonical run still exists, using the newest/most recent retained background job status when a background status is displayed;
+  - if all duplicate jobs are terminal retained history, list the canonical run once while the canonical run still exists, using the newest retained background job status when a background status is displayed;
   - if more than one duplicate job is non-terminal for the same `workflow-id`, `delegate list` should surface an actionable duplicate-job inconsistency/tool error instead of choosing an arbitrary active status, because there is no unambiguous single inflight delegate job to manage.
 - The duplicate-job rule does not change the existing malformed/missing-canonical rules: a non-terminal duplicate group whose canonical workflow run is missing is still an actionable missing-canonical inconsistency, and terminal-only duplicate history whose canonical workflow run was removed remains hidden.
+
+For terminal-only duplicate eligible jobs with the same canonical `workflow-id`, "newest retained background job" is selected deterministically by the background-job completion ordering, newest last:
+
+1. larger non-nil `completed-at`;
+2. if `completed-at` is equal or unavailable for both jobs, larger non-nil `completed-seq`;
+3. if still tied or unavailable, larger non-nil `job-seq`;
+4. if still tied, lexicographically larger string `job-id`.
+
+Terminal retained jobs normally have `completed-at` and `completed-seq`; missing ordering fields are treated as older than present values for the same comparison level, so malformed retained history cannot win over a fully recorded terminal job with a real completion marker. This ordering is only for choosing the displayed delegate/background status in a terminal-only duplicate group. It does not create another management id, and it does not make missing-canonical terminal history visible after the canonical workflow run is removed.
 
 Timed-out delegate background jobs are a delegate-tool retention state, not a canonical workflow-run status. Canonical workflow runs continue to use the workflow runtime status set (`:pending`, `:running`, `:blocked`, `:completed`, `:failed`, `:cancelled`). When a retained same-session delegate background job has `:status :timed-out` and its canonical workflow run still exists, `delegate list` should include the entry with:
 
