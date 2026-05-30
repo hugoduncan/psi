@@ -78,9 +78,18 @@ Likely areas to inspect during planning:
 
 ## Delegate list visibility and retention contract
 
-`delegate list` is scoped to the invoking/originating agent session, not global. A run is visible to a session only when the delegate tool's background-job registry has a `tool-name = "delegate"` workflow job whose `thread-id` equals the invoking `:psi.agent-session/session-id`. The background job is the authoritative session/owner marker for delegate-tool visibility.
+`delegate list` is scoped to the invoking/originating agent session, not global. A run is visible to a session only when the delegate tool's background-job registry has a workflow-delegate background job whose `thread-id` equals the invoking `:psi.agent-session/session-id`. The background job is the authoritative session/owner marker for delegate-tool visibility.
 
-The canonical workflow run registry remains the authoritative source for workflow run identity, status, definition id, current step, creation time, and manageability. A listed delegate entry is formed by joining the same-session background job's `workflow-id` to the canonical workflow run's `run-id`.
+A background job is eligible for workflow-delegate visibility only when all of these fields match the canonical delegate workflow provenance:
+
+- `tool-name = "delegate"`;
+- `job-kind = :workflow`;
+- `workflow-ext-path = "built-in:workflow"` (the built-in workflow delegate provenance);
+- `thread-id = :psi.agent-session/session-id` for the invoking session.
+
+Same-session background jobs with a different `tool-name`, a non-workflow `job-kind`, or a different `workflow-ext-path` are outside the delegate-workflow list contract and should be ignored by `delegate list`; they must not make the list fail as corrupt delegate workflow runs. Same-session `tool-name = "delegate"` jobs that claim `job-kind = :workflow` but have missing, nil, blank, or non-`"built-in:workflow"` workflow provenance are malformed delegate workflow jobs and should surface an actionable `delegate list` inconsistency/tool error rather than being silently listed, silently ignored, or treated as an empty-list case.
+
+The canonical workflow run registry remains the authoritative source for workflow run identity, status, definition id, current step, creation time, and manageability. A listed delegate entry is formed by joining the same-session eligible background job's `workflow-id` to the canonical workflow run's `run-id`.
 
 Visibility rules:
 
