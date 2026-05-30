@@ -959,3 +959,9 @@ No new actionable ambiguities found. Re-read `plan.md`, `steps.md`, `design-step
 Actionable feedback found:
 
 1. **Compacted mid-system preservation is runtime-only, not journal-replay-safe** — `compaction/rebuild-messages-from-entries` coalesces pre-cut `:mid-system` instructions into the replacement runtime message list, but the persisted journal only records the compaction entry with the original `:first-kept-entry-id`. `rebuild-messages-from-journal-entries` later reconstructs from the compaction entry and kept journal entries without applying the same preservation/coalescing rules, so a cold resume after compaction can drop pre-cut active mid-system instructions that the design says remain valid for the remainder of the session. Persist the preservation boundary/state or make journal replay use the same mid-system preservation semantics, with a resume/replay test.
+
+---
+
+## Ambiguity follow-up execution — 2026-05-30 (post compaction persistence/resume review)
+
+Read `design-steps.md` for unchecked ambiguity follow-up items added by the preceding ambiguity-review pass. No unchecked ambiguity design-step items were present (`unchecked count 0`), so there were no newly actionable ambiguity follow-ups to execute. The only remaining unchecked task items are implementation/Slice 5 verification items in `steps.md`, including the implementation-review compaction replay/cold-resume follow-up; those were not ambiguity follow-ups from `design-steps.md`. No `design.md`, `plan.md`, or `steps.md` changes were required for this pass.
