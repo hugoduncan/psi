@@ -73,6 +73,7 @@ Bootstrapped on 2026-04-02.
 
 ## Latest session notes
 
+- 2026-05-30: Task 190 independent implementation verification pass found no unchecked task/design follow-up steps and no concrete implementation work remaining. Re-verified plan/design prompt artifact targets, focused workflow routing tests, and targeted lint green; implementation remains complete pending review/closure.
 - 2026-05-30: Task 190 independent implementation pass found no remaining concrete implementation work. Re-verified plan/design prompt artifact targets, focused workflow routing tests, and targeted lint green; implementation remains complete pending review/closure.
 - 2026-05-29: Task 188 is complete and ready in PR #132: built-in packaged `workflow` skill added at `bases/main/resources/psi/skills/workflow/SKILL.md`, project-local `.psi/skills/workflow/SKILL.md` removed in the same slice to avoid precedence shadowing, and focused proof added across built-in skill discovery/materialization, `:psi.agent-session/skills`, `:psi.skill/by-source`, `/skills`, and `/help` (`96 tests, 497 assertions`).
 - 2026-05-29: Task 188 requested independent implementation review re-read task artifacts/code/tests/docs/changelog, reran focused model/provider/turn-runtime tests and targeted AI lint green, and found no new actionable implementation feedback; remaining unchecked Codex non-streaming `:execute` test item remains conditional future work.
