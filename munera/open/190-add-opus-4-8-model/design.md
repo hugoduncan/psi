@@ -925,7 +925,7 @@ cache-control logic is required.
   mid-system tail by replacing `... user, system` as `... current-user, system`,
   maintaining provider order `user → system`.
 - OpenAI chat-completions message transform maps `:system` → `"system"` string.
-- Compaction preserves both post-cut `:mid-system` entries and pre-cut active mid-system instructions (coalesced after the summary user turn).
+- Compaction preserves both post-cut `:mid-system` entries and pre-cut active mid-system instructions. Tests cover both conditional attachment cases: when retained post-cut history does not begin with a user turn, pre-cut instructions are coalesced after the summary user turn; when retained post-cut history begins with a user turn, they are reattached immediately after that first retained user turn, before any retained assistant response.
 - Unit tests cover: model capability flag, resolver, dispatch handler (supported
   / unsupported model), Anthropic transform (valid placement, invalid placement
   warning+drop), OpenAI transform, journal projection, compaction preservation.

@@ -458,3 +458,13 @@ Completed the newly added inconsistency follow-up item in `design-steps.md` by r
 **New actionable ambiguity found:**
 
 1. **Compaction acceptance criterion still states only summary-user attachment** — Part 4 step 11 now has a conditional compaction rule: pre-cut active `:mid-system` instructions attach after the summary user only when retained history does not begin with a user, but reattach after the first retained user when retained history starts with a user. The Part 4 acceptance criterion still says compaction preserves pre-cut active mid-system instructions "coalesced after the summary user turn". Decide whether acceptance/tests must cover both conditional attachment cases, or whether the detailed rule should be simplified back to unconditional summary-user attachment.
+
+---
+
+## Ambiguity follow-up — 2026-05-30 (compaction acceptance criterion)
+
+Completed the newly added ambiguity follow-up item in `design-steps.md` by refining `design.md`.
+
+Decision recorded:
+- Kept the detailed conditional compaction attachment rule from Part 4 step 11.
+- Updated the Part 4 acceptance criterion to require tests for both conditional cases: pre-cut mid-system instructions coalesced after the summary user when retained history does not begin with a user, and reattached after the first retained user when retained history begins with a user.

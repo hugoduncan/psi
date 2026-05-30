@@ -118,4 +118,4 @@
 
 ## From ambiguity review pass 2026-05-30 (compaction acceptance verification)
 
-- [ ] **Align compaction acceptance criterion with conditional attachment rule** — Part 4 step 11 conditionally attaches preserved pre-cut `:mid-system` instructions after the summary user or after the first retained user, but the acceptance criterion still only says "coalesced after the summary user turn". Update the acceptance criterion/tests to require both conditional cases, or simplify the detailed compaction rule so acceptance has one unambiguous attachment point.
+- [x] **Align compaction acceptance criterion with conditional attachment rule** — Part 4 step 11 conditionally attaches preserved pre-cut `:mid-system` instructions after the summary user or after the first retained user, but the acceptance criterion still only says "coalesced after the summary user turn". Update the acceptance criterion/tests to require both conditional cases, or simplify the detailed compaction rule so acceptance has one unambiguous attachment point.
