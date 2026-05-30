@@ -293,3 +293,9 @@ Completed the newly added inconsistency follow-up item in `design-steps.md` by r
 ## Ambiguity follow-up execution — 2026-05-30
 
 Checked `design-steps.md` for newly added unchecked ambiguity follow-up items. None were present; all ambiguity follow-ups are already marked complete. No `design.md` changes were required.
+
+---
+
+## Design ambiguity review pass — 2026-05-30 (independent verification)
+
+No new actionable ambiguities found. Re-read `design.md` and checked the referenced shared-config resolution/startup wiring, session-state schemas/defaults, provider request shaping, conversation/journal projection, compaction rebuild path, extension mutation bridge, and existing `design-steps.md`; all ambiguity concerns identified in this pass are already resolved or already captured in checked follow-up items. No duplicate `design-steps.md` items were added.
