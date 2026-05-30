@@ -1000,3 +1000,9 @@ Read `design-steps.md` for unchecked inconsistency follow-up items added by the 
 Actionable feedback found:
 
 1. **Compaction replay can drop post-compaction history when preserved mid-system text exists** — `rebuild-messages-from-journal-entries` concatenates kept pre-compaction entries with entries after the compaction record, then applies `normalize-retained-suffix-for-mid-system` across the combined message list. If the journal has pre-cut `:mid-system`, a compaction entry, and later post-compaction user/assistant turns, normalization drops everything through the latest assistant, including the post-compaction turns that must remain in replay. Keep post-compaction entries intact while still avoiding retroactive insertion before already-retained assistant history, and add a replay test covering pre-cut `:mid-system` + compaction + later user/assistant history.
+
+---
+
+## Design ambiguity review pass — 2026-05-30 (plan/steps post-replay-feedback verification)
+
+No new actionable ambiguities found. Re-read `plan.md`, `steps.md`, `design-steps.md`, and the latest `implementation.md` notes, then checked representative referenced surfaces for the remaining open work: compaction replay preservation, Slice 5 documentation/changelog ownership, focused/broad verification, and existing README/`doc/` configuration references. The unchecked compaction replay item in `steps.md` is actionable implementation feedback rather than a plan/steps ambiguity, and Slice 5 remains a clear integration/coherence pass. Existing ambiguity follow-ups in `design-steps.md` are checked; no duplicate follow-up items were added.
