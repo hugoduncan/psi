@@ -564,6 +564,80 @@ before calling.
   )
 ```
 
+The `:ui` API is for contributing content to an attached UI.  Extensions
+that need to discover what UI behaviour is available should query the
+core graph instead of branching on concrete UI type.  Use the runtime
+`[:psi.ui/type :psi.ui/available? :psi.ui/capabilities :psi.ui/actions
+:psi.ui/make-visible-action]` surface to inspect UI capability/action
+data.  `:psi.ui/type`, `:ui-type`, and `:psi.agent-session/ui-type` remain
+diagnostic compatibility data; they are not the normative contract for
+deciding whether a UI action can be invoked.
+
+### Queryable UI capabilities and actions
+
+UI capabilities are core-owned, runtime-scoped EQL data derived from the
+active UI adapter on demand.  They are not stored as extension state and
+should be treated as the current advertised behaviour of the attached UI.
+
+Query the capability/action surface before deciding UI behaviour:
+
+```clojure
+(let [ui-state ((:query api) [:psi.ui/type
+                             :psi.ui/available?
+                             :psi.ui/capabilities
+                             :psi.ui/actions
+                             :psi.ui/make-visible-action])
+      can-make-visible? (contains? (set (:psi.ui/capabilities ui-state))
+                                   :psi.ui.capability/make-visible)
+      make-visible      (:psi.ui/make-visible-action ui-state)]
+  (when (and can-make-visible?
+             (:psi.ui.action/available? make-visible))
+    ;; Present or submit the descriptor through the core UI action request
+    ;; path; do not call frontend namespaces directly.
+    (:psi.ui.action/invocation make-visible)))
+```
+
+Capability keywords use the `:psi.ui.capability/...` namespace.  Action
+descriptors use fully namespaced `:psi.ui.action/...` keys and contain pure,
+serialisable data.  A supported make-visible descriptor looks like:
+
+```clojure
+{:psi.ui.action/id :psi.ui.action/make-visible
+ :psi.ui.action/capability :psi.ui.capability/make-visible
+ :psi.ui.action/label "Show Psi UI"
+ :psi.ui.action/description "Bring the active Psi UI to the foreground."
+ :psi.ui.action/available? true
+ :psi.ui.action/invocation {:psi.ui.invocation/kind :emacs-command
+                            :psi.ui.invocation/command "psi-emacs-show-active"}}
+```
+
+Unavailable cases are explicit.  `:psi.ui/actions` contains only currently
+available action descriptors, while `:psi.ui/make-visible-action` always
+returns a descriptor-shaped value so callers can inspect a stable shape:
+
+```clojure
+{:psi.ui.action/id :psi.ui.action/make-visible
+ :psi.ui.action/capability :psi.ui.capability/make-visible
+ :psi.ui.action/label "Show Psi UI"
+ :psi.ui.action/description "Bring the active Psi UI to the foreground."
+ :psi.ui.action/available? false
+ :psi.ui.action/unavailable-reason :psi.ui.unavailable.reason/no-attached-ui
+ :psi.ui.action/unavailable-message "No attached UI adapter can make itself visible."}
+```
+
+Known unavailable reasons are:
+
+- `:psi.ui.unavailable.reason/no-provider` — no adapter capability provider is installed.
+- `:psi.ui.unavailable.reason/no-attached-ui` — a provider exists, but no usable UI is attached.
+- `:psi.ui.unavailable.reason/unsupported-capability` — an attached UI does not support the requested capability.
+- `:psi.ui.unavailable.reason/provider-error` — the provider failed or returned invalid data.
+
+Provider-error cases may also expose `:psi.ui/diagnostic` as bounded
+troubleshooting text.  Extensions should branch on capability membership,
+`:psi.ui.action/available?`, and unavailable reason keywords, not on
+`:psi.ui/diagnostic` or UI type.
+
+
 ### Dialogs
 
 Dialogs block the calling thread until the user responds.  Only one
@@ -695,7 +769,15 @@ All extension and UI state is queryable via EQL from a connected nREPL:
                  :psi.extension/flag-values
                  :psi.extension/details])
 
-;; UI state
+;; UI capability/action surface
+(s/query-in ctx [:psi.ui/type
+                 :psi.ui/available?
+                 :psi.ui/capabilities
+                 :psi.ui/actions
+                 :psi.ui/make-visible-action
+                 :psi.ui/diagnostic])
+
+;; UI contribution snapshot state
 (s/query-in ctx [:psi.ui/dialog-queue-empty?
                  :psi.ui/active-dialog
                  :psi.ui/pending-dialog-count
@@ -725,7 +807,18 @@ All extension and UI state is queryable via EQL from a connected nREPL:
 | `:psi.extension/flag-values`   | `{name value}` | Current flag values                |
 | `:psi.extension/details`       | `[map]`        | Per-extension detail maps          |
 
-**UI state** (`:psi.ui/*`):
+**UI capability/action surface** (`:psi.ui/*`):
+
+| Attribute                         | Type       | Description                          |
+|-----------------------------------|------------|--------------------------------------|
+| `:psi.ui/type`                    | `keyword?` | Active UI adapter identity for diagnostics/compatibility, not behaviour branching |
+| `:psi.ui/available?`              | `boolean`  | True when a concrete UI adapter is attached |
+| `:psi.ui/capabilities`            | `[keyword]`| Current UI capability keywords such as `:psi.ui.capability/make-visible` |
+| `:psi.ui/actions`                 | `[map]`    | Currently available pure-data UI action descriptors |
+| `:psi.ui/make-visible-action`     | `map`      | Stable make-visible descriptor; available when supported, otherwise unavailable with reason/message |
+| `:psi.ui/diagnostic`              | `string?`  | Optional bounded provider-error diagnostic text |
+
+**UI contribution snapshot state** (`:psi.ui/*`):
 
 | Attribute                          | Type       | Description                          |
 |------------------------------------|------------|--------------------------------------|

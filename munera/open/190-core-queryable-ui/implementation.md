@@ -182,3 +182,7 @@ Found one new actionable inconsistency after re-reading `design.md`, `design-dec
 ## 2026-05-30 design ambiguity review
 
 No new actionable ambiguity feedback after re-reading `design.md`, referenced task design artifacts/docs, and current extension UI/query/frontend seams. The remaining unchecked `design-steps.md` item is a documentation-alignment inconsistency follow-up, not an ambiguity; no new ambiguity follow-up items were added.
+
+## 2026-05-30 ambiguity follow-up execution
+
+Completed the newly added documentation-alignment follow-up in `design-steps.md`: `doc/extensions.md` now documents the queryable UI capability/action surface separately from UI contribution snapshots, and `doc/extension-api.md` now documents the extension-facing `:psi.ui/...` attrs, capability/action branching, unavailable make-visible descriptor semantics, and compatibility-only role of UI-type surfaces. No ambiguity follow-up item remains blocked.
