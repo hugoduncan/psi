@@ -46,7 +46,7 @@
    but consumed during prompt derivation in child-session (not set as a
    standalone child field — it flows into the child's system-prompt-build-opts)."
   [:skill-ids :tool-ids :prompt-contribution-ids :prompt-templates :extensions
-   :auto-retry-enabled :auto-compaction-enabled :prompt-mode :nucleus-prelude-override
+   :auto-retry-enabled :auto-compaction-enabled :prompt-mode :speed-mode :nucleus-prelude-override
    :developer-prompt :developer-prompt-source :cache-breakpoints :scoped-models
    :tool-output-overrides :ui-type :context-tokens :context-window])
 

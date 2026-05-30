@@ -159,6 +159,7 @@
                         (:max-tokens options)       (assoc :max_tokens  (:max-tokens options))
                         (seq tool-defs)             (assoc :tools tool-defs)
                         effort                      (assoc :reasoning_effort effort)
+                        (= :fast (:speed-mode options)) (assoc :service_tier "flex")
                         template-kw                 (assoc :chat_template_kwargs template-kw)
                         (:logprobs-enabled options) (assoc :logprobs true
                                                            :top_logprobs (or (:top-logprobs options) 3))

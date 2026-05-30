@@ -333,6 +333,29 @@
 (def ^:private valid-model-scopes
   #{:session :project :user})
 
+(def ^:private canonical-speed-modes
+  [:normal :fast])
+
+(defn- normalize-speed-mode
+  [s]
+  (some-> s str/trim str/lower-case keyword))
+
+(defn- known-speed-mode?
+  [mode]
+  (contains? (set canonical-speed-modes) mode))
+
+(defn- speed-usage-message
+  []
+  "Usage: /speed OR /speed <normal|fast> [session|project|user]")
+
+(defn- unknown-speed-mode-message
+  [input]
+  (str "Unknown speed mode: " input ". Allowed: normal, fast"))
+
+(defn- unknown-speed-scope-message
+  [scope]
+  (str "Unknown speed scope: " scope ". Allowed: session, project, user"))
+
 (defn- resolve-runtime-model
   [ctx provider model-id]
   (let [provider* (some-> provider keyword)]
@@ -585,6 +608,39 @@
                  :message (str "✓ Thinking level set to "
                                (name (:thinking-level result)))}))))))))
 
+(defn- dispatch-speed-command
+  [ctx session-id trimmed]
+  (let [args (-> (str/replace trimmed #"^/speed\s*" "") str/trim)]
+    (if (str/blank? args)
+      {:type :text
+       :message (str "Current speed mode: "
+                     (name (or (:psi.agent-session/speed-mode
+                                (session/query-in ctx session-id [:psi.agent-session/speed-mode]))
+                               :normal)))}
+      (let [tokens (str/split args #"\s+")]
+        (if-not (contains? #{1 2} (count tokens))
+          {:type :text
+           :message (speed-usage-message)}
+          (let [[mode-input scope-token] tokens
+                mode (normalize-speed-mode mode-input)
+                scope (normalize-model-scope scope-token)]
+            (cond
+              (not (known-speed-mode? mode))
+              {:type :text
+               :message (unknown-speed-mode-message mode-input)}
+
+              (and scope-token (not (contains? valid-model-scopes scope)))
+              {:type :text
+               :message (unknown-speed-scope-message scope-token)}
+
+              :else
+              (let [result (session/set-speed-mode-in! ctx session-id mode (or scope :session))]
+                {:type :text
+                 :message (str "✓ Speed mode set to "
+                               (name (or (:speed-mode result) :normal))
+                               (when scope
+                                 (str " [" (name scope) "]")))}))))))))
+
 (defn- dispatch-login-command
   [ctx session-id oauth-ctx ai-model trimmed]
   (if-not oauth-ctx
@@ -664,7 +720,7 @@
    "/project-repl" :project-repl})
 
 (def ^:private prefixed-command-prefixes
-  ["/tree" "/jobs" "/job" "/cancel-job" "/remember" "/model" "/thinking" "/login" "/project-repl"])
+  ["/tree" "/jobs" "/job" "/cancel-job" "/remember" "/model" "/thinking" "/speed" "/login" "/project-repl"])
 
 (defn- exact-command-handler
   [trimmed]
@@ -688,6 +744,7 @@
     "/remember" (dispatch-remember-command ctx session-id trimmed)
     "/model" (dispatch-model-command ctx session-id trimmed)
     "/thinking" (dispatch-thinking-command ctx session-id trimmed)
+    "/speed" (dispatch-speed-command ctx session-id trimmed)
     "/login" (dispatch-login-command ctx session-id oauth-ctx ai-model trimmed)
     "/project-repl" (project-nrepl-commands/dispatch-project-nrepl-command ctx session-id trimmed)
     nil))

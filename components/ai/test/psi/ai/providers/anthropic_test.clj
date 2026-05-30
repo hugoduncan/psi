@@ -720,3 +720,24 @@
               {:type "text"
                :text "tail"}]
              (get-in out [0 :content]))))))
+
+(deftest anthropic-speed-mode-request-shaping-test
+  ;; Fast speed mode is both a body parameter and a beta header; default modes omit both.
+  (let [model (models/get-model :sonnet-4.6)
+        convo (-> (conv/create "sys") (conv/add-user-message "hi"))]
+    (testing "fast speed mode adds speed body key and beta header"
+      (let [req  (#'anthropic/build-request convo model {:api-key "test-key"
+                                                         :speed-mode :fast})
+            body (json/parse-string (:body req) true)
+            beta (get-in req [:headers "anthropic-beta"])]
+        (is (= "fast" (:speed body)))
+        (is (re-find #"fast-mode-2026-02-01" beta))))
+
+    (testing "normal and nil speed modes omit speed body key and beta header"
+      (doseq [opts [{:api-key "test-key"}
+                    {:api-key "test-key" :speed-mode :normal}]]
+        (let [req  (#'anthropic/build-request convo model opts)
+              body (json/parse-string (:body req) true)
+              beta (get-in req [:headers "anthropic-beta"])]
+          (is (not (contains? body :speed)))
+          (is (not (re-find #"fast-mode-2026-02-01" (or beta "")))))))))

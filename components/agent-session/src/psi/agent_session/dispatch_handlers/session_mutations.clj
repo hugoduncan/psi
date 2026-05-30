@@ -90,6 +90,23 @@
                    persist-effect (conj persist-effect))})))
 
   (register-core-handler!
+   :session/set-speed-mode
+   (fn [_ctx {:keys [session-id mode scope]}]
+     (let [session-mode   (if (= :session (or scope :session))
+                            (when (= :fast mode) :fast)
+                            mode)
+           persist-effect (case scope
+                            :project {:effect/type :persist/project-prefs-update
+                                      :prefs {:speed-mode mode}}
+                            :user    {:effect/type :persist/user-config-update
+                                      :prefs {:speed-mode mode}}
+                            nil)]
+       {:root-state-update (session/session-update session-id #(assoc % :speed-mode session-mode))
+        :return {:speed-mode session-mode}
+        :effects (cond-> []
+                   persist-effect (conj persist-effect))})))
+
+  (register-core-handler!
    :session/set-worktree-path
    (fn [_ctx {:keys [session-id worktree-path]}]
      {:root-state-update (session/session-update session-id #(assoc % :worktree-path (str worktree-path)))}))

@@ -73,3 +73,18 @@
               "bootstrap must reuse the pre-created session-id")
           (is (= 1 (count sessions-after))
               "no extra session created — still exactly one"))))))
+
+(deftest bootstrap-runtime-session-applies-presence-aware-speed-preferences-test
+  (let [cwd (test-support/temp-cwd)]
+    (project-prefs/update-agent-session! cwd {:speed-mode :normal})
+    (with-redefs-fn (app-test-support/bootstrap-stub-bindings)
+      (fn []
+        (let [{:keys [ctx]} (app-test-support/bootstrap-fresh-session!
+                             app-test-support/test-ai-model
+                             {:cwd cwd
+                              :persist? false})
+              session-id (-> (ss/list-context-sessions-in ctx) first :session-id)
+              sd         (ss/get-session-data-in ctx session-id)]
+          (is (= :normal (:speed-mode sd)))
+          (is (= :normal (:psi.agent-session/speed-mode
+                          (session/query-in ctx session-id [:psi.agent-session/speed-mode])))))))))

@@ -55,6 +55,16 @@
   (let [v (:thinking-level cfg)]
     (if (keyword? v) v :off)))
 
+(defn resolved-speed-mode
+  "Return {:present? true :value mode} for valid configured speed mode.
+   Missing or invalid values return nil. Explicit :normal is preserved so it can
+   mask lower-precedence :fast values while still shaping provider-default requests."
+  [cfg]
+  (when (contains? cfg :speed-mode)
+    (let [v (:speed-mode cfg)]
+      (when (#{:normal :fast} v)
+        {:present? true :value v}))))
+
 (defn resolved-prompt-mode
   "Return :lambda or :prose."
   [cfg]

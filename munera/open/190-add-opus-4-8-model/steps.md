@@ -12,24 +12,24 @@
 
 ## Slice 2 — Speed mode stack
 
-- [ ] Add `speed-mode-schema` and optional `:speed-mode` to `agent-session-schema`, with initial sessions defaulting to nil.
-- [ ] Add a `:session/set-speed-mode` dispatch handler that stores the session value and emits project/user config persistence effects for scoped updates.
-- [ ] Add `set-speed-mode-in!` to session settings.
-- [ ] Propagate non-nil `:speed-mode` from session data into `:turn/ai-options` in `session->request-options`.
-- [ ] Add shared-config schema support for persisted `speed-mode`.
-- [ ] Add a presence-aware `resolved-speed-mode` accessor that distinguishes absent/invalid values from explicit `:normal`.
-- [ ] Apply resolved persisted speed defaults to newly created root sessions only when the accessor reports presence.
-- [ ] Implement `/speed` command parsing for no args, `<normal|fast>`, and `<normal|fast> <session|project|user>`.
-- [ ] Ensure `/speed normal session` clears in-memory state to nil while `/speed normal project|user` stores explicit `:normal` in current session and config.
-- [ ] Add `:psi.agent-session/speed-mode` resolver that displays nil session state as `:normal`.
-- [ ] Add footer query/display support for `• fast` when speed mode is `:fast`.
-- [ ] Add Anthropic request shaping for `speed: "fast"` and the `fast-mode-2026-02-01` beta header only when speed mode is `:fast`.
-- [ ] Add `[:speed {:optional true} [:enum "fast"]]` to the Anthropic request body schema.
-- [ ] Add OpenAI chat-completions request shaping for `service_tier: "flex"` only when speed mode is `:fast`.
-- [ ] Confirm Codex/responses request shaping omits speed mode.
-- [ ] Add tests for speed command success/error branches and scope handling.
+- [x] Add `speed-mode-schema` and optional `:speed-mode` to `agent-session-schema`, with initial sessions defaulting to nil.
+- [x] Add a `:session/set-speed-mode` dispatch handler that stores the session value and emits project/user config persistence effects for scoped updates.
+- [x] Add `set-speed-mode-in!` to session settings.
+- [x] Propagate non-nil `:speed-mode` from session data into `:turn/ai-options` in `session->request-options`.
+- [x] Add shared-config schema support for persisted `speed-mode`.
+- [x] Add a presence-aware `resolved-speed-mode` accessor that distinguishes absent/invalid values from explicit `:normal`.
+- [x] Apply resolved persisted speed defaults to newly created root sessions only when the accessor reports presence.
+- [x] Implement `/speed` command parsing for no args, `<normal|fast>`, and `<normal|fast> <session|project|user>`.
+- [x] Ensure `/speed normal session` clears in-memory state to nil while `/speed normal project|user` stores explicit `:normal` in current session and config.
+- [x] Add `:psi.agent-session/speed-mode` resolver that displays nil session state as `:normal`.
+- [x] Add footer query/display support for `• fast` when speed mode is `:fast`.
+- [x] Add Anthropic request shaping for `speed: "fast"` and the `fast-mode-2026-02-01` beta header only when speed mode is `:fast`.
+- [x] Add `[:speed {:optional true} [:enum "fast"]]` to the Anthropic request body schema.
+- [x] Add OpenAI chat-completions request shaping for `service_tier: "flex"` only when speed mode is `:fast`.
+- [x] Confirm Codex/responses request shaping omits speed mode.
+- [x] Add tests for speed command success/error branches and scope handling.
 - [ ] Add tests for speed session mutation, resolver projection, startup config masks, and cold resume transience.
-- [ ] Add tests for Anthropic and OpenAI speed request shaping.
+- [x] Add tests for Anthropic and OpenAI speed request shaping.
 
 ## Slice 3 — Effort override and adaptive `:xhigh`
 

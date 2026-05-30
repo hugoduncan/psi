@@ -109,3 +109,16 @@
     (is (nil? (config-resolution/resolved-nucleus-prelude-override
                {:nucleus-prelude-override :custom})))
     (is (nil? (config-resolution/resolved-nucleus-prelude-override {})))))
+
+(deftest resolved-speed-mode-test
+  ;; Speed resolution is presence-aware so explicit :normal can mask lower layers.
+  (testing "returns presence-aware valid speed modes"
+    (is (= {:present? true :value :normal}
+           (config-resolution/resolved-speed-mode {:speed-mode :normal})))
+    (is (= {:present? true :value :fast}
+           (config-resolution/resolved-speed-mode {:speed-mode :fast}))))
+
+  (testing "returns nil for absent or invalid speed modes"
+    (is (nil? (config-resolution/resolved-speed-mode {})))
+    (is (nil? (config-resolution/resolved-speed-mode {:speed-mode "fast"})))
+    (is (nil? (config-resolution/resolved-speed-mode {:speed-mode :turbo})))))

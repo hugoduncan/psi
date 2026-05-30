@@ -109,6 +109,7 @@
    [:messages [:sequential anthropic-message-schema]]
    [:stream {:optional true} boolean?]
    [:system {:optional true} [:or :string [:sequential anthropic-system-block-schema]]]
+   [:speed {:optional true} [:enum "fast"]]
    [:temperature {:optional true} number?]
    [:thinking {:optional true} anthropic-thinking-schema]
    [:output_config {:optional true} anthropic-output-config-schema]

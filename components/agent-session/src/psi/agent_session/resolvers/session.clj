@@ -123,11 +123,13 @@
   {::pco/input  [:psi/agent-session-ctx :psi.agent-session/session-id]
    ::pco/output [:psi.agent-session/model
                  :psi.agent-session/thinking-level
+                 :psi.agent-session/speed-mode
                  :psi.agent-session/prompt-mode
                  :psi.agent-session/ui-type]}
   (let [sd (support/session-data agent-session-ctx session-id)]
     {:psi.agent-session/model          (:model sd)
      :psi.agent-session/thinking-level (:thinking-level sd)
+     :psi.agent-session/speed-mode     (or (:speed-mode sd) :normal)
      :psi.agent-session/prompt-mode    (:prompt-mode sd)
      :psi.agent-session/ui-type        (:ui-type sd)}))
 

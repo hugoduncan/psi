@@ -158,6 +158,9 @@
       (some? (:temperature session-data))
       (assoc :temperature (:temperature session-data))
 
+      (some? (:speed-mode session-data))
+      (assoc :speed-mode (:speed-mode session-data))
+
       (:logprobs-enabled session-data)
       (assoc :logprobs-enabled true
              :top-logprobs (or (:top-logprobs session-data) 3))

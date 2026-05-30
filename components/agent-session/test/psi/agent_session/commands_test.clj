@@ -450,6 +450,46 @@
     (is (= :text (:type result)))
     (is (= "Usage: /thinking OR /thinking <level>" (:message result)))))
 
+(deftest dispatch-speed-command-test
+  ;; The /speed command exposes nil session state as normal and supports scoped updates.
+  (testing "no args shows normal by default"
+    (let [[ctx session-id] (make-test-ctx)
+          result (commands/dispatch-in ctx session-id "/speed" cmd-opts)]
+      (is (= :text (:type result)))
+      (is (= "Current speed mode: normal" (:message result)))
+      (is (nil? (:speed-mode (ss/get-session-data-in ctx session-id))))))
+
+  (testing "fast sets in-memory speed mode"
+    (let [[ctx session-id] (make-test-ctx)
+          result (commands/dispatch-in ctx session-id "/speed fast" cmd-opts)]
+      (is (= :text (:type result)))
+      (is (= "✓ Speed mode set to fast" (:message result)))
+      (is (= :fast (:speed-mode (ss/get-session-data-in ctx session-id))))))
+
+  (testing "normal session clears in-memory speed mode to nil"
+    (let [[ctx session-id] (make-test-ctx {:session-defaults {:speed-mode :fast}})
+          result (commands/dispatch-in ctx session-id "/speed normal session" cmd-opts)]
+      (is (= :text (:type result)))
+      (is (= "✓ Speed mode set to normal [session]" (:message result)))
+      (is (nil? (:speed-mode (ss/get-session-data-in ctx session-id))))))
+
+  (testing "project-scoped normal stores explicit normal in current session"
+    (let [cwd (test-support/temp-cwd)
+          [ctx session-id] (make-test-ctx {:cwd cwd})
+          result (commands/dispatch-in ctx session-id "/speed normal project" cmd-opts)]
+      (is (= :text (:type result)))
+      (is (= "✓ Speed mode set to normal [project]" (:message result)))
+      (is (= :normal (:speed-mode (ss/get-session-data-in ctx session-id))))))
+
+  (testing "unknown mode and scope report allowed values"
+    (let [[ctx session-id] (make-test-ctx)]
+      (is (= "Unknown speed mode: turbo. Allowed: normal, fast"
+             (:message (commands/dispatch-in ctx session-id "/speed turbo" cmd-opts))))
+      (is (= "Unknown speed scope: bogus. Allowed: session, project, user"
+             (:message (commands/dispatch-in ctx session-id "/speed fast bogus" cmd-opts))))
+      (is (= "Usage: /speed OR /speed <normal|fast> [session|project|user]"
+             (:message (commands/dispatch-in ctx session-id "/speed fast project extra" cmd-opts)))))))
+
 (deftest dispatch-logprobs-command-removed-test
   (let [[ctx session-id] (make-test-ctx)]
     (is (nil? (commands/dispatch-in ctx session-id "/logprobs" cmd-opts)))

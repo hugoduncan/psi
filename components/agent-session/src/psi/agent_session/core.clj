@@ -115,6 +115,12 @@
   [ctx session-id level]
   (settings/set-thinking-level-in! ctx session-id level))
 
+(defn set-speed-mode-in!
+  ([ctx session-id mode]
+   (settings/set-speed-mode-in! ctx session-id mode))
+  ([ctx session-id mode scope]
+   (settings/set-speed-mode-in! ctx session-id mode scope)))
+
 (defn cycle-model-in!
   [ctx session-id direction]
   (settings/cycle-model-in! ctx session-id direction))

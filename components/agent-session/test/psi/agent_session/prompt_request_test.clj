@@ -296,3 +296,23 @@
                 :temperature 1.5}
           opts (prompt-request/session->request-options {} sd {})]
       (is (= 1.5 (:temperature opts))))))
+
+(deftest session-speed-mode-propagates-to-request-options-test
+  ;; Speed mode is canonical session data and is only projected when an override is present.
+  (testing "speed mode is omitted when session state is nil"
+    (is (not (contains? (prompt-request/session->request-options
+                         {}
+                         {:model {:provider "openai" :id "gpt-4.1"}
+                          :thinking-level :off
+                          :speed-mode nil}
+                         {})
+                        :speed-mode))))
+
+  (testing "speed mode propagates when set"
+    (is (= :fast
+           (:speed-mode (prompt-request/session->request-options
+                         {}
+                         {:model {:provider "openai" :id "gpt-4.1"}
+                          :thinking-level :off
+                          :speed-mode :fast}
+                         {}))))))

@@ -9,6 +9,9 @@
 (def thinking-level-schema
   [:enum :off :minimal :low :medium :high :xhigh])
 
+(def speed-mode-schema
+  [:enum :normal :fast])
+
 (def ui-type-schema
   [:enum :console :tui :emacs])
 
@@ -137,6 +140,7 @@
    [:response-mode {:optional true} [:maybe response-mode-schema]]
    [:model {:optional true} [:maybe model-schema]]
    [:thinking-level thinking-level-schema]
+   [:speed-mode {:optional true} [:maybe speed-mode-schema]]
    [:is-streaming :boolean]
    [:is-compacting :boolean]
    [:interrupt-pending :boolean]
@@ -243,6 +247,7 @@
      :workflow-owned?         false
      :model                   nil
      :thinking-level          :off
+     :speed-mode              nil
      :is-streaming            false
      :is-compacting           false
      :interrupt-pending       false

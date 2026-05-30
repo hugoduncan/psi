@@ -774,3 +774,23 @@ Verification:
 - `clj-kondo --lint components/ai/src/psi/ai/models.clj components/ai/src/psi/ai/schemas.clj components/ai/test/psi/ai/core_test.clj components/ai/test/psi/ai/model_registry_test.clj components/ai/test/psi/ai/providers/anthropic_models_api_test.clj` — clean.
 
 Next concrete work: Slice 2 speed-mode stack.
+
+
+## Implementation pass — 2026-05-30 (Slice 2 speed-mode stack, first slice)
+
+Implemented the core speed-mode stack:
+
+- Added `speed-mode-schema`, optional session `:speed-mode`, and nil default.
+- Added `:session/set-speed-mode`, `set-speed-mode-in!`, command-facing core wrapper, and request-option projection.
+- Added presence-aware `shared-config.resolution/resolved-speed-mode` and startup application for new root sessions; `:normal` is preserved as an explicit config/session mask while request shaping treats nil/`:normal` as provider default.
+- Added `:psi.agent-session/speed-mode` resolver with nil→`:normal` display semantics and footer `• fast` display.
+- Added Anthropic `speed: "fast"` request shaping plus `fast-mode-2026-02-01` beta header, and admitted `:speed` in the closed Anthropic request schema.
+- Added OpenAI chat-completions `service_tier: "flex"` shaping for `:fast`; Codex/responses is unchanged and therefore omits speed mode.
+- Added focused tests for `/speed` command branches, request-option propagation, shared-config resolution, startup explicit `:normal`, Anthropic request shaping/schema, and OpenAI request shaping.
+
+Verification:
+
+- `clojure -M:test --focus psi.agent-session.model-dispatch-test --focus psi.agent-session.commands-test --focus psi.agent-session.prompt-request-test --focus psi.shared-config.resolution-test --focus psi.app-runtime-bootstrap-test --focus psi.app-runtime.footer-test --focus psi.ai.providers.anthropic-test --focus psi.ai.providers.openai-request-headers-test` — 117 tests, 611 assertions, 0 failures.
+- `clj-kondo --lint` on all modified source/test paths — clean.
+
+Remaining Slice 2 work: add cold-resume transience proof and decide whether any additional session mutation/persistence assertions are needed before moving to Slice 3.

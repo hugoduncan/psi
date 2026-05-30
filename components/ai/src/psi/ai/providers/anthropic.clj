@@ -20,6 +20,7 @@
 (def ^:private interleaved-thinking-beta "interleaved-thinking-2025-05-14")
 (def ^:private prompt-caching-beta "prompt-caching-2024-07-31")
 (def ^:private prompt-caching-scope-beta "prompt-caching-scope-2026-01-05")
+(def ^:private fast-mode-beta "fast-mode-2026-02-01")
 (defn- anthropic-cache-control
   [cache-control]
   (when (= :ephemeral (:type cache-control))
@@ -254,7 +255,7 @@
 
 (defn- beta-header
   ;; Adaptive thinking (Opus 4.7+) must NOT include interleaved-thinking-beta.
-  [oauth? thinking adaptive? prompt-caching? structured-output?]
+  [oauth? thinking adaptive? prompt-caching? structured-output? speed-mode]
   (let [extended-thinking? (and thinking (not adaptive?))
         betas (cond-> []
                 oauth?               (into [claude-code-beta
@@ -263,6 +264,7 @@
                                             prompt-caching-scope-beta])
                 extended-thinking?   (conj interleaved-thinking-beta)
                 prompt-caching?      (conj prompt-caching-beta)
+                (= :fast speed-mode) (conj fast-mode-beta)
                 structured-output?   (conj anthropic-structured-output/json-schema-output-beta))]
     (when (seq betas)
       (->> betas
@@ -270,14 +272,14 @@
            (str/join ",")))))
 
 (defn- request-headers
-  [api-key thinking adaptive? prompt-caching? structured-output?]
+  [api-key thinking adaptive? prompt-caching? structured-output? speed-mode]
   (let [oauth?       (oauth-api-key? api-key)
         base-headers {"Content-Type"      "application/json"
                       "anthropic-version" anthropic-version}
         headers      (if oauth?
                        (assoc base-headers "Authorization" (str "Bearer " api-key))
                        (assoc base-headers "x-api-key" api-key))
-        beta         (beta-header oauth? thinking adaptive? prompt-caching? structured-output?)]
+        beta         (beta-header oauth? thinking adaptive? prompt-caching? structured-output? speed-mode)]
     (cond-> headers
       beta (assoc "anthropic-beta" beta))))
 
@@ -347,6 +349,7 @@
              :messages   (transform-messages conversation fallback-request)}
       stream? (assoc :stream true)
       (some? system-body) (assoc :system system-body)
+      (= :fast (:speed-mode options)) (assoc :speed "fast")
       ;; temperature is incompatible with extended thinking, and is a 400
       ;; error on adaptive-thinking models (Opus 4.7+) even when thinking=off
       (and (not thinking)
@@ -380,13 +383,15 @@
                                                        thinking
                                                        adaptive?
                                                        prompt-caching?
-                                                       json-schema-output?)
+                                                       json-schema-output?
+                                                       (:speed-mode options))
                                       "Authorization" "x-api-key")
                               (request-headers api-key
                                                thinking
                                                adaptive?
                                                prompt-caching?
-                                               json-schema-output?))
+                                               json-schema-output?
+                                               (:speed-mode options)))
          headers            (if-let [custom (:headers options)]
                               (merge base-hdrs custom)
                               base-hdrs)]
