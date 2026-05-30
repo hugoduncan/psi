@@ -1,4 +1,4 @@
-# 190 — Add Claude Opus 4.8 + /speed + /effort commands
+# 190 — Add Claude Opus 4.8 + /speed + /effort + mid-conversation system messages
 
 ## Goal
 
@@ -9,6 +9,9 @@
    string, orthogonal to thinking on/off.
 4. Make `:xhigh` thinking level genuinely distinct from `:high` on all providers
    that support it.
+5. Support mid-conversation system messages: a model capability that allows
+   `role: "system"` messages to be injected into the message array after user
+   turns, with a first-class extension API and EQL queryable capability flag.
 
 ---
 
@@ -345,6 +348,181 @@ Add `effort-override` to project/user config schema.
 - Unit tests cover: command dispatch (all branches), Anthropic request shaping
   (override present / absent / xhigh), OpenAI request shaping (override present
   / absent / xhigh ceiling), session state mutation, resolver projection.
+- `bb test` green.
+
+---
+
+## Part 4 — Mid-conversation system messages
+
+### Background
+
+Opus 4.8 introduces `role: "system"` messages that can appear inside the
+`messages` array, immediately after a user turn.  This is distinct from the
+top-level `system` field (which is the base system prompt).  A mid-conversation
+system message lets callers append updated instructions — revised permissions,
+changed token budgets, updated context — without restating the full system
+prompt, preserving cache hits on earlier turns and reducing input cost on
+agentic loops.
+
+**Placement rule** (Anthropic): a system message may appear at any position
+where a user message would be valid — i.e. not immediately after another system
+message, not immediately after an assistant message, not as the last message.
+In practice the safe position is immediately after the most recent user turn
+and before the next assistant turn.
+
+**OpenAI**: The OpenAI chat-completions API has always supported
+`{"role": "system", "content": "..."}` objects inside the `messages` array at
+any position; no special handling is needed beyond passing the message through.
+Codex/responses API does not support mid-conversation system messages.
+
+### Model capability flag
+
+A new boolean model attribute `:supports-mid-conversation-system-messages`
+(default `false`) gates the feature at the model layer.  This is queryable via
+EQL so extensions and workflows can introspect before injecting.
+
+Models that support it:
+- `:opus-4.8` — `true`
+- All other Anthropic models — `false` for now (add as Anthropic confirms)
+- All OpenAI chat-completions models — `true` (already supported by the API)
+- Codex/responses models — `false`
+
+### New internal message kind: `:mid-system`
+
+The journal and provider message pipeline need a new message kind to carry
+mid-conversation system text without conflating it with user or assistant turns.
+
+**Journal entry kind**: add `:mid-system` to `session-entry-kind-schema` in
+`components/session-state/src/psi/session_state/model.clj`.
+
+**Provider message role**: add `:system` to `MessageRole` schema in
+`components/ai/src/psi/ai/schemas.clj`.
+
+### Architecture — full stack
+
+#### 1. Model schema (`components/ai/src/psi/ai/schemas.clj`)
+
+Add `:system` to `MessageRole` enum.
+
+#### 2. Model definitions (`components/ai/src/psi/ai/models.clj`)
+
+Add `:supports-mid-conversation-system-messages` boolean to the `Model` schema
+in `schemas.clj`.  Set `true` on `:opus-4.8` and all OpenAI chat-completions
+models.
+
+#### 3. Session state (`components/session-state/src/psi/session_state/model.clj`)
+
+Add `:mid-system` to `session-entry-kind-schema`.
+
+#### 4. Conversation assembly (`components/turn-runtime/src/psi/turn_runtime/conversation.clj`)
+
+In `append-msg`, handle `"system"` role: append a `{:role :system :content
+{:kind :text :text "..."}}` message to the conversation.  These messages pass
+through `agent-messages->ai-conversation` transparently alongside user and
+assistant turns.
+
+#### 5. Anthropic provider (`components/ai/src/psi/ai/providers/anthropic.clj`)
+
+In `transform-message`, add a `:system` case:
+```clojure
+:system
+(conj acc {:role "system"
+           :content (user-content msg)})
+```
+This emits `{"role": "system", "content": [...]}` inline in the `messages`
+array.  No beta header is required.
+
+**Placement validation**: when assembling `transform-messages`, assert that no
+system message appears immediately after another system message or as the final
+message.  Violations log a warning and drop the offending message rather than
+sending a malformed request.
+
+#### 6. OpenAI chat-completions provider (`components/ai/src/psi/ai/providers/openai/chat_completions.clj`)
+
+OpenAI already accepts `{"role": "system", ...}` objects in the messages array.
+Map the internal `:system` role → `"system"` string in the message transform.
+No other change needed.
+
+#### 7. Dispatch handler — inject mid-system message
+
+New `:session/inject-mid-system-message` handler in
+`dispatch_handlers/session_mutations.clj`:
+- Validates that the active model supports the capability (queries
+  `:supports-mid-conversation-system-messages`).  Returns an error map if not.
+- Appends a `:mid-system` journal entry with `{:text text :source source}`.
+- The journal entry is projected into a `{:role "system" ...}` provider message
+  at request-build time via the conversation assembly path above.
+- Emits no runtime effects (journal-only; no notify, no steering message).
+
+#### 8. Extension API (`components/agent-session/src/psi/agent_session/extensions/api.clj`)
+
+Add `inject-mid-system-message!` to the extension API:
+```clojure
+inject-mid-system-message!
+(fn [text]
+  (mutate-ext-required :inject-mid-system-message
+                       'psi.extension/inject-mid-system-message
+                       {:text text}))
+```
+Extensions call this to append updated instructions mid-conversation.  The
+function returns `{:ok true}` or `{:ok false :error :capability-not-supported}`
+when the active model does not support the feature.
+
+#### 9. EQL resolver (`components/agent-session/src/psi/agent_session/resolvers/session.clj`)
+
+Add `:psi.agent-session/model-supports-mid-system-messages` resolver:
+- Input: `[:psi/agent-session-ctx :psi.agent-session/session-id]`
+- Output: boolean derived from the active model's
+  `:supports-mid-conversation-system-messages` flag.
+
+This is the queryable capability surface extensions use before calling
+`inject-mid-system-message!`.
+
+#### 10. `prompt_request.clj` — journal projection
+
+`journal->provider-messages` already projects `:message` entries.  Extend it
+to also project `:mid-system` entries as `{:role "system" :content [{:type
+:text :text "..."}]}` messages, inserted at the correct position in the
+provider message sequence.
+
+#### 11. Compaction (`components/agent-session/src/psi/agent_session/compaction.clj`)
+
+Mid-system messages must be preserved across compaction boundaries: they are
+not part of the conversation history to be summarised, but are instructions
+that remain valid for the remainder of the session.  The compaction pass must
+carry forward all `:mid-system` journal entries that fall after the compaction
+cut point.
+
+#### 12. Cache interaction
+
+Mid-system messages inserted after a cached user turn will break the cache hit
+on the message immediately preceding them.  This is expected and is the stated
+trade-off: the cache hit on all earlier turns is preserved; only the turn
+immediately preceding the injection loses its cache breakpoint.  No special
+cache-control logic is required.
+
+### Acceptance criteria — Part 4
+
+- `:opus-4.8` model map has `:supports-mid-conversation-system-messages true`.
+- All OpenAI chat-completions models have `:supports-mid-conversation-system-messages true`.
+- Codex/responses models and pre-4.8 Anthropic models have the flag `false` or absent.
+- `(session/query-in ctx sid [:psi.agent-session/model-supports-mid-system-messages])`
+  returns `true` when an opus-4.8 session is active, `false` otherwise.
+- `inject-mid-system-message!` on an opus-4.8 session appends a `:mid-system`
+  journal entry and the next `build-prepared-request` includes a
+  `{"role": "system", ...}` message in the Anthropic messages array.
+- `inject-mid-system-message!` on a non-supporting model returns
+  `{:ok false :error :capability-not-supported}` and does not modify the journal.
+- Anthropic `transform-messages` emits `{"role": "system", ...}` for `:system`
+  role messages; drops (with warning) any system message appearing as the final
+  message or immediately after another system message.
+- OpenAI chat-completions message transform maps `:system` → `"system"` string.
+- Compaction preserves `:mid-system` entries after the cut point.
+- Unit tests cover: model capability flag, resolver, dispatch handler (supported
+  / unsupported model), Anthropic transform (valid placement, invalid placement
+  warning+drop), OpenAI transform, journal projection, compaction preservation.
+- Extension API `inject-mid-system-message!` integration test using nullable
+  extension helpers.
 - `bb test` green.
 
 ---
