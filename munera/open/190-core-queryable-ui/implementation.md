@@ -566,3 +566,7 @@ Verification:
 
 - `bb emacs:test` — 321 tests, 321 expected, 0 unexpected.
 - `bb emacs:byte-compile` — clean.
+
+## 2026-05-30 test review
+
+Found one new actionable test issue after reviewing task artifacts, UI capability/provider tests, lifecycle tests, nullable coverage, Emacs ERT coverage, and the invocation schema contract: provider normalization tests cover valid `:ui-event` and `:mutation` invocations only when optional `:psi.ui.invocation/payload` / `:psi.ui.invocation/params` are present, but the design/checklist require those fields to be optional/defaulted to `{}` when omitted. Add focused coverage for omitted payload/params defaulting (and fix implementation if the test exposes drift) so the descriptor contract is executable.
