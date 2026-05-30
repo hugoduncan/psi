@@ -624,3 +624,7 @@ Found one new actionable test-shaping issue after reviewing task artifacts, UI c
 ## 2026-05-30 provider collection-shape follow-up
 
 Completed the newly added test-shaper follow-up for provider collection-shape drift. Added focused normalization coverage proving non-vector `:psi.ui/capabilities` and `:psi.ui/actions` fail closed to provider-error semantics, and fixed normalization to validate raw collection shapes before defaulting/normalizing instead of silently vectorizing lists or sets. Verification: `clojure -M:test --focus psi.agent-session.ui-capabilities-test`; targeted `clj-kondo` for the changed UI capability source/test files.
+
+## 2026-05-30 implementation review
+
+No new actionable implementation feedback after reviewing task artifacts, UI capability normalization/resolver code, provider lifecycle wiring, RPC/TUI tests, extension API/nullability coverage, Emacs command coverage, docs, and the latest provider collection-shape follow-up. Non-vector `:psi.ui/capabilities` / `:psi.ui/actions` now fail closed to provider-error semantics with focused tests, and targeted verification passed: `clojure -M:test --focus psi.agent-session.ui-capabilities-test --focus psi.agent-session.graph-surface-test --focus psi.app-runtime-test --focus psi.rpc-transport-test --focus psi.agent-session.extensions-test`; targeted `clj-kondo` passed for changed UI/RPC/TUI/extension test files.
