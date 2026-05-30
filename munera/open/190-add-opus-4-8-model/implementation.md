@@ -1127,3 +1127,10 @@ No new actionable ambiguities found. Re-read `plan.md`, `steps.md`, `design-step
 ## Ambiguity follow-up execution — 2026-05-30 (post-test-review unchecked-item pass)
 
 Read `design-steps.md` for unchecked ambiguity follow-up items added by the preceding ambiguity-review pass. No unchecked ambiguity design-step items were present (`unchecked count 0`), so there were no newly actionable ambiguity follow-ups to execute. No `design.md`, `plan.md`, or `steps.md` changes were required. Pre-existing uncommitted edits in `components/ai/test/psi/ai/providers/openai_test.clj` were left untouched.
+---
+
+## Test review pass — 2026-05-30 (effort override coverage)
+
+Actionable test feedback found:
+
+1. **Effort override tests only prove the `:xhigh` ceiling path, not ordinary override precedence** — The design acceptance requires non-`xhigh` override values to pass through for Anthropic adaptive, OpenAI chat-completions, and Codex/responses. Existing provider tests cover level-derived medium/high and `:effort-override :xhigh`, but they do not prove that `:effort-override :high` or `:medium` overrides a different thinking level on each provider path. Added one unchecked follow-up in `steps.md`; no duplicate existing step covered this exact gap.

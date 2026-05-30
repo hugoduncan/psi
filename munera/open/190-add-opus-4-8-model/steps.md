@@ -104,3 +104,4 @@
 ## Test review follow-ups
 
 - [x] Add scoped `/speed` and `/effort` persistence tests proving project/user scoped commands or session mutations write the expected config keys, including `/speed normal project|user` explicit `:normal` masks and `/effort none project|user` explicit nil masks.
+- [ ] Add effort override request-shaping tests for non-`xhigh` override values: Anthropic adaptive `:effort-override :high` forces `output_config.effort = "high"` over a different thinking level, OpenAI chat-completions `:effort-override :medium` returns/sends `"medium"`, and Codex/responses `:effort-override :medium` sends `{"effort" "medium" ...}` over a different thinking level.
