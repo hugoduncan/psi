@@ -13,10 +13,18 @@
    custom/runtime-loaded OpenAI chat models do not need to carry psi-specific
    metadata."
   [model]
-  (boolean
-   (or (true? (:supports-mid-conversation-system-messages model))
+  (let [explicit-support (:supports-mid-conversation-system-messages model)]
+    (boolean
+     (cond
+       (true? explicit-support)
+       true
+
+       (false? explicit-support)
+       false
+
+       :else
        (and (= :openai (:provider model))
-            (= :openai-completions (:api model))))))
+            (= :openai-completions (:api model)))))))
 
 (defn runtime-active-model
   "Resolve the active runtime model for `session-id`, falling back to the stored

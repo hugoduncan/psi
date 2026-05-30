@@ -114,4 +114,4 @@
 ## Code-shaper follow-ups
 
 - [x] Align `psi.extension/inject-mid-system-message` Pathom mutation `::pco/params` with its implemented optional provenance inputs (`:source` and `:ext-path`), and add/adjust coverage so the declared mutation contract includes those keys.
-- [ ] Make `psi.agent-session.model-capabilities/supports-mid-system-messages?` honor explicit `:supports-mid-conversation-system-messages false` before OpenAI chat-completions API-shape inference, and add coverage for an OpenAI chat-completions runtime/custom model with the flag explicitly false.
+- [x] Make `psi.agent-session.model-capabilities/supports-mid-system-messages?` honor explicit `:supports-mid-conversation-system-messages false` before OpenAI chat-completions API-shape inference, and add coverage for an OpenAI chat-completions runtime/custom model with the flag explicitly false.

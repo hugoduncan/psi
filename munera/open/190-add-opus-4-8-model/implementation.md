@@ -1273,3 +1273,13 @@ Actionable code-shaping feedback found:
 ## Test review pass — 2026-05-30 (post-implementation-review verification)
 
 No new actionable test feedback found. Applied `.psi/skills/task-test-review/SKILL.md`: re-read the task artifacts and checked the referenced speed/effort command persistence tests, provider request-shaping tests, mid-system dispatch/persistence/projection tests, compaction replay tests, session-transience tests, docs/changelog acceptance surfaces, and current follow-up state. All `steps.md` test-review follow-ups are already checked and no duplicate follow-up item was added. Focused verification passed: `clojure -M:test --focus psi.agent-session.commands-speed-effort-test --focus psi.agent-session.model-dispatch-test --focus psi.agent-session.compaction-test --focus psi.ai.providers.anthropic-test --focus psi.ai.providers.openai-test` — 65 tests, 495 assertions, 0 failures.
+
+## Code-shaper follow-up — 2026-05-30 (capability predicate)
+
+Completed the newly added code-shaper follow-up:
+
+- Updated `psi.agent-session.model-capabilities/supports-mid-system-messages?` so explicit `:supports-mid-conversation-system-messages false` wins before OpenAI chat-completions API-shape inference.
+- Added focused resolver coverage for a custom OpenAI chat-completions runtime model with the flag explicitly false, proving the capability reports unsupported instead of inferred supported.
+- Verification passed:
+  - `clojure -M:test --focus psi.agent-session.model-dispatch-test/mid-system-capability-dispatch-test` — 1 test, 23 assertions, 0 failures.
+  - `clj-kondo --lint components/agent-session/src/psi/agent_session/model_capabilities.clj components/agent-session/test/psi/agent_session/model_dispatch_test.clj` — clean.

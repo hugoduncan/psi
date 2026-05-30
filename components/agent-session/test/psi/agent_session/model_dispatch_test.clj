@@ -70,7 +70,13 @@
                                                    :supports-mid-conversation-system-messages nil)
                              :session)
       (is (= true (:psi.agent-session/model-supports-mid-system-messages
-                   (session/query-in ctx session-id [:psi.agent-session/model-supports-mid-system-messages]))))))
+                   (session/query-in ctx session-id [:psi.agent-session/model-supports-mid-system-messages]))))
+      (session/set-model-in! ctx session-id (assoc (models/get-model :gpt-4o)
+                                                   :id "custom-openai-chat-disabled"
+                                                   :supports-mid-conversation-system-messages false)
+                             :session)
+      (is (= false (:psi.agent-session/model-supports-mid-system-messages
+                    (session/query-in ctx session-id [:psi.agent-session/model-supports-mid-system-messages]))))))
 
   (testing "resolver reports unsupported Anthropic and OpenAI Codex transports as false"
     (let [[ctx session-id] (create-session-context)]
