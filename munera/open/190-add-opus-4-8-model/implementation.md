@@ -1323,3 +1323,9 @@ Verification:
 - `clj-paren-repair components/agent-session/src/psi/agent_session/compaction.clj components/agent-session/test/psi/agent_session/compaction_test.clj`
 - `clojure -M:test --focus psi.agent-session.compaction-test` (`5 tests, 49 assertions`)
 - `clj-kondo --lint components/agent-session/src/psi/agent_session/compaction.clj components/agent-session/test/psi/agent_session/compaction_test.clj`
+
+---
+
+## Code-shaper review pass — 2026-05-30 (final independent pass)
+
+No new actionable code-shaping feedback found. Re-read `.psi/skills/code-shaper/SKILL.md`, all task artifacts, and the referenced implementation/test/doc surfaces for Opus 4.8, scoped `/speed` and `/effort`, mid-system capability/dispatch/extension/provider/projection paths, and compaction preservation. The latest compaction boundary follow-up keeps the retained-suffix logic locally comprehensible and covered for assistant/toolResult tails; provider-specific request shaping remains isolated at provider boundaries; shared capability/config semantics remain centralized. Focused verification passed: `clojure -M:test --focus psi.agent-session.compaction-test --focus psi.agent-session.model-dispatch-test --focus psi.agent-session.prompt-request-test --focus psi.agent-session.extensions-test --focus psi.ai.providers.anthropic-test --focus psi.ai.providers.openai-test` — 103 tests, 633 assertions, 0 failures. No duplicate `steps.md` follow-ups added.
