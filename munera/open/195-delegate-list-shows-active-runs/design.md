@@ -100,3 +100,18 @@ Timed-out delegate background jobs are a delegate-tool retention state, not a ca
 - `continue` compatibility only when the canonical workflow status is one of the statuses currently supported by `delegate continue` (`:blocked`, `:completed`, `:failed`, `:cancelled`). A timed-out background job whose canonical run is still `:pending` or `:running` is listable/removable but not continuable yet.
 
 A retained `:timed-out` background job pointing at a missing canonical workflow run should be hidden like other terminal retained jobs whose canonical run has been removed; it should not create a synthetic `:timed-out` workflow run.
+
+
+## Delegate remove cleanup contract
+
+For runs surfaced by `delegate list`, `delegate remove` uses the listed canonical `run-id` as its target and removes the canonical workflow run from the workflow run registry. When the target is backed by a same-session delegate background job that is still non-terminal (`:running` or `:pending-cancel`), a successful remove must also resolve the delegate background-job side of the relationship so that a later `delegate list` cannot see a non-terminal same-session job pointing at a missing canonical workflow run.
+
+Acceptable cleanup outcomes for an active/non-terminal listed run are:
+
+- cancel the inflight delegate execution and record the background job as terminal `:cancelled`;
+- remove the delegate background job from the delegate/background-job registry; or
+- perform an equivalent atomic state transition that makes the job intentionally hidden from `delegate list` after the canonical workflow run is removed.
+
+A successful `remove` must therefore not leave a same-session non-terminal delegate workflow background job with the removed `workflow-id`. If the implementation cannot cancel or clean up the background job while removing the canonical workflow run, `remove` should fail with an actionable tool error and leave the canonical run visible/manageable rather than creating a state that `delegate list` must later report as corruption.
+
+After successful removal, a retained terminal delegate background job whose canonical workflow run was deleted is hidden by the existing terminal-retention visibility rule; it is not treated as a delegate-list inconsistency. The missing-canonical-run inconsistency remains reserved for non-terminal jobs that were not intentionally resolved by a successful remove/cleanup path.
