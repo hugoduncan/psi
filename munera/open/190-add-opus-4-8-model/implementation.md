@@ -597,3 +597,11 @@ No new actionable inconsistencies found. Re-read `design.md` only for design sco
 ## Inconsistency follow-up execution — 2026-05-30 (post-final independent no-op)
 
 Read `design-steps.md` for newly added unchecked inconsistency follow-up items after the preceding inconsistency-review pass. No unchecked design-step items were present; all inconsistency follow-ups are already marked complete. No `design.md` changes were required. `plan.md` and `steps.md` were not touched.
+
+---
+
+## Design ambiguity review pass — 2026-05-30 (plan/steps verification)
+
+**New actionable ambiguity found:**
+
+1. **Plan slice count contradicts slice list** — `plan.md` says to implement the task as four vertical slices, but the slice order lists five numbered items and `steps.md` has five slice sections, with integration/coherence as Slice 5. Decide whether integration/coherence is intended to be a fifth slice or a final non-slice pass, and align `plan.md`/`steps.md` wording so execution order is unambiguous.

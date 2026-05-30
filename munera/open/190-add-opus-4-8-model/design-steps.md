@@ -131,3 +131,7 @@
 ## From inconsistency review pass 2026-05-30 (OpenAI resolver acceptance)
 
 - [x] **Align mid-system resolver acceptance with OpenAI support** — Part 4 requires OpenAI chat-completions models to report mid-conversation system support via explicit metadata or runtime `:provider :openai` + `:api :openai-completions` inference, but the resolver acceptance criterion says the query is true for opus-4.8 and false otherwise. Update the acceptance criterion/tests to require true for opus-4.8 and OpenAI chat-completions, and false for Codex/responses and unsupported Anthropic models.
+
+## From ambiguity review pass 2026-05-30 (plan/steps verification)
+
+- [ ] **Align plan slice count with slice list** — `plan.md` says the task will be implemented as four vertical slices, but the slice order and `steps.md` define five slices including the integration/coherence pass. Decide whether integration/coherence is a fifth slice or a non-slice final pass, and update `plan.md`/`steps.md` wording so implementors have one unambiguous execution structure.
