@@ -63,6 +63,8 @@ The runtime should classify AI request failures into at least these practical ca
 
 The exact classification should reuse existing provider-error classification where possible rather than introducing a parallel taxonomy.
 
+Unknown provider/request failures default to **terminal non-retryable**. A failure may be retried only when observable data maps it to a retryable classification through the shared provider-error classifier, such as retryable HTTP status, timeout, rate-limit, overloaded, provider-unavailable, or transport evidence. If the classifier returns `:unknown` after inspecting the available stop reason, message, exception data, and HTTP status, the retry boundary must not schedule a retry. The final error and EQL/telemetry projections should expose `:error-kind :unknown`, `:retryable? false`, and a terminal/non-retryable failure reason (for example `:failure-reason :non-retryable`) so callers can distinguish "not retried because unknown" from retry exhaustion. This conservative default avoids masking permanent provider/client bugs behind repeated requests while still allowing newly observed transient subtypes to become retryable by extending the shared classifier rather than adding ad hoc retry rules.
+
 ### Backoff execution
 
 For retryable failures:
