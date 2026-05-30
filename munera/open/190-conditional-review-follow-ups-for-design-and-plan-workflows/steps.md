@@ -59,3 +59,7 @@
 
 - [x] Append implementation decisions, test commands, and any discovered trade-offs to `implementation.md`.
 - [x] Check `git status --short` and ensure only intended workflow, prompt, test, and Munera task files changed.
+
+## Test-shaper follow-up
+
+- [ ] Strengthen `review-task-design` and `review-task-plan` workflow definition tests to assert each per-reviewer `workflow/pass-status-routing` judge sources `:text` from that same step's own `:final-llm-reply` output, not just the operation id and route table.
