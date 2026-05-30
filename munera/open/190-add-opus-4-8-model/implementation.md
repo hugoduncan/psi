@@ -848,3 +848,28 @@ Verification:
 - `clj-kondo --lint` on modified source/test paths — clean.
 
 Remaining Slice 4 work: shared mid-system capability predicate/resolver, dispatch injection handler, extension API/Pathom mutation wiring, compaction preservation, and their focused tests.
+
+## Implementation pass — 2026-05-30 — Slice 4 capability, injection, and extension API
+
+Implemented the next Slice 4 mid-system vertical slice:
+
+- Added `psi.agent-session.model-capabilities` with a shared runtime-active-model lookup and `supports-mid-system-messages?` predicate. Explicit model metadata enables Opus 4.8; OpenAI chat-completions support is inferred from runtime model shape (`:provider :openai`, `:api :openai-completions`) so custom/runtime maps do not need psi-specific metadata.
+- Added `:psi.agent-session/model-supports-mid-system-messages` resolver using the shared predicate.
+- Added `:session/inject-mid-system-message` dispatch handler with capability gating, placement validation over conversational entries only, non-conversational metadata ignored, and journal append of schema-valid `:mid-system` entries with source provenance.
+- Added `inject-mid-system-message` public session API.
+- Added extension API helper `:inject-mid-system-message`, Pathom mutation `psi.extension/inject-mid-system-message`, optional `:source` / `:ext-path` provenance inference, mutation registration, and session-scoped runtime EQL routing.
+- Added focused tests for resolver support on Opus 4.8, OpenAI chat-completions inference, custom OpenAI chat maps, unsupported Anthropic/Codex cases, dispatch success/rejection/no-mutation behavior, metadata-after-user placement, and extension API result normalization/provenance params.
+
+Verification:
+
+- `clojure -M:test --focus psi.agent-session.model-dispatch-test --focus psi.agent-session.extensions-test` — 36 tests, 273 assertions, 0 failures.
+- `clojure -M:test --focus psi.agent-session.commands-test --focus psi.agent-session.model-dispatch-test --focus psi.agent-session.extensions-test --focus psi.agent-session.prompt-request-test --focus psi.agent-session.conversation-test --focus psi.ai.providers.anthropic-test --focus psi.ai.providers.openai-test` — 153 tests, 817 assertions, 0 failures.
+- `clj-kondo --lint` on modified source/test paths — clean.
+
+Remaining Slice 4 work: compaction preservation and tests, plus any broader focused verification after compaction lands.
+
+---
+
+## Design ambiguity review pass — 2026-05-30 (plan/steps current implementation-state verification)
+
+No new actionable ambiguities found. Re-read `plan.md`, `steps.md`, `design-steps.md`, and recent `implementation.md` notes, then checked representative referenced implementation/test surfaces for the current Slice 4 state: mid-system capability resolver/dispatch/extension mutation wiring, provider message transforms, prompt-request projection/current-user replacement, and the still-open compaction/doc verification steps. The plan and steps remain unambiguous: Slice 4 has completed capability/injection/API work, compaction preservation and related tests remain explicitly unchecked, and Slice 5 owns docs/changelog plus broad verification. Existing ambiguity follow-ups in `design-steps.md` are checked; no duplicate follow-up items were added.
