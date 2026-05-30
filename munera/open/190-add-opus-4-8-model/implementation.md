@@ -271,3 +271,9 @@ Completed the newly added inconsistency follow-up item in `design-steps.md` by r
 **New actionable inconsistency found:**
 
 1. **Mid-system source inference needs `ext-path` but mutation params omit it** — Part 4 requires omitted `:source` to be inferred from extension provenance (`ext-path`/extension id), and `create-extension-api`/`mutate-ext-required` normally adds `:ext-path` to extension mutations. But the specified `psi.extension/inject-mid-system-message` Pathom mutation params list only `[:psi/agent-session-ctx :session-id :text]` plus optional `:source`, so the mutation surface as written has no declared provenance input to infer from. Align the API/mutation contract by accepting optional `:ext-path` (or by having the API helper materialize `:source` before mutation) and specifying which layer performs the inference.
+
+---
+
+## Design ambiguity review pass — 2026-05-30 (latest verification pass)
+
+No new actionable ambiguities found. Re-read `design.md` against the referenced shared-config resolution/startup path, extension mutation/runtime EQL bridge, session-state/model schemas, provider message transforms, conversation assembly, and existing `design-steps.md`; all actionable ambiguity concerns identified in this pass are already resolved in the current design or previously captured and checked.
