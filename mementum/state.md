@@ -113,3 +113,5 @@ Bootstrapped on 2026-04-02.
 - 2026-05-30: Task 190 independent implementation pass re-confirmed implementation complete: no unchecked `steps.md` or `design-steps.md` items remain, prompt artifact targets and conditional routing still match design, focused workflow tests and targeted lint green. Remaining work is review/closure only.
 - 2026-05-30: Task 190 independent implementation verification pass found no unchecked task/design follow-up steps and no further concrete implementation slice. Re-verified prompt artifact targets, focused workflow routing tests, and targeted lint green; implementation remains complete pending review/closure.
 - 2026-05-30: Task 190 test-shaper review found one actionable test-shaping gap: workflow definition tests should assert each per-reviewer PASS_STATUS invoke judge sources its own step's `:final-llm-reply`; added unchecked follow-up to `steps.md` and committed `d7ebfe9c`.
+
+- 2026-05-30: Task 190 code-shaper review found one actionable robustness follow-up: design/plan per-reviewer PASS_STATUS routing currently accepts implementation-only tokens via the global routing union; added unchecked `steps.md` item and review note.

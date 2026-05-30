@@ -71,3 +71,6 @@
 - [x] Update CHANGELOG.md [Unreleased] to mention the user-visible `review-task-design` and `review-task-plan` conditional per-reviewer follow-up behavior, including that plan-review follow-ups now target `steps.md` instead of `design-steps.md`.
 - [x] Update doc/workflow-ir.md so its invoke-judge runtime support note reflects the current executed runtime support used by the review workflows, rather than saying invoke judges are only a documented future shape.
 - [x] Update the suggested documentation grammar in doc/workflow-ir.md so the invoke-judge comment no longer says current runtime executes LLM judges only.
+## Code-shaper follow-up
+
+- [ ] Constrain design/plan per-reviewer PASS_STATUS routing to the statuses valid for those review steps, so context-invalid tokens such as `IMPLEMENTATION_COMPLETE` or `MORE_WORK_REMAINS` fail deterministically instead of being accepted by the global `workflow/pass-status-routing` token union.
