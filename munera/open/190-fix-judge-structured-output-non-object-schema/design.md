@@ -51,7 +51,7 @@ In `psi.agent-session.workflow-judge`, when `valid-output-result?` returns false
 
 1. `psi.ai.providers.anthropic.structured-output/structured-output-result` with a bare-string JSON payload (e.g. `"\"DONE\""`) produces a result with `:payload "DONE"` (not `:parse-error? true`).
 2. `psi.workflow-runtime.structured-output/structured-output-envelope` receiving that result with the judge routing schema (`[:enum "REPEAT" "DONE"]`) produces `:status :valid` and `:value "DONE"`.
-3. The OpenAI chat-completions structured-output result sites produce `:payload` for string, number, boolean, array, and `null` JSON values for both provider-native and prompted-JSON strategies emitted by those sites; `null` is represented by a present `:payload nil` and not by `:parse-error? true`. The OpenAI Codex structured-output result helper preserves the same `null` behavior.
+3. The OpenAI chat-completions structured-output result sites produce `:payload` for string, number, boolean, array, object, and `null` JSON values for both provider-native and prompted-JSON strategies emitted by those sites; `null` is represented by a present `:payload nil` and not by `:parse-error? true`. The OpenAI Codex structured-output result helper preserves the same `null` behavior.
 4. The judge retry loop fires on structured-output validation failure when `attempt < max-judge-retries`, matching the plain-text retry behavior, and each structured-output retry preserves the initial structured-output opts/schema when calling `execute-judge-turn!`.
 5. Prompted-JSON fallback instructions request exactly one JSON value matching the supplied JSON Schema and do not require the top-level response to be a JSON object.
 6. All existing structured-output and workflow-judge tests remain green.
