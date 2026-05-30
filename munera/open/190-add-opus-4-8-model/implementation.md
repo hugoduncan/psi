@@ -501,3 +501,11 @@ Decision recorded:
 - On valid injection, dispatch appends the `:mid-system` entry at the literal journal tail; any intervening metadata remains before it in journal order.
 - `journal->provider-messages` does not project metadata entries, so provider-message assembly collapses across them and preserves `user → system` ordering.
 - Acceptance criteria now require coverage for valid injection after metadata entries between the latest user turn and the assistant response.
+---
+
+## Design inconsistency review pass — 2026-05-30 (compaction retained-history placement)
+
+**New actionable inconsistency found:**
+
+1. **Compaction reattaches preserved mid-system instructions before retained assistant history** — Part 4 defines the Anthropic-safe/injection placement as a pending instruction immediately after the most recent user turn before the assistant response being generated, but the compaction rule reattaches pre-cut active `:mid-system` text after the first retained user when retained history begins with a user, before any retained assistant response to that user. If retained history contains an already-generated assistant reply after that first user, compaction retroactively inserts the instruction into historical conversation rather than attaching it to the next generation/latest-user boundary, contradicting the placement contract and the “remain valid for the remainder of the session” intent.
+
