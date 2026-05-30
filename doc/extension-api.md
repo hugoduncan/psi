@@ -45,8 +45,10 @@ descriptor availability, not on concrete UI type:
   (when (and (contains? (set (:psi.ui/capabilities ui-state))
                         :psi.ui.capability/make-visible)
              (:psi.ui.action/available? make-visible))
-    ;; Present or submit this descriptor through the core UI action request
-    ;; path. Do not call Emacs/TUI/frontend namespaces directly.
+    ;; Task 190 exposes descriptor discovery only. Until
+    ;; 191-ui-action-invocation lands, callers may present or record this
+    ;; descriptor, but must not submit it as an executable UI request.
+    ;; Do not call Emacs/TUI/frontend namespaces directly.
     make-visible))
 ```
 
@@ -93,6 +95,12 @@ Known unavailable reasons:
 - `:psi.ui.unavailable.reason/no-attached-ui`
 - `:psi.ui.unavailable.reason/unsupported-capability`
 - `:psi.ui.unavailable.reason/provider-error`
+
+Task 190 is query/descriptor-only: it does not implement side-effecting
+submission of a descriptor through the core UI action request path. The planned
+request path is owned by `191-ui-action-invocation`; until that lands,
+extensions may inspect, display, or store descriptor data, but must not assume a
+supported API exists to execute `:psi.ui.action/invocation` values.
 
 Legacy UI-type surfaces remain supported only as diagnostics/compatibility data:
 `:ui-type`, `:psi.agent-session/ui-type`, and `:psi.ui/type`.  Do not use them

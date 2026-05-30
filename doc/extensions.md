@@ -592,8 +592,10 @@ Query the capability/action surface before deciding UI behaviour:
       make-visible      (:psi.ui/make-visible-action ui-state)]
   (when (and can-make-visible?
              (:psi.ui.action/available? make-visible))
-    ;; Present or submit the descriptor through the core UI action request
-    ;; path; do not call frontend namespaces directly.
+    ;; Task 190 exposes descriptor discovery only. Until
+    ;; 191-ui-action-invocation lands, callers may present or record this
+    ;; descriptor, but must not submit it as an executable UI request.
+    ;; Do not call frontend namespaces directly.
     (:psi.ui.action/invocation make-visible)))
 ```
 
@@ -636,6 +638,12 @@ Provider-error cases may also expose `:psi.ui/diagnostic` as bounded
 troubleshooting text.  Extensions should branch on capability membership,
 `:psi.ui.action/available?`, and unavailable reason keywords, not on
 `:psi.ui/diagnostic` or UI type.
+
+Task 190 is query/descriptor-only: it does not implement side-effecting
+submission of a descriptor through the core UI action request path.  The planned
+request path is owned by `191-ui-action-invocation`; until that lands,
+extensions may inspect, display, or store descriptor data, but must not assume a
+supported API exists to execute `:psi.ui.action/invocation` values.
 
 
 ### Dialogs

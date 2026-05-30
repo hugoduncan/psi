@@ -649,3 +649,7 @@ Found one new actionable documentation issue after reviewing the task artifacts,
 ## 2026-05-30 requested task-test-review pass
 
 No new actionable test feedback after re-reading the task artifacts, referenced UI capability/provider code, resolver/runtime/frontend seams, docs, and the current test coverage. Existing tests cover provider unavailable/error semantics, descriptor/invocation validation and defaulting, collection-shape fail-closed behaviour, root-queryable discovery, real extension API and nullable queries, RPC/TUI lifecycle including exceptional cleanup, legacy UI snapshot compatibility, and direct `psi-emacs-show-active` Emacs behaviour. Verification in this pass: `clojure -M:test --focus psi.agent-session.ui-capabilities-test --focus psi.agent-session.extensions-test --focus psi.app-runtime-test --focus psi.rpc-transport-test` — 84 tests, 419 assertions, 0 failures; `bb emacs:test` — 321 tests, 321 expected, 0 unexpected. No new `steps.md` item was added.
+
+## 2026-05-30 docs follow-up execution
+
+Completed the newly added documentation follow-up. Updated `doc/extensions.md` and `doc/extension-api.md` so extension guidance states task 190 exposes queryable UI descriptor data only. The docs now say side-effecting descriptor submission through the core UI action request path is not implemented in this task, is owned by `191-ui-action-invocation`, and callers may inspect/display/store descriptors but must not assume an API exists yet to execute `:psi.ui.action/invocation` values. Marked the new `steps.md` item complete.
