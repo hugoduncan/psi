@@ -1215,3 +1215,9 @@ Completed the newly added docs review follow-up:
 - Corrected `doc/configuration.md` so the speed/effort runtime-settings section no longer claims extension mutation surfaces exist for `/speed` or `/effort`.
 - The docs now explicitly say there is no `psi.extension/set-speed-mode` or `psi.extension/set-effort-override` EQL mutation, and direct users to the interactive `/speed` and `/effort` commands with their optional scope arguments.
 - Marked the docs follow-up item complete in `steps.md`.
+
+---
+
+## Docs review pass — 2026-05-30 (extension API key)
+
+Actionable docs issue found: `doc/extension-api.md` documents calling `(:inject-mid-system-message! api)`, but `create-extension-api` exposes the helper in the public API map as `:inject-mid-system-message` (without bang). The examples should use the actual public key or the implementation should expose the documented bang alias; as written, copy/pasted docs fail with a nil function lookup. Existing docs-review follow-ups only covered speed/effort config wording, so this is new and not duplicated.
