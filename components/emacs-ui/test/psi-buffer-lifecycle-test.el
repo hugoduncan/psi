@@ -533,7 +533,6 @@
             (when (buffer-live-p stderr)
               (kill-buffer stderr))))))))
 
-
 (ert-deftest psi-footer-update-does-not-insert-newline-into-draft ()
   "Upserting the projection block must not corrupt in-progress draft text.
 
@@ -549,8 +548,6 @@ starts with \"\\n\" so the extra call was both redundant and harmful."
       (psi-emacs--ensure-startup-banner)
       (setf (psi-emacs-state-draft-anchor psi-emacs--state)
             (copy-marker (point-max) nil))
-      ;; Establish input separator and seed an initial footer (simulates
-      ;; show-connecting-affordances at startup).
       (psi-emacs--ensure-input-area)
       (setf (psi-emacs-state-projection-footer psi-emacs--state) "connecting...")
       (psi-emacs--upsert-projection-block)
@@ -561,7 +558,6 @@ starts with \"\\n\" so the extra call was both redundant and harmful."
         ;; Now simulate footer/updated arriving from the backend (RPC connected).
         (setf (psi-emacs-state-projection-footer psi-emacs--state) "idle · claude-3-5-sonnet")
         (psi-emacs--upsert-projection-block)
-        ;; Draft text must be exactly what the user typed — no injected newline.
         (should (equal draft-before (psi-emacs--tail-draft-text)))
         (should (equal "hello" (psi-emacs--tail-draft-text)))))))
 
@@ -606,7 +602,6 @@ the seed during handshaking and disconnected states."
                            (null (psi-emacs-state-projection-footer state))
                            (null (psi-emacs--region-bounds 'projection 'main)))
                   (psi-emacs--show-connecting-affordances (current-buffer))))
-              ;; With transport ready, show-connecting-affordances must NOT have fired.
               (should (null (psi-emacs-state-projection-footer psi-emacs--state))))
           (when (process-live-p mock-process)
             (delete-process mock-process)))))))
@@ -738,6 +733,65 @@ so the user sees the connecting affordance."
       (set-window-configuration original-window-config)
       (when (buffer-live-p buffer)
         (kill-buffer buffer)))))
+
+(ert-deftest psi-show-active-focuses-current-psi-buffer-prompt-after-pop-to-buffer ()
+  (let ((buffer (generate-new-buffer " *psi-show-active-current*"))
+        (original-window-config (current-window-configuration)))
+    (unwind-protect
+        (progn
+          (delete-other-windows)
+          (switch-to-buffer buffer)
+          (with-current-buffer buffer
+            (psi-emacs-mode)
+            (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+            (setf (psi-emacs-state-draft-anchor psi-emacs--state)
+                  (copy-marker (point-max) nil))
+            (psi-emacs--ensure-startup-banner)
+            (psi-emacs--ensure-input-area)
+            (goto-char (psi-emacs--draft-end-position))
+            (insert "show active prompt")
+            (goto-char (point-min)))
+          (let ((shown-buffer (psi-emacs-show-active)))
+            (should (eq shown-buffer buffer))
+            (with-current-buffer buffer
+              (let ((end (psi-emacs--draft-end-position))
+                    (window (get-buffer-window buffer t)))
+                (should (= (point) end))
+                (should (window-live-p window))
+                (should (= (window-point window) end))))))
+      (set-window-configuration original-window-config)
+      (when (buffer-live-p buffer)
+        (kill-buffer buffer)))))
+
+(ert-deftest psi-show-active-falls-back-to-tracked-active-buffer ()
+  (let ((buffer (generate-new-buffer " *psi-show-active-tracked*"))
+        (psi-emacs--state-by-buffer (make-hash-table :test #'eq))
+        (focused nil))
+    (unwind-protect
+        (progn
+          (with-current-buffer buffer
+            (psi-emacs-mode)
+            (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+            (puthash buffer psi-emacs--state psi-emacs--state-by-buffer))
+          (with-temp-buffer
+            (cl-letf (((symbol-function 'pop-to-buffer)
+                       (lambda (target)
+                         (setq focused (cons 'pop-to-buffer target))
+                         nil))
+                      ((symbol-function 'psi-emacs--focus-input-area)
+                       (lambda (target window)
+                         (setq focused (list focused target window)))))
+              (should (eq (psi-emacs-show-active) buffer))))
+          (should (equal (list (cons 'pop-to-buffer buffer) buffer nil)
+                         focused)))
+      (when (buffer-live-p buffer)
+        (kill-buffer buffer)))))
+
+(ert-deftest psi-show-active-errors-when-no-active-psi-buffer-exists ()
+  (let ((psi-emacs--state-by-buffer (make-hash-table :test #'eq)))
+    (with-temp-buffer
+      (should-error (psi-emacs-show-active)
+                    :type 'user-error))))
 
 (provide 'psi-buffer-lifecycle-test)
 

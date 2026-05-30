@@ -39,3 +39,26 @@
               :psi.extension.prompt-contribution/id "c1"
               :psi.extension.prompt-contribution/count 0}
              removed)))))
+
+(deftest documented-ui-capability-query-including-diagnostic-test
+  (testing "nullable extension API supports the documented UI capability query shape"
+    (let [{:keys [api]} (nullable/create-nullable-extension-api {:path "/ext/a"})]
+      (is (= {:psi.ui/type :console
+              :psi.ui/available? true
+              :psi.ui/capabilities []
+              :psi.ui/actions []
+              :psi.ui/make-visible-action
+              {:psi.ui.action/id :psi.ui.action/make-visible
+               :psi.ui.action/capability :psi.ui.capability/make-visible
+               :psi.ui.action/label "Show Psi UI"
+               :psi.ui.action/description "Bring the active Psi UI to the foreground."
+               :psi.ui.action/available? false
+               :psi.ui.action/unavailable-reason :psi.ui.unavailable.reason/unsupported-capability
+               :psi.ui.action/unavailable-message "The attached UI does not support making itself visible."}
+              :psi.ui/diagnostic nil}
+             ((:query api) [:psi.ui/type
+                            :psi.ui/available?
+                            :psi.ui/capabilities
+                            :psi.ui/actions
+                            :psi.ui/make-visible-action
+                            :psi.ui/diagnostic]))))))

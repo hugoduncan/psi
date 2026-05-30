@@ -109,7 +109,13 @@
     :psi.agent-session/context-session-summaries
     :psi.runtime/nrepl-host
     :psi.runtime/nrepl-port
-    :psi.runtime/nrepl-endpoint})
+    :psi.runtime/nrepl-endpoint
+    :psi.ui/type
+    :psi.ui/available?
+    :psi.ui/capabilities
+    :psi.ui/actions
+    :psi.ui/make-visible-action
+    :psi.ui/diagnostic})
 
 (defn- assert-canonical-graph-root-attrs
   [root-attrs]
@@ -382,6 +388,16 @@
           (is entry)
           (is (contains? (:psi.attr/reachable-via entry)
                          :psi.runtime-session/list))))
+
+      (testing "ui capability attrs are discoverable"
+        (doseq [attr [:psi.ui/type
+                      :psi.ui/available?
+                      :psi.ui/capabilities
+                      :psi.ui/actions
+                      :psi.ui/make-visible-action
+                      :psi.ui/diagnostic]]
+          (is (contains? index attr)
+              (str "expected attr index to include " attr))))
 
       (testing "flat attrs have empty reachable-via"
         (let [entry (get index :psi.agent-session/session-name)]

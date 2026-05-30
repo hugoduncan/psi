@@ -61,6 +61,7 @@
    [psi.session-state.state :as ss]
    [psi.agent-session.state-accessors :as sa]
    [psi.agent-session.runtime :as runtime]
+   [psi.agent-session.ui-capabilities :as ui-capabilities]
    [psi.provider-auth.oauth.core :as oauth]
    [psi.app-runtime.background-job-ui :as background-job-ui]
    [psi.app-runtime.cli :as cli]
@@ -272,8 +273,9 @@ Available: " (str/join ", " (map name (keys all))))
    - :ui-type runtime UI type hint (:console | :tui | :emacs)
    - :thinking-level-override explicit thinking level (CLI/env); overrides config when set
    - :persist? optional persistence toggle (defaults true; primarily for tests)
-   - :session-root optional explicit persisted session root (primarily for tests)"
-  [ai-model {:keys [event-queue session-config cwd ui-type thinking-level-override persist? session-root]}]
+   - :session-root optional explicit persisted session root (primarily for tests)
+   - :install-default-ui-capability-provider? optional context default UI provider toggle (defaults true)"
+  [ai-model {:keys [event-queue session-config cwd ui-type thinking-level-override persist? session-root install-default-ui-capability-provider?]}]
   (let [cwd                      (or cwd (System/getProperty "user.dir"))
         ;; Initialize model registry with user-global + project-local custom models
         _                        (model-registry/init!
@@ -313,6 +315,9 @@ Available: " (str/join ", " (map name (keys all))))
                                    :persist? (if (some? persist?) persist? true)
                                    :session-root session-root
                                    :ui-type ui-type
+                                   :install-default-ui-capability-provider? (if (some? install-default-ui-capability-provider?)
+                                                                              install-default-ui-capability-provider?
+                                                                              true)
                                    :mutations mutations/all-mutations})
         recursion-ctx            (recursion/create-hosted-context ctx (ss/state-path :recursion))
         ctx                      (assoc ctx :recursion-ctx recursion-ctx)
@@ -623,7 +628,8 @@ Available: " (str/join ", " (map name (keys all))))
                                                    :session-root            (:session-root startup-opts)
                                                    :ui-type                 :tui
                                                    :persist?                true
-                                                   :thinking-level-override (:thinking-level-override startup-opts)})
+                                                   :thinking-level-override (:thinking-level-override startup-opts)
+                                                   :install-default-ui-capability-provider? false})
          ctx (maybe-install-nullable-execution-mode ctx)
          {:keys [startup-rehydrate session-id]}
          (bootstrap-runtime-session! ctx ai-model {:memory-runtime-opts memory-runtime-opts
@@ -631,6 +637,8 @@ Available: " (str/join ", " (map name (keys all))))
 
          ;; TUI-local focus atom — tracks active session-id
          tui-focus* (atom session-id)
+
+         _ (ui-capabilities/install-provider! ctx (ui-capabilities/unsupported-attached-provider :tui))
 
          ;; Expose state for nREPL introspection
          _         (reset! session-state {:ctx ctx :ai-model ai-model
@@ -691,5 +699,8 @@ Available: " (str/join ", " (map name (keys all))))
                     :fork-session-fn! fork-session-fn!
                     :current-context-widget (tui-session-nav/current-context-widget ctx session-id)})]
 
-     (tui-start-fn! run-agent-fn tui-opts))))
+     (try
+       (tui-start-fn! run-agent-fn tui-opts)
+       (finally
+         (ui-capabilities/clear-provider! ctx))))))
 ;; RPC runtime moved to psi.rpc.

@@ -13,8 +13,6 @@
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
    [psi.agent-session.test-support :as test-support]))
 
-;; ── Registry isolation ──────────────────────────────────────────────────────
-
 (deftest registry-isolation-test
   (testing "two registries are independent"
     (let [reg-a (ext/create-registry)
@@ -22,8 +20,6 @@
       (ext/register-extension-in! reg-a "/ext/a")
       (is (= 1 (ext/extension-count-in reg-a)))
       (is (= 0 (ext/extension-count-in reg-b))))))
-
-;; ── Extension registration ──────────────────────────────────────────────────
 
 (deftest register-extension-test
   (testing "register-extension-in! adds path"
@@ -51,8 +47,6 @@
       (ext/register-extension-in! reg "/ext/foo")
       (is (= ["/ext/foo"] (ext/extensions-in reg)))
       (is (= 1 (ext/extension-count-in reg))))))
-
-;; ── Handler registration ─────────────────────────────────────────────────────
 
 (deftest handler-registration-test
   (testing "register-handler-in! adds handler"
@@ -630,6 +624,35 @@
           runtime-fns {:query-fn (fn [q] {:echo q})}
           api         (ext/create-extension-api reg "/ext/test" runtime-fns)]
       (is (= {:echo [:x]} ((:query api) [:x])))))
+
+  (testing "API :query can read runtime UI capabilities through real extension runtime fns"
+    (let [[ctx session-id] (test-support/create-test-session {:persist? false
+                                                              :ui-type :console})
+          reg             (:extension-registry ctx)
+          ext-path        "/ext/test"
+          _               (ext/register-extension-in! reg ext-path)
+          _               (ext/set-allowed-events-in! reg ext-path #{})
+          runtime-fns     (runtime-fns/make-extension-runtime-fns ctx session-id ext-path)
+          api             (ext/create-extension-api reg ext-path runtime-fns)]
+      (is (= {:psi.ui/type :console
+              :psi.ui/available? true
+              :psi.ui/capabilities []
+              :psi.ui/actions []
+              :psi.ui/make-visible-action
+              {:psi.ui.action/id :psi.ui.action/make-visible
+               :psi.ui.action/capability :psi.ui.capability/make-visible
+               :psi.ui.action/label "Show Psi UI"
+               :psi.ui.action/description "Bring the active Psi UI to the foreground."
+               :psi.ui.action/available? false
+               :psi.ui.action/unavailable-reason :psi.ui.unavailable.reason/unsupported-capability
+               :psi.ui.action/unavailable-message "The attached UI does not support making itself visible."}
+              :psi.ui/diagnostic nil}
+             ((:query api) [:psi.ui/type
+                            :psi.ui/available?
+                            :psi.ui/capabilities
+                            :psi.ui/actions
+                            :psi.ui/make-visible-action
+                            :psi.ui/diagnostic])))))
 
   (testing "API :list-services delegates to runtime query fn"
     (let [reg         (ext/create-registry)

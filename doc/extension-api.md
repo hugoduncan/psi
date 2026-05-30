@@ -15,6 +15,97 @@ Extensions can also call shared library namespaces directly when they need
 common deterministic behavior that should not be reimplemented per extension.
 Current example: `psi.ai.model-selection` for role/policy-based model choice.
 
+## Queryable UI capabilities and actions
+
+Use EQL `:psi.ui/...` attrs when an extension needs to discover UI behaviour.
+The `:ui` API contributes dialogs/widgets/status/notifications/renderers to an
+attached UI; it is not the discovery contract for whether UI actions can be
+performed.
+
+Recommended query:
+
+```clojure
+((:query api) [:psi.ui/type
+               :psi.ui/available?
+               :psi.ui/capabilities
+               :psi.ui/actions
+               :psi.ui/make-visible-action
+               :psi.ui/diagnostic])
+```
+
+Core UI capability/action data is runtime-scoped and derived on demand from the
+active UI adapter.  Extensions should branch on capability keywords and action
+descriptor availability, not on concrete UI type:
+
+```clojure
+(let [ui-state ((:query api) [:psi.ui/capabilities
+                             :psi.ui/actions
+                             :psi.ui/make-visible-action])
+      make-visible (:psi.ui/make-visible-action ui-state)]
+  (when (and (contains? (set (:psi.ui/capabilities ui-state))
+                        :psi.ui.capability/make-visible)
+             (:psi.ui.action/available? make-visible))
+    ;; Task 190 exposes descriptor discovery only. Until
+    ;; 191-ui-action-invocation lands, callers may present or record this
+    ;; descriptor, but must not submit it as an executable UI request.
+    ;; Do not call Emacs/TUI/frontend namespaces directly.
+    make-visible))
+```
+
+UI capability attrs:
+
+- `:psi.ui/type` — active UI adapter identity for diagnostics/compatibility.
+- `:psi.ui/available?` — true when a concrete UI adapter is attached.
+- `:psi.ui/capabilities` — capability keywords such as `:psi.ui.capability/make-visible`.
+- `:psi.ui/actions` — currently available pure-data action descriptors.
+- `:psi.ui/make-visible-action` — stable make-visible descriptor; unavailable when unsupported/headless/error.
+- `:psi.ui/diagnostic` — optional bounded provider-error troubleshooting text.
+
+A supported make-visible descriptor is pure serialisable data:
+
+```clojure
+{:psi.ui.action/id :psi.ui.action/make-visible
+ :psi.ui.action/capability :psi.ui.capability/make-visible
+ :psi.ui.action/label "Show Psi UI"
+ :psi.ui.action/description "Bring the active Psi UI to the foreground."
+ :psi.ui.action/available? true
+ :psi.ui.action/invocation {:psi.ui.invocation/kind :emacs-command
+                            :psi.ui.invocation/command "psi-emacs-show-active"}}
+```
+
+`:psi.ui/actions` contains only currently available actions.  The convenience
+attr `:psi.ui/make-visible-action` always returns a descriptor-shaped value; in
+unavailable cases it has `:psi.ui.action/available? false`, a machine-readable
+`:psi.ui.action/unavailable-reason`, and a human-readable
+`:psi.ui.action/unavailable-message`:
+
+```clojure
+{:psi.ui.action/id :psi.ui.action/make-visible
+ :psi.ui.action/capability :psi.ui.capability/make-visible
+ :psi.ui.action/label "Show Psi UI"
+ :psi.ui.action/description "Bring the active Psi UI to the foreground."
+ :psi.ui.action/available? false
+ :psi.ui.action/unavailable-reason :psi.ui.unavailable.reason/no-attached-ui
+ :psi.ui.action/unavailable-message "No attached UI adapter can make itself visible."}
+```
+
+Known unavailable reasons:
+
+- `:psi.ui.unavailable.reason/no-provider`
+- `:psi.ui.unavailable.reason/no-attached-ui`
+- `:psi.ui.unavailable.reason/unsupported-capability`
+- `:psi.ui.unavailable.reason/provider-error`
+
+Task 190 is query/descriptor-only: it does not implement side-effecting
+submission of a descriptor through the core UI action request path. The planned
+request path is owned by `191-ui-action-invocation`; until that lands,
+extensions may inspect, display, or store descriptor data, but must not assume a
+supported API exists to execute `:psi.ui.action/invocation` values.
+
+Legacy UI-type surfaces remain supported only as diagnostics/compatibility data:
+`:ui-type`, `:psi.agent-session/ui-type`, and `:psi.ui/type`.  Do not use them
+as the normative extension-authoring contract for invokable UI behaviour.
+
 ## Workflow public-data display convention
 
 For workflow-backed extensions, prefer projecting reusable display/read-model

@@ -48,6 +48,37 @@
                      (= ext-path (:psi.extension/path wf)))))
        vec))
 
+(def ^:private ui-capability-query-attrs
+  #{:psi.ui/type
+    :psi.ui/available?
+    :psi.ui/capabilities
+    :psi.ui/actions
+    :psi.ui/make-visible-action
+    :psi.ui/diagnostic})
+
+(defn- ui-capability-query?
+  [q]
+  (and (vector? q)
+       (seq q)
+       (every? ui-capability-query-attrs q)))
+
+(defn- nullable-ui-capabilities
+  [ui-type]
+  (let [ui-type* (or ui-type :console)]
+    {:psi.ui/type ui-type*
+     :psi.ui/available? true
+     :psi.ui/capabilities []
+     :psi.ui/actions []
+     :psi.ui/make-visible-action
+     {:psi.ui.action/id :psi.ui.action/make-visible
+      :psi.ui.action/capability :psi.ui.capability/make-visible
+      :psi.ui.action/label "Show Psi UI"
+      :psi.ui.action/description "Bring the active Psi UI to the foreground."
+      :psi.ui.action/available? false
+      :psi.ui.action/unavailable-reason :psi.ui.unavailable.reason/unsupported-capability
+      :psi.ui.action/unavailable-message "The attached UI does not support making itself visible."}
+     :psi.ui/diagnostic nil}))
+
 (defn- default-query-fn
   [state {:keys [path model system-prompt ui-type]} q]
   (swap! state update :queries conj q)
@@ -66,6 +97,10 @@
     ;; Session UI type
     (= q [:psi.agent-session/ui-type])
     {:psi.agent-session/ui-type (or ui-type :console)}
+
+    ;; Runtime UI capabilities
+    (ui-capability-query? q)
+    (select-keys (nullable-ui-capabilities ui-type) q)
 
     ;; Extension workflows
     (and (vector? q)

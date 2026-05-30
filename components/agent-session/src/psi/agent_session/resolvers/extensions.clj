@@ -6,6 +6,7 @@
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.extension-workflow-runtime :as extension-workflow-runtime]
    [psi.agent-session.resolvers.support :as support]
+   [psi.agent-session.ui-capabilities :as ui-capabilities]
    [psi.command-registry.registry :as command-registry]
    [psi.session-state.state :as session-state]
    [psi.tool-registry.registry :as tool-registry]
@@ -245,6 +246,18 @@
        :psi.ui/tool-renderers        []
        :psi.ui/message-renderers     []})))
 
+(pco/defresolver ui-capabilities-resolver
+  "Resolve runtime UI capabilities and action descriptors."
+  [{:keys [psi/agent-session-ctx]}]
+  {::pco/input  [:psi/agent-session-ctx]
+   ::pco/output [:psi.ui/type
+                 :psi.ui/available?
+                 :psi.ui/capabilities
+                 :psi.ui/actions
+                 :psi.ui/make-visible-action
+                 :psi.ui/diagnostic]}
+  (ui-capabilities/resolve-ui agent-session-ctx))
+
 ;; ── Resolver collection ─────────────────────────────────
 
 (def resolvers
@@ -260,4 +273,5 @@
    extension-workflow-summary-resolver
    extension-workflows-resolver
    extension-workflow-detail-resolver
-   extension-ui-resolver])
+   extension-ui-resolver
+   ui-capabilities-resolver])

@@ -5,6 +5,7 @@
    [psi.agent-session.commands :as commands]
 
    [psi.agent-session.core :as session]
+   [psi.agent-session.ui-capabilities :as ui-capabilities]
    [psi.session-state.state :as ss]
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.extensions :as ext]
@@ -72,6 +73,26 @@
             sessions (ss/list-context-sessions-in ctx)]
         (is (empty? sessions))))))
 
+(deftest create-runtime-session-context-can-suppress-default-tui-ui-provider-test
+  (with-redefs-fn (main-bootstrap-stub-bindings)
+    (fn []
+      (let [{:keys [ctx]} (app-runtime/create-runtime-session-context
+                           app-test-support/test-ai-model
+                           {:ui-type :tui
+                            :persist? false
+                            :install-default-ui-capability-provider? false})]
+        (is (nil? (ui-capabilities/provider ctx)))
+        (is (= {:psi.ui/type nil
+                :psi.ui/available? false
+                :psi.ui/capabilities []
+                :psi.ui/actions []
+                :psi.ui/make-visible-action
+                (ui-capabilities/unavailable-make-visible-action
+                 ui-capabilities/no-provider-reason
+                 "No UI capability provider is installed.")
+                :psi.ui/diagnostic nil}
+               (session/query-in ctx nil ui-capabilities/ui-attrs)))))))
+
 (deftest build-startup-plan-does-not-require-live-session-test
   (with-redefs-fn (main-bootstrap-stub-bindings)
     (fn []
@@ -133,6 +154,80 @@
                 "startup-plan adoption should see the created initial session")
             (is (= startup-plan (:startup-plan result)))
             (is (= 1 (count (ss/list-context-sessions-in ctx))))))))))
+
+(deftest start-tui-runtime-installs-and-clears-tui-ui-provider-test
+  (app-test-support/with-session-state-restore
+    (fn []
+      (with-redefs-fn (main-bootstrap-stub-bindings)
+        (fn []
+          (let [bootstrap-query* (atom nil)
+                started-query*   (atom nil)
+                after-return-ctx* (atom nil)
+                tui-start!       (fn [_run-agent-fn opts]
+                                   (let [query-fn (:query-fn opts)]
+                                     (reset! started-query* (query-fn ui-capabilities/ui-attrs))
+                                     :ok))]
+            (with-redefs [app-runtime/bootstrap-runtime-session!
+                          (fn [ctx _ai-model _opts]
+                            (reset! bootstrap-query* (session/query-in ctx nil ui-capabilities/ui-attrs))
+                            (let [sid (:session-id (session/new-session-in! ctx nil {}))]
+                              {:ctx ctx
+                               :session-id sid
+                               :templates []
+                               :skills []
+                               :startup-rehydrate {}}))]
+              (is (= :ok (app-runtime/start-tui-runtime! tui-start! :ignored {} {} {:session-root nil})))
+              (reset! after-return-ctx* (:ctx @app-runtime/session-state))
+              (is (= ui-capabilities/no-provider-reason
+                     (get-in @bootstrap-query* [:psi.ui/make-visible-action :psi.ui.action/unavailable-reason]))
+                  "bootstrap runs before the TUI frontend installs its active provider")
+              (is (= {:psi.ui/type :tui
+                      :psi.ui/available? true
+                      :psi.ui/capabilities []
+                      :psi.ui/actions []
+                      :psi.ui/make-visible-action
+                      (ui-capabilities/unavailable-make-visible-action
+                       ui-capabilities/unsupported-capability-reason
+                       "The attached UI does not support making itself visible.")
+                      :psi.ui/diagnostic nil}
+                     @started-query*)
+                  "TUI frontend queries see an attached-but-unsupported provider")
+              (is (nil? (ui-capabilities/provider @after-return-ctx*))
+                  "TUI provider is cleared when the frontend exits"))))))))
+
+(deftest start-tui-runtime-clears-tui-ui-provider-when-frontend-throws-test
+  (app-test-support/with-session-state-restore
+    (fn []
+      (with-redefs-fn (main-bootstrap-stub-bindings)
+        (fn []
+          (let [started-query*  (atom nil)
+                after-throw-ctx* (atom nil)
+                tui-start!      (fn [_run-agent-fn opts]
+                                  (let [query-fn (:query-fn opts)]
+                                    (reset! started-query* (query-fn ui-capabilities/ui-attrs))
+                                    (throw (ex-info "frontend failed" {}))))]
+            (with-redefs [app-runtime/bootstrap-runtime-session!
+                          (fn [ctx _ai-model _opts]
+                            (let [sid (:session-id (session/new-session-in! ctx nil {}))]
+                              {:ctx ctx
+                               :session-id sid
+                               :templates []
+                               :skills []
+                               :startup-rehydrate {}}))]
+              (is (thrown-with-msg?
+                   clojure.lang.ExceptionInfo
+                   #"frontend failed"
+                   (app-runtime/start-tui-runtime! tui-start! :ignored {} {} {:session-root nil})))
+              (reset! after-throw-ctx* (:ctx @app-runtime/session-state))
+              (is (= ui-capabilities/unsupported-capability-reason
+                     (get-in @started-query* [:psi.ui/make-visible-action :psi.ui.action/unavailable-reason]))
+                  "TUI frontend observes the attached provider before the exceptional exit")
+              (is (nil? (ui-capabilities/provider @after-throw-ctx*))
+                  "TUI provider is cleared when the frontend throws")
+              (is (= ui-capabilities/no-provider-reason
+                     (get-in (session/query-in @after-throw-ctx* nil ui-capabilities/ui-attrs)
+                             [:psi.ui/make-visible-action :psi.ui.action/unavailable-reason]))
+                  "post-throw queries cannot observe stale attached TUI advertisements"))))))))
 
 (deftest start-tui-runtime-extension-command-after-new-targets-new-session-test
   (app-test-support/with-session-state-restore
@@ -508,56 +603,8 @@
              messages)))))
 
 ;; moved to psi.main
-#_(deftest memory-runtime-opts-from-args-test
-    (is (= {:store-provider "in-memory"
-            :auto-store-fallback? false
-            :history-commit-limit 99
-            :retention-snapshots 12
-            :retention-deltas 34}
-           (#'app-runtime/memory-runtime-opts-from-args
-            ["--memory-store" "in-memory"
-             "--memory-store-fallback" "off"
-             "--memory-history-limit" "99"
-             "--memory-retention-snapshots" "12"
-             "--memory-retention-deltas" "34"])))
-    (is (= {}
-           (#'app-runtime/memory-runtime-opts-from-args
-            ["--memory-history-limit" "not-a-number"
-             "--memory-store-fallback" "maybe"]))))
-
 ;; moved to psi.main
-#_(deftest session-runtime-config-from-args-test
-    (testing "CLI flag sets timeout"
-      (is (= {:llm-stream-idle-timeout-ms 90000}
-             (#'app-runtime/session-runtime-config-from-args
-              ["--llm-idle-timeout-ms" "90000"]))))
-
-    (testing "env var is used when CLI flag is absent"
-      (with-redefs [app-runtime/llm-idle-timeout-ms-from-env (fn [] 42000)]
-        (is (= {:llm-stream-idle-timeout-ms 42000}
-               (#'app-runtime/session-runtime-config-from-args [])))))
-
-    (testing "CLI flag wins over env var"
-      (with-redefs [app-runtime/llm-idle-timeout-ms-from-env (fn [] 42000)]
-        (is (= {:llm-stream-idle-timeout-ms 90000}
-               (#'app-runtime/session-runtime-config-from-args
-                ["--llm-idle-timeout-ms" "90000"])))))
-
-    (testing "invalid CLI value does not fall back to env"
-      (with-redefs [app-runtime/llm-idle-timeout-ms-from-env (fn [] 42000)]
-        (is (= {}
-               (#'app-runtime/session-runtime-config-from-args
-                ["--llm-idle-timeout-ms" "not-a-number"]))))))
-
 ;; moved to psi.main
-#_(deftest rpc-trace-file-from-args-test
-    (is (= "/tmp/rpc-trace.ndedn"
-           (#'app-runtime/rpc-trace-file-from-args
-            ["--rpc-trace-file" "/tmp/rpc-trace.ndedn"])))
-    (is (nil? (#'app-runtime/rpc-trace-file-from-args
-               ["--rpc-trace-file" "   "])))
-    (is (nil? (#'app-runtime/rpc-trace-file-from-args []))))
-
 (deftest bootstrap-runtime-session-initial-context-index-has-single-session-test
   (with-redefs-fn (merge (app-test-support/bootstrap-stub-bindings)
                          {#'ext/discover-extension-paths (fn [& _] [])})
