@@ -37,7 +37,7 @@
 
 ## Slice 4 — Handle provider headers, cancellation, and streaming isolation
 
-- [ ] Normalize streaming and non-streaming provider failure values so retry-relevant headers are available to retry metadata calculation, for example under `:provider-error/headers`.
+- [x] Normalize streaming and non-streaming provider failure values so retry-relevant headers are available to retry metadata calculation, for example under `:provider-error/headers`.
 - [x] Honor parseable `Retry-After` / `X-Retry-After` as the scheduled delay with `:delay-source :retry-after`.
 - [x] Preserve rate-limit reset/limit/remaining header metadata in active retry projection, telemetry, and EQL-ready lifecycle captures.
 - [x] Fall back to configured exponential backoff with `:delay-source :exponential-backoff` when retry headers are absent or invalid.
@@ -66,15 +66,15 @@
 - [x] Add or update a test proving repeated retryable failures through the maximum retry count return structured retry-exhausted failure preserving the last cause.
 - [x] Add or update a test proving terminal provider/client errors are not retried and expose `:failure-reason :non-retryable`.
 - [x] Add or update a tool-result-post test proving provider retry does not rerun a local tool whose result was already recorded.
-- [ ] Add or update a test proving first-attempt successful provider requests preserve existing behavior and telemetry.
-- [ ] Ensure tests use controlled provider/request seams and injectable/controlled backoff timing instead of real network calls or slow sleeps.
+- [x] Add or update a test proving first-attempt successful provider requests preserve existing behavior and telemetry.
+- [x] Ensure tests use controlled provider/request seams and injectable/controlled backoff timing instead of real network calls or slow sleeps.
 
 ## Slice 7 — Review and cleanup
 
 - [ ] Remove, disable, or clearly quarantine obsolete whole-agent-loop retry behavior from the canonical prompt lifecycle path so it cannot duplicate provider-boundary retries.
 - [ ] Simplify duplicated retry policy code after provider-boundary retry is authoritative.
-- [ ] Update `implementation.md` with implementation decisions, discovered runtime seams, and verification commands/results.
-- [ ] Update user-facing docs and changelog if retry behavior, metrics, EQL/`psi-tool`, TUI, or Emacs-visible surfaces changed.
-- [ ] Run targeted retry, turn-runtime, provider telemetry, EQL, app-runtime/TUI/Emacs projection, and prompt lifecycle tests.
-- [ ] Run targeted `clj-kondo` over changed Clojure source and tests.
-- [ ] Run the broad project verification command appropriate for the final edit set, or record why it was not run.
+- [x] Update `implementation.md` with implementation decisions, discovered runtime seams, and verification commands/results.
+- [x] Update user-facing docs and changelog if retry behavior, metrics, EQL/`psi-tool`, TUI, or Emacs-visible surfaces changed.
+- [x] Run targeted retry, turn-runtime, provider telemetry, EQL, app-runtime/TUI/Emacs projection, and prompt lifecycle tests.
+- [x] Run targeted `clj-kondo` over changed Clojure source and tests.
+- [x] Run the broad project verification command appropriate for the final edit set, or record why it was not run.

@@ -140,18 +140,22 @@
                  (get-in result [:execution-result/assistant-message :content]))))))))
 
 (deftest execute-prepared-request-dispatches-provider-telemetry-test
+  ;; First-attempt success preserves existing success behavior and records one
+  ;; start/finish lifecycle pair without retry metadata.
   (let [[ctx session-id] (create-session-context {:persist? false})
         _ (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data]
                  (merge (ss/get-session-data-in ctx session-id)
                         {:model {:provider "openai" :id "gpt-5.4"}}))
         prepared (prepared-request ctx session-id)
         reg (:extension-registry ctx)
-        seen (atom [])]
+        seen (atom [])
+        attempts* (atom 0)]
     (ext/register-extension-in! reg "/ext/provider-telemetry")
     (ext/register-handler-in! reg "/ext/provider-telemetry" "provider_request_started" #(swap! seen conj %))
     (ext/register-handler-in! reg "/ext/provider-telemetry" "provider_request_finished" #(swap! seen conj %))
     (with-redefs [psi.turn-runtime.core/execute-live-turn!
                   (fn [_ai-ctx _ctx _session-id {:keys [turn-id ai-model]}]
+                    (swap! attempts* inc)
                     {:turn-id turn-id
                      :model ai-model
                      :ai-options {}
@@ -161,7 +165,12 @@
                                          :stop-reason :stop
                                          :timestamp (java.time.Instant/now)}
                      :logprobs nil})]
-      (turn-runtime/execute-prepared-request! {:provider-registry (atom {})} ctx session-id prepared nil))
+      (let [result (turn-runtime/execute-prepared-request! {:provider-registry (atom {})} ctx session-id prepared nil)]
+        (is (= 1 @attempts*))
+        (is (= :stop (:execution-result/stop-reason result)))
+        (is (= [{:type :text :text "streamed"}]
+               (get-in result [:execution-result/assistant-message :content])))
+        (is (nil? (:execution-result/retry-outcome result)))))
     (is (= ["provider_request_started" "provider_request_finished"]
            (mapv :type @seen)))
     (is (= {:session-id session-id
@@ -174,7 +183,10 @@
             :type "provider_request_started"}
            (first @seen)))
     (is (= :succeeded (:status (second @seen))))
-    (is (true? (:final? (second @seen))))))
+    (is (true? (:final? (second @seen))))
+    (is (empty? (filter #(= "provider_retry_scheduled" (:type %))
+                        (provider-events ctx session-id))))
+    (is (nil? (:retry (ss/get-session-data-in ctx session-id))))))
 
 (deftest execute-prepared-request-unsupported-structured-output-preflights-before-provider-test
   (testing "fallback-forbidden unsupported strategy fails before streaming provider request"

@@ -22,6 +22,7 @@
    :psi.provider-retry/delay-ms      (:delay-ms event)
    :psi.provider-retry/delay-source  (:delay-source event)
    :psi.provider-retry/resume-at     (:resume-at event)
+   :psi.provider-retry/rate-limit    (:rate-limit event)
    :psi.provider-retry/final?        final?})
 
 (defn- provider-retry-summary->eql
@@ -66,6 +67,7 @@
                      :psi.provider-retry/delay-ms
                      :psi.provider-retry/delay-source
                      :psi.provider-retry/resume-at
+                     :psi.provider-retry/rate-limit
                      :psi.provider-retry/final?]}]}]}
   (let [summaries (provider-retry-summaries agent-session-ctx session-id)
         retried   (filter #(pos? (:psi.provider-request/retry-count %)) summaries)]

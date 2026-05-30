@@ -187,3 +187,18 @@ Verification:
 - `clojure -M:test --focus psi.turn-runtime.response-mode-test/execute-prepared-request-cancels-pending-retry-backoff-test --focus psi.turn-runtime.response-mode-test/execute-prepared-request-streaming-retry-discards-failed-partial-output-test` passed (`2 tests, 18 assertions`).
 - `clojure -M:test --focus psi.turn-runtime.response-mode-test` passed (`15 tests, 100 assertions`).
 - `clj-kondo --lint components/turn-runtime/src components/turn-runtime/test components/agent-session/src/psi/agent_session/resolvers/provider_retries.clj` passed with no errors or warnings.
+
+2026-05-30 — Implementation pass: completed the remaining Slice 4/6 proof gaps and documented the user-visible retry/EQL changes. Confirmed streaming and non-streaming failure normalization is already in place: streaming `:error` events carry provider headers through `make-provider-event-consumer` → turn error data → accumulator final message `:provider-error/headers`, and non-streaming error results map `:headers` to the same field before retry metadata calculation. Strengthened first-attempt success coverage so a successful provider request executes once, returns the normal assistant content with no retry outcome, emits exactly one start/finish lifecycle pair, schedules no retry, and leaves active retry state clear.
+
+Extended provider retry EQL projection to include retained rate-limit metadata on `:psi.provider-retry/rate-limit`, satisfying the design requirement that header-derived rate-limit details are visible through `psi-tool` / EQL rather than only telemetry. Added a changelog entry for user-visible provider retry reliability and retry-history introspection.
+
+Verification:
+- `clojure -M:test --focus psi.turn-runtime.response-mode-test/execute-prepared-request-dispatches-provider-telemetry-test --focus psi.agent-session.eql-provider-retry-test/provider-retry-eql-introspection-test` passed (`2 tests, 15 assertions`).
+
+2026-05-30 — Follow-up verification pass: broad `bb test` initially surfaced four retry-related expectation mismatches caused by the now-intentional active retry phase projection: app-runtime/RPC retry status tests still expected `phase:idle` while `ss/sc-phase-in` now correctly reports `phase:retrying` whenever active provider-boundary backoff state is present. Updated those tests to align with the design's existing TUI/Emacs/app-runtime retry visibility requirement. The two turn-runtime failures from that broad run did not reproduce under focused execution after the status-test fixes, and focused retry suites are green.
+
+Verification:
+- `clojure -M:test --focus psi.app-runtime.session-summary-test/session-summary-builds-retry-status-fragments-test --focus psi.rpc-events-test/session-updated-payload-includes-retry-contract-test` passed (`2 tests, 14 assertions`).
+- `clojure -M:test --focus psi.turn-runtime.response-mode-test --focus psi.agent-session.eql-provider-retry-test --focus psi.agent-session.prompt-lifecycle-test --focus psi.agent-session.statechart-actions-test --focus psi.session-state.model-test --focus psi.agent-session.retry-headers-test --focus psi.app-runtime.session-summary-test --focus psi.rpc-events-test/session-updated-payload-includes-retry-contract-test` passed (`65 tests, 375 assertions`).
+- `clj-kondo --lint components/turn-runtime/src components/turn-runtime/test components/agent-session/src components/agent-session/test components/session-state/src components/session-state/test components/app-runtime/test components/rpc/test` passed with no errors or warnings; existing info-level findings remain in unrelated tests.
+- `bb test` was attempted and exposed the stale active-retry phase expectations above; not rerun yet after the focused fixes in this pass.

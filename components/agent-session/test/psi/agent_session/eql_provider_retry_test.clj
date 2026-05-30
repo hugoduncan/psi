@@ -37,7 +37,11 @@
                                     :error-message "Connection reset by peer"
                                     :delay-ms 10
                                     :delay-source :exponential-backoff
-                                    :resume-at 42}
+                                    :resume-at 42
+                                    :rate-limit {:limit 100
+                                                 :remaining 0
+                                                 :reset-after-ms 3000
+                                                 :reset-at 3042}}
                                    {:type "provider_request_finished"
                                     :provider-request-id "turn-retry"
                                     :turn-id "turn-retry"
@@ -59,7 +63,8 @@
                                      :psi.provider-retry/error-message
                                      :psi.provider-retry/delay-ms
                                      :psi.provider-retry/delay-source
-                                     :psi.provider-retry/resume-at]}]}])]
+                                     :psi.provider-retry/resume-at
+                                     :psi.provider-retry/rate-limit]}]}])]
         (is (= 1 (:psi.agent-session/provider-retry-count r)))
         (is (= 1 (:psi.agent-session/provider-retried-request-count r)))
         (is (= "turn-retry" (get-in r [:psi.agent-session/provider-retries 0 :psi.provider-request/id])))
@@ -70,5 +75,9 @@
                  :psi.provider-retry/error-message "Connection reset by peer"
                  :psi.provider-retry/delay-ms 10
                  :psi.provider-retry/delay-source :exponential-backoff
-                 :psi.provider-retry/resume-at 42}]
+                 :psi.provider-retry/resume-at 42
+                 :psi.provider-retry/rate-limit {:limit 100
+                                                 :remaining 0
+                                                 :reset-after-ms 3000
+                                                 :reset-at 3042}}]
                (get-in r [:psi.agent-session/provider-retries 0 :psi.provider-request/retry-attempts])))))))
