@@ -35,3 +35,5 @@
 2026-05-30 — Design ambiguity review: re-read current design plus referenced provider extraction helpers, prompted-JSON instruction helper, workflow structured-output envelope/schema code, and workflow-judge retry seam. No new actionable ambiguities found; existing ambiguity follow-ups remain resolved and `design-steps.md` needs no new unchecked items.
 
 2026-05-30 — Ambiguity follow-up execution: re-read `design-steps.md` after the preceding ambiguity-review pass. No newly added unchecked ambiguity follow-up items are present, so no `design.md` change was needed and no blocking ambiguity design-step remains.
+
+2026-05-30 — Design inconsistency review: found one new actionable inconsistency: `design.md` says any valid JSON value from the provider structured-output result surface, including `null`, must be preserved, but the affected-file/scope list excludes the existing Codex structured-output result helper, which is also a provider structured-output result surface and currently gates parse success on `:payload` truthiness.
