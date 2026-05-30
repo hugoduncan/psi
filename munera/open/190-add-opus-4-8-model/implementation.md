@@ -1283,3 +1283,9 @@ Completed the newly added code-shaper follow-up:
 - Verification passed:
   - `clojure -M:test --focus psi.agent-session.model-dispatch-test/mid-system-capability-dispatch-test` — 1 test, 23 assertions, 0 failures.
   - `clj-kondo --lint components/agent-session/src/psi/agent_session/model_capabilities.clj components/agent-session/test/psi/agent_session/model_dispatch_test.clj` — clean.
+
+---
+
+## Test-shaper review pass — 2026-05-30 (post capability-predicate follow-up)
+
+No new actionable test-shaping feedback found. Re-read the task artifacts and applied `.psi/skills/test-shaper/SKILL.md` against the referenced speed/effort command persistence tests, provider request-shaping tests, mid-system capability/dispatch/persistence/projection tests, compaction replay tests, and current capability-predicate coverage. The current tests are behavior-focused, deterministic, localized around observable outcomes, and include the explicit-false OpenAI chat-completions capability boundary already added by the existing code-shaper follow-up. Focused verification passed: `clojure -M:test --focus psi.agent-session.commands-speed-effort-test --focus psi.agent-session.model-dispatch-test --focus psi.agent-session.compaction-test --focus psi.ai.providers.anthropic-test --focus psi.ai.providers.openai-test` — 65 tests, 496 assertions, 0 failures. No duplicate `steps.md` follow-ups added.
