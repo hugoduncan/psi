@@ -93,3 +93,4 @@
 - [x] Ensure RPC/Emacs contexts do not expose the default static Emacs make-visible provider before the late-bound RPC UI capability provider is installed; add coverage for bootstrap/pre-install unavailable semantics.
 - [x] Normalize/trim Emacs RPC focused session ids before advertising make-visible availability, and cover nil/blank/whitespace focus state as no-attached UI.
 - [x] Ensure TUI contexts do not expose a default attached TUI provider before the TUI frontend/state is installed, and clear or downgrade the provider on TUI shutdown; add pre-start/bootstrap/shutdown coverage.
+- [ ] Reject provider action descriptors with extra unqualified/foreign keys before exposing them through EQL, and add focused coverage for fail-closed provider-error semantics.

@@ -523,3 +523,7 @@ Verification:
 - `clojure -M:test --focus psi.app-runtime-test/start-tui-runtime-installs-and-clears-tui-ui-provider-test --focus psi.app-runtime-test/create-runtime-session-context-can-suppress-default-tui-ui-provider-test` — 2 tests, 6 assertions, 0 failures.
 - `clojure -M:test --focus psi.app-runtime-test --focus psi.agent-session.ui-capabilities-test` — 45 tests, 222 assertions, 0 failures.
 - `clj-kondo --lint components/app-runtime/src/psi/app_runtime.clj components/app-runtime/test/psi/app_runtime_test.clj` — clean.
+
+## 2026-05-30 implementation review
+
+Found one new actionable implementation issue after re-reading task artifacts, UI capability normalization code, resolver/docs, and focused lifecycle tests: action descriptor validation does not reject extra unqualified descriptor keys. `valid-action?` verifies required `:psi.ui.action/...` keys and EDN serialisability, but a provider can still expose additional unqualified keys (for example `:handler` or `"frontend-object"`) in `:psi.ui/actions` / `:psi.ui/make-visible-action`. The design requires descriptors to be pure data with fully namespaced descriptor keys, so provider normalization should fail closed to provider-error for unqualified/foreign action descriptor keys and add focused coverage.
