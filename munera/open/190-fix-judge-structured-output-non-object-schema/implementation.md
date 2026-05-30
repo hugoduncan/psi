@@ -9,3 +9,5 @@
 2026-05-30 — Inconsistency follow-up: reconciled the `parse-json-object` constraint with current grep evidence by retaining the helper as an object-only API while no remaining non-helper call sites are expected after the three provider extraction sites move. Reconciled the minimal-fix constraint by defining minimality across both root-cause seams: three provider extraction sites plus only the workflow-judge structured-output validation-failure retry path. Marked both inconsistency design-steps complete.
 
 2026-05-30 — Design ambiguity review: re-read design and referenced structured-output/provider/judge code. No new actionable ambiguities found; existing ambiguity follow-ups for JSON null preservation and structured retry opts retention remain resolved.
+
+2026-05-30 — Ambiguity follow-up execution: re-read `design-steps.md`; there are no newly added unchecked ambiguity follow-up items to execute, so `design.md` needed no change and no blocking design-step remains.
