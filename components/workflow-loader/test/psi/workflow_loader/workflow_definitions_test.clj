@@ -65,6 +65,12 @@
                (input-var-wired? c)))
         (:contributions step)))
 
+(defn- pass-status-judge-from-step
+  [step-name]
+  {:type :invoke
+   :operation "workflow/pass-status-routing"
+   :args {:text {:from {:step step-name :output :final-llm-reply}}}})
+
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-design
 
@@ -109,13 +115,15 @@
              inconsistency-follow-up (get step-by-name "inconsistency-follow-up")
              clarity-step (get step-by-name "clarity-status")]
          (testing "per-reviewer follow-up steps route conditionally from deterministic PASS_STATUS"
-           (is (= "workflow/pass-status-routing" (get-in ambiguity-review [:judge :operation])))
+           (is (= (pass-status-judge-from-step "ambiguity-review")
+                  (:judge ambiguity-review)))
            (is (= {"REPEAT" {:goto "ambiguity-follow-up"}
                    "DONE" {:goto "inconsistency-review"}}
                   (:on ambiguity-review)))
            (is (= "workflow/constant-routing" (get-in ambiguity-follow-up [:judge :operation])))
            (is (= {"DONE" {:goto "inconsistency-review"}} (:on ambiguity-follow-up)))
-           (is (= "workflow/pass-status-routing" (get-in inconsistency-review [:judge :operation])))
+           (is (= (pass-status-judge-from-step "inconsistency-review")
+                  (:judge inconsistency-review)))
            (is (= {"REPEAT" {:goto "inconsistency-follow-up"}
                    "DONE" {:goto "clarity-status"}}
                   (:on inconsistency-review)))
@@ -173,13 +181,15 @@
              inconsistency-follow-up (get step-by-name "inconsistency-follow-up")
              clarity-step (get step-by-name "clarity-status")]
          (testing "per-reviewer follow-up steps route conditionally from deterministic PASS_STATUS"
-           (is (= "workflow/pass-status-routing" (get-in ambiguity-review [:judge :operation])))
+           (is (= (pass-status-judge-from-step "ambiguity-review")
+                  (:judge ambiguity-review)))
            (is (= {"REPEAT" {:goto "ambiguity-follow-up"}
                    "DONE" {:goto "inconsistency-review"}}
                   (:on ambiguity-review)))
            (is (= "workflow/constant-routing" (get-in ambiguity-follow-up [:judge :operation])))
            (is (= {"DONE" {:goto "inconsistency-review"}} (:on ambiguity-follow-up)))
-           (is (= "workflow/pass-status-routing" (get-in inconsistency-review [:judge :operation])))
+           (is (= (pass-status-judge-from-step "inconsistency-review")
+                  (:judge inconsistency-review)))
            (is (= {"REPEAT" {:goto "inconsistency-follow-up"}
                    "DONE" {:goto "clarity-status"}}
                   (:on inconsistency-review)))

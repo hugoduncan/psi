@@ -62,4 +62,4 @@
 
 ## Test-shaper follow-up
 
-- [ ] Strengthen `review-task-design` and `review-task-plan` workflow definition tests to assert each per-reviewer `workflow/pass-status-routing` judge sources `:text` from that same step's own `:final-llm-reply` output, not just the operation id and route table.
+- [x] Strengthen `review-task-design` and `review-task-plan` workflow definition tests to assert each per-reviewer `workflow/pass-status-routing` judge sources `:text` from that same step's own `:final-llm-reply` output, not just the operation id and route table.
