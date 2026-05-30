@@ -480,3 +480,11 @@ No new actionable inconsistencies found. Re-read `design.md` and checked referen
 ## Inconsistency follow-up execution — 2026-05-30 (latest no-op)
 
 Read `design-steps.md` for newly added unchecked inconsistency follow-up items after the preceding inconsistency-review pass. No unchecked design-step items were present, so no `design.md` changes were required. `plan.md` and `steps.md` were not touched.
+
+---
+
+## Design ambiguity review pass — 2026-05-30 (journal metadata placement)
+
+**New actionable ambiguity found:**
+
+1. **Mid-system injection placement with non-conversational journal entries** — Part 4 says `:session/inject-mid-system-message` is accepted when the journal tail has a user turn as the latest conversational entry and no pending `:mid-system`, but the journal can contain non-conversational entries (`:model`, `:thinking-level`, `:label`, `:logprobs`, etc.) after that user turn before the assistant response. Specify whether placement validation ignores such metadata entries and inserts/appends the `:mid-system` after them, or requires the literal last journal entry to be the user/`:mid-system` boundary. Without this, extension calls after a model/thinking change between user and assistant have unclear accept/reject behavior and unclear provider-message ordering.

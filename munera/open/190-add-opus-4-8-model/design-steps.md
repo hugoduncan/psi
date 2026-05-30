@@ -119,3 +119,7 @@
 ## From ambiguity review pass 2026-05-30 (compaction acceptance verification)
 
 - [x] **Align compaction acceptance criterion with conditional attachment rule** — Part 4 step 11 conditionally attaches preserved pre-cut `:mid-system` instructions after the summary user or after the first retained user, but the acceptance criterion still only says "coalesced after the summary user turn". Update the acceptance criterion/tests to require both conditional cases, or simplify the detailed compaction rule so acceptance has one unambiguous attachment point.
+
+## From ambiguity review pass 2026-05-30 (journal metadata placement)
+
+- [ ] **Define mid-system placement across non-conversational journal entries** — Decide whether `:session/inject-mid-system-message` placement validation ignores non-conversational journal entries after the latest user turn (for example `:model`, `:thinking-level`, `:label`, `:logprobs`) or requires the literal journal tail to be a user / pending `:mid-system` entry. Specify where the new `:mid-system` entry is appended and how provider-message projection preserves `user → system` ordering when metadata entries sit between them.
