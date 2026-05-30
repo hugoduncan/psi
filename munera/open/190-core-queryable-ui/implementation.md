@@ -362,3 +362,7 @@ No new actionable ambiguity feedback after this independent review of `plan.md`,
 ## 2026-05-30 requested ambiguity follow-up execution
 
 No newly added unchecked ambiguity follow-up items were present in `design-steps.md` after the preceding ambiguity-review pass (`0c8284d9`); all design follow-up steps are already complete. No `design.md`, `plan.md`, or `steps.md` updates were needed, and no design step was left blocked.
+
+## 2026-05-30 requested plan/steps inconsistency review
+
+No new actionable inconsistency feedback after re-reading `plan.md`, `steps.md`, `implementation.md`, `design.md`, `design-decisions.md`, `resolved-design-questions.md`, completed `design-steps.md`, referenced extension docs, and sampled current UI/query/runtime seams. The implementation plan and checklist remain aligned on queryability-first scope, provider-derived runtime UI data, the full root-queryable `:psi.ui/...` attr set including diagnostics, available-only actions, stable unavailable make-visible descriptors, optional/constrained side-effecting invocation, frontend provider expectations, documentation re-verification, and final verification. No unchecked `design-steps.md` follow-up item was added because there is no new inconsistency feedback.
