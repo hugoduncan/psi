@@ -665,3 +665,7 @@ No new actionable documentation feedback after applying `review-task-docs` to th
 ## 2026-05-30 requested test-shaper verification
 
 Applied `test-shaper` in a fresh pass and found no new actionable test-shaping issues. Re-read the task artifacts and sampled the referenced UI capability/provider, extension API/nullability, RPC/TUI lifecycle, and Emacs show-active tests; coverage remains behaviour-focused, deterministic, and boundary-oriented. Verification: `clojure -M:test --focus psi.agent-session.ui-capabilities-test --focus psi.agent-session.extensions-test --focus psi.app-runtime-test --focus psi.rpc-transport-test` — 84 tests, 419 assertions, 0 failures; `bb emacs:test` — 321 tests, 321 expected, 0 unexpected. No new `steps.md` item was added.
+
+## 2026-05-30 requested docs review pass
+
+No new actionable documentation feedback after applying `review-task-docs` to the task artifacts, implementation notes, `README.md`, `doc/extensions.md`, `doc/extension-api.md`, `doc/architecture.md`, `doc/graph-surface.md`, `CHANGELOG.md`, and follow-up task `191-ui-action-invocation`. The docs accurately describe the implemented queryable `:psi.ui/...` capability/action attrs, unavailable/provider-error semantics, UI-type compatibility role, and task-190 query/descriptor-only boundary; the changelog records the user-visible extension capability. No new `steps.md` item was added.
