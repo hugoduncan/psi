@@ -322,3 +322,7 @@ Found one new actionable inconsistency after re-reading `plan.md`, `steps.md`, `
 ## 2026-05-30 inconsistency follow-up execution
 
 Completed the newly added `:psi.ui/diagnostic` attr-summary alignment follow-up from `design-steps.md`. Updated `design-decisions.md` and `resolved-design-questions.md` so both list `:psi.ui/diagnostic` in the root-queryable `:psi.ui/...` attr set and describe it as bounded redacted provider-error troubleshooting data that is nil/absent for normal states. Marked the design step complete. No blocking follow-up remains.
+
+## 2026-05-30 requested plan/steps ambiguity review
+
+No new actionable ambiguity feedback after this requested independent pass over `plan.md`, `steps.md`, `implementation.md`, `design.md`, related design artifacts/docs, and sampled UI/query/runtime seams. Existing checklist items are actionable enough for implementation across discovery, model/validation, EQL discovery, provider lifetime, frontend provider behaviour, optional invocation handling, tests, docs, and verification; no unchecked `design-steps.md` follow-up item was added.
