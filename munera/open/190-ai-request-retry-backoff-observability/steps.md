@@ -33,7 +33,7 @@
 - [x] Publish active retry state into existing session retry fields before pending backoff sleep begins.
 - [x] Clear active retry fields when retry delay completes, the request succeeds, or the request fails terminally/exhausted/disabled; cancellation clearing remains pending with cancellation support.
 - [x] Add focused tests proving app-runtime/TUI/Emacs-facing phase/status reports retrying while provider-boundary backoff is pending.
-- [ ] Add focused tests proving provider-boundary retry resume does not dispatch `:runtime/agent-start-loop` or rerun local tools.
+- [x] Add focused tests proving provider-boundary retry resume does not dispatch `:runtime/agent-start-loop` or rerun local tools.
 
 ## Slice 4 — Handle provider headers, cancellation, and streaming isolation
 
@@ -65,7 +65,7 @@
 - [x] Add or update an integration-style prompt lifecycle test proving retryable failure followed by provider success returns success to the caller.
 - [x] Add or update a test proving repeated retryable failures through the maximum retry count return structured retry-exhausted failure preserving the last cause.
 - [x] Add or update a test proving terminal provider/client errors are not retried and expose `:failure-reason :non-retryable`.
-- [ ] Add or update a tool-result-post test proving provider retry does not rerun a local tool whose result was already recorded.
+- [x] Add or update a tool-result-post test proving provider retry does not rerun a local tool whose result was already recorded.
 - [ ] Add or update a test proving first-attempt successful provider requests preserve existing behavior and telemetry.
 - [ ] Ensure tests use controlled provider/request seams and injectable/controlled backoff timing instead of real network calls or slow sleeps.
 

@@ -175,3 +175,8 @@ Verification:
 - `clojure -M:test --focus psi.turn-runtime.response-mode-test/execute-prepared-request-clears-active-retry-state-before-retry-attempt-test --focus psi.turn-runtime.response-mode-test/execute-prepared-request-retry-after-header-drives-delay-test --focus psi.turn-runtime.response-mode-test/execute-prepared-request-invalid-retry-after-falls-back-test` passed (`3 tests, 18 assertions`).
 - `clojure -M:test --focus psi.turn-runtime.response-mode-test` passed (`13 tests, 82 assertions`).
 - `clj-kondo --lint components/turn-runtime/test/psi/turn_runtime/response_mode_test.clj` passed with no errors or warnings.
+
+2026-05-30 — Implementation pass: added focused prompt-lifecycle coverage for the provider-boundary retry resume contract. The canonical retryable prompt lifecycle test now clears and inspects the dispatch event log to prove provider-boundary retry does not dispatch the old whole-agent-loop `:runtime/agent-start-loop` effect. Added a tool-result-post continuation test where the first provider request asks for a tool, the tool result is recorded once, the continuation provider request fails retryably once, and provider-boundary retry succeeds without rerunning the local tool. This covers the design rule that retrying a provider request containing already-recorded tool results must not replay tool side effects.
+
+Verification:
+- `clojure -M:test --focus psi.agent-session.prompt-lifecycle-test/prompt-execution-result-retryable-error-enters-retrying-and-schedules-retry-test --focus psi.agent-session.prompt-lifecycle-test/prompt-provider-retry-after-tool-result-does-not-rerun-tool-test` passed (`2 tests, 9 assertions`).
