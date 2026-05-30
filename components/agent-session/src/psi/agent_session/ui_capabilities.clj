@@ -277,8 +277,8 @@
   (try
     (let [ui-type (:psi.ui/type raw)
           available? (:psi.ui/available? raw false)
-          capabilities (vec (or (:psi.ui/capabilities raw) []))
-          raw-actions (vec (or (:psi.ui/actions raw) []))]
+          raw-capabilities (:psi.ui/capabilities raw [])
+          raw-actions (:psi.ui/actions raw [])]
       (cond
         (not (map? raw))
         (provider-error-result "provider did not return a map")
@@ -289,8 +289,8 @@
         (not (boolean? available?))
         (provider-error-result "provider returned invalid :psi.ui/available?")
 
-        (not (and (vector? capabilities)
-                  (every? #(namespaced-as? % "psi.ui.capability") capabilities)))
+        (not (and (vector? raw-capabilities)
+                  (every? #(namespaced-as? % "psi.ui.capability") raw-capabilities)))
         (provider-error-result "provider returned invalid :psi.ui/capabilities")
 
         (not (and (vector? raw-actions) (every? valid-action? raw-actions)))
@@ -300,7 +300,8 @@
         (provider-error-result "provider returned duplicate UI action ids")
 
         :else
-        (let [capability-set (set capabilities)
+        (let [capabilities raw-capabilities
+              capability-set (set capabilities)
               actions (filterv :psi.ui.action/available? (mapv normalize-action raw-actions))
               make-visible-actions (filterv #(= make-visible-action-id (:psi.ui.action/id %)) actions)
               incoherent-unavailable? (and (false? available?)

@@ -242,6 +242,35 @@
            (get-in mutation-result
                    [:psi.ui/make-visible-action :psi.ui.action/invocation])))))
 
+(deftest provider-normalization-rejects-non-vector-collections-test
+  ;; Tests that provider capabilities/actions collection shape drift fails closed
+  ;; instead of being silently vectorized into the EQL contract.
+  (let [action (ui-capabilities/make-visible-action
+                {:psi.ui.invocation/kind :emacs-command
+                 :psi.ui.invocation/command "psi-emacs-show-active"})]
+    (doseq [provider-result [{:psi.ui/type :emacs
+                              :psi.ui/available? true
+                              :psi.ui/capabilities '(:psi.ui.capability/make-visible)
+                              :psi.ui/actions [action]}
+                             {:psi.ui/type :emacs
+                              :psi.ui/available? true
+                              :psi.ui/capabilities #{:psi.ui.capability/make-visible}
+                              :psi.ui/actions [action]}
+                             {:psi.ui/type :emacs
+                              :psi.ui/available? true
+                              :psi.ui/capabilities [:psi.ui.capability/make-visible]
+                              :psi.ui/actions (list action)}
+                             {:psi.ui/type :emacs
+                              :psi.ui/available? true
+                              :psi.ui/capabilities [:psi.ui.capability/make-visible]
+                              :psi.ui/actions #{action}}]]
+      (let [result (ui-capabilities/normalize-provider-result provider-result)]
+        (is (provider-error? result)
+            (str "expected provider-error for provider collection shape: "
+                 (pr-str provider-result)))
+        (is (= [] (:psi.ui/capabilities result)))
+        (is (= [] (:psi.ui/actions result)))))))
+
 (deftest provider-normalization-duplicate-action-ids-test
   ;; Tests that duplicate action ids are rejected rather than merged.
   (let [action (ui-capabilities/make-visible-action
