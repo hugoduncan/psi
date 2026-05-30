@@ -463,3 +463,7 @@ Verification:
 - `clojure -M:test --focus psi.extension-test-helpers.nullable-api-test` — 3 tests, 6 assertions, 0 failures.
 - `clojure -M:test --focus psi.agent-session.extensions-service-protocol-api-test --focus psi.agent-session.extensions-post-tool-api-test --focus psi.extension-test-helpers.nullable-api-test` — 6 tests, 11 assertions, 0 failures.
 - `clj-kondo --lint deps.edn tests.edn components/extension-test-helpers/src/psi/extension_test_helpers/nullable_api.clj components/extension-test-helpers/test/psi/extension_test_helpers/nullable_api_test.clj` — clean.
+
+## 2026-05-30 implementation review
+
+Found one new actionable implementation issue after re-reading task artifacts, UI capability normalization/provider code, RPC lifecycle wiring, docs, and focused tests: provider normalization can expose contradictory unavailable/available UI state. If a provider returns `:psi.ui/available? false` while also returning capabilities and available actions, `normalize-provider-result` currently preserves `available? false` but can still expose `:psi.ui.capability/make-visible` and an available make-visible descriptor. The design's no-attached/provider-error semantics require unavailable providers to expose empty capabilities/actions and a stable unavailable make-visible descriptor, while supported make-visible implies `:psi.ui/available? true`. Add validation/coverage so unavailable provider results with capabilities or available actions fail closed to provider-error or normalize to the explicit unavailable state.
