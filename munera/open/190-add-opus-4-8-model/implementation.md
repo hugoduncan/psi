@@ -1193,3 +1193,9 @@ No new actionable test feedback found. Re-read `design.md`, `plan.md`, `steps.md
 ## Inconsistency follow-up execution — 2026-05-30 (post-effort-coverage unchecked-item pass)
 
 Read `design-steps.md` for unchecked inconsistency follow-up items added by the preceding inconsistency-review pass. No unchecked design-step items were present (`unchecked count 0`), so there were no newly actionable inconsistency follow-ups to execute. No `design.md`, `plan.md`, or `steps.md` changes were required.
+
+---
+
+## Test-shaper review pass — 2026-05-30
+
+No new actionable test-shaping feedback found. Re-read the task artifacts and applied `.psi/skills/test-shaper/SKILL.md` against the referenced speed/effort command persistence tests, provider request-shaping tests, mid-system dispatch/persistence/projection tests, compaction replay tests, and docs/changelog acceptance surfaces. The current tests are behavior-focused, deterministic, reasonably localized, and cover the key partitions/boundaries added by the prior test-review follow-ups. Focused verification passed: `clojure -M:test --focus psi.agent-session.commands-speed-effort-test --focus psi.agent-session.model-dispatch-test --focus psi.agent-session.compaction-test --focus psi.ai.providers.anthropic-test --focus psi.ai.providers.openai-test` — 65 tests, 495 assertions, 0 failures. No duplicate `steps.md` follow-ups added.
