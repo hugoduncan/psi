@@ -1048,3 +1048,11 @@ Verification:
 ## Ambiguity follow-up execution — 2026-05-30 (post-replay unchecked-item pass)
 
 Read `design-steps.md` for unchecked ambiguity follow-up items added by the preceding ambiguity-review pass. No unchecked ambiguity design-step items were present (`unchecked count 0`), so there were no newly actionable ambiguity follow-ups to execute. No `design.md`, `plan.md`, or `steps.md` changes were required. Existing uncommitted implementation/test changes were left untouched.
+
+---
+
+## Design inconsistency review pass — 2026-05-30 (post-final follow-up verification)
+
+**New actionable inconsistency found:**
+
+1. **Full-suite verification is marked complete before a later code/test follow-up** — `steps.md` Slice 5 marks `Run bb test and confirm the full suite is green` complete, and the Slice 5 implementation note records `bb test` passing. But a later compaction replay post-history implementation pass changed source/tests after that full-suite run and only reran focused compaction tests plus targeted lint. The task files therefore imply the final working tree has post-change full-suite verification, while `implementation.md` only proves full-suite verification for the pre-follow-up state. Rerun `bb test` after the latest follow-up (or uncheck/reword the Slice 5 verification step until it is rerun) so steps and implementation evidence describe the same final state.
