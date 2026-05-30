@@ -877,28 +877,38 @@ The concrete preservation mechanism in this slice is:
    conversation by coalescing their text, in original order, into one retained
    `:mid-system` entry attached to the first valid user boundary after
    compaction.
-4. The normal attachment point is immediately after the compaction summary user
-   turn. This is used when the retained post-cut history is empty, begins with an
-   assistant turn, or begins with one or more `:mid-system` entries that already
-   belong to the summary boundary.
-5. If the retained post-cut history begins with a user turn, do **not** emit the
-   coalesced instruction after the summary user. Instead, reattach the coalesced
-   instruction immediately after that first retained user turn, before any
-   retained assistant response to that user. This preserves the Anthropic-safe
-   invariant that an inline system message is attached to the most recent user at
-   its position, and it avoids rebuilding `summary user → system → retained user`.
-6. If the retained post-cut history begins with one or more `:mid-system` entries,
-   merge those boundary entries into the same coalesced boundary `:mid-system`
-   entry instead of emitting separate adjacent system messages. When the
-   attachment point is the summary user, the merged entry remains after the
-   summary user; when step 5 reattaches to the first retained user, the merged
-   entry moves with the coalesced instruction after that retained user. The
-   merged text order is: all pre-cut active mid-system instructions first, then
-   the post-cut boundary mid-system entries in journal order. The retained
+4. Compaction must not retroactively insert a preserved mid-system instruction
+   into already-retained historical conversation. In particular, it must not
+   rebuild `retained user → preserved system → retained assistant`, because that
+   would make an instruction that was meant to apply to future generations appear
+   to have influenced an already-generated assistant response.
+5. Before placing the coalesced instruction, normalize the retained suffix to a
+   valid attachment boundary. If the retained suffix contains a user turn that is
+   followed by a retained assistant turn, advance the compaction cut past that
+   completed user/assistant exchange (including intervening metadata and any
+   mid-system entries that belong to that exchange) and include it in the
+   summary. Repeat until the retained conversational suffix is either empty or
+   has a latest/pending user turn with no retained assistant response after it.
+   This cut adjustment is only required when there are preserved pre-cut
+   `:mid-system` instructions or boundary `:mid-system` entries to place.
+6. The attachment point is then:
+   - immediately after the synthetic summary user when the normalized retained
+     suffix has no pending user turn; or
+   - immediately after the latest retained pending user when the normalized
+     retained suffix ends at a user turn before the next assistant generation.
+   The second case preserves the next-generation placement contract without
+   rewriting already-generated retained assistant history.
+7. If the normalized retained suffix begins with one or more boundary
+   `:mid-system` entries, merge those entries into the same coalesced
+   `:mid-system` entry instead of emitting separate adjacent system messages.
+   The merged text order is: all pre-cut active mid-system instructions first,
+   then the post-cut boundary mid-system entries in journal order. The retained
    post-cut history then starts after those merged boundary entries. This
-   guarantees compaction never rebuilds `summary user → system → system` or
-   `summary user → system → retained user`, while preserving both pre-cut
-   continuing instructions and post-cut pending instructions.
+   guarantees compaction never rebuilds `summary user → system → system`,
+   `summary user → system → retained user`, or
+   `retained user → system → retained assistant`, while preserving both pre-cut
+   continuing instructions and post-cut pending instructions at the next valid
+   generation boundary.
 
 #### 12. Cache interaction
 
@@ -939,7 +949,7 @@ cache-control logic is required.
   mid-system tail by replacing `... user, system` as `... current-user, system`,
   maintaining provider order `user → system`.
 - OpenAI chat-completions message transform maps `:system` → `"system"` string.
-- Compaction preserves both post-cut `:mid-system` entries and pre-cut active mid-system instructions. Tests cover both conditional attachment cases: when retained post-cut history does not begin with a user turn, pre-cut instructions are coalesced after the summary user turn; when retained post-cut history begins with a user turn, they are reattached immediately after that first retained user turn, before any retained assistant response.
+- Compaction preserves both post-cut `:mid-system` entries and pre-cut active mid-system instructions. Tests cover conditional attachment and cut-normalization cases: when no pending retained user boundary exists, pre-cut instructions are coalesced after the summary user turn; when retained history ends at a pending user boundary, they are attached immediately after that latest retained user; when retained history would otherwise contain `retained user → preserved system → retained assistant`, compaction advances the cut to summarize that completed exchange rather than retroactively inserting the instruction before retained assistant history.
 - Unit tests cover: model capability flag, resolver, dispatch handler (supported
   / unsupported model), Anthropic transform (valid placement, invalid placement
   warning+drop), OpenAI transform, journal projection, compaction preservation.

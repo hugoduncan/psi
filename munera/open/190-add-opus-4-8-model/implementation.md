@@ -509,3 +509,13 @@ Decision recorded:
 
 1. **Compaction reattaches preserved mid-system instructions before retained assistant history** — Part 4 defines the Anthropic-safe/injection placement as a pending instruction immediately after the most recent user turn before the assistant response being generated, but the compaction rule reattaches pre-cut active `:mid-system` text after the first retained user when retained history begins with a user, before any retained assistant response to that user. If retained history contains an already-generated assistant reply after that first user, compaction retroactively inserts the instruction into historical conversation rather than attaching it to the next generation/latest-user boundary, contradicting the placement contract and the “remain valid for the remainder of the session” intent.
 
+
+---
+
+## Inconsistency follow-up — 2026-05-30 (compaction retained-history placement)
+
+Completed the newly added inconsistency follow-up item in `design-steps.md` by refining `design.md`:
+
+- Compaction must not retroactively insert preserved mid-system instructions before already-retained assistant responses.
+- When preserved pre-cut or boundary `:mid-system` instructions need placement, compaction normalizes the retained suffix by advancing the cut past completed retained user/assistant exchanges until the suffix is empty or ends at a pending latest user boundary.
+- Preserved instructions attach after the summary user only when no pending retained user boundary exists, or after the latest retained pending user when one exists; tests must cover the cut-normalization case that avoids `retained user → system → retained assistant`.
