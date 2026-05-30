@@ -339,3 +339,16 @@ Decisions recorded:
 **New actionable inconsistency found:**
 
 1. **Effort override for extended-thinking models contradicts no-effort-sending rule** — Part 3 step 5 specifies an effort-override mapping for extended-thinking models (`:xhigh` → `"high"` for extended) and renames the current `thinking-level->effort` to `thinking-level->effort-default`. But the same section states extended-thinking models "do not send adaptive `output_config.effort`", and the current code only computes/applies effort `(when (and thinking adaptive?) ...)`. The override mapping for extended models has no sending path, and the renamed `thinking-level->effort-default` has no remaining consumer since adaptive models use the new `thinking-level->effort-xhigh` table. Either remove the extended-thinking effort-override mapping and the dead rename, or specify how effort-override is applied to extended-thinking models (e.g. as a budget multiplier or ignored with a warning).
+
+---
+
+## Inconsistency follow-up — 2026-05-30 (effort override extended-thinking)
+
+Completed the newly added inconsistency follow-up item in `design-steps.md` by refining `design.md`.
+
+Decision: option (a) — removed the rename and the dead extended-thinking effort-override mapping.
+
+- The existing `thinking-level->effort` table is updated in place to map `:xhigh` → `"highest"` (was `"high"`). No rename to `thinking-level->effort-default` is needed because this table is only consumed in the adaptive path.
+- Effort override for adaptive models uses a separate `effort-override->effort` mapping `{:low "low" :medium "medium" :high "high" :xhigh "highest"}`, applied only when the model is adaptive-thinking.
+- Effort override is silently inapplicable to extended-thinking models because they use `budget_tokens`, not `output_config.effort`. No dead table, no dead mapping, no special handling needed.
+- Extended-thinking `:xhigh` distinction is already provided by `thinking-level->budget {:xhigh 32000}` vs `:high 16000` (Part 3 step 11, unchanged).

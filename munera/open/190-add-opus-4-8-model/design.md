@@ -361,21 +361,28 @@ non-nil.
 
 #### 5. Anthropic provider (`components/ai/src/psi/ai/providers/anthropic.clj`)
 
-Rename the private `thinking-level->effort` table to
-`thinking-level->effort-default`.  Add `thinking-level->effort-xhigh` for
-the adaptive path:
+Update the existing `thinking-level->effort` table in place to map `:xhigh`
+to `"highest"` instead of `"high"`:
 
 ```
-thinking-level->effort-xhigh:
+thinking-level->effort:
   {:off nil :minimal "low" :low "low" :medium "medium" :high "high" :xhigh "highest"}
 ```
 
+No rename is needed: this table is used only in the adaptive-thinking path
+(`(when (and thinking adaptive?) ...)`), so the single updated table serves
+both the level-derived and override-derived effort resolution.
+
 In `request-body` / `build-request`, resolve effort as:
 1. If `:effort-override` is present in options, use it directly mapped to the
-   provider string (`:xhigh` → `"highest"` for adaptive, `"high"` for extended).
-2. Otherwise use the level-derived mapping for the active Anthropic thinking
-   mode.  Adaptive-thinking models must use `thinking-level->effort-xhigh`, so
-   plain `thinking-level :xhigh` sends `"highest"` while `:high` sends `"high"`.
+   Anthropic effort string via `effort-override->effort`:
+   `{:low "low" :medium "medium" :high "high" :xhigh "highest"}`.
+   This mapping applies only to adaptive-thinking models; effort override is
+   silently inapplicable to extended-thinking models because they use
+   `budget_tokens`, not `output_config.effort`.
+2. Otherwise use the level-derived `thinking-level->effort` table (now
+   xhigh-aware).  Adaptive-thinking models send `"highest"` for
+   `thinking-level :xhigh` and `"high"` for `:high`.
    Extended-thinking models keep their existing budget-based distinction and do
    not send adaptive `output_config.effort`.
 
