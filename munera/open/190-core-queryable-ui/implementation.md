@@ -246,3 +246,7 @@ No newly added unchecked inconsistency follow-up items were present in `design-s
 ## 2026-05-30 design ambiguity review
 
 No new actionable ambiguity feedback after re-reading `design.md`, `design-decisions.md`, `resolved-design-questions.md`, referenced extension docs (`doc/extensions.md`, `doc/extension-api.md`, `doc/architecture.md`), and current UI/query/runtime seams. The design remains sufficiently specific for implementation planning on provider lookup/lifetime, single-active UI semantics, unavailable/provider-error normalization, available-only actions, capability/action coherence, invocation-kind schemas, descriptor/request correlation, constrained/optional side-effecting invocation, UI-type compatibility, and console/headless classification. No `design-steps.md` items were added because there is no new ambiguity feedback.
+
+## 2026-05-30 ambiguity follow-up execution
+
+No newly added unchecked ambiguity follow-up items were present in `design-steps.md`; all ambiguity design steps remain complete. No `design.md` change was needed, no design step was left blocked, and `plan.md` / `steps.md` were not touched.
