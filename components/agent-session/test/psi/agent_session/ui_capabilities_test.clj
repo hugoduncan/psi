@@ -17,6 +17,18 @@
   [opts]
   (session/create-context (test-support/safe-context-opts (assoc opts :persist? false))))
 
+(defn- valid-provider-result
+  [invocation]
+  {:psi.ui/type :test-ui
+   :psi.ui/available? true
+   :psi.ui/capabilities [:psi.ui.capability/make-visible]
+   :psi.ui/actions [(ui-capabilities/make-visible-action invocation)]})
+
+(defn- provider-error?
+  [result]
+  (= :psi.ui.unavailable.reason/provider-error
+     (get-in result [:psi.ui/make-visible-action :psi.ui.action/unavailable-reason])))
+
 (deftest missing-provider-query-behaviour-test
   ;; Tests that headless/missing-provider UI queries return explicit unavailable data.
   (let [ctx (create-ctx {})
@@ -57,28 +69,128 @@
     (is (= :psi.ui.unavailable.reason/unsupported-capability
            (get-in result [:psi.ui/make-visible-action :psi.ui.action/unavailable-reason])))))
 
+(deftest provider-normalization-supported-make-visible-test
+  ;; Tests that supported make-visible provider data is exposed as capabilities
+  ;; plus available-only action descriptors.
+  (let [result (ui-capabilities/normalize-provider-result
+                (valid-provider-result {:psi.ui.invocation/kind :ui-event
+                                        :psi.ui.invocation/event :psi.ui/show-active
+                                        :psi.ui.invocation/payload {:source :test}}))
+        action (:psi.ui/make-visible-action result)]
+    (is (= :test-ui (:psi.ui/type result)))
+    (is (= true (:psi.ui/available? result)))
+    (is (= [:psi.ui.capability/make-visible] (:psi.ui/capabilities result)))
+    (is (= [action] (:psi.ui/actions result)))
+    (is (= {:psi.ui.invocation/kind :ui-event
+            :psi.ui.invocation/event :psi.ui/show-active
+            :psi.ui.invocation/payload {:source :test}}
+           (:psi.ui.action/invocation action)))
+    (is (nil? (:psi.ui/diagnostic result)))))
+
+(deftest provider-normalization-no-attached-ui-test
+  ;; Tests that an installed provider with no active UI returns no-attached semantics.
+  (let [result (ui-capabilities/normalize-provider-result
+                {:psi.ui/type :emacs
+                 :psi.ui/available? false
+                 :psi.ui/capabilities []
+                 :psi.ui/actions []})]
+    (is (= :emacs (:psi.ui/type result)))
+    (is (= false (:psi.ui/available? result)))
+    (is (= [] (:psi.ui/capabilities result)))
+    (is (= [] (:psi.ui/actions result)))
+    (is (= :psi.ui.unavailable.reason/no-attached-ui
+           (get-in result [:psi.ui/make-visible-action :psi.ui.action/unavailable-reason])))
+    (is (nil? (:psi.ui/diagnostic result)))))
+
+(deftest provider-normalization-unsupported-make-visible-test
+  ;; Tests that attached UI without make-visible support exposes only the
+  ;; stable unavailable convenience descriptor.
+  (let [result (ui-capabilities/normalize-provider-result
+                {:psi.ui/type :tui
+                 :psi.ui/available? true
+                 :psi.ui/capabilities []
+                 :psi.ui/actions []})]
+    (is (= :tui (:psi.ui/type result)))
+    (is (= true (:psi.ui/available? result)))
+    (is (= [] (:psi.ui/actions result)))
+    (is (= :psi.ui.unavailable.reason/unsupported-capability
+           (get-in result [:psi.ui/make-visible-action :psi.ui.action/unavailable-reason])))))
+
 (deftest provider-normalization-invalid-data-test
   ;; Tests that invalid provider output maps to provider-error unavailable data.
   (let [ctx (create-ctx {})]
     (ui-capabilities/install-provider!
      ctx
      (fn [_]
-       {:psi.ui/type :broken
-        :psi.ui/available? true
-        :psi.ui/capabilities [:psi.ui.capability/make-visible]
-        :psi.ui/actions [{:psi.ui.action/id :psi.ui.action/make-visible
-                          :psi.ui.action/capability :psi.ui.capability/make-visible
-                          :psi.ui.action/label "Show Psi UI"
-                          :psi.ui.action/description "Bring the active Psi UI to the foreground."
-                          :psi.ui.action/available? true
-                          :psi.ui.action/invocation {:psi.ui.invocation/kind :unknown}}]}))
+       (valid-provider-result {:psi.ui.invocation/kind :unknown})))
     (let [result (session/query-in ctx ui-query)]
       (is (= false (:psi.ui/available? result)))
       (is (= [] (:psi.ui/capabilities result)))
       (is (= [] (:psi.ui/actions result)))
-      (is (= :psi.ui.unavailable.reason/provider-error
-             (get-in result [:psi.ui/make-visible-action :psi.ui.action/unavailable-reason])))
+      (is (provider-error? result))
       (is (string? (:psi.ui/diagnostic result))))))
+
+(deftest provider-normalization-invocation-kind-test
+  ;; Tests the supported invocation-kind schemas without mocks.
+  (let [valid-invocations [{:psi.ui.invocation/kind :emacs-command
+                            :psi.ui.invocation/command "psi-emacs-show-active"}
+                           {:psi.ui.invocation/kind :ui-event
+                            :psi.ui.invocation/event :psi.ui/show-active
+                            :psi.ui.invocation/payload {:visible? true}}
+                           {:psi.ui.invocation/kind :bash-command
+                            :psi.ui.invocation/argv ["tmux" "switch-client" "-t" "psi"]
+                            :psi.ui.invocation/env {"TMUX" "/tmp/tmux"}}
+                           {:psi.ui.invocation/kind :mutation
+                            :psi.ui.invocation/mutation 'psi.ui/show-active
+                            :psi.ui.invocation/params {:visible? true}}]
+        invalid-invocations [{:psi.ui.invocation/kind :emacs-command
+                              :psi.ui.invocation/command ""}
+                             {:psi.ui.invocation/kind :ui-event
+                              :psi.ui.invocation/event :unqualified}
+                             {:psi.ui.invocation/kind :bash-command
+                              :psi.ui.invocation/argv ["tmux" ""]}
+                             {:psi.ui.invocation/kind :mutation
+                              :psi.ui.invocation/mutation 'show-active}
+                             {:psi.ui.invocation/kind :unknown}]]
+    (doseq [invocation valid-invocations]
+      (is (= true (:psi.ui/available?
+                   (ui-capabilities/normalize-provider-result
+                    (valid-provider-result invocation))))
+          (str "expected valid invocation: " (pr-str invocation))))
+    (doseq [invocation invalid-invocations]
+      (is (provider-error?
+           (ui-capabilities/normalize-provider-result
+            (valid-provider-result invocation)))
+          (str "expected provider error for malformed invocation: " (pr-str invocation))))))
+
+(deftest provider-normalization-duplicate-action-ids-test
+  ;; Tests that duplicate action ids are rejected rather than merged.
+  (let [action (ui-capabilities/make-visible-action
+                {:psi.ui.invocation/kind :emacs-command
+                 :psi.ui.invocation/command "psi-emacs-show-active"})]
+    (is (provider-error?
+         (ui-capabilities/normalize-provider-result
+          {:psi.ui/type :emacs
+           :psi.ui/available? true
+           :psi.ui/capabilities [:psi.ui.capability/make-visible]
+           :psi.ui/actions [action action]})))))
+
+(deftest provider-normalization-capability-action-coherence-test
+  ;; Tests that make-visible capability/action mismatches fail closed.
+  (is (provider-error?
+       (ui-capabilities/normalize-provider-result
+        {:psi.ui/type :emacs
+         :psi.ui/available? true
+         :psi.ui/capabilities [:psi.ui.capability/make-visible]
+         :psi.ui/actions []})))
+  (is (provider-error?
+       (ui-capabilities/normalize-provider-result
+        {:psi.ui/type :emacs
+         :psi.ui/available? true
+         :psi.ui/capabilities []
+         :psi.ui/actions [(ui-capabilities/make-visible-action
+                           {:psi.ui.invocation/kind :emacs-command
+                            :psi.ui.invocation/command "psi-emacs-show-active"})]}))))
 
 (deftest provider-exception-query-behaviour-test
   ;; Tests that provider exceptions do not drop requested UI attrs.

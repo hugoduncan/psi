@@ -67,7 +67,7 @@
 ## Slice 7 — Tests
 
 - [x] Add nullable tests for missing provider/headless UI query behaviour.
-- [ ] Add provider normalization tests for no-attached UI, unsupported make-visible, supported make-visible, provider exception, invalid invocation kind, malformed per-kind invocation, duplicate action ids, and capability/action incoherence.
+- [x] Add provider normalization tests for no-attached UI, unsupported make-visible, supported make-visible, provider exception, invalid invocation kind, malformed per-kind invocation, duplicate action ids, and capability/action incoherence.
 - [x] Add resolver discovery/index tests proving all new `:psi.ui/...` attrs are root-queryable/discoverable.
 - [x] Add extension-query tests proving extension code can query the UI attrs without requiring session-id input or extension permissions.
 - [x] Add Emacs provider tests proving the supported make-visible descriptor includes `:emacs-command` invocation with command `psi-emacs-show-active`.

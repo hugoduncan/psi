@@ -391,3 +391,13 @@ Verification:
 - `clojure -M:test --focus psi.agent-session.ui-capabilities-test --focus psi.agent-session.graph-surface-test` — 27 tests, 2332 assertions, 0 failures.
 - `clj-kondo --lint components/agent-session/src/psi/agent_session/ui_capabilities.clj components/agent-session/src/psi/agent_session/context.clj components/agent-session/src/psi/agent_session/resolvers/extensions.clj components/extension-test-helpers/src/psi/extension_test_helpers/nullable_api.clj components/agent-session/test/psi/agent_session/ui_capabilities_test.clj components/agent-session/test/psi/agent_session/graph_surface_test.clj` — clean.
 - `bb emacs:byte-compile` — clean.
+
+## 2026-05-30 provider-normalization test pass
+
+Expanded `psi.agent-session.ui-capabilities-test` to cover the remaining provider normalization cases from Slice 7: no-attached UI semantics, unsupported make-visible semantics, supported make-visible normalization, all supported invocation-kind schemas, malformed per-kind invocation data, duplicate action id rejection, and capability/action coherence failures. These tests assert normalized EQL-visible state and provider-error outcomes rather than provider interactions/mocks.
+
+Verification:
+
+- `clojure -M:test --focus psi.agent-session.ui-capabilities-test` — 11 tests, 57 assertions, 0 failures.
+- `clojure -M:test --focus psi.agent-session.ui-capabilities-test --focus psi.agent-session.graph-surface-test` — 33 tests, 2360 assertions, 0 failures.
+- `clj-kondo --lint components/agent-session/test/psi/agent_session/ui_capabilities_test.clj` — clean.
