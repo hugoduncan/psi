@@ -669,3 +669,7 @@ Applied `test-shaper` in a fresh pass and found no new actionable test-shaping i
 ## 2026-05-30 requested docs review pass
 
 No new actionable documentation feedback after applying `review-task-docs` to the task artifacts, implementation notes, `README.md`, `doc/extensions.md`, `doc/extension-api.md`, `doc/architecture.md`, `doc/graph-surface.md`, `CHANGELOG.md`, and follow-up task `191-ui-action-invocation`. The docs accurately describe the implemented queryable `:psi.ui/...` capability/action attrs, unavailable/provider-error semantics, UI-type compatibility role, and task-190 query/descriptor-only boundary; the changelog records the user-visible extension capability. No new `steps.md` item was added.
+
+## 2026-05-30 requested code-shaper review
+
+Found one new actionable code-shaping issue after applying `code-shaper` to the task artifacts, UI capability normalization code, resolver/provider lifecycle seams, tests, and docs: invocation validation now rejects unqualified/foreign keys, but still accepts arbitrary extra keys in the `:psi.ui.invocation/...` namespace. The per-kind invocation schemas are intended to be closed, locally comprehensible contracts; allowing undeclared same-namespace keys weakens the invariant and can expose serialisable adapter-local data or create ambiguous request construction. Add closed allowed-key validation per invocation kind and focused fail-closed coverage for extra same-namespace invocation keys.
