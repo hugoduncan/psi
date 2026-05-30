@@ -452,3 +452,14 @@ Verification:
 ## 2026-05-30 implementation review
 
 Found one new actionable implementation issue after re-reading task artifacts, implementation notes, UI capability/provider code, nullable extension API fixture, docs, and focused tests: the nullable extension API only recognizes the exact five-attr UI capability query without `:psi.ui/diagnostic`, while `doc/extension-api.md` recommends querying `:psi.ui/diagnostic` with the capability/action attrs and the real EQL surface exposes it. Extension tests that follow the documented query against `create-nullable-extension-api` currently get `{}` instead of the unsupported-console UI capability map. Add nullable API support and coverage for documented UI capability queries including diagnostics.
+
+
+## 2026-05-30 nullable UI diagnostic query follow-up
+
+Completed the newly added implementation-review follow-up for nullable extension API UI capability queries. `create-nullable-extension-api` now recognizes any non-empty query composed of the documented `:psi.ui/...` capability attrs, including `:psi.ui/diagnostic`, and returns the nullable attached-console unsupported-make-visible map with `:psi.ui/diagnostic nil` instead of `{}`. Added nullable API coverage for the documented query shape and added the extension-test-helpers test path to the project test configuration so this fixture coverage runs under Kaocha.
+
+Verification:
+
+- `clojure -M:test --focus psi.extension-test-helpers.nullable-api-test` — 3 tests, 6 assertions, 0 failures.
+- `clojure -M:test --focus psi.agent-session.extensions-service-protocol-api-test --focus psi.agent-session.extensions-post-tool-api-test --focus psi.extension-test-helpers.nullable-api-test` — 6 tests, 11 assertions, 0 failures.
+- `clj-kondo --lint deps.edn tests.edn components/extension-test-helpers/src/psi/extension_test_helpers/nullable_api.clj components/extension-test-helpers/test/psi/extension_test_helpers/nullable_api_test.clj` — clean.

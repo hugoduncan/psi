@@ -88,4 +88,4 @@
 - [x] Run broader verification required by project convention if focused changes touch shared runtime/query seams.
 - [x] Re-read changed plan, steps, docs, tests, and code for coherence with `design.md` acceptance criteria.
 - [x] Add provider-error diagnostic redaction before exposing `:psi.ui/diagnostic`: redact stack traces, frontend object printed forms, tokens/secrets, secret-bearing paths/data, and arbitrary exception data; add focused tests proving bounded redacted output.
-- [ ] Update `create-nullable-extension-api` so documented UI capability queries that include `:psi.ui/diagnostic` return the nullable unsupported-console UI capability map, and add coverage for that query shape.
+- [x] Update `create-nullable-extension-api` so documented UI capability queries that include `:psi.ui/diagnostic` return the nullable unsupported-console UI capability map, and add coverage for that query shape.
