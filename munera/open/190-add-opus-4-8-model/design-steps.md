@@ -23,3 +23,11 @@
 - [ ] **Remove remaining `:xhigh` fallback wording** — Update the Part 3 effort table so Anthropic adaptive `:xhigh` unambiguously maps to `"highest"` with no fallback/warning in this slice, matching the architecture section.
 
 - [ ] **Resolve mid-system placement versus next-request inclusion** — Make the Anthropic placement rule, dispatch insertion point, provider validation, and acceptance criteria agree. In particular, specify whether an injected mid-system message may be final in the next generation request; if not, design how it is retained until a valid non-final position exists instead of being dropped.
+
+## From ambiguity review pass 2026-05-30
+
+- [ ] **Decide `/effort` behaviour for OpenAI Codex/responses** — Specify whether `/effort` and `:effort-override` affect OpenAI Codex/responses models. If yes, add Codex request shaping/tests; if no, document the exclusion and ensure acceptance criteria only cover supported OpenAI transports.
+
+- [ ] **Define invalid-placement handling for mid-system injection** — Specify what `:session/inject-mid-system-message` / `inject-mid-system-message!` returns and stores when called before any user turn, after an assistant turn, or after another pending mid-system entry. Choose reject, queue, or append-and-drop-later semantics.
+
+- [ ] **Clarify compaction lifetime of pre-cut mid-system entries** — Decide whether mid-system instructions before the compaction cut point remain active after compaction. If they do, specify the preservation mechanism; if they do not, state that compaction expires them.

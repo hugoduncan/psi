@@ -46,3 +46,15 @@ Decisions recorded:
 2. **`:xhigh` fallback contradiction remains in the effort table** — The Part 3 effort table still says Anthropic adaptive `:xhigh` maps to `"highest"` “when supported; else `"high"` with warning”, while the architecture section later says psi always sends `"highest"` with no transparent retry/fallback and provider 400s surface as-is. The earlier checked follow-up did not fully remove the contradictory table text.
 
 3. **Anthropic mid-system placement rules contradict validation/acceptance** — The background says inline system messages may not appear immediately after an assistant message and may not be the last message, but provider validation only drops final or consecutive system messages, and the acceptance criterion requires the next prepared Anthropic request to include the injected system message. If `inject-mid-system-message!` appends after the latest user turn before the next assistant response, that system message is final in the request and would be dropped by the stated validation rule.
+
+---
+
+## Design ambiguity review pass — 2026-05-30
+
+**New actionable ambiguities found:**
+
+1. **`/effort` scope for OpenAI Codex/responses models** — The goal says `/effort` directly controls the provider reasoning-effort string, and `codex_responses.clj` currently has its own effort request shaping, but Part 3 only specifies OpenAI chat-completions `reasoning.clj` behaviour and acceptance. Decide whether `/effort` applies to OpenAI Codex/responses models; if yes, specify the request shaping and tests, and if no, document that exclusion.
+
+2. **Invalid-time `inject-mid-system-message!` behaviour** — The design now allows final inline system messages after a user turn, but does not define what happens if an extension injects after an assistant turn, before any user turn, or after another pending mid-system entry. Provider validation would later drop the message while the extension API may already have returned `{:ok true}`. Decide whether the dispatch handler rejects these placements, queues until a valid user turn, or appends and accepts later provider drop.
+
+3. **Compaction lifetime for older `:mid-system` instructions** — Part 4 says mid-system messages are instructions that remain valid for the remainder of the session, but the concrete preservation rule only carries forward `:mid-system` entries after the compaction cut point. Decide whether pre-cut mid-system instructions remain active after compaction; if yes, specify how they are preserved outside summarization, and if no, state that compaction intentionally expires them.
