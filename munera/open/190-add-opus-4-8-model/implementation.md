@@ -1074,3 +1074,17 @@ Pre-existing uncommitted modifications in `components/agent-session/test/psi/age
 ## Design ambiguity review pass — 2026-05-30 (final plan/steps verification)
 
 No new actionable ambiguities found. Re-read `plan.md`, `steps.md`, `design-steps.md`, and recent `implementation.md` notes, then checked representative referenced code/tests/docs for Opus 4.8, `/speed`, `/effort`, mid-system injection, provider shaping, shared-config startup, compaction replay, docs/changelog, and final verification evidence. The plan and steps remain unambiguous: five vertical slices, Slice 5 owns documentation/changelog and broad verification, all listed steps are checked, and all existing ambiguity follow-ups in `design-steps.md` are checked. No duplicate `design-steps.md` item was added. Pre-existing uncommitted edits in `components/agent-session/test/psi/agent_session/commands_test.clj` and `components/ai/test/psi/ai/providers/openai_test.clj` were not touched.
+
+---
+
+## Ambiguity follow-up execution — 2026-05-30 (final unchecked-item pass)
+
+Read `design-steps.md` for unchecked ambiguity follow-up items added by the preceding ambiguity-review pass. No unchecked ambiguity design-step items were present (`unchecked count 0`), so there were no newly actionable ambiguity follow-ups to execute. No `design.md`, `plan.md`, or `steps.md` changes were required. Pre-existing uncommitted edits in `components/agent-session/test/psi/agent_session/commands_test.clj` and `components/ai/test/psi/ai/providers/openai_test.clj` were left untouched.
+
+---
+
+## Test review pass — 2026-05-30
+
+Actionable test feedback found:
+
+1. **Scoped `/speed` and `/effort` tests do not prove persistence writes** — The design requires project/user scoped updates to persist `:speed-mode` and `:effort-override`, but the current focused command coverage only checks result text and current session state. Existing shared-config/startup tests prove reads, not that `/speed ... project|user` or `/effort ... project|user` write the expected project/user config keys. Add mutation/command tests that assert scoped persistence output for project and user scopes, including explicit `:normal` and nil clear masks.

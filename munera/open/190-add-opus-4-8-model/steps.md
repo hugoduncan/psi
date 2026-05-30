@@ -100,3 +100,7 @@
 - [x] Run targeted `clj-kondo` on modified source/test paths.
 - [x] Run `bb test` and confirm the full suite is green.
 - [x] Append implementation notes with key decisions, verification commands, and any provider/API caveats discovered during implementation.
+
+## Test review follow-ups
+
+- [ ] Add scoped `/speed` and `/effort` persistence tests proving project/user scoped commands or session mutations write the expected config keys, including `/speed normal project|user` explicit `:normal` masks and `/effort none project|user` explicit nil masks.
