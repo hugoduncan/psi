@@ -749,3 +749,9 @@ Read `design-steps.md` for unchecked ambiguity follow-up items added by the prec
 ## Design inconsistency review pass — 2026-05-30 (plan/steps no-new-actionable)
 
 No new actionable inconsistencies found. Re-read `plan.md`, `steps.md`, `design-steps.md`, and recent `implementation.md` notes, then checked `design.md` for the plan/steps-owned execution structure and acceptance surfaces. The task files remain consistent: five vertical slices, Slice 5 owns README/`doc/`/changelog and broad verification, Slice 2/3 cover session-transient speed/effort semantics, and Slice 4 covers mid-system projection/provider/extension/compaction work. Existing inconsistency follow-ups in `design-steps.md` are checked; no duplicate follow-up items were added.
+
+---
+
+## Inconsistency follow-up execution — 2026-05-30 (no-new-actionable pass)
+
+Read `design-steps.md` for unchecked inconsistency follow-up items added by the preceding inconsistency-review pass. No unchecked design-step items were present (`unchecked count 0`), so there were no newly actionable follow-ups to execute. No `design.md`, `plan.md`, or `steps.md` changes were required.
