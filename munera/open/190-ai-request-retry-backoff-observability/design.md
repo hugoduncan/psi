@@ -144,6 +144,22 @@ If retry is intended to cover both streaming and non-streaming request execution
 
 If one path already has working retry and the other does not, the task should align behavior where practical rather than leaving a silent discrepancy.
 
+### Partial streaming output across retry attempts
+
+For streaming provider execution, each provider execution attempt has attempt-local streamed output state until that attempt succeeds. Text deltas, thinking deltas, tool-call deltas, and other assistant-output fragments emitted by a streaming attempt that later fails with a retryable provider/request error must not be committed to the canonical transcript or merged into the successful retry response. A successful later retry owns the final assistant message content for the prepared provider request.
+
+Failed-attempt partial streaming output may be surfaced only as transient in-progress UI/progress while the attempt is active and may be retained in telemetry/debug captures with its `provider-request-id`, `:retry-attempt`, and unique `:attempt-id` for diagnosis. When the attempt is classified as retryable and a retry is scheduled, any transient live-progress buffer for that failed attempt must be cleared, superseded, or explicitly marked failed-attempt-local before the next provider execution attempt starts. The next attempt must start with fresh stream accumulation state.
+
+Canonical transcript/message state must observe these rules:
+
+- failed-attempt partial text/thinking/tool-call deltas are discarded from canonical message assembly when retrying;
+- a later successful retry must not duplicate partial output from an earlier failed attempt;
+- tool calls from a failed streaming attempt must not be executed unless the attempt has reached the existing normal completed-assistant-message/tool-call handoff point;
+- if all retry attempts fail or retry is cancelled, the final transcript/error surface may describe the failure and retry outcome, but it must not present failed-attempt partial assistant content as a completed assistant response;
+- debug/telemetry retention of partial fragments is allowed only when clearly keyed as attempt-local diagnostic data, not as canonical conversation content.
+
+Focused coverage should include a streaming retry case where the first attempt emits partial output and then fails retryably, and the succeeding retry produces the final response without mixing or duplicating the first attempt's partial output.
+
 ## Architectural intent
 
 Retry/backoff should live at the provider request execution boundary, not in higher workflow or UI code.
