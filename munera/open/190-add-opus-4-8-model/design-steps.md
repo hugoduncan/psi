@@ -115,3 +115,7 @@
 ## From inconsistency review pass 2026-05-30 (compaction placement verification)
 
 - [x] **Align compaction mid-system preservation with latest-user placement** — The design says Anthropic-safe mid-system messages are attached to the most recent user turn before the next assistant generation, but compaction currently coalesces pre-cut active mid-system instructions after the synthetic summary user and then carries retained post-cut history normally. If retained history starts with a user, the sequence becomes `summary user → system → retained user`, violating the latest-user tail placement contract. Specify whether this sequence is intentionally valid, whether the coalesced instruction should be reattached to the latest retained user before generation, or whether compaction should choose/merge cut boundaries to preserve the invariant.
+
+## From ambiguity review pass 2026-05-30 (compaction acceptance verification)
+
+- [ ] **Align compaction acceptance criterion with conditional attachment rule** — Part 4 step 11 conditionally attaches preserved pre-cut `:mid-system` instructions after the summary user or after the first retained user, but the acceptance criterion still only says "coalesced after the summary user turn". Update the acceptance criterion/tests to require both conditional cases, or simplify the detailed compaction rule so acceptance has one unambiguous attachment point.

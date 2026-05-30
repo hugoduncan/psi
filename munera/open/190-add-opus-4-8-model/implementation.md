@@ -450,3 +450,11 @@ Completed the newly added inconsistency follow-up item in `design-steps.md` by r
 - Compaction now preserves active pre-cut `:mid-system` instructions by attaching the coalesced instruction to the first valid user boundary after compaction.
 - If retained post-cut history begins with a user turn, the coalesced instruction is reattached immediately after that retained user instead of after the synthetic summary user, avoiding `summary user → system → retained user`.
 - If retained boundary `:mid-system` entries are present, they merge into the same coalesced entry and move with the chosen attachment point, preserving order and avoiding consecutive system messages.
+
+---
+
+## Design ambiguity review pass — 2026-05-30 (compaction acceptance verification)
+
+**New actionable ambiguity found:**
+
+1. **Compaction acceptance criterion still states only summary-user attachment** — Part 4 step 11 now has a conditional compaction rule: pre-cut active `:mid-system` instructions attach after the summary user only when retained history does not begin with a user, but reattach after the first retained user when retained history starts with a user. The Part 4 acceptance criterion still says compaction preserves pre-cut active mid-system instructions "coalesced after the summary user turn". Decide whether acceptance/tests must cover both conditional attachment cases, or whether the detailed rule should be simplified back to unconditional summary-user attachment.
