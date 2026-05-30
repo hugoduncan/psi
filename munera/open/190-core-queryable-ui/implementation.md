@@ -170,3 +170,7 @@ No newly added unchecked inconsistency follow-up items remained in `design-steps
 ## 2026-05-30 design ambiguity review
 
 No new actionable ambiguity feedback after re-reading `design.md`, referenced task design artifacts/docs, and current UI/query/frontend seams. The design remains clear on provider ownership/lifetime, runtime-scoped query semantics, unsupported/error semantics, capability/action coherence, descriptor/request boundaries, invocation schemas, permission constraints, legacy UI-type compatibility, and console/headless classification.
+
+## 2026-05-30 ambiguity follow-up execution
+
+No newly added unchecked ambiguity follow-up items were present in `design-steps.md`; all ambiguity design steps are already complete. No `design.md` change was needed, and no ambiguity follow-up item remains blocked.
