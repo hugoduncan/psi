@@ -383,3 +383,12 @@ Decision: option (b) with a display correction — keep the resolver provider-ag
 1. **Codex/responses effort override mechanism doesn't match actual code path** — Part 3 step 6 says "Update `reasoning-effort` to accept an optional `:effort-override` from options" and "Codex/responses request shaping must use the same mapping instead of reading `thinking-level->effort` directly." But `codex_responses.clj/codex-reasoning` reads `reasoning/thinking-level->effort` directly via `(get reasoning/thinking-level->effort ...)` — it does NOT call `reasoning/reasoning-effort`. Updating `reasoning-effort` alone won't fix Codex because Codex doesn't call that function. The design must specify that `codex-reasoning` is changed to call the updated `reasoning-effort` (or an equivalent shared function incorporating the effort override) rather than reading the map directly.
 
 2. **`/speed fast` provider-semantics paragraph is misplaced in Part 3** — The paragraph defining the canonical user-facing meaning of `/speed fast` ("use the provider's non-default alternate throughput tier") and noting the Anthropic/OpenAI semantic difference appears in Part 3 (effort section, between the effort table and effort override description), not in Part 2 (speed section). Part 2 describes the speed command, architecture, and acceptance criteria but never defines the canonical semantics or addresses the provider asymmetry. An implementor reading Part 2 alone lacks the semantic definition for the feature.
+
+---
+
+## Inconsistency follow-up — 2026-05-30 (independent)
+
+Completed the two newly added inconsistency follow-up items in `design-steps.md` by refining `design.md`:
+
+- Part 3 step 6 now explicitly specifies that `codex-reasoning` must be changed to call the updated `reasoning-effort` function (or equivalent shared function incorporating effort override) rather than reading `reasoning/thinking-level->effort` directly, so the effort override actually reaches the Codex request path.
+- The `/speed fast` provider-semantics paragraph (canonical user-facing meaning and Anthropic/OpenAI mapping difference) is now in Part 2 after the speed mode values table, making Part 2 self-contained. The duplicate in Part 3 has been removed.

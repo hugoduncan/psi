@@ -115,6 +115,13 @@ per-session **speed mode** that maps onto each provider's native parameter.
 
 `:normal` is the default (session starts with no speed override).
 
+The canonical user-facing meaning of `/speed fast` is **use the provider's
+non-default alternate throughput tier** rather than a strict global promise of
+"faster".  Help text and docs should note the concrete provider mapping:
+Anthropic `fast` means higher throughput at premium pricing, while OpenAI
+chat-completions `fast` maps to `service_tier: "flex"`, which is a
+lower-priority / cheaper tier rather than a latency upgrade.
+
 ### Architecture — full stack
 
 The speed mode follows the exact same path as `thinking-level`:
@@ -318,13 +325,6 @@ The effort override is **only applied when thinking is enabled** (i.e.
 `thinking-level` ≠ `:off`).  When thinking is off the effort parameter is
 irrelevant and is not sent.
 
-For provider asymmetry, the user-facing meaning of `/speed fast` is **use the
-provider's non-default alternate throughput tier** rather than a strict global
-promise of "faster". Help text and docs should note the concrete provider
-mapping: Anthropic `fast` means higher throughput at premium pricing, while
-OpenAI chat-completions `fast` maps to `service_tier: "flex"`, which is a
-lower-priority / cheaper tier rather than a latency upgrade.
-
 The effort override is separate from `thinking-level`: setting `/effort xhigh`
 does not change the thinking level; it overrides what effort value is sent for
 the current level.  When no effort override is set, the provider still derives
@@ -410,10 +410,17 @@ must not reject `"highest"` before the HTTP request is attempted.
 Update `reasoning-effort` to accept an optional `:effort-override` from
 options.  When present, map it: `:xhigh` → `"high"` (API ceiling); others
 pass through directly.  When absent, use the existing `thinking-level->effort`
-table.  Codex/responses request shaping must use the same mapping instead of
-reading `thinking-level->effort` directly, so `/effort xhigh` produces
-`{"reasoning": {"effort": "high", "summary": "auto"}}` for Codex models
-when thinking is enabled.
+table.
+
+`codex_responses.clj/codex-reasoning` currently reads
+`reasoning/thinking-level->effort` directly via
+`(get reasoning/thinking-level->effort ...)` and does NOT call
+`reasoning/reasoning-effort`.  Change `codex-reasoning` to call the updated
+`reasoning-effort` function (or an equivalent shared function incorporating the
+effort override) rather than reading the map directly, so the effort override
+actually reaches the Codex request path.  After this change, `/effort xhigh`
+produces `{"reasoning": {"effort": "high", "summary": "auto"}}` for Codex
+models when thinking is enabled.
 
 The override is still omitted from both OpenAI transports when thinking is off.
 
