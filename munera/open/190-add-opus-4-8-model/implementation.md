@@ -572,3 +572,9 @@ No new actionable inconsistencies found. Re-read `design.md` and checked referen
 ## Inconsistency follow-up execution — 2026-05-30 (post-final verification no-op)
 
 Read `design-steps.md` for newly added unchecked inconsistency follow-up items after the preceding inconsistency-review pass. No unchecked design-step items were present; all inconsistency follow-ups are already marked complete. No `design.md` changes were required. `plan.md` and `steps.md` were not touched.
+
+---
+
+## Design ambiguity review pass — 2026-05-30 (post-final independent verification)
+
+No new actionable ambiguities found. Re-read `design.md` and checked referenced shared-config resolution, prompt request projection/current-user replacement, Anthropic/OpenAI request shaping surfaces, extension mutation bridge, model capability rules, and compaction placement rules. Existing ambiguity follow-ups in `design-steps.md` are already checked; no duplicate follow-up items were added.
