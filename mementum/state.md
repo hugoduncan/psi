@@ -15,7 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
-- 2026-05-30: Task 190 design ambiguity follow-up execution completed as a blocked/no-op after the latest ambiguity-review pass: `design-steps.md` is absent, so there were no newly added unchecked ambiguity items to execute or mark done. Recorded in `implementation.md` and committed `1c836805`. Earlier ambiguity review passes found no actionable design ambiguities.
+- 2026-05-30: Task 190 design ambiguity follow-up execution completed as a blocked/no-op after the latest ambiguity-review pass: `design-steps.md` is absent, so there were no newly added unchecked ambiguity items to execute or mark done. Recorded in `implementation.md`; earlier ambiguity review passes found no actionable design ambiguities.
 - Registry unification arc through task 177 is complete in implementation/review terms:
   - 164: registry semantics audit is the migration-rules source of truth and now includes post-migration guidance from 169–173
   - 165: root-registry target architecture captured
