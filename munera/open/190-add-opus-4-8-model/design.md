@@ -15,15 +15,29 @@ Anthropic models follow the established pattern:
 - Add the key to `anthropic-json-schema-native-model-keys` if the model
   supports native JSON Schema structured output (all Anthropic models from
   4.5 onward do).
-- Add `adaptive-thinking true` if the model uses the adaptive thinking API
+- Add `:adaptive-thinking true` if the model uses the adaptive thinking API
   (introduced with Opus 4.7).
 
 Opus 4.8 is the next Opus model after 4.7.  It uses the same adaptive-thinking
 API protocol and the same Anthropic Messages API transport.
 
+## Anthropic Models API
+
+Anthropic exposes a models endpoint documented at
+https://docs.anthropic.com/en/api/models:
+
+- `GET /v1/models` — lists all available models for the authenticated key.
+- `GET /v1/models/{model_id}` — retrieves a single model by ID.
+
+Both endpoints require the standard `x-api-key` and `anthropic-version` headers.
+The `GET /v1/models/claude-opus-4-8` response is the authoritative source for
+the model's `id`, `display_name`, and `created_at` fields.  Pricing and
+capability flags (context window, max tokens, adaptive-thinking) are not
+returned by the API and must be sourced from Anthropic's published documentation.
+
 ## Scope
 
-Single file change in `components/ai/src/psi/ai/models.clj`:
+Changes in `components/ai/src/psi/ai/models.clj`:
 
 1. Add `:opus-4.8` entry to `anthropic-models`.
 2. Add `:opus-4.8` to `anthropic-json-schema-native-model-keys`.
@@ -31,6 +45,18 @@ Single file change in `components/ai/src/psi/ai/models.clj`:
 No provider-layer changes are needed: the `adaptive-thinking?` predicate in
 `providers/anthropic.clj` already dispatches on the `:adaptive-thinking` flag,
 so the new model inherits correct request shaping automatically.
+
+New gated test file `components/ai/test/psi/ai/providers/anthropic_models_api_test.clj`:
+
+3. `^:integration` test gated on `PSI_LIVE_ANTHROPIC_MODELS_API=1` and
+   `ANTHROPIC_API_KEY` that calls `GET /v1/models` and asserts
+   `"claude-opus-4-8"` appears in the response.
+4. `^:integration` test that calls `GET /v1/models/claude-opus-4-8` and
+   asserts the response `id` field equals `"claude-opus-4-8"`.
+
+Both tests skip gracefully (pass with a skip message) when the env-var gate or
+API key is absent, following the same pattern as
+`anthropic_live_structured_output_test.clj`.
 
 ## Model attributes
 
@@ -63,5 +89,11 @@ official pricing for 4.8.
 - The model appears in `(psi.ai.model-registry/models-for-provider :anthropic)`.
 - `psi.ai.models/anthropic-json-schema-native-model-keys` contains `:opus-4.8`.
 - Existing model tests remain green (`bb test`).
-- A focused test confirms the new model entry and its structured-output
+- A focused unit test confirms the new model entry and its structured-output
   capability annotation.
+- A gated `^:integration` test (env `PSI_LIVE_ANTHROPIC_MODELS_API=1` +
+  `ANTHROPIC_API_KEY`) calls `GET /v1/models` and asserts `"claude-opus-4-8"`
+  is present in the response.
+- A gated `^:integration` test calls `GET /v1/models/claude-opus-4-8` and
+  asserts the response `id` equals `"claude-opus-4-8"`.
+- Both gated tests skip gracefully when the gate or key is absent.
