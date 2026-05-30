@@ -1088,3 +1088,9 @@ Read `design-steps.md` for unchecked ambiguity follow-up items added by the prec
 Actionable test feedback found:
 
 1. **Scoped `/speed` and `/effort` tests do not prove persistence writes** — The design requires project/user scoped updates to persist `:speed-mode` and `:effort-override`, but the current focused command coverage only checks result text and current session state. Existing shared-config/startup tests prove reads, not that `/speed ... project|user` or `/effort ... project|user` write the expected project/user config keys. Add mutation/command tests that assert scoped persistence output for project and user scopes, including explicit `:normal` and nil clear masks.
+
+---
+
+## Design inconsistency review pass — 2026-05-30 (plan/steps final no-new-actionable)
+
+No new actionable inconsistencies found. Re-read `plan.md`, `steps.md`, `design-steps.md`, and latest `implementation.md` notes, then checked referenced task surfaces for Opus 4.8, `/speed`, `/effort`, mid-system injection, docs/changelog ownership, final verification evidence, and the existing test-review follow-up. The only unchecked task item is the already-recorded test-review follow-up in `steps.md`; it is not a new plan/steps inconsistency and was not duplicated in `design-steps.md`. Pre-existing uncommitted edits in `components/agent-session/test/psi/agent_session/commands_test.clj` and `components/ai/test/psi/ai/providers/openai_test.clj` were left untouched.
