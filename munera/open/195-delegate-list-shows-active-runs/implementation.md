@@ -15,3 +15,5 @@
 
 
 2026-05-30 inconsistency follow-up: clarified `delegate remove` for active/non-terminal listed runs. A successful remove must delete the canonical workflow run and also cancel, remove, mark terminal, or equivalently hide the same-session delegate background job so later `delegate list` cannot encounter a non-terminal job pointing at the removed canonical run. If cleanup cannot be performed, remove should fail actionably and leave the run visible/manageable. Marked the design-step complete.
+
+2026-05-30 design ambiguity review: found one new actionable ambiguity in the delegate-list read path. The design makes same-session delegate background jobs the authoritative visibility/ownership marker and reserves empty lists for true no-visible-run cases, but it does not explicitly state what `delegate list` should do when the background-job registry/query surface is unavailable, missing, or unreadable while canonical workflow runs may exist. This should be an actionable tool error rather than being treated as an empty background-job set.
