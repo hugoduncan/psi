@@ -81,3 +81,7 @@ Completed the newly added model-ownership wording follow-up in `design.md`: the 
 ## 2026-05-30 design ambiguity review
 
 Found one new actionable ambiguity after re-reading `design.md` against runtime/RPC/TUI attachment seams: the provider contract says an optional provider lives in runtime context, but adapter-local UI attachment/focus state is created and owned outside the agent-session ctx (RPC connection state after ctx creation, TUI UI state), so the design does not define the provider installation/lifetime/update path that makes the single active UI provider accurately reflect attached/detached frontend state.
+
+## 2026-05-30 ambiguity follow-up
+
+Completed the newly added provider installation/lifetime follow-up in `design.md`: adapter/runtime wiring owns late installation/replacement of the runtime-context UI capability provider, providers are looked up at query time rather than captured at ctx creation, RPC/Emacs and TUI update/clear the provider as UI attachment state appears or disappears, detach/shutdown maps to no-provider or no-attached-UI semantics, and a single active-provider slot/handoff enforces the single-active-UI rule for this slice.
