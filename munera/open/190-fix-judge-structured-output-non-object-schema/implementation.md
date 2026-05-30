@@ -25,3 +25,5 @@
 2026-05-30 — Inconsistency follow-up: reconciled native-only wording with referenced provider code. `design.md` now states that the three provider structured-output extraction sites are shared seams and non-object `:payload` preservation applies to both provider-native and prompted-JSON structured-output results emitted by those sites. Marked the design-step complete.
 
 2026-05-30 — Design ambiguity review: re-read current design after shared provider extraction seam clarification plus referenced provider extraction, structured-output envelope, schema, and workflow-judge retry code. No new actionable ambiguities found; existing ambiguity follow-ups remain resolved and `design-steps.md` needs no new unchecked items.
+
+2026-05-30 — Ambiguity follow-up execution: re-read `design-steps.md` after the preceding ambiguity-review pass. No newly added unchecked ambiguity follow-up items are present; no `design.md` changes were needed and no blocking ambiguity follow-up remains.
