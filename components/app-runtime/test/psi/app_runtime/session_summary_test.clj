@@ -50,7 +50,7 @@
                                                                                                         :reset-at (+ now-ms 32000)}})))
           model     (summary/session-summary ctx sid)
           status    (:status-session-line model)]
-      (is (re-find (re-pattern (str "^session: " sid " phase:idle streaming:no compacting:no pending:0 retry:0"))
+      (is (re-find (re-pattern (str "^session: " sid " phase:retrying streaming:no compacting:no pending:0 retry:0"))
                    status))
       (is (re-find #"retrying-in:[78]s" status))
       (is (re-find #"source:retry-after" status))

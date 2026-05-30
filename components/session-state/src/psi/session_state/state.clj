@@ -56,6 +56,7 @@
    :tool-lifecycle-events    #(session-telemetry-path % :tool-lifecycle-events)
    :provider-requests        #(session-telemetry-path % :provider-requests)
    :provider-replies         #(session-telemetry-path % :provider-replies)
+   :provider-events          #(session-telemetry-path % :provider-events)
    :journal                  session-journal-path
    :flush-state              session-flush-state-path
    :turn-ctx                 session-turn-ctx-path
@@ -160,8 +161,11 @@
   (sp/get-working-memory (::sc/working-memory-store sc-env) sc-env session-id))
 
 (defn sc-phase-in [ctx session-id]
-  (when-let [wm (sc-working-memory (:sc-env ctx) (sc-session-id-in ctx session-id))]
-    (first (::sc/configuration wm))))
+  (let [session-data (get-session-data-in ctx session-id)]
+    (if (:retry session-data)
+      :retrying
+      (when-let [wm (sc-working-memory (:sc-env ctx) (sc-session-id-in ctx session-id))]
+        (first (::sc/configuration wm))))))
 
 (defn idle-in? [ctx session-id]
   (= :idle (sc-phase-in ctx session-id)))

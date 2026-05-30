@@ -7,6 +7,7 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 ## [Unreleased]
 
 ### Added
+- Provider retry/backoff history is now queryable through the live graph, including retry counts, retried provider request summaries, attempt error classification, delay source, resume timing, and rate-limit metadata.
 - OpenAI OAuth-backed ChatGPT/Codex sessions now support provider-native structured outputs for streaming requests using Responses-style `text.format` JSON Schema, while remaining distinct from Chat Completions `response_format`.
 - New `review-task-design` workflow: reviews `design.md` only for ambiguities and inconsistencies, loops until no actionable feedback remains. Invokable via `/delegate review-task-design`.
 - New `create-task-plan` workflow: given a stable `design.md`, creates `plan.md` and `steps.md` for a Munera task in a single pass. Invokable via `/delegate create-task-plan`.
@@ -22,6 +23,7 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 - Workflow runs now automatically retain only the newest retained terminal runs per originating session, defaulting to `1` kept run via `[:config :completed-workflow-run-retention-count]`; older retained terminal runs are removed from workflow listing/introspection along with their linked workflow-owned child-session trees.
 
 ### Fixed
+- AI provider request retries now happen at the prepared provider-request boundary for transient request/connection failures, preserving visible active backoff status, per-attempt provider telemetry, structured retry-exhausted/disabled/cancelled/non-retryable outcomes, retry-header delay handling, and streaming retry isolation without rerunning local tools.
 - `review-step` now routes review completion deterministically from the review actor's `PASS_STATUS:` line, so `PASS_STATUS: REVIEW_COMPLETE` stops without running no-op follow-up work and actionable feedback loops back through deterministic `follow-up` routing instead of an LLM/session status step.
 - OpenAI OAuth-backed `gpt-5.5` sessions now route through the ChatGPT/Codex transport, matching Codex account access instead of failing against the platform chat-completions quota path.
 

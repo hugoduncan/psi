@@ -2,6 +2,7 @@
   (:require
    [clojure.set :as set]
    [com.wsscode.pathom3.connect.operation :as pco]
+   [psi.agent-session.resolvers.provider-retries :as provider-retries]
    [psi.agent-session.resolvers.support :as support]
    [psi.agent-session.resolvers.telemetry-basics :as basics]
    [psi.session-state.state :as session]
@@ -768,16 +769,17 @@
      :psi.turn/is-error             false}))
 (def resolvers
   (into basics/resolvers
-        [agent-session-canonical-telemetry
-         agent-session-stats
-         agent-session-tool-call-attempts
-         agent-session-tool-lifecycle-events
-         tool-lifecycle-summary-by-tool-id
-         agent-session-provider-captures
-         provider-request-by-turn-id
-         provider-reply-by-turn-id
-         api-error-list
-         api-error-detail
-         api-error-request-shape
-         current-request-shape
-         agent-session-turn]))
+        (concat [agent-session-canonical-telemetry
+                 agent-session-stats
+                 agent-session-tool-call-attempts
+                 agent-session-tool-lifecycle-events
+                 tool-lifecycle-summary-by-tool-id
+                 agent-session-provider-captures]
+                provider-retries/resolvers
+                [provider-request-by-turn-id
+                 provider-reply-by-turn-id
+                 api-error-list
+                 api-error-detail
+                 api-error-request-shape
+                 current-request-shape
+                 agent-session-turn])))

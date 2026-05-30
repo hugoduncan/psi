@@ -201,11 +201,10 @@
                 (apply-root-state-update! ctx))
            (is (false? (:is-compacting (session-state/get-session-data-in ctx session-id)))))))))
 
-(deftest retry-classified-transport-failure-activates-retry-path-test
-  (testing "classified transport failure admits the retry guard and triggers retry effects"
+(deftest retry-classified-transport-failure-does-not-activate-legacy-statechart-retry-test
+  (testing "classified transport failure is handled by provider-boundary retry, not statechart replay"
     (let [[ctx session-id] (test-support/make-session-ctx {:session-data {:auto-retry-enabled true
                                                                           :retry-attempt 0}})
-          ctx              (assoc ctx :now-fn (constantly (java.time.Instant/ofEpochMilli 0)))
           should-retry?    (resolve 'psi.agent-session.statechart/should-retry?)
           guard-data       {:ctx ctx
                             :session-id session-id
@@ -214,7 +213,7 @@
                                                   :messages [{:role "assistant"
                                                               :stop-reason :error
                                                               :error-message "Premature end of chunk coded message body: closing chunk expected"}]}}]
-      (is (true? (should-retry? guard-data)))
+      (is (false? (should-retry? guard-data)))
       (with-registered-handlers
         ctx
         #(let [result (invoke-handler ctx
@@ -222,29 +221,22 @@
                                       {:session-id session-id
                                        :pending-agent-event {:provider-error/headers {"Retry-After" "8"}}})]
            (apply-root-state-update! ctx result)
-           (is (= 1 (:retry-attempt (session-state/get-session-data-in ctx session-id))))
-           (is (= {:active? true
-                   :attempt 0
-                   :delay-ms 8000
-                   :delay-source :retry-after
-                   :resume-at 8000
-                   :rate-limit nil}
-                  (:retry (session-state/get-session-data-in ctx session-id))))
-           (is (= [{:effect/type :runtime/schedule-thread-sleep-send-event
-                    :delay-ms 8000
-                    :event :session/retry-done}]
-                  (:effects result))))))))
+           (is (= 0 (:retry-attempt (session-state/get-session-data-in ctx session-id))))
+           (is (nil? (:retry (session-state/get-session-data-in ctx session-id))))
+           (is (= [] (:effects result))))))))
 
 (deftest retry-handlers-test
-  ;; Tests retry backoff scheduling and retry continuation effects.
-  (testing "on-retry-triggered increments retry-attempt, emits telemetry, and schedules backoff with configured limits"
+  ;; Tests compatibility retry handlers cannot replay the old whole-agent loop.
+  (testing "on-retry-triggered is a compatibility no-op because provider-boundary retry is authoritative"
     (let [[ctx session-id] (test-support/make-session-ctx {:session-data {:retry-attempt 2
+                                                                          :retry {:active? true
+                                                                                  :attempt 2
+                                                                                  :delay-ms 250
+                                                                                  :delay-source :exponential-backoff
+                                                                                  :resume-at 1250
+                                                                                  :rate-limit nil}
                                                                           :model {:provider "openai" :id "gpt-5.4"}
                                                                           :last-execution-result-summary {:turn-id "turn-2"}}})
-          ctx              (assoc ctx
-                                  :config {:auto-retry-base-delay-ms 100
-                                           :auto-retry-max-delay-ms 250}
-                                  :now-fn (constantly (java.time.Instant/ofEpochMilli 1000)))
           reg              (:extension-registry ctx)
           seen             (atom [])]
       (ext/register-extension-in! reg "/ext/provider-telemetry")
@@ -259,24 +251,10 @@
                                                                                                  :error-message "Premature end of chunk coded message body: closing chunk expected"
                                                                                                  :http-status nil}]}})]
            (apply-root-state-update! ctx result)
-           (is (= 3 (:retry-attempt (session-state/get-session-data-in ctx session-id))))
-           (is (= {:active? true
-                   :attempt 2
-                   :delay-ms 250
-                   :delay-source :exponential-backoff
-                   :resume-at 1250
-                   :rate-limit nil}
-                  (:retry (session-state/get-session-data-in ctx session-id))))
-           (is (= [{:effect/type :runtime/schedule-thread-sleep-send-event
-                    :delay-ms 250
-                    :event :session/retry-done}]
-                  (:effects result)))
-           (is (= ["provider_request_finished" "provider_retry_scheduled"]
-                  (mapv :type @seen)))
-           (is (false? (:final? (first @seen))))
-           (is (= :transport (:error-kind (first @seen))))
-           (is (= 3 (:retry-attempt (second @seen))))
-           (is (= 250 (:delay-ms (second @seen))))))))
+           (is (= 2 (:retry-attempt (session-state/get-session-data-in ctx session-id))))
+           (is (nil? (:retry (session-state/get-session-data-in ctx session-id))))
+           (is (= [] (:effects result)))
+           (is (= [] @seen))))))
 
   (testing "on-retrying-entered returns an explicit no-op pure result because retry state was already updated"
     (let [[ctx _session-id] (test-support/make-session-ctx {})]
@@ -285,7 +263,7 @@
         #(is (= {:effects []}
                 (invoke-handler ctx :on-retrying-entered {}))))))
 
-  (testing "on-retry-resume clears retry metadata and emits agent-start-loop"
+  (testing "on-retry-resume clears retry metadata without replaying the agent loop"
     (let [[ctx session-id] (test-support/make-session-ctx {:session-data {:retry {:active? true
                                                                                   :attempt 1
                                                                                   :delay-ms 1000
@@ -296,7 +274,7 @@
         #(let [result (invoke-handler ctx :on-retry-resume {:session-id session-id})]
            (apply-root-state-update! ctx result)
            (is (nil? (:retry (session-state/get-session-data-in ctx session-id))))
-           (is (= {:effects [{:effect/type :runtime/agent-start-loop}]}
+           (is (= {:effects []}
                   (dissoc result :root-state-update))))))))
 
 (deftest on-agent-done-emits-terminal-provider-failure-telemetry-test
@@ -322,8 +300,8 @@
          (is (true? (:final? (first @seen))))
          (is (= :rate-limit (:error-kind (first @seen))))))))
 
-(deftest retry-flow-builds-fresh-prepared-request-turn-id-test
-  (testing "retry resume followed by next preparation yields a fresh prepared-request / turn id"
+(deftest legacy-retry-flow-does-not-mutate-prepared-request-turn-id-test
+  (testing "legacy retry handlers no longer own prepared-request replay"
     (let [[ctx session-id] (test-support/make-session-ctx {:session-data {:retry-attempt 0
                                                                           :model {:provider "openai" :id "gpt-5.4"}}})
           first-turn-id "turn-initial"
@@ -348,7 +326,7 @@
                                                                                                :stop-reason :error
                                                                                                :error-message "Premature end of chunk coded message body: closing chunk expected"}]}})
                     (apply-root-state-update! ctx)))
-          _ (is (= 1 (:retry-attempt (session-state/get-session-data-in ctx session-id))))
+          _ (is (= 0 (:retry-attempt (session-state/get-session-data-in ctx session-id))))
           _ (with-registered-handlers
               ctx
               #(->> (invoke-handler ctx :on-retry-resume {:session-id session-id})

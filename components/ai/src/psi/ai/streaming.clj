@@ -56,10 +56,17 @@
 
 (defn- exception->error-event
   [e]
-  (let [data (ex-data e)]
+  (let [data       (ex-data e)
+        status     (:status data)
+        http-status (or (:http-status data) status)
+        headers    (or (:provider-error/headers data)
+                       (:headers data))]
     (cond-> {:type          :error
              :error-message (str e)}
-      (:status data) (assoc :http-status (:status data)))))
+      status (assoc :status status)
+      http-status (assoc :http-status http-status)
+      (:headers data) (assoc :headers (:headers data))
+      headers (assoc :provider-error/headers headers))))
 
 ;; ───────────────────────────────────────────────────────────────────────────
 ;; Callback-based streaming (preferred)

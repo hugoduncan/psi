@@ -18,6 +18,7 @@
    [psi.agent-session.prompt-recording :as prompt-recording]
    [psi.agent-session.prompt-request :as prompt-request]
    [psi.agent-session.turn :as turn]
+   [psi.turn-runtime.core :as turn-runtime]
    [psi.agent-session.resolvers :as resolvers]
    [psi.agent-session.services :as services]
    [psi.agent-session.scheduler-time :as scheduler-time]
@@ -339,6 +340,7 @@
   (doseq [{:keys [session-id]} (ss/list-context-sessions-in ctx)]
     (dispatch/dispatch! ctx :scheduler/cancel-all {:session-id session-id} {:origin :core}))
   (doseq [{:keys [session-id]} (ss/list-context-sessions-in ctx)]
+    (turn-runtime/abort-active-turn-in! ctx session-id)
     (when-let [agent-ctx (ss/agent-ctx-in ctx session-id)]
       (agent-core/abort-in! agent-ctx))
     (psi.agent-session.tools/abort-bash!))

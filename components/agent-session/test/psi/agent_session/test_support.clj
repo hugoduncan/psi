@@ -36,7 +36,7 @@
   #{:session-data :provider-error-replies
     :journal :flush-state :turn-ctx
     :tool-output-stats :tool-call-attempts :tool-lifecycle-events
-    :provider-requests :provider-replies})
+    :provider-requests :provider-replies :provider-events})
 
 (defn fixed-scheduler-time-source
   "Return a scheduler test time source fixed at `instant`."

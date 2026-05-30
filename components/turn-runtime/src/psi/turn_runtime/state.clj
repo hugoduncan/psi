@@ -28,6 +28,11 @@
   [ctx session-id]
   (session/get-state-value-in ctx (session/state-path :provider-replies session-id)))
 
+(defn provider-events-in
+  "Return canonical provider lifecycle events for `session-id`."
+  [ctx session-id]
+  (session/get-state-value-in ctx (session/state-path :provider-events session-id)))
+
 (defn set-turn-context-root-update
   [session-id turn-ctx]
   (fn [state]
@@ -55,6 +60,13 @@
       (update-in state (session/session-telemetry-path session-id :provider-replies)
                  #(init/bounded-append 1000 % entry)))))
 
+(defn append-provider-event-root-update
+  [session-id event]
+  (let [entry (assoc event :timestamp (java.time.Instant/now))]
+    (fn [state]
+      (update-in state (session/session-telemetry-path session-id :provider-events)
+                 #(init/bounded-append 1000 % entry)))))
+
 (defn set-turn-context-in!
   "Persist the current live turn context into canonical runtime state."
   [ctx session-id turn-ctx]
@@ -78,3 +90,9 @@
   [ctx session-id capture]
   (session/apply-root-state-update-in! ctx (append-provider-reply-capture-root-update session-id capture))
   (provider-replies-in ctx session-id))
+
+(defn append-provider-event-in!
+  "Append one provider lifecycle event into canonical state with bounded retention."
+  [ctx session-id event]
+  (session/apply-root-state-update-in! ctx (append-provider-event-root-update session-id event))
+  (provider-events-in ctx session-id))

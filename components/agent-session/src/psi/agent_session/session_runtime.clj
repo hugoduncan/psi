@@ -18,7 +18,8 @@
    :tool-call-attempts []
    :tool-lifecycle-events []
    :provider-requests []
-   :provider-replies []})
+   :provider-replies []
+   :provider-events []})
 
 (defn persistence-state
   ([]

@@ -6,13 +6,16 @@
    :idle       — ready for user input; neither streaming nor compacting
    :streaming  — agent loop is running (entered via :session/prompt)
    :compacting — compaction is executing (entered via :session/compact-start)
-   :retrying   — waiting for exponential backoff before the next retry
+   :retrying   — visibility state for provider-boundary retry backoff
 
-   The streaming → compacting / retrying transitions fire reactively when
-   the agent-core emits an :agent-end event.  The session context registers
-   an add-watch on the agent-core events atom so that every event emitted by
-   agent-core is forwarded to the session statechart as :session/agent-event
-   (with the agent event in the working memory under :pending-agent-event).
+   The streaming → compacting transition fires reactively when the agent-core
+   emits an :agent-end event.  The session context registers an add-watch on
+   the agent-core events atom so that every event emitted by agent-core is
+   forwarded to the session statechart as :session/agent-event (with the agent
+   event in the working memory under :pending-agent-event).  Provider request
+   retry is now owned by the turn-runtime provider boundary; the old
+   statechart retry engine is deliberately disabled so it cannot replay the
+   whole agent loop or duplicate provider-boundary retries.
 
    Execution model
    ───────────────
@@ -92,20 +95,11 @@
 (defn- should-auto-compact? [data]
   (boolean (auto-compaction-reason data)))
 
-(defn- should-retry? [data]
-  (let [sd     (current-session-data data)
-        max-r  (get-in data [:config :auto-retry-max-retries] 3)
-        event  (:pending-agent-event data)
-        last-m (last (:messages event))]
-    (boolean
-     (and (agent-end-event? data)
-          (:auto-retry-enabled sd)
-          (not (:interrupt-pending sd))
-          (< (:retry-attempt sd) max-r)
-          (not (session/context-overflow-error? (:error-message last-m)))
-          (session/retry-error? (:stop-reason last-m)
-                                (:error-message last-m)
-                                (:http-status last-m))))))
+(defn- should-retry? [_data]
+  ;; Provider request retry is handled inside turn-runtime around one prepared
+  ;; provider request.  Keeping the old statechart guard false prevents the
+  ;; compatibility state from scheduling whole-agent-loop replay retries.
+  false)
 
 (defn- dispatch! [data action-key]
   (when-let [af (:actions-fn data)]
@@ -161,11 +155,14 @@
                                (ele/transition {:event :session/reset :target :idle}))
 
     ;; ── retrying ─────────────────────────────────────────
+                    ;; Compatibility visibility state only. Provider-boundary
+                    ;; retry publishes active :retry data directly into session
+                    ;; state, and ss/sc-phase-in projects :retrying from that
+                    ;; data; retry resume must not start the old agent loop.
                     (ele/state {:id :retrying}
                                (ele/on-entry {}
                                              (ele/script {:expr (fn [_env data] (dispatch! data :on-retrying-entered))}))
-                               (ele/transition {:event :session/retry-done :target :streaming}
-                                               (ele/script {:expr (fn [_env data] (dispatch! data :on-retry-resume))}))
+                               (ele/transition {:event :session/retry-done :target :streaming})
                                (ele/transition {:event :session/reset :target :idle}))))
 
 ;; ============================================================

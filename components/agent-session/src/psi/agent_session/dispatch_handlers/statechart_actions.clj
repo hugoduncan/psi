@@ -1,8 +1,10 @@
 (ns psi.agent-session.dispatch-handlers.statechart-actions
-  "Handlers for statechart action events:
-   on-streaming-entered, on-agent-done, on-abort, on-auto-compact-triggered,
-   on-compacting-entered, on-compact-done, on-retry-triggered, on-retrying-entered,
-   on-retry-resume."
+  "Handlers for statechart action events.
+
+   Provider request retry is now owned by turn-runtime at the prepared request
+   boundary. The legacy retry-triggered/resume handlers remain registered as
+   compatibility no-ops so stale or historical statechart events cannot replay
+   the whole agent loop."
   (:require
    [psi.agent-session.extensions :as ext]
    [psi.session-state.model :as session-model]
@@ -64,22 +66,6 @@
 
 ;;; Registration
 
-(defn- compute-retry-metadata
-  [headers attempt exponential-delay-ms now-ms]
-  ((requiring-resolve 'psi.session-state.model/retry-metadata)
-   headers attempt exponential-delay-ms now-ms))
-
-(defn- retry-metadata-for
-  [ctx sd event]
-  (let [attempt              (:retry-attempt sd)
-        base-ms              (get-in ctx [:config :auto-retry-base-delay-ms] 2000)
-        max-ms               (get-in ctx [:config :auto-retry-max-delay-ms] 60000)
-        exponential-delay-ms (session-model/exponential-backoff-ms attempt base-ms max-ms)
-        now-fn               (or (:now-fn ctx) #(java.time.Instant/now))
-        now-ms               (.toEpochMilli ^java.time.Instant (now-fn))
-        provider-headers     (:provider-error/headers event)]
-    (compute-retry-metadata provider-headers attempt exponential-delay-ms now-ms)))
-
 (defn- provider-id-for
   [model]
   (or (some-> model :provider name)
@@ -96,6 +82,7 @@
         stop-reason   (or (:stop-reason assistant-msg) (:stopReason assistant-msg))]
     (and (= :agent-end (:type pending-agent-event))
          (map? assistant-msg)
+         (not (:retry/outcome assistant-msg))
          (or (= :error stop-reason) (= "error" stop-reason))
          (or (:provider-error/headers pending-agent-event)
              (:error-message assistant-msg)
@@ -198,32 +185,9 @@
 
   (kernel/register-handler!
    :on-retry-triggered
-   (fn [ctx {:keys [session-id] :as data}]
-     (let [sd                 (session/get-session-data-in ctx session-id)
-           pending-agent-event (:pending-agent-event data)
-           retry-metadata     (retry-metadata-for ctx sd pending-agent-event)
-           retry-attempt      (inc (:retry-attempt sd))
-           provider-event     (failed-provider-event-payload ctx session-id pending-agent-event (:retry-attempt sd) false)
-           model              (:model sd)]
-       (dispatch-provider-event! ctx "provider_request_finished" provider-event)
-       (dispatch-provider-event!
-        ctx
-        "provider_retry_scheduled"
-        {:session-id session-id
-         :turn-id (:turn-id provider-event)
-         :provider (provider-id-for model)
-         :model-id (model-id-for model)
-         :retry-attempt retry-attempt
-         :delay-ms (:delay-ms retry-metadata)
-         :delay-source (:delay-source retry-metadata)
-         :error-kind (:error-kind provider-event)
-         :retryable? true})
-       {:root-state-update (session/session-update session-id #(-> %
-                                                                   (update :retry-attempt inc)
-                                                                   (assoc :retry retry-metadata)))
-        :effects [{:effect/type :runtime/schedule-thread-sleep-send-event
-                   :delay-ms    (:delay-ms retry-metadata)
-                   :event       :session/retry-done}]})))
+   (fn [_ctx {:keys [session-id]}]
+     {:root-state-update (session/session-update session-id #(assoc % :retry nil))
+      :effects []}))
 
   (kernel/register-handler!
    :on-retrying-entered
@@ -234,4 +198,4 @@
    :on-retry-resume
    (fn [_ctx {:keys [session-id]}]
      {:root-state-update (session/session-update session-id #(assoc % :retry nil))
-      :effects [{:effect/type :runtime/agent-start-loop}]})))
+      :effects []})))

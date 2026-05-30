@@ -4,7 +4,7 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
    [psi.agent-session.dispatch]
-   [psi.agent-session.extensions]
+   [psi.agent-session.extensions :as ext]
    [psi.agent-session.prompt-chain]
    [psi.agent-session.prompt-request]
    [psi.turn-runtime.core]
@@ -696,3 +696,96 @@
                             {:origin :core}))
     (is (= ["q1" "q2"] @seen-prompts))
     (is (= [] (:follow-up-messages (ss/get-session-data-in ctx session-id))))))
+
+(deftest prompt-execution-result-retryable-error-enters-retrying-and-schedules-retry-test
+  (testing "canonical prompt lifecycle should schedule retry/backoff for retryable provider errors"
+    (let [[ctx session-id] (create-session-context {:persist? false
+                                                    :provider-retry-sleep? false})
+          reg             (:extension-registry ctx)
+          seen            (atom [])
+          attempts        (atom 0)]
+      (kernel/clear-event-log!)
+      (ext/register-extension-in! reg "/ext/provider-telemetry")
+      (ext/register-handler-in! reg "/ext/provider-telemetry" "provider_retry_scheduled" #(swap! seen conj %))
+      (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                    (fn [_ai-ctx _ctx _sid {:keys [turn-id ai-model]}]
+                      (let [attempt (swap! attempts inc)]
+                        {:turn-id turn-id
+                         :model ai-model
+                         :ai-options {}
+                         :turn-ctx nil
+                         :assistant-message (if (= 1 attempt)
+                                              {:role "assistant"
+                                               :content [{:type :error :text "Connection reset by peer"}]
+                                               :stop-reason :error
+                                               :error-message "Connection reset by peer"
+                                               :timestamp (java.time.Instant/now)}
+                                              {:role "assistant"
+                                               :content [{:type :text :text "recovered"}]
+                                               :stop-reason :stop
+                                               :timestamp (java.time.Instant/now)})}))]
+        (let [result (psi.agent-session.turn/prompt-execution-result-in! ctx session-id "trigger transient connection error")]
+          (is (= :stop (:execution-result/stop-reason result)))))
+      (is (= ["provider_retry_scheduled"] (mapv :type @seen)))
+      (is (= 2 @attempts))
+      (is (empty? (filter (fn [entry]
+                            (some #(= :runtime/agent-start-loop (:effect/type %))
+                                  (concat (:declared-effects entry)
+                                          (:applied-effects entry))))
+                          (kernel/event-log-entries)))))))
+
+(deftest prompt-provider-retry-after-tool-result-does-not-rerun-tool-test
+  ;; Provider-boundary retry for a request containing recorded tool results
+  ;; retries only that prepared provider request; it does not execute tools again.
+  (let [[ctx session-id] (create-session-context {:persist? false
+                                                  :provider-retry-sleep? false})
+        provider-attempts* (atom 0)
+        tool-runs*         (atom 0)]
+    (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                  (fn [_ai-ctx _ctx _sid {:keys [turn-id ai-model]}]
+                    (let [attempt (swap! provider-attempts* inc)]
+                      {:turn-id turn-id
+                       :model ai-model
+                       :ai-options {}
+                       :turn-ctx nil
+                       :assistant-message (case attempt
+                                            1 {:role "assistant"
+                                               :content [{:type :tool-call
+                                                          :id "tc-1"
+                                                          :name "read"
+                                                          :arguments "{}"}]
+                                               :stop-reason :stop
+                                               :timestamp (java.time.Instant/now)}
+                                            2 {:role "assistant"
+                                               :content [{:type :error :text "Connection reset by peer"}]
+                                               :stop-reason :error
+                                               :error-message "Connection reset by peer"
+                                               :timestamp (java.time.Instant/now)}
+                                            {:role "assistant"
+                                             :content [{:type :text :text "final answer"}]
+                                             :stop-reason :stop
+                                             :timestamp (java.time.Instant/now)})}))
+                  psi.agent-session.prompt-chain/run-prompt-tools!
+                  (fn [ctx sid _execution-result _progress-queue]
+                    (swap! tool-runs* inc)
+                    (session/dispatch-in! ctx :session/tool-record-result
+                                          {:session-id sid
+                                           :shaped-result {:result-message {:role "toolResult"
+                                                                            :tool-call-id "tc-1"
+                                                                            :tool-name "read"
+                                                                            :content [{:type :text :text "file body"}]
+                                                                            :timestamp (java.time.Instant/now)}}}
+                                          {:origin :core})
+                    {:continued? true :tool-call-count 1})]
+      (let [result (psi.agent-session.turn/prompt-execution-result-in! ctx session-id "read a file")]
+        (is (= :stop (:execution-result/stop-reason result)))
+        (is (= "final answer"
+               (get-in result [:execution-result/assistant-message :content 0 :text])))))
+    (is (= 3 @provider-attempts*))
+    (is (= 1 @tool-runs*))
+    (is (= ["provider_request_started" "provider_request_finished"
+            "provider_request_started" "provider_request_finished"
+            "provider_retry_scheduled" "provider_request_started"
+            "provider_request_finished"]
+           (mapv :type (get-in @(:state* ctx)
+                               [:agent-session :sessions session-id :telemetry :provider-events]))))))

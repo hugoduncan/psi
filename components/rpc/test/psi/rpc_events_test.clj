@@ -150,7 +150,7 @@
              (:retry payload)))
       (is (= 2 (:pending-message-count payload)))
       (is (= 2 (:retry-attempt payload)))
-      (is (re-find (re-pattern (str "^session: " sid " phase:idle streaming:no compacting:no pending:2 retry:2"))
+      (is (re-find (re-pattern (str "^session: " sid " phase:retrying streaming:no compacting:no pending:2 retry:2"))
                    status))
       (is (re-find #"retrying-in:[78]s" status))
       (is (re-find #"source:retry-after" status))

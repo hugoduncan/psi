@@ -340,13 +340,15 @@
         content (cond-> []
                   (seq text-buffer) (conj {:type :text :text text-buffer})
                   :always           (conj {:type :error :text err-msg}))
+        headers (or (:provider-error/headers data)
+                    (:headers data))
         final   (cond-> {:role          "assistant"
                          :content       content
                          :stop-reason   stop-reason
                          :error-message err-msg
                          :timestamp     (java.time.Instant/now)}
                   (:http-status data) (assoc :http-status (:http-status data))
-                  (:headers data) (assoc :provider-error/headers (:headers data)))]
+                  headers (assoc :provider-error/headers headers))]
     (note-last-provider-event! td :error data)
     (swap! td assoc :final-message final :error-message err-msg :stop-reason stop-reason)
     (deliver done-p final)))

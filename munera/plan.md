@@ -21,6 +21,7 @@ Backlog:
 
 Recently completed:
 
+`munera/closed/190-ai-request-retry-backoff-observability/`
 `munera/closed/184-workflow-file-kinds-and-md-step-prompts/`
 `munera/closed/188-built-in-skill-for-writing-workflows/`
 
