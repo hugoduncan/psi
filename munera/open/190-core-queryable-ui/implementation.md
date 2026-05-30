@@ -190,3 +190,7 @@ Completed the newly added documentation-alignment follow-up in `design-steps.md`
 ## 2026-05-30 design inconsistency review
 
 No new actionable inconsistency feedback after re-reading `design.md`, referenced task design artifacts, extension-authoring docs, and current UI/query/frontend seams. The design remains internally aligned on capability/action vocabulary, provider/query ownership, unavailable/error semantics, invocation/request boundaries, permission constraints, legacy UI-type compatibility, docs guidance, and console/headless classification.
+
+## 2026-05-30 inconsistency follow-up execution
+
+No newly added unchecked inconsistency follow-up items were present in `design-steps.md`; all inconsistency design steps are already complete. No `design.md` change was needed, and no inconsistency follow-up item remains blocked.
