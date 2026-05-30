@@ -287,3 +287,9 @@ Completed the newly added inconsistency follow-up item in `design-steps.md` by r
 - `psi.extension/inject-mid-system-message` Pathom mutation params now include optional `:ext-path` as well as optional `:source`.
 - Provenance inference is explicitly owned by the extension mutation surface: explicit `:source` wins, otherwise `:ext-path` becomes the source, otherwise the mutation passes `:extension` to dispatch.
 - Dispatch continues to store the already-derived source value; tests should assert provenance presence without depending on a provider-specific source string.
+
+---
+
+## Ambiguity follow-up execution — 2026-05-30
+
+Checked `design-steps.md` for newly added unchecked ambiguity follow-up items. None were present; all ambiguity follow-ups are already marked complete. No `design.md` changes were required.
