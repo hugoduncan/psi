@@ -67,7 +67,7 @@ Bootstrapped on 2026-04-02.
 - Task 158 addressed persistence test garbage (still open but test-review showed no actionable feedback).
 
 ## Suggested next step
-- For task 190, design inconsistency and ambiguity follow-ups are resolved; next step is implementation of provider `parse-json-value` result preservation (including present `:payload nil`) and structured-output judge retry opts retention.
+- For task 190, one new inconsistency design follow-up is open: reconcile keyword-vs-string enum examples/acceptance with referenced judge-routing schema/tests before implementation.
 - Registry unification arc: use task `164-registry-semantics-unification-audit` plus completed outcomes through `177` to choose the next cleanup target.
 - Likely next registry cleanup candidates:
   - close or move any remaining Munera tasks whose implementation/review state is already complete

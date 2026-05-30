@@ -11,3 +11,5 @@
 2026-05-30 — Design ambiguity review: re-read design and referenced structured-output/provider/judge code. No new actionable ambiguities found; existing ambiguity follow-ups for JSON null preservation and structured retry opts retention remain resolved.
 
 2026-05-30 — Ambiguity follow-up execution: re-read `design-steps.md`; there are no newly added unchecked ambiguity follow-up items to execute, so `design.md` needed no change and no blocking design-step remains.
+
+2026-05-30 — Design inconsistency review: found one new actionable inconsistency: the design's enum-schema examples/acceptance use keyword enum values (`[:enum :REPEAT :DONE]` and expected `:DONE`), while the referenced reusable judge-routing schema/tests use string enum values (`[:enum "REPEAT" "DONE"]` and expected `"DONE"`).
