@@ -6,6 +6,8 @@
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
    [psi.ai.providers.openai :as openai]
+   [psi.ai.providers.openai.chat-completions]
+   [psi.ai.providers.openai.codex-structured-output]
    [psi.ai.structured-output :as structured-output])
   (:import [java.io ByteArrayInputStream]
            [java.util Base64]))
@@ -108,6 +110,69 @@
         (is (nil? (get-in body [:text :format])))
         (is (not (contains? body :response_format)))
         (is (re-find #"Structured output required" text))))))
+
+(defn- openai-chat-result-payload
+  [strategy raw]
+  (#'psi.ai.providers.openai.chat-completions/structured-output-result
+   strategy
+   (if (= :provider-native (:strategy strategy))
+     :openai/message-json
+     :prompted-json/text)
+   raw))
+
+(deftest openai-chat-completions-structured-output-json-value-payloads-test
+  ;; Tests the shared Chat Completions result helper used by both streaming and
+  ;; non-streaming result paths preserves every JSON value for provider-native
+  ;; and prompted-JSON strategies with raw text payload.
+  (let [cases [{:label "string" :raw "\"DONE\"" :expected "DONE"}
+               {:label "number" :raw "42" :expected 42}
+               {:label "boolean" :raw "true" :expected true}
+               {:label "array" :raw "[true]" :expected [true]}
+               {:label "object" :raw "{\"ok\":true}" :expected {:ok true}}
+               {:label "null" :raw "null" :expected nil}]]
+    (doseq [{:keys [label raw expected]} cases
+            strategy [{:strategy :provider-native}
+                      {:strategy :prompted-json :fallback-used? true}]]
+      (let [result (openai-chat-result-payload strategy raw)]
+        (is (= expected (:payload result)) label)
+        (is (contains? result :payload) label)
+        (is (= raw (:raw-payload result)) label)
+        (is (not (:parse-error? result)) label)
+        (is (= (if (= :provider-native (:strategy strategy))
+                 :openai/message-json
+                 :prompted-json/text)
+               (:source result)) label)))))
+
+(deftest openai-chat-completions-structured-output-parse-failure-preserves-raw-payload-test
+  ;; Tests Chat Completions result metadata retains raw provider text at the
+  ;; canonical raw-payload key even when JSON parsing fails.
+  (let [raw    "not json"
+        result (openai-chat-result-payload {:strategy :provider-native} raw)]
+    (is (= raw (:raw-text result)))
+    (is (= raw (:raw-payload result)))
+    (is (:parse-error? result))
+    (is (not (contains? result :payload)))))
+
+(deftest openai-codex-structured-output-null-payload-test
+  ;; Tests Codex structured-output result preserves JSON null as present payload.
+  (let [result (#'psi.ai.providers.openai.codex-structured-output/structured-output-result
+                {:strategy :provider-native
+                 :native-mechanism :openai/responses-text-format-json-schema}
+                :openai/codex-text-format
+                "null")]
+    (is (contains? result :payload))
+    (is (nil? (:payload result)))
+    (is (= "null" (:raw-payload result)))
+    (is (not (:parse-error? result)))))
+
+(deftest prompted-json-instruction-requests-json-value-test
+  ;; Tests prompted JSON fallback permits non-object JSON Schema outputs.
+  (let [text (structured-output/json-only-instruction judge-structured-output-request)]
+    (is (re-find #"Return exactly one JSON value" text))
+    (is (not (re-find #"Return exactly one JSON object" text)))
+    (is (re-find #"Do not wrap the JSON in Markdown fences" text))
+    (is (re-find #"do not add prose" text))
+    (is (re-find #"do not emit extra top-level text" text))))
 
 (deftest openai-non-streaming-structured-output-result-metadata-test
   ;; Tests top-level structured-output metadata and extracted payload handoff.

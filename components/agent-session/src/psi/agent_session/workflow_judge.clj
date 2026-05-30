@@ -149,14 +149,26 @@
                            :judge-output judge-output
                            :judge-event judge-event
                            :routing-result routing-result})
-                        {:judge-session-id judge-sid
-                         :judge-output judge-output
-                         :judge-event nil
-                         :routing-result (cond-> {:action :fail
-                                                  :reason :invalid-structured-output
-                                                  :output-key output-key}
-                                           (or (:opts request-result) last-structured-output)
-                                           (assoc :details {:structured-output (:structured-output structured-result)}))})))
+                        (if (< attempt max-judge-retries)
+                          (let [retry-result (if-let [opts (:opts request-result)]
+                                               (turn-execution/execute-judge-turn!
+                                                ctx judge-sid
+                                                (judge-retry-feedback last-output expected-sigs)
+                                                opts)
+                                               (turn-execution/execute-judge-turn!
+                                                ctx judge-sid
+                                                (judge-retry-feedback last-output expected-sigs)))]
+                            (recur (inc attempt)
+                                   (str/trim (:assistant-text retry-result))
+                                   (:structured-output retry-result)))
+                          {:judge-session-id judge-sid
+                           :judge-output judge-output
+                           :judge-event nil
+                           :routing-result (cond-> {:action :fail
+                                                    :reason :invalid-structured-output
+                                                    :output-key output-key}
+                                             (or (:opts request-result) last-structured-output)
+                                             (assoc :details {:structured-output (:structured-output structured-result)}))}))))
                   (let [routing-result (workflow-judge/evaluate-routing last-output routing-table
                                                                         current-step-id step-order step-runs)]
                     (if (and (= :no-match (:action routing-result))

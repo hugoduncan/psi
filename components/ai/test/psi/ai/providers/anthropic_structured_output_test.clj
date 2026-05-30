@@ -7,6 +7,7 @@
    [psi.ai.conversation :as conv]
    [psi.ai.models :as models]
    [psi.ai.providers.anthropic :as anthropic]
+   [psi.ai.providers.anthropic.structured-output]
    [psi.ai.structured-output :as structured-output])
   (:import [java.io ByteArrayInputStream]))
 
@@ -330,15 +331,13 @@
     (is (= "{\"ok\":true}" (get-in result [:structured-output :raw-payload])))))
 
 (deftest anthropic-json-schema-output-non-streaming-parse-failure-test
-  ;; Tests Anthropic JSON Schema native non-streaming invalid/non-object output
-  ;; preserves raw text and marks parse failure without a trusted payload.
+  ;; Tests Anthropic JSON Schema native non-streaming invalid output preserves
+  ;; raw text and marks parse failure without a trusted payload.
   (let [model  (models/get-model :sonnet-4.6)
         convo  (-> (conv/create "sys")
                    (conv/add-user-message "Review this"))
         cases  [{:label "invalid-json"
-                 :text "not json"}
-                {:label "non-object-json"
-                 :text "[true]"}]]
+                 :text "not json"}]]
     (doseq [{:keys [label text]} cases]
       (let [body   {:content [{:type "text" :text text}]
                     :stop_reason "end_turn"
@@ -360,15 +359,13 @@
         (is (not (contains? (:structured-output result) :payload)) label)))))
 
 (deftest anthropic-streaming-json-schema-output-parse-failure-test
-  ;; Tests Anthropic JSON Schema native streaming invalid/non-object output emits
-  ;; a parse-failure result with raw text and no trusted payload.
+  ;; Tests Anthropic JSON Schema native streaming invalid output emits a
+  ;; parse-failure result with raw text and no trusted payload.
   (let [model (models/get-model :sonnet-4.6)
         convo (-> (conv/create "sys")
                   (conv/add-user-message "Review this"))
         cases [{:label "invalid-json"
-                :text "not json"}
-               {:label "non-object-json"
-                :text "[true]"}]]
+                :text "not json"}]]
     (doseq [{:keys [label text]} cases]
       (let [events (atom [])
             sse    (str (sse-line "message_start"
@@ -403,6 +400,31 @@
           (is (= text (:raw-payload structured)) label)
           (is (true? (:parse-error? structured)) label)
           (is (not (contains? structured :payload)) label))))))
+
+(deftest anthropic-structured-output-result-json-value-payloads-test
+  ;; Tests the shared Anthropic structured-output result helper preserves every
+  ;; valid JSON value, including present nil for JSON null.
+  (let [strategy {:strategy :provider-native
+                  :native-mechanism :anthropic/json-schema-output}
+        cases    [{:label "string" :raw "\"DONE\"" :expected "DONE"}
+                  {:label "number" :raw "42" :expected 42}
+                  {:label "boolean" :raw "true" :expected true}
+                  {:label "array" :raw "[true]" :expected [true]}
+                  {:label "object" :raw "{\"ok\":true}" :expected {:ok true}}
+                  {:label "null" :raw "null" :expected nil}]]
+    (doseq [{:keys [label raw expected]} cases
+            source [:anthropic/json-schema-output :prompted-json/text]]
+      (let [result (#'psi.ai.providers.anthropic.structured-output/structured-output-result
+                    (if (= :prompted-json/text source)
+                      {:strategy :prompted-json :fallback-used? true}
+                      strategy)
+                    source
+                    raw)]
+        (is (= expected (:payload result)) label)
+        (is (contains? result :payload) label)
+        (is (not (:parse-error? result)) label)
+        (is (= raw (:raw-payload result)) label)
+        (is (= source (:source result)) label)))))
 
 (deftest anthropic-streaming-json-schema-output-events-test
   ;; Tests JSON Schema native streaming preserves text events and emits a parsed

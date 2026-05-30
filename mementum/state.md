@@ -67,6 +67,7 @@ Bootstrapped on 2026-04-02.
 - Task 158 addressed persistence test garbage (still open but test-review showed no actionable feedback).
 
 ## Suggested next step
+- For task 191, structured-output non-object schema implementation/review is complete; PR is open for merge.
 - Registry unification arc: use task `164-registry-semantics-unification-audit` plus completed outcomes through `177` to choose the next cleanup target.
 - Likely next registry cleanup candidates:
   - close or move any remaining Munera tasks whose implementation/review state is already complete
