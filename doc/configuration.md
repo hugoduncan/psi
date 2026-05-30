@@ -260,8 +260,11 @@ The interactive commands are:
 /effort none user              # persist explicit user-level clear/mask
 ```
 
-Extension/runtime mutation surfaces use the same `:session`, `:project`, and
-`:user` scopes as model and thinking settings.
+There is currently no extension EQL mutation named `psi.extension/set-speed-mode`
+or `psi.extension/set-effort-override`. Use the interactive `/speed` and
+`/effort` commands for these runtime settings; their optional scope arguments
+use the same `:session`, `:project`, and `:user` meanings as model and thinking
+settings.
 
 ### `psi.extension/set-prompt-mode`
 

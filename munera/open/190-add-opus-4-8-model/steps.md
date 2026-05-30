@@ -108,4 +108,4 @@
 
 ## Docs review follow-ups
 
-- [ ] Correct `doc/configuration.md` speed/effort runtime-settings wording so it does not claim extension mutation surfaces exist for speed/effort unless actual documented mutation names are implemented.
+- [x] Correct `doc/configuration.md` speed/effort runtime-settings wording so it does not claim extension mutation surfaces exist for speed/effort unless actual documented mutation names are implemented.

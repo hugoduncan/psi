@@ -1207,3 +1207,11 @@ No new actionable test-shaping feedback found. Re-read the task artifacts and ap
 Actionable documentation feedback found:
 
 1. **`doc/configuration.md` overstates extension mutation support for speed/effort** — The "Speed and effort runtime settings" section says "Extension/runtime mutation surfaces use the same `:session`, `:project`, and `:user` scopes as model and thinking settings." The implemented surfaces expose slash commands plus internal/core `set-speed-mode-in!` / `set-effort-override-in!` dispatch wrappers; no `psi.extension/set-speed-mode` or `psi.extension/set-effort-override` Pathom extension mutations are registered. Update the docs to avoid promising extension mutation surfaces, or add and document the actual mutation names if that surface is intended. No duplicate existing follow-up covered this doc accuracy issue.
+
+## Docs follow-up — 2026-05-30
+
+Completed the newly added docs review follow-up:
+
+- Corrected `doc/configuration.md` so the speed/effort runtime-settings section no longer claims extension mutation surfaces exist for `/speed` or `/effort`.
+- The docs now explicitly say there is no `psi.extension/set-speed-mode` or `psi.extension/set-effort-override` EQL mutation, and direct users to the interactive `/speed` and `/effort` commands with their optional scope arguments.
+- Marked the docs follow-up item complete in `steps.md`.
