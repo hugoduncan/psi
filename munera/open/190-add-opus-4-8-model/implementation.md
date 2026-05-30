@@ -1301,3 +1301,9 @@ No new actionable code-shaping feedback found. Re-read the task artifacts and ap
 ## Docs review pass — 2026-05-30 (post capability-predicate follow-up)
 
 No new actionable documentation feedback found. Applied `.psi/skills/review-task-docs/SKILL.md`: re-read the task artifacts plus `README.md`, `doc/configuration.md`, `doc/tui.md`, `doc/extension-api.md`, `doc/custom-providers.md`, and `CHANGELOG.md`, then checked the implemented Opus 4.8 model catalog, `/speed` and `/effort` command/runtime surfaces, config persistence semantics, and mid-system extension API/capability surfaces. Documentation remains consistent with the current implementation: speed/effort docs do not promise nonexistent extension mutations, mid-system examples use the implemented `:inject-mid-system-message` API key, OpenAI chat-completions inference is documented, and the changelog covers the user-visible model/command/provider/extension changes. No duplicate `steps.md` follow-ups added.
+
+## Code-shaper review pass — 2026-05-30 (tool-result compaction boundary)
+
+Actionable code-shaping feedback found:
+
+1. **Mid-system compaction cut-normalization is role-local and can leave orphan retained tool results before the next-generation boundary** — `normalize-retained-suffix-for-mid-system` drops retained history only through the last `"assistant"` message before placing preserved `:mid-system` text. If the retained suffix contains an assistant tool-use followed by `toolResult` entries, the helper can keep trailing `toolResult` messages while moving the preserved system instruction to the summary boundary, rebuilding an invalid/non-local sequence like `summary user → system → toolResult`. Shape the compaction boundary normalization around complete conversational/tool-result segments rather than only the last assistant role, and add focused coverage for retained assistant/toolResult history.
