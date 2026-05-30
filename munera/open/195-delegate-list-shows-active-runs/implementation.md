@@ -35,3 +35,6 @@
 2026-05-30 inconsistency follow-up: resolved the foreign-provenance predicate contradiction. Same-session jobs with different `tool-name` or non-workflow `job-kind` are ignored as outside the workflow-delegate list contract; same-session `tool-name = "delegate"`, `job-kind = :workflow` jobs are inside the contract, and missing/blank/foreign `workflow-ext-path` is an actionable malformed delegate workflow job. Marked the design-step complete.
 
 2026-05-30 design ambiguity review: found one new actionable ambiguity in retained terminal delegate workflow corruption handling. The design specifies malformed missing/blank `workflow-id` as an actionable error for non-terminal same-session delegate workflow jobs, but does not state whether retained terminal same-session delegate workflow jobs with missing/nil/non-string/blank `workflow-id` should be hidden as non-manageable history, reported as corruption, or handled some other way.
+
+
+2026-05-30 ambiguity follow-up: clarified retained terminal same-session delegate workflow background jobs with missing/nil/non-string/blank `workflow-id` are hidden as non-manageable retained history, not actionable list corruption. They must not synthesize run ids or appear continuable/removable; if no other valid visible jobs exist, the ordinary empty-list result is allowed. Marked the ambiguity design-step complete.
