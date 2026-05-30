@@ -33,3 +33,5 @@
 2026-05-30 — Inconsistency follow-up: reconciled prompted-JSON fallback instructions with non-object structured-output schemas. `design.md` now includes `json-only-instruction` wording in scope, requires prompted-JSON instructions to request exactly one JSON value matching the supplied JSON Schema rather than exactly one JSON object, and extends acceptance/minimality wording accordingly. Marked the design-step complete.
 
 2026-05-30 — Design ambiguity review: re-read current design plus referenced provider extraction helpers, prompted-JSON instruction helper, workflow structured-output envelope/schema code, and workflow-judge retry seam. No new actionable ambiguities found; existing ambiguity follow-ups remain resolved and `design-steps.md` needs no new unchecked items.
+
+2026-05-30 — Ambiguity follow-up execution: re-read `design-steps.md` after the preceding ambiguity-review pass. No newly added unchecked ambiguity follow-up items are present, so no `design.md` change was needed and no blocking ambiguity design-step remains.
