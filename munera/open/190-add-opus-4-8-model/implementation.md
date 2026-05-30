@@ -1253,8 +1253,11 @@ Completed the newly added code-shaper follow-up:
 - Verification passed:
   - `clojure -M:test --focus psi.agent-session.extensions-test` — 24 tests, 127 assertions, 0 failures.
   - `clj-kondo --lint components/agent-session/src/psi/agent_session/mutations/extensions.clj components/agent-session/test/psi/agent_session/extensions_test.clj` — clean.
+
+---
+
 ## Implementation review pass — 2026-05-30
 
-No new actionable implementation feedback found. Applied `.psi/skills/task-implementation-review/SKILL.md`: re-read the task artifacts and checked the implemented Opus 4.8 model catalog, `/speed` and `/effort` session/config/provider stacks, mid-system dispatch/extension/provider/compaction paths, docs/changelog alignment, and current follow-up state. The only actionable implementation issue visible in this pass is already captured as the unchecked Code-shaper follow-up for `psi.extension/inject-mid-system-message` mutation `::pco/params`, so no duplicate `steps.md` item was added.
+No new actionable implementation feedback found. Applied `.psi/skills/task-implementation-review/SKILL.md`: re-read the task artifacts and checked the implemented Opus 4.8 model catalog, `/speed` and `/effort` session/config/provider stacks, mid-system dispatch/extension/provider/compaction paths, docs/changelog alignment, and current follow-up state. The prior mid-system mutation params issue is already fixed and checked in `steps.md`; no duplicate follow-up item was added.
 
 ---
