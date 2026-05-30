@@ -69,6 +69,8 @@ Bootstrapped on 2026-04-02.
 
 ## Latest session notes
 
+- 2026-05-30: Task 190 review follow-up completed async streaming exception metadata preservation: `psi.ai.streaming/exception->error-event` now carries `:headers`, `:provider-error/headers`, `:http-status`, and `:status` from provider exception ex-data through the background streaming future path. Focused AI/turn-runtime/prompt telemetry tests and targeted clj-kondo passed.
+
 - 2026-05-30: Task 190 implementation-review follow-up completed terminal telemetry duplication fix: canonical prompt-lifecycle terminal provider failures now prove exactly one `provider_request_finished` event is dispatched to `/ext/provider-telemetry`, and legacy `:on-agent-done` compatibility telemetry is gated when provider-boundary retry outcome metadata is already present. Focused prompt/statechart/turn-runtime/EQL verification passed (`52 tests, 285 assertions`) and targeted clj-kondo passed.
 
 - 2026-05-30: Task 190 follow-up pass completed remaining header/introspection/success-path proof gaps: EQL provider retry attempts now expose `:psi.provider-retry/rate-limit`, first-attempt success telemetry test proves no retry outcome/schedule and active retry cleanup, changelog documents provider-boundary retry reliability and retry-history graph visibility, and app-runtime/RPC retry status tests now expect the intentional active `phase:retrying`. Focused retry/app-runtime/RPC verification passed (`65 tests, 375 assertions`) and targeted clj-kondo passed with only existing info findings; broad `bb test` was attempted before the status-test fixes and not rerun afterward. Remaining task 190 work is cleanup/quarantine of obsolete whole-agent-loop retry policy duplication.

@@ -257,3 +257,10 @@ Verification:
 - `clj-kondo --lint components/turn-runtime/src/psi/turn_runtime/core.clj components/turn-runtime/test/psi/turn_runtime/response_mode_test.clj` passed with no errors or warnings.
 
 2026-05-30 — Implementation review: found one new actionable gap after re-reading the streaming retry header follow-up. The focused test covers synchronous `do-stream!` exceptions caught by `turn-runtime/execute-live-turn!`, but the shared async streaming path `psi.ai.streaming/exception->error-event` still drops retry headers and `:http-status` from `ex-data` (it only maps `:status`). Provider exceptions thrown inside the normal background streaming future can therefore still reach the retry boundary without `Retry-After` / rate-limit metadata, contrary to the design's generic streaming exception requirement.
+
+2026-05-30 — Implementation review follow-up: completed the async streaming exception metadata preservation item. `psi.ai.streaming/exception->error-event` now preserves `:headers`, normalized `:provider-error/headers`, `:http-status`, and `:status` from provider exception `ex-data` when an exception is thrown inside the normal background streaming future. Added focused coverage through `psi.ai.core/stream-response-in` proving a thrown rate-limit exception retains retry headers and status in the delivered `:error` event.
+
+Verification:
+- `clojure -M:test --focus psi.ai.core-test/test-stream-response-callback` passed (`1 tests, 10 assertions`).
+- `clojure -M:test --focus psi.ai.core-test --focus psi.turn-runtime.response-mode-test --focus psi.agent-session.prompt-lifecycle-telemetry-test` passed (`27 tests, 189 assertions`).
+- `clj-kondo --lint components/ai/src/psi/ai/streaming.clj components/ai/test/psi/ai/core_test.clj components/agent-session/test/psi/agent_session/prompt_lifecycle_telemetry_test.clj` passed with no errors or warnings.

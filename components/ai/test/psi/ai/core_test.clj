@@ -134,7 +134,33 @@
       (is (= :completed (:status @session)))
       (is (some #(= :text-delta (:type %)) @events))
       (is (some #(= :done (:type %)) @events))
-      (is (= "hello" (:delta (first (filter #(= :text-delta (:type %)) @events))))))))
+      (is (= "hello" (:delta (first (filter #(= :text-delta (:type %)) @events)))))))
+
+  (testing "stream-response-in preserves provider exception status and headers"
+    (let [conversation (-> (core/create-conversation "assistant")
+                           (core/send-message "hi"))
+          model        (models/get-model :claude-3-5-sonnet)
+          headers      {"Retry-After" "3"
+                        "RateLimit-Reset" "10"}
+          events       (atom [])
+          provider     {:name   :stub
+                        :stream (fn [_conversation _model _options _consume-fn]
+                                  (throw (ex-info "rate limited"
+                                                  {:status 429
+                                                   :headers headers})))}
+          ctx          (core/create-context {:providers {:anthropic provider}})
+          {bg :future
+           session :session}
+          (core/stream-response-in ctx conversation model {}
+                                   (fn [ev] (swap! events conj ev)))]
+      @bg
+      (let [event (first @events)]
+        (is (= :failed (:status @session)))
+        (is (= :error (:type event)))
+        (is (= 429 (:status event)))
+        (is (= 429 (:http-status event)))
+        (is (= headers (:headers event)))
+        (is (= headers (:provider-error/headers event)))))))
 
 ;; ─────────────────────────────────────────────────────────────────────────────
 ;; Streaming — lazy-seq API (isolated context, stub provider)
