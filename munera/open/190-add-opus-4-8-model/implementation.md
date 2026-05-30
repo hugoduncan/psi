@@ -174,3 +174,9 @@ Completed the three newly added ambiguity follow-up items in `design-steps.md` b
 - Persisted `speed-mode` / `effort-override` now have explicit shared-config accessor and app-runtime/session-default startup wiring. Explicit `:normal` speed and explicit nil effort are higher-precedence masks, while request shaping still treats provider-default values as omitted native params.
 - Mid-system capability checks now use the runtime-resolved active model (with OAuth/auth context where available), falling back to the stored session model only if runtime resolution fails, so OpenAI chat-completions and Codex/responses runtime overrides classify correctly.
 - `:mid-system` journal provenance is optional but expected: the extension API infers it from extension provenance when omitted, trusted/internal callers may pass `{:source ...}`, and dispatch stores the resulting source with a `:extension` fallback.
+
+---
+
+## Inconsistency follow-up — 2026-05-30 (latest pass)
+
+Read `design-steps.md` for newly added inconsistency-review follow-up items. No unchecked inconsistency follow-up items were present; the latest inconsistency review recorded no new actionable inconsistencies. No design changes were required for this pass.
