@@ -474,3 +474,9 @@ Decision recorded:
 ## Design inconsistency review pass — 2026-05-30 (latest independent verification)
 
 No new actionable inconsistencies found. Re-read `design.md` and checked referenced artifacts for model/provider schemas, Anthropic request shaping/validation, prompt request projection/current-user replacement, compaction rebuild rules, session resolvers, and shared-config resolution. Existing design concerns are already resolved or captured in checked `design-steps.md`; no duplicate follow-up items were added.
+
+---
+
+## Inconsistency follow-up execution — 2026-05-30 (latest no-op)
+
+Read `design-steps.md` for newly added unchecked inconsistency follow-up items after the preceding inconsistency-review pass. No unchecked design-step items were present, so no `design.md` changes were required. `plan.md` and `steps.md` were not touched.
