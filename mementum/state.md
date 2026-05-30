@@ -79,6 +79,7 @@ Bootstrapped on 2026-04-02.
 - Backlog: `105-agent-session-component-extraction-map`, `124-turn-execution-contract-extraction`, `149-reload-fixup-inventory-and-safety`, `141`/`144`/`147` workflow items, `186-built-in-skill-for-developing-extensions`
 
 ## Latest session notes
+- 2026-05-30: Task 190 latest inconsistency follow-up execution found no unchecked design-steps (`unchecked count 0`); implementation.md records the no-op pass and design/plan/steps were unchanged. Existing uncommitted test-file modifications were left untouched.
 - 2026-05-30: Task 190 Slice 4 foundation pass complete: added schema-valid `:system` AI messages, `:mid-system` journal projection, prepared-turn `user → system` tail preservation, Anthropic/OpenAI inline system transforms/schema, and focused tests/lint green. Remaining Slice 4 work is capability resolver/dispatch/extension mutation/compaction.
 - 2026-05-30: Task 190 Slice 3 is complete. Added `/effort` session/config/startup/resolver/footer/request-shaping stack; adaptive Anthropic `:xhigh` now sends `"highest"`, OpenAI/Codex cap override `:xhigh` to `"high"`; focused tests/lint green.
 - 2026-05-30: Task 190 Slice 2 is complete. Added cold-resume transience proof: resume now excludes session-transient `:speed-mode`, preserving nil canonical state with resolver display `:normal`; focused session lifecycle test/lint green. Commit `ed099c63`.

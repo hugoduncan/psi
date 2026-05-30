@@ -971,3 +971,24 @@ Read `design-steps.md` for unchecked ambiguity follow-up items added by the prec
 ## Design inconsistency review pass — 2026-05-30 (post compaction replay review)
 
 No new actionable inconsistencies found. Re-read `plan.md`, `steps.md`, `design-steps.md`, and recent `implementation.md` notes, then checked `design.md` for the relevant Slice 4/Slice 5 boundaries. The only current inconsistency-like concern is already captured as the unchecked Slice 4 follow-up in `steps.md`: compacted mid-system preservation must survive journal replay/cold resume. I did not add a duplicate `design-steps.md` item.
+
+## Follow-up implementation pass — 2026-05-30 — compaction journal replay preservation
+
+Executed the newly added actionable implementation-review follow-up for compaction persistence/resume safety:
+
+- Reused the mid-system preservation/coalescing path for `rebuild-messages-from-journal-entries`, so cold journal replay after a compaction entry preserves pre-cut active `:mid-system` instructions rather than only preserving them in the immediate runtime rebuilt message list.
+- `rebuild-messages-from-journal-entries` now derives pre-cut entries from the persisted compaction entry's `:first-kept-entry-id`, merges boundary mid-system entries with pre-cut active instructions, and applies the same retained-suffix normalization that avoids retroactive `retained user → system → retained assistant` insertion.
+- Added replay-focused compaction tests proving pre-cut `:mid-system` instructions survive after a compaction entry and that completed retained exchanges are normalized before replaying the preserved instruction.
+- Marked the new Slice 4 replay/cold-resume preservation step complete in `steps.md`.
+
+Verification:
+
+- `clj-paren-repair components/agent-session/src/psi/agent_session/compaction.clj components/agent-session/test/psi/agent_session/compaction_test.clj` — no changes needed.
+- `clojure -M:test --focus psi.agent-session.compaction-test` — 5 tests, 41 assertions, 0 failures.
+- `clj-kondo --lint components/agent-session/src/psi/agent_session/compaction.clj components/agent-session/test/psi/agent_session/compaction_test.clj` — clean.
+
+---
+
+## Inconsistency follow-up execution — 2026-05-30 (post-replay unchecked-item pass)
+
+Read `design-steps.md` for unchecked inconsistency follow-up items added by the preceding inconsistency-review pass. No unchecked design-step items were present (`unchecked count 0`), so there were no newly actionable design follow-ups to execute. No `design.md`, `plan.md`, or `steps.md` changes were required. Existing uncommitted test-file modifications were left untouched.
