@@ -29,6 +29,7 @@ Implement the task as two narrow root-cause fixes plus focused regression covera
    - Cover Codex `null` preservation if no existing test already protects it.
    - Cover prompted-JSON instruction wording.
    - Cover structured-output judge retry on validation failure and preservation of structured-output opts/schema across retries.
+   - Update the existing `execute-judge-invalid-structured-output-fails-locally-test` so it no longer expects immediate no-retry failure. Retarget it to the retry-exhaustion case, or replace it with equivalent coverage, so the test suite matches the planned structured-output retry behavior.
 
 ## Risks
 

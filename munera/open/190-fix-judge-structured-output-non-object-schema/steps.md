@@ -47,7 +47,8 @@
 - [ ] Add or update a workflow-judge test where the first structured-output judge result fails validation and a later retry succeeds.
 - [ ] Assert the retry path returns the successful routing result instead of `:invalid-structured-output`.
 - [ ] Assert each structured-output retry call receives the original structured-output opts/schema.
-- [ ] Add or update a test for exhausted structured-output retries returning `:invalid-structured-output`.
+- [ ] Update `execute-judge-invalid-structured-output-fails-locally-test` so it no longer asserts immediate no-retry failure; retarget it to the exhausted structured-output retry case or replace it with equivalent exhausted-retry coverage.
+- [ ] Add or update a test for exhausted structured-output retries returning `:invalid-structured-output` after retry attempts are used.
 - [ ] Add or update a test proving `:unsupported-structured-output` still fails immediately without retry.
 - [ ] Run focused workflow-judge tests and fix any failures.
 
