@@ -7,6 +7,7 @@ Implement the task as two narrow root-cause fixes plus focused regression covera
 1. Preserve all valid JSON values at provider structured-output result seams.
    - Change the Anthropic structured-output result helper to parse with `parse-json-value` and use parse success, not payload truthiness, to decide whether `:payload` is present.
    - Change the two OpenAI chat-completions structured-output result sites to parse with `parse-json-value` for both provider-native and prompted-JSON strategies.
+   - Preserve OpenAI chat-completions `:raw-payload` as the raw JSON response text, matching Anthropic and Codex, while storing the parsed JSON value only in `:payload`. This applies to scalar, array, object, boolean, number, and `null` outputs.
    - Preserve JSON `null` as a present `:payload nil`; do not treat it as parse failure.
    - Keep `parse-json-object` as an object-only helper.
    - Verify the existing OpenAI Codex helper preserves `:payload nil`; adjust only if implementation proves it gates success on payload truthiness.

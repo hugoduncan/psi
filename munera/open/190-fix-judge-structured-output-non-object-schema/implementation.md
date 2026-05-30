@@ -49,3 +49,5 @@
 2026-05-30 — Inconsistency follow-up execution: re-read `design-steps.md` after the preceding inconsistency-review pass. No newly added unchecked inconsistency follow-up items are present; `design.md` needed no changes and no blocking inconsistency design-step remains.
 
 2026-05-30 — Plan ambiguity review: found one actionable ambiguity in the OpenAI chat-completions provider-result slice. The plan/steps require switching parsed payload extraction to any JSON value, but referenced OpenAI code currently stores `:raw-payload` as the parsed payload while Anthropic/Codex store raw JSON text; the plan does not say whether OpenAI should preserve that legacy parsed `:raw-payload` shape or normalize it to raw text for scalar/array/null outputs.
+
+2026-05-30 — Ambiguity follow-up: clarified the plan/steps for OpenAI chat-completions `:raw-payload` semantics after switching structured-output extraction to `parse-json-value`. OpenAI chat-completions should preserve `:raw-payload` as the raw JSON response text, matching Anthropic and Codex, while parsed scalar/array/object/boolean/number/`null` values live only in `:payload`. Marked the ambiguity design-step complete.
