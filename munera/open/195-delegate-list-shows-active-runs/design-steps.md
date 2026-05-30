@@ -1,0 +1,1 @@
+- [ ] Clarify the `delegate list` visibility and retention contract: whether results are scoped to the invoking/originating session or global; which run/job field is the authoritative owner/session marker; and which terminal or retained statuses, if any, must remain listed versus hidden.
