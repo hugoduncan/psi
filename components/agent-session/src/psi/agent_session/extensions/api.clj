@@ -297,6 +297,24 @@
                            'psi.extension/append-message
                            {:role role
                             :content content}))
+        inject-mid-system-message!
+        (fn
+          ([text]
+           (let [result (mutate-ext-required :inject-mid-system-message
+                                             'psi.extension/inject-mid-system-message
+                                             {:text text})]
+             {:ok     (boolean (:psi.extension/ok? result))
+              :error  (:psi.extension/error result)
+              :reason (:psi.extension/reason result)}))
+          ([text opts]
+           (let [params (cond-> {:text text}
+                          (contains? opts :source) (assoc :source (:source opts)))
+                 result (mutate-ext-required :inject-mid-system-message
+                                             'psi.extension/inject-mid-system-message
+                                             params)]
+             {:ok     (boolean (:psi.extension/ok? result))
+              :error  (:psi.extension/error result)
+              :reason (:psi.extension/reason result)})))
         get-api-key
         (fn [provider]
           (if get-api-key-fn
@@ -340,6 +358,7 @@
      :set-worktree-path              set-worktree-path!
      :notify                         notify!
      :append-message                 append-message!
+     :inject-mid-system-message      inject-mid-system-message!
      :get-api-key                    get-api-key
      :events                         events
      :ui-type                        ui-type

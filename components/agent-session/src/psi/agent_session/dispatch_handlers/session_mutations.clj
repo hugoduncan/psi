@@ -7,6 +7,7 @@
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.journal-append-effect :as journal-append-effect]
+   [psi.agent-session.model-capabilities :as model-capabilities]
    [psi.session-persistence.core :as persist]
    [psi.session-state.init :as ss]
    [psi.state-kernel.dispatch :as kernel]
@@ -23,6 +24,37 @@
 (defn- schedule-record
   [session-data schedule-id]
   (get-in session-data [:scheduler :schedules schedule-id]))
+
+(defn- conversational-entry
+  [entry]
+  (case (:kind entry)
+    :message
+    (let [role (get-in entry [:data :message :role])]
+      (when (#{{"user" "assistant"} "user" "assistant"} role)
+        {:kind :message :role role}))
+
+    :mid-system
+    {:kind :mid-system :role "system"}
+
+    nil))
+
+(defn- latest-conversational-entry
+  [entries]
+  (last (keep conversational-entry entries)))
+
+(defn- mid-system-placement-error
+  [entries]
+  (let [latest (latest-conversational-entry entries)]
+    (case (:role latest)
+      nil         {:ok false :error :invalid-placement :reason :no-preceding-user}
+      "assistant" {:ok false :error :invalid-placement :reason :after-assistant}
+      "system"    {:ok false :error :invalid-placement :reason :pending-mid-system}
+      "user"      nil
+      {:ok false :error :invalid-placement :reason :no-preceding-user})))
+
+(defn- mid-system-entry
+  [text source]
+  (session-data/make-entry :mid-system {:text (str text) :source source}))
 
 (defn- register-session-config-handlers! []
   (register-core-handler!
@@ -124,6 +156,21 @@
    :session/set-worktree-path
    (fn [_ctx {:keys [session-id worktree-path]}]
      {:root-state-update (session/session-update session-id #(assoc % :worktree-path (str worktree-path)))}))
+
+  (register-core-handler!
+   :session/inject-mid-system-message
+   (fn [ctx {:keys [session-id text source]}]
+     (cond
+       (not (model-capabilities/session-supports-mid-system-messages? ctx session-id))
+       {:return {:ok false :error :capability-not-supported}}
+
+       :else
+       (let [entries (persist/all-entries-in ctx session-id)]
+         (if-let [placement-error (mid-system-placement-error entries)]
+           {:return placement-error}
+           (let [entry (mid-system-entry text (or source :extension))]
+             {:root-state-update (persist/append-journal-entry-root-update session-id entry)
+              :return {:ok true}}))))))
 
   (register-core-handler!
    :session/set-cache-breakpoints

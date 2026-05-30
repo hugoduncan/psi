@@ -5,6 +5,7 @@
    [com.wsscode.pathom3.connect.operation :as pco]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.message-text :as message-text]
+   [psi.agent-session.model-capabilities :as model-capabilities]
    [psi.agent-session.resolvers.support :as support]
    [psi.session-state.model :as session]
    [psi.session-state.state :as ss]
@@ -473,6 +474,14 @@
      :psi.agent-session/effective-reasoning-effort
      (effective-reasoning-effort model level)}))
 
+(pco/defresolver agent-session-model-mid-system-support
+  "Resolve whether the runtime active model supports mid-conversation system messages."
+  [{:keys [psi/agent-session-ctx psi.agent-session/session-id]}]
+  {::pco/input  [:psi/agent-session-ctx :psi.agent-session/session-id]
+   ::pco/output [:psi.agent-session/model-supports-mid-system-messages]}
+  {:psi.agent-session/model-supports-mid-system-messages
+   (model-capabilities/session-supports-mid-system-messages? agent-session-ctx session-id)})
+
 (defn- runtime-model-catalog
   "Return deterministic runtime model catalog for frontend selectors."
   []
@@ -622,6 +631,7 @@
    agent-session-model-provider
    agent-session-model-id
    agent-session-model-reasoning
+   agent-session-model-mid-system-support
    agent-session-model-catalog
    agent-session-authenticated-providers
    agent-session-rpc-trace

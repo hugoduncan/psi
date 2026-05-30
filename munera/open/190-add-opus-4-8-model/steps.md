@@ -68,25 +68,25 @@
 - [x] Add Anthropic transform placement validation that allows `user → system` even when system is final, and drops/logs invalid beginning, consecutive-system, or after-assistant system messages.
 - [x] Add Anthropic request schema support for inline system messages with text-block content.
 - [x] Extend OpenAI chat-completions message transformation to map internal `:system` to wire role `"system"`.
-- [ ] Add a shared model-supports-mid-system predicate using runtime-resolved model data, explicit metadata, and OpenAI chat-completions API-shape inference.
-- [ ] Add `:psi.agent-session/model-supports-mid-system-messages` resolver using the shared capability predicate.
-- [ ] Add `:session/inject-mid-system-message` dispatch handler with capability gating and placement validation that ignores non-conversational metadata after the latest user turn.
-- [ ] Ensure invalid injection placements return `:invalid-placement` reason maps and do not mutate the journal.
-- [ ] Add `inject-mid-system-message!` to the extension API with text-only and text/options arities.
-- [ ] Add `psi.extension/inject-mid-system-message` Pathom mutation with optional `:source` and `:ext-path` provenance inference.
-- [ ] Register the extension mutation in `all-mutations` and `session-scoped-extension-mutation-ops`.
-- [ ] Translate Pathom mutation results back to the compact extension API result contract.
+- [x] Add a shared model-supports-mid-system predicate using runtime-resolved model data, explicit metadata, and OpenAI chat-completions API-shape inference.
+- [x] Add `:psi.agent-session/model-supports-mid-system-messages` resolver using the shared capability predicate.
+- [x] Add `:session/inject-mid-system-message` dispatch handler with capability gating and placement validation that ignores non-conversational metadata after the latest user turn.
+- [x] Ensure invalid injection placements return `:invalid-placement` reason maps and do not mutate the journal.
+- [x] Add `inject-mid-system-message!` to the extension API with text-only and text/options arities.
+- [x] Add `psi.extension/inject-mid-system-message` Pathom mutation with optional `:source` and `:ext-path` provenance inference.
+- [x] Register the extension mutation in `all-mutations` and `session-scoped-extension-mutation-ops`.
+- [x] Translate Pathom mutation results back to the compact extension API result contract.
 - [ ] Extend compaction `entry->message` to handle `:mid-system` entries.
 - [ ] Implement compaction preservation for pre-cut active mid-system instructions by coalescing them at a valid next-generation boundary.
 - [ ] Implement compaction cut-normalization so preserved mid-system instructions are not inserted before already-retained assistant history.
 - [ ] Merge retained boundary `:mid-system` entries with pre-cut coalesced instructions to avoid adjacent system messages.
-- [ ] Add tests for model capability flags and OpenAI chat-completions inference, including custom/runtime-loaded model maps.
-- [ ] Add tests for the EQL capability resolver and dispatch gating agreement.
-- [ ] Add tests for successful and rejected mid-system injection, including non-conversational metadata after the latest user turn.
+- [x] Add tests for model capability flags and OpenAI chat-completions inference, including custom/runtime-loaded model maps.
+- [x] Add tests for the EQL capability resolver and dispatch gating agreement.
+- [x] Add tests for successful and rejected mid-system injection, including non-conversational metadata after the latest user turn.
 - [ ] Add tests for journal projection, prepared-turn current-user replacement, and conversation normalization.
 - [ ] Add tests for Anthropic valid/invalid inline system transform behavior and request schema acceptance.
 - [ ] Add tests for OpenAI chat-completions system-role transformation.
-- [ ] Add nullable extension-helper integration coverage for `inject-mid-system-message!`.
+- [x] Add nullable extension-helper integration coverage for `inject-mid-system-message!`.
 - [ ] Add compaction tests covering summary-boundary attachment, retained pending-user attachment, cut advancement over completed user/assistant exchanges, and boundary mid-system merge.
 
 ## Slice 5 — Integration and coherence
