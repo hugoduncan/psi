@@ -63,7 +63,7 @@
    invocation correlation data."
   [active-session-id-fn]
   (fn [_ctx]
-    (if-let [session-id (not-empty (str (or (active-session-id-fn) "")))]
+    (if-let [session-id (not-empty (str/trim (str (or (active-session-id-fn) ""))))]
       {:psi.ui/type :emacs
        :psi.ui/available? true
        :psi.ui/capabilities [make-visible-capability]

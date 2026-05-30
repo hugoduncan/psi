@@ -74,14 +74,21 @@
              (:psi.ui/capabilities result)))
       (is (= "s1"
              (get-in action [:psi.ui.action/invocation :psi.ui.invocation/session-id]))))
-    (reset! active-session-id* nil)
-    (let [result (session/query-in ctx ui-query)]
-      (is (= :emacs (:psi.ui/type result)))
-      (is (= false (:psi.ui/available? result)))
-      (is (= [] (:psi.ui/capabilities result)))
-      (is (= [] (:psi.ui/actions result)))
-      (is (= :psi.ui.unavailable.reason/no-attached-ui
-             (get-in result [:psi.ui/make-visible-action :psi.ui.action/unavailable-reason]))))))
+    (doseq [unfocused-id [nil "" "   " "\n\t"]]
+      (reset! active-session-id* unfocused-id)
+      (let [result (session/query-in ctx ui-query)]
+        (is (= :emacs (:psi.ui/type result)))
+        (is (= false (:psi.ui/available? result)))
+        (is (= [] (:psi.ui/capabilities result)))
+        (is (= [] (:psi.ui/actions result)))
+        (is (= :psi.ui.unavailable.reason/no-attached-ui
+               (get-in result [:psi.ui/make-visible-action :psi.ui.action/unavailable-reason])))))
+    (reset! active-session-id* "  s2  ")
+    (let [result (session/query-in ctx ui-query)
+          action (:psi.ui/make-visible-action result)]
+      (is (= true (:psi.ui/available? result)))
+      (is (= "s2"
+             (get-in action [:psi.ui.action/invocation :psi.ui.invocation/session-id]))))))
 
 (deftest console-provider-query-behaviour-test
   ;; Tests that attached console UI is available but unsupported for make-visible.

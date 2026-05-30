@@ -91,4 +91,4 @@
 - [x] Update `create-nullable-extension-api` so documented UI capability queries that include `:psi.ui/diagnostic` return the nullable unsupported-console UI capability map, and add coverage for that query shape.
 - [x] Validate and cover provider results that set `:psi.ui/available? false` while advertising capabilities or available actions; they must not expose contradictory available action descriptors through EQL.
 - [x] Ensure RPC/Emacs contexts do not expose the default static Emacs make-visible provider before the late-bound RPC UI capability provider is installed; add coverage for bootstrap/pre-install unavailable semantics.
-- [ ] Normalize/trim Emacs RPC focused session ids before advertising make-visible availability, and cover nil/blank/whitespace focus state as no-attached UI.
+- [x] Normalize/trim Emacs RPC focused session ids before advertising make-visible availability, and cover nil/blank/whitespace focus state as no-attached UI.

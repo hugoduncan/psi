@@ -498,3 +498,12 @@ Verification:
 ## 2026-05-30 implementation review
 
 Found one new actionable implementation issue after re-reading task artifacts, UI capability/provider code, RPC runtime wiring, docs, and focused tests: `emacs-rpc-provider` intends to downgrade nil or blank focused session ids to no-attached UI, but it checks `(not-empty (str ...))`, so whitespace-only focus ids (for example `"   "`) still advertise an available make-visible action with invalid session correlation. Normalize/trim the focused session id before advertising availability, and add coverage proving blank/whitespace focus state returns no-attached semantics.
+
+## 2026-05-30 Emacs RPC focused-session normalization follow-up
+
+Completed the newly added implementation-review follow-up for Emacs RPC focused-session correlation. `emacs-rpc-provider` now trims the focused session id before advertising make-visible availability, treats nil/blank/whitespace focus state as no-attached UI, and stores the trimmed session id in descriptor invocation correlation data. Added focused coverage for nil, empty, whitespace, and padded focused-session values.
+
+Verification:
+
+- `clojure -M:test --focus psi.agent-session.ui-capabilities-test` — 15 tests, 107 assertions, 0 failures.
+- `clj-kondo --lint components/agent-session/src/psi/agent_session/ui_capabilities.clj components/agent-session/test/psi/agent_session/ui_capabilities_test.clj` — clean.
