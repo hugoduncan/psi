@@ -432,3 +432,11 @@ No new actionable ambiguities found. Re-read `design.md` and checked the referen
 ## Ambiguity follow-up execution — 2026-05-30 (post-review pass)
 
 Read `design-steps.md` for newly added unchecked ambiguity follow-up items after the preceding ambiguity-review pass. No unchecked ambiguity items were present; all ambiguity follow-ups are already marked complete. No `design.md` changes were required. `plan.md` and `steps.md` were not touched.
+
+---
+
+## Design inconsistency review pass — 2026-05-30 (compaction placement verification)
+
+**New actionable inconsistency found:**
+
+1. **Compaction can place preserved mid-system instructions before retained user history** — Part 4 defines Anthropic-safe mid-system placement as immediately after the most recent user turn and before the assistant response being generated, and the injection API only permits the latest-user tail shape. But the compaction rule coalesces pre-cut active `:mid-system` entries immediately after the synthetic summary user turn, then carries retained post-cut history normally. If the retained post-cut history starts with a user turn, the rebuilt request becomes `summary user → system → retained user ...`, so the preserved system message is no longer attached to the most recent user turn / next assistant generation despite passing the weaker provider validation rule of “preceded by a user”. Align compaction preservation with the placement contract by specifying how to handle retained history that begins with a user (for example attach the coalesced instruction to the latest retained user before generation, define `user → system → user` as intentionally valid, or choose a cut/merge rule that preserves the latest-user tail invariant).
