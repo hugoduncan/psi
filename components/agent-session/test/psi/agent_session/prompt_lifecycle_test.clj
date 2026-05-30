@@ -4,7 +4,7 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
    [psi.agent-session.dispatch]
-   [psi.agent-session.extensions]
+   [psi.agent-session.extensions :as ext]
    [psi.agent-session.prompt-chain]
    [psi.agent-session.prompt-request]
    [psi.turn-runtime.core]
@@ -696,3 +696,30 @@
                             {:origin :core}))
     (is (= ["q1" "q2"] @seen-prompts))
     (is (= [] (:follow-up-messages (ss/get-session-data-in ctx session-id))))))
+
+(deftest prompt-execution-result-retryable-error-enters-retrying-and-schedules-retry-test
+  (testing "canonical prompt lifecycle should schedule retry/backoff for retryable provider errors"
+    (let [[ctx session-id] (create-session-context {:persist? false})
+          reg             (:extension-registry ctx)
+          seen            (atom [])
+          attempts        (atom 0)]
+      (ext/register-extension-in! reg "/ext/provider-telemetry")
+      (ext/register-handler-in! reg "/ext/provider-telemetry" "provider_retry_scheduled" #(swap! seen conj %))
+      (with-redefs [psi.turn-runtime.core/execute-prepared-request!
+                    (fn [_ai-ctx _ctx sid prepared _pq]
+                      (swap! attempts inc)
+                      {:execution-result/turn-id (:prepared-request/id prepared)
+                       :execution-result/session-id sid
+                       :execution-result/assistant-message {:role "assistant"
+                                                            :content [{:type :error :text "Connection reset by peer"}]
+                                                            :stop-reason :error
+                                                            :error-message "Connection reset by peer"
+                                                            :timestamp (java.time.Instant/now)}
+                       :execution-result/turn-outcome :turn.outcome/error
+                       :execution-result/tool-calls []
+                       :execution-result/error-message "Connection reset by peer"
+                       :execution-result/stop-reason :error})]
+        (psi.agent-session.turn/prompt-execution-result-in! ctx session-id "trigger transient connection error"))
+      (is (= :retrying (ss/sc-phase-in ctx session-id)))
+      (is (= ["provider_retry_scheduled"] (mapv :type @seen)))
+      (is (= 1 @attempts)))))
