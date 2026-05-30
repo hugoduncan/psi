@@ -77,3 +77,7 @@ Found one new actionable inconsistency: `design.md` says the UI capability/actio
 
 Completed the newly added model-ownership wording follow-up in `design.md`: the UI capability/action model is now described as core/runtime-owned at the query/provider contract boundary, while advertised capabilities/actions are explicitly derived on demand and not stored or cached in root state.
 
+
+## 2026-05-30 design ambiguity review
+
+Found one new actionable ambiguity after re-reading `design.md` against runtime/RPC/TUI attachment seams: the provider contract says an optional provider lives in runtime context, but adapter-local UI attachment/focus state is created and owned outside the agent-session ctx (RPC connection state after ctx creation, TUI UI state), so the design does not define the provider installation/lifetime/update path that makes the single active UI provider accurately reflect attached/detached frontend state.
