@@ -76,3 +76,13 @@ Decisions recorded:
 ## Design inconsistency review pass — 2026-05-30
 
 No new actionable inconsistencies found beyond the existing unchecked `design-steps.md` follow-ups. Re-read `design.md` against the referenced model/provider/session-state/request/compaction command surfaces; remaining concerns are already captured and were not duplicated.
+
+---
+
+## Inconsistency follow-up — 2026-05-30
+
+Completed the newly added inconsistency follow-up items in `design-steps.md` by verifying the current `design.md` already contains the required refinements from the preceding follow-up passes:
+
+- `/effort` accepts optional scope syntax `<value> [session|project|user]`; command help, persistence scope, shared-config, and acceptance criteria are aligned.
+- Anthropic adaptive `:xhigh` maps to `"highest"` with no transparent fallback or warning in this slice; provider 400s surface as-is.
+- Mid-system placement is aligned across the design: dispatch accepts injection only after the latest user turn with no pending mid-system entry, the next request may include that system message as the final message, Anthropic validation allows final system-after-user messages, and invalid placements are rejected before journal mutation.
