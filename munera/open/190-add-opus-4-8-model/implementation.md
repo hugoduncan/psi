@@ -554,3 +554,9 @@ Completed the newly added inconsistency follow-up item in `design-steps.md` by r
 ## Design ambiguity review pass — 2026-05-30 (final verification)
 
 No new actionable ambiguities found. Re-read `design.md` and checked referenced model catalog/schema, shared-config startup resolution, session request options, command/status display surfaces, provider request shaping/validation, OpenAI Codex effort path, extension mutation bridge, journal projection/current-user replacement, and compaction preservation rules. Existing ambiguity follow-ups in `design-steps.md` are already checked; no duplicate follow-up items were added.
+
+---
+
+## Ambiguity follow-up execution — 2026-05-30 (final no-op)
+
+Read `design-steps.md` for newly added unchecked ambiguity follow-up items after the preceding ambiguity-review pass. No unchecked ambiguity items were present; all ambiguity follow-ups are already marked complete. No `design.md` changes were required. `plan.md` and `steps.md` were not touched.
