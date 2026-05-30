@@ -247,3 +247,4 @@ Bootstrapped on 2026-04-02.
 
 - 2026-05-30: Task 190 follow-up implementation complete: successful `:session/inject-mid-system-message` now emits equivalent `:persist/session-journal-io` for flushed session journals, and `:mid-system` entries count as persistence anchors. Focused Slice 4 verification passed (`153 tests, 822 assertions`) and targeted lint is clean. Remaining task work is Slice 5 docs/changelog/full verification.
 - 2026-05-30: Task 190 compaction replay follow-up complete: `rebuild-messages-from-journal-entries` now reuses mid-system preservation/coalescing semantics so pre-cut active `:mid-system` instructions survive cold journal replay after compaction; focused compaction test and targeted lint green.
+- 2026-05-30: Task 190 inconsistency follow-up execution after the latest no-new-feedback review found no unchecked design-steps (`unchecked count 0`); implementation.md records the no-op pass and design/plan/steps were unchanged.

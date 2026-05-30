@@ -1094,3 +1094,9 @@ Actionable test feedback found:
 ## Design inconsistency review pass — 2026-05-30 (plan/steps final no-new-actionable)
 
 No new actionable inconsistencies found. Re-read `plan.md`, `steps.md`, `design-steps.md`, and latest `implementation.md` notes, then checked referenced task surfaces for Opus 4.8, `/speed`, `/effort`, mid-system injection, docs/changelog ownership, final verification evidence, and the existing test-review follow-up. The only unchecked task item is the already-recorded test-review follow-up in `steps.md`; it is not a new plan/steps inconsistency and was not duplicated in `design-steps.md`. Pre-existing uncommitted edits in `components/agent-session/test/psi/agent_session/commands_test.clj` and `components/ai/test/psi/ai/providers/openai_test.clj` were left untouched.
+
+---
+
+## Inconsistency follow-up execution — 2026-05-30 (post-plan no-op)
+
+Read `design-steps.md` for unchecked inconsistency follow-up items added by the preceding inconsistency-review pass. No unchecked design-step items were present (`unchecked count 0`), so there were no newly actionable inconsistency follow-ups to execute. No `design.md`, `plan.md`, or `steps.md` changes were required. Pre-existing uncommitted edits in `components/agent-session/test/psi/agent_session/commands_test.clj` and `components/ai/test/psi/ai/providers/openai_test.clj` were left untouched.
