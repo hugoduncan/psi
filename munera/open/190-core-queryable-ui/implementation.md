@@ -553,3 +553,7 @@ Verification:
 ## 2026-05-30 implementation review
 
 No new actionable implementation feedback after reviewing task artifacts, UI capability normalization/resolver code, context provider lifecycle wiring, RPC/TUI provider installation, Emacs command implementation, nullable API support, extension docs, and focused tests. The latest review-fixed issues for diagnostic redaction, nullable diagnostic queries, contradictory unavailable provider output, RPC/TUI late provider lifecycle, focus-session normalization, and descriptor/invocation foreign-key rejection are covered by focused tests. Verification: `clojure -M:test --focus psi.agent-session.ui-capabilities-test --focus psi.agent-session.graph-surface-test --focus psi.app-runtime-test --focus psi.rpc-transport-test` — 79 tests, 2580 assertions, 0 failures.
+
+## 2026-05-30 test review
+
+Found one new actionable test issue after reviewing task artifacts, UI capability/provider tests, RPC/TUI lifecycle tests, nullable API coverage, extension docs, and Emacs UI code: the Emacs Lisp `psi-emacs-show-active` command implementation has no direct test coverage. Existing tests prove the descriptor advertises `psi-emacs-show-active` and byte-compilation catches syntax errors, but no test proves the command locates the active/current Psi buffer, calls the prompt-focus path after `pop-to-buffer`, or errors when no active Psi buffer exists. Add focused Emacs UI coverage or explicitly justify why byte-compile-only proof is sufficient for this frontend behaviour.
