@@ -1169,3 +1169,9 @@ Verification:
 ## Design ambiguity review pass — 2026-05-30 (plan/steps no-new-actionable after effort coverage)
 
 No new actionable ambiguities found. Re-read `plan.md`, `steps.md`, `design-steps.md`, and recent `implementation.md` notes, then checked representative referenced code/tests/docs for Opus 4.8, `/speed`, `/effort`, mid-system injection, provider request shaping, shared-config startup/resume semantics, compaction replay, docs/changelog, and the latest effort-override test follow-up. The task plan and steps remain unambiguous: five vertical slices, Slice 5 owns documentation/changelog and broad verification, all `steps.md` and `design-steps.md` items are checked, and the latest test-review follow-up has been completed. No duplicate follow-up item was added.
+
+---
+
+## Ambiguity follow-up execution — 2026-05-30 (post-effort-coverage unchecked-item pass)
+
+Read `design-steps.md` for unchecked ambiguity follow-up items added by the preceding ambiguity-review pass. No unchecked ambiguity design-step items were present (`unchecked count 0`), so there were no newly actionable ambiguity follow-ups to execute. No `design.md`, `plan.md`, or `steps.md` changes were required.
