@@ -115,4 +115,4 @@
 
 - [x] Align `psi.extension/inject-mid-system-message` Pathom mutation `::pco/params` with its implemented optional provenance inputs (`:source` and `:ext-path`), and add/adjust coverage so the declared mutation contract includes those keys.
 - [x] Make `psi.agent-session.model-capabilities/supports-mid-system-messages?` honor explicit `:supports-mid-conversation-system-messages false` before OpenAI chat-completions API-shape inference, and add coverage for an OpenAI chat-completions runtime/custom model with the flag explicitly false.
-- [ ] Shape mid-system compaction boundary normalization so preserved pre-cut `:mid-system` instructions do not leave retained assistant/toolResult segments as `summary user → system → toolResult`; add focused coverage for retained assistant tool-use plus tool-result history.
+- [x] Shape mid-system compaction boundary normalization so preserved pre-cut `:mid-system` instructions do not leave retained assistant/toolResult segments as `summary user → system → toolResult`; add focused coverage for retained assistant tool-use plus tool-result history.

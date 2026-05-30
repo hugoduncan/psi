@@ -79,6 +79,7 @@ Bootstrapped on 2026-04-02.
 - Backlog: `105-agent-session-component-extraction-map`, `124-turn-execution-contract-extraction`, `149-reload-fixup-inventory-and-safety`, `141`/`144`/`147` workflow items, `186-built-in-skill-for-developing-extensions`
 
 ## Latest session notes
+- 2026-05-30: Task 190 code-shaper follow-up complete: compaction retained-suffix normalization now advances past retained assistant tool-use plus contiguous `toolResult` messages before placing preserved `:mid-system`; added direct rebuild and journal replay coverage; focused compaction test/lint green; checked the follow-up in `steps.md`.
 - 2026-05-30: Task 190 code-shaper review found actionable compaction boundary issue: mid-system preservation normalization drops only through last assistant, so retained assistant/toolResult tails can rebuild as `summary user → system → toolResult`. Added unchecked `steps.md` follow-up and implementation review note.
 - 2026-05-30: Task 190 test-shaper pass after capability-predicate follow-up found no new actionable test-shaping feedback; focused speed/effort/mid-system/compaction/provider verification passed (`65 tests, 496 assertions`); implementation.md records the pass and steps.md was unchanged.
 - 2026-05-30: Task 190 code-shaper follow-up complete: `supports-mid-system-messages?` now lets explicit `:supports-mid-conversation-system-messages false` override OpenAI chat-completions inference; added focused resolver coverage for a custom disabled OpenAI chat model; focused test/lint green; checked the follow-up in `steps.md`.

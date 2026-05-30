@@ -1307,3 +1307,19 @@ No new actionable documentation feedback found. Applied `.psi/skills/review-task
 Actionable code-shaping feedback found:
 
 1. **Mid-system compaction cut-normalization is role-local and can leave orphan retained tool results before the next-generation boundary** — `normalize-retained-suffix-for-mid-system` drops retained history only through the last `"assistant"` message before placing preserved `:mid-system` text. If the retained suffix contains an assistant tool-use followed by `toolResult` entries, the helper can keep trailing `toolResult` messages while moving the preserved system instruction to the summary boundary, rebuilding an invalid/non-local sequence like `summary user → system → toolResult`. Shape the compaction boundary normalization around complete conversational/tool-result segments rather than only the last assistant role, and add focused coverage for retained assistant/toolResult history.
+
+---
+
+## Code-shaper follow-up execution — 2026-05-30 (mid-system compaction tool-result boundary)
+
+Completed the newly added code-shaper follow-up from `steps.md`.
+
+Changes:
+- Updated compaction retained-suffix normalization so preserved pre-cut/boundary `:mid-system` instructions advance past the last retained assistant and its contiguous `toolResult` messages before placement.
+- Added focused compaction coverage for retained assistant tool-use plus tool-result history in both direct rebuild and journal replay paths, proving rebuilt messages do not become `summary user → system → toolResult`.
+- Marked the code-shaper follow-up checked in `steps.md`.
+
+Verification:
+- `clj-paren-repair components/agent-session/src/psi/agent_session/compaction.clj components/agent-session/test/psi/agent_session/compaction_test.clj`
+- `clojure -M:test --focus psi.agent-session.compaction-test` (`5 tests, 49 assertions`)
+- `clj-kondo --lint components/agent-session/src/psi/agent_session/compaction.clj components/agent-session/test/psi/agent_session/compaction_test.clj`

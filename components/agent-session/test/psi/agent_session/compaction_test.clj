@@ -28,6 +28,11 @@
               :name name
               :arguments (str "{\"path\":\"" path "\"}")}]})
 
+(defn- tool-result-message [tool-call-id result]
+  {:role "toolResult"
+   :tool-call-id tool-call-id
+   :content [{:type :text :text result}]})
+
 (defn- session-with-user-entries
   [n]
   (let [entries (mapv (fn [i]
@@ -187,6 +192,24 @@
       (is (= (system-message "Future-only instruction")
              (select-keys (second msgs) [:role :content])))))
 
+  (testing "advances cut past retained assistant tool-use plus tool-result before placing preserved mid-system"
+    (let [u1     (persist/message-entry (user-message "u1"))
+          mid    (mid-system-entry "Future-only tool instruction")
+          u2     (persist/message-entry (user-message "u2"))
+          a2     (persist/message-entry (assistant-toolcall-message "read" "src/a.clj"))
+          tr2    (persist/message-entry (tool-result-message "tc-read" "ok"))
+          sd     (assoc (session/initial-session)
+                        :session-entries [u1 mid u2 a2 tr2]
+                        :context-tokens 50000)
+          result {:summary "Summary."
+                  :first-kept-entry-id (:id u2)
+                  :tokens-before 50000}
+          msgs   (compaction/rebuild-messages-from-entries result sd)]
+      (is (= ["user" "system"] (mapv :role msgs))
+          "retained user/assistant/toolResult exchange is summarized rather than leaving summary user → system → toolResult")
+      (is (= (system-message "Future-only tool instruction")
+             (select-keys (second msgs) [:role :content])))))
+
   (testing "merges retained boundary mid-system entries with pre-cut instructions"
     (let [u1     (persist/message-entry (user-message "u1"))
           old    (mid-system-entry "Old active instruction")
@@ -273,6 +296,24 @@
           msgs (compaction/rebuild-messages-from-journal-entries [u1 mid u2 a2 comp])]
       (is (= ["user" "system"] (mapv :role msgs)))
       (is (= (system-message "Future-only replay instruction")
+             (select-keys (second msgs) [:role :content])))))
+
+  (testing "normalizes retained assistant tool-use and tool-result before replaying preserved mid-system instructions"
+    (let [u1   (persist/message-entry (user-message "u1"))
+          mid  (mid-system-entry "Future-only replay tool instruction")
+          u2   (persist/message-entry (user-message "u2"))
+          a2   (persist/message-entry (assistant-toolcall-message "read" "src/a.clj"))
+          tr2  (persist/message-entry (tool-result-message "tc-read" "ok"))
+          comp (persist/compaction-entry
+                {:summary "Summary before u2"
+                 :first-kept-entry-id (:id u2)
+                 :tokens-before 123
+                 :details nil}
+                false)
+          msgs (compaction/rebuild-messages-from-journal-entries [u1 mid u2 a2 tr2 comp])]
+      (is (= ["user" "system"] (mapv :role msgs))
+          "retained assistant/toolResult history is summarized rather than leaving summary user → system → toolResult")
+      (is (= (system-message "Future-only replay tool instruction")
              (select-keys (second msgs) [:role :content])))))
 
   (testing "preserves post-compaction history while replaying preserved mid-system instructions"

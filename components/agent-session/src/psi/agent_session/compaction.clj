@@ -502,12 +502,18 @@
 (defn- normalize-retained-suffix-for-mid-system
   [messages]
   ;; Preserved mid-system instructions must attach to the next generation
-  ;; boundary, not to already-generated retained assistant history. Dropping
-  ;; everything through the last retained assistant mirrors advancing the
-  ;; compaction cut past completed retained exchanges.
-  (if-let [last-assistant-index (last-role-index messages "assistant")]
-    (subvec (vec messages) (inc last-assistant-index))
-    (vec messages)))
+  ;; boundary, not to already-generated retained assistant/tool-result history.
+  ;; Dropping everything through the last retained assistant and its contiguous
+  ;; tool results mirrors advancing the compaction cut past completed retained
+  ;; exchanges.
+  (let [messages (vec messages)]
+    (if-let [last-assistant-index (last-role-index messages "assistant")]
+      (let [trailing-tool-result-indexes (take-while #(= "toolResult" (:role (nth messages %)))
+                                                     (range (inc last-assistant-index) (count messages)))
+            drop-through-index          (or (last trailing-tool-result-indexes)
+                                            last-assistant-index)]
+        (subvec messages (inc drop-through-index)))
+      messages)))
 
 (defn- insert-after-latest-user
   [messages system-message]
