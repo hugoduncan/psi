@@ -69,6 +69,8 @@ Bootstrapped on 2026-04-02.
 
 ## Latest session notes
 
+- 2026-05-30: Task 190 implementation review found one new actionable gap after the async streaming metadata follow-up: `psi.ai.streaming/exception->error-event` now preserves normalized `:provider-error/headers`, but `turn-runtime/make-provider-event-consumer` forwards only `:headers` from streaming `:error` events into `:turn/error`. Added task follow-up to cover background streaming errors carrying only `:provider-error/headers` and forward those headers before retry metadata calculation. Committed `294b836a`.
+
 - 2026-05-30: Task 190 review follow-up completed async streaming exception metadata preservation: `psi.ai.streaming/exception->error-event` now carries `:headers`, `:provider-error/headers`, `:http-status`, and `:status` from provider exception ex-data through the background streaming future path. Focused AI/turn-runtime/prompt telemetry tests and targeted clj-kondo passed.
 
 - 2026-05-30: Task 190 implementation-review follow-up completed terminal telemetry duplication fix: canonical prompt-lifecycle terminal provider failures now prove exactly one `provider_request_finished` event is dispatched to `/ext/provider-telemetry`, and legacy `:on-agent-done` compatibility telemetry is gated when provider-boundary retry outcome metadata is already present. Focused prompt/statechart/turn-runtime/EQL verification passed (`52 tests, 285 assertions`) and targeted clj-kondo passed.
@@ -91,13 +93,4 @@ Bootstrapped on 2026-04-02.
 
 - 2026-05-29: Task 189 inconsistency follow-up complete: review-step max-iteration protection now belongs on deterministic `follow-up` → `review` loopback (`:max-iterations 6`) because runtime iteration counts are target-step keyed; `review` → `follow-up` routes actionable feedback without the loop guard.
 
-- 2026-05-29: Task 189 ambiguity follow-up complete: design now requires `review-step` `:review-result` to be provider-native only with `:fallback :none` / `:require-provider-native? true`, preserving the prose final reply plus legacy `PASS_STATUS:` token and failing unsupported native structured output before routing/follow-up.
-
-- 2026-05-29: Task 189 ambiguity review found one new actionable ambiguity: the `review` actor must keep a prose final reply ending with `PASS_STATUS`, but adding `:review-result` without an explicit strategy can use prompted-JSON fallback whose JSON-only final text conflicts with that token/prose routing surface. Added an unchecked `design-steps.md` follow-up and committed the review.
-
-- 2026-05-29: Task 189 inconsistency follow-up complete: aligned `review-step` structured status routing to source the validated `:review-result` value via `:path [:status]`, documented that raw structured-output envelope internals are not part of the workflow ref contract, and marked the design-step done.
-
-- 2026-05-30: Task 190 follow-up final-marker gap is complete: provider retry EQL `:psi.provider-retry/final?` now matches scheduled retry attempts by final lifecycle `:retry-attempt`, including cancelled suppressed attempts; focused retry/EQL tests and targeted lint passed.
-- 2026-05-30: Task 190 is closed. Final pass re-read task artifacts, confirmed all implementation checklist items complete, reran broad `bb test` green, moved `munera/open/190-ai-request-retry-backoff-observability/` to `munera/closed/190-ai-request-retry-backoff-observability/`, and updated `munera/plan.md`. Provider-boundary retry/backoff observability work is implementation-complete.
-
-- 2026-05-30: Task 190 final implementation-review follow-up completed streaming thrown-exception retry header handling. `execute-live-turn!` now converts synchronous streaming provider exceptions with `ex-data` headers/status into the generic turn error path, preserving retry headers for provider-boundary retry metadata. Added focused coverage for thrown streaming `Retry-After`/rate-limit headers and reran focused header/streaming retry tests plus targeted clj-kondo green.
+- 2026-05-29: Task 189 ambiguity follow-up complete: review-step `:review-result` is provider-native only with `:fallback :none` / `:require-provider-native? true`, preserving the prose final reply plus legacy `PASS_STATUS:` token and failing unsupported native structured output before routing/follow-up.
