@@ -311,6 +311,33 @@
                   "leaked-adapter-data"))))
         (str "expected provider-error for extra invocation key: " (pr-str extra-key)))))
 
+(deftest provider-normalization-same-namespace-invocation-keys-test
+  ;; Tests that per-kind invocation schemas are closed even for same-namespace
+  ;; extras, so provider-local data cannot appear under plausible contract keys.
+  (doseq [[kind invocation extra-key]
+          [[:emacs-command
+            {:psi.ui.invocation/kind :emacs-command
+             :psi.ui.invocation/command "psi-emacs-show-active"}
+            :psi.ui.invocation/payload]
+           [:ui-event
+            {:psi.ui.invocation/kind :ui-event
+             :psi.ui.invocation/event :psi.ui/show-active}
+            :psi.ui.invocation/command]
+           [:bash-command
+            {:psi.ui.invocation/kind :bash-command
+             :psi.ui.invocation/argv ["tmux" "switch-client" "-t" "psi"]}
+            :psi.ui.invocation/mutation]
+           [:mutation
+            {:psi.ui.invocation/kind :mutation
+             :psi.ui.invocation/mutation 'psi.ui/show-active}
+            :psi.ui.invocation/env]]]
+    (is (provider-error?
+         (ui-capabilities/normalize-provider-result
+          (valid-provider-result
+           (assoc invocation extra-key "adapter-local-data"))))
+        (str "expected provider-error for extra " kind " invocation key: "
+             (pr-str extra-key)))))
+
 (deftest provider-normalization-capability-action-coherence-test
   ;; Tests that make-visible capability/action mismatches fail closed.
   (is (provider-error?

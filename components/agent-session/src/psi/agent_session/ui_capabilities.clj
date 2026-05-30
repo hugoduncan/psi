@@ -135,15 +135,42 @@
     (sequential? x) (every? serializable-value? x)
     :else false))
 
+(def invocation-common-keys
+  #{:psi.ui.invocation/kind
+    :psi.ui.invocation/session-id
+    :psi.ui.invocation/runtime-id})
+
+(def invocation-kind-keys
+  {:emacs-command (into invocation-common-keys
+                        [:psi.ui.invocation/command
+                         :psi.ui.invocation/args])
+   :ui-event (into invocation-common-keys
+                   [:psi.ui.invocation/event
+                    :psi.ui.invocation/payload])
+   :bash-command (into invocation-common-keys
+                       [:psi.ui.invocation/argv
+                        :psi.ui.invocation/env])
+   :mutation (into invocation-common-keys
+                   [:psi.ui.invocation/mutation
+                    :psi.ui.invocation/params])})
+
+(defn- invocation-keys-allowed?
+  [inv]
+  (when-let [allowed-keys (get invocation-kind-keys (:psi.ui.invocation/kind inv))]
+    (every? allowed-keys (keys inv))))
+
+(defn- valid-correlation? [inv]
+  (and (or (not (contains? inv :psi.ui.invocation/session-id))
+           (serializable-value? (:psi.ui.invocation/session-id inv)))
+       (or (not (contains? inv :psi.ui.invocation/runtime-id))
+           (serializable-value? (:psi.ui.invocation/runtime-id inv)))))
+
 (defn- valid-emacs-command? [inv]
   (and (non-empty-string? (:psi.ui.invocation/command inv))
        (or (not (contains? inv :psi.ui.invocation/args))
            (and (vector? (:psi.ui.invocation/args inv))
                 (serializable-value? (:psi.ui.invocation/args inv))))
-       (or (not (contains? inv :psi.ui.invocation/session-id))
-           (serializable-value? (:psi.ui.invocation/session-id inv)))
-       (or (not (contains? inv :psi.ui.invocation/runtime-id))
-           (serializable-value? (:psi.ui.invocation/runtime-id inv)))))
+       (valid-correlation? inv)))
 
 (defn- valid-ui-event? [inv]
   (and (keyword? (:psi.ui.invocation/event inv))
@@ -175,6 +202,7 @@
   (and (map? inv)
        (serializable-value? inv)
        (every? #(namespaced-as? % "psi.ui.invocation") (keys inv))
+       (invocation-keys-allowed? inv)
        (case (:psi.ui.invocation/kind inv)
          :emacs-command (valid-emacs-command? inv)
          :ui-event (valid-ui-event? inv)

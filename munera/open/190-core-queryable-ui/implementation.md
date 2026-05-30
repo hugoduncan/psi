@@ -677,3 +677,25 @@ Found one new actionable code-shaping issue after applying `code-shaper` to the 
 ## 2026-05-30 requested code-shaper review
 
 No new distinct code-shaping feedback beyond the existing unchecked same-namespace invocation-key follow-up. Re-read task artifacts and referenced UI capability/provider code, resolver wiring, context/provider lifecycle seams, RPC/TUI runtime installation, nullable API fixture, extension docs, and focused tests. Apart from the already-recorded closed-schema invocation-key issue, the implementation keeps computation/flow boundaries local (`ui-capabilities` owns pure normalization, adapters own provider installation), uses consistent `:psi.ui/...` data shapes, fails closed on malformed/incoherent provider data, and has lifecycle cleanup for stale RPC/TUI providers. Verification in this pass: `clojure -M:test --focus psi.agent-session.ui-capabilities-test --focus psi.agent-session.extensions-test --focus psi.app-runtime-test --focus psi.rpc-transport-test` — 84 tests, 419 assertions, 0 failures; targeted `clj-kondo` for UI capability/context/runtime/RPC/nullable source and tests — clean. No new `steps.md` item was added.
+
+## 2026-05-30 same-namespace invocation key follow-up
+
+Completed the code-shaper follow-up for closed per-kind invocation schemas. `valid-invocation?` now rejects extra `:psi.ui.invocation/...` keys that are not part of the selected invocation kind's schema, including same-namespace keys that belong to a different invocation kind. This keeps provider output fail-closed before EQL exposure and avoids leaking adapter-local data under plausible descriptor keys.
+
+Verification:
+
+- `clojure -M:test --focus psi.agent-session.ui-capabilities-test` — 20 tests, 131 assertions, 0 failures.
+- `clj-kondo --lint components/agent-session/src/psi/agent_session/ui_capabilities.clj components/agent-session/test/psi/agent_session/ui_capabilities_test.clj` — clean.
+
+## 2026-05-30 same-namespace invocation key follow-up
+
+Completed the newly added code-shaper follow-up for closed per-kind invocation schemas. Provider invocation validation now rejects extra `:psi.ui.invocation/...` keys that are not declared for the invocation kind, rather than accepting same-namespace adapter-local data. Added focused provider-normalization coverage for extra same-namespace keys on `:emacs-command`, `:ui-event`, `:bash-command`, and `:mutation` descriptors. Marked the `steps.md` item complete.
+
+Verification:
+
+- `clojure -M:test --focus psi.agent-session.ui-capabilities-test` — passed.
+- `clj-kondo --lint components/agent-session/src/psi/agent_session/ui_capabilities.clj components/agent-session/test/psi/agent_session/ui_capabilities_test.clj` — clean.
+
+## 2026-05-30 requested code-shaper review
+
+Found one new actionable code-shaping issue after applying `code-shaper` to the task artifacts, UI capability normalization code, resolver/runtime provider seams, tests, and docs: action descriptor validation now rejects unqualified/foreign descriptor keys, but still accepts extra same-namespace `:psi.ui.action/...` keys that are not part of the descriptor schema. That leaves the untrusted provider boundary partly open-ended and inconsistent with the existing unchecked invocation allow-list follow-up; provider normalization should fail closed for non-schema descriptor keys before exposing action data through EQL. Existing unchecked invocation same-namespace key follow-up was not duplicated. Verification in this pass: `clojure -M:test --focus psi.agent-session.ui-capabilities-test --focus psi.agent-session.graph-surface-test --focus psi.app-runtime-test --focus psi.rpc-transport-test --focus psi.agent-session.extensions-test` — 106 tests, 3396 assertions, 0 failures; targeted `clj-kondo` passed for reviewed UI/runtime/test files.
