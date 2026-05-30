@@ -965,3 +965,9 @@ Actionable feedback found:
 ## Ambiguity follow-up execution — 2026-05-30 (post compaction persistence/resume review)
 
 Read `design-steps.md` for unchecked ambiguity follow-up items added by the preceding ambiguity-review pass. No unchecked ambiguity design-step items were present (`unchecked count 0`), so there were no newly actionable ambiguity follow-ups to execute. The only remaining unchecked task items are implementation/Slice 5 verification items in `steps.md`, including the implementation-review compaction replay/cold-resume follow-up; those were not ambiguity follow-ups from `design-steps.md`. No `design.md`, `plan.md`, or `steps.md` changes were required for this pass.
+
+---
+
+## Design inconsistency review pass — 2026-05-30 (post compaction replay review)
+
+No new actionable inconsistencies found. Re-read `plan.md`, `steps.md`, `design-steps.md`, and recent `implementation.md` notes, then checked `design.md` for the relevant Slice 4/Slice 5 boundaries. The only current inconsistency-like concern is already captured as the unchecked Slice 4 follow-up in `steps.md`: compacted mid-system preservation must survive journal replay/cold resume. I did not add a duplicate `design-steps.md` item.
