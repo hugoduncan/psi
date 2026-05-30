@@ -134,3 +134,4 @@ Bootstrapped on 2026-04-02.
 - 2026-05-30: Task 190 code-shaper re-review after review-step allowed-status follow-up found no new actionable code-shaping issues. Focused workflow tests and targeted lint green; review note committed as `fb32b792`.
 
 - 2026-05-30: Task 190 design ambiguity review pass found three new actionable ambiguities: `/effort` behaviour for OpenAI Codex/responses, invalid-placement semantics for `inject-mid-system-message!`, and compaction lifetime for pre-cut `:mid-system` instructions. Added follow-ups to `design-steps.md`; note that `design.md` already had uncommitted refinements before this pass.
+- 2026-05-30: Task 190 ambiguity follow-up complete: design now applies `/effort` to OpenAI Codex/responses with the same override mapping, rejects invalid `inject-mid-system-message!` placements before journal mutation, and preserves pre-cut mid-system instructions across compaction by coalescing them after the summary user turn.

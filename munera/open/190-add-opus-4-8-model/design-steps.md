@@ -26,8 +26,8 @@
 
 ## From ambiguity review pass 2026-05-30
 
-- [ ] **Decide `/effort` behaviour for OpenAI Codex/responses** — Specify whether `/effort` and `:effort-override` affect OpenAI Codex/responses models. If yes, add Codex request shaping/tests; if no, document the exclusion and ensure acceptance criteria only cover supported OpenAI transports.
+- [x] **Decide `/effort` behaviour for OpenAI Codex/responses** — Specify whether `/effort` and `:effort-override` affect OpenAI Codex/responses models. If yes, add Codex request shaping/tests; if no, document the exclusion and ensure acceptance criteria only cover supported OpenAI transports.
 
-- [ ] **Define invalid-placement handling for mid-system injection** — Specify what `:session/inject-mid-system-message` / `inject-mid-system-message!` returns and stores when called before any user turn, after an assistant turn, or after another pending mid-system entry. Choose reject, queue, or append-and-drop-later semantics.
+- [x] **Define invalid-placement handling for mid-system injection** — Specify what `:session/inject-mid-system-message` / `inject-mid-system-message!` returns and stores when called before any user turn, after an assistant turn, or after another pending mid-system entry. Choose reject, queue, or append-and-drop-later semantics.
 
-- [ ] **Clarify compaction lifetime of pre-cut mid-system entries** — Decide whether mid-system instructions before the compaction cut point remain active after compaction. If they do, specify the preservation mechanism; if they do not, state that compaction expires them.
+- [x] **Clarify compaction lifetime of pre-cut mid-system entries** — Decide whether mid-system instructions before the compaction cut point remain active after compaction. If they do, specify the preservation mechanism; if they do not, state that compaction expires them.

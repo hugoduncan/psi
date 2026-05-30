@@ -250,7 +250,7 @@ is independent of the thinking on/off level.  It also lays the groundwork for
 | `:low` | `"low"` | `"low"` |
 | `:medium` | `"medium"` | `"medium"` |
 | `:high` | `"high"` | `"high"` |
-| `:xhigh` | `"highest"` (when supported; else `"high"` with warning) | `"high"` (API ceiling) |
+| `:xhigh` | `"highest"` (no fallback in this slice; provider 400s surface as-is if unsupported) | `"high"` (API ceiling) |
 
 The effort override is **only applied when thinking is enabled** (i.e.
 `thinking-level` ≠ `:off`).  When thinking is off the effort parameter is
@@ -284,7 +284,7 @@ effort).
 
 New `:session/set-effort-override` handler:
 - Stores `:effort-override` on the session.
-- Emits optional persist effect for `:project` / `:user` scope.
+- Emits optional persist effect for `:project` / `:user` scope, matching `/effort <value> [session|project|user]`.
 
 #### 3. Session settings (`components/agent-session/src/psi/agent_session/session_settings.clj`)
 
@@ -317,23 +317,38 @@ combination rejects it with a 400, that provider error should surface to the
 user as-is. Remove any implied "fallback with warning" behaviour from code,
 tests, and docs in this task.
 
-#### 6. OpenAI provider (`components/ai/src/psi/ai/providers/openai/reasoning.clj`)
+#### 6. OpenAI providers
+
+`/effort` applies to both OpenAI transports that currently send reasoning effort:
+
+- `components/ai/src/psi/ai/providers/openai/reasoning.clj` for chat completions.
+- `components/ai/src/psi/ai/providers/openai/codex_responses.clj` for Codex/responses.
 
 Update `reasoning-effort` to accept an optional `:effort-override` from
 options.  When present, map it: `:xhigh` → `"high"` (API ceiling); others
 pass through directly.  When absent, use the existing `thinking-level->effort`
-table.
+table.  Codex/responses request shaping must use the same mapping instead of
+reading `thinking-level->effort` directly, so `/effort xhigh` produces
+`{"reasoning": {"effort": "high", "summary": "auto"}}` for Codex models
+when thinking is enabled.
+
+The override is still omitted from both OpenAI transports when thinking is off.
 
 #### 7. `/effort` command (`components/agent-session/src/psi/agent_session/commands.clj`)
 
 New `dispatch-effort-command`:
 - No args → show current effort override: `"Current effort override: none"` or
   `"Current effort override: xhigh"`.
-- One arg (`low`|`medium`|`high`|`xhigh`|`none`) → validate, call
-  `set-effort-override-in!`, confirm.  `none` clears the override (nil).
-- Unknown arg → error listing allowed values.
+- One or two args: `<value> [session|project|user]`.
+  - `low`|`medium`|`high`|`xhigh`|`none` validates and calls
+    `set-effort-override-in!`; `none` clears the override (nil).
+  - Optional scope token follows the same persistence pattern as `/speed`:
+    `session` = in-memory only, `project` = persist to project prefs,
+    `user` = persist to user config.
+- Unknown value or unknown scope → error with allowed values/scopes.
 
-Register in `prefixed-command-prefixes` and `format-help`.
+Register in `prefixed-command-prefixes` and `format-help`, documenting the
+optional scope form.
 
 #### 8. Footer / status (`components/app-runtime/src/psi/app_runtime/footer.clj`)
 
@@ -358,18 +373,25 @@ Add `effort-override` to project/user config schema.
 
 - `/effort` with no args prints current override (`none` when unset).
 - `/effort xhigh` sets override; `/effort none` clears it.
+- `/effort xhigh project` persists the override to project prefs; `session` leaves
+  it in-memory only; `user` writes user config.
 - `/effort unknown` returns error listing allowed values.
+- `/effort xhigh bogus` returns an error listing allowed scopes.
 - Anthropic adaptive `build-request`: when effort-override is `:xhigh`,
   `output_config.effort` is `"highest"`; when `:high`, `"high"`; when nil,
   falls back to level-derived value.
-- OpenAI `reasoning-effort`: when effort-override is `:xhigh`, returns `"high"`
+- OpenAI chat-completions `reasoning-effort`: when effort-override is `:xhigh`, returns `"high"`
   (ceiling); when `:medium`, returns `"medium"`; when nil, falls back to
   level-derived value.
-- Effort override is omitted from the request when thinking-level is `:off`.
+- OpenAI Codex/responses `codex-reasoning`: when effort-override is `:xhigh`, sends `"high"`
+  (ceiling); when `:medium`, sends `"medium"`; when nil, falls back to
+  level-derived value.
+- Effort override is omitted from the request when thinking-level is `:off` for all supported providers.
 - Footer shows `• effort:xhigh` when override is active and thinking is on.
 - Unit tests cover: command dispatch (all branches), Anthropic request shaping
-  (override present / absent / xhigh), OpenAI request shaping (override present
-  / absent / xhigh ceiling), session state mutation, resolver projection.
+  (override present / absent / xhigh), OpenAI chat-completions and Codex/responses
+  request shaping (override present / absent / xhigh ceiling), session state
+  mutation, resolver projection.
 - `bb test` green.
 
 ---
@@ -386,11 +408,14 @@ changed token budgets, updated context — without restating the full system
 prompt, preserving cache hits on earlier turns and reducing input cost on
 agentic loops.
 
-**Placement rule** (Anthropic): a system message may appear at any position
-where a user message would be valid — i.e. not immediately after another system
-message, not immediately after an assistant message, not as the last message.
-In practice the safe position is immediately after the most recent user turn
-and before the next assistant turn.
+**Placement rule** (Anthropic): a mid-conversation system message is valid only
+when it is associated with a preceding user turn. In psi request assembly this
+means it may appear immediately after the most recent user message, including as
+the final message in the next generation request, because the assistant response
+being generated is the implicit following turn. It must not appear immediately
+after another system message or after an assistant message. In practice the safe
+position is immediately after the most recent user turn and before the assistant
+turn that is about to be generated.
 
 **OpenAI**: The OpenAI chat-completions API has always supported
 `{"role": "system", "content": "..."}` objects inside the `messages` array at
@@ -455,10 +480,11 @@ In `transform-message`, add a `:system` case:
 This emits `{"role": "system", "content": [...]}` inline in the `messages`
 array.  No beta header is required.
 
-**Placement validation**: when assembling `transform-messages`, assert that no
-system message appears immediately after another system message or as the final
-message.  Violations log a warning and drop the offending message rather than
-sending a malformed request.
+**Placement validation**: when assembling `transform-messages`, assert that every
+inline system message is preceded by a user message, allowing it to be the final
+message in the next generation request. Violations (consecutive system messages
+or a system message after an assistant message / at the beginning) log a warning
+and drop the offending message rather than sending a malformed request.
 
 #### 6. OpenAI chat-completions provider (`components/ai/src/psi/ai/providers/openai/chat_completions.clj`)
 
@@ -472,9 +498,21 @@ New `:session/inject-mid-system-message` handler in
 `dispatch_handlers/session_mutations.clj`:
 - Validates that the active model supports the capability (queries
   `:supports-mid-conversation-system-messages`).  Returns an error map if not.
-- Appends a `:mid-system` journal entry with `{:text text :source source}`.
+- Validates placement at dispatch time before mutating the journal. Injection is
+  accepted only when the current journal tail has a user turn as the latest
+  conversational entry and there is not already a pending `:mid-system` entry
+  after that user turn. This covers the intended use: after a user turn, before
+  the assistant response being generated.
+- Invalid placements are rejected without modifying the journal:
+  - before any user turn → `{:ok false :error :invalid-placement :reason :no-preceding-user}`
+  - after an assistant turn → `{:ok false :error :invalid-placement :reason :after-assistant}`
+  - after another pending `:mid-system` entry → `{:ok false :error :invalid-placement :reason :pending-mid-system}`
+- On valid placement, appends a `:mid-system` journal entry with `{:text text :source source}`.
 - The journal entry is projected into a `{:role "system" ...}` provider message
-  at request-build time via the conversation assembly path above.
+  at request-build time via the conversation assembly path above. Because valid
+  injection occurs after the latest user turn and before the next assistant
+  response, that system message is intentionally final in the generation
+  request and must be retained.
 - Emits no runtime effects (journal-only; no notify, no steering message).
 
 #### 8. Extension API (`components/agent-session/src/psi/agent_session/extensions/api.clj`)
@@ -488,8 +526,10 @@ inject-mid-system-message!
                        {:text text}))
 ```
 Extensions call this to append updated instructions mid-conversation.  The
-function returns `{:ok true}` or `{:ok false :error :capability-not-supported}`
-when the active model does not support the feature.
+function returns `{:ok true}`, `{:ok false :error :capability-not-supported}`
+when the active model does not support the feature, or `{:ok false :error
+:invalid-placement :reason ...}` for the invalid timing cases enforced by the
+dispatch handler.
 
 #### 9. EQL resolver (`components/agent-session/src/psi/agent_session/resolvers/session.clj`)
 
@@ -516,12 +556,20 @@ provider-style content blocks `{:type :text :text ...}`.
 
 Mid-system messages must be preserved across compaction boundaries: they are
 not part of the conversation history to be summarised, but are instructions
-that remain valid for the remainder of the session. The concrete preservation
-mechanism in this slice is to extend `entry->message` to handle `:mid-system`
-entries by returning a provider-style message map `{:role "system" :content
-[{:type :text :text ...}]}` so post-compaction message rebuilds retain them.
-The compaction pass must carry forward all `:mid-system` journal entries that
-fall after the compaction cut point.
+that remain valid for the remainder of the session. Compaction must therefore
+not expire pre-cut `:mid-system` instructions.
+
+The concrete preservation mechanism in this slice is:
+
+1. Extend `entry->message` to handle `:mid-system` entries by returning a
+   provider-style message map `{:role "system" :content [{:type :text :text
+   ...}]}` so post-compaction message rebuilds can retain them.
+2. Carry forward post-cut `:mid-system` journal entries normally.
+3. Preserve pre-cut active `:mid-system` entries outside the summarised
+   conversation by coalescing their text, in original order, into one retained
+   `:mid-system` entry immediately after the compaction summary user turn. This
+   avoids consecutive inline system messages after compaction while preserving
+   their continuing instruction effect.
 
 #### 12. Cache interaction
 
@@ -543,11 +591,16 @@ cache-control logic is required.
   `{"role": "system", ...}` message in the Anthropic messages array.
 - `inject-mid-system-message!` on a non-supporting model returns
   `{:ok false :error :capability-not-supported}` and does not modify the journal.
+- `inject-mid-system-message!` before any user turn, after an assistant turn, or
+  after another pending mid-system entry returns `{:ok false :error
+  :invalid-placement ...}` and does not modify the journal.
 - Anthropic `transform-messages` emits `{"role": "system", ...}` for `:system`
-  role messages; drops (with warning) any system message appearing as the final
-  message or immediately after another system message.
+  role messages; allows a system message that immediately follows a user message
+  even when it is final in the generation request; drops (with warning) any
+  system message at the beginning, immediately after another system message, or
+  immediately after an assistant message.
 - OpenAI chat-completions message transform maps `:system` → `"system"` string.
-- Compaction preserves `:mid-system` entries after the cut point.
+- Compaction preserves both post-cut `:mid-system` entries and pre-cut active mid-system instructions (coalesced after the summary user turn).
 - Unit tests cover: model capability flag, resolver, dispatch handler (supported
   / unsupported model), Anthropic transform (valid placement, invalid placement
   warning+drop), OpenAI transform, journal projection, compaction preservation.

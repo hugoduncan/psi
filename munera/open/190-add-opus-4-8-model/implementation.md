@@ -58,3 +58,15 @@ Decisions recorded:
 2. **Invalid-time `inject-mid-system-message!` behaviour** — The design now allows final inline system messages after a user turn, but does not define what happens if an extension injects after an assistant turn, before any user turn, or after another pending mid-system entry. Provider validation would later drop the message while the extension API may already have returned `{:ok true}`. Decide whether the dispatch handler rejects these placements, queues until a valid user turn, or appends and accepts later provider drop.
 
 3. **Compaction lifetime for older `:mid-system` instructions** — Part 4 says mid-system messages are instructions that remain valid for the remainder of the session, but the concrete preservation rule only carries forward `:mid-system` entries after the compaction cut point. Decide whether pre-cut mid-system instructions remain active after compaction; if yes, specify how they are preserved outside summarization, and if no, state that compaction intentionally expires them.
+
+---
+
+## Ambiguity follow-up — 2026-05-30
+
+Completed all newly added ambiguity follow-up items in `design-steps.md` by refining `design.md`.
+
+Decisions recorded:
+- `/effort` applies to OpenAI Codex/responses as well as OpenAI chat-completions. Codex request shaping must use the same effort override mapping, with `:xhigh` capped to `"high"`, instead of reading only `thinking-level->effort` directly.
+- `inject-mid-system-message!` rejects invalid placements before mutating the journal. It only accepts injection after the latest user turn and before any pending assistant response or pending mid-system entry; invalid timing returns `{:ok false :error :invalid-placement :reason ...}`.
+- Pre-cut mid-system instructions remain active after compaction. Compaction must preserve them by coalescing their text, in order, into one retained `:mid-system` entry immediately after the compaction summary user turn; post-cut entries are carried forward normally.
+
