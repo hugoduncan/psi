@@ -154,3 +154,5 @@ Bootstrapped on 2026-04-02.
 - 2026-05-30: Task 190 third ambiguity review pass found three new actionable ambiguities: persisted speed/effort startup wiring, mid-system capability lookup source under runtime model overrides, and mid-system journal `:source` provenance contract. Added unchecked follow-ups to `design-steps.md`.
 
 - 2026-05-30: Task 190 latest inconsistency follow-up completed and committed `d8b342ac`: design now requires plain adaptive Anthropic `thinking-level :xhigh` (nil `/effort` override) to send `output_config.effort = "highest"`, preserving the task goal that `:xhigh` is distinct from `:high`; `design-steps.md` is checked for the latest inconsistency item.
+
+- 2026-05-30: Task 190 ambiguity follow-up no-op pass: `design-steps.md` had no unchecked ambiguity follow-up items, so no design changes were needed; implementation.md records the pass.

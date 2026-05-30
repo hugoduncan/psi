@@ -241,3 +241,9 @@ Additional latest-pass follow-ups completed after re-reading the current `design
 ## Design ambiguity review pass — 2026-05-30 (verification pass)
 
 No new actionable ambiguities found. Re-read `design.md`, referenced extension mutation/runtime EQL surfaces, shared-config startup resolution, current-session speed clearing semantics, provider request assembly, and existing `design-steps.md`; the actionable ambiguity concerns are already captured in existing follow-up items and have no unduplicated additions for this pass.
+
+---
+
+## Ambiguity follow-up — 2026-05-30 (no-op pass)
+
+Read `design-steps.md` for newly added unchecked ambiguity follow-up items. No unchecked ambiguity follow-up items were present, so no `design.md` changes were required. `plan.md` and `steps.md` were not touched.
