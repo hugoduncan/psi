@@ -146,3 +146,7 @@ Completed both newly added ambiguity follow-ups in `design.md`:
 ## 2026-05-30 design inconsistency review
 
 Found one new actionable inconsistency after re-reading `design.md` against referenced extension-authoring docs: `design.md` makes capability/action `:psi.ui/...` queries the normative UI-behaviour contract and says docs must not recommend UI-type branching, but `doc/architecture.md` still explicitly recommends `:psi.agent-session/ui-type` for "runtime UI surface detection (extension/UI branching)".
+
+## 2026-05-30 inconsistency follow-up
+
+Completed the newly added extension-authoring documentation follow-up in `doc/architecture.md`: EQL introspection guidance now recommends the `:psi.ui/...` capability/action query surface for extension UI behaviour, says to branch on `:psi.ui.capability/...` and action descriptor availability, and reclassifies `:psi.agent-session/ui-type` as runtime UI type diagnostics/compatibility data rather than the normative extension-authoring contract for invokable UI behaviour.

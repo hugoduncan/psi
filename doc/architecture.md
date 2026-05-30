@@ -106,8 +106,15 @@ or session navigation domain logic.
 - Query only attributes that exist in the graph; unknown attrs can cause the whole `psi-tool` request to fail.
 - For the active system prompt, use:
   - `[:psi.agent-session/system-prompt]`
-- For runtime UI surface detection (extension/UI branching), use:
+- For extension UI behaviour, prefer capability/action discovery through the
+  `:psi.ui/...` query surface when available:
+  - `[:psi.ui/type :psi.ui/available? :psi.ui/capabilities :psi.ui/actions :psi.ui/make-visible-action]`
+  - branch on `:psi.ui.capability/...` keywords and action descriptor availability,
+    not concrete frontend types
+- For runtime UI type diagnostics and compatibility with older callers, use:
   - `[:psi.agent-session/ui-type]`  ; `:console` | `:tui` | `:emacs`
+  - treat this as low-level introspection/compatibility data, not the normative
+    extension-authoring contract for invokable UI behaviour
 - For prompt sizing (chars + estimated tokens), use:
   - `[{:psi.agent-session/request-shape [:psi.request-shape/system-prompt-chars :psi.request-shape/estimated-tokens :psi.request-shape/total-chars]}]`
 - For prompt lifecycle introspection summaries, use:
