@@ -119,3 +119,12 @@ Decisions recorded:
 1. **`/speed` resolver/default semantics conflict** — Session state intentionally stores `:speed-mode nil` for provider default and `/speed normal session` clears back to nil, but the acceptance criteria require `(session/query-in ... [:psi.agent-session/speed-mode])` to return `:normal` when unset. The resolver section only says to project from session state, which would expose nil unless it explicitly coerces nil to `:normal`.
 
 2. **Mid-system capability flag requiredness is inconsistent** — Part 4 says `:supports-mid-conversation-system-messages` defaults false and acceptance allows Codex/responses and pre-4.8 Anthropic models to have the flag `false` or absent, but the model-schema step says to add a boolean model attribute to the closed `Model` schema. Specify whether the schema key is optional with absent-as-false semantics, or required on every model map.
+
+---
+
+## Inconsistency follow-up — 2026-05-30 (second pass)
+
+Completed the two newly added inconsistency follow-up items in `design-steps.md` by refining `design.md`:
+
+- `:psi.agent-session/speed-mode` is now explicitly a display/effective resolver: nil session state is coerced to `:normal`, including after `/speed normal session`, while request shaping still treats nil/`:normal` as provider default.
+- `:supports-mid-conversation-system-messages` is now optional model metadata; absent is semantically false at schema/capability resolver surfaces, so unsupported models may omit it or set `false`.

@@ -194,7 +194,12 @@ the footer context line when speed mode is `:fast`.
 
 #### 10. Resolvers (`components/agent-session/src/psi/agent_session/resolvers/session.clj`)
 
-Add `:psi.agent-session/speed-mode` resolver projecting from session state.
+Add `:psi.agent-session/speed-mode` resolver projecting the display/effective
+mode from session state.  The resolver must coerce nil session state to
+`:normal`, so query/UI surfaces always report the user-facing default even
+though the canonical in-memory override remains nil for provider-default
+request shaping.  After `/speed normal session`, session state is cleared back
+to nil and the resolver again returns `:normal`.
 
 #### 11. Persistence (`components/shared-config/`)
 
@@ -491,9 +496,12 @@ Add `:system` to `MessageRole` enum.
 
 #### 2. Model definitions (`components/ai/src/psi/ai/models.clj`)
 
-Add `:supports-mid-conversation-system-messages` boolean to the `Model` schema
-in `schemas.clj`.  Set `true` on `:opus-4.8` and all OpenAI chat-completions
-models.
+Add optional `:supports-mid-conversation-system-messages` boolean metadata to
+the `Model` schema in `schemas.clj`:
+`[:supports-mid-conversation-system-messages {:optional true} boolean?]`.
+Absent means false at every read/capability surface.  Set `true` on `:opus-4.8`
+and all OpenAI chat-completions models.  Other models may either omit the key or
+set it explicitly to `false`; both forms are semantically equivalent.
 
 #### 3. Session state (`components/session-state/src/psi/session_state/model.clj`)
 
@@ -582,7 +590,8 @@ dispatch handler.
 Add `:psi.agent-session/model-supports-mid-system-messages` resolver:
 - Input: `[:psi/agent-session-ctx :psi.agent-session/session-id]`
 - Output: boolean derived from the active model's
-  `:supports-mid-conversation-system-messages` flag.
+  `:supports-mid-conversation-system-messages` flag, treating an absent flag as
+  `false`.
 
 This is the queryable capability surface extensions use before calling
 `inject-mid-system-message!`.

@@ -42,6 +42,6 @@
 
 ## From inconsistency review pass 2026-05-30 (second pass)
 
-- [ ] **Align `/speed` resolver default with nil session state** — Decide whether `:psi.agent-session/speed-mode` resolver coerces nil to `:normal` (matching acceptance criteria and display semantics) or whether acceptance should allow nil. Update the resolver/design text accordingly, including `/speed normal session` behaviour.
+- [x] **Align `/speed` resolver default with nil session state** — Decide whether `:psi.agent-session/speed-mode` resolver coerces nil to `:normal` (matching acceptance criteria and display semantics) or whether acceptance should allow nil. Update the resolver/design text accordingly, including `/speed normal session` behaviour.
 
-- [ ] **Specify mid-system capability flag schema/default semantics** — Decide whether `:supports-mid-conversation-system-messages` is optional in `Model` with absent treated as false, or required on every model map. Align the schema step with the acceptance criterion that unsupported models may have the flag false or absent.
+- [x] **Specify mid-system capability flag schema/default semantics** — Decide whether `:supports-mid-conversation-system-messages` is optional in `Model` with absent treated as false, or required on every model map. Align the schema step with the acceptance criterion that unsupported models may have the flag false or absent.
