@@ -683,3 +683,9 @@ No new actionable inconsistencies found. Re-read `plan.md`, `steps.md`, `design-
 ## Inconsistency follow-up execution — 2026-05-30 (latest design-steps no-op)
 
 Read `design-steps.md` for newly added unchecked inconsistency follow-up items after the preceding inconsistency-review pass. No unchecked design-step items were present (`unchecked count 0`), so there were no actionable follow-ups to execute. No `design.md`, `plan.md`, or `steps.md` changes were required.
+
+---
+
+## Design ambiguity review pass — 2026-05-30 (plan/steps final independent verification)
+
+No new actionable ambiguities found. Re-read `plan.md`, `steps.md`, `design-steps.md`, and latest `implementation.md` notes, then checked representative referenced code surfaces for the remaining plan/steps risk areas: Anthropic request schema gaps, prompt-request mid-system projection/current-user replacement, compaction boundary placement, Codex effort override routing, and shared-config presence-aware resolution. The task plan and steps remain unambiguous: five vertical slices, Slice 5 owns docs/changelog and broad verification, and all existing ambiguity follow-ups in `design-steps.md` are checked. No duplicate follow-up items were added.
