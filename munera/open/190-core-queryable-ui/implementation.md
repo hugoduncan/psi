@@ -106,3 +106,10 @@ Completed the newly added legacy UI-type compatibility follow-up in `design.md`:
 ## 2026-05-30 design inconsistency review
 
 Found two new actionable inconsistencies after re-reading `design.md` against referenced design artifacts: `resolved-design-questions.md` still states invocation has no new permissions without carrying the design's dedicated-helper-or-descriptor-only constraint, and `design-decisions.md` says implementation may start with only `:emacs-command` despite `design.md` requiring resolver validation to accept the full supported invocation-kind vocabulary for descriptors in this slice.
+
+## 2026-05-30 inconsistency follow-up
+
+Completed both newly added inconsistency follow-ups:
+
+- Aligned `resolved-design-questions.md` with `design.md` for invocation permissions: query remains permission-free, but side-effecting invocation is permission-free only through the dedicated constrained `:psi.ui/request-action` helper outside manifest `allowed-events`; otherwise the slice must expose descriptors only and defer permission-aware submission.
+- Aligned `design-decisions.md` invocation-kind guidance with `design.md`: resolver descriptor validation must recognize all supported design invocation kinds (`:emacs-command`, `:ui-event`, `:bash-command`, `:mutation`) in this slice, even if only Emacs initially advertises an available make-visible action.

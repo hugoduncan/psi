@@ -72,7 +72,7 @@ Supported invocation kinds for the design:
 - `:bash-command` — shell command vector or string for tmux-style reveal actions.
 - `:mutation` — Pathom mutation symbol plus params, if an existing mutation is the cleanest path.
 
-Implementation may start with only `:emacs-command`. The schema must leave room for tmux or adapter-event invocation without changing the query attrs.
+Resolver descriptor validation must recognize all supported design invocation kinds in this slice: `:emacs-command`, `:ui-event`, `:bash-command`, and `:mutation`. Initial adapters may advertise only `:emacs-command` for the Emacs make-visible action, and TUI/console may advertise no available make-visible action unless real target metadata exists, but provider output using any supported kind must validate without changing the query attrs.
 
 ## 5. Invocation scope for this task
 

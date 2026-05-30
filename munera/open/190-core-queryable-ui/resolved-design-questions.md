@@ -9,7 +9,7 @@ No design blockers remain. The task is ready for implementation planning.
 - Extension behaviour: extensions must be capability-driven, not UI-type-driven.
 - Capabilities and actions remain separate.
 - Active UI model: single UI for this slice.
-- Permissions: no new permissions for query or invocation in this slice.
+- Permissions: no new permissions for query. Side-effecting invocation has no new manifest `allowed-events` permission only if implemented through the dedicated constrained `:psi.ui/request-action` helper described in `design.md`; otherwise this slice remains descriptor-only and permission-aware submission is deferred to a follow-up.
 - Registration/storage: frontend descriptors are derived on demand; do not store advertised capabilities/actions in root state.
 - Request delivery: UI action requests use a core-owned event/subscription path.
 - Tests: include nullable tests and frontend-specific tests.
