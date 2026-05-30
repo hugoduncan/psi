@@ -9,7 +9,6 @@
    [psi.ai.providers.openai :as openai])
   (:import [java.io ByteArrayInputStream]
            [java.util Base64]))
-
 (defn- jwt-with-account-id
   [account-id]
   (let [payload-json (json/generate-string
@@ -18,11 +17,9 @@
         payload      (.encodeToString (.withoutPadding (Base64/getUrlEncoder))
                                       (.getBytes payload-json "UTF-8"))]
     (str "aaa." payload ".bbb")))
-
 (defn- stream-body
   [s]
   (ByteArrayInputStream. (.getBytes s "UTF-8")))
-
 (deftest structured-user-content-renders-as-plain-text-for-chat-and-codex-test
   (let [convo (-> (conv/create "sys")
                   (conv/add-user-message [{:type :text :text "line one"}
@@ -33,7 +30,6 @@
            (get-in chat-messages [0 :content])))
     (is (= "line one\nline two"
            (get-in codex-items [0 "content" 0 "text"])))))
-
 (deftest chat-completions-system-message-transform-test
   ;; OpenAI chat completions receives inline system messages as wire role "system".
   (testing "chat-completions-system-message-transform"
@@ -44,7 +40,6 @@
       (is (= [{:role "user" :content "q"}
               {:role "system" :content "Use short answers."}]
              messages)))))
-
 (deftest codex-streaming-test
   (testing "codex model streams via chatgpt backend and emits normalized events"
     (let [model      (models/get-model :gpt-5.3-codex)
@@ -87,25 +82,21 @@
         ((:stream openai/provider)
          convo model {:api-key token}
          (fn [ev] (swap! events conj ev))))
-
       (is (= "https://chatgpt.com/backend-api/codex/responses"
              (:url @captured)))
       (is (= (str "Bearer " token)
              (get-in @captured [:req :headers "Authorization"])))
       (is (= "acc_test"
              (get-in @captured [:req :headers "chatgpt-account-id"])))
-
       (let [body (json/parse-string (get-in @captured [:req :body]) true)]
         (is (= "gpt-5.3-codex" (:model body)))
         (is (= "You are a helpful assistant" (:instructions body)))
         (is (= true (:stream body)))
         (is (= {:effort "medium" :summary "auto"}
                (:reasoning body))))
-
       (is (some #(= :start (:type %)) @events))
       (is (some #(and (= :text-delta (:type %)) (= "Hello" (:delta %))) @events))
       (is (some #(= :done (:type %)) @events)))))
-
 (deftest codex-request-and-reply-capture-callbacks-test
   (testing "built-in OpenAI codex captures preserve provider and api identity"
     (let [model            (models/get-model :gpt-5.3-codex)
@@ -132,7 +123,6 @@
                       :on-provider-request  #(reset! request-capture %)
                       :on-provider-response #(swap! reply-captures conj %)}
          (fn [_ev] nil)))
-
       (is (= :openai (:provider @request-capture)))
       (is (= :openai-codex-responses (:api @request-capture)))
       (is (= "gpt-5.3-codex"
@@ -146,7 +136,6 @@
       (is (some #(= "response.completed"
                     (get-in % [:event :type]))
                 @reply-captures)))
-
     (testing "custom OpenAI-compatible codex captures preserve selected provider identity"
       (let [model           {:id                 "local-codex"
                              :name               "Local Codex"
@@ -185,7 +174,6 @@
                         :on-provider-request  #(reset! request-capture %)
                         :on-provider-response #(swap! reply-captures conj %)}
            (fn [_ev] nil)))
-
         (is (= :local (:provider @request-capture)))
         (is (= :openai-codex-responses (:api @request-capture)))
         (is (= "local-codex"
@@ -196,7 +184,6 @@
         (is (some #(= "response.completed"
                       (get-in % [:event :type]))
                   @reply-captures))))))
-
 (deftest openai-stream-applies-proxy-request-options-test
   (testing "OpenAI codex stream request merges shared proxy options"
     (let [model    (models/get-model :gpt-5.3-codex)
@@ -229,7 +216,6 @@
       (is (= "proxy.example" (:proxy-host @captured)))
       (is (= 8080 (:proxy-port @captured)))
       (is (= :http (:proxy-scheme @captured)))))
-
   (testing "OpenAI completions stream leaves request unchanged when no proxy applies"
     (let [model    (models/get-model :gpt-4o)
           convo    (-> (conv/create "sys")
@@ -247,7 +233,6 @@
       (is (nil? (:proxy-host @captured)))
       (is (nil? (:proxy-port @captured)))
       (is (nil? (:proxy-scheme @captured))))))
-
 (deftest codex-requires-chatgpt-token-test
   (testing "non-ChatGPT token emits an error event (missing chatgpt_account_id)"
     (let [model  (models/get-model :gpt-5.3-codex)
@@ -256,11 +241,9 @@
       ((:stream openai/provider)
        convo model {:api-key "not-a-jwt-token"}
        (fn [ev] (swap! events conj ev)))
-
       (is (= :error (:type (first @events))))
       (is (re-find #"chatgpt_account_id"
                    (:error-message (first @events)))))))
-
 (deftest codex-reasoning-text-delta-maps-to-thinking-delta-test
   (testing "response.reasoning_text.delta is bridged as :thinking-delta"
     (let [model    (models/get-model :gpt-5.3-codex)
@@ -283,13 +266,11 @@
         ((:stream openai/provider)
          convo model {:api-key token}
          (fn [ev] (swap! events conj ev))))
-
       (is (some #(= :start (:type %)) @events))
       (is (some #(and (= :thinking-delta (:type %))
                       (= "Plan step" (:delta %)))
                 @events))
       (is (some #(= :done (:type %)) @events)))))
-
 (deftest codex-reasoning-map-delta-normalized-to-string-test
   (testing "non-string reasoning delta payloads are normalized to text"
     (let [model    (models/get-model :gpt-5.3-codex)
@@ -311,11 +292,9 @@
         ((:stream openai/provider)
          convo model {:api-key token}
          (fn [ev] (swap! events conj ev))))
-
       (is (some #(and (= :thinking-delta (:type %))
                       (= "Plan chunk" (:delta %)))
                 @events)))))
-
 (deftest codex-reasoning-output-item-done-emits-thinking-boundary-test
   (testing "response.output_item.done reasoning emits thinking start/end even without reasoning delta events"
     (let [model  (models/get-model :gpt-5.3-codex)
@@ -341,11 +320,9 @@
         ((:stream openai/provider)
          convo model {:api-key token}
          (fn [ev] (swap! events conj ev))))
-
       (let [types (mapv :type @events)]
         (is (some #{:thinking-start} types))
         (is (some #{:thinking-end} types))))))
-
 (deftest codex-thinking-level-maps-to-reasoning-effort-test
   (let [model (models/get-model :gpt-5.3-codex)]
     (is (= {"effort" "high" "summary" "auto"}
@@ -355,11 +332,13 @@
     (is (= {"effort" "high" "summary" "auto"}
            (#'openai/codex-reasoning model {:thinking-level :medium
                                             :effort-override :xhigh})))
+    (is (= {"effort" "medium" "summary" "auto"}
+           (#'openai/codex-reasoning model {:thinking-level :high
+                                            :effort-override :medium})))
     (is (nil? (#'openai/codex-reasoning model {:thinking-level :off
                                                :effort-override :xhigh})))
     (is (= {"effort" "medium" "summary" "auto"}
            (#'openai/codex-reasoning model {})))))
-
 (deftest codex-tool-call-id-roundtrip-test
   (testing "tool call ids split into call_id + item id (not single-char prefixes)"
     (let [call-id "call_abc123"
@@ -383,7 +362,6 @@
       (is (= item-id (get call "id")))
       (is (= "function_call_output" (get result "type")))
       (is (= call-id (get result "call_id"))))))
-
 (deftest codex-function-call-done-includes-final-arguments-test
   (testing "response.output_item.done can carry final function arguments"
     (let [model  (models/get-model :gpt-5.3-codex)
@@ -416,7 +394,6 @@
         ((:stream openai/provider)
          convo model {:api-key token}
          (fn [ev] (swap! events conj ev))))
-
       (is (some #(and (= :toolcall-start (:type %))
                       (= "call_1|fc_1" (:id %))
                       (= "bash" (:name %)))
@@ -426,7 +403,6 @@
                 @events))
       (is (some #(= :toolcall-end (:type %)) @events))
       (is (some #(= :done (:type %)) @events)))))
-
 (deftest completions-tool-call-starts-when-id-arrives-late-test
   (testing "chat completions buffers tool args until call id is available"
     (let [model  (models/get-model :gpt-5)
@@ -452,7 +428,6 @@
         ((:stream openai/provider)
          convo model {:api-key "sk-test"}
          (fn [ev] (swap! events conj ev))))
-
       (is (some #(= :start (:type %)) @events))
       (is (some #(and (= :toolcall-start (:type %))
                       (= 0 (:content-index %))
@@ -469,7 +444,6 @@
       (is (some #(and (= :done (:type %))
                       (= :tool_calls (:reason %)))
                 @events)))))
-
 (deftest completions-tool-call-cumulative-arguments-emit-only-unseen-suffix-test
   (testing "chat completions cumulative tool args do not duplicate emitted deltas"
     (let [model  (models/get-model :gpt-5)
@@ -495,7 +469,6 @@
         ((:stream openai/provider)
          convo model {:api-key "sk-test"}
          (fn [ev] (swap! events conj ev))))
-
       (let [deltas (->> @events
                         (filter #(= :toolcall-delta (:type %)))
                         (map :delta)
@@ -503,7 +476,6 @@
         (is (= "{\"command\":\"pwd\"}" deltas)))
       (is (= 1 (count (filter #(= :toolcall-start (:type %)) @events))))
       (is (= 1 (count (filter #(= :toolcall-end (:type %)) @events)))))))
-
 (deftest completions-tool-call-from-message-fallback-test
   (testing "chat completions message.tool_calls fallback is processed"
     (let [model  (models/get-model :gpt-5)
@@ -594,6 +566,13 @@
                                                       :effort-override :xhigh})
             body (json/parse-string (:body req) true)]
         (is (= "high" (:reasoning_effort body)))))
+
+    (testing "non-xhigh effort override wins over a different thinking level"
+      (let [req  (#'openai/build-request convo model {:api-key "sk-test"
+                                                      :thinking-level :high
+                                                      :effort-override :medium})
+            body (json/parse-string (:body req) true)]
+        (is (= "medium" (:reasoning_effort body)))))
 
     (testing "thinking off omits reasoning effort for cloud models"
       (let [req  (#'openai/build-request convo model {:api-key "sk-test"

@@ -1146,3 +1146,20 @@ No new actionable inconsistencies found. Re-read `plan.md`, `steps.md`, `design-
 ## Inconsistency follow-up execution — 2026-05-30 (post-test-review unchecked-item pass)
 
 Read `design-steps.md` for unchecked inconsistency follow-up items added by the preceding inconsistency-review pass. No unchecked design-step items were present (`unchecked count 0`), so there were no newly actionable inconsistency follow-ups to execute. No `design.md`, `plan.md`, or `steps.md` changes were required. Existing uncommitted test-file changes were left untouched.
+
+---
+
+## Test review follow-up execution — 2026-05-30 (effort override precedence)
+
+Completed the newly added test-review follow-up in `steps.md`:
+
+- Added Anthropic adaptive request-shaping coverage proving `:effort-override :high` sends `output_config.effort = "high"` over a different `thinking-level`.
+- Added OpenAI chat-completions coverage proving `:effort-override :medium` sends `reasoning_effort = "medium"` over a different `thinking-level`.
+- Added Codex/responses coverage proving `:effort-override :medium` sends `{"effort" "medium" ...}` over a different `thinking-level`.
+- Marked the non-`xhigh` effort override request-shaping follow-up done in `steps.md`.
+
+Verification:
+
+- `clojure -M:test --focus psi.ai.providers.anthropic-test --focus psi.ai.providers.openai-test` — 46 tests, 258 assertions, 0 failures.
+- `clojure -M:test --focus psi.agent-session.commands-test` — 50 tests, 200 assertions, 0 failures.
+- `clj-kondo --lint components/agent-session/test/psi/agent_session/commands_test.clj components/agent-session/test/psi/agent_session/commands_speed_effort_test.clj components/ai/test/psi/ai/providers/anthropic_test.clj components/ai/test/psi/ai/providers/openai_test.clj` — clean.

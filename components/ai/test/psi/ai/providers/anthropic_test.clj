@@ -185,6 +185,15 @@
           body    (json/parse-string (:body req) true)]
       (is (= "highest" (get-in body [:output_config :effort])))))
 
+  (testing "non-xhigh effort override wins over a different thinking level"
+    (let [model   (models/get-model :opus-4.7)
+          convo   (conv/create "sys")
+          req     (#'anthropic/build-request convo model {:thinking-level :medium
+                                                          :effort-override :high
+                                                          :api-key "test-key"})
+          body    (json/parse-string (:body req) true)]
+      (is (= "high" (get-in body [:output_config :effort])))))
+
   (testing "medium effort level passes through"
     (let [model   (models/get-model :opus-4.7)
           convo   (conv/create "sys")
