@@ -144,7 +144,10 @@ New `:session/set-speed-mode` handler:
 
 #### 3. Dispatch schema (`components/agent-session/src/psi/agent_session/dispatch_schema.clj`)
 
-Add `:runtime/agent-set-speed-mode` effect type to the effect schema.
+No new runtime effect type is needed for `/speed`. Unlike model and thinking
+level, speed mode is consumed entirely from canonical session data via
+`session->request-options` at request-build time, so there is no parallel
+agent-core state to keep in sync.
 
 #### 4. Session settings (`components/agent-session/src/psi/agent_session/session_settings.clj`)
 
@@ -158,8 +161,11 @@ and non-nil (same guard as `:temperature`).
 #### 6. Anthropic provider (`components/ai/src/psi/ai/providers/anthropic.clj`)
 
 In `build-request` (and streaming equivalent), when `:speed-mode` is `:fast`
-in options, add `speed: "fast"` to the request body.  Omit the key entirely
-for `:normal` or nil.
+in options, add `speed: "fast"` to the request body and include the Anthropic
+fast-mode beta header token `fast-mode-2026-02-01` via `beta-header` /
+`request-headers`.
+
+Omit the body key and the beta token entirely for `:normal` or nil.
 
 #### 7. OpenAI provider (`components/ai/src/psi/ai/providers/openai/chat_completions.clj`)
 
@@ -171,11 +177,15 @@ not expose `service_tier`.
 
 New `dispatch-speed-command` function:
 - No args → show current speed mode: `"Current speed mode: normal"`.
-- One arg (`normal` | `fast`) → validate, call `set-speed-mode-in!`, confirm.
-- Unknown arg → error with allowed values.
+- One or two args: `<mode> [session|project|user]`.
+  - `normal` | `fast` validates and calls `set-speed-mode-in!`.
+  - Optional scope token follows the existing `/model` persistence pattern:
+    `session` = in-memory only, `project` = persist to project prefs,
+    `user` = persist to user config.
+- Unknown mode or unknown scope → error with allowed values.
 
 Register in `exact-command-handlers` / `prefixed-command-prefixes` and
-`format-help` (same pattern as `/thinking`).
+`format-help` (same pattern as `/thinking`, but with optional scope support).
 
 #### 9. Footer / status (`components/app-runtime/src/psi/app_runtime/footer.clj`)
 
@@ -197,7 +207,10 @@ persists across sessions (same as thinking-level).
   (nil coerced) or `:fast` after `/speed fast`.
 - `/speed` with no args prints the current mode.
 - `/speed fast` sets mode; `/speed normal` clears it.
+- `/speed fast project` persists the setting to project prefs; `session` leaves
+  it in-memory only; `user` writes user config.
 - `/speed unknown` returns an error listing allowed values.
+- `/speed fast bogus` returns an error listing allowed scopes.
 - Anthropic `build-request` includes `speed: "fast"` iff speed-mode is `:fast`;
   omits it otherwise.
 - OpenAI chat-completions `build-request` includes `service_tier: "flex"` iff
@@ -242,6 +255,13 @@ is independent of the thinking on/off level.  It also lays the groundwork for
 The effort override is **only applied when thinking is enabled** (i.e.
 `thinking-level` ≠ `:off`).  When thinking is off the effort parameter is
 irrelevant and is not sent.
+
+For provider asymmetry, the user-facing meaning of `/speed fast` is **use the
+provider's non-default alternate throughput tier** rather than a strict global
+promise of "faster". Help text and docs should note the concrete provider
+mapping: Anthropic `fast` means higher throughput at premium pricing, while
+OpenAI chat-completions `fast` maps to `service_tier: "flex"`, which is a
+lower-priority / cheaper tier rather than a latency upgrade.
 
 The effort override is separate from `thinking-level`: setting `/effort xhigh`
 does not change the thinking level; it overrides what effort value is sent for
@@ -291,9 +311,11 @@ In `request-body` / `build-request`, resolve effort as:
    provider string (`:xhigh` → `"highest"` for adaptive, `"high"` for extended).
 2. Otherwise fall back to the existing `thinking-level->effort-default` mapping.
 
-When `"highest"` is sent and the model does not yet support it (detectable via
-a 400 response), the provider error surface already handles this — no special
-retry logic is needed at design time.
+`"highest"` has **no transparent retry fallback in this slice**. Psi should
+always send `"highest"` for adaptive Anthropic `:xhigh`, and if a model/API
+combination rejects it with a 400, that provider error should surface to the
+user as-is. Remove any implied "fallback with warning" behaviour from code,
+tests, and docs in this task.
 
 #### 6. OpenAI provider (`components/ai/src/psi/ai/providers/openai/reasoning.clj`)
 
@@ -416,10 +438,11 @@ Add `:mid-system` to `session-entry-kind-schema`.
 
 #### 4. Conversation assembly (`components/turn-runtime/src/psi/turn_runtime/conversation.clj`)
 
-In `append-msg`, handle `"system"` role: append a `{:role :system :content
-{:kind :text :text "..."}}` message to the conversation.  These messages pass
-through `agent-messages->ai-conversation` transparently alongside user and
-assistant turns.
+In `append-msg`, handle `"system"` role by appending the projected provider
+message produced by `journal->provider-messages`: `{:role "system" :content
+[{:type :text :text "..."}]}`. These messages then pass through
+`agent-messages->ai-conversation` transparently alongside user and assistant
+turns.
 
 #### 5. Anthropic provider (`components/ai/src/psi/ai/providers/anthropic.clj`)
 
@@ -480,18 +503,25 @@ This is the queryable capability surface extensions use before calling
 
 #### 10. `prompt_request.clj` — journal projection
 
-`journal->provider-messages` already projects `:message` entries.  Extend it
+`journal->provider-messages` already projects `:message` entries. Extend it
 to also project `:mid-system` entries as `{:role "system" :content [{:type
 :text :text "..."}]}` messages, inserted at the correct position in the
 provider message sequence.
+
+This exact shape is the contract consumed by Part 4 step 4's `append-msg`
+`"system"` branch: string role key `"system"`, and `:content` as a vector of
+provider-style content blocks `{:type :text :text ...}`.
 
 #### 11. Compaction (`components/agent-session/src/psi/agent_session/compaction.clj`)
 
 Mid-system messages must be preserved across compaction boundaries: they are
 not part of the conversation history to be summarised, but are instructions
-that remain valid for the remainder of the session.  The compaction pass must
-carry forward all `:mid-system` journal entries that fall after the compaction
-cut point.
+that remain valid for the remainder of the session. The concrete preservation
+mechanism in this slice is to extend `entry->message` to handle `:mid-system`
+entries by returning a provider-style message map `{:role "system" :content
+[{:type :text :text ...}]}` so post-compaction message rebuilds retain them.
+The compaction pass must carry forward all `:mid-system` journal entries that
+fall after the compaction cut point.
 
 #### 12. Cache interaction
 
