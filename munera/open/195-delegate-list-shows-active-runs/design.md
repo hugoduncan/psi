@@ -89,3 +89,13 @@ Visibility rules:
 - Removed canonical workflow runs must not remain visible solely because terminal background-job history is retained.
 - Delegate jobs from unrelated sessions must not be listed, even if their canonical workflow runs still exist in the global workflow registry.
 - If a same-session delegate background job points at a missing canonical workflow run while still non-terminal, `delegate list` should surface an actionable inconsistency/error rather than silently returning an empty list.
+
+Timed-out delegate background jobs are a delegate-tool retention state, not a canonical workflow-run status. Canonical workflow runs continue to use the workflow runtime status set (`:pending`, `:running`, `:blocked`, `:completed`, `:failed`, `:cancelled`). When a retained same-session delegate background job has `:status :timed-out` and its canonical workflow run still exists, `delegate list` should include the entry with:
+
+- the canonical `run-id` as the surfaced management id;
+- canonical workflow status as the primary run status used to decide `continue` compatibility;
+- delegate/background status shown separately as `:timed-out` (or equivalent text such as `delegate timed out`) so the operator can distinguish wrapper/job timeout from workflow state;
+- `remove` compatibility whenever the canonical run exists, because `remove` deletes the canonical workflow run;
+- `continue` compatibility only when the canonical workflow status is one of the statuses currently supported by `delegate continue` (`:blocked`, `:completed`, `:failed`, `:cancelled`). A timed-out background job whose canonical run is still `:pending` or `:running` is listable/removable but not continuable yet.
+
+A retained `:timed-out` background job pointing at a missing canonical workflow run should be hidden like other terminal retained jobs whose canonical run has been removed; it should not create a synthetic `:timed-out` workflow run.
