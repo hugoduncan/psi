@@ -27,3 +27,5 @@
 2026-05-30 — Design ambiguity review: re-read current design after shared provider extraction seam clarification plus referenced provider extraction, structured-output envelope, schema, and workflow-judge retry code. No new actionable ambiguities found; existing ambiguity follow-ups remain resolved and `design-steps.md` needs no new unchecked items.
 
 2026-05-30 — Ambiguity follow-up execution: re-read `design-steps.md` after the preceding ambiguity-review pass. No newly added unchecked ambiguity follow-up items are present; no `design.md` changes were needed and no blocking ambiguity follow-up remains.
+
+2026-05-30 — Design inconsistency review: found one new actionable inconsistency: `design.md` now requires non-object payload preservation for prompted-JSON structured-output results at the shared provider extraction sites, but referenced `psi.ai.structured-output/json-only-instruction` still tells prompted-JSON models to “Return exactly one JSON object,” which conflicts with bare string-enum/non-object schemas.
