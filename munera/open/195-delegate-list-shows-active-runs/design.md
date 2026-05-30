@@ -118,6 +118,15 @@ For terminal-only duplicate eligible jobs with the same canonical `workflow-id`,
 
 Terminal retained jobs normally have `completed-at` and `completed-seq`; missing ordering fields are treated as older than present values for the same comparison level, so malformed retained history cannot win over a fully recorded terminal job with a real completion marker. This ordering is only for choosing the displayed delegate/background status in a terminal-only duplicate group. It does not create another management id, and it does not make missing-canonical terminal history visible after the canonical workflow run is removed.
 
+Final `delegate list` rows are ordered by the selected representative delegate/background job for each visible canonical workflow run, not by canonical workflow registry traversal order or status groups. The stable ordering is newest first by the earliest durable delegate-job ordering marker available for the representative job:
+
+1. larger non-nil `started-at`;
+2. if `started-at` is equal or unavailable for both rows, larger non-nil `job-seq`;
+3. if still tied or unavailable, lexicographically larger string `job-id`;
+4. if still tied, lexicographically larger canonical workflow `run-id`.
+
+Missing ordering fields are treated as older than present values at the same comparison level. Rows are not grouped by canonical workflow status or delegate/background status before applying this ordering; status is display/filtering information, not the primary list sort key. This keeps active and retained delegate runs in deterministic recency order using the same background-job ownership surface that determines visibility, while `run-id` remains only a final deterministic tie-breaker.
+
 Timed-out delegate background jobs are a delegate-tool retention state, not a canonical workflow-run status. Canonical workflow runs continue to use the workflow runtime status set (`:pending`, `:running`, `:blocked`, `:completed`, `:failed`, `:cancelled`). When a retained same-session delegate background job has `:status :timed-out` and its canonical workflow run still exists, `delegate list` should include the entry with:
 
 - the canonical `run-id` as the surfaced management id;
