@@ -181,7 +181,7 @@ Provider-boundary retry outcomes must return structured final error data at the 
 
 Minimum final error fields:
 
-- `:failure-reason` — one of `:non-retryable`, `:retry-exhausted`, or `:retry-cancelled` for provider-boundary retry outcomes;
+- `:failure-reason` — one of `:non-retryable`, `:retry-disabled`, `:retry-exhausted`, or `:retry-cancelled` for provider-boundary retry outcomes;
 - `:retryable?` — whether the final provider cause was classified as retryable before the final outcome rule was applied;
 - `:error-kind` — shared provider-error classification for the final/last provider cause, including `:unknown` when classification cannot identify a retryable subtype;
 - `:http-status` — provider HTTP status when available;
@@ -195,6 +195,7 @@ Minimum final error fields:
 Outcome-specific requirements:
 
 - Terminal non-retryable failure: `:failure-reason :non-retryable`, `:retryable? false`, no retry schedule after the final attempt, and classification fields showing why retry was skipped. Unknown failures use this path with `:error-kind :unknown`.
+- Disabled retry for an otherwise retryable failure: `:failure-reason :retry-disabled`, `:retryable? true`, `:retry-enabled? false`, no retry schedule after the initial attempt, `:attempt-count 1`, final `:retry-attempt 0`, and the configured `:max-retries` preserved for observability. This is the only disabled-retry outcome; terminal non-retryable and unknown failures still use `:non-retryable` even when retry is disabled.
 - Retry exhaustion: `:failure-reason :retry-exhausted`, `:retryable? true` for the last cause, `:exhausted? true`, `:attempt-count` equal to `1 + :max-retries` when retries were enabled and every attempt failed retryably, and the last provider cause preserved as the primary cause.
 - Retry cancellation: `:failure-reason :retry-cancelled`, `:cancelled? true`, `:retryable? true` for the failure that scheduled the pending retry, `:attempt-count` excluding the suppressed next attempt, and `:retry-attempt` identifying the suppressed next zero-based attempt when available.
 
