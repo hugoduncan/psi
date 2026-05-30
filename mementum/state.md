@@ -97,3 +97,5 @@ Bootstrapped on 2026-04-02.
 
 - 2026-05-30: Task 190 follow-up final-marker gap is complete: provider retry EQL `:psi.provider-retry/final?` now matches scheduled retry attempts by final lifecycle `:retry-attempt`, including cancelled suppressed attempts; focused retry/EQL tests and targeted lint passed.
 - 2026-05-30: Task 190 is closed. Final pass re-read task artifacts, confirmed all implementation checklist items complete, reran broad `bb test` green, moved `munera/open/190-ai-request-retry-backoff-observability/` to `munera/closed/190-ai-request-retry-backoff-observability/`, and updated `munera/plan.md`. Provider-boundary retry/backoff observability work is implementation-complete.
+
+- 2026-05-30: Task 190 final implementation-review follow-up completed streaming thrown-exception retry header handling. `execute-live-turn!` now converts synchronous streaming provider exceptions with `ex-data` headers/status into the generic turn error path, preserving retry headers for provider-boundary retry metadata. Added focused coverage for thrown streaming `Retry-After`/rate-limit headers and reran focused header/streaming retry tests plus targeted clj-kondo green.

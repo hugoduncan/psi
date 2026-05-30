@@ -178,6 +178,15 @@
       :else
       result)))
 
+(defn- streaming-exception-error-data
+  [^Throwable t]
+  (let [data        (ex-data t)
+        headers     (or (:provider-error/headers data) (:headers data))
+        http-status (or (:http-status data) (:status data))]
+    (cond-> {:error-message (or (ex-message t) "Provider streaming request failed")}
+      http-status (assoc :http-status http-status)
+      headers     (assoc :headers headers))))
+
 (defn execute-live-turn!
   "Execute one live provider turn against an already prepared conversation.
    Returns {:turn-id :model :assistant-message :ai-options :turn-ctx}."
@@ -186,13 +195,18 @@
         (create-live-turn-context ctx session-id ai-model progress-queue turn-id)
         ai-options      (capture-aware-ai-options ctx session-id turn-id base-ai-options)
         cancelled-pred  #(stream/cancelled-stream-handle? (:stream-handle @(:turn-data turn-ctx)))
-        _stream-handle  (stream/mark-turn-stream-handle!
-                         turn-ctx
-                         (do-stream! ai-ctx ai-conv ai-model ai-options
-                                     (make-provider-event-consumer
-                                      turn-ctx actions-fn last-progress-ms timed-out?
-                                      {:cancelled-pred cancelled-pred
-                                       :now-fn stream/now-ms})))
+        stream-handle   (try
+                          (do-stream! ai-ctx ai-conv ai-model ai-options
+                                      (make-provider-event-consumer
+                                       turn-ctx actions-fn last-progress-ms timed-out?
+                                       {:cancelled-pred cancelled-pred
+                                        :now-fn stream/now-ms}))
+                          (catch Throwable t
+                            (turn-sc/send-event! turn-ctx :turn/error
+                                                 (streaming-exception-error-data t))
+                            nil))
+        _               (when stream-handle
+                          (stream/mark-turn-stream-handle! turn-ctx stream-handle))
         assistant-msg   (await-assistant-message!
                          turn-ctx done-p last-progress-ms timed-out?
                          {:idle-timeout-ms (:llm-stream-idle-timeout-ms ai-options)
