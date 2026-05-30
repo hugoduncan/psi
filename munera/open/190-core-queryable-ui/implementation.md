@@ -162,3 +162,7 @@ No newly added unchecked ambiguity follow-up items remained in `design-steps.md`
 ## 2026-05-30 design inconsistency review
 
 No new actionable inconsistency feedback after re-reading `design.md`, referenced task design artifacts, extension-authoring docs, and current UI/query/frontend seams. Existing aligned decisions cover capability/action vocabulary, provider/query ownership, unsupported/error semantics, invocation/request boundaries, permission constraints, legacy UI-type compatibility, and referenced documentation guidance consistently enough for planning.
+
+## 2026-05-30 inconsistency follow-up execution
+
+No newly added unchecked inconsistency follow-up items remained in `design-steps.md`; no `design.md` changes were needed and no inconsistency steps were left blocked.
