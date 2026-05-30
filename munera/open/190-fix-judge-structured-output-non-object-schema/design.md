@@ -26,7 +26,7 @@ Affected files:
 - `components/ai/src/psi/ai/providers/anthropic/structured_output.clj` — `structured-output-result` (one call)
 - `components/ai/src/psi/ai/providers/openai/chat_completions.clj` — two call sites that build provider-native structured-output results
 
-The `parse-json-object` helper itself is not removed; it is still used elsewhere for non-structured-output purposes.
+The `parse-json-object` helper itself is not removed. After the three provider result-extraction call sites move to `parse-json-value`, no non-helper call sites are expected to remain; the helper is retained as the object-only parsing API for future callers and to avoid broad API cleanup in this slice.
 
 ### Secondary fix — retry loop for structured-output judge path
 
@@ -36,7 +36,7 @@ In `psi.agent-session.workflow-judge`, when `valid-output-result?` returns false
 
 - `psi.workflow-runtime.structured-output/structured-output-envelope` and `validation-input` are **not changed** — they already handle `:payload` correctly for any JSON value.
 - `parse-json-object` is not removed from `psi.ai.structured-output`.
-- The fix is minimal: only the provider result-extraction sites change.
+- The fix is minimal across the two root causes: provider result-extraction changes are limited to the three native structured-output payload extraction sites, and workflow-judge changes are limited to the structured-output validation-failure retry path.
 - Existing tests for the `structured-output-envelope` non-object JSON path (e.g. `structured-output-envelope-string-enum-json-test`, `structured-output-envelope-non-object-json-test`) must remain green.
 
 ## Acceptance criteria
