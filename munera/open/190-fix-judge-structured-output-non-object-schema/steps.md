@@ -71,3 +71,8 @@
 
 - [x] Add workflow-judge retry-exhaustion coverage asserting every structured-output retry call receives the original structured-output opts/schema, not just the first successful retry path.
 - [x] Add an integrated regression that builds an Anthropic native structured-output result for a bare string payload (for example `"\"DONE\""`) and passes that metadata to `psi.workflow-runtime.structured-output/output-result` with the judge routing schema, asserting `:status :valid`, `:value "DONE"`, and preserved Anthropic source/raw payload metadata. Added `structured-output-envelope-anthropic-native-string-payload-test`.
+
+## Code-shaper review follow-ups
+
+- [ ] Normalize `psi.ai.providers.openai.chat-completions/structured-output-result` metadata so raw provider text is always preserved at `:raw-payload` (including parse failures), matching Anthropic/Codex, and add a parse-failure regression for the OpenAI helper.
+
