@@ -15,7 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
-- 2026-05-30: Task 190 design ambiguity review pass completed independently. Read `design.md` plus referenced `.psi/workflows/review-task-design.edn`, `.psi/workflows/review-task-plan.edn`, review prompt files, workflow-loader definition tests, and review-step routing tests. No new actionable design ambiguities found. Commit: `86038d4d` (`◇ review: task 190 design ambiguity`).
+- 2026-05-30: Task 190 design ambiguity review passes completed independently. Latest pass re-read `design.md`, task-design guidance, referenced review workflow definitions/prompts, workflow-loader definition tests, review-step routing tests, and deterministic PASS_STATUS routing code. No new actionable design ambiguities found. Commits include `86038d4d` and `78a674b0`.
 - Registry unification arc through task 177 is complete in implementation/review terms:
   - 164: registry semantics audit is the migration-rules source of truth and now includes post-migration guidance from 169–173
   - 165: root-registry target architecture captured
