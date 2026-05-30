@@ -1006,3 +1006,24 @@ Actionable feedback found:
 ## Design ambiguity review pass — 2026-05-30 (plan/steps post-replay-feedback verification)
 
 No new actionable ambiguities found. Re-read `plan.md`, `steps.md`, `design-steps.md`, and the latest `implementation.md` notes, then checked representative referenced surfaces for the remaining open work: compaction replay preservation, Slice 5 documentation/changelog ownership, focused/broad verification, and existing README/`doc/` configuration references. The unchecked compaction replay item in `steps.md` is actionable implementation feedback rather than a plan/steps ambiguity, and Slice 5 remains a clear integration/coherence pass. Existing ambiguity follow-ups in `design-steps.md` are checked; no duplicate follow-up items were added.
+
+---
+
+## Slice 5 integration/coherence pass — 2026-05-30
+
+Completed the user-facing documentation and verification slice:
+
+- Updated `README.md` to surface Claude Opus 4.8 plus the new `/speed` and `/effort` controls and to point extension readers at mid-conversation system-message injection docs.
+- Updated `doc/configuration.md` with `:speed-mode` and `:effort-override` config keys, scoped clear/mask semantics, session-transient cold-resume caveats, and adaptive Anthropic `:xhigh` behavior.
+- Updated `doc/tui.md` with `/model anthropic claude-opus-4-8`, `/speed`, `/effort`, and footer display behavior.
+- Updated `doc/extension-api.md` with `inject-mid-system-message!`, result contracts, placement rules, provenance, and capability query guidance.
+- Added `CHANGELOG.md` Unreleased entries for Opus 4.8, speed mode, effort override / `:xhigh`, and extension mid-system injection.
+- Aligned two RPC payload tests with the now-distinct provider-agnostic `thinking xhigh` display.
+
+Verification:
+
+- Focused Slice 1–4 regression set: `clojure -M:test --focus psi.ai.model-registry-test --focus psi.ai.providers.anthropic-test --focus psi.ai.providers.openai-test --focus psi.agent-session.commands-test --focus psi.agent-session.prompt-request-test --focus psi.agent-session.model-dispatch-test --focus psi.agent-session.compaction-test --focus psi.agent-session.extensions-test --focus psi.agent-session.session-lifecycle-test --focus psi.shared-config.resolution-test --focus psi.app-runtime-bootstrap-test` — 189 tests, 1113 assertions, 0 failures.
+- RPC display fix checks: `clojure -M:test --focus psi.rpc-events-test/session-updated-payload-includes-model-metadata-test` and `clojure -M:test --focus psi.rpc-test/session-updated-payload-includes-model-metadata-test` — green.
+- Targeted lint: `clj-kondo --lint components/ai/src components/ai/test components/agent-session/src components/agent-session/test components/session-state/src components/shared-config/src components/shared-config/test components/app-runtime/src components/app-runtime/test` — no errors/warnings; existing info-level assertion-message notes only.
+- RPC test lint: `clj-kondo --lint components/rpc/test/psi/rpc_events_test.clj components/rpc/test/psi/rpc_test.clj` — clean.
+- Full verification: `bb test` — passed.

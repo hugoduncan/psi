@@ -115,8 +115,8 @@
       (is (= "gpt-5.3-codex" (:model-id payload)))
       (is (= true (:model-reasoning payload)))
       (is (= "xhigh" (:thinking-level payload)))
-      (is (= "high" (:effective-reasoning-effort payload)))
-      (is (= "(openai) gpt-5.3-codex • thinking high" (:header-model-label payload))))))
+      (is (= "xhigh" (:effective-reasoning-effort payload)))
+      (is (= "(openai) gpt-5.3-codex • thinking xhigh" (:header-model-label payload))))))
 
 (deftest session-updated-payload-includes-retry-contract-test
   (testing "session payload includes canonical retry payload and summary text"

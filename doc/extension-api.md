@@ -88,6 +88,47 @@ Example:
              :id       (:psi.agent-session/model-id model-ctx)}}))
 ```
 
+## Mid-conversation system-message injection
+
+Extensions can append a provider-safe mid-conversation system instruction to the
+active session with:
+
+```clojure
+((:inject-mid-system-message! api) "Use the updated budget for the next reply")
+((:inject-mid-system-message! api)
+ "Prefer concise answers for the next reply"
+ {:source :my-extension})
+```
+
+The helper invokes `psi.extension/inject-mid-system-message` and returns a compact
+result:
+
+```clojure
+{:ok true}
+{:ok false :error :capability-not-supported}
+{:ok false :error :invalid-placement :reason :no-preceding-user}
+{:ok false :error :invalid-placement :reason :after-assistant}
+{:ok false :error :invalid-placement :reason :pending-mid-system}
+```
+
+Psi exposes the Anthropic-compatible placement subset for all providers: a
+mid-system message may be injected only after the latest conversational user turn
+and before the assistant response being generated. Non-conversational journal
+metadata after that user turn is ignored for placement, so the provider message
+sequence still becomes `user → system`.
+
+Capability can be checked before injection with:
+
+```clojure
+((:query api) [:psi.agent-session/model-supports-mid-system-messages])
+```
+
+Support is true for Claude Opus 4.8 and for OpenAI chat-completions models
+(including runtime/custom maps inferred from `:provider :openai` and
+`:api :openai-completions`). Codex/responses models and older Anthropic models
+are reported unsupported. When `:source` is omitted, the mutation infers
+provenance from extension path metadata and falls back to `:extension`.
+
 ## Child-session helper runs
 
 Extensions can create targeted helper/background child sessions with:

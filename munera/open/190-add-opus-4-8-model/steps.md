@@ -94,9 +94,9 @@
 
 ## Slice 5 — Integration and coherence
 
-- [ ] Update README and `doc/` user-facing command/model documentation for Opus 4.8, `/speed`, `/effort`, and mid-system extension capability.
-- [ ] Add changelog entries for user-visible model, command, provider-shaping, and extension capability changes.
-- [ ] Run focused tests for all modified model, command, provider, resolver, extension, prompt-request, and compaction namespaces.
-- [ ] Run targeted `clj-kondo` on modified source/test paths.
-- [ ] Run `bb test` and confirm the full suite is green.
-- [ ] Append implementation notes with key decisions, verification commands, and any provider/API caveats discovered during implementation.
+- [x] Update README and `doc/` user-facing command/model documentation for Opus 4.8, `/speed`, `/effort`, and mid-system extension capability.
+- [x] Add changelog entries for user-visible model, command, provider-shaping, and extension capability changes.
+- [x] Run focused tests for all modified model, command, provider, resolver, extension, prompt-request, and compaction namespaces.
+- [x] Run targeted `clj-kondo` on modified source/test paths.
+- [x] Run `bb test` and confirm the full suite is green.
+- [x] Append implementation notes with key decisions, verification commands, and any provider/API caveats discovered during implementation.
