@@ -23,3 +23,5 @@
 2026-05-30 — Design inconsistency review: found one new actionable inconsistency: `design.md` describes the three provider extraction edits as native structured-output payload sites and frames the intent around provider-native output, but referenced Anthropic/OpenAI code shows the same `parse-json-object` extraction helpers also emit prompted-JSON structured-output results at those call sites.
 
 2026-05-30 — Inconsistency follow-up: reconciled native-only wording with referenced provider code. `design.md` now states that the three provider structured-output extraction sites are shared seams and non-object `:payload` preservation applies to both provider-native and prompted-JSON structured-output results emitted by those sites. Marked the design-step complete.
+
+2026-05-30 — Design ambiguity review: re-read current design after shared provider extraction seam clarification plus referenced provider extraction, structured-output envelope, schema, and workflow-judge retry code. No new actionable ambiguities found; existing ambiguity follow-ups remain resolved and `design-steps.md` needs no new unchecked items.
