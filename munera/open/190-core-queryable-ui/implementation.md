@@ -186,3 +186,7 @@ No new actionable ambiguity feedback after re-reading `design.md`, referenced ta
 ## 2026-05-30 ambiguity follow-up execution
 
 Completed the newly added documentation-alignment follow-up in `design-steps.md`: `doc/extensions.md` now documents the queryable UI capability/action surface separately from UI contribution snapshots, and `doc/extension-api.md` now documents the extension-facing `:psi.ui/...` attrs, capability/action branching, unavailable make-visible descriptor semantics, and compatibility-only role of UI-type surfaces. No ambiguity follow-up item remains blocked.
+
+## 2026-05-30 design inconsistency review
+
+No new actionable inconsistency feedback after re-reading `design.md`, referenced task design artifacts, extension-authoring docs, and current UI/query/frontend seams. The design remains internally aligned on capability/action vocabulary, provider/query ownership, unavailable/error semantics, invocation/request boundaries, permission constraints, legacy UI-type compatibility, docs guidance, and console/headless classification.
