@@ -729,20 +729,28 @@ New `:session/inject-mid-system-message` handler in
 - Validates that the active model supports the capability (queries
   `:supports-mid-conversation-system-messages`).  Returns an error map if not.
 - Validates placement at dispatch time before mutating the journal. Injection is
-  accepted only when the current journal tail has a user turn as the latest
-  conversational entry and there is not already a pending `:mid-system` entry
-  after that user turn. This covers the intended use: after a user turn, before
-  the assistant response being generated.
+  accepted only when the current journal has a user turn as the latest
+  **conversational** entry and there is not already a pending `:mid-system`
+  conversational entry after that user turn. Non-conversational journal entries
+  such as `:model`, `:thinking-level`, `:label`, `:logprobs`, telemetry, or
+  other metadata/control entries are ignored for placement validation. This
+  covers the intended use: after a user turn, before the assistant response
+  being generated, even if model/thinking/label/logprob metadata was appended
+  after the user turn.
 - Invalid placements are rejected without modifying the journal:
   - before any user turn → `{:ok false :error :invalid-placement :reason :no-preceding-user}`
   - after an assistant turn → `{:ok false :error :invalid-placement :reason :after-assistant}`
   - after another pending `:mid-system` entry → `{:ok false :error :invalid-placement :reason :pending-mid-system}`
-- On valid placement, appends a `:mid-system` journal entry with `{:text text :source source}`.
+- On valid placement, appends a `:mid-system` journal entry with `{:text text :source source}` at the literal end of the journal. If non-conversational
+  metadata entries occurred after the latest user turn, they remain before the
+  new `:mid-system` entry in journal order; the provider-message projection
+  ignores those metadata entries, so the generated provider sequence still
+  preserves `user → system`.
 - The journal entry is projected into a `{:role "system" ...}` provider message
   at request-build time via the conversation assembly path above. Because valid
-  injection occurs after the latest user turn and before the next assistant
-  response, that system message is intentionally final in the generation
-  request and must be retained.
+  injection occurs after the latest conversational user turn and before the next
+  assistant response, that system message is intentionally final in the
+  generation request and must be retained.
 - Emits no runtime effects (journal-only; no notify, no steering message).
 
 #### 8. Extension API and mutation surface
@@ -830,7 +838,10 @@ This is the queryable capability surface extensions use before calling
 `journal->provider-messages` already projects `:message` entries. Extend it
 to also project `:mid-system` entries as `{:role "system" :content [{:type
 :text :text "..."}]}` messages, inserted at the correct position in the
-provider message sequence.
+provider message sequence. Non-conversational journal entries are not projected
+into provider messages; when such entries sit between a user turn and a later
+`:mid-system` entry, projection collapses across them and emits the provider
+order `user → system`.
 
 This exact shape is the contract consumed by Part 4 step 4's `append-msg`
 `"system"` branch: string role key `"system"`, and `:content` as a vector of
@@ -912,7 +923,10 @@ cache-control logic is required.
   `{:ok false :error :capability-not-supported}` and does not modify the journal.
 - `inject-mid-system-message!` before any user turn, after an assistant turn, or
   after another pending mid-system entry returns `{:ok false :error
-  :invalid-placement ...}` and does not modify the journal.
+  :invalid-placement ...}` and does not modify the journal. Placement validation
+  ignores non-conversational journal entries after the latest user turn; a valid
+  injection after such metadata appends `:mid-system` at the journal tail and
+  provider projection still emits `user → system`.
 - Anthropic `request_schema.clj` accepts inline `{"role": "system", ...}`
   messages with text-block content in the `messages` array, so valid mid-system
   requests are not rejected by local request validation.

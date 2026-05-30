@@ -488,3 +488,16 @@ Read `design-steps.md` for newly added unchecked inconsistency follow-up items a
 **New actionable ambiguity found:**
 
 1. **Mid-system injection placement with non-conversational journal entries** — Part 4 says `:session/inject-mid-system-message` is accepted when the journal tail has a user turn as the latest conversational entry and no pending `:mid-system`, but the journal can contain non-conversational entries (`:model`, `:thinking-level`, `:label`, `:logprobs`, etc.) after that user turn before the assistant response. Specify whether placement validation ignores such metadata entries and inserts/appends the `:mid-system` after them, or requires the literal last journal entry to be the user/`:mid-system` boundary. Without this, extension calls after a model/thinking change between user and assistant have unclear accept/reject behavior and unclear provider-message ordering.
+
+
+---
+
+## Ambiguity follow-up — 2026-05-30 (journal metadata placement)
+
+Completed the newly added ambiguity follow-up item in `design-steps.md` by refining `design.md`.
+
+Decision recorded:
+- `:session/inject-mid-system-message` placement validation ignores non-conversational journal entries such as `:model`, `:thinking-level`, `:label`, and `:logprobs` when determining the latest conversational entry and pending `:mid-system` state.
+- On valid injection, dispatch appends the `:mid-system` entry at the literal journal tail; any intervening metadata remains before it in journal order.
+- `journal->provider-messages` does not project metadata entries, so provider-message assembly collapses across them and preserves `user → system` ordering.
+- Acceptance criteria now require coverage for valid injection after metadata entries between the latest user turn and the assistant response.
