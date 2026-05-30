@@ -146,4 +146,4 @@
 
 ## From inconsistency review pass 2026-05-30 (post-final follow-up verification)
 
-- [ ] **Align full-suite verification with latest code/test follow-up** — `steps.md` marks Slice 5 `bb test` verification complete and `implementation.md` records full-suite success during the Slice 5 pass, but a later compaction replay post-history follow-up changed source/tests and only reran focused compaction tests plus targeted lint. Rerun `bb test` after the latest follow-up, or uncheck/reword the Slice 5 verification step so the task files do not claim final-state full-suite verification without matching evidence.
+- [x] **Align full-suite verification with latest code/test follow-up** — `steps.md` marks Slice 5 `bb test` verification complete and `implementation.md` records full-suite success during the Slice 5 pass, but a later compaction replay post-history follow-up changed source/tests and only reran focused compaction tests plus targeted lint. Rerun `bb test` after the latest follow-up, or uncheck/reword the Slice 5 verification step so the task files do not claim final-state full-suite verification without matching evidence.

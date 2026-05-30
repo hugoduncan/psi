@@ -1056,3 +1056,15 @@ Read `design-steps.md` for unchecked ambiguity follow-up items added by the prec
 **New actionable inconsistency found:**
 
 1. **Full-suite verification is marked complete before a later code/test follow-up** — `steps.md` Slice 5 marks `Run bb test and confirm the full suite is green` complete, and the Slice 5 implementation note records `bb test` passing. But a later compaction replay post-history implementation pass changed source/tests after that full-suite run and only reran focused compaction tests plus targeted lint. The task files therefore imply the final working tree has post-change full-suite verification, while `implementation.md` only proves full-suite verification for the pre-follow-up state. Rerun `bb test` after the latest follow-up (or uncheck/reword the Slice 5 verification step until it is rerun) so steps and implementation evidence describe the same final state.
+
+---
+
+## Inconsistency follow-up execution — 2026-05-30 (post-final full-suite verification)
+
+Completed the newly added inconsistency follow-up item in `design-steps.md`:
+
+- Reran `bb test` after the latest compaction replay code/test follow-up; the full suite passed (`✅ All tests passed`).
+- Kept the Slice 5 `bb test` verification step checked because final-state full-suite evidence now matches the current task state.
+- Marked the corresponding `design-steps.md` follow-up complete.
+
+Pre-existing uncommitted modifications in `components/agent-session/test/psi/agent_session/commands_test.clj` and `components/ai/test/psi/ai/providers/openai_test.clj` were not changed by this follow-up.
