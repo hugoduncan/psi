@@ -549,3 +549,7 @@ Verification:
 
 - `clojure -M:test --focus psi.agent-session.ui-capabilities-test` — 17 tests, 113 assertions, 0 failures.
 - `clj-kondo --lint components/agent-session/src/psi/agent_session/ui_capabilities.clj components/agent-session/test/psi/agent_session/ui_capabilities_test.clj` — clean.
+
+## 2026-05-30 implementation review
+
+No new actionable implementation feedback after reviewing task artifacts, UI capability normalization/resolver code, context provider lifecycle wiring, RPC/TUI provider installation, Emacs command implementation, nullable API support, extension docs, and focused tests. The latest review-fixed issues for diagnostic redaction, nullable diagnostic queries, contradictory unavailable provider output, RPC/TUI late provider lifecycle, focus-session normalization, and descriptor/invocation foreign-key rejection are covered by focused tests. Verification: `clojure -M:test --focus psi.agent-session.ui-capabilities-test --focus psi.agent-session.graph-surface-test --focus psi.app-runtime-test --focus psi.rpc-transport-test` — 79 tests, 2580 assertions, 0 failures.
