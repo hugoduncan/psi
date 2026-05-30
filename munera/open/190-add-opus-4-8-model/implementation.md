@@ -1134,3 +1134,9 @@ Read `design-steps.md` for unchecked ambiguity follow-up items added by the prec
 Actionable test feedback found:
 
 1. **Effort override tests only prove the `:xhigh` ceiling path, not ordinary override precedence** — The design acceptance requires non-`xhigh` override values to pass through for Anthropic adaptive, OpenAI chat-completions, and Codex/responses. Existing provider tests cover level-derived medium/high and `:effort-override :xhigh`, but they do not prove that `:effort-override :high` or `:medium` overrides a different thinking level on each provider path. Added one unchecked follow-up in `steps.md`; no duplicate existing step covered this exact gap.
+
+---
+
+## Design inconsistency review pass — 2026-05-30 (post-test-review plan/steps)
+
+No new actionable inconsistencies found. Re-read `plan.md`, `steps.md`, `design-steps.md`, and latest `implementation.md` notes, then checked referenced task/code/doc/test surfaces for Opus 4.8, `/speed`, `/effort`, mid-system injection, docs/changelog ownership, final verification evidence, and current follow-up status. The only unchecked task item is the already-recorded test-review follow-up for non-`xhigh` effort override request-shaping coverage; it is test feedback rather than a plan/steps inconsistency, so no duplicate `design-steps.md` item was added. Existing uncommitted test-file changes were not touched.
