@@ -1,16 +1,38 @@
 {:steps
  [{:name "ambiguity-review",
    :type :session,
-   :prompt-workflow "review-task-design-ambiguity-review.md"}
+   :prompt-workflow "review-task-design-ambiguity-review.md",
+   :judge
+   {:type :invoke,
+    :operation "workflow/pass-status-routing",
+    :args {:text {:from {:step "ambiguity-review", :output :final-llm-reply}},
+           :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}},
+   :on {"REPEAT" {:goto "ambiguity-follow-up"},
+        "DONE" {:goto "inconsistency-review"}}}
   {:name "ambiguity-follow-up",
    :type :session,
-   :prompt-workflow "review-task-design-ambiguity-follow-up.md"}
+   :prompt-workflow "review-task-design-ambiguity-follow-up.md",
+   :judge {:type :invoke,
+           :operation "workflow/constant-routing",
+           :args {:route "DONE"}},
+   :on {"DONE" {:goto "inconsistency-review"}}}
   {:name "inconsistency-review",
    :type :session,
-   :prompt-workflow "review-task-design-inconsistency-review.md"}
+   :prompt-workflow "review-task-design-inconsistency-review.md",
+   :judge
+   {:type :invoke,
+    :operation "workflow/pass-status-routing",
+    :args {:text {:from {:step "inconsistency-review", :output :final-llm-reply}},
+           :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}},
+   :on {"REPEAT" {:goto "inconsistency-follow-up"},
+        "DONE" {:goto "clarity-status"}}}
   {:name "inconsistency-follow-up",
    :type :session,
-   :prompt-workflow "review-task-design-inconsistency-follow-up.md"}
+   :prompt-workflow "review-task-design-inconsistency-follow-up.md",
+   :judge {:type :invoke,
+           :operation "workflow/constant-routing",
+           :args {:route "DONE"}},
+   :on {"DONE" {:goto "clarity-status"}}}
   {:name "clarity-status",
    :type :session,
    :prompt-workflow "review-task-design-clarity-status.md",

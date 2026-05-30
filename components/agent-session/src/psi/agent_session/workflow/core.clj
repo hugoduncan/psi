@@ -102,7 +102,9 @@
 (def ^:private pass-status-prefix "PASS_STATUS:")
 (def ^:private known-pass-status->route
   {"REVIEW_COMPLETE" "DONE"
-   "ACTIONABLE_FEEDBACK" "REPEAT"})
+   "ACTIONABLE_FEEDBACK" "REPEAT"
+   "IMPLEMENTATION_COMPLETE" "DONE"
+   "MORE_WORK_REMAINS" "REPEAT"})
 
 (defn- pass-status-line-value
   [line]
@@ -111,8 +113,10 @@
       (subs line (count pass-status-prefix)))))
 
 (defn- parse-pass-status-routing
-  [text]
+  [text allowed-statuses]
   (let [lines (str/split-lines (or text ""))
+        allowed-statuses-set (when (seq allowed-statuses)
+                               (set allowed-statuses))
         status-lines (keep (fn [line]
                              (when-let [raw-value (pass-status-line-value line)]
                                {:line line
@@ -136,11 +140,25 @@
       :else
       (let [{:keys [line raw-value trimmed-value]} (first status-lines)
             route (get known-pass-status->route trimmed-value)
-            exact-known? (= raw-value (str " " trimmed-value))]
-        (if (and route exact-known?)
+            exact-known? (= raw-value (str " " trimmed-value))
+            allowed? (or (nil? allowed-statuses-set)
+                         (contains? allowed-statuses-set trimmed-value))]
+        (cond
+          (and route exact-known? allowed?)
           {:status :ok
            :data route
            :summary route}
+
+          (and route exact-known? (not allowed?))
+          {:status :error
+           :reason :invalid-pass-status
+           :message "PASS_STATUS token is not valid for this workflow step"
+           :details {:text text
+                     :line line
+                     :value trimmed-value
+                     :allowed-statuses (vec allowed-statuses)}}
+
+          :else
           {:status :error
            :reason :malformed-pass-status
            :message "PASS_STATUS line must contain exactly one known token"
@@ -154,7 +172,7 @@
     (register-operation
      {:id "workflow/pass-status-routing"
       :handler (fn [{:keys [args]}]
-                 (parse-pass-status-routing (:text args)))})
+                 (parse-pass-status-routing (:text args) (:allowed-statuses args)))})
     (register-operation
      {:id "workflow/constant-routing"
       :handler (fn [{:keys [args]}]

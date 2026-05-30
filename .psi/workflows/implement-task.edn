@@ -4,21 +4,9 @@
    :type :session,
    :prompt-workflow "implement-task-implement-pass.md",
    :judge
-   {:type :llm,
-    :contributions
-    [{:type :source, :from :workflow-original}
-     {:type :template,
-      :text
-      "Review the specific Munera task described by {{input}} and decide whether implementation work still remains. Independently inspect that task's artifacts, especially `design.md`, `plan.md`, `steps.md`, and `implementation.md`.\n\nRespond with exactly one word: REPEAT or DONE.\n\nDecision rules:\n- Respond REPEAT if `steps.md` still contains any unchecked implementation item (`- [ ]`) that is not explicitly marked as intentionally deferred or out of scope.\n- Respond REPEAT if the task artifacts record unmet acceptance criteria, missing verification, blocked implementation follow-up, or newly discovered concrete work for another implementation pass.\n- Respond DONE only if the implementation work is complete enough for handoff: no remaining unchecked implementation items, relevant verification has been run, and the task artifacts do not indicate remaining implementation work.\n- Trust the task artifacts over any incomplete or stale supporting context.\n\nDo not review the repository generically. Judge only the specific named task from the actor-step context.",
-      :vars {"input" {:from :workflow-input, :path [:input]}}}],
-    :outputs
-    {:routing-result
-     {:source :judge/structured-output,
-      :mode :structured,
-      :schema-id :psi.workflow/judge-routing-result,
-      :schema-version 1,
-      :schema [:enum "REPEAT" "DONE"],
-      :json-schema {:type "string", :enum ["REPEAT" "DONE"]}}}},
+   {:type :invoke,
+    :operation "workflow/pass-status-routing",
+    :args {:text {:from {:step "implement-pass", :output :final-llm-reply}}}},
    :on
    {"REPEAT" {:goto "implement-pass", :max-iterations 8},
     "DONE" {:goto "final-summary"}}}

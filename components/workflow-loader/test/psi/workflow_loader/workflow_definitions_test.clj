@@ -65,6 +65,21 @@
                (input-var-wired? c)))
         (:contributions step)))
 
+(defn- pass-status-judge-from-step
+  ([step-name]
+   (pass-status-judge-from-step step-name nil))
+  ([step-name allowed-statuses]
+   {:type :invoke
+    :operation "workflow/pass-status-routing"
+    :args (cond-> {:text {:from {:step step-name :output :final-llm-reply}}}
+            allowed-statuses (assoc :allowed-statuses allowed-statuses))}))
+
+(defn- constant-routing-judge
+  [route]
+  {:type :invoke
+   :operation "workflow/constant-routing"
+   :args {:route route}})
+
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-design
 
@@ -102,9 +117,33 @@
            ;; final-summary carries :source contributions and is intentionally kept inline
            (is (some? final-step) "final-summary step should exist")
            (is (seq (:contributions final-step)) "final-summary step should have inline contributions")))
-       (let [clarity-step (first (filter #(= "clarity-status" (:name %)) steps))]
-         (testing "clarity-status judge has REPEAT/DONE routing"
-           (is (= #{"REPEAT" "DONE"} (set (keys (:on clarity-step)))))
+       (let [step-by-name (into {} (map (juxt :name identity) steps))
+             ambiguity-review (get step-by-name "ambiguity-review")
+             ambiguity-follow-up (get step-by-name "ambiguity-follow-up")
+             inconsistency-review (get step-by-name "inconsistency-review")
+             inconsistency-follow-up (get step-by-name "inconsistency-follow-up")
+             clarity-step (get step-by-name "clarity-status")]
+         (testing "per-reviewer follow-up steps route conditionally from deterministic PASS_STATUS"
+           (is (= (pass-status-judge-from-step "ambiguity-review" ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"])
+                  (:judge ambiguity-review)))
+           (is (= {"REPEAT" {:goto "ambiguity-follow-up"}
+                   "DONE" {:goto "inconsistency-review"}}
+                  (:on ambiguity-review)))
+           (is (= (constant-routing-judge "DONE")
+                  (:judge ambiguity-follow-up)))
+           (is (= {"DONE" {:goto "inconsistency-review"}} (:on ambiguity-follow-up)))
+           (is (= (pass-status-judge-from-step "inconsistency-review" ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"])
+                  (:judge inconsistency-review)))
+           (is (= {"REPEAT" {:goto "inconsistency-follow-up"}
+                   "DONE" {:goto "clarity-status"}}
+                  (:on inconsistency-review)))
+           (is (= (constant-routing-judge "DONE")
+                  (:judge inconsistency-follow-up)))
+           (is (= {"DONE" {:goto "clarity-status"}} (:on inconsistency-follow-up))))
+         (testing "clarity-status judge has full cycle routing"
+           (is (= {"REPEAT" {:goto "ambiguity-review" :max-iterations 6}
+                   "DONE" {:goto "final-summary"}}
+                  (:on clarity-step)))
            (is (some? (:judge clarity-step))))
          (testing "clarity-status judge has :outputs with judge-routing-result schema-id"
            (is (contains? (:judge clarity-step) :outputs))
@@ -148,14 +187,60 @@
            ;; final-summary carries :source contributions and is intentionally kept inline
            (is (some? final-step) "final-summary step should exist")
            (is (seq (:contributions final-step)) "final-summary step should have inline contributions")))
-       (let [clarity-step (first (filter #(= "clarity-status" (:name %)) steps))]
-         (testing "clarity-status judge has REPEAT/DONE routing"
-           (is (= #{"REPEAT" "DONE"} (set (keys (:on clarity-step)))))
+       (let [step-by-name (into {} (map (juxt :name identity) steps))
+             ambiguity-review (get step-by-name "ambiguity-review")
+             ambiguity-follow-up (get step-by-name "ambiguity-follow-up")
+             inconsistency-review (get step-by-name "inconsistency-review")
+             inconsistency-follow-up (get step-by-name "inconsistency-follow-up")
+             clarity-step (get step-by-name "clarity-status")]
+         (testing "per-reviewer follow-up steps route conditionally from deterministic PASS_STATUS"
+           (is (= (pass-status-judge-from-step "ambiguity-review" ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"])
+                  (:judge ambiguity-review)))
+           (is (= {"REPEAT" {:goto "ambiguity-follow-up"}
+                   "DONE" {:goto "inconsistency-review"}}
+                  (:on ambiguity-review)))
+           (is (= (constant-routing-judge "DONE")
+                  (:judge ambiguity-follow-up)))
+           (is (= {"DONE" {:goto "inconsistency-review"}} (:on ambiguity-follow-up)))
+           (is (= (pass-status-judge-from-step "inconsistency-review" ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"])
+                  (:judge inconsistency-review)))
+           (is (= {"REPEAT" {:goto "inconsistency-follow-up"}
+                   "DONE" {:goto "clarity-status"}}
+                  (:on inconsistency-review)))
+           (is (= (constant-routing-judge "DONE")
+                  (:judge inconsistency-follow-up)))
+           (is (= {"DONE" {:goto "clarity-status"}} (:on inconsistency-follow-up))))
+         (testing "clarity-status judge has full cycle routing"
+           (is (= {"REPEAT" {:goto "ambiguity-review" :max-iterations 6}
+                   "DONE" {:goto "final-summary"}}
+                  (:on clarity-step)))
            (is (some? (:judge clarity-step))))
          (testing "clarity-status judge has :outputs with judge-routing-result schema-id"
            (is (contains? (:judge clarity-step) :outputs))
            (is (= :psi.workflow/judge-routing-result
                   (get-in clarity-step [:judge :outputs :routing-result :schema-id])))))))))
+
+;;; ---------------------------------------------------------------------------
+;;; review task prompt artifact targets
+
+(deftest review-task-prompt-artifact-targets-test
+  ;; Tests review prompt artifact ownership: design review uses design-steps.md,
+  ;; plan review uses steps.md and never design-steps.md.
+  (testing "design review prompts target design-steps.md"
+    (doseq [filename ["review-task-design-ambiguity-review.md"
+                      "review-task-design-ambiguity-follow-up.md"
+                      "review-task-design-inconsistency-review.md"
+                      "review-task-design-inconsistency-follow-up.md"]]
+      (let [content (slurp-workflow-file filename)]
+        (is (.contains content "design-steps.md") filename))))
+  (testing "plan review prompts target steps.md rather than design-steps.md"
+    (doseq [filename ["review-task-plan-ambiguity-review.md"
+                      "review-task-plan-ambiguity-follow-up.md"
+                      "review-task-plan-inconsistency-review.md"
+                      "review-task-plan-inconsistency-follow-up.md"]]
+      (let [content (slurp-workflow-file filename)]
+        (is (.contains content "steps.md") filename)
+        (is (not (.contains content "design-steps.md")) filename)))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-implementation
@@ -231,9 +316,7 @@
                    (:contributions review-step))
              "review step should have {{skill}} wired to :workflow-input"))
        (testing "review step uses deterministic invoke routing from final-llm-reply"
-         (is (= {:type :invoke
-                 :operation "workflow/pass-status-routing"
-                 :args {:text {:from {:step "review" :output :final-llm-reply}}}}
+         (is (= (pass-status-judge-from-step "review" ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"])
                 (:judge review-step)))
          (is (= {"DONE" {:goto :done}
                  "REPEAT" {:goto "follow-up"}}
@@ -276,13 +359,12 @@
            (is (some? final-step) "final-summary step should exist")
            (is (seq (:contributions final-step)) "final-summary step should have inline contributions")))
        (let [pass-step (first (filter #(= "implement-pass" (:name %)) steps))]
-         (testing "implement-pass judge has REPEAT/DONE routing"
+         (testing "implement-pass routes deterministically from PASS_STATUS"
            (is (= #{"REPEAT" "DONE"} (set (keys (:on pass-step)))))
-           (is (some? (:judge pass-step))))
-         (testing "implement-pass judge has :outputs with judge-routing-result schema-id"
-           (is (contains? (:judge pass-step) :outputs))
-           (is (= :psi.workflow/judge-routing-result
-                  (get-in pass-step [:judge :outputs :routing-result :schema-id])))))))))
+           (is (= {:type :invoke
+                   :operation "workflow/pass-status-routing"
+                   :args {:text {:from {:step "implement-pass" :output :final-llm-reply}}}}
+                  (:judge pass-step)))))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; review-implementation-in-worktree
