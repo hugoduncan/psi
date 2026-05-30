@@ -1295,3 +1295,9 @@ No new actionable test-shaping feedback found. Re-read the task artifacts and ap
 ## Code-shaper review pass — 2026-05-30 (post test-shaper verification)
 
 No new actionable code-shaping feedback found. Re-read the task artifacts and applied `.psi/skills/code-shaper/SKILL.md` against the implemented Opus 4.8 catalog, scoped `/speed` and `/effort` session/config/provider stacks, mid-system capability/dispatch/extension/provider/compaction paths, and the existing code-shaper follow-ups. The current code is locally comprehensible, keeps provider-specific request shaping at provider boundaries, shares mid-system capability logic through `model-capabilities`, and preserves explicit capability/config boundary semantics already captured by prior follow-ups. No duplicate `steps.md` follow-ups added.
+
+---
+
+## Docs review pass — 2026-05-30 (post capability-predicate follow-up)
+
+No new actionable documentation feedback found. Applied `.psi/skills/review-task-docs/SKILL.md`: re-read the task artifacts plus `README.md`, `doc/configuration.md`, `doc/tui.md`, `doc/extension-api.md`, `doc/custom-providers.md`, and `CHANGELOG.md`, then checked the implemented Opus 4.8 model catalog, `/speed` and `/effort` command/runtime surfaces, config persistence semantics, and mid-system extension API/capability surfaces. Documentation remains consistent with the current implementation: speed/effort docs do not promise nonexistent extension mutations, mid-system examples use the implemented `:inject-mid-system-message` API key, OpenAI chat-completions inference is documented, and the changelog covers the user-visible model/command/provider/extension changes. No duplicate `steps.md` follow-ups added.
