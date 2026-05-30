@@ -414,3 +414,9 @@ Decision: option (c) — speed/effort are intentionally session-transient and no
 - Persisted project/user config is applied only on new session creation (Part 2 step 12, Part 3 step 10a), not on resume.
 - Added Part 2 step 13 and Part 3 step 12 documenting the session-transient constraint.
 - Added acceptance criteria entries for both Part 2 and Part 3 stating speed/effort are not restored on cold resume.
+
+---
+
+## Design inconsistency review pass — 2026-05-30 (independent verification)
+
+No new actionable inconsistencies found. Re-read `design.md` against referenced code artifacts: `models.clj` (model catalog, `anthropic-json-schema-native-model-keys`, `adaptive-thinking` flag pattern), `anthropic.clj` (`thinking-level->effort` table, `thinking-param` nil-for-off guard, `request-body` effort/output_config construction, `beta-header`/`request-headers` signatures, `transform-message` role dispatch), `request_schema.clj` (`anthropic-output-config-schema` effort enum, `anthropic-request-body-schema` closed map, `anthropic-message-schema` user/assistant-only), `reasoning.clj` (`thinking-level->effort` OpenAI map, `reasoning-effort` function signature), `codex_responses.clj` (`codex-reasoning` direct map read), `chat_completions.clj` (`build-request` effort/service_tier construction), `schemas.clj` (`Model` closed schema, `MessageRole` enum, `Message` schema), `model.clj` (`session-entry-kind-schema`, `agent-session-schema`), `conversation.clj` (`append-msg` role dispatch), `compaction.clj` (`entry->message` kind dispatch), `prompt_request.clj` (`journal->provider-messages` `:message`-only projection, `session->request-options` propagation pattern, `replace-current-user-message` tail logic), `resolution.clj` (`system-defaults` keys, `resolve-config` merge). Verified all 27 existing design-steps are checked and consistent with current design text. No duplicate follow-up items added.
