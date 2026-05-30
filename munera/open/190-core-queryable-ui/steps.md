@@ -71,7 +71,7 @@
 - [x] Add resolver discovery/index tests proving all new `:psi.ui/...` attrs are root-queryable/discoverable.
 - [x] Add extension-query tests proving extension code can query the UI attrs without requiring session-id input or extension permissions.
 - [x] Add Emacs provider tests proving the supported make-visible descriptor includes `:emacs-command` invocation with command `psi-emacs-show-active`.
-- [ ] Add focused Emacs UI test coverage for `psi-emacs-show-active` command behaviour (active/current buffer selection, prompt focus after `pop-to-buffer`, and no-active-buffer error), or explicitly document why byte-compile-only proof is sufficient.
+- [x] Add focused Emacs UI test coverage for `psi-emacs-show-active` command behaviour (active/current buffer selection, prompt focus after `pop-to-buffer`, and no-active-buffer error), or explicitly document why byte-compile-only proof is sufficient.
 - [x] Add TUI tests proving make-visible is omitted unless a real safe reveal mechanism is present.
 - [x] Add console tests proving attached console without visibility mechanism is available but unsupported for make-visible.
 - [x] Add regression tests proving existing UI contribution snapshot/query behaviour and legacy UI-type surfaces still pass.

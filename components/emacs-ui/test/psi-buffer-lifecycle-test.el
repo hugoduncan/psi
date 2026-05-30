@@ -739,6 +739,68 @@ so the user sees the connecting affordance."
       (when (buffer-live-p buffer)
         (kill-buffer buffer)))))
 
+(ert-deftest psi-show-active-focuses-current-psi-buffer-prompt-after-pop-to-buffer ()
+  "The public make-visible command focuses the current Psi buffer prompt."
+  (let ((buffer (generate-new-buffer " *psi-show-active-current*"))
+        (original-window-config (current-window-configuration)))
+    (unwind-protect
+        (progn
+          (delete-other-windows)
+          (switch-to-buffer buffer)
+          (with-current-buffer buffer
+            (psi-emacs-mode)
+            (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+            (setf (psi-emacs-state-draft-anchor psi-emacs--state)
+                  (copy-marker (point-max) nil))
+            (psi-emacs--ensure-startup-banner)
+            (psi-emacs--ensure-input-area)
+            (goto-char (psi-emacs--draft-end-position))
+            (insert "show active prompt")
+            (goto-char (point-min)))
+          (let ((shown-buffer (psi-emacs-show-active)))
+            (should (eq shown-buffer buffer))
+            (with-current-buffer buffer
+              (let ((end (psi-emacs--draft-end-position))
+                    (window (get-buffer-window buffer t)))
+                (should (= (point) end))
+                (should (window-live-p window))
+                (should (= (window-point window) end))))))
+      (set-window-configuration original-window-config)
+      (when (buffer-live-p buffer)
+        (kill-buffer buffer)))))
+
+(ert-deftest psi-show-active-falls-back-to-tracked-active-buffer ()
+  "The public make-visible command can show a tracked Psi buffer from elsewhere."
+  (let ((buffer (generate-new-buffer " *psi-show-active-tracked*"))
+        (psi-emacs--state-by-buffer (make-hash-table :test #'eq))
+        (focused nil))
+    (unwind-protect
+        (progn
+          (with-current-buffer buffer
+            (psi-emacs-mode)
+            (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+            (puthash buffer psi-emacs--state psi-emacs--state-by-buffer))
+          (with-temp-buffer
+            (cl-letf (((symbol-function 'pop-to-buffer)
+                       (lambda (target)
+                         (setq focused (cons 'pop-to-buffer target))
+                         nil))
+                      ((symbol-function 'psi-emacs--focus-input-area)
+                       (lambda (target window)
+                         (setq focused (list focused target window)))))
+              (should (eq (psi-emacs-show-active) buffer))))
+          (should (equal (list (cons 'pop-to-buffer buffer) buffer nil)
+                         focused)))
+      (when (buffer-live-p buffer)
+        (kill-buffer buffer)))))
+
+(ert-deftest psi-show-active-errors-when-no-active-psi-buffer-exists ()
+  "The public make-visible command fails clearly without an active Psi buffer."
+  (let ((psi-emacs--state-by-buffer (make-hash-table :test #'eq)))
+    (with-temp-buffer
+      (should-error (psi-emacs-show-active)
+                    :type 'user-error))))
+
 (provide 'psi-buffer-lifecycle-test)
 
 ;;; psi-buffer-lifecycle-test.el ends here

@@ -557,3 +557,12 @@ No new actionable implementation feedback after reviewing task artifacts, UI cap
 ## 2026-05-30 test review
 
 Found one new actionable test issue after reviewing task artifacts, UI capability/provider tests, RPC/TUI lifecycle tests, nullable API coverage, extension docs, and Emacs UI code: the Emacs Lisp `psi-emacs-show-active` command implementation has no direct test coverage. Existing tests prove the descriptor advertises `psi-emacs-show-active` and byte-compilation catches syntax errors, but no test proves the command locates the active/current Psi buffer, calls the prompt-focus path after `pop-to-buffer`, or errors when no active Psi buffer exists. Add focused Emacs UI coverage or explicitly justify why byte-compile-only proof is sufficient for this frontend behaviour.
+
+## 2026-05-30 Emacs show-active test follow-up
+
+Completed the newly added test-review follow-up for direct `psi-emacs-show-active` coverage. Added focused Emacs ERT tests proving the command focuses the current Psi buffer prompt after `pop-to-buffer`, can fall back to a tracked active Psi buffer when invoked outside a Psi buffer, and raises `user-error` when no active Psi buffer exists. Marked the Slice 7 follow-up item complete.
+
+Verification:
+
+- `bb emacs:test` — 321 tests, 321 expected, 0 unexpected.
+- `bb emacs:byte-compile` — clean.
