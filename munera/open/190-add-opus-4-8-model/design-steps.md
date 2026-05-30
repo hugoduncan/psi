@@ -51,3 +51,11 @@
 - [x] **Allow Anthropic inline system messages through request validation** — Update the design to specify how `request_schema.clj` admits inline `{"role": "system", ...}` messages in the Anthropic `messages` array, or explicitly state a different validation/normalization path, so mid-system requests are not rejected locally.
 
 - [x] **Define pending mid-system handling during current-user replacement** — Specify how prepared-turn assembly updates/replaces the current user message when a pending `:mid-system` entry follows it in the projected journal, preserving the valid provider order `user → system` rather than treating the system message as an unrelated tail.
+
+## From ambiguity review pass 2026-05-30 (third pass)
+
+- [ ] **Specify persisted speed/effort startup wiring** — Add the config-resolution accessors and app-runtime/session-default application path for persisted `:speed-mode` and `:effort-override`, including how explicit `:normal` and nil values mask lower-precedence settings when a new session starts.
+
+- [ ] **Define mid-system capability lookup source** — Decide whether `model-supports-mid-system-messages` and injection gating read the reduced session model, catalog model, or runtime-resolved model with auth context; document the rule so OpenAI chat-completions and Codex/responses (including OAuth runtime overrides) are classified correctly.
+
+- [ ] **Define the `:mid-system` source/provenance contract** — Specify what value is stored in `{:source ...}` for injected mid-system journal entries, and whether the extension API infers it from `ext-path`, accepts it from callers, or omits it.

@@ -146,3 +146,15 @@ Completed the two newly added ambiguity follow-up items in `design-steps.md` by 
 
 - Anthropic local request validation must now admit inline `{"role": "system", ...}` entries in the `messages` array via an explicit system-message schema, so valid mid-system requests are not rejected before HTTP/provider placement handling.
 - Prepared-turn assembly must treat a pending tail `... user, system` as an attached mid-system instruction: replace the preceding current user message, then preserve the system message after it, maintaining provider order `user → system`.
+
+---
+
+## Design ambiguity review pass — 2026-05-30 (third pass)
+
+**New actionable ambiguities found:**
+
+1. **Persisted speed/effort startup application path** — The design adds `speed-mode` and `effort-override` to shared-config and says project/user values persist across sessions, but the existing startup path only resolves/applies model, thinking level, prompt mode, and nucleus prelude override into `:session-defaults`. Specify the config-resolution accessors and runtime/session creation wiring that apply persisted `:speed-mode` and `:effort-override` to new sessions, including explicit `:normal` / nil masking semantics.
+
+2. **Mid-system capability lookup source under runtime model overrides** — The design says the resolver and dispatch handler derive support from the active model's `:supports-mid-conversation-system-messages` flag, but session state currently stores a reduced model map and runtime resolution can change OpenAI transport/capabilities (for example OAuth-backed `gpt-5.5` becoming Codex/responses). Specify whether capability checks use the stored session model, catalog lookup by provider/id, or runtime `resolve-runtime-model` with auth context so OpenAI chat-completions versus Codex/responses are classified correctly.
+
+3. **Mid-system journal `:source` contract** — The dispatch handler stores `{:text text :source source}` for `:mid-system` entries and the extension API exposes `(inject-mid-system-message! text)`, but no source value or provenance rule is defined. Specify whether `source` is optional, inferred from `ext-path`, caller-supplied via an arity/options map, or omitted from the journal schema/tests.
