@@ -194,3 +194,7 @@ No new actionable inconsistency feedback after re-reading `design.md`, reference
 ## 2026-05-30 inconsistency follow-up execution
 
 No newly added unchecked inconsistency follow-up items were present in `design-steps.md`; all inconsistency design steps are already complete. No `design.md` change was needed, and no inconsistency follow-up item remains blocked.
+
+## 2026-05-30 design ambiguity review
+
+No new actionable ambiguity feedback after re-reading `design.md`, referenced task design artifacts/docs, and current UI/query/frontend seams. The design remains clear enough for implementation planning on provider ownership/lifetime, runtime-scoped EQL attrs, descriptor validation, unavailable/error semantics, invocation/request boundaries, permission constraints, legacy UI-type compatibility, and docs expectations.
