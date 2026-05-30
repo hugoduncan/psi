@@ -536,3 +536,7 @@ Verification:
 
 - `clojure -M:test --focus psi.agent-session.ui-capabilities-test` — 16 tests, 110 assertions, 0 failures.
 - `clj-kondo --lint components/agent-session/src/psi/agent_session/ui_capabilities.clj components/agent-session/test/psi/agent_session/ui_capabilities_test.clj` — clean.
+
+## 2026-05-30 implementation review
+
+Found one new actionable implementation issue after re-reading task artifacts, UI capability normalization/provider code, resolver/docs, and focused tests: invocation maps nested inside action descriptors still allow extra unqualified or foreign keys. `valid-action?` now rejects non-`:psi.ui.action/...` descriptor keys, but `valid-invocation?` only checks EDN serialisability plus required per-kind fields, so a provider can expose adapter-local invocation data such as `:handler`, `:foreign.ui/object`, or string keys inside `:psi.ui.action/invocation`. The design says descriptor invocation data uses only the `:psi.ui.invocation/...` namespace and must not expose adapter/frontend internals. Provider normalization should fail closed to provider-error for unqualified/foreign invocation keys and add focused coverage.
