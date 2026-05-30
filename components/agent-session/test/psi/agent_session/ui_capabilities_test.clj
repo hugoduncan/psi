@@ -232,6 +232,21 @@
            :psi.ui/capabilities [:psi.ui.capability/make-visible]
            :psi.ui/actions [action action]})))))
 
+(deftest provider-normalization-foreign-action-keys-test
+  ;; Tests that provider action descriptors reject unqualified and foreign keys
+  ;; rather than exposing adapter-local data through EQL.
+  (let [base-action (ui-capabilities/make-visible-action
+                     {:psi.ui.invocation/kind :emacs-command
+                      :psi.ui.invocation/command "psi-emacs-show-active"})]
+    (doseq [extra-key [:handler :foreign.ui/handler "frontend-object"]]
+      (is (provider-error?
+           (ui-capabilities/normalize-provider-result
+            {:psi.ui/type :emacs
+             :psi.ui/available? true
+             :psi.ui/capabilities [:psi.ui.capability/make-visible]
+             :psi.ui/actions [(assoc base-action extra-key "leaked-adapter-data")]}))
+          (str "expected provider-error for extra action key: " (pr-str extra-key))))))
+
 (deftest provider-normalization-capability-action-coherence-test
   ;; Tests that make-visible capability/action mismatches fail closed.
   (is (provider-error?

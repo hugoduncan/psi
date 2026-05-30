@@ -527,3 +527,12 @@ Verification:
 ## 2026-05-30 implementation review
 
 Found one new actionable implementation issue after re-reading task artifacts, UI capability normalization code, resolver/docs, and focused lifecycle tests: action descriptor validation does not reject extra unqualified descriptor keys. `valid-action?` verifies required `:psi.ui.action/...` keys and EDN serialisability, but a provider can still expose additional unqualified keys (for example `:handler` or `"frontend-object"`) in `:psi.ui/actions` / `:psi.ui/make-visible-action`. The design requires descriptors to be pure data with fully namespaced descriptor keys, so provider normalization should fail closed to provider-error for unqualified/foreign action descriptor keys and add focused coverage.
+
+## 2026-05-30 action descriptor foreign-key follow-up
+
+Completed the newly added implementation-review follow-up for provider action descriptor key validation. Action descriptors now require all descriptor keys to be in the `:psi.ui.action/...` namespace, so providers cannot expose unqualified keys such as `:handler`, foreign namespaced keys, string keys, or adapter-local data through `:psi.ui/actions` / `:psi.ui/make-visible-action`. Invalid descriptor keys fail closed to provider-error unavailable semantics. Added focused coverage for unqualified, foreign, and string action keys.
+
+Verification:
+
+- `clojure -M:test --focus psi.agent-session.ui-capabilities-test` — 16 tests, 110 assertions, 0 failures.
+- `clj-kondo --lint components/agent-session/src/psi/agent_session/ui_capabilities.clj components/agent-session/test/psi/agent_session/ui_capabilities_test.clj` — clean.

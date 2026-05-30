@@ -187,6 +187,7 @@
 (defn- valid-action? [action]
   (and (map? action)
        (serializable-value? action)
+       (every? #(namespaced-as? % "psi.ui.action") (keys action))
        (namespaced-as? (:psi.ui.action/id action) "psi.ui.action")
        (namespaced-as? (:psi.ui.action/capability action) "psi.ui.capability")
        (bounded-string? (:psi.ui.action/label action))
