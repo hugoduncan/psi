@@ -616,3 +616,11 @@ Decision recorded:
 - Integration/coherence is Slice 5, not a separate unnumbered final pass.
 - `plan.md` now says the task has five vertical slices and explicitly identifies the fifth slice as the integration/coherence slice.
 - `steps.md` already used five slice sections, so no `steps.md` changes were required.
+
+---
+
+## Design inconsistency review pass — 2026-05-30 (plan/steps docs ownership)
+
+**New actionable inconsistency found:**
+
+1. **Documentation ownership differs between plan and steps** — `plan.md` describes Slice 2, Slice 3, and Slice 4 as including docs for `/speed`, `/effort`, and mid-system support respectively, while `steps.md` has no per-feature doc items in those slices and instead puts all README/`doc/` updates in Slice 5 integration/coherence. Align the plan/steps so documentation work has one execution owner: either keep docs in Slice 5 only, or add explicit per-slice documentation steps.

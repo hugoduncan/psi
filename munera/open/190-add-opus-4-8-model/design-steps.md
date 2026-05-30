@@ -135,3 +135,7 @@
 ## From ambiguity review pass 2026-05-30 (plan/steps verification)
 
 - [x] **Align plan slice count with slice list** — `plan.md` says the task will be implemented as four vertical slices, but the slice order and `steps.md` define five slices including the integration/coherence pass. Decide whether integration/coherence is a fifth slice or a non-slice final pass, and update `plan.md`/`steps.md` wording so implementors have one unambiguous execution structure.
+
+## From inconsistency review pass 2026-05-30 (plan/steps docs ownership)
+
+- [ ] **Align documentation ownership between plan and steps** — `plan.md` lists docs work inside Slice 2 (`/speed`), Slice 3 (`/effort`), and Slice 4 (mid-system), but `steps.md` only schedules docs in Slice 5 integration/coherence. Decide whether docs belong to the feature slices or to Slice 5, and update `plan.md` / `steps.md` so implementors have one consistent execution structure.
