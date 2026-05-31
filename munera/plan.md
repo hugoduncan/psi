@@ -9,12 +9,15 @@ Backlog:
 `munera/open/154-fix-workflow-max-iterations-error-surfacing/`
 `munera/open/157-jar-owned-deps-release-startup/`
 
-`munera/open/001-post-wave-b-gordian-follow-on/`
-`munera/open/002-compatibility-scaffold-removal/`
-`munera/open/003-prompt-lifecycle-architectural-convergence/`
-`munera/open/006-agent-tool-skill-prelude-follow-on/`
-`munera/open/005-canonical-dispatch-pipeline-trace-observability/`
 `munera/open/191-ui-action-invocation/`
+
+Recently completed (abandoned as stale, 2026-05-31):
+
+`munera/closed/001-post-wave-b-gordian-follow-on/`
+`munera/closed/002-compatibility-scaffold-removal/`
+`munera/closed/003-prompt-lifecycle-architectural-convergence/`
+`munera/closed/005-canonical-dispatch-pipeline-trace-observability/`
+`munera/closed/006-agent-tool-skill-prelude-follow-on/`
 
 Recently completed:
 

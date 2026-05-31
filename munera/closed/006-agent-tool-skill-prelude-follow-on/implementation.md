@@ -6,3 +6,7 @@ Coordination note
 - The main open technical target here is the intended skill-prelude cache-breakpoint shape for child-session seeding.
 - Detailed decisions about the 2-breakpoint split, acknowledgement-marker status, and any metadata/introspection exposure should be recorded here so the concrete prelude contract lives in one place.
 - `003` remains the broader umbrella for prompt-lifecycle ownership and convergence; this task should carry the execution detail for the prelude/cache-breakpoint follow-on.
+
+## Closure (2026-05-31)
+
+Closed as stale/abandoned by 刀 decision. This task predates the registry-unification, bootstrap-simplification, and structured-output arcs and no longer reflects active priorities. If the underlying concern resurfaces, open a fresh task scoped to the then-current architecture rather than reviving this one.
