@@ -51,4 +51,4 @@
 
 ## Implementation review follow-ups
 
-- [ ] Normalize registered-tool JSON string-key arguments for `delegate continue` and `delegate remove`, and add boundary coverage proving string-keyed `id`/`prompt` calls reach the intended continue/remove behavior instead of false missing-argument errors.
+- [x] Normalize registered-tool JSON string-key arguments for `delegate continue` and `delegate remove`, and add boundary coverage proving string-keyed `id`/`prompt` calls reach the intended continue/remove behavior instead of false missing-argument errors.

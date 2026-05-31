@@ -431,10 +431,10 @@
 
    - blocked runs: update workflow input and resume the existing run
    - terminal runs: create a fresh run from the original definition and execute it"
-  [{:keys [id prompt include_result_in_context]}]
-  (let [run-id (some-> id str str/trim not-empty)
-        prompt-text (some-> prompt str str/trim not-empty)
-        include? (true? include_result_in_context)]
+  [args]
+  (let [run-id (some-> (arg-value args :id) str str/trim not-empty)
+        prompt-text (some-> (arg-value args :prompt) str str/trim not-empty)
+        include? (true? (arg-value args :include_result_in_context))]
     (cond
       (nil? run-id)
       {:error "id is required for continue"}
@@ -518,8 +518,8 @@
    delegate background jobs for the target have been resolved to terminal
    history, so later list calls cannot observe non-terminal missing-canonical
    corruption."
-  [{:keys [id]}]
-  (let [run-id (some-> id str str/trim not-empty)]
+  [args]
+  (let [run-id (some-> (arg-value args :id) str str/trim not-empty)]
     (if (nil? run-id)
       {:error "id is required for remove"}
       (let [session-id (current-session-id)
