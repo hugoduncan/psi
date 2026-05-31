@@ -10,7 +10,6 @@ Not yet started:
 - `munera/open/197-ui-action-invocation/` — renumbered from 191 (NNN collision); side-effecting UI action invocation deferred from closed 190/194 UI work.
 - `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 - `munera/open/108-project-nrepl-testing-without-mocks/`
-- `munera/open/157-jar-owned-deps-release-startup/`
 
 ## Audit outcome (2026-05-31)
 
