@@ -53,11 +53,23 @@
 (deftest malformed-delegate-workflow-provenance-is-actionable-test
   ;; Same-session delegate workflow jobs are inside the contract and malformed
   ;; provenance must not collapse into an empty list.
-  (testing "missing or foreign built-in workflow provenance returns an error"
+  (testing "foreign built-in workflow provenance returns an error"
     (let [result (project [base-run]
                           [(assoc base-job :workflow-ext-path "foreign:workflow")])]
       (is (= :error (:status result)))
       (is (= :malformed-delegate-workflow-job (:reason result))))))
+
+(deftest malformed-delegate-workflow-provenance-boundary-is-actionable-test
+  ;; Missing, nil, and blank provenance all claim delegate workflow shape but
+  ;; lack the required built-in workflow source marker.
+  (testing "missing, nil, and blank built-in workflow provenance return errors"
+    (doseq [[label job] [["missing" (dissoc base-job :workflow-ext-path)]
+                         ["nil" (assoc base-job :workflow-ext-path nil)]
+                         ["blank" (assoc base-job :workflow-ext-path "")]]]
+      (testing label
+        (let [result (project [base-run] [job])]
+          (is (= :error (:status result)))
+          (is (= :malformed-delegate-workflow-job (:reason result))))))))
 
 (deftest malformed-non-terminal-workflow-id-is-actionable-test
   ;; Non-terminal delegate jobs without a usable workflow-id cannot be managed.
@@ -66,6 +78,18 @@
                           [(assoc base-job :workflow-id "")])]
       (is (= :error (:status result)))
       (is (= :malformed-delegate-workflow-id (:reason result))))))
+
+(deftest malformed-non-terminal-workflow-id-boundary-is-actionable-test
+  ;; Missing, nil, and non-string workflow ids on non-terminal jobs cannot be
+  ;; joined to canonical runs and must not become empty lists.
+  (testing "missing, nil, and non-string workflow ids on running jobs return errors"
+    (doseq [[label job] [["missing" (dissoc base-job :workflow-id)]
+                         ["nil" (assoc base-job :workflow-id nil)]
+                         ["non-string" (assoc base-job :workflow-id 42)]]]
+      (testing label
+        (let [result (project [base-run] [job])]
+          (is (= :error (:status result)))
+          (is (= :malformed-delegate-workflow-id (:reason result))))))))
 
 (deftest terminal-malformed-workflow-id-is-hidden-test
   ;; Terminal retained history without a workflow id is non-manageable history,
