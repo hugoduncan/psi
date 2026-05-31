@@ -48,3 +48,7 @@
 - [x] Review `README.md` and `doc/` delegate/workflow sections and update them only if their current delegate behavior description becomes inaccurate or incomplete.
 - [x] Re-read changed plan, steps, implementation notes, tests, code, and docs for coherence with `design.md` acceptance criteria.
 - [x] Commit the completed implementation changes separately from this planning commit when implementation work begins.
+
+## Implementation review follow-ups
+
+- [ ] Normalize registered-tool JSON string-key arguments for `delegate continue` and `delegate remove`, and add boundary coverage proving string-keyed `id`/`prompt` calls reach the intended continue/remove behavior instead of false missing-argument errors.
