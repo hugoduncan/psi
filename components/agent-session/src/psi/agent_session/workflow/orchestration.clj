@@ -234,17 +234,29 @@
                                       {:run-id run-id
                                        :session-id session-id
                                        :workflow-input (continue-workflow-input prompt-text)})]
-                  (when-not (:psi.workflow/error result)
-                    (on-async-completion-fn run-id workflow-name parent-session-id include? result))
-                  (if (:psi.workflow/error result)
-                    {:run-id run-id
-                     :workflow workflow-name
-                     :status :failed
-                     :error (:psi.workflow/error result)}
-                    {:run-id run-id
-                     :workflow workflow-name
-                     :status (:psi.workflow/status result)
-                     :result (:psi.workflow/result result)}))
+                  (if-let [resume-error (:psi.workflow/error result)]
+                    (do
+                      (when job-id
+                        (mark-background-job-terminal!
+                         job-id
+                         :failed
+                         {:run-id run-id
+                          :workflow workflow-name
+                          :status :failed
+                          :error resume-error}))
+                      (notify! (str "Resume of run '" run-id "' failed: " resume-error) :error)
+                      (swap! inflight-runs dissoc run-id)
+                      (refresh-widgets!)
+                      {:run-id run-id
+                       :workflow workflow-name
+                       :status :failed
+                       :error resume-error})
+                    (do
+                      (on-async-completion-fn run-id workflow-name parent-session-id include? result)
+                      {:run-id run-id
+                       :workflow workflow-name
+                       :status (:psi.workflow/status result)
+                       :result (:psi.workflow/result result)})))
                 (catch Exception e
                   (when job-id
                     (try

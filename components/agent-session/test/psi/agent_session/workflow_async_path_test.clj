@@ -95,3 +95,47 @@
       (is (= :blocked (get-in publication [:background-job :payload :status])))
       (is (= :completed (get-in publication [:background-job :payload :delegate-status])))
       (is (= :info (get-in publication [:notification :level]))))))
+
+(deftest blocked-run-continue-error-terminalizes-wrapper-and-cleans-inflight-test
+  ;; resume-run may return an error map without throwing. That path must still
+  ;; resolve the newly-started delegate attempt and remove inflight tracking.
+  (testing "resume error map marks wrapper failed and clears inflight run"
+    (let [inflight* (atom {})
+          terminal-calls* (atom [])
+          notifications* (atom [])
+          refresh-count* (atom 0)
+          started* (atom [])
+          result (orchestration/continue-blocked-run-async!
+                  {:mutate! (fn [op _args]
+                              (case op
+                                psi.workflow/resume-run
+                                {:psi.workflow/error "resume rejected"}))
+                   :start-background-job! (fn [session-id run-id workflow-name]
+                                            (swap! started* conj {:session-id session-id
+                                                                  :run-id run-id
+                                                                  :workflow-name workflow-name})
+                                            {:job-id "job-resume"})
+                   :mark-background-job-terminal! (fn [job-id status payload & _]
+                                                    (swap! terminal-calls* conj {:job-id job-id
+                                                                                 :status status
+                                                                                 :payload payload}))
+                   :notify! (fn [message level]
+                              (swap! notifications* conj {:message message :level level}))
+                   :refresh-widgets! (fn [] (swap! refresh-count* inc))
+                   :inflight-runs inflight*}
+                  "run-1" "session-1" "next" false)]
+      (is (= {:ok true :run-id "run-1" :status :resuming} result))
+      (is (= [{:session-id "session-1" :run-id "run-1" :workflow-name "resume-run-1"}]
+             @started*))
+      (workflow-test-support/poll-until #(empty? @inflight*))
+      (is (= [{:job-id "job-resume"
+               :status :failed
+               :payload {:run-id "run-1"
+                         :workflow "resume-run-1"
+                         :status :failed
+                         :error "resume rejected"}}]
+             @terminal-calls*))
+      (is (= [{:message "Resume of run 'run-1' failed: resume rejected"
+               :level :error}]
+             @notifications*))
+      (is (pos? @refresh-count*)))))

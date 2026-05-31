@@ -313,6 +313,45 @@
             (is (= "Removed run run-1" remove-text))
             (is (= [{:run-id "run-1"}] @removed*))))))))
 
+(deftest delegate-list-and-remove-reject-non-shaped-background-job-payloads-test
+  ;; The background-job query result must contain a collection of job maps. Nil
+  ;; or scalar payloads are query-shape failures, not empty job sets.
+  (testing "delegate list rejects nil/non-collection/non-map job payloads"
+    (doseq [payload [nil :not-a-collection ["not-a-map"]]]
+      (with-workflow-runtime-state
+        {:current-session-id "session-1"
+         :loaded-definitions {}
+         :mutate-fn (fn [op _args]
+                      (case op
+                        psi.workflow/list-runs
+                        {:psi.workflow/runs [base-run]}))
+         :query-fn (fn [_]
+                     {:psi.agent-session/background-jobs payload})}
+        (fn []
+          (let [text (#'workflow-core/delegate-list)]
+            (is (re-find #"Error: delegate list background-job visibility surface returned a non-shaped jobs payload"
+                         text))
+            (is (not (re-find #"No active runs\." text))))))))
+  (testing "delegate remove rejects nil/non-collection/non-map job payloads before canonical removal"
+    (doseq [payload [nil :not-a-collection ["not-a-map"]]]
+      (let [removed* (atom false)]
+        (with-workflow-runtime-state
+          {:current-session-id "session-1"
+           :loaded-definitions {}
+           :mutate-fn (fn [op _args]
+                        (case op
+                          psi.workflow/remove-run
+                          (do
+                            (reset! removed* true)
+                            {:psi.workflow/removed? true})))
+           :query-fn (fn [_]
+                       {:psi.agent-session/background-jobs payload})}
+          (fn []
+            (let [result (#'workflow-core/delegate-remove {:id "run-1"})]
+              (is (= {:error "delegate remove background-job visibility surface returned a non-shaped jobs payload"}
+                     result))
+              (is (false? @removed*)))))))))
+
 (deftest terminal-duplicate-selection-tie-breakers-are-deterministic-test
   ;; Completion ordering falls through completed-at, completed-seq, job-seq, and
   ;; job-id with present values newer than missing values at each level.

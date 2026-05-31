@@ -242,17 +242,31 @@
    :message message
    :details details})
 
+(defn- background-jobs-payload-shaped?
+  [jobs]
+  (and (sequential? jobs)
+       (every? map? jobs)))
+
 (defn- query-background-jobs
   [action-name]
   (if-let [qf (query-fn)]
     (try
       (let [result (qf [:psi.agent-session/background-jobs])]
-        (if (and (map? result) (contains? result :psi.agent-session/background-jobs))
-          {:status :ok
-           :jobs (:psi.agent-session/background-jobs result)}
+        (cond
+          (not (and (map? result) (contains? result :psi.agent-session/background-jobs)))
           (background-job-query-error
            (str action-name " could not read the background-job visibility surface")
-           {:query-result result})))
+           {:query-result result})
+
+          (not (background-jobs-payload-shaped?
+                (:psi.agent-session/background-jobs result)))
+          (background-job-query-error
+           (str action-name " background-job visibility surface returned a non-shaped jobs payload")
+           {:jobs (:psi.agent-session/background-jobs result)})
+
+          :else
+          {:status :ok
+           :jobs (:psi.agent-session/background-jobs result)}))
       (catch Exception e
         (background-job-query-error
          (str action-name " background-job query failed")
