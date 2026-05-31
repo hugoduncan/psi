@@ -84,3 +84,7 @@
 ## Docs review follow-up
 
 - [x] Document the updated delegate management/list behavior in user-facing docs: `delegate list` is same-session scoped, shows active/retained delegated workflow runs with canonical workflow status plus separate delegate/background status, and listed ids remain usable for `continue`/`remove`; include the active-remove cleanup behavior where the delegate tool/action surface is described.
+
+## Code-shaper review follow-up
+
+- [ ] Make delegate background-job query handling reject wrong-keyed map rows (for example unqualified background-job maps or maps without `:psi.background-job/*` identity/status keys) for both list and remove, surfacing an actionable background-job visibility shape error instead of normalizing them to nil fields and treating them as empty/irrelevant jobs.
