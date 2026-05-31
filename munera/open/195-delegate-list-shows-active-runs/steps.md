@@ -9,7 +9,7 @@
 ## Slice 2 — Extract delegate-list projection
 
 - [ ] Create a pure delegate-list projection function that accepts invoking session id, canonical workflow runs, and background jobs.
-- [ ] Resolve the projection input-shape ambiguity: specify whether the pure delegate-list projection accepts canonical unqualified background-job maps, namespaced `:psi.background-job/*` query maps, or both, and put normalization on exactly one side of the projection/caller boundary.
+- [x] Resolve the projection input-shape ambiguity: specify whether the pure delegate-list projection accepts canonical unqualified background-job maps, namespaced `:psi.background-job/*` query maps, or both, and put normalization on exactly one side of the projection/caller boundary.
 - [ ] Filter visible jobs to same-session `tool-name = "delegate"`, `job-kind = :workflow`, and `workflow-ext-path = "built-in:workflow"`.
 - [ ] Ignore same-session jobs with different `tool-name` or non-workflow `job-kind` as outside the workflow-delegate list contract.
 - [ ] Return an actionable projection error for same-session delegate workflow jobs with missing, blank, or foreign `workflow-ext-path`.

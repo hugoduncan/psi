@@ -14,6 +14,7 @@ Key decisions:
 - Use attempt-specific delegate background-job `tool-call-id`s where retained jobs may coexist with resumed/continued attempts.
 - Make `delegate remove` clean up or terminalize active delegate background jobs before/with canonical run removal so list cannot observe a non-terminal missing-canonical corruption after a successful remove.
 - Add focused unit-level coverage around the projection rules first, then integration coverage through the actual delegate tool path.
+- Keep the pure delegate-list projection boundary canonical and unqualified: callers normalize any namespaced `:psi.background-job/*` query maps into the unqualified delegate background-job shape before invoking the projection. The projection may defensively reject malformed or mixed shapes with actionable errors, but it should not contain a second broad query-shape interpretation layer.
 
 ## Risks
 
