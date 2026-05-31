@@ -13,6 +13,7 @@
    [clojure.set :as set]
    [clojure.string :as str]
    [psi.tool-runtime.call-summary :as call-summary]
+   [psi.agent-session.background-jobs :as background-jobs]
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
    [psi.agent-session.workflow.delegate-list :as delegate-list-projection]
    [psi.agent-session.workflow.delivery :as delivery]
@@ -249,10 +250,24 @@
     :psi.background-job/job-kind
     :psi.background-job/status})
 
+(defn- present-string?
+  [x]
+  (and (string? x) (not (str/blank? x))))
+
+(defn- known-background-job-status?
+  [status]
+  (or (background-jobs/non-terminal-status? status)
+      (background-jobs/terminal-status? status)))
+
 (defn- background-job-row-shaped?
   [job]
   (and (map? job)
-       (every? #(contains? job %) required-background-job-row-keys)))
+       (every? #(contains? job %) required-background-job-row-keys)
+       (present-string? (:psi.background-job/id job))
+       (present-string? (:psi.background-job/thread-id job))
+       (present-string? (:psi.background-job/tool-name job))
+       (keyword? (:psi.background-job/job-kind job))
+       (known-background-job-status? (:psi.background-job/status job))))
 
 (defn- background-job-row-shape-error-details
   [jobs]
