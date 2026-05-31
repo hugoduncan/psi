@@ -80,3 +80,7 @@
 
 - [x] Add focused coverage for retained `:timed-out` delegate background jobs: existing canonical run lists with primary canonical workflow status plus separate timed-out delegate/background status, and missing canonical run is hidden.
 - [x] Add focused projection coverage for the full malformed delegate-job boundary: same-session delegate workflow jobs with missing/nil/blank `workflow-ext-path`, and non-terminal eligible jobs with missing/nil/non-string `workflow-id`, must be actionable errors rather than empty lists.
+
+## Docs review follow-up
+
+- [ ] Document the updated delegate management/list behavior in user-facing docs: `delegate list` is same-session scoped, shows active/retained delegated workflow runs with canonical workflow status plus separate delegate/background status, and listed ids remain usable for `continue`/`remove`; include the active-remove cleanup behavior where the delegate tool/action surface is described.
