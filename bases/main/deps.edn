@@ -1,2 +1,3 @@
-{:deps {org.clojure/clojure {:mvn/version "1.12.0"}
-        psi/app-runtime     {:local/root "../../components/app-runtime"}}}
+{:paths ["src" "resources"]
+ :deps  {org.clojure/clojure {:mvn/version "1.12.0"}
+         psi/app-runtime     {:local/root "../../components/app-runtime"}}}
