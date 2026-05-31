@@ -88,3 +88,4 @@
 ## Code-shaper review follow-up
 
 - [x] Make delegate background-job query handling reject wrong-keyed map rows (for example unqualified background-job maps or maps without `:psi.background-job/*` identity/status keys) for both list and remove, surfacing an actionable background-job visibility shape error instead of normalizing them to nil fields and treating them as empty/irrelevant jobs.
+- [ ] Strengthen delegate background-job EQL row-shape validation for list/remove so required identity/session/tool/kind/status values are usable (not merely present) and status is a known background-job status before normalization; nil or unknown statuses must surface an actionable visibility shape/projection error instead of rendering rows with missing delegate status or silently ignoring corrupted rows.
