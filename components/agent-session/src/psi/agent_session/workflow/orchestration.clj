@@ -11,7 +11,7 @@
 
 (defn background-job-tool-call-id
   [run-id]
-  (str "delegate/" run-id))
+  (str "delegate/" run-id "/" (UUID/randomUUID)))
 
 (defn start-background-job!
   [mutate! session-id run-id _workflow-name]
@@ -81,7 +81,8 @@
   [{:keys [run-id workflow-name parent-session-id include-result? exec-result]}]
   (let [status (:psi.workflow/status exec-result)
         result-text (some-> (:psi.workflow/result exec-result) str/trim not-empty)
-        ok? (= :completed status)
+        wrapper-status (if (= :blocked status) :completed status)
+        ok? (contains? #{:completed :blocked} status)
         chat-delivery? (and include-result? ok? (some? result-text))]
     {:completion {:run-id run-id
                   :workflow workflow-name
@@ -91,9 +92,11 @@
                   :error (:psi.workflow/error exec-result)
                   :include-result? include-result?
                   :ok? ok?}
-     :background-job {:payload {:run-id run-id
+     :background-job {:status wrapper-status
+                      :payload {:run-id run-id
                                 :workflow workflow-name
                                 :status status
+                                :delegate-status wrapper-status
                                 :result result-text
                                 :error (:psi.workflow/error exec-result)}
                       :suppress-terminal-message? chat-delivery?}
@@ -119,19 +122,18 @@
   [{:keys [mutate! notify! mark-background-job-terminal! inject-result-into-context!
            refresh-widgets! inflight-runs]}
    run-id workflow-name parent-session-id include-result? exec-result]
-  (let [{:keys [completion background-job chat-injection notification append-entry] :as _publication}
+  (let [{:keys [background-job chat-injection notification append-entry]}
         (delegated-result-publication
          {:run-id run-id
           :workflow-name workflow-name
           :parent-session-id parent-session-id
           :include-result? include-result?
           :exec-result exec-result})
-        {:keys [status]} completion
         job-id (get-in @inflight-runs [run-id :job-id])]
     (when job-id
       (mark-background-job-terminal!
        job-id
-       status
+       (:status background-job)
        (:payload background-job)
        {:suppress-terminal-message? (:suppress-terminal-message? background-job)}))
     (when (:enabled? chat-injection)

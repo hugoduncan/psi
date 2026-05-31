@@ -116,6 +116,20 @@
       (is (= :error (:status result)))
       (is (= :duplicate-non-terminal-delegate-jobs (:reason result))))))
 
+(deftest blocked-run-retained-wrapper-completion-is-listable-test
+  ;; Blocked canonical workflow status remains primary/continuable while the
+  ;; delegate wrapper attempt can be terminal completed history.
+  (testing "blocked canonical run lists with completed delegate status"
+    (let [job (assoc base-job
+                     :status :completed
+                     :completed-at #inst "2026-05-30T10:02:00.000Z"
+                     :completed-seq 1)
+          result (project [(assoc base-run :status :blocked)] [job])]
+      (is (= :ok (:status result)))
+      (is (= ["run-1"] (mapv :run-id (:runs result))))
+      (is (= :blocked (get-in result [:runs 0 :workflow-status])))
+      (is (= :completed (get-in result [:runs 0 :delegate-status]))))))
+
 (deftest terminal-duplicate-selection-is-deterministic-test
   ;; Terminal-only duplicate groups choose newest completion markers with stable
   ;; tie-breakers so displayed background status is deterministic.

@@ -37,11 +37,11 @@
 
 ## Slice 4 — Make attempt identity and blocked status coherent
 
-- [ ] Update delegate background-job `tool-call-id` generation so resumed/continued attempts can create a unique attempt-specific background job when retained history may already exist for the same canonical run.
-- [ ] Preserve canonical `workflow-id` on delegate background jobs as the workflow run id surfaced by `list`, `continue`, and `remove`.
-- [ ] Update blocked-run async completion handling so a canonical workflow status `:blocked` marks the delegate wrapper/background job terminal `:completed`.
-- [ ] Add focused coverage that a blocked canonical run is listed with primary status `:blocked`, delegate/background status `:completed`, and remains continuable/removable.
-- [ ] Add focused coverage that retained terminal history plus one newer non-terminal attempt for the same workflow id lists as one row using the non-terminal background status.
+- [x] Update delegate background-job `tool-call-id` generation so resumed/continued attempts can create a unique attempt-specific background job when retained history may already exist for the same canonical run.
+- [x] Preserve canonical `workflow-id` on delegate background jobs as the workflow run id surfaced by `list`, `continue`, and `remove`.
+- [x] Update blocked-run async completion handling so a canonical workflow status `:blocked` marks the delegate wrapper/background job terminal `:completed`.
+- [x] Add focused coverage that a blocked canonical run is listed with primary status `:blocked`, delegate/background status `:completed`, and remains continuable/removable.
+- [x] Add focused coverage that retained terminal history plus one newer non-terminal attempt for the same workflow id lists as one row using the non-terminal background status.
 
 ## Slice 5 — Make remove cleanup coherent
 
