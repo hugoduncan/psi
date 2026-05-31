@@ -79,3 +79,4 @@
 ## Test review follow-up
 
 - [x] Add focused coverage for retained `:timed-out` delegate background jobs: existing canonical run lists with primary canonical workflow status plus separate timed-out delegate/background status, and missing canonical run is hidden.
+- [ ] Add focused projection coverage for the full malformed delegate-job boundary: same-session delegate workflow jobs with missing/nil/blank `workflow-ext-path`, and non-terminal eligible jobs with missing/nil/non-string `workflow-id`, must be actionable errors rather than empty lists.
