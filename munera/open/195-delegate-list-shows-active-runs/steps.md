@@ -65,7 +65,7 @@
 
 ## Slice 7 — Docs and coherence pass
 
-- [ ] Update README, `doc/`, or CHANGELOG if delegate list output shape or user-visible behavior changes.
-- [ ] Run focused delegate/workflow/background-job tests affected by the implementation.
-- [ ] Run targeted `clj-kondo` over changed Clojure source and tests.
-- [ ] Record verification commands and results in `implementation.md`.
+- [x] Update README, `doc/`, or CHANGELOG if delegate list output shape or user-visible behavior changes.
+- [x] Run focused delegate/workflow/background-job tests affected by the implementation.
+- [x] Run targeted `clj-kondo` over changed Clojure source and tests.
+- [x] Record verification commands and results in `implementation.md`.
