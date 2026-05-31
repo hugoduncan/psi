@@ -133,6 +133,29 @@
       (is (= :blocked (get-in result [:runs 0 :workflow-status])))
       (is (= :completed (get-in result [:runs 0 :delegate-status]))))))
 
+(deftest timed-out-retained-delegate-job-visibility-test
+  ;; Timed-out is retained delegate/background state, not canonical workflow
+  ;; state: existing canonical runs list with primary workflow status, while
+  ;; removed canonical runs hide the retained terminal timeout history.
+  (testing "existing canonical run lists with separate timed-out delegate status"
+    (let [job (assoc base-job
+                     :status :timed-out
+                     :completed-at #inst "2026-05-30T10:02:00.000Z"
+                     :completed-seq 1)
+          result (project [(assoc base-run :status :running)] [job])]
+      (is (= :ok (:status result)))
+      (is (= ["run-1"] (mapv :run-id (:runs result))))
+      (is (= :running (get-in result [:runs 0 :workflow-status])))
+      (is (= :timed-out (get-in result [:runs 0 :delegate-status])))))
+  (testing "missing canonical run hides timed-out terminal history"
+    (let [job (assoc base-job
+                     :status :timed-out
+                     :completed-at #inst "2026-05-30T10:02:00.000Z"
+                     :completed-seq 1)
+          result (project [] [job])]
+      (is (= :ok (:status result)))
+      (is (empty? (:runs result))))))
+
 (deftest terminal-duplicate-selection-is-deterministic-test
   ;; Terminal-only duplicate groups choose newest completion markers with stable
   ;; tie-breakers so displayed background status is deterministic.
@@ -224,6 +247,28 @@
         (let [text (#'workflow-core/delegate-list)]
           (is (re-find #"Active runs:\nNo active runs\." text))
           (is (not (re-find #"  run-1 —" text))))))))
+
+(deftest delegate-list-tool-path-renders-timed-out-delegate-status-test
+  ;; The rendered list keeps canonical workflow status primary and reports the
+  ;; retained delegate/background timeout separately.
+  (testing "timed-out delegate history renders separately from canonical status"
+    (with-workflow-runtime-state
+      {:current-session-id "session-1"
+       :loaded-definitions {}
+       :mutate-fn (fn [op _args]
+                    (case op
+                      psi.workflow/list-runs
+                      {:psi.workflow/runs [(assoc base-run :status :running)]}))
+       :query-fn (fn [_]
+                   {:psi.agent-session/background-jobs
+                    (eql-jobs [(assoc base-job
+                                      :status :timed-out
+                                      :completed-at #inst "2026-05-30T10:02:00.000Z"
+                                      :completed-seq 1)])})}
+      (fn []
+        (let [text (#'workflow-core/delegate-list)]
+          (is (re-find #"run-1 — running" text))
+          (is (re-find #"\[delegate timed-out\]" text)))))))
 
 (deftest delegate-list-returned-id-can-continue-blocked-run-test
   ;; A run id surfaced by list remains the canonical management id accepted by

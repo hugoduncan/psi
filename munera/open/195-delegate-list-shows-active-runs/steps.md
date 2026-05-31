@@ -78,4 +78,4 @@
 
 ## Test review follow-up
 
-- [ ] Add focused coverage for retained `:timed-out` delegate background jobs: existing canonical run lists with primary canonical workflow status plus separate timed-out delegate/background status, and missing canonical run is hidden.
+- [x] Add focused coverage for retained `:timed-out` delegate background jobs: existing canonical run lists with primary canonical workflow status plus separate timed-out delegate/background status, and missing canonical run is hidden.
