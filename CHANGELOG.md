@@ -29,6 +29,7 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 
 ### Fixed
 - AI provider request retries now happen at the prepared provider-request boundary for transient request/connection failures, preserving visible active backoff status, per-attempt provider telemetry, structured retry-exhausted/disabled/cancelled/non-retryable outcomes, retry-header delay handling, and streaming retry isolation without rerunning local tools.
+- `review-task-design` and `review-task-plan` now use deterministic routing for their final clarity-status step, avoiding split-brain LLM judge decisions that could loop until iteration exhaustion after reviewers already reported completion.
 - `review-step` now routes review completion deterministically from the review actor's `PASS_STATUS:` line, so `PASS_STATUS: REVIEW_COMPLETE` stops without running no-op follow-up work and actionable feedback loops back through deterministic `follow-up` routing instead of an LLM/session status step.
 - OpenAI OAuth-backed `gpt-5.5` sessions now route through the ChatGPT/Codex transport, matching Codex account access instead of failing against the platform chat-completions quota path.
 

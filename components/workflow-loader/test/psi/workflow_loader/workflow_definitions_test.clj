@@ -80,6 +80,13 @@
    :operation "workflow/constant-routing"
    :args {:route route}})
 
+(defn- constant-routing-step
+  [step-name route]
+  {:name step-name
+   :type :invoke
+   :operation "workflow/constant-routing"
+   :args {:route route}})
+
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-design
 
@@ -89,8 +96,7 @@
    ["review-task-design-ambiguity-review.md"
     "review-task-design-ambiguity-follow-up.md"
     "review-task-design-inconsistency-review.md"
-    "review-task-design-inconsistency-follow-up.md"
-    "review-task-design-clarity-status.md"]
+    "review-task-design-inconsistency-follow-up.md"]
    (fn [{:keys [definitions errors]}]
      (testing "loads without error"
        (is (empty? errors))
@@ -105,11 +111,11 @@
                  "clarity-status"
                  "final-summary"]
                 (mapv :name steps)))
-         (is (= [:session :session :session :session :session :session]
+         (is (= [:session :session :session :session :invoke :session]
                 (mapv :type steps))))
-       (let [wired-steps (remove #(= "final-summary" (:name %)) steps)
+       (let [wired-steps (filter #(= :session (:type %)) (remove #(= "final-summary" (:name %)) steps))
              final-step (first (filter #(= "final-summary" (:name %)) steps))]
-         (testing "wired (non-final-summary) steps have {{input}} wired to :workflow-input"
+         (testing "wired non-final session steps have {{input}} wired to :workflow-input"
            (doseq [step wired-steps]
              (is (step-has-input-var-wired? step)
                  (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))
@@ -140,15 +146,11 @@
            (is (= (constant-routing-judge "DONE")
                   (:judge inconsistency-follow-up)))
            (is (= {"DONE" {:goto "clarity-status"}} (:on inconsistency-follow-up))))
-         (testing "clarity-status judge has full cycle routing"
-           (is (= {"REPEAT" {:goto "ambiguity-review" :max-iterations 6}
-                   "DONE" {:goto "final-summary"}}
-                  (:on clarity-step)))
-           (is (some? (:judge clarity-step))))
-         (testing "clarity-status judge has :outputs with judge-routing-result schema-id"
-           (is (contains? (:judge clarity-step) :outputs))
-           (is (= :psi.workflow/judge-routing-result
-                  (get-in clarity-step [:judge :outputs :routing-result :schema-id])))))))))
+         (testing "clarity-status is deterministic invoke routing, not an LLM judge"
+           (is (= (constant-routing-step "clarity-status" "DONE")
+                  (select-keys clarity-step [:name :type :operation :args])))
+           (is (nil? (:on clarity-step)))
+           (is (nil? (:judge clarity-step)))))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-plan
@@ -159,8 +161,7 @@
    ["review-task-plan-ambiguity-review.md"
     "review-task-plan-ambiguity-follow-up.md"
     "review-task-plan-inconsistency-review.md"
-    "review-task-plan-inconsistency-follow-up.md"
-    "review-task-plan-clarity-status.md"]
+    "review-task-plan-inconsistency-follow-up.md"]
    (fn [{:keys [definitions errors]}]
      (testing "loads without error"
        (is (empty? errors))
@@ -175,11 +176,11 @@
                  "clarity-status"
                  "final-summary"]
                 (mapv :name steps)))
-         (is (= [:session :session :session :session :session :session]
+         (is (= [:session :session :session :session :invoke :session]
                 (mapv :type steps))))
-       (let [wired-steps (remove #(= "final-summary" (:name %)) steps)
+       (let [wired-steps (filter #(= :session (:type %)) (remove #(= "final-summary" (:name %)) steps))
              final-step (first (filter #(= "final-summary" (:name %)) steps))]
-         (testing "wired (non-final-summary) steps have {{input}} wired to :workflow-input"
+         (testing "wired non-final session steps have {{input}} wired to :workflow-input"
            (doseq [step wired-steps]
              (is (step-has-input-var-wired? step)
                  (str "step " (:name step) " should have {{input}} wired to :workflow-input"))))
@@ -210,15 +211,11 @@
            (is (= (constant-routing-judge "DONE")
                   (:judge inconsistency-follow-up)))
            (is (= {"DONE" {:goto "clarity-status"}} (:on inconsistency-follow-up))))
-         (testing "clarity-status judge has full cycle routing"
-           (is (= {"REPEAT" {:goto "ambiguity-review" :max-iterations 6}
-                   "DONE" {:goto "final-summary"}}
-                  (:on clarity-step)))
-           (is (some? (:judge clarity-step))))
-         (testing "clarity-status judge has :outputs with judge-routing-result schema-id"
-           (is (contains? (:judge clarity-step) :outputs))
-           (is (= :psi.workflow/judge-routing-result
-                  (get-in clarity-step [:judge :outputs :routing-result :schema-id])))))))))
+         (testing "clarity-status is deterministic invoke routing, not an LLM judge"
+           (is (= (constant-routing-step "clarity-status" "DONE")
+                  (select-keys clarity-step [:name :type :operation :args])))
+           (is (nil? (:on clarity-step)))
+           (is (nil? (:judge clarity-step)))))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; review task prompt artifact targets
@@ -400,16 +397,14 @@
    ["review-task-design-ambiguity-review.md"
     "review-task-design-ambiguity-follow-up.md"
     "review-task-design-inconsistency-review.md"
-    "review-task-design-inconsistency-follow-up.md"
-    "review-task-design-clarity-status.md"]
+    "review-task-design-inconsistency-follow-up.md"]
    (fn [_]
      (load-edn-with-md-refs
       "review-task-plan.edn"
       ["review-task-plan-ambiguity-review.md"
        "review-task-plan-ambiguity-follow-up.md"
        "review-task-plan-inconsistency-review.md"
-       "review-task-plan-inconsistency-follow-up.md"
-       "review-task-plan-clarity-status.md"]
+       "review-task-plan-inconsistency-follow-up.md"]
       (fn [_]
         (with-workflow-dir
           {"review-step.edn" (slurp-workflow-file "review-step.edn")
@@ -421,13 +416,11 @@
            "review-task-design-ambiguity-follow-up.md" (slurp-workflow-file "review-task-design-ambiguity-follow-up.md")
            "review-task-design-inconsistency-review.md" (slurp-workflow-file "review-task-design-inconsistency-review.md")
            "review-task-design-inconsistency-follow-up.md" (slurp-workflow-file "review-task-design-inconsistency-follow-up.md")
-           "review-task-design-clarity-status.md" (slurp-workflow-file "review-task-design-clarity-status.md")
            "review-task-plan.edn" (slurp-workflow-file "review-task-plan.edn")
            "review-task-plan-ambiguity-review.md" (slurp-workflow-file "review-task-plan-ambiguity-review.md")
            "review-task-plan-ambiguity-follow-up.md" (slurp-workflow-file "review-task-plan-ambiguity-follow-up.md")
            "review-task-plan-inconsistency-review.md" (slurp-workflow-file "review-task-plan-inconsistency-review.md")
-           "review-task-plan-inconsistency-follow-up.md" (slurp-workflow-file "review-task-plan-inconsistency-follow-up.md")
-           "review-task-plan-clarity-status.md" (slurp-workflow-file "review-task-plan-clarity-status.md")}
+           "review-task-plan-inconsistency-follow-up.md" (slurp-workflow-file "review-task-plan-inconsistency-follow-up.md")}
           (fn [{:keys [definitions errors]}]
             (testing "all review workflows load together without compilation errors"
               (is (empty? errors))
