@@ -87,4 +87,4 @@
 
 ## Code-shaper review follow-up
 
-- [ ] Make delegate background-job query handling reject wrong-keyed map rows (for example unqualified background-job maps or maps without `:psi.background-job/*` identity/status keys) for both list and remove, surfacing an actionable background-job visibility shape error instead of normalizing them to nil fields and treating them as empty/irrelevant jobs.
+- [x] Make delegate background-job query handling reject wrong-keyed map rows (for example unqualified background-job maps or maps without `:psi.background-job/*` identity/status keys) for both list and remove, surfacing an actionable background-job visibility shape error instead of normalizing them to nil fields and treating them as empty/irrelevant jobs.

@@ -383,10 +383,12 @@
             (is (= [{:run-id "run-1"}] @removed*))))))))
 
 (deftest delegate-list-and-remove-reject-non-shaped-background-job-payloads-test
-  ;; The background-job query result must contain a collection of job maps. Nil
-  ;; or scalar payloads are query-shape failures, not empty job sets.
-  (testing "delegate list rejects nil/non-collection/non-map job payloads"
-    (doseq [payload [nil :not-a-collection ["not-a-map"]]]
+  ;; The background-job query result must contain a collection of canonical EQL
+  ;; background-job maps. Nil/scalar payloads, non-map rows, and wrong-keyed rows
+  ;; are query-shape failures, not empty job sets.
+  (testing "delegate list rejects nil/non-collection/non-map/wrong-keyed job payloads"
+    (doseq [payload [nil :not-a-collection ["not-a-map"] [base-job] [{:wrong/key "job-1"}]]]
+
       (with-workflow-runtime-state
         {:current-session-id "session-1"
          :loaded-definitions {}
@@ -401,8 +403,9 @@
             (is (re-find #"Error: delegate list background-job visibility surface returned a non-shaped jobs payload"
                          text))
             (is (not (re-find #"No active runs\." text))))))))
-  (testing "delegate remove rejects nil/non-collection/non-map job payloads before canonical removal"
-    (doseq [payload [nil :not-a-collection ["not-a-map"]]]
+  (testing "delegate remove rejects nil/non-collection/non-map/wrong-keyed job payloads before canonical removal"
+    (doseq [payload [nil :not-a-collection ["not-a-map"] [base-job] [{:wrong/key "job-1"}]]]
+
       (let [removed* (atom false)]
         (with-workflow-runtime-state
           {:current-session-id "session-1"

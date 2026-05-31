@@ -242,10 +242,41 @@
    :message message
    :details details})
 
+(def ^:private required-background-job-row-keys
+  #{:psi.background-job/id
+    :psi.background-job/thread-id
+    :psi.background-job/tool-name
+    :psi.background-job/job-kind
+    :psi.background-job/status})
+
+(defn- background-job-row-shaped?
+  [job]
+  (and (map? job)
+       (every? #(contains? job %) required-background-job-row-keys)))
+
+(defn- background-job-row-shape-error-details
+  [jobs]
+  (if-not (sequential? jobs)
+    {:jobs jobs}
+    (let [indexed-jobs (map-indexed vector jobs)]
+      {:malformed-rows
+       (->> indexed-jobs
+            (keep (fn [[idx job]]
+                    (when (not (background-job-row-shaped? job))
+                      {:index idx
+                       :keys (when (map? job)
+                               (->> (keys job) (mapv str) sort))
+                       :missing-keys (when (map? job)
+                                       (->> required-background-job-row-keys
+                                            (remove #(contains? job %))
+                                            (mapv str)
+                                            sort))})))
+            vec)})))
+
 (defn- background-jobs-payload-shaped?
   [jobs]
   (and (sequential? jobs)
-       (every? map? jobs)))
+       (every? background-job-row-shaped? jobs)))
 
 (defn- query-background-jobs
   [action-name]
@@ -262,7 +293,8 @@
                 (:psi.agent-session/background-jobs result)))
           (background-job-query-error
            (str action-name " background-job visibility surface returned a non-shaped jobs payload")
-           {:jobs (:psi.agent-session/background-jobs result)})
+           (background-job-row-shape-error-details
+            (:psi.agent-session/background-jobs result)))
 
           :else
           {:status :ok
