@@ -31,6 +31,11 @@
 
 ;;; Helpers
 
+(defn- arg-value
+  [args k]
+  (or (get args k)
+      (get args (name k))))
+
 (def query-fn runtime-state/query-fn)
 (def mutate! runtime-state/mutate!)
 (def log! runtime-state/log!)
@@ -348,13 +353,15 @@
 (defn- delegate-run
   "Handle action=run: resolve workflow, create + execute canonical workflow run.
    Supports async (default) and sync modes, fork_session, and include_result_in_context."
-  [{:keys [workflow prompt name mode fork_session include_result_in_context timeout_ms]}]
-  (let [workflow-name (some-> workflow str str/trim not-empty)
-        prompt-text   (some-> prompt str str/trim not-empty)
-        mode*         (text/parse-mode mode)
-        fork?         (true? fork_session)
-        include?      (true? include_result_in_context)
-        timeout       (or (when (number? timeout_ms) (long timeout_ms)) 300000)]
+  [args]
+  (let [workflow-name (some-> (arg-value args :workflow) str str/trim not-empty)
+        prompt-text   (some-> (arg-value args :prompt) str str/trim not-empty)
+        mode*         (text/parse-mode (arg-value args :mode))
+        fork?         (true? (arg-value args :fork_session))
+        include?      (true? (arg-value args :include_result_in_context))
+        timeout-ms    (arg-value args :timeout_ms)
+        timeout       (or (when (number? timeout-ms) (long timeout-ms)) 300000)
+        name          (arg-value args :name)]
     (cond
       (nil? workflow-name)
       {:error "workflow is required"}
@@ -532,7 +539,7 @@
 
    Defaults missing action to `run`."
   [args _opts]
-  (let [action (or (some-> (:action args) str str/lower-case str/trim) "run")]
+  (let [action (or (some-> (arg-value args :action) str str/lower-case str/trim) "run")]
     (case action
       "list"     (delegate-list)
       "run"      (let [result (delegate-run args)]
