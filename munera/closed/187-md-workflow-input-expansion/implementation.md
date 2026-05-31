@@ -591,3 +591,7 @@ Executed all three design-steps from ambiguity review pass 2. All resolved in de
    `(catch clojure.lang.ExceptionInfo e {:error (.getMessage e)})`, so no error-return path
    needs to be added to `compile-markdown-workflow-file`. Implementation path steps 2d and 3
    updated to document this mechanism explicitly.
+
+## Closure (2026-05-31 audit)
+
+Closed as complete during the open-task reconciliation audit. All `steps.md` items checked and review loops recorded no actionable feedback.

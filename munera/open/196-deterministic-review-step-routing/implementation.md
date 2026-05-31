@@ -69,3 +69,7 @@
 2026-05-29: review-task-docs re-read `.psi/skills/review-task-docs/SKILL.md`, task 189 artifacts, `.psi/workflows/review-step.edn`, focused loader/routing proofs, `README.md`, `doc/`, and `CHANGELOG.md`. Found no new actionable docs issues: the user-visible deterministic `review-step` routing change is already recorded in `CHANGELOG.md`, and no stale README/doc references for this slice stood out. PASS_STATUS: REVIEW_COMPLETE
 
 2026-05-29: code-shaper review re-read `.psi/skills/code-shaper/SKILL.md`, task 189 artifacts, `.psi/workflows/review-step.edn`, focused invoke-judge runtime/materialization code, routing/loader tests, and `CHANGELOG.md`, then reran `clojure -M:test --focus psi.agent-session.workflow-review-step-routing-test --focus psi.workflow-loader.workflow-definitions-test --focus psi.workflow-runtime.ir-test --focus psi.agent-session.workflow-invoke-runtime-test` plus targeted `clj-kondo` lint green. Found no new actionable code-shaping issues: the deterministic routing slice is locally comprehensible, the invoke-judge path stays narrow, and the current task artifacts/tests already cover the remaining behavior without stale unchecked gaps. PASS_STATUS: REVIEW_COMPLETE
+
+## Renumber (2026-05-31 audit)
+
+Task id changed from `194-deterministic-review-step-routing` to `196-deterministic-review-step-routing` to resolve a Munera NNN collision (old number `194` was reused across concurrent branches). Slug and content unchanged; task remains open/active.
