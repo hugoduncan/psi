@@ -74,3 +74,4 @@
 
 - [x] Make delegate background-job query handling reject nil/non-collection/non-shaped `:psi.agent-session/background-jobs` payloads for both list and remove, surfacing an actionable tool error instead of treating them as an empty job set.
 - [x] Make blocked-run `delegate continue` terminalize/clean up its newly started delegate background job and inflight tracking when `psi.workflow/resume-run` returns `:psi.workflow/error` without throwing; add focused coverage for the failed-resume path.
+- [ ] Add focused tests that background-job read-surface failures (missing query function, thrown query/unreadable surface, non-map query result, and query map missing `:psi.agent-session/background-jobs`) surface actionable errors instead of empty lists, and that `delegate remove` skips canonical removal on the applicable failures.
