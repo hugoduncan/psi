@@ -15,6 +15,7 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-05-31: Closed completed tasks 173, 175, 186, 189 (`git mv` open→closed) and reconciled `munera/plan.md` open backlog. All four had fully checked `steps.md` (173 had only the open-ended "continue to next task and repeat" audit-loop item left, closed by 刀 decision). Commit `061aa929`. Remaining open: 021, 108, 154, 157, 001, 002, 003, 006, 005, 191.
 - 2026-05-30: Task 190 code-shaper follow-up executed: design/plan per-reviewer `workflow/pass-status-routing` judges now pass `:allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]`; globally known implementation tokens now fail those review steps with deterministic `:invalid-pass-status`, while callers that omit `:allowed-statuses` preserve global token behavior. Focused workflow tests and targeted lint are green; code-shaper follow-up item is checked.
 - 2026-05-30: Task 190 docs review follow-ups completed and committed (`accfd3d8`): CHANGELOG [Unreleased] now documents user-visible conditional per-reviewer follow-up behavior and plan-review `steps.md` targeting; `doc/workflow-ir.md` now reflects executed invoke-judge runtime support. All docs follow-up items are checked.
 - 2026-05-30: Task 190 docs review applied `review-task-docs`: found actionable documentation follow-ups for CHANGELOG user-visible conditional design/plan review behavior plus `doc/workflow-ir.md` invoke-judge runtime support note; added unchecked `steps.md` items and recorded review note.
