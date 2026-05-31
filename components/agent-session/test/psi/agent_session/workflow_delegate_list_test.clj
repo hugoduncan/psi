@@ -352,6 +352,134 @@
                      result))
               (is (false? @removed*)))))))))
 
+(deftest delegate-list-read-surface-failures-are-actionable-test
+  ;; Empty lists are reserved for successful reads with no visible jobs. Missing,
+  ;; unreadable, or non-query-shaped background-job surfaces must be errors.
+  (testing "delegate list rejects missing query function"
+    (with-workflow-runtime-state
+      {:current-session-id "session-1"
+       :loaded-definitions {}
+       :mutate-fn (fn [op _args]
+                    (case op
+                      psi.workflow/list-runs
+                      {:psi.workflow/runs [base-run]}))}
+      (fn []
+        (let [text (#'workflow-core/delegate-list)]
+          (is (re-find #"Error: delegate list requires a background-job query surface" text))
+          (is (not (re-find #"No active runs\." text)))))))
+  (testing "delegate list rejects thrown query/unreadable surface"
+    (with-workflow-runtime-state
+      {:current-session-id "session-1"
+       :loaded-definitions {}
+       :mutate-fn (fn [op _args]
+                    (case op
+                      psi.workflow/list-runs
+                      {:psi.workflow/runs [base-run]}))
+       :query-fn (fn [_]
+                   (throw (ex-info "unreadable" {:surface :background-jobs})))}
+      (fn []
+        (let [text (#'workflow-core/delegate-list)]
+          (is (re-find #"Error: delegate list background-job query failed" text))
+          (is (not (re-find #"No active runs\." text)))))))
+  (testing "delegate list rejects non-map query result"
+    (with-workflow-runtime-state
+      {:current-session-id "session-1"
+       :loaded-definitions {}
+       :mutate-fn (fn [op _args]
+                    (case op
+                      psi.workflow/list-runs
+                      {:psi.workflow/runs [base-run]}))
+       :query-fn (fn [_] [:not :a :map])}
+      (fn []
+        (let [text (#'workflow-core/delegate-list)]
+          (is (re-find #"Error: delegate list could not read the background-job visibility surface" text))
+          (is (not (re-find #"No active runs\." text)))))))
+  (testing "delegate list rejects query map missing background-jobs key"
+    (with-workflow-runtime-state
+      {:current-session-id "session-1"
+       :loaded-definitions {}
+       :mutate-fn (fn [op _args]
+                    (case op
+                      psi.workflow/list-runs
+                      {:psi.workflow/runs [base-run]}))
+       :query-fn (fn [_] {:psi.agent-session/other []})}
+      (fn []
+        (let [text (#'workflow-core/delegate-list)]
+          (is (re-find #"Error: delegate list could not read the background-job visibility surface" text))
+          (is (not (re-find #"No active runs\." text))))))))
+
+(deftest delegate-remove-read-surface-failures-skip-canonical-removal-test
+  ;; Remove must not delete the canonical workflow run when it cannot prove or
+  ;; clean up the same-session delegate background-job side of the relationship.
+  (testing "delegate remove rejects missing query function before canonical removal"
+    (let [removed* (atom false)]
+      (with-workflow-runtime-state
+        {:current-session-id "session-1"
+         :loaded-definitions {}
+         :mutate-fn (fn [op _args]
+                      (case op
+                        psi.workflow/remove-run
+                        (do
+                          (reset! removed* true)
+                          {:psi.workflow/removed? true})))}
+        (fn []
+          (let [result (#'workflow-core/delegate-remove {:id "run-1"})]
+            (is (= {:error "delegate remove requires a background-job query surface"}
+                   result))
+            (is (false? @removed*)))))))
+  (testing "delegate remove rejects thrown query/unreadable surface before canonical removal"
+    (let [removed* (atom false)]
+      (with-workflow-runtime-state
+        {:current-session-id "session-1"
+         :loaded-definitions {}
+         :mutate-fn (fn [op _args]
+                      (case op
+                        psi.workflow/remove-run
+                        (do
+                          (reset! removed* true)
+                          {:psi.workflow/removed? true})))
+         :query-fn (fn [_]
+                     (throw (ex-info "unreadable" {:surface :background-jobs})))}
+        (fn []
+          (let [result (#'workflow-core/delegate-remove {:id "run-1"})]
+            (is (= {:error "delegate remove background-job query failed"}
+                   result))
+            (is (false? @removed*)))))))
+  (testing "delegate remove rejects non-map query result before canonical removal"
+    (let [removed* (atom false)]
+      (with-workflow-runtime-state
+        {:current-session-id "session-1"
+         :loaded-definitions {}
+         :mutate-fn (fn [op _args]
+                      (case op
+                        psi.workflow/remove-run
+                        (do
+                          (reset! removed* true)
+                          {:psi.workflow/removed? true})))
+         :query-fn (fn [_] [:not :a :map])}
+        (fn []
+          (let [result (#'workflow-core/delegate-remove {:id "run-1"})]
+            (is (= {:error "delegate remove could not read the background-job visibility surface"}
+                   result))
+            (is (false? @removed*)))))))
+  (testing "delegate remove rejects query map missing background-jobs key before canonical removal"
+    (let [removed* (atom false)]
+      (with-workflow-runtime-state
+        {:current-session-id "session-1"
+         :loaded-definitions {}
+         :mutate-fn (fn [op _args]
+                      (case op
+                        psi.workflow/remove-run
+                        (do
+                          (reset! removed* true)
+                          {:psi.workflow/removed? true})))
+         :query-fn (fn [_] {:psi.agent-session/other []})}
+        (fn []
+          (let [result (#'workflow-core/delegate-remove {:id "run-1"})]
+            (is (= {:error "delegate remove could not read the background-job visibility surface"}
+                   result))
+            (is (false? @removed*))))))))
+
 (deftest terminal-duplicate-selection-tie-breakers-are-deterministic-test
   ;; Completion ordering falls through completed-at, completed-seq, job-seq, and
   ;; job-id with present values newer than missing values at each level.
