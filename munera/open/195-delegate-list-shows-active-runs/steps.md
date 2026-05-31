@@ -2,28 +2,28 @@
 
 ## Slice 1 — Characterize current delegate-list data paths and failure
 
-- [ ] Locate the current `delegate list`, delegate run/start, continue, remove, background-job registry, and canonical workflow run code paths.
-- [ ] Add or identify a focused test that installs or starts an active same-session delegate workflow background job plus canonical workflow run and proves current `delegate list` omits it or would return an empty active-run section.
-- [ ] Record in `implementation.md` the authoritative read/write surfaces found for delegate background jobs and canonical workflow runs.
+- [x] Locate the current `delegate list`, delegate run/start, continue, remove, background-job registry, and canonical workflow run code paths.
+- [x] Add or identify a focused test that installs or starts an active same-session delegate workflow background job plus canonical workflow run and proves current `delegate list` omits it or would return an empty active-run section.
+- [x] Record in `implementation.md` the authoritative read/write surfaces found for delegate background jobs and canonical workflow runs.
 
 ## Slice 2 — Extract delegate-list projection
 
-- [ ] Create a pure delegate-list projection function that accepts invoking session id, canonical workflow runs, and background jobs.
+- [x] Create a pure delegate-list projection function that accepts invoking session id, canonical workflow runs, and background jobs.
 - [x] Resolve the projection input-shape ambiguity: specify whether the pure delegate-list projection accepts canonical unqualified background-job maps, namespaced `:psi.background-job/*` query maps, or both, and put normalization on exactly one side of the projection/caller boundary.
-- [ ] Filter visible jobs to same-session `tool-name = "delegate"`, `job-kind = :workflow`, and `workflow-ext-path = "built-in:workflow"`.
-- [ ] Ignore same-session jobs with different `tool-name` or non-workflow `job-kind` as outside the workflow-delegate list contract.
-- [ ] Return an actionable projection error for same-session delegate workflow jobs with missing, blank, or foreign `workflow-ext-path`.
-- [ ] Return an actionable projection error for non-terminal eligible jobs with missing, nil, non-string, or blank `workflow-id`.
-- [ ] Hide retained terminal eligible jobs with missing, nil, non-string, or blank `workflow-id` as non-manageable history.
-- [ ] Join eligible jobs to canonical workflow runs by `workflow-id` / `run-id` and use the canonical run as the management identity.
-- [ ] Return an actionable projection error when a non-terminal eligible job points at a missing canonical workflow run.
-- [ ] Hide terminal-only eligible jobs whose canonical workflow run no longer exists.
-- [ ] De-duplicate eligible jobs by canonical `workflow-id` into at most one row per run.
-- [ ] Prefer the single non-terminal job as representative when duplicate jobs contain exactly one non-terminal job.
-- [ ] Return an actionable duplicate-job error when duplicate jobs for a workflow id contain more than one non-terminal job.
-- [ ] Select the representative terminal job for terminal-only duplicates by newest `completed-at`, then `completed-seq`, then `job-seq`, then lexicographic `job-id`.
-- [ ] Sort final rows newest-first by representative job `started-at`, then `job-seq`, then `job-id`, then canonical workflow `run-id`.
-- [ ] Include row fields for canonical run id, workflow definition/source id, canonical workflow status, delegate/background status, and useful timestamps/labels available from either source.
+- [x] Filter visible jobs to same-session `tool-name = "delegate"`, `job-kind = :workflow`, and `workflow-ext-path = "built-in:workflow"`.
+- [x] Ignore same-session jobs with different `tool-name` or non-workflow `job-kind` as outside the workflow-delegate list contract.
+- [x] Return an actionable projection error for same-session delegate workflow jobs with missing, blank, or foreign `workflow-ext-path`.
+- [x] Return an actionable projection error for non-terminal eligible jobs with missing, nil, non-string, or blank `workflow-id`.
+- [x] Hide retained terminal eligible jobs with missing, nil, non-string, or blank `workflow-id` as non-manageable history.
+- [x] Join eligible jobs to canonical workflow runs by `workflow-id` / `run-id` and use the canonical run as the management identity.
+- [x] Return an actionable projection error when a non-terminal eligible job points at a missing canonical workflow run.
+- [x] Hide terminal-only eligible jobs whose canonical workflow run no longer exists.
+- [x] De-duplicate eligible jobs by canonical `workflow-id` into at most one row per run.
+- [x] Prefer the single non-terminal job as representative when duplicate jobs contain exactly one non-terminal job.
+- [x] Return an actionable duplicate-job error when duplicate jobs for a workflow id contain more than one non-terminal job.
+- [x] Select the representative terminal job for terminal-only duplicates by newest `completed-at`, then `completed-seq`, then `job-seq`, then lexicographic `job-id`.
+- [x] Sort final rows newest-first by representative job `started-at`, then `job-seq`, then `job-id`, then canonical workflow `run-id`.
+- [x] Include row fields for canonical run id, workflow definition/source id, canonical workflow status, delegate/background status, and useful timestamps/labels available from either source.
 
 ## Slice 3 — Wire projection into delegate list output
 
