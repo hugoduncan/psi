@@ -83,4 +83,4 @@
 
 ## Docs review follow-up
 
-- [ ] Document the updated delegate management/list behavior in user-facing docs: `delegate list` is same-session scoped, shows active/retained delegated workflow runs with canonical workflow status plus separate delegate/background status, and listed ids remain usable for `continue`/`remove`; include the active-remove cleanup behavior where the delegate tool/action surface is described.
+- [x] Document the updated delegate management/list behavior in user-facing docs: `delegate list` is same-session scoped, shows active/retained delegated workflow runs with canonical workflow status plus separate delegate/background status, and listed ids remain usable for `continue`/`remove`; include the active-remove cleanup behavior where the delegate tool/action surface is described.
