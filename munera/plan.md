@@ -5,11 +5,6 @@ open-task reconciliation audit (completed-task closure, NNN-collision renumber).
 
 ## Open tasks (suggested execution order)
 
-In progress (partial `steps.md`):
-
-- `munera/open/195-fix-workflow-max-iterations-error-surfacing/` — 15/4 checked; renumbered from 154 (NNN collision).
-- `munera/open/196-deterministic-review-step-routing/` — 42/24 checked; renumbered from 194 (NNN collision).
-
 Not yet started:
 
 - `munera/open/197-ui-action-invocation/` — renumbered from 191 (NNN collision); side-effecting UI action invocation deferred from closed 190/194 UI work.
@@ -37,11 +32,11 @@ Closed as stale/abandoned (predate registry/bootstrap/structured-output arcs):
 - `005-canonical-dispatch-pipeline-trace-observability`
 - `006-agent-tool-skill-prelude-follow-on`
 
-Renumbered (NNN collision, slug/content unchanged, still open):
+Renumbered (NNN collision, slug/content unchanged):
 
-- `154-fix-workflow-max-iterations-error-surfacing` → `195`
-- `194-deterministic-review-step-routing` → `196`
-- `191-ui-action-invocation` → `197`
+- `154-fix-workflow-max-iterations-error-surfacing` → `195` (since closed — core fix done, edge-case tests deferred)
+- `194-deterministic-review-step-routing` → `196` (since closed — work landed under 189/190; stale unchecked boxes)
+- `191-ui-action-invocation` → `197` (still open)
 
 ## Conventions
 

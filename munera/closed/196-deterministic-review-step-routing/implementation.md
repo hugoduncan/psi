@@ -73,3 +73,7 @@
 ## Renumber (2026-05-31 audit)
 
 Task id changed from `194-deterministic-review-step-routing` to `196-deterministic-review-step-routing` to resolve a Munera NNN collision (old number `194` was reused across concurrent branches). Slug and content unchanged; task remains open/active.
+
+## Closure (2026-05-31)
+
+Closed by 刀 decision. The unchecked `steps.md` items are stale: the deterministic `workflow/pass-status-routing` and `workflow/constant-routing` operations they describe were actually implemented and registered under tasks 189/190 (see `components/agent-session/src/psi/agent_session/workflow/core.clj` and tests in workflow_review_step_routing_test / workflow_definitions_test / workflow_delegate_review_step_live_test). This task was never re-checked. Future issues will be tracked as new tasks.
