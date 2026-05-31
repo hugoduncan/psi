@@ -14,6 +14,7 @@
    [clojure.string :as str]
    [psi.tool-runtime.call-summary :as call-summary]
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
+   [psi.agent-session.workflow.delegate-list :as delegate-list-projection]
    [psi.agent-session.workflow.delivery :as delivery]
    [psi.agent-session.workflow.orchestration :as orchestration]
    [psi.agent-session.workflow.runtime-state :as runtime-state]
@@ -234,15 +235,50 @@
 
 ;;; Delegate tool implementation
 
+(defn- background-job-query-error
+  [message details]
+  {:status :error
+   :reason :background-job-query-unavailable
+   :message message
+   :details details})
+
+(defn- query-background-jobs-for-list
+  []
+  (if-let [qf (query-fn)]
+    (try
+      (let [result (qf [:psi.agent-session/background-jobs])]
+        (if (and (map? result) (contains? result :psi.agent-session/background-jobs))
+          {:status :ok
+           :jobs (:psi.agent-session/background-jobs result)}
+          (background-job-query-error
+           "delegate list could not read the background-job visibility surface"
+           {:query-result result})))
+      (catch Exception e
+        (background-job-query-error
+         "delegate list background-job query failed"
+         {:exception-message (ex-message e)
+          :exception-data (ex-data e)})))
+    (background-job-query-error
+     "delegate list requires a background-job query surface"
+     {:query :psi.agent-session/background-jobs})))
+
 (defn- delegate-list
-  "Handle action=list: list available workflows and active runs."
+  "Handle action=list: list available workflows and visible delegate runs."
   []
   (let [runs-result (mutate! 'psi.workflow/list-runs {})
         runs (:psi.workflow/runs runs-result)
-        jobs-result (when-let [qf (query-fn)]
-                      (qf [:psi.agent-session/background-jobs]))
-        jobs (:psi.agent-session/background-jobs jobs-result)]
-    (text/delegate-list-text (runtime-state/loaded-definitions) runs jobs)))
+        jobs-result (query-background-jobs-for-list)]
+    (if (= :error (:status jobs-result))
+      (text/error-text (:message jobs-result))
+      (let [projection (delegate-list-projection/project-visible-runs
+                        {:session-id (current-session-id)
+                         :runs runs
+                         :background-jobs (mapv delegate-list-projection/normalize-query-job
+                                                (:jobs jobs-result))})]
+        (if (= :error (:status projection))
+          (text/error-text (:message projection))
+          (text/delegate-list-text (runtime-state/loaded-definitions)
+                                   (:runs projection)))))))
 
 (defn- delegate-run
   "Handle action=run: resolve workflow, create + execute canonical workflow run.

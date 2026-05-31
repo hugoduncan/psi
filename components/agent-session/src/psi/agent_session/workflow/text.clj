@@ -21,28 +21,22 @@
                          (str " (" step-count " steps)"))))))))
 
 (defn active-runs-text
-  "Return human-readable list of active/recent workflow runs backed by canonical workflow + background-job state."
-  [runs jobs]
-  (let [async-run-ids (->> jobs
-                           (filter #(= "delegate" (:psi.background-job/tool-name %)))
-                           (filter #(contains? #{:running :pending-cancel}
-                                               (:psi.background-job/status %)))
-                           (map :psi.background-job/workflow-id)
-                           set)]
-    (if (empty? runs)
-      "No active runs."
-      (->> runs
-           (map (fn [{:keys [run-id status source-definition-id]}]
-                  (str "  " run-id " — " (name status)
-                       (when source-definition-id
-                         (str " (" source-definition-id ")"))
-                       (when (contains? async-run-ids run-id)
-                         " [async]"))))
-           (str/join "\n")))))
+  "Return human-readable list of visible delegate workflow runs."
+  [runs]
+  (if (empty? runs)
+    "No active runs."
+    (->> runs
+         (map (fn [{:keys [run-id workflow-status delegate-status definition-id]}]
+                (str "  " run-id " — " (name (or workflow-status :unknown))
+                     (when definition-id
+                       (str " (" definition-id ")"))
+                     (when delegate-status
+                       (str " [delegate " (name delegate-status) "]")))))
+         (str/join "\n"))))
 
-(defn delegate-list-text [definitions runs jobs]
+(defn delegate-list-text [definitions runs]
   (str "Available workflows:\n" (available-workflows-text definitions)
-       "\n\nActive runs:\n" (active-runs-text runs jobs)))
+       "\n\nActive runs:\n" (active-runs-text runs)))
 
 (defn workflow-run-started-text [run-id]
   (str "Workflow run " run-id " started asynchronously. "

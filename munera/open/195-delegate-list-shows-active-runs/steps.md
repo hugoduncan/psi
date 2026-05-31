@@ -27,13 +27,13 @@
 
 ## Slice 3 — Wire projection into delegate list output
 
-- [ ] Update `delegate-list` to require the invoking/current session id when projecting visible delegate runs.
-- [ ] Update `delegate-list` to surface an actionable tool error if the background-job query surface is missing, unavailable, unreadable, or returns no query-shaped result.
-- [ ] Update `delegate-list` to avoid falling back to global canonical workflow runs when background-job visibility cannot be read.
-- [ ] Update delegate list rendering to show only projected visible delegate rows in the active-runs section.
-- [ ] Render canonical workflow status as the primary run/manageability status.
-- [ ] Render delegate/background status separately when available, including `:timed-out` and wrapper `:completed` for blocked canonical runs.
-- [ ] Preserve the ordinary empty-list result only when the projection succeeds and no visible delegate rows exist.
+- [x] Update `delegate-list` to require the invoking/current session id when projecting visible delegate runs.
+- [x] Update `delegate-list` to surface an actionable tool error if the background-job query surface is missing, unavailable, unreadable, or returns no query-shaped result.
+- [x] Update `delegate-list` to avoid falling back to global canonical workflow runs when background-job visibility cannot be read.
+- [x] Update delegate list rendering to show only projected visible delegate rows in the active-runs section.
+- [x] Render canonical workflow status as the primary run/manageability status.
+- [x] Render delegate/background status separately when available, including `:timed-out` and wrapper `:completed` for blocked canonical runs.
+- [x] Preserve the ordinary empty-list result only when the projection succeeds and no visible delegate rows exist.
 
 ## Slice 4 — Make attempt identity and blocked status coherent
 
