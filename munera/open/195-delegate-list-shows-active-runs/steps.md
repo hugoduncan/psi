@@ -53,15 +53,15 @@
 
 ## Slice 6 — Regression and boundary coverage
 
-- [ ] Add same-session visibility coverage proving an active delegated run appears in `delegate list` for the invoking session.
-- [ ] Add unrelated-session boundary coverage proving delegate jobs from other sessions are not listed.
-- [ ] Add regression coverage for the observed failure mode: active run exists, `delegate list` active-runs output is not empty.
-- [ ] Add coverage that ids returned by `delegate list` can be used by `delegate continue` when canonical status supports continuation.
-- [ ] Add coverage that ids returned by `delegate list` can be used by `delegate remove` when the canonical run exists.
-- [ ] Add malformed same-session non-terminal delegate job coverage for blank/missing workflow ids and missing canonical runs.
-- [ ] Add retained terminal malformed workflow-id coverage proving such jobs are hidden rather than errors.
-- [ ] Add deterministic duplicate terminal selection coverage using `completed-at`, `completed-seq`, `job-seq`, and `job-id` tie-breakers.
-- [ ] Add deterministic final row ordering coverage using `started-at`, `job-seq`, `job-id`, and `run-id` tie-breakers.
+- [x] Add same-session visibility coverage proving an active delegated run appears in `delegate list` for the invoking session.
+- [x] Add unrelated-session boundary coverage proving delegate jobs from other sessions are not listed.
+- [x] Add regression coverage for the observed failure mode: active run exists, `delegate list` active-runs output is not empty.
+- [x] Add coverage that ids returned by `delegate list` can be used by `delegate continue` when canonical status supports continuation.
+- [x] Add coverage that ids returned by `delegate list` can be used by `delegate remove` when the canonical run exists.
+- [x] Add malformed same-session non-terminal delegate job coverage for blank/missing workflow ids and missing canonical runs.
+- [x] Add retained terminal malformed workflow-id coverage proving such jobs are hidden rather than errors.
+- [x] Add deterministic duplicate terminal selection coverage using `completed-at`, `completed-seq`, `job-seq`, and `job-id` tie-breakers.
+- [x] Add deterministic final row ordering coverage using `started-at`, `job-seq`, `job-id`, and `run-id` tie-breakers.
 
 ## Slice 7 — Docs and coherence pass
 

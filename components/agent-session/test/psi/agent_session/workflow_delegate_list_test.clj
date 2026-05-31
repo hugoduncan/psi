@@ -174,6 +174,213 @@
       (is (= :ok (:status result)))
       (is (= ["run-2" "run-1"] (mapv :run-id (:runs result)))))))
 
+(defn- with-workflow-runtime-state
+  [state f]
+  (let [original-state @runtime-state/state]
+    (try
+      (reset! runtime-state/state state)
+      (f)
+      (finally
+        (reset! runtime-state/state original-state)))))
+
+(defn- eql-jobs
+  [jobs]
+  (mapv background-jobs/job->eql jobs))
+
+(deftest delegate-list-tool-path-shows-active-same-session-run-test
+  ;; The actual delegate list path must use the invoking session's background
+  ;; jobs, not only the canonical workflow registry, so active runs render.
+  (testing "same-session active delegated run appears in delegate list text"
+    (with-workflow-runtime-state
+      {:current-session-id "session-1"
+       :loaded-definitions {}
+       :mutate-fn (fn [op _args]
+                    (case op
+                      psi.workflow/list-runs
+                      {:psi.workflow/runs [base-run]}))
+       :query-fn (fn [_]
+                   {:psi.agent-session/background-jobs (eql-jobs [base-job])})}
+      (fn []
+        (let [text (#'workflow-core/delegate-list)]
+          (is (string? text))
+          (is (re-find #"Active runs:\n  run-1" text))
+          (is (re-find #"run-1 — running" text))
+          (is (re-find #"\[delegate running\]" text)))))))
+
+(deftest delegate-list-tool-path-excludes-unrelated-session-runs-test
+  ;; Session visibility is enforced through background-job thread ownership.
+  (testing "other-session delegate jobs do not render through the tool path"
+    (with-workflow-runtime-state
+      {:current-session-id "session-1"
+       :loaded-definitions {}
+       :mutate-fn (fn [op _args]
+                    (case op
+                      psi.workflow/list-runs
+                      {:psi.workflow/runs [base-run]}))
+       :query-fn (fn [_]
+                   {:psi.agent-session/background-jobs
+                    (eql-jobs [(assoc base-job :thread-id "session-2")])})}
+      (fn []
+        (let [text (#'workflow-core/delegate-list)]
+          (is (re-find #"Active runs:\nNo active runs\." text))
+          (is (not (re-find #"  run-1 —" text))))))))
+
+(deftest delegate-list-returned-id-can-continue-blocked-run-test
+  ;; A run id surfaced by list remains the canonical management id accepted by
+  ;; continue when canonical workflow status supports continuation.
+  (testing "listed blocked run id can be passed to delegate continue"
+    (let [started-jobs* (atom [])
+          resumed* (atom [])]
+      (with-workflow-runtime-state
+        {:current-session-id "session-1"
+         :loaded-definitions {}
+         :notify-fn (fn [_ _] nil)
+         :mutate-fn (fn [op args]
+                      (case op
+                        psi.workflow/list-runs
+                        {:psi.workflow/runs [(assoc base-run :status :blocked)]}
+
+                        psi.extension/start-background-job
+                        (do
+                          (swap! started-jobs* conj args)
+                          {:psi.background-job/job-id (:job-id args)
+                           :psi.background-job/status :running})
+
+                        psi.workflow/resume-run
+                        (do
+                          (swap! resumed* conj args)
+                          {:psi.workflow/status :completed
+                           :psi.workflow/result "done"})
+
+                        psi.extension/mark-background-job-terminal
+                        {:psi.background-job/job-id (:job-id args)
+                         :psi.background-job/status (:outcome args)}
+
+                        psi.extension/append-entry
+                        {:ok true}))
+         :query-fn (fn [_]
+                     {:psi.agent-session/background-jobs
+                      (eql-jobs [(assoc base-job :status :completed
+                                        :completed-at #inst "2026-05-30T10:02:00.000Z"
+                                        :completed-seq 1)])})}
+        (fn []
+          (let [list-text (#'workflow-core/delegate-list)
+                run-id (second (re-find #"Active runs:\n  ([^ ]+)" list-text))
+                continue-text (#'workflow-core/execute-delegate-tool
+                               {:action "continue"
+                                :id run-id
+                                :prompt "next"}
+                               nil)]
+            (is (= "run-1" run-id))
+            (is (= "Resuming run run-1 asynchronously." continue-text))
+            (is (= "run-1" (:workflow-id (first @started-jobs*))))
+            (is (= [{:run-id "run-1"
+                     :session-id "session-1"
+                     :workflow-input {:input "next" :original "next"}}]
+                   @resumed*))))))))
+
+(deftest delegate-list-returned-id-can-remove-existing-run-test
+  ;; A run id surfaced by list remains the canonical management id accepted by
+  ;; remove while the canonical workflow run exists.
+  (testing "listed run id can be passed to delegate remove"
+    (let [removed* (atom [])]
+      (with-workflow-runtime-state
+        {:current-session-id "session-1"
+         :loaded-definitions {}
+         :mutate-fn (fn [op args]
+                      (case op
+                        psi.workflow/list-runs
+                        {:psi.workflow/runs [base-run]}
+
+                        psi.workflow/remove-run
+                        (do
+                          (swap! removed* conj args)
+                          {:psi.workflow/removed? true
+                           :psi.workflow/run-id (:run-id args)})))
+         :query-fn (fn [_]
+                     {:psi.agent-session/background-jobs
+                      (eql-jobs [(assoc base-job
+                                        :status :completed
+                                        :completed-at #inst "2026-05-30T10:02:00.000Z"
+                                        :completed-seq 1)])})}
+        (fn []
+          (let [list-text (#'workflow-core/delegate-list)
+                run-id (second (re-find #"Active runs:\n  ([^ ]+)" list-text))
+                remove-text (#'workflow-core/execute-delegate-tool
+                             {:action "remove" :id run-id}
+                             nil)]
+            (is (= "run-1" run-id))
+            (is (= "Removed run run-1" remove-text))
+            (is (= [{:run-id "run-1"}] @removed*))))))))
+
+(deftest terminal-duplicate-selection-tie-breakers-are-deterministic-test
+  ;; Completion ordering falls through completed-at, completed-seq, job-seq, and
+  ;; job-id with present values newer than missing values at each level.
+  (testing "completed-at beats later tie-breakers"
+    (let [older (assoc base-job :job-id "job-z" :status :failed
+                       :completed-at #inst "2026-05-30T10:01:00.000Z"
+                       :completed-seq 9 :job-seq 9)
+          newer (assoc base-job :job-id "job-a" :status :completed
+                       :completed-at #inst "2026-05-30T10:02:00.000Z"
+                       :completed-seq 1 :job-seq 1)
+          result (project [base-run] [older newer])]
+      (is (= :ok (:status result)))
+      (is (= "job-a" (get-in result [:runs 0 :job-id])))))
+  (testing "completed-seq breaks completed-at ties"
+    (let [lower (assoc base-job :job-id "job-z" :status :failed
+                       :completed-at #inst "2026-05-30T10:01:00.000Z"
+                       :completed-seq 1 :job-seq 9)
+          higher (assoc base-job :job-id "job-a" :status :completed
+                        :completed-at #inst "2026-05-30T10:01:00.000Z"
+                        :completed-seq 2 :job-seq 1)
+          result (project [base-run] [lower higher])]
+      (is (= :ok (:status result)))
+      (is (= "job-a" (get-in result [:runs 0 :job-id])))))
+  (testing "job-seq breaks missing completion marker ties"
+    (let [lower (assoc base-job :job-id "job-a" :status :failed :job-seq 1)
+          higher (assoc base-job :job-id "job-b" :status :completed :job-seq 2)
+          result (project [base-run] [lower higher])]
+      (is (= :ok (:status result)))
+      (is (= "job-b" (get-in result [:runs 0 :job-id])))))
+  (testing "job-id breaks final ties lexicographically"
+    (let [lower (assoc base-job :job-id "job-a" :status :failed)
+          higher (assoc base-job :job-id "job-b" :status :completed)
+          result (project [base-run] [lower higher])]
+      (is (= :ok (:status result)))
+      (is (= "job-b" (get-in result [:runs 0 :job-id]))))))
+
+(deftest final-row-ordering-tie-breakers-are-deterministic-test
+  ;; Final rows sort by started-at, then job-seq, job-id, and canonical run-id.
+  (testing "started-at orders rows newest first"
+    (let [run-2 (assoc base-run :run-id "run-2")
+          job-2 (assoc base-job :job-id "job-a" :workflow-id "run-2"
+                       :started-at #inst "2026-05-30T10:02:00.000Z")
+          result (project [base-run run-2] [base-job job-2])]
+      (is (= :ok (:status result)))
+      (is (= ["run-2" "run-1"] (mapv :run-id (:runs result))))))
+  (testing "job-seq breaks missing started-at ties"
+    (let [run-2 (assoc base-run :run-id "run-2")
+          job-1 (assoc base-job :started-at nil :job-seq 1)
+          job-2 (assoc base-job :job-id "job-a" :workflow-id "run-2"
+                       :started-at nil :job-seq 2)
+          result (project [base-run run-2] [job-1 job-2])]
+      (is (= :ok (:status result)))
+      (is (= ["run-2" "run-1"] (mapv :run-id (:runs result))))))
+  (testing "job-id breaks ordering ties"
+    (let [run-2 (assoc base-run :run-id "run-2")
+          job-1 (assoc base-job :started-at nil :job-seq nil :job-id "job-a")
+          job-2 (assoc base-job :workflow-id "run-2" :started-at nil :job-seq nil :job-id "job-b")
+          result (project [base-run run-2] [job-1 job-2])]
+      (is (= :ok (:status result)))
+      (is (= ["run-2" "run-1"] (mapv :run-id (:runs result))))))
+  (testing "run-id breaks final ordering ties"
+    (let [run-2 (assoc base-run :run-id "run-2")
+          job-1 (assoc base-job :started-at nil :job-seq nil :job-id nil)
+          job-2 (assoc base-job :workflow-id "run-2" :started-at nil :job-seq nil :job-id nil)
+          result (project [base-run run-2] [job-1 job-2])]
+      (is (= :ok (:status result)))
+      (is (= ["run-2" "run-1"] (mapv :run-id (:runs result)))))))
+
 (deftest delegate-remove-terminalizes-active-background-job-before-canonical-removal-test
   ;; Removing an active listed run resolves the delegate background job before
   ;; deleting the canonical run, preventing later list corruption.
