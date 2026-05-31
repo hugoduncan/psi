@@ -137,6 +137,18 @@ Timed-out delegate background jobs are a delegate-tool retention state, not a ca
 
 A retained `:timed-out` background job pointing at a missing canonical workflow run should be hidden like other terminal retained jobs whose canonical run has been removed; it should not create a synthetic `:timed-out` workflow run.
 
+When canonical workflow execution stops because the workflow is `:blocked`, the delegate wrapper/background job should be marked terminal `:completed`, not `:failed`, `:cancelled`, or a synthetic `:blocked` background-job status. The wrapper job completed its attempt successfully by driving the canonical workflow to a valid pause point; the canonical workflow run remains the authoritative source of the `:blocked` state and of `continue` eligibility.
+
+For a blocked run, `delegate list` should therefore display both layers explicitly:
+
+- canonical workflow status remains `:blocked` and is the primary run status used for management decisions;
+- delegate/background status is `:completed` (or equivalent text such as `delegate attempt completed`) for the attempt that reached the blocked pause;
+- the listed run is continuable because canonical `:blocked` is supported by `delegate continue`;
+- the listed run is removable while the canonical run exists;
+- the background status must not be interpreted as canonical workflow completion, and must not hide the run while the canonical blocked run remains retained.
+
+This mapping applies only to the delegate/background wrapper status. It does not change the canonical workflow status model, does not add `:blocked` to the background-job terminal status set, and does not make blocked workflow runs terminal in the canonical workflow registry.
+
 
 ## Delegate background-job identity for attempts and continuations
 
