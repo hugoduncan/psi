@@ -242,8 +242,8 @@
    :message message
    :details details})
 
-(defn- query-background-jobs-for-list
-  []
+(defn- query-background-jobs
+  [action-name]
   (if-let [qf (query-fn)]
     (try
       (let [result (qf [:psi.agent-session/background-jobs])]
@@ -251,16 +251,20 @@
           {:status :ok
            :jobs (:psi.agent-session/background-jobs result)}
           (background-job-query-error
-           "delegate list could not read the background-job visibility surface"
+           (str action-name " could not read the background-job visibility surface")
            {:query-result result})))
       (catch Exception e
         (background-job-query-error
-         "delegate list background-job query failed"
+         (str action-name " background-job query failed")
          {:exception-message (ex-message e)
           :exception-data (ex-data e)})))
     (background-job-query-error
-     "delegate list requires a background-job query surface"
+     (str action-name " requires a background-job query surface")
      {:query :psi.agent-session/background-jobs})))
+
+(defn- query-background-jobs-for-list
+  []
+  (query-background-jobs "delegate list"))
 
 (defn- delegate-list
   "Handle action=list: list available workflows and visible delegate runs."
@@ -399,23 +403,68 @@
           :else
           {:error (str "Run '" run-id "' is not stopped; current status is " (name (or status :unknown)))})))))
 
+(defn- active-delegate-background-jobs
+  [session-id run-id jobs]
+  (->> jobs
+       (map delegate-list-projection/normalize-query-job)
+       (filter #(and (= (str session-id) (:thread-id %))
+                     (= "delegate" (:tool-name %))
+                     (= :workflow (:job-kind %))
+                     (= delegate-list-projection/workflow-provenance-id (:workflow-ext-path %))
+                     (= run-id (:workflow-id %))
+                     (contains? #{:running :pending-cancel} (:status %))))
+       vec))
+
+(defn- terminalize-active-delegate-background-jobs!
+  [jobs]
+  (try
+    (doseq [job jobs]
+      (mark-background-job-terminal!
+       (:job-id job)
+       :cancelled
+       {:workflow-id (:workflow-id job)
+        :status :cancelled
+        :delegate-status :cancelled
+        :reason :delegate-remove}
+       {:suppress-terminal-message? true}))
+    {:status :ok}
+    (catch Exception e
+      {:status :error
+       :message "delegate remove could not clean up active delegate background jobs"
+       :details {:exception-message (ex-message e)
+                 :exception-data (ex-data e)
+                 :job-ids (mapv :job-id jobs)}})))
+
+(defn- cleanup-active-delegate-background-jobs-before-remove!
+  [session-id run-id]
+  (let [jobs-result (query-background-jobs "delegate remove")]
+    (if (= :error (:status jobs-result))
+      jobs-result
+      (terminalize-active-delegate-background-jobs!
+       (active-delegate-background-jobs session-id run-id (:jobs jobs-result))))))
+
 (defn- delegate-remove
   "Handle action=remove: remove a run by id.
 
-   Removal clears the canonical workflow run. Delegate projection then derives
-   disappearance from canonical workflow + non-terminal background-job state,
-   so terminal background-job history does not keep removed runs visible here."
+   Removal clears the canonical workflow run only after any same-session active
+   delegate background jobs for the target have been resolved to terminal
+   history, so later list calls cannot observe non-terminal missing-canonical
+   corruption."
   [{:keys [id]}]
   (let [run-id (some-> id str str/trim not-empty)]
     (if (nil? run-id)
       {:error "id is required for remove"}
-      (let [result (mutate! 'psi.workflow/remove-run {:run-id run-id})]
-        (if (:psi.workflow/error result)
-          {:error (:psi.workflow/error result)}
-          (do
-            (swap! inflight-runs dissoc run-id)
-            (refresh-widgets!)
-            {:ok true :run-id run-id}))))))
+      (let [session-id (current-session-id)
+            cleanup-result (cleanup-active-delegate-background-jobs-before-remove! session-id run-id)]
+        (if (= :error (:status cleanup-result))
+          {:error (:message cleanup-result)}
+          (let [result (mutate! 'psi.workflow/remove-run {:run-id run-id})]
+            (if (:psi.workflow/error result)
+              {:error (:psi.workflow/error result)}
+              (do
+                (swap! inflight-runs dissoc run-id)
+                (refresh-widgets!)
+                {:ok true :run-id run-id}))))))))
 
 (defn- execute-delegate-tool
   "Main delegate tool execution dispatcher.

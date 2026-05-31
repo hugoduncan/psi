@@ -1,7 +1,10 @@
 (ns psi.agent-session.workflow-delegate-list-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [psi.agent-session.workflow.delegate-list :as delegate-list]))
+   [psi.agent-session.background-jobs :as background-jobs]
+   [psi.agent-session.workflow.core :as workflow-core]
+   [psi.agent-session.workflow.delegate-list :as delegate-list]
+   [psi.agent-session.workflow.runtime-state :as runtime-state]))
 
 (def base-run
   {:run-id "run-1"
@@ -170,3 +173,94 @@
           result (project [run-2 base-run] [base-job job-2])]
       (is (= :ok (:status result)))
       (is (= ["run-2" "run-1"] (mapv :run-id (:runs result)))))))
+
+(deftest delegate-remove-terminalizes-active-background-job-before-canonical-removal-test
+  ;; Removing an active listed run resolves the delegate background job before
+  ;; deleting the canonical run, preventing later list corruption.
+  (testing "active delegate background jobs become terminal before run removal"
+    (let [store (-> (background-jobs/empty-state)
+                    (background-jobs/start-background-job
+                     {:tool-call-id "delegate/run-1/attempt-1"
+                      :thread-id "session-1"
+                      :tool-name "delegate"
+                      :job-id "job-1"
+                      :job-kind :workflow
+                      :workflow-ext-path "built-in:workflow"
+                      :workflow-id "run-1"})
+                    :state)
+          state* (atom {:background-jobs {:store store}})
+          removed* (atom false)
+          original-state @runtime-state/state
+          query-fn (fn [_]
+                     {:psi.agent-session/background-jobs
+                      (mapv background-jobs/job->eql
+                            (vals (get-in @state* [:background-jobs :store :jobs-by-id])))})
+          mutate-fn (fn [op args]
+                      (case op
+                        psi.extension/mark-background-job-terminal
+                        (let [state' (background-jobs/mark-terminal
+                                      (get-in @state* [:background-jobs :store])
+                                      {:job-id (:job-id args)
+                                       :outcome (:outcome args)
+                                       :payload (:payload args)
+                                       :suppress-terminal-message? (:suppress-terminal-message? args)})]
+                          (swap! state* assoc-in [:background-jobs :store] state')
+                          {:psi.background-job/job-id (:job-id args)
+                           :psi.background-job/status (:outcome args)})
+
+                        psi.workflow/remove-run
+                        (do
+                          (reset! removed* true)
+                          {:psi.workflow/removed? true
+                           :psi.workflow/run-id (:run-id args)})))]
+      (try
+        (reset! runtime-state/state {:current-session-id "session-1"
+                                     :query-fn query-fn
+                                     :mutate-fn mutate-fn})
+        (let [result (#'workflow-core/delegate-remove {:id "run-1"})
+              job (background-jobs/get-job-in (get-in @state* [:background-jobs :store]) "job-1")]
+          (is (= {:ok true :run-id "run-1"} result))
+          (is (true? @removed*))
+          (is (= :cancelled (:status job)))
+          (is (= :delegate-remove (get-in job [:terminal-payload :reason]))))
+        (finally
+          (reset! runtime-state/state original-state))))))
+
+(deftest delegate-remove-stops-before-canonical-removal-when-background-cleanup-fails-test
+  ;; If active background cleanup fails, canonical removal is skipped so the run
+  ;; remains visible/manageable rather than becoming list corruption.
+  (testing "cleanup failure prevents canonical workflow removal"
+    (let [store (-> (background-jobs/empty-state)
+                    (background-jobs/start-background-job
+                     {:tool-call-id "delegate/run-1/attempt-1"
+                      :thread-id "session-1"
+                      :tool-name "delegate"
+                      :job-id "job-1"
+                      :job-kind :workflow
+                      :workflow-ext-path "built-in:workflow"
+                      :workflow-id "run-1"})
+                    :state)
+          removed* (atom false)
+          original-state @runtime-state/state
+          query-fn (fn [_]
+                     {:psi.agent-session/background-jobs
+                      (mapv background-jobs/job->eql (vals (:jobs-by-id store)))})
+          mutate-fn (fn [op _args]
+                      (case op
+                        psi.extension/mark-background-job-terminal
+                        (throw (ex-info "boom" {:op op}))
+
+                        psi.workflow/remove-run
+                        (do
+                          (reset! removed* true)
+                          {:psi.workflow/removed? true})))]
+      (try
+        (reset! runtime-state/state {:current-session-id "session-1"
+                                     :query-fn query-fn
+                                     :mutate-fn mutate-fn})
+        (let [result (#'workflow-core/delegate-remove {:id "run-1"})]
+          (is (= {:error "delegate remove could not clean up active delegate background jobs"}
+                 result))
+          (is (false? @removed*)))
+        (finally
+          (reset! runtime-state/state original-state))))))

@@ -45,11 +45,11 @@
 
 ## Slice 5 — Make remove cleanup coherent
 
-- [ ] Identify how `delegate remove` can find same-session delegate background jobs for the target canonical run before removal.
-- [ ] Update `delegate remove` for active/non-terminal listed runs to cancel, remove, mark terminal, or otherwise hide matching background jobs before/with canonical workflow run deletion.
-- [ ] Make `delegate remove` fail with an actionable tool error and leave the canonical run intact if active background-job cleanup cannot be completed.
-- [ ] Add focused coverage that removing an active listed run does not leave a later `delegate list` reporting a non-terminal missing-canonical inconsistency.
-- [ ] Add focused coverage that retained terminal background history for a removed canonical run is hidden after successful remove.
+- [x] Identify how `delegate remove` can find same-session delegate background jobs for the target canonical run before removal.
+- [x] Update `delegate remove` for active/non-terminal listed runs to cancel, remove, mark terminal, or otherwise hide matching background jobs before/with canonical workflow run deletion.
+- [x] Make `delegate remove` fail with an actionable tool error and leave the canonical run intact if active background-job cleanup cannot be completed.
+- [x] Add focused coverage that removing an active listed run does not leave a later `delegate list` reporting a non-terminal missing-canonical inconsistency.
+- [x] Add focused coverage that retained terminal background history for a removed canonical run is hidden after successful remove.
 
 ## Slice 6 — Regression and boundary coverage
 
