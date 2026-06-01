@@ -231,12 +231,24 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Slice 8 — Projections
 
-- [ ] Audit projection coverage (`scheduler_resolvers_test.clj`,
+- [x] Audit projection coverage (`scheduler_resolvers_test.clj`,
       `scheduler_background_jobs_test.clj`, psi-tool summary).
-- [ ] Ensure EQL `:psi.scheduler/*` attrs, psi-tool summary, and background-job
+      Done: resolver test covered `:pending` only with a subset of attrs;
+      background-jobs covered pending+queued projection + cancel routing; the
+      rich attrs (`created-session-id`/`delivery-phase`/`error-summary`/
+      `session-config-summary`) across `:delivered`/`:cancelled`/`:failed` were
+      uncovered.
+- [x] Ensure EQL `:psi.scheduler/*` attrs, psi-tool summary, and background-job
       projection stay coherent across statuses
       (`:pending`/`:queued`/`:delivered`/`:cancelled`/`:failed`). Add if missing.
-- [ ] Record projections finding citing covering deftests.
+      Done: added `scheduler-resolver-projects-rich-attrs-across-statuses` —
+      seeds `:delivered`/`:cancelled` + a `:failed` session-kind and asserts the
+      full `:psi.scheduler/*` attr set (incl. created-session-id, delivery-phase,
+      error-summary, session-config-summary) projects coherently. psi-tool
+      summary projection is exercised by Slice 5's list/create tests
+      (`:psi-tool/scheduler :schedule`/`:schedules`).
+- [x] Record projections finding citing covering deftests.
+      Done: 3 entries recorded (`verified-correct`).
 
 ## Slice 9 — Defect handling (conditional)
 

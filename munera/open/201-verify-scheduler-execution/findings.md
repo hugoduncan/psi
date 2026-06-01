@@ -103,3 +103,6 @@ Baseline `bb test` (scheduler subset, 2026-06-01): `35 tests, 338 assertions, 0 
 
 | status | summary | covering test | repro / task-ref |
 | ------ | ------- | ------------- | ---------------- |
+| verified-correct | EQL `:psi.scheduler/*` root + detail resolvers project `:pending` schedule attrs (id/kind/label/status/origin + message/fire-at) coherently. | `scheduler-resolvers-test/scheduler-resolver` | — |
+| verified-correct | EQL `:psi.scheduler/*` project the **rich attrs across statuses** — `:delivered`/`:cancelled` (status+kind+origin) and a `:failed` session-kind exposing `:created-session-id`/`:delivery-phase`/`:error-summary`/`:session-config-summary` coherent with underlying state. | `scheduler-resolvers-test/scheduler-resolver-projects-rich-attrs-across-statuses` (new) | — |
+| verified-correct | Background-job projection: pending+queued message/session schedules → `:scheduled-prompt`/`:scheduled-session` jobs; scheduler-projected job cancel routes to `:scheduler/cancel`. | `scheduler-background-jobs-test/scheduler-background-job-projection`, `scheduler-cancel-job-test/session-cancel-job-routes-scheduler-projection-to-scheduler-cancel` | — |

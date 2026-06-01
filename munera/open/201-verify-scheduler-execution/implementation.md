@@ -388,3 +388,22 @@ dedicated test. Filled:
 
 `scheduler_test` + `scheduler_handlers_test`: 21 tests / 103 assertions green.
 clj-kondo clean.
+
+## Slice 8 execution — Projections (2026-06-01)
+
+Audit: `scheduler-resolver` covered `:pending` + a subset of attrs;
+`scheduler-background-job-projection` covered pending+queued projection (message
++session) and cancel routing. Gap: the rich attrs across terminal statuses.
+
+Added `scheduler-resolver-projects-rich-attrs-across-statuses`: seeds the
+scheduler state directly with `:delivered`/`:cancelled` message schedules and a
+`:failed` session-kind carrying `:created-session-id` / `:delivery-phase
+:prompt-submit` / `:error-summary {:message "boom" …}` /
+`:session-config-summary`, then queries the full `:psi.scheduler/*` attr set and
+asserts each projects coherently with the underlying state. Confirms the
+runtime exposes the documented introspection attrs across all statuses.
+
+psi-tool summary projection (`:psi-tool/scheduler :schedule`/`:schedules`) is
+exercised by Slice 5's create/list/cancel tests. `scheduler_resolvers_test` +
+`scheduler_background_jobs_test` + `scheduler_cancel_job_test`: 4 tests / 27
+assertions green. clj-kondo clean.
