@@ -285,28 +285,48 @@
      :override          override
      :results           results}))
 
+(defn tool-call-event
+  "Build the canonical `tool_call` bus-event payload.
+   Single source of the cross-path payload shape — used by both
+   `dispatch-tool-call-in` (plan path) and the session
+   `emit-tool-lifecycle!` bridge (interactive/batch path)."
+  [tool-name tool-call-id args]
+  {:type         "tool_call"
+   :tool-name    tool-name
+   :tool-call-id tool-call-id
+   :input        args})
+
+(defn tool-result-event
+  "Build the canonical `tool_result` bus-event payload.
+   Single source of the cross-path payload shape and value semantics —
+   used by both `dispatch-tool-result-in` (plan path) and the session
+   `emit-tool-lifecycle!` bridge (interactive/batch path). Coerces
+   `:content` to normalized content-blocks and `:is-error` to a strict
+   boolean so both paths deliver an identical contract."
+  [tool-name tool-call-id args content details is-error?]
+  {:type         "tool_result"
+   :tool-name    tool-name
+   :tool-call-id tool-call-id
+   :input        args
+   :content      (tool-runtime/normalize-tool-content content)
+   :details      details
+   :is-error     (boolean is-error?)})
+
 (defn dispatch-tool-call-in
   "Dispatch a tool_call event. Returns {:block true :reason s} or nil."
   [reg tool-name tool-call-id args]
   (let [{:keys [results]} (dispatch-in reg "tool_call"
-                                       {:type         "tool_call"
-                                        :tool-name    tool-name
-                                        :tool-call-id tool-call-id
-                                        :input        args})]
+                                       (tool-call-event tool-name tool-call-id args))]
     (first (filter :block results))))
 
 (defn dispatch-tool-result-in
   "Dispatch a tool_result event. Returns modified result map or nil."
   [reg tool-name tool-call-id args result is-error?]
   (let [{:keys [results]} (dispatch-in reg "tool_result"
-                                       {:type         "tool_result"
-                                        :tool-name    tool-name
-                                        :tool-call-id tool-call-id
-                                        :input        args
-                                        :content      (tool-runtime/normalize-tool-content
-                                                       (:content result))
-                                        :details      (:details result)
-                                        :is-error     (boolean is-error?)})]
+                                       (tool-result-event tool-name tool-call-id args
+                                                          (:content result)
+                                                          (:details result)
+                                                          is-error?))]
     (first (filter #(and (map? %)
                          (or (contains? % :content) (contains? % :details)
                              (contains? % :is-error)))

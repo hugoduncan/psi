@@ -472,6 +472,31 @@
                                      {:content "boom"} "some-error")
         (is (true? (:is-error @payload)))))))
 
+(deftest tool-event-payload-constructors-test
+  (testing "tool-call-event builds the canonical tool_call payload shape"
+    (is (= {:type         "tool_call"
+            :tool-name    "read"
+            :tool-call-id "call-1"
+            :input        {"path" "x"}}
+           (ext/tool-call-event "read" "call-1" {"path" "x"}))))
+  (testing "tool-result-event builds the canonical tool_result payload shape"
+    (is (= {:type         "tool_result"
+            :tool-name    "read"
+            :tool-call-id "call-1"
+            :input        {"path" "x"}
+            :content      [{:type :text :text "raw string"}]
+            :details      {:k :v}
+            :is-error     false}
+           (ext/tool-result-event "read" "call-1" {"path" "x"}
+                                  "raw string" {:k :v} nil))
+        "string content normalized to blocks; nil is-error? coerced to strict false")
+    (is (true? (:is-error (ext/tool-result-event "read" "c" {} "boom" nil "oops")))
+        "non-boolean is-error? coerced to strict true")
+    (is (= [{:type :text :text "already"}]
+           (:content (ext/tool-result-event "read" "c" {}
+                                            [{:type :text :text "already"}] nil false)))
+        "already-normalized content (interactive bridge) is idempotent through the builder")))
+
 ;; ── Introspection: handler event names ──────────────────────────────────────
 
 (deftest handler-event-names-test

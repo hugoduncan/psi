@@ -21,23 +21,25 @@
                       :session/tool-lifecycle-event
                       {:session-id session-id :entry lifecycle-event}
                       {:origin :core})
+  ;; Bridge interactive/batch lifecycle events onto the same extension bus
+  ;; contract as the plan path, via the canonical payload constructors in
+  ;; `extensions`. The bridge deliberately discards the dispatch return value
+  ;; ({:block true}/override) — interactive-path non-enforcement (documented).
   (when-let [reg (:extension-registry ctx)]
     (case (:event-kind lifecycle-event)
       :tool-start
       (ext/dispatch-in reg "tool_call"
-                       {:type         "tool_call"
-                        :tool-name    (:tool-name lifecycle-event)
-                        :tool-call-id (:tool-call-id lifecycle-event)
-                        :input        (:parsed-args lifecycle-event)})
+                       (ext/tool-call-event (:tool-name lifecycle-event)
+                                            (:tool-call-id lifecycle-event)
+                                            (:parsed-args lifecycle-event)))
       :tool-result
       (ext/dispatch-in reg "tool_result"
-                       {:type         "tool_result"
-                        :tool-name    (:tool-name lifecycle-event)
-                        :tool-call-id (:tool-call-id lifecycle-event)
-                        :input        (:parsed-args lifecycle-event)
-                        :content      (:content lifecycle-event)
-                        :details      (:details lifecycle-event)
-                        :is-error     (boolean (:is-error lifecycle-event))})
+                       (ext/tool-result-event (:tool-name lifecycle-event)
+                                              (:tool-call-id lifecycle-event)
+                                              (:parsed-args lifecycle-event)
+                                              (:content lifecycle-event)
+                                              (:details lifecycle-event)
+                                              (:is-error lifecycle-event)))
       nil))
   lifecycle-event)
 

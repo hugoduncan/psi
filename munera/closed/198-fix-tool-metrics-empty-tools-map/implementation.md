@@ -762,3 +762,40 @@ single canonical payload constructor — the bridge then deliberately discards t
 bridge; (c) declare the duplication acceptable with a contract note + a
 cross-path payload-parity test as the guard. Recommend (a) or (b) for
 `addition > modification` and single-source contract. Recorded as a follow-up.
+
+---
+
+## Bus-event payload single-sourcing — RESOLVED (resolution b)
+
+Chose (b) shared-builder over (a) route-through-`dispatch-tool-*-in`: the bridge
+needs the *payload*, not the dispatch-return semantics (it discards the
+`{:block true}`/override). A pure builder is the smaller, more orthogonal seam —
+`xor(computation, flow_control)`: builders compute payloads, the two dispatch
+sites own the dispatch/return flow.
+
+Changes:
+- `extensions.clj`: added `tool-call-event [tool-name tool-call-id args]` and
+  `tool-result-event [tool-name tool-call-id args content details is-error?]`.
+  `tool-result-event` owns the two value coercions (`:content` →
+  `normalize-tool-content`, `:is-error` → strict boolean), so the three prior
+  per-field alignments are now enforced in one place.
+- `extensions.clj`: `dispatch-tool-call-in` / `dispatch-tool-result-in` now
+  build their payload via the new constructors.
+- `tool_runtime_adapter.clj`: `emit-tool-lifecycle!` bridge branches now build
+  payloads via `ext/tool-call-event` / `ext/tool-result-event` (bridge still
+  discards the `dispatch-in` return — interactive-path non-enforcement,
+  comment added).
+- `extensions_test.clj`: added `tool-event-payload-constructors-test` pinning
+  the canonical shape + content-normalize idempotence (already-normalized
+  blocks pass through unchanged, matching the interactive bridge) + is-error
+  coercion. This is the cross-path guard: any divergence reopening would have
+  to change the single builder, which this test pins.
+
+The cross-path payload shape (and its value semantics) is now defined once.
+Adding a future field to one builder propagates to both paths by construction —
+the divergence class is structurally closed, not defended per-field.
+
+Verify: `clojure -M:test --focus psi.agent-session.extensions-test --focus
+psi.agent-session.tool-execution-test --focus psi.tool-runtime.core-test` →
+45 tests, 195 assertions, 0 failures. `clj-kondo` clean on all three changed
+files (0 errors, 0 warnings).

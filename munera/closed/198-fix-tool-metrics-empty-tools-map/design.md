@@ -111,6 +111,24 @@ so a `tool_result` handler sees a strict boolean regardless of triggering path
 unifications and `one_way ¬ambiguity`; idempotent for the already-boolean
 interactive path).
 
+The `:input`/`:content`/`:is-error` value alignments above each closed one
+field of a per-field divergence class whose **structural** cause was payload
+shape duplicated across the two paths: `emit-tool-lifecycle!`
+(`tool_runtime_adapter.clj`) hand-built both bus payloads inline, duplicating
+the canonical `dispatch-tool-call-in`/`dispatch-tool-result-in` constructors
+(`extensions.clj`, also used by the plan path). Any field added to one
+constructor would reopen the divergence. The payload shape (and value
+coercions) is now single-sourced in two builders in `extensions.clj` —
+`tool-call-event` and `tool-result-event` — called by both the
+`dispatch-tool-*-in` constructors and the `emit-tool-lifecycle!` bridge
+(chosen resolution (b) shared-builder over route-through-`dispatch-tool-*-in`
+(a) — the bridge needs the payload, not the dispatch-return semantics, so a
+pure builder is the smaller, more orthogonal seam; `consistent(idioms)`/DRY,
+`robust → enforceable(invariants)` — the contract is now defined once). The
+bridge still discards the dispatch return value (interactive-path
+non-enforcement, documented). A `tool-event-payload-constructors-test` pins the
+canonical shape and the content/is-error coercions as the cross-path guard.
+
 ### `extension-registry` nil guard
 
 `context.clj` always sets `:extension-registry (ext/create-registry)` in
