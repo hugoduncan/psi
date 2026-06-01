@@ -609,3 +609,42 @@ Actionable findings (quality, not acceptance blockers):
    connected-instance state assertions already prove the connector result was
    used. Consider dropping the `calls*` atom (the state assertions suffice) or
    keep it only if endpoint-passthrough is the specific behaviour under test.
+
+2026-06-01 — Implementation-review follow-up execution (both items complete)
+
+Item 1 — shared test-support consolidation. Added
+`components/project-nrepl/test/psi/project_nrepl/test_support.clj`
+(`psi.project-nrepl.test-support`) exposing `make-ctx`, `install-instance!`,
+`temp-dir`, `delete-tree!`, `session-fn-with-id`. All test files now `:refer`
+the shared helpers and dropped their local copies:
+- eval_test: make-ctx, install-instance!
+- commands_test: install-instance!
+- ops_test: make-ctx, install-instance!, temp-dir, delete-tree!
+- attach_test: make-ctx, temp-dir, delete-tree!, session-fn-with-id
+- started_test: make-ctx, temp-dir, delete-tree!, session-fn-with-id (kept its
+  own `fake-process` proxy — single-use, not shared)
+- config_test: temp-dir, delete-tree! (kept its own config-file writers +
+  capture-stderr — single-use)
+- runtime_test: make-ctx (the 6th copy; folded in for completeness)
+
+`temp-dir` is uniformly `[prefix]`-taking (config_test already used that shape);
+per-file prefixes preserved, so the bare `(temp-dir)` call sites in
+ops/attach/started were given their existing prefix string. The shared
+`install-instance!` carries the single canonical seeded `:runtime-handle`
+`{:client-session … :session-id "nrepl-session-1"}` shape, eliminating the
+drift risk across the three former copies. `test_support.clj` does not match
+the `.*-test$` ns-pattern, so Kaocha will not collect it as a test namespace.
+
+Item 2 — client_test `@calls*` interaction assertion. Removed the `calls*` atom
+and the `(= [{:host … :port …}] @calls*)` assertion from
+`connect-instance-in-test`; the connector now ignores its `_endpoint` arg. The
+existing connected-instance state assertions (`:transport`, `:client`,
+`:client-session`, `:session-id` all sourced from the seeded connector result)
+already prove the connector was invoked and its result threaded into the
+managed instance, so the input-capture check was redundant and the only
+interaction-style assertion left in the in-scope files. Net assertion count
+drops by 1 (154 → 153).
+
+Verification: focused project-nrepl suite (eval/commands/ops/attach/started/
+config/client/runtime) — 25 tests, 153 assertions, 0 failures; targeted
+clj-kondo over `components/project-nrepl/test` (+ src) — 0 errors, 0 warnings.

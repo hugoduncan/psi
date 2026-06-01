@@ -3,11 +3,7 @@
    [clojure.test :refer [deftest is testing]]
    [psi.project-nrepl.client :as project-nrepl-client]
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
-   [psi.agent-session.test-support :as test-support]))
-
-(defn- make-ctx []
-  (let [[ctx _] (test-support/create-test-session {:persist? false})]
-    ctx))
+   [psi.project-nrepl.test-support :refer [make-ctx]]))
 
 (deftest connect-instance-in-test
   (testing "connect establishes single managed client session and capability flags"
@@ -17,9 +13,7 @@
           client-fn  (fn ([] nil) ([_] nil))
           session-fn (with-meta (fn [_] nil)
                        {(keyword "nrepl.core" "taking-until") {:session "nrepl-session-1"}})
-          calls*     (atom [])
-          connector  (fn [endpoint]
-                       (swap! calls* conj endpoint)
+          connector  (fn [_endpoint]
                        {:transport transport
                         :client client-fn
                         :client-session session-fn})]
@@ -40,8 +34,7 @@
         (is (= transport (get-in instance [:runtime-handle :transport])))
         (is (= client-fn (get-in instance [:runtime-handle :client])))
         (is (= session-fn (get-in instance [:runtime-handle :client-session])))
-        (is (= "nrepl-session-1" (get-in instance [:runtime-handle :session-id])))
-        (is (= [{:host "127.0.0.1" :port 7888}] @calls*))))))
+        (is (= "nrepl-session-1" (get-in instance [:runtime-handle :session-id])))))))
 
 (deftest disconnect-instance-in-test
   (testing "disconnect clears managed client session runtime fields"

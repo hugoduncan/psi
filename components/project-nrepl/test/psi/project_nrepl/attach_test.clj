@@ -4,23 +4,8 @@
    [clojure.test :refer [deftest is testing]]
    [psi.project-nrepl.attach :as project-nrepl-attach]
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
-   [psi.agent-session.test-support :as test-support]))
-
-(defn- make-ctx []
-  (let [[ctx _] (test-support/create-test-session {:persist? false})]
-    ctx))
-
-(defn- temp-dir []
-  (str (java.nio.file.Files/createTempDirectory
-        "psi-project-nrepl-attach-"
-        (make-array java.nio.file.attribute.FileAttribute 0))))
-
-(defn- delete-tree! [path]
-  (when path
-    (let [f (io/file path)]
-      (when (.exists f)
-        (doseq [x (reverse (file-seq f))]
-          (.delete x))))))
+   [psi.project-nrepl.test-support
+    :refer [delete-tree! make-ctx session-fn-with-id temp-dir]]))
 
 (deftest resolve-attach-endpoint-test
   (testing "explicit port wins and host defaults when omitted"
@@ -31,7 +16,7 @@
              (project-nrepl-attach/resolve-attach-endpoint worktree {:host "localhost" :port 7888})))))
 
   (testing "falls back to worktree-local .nrepl-port when explicit port absent"
-    (let [dir (temp-dir)]
+    (let [dir (temp-dir "psi-project-nrepl-attach-")]
       (try
         (spit (io/file dir ".nrepl-port") "7999\n")
         (is (= {:host "127.0.0.1" :port 7999 :port-source :dot-nrepl-port}
@@ -40,11 +25,6 @@
                (project-nrepl-attach/resolve-attach-endpoint dir {:host "localhost"})))
         (finally
           (delete-tree! dir))))))
-
-(defn- session-fn-with-id
-  [session-id]
-  (with-meta (fn [_] nil)
-    {(keyword "nrepl.core" "taking-until") {:session session-id}}))
 
 (deftest attach-instance-in-test
   (testing "attach establishes attached instance and managed client session"

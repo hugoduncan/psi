@@ -2,25 +2,14 @@
   (:require
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
-   [psi.project-nrepl.config :as project-nrepl-config]))
+   [psi.project-nrepl.config :as project-nrepl-config]
+   [psi.project-nrepl.test-support :refer [delete-tree! temp-dir]]))
 
 (defn- capture-stderr [f]
   (let [w (java.io.StringWriter.)]
     (binding [*err* w]
       (f))
     (str w)))
-
-(defn- temp-dir [prefix]
-  (str (java.nio.file.Files/createTempDirectory
-        prefix
-        (make-array java.nio.file.attribute.FileAttribute 0))))
-
-(defn- delete-tree! [path]
-  (when path
-    (let [f (io/file path)]
-      (when (.exists f)
-        (doseq [x (reverse (file-seq f))]
-          (.delete x))))))
 
 (defn- write-user-config! [home-dir content]
   (let [f (io/file home-dir ".psi" "agent" "config.edn")]

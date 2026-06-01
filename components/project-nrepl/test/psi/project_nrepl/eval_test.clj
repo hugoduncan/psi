@@ -3,27 +3,8 @@
    [clojure.test :refer [deftest is testing]]
    [psi.project-nrepl.eval :as project-nrepl-eval]
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
-   [psi.agent-session.test-support :as test-support]))
-
-(defn- make-ctx []
-  (let [[ctx _] (test-support/create-test-session {:persist? false})]
-    ctx))
-
-(defn- install-instance!
-  [ctx worktree-path client-session]
-  (project-nrepl-runtime/ensure-instance-in!
-   ctx
-   {:worktree-path worktree-path
-    :acquisition-mode :attached
-    :endpoint {:host "127.0.0.1" :port 7888 :port-source :explicit}})
-  (project-nrepl-runtime/update-instance-in!
-   ctx worktree-path
-   #(assoc %
-           :lifecycle-state :ready
-           :readiness true
-           :active-session-id "nrepl-session-1"
-           :runtime-handle {:client-session client-session
-                            :session-id "nrepl-session-1"})))
+   [psi.project-nrepl.test-support
+    :refer [install-instance! make-ctx]]))
 
 (deftest eval-instance-in-test
   (testing "successful eval returns structured result and updates projection"

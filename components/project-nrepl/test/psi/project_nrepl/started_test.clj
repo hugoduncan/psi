@@ -4,16 +4,8 @@
    [clojure.test :refer [deftest is testing]]
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
    [psi.project-nrepl.started :as project-nrepl-started]
-   [psi.agent-session.test-support :as test-support]))
-
-(defn- make-ctx []
-  (let [[ctx _] (test-support/create-test-session {:persist? false})]
-    ctx))
-
-(defn- temp-dir []
-  (str (java.nio.file.Files/createTempDirectory
-        "psi-project-nrepl-started-"
-        (make-array java.nio.file.attribute.FileAttribute 0))))
+   [psi.project-nrepl.test-support
+    :refer [delete-tree! make-ctx session-fn-with-id temp-dir]]))
 
 (defn- fake-process
   [{:keys [alive? exit-code pid destroyed*]}]
@@ -34,16 +26,9 @@
     (getErrorStream [] nil)
     (getOutputStream [] nil)))
 
-(defn- delete-tree! [path]
-  (when path
-    (let [f (io/file path)]
-      (when (.exists f)
-        (doseq [x (reverse (file-seq f))]
-          (.delete x))))))
-
 (deftest wait-for-started-endpoint-test
   (testing "reads discovered endpoint once .nrepl-port appears"
-    (let [dir     (temp-dir)
+    (let [dir     (temp-dir "psi-project-nrepl-started-")
           process (fake-process {:alive? true :exit-code 0 :pid 1234})]
       (try
         (future
@@ -55,7 +40,7 @@
           (delete-tree! dir)))))
 
   (testing "fails when process exits before port discovery"
-    (let [dir     (temp-dir)
+    (let [dir     (temp-dir "psi-project-nrepl-started-")
           process (fake-process {:alive? false :exit-code 23 :pid 1234})]
       (try
         (is (thrown-with-msg?
@@ -65,15 +50,10 @@
         (finally
           (delete-tree! dir))))))
 
-(defn- session-fn-with-id
-  [session-id]
-  (with-meta (fn [_] nil)
-    {(keyword "nrepl.core" "taking-until") {:session session-id}}))
-
 (deftest start-instance-in-test
   (testing "started-mode acquisition launches command, discovers endpoint, and marks ready"
     (let [ctx          (make-ctx)
-          worktree     (temp-dir)
+          worktree     (temp-dir "psi-project-nrepl-started-")
           fake-proc    (fake-process {:alive? true :exit-code 0 :pid 4321})
           launcher     (fn [_worktree _command]
                          ;; file-backed readiness: write a real .nrepl-port in the
@@ -105,7 +85,7 @@
 
   (testing "startup failure is projected as failed state"
     (let [ctx      (make-ctx)
-          worktree (temp-dir)
+          worktree (temp-dir "psi-project-nrepl-started-")
           launcher (fn [_ _] (throw (ex-info "boom" {:phase :spawn})))]
       (try
         (is (thrown-with-msg?

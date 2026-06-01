@@ -1,50 +1,15 @@
 (ns psi.project-nrepl.ops-test
   (:require
-   [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
    [psi.project-nrepl.config]
-   [psi.project-nrepl.runtime :as project-nrepl-runtime]
    [psi.project-nrepl.ops :as project-nrepl-ops]
-   [psi.agent-session.test-support :as test-support]))
-
-(defn- make-ctx []
-  (let [[ctx _] (test-support/create-test-session {:persist? false})]
-    ctx))
-
-(defn- install-instance!
-  "Install a real managed attached instance at `worktree-path` with an in-memory
-   `[:runtime-handle :client-session]` fn (the eval_test pattern)."
-  [ctx worktree-path client-session]
-  (project-nrepl-runtime/ensure-instance-in!
-   ctx
-   {:worktree-path worktree-path
-    :acquisition-mode :attached
-    :endpoint {:host "127.0.0.1" :port 7888 :port-source :explicit}})
-  (project-nrepl-runtime/update-instance-in!
-   ctx worktree-path
-   #(assoc %
-           :lifecycle-state :ready
-           :readiness true
-           :active-session-id "nrepl-session-1"
-           :runtime-handle {:client-session client-session
-                            :session-id "nrepl-session-1"})))
-
-(defn- temp-dir []
-  (str (java.nio.file.Files/createTempDirectory
-        "psi-project-nrepl-ops-"
-        (make-array java.nio.file.attribute.FileAttribute 0))))
-
-(defn- delete-tree! [path]
-  (when path
-    (let [f (io/file path)]
-      (when (.exists f)
-        (doseq [x (reverse (file-seq f))]
-          (.delete x))))))
+   [psi.project-nrepl.test-support
+    :refer [delete-tree! install-instance! make-ctx temp-dir]]))
 
 (deftest start-test
   (testing "start returns structured missing-start-command result with actionable guidance"
     (let [ctx      (make-ctx)
-          worktree (temp-dir)]
+          worktree (temp-dir "psi-project-nrepl-ops-")]
       (try
         (let [result (project-nrepl-ops/start ctx worktree)]
           (is (= :missing-start-command (:status result)))

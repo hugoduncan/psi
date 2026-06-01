@@ -4,25 +4,8 @@
    [clojure.test :refer [deftest is testing]]
    [psi.project-nrepl.commands :as project-nrepl-commands]
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
+   [psi.project-nrepl.test-support :refer [install-instance!]]
    [psi.agent-session.test-support :as test-support]))
-
-(defn- install-instance!
-  "Install a real managed attached instance at `worktree-path` with an in-memory
-   `[:runtime-handle :client-session]` fn (the eval_test pattern)."
-  [ctx worktree-path client-session]
-  (project-nrepl-runtime/ensure-instance-in!
-   ctx
-   {:worktree-path worktree-path
-    :acquisition-mode :attached
-    :endpoint {:host "127.0.0.1" :port 7888 :port-source :explicit}})
-  (project-nrepl-runtime/update-instance-in!
-   ctx worktree-path
-   #(assoc %
-           :lifecycle-state :ready
-           :readiness true
-           :active-session-id "nrepl-session-1"
-           :runtime-handle {:client-session client-session
-                            :session-id "nrepl-session-1"})))
 
 (deftest format-project-nrepl-status-test
   (testing "status formatting shows absent instance"
