@@ -904,3 +904,27 @@ prior item and never promoted to an actionable step; promoting it now. The
 so the fix is to register `extensions/metrics/test` (and `extensions/metrics/src`)
 in the `:extensions` suite (and `:integration`), then verify the suite collects
 and passes the 20 metrics tests via `bb clojure:test:extensions`.
+
+## Resolved: metrics test suite wiring (this pass)
+
+Wired `extensions/metrics/test` into `tests.edn`:
+- `:extensions` suite — added `extensions/metrics/test` to `:test-paths` and
+  `extensions/metrics/src` to `:source-paths`.
+- `:integration` suite — added the same `:test-paths`/`:source-paths` entries
+  to match.
+
+The `:unit` suite already carried `extensions/metrics/src` (`c00f4feda`) for
+the e2e ns load; the extension's test directory belongs in `:extensions` (the
+extension-test home, run by `bb clojure:test:extensions`, which `bb
+clojure:test` depends on), so the metrics regression guards now run in CI.
+
+Verification:
+- `bb clojure:test:extensions` → **225 tests, 782 assertions, 0 failures**,
+  with all 20 `psi.metrics.extension-test` tests collected and passing
+  (including the task-198 `error-reason` truncation guards and cross-path
+  contract assertions).
+- `clj-kondo --lint tests.edn` → 0 errors, 0 warnings.
+
+No code/spec changes — pure test-collection wiring. The robustness gap
+(`robust → enforceable(invariants)`: authored guards now actually run) is
+closed.
