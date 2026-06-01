@@ -89,3 +89,10 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
 - [ ] Record a **separate** `implementation.md` strategy note for the `:process-launcher` seam
 - [ ] Record any remaining justified exception
 - [ ] Update `mementum/state.md` with task-108 completion state
+
+## Plan/steps ambiguity follow-ups (2026-06-01 review)
+
+- [ ] Slice 4: specify the concrete `:runtime-handle` seed placement on `attach-instance-in!` (new arity vs. key merged into the existing `attach-input` 3rd-positional map vs. a new opts map) so the seam-seed thread into `ensure-instance-in!` is deterministic; `start-instance-in!` already has an `opts` map and is unambiguous
+- [ ] Slice 9: state that the `commands_test.clj` operational tests must seed session-state so the dispatch `session-id` resolves (via `ss/session-worktree-path-in`) to the same worktree-path where the real managed instance is installed, or the dispatch instance lookup misses
+- [ ] Slices 9 & 10: specify what the in-memory `[:runtime-handle :client-session]` fn must return to drive the `:interrupted` path (responses whose `summarize-response` yields `:interrupted`, i.e. a `"interrupted"` status), since `eval_test.clj` provides only a `:success` eval template and no `:interrupted` eval template
+- [ ] Slice 7: replace "drive `.nrepl-port` appearance / readiness through state" with the concrete file-backed mechanism — `started_test.clj` must write a real `.nrepl-port` file in the temp worktree (consumed by `wait-for-started-endpoint!` / `read-dot-nrepl-port-safe`); readiness is file-backed, not runtime-handle-state-backed (also fix the matching wording in plan.md's started_test reshape bullet)

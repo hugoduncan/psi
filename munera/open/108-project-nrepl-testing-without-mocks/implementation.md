@@ -333,3 +333,44 @@ user.clj, and runtime.clj.
 
 No blocking reasons; both items completed at the design level. Production seam
 code + test reshaping remain for the build phase per steps.md.
+
+2026-06-01 — Plan/steps ambiguity review
+
+Reviewed plan.md + steps.md (not design) against the real source (`started.clj`,
+`attach.clj`, `client.clj`, `commands.clj`, `ops.clj`, `eval.clj`, `eval_test.clj`).
+Prior review notes all target design; this is the first plan/steps pass. Found
+four NEW actionable plan/steps ambiguities (added to steps.md as follow-up items):
+
+1. Slice 4 seed-param placement undetermined. Plan/steps Slice 4 says add an
+   optional `:runtime-handle` seam-seed to `attach-instance-in!` but not HOW it
+   attaches to its current `([ctx wt] [ctx wt attach-input])` arities — new arity?
+   merged into the existing `attach-input` 3rd-positional map? a new opts map?
+   Design's "passed alongside or within its opts" is not concretized in the
+   actionable step, so an implementer cannot deterministically place it.
+   (`start-instance-in!`'s 4th `opts` map already exists, so its seed source is
+   unambiguous; only `attach-instance-in!` is underspecified.)
+
+2. Slice 9 omits session-state→worktree binding. `dispatch-project-nrepl-command`
+   derives worktree via `(ss/session-worktree-path-in ctx session-id)`, then looks
+   up the managed instance at that worktree. Slice 9 says "install a real managed
+   instance" + "dispatch real `/project-repl eval`/`interrupt`" but never states
+   the test must seed session-state so the dispatch `session-id` maps to the
+   instance's worktree-path. Without that mapping the instance lookup misses and
+   the command never reaches real `ops → eval`.
+
+3. Slices 9 & 10 leave the `:interrupted` seam-fn response shape unspecified.
+   eval-op/eval-instance-in! derive `:interrupted` from `summarize-response` over
+   the `client-session` fn's returned nREPL responses (status `"interrupted"`),
+   NOT from a canned op result. `eval_test.clj` has a `:success` eval template but
+   NO `:interrupted` eval template (its interrupt test exercises
+   `interrupt-instance-in!`, a different fn). Steps say "assert ... interrupted
+   contract through real `eval-instance-in!`" without stating what the in-memory
+   `client-session` fn must return to yield `:interrupted`.
+
+4. Slice 7 "drive `.nrepl-port` appearance / readiness through state" is
+   misleading. `wait-for-started-endpoint!` reads a REAL on-disk `.nrepl-port`
+   file (`read-dot-nrepl-port-safe`) in the temp worktree; readiness is file-backed,
+   not runtime-handle-state-backed. "Through state" conflates the seam runtime
+   state with the file mechanism and could lead an implementer to seed readiness
+   via runtime-handle instead of writing a real `.nrepl-port` file. Plan's
+   started_test reshape bullet carries the same wording.
