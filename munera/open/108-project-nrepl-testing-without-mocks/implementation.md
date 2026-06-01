@@ -868,3 +868,16 @@ One actionable behaviour-coverage gap (criterion 2):
    returning a metadata-less session-fn, assert the
    `did not expose a session id` `ExceptionInfo`) closes it with the existing
    seam mechanism — no new seam needed.
+
+## Test-review follow-up resolved (2026-06-01)
+
+The missing-session-id covering gap above is now closed.
+`client_test.clj` gained `connect-instance-in-missing-session-id-test`: seeds a
+`[:runtime-handle :nrepl-connector]` returning `:client-session (fn [_] nil)`
+(no `:nrepl.core/taking-until` metadata) through the existing connector-seed
+setup, then asserts `connect-instance-in!` throws `clojure.lang.ExceptionInfo`
+`#"did not expose a session id"` (`thrown-with-msg?`). State/throw assertion
+only — no interaction capture. Reused the existing `ensure-instance-in!` +
+`update-instance-in!` seed pattern; no new seam introduced. `client_test`:
+3 tests, 14 assertions, 0 failures (up from 2/12). Focused project-nrepl suite
+(8 ns) all green; `clj-kondo` 0/0.

@@ -35,6 +35,27 @@
         (is (= session-fn (get-in instance [:runtime-handle :client-session])))
         (is (= "nrepl-session-1" (get-in instance [:runtime-handle :session-id])))))))
 
+(deftest connect-instance-in-missing-session-id-test
+  (testing "connect throws when the client session exposes no session id"
+    (let [ctx        (make-ctx)
+          worktree   (System/getProperty "user.dir")
+          connector  (fn [_endpoint]
+                       {:transport {:transport :fake}
+                        :client (fn ([] nil) ([_] nil))
+                        :client-session (fn [_] nil)})]
+      (project-nrepl-runtime/ensure-instance-in!
+       ctx
+       {:worktree-path worktree
+        :acquisition-mode :attached
+        :endpoint {:host "127.0.0.1" :port 7888 :port-source :explicit}})
+      (project-nrepl-runtime/update-instance-in!
+       ctx worktree
+       #(assoc-in % [:runtime-handle :nrepl-connector] connector))
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"did not expose a session id"
+           (project-nrepl-client/connect-instance-in! ctx worktree))))))
+
 (deftest disconnect-instance-in-test
   (testing "disconnect clears managed client session runtime fields"
     (let [ctx      (make-ctx)

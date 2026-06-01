@@ -127,7 +127,7 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
 
 ## Test review follow-ups (2026-06-01, task-test-review)
 
-- [ ] Add a `client_test.clj` covering test for the missing-session-id throw in
+- [x] Add a `client_test.clj` covering test for the missing-session-id throw in
   `connect-instance-in!`. The `:nrepl-connector` seam was shaped so session-id
   derivation (and its throw-on-missing branch, `"… did not expose a session
   id"`) stays in `connect-instance-in!` — a design-retained behaviour now
@@ -137,4 +137,12 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
   bare `(fn [_] nil)`, not `session-fn-with-id`), invoke `connect-instance-in!`,
   and assert it throws `clojure.lang.ExceptionInfo` with message `#"did not
   expose a session id"`. No new seam needed; reuse the existing
-  `connect-instance-in-test` setup pattern. Keep tests green + lint clean.
+  `connect-instance-in-test` setup pattern. Keep tests green + lint clean. —
+  DONE: added `connect-instance-in-missing-session-id-test`. Seeds a
+  `[:runtime-handle :nrepl-connector]` returning `:client-session (fn [_] nil)`
+  (no `:nrepl.core/taking-until` metadata) and asserts `connect-instance-in!`
+  throws `clojure.lang.ExceptionInfo` `#"did not expose a session id"` via
+  `thrown-with-msg?`. Reused the existing `ensure-instance-in!` +
+  `update-instance-in!` connector-seed setup; state-only, no interaction
+  assertions. `client_test`: 3 tests, 14 assertions, 0 failures (up from 2/12).
+  Focused project-nrepl suite (8 ns) green; `clj-kondo` 0/0 on `client_test.clj`.
