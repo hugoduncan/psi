@@ -35,10 +35,14 @@
      {:api api* :state state :ops ops})))
 
 (defn- fire-event
-  "Fire all registered handlers for event-name with payload."
+  "Fire all registered handlers for event-name with payload, returning the
+   last handler's result. Use the return value when a test needs to assert on
+   a handler's result (e.g. the swallow-and-return-nil contract); most callers
+   discard it."
   [state event-name payload]
-  (doseq [h (get-in @state [:handlers event-name])]
-    (h payload)))
+  (reduce (fn [_ h] (h payload))
+          nil
+          (get-in @state [:handlers event-name])))
 
 ;;; init registration
 
@@ -186,7 +190,7 @@
                             :psi.agent-session/usage-cache-read 0
                             :psi.agent-session/usage-cache-write 0
                             :psi.agent-session/model-id "claude-3"})
-        {:keys [api state]} (make-api {:query-fn (fn [_q] {})})
+        {:keys [api state]} (make-api)
         api* (assoc api :query-session query-session-fn)]
     (ext/init api*)
     (fire-event state "session_turn_finished" {:session-id "s1" :turn-id "t1"})
@@ -211,7 +215,7 @@
                            (let [idx @call-count]
                              (swap! call-count inc)
                              (nth responses idx nil)))
-        {:keys [api state]} (make-api {:query-fn (fn [_q] {})})
+        {:keys [api state]} (make-api)
         api* (assoc api :query-session query-session-fn)]
     (ext/init api*)
     (fire-event state "session_turn_finished" {:session-id "s1" :turn-id "t1"})
@@ -228,12 +232,11 @@
   ;; design's swallow-and-return-nil acceptance criterion).
   (let [query-session-fn (fn [_session-id _eql]
                            (throw (ex-info "boom" {})))
-        {:keys [api state]} (make-api {:query-fn (fn [_q] {})})
+        {:keys [api state]} (make-api)
         api* (assoc api :query-session query-session-fn)]
     (ext/init api*)
-    (let [metrics-before (:metrics @ext/store)
-          handler        (first (get-in @state [:handlers "session_turn_finished"]))]
-      (is (nil? (handler {:session-id "s1" :turn-id "t1"}))
+    (let [metrics-before (:metrics @ext/store)]
+      (is (nil? (fire-event state "session_turn_finished" {:session-id "s1" :turn-id "t1"}))
           "handler returns nil even when the query throws")
       (is (= metrics-before (:metrics @ext/store))
           "metrics store is unchanged when token tracking is skipped"))))
@@ -246,7 +249,7 @@
                             :psi.agent-session/usage-cache-read 0
                             :psi.agent-session/usage-cache-write 0
                             :psi.agent-session/model-id nil})
-        {:keys [api state]} (make-api {:query-fn (fn [_q] {})})
+        {:keys [api state]} (make-api)
         api* (assoc api :query-session query-session-fn)]
     (ext/init api*)
     (fire-event state "session_turn_finished" {:session-id "s1" :turn-id "t1"})

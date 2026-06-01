@@ -61,7 +61,7 @@
 
 ## Test-shaper review follow-up (2026-06-01)
 
-- [ ] Remove the incidental dead `:query-fn` setup from the four turn-finished
+- [x] Remove the incidental dead `:query-fn` setup from the four turn-finished
       tests in `extensions/metrics/test/psi/metrics/extension_test.clj`: replace
       `(make-api {:query-fn (fn [_q] {})})` with `(make-api)` in
       `turn-finished-accumulates-token-delta-per-model-test`,
@@ -69,9 +69,14 @@
       `turn-finished-swallows-query-error-and-returns-nil-test`, and
       `turn-finished-uses-unknown-when-model-id-nil-test` (the `:query-session`
       `assoc` is the live seam; `:query-fn` is never exercised). Re-run
-      `bb clojure:test:extensions` + `clj-kondo` to confirm green.
-- [ ] Unify the handler-invocation idiom: add a `fire-event` variant (or extend
+      `bb clojure:test:extensions` + `clj-kondo` to confirm green. → all four
+      sites now `(make-api)`; suite green (228 tests, 788 assertions, 0
+      failures); `clj-kondo` clean (0/0).
+- [x] Unify the handler-invocation idiom: add a `fire-event` variant (or extend
       `fire-event`) that returns the last handler's result, and have
       `turn-finished-swallows-query-error-and-returns-nil-test` use it instead of
       the direct `(first (get-in @state [:handlers ...]))` reach-in, so the suite
-      has a single handler-invocation seam.
+      has a single handler-invocation seam. → extended `fire-event` to return the
+      last handler's result (via `reduce`); the catch-branch test now asserts on
+      `(fire-event state "session_turn_finished" …)` directly, dropping the
+      `(first (get-in @state [:handlers …]))` reach-in. Single invocation seam.

@@ -242,3 +242,32 @@ hiding intent. Left as observation, not a required follow-up.
 
 The logging-mechanism specifics (timbre `warn`, structured-`e` arg) remain
 correctly unasserted (would require interaction assertions / is `¬user_visible`).
+
+## Test-shaper follow-up execution (2026-06-01)
+
+Executed both test-shaper follow-up items in
+`extensions/metrics/test/psi/metrics/extension_test.clj`:
+
+- **Dead `:query-fn` removed (4 sites).** Replaced
+  `(make-api {:query-fn (fn [_q] {})})` with `(make-api)` in the four
+  turn-finished tests. Confirmed against `nullable_api.clj`: `:query-session` is
+  built from `query*` (the `:query-fn` override target), but each test
+  `(assoc api :query-session …)` replaces it wholesale, so `:query-fn` was never
+  on a live path — pure incidental noise. The `:query-session` `assoc` remains
+  the sole live injection seam.
+- **Single handler-invocation seam.** Extended `fire-event` to return the last
+  handler's result (switched the `doseq` to a `reduce` seeded with `nil`),
+  documenting that most callers discard the value. The catch-branch test
+  (`turn-finished-swallows-query-error-and-returns-nil-test`) now asserts on
+  `(fire-event state "session_turn_finished" …)` directly instead of reaching in
+  via `(first (get-in @state [:handlers …]))`. All handler invocations in the
+  suite now flow through `fire-event`. Behaviour of the existing discard-callers
+  is unchanged (they ignore the new return value).
+
+Verification (all green):
+
+- `bb clojure:test:extensions`: 228 tests, 788 assertions, 0 failures, 0 errors.
+- `clj-kondo --lint …extension_test.clj`: 0 errors, 0 warnings.
+- `clj-paren-repair` applied (balanced/formatted).
+
+No blocked items remain. Both test-shaper follow-up steps complete.
