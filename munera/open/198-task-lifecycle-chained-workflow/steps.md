@@ -23,18 +23,18 @@
 
 ## Slice 2 — Verification test
 
-- [ ] Add a `task-lifecycle-test` `deftest` to
+- [x] Add a `task-lifecycle-test` `deftest` to
       `components/workflow-loader/test/psi/workflow_loader/workflow_definitions_test.clj`
       using `load-edn-only "task-lifecycle.edn"`.
-- [ ] Assert `(empty? errors)` and `(contains? definitions "task-lifecycle")`.
-- [ ] Assert step count = 5 and `(mapv :name steps)` =
+- [x] Assert `(empty? errors)` and `(contains? definitions "task-lifecycle")`.
+- [x] Assert step count = 5 and `(mapv :name steps)` =
       `["review-task-design" "create-task-plan" "review-task-plan"
       "implement-task" "review-task-implementation"]`.
-- [ ] Assert `(mapv :type steps)` = `[:delegate :delegate :delegate :delegate
+- [x] Assert `(mapv :type steps)` = `[:delegate :delegate :delegate :delegate
       :delegate]`.
-- [ ] Assert `(mapv :target steps)` equals the same five names in order (the
+- [x] Assert `(mapv :target steps)` equals the same five names in order (the
       `:target` assertion is the addition beyond the sibling `*-test` deftests).
-- [ ] Run the workflow-loader test namespace and confirm `task-lifecycle-test`
+- [x] Run the workflow-loader test namespace and confirm `task-lifecycle-test`
       passes green.
 
 ## Slice 3 — CHANGELOG

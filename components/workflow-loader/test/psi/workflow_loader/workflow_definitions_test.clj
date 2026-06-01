@@ -430,3 +430,31 @@
               (is (contains? definitions "review-task-plan"))
               (is (contains? definitions "review-task-implementation"))
               (is (contains? definitions "review-implementation-in-worktree"))))))))))
+
+;;; ---------------------------------------------------------------------------
+;;; task-lifecycle
+
+(deftest task-lifecycle-test
+  (load-edn-only
+   "task-lifecycle.edn"
+   (fn [{:keys [definitions errors]}]
+     (testing "loads without error"
+       (is (empty? errors))
+       (is (contains? definitions "task-lifecycle")))
+     (let [steps (get-in definitions ["task-lifecycle" :steps])]
+       (testing "has 5 delegate steps with correct names, types, and targets"
+         (is (= 5 (count steps)))
+         (is (= ["review-task-design"
+                 "create-task-plan"
+                 "review-task-plan"
+                 "implement-task"
+                 "review-task-implementation"]
+                (mapv :name steps)))
+         (is (= [:delegate :delegate :delegate :delegate :delegate]
+                (mapv :type steps)))
+         (is (= ["review-task-design"
+                 "create-task-plan"
+                 "review-task-plan"
+                 "implement-task"
+                 "review-task-implementation"]
+                (mapv :target steps))))))))

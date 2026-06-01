@@ -303,6 +303,21 @@ Description uses literal `→` to match sibling convention (`gh-pr-refine.edn`),
 not a `\u2192` escape. `clj-paren-repair` reports Success: 1 / Failed: 0; file
 reads as valid EDN.
 
+## 2026-06-01 — Slice 2: verification test added (ψ)
+
+Added `task-lifecycle-test` `deftest` at the end of
+`components/workflow-loader/test/psi/workflow_loader/workflow_definitions_test.clj`,
+following the `review-task-implementation-test` `load-edn-only` pattern. Asserts
+`(empty? errors)`, `(contains? definitions "task-lifecycle")`, step count = 5,
+`(mapv :name steps)`, `(mapv :type steps)` (all `:delegate`), and — the
+addition beyond the sibling deftests — `(mapv :target steps)` equal to the five
+target names in order. Focused run (`--focus
+psi.workflow-loader.workflow-definitions-test/task-lifecycle-test`): 1 test, 6
+assertions, 0 failures. Full namespace: 10 tests, 110 assertions, 0 failures.
+Per design, `(empty? errors)` here only proves isolated parse/compile — not
+cross-workflow target resolution (the temp `with-workflow-dir` holds only
+`task-lifecycle.edn`); this matches the accepted design scope.
+
 ## 2026-06-01 — inconsistency follow-up execution pass 3 (ψ)
 
 Executed both pass-3 inconsistency-review follow-up items; design.md
