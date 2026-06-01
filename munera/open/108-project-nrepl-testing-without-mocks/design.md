@@ -21,9 +21,10 @@ A focused audit of `components/project-nrepl/test/psi/project_nrepl/` shows that
   - redefines `start-process!`
   - redefines `psi.project-nrepl.client/connect-instance-in!`
 - `commands_test.clj`
-  - redefines `psi.project-nrepl.config/resolve-config`
   - redefines `psi.project-nrepl.ops/eval-op`
   - redefines `psi.project-nrepl.ops/interrupt`
+  - (the missing-start-command test uses a real temp worktree, not a
+    `resolve-config` redef)
 - `ops_test.clj`
   - redefines `psi.project-nrepl.eval/eval-instance-in!` (success and interrupted
     contract proofs)
@@ -79,9 +80,14 @@ This task should leave the component extraction boundary from `107` intact. It i
 - `attach_test.clj`
   - stop redefining `connect-instance-in!`; instead exercise attach behavior through a nullable client/connect seam and assert on resulting instance state
 - `started_test.clj`
-  - stop redefining `start-process!` and `connect-instance-in!`; instead introduce or reuse a process-start wrapper and nullable connect seam so tests can drive startup behavior through visible state
+  - stop redefining `start-process!` and `connect-instance-in!`; instead seed
+    both the `:process-launcher` and `:nrepl-connector` seams (the latter because
+    `start-instance-in!` calls `connect-instance-in!` internally) so tests can
+    drive startup behavior through visible state. Requires the started-mode
+    `:runtime-handle` merge production change (see "Started-mode runtime-handle
+    merge")
 - `commands_test.clj`
-  - stop redefining `resolve-config`, `eval-op`, and `interrupt`; instead use real component behavior with temp config/runtime state plus the canonical `[:runtime-handle :client-session]` seam so command-layer operational routing is proven through real `ops`/`eval` behavior (see "Concrete target for `commands_test.clj` operational routing")
+  - stop redefining `eval-op` and `interrupt` (the only redefs present); instead use real component behavior with temp config/runtime state plus the canonical `[:runtime-handle :client-session]` seam so command-layer operational routing is proven through real `ops`/`eval` behavior (see "Concrete target for `commands_test.clj` operational routing")
 - `ops_test.clj`
   - stop redefining `psi.project-nrepl.eval/eval-instance-in!`; instead install a real managed instance with a deterministic in-memory `[:runtime-handle :client-session]` seam (the `eval_test.clj` pattern) and assert `eval-op`'s public success/interrupted contract through real `eval-instance-in!` behavior
 
@@ -150,10 +156,25 @@ Seam keys introduced or reused:
   `eval`/`interrupt` paths.
 - `[:runtime-handle :nrepl-connector]` — new; a single fn that performs the
   `connect → client → client-session` establishment for `connect-instance-in!`,
-  returning `{:transport t :client c :client-session s :session-id id}`. The
-  real default calls `nrepl.core/connect|client|client-session` (the inline
-  `requiring-resolve` block currently in `client.clj` becomes the default
-  implementation of this seam).
+  returning `{:transport t :client c :client-session s}`. The real default calls
+  `nrepl.core/connect|client|client-session`; concretely, the inline
+  `requiring-resolve` block currently in `client.clj` — up to and including
+  binding `transport`, `client-fn`, and `session-fn` — becomes the default
+  implementation of this seam.
+
+  Session-id derivation stays in `connect-instance-in!`, not in the seam
+  default. After invoking the connector, `connect-instance-in!` derives
+  `:session-id` from the returned `:client-session` fn's metadata (the existing
+  `(-> session-fn meta (get :nrepl.core/taking-until) :session)` lookup) and
+  retains the throw-on-missing-session-id behaviour. Rationale: session-id
+  derivation is interpretation of the returned session fn, not part of the
+  infrastructure boundary the seam wraps; keeping it in `connect-instance-in!`
+  lets a nullable connector return a session fn carrying deterministic
+  `:nrepl.core/taking-until` metadata (or lets the test seed it) without the
+  seam contract having to reproduce the throw. The connected-instance
+  `:runtime-handle` still ends up with `{:transport :client :client-session
+  :session-id}` exactly as today; only the `:session-id` element is computed by
+  `connect-instance-in!` from the connector's return rather than by the seam.
 - `[:runtime-handle :process-launcher]` — new; a single fn
   `(fn [worktree-path command-vector] -> Process-like)` for `start-instance-in!`.
   The real default is the current private `start-process!` (promoted to be the
@@ -165,6 +186,47 @@ This mechanism is required identically across `client_test.clj`,
 `started_test.clj`, and `attach_test.clj`; `attach_test.clj` drives the
 `:nrepl-connector` seam transitively through `attach-instance-in! → connect-instance-in!`
 rather than redefining `connect-instance-in!`.
+
+##### Seam seeding per test file
+
+- `client_test.clj` seeds `[:runtime-handle :nrepl-connector]` before
+  `connect-instance-in!`.
+- `attach_test.clj` seeds `[:runtime-handle :nrepl-connector]`; it is consumed
+  transitively via `attach-instance-in! → connect-instance-in!`.
+- `started_test.clj` seeds **both** `[:runtime-handle :process-launcher]` **and**
+  `[:runtime-handle :nrepl-connector]`. The launcher seam covers
+  `start-process!`; the connector seam is also required because
+  `start-instance-in!` calls `connect-instance-in!` internally, so dropping the
+  `connect-instance-in!` redef means the started-mode test must drive that inner
+  call through a seeded connector rather than a real socket.
+
+##### Started-mode runtime-handle merge (required production change)
+
+`start-instance-in!` currently **overwrites** `:runtime-handle` with
+`{:process … :pid … :started-at … :launch-id …}` immediately before calling
+`connect-instance-in!`. That overwrite would discard any seam fn seeded at
+acquisition time (`:process-launcher`, `:nrepl-connector`, `:client-session`),
+so the "seed at acquisition, resolve at call time, production call sites
+unchanged" mechanism cannot work for started-mode as written.
+
+Required production change: `start-instance-in!` MUST **merge** the
+process-handle keys into the existing `:runtime-handle` (`(update %
+:runtime-handle merge {:process … :pid … :started-at … :launch-id …})`) instead
+of replacing it, so seeded seam fns survive into the internal
+`connect-instance-in!` call. With this merge in place:
+
+- a started-mode test seeds `:process-launcher` and `:nrepl-connector` at
+  acquisition,
+- `start-instance-in!` resolves `:process-launcher` (real default = the promoted
+  `start-process!`), merges the process keys, and
+- the seeded `:nrepl-connector` is still present when `connect-instance-in!`
+  runs.
+
+This is the only production behavioural change required by the seam mechanism
+beyond promoting the two seam defaults; it is behaviour-preserving for real
+callers (who seed nothing, so the merge adds the same keys the overwrite would
+have set, and `:runtime-handle` was empty/`nil` before acquisition completes the
+process keys).
 
 Rationale for choosing runtime-state injection over a passed argument or options
 map: it is the only mechanism already present and proven in this component
@@ -201,6 +263,10 @@ Target properties:
   state via the `[:runtime-handle :process-launcher]` seed
 - started-mode tests can drive `.nrepl-port` appearance and readiness through
   state rather than var replacement
+- the started-mode path also seeds `[:runtime-handle :nrepl-connector]` (consumed
+  by the internal `connect-instance-in!` call) and depends on the started-mode
+  `:runtime-handle` merge production change so seeded seam fns survive acquisition
+  (see "Started-mode runtime-handle merge")
 
 #### config source seam
 
@@ -216,33 +282,51 @@ Avoid simply moving existing `with-redefs` one layer lower.
 
 Option 1 (real file-backed config) applies. The two `resolve-config` tests that
 currently redefine `read-user-config` and `read-project-preferences` are
-reshaped to drive `resolve-config` through real on-disk project config files in
-a temp worktree, exactly as the already-file-backed `read-project-preferences-test`
-does for the project layer.
+reshaped to drive `resolve-config` through real on-disk config files at **both**
+scopes — a real user config under a temp `user.home` and a real project config
+in a temp worktree — so the user-vs-project precedence `resolve-config` owns is
+proven through the real readers (see Decisions below), distinct from the
+project-internal shared/local merge proven by the already-file-backed
+`read-project-preferences-test`.
 
 Decisions:
 
-- The user-scope reader (`read-user-config`) reads `~/.psi/agent/config.edn`,
-  which a unit test must not depend on or mutate. For the merge-precedence proof,
-  the user layer is provided through real project config files only when the
-  precedence under test is system-vs-project; the user-vs-project precedence case
-  is covered by writing a real shared `project.edn` (lower precedence) and a real
-  local `project.local.edn` (higher precedence) in the temp worktree and asserting
-  `resolve-config` returns the deep-merged `:project-nrepl` map. This exercises
-  the same merge precedence the redef test asserted (project local overrides
-  shared) without patching readers.
+- The precedence `resolve-config` actually owns — and the precedence the redef
+  `resolve-config-test` actually proves — is **user-vs-project** (`system < user
+  < project`): the redef test seeds a user-scope `:attach {:host "localhost"
+  :port 7888}` and a project-scope `:attach {:port 9999}`, then asserts the
+  merged result keeps the user's `:host` while the project's `:port` wins. This
+  is **not** the project-internal shared/local merge (handled inside
+  `read-project-preferences` and already proven by `read-project-preferences-test`);
+  the reshaped test must therefore layer a real **user** config file against a
+  real **project** config file, not two project-layer files.
+- The user-scope reader (`read-user-config` → `user-config/read-config`) resolves
+  its path through `user-config/user-config-file`, which derives
+  `~/.psi/agent/config.edn` from the `user.home` system property. A unit test
+  must not read or mutate the developer's real home directory, so the reshaped
+  test temporarily rebinds the `user.home` system property to a temp directory,
+  writes a real `<tmp-home>/.psi/agent/config.edn` user config there, and restores
+  the original `user.home` in a `finally`. This exercises the **real**
+  `read-user-config` reader (no redef) against a deterministic on-disk user file.
+- The merge-precedence proof writes a real user config (lower precedence) under
+  the temp `user.home` and a real project config (higher precedence) in the temp
+  worktree (`<worktree>/.psi/project.edn`), then asserts `resolve-config` returns
+  the deep-merged `:project-nrepl` map showing project values overriding user
+  values while user-only keys survive — exactly the layering the redef test
+  asserted, now driven by real readers and real files.
 - `resolve-config` strips the `:version 1` key by design: it extracts only
   `(:project-nrepl (agent-session-map ...))`, so the real `:version 1` key the
   redef tests omitted is irrelevant to `resolve-config`'s output and the
   file-backed test asserts only the merged `:project-nrepl` map.
 - The merge-precedence proof is **not** made redundant by the existing
   `read-project-preferences-test`: that test proves the project-config reader's
-  shared/local merge, whereas the reshaped `resolve-config` test proves
-  `resolve-config`'s own system < user < project layering and `:project-nrepl`
-  extraction. Both proofs are retained; they cover different units.
-- The "returns empty project-nrepl config" case is reshaped to a temp worktree
-  with no project config files (and no user override available), asserting
-  `resolve-config` returns `{:project-nrepl {}}` from `system-defaults`.
+  shared/local merge (one layer, two files inside one worktree), whereas the
+  reshaped `resolve-config` test proves `resolve-config`'s own user-vs-project
+  layering (two distinct readers/scopes) and `:project-nrepl` extraction. Both
+  proofs are retained; they cover different units and different precedence axes.
+- The "returns empty project-nrepl config" case is reshaped to a temp `user.home`
+  with no user config file and a temp worktree with no project config files,
+  asserting `resolve-config` returns `{:project-nrepl {}}` from `system-defaults`.
 
 #### command tests
 

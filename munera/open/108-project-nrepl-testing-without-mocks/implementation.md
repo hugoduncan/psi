@@ -162,3 +162,50 @@ Found four actionable inconsistencies (added to `design-steps.md`):
    unchanged" mechanism cannot work for started-mode without a production change
    (merge instead of overwrite, or seed differently). Design does not acknowledge
    this.
+
+2026-06-01 — Design inconsistency follow-up execution
+
+Resolved all four 2026-06-01 design-inconsistency follow-up items in design.md
+(grounded in re-reading client.clj, started.clj, config.clj, commands_test.clj,
+config_test.clj, started_test.clj, and shared-config user reader/test).
+
+1. `:nrepl-connector` seam contract — narrowed the seam return shape to
+   `{:transport :client :client-session}` (the inline `requiring-resolve` block
+   up to binding session-fn). Session-id derivation and the throw-on-missing
+   stay in `connect-instance-in!` (interpretation of the returned session fn, not
+   the infra boundary). Connected `:runtime-handle` still ends with
+   `{:transport :client :client-session :session-id}`; only `:session-id` is
+   computed by `connect-instance-in!` from the connector return. Updated the
+   Seam-injection `:nrepl-connector` entry.
+
+2. `commands_test.clj` redef list — corrected design Problem audit + Audit-summary
+   redesign bullet to list only `eval-op` and `interrupt` (the real redefs); noted
+   the missing-start-command test uses a real temp worktree, not a `resolve-config`
+   redef. NOTE: the earlier re-audit note at implementation.md line 65 (and the
+   Initial audit at line 24) carry the same stale three-symbol list; left as
+   historical record (append-only), corrected authoritatively in design.md and
+   here.
+
+3. `config_test.clj` precedence — restated the concrete target. The precedence
+   `resolve-config` owns (and the redef test proves) is user-vs-project
+   (system<user<project), NOT the project-internal shared/local merge already
+   covered by `read-project-preferences-test`. Reshaped test rebinds `user.home`
+   to a temp dir and writes a real `<tmp-home>/.psi/agent/config.edn` user file
+   (exercising the real `read-user-config` reader, no redef) layered against a
+   real `<worktree>/.psi/project.edn` project file; asserts project overrides user
+   while user-only keys survive. Empty case = no user file + no project file →
+   `{:project-nrepl {}}`. The "NOT redundant" claim now holds (different readers,
+   different precedence axes).
+
+4. `started_test.clj` seam assignment + overwrite conflict — added a
+   "Seam seeding per test file" subsection (started_test seeds BOTH
+   `:process-launcher` and `:nrepl-connector`, the latter for the internal
+   `connect-instance-in!` call) and a "Started-mode runtime-handle merge"
+   subsection requiring `start-instance-in!` to merge process keys into
+   `:runtime-handle` rather than overwrite, so seeded seam fns survive acquisition.
+   This is the only production behavioural change beyond promoting the two seam
+   defaults; behaviour-preserving for real callers. Updated the started_test
+   redesign bullet and process-start seam shape to reference both.
+
+No blocking reasons; all four items completed at the design level. Production
+seam code + test reshaping remain for the build phase per steps.md.
