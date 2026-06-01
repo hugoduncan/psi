@@ -33,11 +33,13 @@ handle and returns no `:root-state-update`).
   canonical-state replacement must compute the value in the handler.
 - **Replace, not append** — wholesale `assoc :prompt-templates discovered`,
   unlike the appending `:session/register-prompt-template`.
-- **Exact discovery opts**:
+- **Exact discovery opts** (handler in `session_mutations.clj`, so
+  `session/` = `psi.session-state.state`; `let`-bind `worktree-path` once and
+  reuse it for both the opts and the `:worktree` return value):
   ```clojure
-  {:global-prompts-dir  (:global-prompts-dir pt/default-config)
-   :project-prompts-dir (str (ss/session-worktree-path-in ctx session-id)
-                             "/.psi/prompts")}
+  (let [worktree-path (session/session-worktree-path-in ctx session-id)]
+    {:global-prompts-dir  (:global-prompts-dir pt/default-config)
+     :project-prompts-dir (str worktree-path "/.psi/prompts")})
   ```
   `:global-prompts-dir` passed **explicitly** (the `default-config` value);
   `:project-prompts-dir` from the **session worktree** (intentional divergence
@@ -56,8 +58,9 @@ handle and returns no `:root-state-update`).
 ### Surfaces touched
 
 - `dispatch_handlers/session_mutations.clj` — new `:session/reload-prompts`
-  handler (requires `prompt-templates` + `session-settings`/`ss` worktree
-  helper).
+  handler (requires `prompt-templates`; worktree helper via
+  `session/session-worktree-path-in`, `session` = `psi.session-state.state` —
+  **not** the `ss` = `psi.session-state.init` alias, which lacks it).
 - `session_settings.clj` — a thin `reload-prompts-in!` core fn dispatching
   `:session/reload-prompts` (mirrors `reload-models-in!`), so the command and
   mutation share one entry point.

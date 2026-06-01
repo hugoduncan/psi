@@ -243,3 +243,26 @@ surfaces the handler `:return`" risk is sound — `state-kernel/dispatch`
 returns `(:result result-ictx)`, so `reload-prompts-in!`'s
 `(dispatch/dispatch! ...)` yields the `{:reloaded? :count :worktree}` map
 directly (no `:return-effect-result?` needed). Mechanism confirmed in code.
+
+## Plan/steps ambiguity-review follow-ups executed (2026-06-01)
+
+P1–P3 (the three plan/steps ambiguity follow-ups) resolved in plan.md +
+steps.md (docs-only; no code touched — implementation slices not yet started).
+
+- ✅ P1 — Per-file worktree-helper alias pinned. Slice-1 wording now uses
+  `session/session-worktree-path-in` (`session` = `psi.session-state.state`),
+  noting the `ss` alias in `session_mutations.clj` (= `psi.session-state.init`)
+  lacks it. Removed the `ss`/`session` slash-alternative from slice 1 and the
+  plan "Surfaces touched" note + the "Exact discovery opts" example.
+  `session_settings.clj` / `commands.clj` keep `ss/session-worktree-path-in`
+  (`ss` = `psi.session-state.state` in those nss) — already correct.
+- ✅ P2 — Single `worktree-path` `let` binding named in slice 1; opts
+  `:project-prompts-dir` and the `:return :worktree` value both derive from it.
+  Removed the bare `<path>` placeholder; plan opts example shows the binding.
+  Avoids a second `session-worktree-path-in` call.
+- ✅ P3 — Slice-3 mutation entry point resolved to `reload-prompts-in!` only;
+  dropped the `dispatch!` either/or, consistent with the plan/design's single
+  shared entry point.
+
+No blockers. Design unchanged (read-only context). Remaining work = the
+implementation slices 1–5, unchanged by these clarifications.

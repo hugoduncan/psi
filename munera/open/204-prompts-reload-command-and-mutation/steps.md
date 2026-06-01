@@ -5,16 +5,22 @@ Vertical slices from plan.md. Tick each item with its sha / decision note.
 ## Slice 1 — `:session/reload-prompts` dispatch handler
 
 - [ ] Add `[psi.prompt-assets.prompt-templates :as pt]` require to
-      `dispatch_handlers/session_mutations.clj` (and confirm the worktree
-      helper `ss`/`session/session-worktree-path-in` is already in scope).
-- [ ] Register `:session/reload-prompts` core handler: resolve opts
+      `dispatch_handlers/session_mutations.clj` (and confirm
+      `session/session-worktree-path-in` — `session` =
+      `psi.session-state.state` — is already in scope; the `ss` alias in this
+      ns is `psi.session-state.init`, which does **not** define it).
+- [ ] Register `:session/reload-prompts` core handler: `let`-bind a single
+      `worktree-path` = `(session/session-worktree-path-in ctx session-id)`,
+      then resolve opts
       `{:global-prompts-dir (:global-prompts-dir pt/default-config)
-        :project-prompts-dir (str (session/session-worktree-path-in ctx session-id) "/.psi/prompts")}`,
+        :project-prompts-dir (str worktree-path "/.psi/prompts")}`,
       call `(pt/discover-templates opts)` inline.
 - [ ] Handler returns a single `:root-state-update`
       `(session/session-update session-id #(assoc % :prompt-templates discovered))`
-      and a `:return {:reloaded? true :count (count discovered) :worktree <path>}`;
-      emits **no** `:effects` (no `:runtime/refresh-system-prompt`).
+      and a `:return {:reloaded? true :count (count discovered) :worktree worktree-path}`
+      (reusing the same `worktree-path` binding from the opts step — no second
+      `session-worktree-path-in` call); emits **no** `:effects` (no
+      `:runtime/refresh-system-prompt`).
 - [ ] Add a dispatch-handler test: seed a session with an explicit worktree
       path and pre-existing `:prompt-templates`; dispatch
       `:session/reload-prompts`; assert `:prompt-templates` is **replaced** by
@@ -41,8 +47,8 @@ Vertical slices from plan.md. Tick each item with its sha / decision note.
       `::pco/op-name 'psi.extension/reload-prompts`,
       `::pco/params [:psi/agent-session-ctx :session-id]`,
       `::pco/output [:psi.prompt-template/reloaded? :psi.prompt-template/count]`.
-- [ ] Mutation body calls the core path (`reload-prompts-in!` or
-      `dispatch!`) and returns
+- [ ] Mutation body calls the single shared core entry point
+      `reload-prompts-in!` (not `dispatch!` directly) and returns
       `{:psi.prompt-template/reloaded? (boolean reloaded?)
         :psi.prompt-template/count (or count 0)}` — does **not** surface
       `:worktree`.
@@ -92,18 +98,16 @@ Vertical slices from plan.md. Tick each item with its sha / decision note.
 
 ## Plan/steps ambiguity follow-ups (2026-06-01)
 
-- [ ] P1: Pin the correct per-file worktree-helper alias (only
-      `psi.session-state.state` defines `session-worktree-path-in`). Use
-      `session/session-worktree-path-in` in `session_mutations.clj`
-      (`session` = `psi.session-state.state`; `ss` there =
-      `psi.session-state.init`, which lacks it) and
-      `ss/session-worktree-path-in` in `session_settings.clj` / `commands.clj`.
-      Remove the ambiguous "`ss`/`session`" slash-alternative from slice 1 and
-      the plan "Surfaces touched" note.
-- [ ] P2: In slice 1, name the single worktree binding so the opts
-      `:project-prompts-dir` and the `:return :worktree` value derive from one
-      computed path (replace the bare `<path>` placeholder); avoid recomputing
-      `session-worktree-path-in` twice in the handler.
-- [ ] P3: Resolve the slice-3 mutation entry-point either/or to
-      `reload-prompts-in!` only (the plan's single shared entry point); drop
-      the `dispatch!` alternative from the step wording.
+- [x] P1: Pinned per-file worktree-helper alias. Slice-1 now states
+      `session/session-worktree-path-in` (`session` = `psi.session-state.state`;
+      noted `ss` = `psi.session-state.init` lacks it); removed the
+      `ss`/`session` slash-alternative. Updated plan "Surfaces touched" + the
+      "Exact discovery opts" example to `session/`. (`session_settings.clj` /
+      `commands.clj` keep `ss/session-worktree-path-in` — `ss` =
+      `psi.session-state.state` there — already correct in their slices.)
+- [x] P2: Named the single `worktree-path` binding in slice 1; opts
+      `:project-prompts-dir` and the `:return :worktree` value both derive from
+      it (bare `<path>` placeholder removed; no double `session-worktree-path-in`
+      call). Plan opts example shows the `let` binding.
+- [x] P3: Resolved slice-3 mutation entry point to `reload-prompts-in!` only;
+      dropped the `dispatch!` alternative from the step wording.
