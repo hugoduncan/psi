@@ -128,3 +128,39 @@ Reviewed code/tests against design.md + plan.md. Verified at runtime, not just d
   26 tests, 94 assertions, 0 failures (re-run during this review).
 
 No new actionable issues. REVIEW_COMPLETE.
+
+## Test review: task-test-review (2026-06-01)
+
+Applied task-test-review (well-formed ∧ behaviour-coverage ∧ injectable-nullable
+infra deps). Verified at runtime: 26 tests, 94 assertions, 0 failures.
+
+- **well-formed** ✓ Tests use `deftest`/`testing`/`is`, assert on return values
+  (state/output), not interactions. Real `create-registry` used; no mocks/stubs.
+- **infra deps** ✓ No infra deps to null — handlers are plain in-test fns; the
+  registry is the real domain object.
+- **behaviour coverage** ✗ One gap (actionable, T1 below).
+
+T1 (actionable — coverage gap on the single-sourced contract): the task's stated
+purpose is that the `dispatch-tool-result-in` filter predicate
+(extensions.clj:330–332) becomes the *sole* expression of the modifiable-key
+contract. That predicate has two guard branches: `(map? %)` AND
+`(or (contains? % :content) (contains? % :details) (contains? % :is-error))`.
+The migrated `dispatch-tool-result-non-map-return-test` exercises only the
+`map?` branch (handler returns `"not-a-map"` ⇒ nil). The `contains?` branch —
+which *is* the modifiable-key contract — is untested in both directions:
+  - **positive (selection):** no test feeds a handler return that is a map
+    containing a modifiable key and asserts it is selected/returned as the
+    override. The two coercion tests (extensions_test.clj:383/397) register
+    handlers returning `nil` (`(fn [p] (reset! payload p) nil)`), so they
+    exercise plan-path payload construction, never the filter's positive select.
+  - **negative (map-without-keys):** no test feeds a map handler return lacking
+    all three keys (expected ⇒ nil).
+A `:content`/`:details`/`:is-error` key could be dropped from the predicate (or
+the positive selection broken) with the whole suite still green. The design A3
+audit framed migration around the "non-map filter return-shape" only and missed
+that the surviving predicate is now the single source of the modifiable-key
+contract whose *selection* behaviour has no test. Add a positive-selection test
+(and ideally the map-without-keys negative) so the single-sourced contract is
+covered.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
