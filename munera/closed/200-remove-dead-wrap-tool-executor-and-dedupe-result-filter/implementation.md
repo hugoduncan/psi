@@ -476,3 +476,19 @@ Wrapping" event-API section (550) — which documents the surviving public
 capability — unchanged.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Docs review follow-up execution: D1 (2026-06-01)
+
+Executed D1. Edited `doc/extensions.md:898` "Implementation" namespace table:
+`psi.agent-session.extensions` Role changed from
+"Registry, loading, event dispatch, **tool wrapping**" to
+"Registry, loading, event dispatch, **tool-result filtering**". The stale "tool
+wrapping" clause named the removed `wrap-tool-executor` mechanism; the surviving
+responsibility is `tool_result` dispatch/filtering via `dispatch-tool-result-in`.
+
+Verified scope: lowercase internal "tool wrapping" label no longer present
+(`grep`); the public "Tool Wrapping" event-API section (`doc/extensions.md:550`)
+and its `#tool-wrapping` anchors (530/531) left unchanged; no `wrap-tool-executor`
+references remain anywhere under `doc/`.
+
+PASS_STATUS: REVIEW_COMPLETE

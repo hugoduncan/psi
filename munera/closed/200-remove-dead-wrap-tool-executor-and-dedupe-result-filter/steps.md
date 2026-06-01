@@ -116,7 +116,7 @@
 
 ## Docs review follow-ups (review-task-docs, 2026-06-01)
 
-- [ ] D1: Fix stale internal terminology in the user-facing
+- [x] D1: Fix stale internal terminology in the user-facing
   `doc/extensions.md:898` "Implementation" namespace table — the
   `psi.agent-session.extensions` Role still reads "Registry, loading, event
   dispatch, **tool wrapping**", but the `wrap-tool-executor` tool-wrapping

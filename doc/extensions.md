@@ -895,7 +895,7 @@ The extension system spans two components:
 
 | Namespace                     | Component       | Role                                     |
 |-------------------------------|-----------------|------------------------------------------|
-| `psi.agent-session.extensions`| agent-session   | Registry, loading, event dispatch, tool wrapping |
+| `psi.agent-session.extensions`| agent-session   | Registry, loading, event dispatch, tool-result filtering |
 | `psi.tui.extension-ui`       | tui             | UI state atom, dialogs, widgets, renderers |
 | `psi.agent-session.resolvers` | agent-session  | EQL resolvers (`:psi.extension/*`, `:psi.ui/*`) |
 | `psi.agent-session.core`     | agent-session   | Context wiring, `make-extension-action-fns` |
