@@ -716,3 +716,39 @@ Verification: focused (config/client/commands) → 11 tests, 64 assertions, 0
 failures; full project-nrepl suite (8 ns) → 25 tests, 153 assertions, 0
 failures; `clj-kondo --lint components/project-nrepl/test` → 0 errors, 0
 warnings. No remaining second-pass review exceptions.
+
+2026-06-01 — Implementation review (third pass, task-implementation-review)
+
+Re-verified empirically: focused project-nrepl suite (8 ns) — 25 tests, 153
+assertions, 0 failures; `clj-kondo --lint components/project-nrepl/{src,test}` —
+0 errors, 0 warnings; zero `with-redefs` in the test tree (git grep → none);
+working tree clean. The three production seams in `client.clj`
+(`real-nrepl-connector` + or-default resolve, session-id derivation retained in
+`connect-instance-in!`) and `started.clj` (`real-process-launcher`,
+`(update :runtime-handle merge {...})`) plus the `attach.clj` 4th-positional
+`opts` arity threading `(:runtime-handle opts)` match the design exactly. All
+acceptance criteria met; no acceptance blockers.
+
+New actionable finding (quality/consistency, not an acceptance blocker):
+
+1. The canonical `eval_test.clj` — the reference pattern every reshaped file was
+   pointed at, and which the prior follow-up cited approvingly while removing the
+   identical `@calls*` assertion from `client_test.clj` — itself still carries
+   interaction-style assertions on the seam's captured messages:
+   `(is (= "eval" (:op (first @calls*))))` (line 30) and
+   `(is (= "interrupt" (:op (first @calls*))))` / `(is (= "eval-123"
+   (:interrupt-id (first @calls*))))` (lines 84–85). These assert *what was sent
+   to the collaborator* (`¬assert(interactions(test))`), the exact class of
+   assertion the second-pass follow-up removed from `client_test.clj` as
+   "the only interaction-style assertion left in the in-scope files." That claim
+   held only because `eval_test.clj` was out of the de-mock reshape set; the
+   reference idiom the task propagates still violates the standard. The behaviour
+   each assertion actually proves is already covered by state/result assertions in
+   the same test: the eval `:op "eval"` is implied by the `:success`/`:value "3"`
+   result; the interrupt `:op "interrupt"` and `:interrupt-id "eval-123"` are
+   already asserted as state via `(:interrupted-op-id result)` (line 81) and
+   `(:last-interrupt instance)` (line 86). Dropping the `@calls*` op/interrupt-id
+   assertions (the `swap! conj` capture can stay only if a returned value depends
+   on the message) would make the canonical pattern consistent with the standard
+   this task enforced elsewhere. `eval_test.clj` was nominally out of scope, so
+   this is a follow-on consistency item rather than a regression introduced here.
