@@ -646,3 +646,46 @@ file. steps.md doc edit only — no test/src/doc behaviour change.
 
 No `src/**` or `doc/scheduler.md` touched; no test code changed. Verification-
 only invariant intact.
+
+## Implementation review — pass 4 (task-implementation-review skill, 2026-06-01)
+
+Reviewed the verification-only deliverable against design/plan/architecture and
+the live runtime. Verified directly (not just from the log):
+
+- **Coherence gate holds.** `git diff --name-only 87140947b~1..HEAD` → only test
+  files under `components/agent-session/test/**` (7 scheduler test files +
+  `test_support.clj`) + 3 task-dir files. **Zero** `components/agent-session/src/**`
+  or `doc/scheduler.md` changes. Working tree clean. ✓
+- **Suite green, re-run here.** Full scheduler subset (13 ns):
+  **45 tests / 412 assertions / 0 fail / 0 error.** clj-kondo 0/0 on all 8
+  touched test files. ✓
+- **Tests are substantive.** Spot-read `scheduler_end_to_end_test` (both live
+  round trips genuinely capture+invoke the timer callback, assert delivered-
+  prompt provenance / `:created-session-id` / `:delivery-phase` / created-session
+  freshness — state/outputs, not interactions), `scheduler_test` pure-model
+  guards (exact `thrown-with-msg?` strings; `drain-one-orders-by-fire-at` builds
+  insertion-order ≠ fire-at-order; `fail-schedule` detail+dequeue+terminal
+  guard), and `psi_tool_scheduler_test` `:at` named-bound assertions (pass-2:
+  L242/260 assert `"delay-ms is below/exceeds the … bound"` via
+  `[:psi-tool/error :message]`). All sound. ✓
+- **Prior flags genuinely executed.** capture-timer DRY (`capturing-delay-fn`),
+  `:at` named-bound precision, Slice-10 allowlist generalisation — all present
+  in code/steps, verified, not merely logged. ✓
+
+**Flag (new, actionable) — documented assertion count (410) is stale; runtime
+reports 412.** The summary figures in `findings.md` (Outcome: "45 tests / 410
+assertions"), `steps.md` (Slice 10 "Done:" + pass-1 follow-up note), and
+`implementation.md` (Slice 9+10 close-out, pass-1, pass-2, pass-3 review notes)
+all cite **410 assertions**. The runtime now reports **412** (re-run here, and
+arithmetic-confirmed: `410 − 107 + 109 = 412`). The pass-2 follow-up added the
+two `:at` named-bound assertions (psi-tool test 107 → 109) and was committed, but
+the aggregate count was never updated to match — so every "45 tests / 410
+assertions" claim in the deliverable now under-counts by 2 and contradicts the
+runtime. Per `runtime ≡ truth, file ≡ memory`, the findings.md Outcome (the
+structured deliverable) and the steps/impl close-out counts should read 412 to
+match the green suite. Test/source unaffected (no behaviour change); doc-accuracy
+only, within the verification-only scope (no `src/**`/`doc/scheduler.md`). Added
+as a follow-up step.
+
+No other new actionable issues. The verification-only deliverable is otherwise
+accurate, coherent, and green against current behaviour.

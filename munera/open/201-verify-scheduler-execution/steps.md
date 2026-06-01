@@ -452,3 +452,18 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       `test_support.clj`, all under `test/`, + 3 task-dir files; zero `src/**` /
       `doc/scheduler.md`). steps.md doc edit only — no test/src/doc change; gate
       now passes on a literal application against the real changeset.
+
+## Implementation review follow-ups — pass 4 (2026-06-01)
+
+- [ ] Correct the stale assertion count in the deliverable summaries from
+      **410** to **412** to match the green runtime. The pass-2 `:at`
+      named-bound follow-up added two assertions (psi-tool test 107 → 109,
+      committed), but the aggregate "45 tests / 410 assertions" claim was never
+      updated — runtime now reports **45 tests / 412 assertions** (re-run
+      confirms; `410 − 107 + 109 = 412`). Update `findings.md` Outcome
+      ("45 tests / 410 assertions" → 412) and the `steps.md` / `implementation.md`
+      close-out + review-note counts that cite 410, so the structured deliverable
+      matches `runtime ≡ truth`. Doc-accuracy only — no test/src/doc behaviour
+      change; within the verification-only scope (zero `components/agent-session/
+      src/**` or `doc/scheduler.md`). (If the task is treated as closed, raise it
+      as a small standalone task-hygiene fix instead.)
