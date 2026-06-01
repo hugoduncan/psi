@@ -780,3 +780,36 @@ prompt-string doc gap) is fully and accurately resolved. No `steps.md` items
 added.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## 2026-06-01 — code-shaper review (code-shaper, ψ)
+
+Applied the code-shaper lens (`simplicity ∧ consistency ∧ robustness`) to the
+in-scope artifacts: `.psi/workflows/task-lifecycle.edn` and the
+`task-lifecycle-test` deftest. No production Clojure source is in scope (the
+task ships only a declarative workflow `.edn`, a loader test, a CHANGELOG entry,
+and an additive doc note).
+
+- **`task-lifecycle.edn`** — simple (single responsibility: sequence five
+  delegate stages), consistent (uniform step shape, `:name` = `:target`,
+  identical `:prompt-string` / `:context` across all five steps), robust (loads
+  clean, `clj-kondo` 0/0, valid EDN, all five steps `:delegate`; shape mirrors
+  shipping exemplars `review-task-implementation.edn` / `gh-issue-implement.edn`).
+  The verbatim repetition of the identical `:prompt-string` and `:context` maps
+  across the five steps is *intrinsic* to the declarative workflow grammar —
+  there is no abstraction/templating primitive at the step level to DRY it, and
+  every exemplar workflow repeats per-step context likewise. Not a code-shaping
+  defect; introducing a non-grammatical indirection would *reduce* robustness
+  and local comprehensibility.
+- **`task-lifecycle-test`** — already shaped by the prior test-shaper pass:
+  projected-collection equalities (`(= (repeat 5 …) (mapv …))`,
+  `(mapv #(select-keys % [:yields :terminal-contract]) …)`) for meaningful
+  named failures, single `expected-targets` `let` binding referenced by both the
+  `:name` and `:target` assertions (no duplicated literal). Consistent assertion
+  style, single responsibility, locally comprehensible. No actionable gap.
+
+Verification: `clj-kondo --lint …workflow_definitions_test.clj` → 0 errors /
+0 warnings; `task-lifecycle.edn` reads as valid EDN with 5 delegate steps.
+
+No new actionable code-shaping feedback. No `steps.md` items added.
+
+PASS_STATUS: REVIEW_COMPLETE
