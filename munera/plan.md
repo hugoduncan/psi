@@ -7,6 +7,7 @@ open-task reconciliation audit (completed-task closure, NNN-collision renumber).
 
 Not yet started:
 
+- `munera/open/204-prompts-reload-command-and-mutation/` — add `/prompts-reload` command + `psi.extension/reload-prompts` mutation (psi-tool visible) that re-discovers prompt templates from disk for the session worktree and replaces the session's registered templates. Mirrors `/reload-models`. Design-only; open questions on effect-vs-in-handler discovery and CLI extra-path persistence.
 - `munera/open/203-task-lifecycle-chained-workflow/` — renumbered from 198 (NNN collision with closed `198-fix-tool-metrics-empty-tools-map`); new orchestration workflow chaining review-task-design → create-task-plan → review-task-plan → implement-task → review-task-implementation. Design-only; open questions on stage gating and context threading.
 - `munera/open/197-ui-action-invocation/` — renumbered from 191 (NNN collision); side-effecting UI action invocation deferred from closed 190/194 UI work.
 - `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
