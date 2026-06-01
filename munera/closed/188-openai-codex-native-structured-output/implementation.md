@@ -283,3 +283,9 @@
   - Found no newly added actionable unchecked `steps.md` items from the preceding review pass.
   - No implementation steps were executed in this pass.
   - Left `steps.md` unchanged. The only remaining unchecked item is the conditional future Codex non-streaming `:execute` structured-output test, still blocked by current recorded evidence that `stream: false` returned `400` and by the absence of implemented Codex non-streaming structured-output support.
+
+## Closure (2026-05-31 audit)
+
+Closed as complete during the open-task reconciliation audit. All `steps.md` items checked and review loops recorded no actionable feedback.
+
+Note: one `steps.md` item remains unchecked by design — a conditional future test for Codex non-streaming `:execute` structured output, blocked by provider `400` on `stream: false` and the absence of implemented non-streaming Codex support. Deferred, not outstanding work for this task.

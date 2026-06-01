@@ -42,3 +42,11 @@ All 4 review follow-ups resolved:
 4. **No test for `[:failed]` vector form in `judged-routing-transition`** — Defensive guard for `(= target [:failed])` is untested. `compile-routing-transitions` only produces `:failed` keyword, so the vector path is never exercised. Severity: low — defensive code without a regression anchor.
 
 5. **No integration test connecting handler output shape to message formatter** — Statechart test verifies action fires; mutation test verifies formatting on hand-crafted maps. No test verifies that the `:iteration/exhausted` handler's actual `terminal-outcome` map shape is consumable by `terminal-outcome-error-message`. Severity: low — the shapes are consistent today but could drift silently.
+
+## Renumber (2026-05-31 audit)
+
+Task id changed from `154-fix-workflow-max-iterations-error-surfacing` to `195-fix-workflow-max-iterations-error-surfacing` to resolve a Munera NNN collision (old number `154` was reused across concurrent branches). Slug and content unchanged; task remains open/active.
+
+## Closure (2026-05-31)
+
+Closed by 刀 decision. Core max-iterations error-surfacing fix is implemented (15 steps checked). The remaining unchecked items are deferred edge-case test coverage (empty/truncated last-result-text, `[:failed]` vector guard, `:judge/no-match` nil-error path); future issues will be tracked as new tasks rather than blocking closure.

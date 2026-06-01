@@ -34,3 +34,7 @@ Additional refinement after completed tasks `165`–`172`:
 - recorded the contract-simplification lesson from `172`: preserved registration order can be an adapter-local compatibility surface that may be removed when callers only require unordered membership/count coherence
 - updated the audit conclusion so future migrations distinguish direct semantic adoption from adapter-backed storage adoption, and treat ordering as opt-in rather than default lower-substrate behavior
 - task `174` migrated `skill-registry` to adapter-backed shared storage: canonical skill definitions now live in `root-registry` while sessions own membership via `:skill-ids`; adapter-owned behavior still preserves duplicate-ignore/no-change projection, `:added?` / `:changed?`, prompt-refresh gating, and canonical exact skill-name ordering. Embedded session `:skills` storage was removed from canonical runtime/persisted session data, and bootstrap/top-level defaults now hydrate root skill definitions directly before or during canonical `:skill-ids` ownership paths rather than treating session membership as the definition owner.
+
+## Closure (2026-05-31 audit)
+
+Closed as complete during the open-task reconciliation audit. All `steps.md` items checked and review loops recorded no actionable feedback.
