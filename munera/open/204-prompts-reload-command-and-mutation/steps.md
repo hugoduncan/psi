@@ -61,22 +61,23 @@ Vertical slices from plan.md. Tick each item with its sha / decision note.
 
 ## Slice 4 — `/prompts-reload` command
 
-- [ ] Add `format-prompts-reload` in `commands.clj` mirroring
-      `format-reload-models`: read `worktree-path` via
-      `ss/session-worktree-path-in`, call `session/reload-prompts-in!`
-      (`session` = `psi.agent-session.core`, the slice-2 re-export — exactly as
-      `format-reload-models` (`commands.clj:255`) calls
-      `session/reload-models-in!`), build a `:text` summary with **worktree +
-      count only** (no diagnostics line) (AC4).
-- [ ] Add `"/prompts-reload" :prompts-reload` to `exact-command-handlers`.
-- [ ] Add `:prompts-reload {:type :text :message (format-prompts-reload ctx
+- [x] Added `format-prompts-reload` in `commands.clj`: calls
+      `session/reload-prompts-in!` (`session` = `psi.agent-session.core`, the
+      slice-2 re-export) and reads `:worktree`/`:count` from the return map
+      (no separate `session-worktree-path-in` call — the handler return already
+      carries `:worktree`); builds a `:text` summary with **worktree + count
+      only**, no diagnostics line (AC4).
+- [x] Added `"/prompts-reload" :prompts-reload` to `exact-command-handlers`.
+- [x] Added `:prompts-reload {:type :text :message (format-prompts-reload ctx
       session-id)}` to the exact-command `case`.
-- [ ] Add a `/help` listing line for `/prompts-reload` (near the existing
-      `/reload-models` / `/reload-extension-installs` entries).
-- [ ] Add a command test (mirror reload-models command tests): assert the
-      `/prompts-reload` result is `{:type :text}` and the message contains the
-      worktree path and resulting template count (AC4).
-- [ ] `clj-kondo` clean; focused command test green.
+- [x] Added `/help` listing line for `/prompts-reload` (between
+      `/reload-models` and `/reload-extension-installs`).
+- [x] Command test (`prompts-reload-command-test`): worktree with `foo`/`bar`
+      `.md`; asserts `{:type :text}`, "Prompts reloaded", worktree path,
+      `count : 2`, and no diagnostics line (AC4). Also added `/prompts-reload`
+      to `format-help-includes-all-commands-test` enumeration.
+- [x] `clj-kondo` clean; focused command suite green (51 tests / 206
+      assertions).
 
 ## Slice 5 — docs, changelog, coherence
 

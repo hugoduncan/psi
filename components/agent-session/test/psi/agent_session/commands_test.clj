@@ -644,7 +644,7 @@
         s          (commands/format-help ctx session-id)]
     (doseq [cmd ["/quit" "/status" "/history" "/new" "/resume" "/tree"
                  "/login" "/logout" "/remember" "/worktree"
-                 "/reload-models"
+                 "/reload-models" "/prompts-reload"
                  "/jobs" "/job" "/cancel-job"
                  "/help" "/prompts" "/skills"]]
       (is (str/includes? s cmd) (str "help should mention " cmd)))
@@ -706,6 +706,26 @@
       ;; cleanup: reset registry to built-ins only
       (model-registry/init! {:user-models-path    nil
                              :project-models-path nil}))))
+
+;; ── /prompts-reload ─────────────────────────────────────────
+
+(deftest prompts-reload-command-test
+  (testing "/prompts-reload returns :text result with worktree + count"
+    (let [cwd (test-support/temp-cwd)
+          _   (.mkdirs (java.io.File. (str cwd "/.psi/prompts")))
+          _   (spit (str cwd "/.psi/prompts/foo.md") "foo body")
+          _   (spit (str cwd "/.psi/prompts/bar.md") "bar body")
+          [ctx session-id] (create-session-context
+                            {:session-defaults {:worktree-path cwd}
+                             :cwd cwd
+                             :persist? false})
+          result (commands/dispatch-in ctx session-id "/prompts-reload" cmd-opts)]
+      (is (= :text (:type result)))
+      (is (str/includes? (:message result) "Prompts reloaded"))
+      (is (str/includes? (:message result) cwd))
+      (is (str/includes? (:message result) "count : 2"))
+      ;; No diagnostics line (prompt discovery has no diagnostics channel).
+      (is (not (str/includes? (:message result) "diagnostics"))))))
 
 (deftest reload-extension-installs-command-test
   (testing "/reload-extension-installs returns :text result with apply summary"

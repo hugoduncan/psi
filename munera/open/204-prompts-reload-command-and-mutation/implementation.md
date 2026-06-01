@@ -420,3 +420,17 @@ Deviation note: the visibility assertion checks membership in
 `mutations/all-mutations` (the aggregate `registered-mutation-syms` derives
 from) rather than re-deriving the registered set; the live mutate test already
 exercises the full registered-mutation resolution path end-to-end.
+
+## Implementation — Slice 4 (2026-06-01)
+
+`/prompts-reload` command in `commands.clj`: `format-prompts-reload` calls
+`session/reload-prompts-in!` (core re-export) and reports worktree + count from
+the **return map** (deviation from `format-reload-models`, which reads worktree
+separately via `ss/session-worktree-path-in` then count from the return —
+prompts' `reload-prompts-in!` already returns `:worktree`, so a separate
+worktree read would be redundant). No diagnostics line (AC4). Wired into
+`exact-command-handlers`, the exact-command `case`, and `/help`.
+
+Tests: `prompts-reload-command-test` (worktree `.psi/prompts/{foo,bar}.md`,
+asserts text/worktree/`count : 2`/no-diagnostics); extended
+`format-help-includes-all-commands-test` with `/prompts-reload`.

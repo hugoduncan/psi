@@ -136,6 +136,7 @@
          "  /remember [text] — capture a memory note for future ψ\n"
          "  /worktree — show git worktree context\n"
          "  /reload-models — reload custom model definitions from ~/.psi/agent/models.edn and .psi/models.edn\n"
+         "  /prompts-reload — re-discover prompt templates from ~/.psi/agent/prompts and <worktree>/.psi/prompts\n"
          "  /reload-extension-installs — reload/apply extension installs from extensions.edn\n"
          "  /jobs [status ...] — list background jobs (default: running,pending-cancel)\n"
          "  /job <job-id> — inspect a background job\n"
@@ -263,6 +264,16 @@
            "  worktree : " worktree-path "\n"
            "  count : " count "\n"
            "───────────────────────────────────────"))))
+
+(defn- format-prompts-reload
+  "Re-discover prompt templates from disk and return a status string.
+   Reports worktree + resulting template count only (no diagnostics channel)."
+  [ctx session-id]
+  (let [{:keys [count worktree]} (session/reload-prompts-in! ctx session-id)]
+    (str "── Prompts reloaded ──────────────────\n"
+         "  worktree : " worktree "\n"
+         "  count : " count "\n"
+         "───────────────────────────────────────")))
 
 (defn- format-reload-extension-installs
   "Reload/apply extension installs from extensions.edn and return a status string."
@@ -664,6 +675,7 @@
    "/worktree" :worktree
    "/logout" :logout
    "/reload-models" :reload-models
+   "/prompts-reload" :prompts-reload
    "/reload-extension-installs" :reload-extension-installs
    "/project-repl" :project-repl})
 
@@ -764,6 +776,7 @@
        :skills {:type :text :message (format-skills ctx session-id)}
        :worktree {:type :text :message (format-worktree ctx session-id)}
        :reload-models {:type :text :message (format-reload-models ctx session-id)}
+       :prompts-reload {:type :text :message (format-prompts-reload ctx session-id)}
        :reload-extension-installs {:type :text :message (format-reload-extension-installs ctx session-id)}
        :project-repl (project-nrepl-commands/dispatch-project-nrepl-command ctx session-id trimmed)
        :logout (dispatch-logout-command ctx session-id oauth-ctx)
