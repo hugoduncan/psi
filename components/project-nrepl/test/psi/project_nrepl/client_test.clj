@@ -1,7 +1,6 @@
 (ns psi.project-nrepl.client-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [nrepl.core]
    [psi.project-nrepl.client :as project-nrepl-client]
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
    [psi.agent-session.test-support :as test-support]))
@@ -12,26 +11,37 @@
 
 (deftest connect-instance-in-test
   (testing "connect establishes single managed client session and capability flags"
-    (let [ctx      (make-ctx)
-          worktree (System/getProperty "user.dir")
-          transport {:transport :fake}
-          client-fn (fn ([] nil) ([_] nil))
-          session-fn (with-meta (fn [_] nil) {(keyword "nrepl.core" "taking-until") {:session "nrepl-session-1"}})]
+    (let [ctx        (make-ctx)
+          worktree   (System/getProperty "user.dir")
+          transport  {:transport :fake}
+          client-fn  (fn ([] nil) ([_] nil))
+          session-fn (with-meta (fn [_] nil)
+                       {(keyword "nrepl.core" "taking-until") {:session "nrepl-session-1"}})
+          calls*     (atom [])
+          connector  (fn [endpoint]
+                       (swap! calls* conj endpoint)
+                       {:transport transport
+                        :client client-fn
+                        :client-session session-fn})]
       (project-nrepl-runtime/ensure-instance-in!
        ctx
        {:worktree-path worktree
         :acquisition-mode :attached
         :endpoint {:host "127.0.0.1" :port 7888 :port-source :explicit}})
-      (with-redefs [nrepl.core/connect (fn [& _] transport)
-                    nrepl.core/client (fn [_transport _timeout] client-fn)
-                    nrepl.core/client-session (fn [_client] session-fn)]
-        (let [instance (project-nrepl-client/connect-instance-in! ctx worktree)]
-          (is (= :ready (:lifecycle-state instance)))
-          (is (= true (:readiness instance)))
-          (is (= "nrepl-session-1" (:active-session-id instance)))
-          (is (= true (:can-eval? instance)))
-          (is (= true (:can-interrupt? instance)))
-          (is (= transport (get-in instance [:runtime-handle :transport]))))))))
+      (project-nrepl-runtime/update-instance-in!
+       ctx worktree
+       #(assoc-in % [:runtime-handle :nrepl-connector] connector))
+      (let [instance (project-nrepl-client/connect-instance-in! ctx worktree)]
+        (is (= :ready (:lifecycle-state instance)))
+        (is (= true (:readiness instance)))
+        (is (= "nrepl-session-1" (:active-session-id instance)))
+        (is (= true (:can-eval? instance)))
+        (is (= true (:can-interrupt? instance)))
+        (is (= transport (get-in instance [:runtime-handle :transport])))
+        (is (= client-fn (get-in instance [:runtime-handle :client])))
+        (is (= session-fn (get-in instance [:runtime-handle :client-session])))
+        (is (= "nrepl-session-1" (get-in instance [:runtime-handle :session-id])))
+        (is (= [{:host "127.0.0.1" :port 7888}] @calls*))))))
 
 (deftest disconnect-instance-in-test
   (testing "disconnect clears managed client session runtime fields"

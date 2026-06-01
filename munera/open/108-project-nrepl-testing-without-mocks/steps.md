@@ -21,9 +21,9 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
 
 ## Slice 3 — `client_test.clj`
 
-- [ ] Replace `nrepl.core/*` redefs with a seeded `[:runtime-handle :nrepl-connector]` fn returning a deterministic transport/client/session-fn (session-fn carrying `:nrepl.core/taking-until {:session ...}` metadata)
-- [ ] Assert on connected-instance `:runtime-handle` state (`:transport :client :client-session :session-id`)
-- [ ] Run `client_test.clj` green
+- [x] Replace `nrepl.core/*` redefs with a seeded `[:runtime-handle :nrepl-connector]` fn returning a deterministic transport/client/session-fn (session-fn carrying `:nrepl.core/taking-until {:session ...}` metadata)
+- [x] Assert on connected-instance `:runtime-handle` state (`:transport :client :client-session :session-id`)
+- [x] Run `client_test.clj` green (2 tests, 14 assertions, 0 failures)
 
 ## Slice 4 — Composite seed param (production)
 
