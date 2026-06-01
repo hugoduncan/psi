@@ -204,3 +204,29 @@ but its final test artifact is not in git. The `.clj-kondo/config.edn` change (n
 **Lint regressions in `tool_execution_test.clj`** (clj-kondo, 3 warnings):
 - `use-fixtures` referred but never used (line 5) — also trips the newly-added discouraged-var.
 - `inline def` at line 379 (the e2e test ns body) — likely from the discouraged-var/def shape.
+
+## 2026-06-01 — review follow-up execution
+
+Executed the four follow-up items from the independent implementation review.
+
+**e2e test runs (was the central concern).** The committed e2e test (`4630d40c0`)
+executes and passes under the standard command:
+`clojure -M:test --focus psi.agent-session.tool-execution-test` →
+**12 tests, 61 assertions, 0 failures**, stable across repeated runs (verified twice in
+the default capture+randomize mode and once in documentation mode). The review's "11 tests"
+count is no longer reproducible. Mechanism check: under the full `:test` alias classpath the
+namespace loads with all 12 deftests (`extensions/metrics/src` is on that classpath via
+`deps.edn` `:test`), kaocha's `--print-test-plan` lists all 12, and the focused run executes
+all 12. To make the `:unit` suite *self-consistent* rather than rely on incidental
+`:test`-alias classpath ordering, added `extensions/metrics/src` to the `:unit` suite
+`:source-paths` in `tests.edn`. `extensions/metrics/test` was intentionally NOT added — the
+e2e test lives in `components/agent-session/test` (it exercises the agent-session adapter
+bridge), already covered by the suite's existing `components/agent-session/test` path.
+
+**Config and lint items moot.** The first working-tree draft I observed at the start of this
+pass added a `use-fixtures` referral, a `#'metrics-ext/init` var, and an out-of-scope
+`.clj-kondo/config.edn` `:discouraged-var` entry. That draft was superseded by the cleaner
+commit `4630d40c0`, which: keeps `:refer [deftest testing is]` (no unused `use-fixtures`),
+uses a quoted `'psi.metrics.extension/init` symbol (no inline-def warning), and touches no
+kondo config. `clj-kondo --lint` on `tool_execution_test.clj` and `tests.edn` → 0 errors,
+0 warnings. No revert needed; no warnings to fix.

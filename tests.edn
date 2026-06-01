@@ -13,7 +13,8 @@
                    "extensions/mcp-tasks-run/src" "extensions/mementum/src" "extensions/mementum/resources" "extensions/munera/src" "extensions/munera/resources" "extensions/plan-state-learning/src"
                    "extensions/work-on/src" "extensions/github/src"
                    "extensions/edit-clj/src"
-                   "extensions/logprobs/src"]
+                   "extensions/logprobs/src"
+                   "extensions/metrics/src"]
     :ns-patterns [".*-test$"]
     :skip-meta [:integration]}
 
