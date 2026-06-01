@@ -1147,3 +1147,15 @@ Considered but NOT raised: the `commands_test.clj` interrupt-ok response seeds
 would drive the `:interrupted` summary — but `#{"done" "interrupted"}` is a
 realistic nREPL interrupt-completion status set (interrupt and done both arrive),
 so it is representative-case fidelity rather than misleading setup; not raised.
+
+## ops_test `:ns` incidental-setup removal (2026-06-01, executed)
+
+Executed the fourth test-shaper follow-up. Dropped `:ns "user"` from both the
+success and interrupted seeded `client-session` responses in
+`ops_test.clj/eval-op-test`. Kept both `(is (nil? (:ns result)))` assertions —
+the drop-`:ns` contract is now proven by NOT seeding `:ns` and still observing
+nil (stronger signal than seeding then asserting nil). Updated the success-block
+comment to drop the now-inaccurate "prior mock fabricated :ns" framing. The
+interrupted block's `:err "Interrupted"` seed stays (asserted). `ops_test` 2/17
+green; full focused project-nrepl suite (8 ns) 26 tests/151 assertions/0 —
+assertion count unchanged (only dead setup removed); `clj-kondo` 0/0.

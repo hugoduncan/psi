@@ -234,7 +234,7 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
 
 ## Test-shaper follow-ups (2026-06-01, fourth test-shaper pass)
 
-- [ ] Remove the misleading `:ns "user"` incidental setup from `ops_test.clj`
+- [x] Remove the misleading `:ns "user"` incidental setup from `ops_test.clj`
   `eval-op-test`. Both the success block (line 37) and the interrupted block
   (line 59) seed `:ns "user"` in the in-memory `client-session` response, then
   each asserts `(is (nil? (:ns result)))`. The seeded `:ns` feeds nothing the
@@ -248,3 +248,12 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
   drop-`:ns` contract is best proven by NOT seeding `:ns` and still observing
   nil). The `:err "Interrupted"` seeded in the interrupted block stays — it is
   asserted (`(= "Interrupted" (:err result))`). Keep tests green + lint clean.
+  — DONE: dropped `:ns "user"` from both the success and interrupted seeded
+  `client-session` responses; kept both `(is (nil? (:ns result)))` assertions.
+  Updated the success-block comment to state the contract is now proven by NOT
+  seeding `:ns` and still observing nil (removed the now-inaccurate "prior mock
+  fabricated :ns" framing). The interrupted block's `:err "Interrupted"` seed
+  stays (asserted). `ops_test` 2 tests/17 assertions green; full focused
+  project-nrepl suite (8 ns) 26 tests/151 assertions/0 failures unchanged
+  (assertion count steady — only dead setup removed); `clj-kondo` 0/0 on
+  `ops_test.clj`.

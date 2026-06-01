@@ -34,14 +34,14 @@
                            [{:id (:id msg)
                              :session "nrepl-session-1"
                              :value "3"
-                             :ns "user"
                              :status #{"done"}}])]
       (install-instance! ctx worktree client-session)
       (let [result (project-nrepl-ops/eval-op ctx worktree "(+ 1 2)")]
         (is (= :ok (:status result)))
         (is (= "3" (:value result)))
         ;; eval-instance-in!'s result map omits :ns, so the public payload's
-        ;; :ns is nil — real-behavior contract (the prior mock fabricated :ns).
+        ;; :ns is nil regardless of the response — the response intentionally
+        ;; does NOT seed :ns, proving the drop-:ns contract by observation.
         (is (nil? (:ns result)))
         (is (contains? (:timing result) :started-at))
         (is (contains? (:timing result) :finished-at)))))
@@ -56,7 +56,6 @@
                            [{:id (:id msg)
                              :session "nrepl-session-1"
                              :err "Interrupted"
-                             :ns "user"
                              :status #{"interrupted"}}])]
       (install-instance! ctx worktree client-session)
       (let [result (project-nrepl-ops/eval-op ctx worktree "(+ 1 2)")]
