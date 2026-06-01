@@ -10,22 +10,68 @@
       (f))
     (str w)))
 
-(deftest resolve-config-test
-  (testing "merges project nREPL config from user and project scopes"
-    (with-redefs [project-nrepl-config/read-user-config (fn [] {:agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]
-                                                                                                :attach {:host "localhost" :port 7888}}}})
-                  project-nrepl-config/read-project-preferences (fn [cwd]
-                                                                  (is (= "/tmp/project" cwd))
-                                                                  {:agent-session {:project-nrepl {:attach {:port 9999}}}})]
-      (is (= {:project-nrepl {:start-command ["bb" "nrepl-server"]
-                              :attach {:host "localhost" :port 9999}}}
-             (project-nrepl-config/resolve-config "/tmp/project")))))
+(defn- temp-dir [prefix]
+  (str (java.nio.file.Files/createTempDirectory
+        prefix
+        (make-array java.nio.file.attribute.FileAttribute 0))))
 
-  (testing "returns empty project-nrepl config when user and project config are empty"
-    (with-redefs [project-nrepl-config/read-user-config (fn [] {})
-                  project-nrepl-config/read-project-preferences (fn [_] {})]
-      (is (= {:project-nrepl {}}
-             (project-nrepl-config/resolve-config "/tmp/project"))))))
+(defn- delete-tree! [path]
+  (when path
+    (let [f (io/file path)]
+      (when (.exists f)
+        (doseq [x (reverse (file-seq f))]
+          (.delete x))))))
+
+(defn- write-user-config! [home-dir content]
+  (let [f (io/file home-dir ".psi" "agent" "config.edn")]
+    (.mkdirs (.getParentFile f))
+    (spit f (pr-str content))))
+
+(defn- write-project-config! [worktree content]
+  (let [f (io/file worktree ".psi" "project.edn")]
+    (.mkdirs (.getParentFile f))
+    (spit f (pr-str content))))
+
+(defn- with-temp-home
+  "Run `f` with `user.home` rebound to `home-dir`, restoring the original after."
+  [home-dir f]
+  (let [prior (System/getProperty "user.home")]
+    (try
+      (System/setProperty "user.home" home-dir)
+      (f)
+      (finally
+        (System/setProperty "user.home" prior)))))
+
+(deftest resolve-config-test
+  (testing "merges project nREPL config from real user and project config files (project overrides user)"
+    (let [home     (temp-dir "psi-project-nrepl-home-")
+          worktree (temp-dir "psi-project-nrepl-wt-")]
+      (try
+        ;; on-disk content MUST be nested under [:agent-session :project-nrepl]
+        ;; because resolve-config extracts via (:project-nrepl (agent-session-map ...)).
+        (write-user-config! home
+                            {:agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]
+                                                             :attach {:host "localhost" :port 7888}}}})
+        (write-project-config! worktree
+                               {:agent-session {:project-nrepl {:attach {:port 9999}}}})
+        (with-temp-home home
+          #(is (= {:project-nrepl {:start-command ["bb" "nrepl-server"]
+                                   :attach {:host "localhost" :port 9999}}}
+                  (project-nrepl-config/resolve-config worktree))))
+        (finally
+          (delete-tree! home)
+          (delete-tree! worktree)))))
+
+  (testing "returns empty project-nrepl config when no user or project config files exist"
+    (let [home     (temp-dir "psi-project-nrepl-home-")
+          worktree (temp-dir "psi-project-nrepl-wt-")]
+      (try
+        (with-temp-home home
+          #(is (= {:project-nrepl {}}
+                  (project-nrepl-config/resolve-config worktree))))
+        (finally
+          (delete-tree! home)
+          (delete-tree! worktree))))))
 
 (deftest read-project-preferences-test
   (testing "deep-merges shared then local with local precedence"

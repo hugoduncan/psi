@@ -54,12 +54,12 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
 
 ## Slice 8 — `config_test.clj`
 
-- [ ] Reshape the `resolve-config` merge test to write a real user file `<tmp-home>/.psi/agent/config.edn` = `{:agent-session {:project-nrepl {:attach {:host "localhost" :port 7888}}}}` and a real project file `<wt>/.psi/project.edn` = `{:agent-session {:project-nrepl {:attach {:port 9999}}}}`
-- [ ] Temporarily rebind `user.home` to the temp home; restore original in `finally`
-- [ ] Assert `resolve-config` returns the deep-merged `:project-nrepl` (project `:port` wins, user `:host` survives) — no `:version` key in output
-- [ ] Reshape the empty case: temp `user.home` with no user file + temp worktree with no project files → assert `{:project-nrepl {}}`
-- [ ] Remove all `read-user-config`/`read-project-preferences` redefs
-- [ ] Run `config_test.clj` green
+- [x] Reshape the `resolve-config` merge test to write a real user file `<tmp-home>/.psi/agent/config.edn` and a real project file `<wt>/.psi/project.edn`, both nested under `{:agent-session {:project-nrepl {...}}}`
+- [x] Temporarily rebind `user.home` to the temp home; restore original in `finally`
+- [x] Assert `resolve-config` returns the deep-merged `:project-nrepl` (project `:port` wins, user `:host` survives) — no `:version` key in output
+- [x] Reshape the empty case: temp `user.home` with no user file + temp worktree with no project files → assert `{:project-nrepl {}}`
+- [x] Remove all `read-user-config`/`read-project-preferences` redefs
+- [x] Run `config_test.clj` green (7 tests, 32 assertions)
 
 ## Slice 9 — `commands_test.clj`
 
