@@ -571,3 +571,51 @@ Verification: `clojure -M:test --focus psi.agent-session.psi-tool-scheduler-test
 clean. Coherence gate: `git diff --name-only` shows only the psi-tool-surface
 test file (Slice-10 allowlist) + task-dir `steps.md`; zero `src/**` /
 `doc/scheduler.md` changes.
+
+## Implementation review — pass 3 (task-implementation-review skill, 2026-06-01)
+
+Reviewed the verification-only deliverable against design/plan/architecture and
+the live runtime. Re-ran full `bb test` → ✅ all green; scheduler-touched test
+files `clj-kondo` 0/0. Spot-verified test↔source coherence:
+
+- Live round-trip tests (`scheduler_end_to_end_test`) drive the real
+  dispatch+effect pipeline, cross only the time/timer boundary via the captured
+  `:scheduler-run-after-delay-fn` seam, and assert state/outputs (delivered
+  journal message + provenance; created top-level session + `:created-session-id`
+  / `:delivery-phase`), never handler interactions. Matches design "real
+  effect/dispatch round trip" + architecture (assert state, not interactions). ✓
+- Pure-model guard messages in `scheduler_test` match `scheduler.clj` exactly:
+  "schedule-id already exists" (:138), "schedule is not cancellable" (:163),
+  "only pending schedules can fire" (:201), "schedule is not fail-able" (:245). ✓
+- `fail-schedule-records-failure-detail-and-dequeues-test` logic sound: `s1`
+  fires a `:session`-kind schedule which returns action `:deliver` with
+  `:state state` unchanged, so `sch-fail` stays `:pending`; the cancel→`:cancelled`
+  path then correctly triggers the `:fail-able` guard rejection. ✓
+- `:at` finding matches `doc/scheduler.md:99` ("past absolute instants fire
+  immediately") and `resolve-fire-time!` delay-0 path; named-bound assertions
+  present (pass-2). ✓
+- `capturing-delay-fn` test-support helper (pass-1 DRY) is clean, documented,
+  single-purpose. ✓
+
+One new actionable issue (test-doc accuracy, non-blocking):
+
+- **Slice-10 coherence-gate allowlist is stale.** The close-out gate enumerates
+  permitted touched paths as test files matching `scheduler_*` **or**
+  `psi_tool_scheduler_test.clj` (+ task dir + any Slice-9 remediation dir). But
+  the actual changeset (`git diff --name-only 87140947b~1..HEAD`) also includes
+  `components/agent-session/test/psi/agent_session/test_support.clj`, added by
+  the pass-1 `capturing-delay-fn` extraction. `test_support.clj` matches neither
+  the `scheduler_*` glob nor the named exception, so a literal application of the
+  documented gate would FAIL on a legitimately-touched file. The real
+  verification-only invariant (no `src/**` / `doc/scheduler.md` changes) still
+  holds — `test_support.clj` is under `test/`, not source/doc — but the
+  *falsifiable gate as written* no longer enumerates a path it should permit.
+  Fix: broaden the Slice-10 allowlist to include shared test-support files under
+  `components/agent-session/test/**` (e.g. add `test_support.clj` to the named
+  exceptions, or generalise to "test files under
+  `components/agent-session/test/**`"), and re-state the gate's true invariant as
+  "zero `components/agent-session/src/**` or `doc/scheduler.md` changes". Doc
+  edit to steps.md only; no test/src/doc behaviour change.
+
+No other new actionable issues. Earlier flags (capture-timer DRY, `:at`
+named-bound precision) already executed.

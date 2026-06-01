@@ -420,3 +420,22 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       would fail). `psi_tool_scheduler_test` now 1 test / 109 assertions
       (was 107; +2), green; clj-kondo 0/0, cljfmt clean. Test file only — no
       `src/**` or `doc/scheduler.md` touched (within the Slice-10 allowlist).
+
+## Implementation review follow-ups — pass 3 (2026-06-01)
+
+- [ ] Broaden the Slice-10 coherence-gate allowlist to admit shared
+      test-support files. The gate currently permits only test files matching
+      `scheduler_*` **or** `psi_tool_scheduler_test.clj` (+ task dir + Slice-9
+      remediation dir), but the actual changeset includes
+      `components/agent-session/test/psi/agent_session/test_support.clj` (added
+      by the pass-1 `capturing-delay-fn` extraction), which matches neither
+      pattern — so a literal application of the documented gate would FAIL on a
+      legitimately-touched file even though the verification-only invariant holds
+      (`test_support.clj` is under `test/`, not `src/**`/`doc/`). Update the
+      Slice-10 close-out item: add `test_support.clj` to the named exceptions
+      (or generalise the allowed-path rule to "test files under
+      `components/agent-session/test/**`"), and re-state the gate's real
+      invariant as "zero `components/agent-session/src/**` or `doc/scheduler.md`
+      changes". steps.md doc edit only — no test/src/doc behaviour change. (If
+      the task is treated as closed, raise it as a small standalone
+      task-hygiene task instead.)
