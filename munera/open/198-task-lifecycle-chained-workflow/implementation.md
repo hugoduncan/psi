@@ -481,3 +481,38 @@ Verification: focused `task-lifecycle-test` → 1 test, 8 assertions (was 6),
 0 failures. `clj-kondo` on the edited test file: 0 errors / 0 warnings.
 
 PASS_STATUS: follow-ups complete.
+
+## 2026-06-01 — test review pass 2 (task-test-review skill) (ψ)
+
+Re-applied `task-test-review` to `task-lifecycle-test`
+(`workflow_definitions_test.clj`) after the prior pass-1 follow-ups landed
+(`:prompt-string` + `:context` assertions, now 8 assertions, green). Re-read
+design acceptance criteria, the `.edn`, and the test.
+
+Skill criteria:
+- well_formed: ✓ — clean `load-edn-only` shape, mirrors siblings.
+- ¬mock ∧ ¬stub ∧ nullable infra: ✓ — real loader over temp `with-workflow-dir`.
+- ∀ behaviour(design) ∃ covering test: one residual gap (actionable).
+
+Already-covered (no duplication): definition presence, five `:name`/`:type`/
+`:target` in order, `:prompt-string` `:map` form, `:context` input-only. The
+two pass-1 follow-ups closed the highest-value gaps.
+
+Residual coverage gap (NEW, not a duplicate of pass-1):
+
+1. **Terminal-step `:yields` / `:terminal-contract` absence unguarded.**
+   Design's "Final-stage surfacing" makes the terminal output contract depend on
+   the terminal `review-task-implementation` step declaring **no** explicit
+   `:yields` and **no** `:terminal-contract` (it relies on the propagated
+   session default yield). `steps.md` Slice 1 has an explicit verification item
+   for this ("Confirm the terminal … step declares no explicit `:yields` and no
+   `:terminal-contract`"), and the implementation-review note asserts it ✓ — but
+   that confirmation is by inspection, not by the test. `task-lifecycle-test`
+   asserts `:prompt-string` and `:context` equality per step but never asserts
+   the absence of `:yields`/`:terminal-contract`. A regression adding `:yields`
+   or `:terminal-contract` to any step (especially the terminal) would pass the
+   test green while changing the design's terminal-surfacing contract. Add an
+   assertion that no step declares `:yields` or `:terminal-contract` (or
+   specifically that the terminal step omits both).
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
