@@ -1579,3 +1579,42 @@ Verification: `clj-paren-repair` + `clj-kondo` clean on both files;
 (`5 tests, 26 assertions`), plus commands/runtime/eval/ops/attach
 (`14 tests, 93 assertions`) all green. Behaviour and the component boundary are
 unchanged; no user-facing doc/changelog impact. All three `steps.md` items checked.
+
+## Code-shaper review follow-ups (2026-06-01, second code-shaper pass)
+
+Second independent code-shaper pass (simplicity ∧ consistency ∧ robustness) over
+the code this task shaped — the three seams (`:nrepl-connector`,
+`:process-launcher`, `[:runtime-handle :client-session]`), their consuming
+production call sites (`client.clj`, `started.clj`, `attach.clj`, `ops.clj`),
+and the shared `test-support` helpers. Found NO new actionable issues.
+
+- simple: each seam resolved via one `(or (get-in instance [:runtime-handle
+  <key>]) <real-default>)` idiom; helpers are single-responsibility; the prior
+  pass's guard-order, single `client-session` name, and single
+  `effective-timeout-ms` fixes are in place and verified.
+- consistent: identical `[:runtime-handle <key>]` injection idiom across all
+  three seams; uniform `real-*` default naming and `*-instance-in!` call shape;
+  all test fixture ceremony single-sourced in `psi.project-nrepl.test-support`
+  (`make-ctx`/`session-ctx-at`/`install-instance!`/`seed-connector!`/
+  `fake-connector`/`session-fn-with-id`/`temp-dir`/`delete-tree!`).
+- robust: seams are thin, production-owned, orthogonal; nullable defaults
+  preserve real-caller behaviour (optional seeds default absent); the
+  session-id-missing throw invariant is retained at the correct boundary
+  (`connect-instance-in!`, not the seam).
+
+Verified empirically: zero `with-redefs`; `clj-kondo --lint
+components/project-nrepl/{src,test}` → 0 errors / 0 warnings.
+
+Considered and deliberately NOT raised (scope discipline): the
+`eval.clj summarize-response` status-set check duplicates each outcome across a
+string and a keyword form (`"interrupted"`/`:interrupted`,
+`"eval-error"`/`:eval-error`, `"done"`/`:done`), and the keyword branches are
+unexercised (nREPL `combine-responses` yields string statuses; every test seam
+returns string-status sets). This is a real flow-control-simplicity smell, but
+it lives in `eval.clj`, which the design classifies "keep largely as-is" and
+this task never modified — raising it would be scope expansion beyond the
+de-mock/seam-shaping slice, consistent with the discipline prior passes applied
+to pre-existing `connect-instance-in!` guards. Left for a future eval-focused
+slice if desired.
+
+Review complete — no follow-up steps added.

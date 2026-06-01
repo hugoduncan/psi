@@ -412,3 +412,16 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
 - [x] `client.clj connect-instance-in!`: move the `{:keys [host port]} (:endpoint instance)` destructure below the `(when-not instance ...)` existence guard so `instance` is validated to exist before its contents are read (the throw already fires first, but the binding reads as a latent nil-deref — `locally_comprehensible`). Keep tests green + lint clean.
 - [x] `client.clj connect-instance-in!`: drop the redundant `session-fn` alias of `client-session` — read the `:nrepl.core/taking-until` meta off `client-session` directly (the runtime-handle merge already uses `client-session`), so one concept carries one name (`simple`). Keep tests green + lint clean.
 - [x] `started.clj wait-for-started-endpoint!`: bind the effective timeout once (`effective-timeout-ms = (or (:timeout-ms opts) default-readiness-timeout-ms)`) and use it for BOTH the deadline and the timeout `ex-info` `:timeout-ms` value, so the reported timeout matches the deadline enforced instead of reporting `nil` when a caller uses the default (`robust`/`consistent`). Keep tests green + lint clean.
+
+## Code-shaper review follow-ups (2026-06-01, second code-shaper pass)
+
+- (none) Second independent code-shaper pass found no new actionable issues in
+  the code this task shaped. The three prior code-shaper follow-ups (guard
+  order, single `client-session` name, single `effective-timeout-ms`) are in
+  place. Seams use one consistent `[:runtime-handle <key>]` injection idiom;
+  all test fixture ceremony is single-sourced in `test-support`; nullable
+  defaults preserve real-caller behaviour. Zero `with-redefs`; lint 0/0.
+  Deliberately NOT raised (scope): the `eval.clj summarize-response`
+  string/keyword status-branch duplication — `eval.clj` is design-classified
+  "keep largely as-is" and untouched by this task, so raising it is scope
+  expansion. No follow-up steps added. (Detail in implementation.md.)
