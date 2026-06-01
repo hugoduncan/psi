@@ -6,6 +6,7 @@
    [psi.agent-core.core :as agent]
    [psi.agent-session.core :as session]
    [psi.agent-session.dispatch :as dispatch]
+   [psi.agent-session.extensions :as ext]
    [psi.agent-session.post-tool :as post-tool]
    [psi.agent-session.tool-runtime-adapter :as tool-runtime-adapter]
    [psi.session-state.state :as ss]
@@ -314,3 +315,60 @@
       (let [projected (.poll q 5 TimeUnit/MILLISECONDS)]
         (is (= :agent-event (:type projected)))
         (is (= event (dissoc projected :type)))))))
+
+(deftest emit-tool-lifecycle-bridge-fires-extension-handlers-test
+  (testing "run-tool-call! fires registered tool_call and tool_result extension handlers (regression guard for emit-tool-lifecycle! bridge)"
+    (let [agent-ctx   (setup-agent-ctx!)
+          [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
+          tc          {:id "call-bridge" :name "read" :arguments "{}"}
+          reg         (:extension-registry session-ctx)
+          calls       (atom [])]
+      (ext/register-extension-in! reg "/ext/test-bridge")
+      (ext/register-handler-in! reg "/ext/test-bridge" "tool_call"
+                                (fn [event] (swap! calls conj [:tool-call event]) nil))
+      (ext/register-handler-in! reg "/ext/test-bridge" "tool_result"
+                                (fn [event] (swap! calls conj [:tool-result event]) nil))
+      (with-redefs [tool-plan/execute-tool-runtime-in!
+                    (fn [_ _ _ _]
+                      {:content "result-text"
+                       :is-error false
+                       :details {:truncation {:truncated false}}})
+                    agent/emit-tool-start-in! (fn [_ _] nil)
+                    agent/emit-tool-end-in! (fn [_ _ _ _] nil)
+                    agent/record-tool-result-in! (fn [_ _] nil)]
+        (#'tool-runtime-adapter/run-tool-call! session-ctx session-ctx-id tc nil)
+        (let [recorded @calls
+              call-event   (second (first (filter #(= :tool-call (first %)) recorded)))
+              result-event (second (first (filter #(= :tool-result (first %)) recorded)))]
+          (is (= 2 (count recorded)) "both tool_call and tool_result handlers fire")
+          (is (= "tool_call" (:type call-event)))
+          (is (= "read" (:tool-name call-event)))
+          (is (= "call-bridge" (:tool-call-id call-event)))
+          (is (= "tool_result" (:type result-event)))
+          (is (= "read" (:tool-name result-event)))
+          (is (= "call-bridge" (:tool-call-id result-event)))
+          (is (= false (:is-error result-event))))))))
+
+(deftest tool-call-handler-block-ignored-on-interactive-path-test
+  (testing "{:block true} from a tool_call handler does NOT block execution on the interactive path (intentional non-enforcement)"
+    (let [agent-ctx   (setup-agent-ctx!)
+          [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
+          tc          {:id "call-block" :name "bash" :arguments "{}"}
+          reg         (:extension-registry session-ctx)
+          result-atom (atom nil)]
+      (ext/register-extension-in! reg "/ext/test-block")
+      (ext/register-handler-in! reg "/ext/test-block" "tool_call"
+                                (fn [_] {:block true :reason "blocked by extension"}))
+      (with-redefs [tool-plan/execute-tool-runtime-in!
+                    (fn [_ _ _ _]
+                      {:content "executed despite block"
+                       :is-error false
+                       :details {:truncation {:truncated false}}})
+                    agent/emit-tool-start-in! (fn [_ _] nil)
+                    agent/emit-tool-end-in! (fn [_ _ _ _] nil)
+                    agent/record-tool-result-in!
+                    (fn [_ msg] (reset! result-atom msg) nil)]
+        (let [result (#'tool-runtime-adapter/run-tool-call! session-ctx session-ctx-id tc nil)]
+          (is (some? result) "tool execution completes even when handler returns {:block true}")
+          (is (= "call-block" (:tool-call-id result)) "result carries the tool-call-id")
+          (is (some? @result-atom) "tool result was recorded — execution was not blocked"))))))

@@ -88,3 +88,23 @@ enforcement.
    sets it. Absence is test-only (minimal unit-test ctx bypassing `make-session-ctx`).
    Decision: keep `when-let` guard as-is — asserting presence would break low-level unit
    tests that legitimately omit the registry.
+
+## 2026-06-01 — review follow-up tests added
+
+Added two tests to `tool_execution_test.clj`:
+
+1. **`emit-tool-lifecycle-bridge-fires-extension-handlers-test`**: registers `"tool_call"`
+   and `"tool_result"` handlers on the session ctx's `extension-registry`, calls
+   `run-tool-call!`, and asserts both handlers fire with correct payload fields
+   (`:type`, `:tool-name`, `:tool-call-id`, `:is-error`). Regression guard for the
+   `emit-tool-lifecycle!` bridge — the fix could be silently reverted without this test
+   failing.
+
+2. **`tool-call-handler-block-ignored-on-interactive-path-test`**: registers a `"tool_call"`
+   handler returning `{:block true}`, calls `run-tool-call!`, and asserts execution
+   completes and the result is recorded. Documents the intentional asymmetry: blocking is
+   only enforced on the data-driven plan path (`dispatch-tool-call-in`); the interactive
+   bridge calls `dispatch-in` directly so `:block` returns are silently ignored.
+
+Verification: `clojure -M:test --focus psi.agent-session.tool-execution-test` →
+`11 tests, 60 assertions, 0 failures`. `clj-kondo` clean.
