@@ -418,3 +418,36 @@ code changed.
 
 No blocking reasons; all four items completed at the plan/steps level. Production
 seam code + test reshaping remain for the build phase per steps.md (Slices 1–12).
+
+2026-06-01 — Plan/steps inconsistency review
+
+Reviewed plan.md + steps.md against the real source (`commands.clj`, `ops.clj`,
+`eval.clj`, `started.clj`, `runtime.clj`, `client.clj`, `config.clj`) plus the
+six in-scope test files. Prior plan/steps note was an ambiguity pass; this is the
+first plan/steps inconsistency pass. Found ONE NEW actionable inconsistency (added
+to steps.md):
+
+1. Slice 9 conflates the `/project-repl interrupt` command path with the eval
+   path and omits the `active-op` precondition. Steps Slice 9 says to dispatch
+   real `/project-repl eval` AND `/project-repl interrupt` "through real
+   `commands → ops → eval`" and that the seeded `[:runtime-handle :client-session]`
+   fn returning `[{:status #{"interrupted"}}]` drives "the `:interrupted` path."
+   But source shows `/project-repl interrupt` routes via `ops/interrupt →
+   eval/interrupt-instance-in!` (NOT `eval-op`/`eval-instance-in!`), and
+   `interrupt-instance-in!` first checks `(get-in instance [:runtime-handle
+   :active-op])` — with no active-op it short-circuits to `{:status :unavailable
+   :reason :no-active-eval}` and never calls the seeded `client-session`. So a
+   command-layer interrupt test that installs an instance and dispatches
+   `/project-repl interrupt` WITHOUT first seeding/triggering an `:active-op`
+   returns `:unavailable`, never reaching the prescribed `[{:status
+   #{"interrupted"}}]` response, and the stated interrupt assertion cannot pass.
+   The prior 2026-06-01 plan/steps ambiguity note (item 3) addressed only the
+   eval-op interrupted-response template; it did not state the interrupt command
+   routes through `interrupt-instance-in!` nor that the test must establish an
+   `:active-op` (e.g. an in-flight eval, or seeding `[:runtime-handle :active-op]`)
+   before interrupting. Slice 9 must (a) correct the routing wording (interrupt →
+   `ops/interrupt → interrupt-instance-in!`, not `→ eval`), and (b) state that the
+   interrupt test must establish an `:active-op` so `interrupt-instance-in!`
+   reaches the seeded `client-session {:op "interrupt" ...}` call.
+
+No production/test code changed in this review pass.
