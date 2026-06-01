@@ -87,3 +87,20 @@ Executed I1–I3. All resolved in design.md (no blockers). Verified against sour
   `tool-event-payload-constructors-test` @475 (unrelated). Two coercion tests
   span **445–473**. Fixed design.md A3 (`453–490` → `445`/`459`, span 445–473)
   and reconciled design-steps.md A3 (`453–471` → `445–473`).
+
+## Slice 1 execution (2026-06-01)
+
+Implemented as designed; no deviations from plan.
+
+- Re-confirmed zero production callers (only the `defn` + tests).
+- Added `dispatch-tool-result-non-map-return-test` after
+  `dispatch-tool-result-coerces-is-error-test` (extensions_test.clj:413):
+  registers a `tool_result` handler returning `"not-a-map"`, asserts
+  `dispatch-tool-result-in` returns `nil`. Migrates the one wrapper-only
+  behaviour (map?/contains? guard).
+- Removed `tool-wrapping-test` (and its `;; ── Tool wrapping ──` section comment).
+- Removed `wrap-tool-executor` from extensions.clj. Modifiable-key contract now
+  appears exactly once (filter predicate, extensions.clj:331).
+- Verify: clj-paren-repair (no changes), clj-kondo clean (0/0), Kaocha focus
+  `psi.agent-session.extensions-test` → 26 tests, 94 assertions, 0 failures.
+  No project nREPL available; used Kaocha runner instead.

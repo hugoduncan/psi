@@ -332,28 +332,6 @@
                              (contains? % :is-error)))
                    results))))
 
-(defn wrap-tool-executor
-  "Wrap a tool executor fn with extension pre/post hooks.
-   `execute-fn` is (fn [tool-name args] → {:content s :is-error bool}).
-   Returns a wrapped fn with the same signature."
-  [reg execute-fn]
-  (fn [tool-name args]
-    (let [block-result (dispatch-tool-call-in reg tool-name nil args)]
-      (if (:block block-result)
-        {:content  (or (:reason block-result)
-                       "Tool execution was blocked by an extension")
-         :is-error true}
-        (let [result   (execute-fn tool-name args)
-              is-error (:is-error result false)
-              modified (dispatch-tool-result-in
-                        reg tool-name nil args result is-error)]
-          (if modified
-            (cond-> result
-              (contains? modified :content)  (assoc :content (:content modified))
-              (contains? modified :details)  (assoc :details (:details modified))
-              (contains? modified :is-error) (assoc :is-error (:is-error modified)))
-            result))))))
-
 (defn extensions-in
   "Return sequence of all registered extension paths in `reg`."
   [reg]

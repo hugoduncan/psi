@@ -380,68 +380,6 @@
       (ext/bus-emit-in! reg "ch" :x)
       (is (= [[:a :x] [:b :x]] @fired)))))
 
-;; ── Tool wrapping ───────────────────────────────────────────────────────────
-
-(deftest tool-wrapping-test
-  (testing "wrap-tool-executor passes through when no handlers"
-    (let [reg        (ext/create-registry)
-          execute-fn (fn [tool-name _args] {:content (str tool-name " ok") :is-error false})
-          wrapped    (ext/wrap-tool-executor reg execute-fn)]
-      (is (= {:content "read ok" :is-error false}
-             (wrapped "read" {})))))
-
-  (testing "wrap-tool-executor remains an extension-local compatibility wrapper"
-    (let [reg        (ext/create-registry)
-          calls      (atom [])
-          execute-fn (fn [tool-name args]
-                       (swap! calls conj {:tool-name tool-name :args args})
-                       {:content "ok" :is-error false})
-          wrapped    (ext/wrap-tool-executor reg execute-fn)]
-      (is (= {:content "ok" :is-error false}
-             (wrapped "echo" {"x" 1})))
-      (is (= [{:tool-name "echo" :args {"x" 1}}] @calls))))
-
-  (testing "tool_call handler can block execution"
-    (let [reg        (ext/create-registry)
-          execute-fn (fn [_tool-name _args]
-                       (throw (Exception. "should not be called")))
-          _          (ext/register-extension-in! reg "/ext/a")
-          _          (ext/register-handler-in! reg "/ext/a" "tool_call"
-                                               (fn [_] {:block true :reason "blocked!"}))
-          wrapped    (ext/wrap-tool-executor reg execute-fn)]
-      (is (= {:content "blocked!" :is-error true}
-             (wrapped "bash" {"command" "rm -rf /"})))))
-
-  (testing "tool_result handler can modify result"
-    (let [reg        (ext/create-registry)
-          execute-fn (fn [_tool-name _args] {:content "original" :is-error false})
-          _          (ext/register-extension-in! reg "/ext/a")
-          _          (ext/register-handler-in! reg "/ext/a" "tool_result"
-                                               (fn [_] {:content "modified"}))
-          wrapped    (ext/wrap-tool-executor reg execute-fn)]
-      (is (= {:content "modified" :is-error false}
-             (wrapped "read" {"path" "test.txt"})))))
-
-  (testing "tool_result handler can modify is-error"
-    (let [reg        (ext/create-registry)
-          execute-fn (fn [_tool-name _args] {:content "result" :is-error false})
-          _          (ext/register-extension-in! reg "/ext/a")
-          _          (ext/register-handler-in! reg "/ext/a" "tool_result"
-                                               (fn [_] {:is-error true}))
-          wrapped    (ext/wrap-tool-executor reg execute-fn)]
-      (is (= {:content "result" :is-error true}
-             (wrapped "read" {"path" "test.txt"})))))
-
-  (testing "tool_result handler returning non-map is silently ignored"
-    (let [reg        (ext/create-registry)
-          execute-fn (fn [_tool-name _args] {:content "original" :is-error false})
-          _          (ext/register-extension-in! reg "/ext/a")
-          _          (ext/register-handler-in! reg "/ext/a" "tool_result"
-                                               (fn [_] "not-a-map"))
-          wrapped    (ext/wrap-tool-executor reg execute-fn)]
-      (is (= {:content "original" :is-error false}
-             (wrapped "read" {"path" "test.txt"}))))))
-
 (deftest dispatch-tool-result-normalizes-content-test
   (testing "plan-path tool_result bus event delivers :content as normalized content-blocks"
     (let [reg     (ext/create-registry)
@@ -471,6 +409,18 @@
         (ext/dispatch-tool-result-in reg "read" "call-2" {"path" "x"}
                                      {:content "boom"} "some-error")
         (is (true? (:is-error @payload)))))))
+
+(deftest dispatch-tool-result-non-map-return-test
+  (testing "tool_result handler returning a non-map yields no override (nil)"
+    (let [reg (ext/create-registry)
+          _   (ext/register-extension-in! reg "/ext/a")
+          _   (ext/register-handler-in! reg "/ext/a" "tool_result"
+                                        (fn [_] "not-a-map"))]
+      ;; The surviving filter predicate's map?/contains? guard rejects non-map
+      ;; handler returns, so no modifiable-key override is produced.
+      (is (nil? (ext/dispatch-tool-result-in reg "read" "call-1" {"path" "x"}
+                                             {:content "original" :is-error false}
+                                             false))))))
 
 (deftest tool-event-payload-constructors-test
   (testing "tool-call-event builds the canonical tool_call payload shape"
