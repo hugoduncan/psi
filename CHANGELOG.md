@@ -6,6 +6,8 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 
 ## [Unreleased]
 
+## [0.1.2166] - 2026-06-01
+
 ### Added
 - Provider retry/backoff history is now queryable through the live graph, including retry counts, retried provider request summaries, attempt error classification, delay source, resume timing, and rate-limit metadata.
 - Claude Opus 4.8 (`claude-opus-4-8`) is now available in the Anthropic model catalog with adaptive thinking, native JSON Schema structured output, and mid-conversation system-message capability metadata.
@@ -144,7 +146,8 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 ### Fixed
 
 <!-- Comparison links -->
-[Unreleased]: https://github.com/hugoduncan/psi/compare/v0.1.2137...HEAD
+[Unreleased]: https://github.com/hugoduncan/psi/compare/v0.1.2166...HEAD
+[0.1.2166]: https://github.com/hugoduncan/psi/compare/v0.1.2137...v0.1.2166
 [0.1.2137]: https://github.com/hugoduncan/psi/compare/v0.1.2123...v0.1.2137
 [0.1.2123]: https://github.com/hugoduncan/psi/compare/v0.1.2119...v0.1.2123
 [0.1.2119]: https://github.com/hugoduncan/psi/compare/v0.1.2115...v0.1.2119
