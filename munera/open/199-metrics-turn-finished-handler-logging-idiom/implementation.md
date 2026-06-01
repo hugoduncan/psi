@@ -53,3 +53,27 @@ Resolved all four ambiguity items in `design.md` from codebase evidence:
   prefix (timbre supplies level + ns).
 
 All four design-steps marked done. No items left blocked.
+
+## Design review — inconsistency pass (2026-06-01)
+
+Reviewed `design.md` only (not plan/steps) for internal inconsistency and
+inconsistency against referenced artifacts. Verified against the codebase:
+
+- Code matches: `extension.clj:98-100` `println "DEBUG [psi/metrics] ..."` in the
+  `catch`; ns requires lack timbre; `deps.edn :deps` = clojure 1.12.0 + malli only.
+- Sibling sites match: `persistence.clj:47,51` `println "WARN [psi/metrics]"`.
+- Version pin consistent: state-kernel + root pin timbre `6.8.0`; transitive
+  timbre on the `:test` classpath is also `6.8.0` (no conflict with the proposed
+  metrics `:deps` pin).
+- Dep claims verified empirically: `:test` alias resolves timbre `6.8.0`
+  transitively (agent-session → statecharts); standalone `src` classpath has no
+  timbre — confirming the explicit-dep requirement.
+- Reference idiom sites exist: `runtime.clj:217 (timbre/warn e "Extension run-fn
+  failed")`, `app-runtime/.../app_runtime.clj:222 (timbre/warn e ...)`,
+  `loader.clj:113`, `tool_output.clj:282`.
+- Out-of-scope cross-ref valid: task `200-...` exists.
+
+No new actionable inconsistency. Minor (non-actionable) note: the design cites
+`app_runtime.clj:222` with a bare filename; the file lives in the `app-runtime`
+component, not `agent-session` — but the cited site exists and supports the
+structured-`e` claim, so it does not mislead an implementer.
