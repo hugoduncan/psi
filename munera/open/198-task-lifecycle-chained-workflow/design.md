@@ -47,11 +47,23 @@ using the `:map` form:
 ```
 
 This is required because, for a delegated workflow invocation, the delegated
-step's fully-rendered `:prompt-string` becomes that sub-workflow's
-`:workflow-input` (per `doc/workflow-grammar-concepts.md` § "Workflow input and
-original request"). The `:map` form makes `:workflow-input` the map
-`{:input "<task-id>"}`, so a sub-workflow reference of `{:from :workflow-input
-:path [:input]}` resolves the identifier.
+step's rendered `:prompt-string` becomes that sub-workflow's `:workflow-input`.
+The `:map` form makes the rendered `:prompt-string` — and therefore
+`:workflow-input` — the map `{:input "<task-id>"}`, so a sub-workflow reference
+of `{:from :workflow-input :path [:input]}` resolves the identifier.
+
+Authority note: the runtime, not the prose doc, is the authority for this
+mechanism. `psi.workflow-step-materialization.source-resolution/render-delegate-prompt-string`
+returns a map (via `(into {} ...)` over `:fields`) for a `{:type :map}`
+`:prompt-string`. `doc/workflow-grammar-concepts.md` § "Workflow input and
+original request" describes `:workflow-input` only as the delegated step's
+"fully rendered `:prompt-string`" / "final rendered prompt string" and presents
+it as a string; it does not document the `:map` `:prompt-string` form (nor do
+`doc/workflow-grammar.md` or `doc/workflow-ir.md`). That doc therefore does not
+support — and textually contradicts — the map-shaped result. The mechanism is
+correct against the runtime (and matches `gh-issue-implement.edn` /
+`review-task-implementation.edn` usage); the concepts doc has a known gap for
+the `:map` form.
 
 All five targets uniformly require `:path [:input]` to resolve:
 
@@ -95,11 +107,24 @@ Out of scope:
 There is **no** additional synthesizing/`final-summary` step. The last delegate
 step (`review-task-implementation`) surfaces its result directly, mirroring
 `review-task-implementation.edn` itself, which ends on its last delegate step
-with no trailing summary step. A `:delegate` step yields its delegated run's
-text result by default, so the orchestrator's terminal output is that last
-delegate's text yield. The terminal step therefore declares no explicit
-`:yields` (it relies on the default text yield); no `:terminal-contract` is
-required.
+with no trailing summary step.
+
+A `:delegate` step does **not** yield text as a universal default. The
+documented default (`doc/workflow-grammar-concepts.md` § default yielded-value
+composition) is that a delegate step "yields the called workflow's yielded value
+unchanged". The orchestrator's terminal output is text only because the chain
+bottoms out in session steps:
+
+- `task-lifecycle` last step delegates to `review-task-implementation`;
+- `review-task-implementation` ends on its last delegate step (`review-code-shape`),
+  which delegates to `review-step`;
+- `review-step` terminates in a `:session` step, whose default yield is its
+  `:final-llm-reply` text.
+
+So the text yield is propagated unchanged up the delegate chain from the
+terminal session step, rather than being a property of the `:delegate` step
+itself. The terminal step therefore declares no explicit `:yields` (it relies on
+this propagated default); no `:terminal-contract` is required.
 
 Intermediate stage summaries are not threaded forward as authoritative input:
 each sub-workflow re-inspects the task's Munera files (input-only threading, per

@@ -85,3 +85,30 @@ artifacts. New actionable inconsistencies found:
    session yields `:final-llm-reply` text). The design states text-as-default as a
    universal delegate property rather than tracing it through the
    review-task-implementation → review-step chain.
+
+## 2026-06-01 — inconsistency follow-up execution (ψ)
+
+Executed both inconsistency-review follow-up items; design.md updated.
+
+1. Doc-citation contradiction — RESOLVED. "Input threading mechanism" no longer
+   cites `doc/workflow-grammar-concepts.md` § "Workflow input and original
+   request" as the authority for the map-shaped `:workflow-input`. Verified
+   against runtime:
+   `source_resolution.clj` `render-delegate-prompt-string` returns a map via
+   `(into {} ...)` over `:fields` for `{:type :map}`. Verified the concepts doc
+   describes `:workflow-input` only as "fully rendered `:prompt-string`" /
+   "final rendered prompt string" (string) and does not document the `:map`
+   form (also absent from workflow-grammar.md / workflow-ir.md). design.md now
+   names the runtime as authority, points to `gh-issue-implement.edn` /
+   `review-task-implementation.edn` usage, and flags the concepts-doc gap.
+
+2. Delegate default-yield — CORRECTED. "Final-stage surfacing" no longer claims
+   a `:delegate` step yields text by default. Verified the documented default
+   (concepts § default yielded-value composition, line 287): delegate "yields
+   the called workflow's yielded value unchanged". design.md now traces the text
+   yield through the chain: task-lifecycle → review-task-implementation (ends on
+   `review-code-shape` delegate) → review-step (terminates in `:session` step
+   yielding `:final-llm-reply` text). Confirmed against `.psi/workflows/`
+   `review-task-implementation.edn` (last step `review-code-shape` :delegate →
+   "review-step") and `review-step.edn` (terminal `:session` steps). Text is the
+   propagated session default, not a delegate property.

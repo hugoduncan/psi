@@ -25,7 +25,7 @@
 
 ## Inconsistency review follow-ups
 
-- [ ] Resolve the doc-citation contradiction in "Input threading mechanism". The
+- [x] Resolve the doc-citation contradiction in "Input threading mechanism". The
       design cites `doc/workflow-grammar-concepts.md` § "Workflow input and
       original request" as authority for `:workflow-input` becoming the map
       `{:input "<task-id>"}`, but that section describes `:workflow-input` as the
@@ -35,7 +35,7 @@
       `source_resolution.clj`, which returns a map for `{:type :map}`) and/or note
       the doc gap, so the design's mechanism is not justified by a contradicting
       reference.
-- [ ] Correct the "Final-stage surfacing" claim that a `:delegate` step "yields
+- [x] Correct the "Final-stage surfacing" claim that a `:delegate` step "yields
       its delegated run's text result by default". The documented default
       (concepts § default yielded-value composition) is that a delegate "yields
       the called workflow's yielded value unchanged". State that the terminal
