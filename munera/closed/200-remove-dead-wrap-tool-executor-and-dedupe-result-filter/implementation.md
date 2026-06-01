@@ -258,3 +258,46 @@ covered by `dispatch-override-test`; exception wrapping by `dispatch-exception-t
 They are out of scope for this dead-code-removal / single-sourcing task.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Test review: test-shaper (2026-06-01)
+
+Applied test-shaper (clarity ∧ signal ∧ robustness ∧ economy) to the
+`dispatch-tool-result-*` test cluster (extensions_test.clj:383–478). Prior passes
+were task-test-review (coverage-focused) and reached full branch coverage; this
+pass reviews test *shape*, a distinct lens. Two actionable shape issues (S1, S2);
+no coverage regressions.
+
+S1 (actionable — economy / repeated ceremony): the six `dispatch-tool-result-*`
+tests (383–478) each rebuild identical scaffolding — `create-registry` +
+`register-extension-in!` + `register-handler-in!` + the full 5-arg
+`dispatch-tool-result-in` call (`"read" "call-N" {"path" "x"} {…original…}
+false`). Only the handler return and the expected value vary. This is
+incidental setup repeated 6× (`λ economical`: `minimal(incidental_variation)`;
+`prefer helpers_that_compress(ceremony)`). No shared helper exists (confirmed:
+the test ns defines none for this cluster). Extract a helper that registers a
+single `tool_result` handler returning a fixed value and invokes
+`dispatch-tool-result-in`, e.g. `(result-override <handler-return>) ⇒
+<dispatch return>`, so each test states only its one varying axis (return →
+selected/nil). This compresses ceremony without hiding intent.
+
+S2 (actionable — incidental detail obscures signal): the override-selection
+tests (`-modifiable-key-override`, `-map-without-modifiable-key`,
+`-details-only-override`, `-is-error-only-override`, `-non-map-return`) pass an
+*original* result `{:content "original" :is-error false}` that is never
+asserted against — the override fully replaces it, so the literal "original"
+content is incidental noise that does not aid comprehension of the
+filter-selection behaviour under test (`λ simple`: `minimal_incidental_setup`,
+`¬embed(unrelated_details)`). Either fold the original payload into the S1
+helper as a single fixed constant (so it stops varying / drawing attention) or
+use a clearly-inert marker, so the reader's eye lands on the handler-return vs
+expected-override contract, not the discarded original.
+
+Note (¬actionable, recorded for shape rationale): the four override-selection
+tests are one parameterized behaviour ("which handler return is selected") split
+per-disjunct deliberately (per the T2 coverage rationale — each `or` disjunct
+must be independently mutation-protected). Keeping them as distinct deftests
+preserves per-branch failure signal (`meaningful_failures`); they need not be
+collapsed into one `are`-table. The S1 helper alone suffices to remove the
+ceremony while retaining per-test signal.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
