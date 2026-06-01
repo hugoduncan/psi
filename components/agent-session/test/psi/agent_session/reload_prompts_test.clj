@@ -112,6 +112,37 @@
                  (set (map :name (:prompt-templates (ss/get-session-data-in ctx session-id)))))))
         (finally (delete-tree! wt))))))
 
+(defn- template-by-name
+  [ctx session-id name]
+  (->> (ss/get-session-data-in ctx session-id)
+       :prompt-templates
+       (filter #(= name (:name %)))
+       first))
+
+(deftest reload-prompts-end-to-end-edit-add-delete-test
+  (testing "edit/add/delete .md against the worktree, then reload reflects each change (AC1-AC3, AC6)"
+    (let [wt (worktree-with-prompts! {"foo" "foo body v1"
+                                      "baz" "baz body"})
+          prompts (io/file wt ".psi/prompts")]
+      (try
+        (let [[ctx session-id] (session-at-worktree wt)]
+          ;; Initial reload picks up foo + baz from the worktree.
+          (session/reload-prompts-in! ctx session-id)
+          (is (= "foo body v1" (:content (template-by-name ctx session-id "foo"))))
+          (is (some? (template-by-name ctx session-id "baz")))
+          ;; AC1: edit foo body, AC2: add bar, AC3: delete baz.
+          (spit (io/file prompts "foo.md") "foo body v2")
+          (spit (io/file prompts "bar.md") "bar body")
+          (.delete (io/file prompts "baz.md"))
+          (session/reload-prompts-in! ctx session-id)
+          ;; AC1: foo expands with new content.
+          (is (= "foo body v2" (:content (template-by-name ctx session-id "foo"))))
+          ;; AC2: bar is now discoverable.
+          (is (some? (template-by-name ctx session-id "bar")))
+          ;; AC3: baz removed.
+          (is (nil? (template-by-name ctx session-id "baz"))))
+        (finally (delete-tree! wt))))))
+
 (deftest reload-prompts-mutation-psi-tool-visible-test
   (testing "psi.extension/reload-prompts is in the registered mutation set (psi-tool visible)"
     (letfn [(op-name [m]

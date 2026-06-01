@@ -434,3 +434,34 @@ worktree read would be redundant). No diagnostics line (AC4). Wired into
 Tests: `prompts-reload-command-test` (worktree `.psi/prompts/{foo,bar}.md`,
 asserts text/worktree/`count : 2`/no-diagnostics); extended
 `format-help-includes-all-commands-test` with `/prompts-reload`.
+
+## Implementation — Slice 5 (2026-06-01)
+
+Docs + changelog + coherence. CHANGELOG `[Unreleased] → Added` entry for the
+command + mutation. `doc/tui.md`: `/prompts-reload` added to the in-session
+command list + a new "Prompt templates" subsection (documents `/prompts`,
+`/prompts-reload`, and the `psi.extension/reload-prompts` mutation).
+
+Doc-placement note: no dedicated prompt-template user doc page exists.
+`/reload-models` is documented only in `doc/custom-providers.md` (provider-
+specific) — not the right home for prompt reload. `doc/tui.md`'s in-session
+commands section is the discoverable home alongside `/prompts`.
+
+End-to-end acceptance proof `reload-prompts-end-to-end-edit-add-delete-test`
+covers AC1 (edit→content updates), AC2 (add→discoverable), AC3
+(delete→removed), AC6 (worktree root), all via `reload-prompts-in!` against a
+temp `<wt>/.psi/prompts`.
+
+Verification: `clj-kondo` 0/0 over all changed src+test; full `bb test` green.
+
+## Task complete (2026-06-01)
+
+All five slices implemented; all `steps.md` items checked. Surfaces:
+- `:session/reload-prompts` pure dispatch handler (in-handler discovery IO,
+  `:root-state-update` wholesale replace, no effects).
+- `reload-prompts-in!` settings fn + `core.clj` re-export.
+- `psi.extension/reload-prompts` mutation (psi-tool visible).
+- `/prompts-reload` command + `/help` listing.
+- CHANGELOG + `doc/tui.md` updates.
+Tests: `reload_prompts_test.clj` (6 tests / 22 assertions) + command/help tests
+in `commands_test.clj`. Full `bb test` green. AC1–AC9 all satisfied.

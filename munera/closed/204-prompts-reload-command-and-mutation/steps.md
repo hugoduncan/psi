@@ -81,22 +81,25 @@ Vertical slices from plan.md. Tick each item with its sha / decision note.
 
 ## Slice 5 — docs, changelog, coherence
 
-- [ ] Add `CHANGELOG.md` `[Unreleased] → Added` entry: new `/prompts-reload`
-      command + new `psi.extension/reload-prompts` mutation (psi-tool visible)
-      that re-discovers prompt templates from disk and replaces the session's
-      templates (AC9).
-- [ ] Update docs referencing prompt templates / reload commands (`doc/tui.md`
-      command/help listing; any prompt-template reference) to mention
-      `/prompts-reload` (AC9).
-- [ ] End-to-end acceptance proof (AC1–AC3, AC6): with a temp worktree
-      `<wt>/.psi/prompts`, prove (a) editing `foo.md` body then reload makes
-      `/foo` expand with new content, (b) adding `bar.md` then reload makes
-      `/bar` discoverable, (c) deleting `baz.md` then reload removes it — all
-      against the **worktree** root.
-- [ ] Run `clj-kondo --lint` over all changed src + test paths; fix findings.
-- [ ] Run full `bb test`; confirm green.
-- [ ] Re-read changed files (sync) and confirm coherence across
-      handler/core/mutation/command/docs/changelog.
+- [x] Added `CHANGELOG.md` `[Unreleased] → Added` entry: `/prompts-reload`
+      command + `psi.extension/reload-prompts` mutation (psi-tool visible),
+      re-discovers from `~/.psi/agent/prompts` + `<worktree>/.psi/prompts` and
+      replaces the session's templates (AC9).
+- [x] Updated `doc/tui.md`: added `/prompts-reload` to the in-session command
+      list and a new "Prompt templates" subsection documenting `/prompts` +
+      `/prompts-reload` and the mutation (AC9). (No dedicated prompt-template
+      doc page exists; `/reload-models` lives in `doc/custom-providers.md`,
+      which is provider-specific and not the right home for prompts.)
+- [x] End-to-end acceptance proof (AC1–AC3, AC6,
+      `reload-prompts-end-to-end-edit-add-delete-test`): worktree
+      `<wt>/.psi/prompts` with `foo`/`baz`; after reload (a) editing `foo.md`
+      → `foo` template `:content` updates, (b) adding `bar.md` → `bar`
+      discoverable, (c) deleting `baz.md` → `baz` removed — all against the
+      worktree root.
+- [x] `clj-kondo --lint` over all changed src + test paths: 0/0.
+- [x] Full `bb test`: green (✅ All tests passed).
+- [x] Re-read changed handler/core/mutation/command/docs/changelog (sync) —
+      coherent.
 
 ## Plan/steps ambiguity follow-ups (2026-06-01)
 
