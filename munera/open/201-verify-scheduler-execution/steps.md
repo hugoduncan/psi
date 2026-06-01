@@ -53,20 +53,34 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Slice 2 — Live execution: message kind
 
-- [ ] Audit `scheduler_end_to_end_test.clj` / `scheduler_lifecycle_test.clj`
+- [x] Audit `scheduler_end_to_end_test.clj` / `scheduler_lifecycle_test.clj`
       / `scheduler_handlers_test.clj` for a real-round-trip message-kind
       idle-delivery test (handler-level message-kind delivery lives in
       `scheduler_handlers_test.clj`).
-- [ ] Ensure a test exists that, via `test_support/make-session-ctx` seams:
+      Done: `scheduler-fired-end-to-end-delivers-when-idle` asserts provenance
+      but dispatches `:scheduler/fired` directly (skips the timer seam);
+      `scheduler-start-timer-uses-injected-time-source-and-delay-runner` crosses
+      the timer seam but only asserts status `:delivered`. Neither single test
+      jointly satisfied clauses (1)+(2) for the message-kind area → insufficient.
+- [x] Ensure a test exists that, via `test_support/make-session-ctx` seams:
       creates a message-kind schedule → captures the timer callback → invokes it
       (no sleep) → `:scheduler/fired` → schedule delivered → asserts the
       delivered prompt (`kind "message"`) appears in the **origin session** with
       scheduled provenance. Add if missing.
-- [ ] Confirm assertions are on state/outputs (delivered prompt), not handler
+      Done: added
+      `scheduler-message-kind-fires-via-timer-seam-and-delivers-to-origin` to
+      `scheduler_end_to_end_test.clj`. Captures the timer callback via
+      `:scheduler-run-after-delay-fn`, asserts pending-before-fire, invokes the
+      callback (no sleep), then asserts the delivered user message with
+      `:source :scheduled` + `:schedule-id` in the origin journal, status
+      `:delivered`, empty queue.
+- [x] Confirm assertions are on state/outputs (delivered prompt), not handler
       interactions.
-- [ ] Record message-kind finding as an entry in the **single shared "Live
+      Done: asserts journal message + scheduler state only; no interaction asserts.
+- [x] Record message-kind finding as an entry in the **single shared "Live
       execution path"** `findings.md` section (do NOT create a separate
       message-kind section), citing covering deftest.
+      Done: message-kind entry recorded as `verified-correct`.
 
 ## Slice 3 — Busy-session queue + drain-on-idle
 

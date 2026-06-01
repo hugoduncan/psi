@@ -55,6 +55,7 @@ Baseline `bb test` (scheduler subset, 2026-06-01): `35 tests, 338 assertions, 0 
 
 | status | summary | covering test | repro / task-ref |
 | ------ | ------- | ------------- | ---------------- |
+| verified-correct | **message kind** — real timer-seam round trip: create message-kind → captured timer callback invoked (no sleep) → delivered prompt with scheduled provenance (`:source :scheduled`, `:schedule-id`, role `"user"`) appears in the **origin session**; status `:delivered`, queue empty. | `scheduler-end-to-end-test/scheduler-message-kind-fires-via-timer-seam-and-delivers-to-origin` (new) | — |
 
 ---
 

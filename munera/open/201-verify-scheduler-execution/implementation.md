@@ -262,3 +262,21 @@ the earliest fire-at (`sch-early`) — confirming the sort, not insertion order.
 
 `scheduler_test` now: 11 tests / 44 assertions / 0 fail / 0 error. clj-kondo
 clean. No scheduler source touched.
+
+## Slice 2 execution — Live execution: message kind (2026-06-01)
+
+Audit: the existing `scheduler-fired-end-to-end-delivers-when-idle` test asserts
+the scheduled-provenance delivered message but dispatches `:scheduler/fired`
+**directly** — it never crosses the timer seam. The seam test
+`scheduler-start-timer-uses-injected-time-source-and-delay-runner` crosses the
+timer (captures + invokes the callback) but only asserts status `:delivered`,
+not the delivered prompt/provenance. So per the sufficient-coverage criterion
+(clause 1 named outputs AND clause 2 drive via timer seam), the message-kind
+live path was insufficiently covered by any single test.
+
+Added `scheduler-message-kind-fires-via-timer-seam-and-delivers-to-origin`:
+fixed scheduler time source; override `:scheduler-run-after-delay-fn` to capture
+the timer callback; assert pending before fire; invoke the callback (no
+`Thread/sleep`); assert the origin-session journal carries a `user` message with
+`:source :scheduled` + matching `:schedule-id`, schedule `:delivered`, queue
+empty. Green (2 tests / 9 assertions in `scheduler_end_to_end_test`).
