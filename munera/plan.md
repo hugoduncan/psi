@@ -8,6 +8,7 @@ open-task reconciliation audit (completed-task closure, NNN-collision renumber).
 Not yet started:
 
 - `munera/open/206-emacs-buffer-local-widget-mutation-timers/` — move Emacs widget-projection mutation watchdog timers from a module-global hash into buffer-local `psi-emacs-state` and cancel them in `psi-emacs--teardown-buffer`, fixing orphaned/non-deterministic/cross-buffer timers when a psi buffer is killed mid-mutation. Design-only.
+- `munera/open/201-verify-scheduler-execution/` — verify the scheduler subsystem (pure model + live timer/dispatch firing/delivery path) end-to-end and fix any defects found. Design-only; verification-led, fixes are whatever it exposes. One-shot/volatile scope (no persistence/recurrence).
 - `munera/open/203-task-lifecycle-chained-workflow/` — renumbered from 198 (NNN collision with closed `198-fix-tool-metrics-empty-tools-map`); new orchestration workflow chaining review-task-design → create-task-plan → review-task-plan → implement-task → review-task-implementation. Design-only; open questions on stage gating and context threading.
 - `munera/open/197-ui-action-invocation/` — renumbered from 191 (NNN collision); side-effecting UI action invocation deferred from closed 190/194 UI work.
 - `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
