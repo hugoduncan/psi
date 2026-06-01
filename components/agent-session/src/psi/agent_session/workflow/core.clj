@@ -13,7 +13,9 @@
    [clojure.set :as set]
    [clojure.string :as str]
    [psi.tool-runtime.call-summary :as call-summary]
+   [psi.agent-session.background-jobs :as background-jobs]
    [psi.agent-session.extensions.runtime-fns :as runtime-fns]
+   [psi.agent-session.workflow.delegate-list :as delegate-list-projection]
    [psi.agent-session.workflow.delivery :as delivery]
    [psi.agent-session.workflow.orchestration :as orchestration]
    [psi.agent-session.workflow.runtime-state :as runtime-state]
@@ -28,6 +30,11 @@
 (def inflight-runs runtime-state/inflight-runs)
 
 ;;; Helpers
+
+(defn- arg-value
+  [args k]
+  (or (get args k)
+      (get args (name k))))
 
 (def query-fn runtime-state/query-fn)
 (def mutate! runtime-state/mutate!)
@@ -234,26 +241,127 @@
 
 ;;; Delegate tool implementation
 
+(defn- background-job-query-error
+  [message details]
+  {:status :error
+   :reason :background-job-query-unavailable
+   :message message
+   :details details})
+
+(def ^:private required-background-job-row-keys
+  #{:psi.background-job/id
+    :psi.background-job/thread-id
+    :psi.background-job/tool-name
+    :psi.background-job/job-kind
+    :psi.background-job/status})
+
+(defn- present-string?
+  [x]
+  (and (string? x) (not (str/blank? x))))
+
+(defn- known-background-job-status?
+  [status]
+  (or (background-jobs/non-terminal-status? status)
+      (background-jobs/terminal-status? status)))
+
+(defn- background-job-row-shaped?
+  [job]
+  (and (map? job)
+       (every? #(contains? job %) required-background-job-row-keys)
+       (present-string? (:psi.background-job/id job))
+       (present-string? (:psi.background-job/thread-id job))
+       (present-string? (:psi.background-job/tool-name job))
+       (keyword? (:psi.background-job/job-kind job))
+       (known-background-job-status? (:psi.background-job/status job))))
+
+(defn- background-job-row-shape-error-details
+  [jobs]
+  (if-not (sequential? jobs)
+    {:jobs jobs}
+    (let [indexed-jobs (map-indexed vector jobs)]
+      {:malformed-rows
+       (->> indexed-jobs
+            (keep (fn [[idx job]]
+                    (when (not (background-job-row-shaped? job))
+                      {:index idx
+                       :keys (when (map? job)
+                               (->> (keys job) (mapv str) sort))
+                       :missing-keys (when (map? job)
+                                       (->> required-background-job-row-keys
+                                            (remove #(contains? job %))
+                                            (mapv str)
+                                            sort))})))
+            vec)})))
+
+(defn- background-jobs-payload-shaped?
+  [jobs]
+  (and (sequential? jobs)
+       (every? background-job-row-shaped? jobs)))
+
+(defn- query-background-jobs
+  [action-name]
+  (if-let [qf (query-fn)]
+    (try
+      (let [result (qf [:psi.agent-session/background-jobs])]
+        (cond
+          (not (and (map? result) (contains? result :psi.agent-session/background-jobs)))
+          (background-job-query-error
+           (str action-name " could not read the background-job visibility surface")
+           {:query-result result})
+
+          (not (background-jobs-payload-shaped?
+                (:psi.agent-session/background-jobs result)))
+          (background-job-query-error
+           (str action-name " background-job visibility surface returned a non-shaped jobs payload")
+           (background-job-row-shape-error-details
+            (:psi.agent-session/background-jobs result)))
+
+          :else
+          {:status :ok
+           :jobs (:psi.agent-session/background-jobs result)}))
+      (catch Exception e
+        (background-job-query-error
+         (str action-name " background-job query failed")
+         {:exception-message (ex-message e)
+          :exception-data (ex-data e)})))
+    (background-job-query-error
+     (str action-name " requires a background-job query surface")
+     {:query :psi.agent-session/background-jobs})))
+
+(defn- query-background-jobs-for-list
+  []
+  (query-background-jobs "delegate list"))
+
 (defn- delegate-list
-  "Handle action=list: list available workflows and active runs."
+  "Handle action=list: list available workflows and visible delegate runs."
   []
   (let [runs-result (mutate! 'psi.workflow/list-runs {})
         runs (:psi.workflow/runs runs-result)
-        jobs-result (when-let [qf (query-fn)]
-                      (qf [:psi.agent-session/background-jobs]))
-        jobs (:psi.agent-session/background-jobs jobs-result)]
-    (text/delegate-list-text (runtime-state/loaded-definitions) runs jobs)))
+        jobs-result (query-background-jobs-for-list)]
+    (if (= :error (:status jobs-result))
+      (text/error-text (:message jobs-result))
+      (let [projection (delegate-list-projection/project-visible-runs
+                        {:session-id (current-session-id)
+                         :runs runs
+                         :background-jobs (mapv delegate-list-projection/normalize-query-job
+                                                (:jobs jobs-result))})]
+        (if (= :error (:status projection))
+          (text/error-text (:message projection))
+          (text/delegate-list-text (runtime-state/loaded-definitions)
+                                   (:runs projection)))))))
 
 (defn- delegate-run
   "Handle action=run: resolve workflow, create + execute canonical workflow run.
    Supports async (default) and sync modes, fork_session, and include_result_in_context."
-  [{:keys [workflow prompt name mode fork_session include_result_in_context timeout_ms]}]
-  (let [workflow-name (some-> workflow str str/trim not-empty)
-        prompt-text   (some-> prompt str str/trim not-empty)
-        mode*         (text/parse-mode mode)
-        fork?         (true? fork_session)
-        include?      (true? include_result_in_context)
-        timeout       (or (when (number? timeout_ms) (long timeout_ms)) 300000)]
+  [args]
+  (let [workflow-name (some-> (arg-value args :workflow) str str/trim not-empty)
+        prompt-text   (some-> (arg-value args :prompt) str str/trim not-empty)
+        mode*         (text/parse-mode (arg-value args :mode))
+        fork?         (true? (arg-value args :fork_session))
+        include?      (true? (arg-value args :include_result_in_context))
+        timeout-ms    (arg-value args :timeout_ms)
+        timeout       (or (when (number? timeout-ms) (long timeout-ms)) 300000)
+        name          (arg-value args :name)]
     (cond
       (nil? workflow-name)
       {:error "workflow is required"}
@@ -323,10 +431,10 @@
 
    - blocked runs: update workflow input and resume the existing run
    - terminal runs: create a fresh run from the original definition and execute it"
-  [{:keys [id prompt include_result_in_context]}]
-  (let [run-id (some-> id str str/trim not-empty)
-        prompt-text (some-> prompt str str/trim not-empty)
-        include? (true? include_result_in_context)]
+  [args]
+  (let [run-id (some-> (arg-value args :id) str str/trim not-empty)
+        prompt-text (some-> (arg-value args :prompt) str str/trim not-empty)
+        include? (true? (arg-value args :include_result_in_context))]
     (cond
       (nil? run-id)
       {:error "id is required for continue"}
@@ -363,30 +471,75 @@
           :else
           {:error (str "Run '" run-id "' is not stopped; current status is " (name (or status :unknown)))})))))
 
+(defn- active-delegate-background-jobs
+  [session-id run-id jobs]
+  (->> jobs
+       (map delegate-list-projection/normalize-query-job)
+       (filter #(and (= (str session-id) (:thread-id %))
+                     (= "delegate" (:tool-name %))
+                     (= :workflow (:job-kind %))
+                     (= delegate-list-projection/workflow-provenance-id (:workflow-ext-path %))
+                     (= run-id (:workflow-id %))
+                     (contains? #{:running :pending-cancel} (:status %))))
+       vec))
+
+(defn- terminalize-active-delegate-background-jobs!
+  [jobs]
+  (try
+    (doseq [job jobs]
+      (mark-background-job-terminal!
+       (:job-id job)
+       :cancelled
+       {:workflow-id (:workflow-id job)
+        :status :cancelled
+        :delegate-status :cancelled
+        :reason :delegate-remove}
+       {:suppress-terminal-message? true}))
+    {:status :ok}
+    (catch Exception e
+      {:status :error
+       :message "delegate remove could not clean up active delegate background jobs"
+       :details {:exception-message (ex-message e)
+                 :exception-data (ex-data e)
+                 :job-ids (mapv :job-id jobs)}})))
+
+(defn- cleanup-active-delegate-background-jobs-before-remove!
+  [session-id run-id]
+  (let [jobs-result (query-background-jobs "delegate remove")]
+    (if (= :error (:status jobs-result))
+      jobs-result
+      (terminalize-active-delegate-background-jobs!
+       (active-delegate-background-jobs session-id run-id (:jobs jobs-result))))))
+
 (defn- delegate-remove
   "Handle action=remove: remove a run by id.
 
-   Removal clears the canonical workflow run. Delegate projection then derives
-   disappearance from canonical workflow + non-terminal background-job state,
-   so terminal background-job history does not keep removed runs visible here."
-  [{:keys [id]}]
-  (let [run-id (some-> id str str/trim not-empty)]
+   Removal clears the canonical workflow run only after any same-session active
+   delegate background jobs for the target have been resolved to terminal
+   history, so later list calls cannot observe non-terminal missing-canonical
+   corruption."
+  [args]
+  (let [run-id (some-> (arg-value args :id) str str/trim not-empty)]
     (if (nil? run-id)
       {:error "id is required for remove"}
-      (let [result (mutate! 'psi.workflow/remove-run {:run-id run-id})]
-        (if (:psi.workflow/error result)
-          {:error (:psi.workflow/error result)}
-          (do
-            (swap! inflight-runs dissoc run-id)
-            (refresh-widgets!)
-            {:ok true :run-id run-id}))))))
+      (let [session-id (current-session-id)
+            cleanup-result (cleanup-active-delegate-background-jobs-before-remove! session-id run-id)]
+        (if (= :error (:status cleanup-result))
+          {:error (:message cleanup-result)}
+          (let [result (mutate! 'psi.workflow/remove-run {:run-id run-id})]
+            (if (:psi.workflow/error result)
+              {:error (:psi.workflow/error result)}
+              (do
+                (swap! inflight-runs dissoc run-id)
+                (refresh-widgets!)
+                {:ok true :run-id run-id}))))))))
 
 (defn- execute-delegate-tool
   "Main delegate tool execution dispatcher.
 
    Defaults missing action to `run`."
   [args _opts]
-  (let [action (or (some-> (:action args) str str/lower-case str/trim) "run")]
+  (let [action (or (some-> (arg-value args :action) str str/lower-case str/trim) "run")]
     (case action
       "list"     (delegate-list)
       "run"      (let [result (delegate-run args)]

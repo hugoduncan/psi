@@ -356,13 +356,9 @@
                      :args {:route "DONE"}}
              :on {"DONE" {:goto "clarity-status"}}}
             {:name "clarity-status"
-             :type :session
-             :contributions [{:type :template :text "clarity-status"}]
-             :judge {:type :invoke
-                     :operation "workflow/constant-routing"
-                     :args {:route "DONE"}}
-             :on {"REPEAT" {:goto "ambiguity-review" :max-iterations 6}
-                  "DONE" {:goto "final-summary"}}}
+             :type :invoke
+             :operation "workflow/constant-routing"
+             :args {:route "DONE"}}
             {:name "final-summary"
              :type :session
              :contributions [{:type :template :text "final-summary"}]}]}))
@@ -453,28 +449,28 @@
                                     {"ambiguity-review" "PASS_STATUS: REVIEW_COMPLETE"
                                      "inconsistency-review" "PASS_STATUS: REVIEW_COMPLETE"})]
       (is (= :completed (:status result)))
-      (is (= ["ambiguity-review" "inconsistency-review" "clarity-status" "final-summary"] prompts))))
-  (testing "design inconsistency REVIEW_COMPLETE skips inconsistency follow-up and still runs clarity-status"
+      (is (= ["ambiguity-review" "inconsistency-review" "final-summary"] prompts))))
+  (testing "design inconsistency REVIEW_COMPLETE skips inconsistency follow-up and still reaches final summary"
     (let [{:keys [result prompts]} (execute-conditional-review-proof!
                                     "review-task-design-proof" "design-skip-inconsistency"
                                     {"ambiguity-review" "PASS_STATUS: REVIEW_COMPLETE"
                                      "inconsistency-review" "PASS_STATUS: REVIEW_COMPLETE"})]
       (is (= :completed (:status result)))
-      (is (= ["ambiguity-review" "inconsistency-review" "clarity-status" "final-summary"] prompts))))
+      (is (= ["ambiguity-review" "inconsistency-review" "final-summary"] prompts))))
   (testing "design ambiguity ACTIONABLE_FEEDBACK runs only ambiguity follow-up before inconsistency review"
     (let [{:keys [result prompts]} (execute-conditional-review-proof!
                                     "review-task-design-proof" "design-run-ambiguity"
                                     {"ambiguity-review" "PASS_STATUS: ACTIONABLE_FEEDBACK"
                                      "inconsistency-review" "PASS_STATUS: REVIEW_COMPLETE"})]
       (is (= :completed (:status result)))
-      (is (= ["ambiguity-review" "ambiguity-follow-up" "inconsistency-review" "clarity-status" "final-summary"] prompts))))
-  (testing "design inconsistency ACTIONABLE_FEEDBACK runs inconsistency follow-up before clarity-status"
+      (is (= ["ambiguity-review" "ambiguity-follow-up" "inconsistency-review" "final-summary"] prompts))))
+  (testing "design inconsistency ACTIONABLE_FEEDBACK runs inconsistency follow-up before final summary"
     (let [{:keys [result prompts]} (execute-conditional-review-proof!
                                     "review-task-design-proof" "design-run-inconsistency"
                                     {"ambiguity-review" "PASS_STATUS: REVIEW_COMPLETE"
                                      "inconsistency-review" "PASS_STATUS: ACTIONABLE_FEEDBACK"})]
       (is (= :completed (:status result)))
-      (is (= ["ambiguity-review" "inconsistency-review" "inconsistency-follow-up" "clarity-status" "final-summary"] prompts)))))
+      (is (= ["ambiguity-review" "inconsistency-review" "inconsistency-follow-up" "final-summary"] prompts)))))
 
 (deftest plan-review-conditional-follow-up-routing-test
   ;; Tests plan review per-reviewer PASS_STATUS routing mirrors design review
@@ -485,25 +481,25 @@
                                     {"ambiguity-review" "PASS_STATUS: REVIEW_COMPLETE"
                                      "inconsistency-review" "PASS_STATUS: REVIEW_COMPLETE"})]
       (is (= :completed (:status result)))
-      (is (= ["ambiguity-review" "inconsistency-review" "clarity-status" "final-summary"] prompts))))
-  (testing "plan inconsistency REVIEW_COMPLETE skips inconsistency follow-up and still runs clarity-status"
+      (is (= ["ambiguity-review" "inconsistency-review" "final-summary"] prompts))))
+  (testing "plan inconsistency REVIEW_COMPLETE skips inconsistency follow-up and still reaches final summary"
     (let [{:keys [result prompts]} (execute-conditional-review-proof!
                                     "review-task-plan-proof" "plan-skip-inconsistency"
                                     {"ambiguity-review" "PASS_STATUS: REVIEW_COMPLETE"
                                      "inconsistency-review" "PASS_STATUS: REVIEW_COMPLETE"})]
       (is (= :completed (:status result)))
-      (is (= ["ambiguity-review" "inconsistency-review" "clarity-status" "final-summary"] prompts))))
+      (is (= ["ambiguity-review" "inconsistency-review" "final-summary"] prompts))))
   (testing "plan ambiguity ACTIONABLE_FEEDBACK runs only ambiguity follow-up before inconsistency review"
     (let [{:keys [result prompts]} (execute-conditional-review-proof!
                                     "review-task-plan-proof" "plan-run-ambiguity"
                                     {"ambiguity-review" "PASS_STATUS: ACTIONABLE_FEEDBACK"
                                      "inconsistency-review" "PASS_STATUS: REVIEW_COMPLETE"})]
       (is (= :completed (:status result)))
-      (is (= ["ambiguity-review" "ambiguity-follow-up" "inconsistency-review" "clarity-status" "final-summary"] prompts))))
-  (testing "plan inconsistency ACTIONABLE_FEEDBACK runs inconsistency follow-up before clarity-status"
+      (is (= ["ambiguity-review" "ambiguity-follow-up" "inconsistency-review" "final-summary"] prompts))))
+  (testing "plan inconsistency ACTIONABLE_FEEDBACK runs inconsistency follow-up before final summary"
     (let [{:keys [result prompts]} (execute-conditional-review-proof!
                                     "review-task-plan-proof" "plan-run-inconsistency"
                                     {"ambiguity-review" "PASS_STATUS: REVIEW_COMPLETE"
                                      "inconsistency-review" "PASS_STATUS: ACTIONABLE_FEEDBACK"})]
       (is (= :completed (:status result)))
-      (is (= ["ambiguity-review" "inconsistency-review" "inconsistency-follow-up" "clarity-status" "final-summary"] prompts)))))
+      (is (= ["ambiguity-review" "inconsistency-review" "inconsistency-follow-up" "final-summary"] prompts)))))

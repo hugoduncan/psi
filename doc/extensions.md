@@ -103,8 +103,10 @@ Built-in workflow surface:
 - Tool: `delegate`
   - actions: `run`, `list`, `continue`, `remove`
   - omitted `action` defaults to `run`
+  - `list` is scoped to the invoking session and shows active or retained delegated workflow runs owned by that session, with canonical workflow status as the primary status and delegate/background attempt status shown separately when available
+  - ids returned by `list` are canonical workflow run ids usable with `continue` when the workflow status supports continuation, and with `remove` while the run exists
   - `continue` pushes a stopped run forward with a new prompt
-  - `remove` deletes a run (it does not cancel and retain it)
+  - `remove` deletes a run and cleans up/terminalizes any active same-session delegate background job for that run first, failing actionably without deleting the canonical run if that cleanup cannot be completed
   - run options include `workflow`, `mode` (`sync|async`), `fork_session`, `timeout_ms`, `include_result_in_context`
 - Commands:
   - `/delegate <workflow> <prompt>`

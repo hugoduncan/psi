@@ -34,26 +34,9 @@
            :args {:route "DONE"}},
    :on {"DONE" {:goto "clarity-status"}}}
   {:name "clarity-status",
-   :type :session,
-   :prompt-workflow "review-task-plan-clarity-status.md",
-   :judge
-   {:type :llm,
-    :contributions
-    [{:type :template,
-      :text
-      "Respond exactly with one word: REPEAT or DONE.\n\nUse the actor step context to identify the Munera task under review. Independently inspect that specific task's artifacts, especially plan.md, steps.md, and implementation.md.\n\nReturn REPEAT if there is still actionable ambiguity or inconsistency follow-up remaining from the review cycle, including newly added unchecked steps or unresolved review findings. Return DONE only if the task has no remaining new actionable ambiguity or inconsistency feedback from the cycle.\n\nDo not review the repository generically. Judge only the specific named task.",
-      :vars {}}],
-    :outputs
-    {:routing-result
-     {:source :judge/structured-output,
-      :mode :structured,
-      :schema-id :psi.workflow/judge-routing-result,
-      :schema-version 1,
-      :schema [:enum "REPEAT" "DONE"],
-      :json-schema {:type "string", :enum ["REPEAT" "DONE"]}}}},
-   :on
-   {"REPEAT" {:goto "ambiguity-review", :max-iterations 6},
-    "DONE" {:goto "final-summary"}}}
+   :type :invoke,
+   :operation "workflow/constant-routing",
+   :args {:route "DONE"}}
   {:name "final-summary",
    :type :session,
    :tools ["read" "bash"],

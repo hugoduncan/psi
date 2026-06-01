@@ -34,6 +34,20 @@
     (nil? content)        [{:type :text :text ""}]
     :else                 [{:type :text :text (str content)}]))
 
+(defn normalize-tool-result
+  "Coerce raw tool execution output into the canonical result map shape.
+
+   Registered tools may return a plain string as successful textual output.
+   Normalize before post-tool processing so downstream enrichment, lifecycle,
+   and provider-facing toolResult shaping all see the same map contract."
+  [result]
+  (cond
+    (map? result) result
+    (nil? result) {:content "Error: tool execution returned no result"
+                   :is-error true}
+    :else {:content result
+           :is-error false}))
+
 (defn tool-lifecycle-event
   "Build one canonical tool lifecycle event shape."
   [event-kind tool-call-id tool-name & {:as extra}]
@@ -101,29 +115,29 @@
                                             :arguments (:arguments tool-call)
                                             :parsed-args telemetry-args
                                             :call-summary summary))
-    (let [raw-tool-result (or (execute-tool
-                               name
-                               args
-                               (assoc execute-opts
-                                      :on-update
-                                      (fn [{:keys [content details is-error]}]
-                                        (let [content-blocks (normalize-tool-content content)
-                                              text-fallback  (tool-content->text content)]
-                                          (emit-tool-event! on-event
-                                                            (tool-lifecycle-event :tool-execution-update
-                                                                                  call-id
-                                                                                  name
-                                                                                  :content content-blocks
-                                                                                  :result-text text-fallback
-                                                                                  :details details
-                                                                                  :is-error (boolean is-error)
-                                                                                  :call-summary summary))))))
-                              {:content "Error: tool execution returned no result"
-                               :is-error true})
+    (let [raw-tool-result (normalize-tool-result
+                           (execute-tool
+                            name
+                            args
+                            (assoc execute-opts
+                                   :on-update
+                                   (fn [{:keys [content details is-error]}]
+                                     (let [content-blocks (normalize-tool-content content)
+                                           text-fallback  (tool-content->text content)]
+                                       (emit-tool-event! on-event
+                                                         (tool-lifecycle-event :tool-execution-update
+                                                                               call-id
+                                                                               name
+                                                                               :content content-blocks
+                                                                               :result-text text-fallback
+                                                                               :details details
+                                                                               :is-error (boolean is-error)
+                                                                               :call-summary summary)))))))
           {:keys [content is-error details] :as tool-result}
-          (if post-process
-            (post-process tool-call args raw-tool-result)
-            raw-tool-result)
+          (normalize-tool-result
+           (if post-process
+             (post-process tool-call args raw-tool-result)
+             raw-tool-result))
           content-blocks  (normalize-tool-content content)
           text-fallback   (tool-content->text content)
           policy          (when effective-policy

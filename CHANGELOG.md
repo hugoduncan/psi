@@ -28,7 +28,10 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 - Workflow runs now automatically retain only the newest retained terminal runs per originating session, defaulting to `1` kept run via `[:config :completed-workflow-run-retention-count]`; older retained terminal runs are removed from workflow listing/introspection along with their linked workflow-owned child-session trees.
 
 ### Fixed
+- `delegate` tool results that return plain text now remain visible at the caller tool-result boundary, so unknown workflow errors and empty delegate lists no longer look like silent successes.
+- `delegate list` now shows active same-session delegated workflow runs from the delegate background-job visibility surface, keeps workflow status separate from delegate attempt status, and `delegate remove` cleans up active delegate background jobs before deleting their canonical run.
 - AI provider request retries now happen at the prepared provider-request boundary for transient request/connection failures, preserving visible active backoff status, per-attempt provider telemetry, structured retry-exhausted/disabled/cancelled/non-retryable outcomes, retry-header delay handling, and streaming retry isolation without rerunning local tools.
+- `review-task-design` and `review-task-plan` now use deterministic routing for their final clarity-status step, avoiding split-brain LLM judge decisions that could loop until iteration exhaustion after reviewers already reported completion.
 - `review-step` now routes review completion deterministically from the review actor's `PASS_STATUS:` line, so `PASS_STATUS: REVIEW_COMPLETE` stops without running no-op follow-up work and actionable feedback loops back through deterministic `follow-up` routing instead of an LLM/session status step.
 - OpenAI OAuth-backed `gpt-5.5` sessions now route through the ChatGPT/Codex transport, matching Codex account access instead of failing against the platform chat-completions quota path.
 

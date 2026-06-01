@@ -108,6 +108,26 @@ What happens:
 If you want a workflow to continue from a narrow request, put that request after
 the workflow name as the prompt text.
 
+The underlying `delegate` tool also exposes management actions for active and
+retained workflow runs: `list`, `continue`, and `remove`. `delegate list` is
+scoped to the invoking session; it shows delegated workflow runs owned by that
+session and does not show runs from unrelated sessions. Listed ids are canonical
+workflow run ids, so the same id can be used with `delegate continue` when the
+workflow status supports continuation, or with `delegate remove` while the run
+still exists.
+
+List output reports the canonical workflow status as the primary status and, when
+available, the delegate/background attempt status separately. For example, a
+blocked workflow may list as primary status `blocked` with a separate delegate
+attempt status of `completed`, and a retained timed-out delegate attempt may show
+the canonical workflow status plus a separate `delegate timed-out` status.
+
+`delegate remove` deletes the canonical workflow run. When the listed run still
+has an active delegate/background job, remove first cleans up or terminalizes that
+active job so a later `delegate list` does not report a stale active attempt for a
+removed workflow run. If that cleanup cannot be completed, remove fails with an
+actionable error and leaves the canonical run visible/manageable.
+
 ## Reloading workflow definitions
 
 When editing workflow files under `.psi/workflows/`, reload them without restarting psi:
