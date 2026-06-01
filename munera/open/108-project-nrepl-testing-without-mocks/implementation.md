@@ -1227,3 +1227,48 @@ Verification: focused project-nrepl suite (8 ns) → 26 tests / 151 assertions /
 0 failures (count unchanged — pure helper extraction, no assertions
 added/removed); `clj-kondo --lint` on `test_support.clj` + the three test
 files → 0 errors / 0 warnings.
+
+## Test-shaper review (2026-06-01, sixth test-shaper pass)
+
+Independent test-shaper pass. Verified green baseline: focused project-nrepl
+suite (8 ns) → 26 tests / 151 assertions / 0 failures; `clj-kondo --lint`
+src+test → 0/0; zero `with-redefs`; the only interaction-style atom is
+`disconnect-instance-in-test`'s `closed*` real-effect Closeable check (accepted
+by prior passes — it asserts a real `.close` side effect on the opaque
+transport, not a collaborator call count).
+
+One new actionable economy/consistency finding
+(`helpers_that_compress(ceremony)` ∧ `consistent(test_abstractions)` ∧
+`minimal(incidental_variation)`):
+
+1. `commands_test.clj` repeats the session-with-resolvable-worktree construction
+   ceremony verbatim at SIX sites (lines 11–12, 19–20, 27–28, 42–43, 59–60,
+   79–80): `(test-support/create-test-session {:persist? false :session-defaults
+   {:worktree-path <wt>}})`, identical except the `:worktree-path` value. This
+   is the one session-construction idiom never folded into `test-support`: prior
+   passes consolidated the no-session-id ctx (`make-ctx`), the instance install
+   (`install-instance!`), the connector seed (`seed-connector!`), the session fn
+   (`session-fn-with-id`), the connector value (`fake-connector`), and the
+   temp-dir lifecycle (`temp-dir`/`delete-tree!`) — but `commands_test` needs a
+   ctx WITH a session-id resolving (via `ss/session-worktree-path-in`) to a
+   specific worktree, which `make-ctx` (no session-id) cannot provide, so it
+   open-codes the full `:persist?`/`:session-defaults` map six times. A drift in
+   the session-construction shape (e.g. a new required `:session-defaults` key,
+   or a `:persist?` default change) must be edited at six call sites. Add a
+   `test-support` helper (e.g. `(session-ctx-at worktree-path)` returning
+   `[ctx session-id]`) single-sourcing the `{:persist? false :session-defaults
+   {:worktree-path …}}` shape, and have the six `commands_test` sites call it.
+   This is symmetric with the established `make-ctx`/`install-instance!`/
+   `seed-connector!`/`fake-connector` consolidation pattern; `make-ctx` itself
+   can be re-expressed in terms of the new helper (discard the session-id) to
+   keep one session-construction source. `create-test-session` is called
+   directly ONLY in `commands_test` (×6) and inside `make-ctx` (verified via
+   `git grep`), so the helper genuinely single-sources the idiom. Follow-up step
+   added.
+
+Considered but NOT raised (scope/precedent, consistent with prior passes): the
+pervasive `worktree (System/getProperty "user.dir")` ambient-cwd instance key
+(pre-existing, uniform, not introduced by this task), and
+`disconnect-instance-in-test`'s `closed*` real-effect atom + hand-rolled
+ensure+update setup (distinct Closeable-proxy intent, not connector-seeding;
+accepted by prior passes). Raising either is scope expansion.

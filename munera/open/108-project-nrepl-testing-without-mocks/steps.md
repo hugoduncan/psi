@@ -301,3 +301,28 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
   Verified: focused project-nrepl suite (8 ns) 26 tests / 151 assertions / 0
   failures (count unchanged — pure helper extraction); `clj-kondo` 0/0 on
   `test_support.clj` + the three test files.
+
+## Test-shaper follow-ups (2026-06-01, sixth test-shaper pass)
+
+- [ ] Consolidate the duplicated session-with-resolvable-worktree construction
+  ceremony in `commands_test.clj` into a shared `psi.project-nrepl.test-support`
+  helper. The call `(test-support/create-test-session {:persist? false
+  :session-defaults {:worktree-path <wt>}})` is open-coded verbatim at SIX sites
+  (lines 11–12, 19–20, 27–28, 42–43, 59–60, 79–80), identical except the
+  `:worktree-path` value. This is the one session-construction idiom never
+  folded into `test-support` (prior passes shared `make-ctx`,
+  `install-instance!`, `seed-connector!`, `session-fn-with-id`, `fake-connector`,
+  `temp-dir`/`delete-tree!`): `commands_test` needs a ctx WITH a session-id that
+  resolves (via `ss/session-worktree-path-in`) to a specific worktree, which the
+  no-session-id `make-ctx` cannot provide, so it repeats the full
+  `:persist?`/`:session-defaults` map. Violates `helpers_that_compress(ceremony)`
+  ∧ `consistent(test_abstractions)` ∧ `minimal(incidental_variation)` — a drift
+  in the session-construction shape (new required `:session-defaults` key,
+  `:persist?` default change) must be edited in six places. Add
+  `(session-ctx-at worktree-path)` (or similarly named) to `test-support`
+  returning `[ctx session-id]` and single-sourcing the `{:persist? false
+  :session-defaults {:worktree-path …}}` shape; have the six `commands_test`
+  sites call it. Re-express `make-ctx` in terms of the new helper (discard the
+  returned session-id) so one source owns session construction. `create-test-session`
+  is called directly only in `commands_test` (×6) + inside `make-ctx` (verified),
+  so the helper genuinely single-sources the idiom. Keep tests green + lint clean.
