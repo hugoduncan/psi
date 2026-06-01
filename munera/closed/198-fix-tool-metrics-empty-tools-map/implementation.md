@@ -143,3 +143,35 @@ Verification: `clojure -M:test --focus psi.agent-session.tool-execution-test` �
 `psi/root-registry` as a transitive test dep, so `clojure -M:test -m kaocha.runner` in that
 directory fails to load. The metrics extension tests pass when run via the main `tests.edn`
 suite (which has the full classpath). No action required for this task.
+
+## 2026-06-01 — implementation review (independent)
+
+**Fix code correct and minimal.** `emit-tool-lifecycle!` bridge payload shapes verified
+against `tool-runtime/core` lifecycle events (`:parsed-args`, `:content`, `:details`,
+`:is-error`) and against metrics handlers (`on-tool-call` reads `:tool-name`; `on-tool-result`
+reads `:tool-name` + `:is-error`). `(boolean (:is-error ...))` coercion correct. Single
+responsibility, coherent with design.
+
+**❌ Critical: the e2e test `metrics-extension-accumulates-tools-via-bridge-test` never runs.**
+`tool_execution_test.clj` now `(:require [psi.metrics.extension :as metrics-ext])`, but
+`extensions/metrics/src` is absent from kaocha's `:unit` suite `:source-paths` in `tests.edn`
+(present only on the deps `:test` classpath). Empirically:
+- `clojure -M:test --focus psi.agent-session.tool-execution-test` reports **11 tests**, not 12
+  (documentation reporter shows the e2e deftest absent from output).
+- `--focus …/metrics-extension-accumulates-tools-via-bridge-test` → "All 2616 tests were skipped"
+  (the test ID is not in kaocha's plan).
+The implementation note (c224ffa7d) claims this test "covers the full path … as a single
+regression guard for the primary acceptance criterion" — but it does not execute under the
+standard test command. The primary AC ("tool invocations appear in `:tools`") therefore has
+**no executing end-to-end guard**. Either add `extensions/metrics/{src,test}` to the `:unit`
+suite source-paths, or relocate the e2e test to the `:extensions`/metrics suite where the
+classpath is correct.
+
+**❌ Uncommitted work on a closed task.** Working tree has uncommitted changes:
+`tool_execution_test.clj` (the e2e test) and `.clj-kondo/config.edn`. Task is in `closed/`
+but its final test artifact is not in git. The `.clj-kondo/config.edn` change (new
+`:discouraged-var` for `clojure.test/use-fixtures`) is out of scope for task 198.
+
+**Lint regressions in `tool_execution_test.clj`** (clj-kondo, 3 warnings):
+- `use-fixtures` referred but never used (line 5) — also trips the newly-added discouraged-var.
+- `inline def` at line 379 (the e2e test ns body) — likely from the discouraged-var/def shape.
