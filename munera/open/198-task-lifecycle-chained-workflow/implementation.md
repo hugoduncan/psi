@@ -936,3 +936,20 @@ One **new actionable finding** that passes 1–2 missed/mis-judged:
    Follow-up added to `steps.md`.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## 2026-06-01 — docs review pass-3 follow-up executed (ψ)
+
+Executed the single newly-added pass-3 docs-review follow-up: moved the
+`task-lifecycle` CHANGELOG entry out of the released `## [0.1.2166] - 2026-06-01`
+section (where it had been stranded — authored two commits after the v0.1.2166
+tag, commit `8a1ac8501`) into the empty `## [Unreleased]` section under a new
+`### Added` subheading. This satisfies the acceptance criterion that
+`[Unreleased]` MUST carry the entry and stops mislabelling an unreleased change
+as shipped in v0.1.2166 — a placement defect, not a release-stamp question.
+
+Scope respected: moved ONLY the `task-lifecycle` line. The sibling
+`review-task-design` / `create-task-plan` Added entries (out of this task's
+scope) were left in place under `[0.1.2166]`, untouched. Verified the resulting
+`[Unreleased]` section holds exactly the `### Added` + `task-lifecycle` line and
+`[0.1.2166]` no longer contains it. CHANGELOG footer/version links untouched
+(owned by `bb release:tag`). steps.md item marked done.

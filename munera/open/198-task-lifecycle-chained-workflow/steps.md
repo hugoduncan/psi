@@ -108,7 +108,7 @@
 
 ## Docs review follow-ups (review-task-docs) — pass 3
 
-- [ ] Move the `task-lifecycle` CHANGELOG entry from under the released
+- [x] Move the `task-lifecycle` CHANGELOG entry from under the released
       `## [0.1.2166] - 2026-06-01` section into the empty `## [Unreleased]`
       section (add a `### Added` subheading under `[Unreleased]` and place the
       entry there), satisfying the acceptance criterion that `[Unreleased]`
