@@ -90,8 +90,14 @@ These three are the *only* production changes. Everything else is test reshape.
   absent → `{:project-nrepl {}}`. Restore `user.home` in `finally`.
 - `commands_test.clj` — stop redefining `eval-op`/`interrupt`. Install a real
   managed instance with in-memory `[:runtime-handle :client-session]`, dispatch
-  the real command strings, assert user-facing `{:type :text :message ...}` from
-  real `commands → ops → eval`. Pure formatting/parsing tests stay seamless.
+  the real command strings, assert user-facing `{:type :text :message ...}`. The
+  eval path runs through `commands → ops/eval-op → eval/eval-instance-in!`; the
+  interrupt path runs through `commands → ops/interrupt →
+  eval/interrupt-instance-in!` (distinct routing, not eval). For interrupt the
+  test must first establish an `[:runtime-handle :active-op]` (in-flight eval or
+  seeded), or `interrupt-instance-in!` short-circuits to `:no-active-eval` and
+  never reaches the seeded `:client-session`. Pure formatting/parsing tests stay
+  seamless.
 - `ops_test.clj` — **in scope**. Stop redefining `eval-instance-in!`. Install a
   real managed instance with in-memory `[:runtime-handle :client-session]`, assert
   `eval-op` success/interrupted public contract through real `eval-instance-in!`.

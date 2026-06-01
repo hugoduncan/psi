@@ -451,3 +451,26 @@ to steps.md):
    reaches the seeded `client-session {:op "interrupt" ...}` call.
 
 No production/test code changed in this review pass.
+
+2026-06-01 — Plan/steps inconsistency follow-up executed
+
+Resolved the single Slice 9 inconsistency follow-up. Verified against real
+source (`ops.clj` lines 124–133, `eval.clj` lines 124–152) that `/project-repl
+interrupt` routes `ops/interrupt → eval/interrupt-instance-in!` (not
+`eval-op`/`eval-instance-in!`) and that `interrupt-instance-in!` short-circuits
+to `{:status :unavailable :reason :no-active-eval}` when `[:runtime-handle
+:active-op]` is absent, only invoking the seeded `client-session {:op
+"interrupt" …}` once an `:active-op` exists.
+
+Changes:
+- steps.md Slice 9: split the single eval+interrupt dispatch step into two —
+  (a) eval through `ops/eval-op → eval/eval-instance-in!`, and (b) interrupt
+  through `ops/interrupt → eval/interrupt-instance-in!` with the explicit
+  `:active-op` precondition (in-flight eval or seeded `[:runtime-handle
+  :active-op]`) required before the `[{:status #{"interrupted"}}]` response can
+  drive the assertion.
+- plan.md `commands_test.clj` bullet: corrected the eval-only `commands → ops →
+  eval` wording to name both distinct routes and state the `:active-op`
+  precondition for interrupt.
+
+No production/test code changed.
