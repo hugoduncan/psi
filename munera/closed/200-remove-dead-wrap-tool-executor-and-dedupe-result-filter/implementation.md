@@ -337,3 +337,47 @@ Executed S1 and S2 from the test-shaper pass. Both reshape the
   (unchanged from before — pure shape change, no coverage delta). No deviations.
 
 PASS_STATUS: REVIEW_COMPLETE (test-shaper S1/S2 resolved)
+
+## Test review: test-shaper (second pass, 2026-06-01)
+
+Re-applied test-shaper to the `dispatch-tool-result-*` cluster
+(extensions_test.clj:383–461) after the prior S1/S2 reshape landed. Verified at
+runtime: 30 tests, 98 assertions, 0 failures (Kaocha focus
+`psi.agent-session.extensions-test`).
+
+- **override-selection cluster** ✓ S1/S2 resolved: the five override tests are
+  one-line `(is (= <expected> (result-override <return>)))` / `nil?`,
+  per-disjunct deftests retained for branch failure signal, original payload
+  folded into the inert `inert-original-result` marker. Clear, economical,
+  behaviour-focused. No regression.
+
+- **coercion cluster** ✗ One residual shape issue (actionable, S3 below).
+
+S3 (actionable — economy / consistency: payload-capture ceremony):
+`dispatch-tool-result-normalizes-content-test` (400) and
+`dispatch-tool-result-coerces-is-error-test` (414) each rebuild the same
+payload-capturing scaffold — `create-registry` + `register-extension-in!` +
+`register-handler-in!` with the `(fn [p] (reset! payload p) nil)` capture
+handler — and inline a full 6-arg `dispatch-tool-result-in` call per assertion
+(three calls total across the two tests). This is the *same kind* of incidental
+ceremony S1 compressed for the override cluster, on a different axis: these tests
+vary the *input* result/`is-error?` and assert on the *captured incoming
+payload*. S1 deliberately scoped itself to override-selection and left these out;
+the payload-capture ceremony was therefore never compressed (`λ economical`:
+`minimal(incidental_variation)`; `λ simple`: `minimal_incidental_setup`). It also
+leaves the cluster inconsistent (`λ consistent`: `consistent(fixtures)` ∧
+`consistent(test_abstractions)`): override tests go through `result-override`,
+coercion tests hand-roll the registry+capture+dispatch. Extract a sibling helper
+(e.g. `(capture-payload <result> <is-error?>)` that registers the capture
+handler, dispatches, and returns the captured incoming payload) so each coercion
+test states only its varying input axis and asserted field. Helper must compress
+ceremony without hiding intent — the input result/`is-error?` and the asserted
+payload field stay visible per test.
+
+Note (¬actionable): `dispatch-tool-result-coerces-is-error-test` holds two
+`testing` blocks (nil→false, truthy-non-bool→true) — two boundary cases of one
+coercion behaviour, correctly grouped; keep them as distinct assertions for
+boundary failure signal. With a `capture-payload` helper they collapse to two
+visible `(is (… (:is-error (capture-payload {…} <raw>))))` lines.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

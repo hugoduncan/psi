@@ -94,3 +94,22 @@
   discarded original payload.
   Replaced with the inert marker `inert-original-result` (`::original`) held
   inside the `result-override` helper; no test references it.
+
+## Test review follow-ups (test-shaper second pass, 2026-06-01)
+
+- [ ] S3: Extract a sibling helper for the payload-capture coercion tests
+  (`dispatch-tool-result-normalizes-content-test` @400,
+  `dispatch-tool-result-coerces-is-error-test` @414), e.g.
+  `(capture-payload <result> <is-error?>)` that registers the
+  `(fn [p] (reset! payload p) nil)` capture handler, invokes
+  `dispatch-tool-result-in`, and returns the captured incoming payload. Rewrite
+  the two coercion tests so each states only its varying input axis and asserted
+  field — `(is (= … (:content (capture-payload {:content "raw string"} false))))`
+  and `(is (false?/true? (:is-error (capture-payload {…} <raw>))))`. Compress the
+  repeated `create-registry`/`register-extension-in!`/`register-handler-in!`/
+  6-arg-dispatch ceremony (3 inline dispatch calls) without hiding intent (keep
+  input result/`is-error?` and asserted field visible). This also restores
+  fixture/abstraction consistency across the cluster (override tests use
+  `result-override`; coercion tests should use the sibling helper rather than
+  hand-rolling). Run clj-kondo + Kaocha focus; coverage must be unchanged
+  (pure shape change, 30/98 expected).
