@@ -276,3 +276,27 @@ bridge's `:is-error (boolean (:is-error lifecycle-event))` propagation
 that drops or hardcodes `:is-error` on `tool_result` would not fail any test while the
 success-path e2e test still passes. This is the same split-coverage class previously
 closed for the invocation path, but the error path remains split.
+
+## 2026-06-01 — test review (independent, task-test-review skill, confirming pass)
+
+**Tests well-formed; infra deps clean; one known gap remains.** Re-applied the skill against
+source, not just notes:
+- `well_formed`: the three bridge/e2e tests
+  (`emit-tool-lifecycle-bridge-fires-extension-handlers-test`,
+  `tool-call-handler-block-ignored-on-interactive-path-test`,
+  `metrics-extension-accumulates-tools-via-bridge-test`) are clearly structured with
+  state/output assertions.
+- `infra_deps`: `with-redefs` only on `tool-plan/execute-tool-runtime-in!`,
+  `agent/emit-tool-start-in!`, `agent/emit-tool-end-in!`, `agent/record-tool-result-in!`,
+  and `dispatch/dispatch!` (capture-wrapped, calls original) — all infra/side-effect deps
+  with canned nullable returns. No mocks/stubs asserting interactions.
+- `behaviour coverage`: AC1 (`:tools` invocations) covered e2e via
+  `metrics-extension-accumulates-tools-via-bridge-test` (verified: `--focus
+  psi.agent-session.tool-execution-test` → 12 tests, 61 assertions, 0 failures). AC2
+  (`:is-error true` → `:errors`) still only covered with the bridge bypassed
+  (`metrics/extension_test.clj` via `fire-event`); bridge `:is-error` propagation on the
+  truthy path (`tool_runtime_adapter.clj:39`) is unguarded.
+
+**No new actionable issues.** The AC2 error-path gap is already documented (note above,
+`bfe2ea561`) and already has a matching unchecked follow-up in steps.md — not re-added to
+avoid duplication.
