@@ -4,6 +4,7 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.psi-tool-scheduler :as psi-tool-scheduler]
    [psi.agent-session.scheduler :as scheduler]
+   [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.tools :as tools]))
 
@@ -195,4 +196,65 @@
           parsed (read-string (:content result))]
       (is (true? (:is-error result)))
       (is (= :error (:psi-tool/overall-status parsed)))
-      (is (= :validate (get-in parsed [:psi-tool/error :phase]))))))
+      (is (= :validate (get-in parsed [:psi-tool/error :phase])))))
+
+  ;; --- 201 verification: :at resolution matrix (past fires / near-future rejected / above-max rejected) ---
+
+  (testing "past :at resolves to delay 0, skips min-delay check, and FIRES immediately via the seam"
+    (let [fixed-now        (java.time.Instant/parse "2026-04-21T18:00:00Z")
+          past-at          (.minusSeconds fixed-now 60)
+          [ctx session-id] (create-session-context
+                            {:scheduler-time-source (test-support/fixed-scheduler-time-source fixed-now)})
+          callback*        (atom nil)
+          ctx*             (assoc ctx
+                                  :scheduler-run-after-delay-fn
+                                  (fn [_ctx delay-ms f]
+                                    (reset! callback* {:delay-ms delay-ms :f f})
+                                    {:handle :captured}))
+          tool             (tools/make-psi-tool (fn [_q] {}) {:ctx ctx* :session-id session-id})
+          result           ((:execute tool) {"action" "scheduler"
+                                             "op" "create"
+                                             "kind" "message"
+                                             "message" "fire now"
+                                             "at" (str past-at)})
+          parsed           (read-string (:content result))
+          schedule         (get-in parsed [:psi-tool/scheduler :schedule])]
+      (is (false? (:is-error result)) "past :at is accepted (no min-delay rejection)")
+      (is (= :ok (:psi-tool/overall-status parsed)))
+      (is (= 0 (:delay-ms @callback*)) "timer scheduled with delay 0")
+      (is (= past-at (java.time.Instant/parse (:fire-at schedule))))
+      ;; drive the delay-0 timer via the captured seam (no wall-clock wait)
+      ((:f @callback*))
+      (is (= :delivered (get-in (ss/get-session-data-in ctx* session-id)
+                                [:scheduler :schedules (:schedule-id schedule) :status]))
+          "delay-0 schedule fires and delivers")))
+
+  (testing "future :at below min-delay-ms (1-999ms) is rejected with the below-minimum bound error"
+    (let [fixed-now        (java.time.Instant/parse "2026-04-21T18:00:00Z")
+          near-future-at   (.plusMillis fixed-now 500)
+          [ctx session-id] (create-session-context
+                            {:scheduler-time-source (test-support/fixed-scheduler-time-source fixed-now)})
+          tool             (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
+          result           ((:execute tool) {"action" "scheduler"
+                                             "op" "create"
+                                             "kind" "message"
+                                             "message" "too soon"
+                                             "at" (str near-future-at)})
+          parsed           (read-string (:content result))]
+      (is (true? (:is-error result)))
+      (is (= :error (:psi-tool/overall-status parsed)))))
+
+  (testing "future :at above max-delay-ms (>24h) is rejected with the exceeds-maximum bound error"
+    (let [fixed-now        (java.time.Instant/parse "2026-04-21T18:00:00Z")
+          far-future-at    (.plusMillis fixed-now (inc scheduler/max-delay-ms))
+          [ctx session-id] (create-session-context
+                            {:scheduler-time-source (test-support/fixed-scheduler-time-source fixed-now)})
+          tool             (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
+          result           ((:execute tool) {"action" "scheduler"
+                                             "op" "create"
+                                             "kind" "message"
+                                             "message" "too far"
+                                             "at" (str far-future-at)})
+          parsed           (read-string (:content result))]
+      (is (true? (:is-error result)))
+      (is (= :error (:psi-tool/overall-status parsed))))))

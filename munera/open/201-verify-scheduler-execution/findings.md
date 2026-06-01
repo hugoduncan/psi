@@ -66,6 +66,14 @@ Baseline `bb test` (scheduler subset, 2026-06-01): `35 tests, 338 assertions, 0 
 
 | status | summary | covering test | repro / task-ref |
 | ------ | ------- | ------------- | ---------------- |
+| verified-correct | create / list / cancel happy paths; message-kind stored pending; list returns pending+queued; cancel marks cancelled. | `psi-tool-scheduler-test/psi-tool-scheduler-create-list-cancel`, `scheduler-tools-test/make-psi-tool-scheduler` | — |
+| verified-correct | `:delay-ms` relative path: valid 1000ms accepted; below-min (10ms) rejected as scheduler error; cap (51st pending) rejected. | `psi-tool-scheduler-test/psi-tool-scheduler-create-list-cancel` | — |
+| verified-correct | `:at` future absolute resolves delay from scheduler time source (5000ms → fire-at). | `psi-tool-scheduler-test/psi-tool-scheduler-create-list-cancel` | — |
+| verified-correct | `:at` **past/now** → delay 0, no min-delay check → created **and fires immediately** (delay-0 timer driven via the captured seam, asserts `:delivered`). | `psi-tool-scheduler-test/psi-tool-scheduler-create-list-cancel` (new `past :at … FIRES immediately via the seam` testing block) | — |
+| verified-correct | `:at` future **<min-delay-ms** (500ms) → rejected (below-minimum bound). | `psi-tool-scheduler-test/psi-tool-scheduler-create-list-cancel` (new near-future block) | — |
+| verified-correct | `:at` **>max-delay-ms** (>24h) → rejected (exceeds-maximum bound). | `psi-tool-scheduler-test/psi-tool-scheduler-create-list-cancel` (new far-future block) | — |
+| verified-correct | `:at` asymmetry (past allowed-and-fires / near-future-rejected): this is **current behaviour and matches** `doc/scheduler.md` ("past absolute instants fire immediately"). Not a doc/behaviour drift — recorded as verified-correct, not a defect. | (same `:at` blocks) | — |
+| verified-correct | kind selection + validation: `message` vs `session`; session-kind requires `:session-config`; message-kind forbids `:session-config`; unsupported session-config keys rejected; explicit-vs-invoking session-id; missing/invalid scheduler-time-source fails create (no wall-clock fallback). | `psi-tool-scheduler-test/psi-tool-scheduler-create-list-cancel` | — |
 
 ---
 

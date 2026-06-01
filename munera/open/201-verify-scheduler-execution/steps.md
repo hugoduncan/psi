@@ -135,23 +135,38 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Slice 5 — psi-tool surface
 
-- [ ] Audit `psi_tool_scheduler_test.clj` /
+- [x] Audit `psi_tool_scheduler_test.clj` /
       `scheduler_tools_test.clj` for create / list / cancel coverage.
-- [ ] Ensure coverage for input resolution:
-      - [ ] `:delay-ms` relative path (valid; below-min rejected "below … bound";
+      Done: create/list/cancel + delay-ms valid/below-min/cap + future `:at` +
+      kind validation already covered; the three `:at` matrix corners below were
+      missing.
+- [x] Ensure coverage for input resolution:
+      - [x] `:delay-ms` relative path (valid; below-min rejected "below … bound";
             above-max rejected "exceeds … bound").
-      - [ ] `:at` past/now → `delay = 0`, no min check → created **and fires**:
+            Done: valid + below-min (10ms) already covered; above-max covered at
+            the pure level (`validate-delay-ms`) — psi-tool surfaces the same
+            error via `resolve-fire-time!`.
+      - [x] `:at` past/now → `delay = 0`, no min check → created **and fires**:
             the test must drive the delay-0 timer via the seam (capture the
             timer callback and invoke it) and assert the schedule reaches a
             fired/delivered state — not merely that creation was accepted.
-      - [ ] `:at` future <`min-delay-ms` (1–999ms) → `validate-delay-ms!` throws
+            Done: added `past :at … FIRES immediately via the seam` block —
+            captures the delay-0 timer callback, asserts delay 0, invokes it,
+            asserts `:delivered`.
+      - [x] `:at` future <`min-delay-ms` (1–999ms) → `validate-delay-ms!` throws
             "below the minimum bound".
-      - [ ] `:at` > `max-delay-ms` (>24h) → throws "exceeds the maximum bound".
-      - [ ] `message` vs `session` kind selection.
-      Add tests for any uncovered case.
-- [ ] Record psi-tool finding; note the `:at` past-allowed / near-future-rejected
+            Done: added near-future (500ms) block → rejected.
+      - [x] `:at` > `max-delay-ms` (>24h) → throws "exceeds the maximum bound".
+            Done: added far-future (max+1ms) block → rejected.
+      - [x] `message` vs `session` kind selection.
+            Done: message create + session-config validation already covered.
+- [x] Record psi-tool finding; note the `:at` past-allowed / near-future-rejected
       asymmetry — if it reads as doc/behaviour drift, record it as a `defect`
       finding (drift), not a fix.
+      Done: recorded as **verified-correct** — the asymmetry matches
+      `doc/scheduler.md` ("past absolute instants fire immediately"), so it is
+      not a doc/behaviour drift defect. `psi_tool_scheduler_test` now
+      1 test / 107 assertions, green.
 
 ## Slice 6 — Cancellation & lifecycle
 

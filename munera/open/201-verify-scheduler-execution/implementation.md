@@ -325,3 +325,24 @@ origin; created session carries `:scheduled-origin-session-id` /
 (not switched away). `with-redefs` stubs `execute-prepared-request!` (no live
 model) as the lifecycle test does. Green: `scheduler_end_to_end_test` now
 3 tests / 20 assertions.
+
+## Slice 5 execution — psi-tool surface (2026-06-01)
+
+Audit: create/list/cancel, `:delay-ms` valid + below-min (10ms) + cap, future
+`:at` (+5000ms), kind validation (session requires session-config, message
+forbids it, unsupported keys), missing/invalid time-source — all already
+covered. Missing: the three `:at` matrix corners the design names.
+
+Added 3 testing blocks to `psi-tool-scheduler-create-list-cancel`:
+- **past `:at`** (now−60s) → accepted, timer scheduled with `delay 0`; drive the
+  delay-0 timer via the captured `:scheduler-run-after-delay-fn` seam (invoke
+  callback, no sleep) → schedule `:delivered`. Confirms past `:at` fires
+  immediately, grounded in `resolve-fire-time!` (`delay = max(0, between)`,
+  `validate-delay-ms!` only when `(pos? delay)`).
+- **near-future `:at`** (now+500ms) → positive delay <1000 → rejected (error).
+- **far-future `:at`** (now+max+1ms) → rejected (error).
+
+The past-allowed / near-future-rejected **asymmetry** is recorded
+verified-correct (NOT a defect): it matches `doc/scheduler.md` "past absolute
+instants fire immediately" — no doc/behaviour drift. `psi_tool_scheduler_test`:
+1 test / 107 assertions / green. clj-kondo clean.
