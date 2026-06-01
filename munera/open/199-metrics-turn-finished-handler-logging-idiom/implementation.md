@@ -271,3 +271,31 @@ Verification (all green):
 - `clj-paren-repair` applied (balanced/formatted).
 
 No blocked items remain. Both test-shaper follow-up steps complete.
+
+## Test review — test-shaper re-pass (2026-06-01)
+
+Re-applied test-shaper (clarity ∧ signal ∧ robustness ∧ consistency ∧ economy)
+to `extensions/metrics/test/psi/metrics/extension_test.clj` against the
+post-follow-up state (`99121a290`). **PASS — no new actionable test issues.**
+
+- Both prior test-shaper follow-ups are present and effective: the four
+  turn-finished tests use `(make-api)` (dead `:query-fn` removed), and all
+  handler invocations flow through the single `fire-event` seam (extended to
+  return the last handler's result; the catch-branch test asserts on its `nil`
+  return directly — no `[:handlers …]` reach-in remains).
+- `simple ∧ behavior_focused ∧ deterministic ∧ ¬mock` all hold: nullable seam +
+  injected plain fns; assertions on store state / return values, not
+  interactions; no time/randomness/io/concurrency. Logging specifics
+  (timbre `warn`, structured-`e`) correctly unasserted (`¬user_visible`).
+- Suite green: `bb clojure:test:extensions` 228 tests, 788 assertions,
+  0 failures/0 errors.
+- Below-threshold observations (not raised as follow-ups): the
+  `make-api` + `(assoc api :query-session …)` + `init` arrange ceremony repeats
+  in 4 turn-finished tests, and the `metrics/summary` op-handler lookup
+  `(first (filter #(= "metrics/summary" (:id %)) @ops))` repeats in 2 tests.
+  The first was already weighed and explicitly left as a non-blocking
+  observation by the prior test-shaper pass; the second (2 sites, clear) sits
+  below the consolidation threshold the prior pass applied to the handler seam.
+  Re-raising either would duplicate prior judgment.
+
+No follow-up items added.
