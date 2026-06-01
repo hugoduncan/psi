@@ -562,3 +562,39 @@ shape; (b) explicitly document `:input` as plan-path-only on `tool_result` and a
 `dispatch-tool-result-in` to drop it, making the contract uniform by removal; or
 (c) declare divergence acceptable with a documented contract note. Recorded as a
 follow-up.
+
+## 2026-06-01 — code review follow-up: unify cross-path `tool_result` `:input`
+
+Executed the open code-review follow-up (cross-path `"tool_result"` payload
+divergence). Chose resolution (a) — addition over removal/documentation:
+
+- `components/tool-runtime/src/psi/tool_runtime/core.clj` `record-tool-call-result!`:
+  added `:parsed-args (:parsed-args tool-call)` to the `:tool-result`
+  lifecycle event. The shaped result's `:tool-call` is the `prepared-tool-call`
+  (carries `:parsed-args`) built in `execute-tool-call-prepared!`, so the data is
+  present without threading new args through the result path.
+- `components/agent-session/src/psi/agent_session/tool_runtime_adapter.clj`
+  `emit-tool-lifecycle!`: the `:tool-result` bridge branch now emits
+  `:input (:parsed-args lifecycle-event)`, matching `dispatch-tool-result-in`'s
+  plan-path shape. Both paths' `"tool_result"` events now carry the same key set.
+
+Why (a) over (b)/(c): (b) drop-`:input` would break the plan-path
+`dispatch-tool-result-in` consumers and discard available data; (c) documenting
+divergence leaves the silent-`nil` hazard for any handler reading `:input`.
+Addition unifies `consistent(data_shapes)` and strengthens the extension-boundary
+invariant without removing existing behaviour.
+
+Test: extended `emit-tool-lifecycle-bridge-fires-extension-handlers-test` —
+`tc` now carries `:parsed-args {:path "x"}`; asserts both `tool_call` and
+`tool_result` bridge events deliver `:input {:path "x"}`. This is the regression
+guard against the bridge dropping `:input` again.
+
+Verification:
+- `clojure -M:test --focus psi.agent-session.tool-execution-test` → 13 tests,
+  68 assertions, 0 failures (was 66; +2 `:input` assertions).
+- `clojure -M:test --focus psi.tool-runtime.core-test` → 6 tests, 27 assertions,
+  0 failures (no regression from the lifecycle-event change).
+- `clj-kondo --lint` on all three changed files → 0 errors, 0 warnings.
+
+design.md updated: new "`tool_result` cross-path payload shape (unified)"
+clarification records the chosen resolution. steps.md item checked.

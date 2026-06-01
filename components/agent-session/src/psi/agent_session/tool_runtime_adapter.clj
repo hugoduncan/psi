@@ -34,6 +34,7 @@
                        {:type         "tool_result"
                         :tool-name    (:tool-name lifecycle-event)
                         :tool-call-id (:tool-call-id lifecycle-event)
+                        :input        (:parsed-args lifecycle-event)
                         :content      (:content lifecycle-event)
                         :details      (:details lifecycle-event)
                         :is-error     (boolean (:is-error lifecycle-event))})

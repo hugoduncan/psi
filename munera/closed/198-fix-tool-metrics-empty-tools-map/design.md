@@ -69,6 +69,23 @@ its own direct dispatch.
 caller exists. The new `emit-tool-lifecycle!` bridge creates no double-dispatch
 through this function.
 
+### `tool_result` cross-path payload shape (unified)
+
+Both paths that fire the `"tool_result"` extension bus event now deliver the
+same key set, including `:input` (the parsed tool args):
+
+- Data-driven plan path: `dispatch-tool-result-in` — already emitted `:input`.
+- Interactive/batch bridge: `emit-tool-lifecycle!` — now emits `:input`,
+  sourced from `:parsed-args` on the `:tool-result` lifecycle event.
+
+To make this possible, `tool-runtime/core` `record-tool-call-result!` now
+threads `:parsed-args` (from the shaped result's `:tool-call`) into the
+`:tool-result` lifecycle event. This unifies the extension contract so a
+`tool_result` handler reading `:input` behaves identically regardless of which
+path triggered the event (`consistent(data_shapes)`; chosen resolution (a) over
+drop-`:input` (b) or document-divergence (c) — addition preserves both existing
+consumers and removes the silent-`nil` hazard).
+
 ### `extension-registry` nil guard
 
 `context.clj` always sets `:extension-registry (ext/create-registry)` in

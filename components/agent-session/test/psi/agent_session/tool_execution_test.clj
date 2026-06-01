@@ -322,7 +322,8 @@
   (testing "run-tool-call! fires registered tool_call and tool_result extension handlers (regression guard for emit-tool-lifecycle! bridge)"
     (let [agent-ctx   (setup-agent-ctx!)
           [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
-          tc          {:id "call-bridge" :name "read" :arguments "{}"}
+          tc          {:id "call-bridge" :name "read" :arguments "{\"path\":\"x\"}"
+                       :parsed-args {:path "x"}}
           reg         (:extension-registry session-ctx)
           calls       (atom [])]
       (ext/register-extension-in! reg "/ext/test-bridge")
@@ -349,7 +350,12 @@
           (is (= "tool_result" (:type result-event)))
           (is (= "read" (:tool-name result-event)))
           (is (= "call-bridge" (:tool-call-id result-event)))
-          (is (= false (:is-error result-event))))))))
+          (is (= false (:is-error result-event)))
+          ;; Contract: both tool_call and tool_result carry :input (parsed-args),
+          ;; matching the plan-path dispatch-tool-{call,result}-in shape.
+          (is (= {:path "x"} (:input call-event)))
+          (is (= {:path "x"} (:input result-event))
+              "interactive-path tool_result carries :input, unifying the cross-path contract"))))))
 
 (deftest tool-call-handler-block-ignored-on-interactive-path-test
   (testing "{:block true} from a tool_call handler does NOT block execution on the interactive path (intentional non-enforcement)"

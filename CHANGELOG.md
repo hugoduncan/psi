@@ -9,6 +9,9 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 ### Added
 - New `task-lifecycle` workflow: runs a Munera task through its full design → plan → implement → review lifecycle by chaining `review-task-design`, `create-task-plan`, `review-task-plan`, `implement-task`, and `review-task-implementation` in order. Invokable via `/delegate task-lifecycle`.
 
+### Changed
+- Extension `tool_result` events fired on the interactive/batch tool execution path now carry the parsed tool arguments under `:input`, matching the data-driven plan path; previously `:input` was present only on the plan path, so a handler reading it silently received `nil` on the interactive path.
+
 ### Fixed
 - Tool invocations now appear in the `:tools` map in `.psi/metrics.edn`; previously the map was always empty because the `psi/metrics` extension's `on-tool-call`/`on-tool-result` handlers were never fired on the interactive tool execution path.
 
