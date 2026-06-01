@@ -443,3 +443,31 @@ Verification: `clojure -M:test --focus psi.agent-session.tool-execution-test` �
 
 **No new actionable test issues.** All prior findings (AC1/AC2 e2e coverage, ceremony
 dedup, block-ignored guard) are closed and confirmed executing.
+
+## 2026-06-01 — docs review (independent, review-task-docs skill)
+
+Applied the review-task-docs checklist to the user-facing docs surface for this fix.
+
+**Changelog — ✓.** `CHANGELOG.md` `[Unreleased]` / `### Fixed` entry is present, accurate,
+and consistent with the implementation: `.psi/metrics.edn`, `:tools` map, `psi/metrics`
+extension, `on-tool-call`/`on-tool-result` handlers, and the interactive tool execution
+path all match the code (`extensions/metrics/src/psi/metrics/extension.clj`,
+`tool_runtime_adapter.clj`). Bug fix is user-visible → changelog correctly required and present.
+
+**README / examples / removed-behaviour — ✓.** No README references to metrics; no stale
+references; no examples to update; nothing removed.
+
+**Actionable: `psi/metrics` is an activated built-in extension with zero user-facing docs.**
+`.psi/extensions.edn` activates `psi/metrics {}` in this repo, and after this fix
+`.psi/metrics.edn` actually populates the `:tools` map — i.e. metrics is now a real,
+user-observable feature (counters at `worktree/.psi/metrics.edn` with `:tools {name
+{:invocations :errors :error-reasons}}`). But `doc/extensions.md` "Built-in extensions in
+this repo" catalog documents peer built-ins (`commit-checks`, `mcp-tasks-run`, workflow
+surface) and omits `psi/metrics` entirely; no `doc/` or `README.md` mentions it. The fix
+turned the extension from inert (`:tools` always `{}`) into a working feature without any
+doc describing what `.psi/metrics.edn` is, where it lives, or what it records. This is a
+documentation completeness gap surfaced by the behaviour change.
+
+Severity note: arguably pre-existing (metrics was undocumented before too), but this task
+is what makes the behaviour observable, so it is the natural point to document it. Recorded
+as a follow-up.
