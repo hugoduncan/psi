@@ -464,7 +464,9 @@
     ;; The application half of the single-sourced modifiable-key contract:
     ;; only keys the override actually carries are copied; each modifiable key
     ;; is applied (mirrors the selection guard's :content/:details/:is-error or).
-    (is (= {:content "new" :details {:k :v} :is-error true}
+    ;; Copied :content/:is-error values are coerced via
+    ;; modifiable-tool-result-coercions, matching the inbound tool-result-event.
+    (is (= {:content [{:type :text :text "new"}] :details {:k :v} :is-error true}
            (ext/merge-tool-result-override
             {:content "old" :details nil :is-error false}
             {:content "new" :details {:k :v} :is-error true})))))
@@ -472,7 +474,7 @@
 (deftest merge-tool-result-override-ignores-absent-keys-test
   (testing "merge-tool-result-override leaves result keys the override omits unchanged"
     ;; An override carrying only :content must not clobber :details/:is-error.
-    (is (= {:content "new" :details {:orig true} :is-error false}
+    (is (= {:content [{:type :text :text "new"}] :details {:orig true} :is-error false}
            (ext/merge-tool-result-override
             {:content "old" :details {:orig true} :is-error false}
             {:content "new"})))))
@@ -489,6 +491,22 @@
     ;; the application half must pass result through untouched.
     (is (= {:content "old" :is-error false}
            (ext/merge-tool-result-override {:content "old" :is-error false} nil)))))
+
+(deftest merge-tool-result-override-normalizes-content-test
+  (testing "merge-tool-result-override normalizes override :content like the inbound event"
+    ;; C2 value-semantics symmetry: a handler override returning a raw string
+    ;; :content must land as normalized content-blocks in the merged result,
+    ;; matching tool-result-event's inbound :content coercion.
+    (is (= {:content [{:type :text :text "raw string"}]}
+           (ext/merge-tool-result-override {} {:content "raw string"})))))
+
+(deftest merge-tool-result-override-coerces-is-error-test
+  (testing "merge-tool-result-override coerces override :is-error to a strict boolean"
+    ;; C2 value-semantics symmetry: a truthy non-boolean override :is-error must
+    ;; become strict true (matching tool-result-event's (boolean …) coercion),
+    ;; and a falsey nil must become strict false.
+    (is (true? (:is-error (ext/merge-tool-result-override {} {:is-error "truthy"}))))
+    (is (false? (:is-error (ext/merge-tool-result-override {} {:is-error nil}))))))
 
 (deftest tool-event-payload-constructors-test
   (testing "tool-call-event builds the canonical tool_call payload shape"

@@ -689,3 +689,50 @@ C2 is about applying the *same* coercions on the override path, not changing the
 constructor.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Code review follow-up execution: C2 (2026-06-01)
+
+Executed the C2 code-shaper second-pass follow-up: restored value-semantics
+symmetry between the inbound `tool-result-event` constructor and the override
+application `merge-tool-result-override`, choosing the honest single-sourcing
+fix (not the documentation-of-asymmetry alternative).
+
+Change (`components/agent-session/src/psi/agent_session/extensions.clj`):
+- Added `modifiable-tool-result-coercions` — a single per-key coercion table
+  `{:content normalize-tool-content :is-error boolean}` documenting and owning
+  the *value semantics* half of the modifiable-key contract (`:details` carries
+  no coercion / identity).
+- Added private `coerce-tool-result-value` deriving from that table
+  (identity fallback for keys without a coercion).
+- `tool-result-event` now coerces `:content`/`:is-error` via
+  `coerce-tool-result-value` (behaviour unchanged; same coercions, now sourced
+  from the shared table).
+- `merge-tool-result-override` now coerces each copied override value via
+  `coerce-tool-result-value`, so a handler override's `:content` (raw string →
+  normalized content-blocks) and `:is-error` (truthy/falsey → strict boolean)
+  land identically to the inbound path. This closes the inbound/applied
+  asymmetry: both halves of the contract (key set *and* value semantics) are now
+  single-sourced.
+
+`tool_plan.clj` consumer is unchanged — it already routes overrides through
+`merge-tool-result-override`, so it now benefits from coercion automatically.
+
+Tests (`components/agent-session/test/psi/agent_session/extensions_test.clj`):
+- Added `merge-tool-result-override-normalizes-content-test`: override
+  `{:content "raw string"}` ⇒ `{:content [{:type :text :text "raw string"}]}`.
+- Added `merge-tool-result-override-coerces-is-error-test`: override
+  `{:is-error "truthy"}` ⇒ strict `true`; `{:is-error nil}` ⇒ strict `false`.
+- Updated the two pre-existing merge assertions
+  (`merge-tool-result-override-applies-present-keys-test`,
+  `merge-tool-result-override-ignores-absent-keys-test`) that expected the raw
+  override `:content "new"` — they now expect normalized content-blocks,
+  reflecting the symmetric coercion.
+
+Verify: `clj-paren-repair` balanced/formatted both changed files; clj-kondo
+clean (0 errors, 0 warnings) on extensions.clj, tool_plan.clj, and the test ns;
+full `bb clojure:test:unit` suite green (all new and updated tests present and
+passing). The `result-override` selection-helper tests are unaffected —
+`dispatch-tool-result-in` selects but does not coerce; coercion is the
+application path's responsibility.
+
+C2 follow-up item checked.

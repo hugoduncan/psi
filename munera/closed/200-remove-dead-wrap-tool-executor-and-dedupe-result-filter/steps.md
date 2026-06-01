@@ -158,7 +158,7 @@
 
 ## Code review follow-ups (code-shaper second pass, 2026-06-01)
 
-- [ ] C2: The modifiable-key contract single-sources the *key set* but not the
+- [x] C2: The modifiable-key contract single-sources the *key set* but not the
   *value semantics*. `tool-result-event` (`extensions.clj:312–314`) coerces the
   *inbound* payload (`:content` → `tool-runtime/normalize-tool-content`,
   `:is-error` → `(boolean …)`) and is documented as the single source of "payload
@@ -179,3 +179,13 @@
   Run clj-kondo + Kaocha focus `psi.agent-session.extensions-test` and
   `psi.agent-session.tool-execution-test`; behaviour change limited to override
   value coercion.
+  Restored symmetry via the honest fix: extracted a single per-key coercion
+  table `modifiable-tool-result-coercions` (`:content` →
+  `normalize-tool-content`, `:is-error` → `boolean`) that *both*
+  `tool-result-event` (inbound) and `merge-tool-result-override` (override
+  application) now derive from via `coerce-tool-result-value`. Override
+  `:content`/`:is-error` are now coerced identically to the inbound payload.
+  Added focused coverage (`merge-tool-result-override-normalizes-content-test`,
+  `merge-tool-result-override-coerces-is-error-test`) and updated the two
+  pre-existing merge assertions that expected raw `:content`. clj-kondo clean
+  (0/0) on all three files; full unit suite green.

@@ -296,21 +296,40 @@
    :tool-call-id tool-call-id
    :input        args})
 
+(def modifiable-tool-result-coercions
+  "Per-key value coercions for the modifiable tool-result keys.
+
+   Single source of the *value semantics* half of the modifiable-key contract:
+   `:content` normalizes to content-blocks and `:is-error` coerces to a strict
+   boolean. `:details` carries no coercion (identity). Both the *inbound*
+   payload constructor (`tool-result-event`) and the *override application*
+   (`merge-tool-result-override`) derive from this table, so a key's value
+   shape is enumerated once and both halves stay in lockstep."
+  {:content  tool-runtime/normalize-tool-content
+   :is-error boolean})
+
+(defn- coerce-tool-result-value
+  "Coerce `v` for modifiable-key `k` per `modifiable-tool-result-coercions`,
+   returning `v` unchanged when the key carries no coercion."
+  [k v]
+  ((get modifiable-tool-result-coercions k identity) v))
+
 (defn tool-result-event
   "Build the canonical `tool_result` bus-event payload.
    Single source of the cross-path payload shape and value semantics —
    used by both `dispatch-tool-result-in` (plan path) and the session
    `emit-tool-lifecycle!` bridge (interactive/batch path). Coerces
    `:content` to normalized content-blocks and `:is-error` to a strict
-   boolean so both paths deliver an identical contract."
+   boolean (via `modifiable-tool-result-coercions`) so both paths deliver an
+   identical contract."
   [tool-name tool-call-id args content details is-error?]
   {:type         "tool_result"
    :tool-name    tool-name
    :tool-call-id tool-call-id
    :input        args
-   :content      (tool-runtime/normalize-tool-content content)
+   :content      (coerce-tool-result-value :content content)
    :details      details
-   :is-error     (boolean is-error?)})
+   :is-error     (coerce-tool-result-value :is-error is-error?)})
 
 (defn dispatch-tool-call-in
   "Dispatch a tool_call event. Returns {:block true :reason s} or nil."
@@ -340,13 +359,17 @@
 
 (defn merge-tool-result-override
   "Apply `override`'s modifiable keys onto `result`, copying only the keys in
-   `modifiable-tool-result-keys` that `override` actually carries. When
-   `override` is nil/absent, `result` is returned unchanged. The application
-   half of the modifiable-key contract."
+   `modifiable-tool-result-keys` that `override` actually carries. Each copied
+   value is coerced per `modifiable-tool-result-coercions`, so an override's
+   `:content`/`:is-error` receive the same normalization the inbound
+   `tool-result-event` constructor applies. When `override` is nil/absent,
+   `result` is returned unchanged. The application half of the modifiable-key
+   contract."
   [result override]
   (reduce (fn [acc k]
             (cond-> acc
-              (contains? override k) (assoc k (get override k))))
+              (contains? override k)
+              (assoc k (coerce-tool-result-value k (get override k)))))
           result
           modifiable-tool-result-keys))
 
