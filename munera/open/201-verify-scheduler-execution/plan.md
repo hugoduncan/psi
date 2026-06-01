@@ -104,7 +104,16 @@ regardless of pre-existing vs new.
 ## Slice order
 
 Each slice is a vertical area-verification (audit → fill gap → record finding),
-keeping `bb test` green throughout. Slices map to design Scope areas.
+keeping `bb test` green throughout. Slices map to design Scope areas
+**mostly 1:1, with one deliberate 3:1 split**: design Scope area #3 "Live
+execution path" is verified across **three** slices — Slice 2 (message kind),
+Slice 3 (busy-session queue + drain-on-idle), and Slice 4 (session kind). All
+three record into the **single shared "Live execution path"** section of the
+fixed 7-section `findings.md` skeleton (Baseline, Pure model, Live execution
+path, psi-tool surface, Cancellation & lifecycle, Failure path, Projections);
+they do **not** create three separate findings sections. The remaining slices
+map 1:1 to their Scope areas (Slice 0→Baseline, 1→Pure model, 5→psi-tool
+surface, 6→Cancellation & lifecycle, 7→Failure path, 8→Projections).
 
 0. **Baseline** — inventory existing scheduler tests; run `bb test`; capture
    current pass/fail; start `findings.md` skeleton (one section per Scope area).

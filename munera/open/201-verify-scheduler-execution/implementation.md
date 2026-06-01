@@ -197,3 +197,25 @@ Found 2 actionable inconsistencies; added unchecked follow-ups to steps.md.
    an internal contradiction between the work the plan authorises and the gate
    that validates it. (`scheduler_tools_test.clj`, the other Slice 5 file, does
    match.)
+
+## Plan/steps inconsistency follow-up execution (2026-06-01)
+
+Executed both newly added plan/steps inconsistency follow-ups (from the
+preceding inconsistency-review pass). Both resolvable from artifact facts; no
+blockers. No scheduler source/doc/test code touched (plan/steps/impl only).
+
+1. Slice↔Scope-area↔findings-section mapping → chose **option (a)** (keep the
+   fixed 7-section findings skeleton; correct the plan claim). plan.md
+   "Slice order" now states the deliberate 3:1 mapping for design Scope area
+   #3 "Live execution path" (= Slices 2 message-kind / 3 busy-drain / 4
+   session-kind, all → one shared findings section) and the 1:1 mappings for
+   the rest. steps.md Slices 2/3/4 "Record …" items now explicitly record into
+   the single shared "Live execution path" `findings.md` section; the Slice 0
+   skeleton item now states exactly 7 sections with that one section holding all
+   three live-execution entries (no separate per-slice sections). No design.md
+   change (the 7-section Scope/skeleton is preserved, not split).
+2. Slice 10 allowlist → broadened the close-out touched-path allowlist to permit
+   test files matching `scheduler_*` **or** `psi_tool_scheduler_test.clj`
+   (the psi-tool-surface file is named explicitly because it does not match the
+   `scheduler_*` glob, and Slices 0/5 inventory/extend it). `src/**` and
+   `doc/scheduler.md` changes still fail the gate.

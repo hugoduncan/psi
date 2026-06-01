@@ -18,9 +18,12 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 - [ ] Run `bb test`; capture current pass/fail state (note any pre-existing
       failures) in `implementation.md`.
 - [ ] Create `munera/open/201-verify-scheduler-execution/findings.md` skeleton:
-      one `##` section per Scope area (Baseline, Pure model, Live execution path,
-      psi-tool surface, Cancellation & lifecycle, Failure path, Projections),
-      each with an entry table for {status, summary, covering test, repro+task-ref}.
+      exactly **7** `##` sections, one per design Scope area (Baseline, Pure
+      model, Live execution path, psi-tool surface, Cancellation & lifecycle,
+      Failure path, Projections), each with an entry table for {status, summary,
+      covering test, repro+task-ref}. The single "Live execution path" section
+      holds all three live-execution slices (2 message-kind / 3 busy-drain /
+      4 session-kind) as separate entries — do not split it into three sections.
 - [ ] Record Baseline finding: suite present, current pass/fail, seam helpers
       available in `test_support`.
 
@@ -47,7 +50,9 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       scheduled provenance. Add if missing.
 - [ ] Confirm assertions are on state/outputs (delivered prompt), not handler
       interactions.
-- [ ] Record message-kind live-path finding citing covering deftest.
+- [ ] Record message-kind finding as an entry in the **single shared "Live
+      execution path"** `findings.md` section (do NOT create a separate
+      message-kind section), citing covering deftest.
 
 ## Slice 3 — Busy-session queue + drain-on-idle
 
@@ -60,7 +65,8 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       `:is-compacting` true) → schedule `:queued`; set session idle; dispatch
       `:scheduler/drain-queue` directly → `drain-one` delivers oldest queued
       (by `fire-at`, `created-at`, `schedule-id`). Add if missing.
-- [ ] Record busy-queue/drain finding citing covering deftest.
+- [ ] Record busy-queue/drain finding as an entry in the **same single shared
+      "Live execution path"** `findings.md` section, citing covering deftest.
 
 ## Slice 4 — Live execution: session kind
 
@@ -71,7 +77,9 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       origin idle) → fresh **top-level session** created in origin worktree/
       context → prompt submitted into it → `created-session-id` and
       `delivery-phase` recorded. Add if missing.
-- [ ] Record session-kind live-path finding citing covering deftest.
+- [ ] Record session-kind finding as an entry in the **same single shared "Live
+      execution path"** `findings.md` section (the three live-execution slices
+      2/3/4 all write into this one section), citing covering deftest.
 
 ## Slice 5 — psi-tool surface
 
@@ -163,8 +171,11 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       green coverage + `findings.md`. Prove it with a touched-path allowlist via
       `git diff --stat <base>...HEAD`: the only changed paths permitted are
       (a) test files under
-      `components/agent-session/test/psi/agent_session/scheduler_*` (new or
-      extended verification tests), and (b) files under
+      `components/agent-session/test/psi/agent_session/` matching
+      `scheduler_*` **or** `psi_tool_scheduler_test.clj` (new or extended
+      verification tests — the psi-tool-surface file does not match the
+      `scheduler_*` glob, so it is named explicitly; Slices 0/5 inventory and
+      may extend it), and (b) files under
       `munera/open/201-verify-scheduler-execution/` (incl. `findings.md`) plus
       any newly created `munera/open/NNN-slug/` remediation dir from Slice 9.
       Any changed path under `components/agent-session/src/**` or
@@ -209,7 +220,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Plan/steps inconsistency follow-ups (2026-06-01)
 
-- [ ] Reconcile the slice↔Scope-area↔findings-section mapping. plan.md "Slice
+- [x] Reconcile the slice↔Scope-area↔findings-section mapping. plan.md "Slice
       order" claims "Slices map to design Scope areas", but design.md's single
       "Live execution path" Scope area (and the one `findings.md` "Live execution
       path" section in the Slice 0 skeleton) is split across Slices 2/3/4
@@ -220,9 +231,19 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       slices — pick one and align plan.md + steps.md (+ design.md/findings
       skeleton if option b) so the mapping is 1:1 and the 7-section skeleton is
       not silently violated.
-- [ ] Fix the Slice 10 coherence-gate allowlist to include
+      Done: chose option (a). plan.md "Slice order" now states the deliberate
+      3:1 split (Live execution path = Slices 2/3/4 → one shared findings
+      section) and lists the remaining 1:1 mappings. steps.md Slices 2/3/4
+      "Record …" items now explicitly write into the single shared "Live
+      execution path" `findings.md` section; Slice 0 skeleton item states
+      exactly 7 sections with that one section holding all three live entries.
+      Design Scope/findings skeleton kept 7-section (no design.md change).
+- [x] Fix the Slice 10 coherence-gate allowlist to include
       `psi_tool_scheduler_test.clj`. Slice 0 inventories and Slice 5 audits/may
       add tests to `psi_tool_scheduler_test.clj`, which the current
       `scheduler_*` allowlist glob excludes; broaden the Slice 10 allowed-path
       pattern (e.g. `psi_tool_scheduler_test.clj` ∪ `scheduler_*`) so a
       legitimately-changed psi-tool-surface test file does not fail the gate.
+      Done: Slice 10 close-out allowlist now permits test files matching
+      `scheduler_*` **or** `psi_tool_scheduler_test.clj` (named explicitly since
+      it does not match the glob); `src/**` and `doc/scheduler.md` still fail.
