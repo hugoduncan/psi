@@ -83,3 +83,44 @@ Read design.md plus testing-without-mocks SKILL, the five named test files, `ops
 - `config_test.clj` `resolve-config` target shape undefined: real `read-project-preferences` returns `:version 1` (redef tests omit it), and an already-file-backed `read-project-preferences-test` exists; design does not say whether the merge-precedence proof becomes redundant, moves to a config-source seam, or which of the three preferred options applies to it.
 - Acceptance wording "at least one note ... for nREPL and process infrastructure" is ambiguous between one combined note and per-seam strategy notes.
 - `commands_test.clj` operational (`eval-op`/`interrupt`) target uses an "or" (real runtime+config vs. split formatting/parsing tests), leaving unclear whether command-layer operational routing must still be proven through real `eval-instance-in!` (eval_test style) or may be reduced to formatting tests.
+
+2026-06-01 — Ambiguity follow-up execution
+
+Resolved all five 2026-06-01 design-ambiguity follow-up items in design.md
+(grounded in reading the real source + tests):
+
+1. Seam-injection mechanism — chose runtime-state injection (fn carried in
+   `[:runtime-handle <seam-key>]`, seeded at acquisition, real-impl default when
+   absent), mirroring the proven `[:runtime-handle :client-session]` idiom in
+   `eval_test.clj`. Added a canonical "Seam-injection mechanism" subsection to
+   Design guidance. New keys: `:nrepl-connector` (wraps inline
+   `requiring-resolve` nrepl.core block in `client.clj`) and `:process-launcher`
+   (promotes private `start-process!` to the seam default). Rejected
+   passed-argument/options-map: would force `ops`/`commands` to thread a test-only
+   param. `attach_test.clj` drives `:nrepl-connector` transitively via
+   `attach-instance-in! → connect-instance-in!` (no connect-instance-in! redef).
+
+2. `ops_test.clj` scope — resolved as IN scope. Added to Problem audit, Audit
+   summary (redesign), Scope (explicit in-scope rationale), Acceptance file list,
+   and execution order. De-mock set is now six files. Same `:client-session` seam
+   covers its `eval-instance-in!` redefs.
+
+3. `config_test.clj` `resolve-config` — Option 1 (real file-backed). Decisions:
+   user layer not file-mutated (reads ~/.psi); precedence proof uses real shared
+   `project.edn` + local `project.local.edn` in temp worktree; `:version 1` is
+   irrelevant because `resolve-config` extracts only `:project-nrepl`; merge proof
+   NOT redundant with `read-project-preferences-test` (different units, both kept);
+   empty case = temp worktree with no config → `{:project-nrepl {}}`.
+
+4. Acceptance note wording — resolved to per-seam: one strategy note for the
+   nREPL client seam and one for the process-start seam; a single combined note is
+   explicitly insufficient.
+
+5. `commands_test.clj` operational "or" — resolved to REAL operational routing
+   through canonical `[:runtime-handle :client-session]` seam (eval_test
+   `install-instance!` pattern), not reduction to formatting-only tests. Pure
+   formatting/parsing tests stay seam-free.
+
+No blocking reasons; all five items completed at the design level. Implementation
+(production seam code + test reshaping) remains for the build phase per the
+existing steps.md.
