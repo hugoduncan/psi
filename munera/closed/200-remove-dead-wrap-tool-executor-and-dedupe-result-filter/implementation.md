@@ -231,3 +231,30 @@ branch of the single-sourced contract is independently protected.
 - Verify: clj-paren-repair (no changes), clj-kondo clean (0/0); Kaocha focus
   `psi.agent-session.extensions-test` → 30 tests, 98 assertions, 0 failures
   (was 28/96 before; +2 tests, +2 assertions). No deviations.
+
+## Test review: task-test-review (third pass, 2026-06-01)
+
+Re-applied task-test-review after T2a/T2b landed. Verified at runtime: 30 tests,
+98 assertions, 0 failures (Kaocha focus `psi.agent-session.extensions-test`).
+
+- **well-formed** ✓ `deftest`/`testing`/`is`; assert on return values, not
+  interactions. Real `create-registry`; handlers are plain in-test fns; no
+  mocks/stubs.
+- **infra deps** ✓ None to null — registry is the real domain object.
+- **behaviour coverage** ✓ The surviving `dispatch-tool-result-in` filter
+  predicate (the single-sourced modifiable-key contract, extensions.clj:330–332)
+  is now fully covered: `map?` guard (non-map ⇒ nil); each modifiable-key
+  disjunct positively selected (`:content` T1a, `:details` T2a, `:is-error`
+  T2b); map-without-modifiable-keys rejected (T1b). Coercion/normalization
+  covered by `dispatch-tool-result-{normalizes-content,coerces-is-error}-test`.
+  No predicate branch is silently mutable.
+
+No new actionable test issues within this task's scope. The remaining untested
+behaviours touching `dispatch-tool-result-in` — `first (filter …)` first-writer
+selection across multiple modifiable handler returns, and the `{:error …}`
+handler-exception map being rejected by the filter — are pre-existing `dispatch-in`
+semantics neither introduced nor changed by this task (override precedence is
+covered by `dispatch-override-test`; exception wrapping by `dispatch-exception-test`).
+They are out of scope for this dead-code-removal / single-sourcing task.
+
+PASS_STATUS: REVIEW_COMPLETE
