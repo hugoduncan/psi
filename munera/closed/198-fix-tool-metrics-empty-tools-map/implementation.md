@@ -1028,3 +1028,17 @@ finding stands (not re-raised).
 **Verification.** `clojure -M:test --focus psi.agent-session.tool-execution-test --focus
 psi.metrics.extension-test --focus psi.agent-session.extensions-test` → **59 tests, 212
 assertions, 0 failures**.
+
+## 2026-06-01 — test-shaper follow-up executed (dedup)
+
+Removed `tool-result-error-reason-truncated-to-80-chars-test` (single-line 100×`x`,
+`(<= count 80)`) — strictly subsumed by `tool-result-error-reason-multiline-truncated-to-first-line-80-chars-test`
+(multiline, asserts the stronger `(= 80 count)` + exact 80×`x` value + first-line
+selection/trim; `str/split-lines` on single-line content yields `[line]`, so the
+multiline path already covers the single-line case). Kept the multiline test as the
+canonical 80-char first-line truncation guard.
+
+**Verification.** `clojure -M:test --focus psi.metrics.extension-test` →
+**19 tests, 42 assertions, 0 failures** (was 20/44; the deleted test contributed 2
+assertions and no distinct coverage). `clj-kondo --lint extension_test.clj` →
+0 errors, 0 warnings.

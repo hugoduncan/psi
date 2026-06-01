@@ -113,17 +113,6 @@
     (let [metrics (:metrics @ext/store)]
       (is (nil? (get-in metrics [:tools "bash" :errors]))))))
 
-(deftest tool-result-error-reason-truncated-to-80-chars-test
-  ;; The error reason key is derived from the first line, max 80 chars.
-  (let [{:keys [api state]} (make-api)
-        long-message (apply str (repeat 100 "x"))]
-    (ext/init api)
-    (fire-event state "tool_result"
-                {:tool-name "read" :tool-call-id "c1" :is-error true :content long-message})
-    (let [reasons (get-in @ext/store [:metrics :tools "read" :error-reasons])]
-      (is (= 1 (count reasons)))
-      (is (<= (count (first (keys reasons))) 80)))))
-
 (deftest tool-result-error-reason-multiline-truncated-to-first-line-80-chars-test
   ;; Multi-line error content >80 chars: reason is the first line, trimmed,
   ;; capped at 80 chars (single key, no StringIndexOutOfBounds on the bound).
