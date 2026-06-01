@@ -7,6 +7,7 @@
    [psi.agent-session.extensions.loader :as loader]
    [psi.command-registry.registry :as command-registry]
    [psi.tool-registry.registry :as tool-registry]
+   [psi.tool-runtime.core :as tool-runtime]
    [taoensso.timbre :as timbre]))
 
 (defrecord ExtensionRegistry [state])
@@ -302,7 +303,8 @@
                                         :tool-name    tool-name
                                         :tool-call-id tool-call-id
                                         :input        args
-                                        :content      (:content result)
+                                        :content      (tool-runtime/normalize-tool-content
+                                                       (:content result))
                                         :details      (:details result)
                                         :is-error     is-error?})]
     (first (filter #(and (map? %)

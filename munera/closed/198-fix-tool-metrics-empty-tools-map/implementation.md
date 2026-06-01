@@ -636,3 +636,29 @@ silent-`nil` `:input` case. Recorded as a single low-priority follow-up for
 cross-path-contract completeness; not a blocker for this fix.
 
 No other simplicity/consistency/robustness issues. Implementation complete and correct.
+
+## Follow-up resolution: `:content` value-shape unification (2026-06-01)
+
+Executed the residual code-shaper follow-up. Resolution (a) — normalise by
+addition. `dispatch-tool-result-in` (extensions.clj) now coerces its
+`"tool_result"` bus event `:content` through
+`tool-runtime/normalize-tool-content`, so the plan path emits the canonical
+`[{:type :text :text …}]` block vector that the interactive/batch bridge
+already emits. The bus event's `:content` value shape is now path-independent.
+
+- Idempotent for the interactive path (its content is already block-vec).
+- Robust for the sole consumer (`on-tool-result` reads `:content` via
+  `(str content)` — a vec of text blocks `str`s deterministically).
+- Eliminates the `consistent(data_shapes)` hazard at the value level rather
+  than documenting it (`one_way ¬ambiguity`).
+
+Added focused contract proof `dispatch-tool-result-normalizes-content-test`
+in `extensions_test.clj`: a raw string runtime result `:content "raw string"`
+arrives at the handler as `[{:type :text :text "raw string"}]`.
+
+Verification: `clojure -M:test --focus psi.agent-session.extensions-test
+--focus psi.agent-session.tool-execution-test --focus psi.tool-runtime.core-test`
+→ 43 tests, 189 assertions, 0 failures. `clj-kondo` clean on
+`extensions.clj` (src) and `extensions_test.clj`.
+
+`steps.md` final unchecked item is now checked; no remaining unchecked items.

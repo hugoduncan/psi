@@ -86,6 +86,19 @@ path triggered the event (`consistent(data_shapes)`; chosen resolution (a) over
 drop-`:input` (b) or document-divergence (c) — addition preserves both existing
 consumers and removes the silent-`nil` hazard).
 
+`:content` value shape is also unified to canonical content-blocks on both
+paths. The interactive/batch bridge already emits `:content` as normalized
+content-blocks (`(:content result-message)`). The plan path's
+`dispatch-tool-result-in` previously emitted the raw, un-normalised
+`(:content result)` (e.g. a plain string), so the same bus event carried a
+different value shape per path. `dispatch-tool-result-in` now coerces its
+`:content` via `tool-runtime/normalize-tool-content`, so a `tool_result`
+handler reading `:content` sees the canonical `[{:type :text :text …}]` block
+vector regardless of triggering path (chosen resolution: normalise-by-addition
+over document-divergence — eliminates the path-dependent value hazard rather
+than codifying it; the change is idempotent for the already-normalised
+interactive path).
+
 ### `extension-registry` nil guard
 
 `context.clj` always sets `:extension-registry (ext/create-registry)` in

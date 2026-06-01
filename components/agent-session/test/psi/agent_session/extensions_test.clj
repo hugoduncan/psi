@@ -442,6 +442,20 @@
       (is (= {:content "original" :is-error false}
              (wrapped "read" {"path" "test.txt"}))))))
 
+(deftest dispatch-tool-result-normalizes-content-test
+  (testing "plan-path tool_result bus event delivers :content as normalized content-blocks"
+    (let [reg     (ext/create-registry)
+          payload (atom nil)
+          _       (ext/register-extension-in! reg "/ext/a")
+          _       (ext/register-handler-in! reg "/ext/a" "tool_result"
+                                            (fn [p] (reset! payload p) nil))]
+      ;; raw runtime result carries :content as a plain string
+      (ext/dispatch-tool-result-in reg "read" "call-1" {"path" "x"}
+                                   {:content "raw string" :is-error false}
+                                   false)
+      (is (= [{:type :text :text "raw string"}] (:content @payload))
+          "string content is coerced to canonical text blocks, matching the interactive bridge"))))
+
 ;; ── Introspection: handler event names ──────────────────────────────────────
 
 (deftest handler-event-names-test
