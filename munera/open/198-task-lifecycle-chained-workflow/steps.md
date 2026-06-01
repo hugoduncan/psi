@@ -90,7 +90,7 @@
 
 ## Docs review follow-ups (review-task-docs)
 
-- [ ] Document the `:map` `:prompt-string` form in
+- [x] Document the `:map` `:prompt-string` form in
       `doc/workflow-grammar-concepts.md` (§ "Delegation" / § "Workflow input and
       original request"). The doc currently frames `:prompt-string` and the
       resulting `:workflow-input` as string-only ("rendered to a final string

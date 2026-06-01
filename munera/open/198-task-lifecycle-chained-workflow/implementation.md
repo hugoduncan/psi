@@ -722,3 +722,29 @@ One actionable finding (new):
    feared. Minimal-scope follow-up added to `steps.md`.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Docs review follow-up executed (2026-06-01)
+
+Completed the docs-review follow-up: documented the `:map` `:prompt-string`
+form in `doc/workflow-grammar-concepts.md`. Three additive edits, no
+restructure:
+
+1. § "Delegation boundary" — added a paragraph after the string-only
+   `:prompt-string` framing describing the `{:type :map :fields {...}}` form
+   rendering to a **map** (not a string), each field resolved from its
+   source-spec, becoming the delegated workflow's `:workflow-input` so
+   `{:from :workflow-input :path [<key>]}` resolves. Cites the shipping
+   exemplars `gh-issue-implement.edn` / `review-task-implementation.edn`.
+2. Same section — generalized the "treats the final rendered prompt string as
+   its local workflow input surface" line to "— or, for the `:map` form, the
+   rendered map —".
+3. § "Workflow input and original request" — added a clarifying note that
+   `:workflow-input` is a string for literal/`:template` forms and a **map** for
+   the `:map` form, so `:path` selectors resolve against it.
+
+Verification of accuracy against runtime: re-read
+`source-resolution/render-delegate-prompt-string` — `{:type :map}` returns
+`(into {} (map ... (:fields prompt-string)))`, i.e. a map. Both exemplars
+(`gh-issue-implement.edn`, `review-task-implementation.edn`) confirmed to use
+`:type :map`. The doc note now matches runtime authority; the design's
+"known gap" / textual contradiction is closed. steps.md item marked done.
