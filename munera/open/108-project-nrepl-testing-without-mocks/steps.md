@@ -158,3 +158,23 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
   missing-host/port) were considered but deliberately NOT raised — they are
   pre-existing infra guards outside this de-mocking task's behaviour set;
   covering them would be scope expansion. No follow-up steps added.
+
+## Test review follow-ups (2026-06-01, test-shaper)
+
+- [ ] Remove the wall-clock/thread-scheduling dependency from `started_test.clj`
+  so the readiness tests are deterministic (`control(time)` ∧ `control(concurrency)`
+  ∧ `¬flaky`). Both `wait-for-started-endpoint-test` (happy case) and
+  `start-instance-in-test` currently drive `.nrepl-port` appearance via
+  `(future (Thread/sleep …) (spit …))` racing the polling
+  `wait-for-started-endpoint!`. The race is unnecessary because
+  `wait-for-started-endpoint!` (started.clj:52–53) checks `read-dot-nrepl-port-safe`
+  on the FIRST loop iteration. Fix: (a) in `wait-for-started-endpoint-test`, write
+  the `.nrepl-port` file synchronously before invoking
+  `wait-for-started-endpoint!` (drop the `future`/`Thread/sleep`); (b) in
+  `start-instance-in-test`, have the seeded `launcher` write `.nrepl-port`
+  synchronously before returning the fake process (drop its `future`/`Thread/sleep`)
+  — the launcher runs synchronously before `wait-for-started-endpoint!`, so the
+  first poll finds the file. Preserve the file-backed-readiness signal (still
+  discover the endpoint from a real on-disk `.nrepl-port`); leave the
+  process-exit failure case unchanged (already deterministic). Keep tests green +
+  lint clean.

@@ -919,3 +919,42 @@ behaviour the seam shaping deliberately preserved), these guards are outside
 this task's behaviour set; covering them would be scope expansion beyond the
 de-mocking intent. No new follow-up step added. No actionable test-quality
 issue found this pass.
+
+2026-06-01 — Test review (test-shaper skill)
+
+First review pass through the `test-shaper` lens (clarity ∧ signal ∧ robustness
+∧ economy ∧ determinism), distinct from the prior task-test-review passes which
+focused on well-formedness, behaviour coverage, and ¬mock seam injection. Read
+all eight test files and `started.clj` source. Most criteria hold strongly:
+sociable/state-based, single-concern, isolated (temp dirs + `user.home`
+restored in `finally`), no interaction assertions, economical coverage, shared
+`test-support` compresses ceremony without hiding intent.
+
+One actionable robustness/determinism gap (skill: `λ deterministic(tests)` →
+`control(time)` ∧ `control(concurrency)` ∧ `¬flaky`):
+
+1. `started_test.clj` `wait-for-started-endpoint-test` (happy case) and
+   `start-instance-in-test` drive `.nrepl-port` readiness through a racing
+   background thread: `(future (Thread/sleep 100|50) (spit … ".nrepl-port" …))`
+   against the polling `wait-for-started-endpoint!` (`:timeout-ms 1000`). This
+   couples the test to real wall-clock timing and thread scheduling — a slow or
+   contended CI host can miss the window, making the tests flaky, and every
+   green run pays the sleep latency. The race is also UNNECESSARY:
+   `wait-for-started-endpoint!` (started.clj:52–53) checks
+   `read-dot-nrepl-port-safe` on the FIRST loop iteration and returns
+   immediately if the file exists, so the port file can be written
+   deterministically BEFORE the wait/launch rather than from a sleeping future.
+   Fixes: (a) `wait-for-started-endpoint-test` — `spit` the `.nrepl-port` file
+   synchronously before calling `wait-for-started-endpoint!` (drop the
+   `future`/`Thread/sleep`); the first poll finds it. (b) `start-instance-in-test`
+   — make the seeded `launcher` write `.nrepl-port` SYNCHRONOUSLY before
+   returning the fake process (drop its `future`/`Thread/sleep`); the launcher is
+   called synchronously before `wait-for-started-endpoint!`, so the subsequent
+   poll finds the file on its first iteration. Both keep the file-backed-readiness
+   signal intact (still proving discovery from a real on-disk `.nrepl-port`) while
+   removing the time/concurrency dependency and the per-run sleep. Keep tests
+   green + lint clean.
+
+The `process-exited?` failure case (`fail when process exits before port
+discovery`) is already deterministic (process reports `isAlive=false`
+immediately, no file write) and needs no change.
