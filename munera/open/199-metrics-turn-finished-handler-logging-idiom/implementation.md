@@ -207,3 +207,38 @@ Re-applied the skill's three criteria against the post-follow-up suite.
   swallow proof.
 
 No follow-up items added.
+
+## Test review — test-shaper (2026-06-01)
+
+Applied test-shaper (clarity ∧ signal ∧ robustness ∧ consistency ∧ economy) to
+`extensions/metrics/test/psi/metrics/extension_test.clj`. Suite is well-formed,
+deterministic, behaviour-focused, and `¬mock`-compliant. **Two actionable
+shaping issues** (both `consistent ∧ minimal_incidental_setup`, neither a
+correctness defect):
+
+- **Incidental dead `:query-fn` setup (3 sites).** The three turn-finished
+  tests do `(make-api {:query-fn (fn [_q] {})})` then `(assoc api :query-session
+  …)`. Overriding `:query-session` directly bypasses `query*`/`:query-fn`
+  entirely (see `nullable_api.clj`: `:query-session` is built from `query*`, but
+  the `assoc` replaces it wholesale), so the `{:query-fn (fn [_q] {})}` opt is
+  never exercised — it is incidental noise repeated verbatim across
+  `turn-finished-accumulates-…`, `…computes-delta-on-second-turn`,
+  `…swallows-query-error-and-returns-nil`, and `…uses-unknown-when-model-id-nil`
+  (4 sites). Violates `minimal_incidental_setup`; drop to `(make-api)` + the
+  `:query-session` `assoc`.
+- **Two handler-invocation idioms.** Most tests invoke handlers via the
+  `fire-event` helper (discards the return value); the catch-branch test reaches
+  in via `(first (get-in @state [:handlers "session_turn_finished"]))` because
+  it needs the handler's `nil` return. The divergence is justified but
+  introduces a second invocation seam (`consistent(test_abstractions)` drift). A
+  `fire-event` variant that returns the last handler result (or a single
+  documented seam) would unify the idiom and let the catch-branch test use the
+  same helper.
+
+`helpers_that_compress` note (non-blocking): the four turn-finished tests repeat
+the same `query-session-fn` + `make-api` + `assoc` + `init` arrange ceremony; a
+small `init-with-query-session` helper would compress the ceremony without
+hiding intent. Left as observation, not a required follow-up.
+
+The logging-mechanism specifics (timbre `warn`, structured-`e` arg) remain
+correctly unasserted (would require interaction assertions / is `¬user_visible`).
