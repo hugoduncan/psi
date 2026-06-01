@@ -529,6 +529,73 @@ runtime.
 Tokens that do not match the var pattern (e.g. `{{1bad}}`, `{{}}`) pass through
 literally and are not subject to this check.
 
+## Architectural-fit design review
+
+`review-task-design` reviews a Munera task `design.md` along three aspects, in
+order: **architectural fit**, then **ambiguity**, then **inconsistency**.
+
+The architectural-fit aspect runs **first** so structural misfit is caught
+before fine-grained clarity/consistency polishing. Its `architecture-review`
+step is the workflow's start step (the first `:steps` element) and loads the
+`review-task-architecture` skill — a thin lens that asks the reviewing agent to
+check the design's fit with the current architecture, consulting the in-context
+architecture sources (`AGENTS.md`, `META.md`, `doc/architecture.md`) as needed.
+It judges architectural *fit* — does the design follow the one-way principle,
+the dispatch/resolver/mutation boundaries, VSM layering, extension isolation,
+effects-as-data, and the "no silent shims/adapters/compatibility layers" rule —
+rather than correctness, clarity, or completeness.
+
+Like the ambiguity and inconsistency aspects, architectural fit is a review
+step + follow-up step pair gated by `pass-status-routing`: actionable misfits
+are recorded as unchecked `design-steps.md` items, the `architecture-follow-up`
+step reuses the shared `design`-profile follow-up (see below) to execute them,
+and the loop advances `architecture → ambiguity → inconsistency → clarity-status
+→ final-summary`. The `final-summary` pass reports the architectural-fit pass
+alongside ambiguity and inconsistency.
+
+## Shared review follow-up steps
+
+The review workflows (`review-task-design`, `review-task-plan`, and the
+`review-step` sub-workflow that `review-task-implementation` delegates to) all
+run the same kind of follow-up step after each review pass: execute the
+unchecked items the preceding review pass just added, update the in-scope task
+artifacts, mark completed items done, leave blocked items unchecked with a terse
+`implementation.md` reason, and commit.
+
+That follow-up behaviour is shared across hosts via **two** profile follow-up
+`.md` files, referenced with `:prompt-workflow`. A profile is chosen by *which*
+file a host references — there is no per-step parameter to get wrong:
+
+| Profile  | File                         | Items file        | Writable artifacts                                  | Forbidden / read-only            |
+| -------- | ---------------------------- | ----------------- | --------------------------------------------------- | -------------------------------- |
+| `design` | `review-follow-up-design.md` | `design-steps.md` | `design.md`, `design-steps.md`, `implementation.md` | `plan.md`/`steps.md` (forbidden) |
+| `steps`  | `review-follow-up-steps.md`  | `steps.md`        | `plan.md`, `steps.md`, `implementation.md`, plus referenced code/tests/docs | `design.md` (read-only context)  |
+
+- `review-task-design` references the `design`-profile follow-up from its
+  `architecture-follow-up`, `ambiguity-follow-up`, and `inconsistency-follow-up`
+  steps.
+- `review-task-plan` and `review-step` reference the `steps`-profile follow-up;
+  `review-task-implementation` inherits it transitively via `review-step`.
+
+The `steps` profile hosts both plan review and *implementation* review. When it
+hosts implementation review (via `review-step`), follow-up items routinely
+require editing the actual code, tests, and docs they reference — so the
+`steps`-profile follow-up explicitly permits writing those referenced source
+artifacts, not just the task files. For plan review there are simply no
+code/test items to edit, so the broader scope is harmless.
+
+Each shared file uses generic "preceding review pass" wording rather than naming
+a specific review aspect: every host wires the follow-up immediately after its
+review step, so "the preceding review pass" is unambiguous at runtime. Both
+profiles execute only the items the immediately preceding review pass added,
+leaving any pre-existing unchecked items untouched.
+
+Host routing and looping are unchanged by this sharing: `review-task-design` and
+`review-task-plan` advance forward one aspect at a time, while `review-step`
+loops back to its review step (`REPEAT → review`, bounded by
+`:max-iterations`). Only the follow-up step *body* is shared; the
+judge/`:on` wiring around each follow-up stays with its host.
+
 ## Related docs
 
 - [`doc/workflow-grammar.md`](workflow-grammar.md) — workflow grammar
