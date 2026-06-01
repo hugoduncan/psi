@@ -392,3 +392,22 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       handle) are intentionally left — not the named idiom. clj-kondo 0/0,
       cljfmt clean; full scheduler suite still 45 tests / 410 assertions / 0
       failures (unchanged baseline). No `src/**` or `doc/scheduler.md` touched.
+
+## Implementation review follow-ups — pass 2 (2026-06-01)
+
+- [ ] Tighten the `:at` bound-rejection assertions in
+      `psi_tool_scheduler_test.clj` so each block asserts the *named* bound.
+      The near-future (~L228) and far-future (~L243) `:at` rejection blocks
+      assert only `(true? (:is-error result))` + `(= :error
+      (:psi-tool/overall-status parsed))` — they do not verify *which* bound was
+      hit, so they are assertion-indistinguishable and pass for any error
+      (including a swapped/unrelated rejection). This under-asserts the
+      sufficient-coverage criterion clause 1 and the `:at` *asymmetry* finding
+      (the deliberate below-min vs exceeds-max distinction the finding records as
+      verified-correct). Assert the specific surfaced error message per block —
+      near-future → "below the minimum bound", far-future → "exceeds the maximum
+      bound" — via `(get-in parsed [:psi-tool/error :message])` (matching
+      `scheduler.clj:85`/`:89`). Test file only, within the Slice-10 allowlist;
+      no `src/**`/`doc/scheduler.md` change. Keep the suite green + clj-kondo
+      clean. (If the task is treated as closed, raise it as a small standalone
+      test-hygiene task instead.)

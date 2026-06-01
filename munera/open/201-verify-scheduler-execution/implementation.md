@@ -506,3 +506,43 @@ no `doc/scheduler.md`):
 - Four touched scheduler test namespaces: 9 tests / 148 assertions / 0 fail.
 - Full scheduler suite: **45 tests / 410 assertions / 0 failures** — identical
   to the cited baseline → no behaviour change, pure test-quality DRY.
+
+## Implementation review pass 2 (2026-06-01)
+
+Fresh review pass via task-implementation-review skill. Re-verified against
+runtime (suite re-run here: 45 tests / 410 assertions / 0 fail / 0 error;
+clj-kondo 0/0 on all 8 touched test files incl. `test_support.clj`). Spot-read
+the new test source, not just the log:
+
+- Pure-model guard tests (`scheduler_test.clj`) assert exact error strings
+  (`thrown-with-msg?`) + concrete state. `drain-one-orders-by-fire-at` correctly
+  builds insertion-order ≠ fire-at-order. Solid.
+- Live round trips (`scheduler_end_to_end_test.clj`) genuinely cross the timer
+  seam (capture+invoke callback, no sleep) and assert state/outputs
+  (delivered-prompt provenance; `:created-session-id`/`:delivery-phase`;
+  created-session freshness/provenance), not interactions. Solid.
+- Resolver rich-attrs test asserts every projected attr value. Solid.
+
+**Flag (new, actionable) — `:at` bound-rejection tests don't assert the named
+bound.** In `psi_tool_scheduler_test.clj`, the near-future (line ~228) and
+far-future (line ~243) `:at` rejection blocks assert only
+`(true? (:is-error result))` + `(= :error (:psi-tool/overall-status parsed))`.
+Both block docstrings — and `findings.md` (psi-tool surface) + steps.md lines
+157/159 — claim rejection "with the **below-minimum** bound error" /
+"with the **exceeds-maximum** bound error" respectively, but neither assertion
+checks *which* bound was hit. The two blocks are assertion-indistinguishable:
+they pass for *any* error (a swapped bound, or an unrelated validation failure).
+This under-asserts the sufficient-coverage criterion clause 1 (assert the area's
+named output) and, more pointedly, the `:at` *asymmetry* finding
+(verified-correct, not a drift) is the deliberate distinction between
+below-min (near-future) and exceeds-max (far-future) — yet the tests can't tell
+them apart. The distinct messages exist in source
+(`scheduler.clj:85`/`:89` "delay-ms is below the minimum bound" /
+"delay-ms exceeds the maximum bound") and surface through `:psi-tool/error`
+`:message`, so asserting the specific bound message per block is feasible and
+in-scope (test file only, within the Slice-10 allowlist). Non-blocking for the
+green deliverable but it is a real precision gap that contradicts the test's own
+claimed coverage. Added as a follow-up step.
+
+Everything else verified accurate against runtime. No other new actionable
+issues; the earlier capture-timer DRY flag was already executed.
