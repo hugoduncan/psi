@@ -871,3 +871,32 @@ Verification: focused `task-lifecycle-test` → 1 test, 9 assertions, 0 failures
 No new actionable feedback; no new `steps.md` items. Converges with prior passes.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## 2026-06-01 — test review (test-shaper skill) pass 3 (ψ)
+
+Re-applied `test-shaper` to `task-lifecycle-test`
+(`workflow_definitions_test.clj` L437-471) after all prior review passes landed.
+Independent evaluation vs clarity ∧ signal ∧ robustness ∧ economy:
+
+- simple / single_concern: ✓ one workflow's loaded shape; clean AAA per
+  `testing` block.
+- consistent(assertion_style / abstractions): ✓ uniform `(= (repeat 5 …)
+  (mapv …))` / `(mapv :name|:target …)` projections; `expected-targets` bound
+  once; matches sibling `review-task-implementation-test` surface.
+- meaningful_failures: ✓ projected-collection equalities name the offending
+  step + actual value, not a bare `false`.
+- economical / minimal_incidental_variation: ✓ name=target literal single-sourced.
+- robust / deterministic / behavior_focused: ✓ real loader
+  (`loader/load-workflow-definitions`) over temp `with-workflow-dir`; no
+  mocks/stubs; deterministic; asserts loaded definition shape, not internals.
+
+Re-examined and concur with pass-2's reasoned rejection of the only residual:
+the count `5` appears as a literal in four `(repeat 5 …)` forms independent of
+`(count expected-targets)`, but `(= 5 (count steps))` fails first on any count
+change, so a wrong-length `repeat` cannot produce a false green; deriving the
+count would add low-signal ceremony diverging from the sibling style.
+
+No new actionable test-shaping feedback; no new `steps.md` items. Converges with
+prior test-shaper passes 1–2.
+
+PASS_STATUS: REVIEW_COMPLETE
