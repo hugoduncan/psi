@@ -211,3 +211,40 @@ Executed the single pass-2 inconsistency-review follow-up item; design.md update
    unchanged name=target table (Acceptance criteria line "`:name` equals its
    `:target`" is a plain factual statement of the chosen shape, no precedent
    claim).
+
+## 2026-06-01 — design ambiguity review pass 3 (ψ)
+
+Re-reviewed design.md against the runtime invocation surface and the five target
+`.edn` files / exemplars after the prior two ambiguity passes plus two
+inconsistency passes. Verified the previously-resolved items hold against code:
+
+- Top-level invocation surface — VERIFIED, not ambiguous. `delegate-run`
+  (`components/agent-session/src/psi/agent_session/workflow/core.clj` ~L378)
+  builds `workflow-input` as `{:input prompt-text :original prompt-text}`, so
+  invoking `task-lifecycle` via the delegate tool/command makes the
+  orchestrator's own `:workflow-input` a map, and the design's internal
+  `{:from :workflow-input :path [:input]}` references resolve at the top level
+  exactly as for the sibling workflows. The design's input-addressability claim
+  is correct.
+- Input-threading `:map` form vs concepts doc — already covered. The
+  string-yielding doc claim (`workflow-grammar-concepts.md` §"Workflow input and
+  original request" / "Delegation boundary": prompt-string "rendered to a final
+  string", treated as the "local workflow input surface") textually contradicts
+  the `:map` map-shaped result; design + inconsistency-follow-up #1 already flag
+  this as a known concepts-doc gap and name the runtime
+  (`render-delegate-prompt-string`) as authority. Not new.
+- Verification surface — VERIFIED. `review-task-implementation-test` (a
+  pure-delegate workflow) uses `load-edn-only` + `(empty? errors)` +
+  definition-presence + step names/types, exactly matching the design's
+  prescribed test. `load-edn-only` (no `.md` refs) is the correct helper because
+  `task-lifecycle.edn` is pure-delegate with no prompt-workflow `.md`.
+- CHANGELOG precedent — VERIFIED. CHANGELOG `[Unreleased]` already lists
+  `review-task-design` / `create-task-plan` Added entries "Invokable via
+  `/delegate <name>`", matching the design's stated obligation.
+- Per-step `:context [{:type :source :from :workflow-original}]` + input-only
+  threading — VERIFIED against `review-task-implementation.edn` first step and
+  `gh-issue-implement.edn`; consistent with stage-4 `implement-task` handoff NOT
+  being threaded forward (input-only is a stated Resolved decision).
+
+No new actionable ambiguity found. Design is concretely specified and every
+checked claim matches the runtime and exemplars.
