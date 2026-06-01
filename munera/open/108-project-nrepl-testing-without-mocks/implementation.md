@@ -565,3 +565,47 @@ None. All six in-scope files are `with-redefs`-free. The two seams wrap genuine
 infrastructure boundaries (nREPL socket establishment, OS process launch); no
 test-only helper layer was introduced beyond the per-file `install-instance!`
 seeding helpers that mirror the already-proven `eval_test.clj` idiom.
+
+2026-06-01 — Implementation review (task-implementation-review)
+
+Reviewed the landed implementation against design/plan and the
+testing-without-mocks standard. Verified empirically:
+- focused component tests green: 25 tests, 154 assertions, 0 failures
+- targeted clj-kondo lint (`components/project-nrepl/src` + `/test`): 0 errors, 0 warnings
+- consuming-path `project-nrepl-extension-install-test`: 1 test, 5 assertions, 0 failures
+- zero `with-redefs` remain in the six in-scope test files
+- `eval_test.clj` / `runtime_test.clj` untouched (last touched by extraction #72)
+- the three production changes match the design exactly (`real-nrepl-connector`
+  + or-default resolve; `start-instance-in!` overwrite→merge; optional
+  `:runtime-handle` seed on `attach-instance-in!`/`start-instance-in!`)
+- production callers in `ops.clj` still use the original arities → behaviour
+  preserved for real callers
+
+Acceptance criteria: all met. Implementation matches design, follows the
+established `[:runtime-handle :client-session]` seam architecture, introduces no
+shims/adapters, and the two seams wrap genuine infrastructure boundaries (no
+unnecessary abstraction).
+
+Actionable findings (quality, not acceptance blockers):
+
+1. Test-helper duplication extended by this task. `install-instance!` is now
+   defined in three files (`eval_test`, `commands_test`, `ops_test`) with
+   identical bodies; `temp-dir` and `delete-tree!` are each duplicated across
+   four files (`attach`/`config`/`ops`/`started`_test); `session-fn-with-id`
+   across two (`attach`/`started`_test); `make-ctx` across six. No component-local
+   test-support namespace exists. This task added several of these copies. A small
+   `psi.project-nrepl.test-support` namespace consolidating `make-ctx`,
+   `install-instance!`, `temp-dir`, `delete-tree!`, and `session-fn-with-id` would
+   remove the drift risk (e.g. `install-instance!`'s seeded `:runtime-handle`
+   shape must stay identical across copies) and align with the consistency
+   guideline. Non-blocking: tests are green and the duplication is conventional
+   test isolation, but it is the one structural quality issue introduced/extended
+   here.
+
+2. Minor — `client_test.clj` `connect-instance-in-test` asserts
+   `(= [{:host "127.0.0.1" :port 7888}] @calls*)`, tracking the connector's
+   captured input. This is borderline against `¬assert(interactions(test))`: it is
+   an input-value-at-boundary check rather than a call-count assertion, and the
+   connected-instance state assertions already prove the connector result was
+   used. Consider dropping the `calls*` atom (the state assertions suffice) or
+   keep it only if endpoint-passthrough is the specific behaviour under test.
