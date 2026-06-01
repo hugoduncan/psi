@@ -1482,3 +1482,37 @@ re-litigation of accepted design):
 Conclusion: the test suite is well-shaped. The seven prior test-shaper passes
 (4th–7th converging) have exhausted actionable improvements. No new actionable
 issues found — review complete.
+
+## Docs review follow-ups (2026-06-01, review-task-docs)
+
+review-task-docs pass found NO new actionable issues — no user-facing doc
+change is warranted by this task.
+
+Scope checked: `README.md`, `doc/` (esp. `doc/project-nrepl.md`, `doc/tui.md`,
+`doc/architecture.md`), `CHANGELOG.md`.
+
+Findings:
+
+- **New/changed behaviours**: none user-facing. The three production changes
+  are all internal: (1) promote `:nrepl-connector`/`:process-launcher` seam
+  defaults, (2) merge-not-overwrite `:runtime-handle` in `start-instance-in!`,
+  (3) optional `:runtime-handle` seam-seed on `attach-instance-in!`/
+  `start-instance-in!`. None alters user-facing commands, config surfaces, or
+  flags; all are behaviour-preserving for real callers (explicit acceptance
+  criterion: "behavior remains unchanged at the component boundary").
+- **Removed behaviours**: none → no stale doc references introduced.
+- **Changelog**: no entry warranted. The change is test-and-seam reshaping
+  (¬user_visible per the changelog rule: refactor ∨ tests ∨ internal → ∅).
+  `[Unreleased]` correctly carries no project-nrepl entry.
+- **Examples / Consistency**: `doc/project-nrepl.md` config shapes
+  (`{:agent-session {:project-nrepl {...}}}`, user/project/local files,
+  `.nrepl-port` discovery, `system < user < project` precedence) verified
+  against the unchanged `config.clj` `resolve-config`/`agent-session-map`
+  extraction and the file paths in `config.clj` — accurate and consistent.
+  `/project-repl` command list in `README.md` (l117), `doc/tui.md` (l59), and
+  `doc/project-nrepl.md` (Commands) is unchanged by this task and remains
+  correct.
+
+Conclusion: user-facing docs (`README.md` + `doc/`) and `CHANGELOG.md` remain
+synchronized with the implementation; this task required no doc edits. Review
+complete — no follow-up steps added.

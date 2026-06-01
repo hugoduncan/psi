@@ -397,3 +397,12 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
   low-signal setup-before-`try` leak pattern; and the per-ctx-isolated,
   read-only `user.dir` instance keying (no cross-test contamination). Review
   complete — no follow-up steps added. (Detail in implementation.md.)
+
+## Docs review follow-ups (2026-06-01, review-task-docs)
+
+- (none) review-task-docs pass found no new actionable issues. This task is
+  test-and-seam reshaping with behaviour preserved at the component boundary;
+  no user-facing behaviour, command, flag, or config surface changed. Verified
+  `README.md`, `doc/project-nrepl.md`, `doc/tui.md`, `doc/architecture.md`, and
+  `CHANGELOG.md` remain accurate and consistent with the implementation; no
+  changelog entry warranted (¬user_visible). No follow-up steps added.
