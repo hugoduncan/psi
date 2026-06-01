@@ -752,3 +752,36 @@ New actionable finding (quality/consistency, not an acceptance blocker):
    on the message) would make the canonical pattern consistent with the standard
    this task enforced elsewhere. `eval_test.clj` was nominally out of scope, so
    this is a follow-on consistency item rather than a regression introduced here.
+
+## 2026-06-01 — Third-pass implementation-review follow-up executed
+
+Removed the interaction-style `@calls*` assertions from the canonical
+`eval_test.clj` (the reference pattern the six reshaped files were pointed at):
+
+- `eval-instance-in-test` success block: dropped `(is (= "eval" (:op (first
+  @calls*))))`.
+- `interrupt-instance-in-test` active-op block: dropped `(is (= "interrupt"
+  (:op (first @calls*))))` and `(is (= "eval-123" (:interrupt-id (first
+  @calls*))))`.
+
+The `calls*` atom and its `(swap! calls* conj msg)` capture were dead once those
+assertions were removed — the seeded `client-session` fn's return value uses only
+`(:id msg)` (an input→output echo that needs no external capture), so I dropped
+the `calls*` atom entirely from both test blocks rather than leaving an unused
+capture. The canonical reference pattern now carries zero interaction-style
+assertions, matching `¬assert(interactions(test))` — the same standard the task
+enforced across the six in-scope files and that the 2nd-pass follow-up applied to
+`client_test.clj`.
+
+Behaviour previously implied by the dropped assertions remains proven by
+state/result assertions in the same tests:
+- eval `:op "eval"` → the `:success` status + `:value "3"` result (a real eval
+  through `eval-instance-in!`),
+- interrupt `:op "interrupt"` / `:interrupt-id "eval-123"` → `(:interrupted-op-id
+  result)` and `(= result (:last-interrupt instance))`.
+
+Verification: focused project-nrepl suite (eval/commands/ops/attach/started/
+config/client/runtime) → 25 tests, 150 assertions, 0 failures (down 3 from 153 —
+exactly the three removed interaction assertions); `clj-kondo --lint` over the
+file → 0 errors, 0 warnings. No remaining interaction-style assertions in any
+project-nrepl test file.
