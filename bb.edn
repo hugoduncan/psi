@@ -423,7 +423,7 @@
    :task (bb.release/check-changelog! *command-line-args*)}
 
   release
-  {:doc  "Cut a release and push: stamp changelog, commit, tag, reset, then push master + tags to origin."
+  {:doc  "Cut a release and push: stamp changelog, commit, tag, reset, then push master + tags to origin. With --dry-run, only dispatch the non-publishing Release workflow dry run."
    :task (bb.release/release-and-push! *command-line-args*)}
 
   release:tag

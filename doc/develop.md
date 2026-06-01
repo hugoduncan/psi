@@ -160,6 +160,12 @@ usefulness before broadening scope or upstreaming ideas.
 bb release
 ```
 
+For a workflow-only validation run with no local release/tag/push side effects:
+
+```bash
+bb release --dry-run
+```
+
 This single command:
 1. Asserts clean tree + on `master`.
 2. Computes `PATCH = (git rev-list HEAD --count) + 1`.
@@ -180,8 +186,11 @@ Pushing the tag triggers `.github/workflows/release.yml`, which:
 - Creates a GitHub Release with the changelog body and jar assets attached.
 
 The same workflow also supports manual dry-run testing via `workflow_dispatch`
-without publishing anything publicly. Use GitHub Actions → `Release` → `Run workflow`
-with:
+without publishing anything publicly. `bb release --dry-run` now does exactly that:
+it dispatches the `Release` workflow in non-publishing mode and performs no local
+release stamping, tagging, commits, or pushes.
+
+If you need to run it manually via GitHub Actions → `Release` → `Run workflow`, use:
 - `publish = false` to validate the release build path without external publication
 - optional `ref` to test a branch/commit instead of the current ref
 - optional `release_version` to force a specific version label for the dry-run

@@ -2,7 +2,8 @@
   (:require
    [babashka.process :as process]
    [clojure.edn :as edn]
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [clojure.java.io :as io]))
 
 ;; ---------------------------------------------------------------------------
 ;; Git helpers
@@ -181,6 +182,84 @@
 ;; Public entry points
 ;; ---------------------------------------------------------------------------
 
+(defn- parse-release-opts
+  [args]
+  (loop [args args
+         opts {:dry-run false}]
+    (if-let [arg (first args)]
+      (cond
+        (= arg "--dry-run")
+        (recur (next args) (assoc opts :dry-run true))
+
+        :else
+        (throw (ex-info "Unknown argument" {:arg arg :args args})))
+      opts)))
+
+(defn- git-origin-owner-repo
+  []
+  (let [url (git! "remote" "get-url" "origin")]
+    (or (some->> (re-matches #"git@github\.com:([^/]+)/(.+)\.git" url)
+                 rest
+                 vec)
+        (some->> (re-matches #"https://github\.com/([^/]+)/(.+)\.git" url)
+                 rest
+                 vec)
+        (throw (ex-info "Unsupported origin remote URL format." {:url url})))))
+
+(defn- current-head-ref
+  []
+  (git! "rev-parse" "HEAD"))
+
+(defn- current-dispatch-ref
+  []
+  (let [head-sha (current-head-ref)
+        refs     (->> (str/split-lines (git! "ls-remote" "--heads" "origin"))
+                      (keep (fn [line]
+                              (let [[sha ref] (str/split line #"\s+" 2)]
+                                (when (= sha head-sha)
+                                  (some->> (re-matches #"refs/heads/(.+)" ref)
+                                           second))))))
+        branch   (or (some #(when (= "master" %) %) refs)
+                     (some #(when (= "main" %) %) refs)
+                     (first refs))]
+    (when-not branch
+      (throw (ex-info "Release workflow dry-run requires HEAD to be present on a remote branch at origin." {:head-sha head-sha})))
+    branch))
+
+(defn- latest-version-tag
+  []
+  (some-> (git! "describe" "--tags" "--abbrev=0" "--match" "v*")
+          str/trim
+          not-empty))
+
+(defn- workflow-file-name
+  []
+  (some-> (io/file ".github/workflows/release.yml") .getName))
+
+(defn- trigger-release-dry-run!
+  []
+  (let [[owner repo]    (git-origin-owner-repo)
+        workflow-file   (workflow-file-name)
+        release-tag     (or (latest-version-tag)
+                            (throw (ex-info "No existing release tag found for dry-run release workflow input." {})))
+        dispatch-ref    (current-dispatch-ref)
+        head-sha        (current-head-ref)
+        release-version (subs release-tag 1)]
+    (println "Triggering Release workflow dry run ...")
+    (println (str "  repo: " owner "/" repo))
+    (println (str "  workflow: " workflow-file))
+    (println (str "  dispatch ref: " dispatch-ref))
+    (println (str "  head sha: " head-sha))
+    (println (str "  release_version: " release-version))
+    (process/shell "gh" "api"
+                   (str "repos/" owner "/" repo "/actions/workflows/" workflow-file "/dispatches")
+                   "--method" "POST"
+                   "-f" (str "ref=" dispatch-ref)
+                   "-f" (str "inputs[ref]=" head-sha)
+                   "-f" "inputs[publish]=false"
+                   "-f" (str "inputs[release_version]=" release-version))
+    (println "Done. Release workflow dry-run dispatched.")))
+
 (defn check-changelog!
   "Assert CHANGELOG.md has a non-empty [Unreleased] section.
    Exits 0 on success, 1 with a message on failure."
@@ -285,19 +364,25 @@
   "Cut a release (stamp changelog, commit, tag) then push to origin.
    Equivalent to: bb release:tag && git push origin master --tags
 
+   With --dry-run, dispatch the GitHub Release workflow in non-publishing
+   workflow_dispatch mode and do nothing locally.
+
    Partial-failure recovery: if a vX.Y.Z tag points at HEAD but has not been
    pushed (e.g. prior network failure), skips re-tagging and goes straight to
    push.  Uses git describe rather than recomputing the version from commit
    count, which would be wrong after the two release commits have been made."
-  [_args]
-  (if-let [tag (latest-local-release-tag)]
-    (if (post-tag-push-needed? tag)
-      (do
-        (println (str "  Tag " tag " exists locally but not on origin — retrying push ..."))
-        (push! nil))
-      (do
-        (println (str "  Tag " tag " already on origin — nothing to do."))
-        (println "If you intended a new release, ensure CHANGELOG.md has new entries.")))
-    (do
-      (release! nil)
-      (push! nil))))
+  [args]
+  (let [{:keys [dry-run]} (parse-release-opts args)]
+    (if dry-run
+      (trigger-release-dry-run!)
+      (if-let [tag (latest-local-release-tag)]
+        (if (post-tag-push-needed? tag)
+          (do
+            (println (str "  Tag " tag " exists locally but not on origin — retrying push ..."))
+            (push! nil))
+          (do
+            (println (str "  Tag " tag " already on origin — nothing to do."))
+            (println "If you intended a new release, ensure CHANGELOG.md has new entries.")))
+        (do
+          (release! nil)
+          (push! nil))))))
