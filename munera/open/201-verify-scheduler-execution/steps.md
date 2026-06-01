@@ -395,7 +395,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Implementation review follow-ups — pass 2 (2026-06-01)
 
-- [ ] Tighten the `:at` bound-rejection assertions in
+- [x] Tighten the `:at` bound-rejection assertions in
       `psi_tool_scheduler_test.clj` so each block asserts the *named* bound.
       The near-future (~L228) and far-future (~L243) `:at` rejection blocks
       assert only `(true? (:is-error result))` + `(= :error
@@ -411,3 +411,12 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       no `src/**`/`doc/scheduler.md` change. Keep the suite green + clj-kondo
       clean. (If the task is treated as closed, raise it as a small standalone
       test-hygiene task instead.)
+      Done: both `:at` rejection blocks now assert the named bound via
+      `(get-in parsed [:psi-tool/error :message])` — near-future →
+      `"delay-ms is below the minimum bound"`, far-future →
+      `"delay-ms exceeds the maximum bound"` (exact `scheduler.clj:85`/`:89`
+      messages surfaced through `psi-tool-error-summary`'s `ex-message`). The
+      blocks are now assertion-distinguishable (a swapped/unrelated rejection
+      would fail). `psi_tool_scheduler_test` now 1 test / 109 assertions
+      (was 107; +2), green; clj-kondo 0/0, cljfmt clean. Test file only — no
+      `src/**` or `doc/scheduler.md` touched (within the Slice-10 allowlist).

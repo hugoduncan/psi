@@ -238,7 +238,10 @@
                                              "at" (str near-future-at)})
           parsed           (read-string (:content result))]
       (is (true? (:is-error result)))
-      (is (= :error (:psi-tool/overall-status parsed)))))
+      (is (= :error (:psi-tool/overall-status parsed)))
+      (is (= "delay-ms is below the minimum bound"
+             (get-in parsed [:psi-tool/error :message]))
+          "near-future :at is rejected by the minimum (not maximum) bound")))
 
   (testing "future :at above max-delay-ms (>24h) is rejected with the exceeds-maximum bound error"
     (let [fixed-now        (java.time.Instant/parse "2026-04-21T18:00:00Z")
@@ -253,4 +256,7 @@
                                              "at" (str far-future-at)})
           parsed           (read-string (:content result))]
       (is (true? (:is-error result)))
-      (is (= :error (:psi-tool/overall-status parsed))))))
+      (is (= :error (:psi-tool/overall-status parsed)))
+      (is (= "delay-ms exceeds the maximum bound"
+             (get-in parsed [:psi-tool/error :message]))
+          "far-future :at is rejected by the maximum (not minimum) bound"))))

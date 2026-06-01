@@ -546,3 +546,28 @@ claimed coverage. Added as a follow-up step.
 
 Everything else verified accurate against runtime. No other new actionable
 issues; the earlier capture-timer DRY flag was already executed.
+
+## Implementation review follow-up — pass 2 executed (2026-06-01)
+
+Tightened the two `:at` bound-rejection assertions in
+`psi_tool_scheduler_test.clj` to assert the *named* bound rather than a generic
+error. Previously both the near-future (~L228) and far-future (~L243) blocks
+asserted only `(true? (:is-error result))` + `(= :error (:psi-tool/overall-status
+parsed))`, which are assertion-indistinguishable and would pass for any error
+(including a swapped/unrelated rejection). Added per-block
+`(= <msg> (get-in parsed [:psi-tool/error :message]))`:
+- near-future (500ms) → `"delay-ms is below the minimum bound"`
+- far-future (max+1ms) → `"delay-ms exceeds the maximum bound"`
+
+These are the exact `scheduler.clj:85`/`:89` `ex-info` messages surfaced through
+`psi-tool-error-summary` (`ex-message e` → `:message`), confirmed via
+`validate-delay-ms!`'s `resolve-fire-time!` path. This restores
+sufficient-coverage clause 1 (assert named state/outputs) for the deliberate
+below-min vs exceeds-max `:at` asymmetry that the findings record as
+`verified-correct`.
+
+Verification: `clojure -M:test --focus psi.agent-session.psi-tool-scheduler-test`
+→ 1 test / 109 assertions / 0 failures (was 107; +2). clj-kondo 0/0, cljfmt
+clean. Coherence gate: `git diff --name-only` shows only the psi-tool-surface
+test file (Slice-10 allowlist) + task-dir `steps.md`; zero `src/**` /
+`doc/scheduler.md` changes.
