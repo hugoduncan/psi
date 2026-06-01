@@ -680,3 +680,45 @@ the established sibling assertion style. The two prior-pass test-shaper fixes
 already resolved the only genuine clarity/signal/economy issues.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## 2026-06-01 — user-facing docs review (review-task-docs, ψ)
+
+Applied the `review-task-docs` checklist (README, `doc/`, CHANGELOG;
+accuracy ∧ completeness ∧ consistency) to the implemented task.
+
+What is correct:
+- CHANGELOG `[Unreleased]` → `### Added` carries the `task-lifecycle` entry.
+  Its named/ordered chain (`review-task-design`, `create-task-plan`,
+  `review-task-plan`, `implement-task`, `review-task-implementation`) and the
+  `/delegate task-lifecycle` invocation match `.psi/workflows/task-lifecycle.edn`
+  (`:target` order and `:description`) exactly. Follows the established
+  `review-task-design` / `create-task-plan` precedent. ✅
+- No removed behaviours; no stale doc references. ✅
+- `README.md` carries no per-workflow enumeration to update; `doc/workflows.md`
+  is the example-led authoring guide (line 14 "primary example-led guide";
+  line 58 "authoritative example set"), not an exhaustive list — design's
+  no-`doc/workflows.md`-edit decision is accurate. ✅
+
+One actionable finding (new):
+1. **`doc/workflow-grammar-concepts.md` contradicts the `:map` prompt-string
+   form this workflow ships on.** The concepts doc states `:prompt-string` "is
+   rendered to a final string before delegation" (≈line 146), that the delegated
+   workflow "treats the final rendered prompt string as its local workflow input
+   surface" (≈line 155), that `:workflow-input` "is the delegated step's fully
+   rendered `:prompt-string`" (≈line 197), and that a delegate `:prompt-string`
+   "may also use this same template shape before rendering to a final string"
+   (≈line 221) — all string-only framing. The runtime
+   (`source-resolution/render-delegate-prompt-string`) returns a *map* for
+   `{:type :map}`, and `task-lifecycle.edn` (plus shipping exemplars
+   `gh-issue-implement.edn`, `review-task-implementation.edn`) relies on that map
+   shape so the sub-workflow's `:workflow-input` resolves `:path [:input]`. This
+   is a genuine user-facing doc accuracy/completeness gap: the concepts doc does
+   not document the `:map` form and textually contradicts it, while a now-shipped
+   workflow depends on it. The task design flags this as a "known gap" and scopes
+   the fix out; this docs review records it as actionable because the docs-review
+   lens is exactly what surfaces cross-doc inaccuracy, and the fix is *additive*
+   (a short note documenting the `:map` prompt-string form and its map-shaped
+   `:workflow-input`), not the broad authoring-guide restructure the design
+   feared. Minimal-scope follow-up added to `steps.md`.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

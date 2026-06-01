@@ -87,3 +87,21 @@
       referencing it from both assertions, making the name=target invariant
       explicit rather than two copy-pasted literals that can silently drift
       (`economical` / `minimal_incidental_variation`).
+
+## Docs review follow-ups (review-task-docs)
+
+- [ ] Document the `:map` `:prompt-string` form in
+      `doc/workflow-grammar-concepts.md` (§ "Delegation" / § "Workflow input and
+      original request"). The doc currently frames `:prompt-string` and the
+      resulting `:workflow-input` as string-only ("rendered to a final string
+      before delegation"; "`:workflow-input` is the delegated step's fully
+      rendered `:prompt-string`"), which contradicts the map-shaped result the
+      runtime (`source-resolution/render-delegate-prompt-string`) produces for
+      `{:type :map}` and that the shipped `task-lifecycle.edn` relies on to
+      thread the task identifier via `{:from :workflow-input :path [:input]}`.
+      Add a short, additive note that a `{:type :map :fields {...}}`
+      `:prompt-string` renders to a map and becomes the sub-workflow's
+      map-shaped `:workflow-input` (so `:path` selectors resolve), matching the
+      shipping exemplars (`gh-issue-implement.edn`,
+      `review-task-implementation.edn`). Keep it minimal — do not restructure the
+      authoring guide.
