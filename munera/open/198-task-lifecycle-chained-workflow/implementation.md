@@ -980,3 +980,31 @@ No new actionable feedback; all prior docs follow-ups verified landed:
 Accuracy / completeness / consistency all hold. No new `steps.md` items added.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## 2026-06-01 — code-shaper review pass 2 (code-shaper, ψ)
+
+Re-applied the code-shaper lens (`simplicity ∧ consistency ∧ robustness`)
+independently after the pass-3 docs CHANGELOG move and subsequent passes. In
+scope: `.psi/workflows/task-lifecycle.edn`, `task-lifecycle-test`, CHANGELOG
+`[Unreleased]` entry, additive doc note. No production Clojure source exists.
+
+- **task-lifecycle.edn** — simple (one responsibility: sequence five delegate
+  stages), consistent (uniform step shape; `:name` = `:target`; identical
+  `:prompt-string` / `:context` across all five steps), robust (valid EDN, all
+  five `:delegate`, loads clean via `load-edn-only`, mirrors shipping exemplars).
+  Per-step verbatim map repetition is intrinsic to the declarative grammar — no
+  step-level templating primitive exists, and every exemplar repeats per-step
+  context likewise; DRYing it via non-grammatical indirection would *reduce*
+  robustness/local-comprehensibility. Not a defect.
+- **task-lifecycle-test** — projected-collection equalities for named per-step
+  failure diffs, single `expected-targets` `let` referenced by both `:name` and
+  `:target` assertions (no duplicated literal), consistent with sibling
+  `review-task-implementation-test`, real loader (no mocks/stubs). No gap.
+
+Verification: focused `task-lifecycle-test` → 1 test, 9 assertions, 0 failures;
+`clj-kondo --lint …workflow_definitions_test.clj` → 0 errors / 0 warnings.
+
+Converges with the prior code-shaper pass. No new actionable code-shaping
+feedback; no new `steps.md` items.
+
+PASS_STATUS: REVIEW_COMPLETE
