@@ -928,3 +928,35 @@ Verification:
 No code/spec changes — pure test-collection wiring. The robustness gap
 (`robust → enforceable(invariants)`: authored guards now actually run) is
 closed.
+
+## 2026-06-01 — implementation review (independent, task-implementation-review skill)
+
+**PASS — no new actionable issues.** Re-applied the skill against source + live
+runs, not notes. Verified the committed state at `c68081bc1` (working tree clean).
+
+- `matches(code, design)` ✓: `emit-tool-lifecycle!` bridge present
+  (`tool_runtime_adapter.clj`), `case` flow-control isolated from per-branch
+  payload construction, both branches build payloads via the single-sourced
+  `ext/tool-call-event`/`ext/tool-result-event` constructors (`extensions.clj`).
+  `:parsed-args` is threaded into the `:tool-result` lifecycle event in
+  `tool-runtime/core` `record-tool-call-result!` (core.clj:179), supplying the
+  bridge's `:input` parity as designed.
+- `follows(code, architecture)` ✓: bridge is session-owned adaptation; payload
+  contract single-sourced (`one_way ¬ambiguity`); `error-reason` helper restores
+  `xor(computation, flow_control)` in `on-tool-result`.
+- new-pattern / unnecessary-abstraction / structural-perf flags: none. The
+  shared-builder seam (`tool-*-event`) is the minimal orthogonal abstraction that
+  closes the per-field divergence class structurally rather than per-field.
+- Tests pass (independently run): agent-session + tool-runtime
+  `--focus psi.agent-session.tool-execution-test --focus
+  psi.agent-session.extensions-test --focus psi.tool-runtime.core-test` →
+  **45 tests, 195 assertions, 0 failures**; `--focus psi.metrics.extension-test`
+  → **20 tests, 44 assertions, 0 failures**.
+- Lint clean: `clj-kondo --lint` on all 5 changed files (adapter, extensions,
+  metrics extension, tool-runtime core, tests.edn) → 0 errors, 0 warnings.
+- Coherence ✓: CHANGELOG `[Unreleased]/Fixed` entry present and accurate;
+  `doc/extensions.md` `psi/metrics` entry present and accurate; metrics tests
+  wired into `:extensions`/`:integration` suites so the authored guards run in CI.
+
+All prior review follow-ups (steps.md) are ticked and independently confirmed.
+No new actionable items.
