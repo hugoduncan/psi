@@ -299,3 +299,32 @@ post-follow-up state (`99121a290`). **PASS — no new actionable test issues.**
   Re-raising either would duplicate prior judgment.
 
 No follow-up items added.
+
+## Docs review — review-task-docs (2026-06-01)
+
+Applied review-task-docs (README ∧ doc/ ∧ CHANGELOG accuracy ∧ completeness ∧
+consistency). **PASS — no new actionable doc issues.**
+
+- **New/changed behaviour**: change is `println` → `timbre/warn` in the metrics
+  turn-finished catch branch. `doc/extensions.md`'s metrics section
+  (`extension.clj` entry, ~L203) documents triggers, persistence, `metrics/summary`,
+  `/metrics`, and the persisted `metrics.edn` shape — it does **not** document the
+  internal swallowed-exception logging, so nothing needs adding (the swallow
+  contract is unchanged: exception caught, `nil` returned).
+- **Removed behaviour / stale refs**: the old `println "DEBUG [psi/metrics] ..."`
+  line had no doc reference. `grep -rni "DEBUG \[psi"` / `psi/metrics` across
+  `README.md`, `doc/`, `CHANGELOG.md` finds no stale mention of the removed
+  println. The `println` occurrences in `doc/extensions.md` (L23,28,359,929) are
+  illustrative *user-extension* example handlers, unrelated to the metrics
+  extension's internal logging — not affected.
+- **CHANGELOG**: design classifies this `¬user_visible` (internal idiom
+  alignment). Consistent with the policy boundary
+  (`{commands ∨ flags ∨ behaviours ∨ breaking ∨ bug_fix ∨ extension_capability}`):
+  no command/flag/behaviour/bugfix/capability changes; the stdout→timbre
+  output-routing shift is an internal logging-mechanism detail, not a documented
+  behaviour. The no-CHANGELOG decision is sound — no entry required.
+- **Examples / consistency**: metrics-section names + paths (`metrics.edn`,
+  `worktree/.psi/metrics.edn`, `metrics/summary`, `/metrics`) remain accurate
+  against `extension.clj`. No doc example references the changed logging.
+
+No follow-up items added.
