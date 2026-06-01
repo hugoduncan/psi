@@ -352,8 +352,14 @@
            (apply-root-state-update! ctx create-r)
            (let [result (invoke-handler ctx :scheduler/deliver {:session-id session-id :schedule-id "sch-session-fail"})]
              (apply-root-state-update! ctx result)
-             (is (= :failed (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-session-fail" :status])))
-             (is (= :prompt-submit (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-session-fail" :delivery-phase])))))))))
+             (let [failed (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-session-fail"])]
+               (is (= :failed (:status failed)))
+               (is (= :prompt-submit (:delivery-phase failed)))
+               ;; 201 verification: failure records error-summary and the created-session-id
+               (is (some? (:error-summary failed)) "failure records an error summary")
+               (is (= "boom" (get-in failed [:error-summary :message])))
+               (is (some? (:created-session-id failed))
+                   "session created before prompt-submit failure is still recorded"))))))))
 
 (deftest scheduler-drain-and-statechart-idle-hooks-test
   (let [drained-at (instant "2026-04-21T18:06:00Z")

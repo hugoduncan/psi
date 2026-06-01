@@ -367,3 +367,24 @@ Both use non-`Thread` handles + a no-op `:scheduler-cancel-delay-fn` so cancel i
 deterministic. Race B terminal-status guard is the Slice-1
 `cancel-schedule-rejects-terminal-status`. 7 tests / 33 assertions green across
 seam + shutdown + effects.
+
+## Slice 7 execution — Failure path (2026-06-01)
+
+Audit: `scheduler-session-deliver-records-failed-status-on-prompt-submit-error`
+asserted only `:failed` + `:delivery-phase`; `fail-schedule` (pure) had no
+dedicated test. Filled:
+
+- Pure `fail-schedule-records-failure-detail-and-dequeues`: from `:queued`,
+  `fail-schedule` records `:failed` + `:delivery-phase :prompt-submit` +
+  `:error-summary` + `:created-session-id` and removes the id from `:queue`
+  (queue-not-wedged mechanism). Plus terminal-status guard: failing a
+  `:cancelled` schedule throws "schedule is not fail-able".
+- Extended the handler failure test to assert the failure `:error-summary`
+  (`scheduler-error-summary` → `{:message :class :data}`, message "boom") and the
+  `:created-session-id` recorded when the session is created before the
+  prompt-submit failure (matches doc: "If session creation succeeds but prompt
+  submission fails, the schedule becomes :failed and still records the created
+  session id").
+
+`scheduler_test` + `scheduler_handlers_test`: 21 tests / 103 assertions green.
+clj-kondo clean.

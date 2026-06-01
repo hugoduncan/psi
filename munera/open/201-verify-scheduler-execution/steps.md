@@ -209,14 +209,25 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Slice 7 — Failure path
 
-- [ ] Audit failure coverage
+- [x] Audit failure coverage
       (`scheduler-session-deliver-records-failed-status-on-prompt-submit-error-test`
       → `scheduler_handlers_test.clj`;
       `fail-schedule` in `scheduler_test.clj`).
-- [ ] Ensure: delivery/creation failure records `:failed` with `error-summary`
+      Done: handler test asserted `:failed` + `:delivery-phase` only;
+      `fail-schedule` had NO dedicated pure test. `error-summary`,
+      `created-session-id`-on-failure, dequeue, and the status guard were
+      uncovered.
+- [x] Ensure: delivery/creation failure records `:failed` with `error-summary`
       and `delivery-phase`; status guard `{:pending :queued :delivered}`; queue
       not wedged (subsequent drain still works). Add if missing.
-- [ ] Record failure-path finding citing covering deftest.
+      Done: added pure `fail-schedule-records-failure-detail-and-dequeues`
+      (records `:delivery-phase`/`:error-summary`/`:created-session-id` + dequeues
+      + terminal-status guard "schedule is not fail-able"); extended the handler
+      failure test to assert `:error-summary` (`:message "boom"`) and the recorded
+      `:created-session-id`. Queue-not-wedged is proven by the pure dequeue
+      assertion (the failed id is removed from `:queue`, leaving drain free).
+- [x] Record failure-path finding citing covering deftest.
+      Done: 3 entries recorded (`verified-correct`).
 
 ## Slice 8 — Projections
 

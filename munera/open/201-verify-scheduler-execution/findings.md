@@ -93,6 +93,9 @@ Baseline `bb test` (scheduler subset, 2026-06-01): `35 tests, 338 assertions, 0 
 
 | status | summary | covering test | repro / task-ref |
 | ------ | ------- | ------------- | ---------------- |
+| verified-correct | `fail-schedule` records `:failed` + `:delivery-phase` + `:error-summary` + `:created-session-id` and removes the id from the queue (queue not wedged). | `scheduler-test/fail-schedule-records-failure-detail-and-dequeues` (new) | — |
+| verified-correct | `fail-schedule` status guard: cannot fail a terminal (`:cancelled`) schedule → throws "schedule is not fail-able". | `scheduler-test/fail-schedule-records-failure-detail-and-dequeues` (new) | — |
+| verified-correct | session-kind delivery failure (prompt-submit throws after session creation): schedule `:failed` with `:delivery-phase :prompt-submit`, an `:error-summary` (`:message "boom"`), and the **created-session-id is still recorded**. | `scheduler-handlers-test/scheduler-session-deliver-records-failed-status-on-prompt-submit-error` (extended) | — |
 
 ---
 

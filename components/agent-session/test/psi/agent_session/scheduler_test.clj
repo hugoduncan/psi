@@ -215,6 +215,48 @@
              #"schedule is not cancellable"
              (scheduler/cancel-schedule cancelled "sch-2")))))))
 
+(deftest fail-schedule-records-failure-detail-and-dequeues-test
+  (let [{s0 :state} (scheduler/create-schedule
+                     (scheduler/empty-state)
+                     {:schedule-id "sch-fail"
+                      :kind :session
+                      :message "run later"
+                      :created-at (instant "2026-04-21T18:00:00Z")
+                      :fire-at (instant "2026-04-21T18:05:00Z")
+                      :session-id "sid-1"})
+        ;; queue it so we can verify dequeue on fail
+        s1 (:state (scheduler/fire-schedule s0 {:is-streaming false :is-compacting false}
+                                            "sch-fail"))]
+    ;; session-kind fire delivers (action :deliver), so re-queue manually to test dequeue
+    (testing "fail-schedule from :queued records detail and removes id from the queue"
+      (let [{q0 :state} (scheduler/create-schedule
+                         (scheduler/empty-state)
+                         {:schedule-id "sch-q"
+                          :kind :message
+                          :message "wake"
+                          :created-at (instant "2026-04-21T18:00:00Z")
+                          :fire-at (instant "2026-04-21T18:05:00Z")
+                          :session-id "sid-1"})
+            q1 (:state (scheduler/fire-schedule q0 {:is-streaming true :is-compacting false} "sch-q"))
+            {q2 :state failed :schedule}
+            (scheduler/fail-schedule q1 "sch-q"
+                                     {:delivery-phase :prompt-submit
+                                      :error-summary {:message "boom"}
+                                      :created-session-id "created-sid"})]
+        (is (= :failed (:status failed)))
+        (is (= :prompt-submit (:delivery-phase failed)))
+        (is (= {:message "boom"} (:error-summary failed)))
+        (is (= "created-sid" (:created-session-id failed)))
+        (is (= [] (:queue q2)))
+        (is (= :failed (:status (scheduler/get-schedule q2 "sch-q"))))))
+    (testing "fail-schedule guards terminal statuses (cannot fail a cancelled schedule)"
+      (let [cancelled (:state (scheduler/cancel-schedule s1 "sch-fail"))]
+        (is (= :cancelled (:status (scheduler/get-schedule cancelled "sch-fail"))))
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"schedule is not fail-able"
+             (scheduler/fail-schedule cancelled "sch-fail" {:delivery-phase :prompt-submit})))))))
+
 (deftest drain-one-orders-by-fire-at-not-queue-insertion-order-test
   ;; Queue the later-firing schedule FIRST so queue-insertion order and
   ;; fire-at order disagree; drain-one must still pick the earliest fire-at,
