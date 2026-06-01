@@ -97,8 +97,15 @@ keyed off the top-level `:name`):
   task-lifecycle workflows in order."
 
 The five delegate steps, in order, with their `:name` and `:target`. Each step's
-`:name` mirrors its `:target` (the convention used by
-`review-task-implementation.edn`, whose first step is named for its purpose):
+`:name` is chosen to equal its `:target` here. This is **not** the exemplar
+convention — in `review-task-implementation.edn` all five steps share
+`:target "review-step"` with distinct purpose-named `:name`s
+(`review-task-implementation`, `review-task-tests`, …), and `gh-issue-implement.edn`
+likewise (`:name "implement"` → `:target "implement-task-in-worktree"`). Those
+exemplars name steps for their role, distinct from a reused target. Here each
+stage delegates to a **distinctly-named** target, so reusing the target as the
+step name is unambiguous and self-documenting; name=target is a local choice
+justified on its own merits, not borrowed precedent:
 
 | order | `:name`                       | `:target`                     |
 | ----- | ----------------------------- | ----------------------------- |

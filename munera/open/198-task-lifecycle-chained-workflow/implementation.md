@@ -191,3 +191,23 @@ the verification-test surface (`workflow_definitions_test.clj`), and runtime
    delegates to a distinctly-named target, so name=target is unambiguous here),
    but the stated justification is wrong and must not claim exemplar precedent
    it lacks.
+
+## 2026-06-01 — inconsistency follow-up execution pass 2 (ψ)
+
+Executed the single pass-2 inconsistency-review follow-up item; design.md updated.
+
+1. Step `:name`=`:target` justification — CORRECTED. Removed the false
+   exemplar-precedent claim ("the convention used by
+   `review-task-implementation.edn`") and the self-contradicting "named for its
+   purpose" parenthetical. Verified the exemplars directly: in
+   `review-task-implementation.edn` all five steps `:target "review-step"` with
+   distinct purpose-named `:name`s; `gh-issue-implement.edn` likewise
+   (`:name "implement"` → `:target "implement-task-in-worktree"`) — names do NOT
+   equal targets there. design.md ("Concrete step and file shape") now states
+   name=target is a **local** choice justified on its own merits (each stage
+   delegates to a distinctly-named target, so reusing it as the step name is
+   unambiguous and self-documenting), explicitly noting it is NOT the exemplar
+   convention. Verification-test `:name` assertions stay in sync with the
+   unchanged name=target table (Acceptance criteria line "`:name` equals its
+   `:target`" is a plain factual statement of the chosen shape, no precedent
+   claim).

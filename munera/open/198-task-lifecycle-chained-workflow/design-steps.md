@@ -65,7 +65,7 @@
 
 ## Inconsistency review follow-ups (pass 2)
 
-- [ ] Correct the step `:name`-equals-`:target` justification. design.md claims
+- [x] Correct the step `:name`-equals-`:target` justification. design.md claims
       each delegate step's `:name` "mirrors its `:target`" / "`:name` equals its
       `:target`" is "the convention used by `review-task-implementation.edn`", but
       that file's five steps all `:target "review-step"` with purpose-named
