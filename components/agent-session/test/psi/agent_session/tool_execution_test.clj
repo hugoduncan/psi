@@ -2,7 +2,6 @@
   "Tests for tool execution — execute-tool-call, recording, output accounting,
   dispatch lifecycle, runtime-effect helper."
   (:require
-   [clojure.string :as str]
    [clojure.test :refer [deftest testing is]]
    [psi.agent-core.core :as agent]
    [psi.agent-session.core :as session]
@@ -437,14 +436,12 @@
           "invocation counter incremented via bridge")
       (is (= 1 (get-in @metrics-ext/store [:metrics :tools "bash" :errors]))
           "error counter incremented via adapter → bridge → on-tool-result → store")
-      ;; The lifecycle :tool-result event carries shaped structured-block content; the
-      ;; metrics handler derives the reason from (str content). Assert a single reason
-      ;; was recorded with count 1 (exact text is the stringified content block).
+      ;; The lifecycle :tool-result event carries shaped structured-block content;
+      ;; the metrics handler extracts the human-readable :text from the blocks.
+      ;; Assert the exact cross-path reason key (no stringified-data-structure wrapping).
       (let [reasons (get-in @metrics-ext/store [:metrics :tools "bash" :error-reasons])]
-        (is (= 1 (count reasons)) "one error reason recorded")
-        (is (= 1 (val (first reasons))) "reason count is 1")
-        (is (str/includes? (key (first reasons)) "boom: command failed")
-            "reason derived from propagated :content"))
+        (is (= {"boom: command failed" 1} reasons)
+            "exact human-readable reason key derived from propagated content blocks"))
       (finally
         (reset! metrics-ext/store nil)
         (reset! metrics-ext/writing? false)))))

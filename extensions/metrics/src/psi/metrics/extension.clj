@@ -43,10 +43,24 @@
     (update-metrics! counters/inc-tool-invocation tool-name))
   nil)
 
+(defn- content->text
+  "Extract human-readable text from tool result content.
+
+   Content is canonically a vec of `{:type :text :text ...}` blocks (both the
+   interactive/batch bridge and the plan path normalise via
+   `tool-runtime/normalize-tool-content`). Join the `:text` of each block so the
+   derived reason is the human-readable error text, not a stringified data
+   structure. Falls back to `(str content)` for any non-block-vector value."
+  [content]
+  (if (and (sequential? content)
+           (every? map? content))
+    (str/join " " (keep :text content))
+    (str content)))
+
 (defn- error-reason
   "Derive a single-line, ≤80-char error reason key from tool result content."
   [content]
-  (let [first-line (-> (str content) str/split-lines first str/trim)]
+  (let [first-line (-> (content->text content) str/split-lines first str/trim)]
     (subs first-line 0 (min 80 (count first-line)))))
 
 (defn- on-tool-result

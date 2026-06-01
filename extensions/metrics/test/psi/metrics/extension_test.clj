@@ -113,6 +113,33 @@
     (let [metrics (:metrics @ext/store)]
       (is (nil? (get-in metrics [:tools "bash" :errors]))))))
 
+(deftest tool-result-error-reason-extracts-text-from-content-blocks-test
+  ;; On both paths :content is normalised to a vec of {:type :text :text ...}
+  ;; blocks. The reason key must be the human-readable :text, not a stringified
+  ;; data structure.
+  (let [{:keys [api state]} (make-api)]
+    (ext/init api)
+    (fire-event state "tool_result"
+                {:tool-name "bash" :tool-call-id "c1" :is-error true
+                 :content [{:type :text :text "boom: command failed"}]})
+    (let [reasons (get-in @ext/store [:metrics :tools "bash" :error-reasons])]
+      (is (= 1 (count reasons)))
+      (is (= 1 (get reasons "boom: command failed"))
+          "reason key is the human-readable :text from the content block"))))
+
+(deftest tool-result-error-reason-joins-multiple-content-blocks-test
+  ;; Multiple text blocks are joined; the first-line/80-char rule then applies.
+  (let [{:keys [api state]} (make-api)]
+    (ext/init api)
+    (fire-event state "tool_result"
+                {:tool-name "bash" :tool-call-id "c1" :is-error true
+                 :content [{:type :text :text "first part"}
+                           {:type :text :text "second part"}]})
+    (let [reasons (get-in @ext/store [:metrics :tools "bash" :error-reasons])]
+      (is (= 1 (count reasons)))
+      (is (= 1 (get reasons "first part second part"))
+          "text blocks joined into a single reason key"))))
+
 (deftest tool-result-error-reason-multiline-truncated-to-first-line-80-chars-test
   ;; Multi-line error content >80 chars: reason is the first line, trimmed,
   ;; capped at 80 chars (single key, no StringIndexOutOfBounds on the bound).

@@ -1069,3 +1069,44 @@ canonical 80-char first-line truncation guard.
 **19 tests, 42 assertions, 0 failures** (was 20/44; the deleted test contributed 2
 assertions and no distinct coverage). `clj-kondo --lint extension_test.clj` →
 0 errors, 0 warnings.
+
+---
+
+## Pass: `:error-reasons` key human-readable (test-shaper follow-up, 2 items)
+
+**Items.** Two newly-added test-shaper steps: (medium) pin the
+block-content `:error-reasons` key value, exposing the malformed
+stringified-data-structure reason; (low) strengthen the bridge test's reason
+assertion to the full expected key.
+
+**Diagnosis.** The cross-path `:content` normalisation closed earlier in this
+task means `:content` on the `"tool_result"` bus event is now always a
+canonical content-block vector (`[{:type :text :text …}]`) on both paths. The
+metrics handler's `error-reason` did `(str content)`, so the persisted
+`:error-reasons` key was the stringified vector
+(`"[{:type :text, :text \"boom: command failed\"}]"`), not the human-readable
+error text. Confirmed via `(str [{:type :text :text "boom: command failed"}])`.
+Judged a defect: the persisted reason key should be human-readable.
+
+**Resolution (code follow-up).** Extracted `content->text` in
+`psi.metrics.extension`: when `:content` is a block vector (sequential, every
+element a map) it joins the `:text` of each block; otherwise falls back to
+`(str content)` (preserves the legacy string/scalar path). `error-reason` now
+derives its first-line/≤80-char key off this text. No spec/schema change — the
+`:error-reasons` map shape is unchanged; only the key value is now correct.
+
+**Tests.** Unit: added `tool-result-error-reason-extracts-text-from-content-blocks-test`
+(single block → `"boom: command failed"`) and
+`tool-result-error-reason-joins-multiple-content-blocks-test` (two blocks →
+`"first part second part"`). Bridge e2e: strengthened
+`metrics-extension-accumulates-errors-via-bridge-test` to assert the exact key
+`(= {"boom: command failed" 1} reasons)` (subsumes the low item). Removed the
+now-unused `clojure.string` require from `tool_execution_test.clj`.
+
+**Verification.** `--focus psi.metrics.extension-test` → **21 tests, 46
+assertions, 0 failures** (was 19/42; +2 new tests). `--focus
+psi.agent-session.tool-execution-test` → **13 tests, 66 assertions, 0
+failures**. `--focus psi.agent-session.extensions-test
+psi.tool-runtime.core-test` → **32 tests, 127 assertions, 0 failures** (no
+regressions). `clj-kondo --lint` on all three changed files → 0 errors, 0
+warnings.

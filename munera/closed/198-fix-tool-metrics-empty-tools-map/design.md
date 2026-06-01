@@ -129,6 +129,27 @@ bridge still discards the dispatch return value (interactive-path
 non-enforcement, documented). A `tool-event-payload-constructors-test` pins the
 canonical shape and the content/is-error coercions as the cross-path guard.
 
+### `:error-reasons` key is human-readable text (not stringified blocks)
+
+Because this task unified `:content` on the `"tool_result"` bus event to
+canonical content-blocks (`[{:type :text :text …}]`) on both paths, the metrics
+extension's `on-tool-result` reason derivation — originally `(str content)` —
+would have produced a stringified data structure
+(`"[{:type :text, :text \"boom: command failed\"}]"`) as the `:error-reasons`
+map key, instead of the human-readable error text. This is the natural
+consequence of the cross-path `:content` normalisation and is a defect: the
+persisted reason key should be human-readable.
+
+Resolution (chosen): extract the text from content blocks before deriving the
+reason. `psi.metrics.extension/content->text` joins the `:text` of each block
+when `:content` is a block vector (every element a map), falling back to
+`(str content)` for any other value. `error-reason` derives its first-line,
+≤80-char key off this text. So `:error-reasons` keys are the human-readable
+error text on both paths regardless of triggering path. The
+`metrics-extension-accumulates-errors-via-bridge-test` now asserts the exact
+key (`{"boom: command failed" 1}`), and focused unit tests pin the
+block-vector → text extraction (single and multi-block).
+
 ### `extension-registry` nil guard
 
 `context.clj` always sets `:extension-registry (ext/create-registry)` in
