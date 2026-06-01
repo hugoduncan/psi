@@ -266,3 +266,37 @@ Resolution:
 
 No blocking reasons; item completed at the design level. Production seam code +
 test reshaping remain for the build phase per steps.md.
+
+2026-06-01 — Design inconsistency review (second pass)
+
+Re-read design.md plus source (`config.clj`, `runtime.clj`, `client.clj`,
+`started.clj`, `attach.clj`, shared-config `user`/`project`/`resolution`) and
+`config_test.clj`. Prior four inconsistency items + two-pass ambiguity items are
+resolved. Found TWO NEW actionable inconsistencies (added to `design-steps.md`):
+
+1. `config_test.clj` concrete target omits `:agent-session` wrapping. `resolve-config`
+   extracts config via `(:project-nrepl (shared-resolution/agent-session-map
+   (read-user-config)))` and the same for project — i.e. it reads `[:agent-session
+   :project-nrepl]`. The current redef test correctly returns `{:agent-session
+   {:project-nrepl {...}}}` maps. But the design's concrete-target Decisions describe
+   writing "a real `<tmp-home>/.psi/agent/config.edn` user config" and "a real project
+   config in the temp worktree (`<worktree>/.psi/project.edn`)" and characterise the
+   seeded values as "user-scope `:attach {:host "localhost" :port 7888}`" / "project-scope
+   `:attach {:port 9999}`" — never stating the on-disk content MUST be nested under
+   `:agent-session :project-nrepl`. An implementer writing `{:project-nrepl {...}}` files
+   literally would get `{:project-nrepl {}}` from `resolve-config` (extraction misses).
+   Design must state the file content is `{:agent-session {:project-nrepl {...}}}` (and that
+   the user reader merges `default-config` `{:version 1 :agent-session {}}`).
+
+2. `ensure-instance-in!` "destructures `:runtime-handle`" claim is inaccurate against source.
+   The "Composite acquisition entry-point seed injection" section and its Verified-source-facts
+   bullet state "`ensure-instance-in!` already destructures and forwards `:runtime-handle`
+   into `build-instance`." Source: `ensure-instance-in!` destructures only `{:keys
+   [worktree-path acquisition-mode endpoint command-vector] :as opts}` — `:runtime-handle`
+   is NOT in its `:keys`. Forwarding happens only via the `:as opts` passthrough to
+   `build-instance` (which does destructure `:runtime-handle`). The functional claim
+   (a seeded `:runtime-handle` reaches `build-instance`) holds; the word "destructures" is
+   wrong and could mislead. Restate as "`ensure-instance-in!` forwards `:runtime-handle`
+   through its `opts` passthrough; only `build-instance` destructures it."
+
+No production/test code changed in this review pass.
