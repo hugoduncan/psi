@@ -54,3 +54,34 @@ Executed all five ambiguity-review follow-up items; design.md updated.
    `create-task-plan` entries are listed as user-visible, invokable via
    `/delegate <name>`). `doc/workflows.md` edit NOT required — it is the
    example-led authoring guide, not an exhaustive workflow enumeration.
+
+## 2026-06-01 — design inconsistency review (ψ)
+
+Reviewed design.md for internal consistency and against referenced artifacts
+(`doc/workflow-grammar-concepts.md`, the five target `.edn` files, `review-step.edn`,
+`source_resolution.clj`, `compiler.clj`, `workflow_definitions_test.clj`). The
+five-stage ordering, per-stage `:path [:input]` threading claims, verification
+surface, and CHANGELOG/doc obligations are internally consistent and match the
+artifacts. New actionable inconsistencies found:
+
+1. Doc-citation contradiction for input threading. "Input threading mechanism"
+   asserts the `:map` form makes `:workflow-input` the map `{:input "<task-id>"}`
+   "per `doc/workflow-grammar-concepts.md` § 'Workflow input and original
+   request'". But that section says `:workflow-input` is the delegated step's
+   "fully rendered `:prompt-string`" / "final rendered prompt string" — a string,
+   not a map — and the `:map` prompt-string form is not documented anywhere in
+   that doc (nor in workflow-grammar.md / workflow-ir.md). The runtime
+   (`source_resolution.clj` `render-delegate-prompt-string`) does return a map for
+   the `:map` form, so the mechanism is correct against code but the cited doc
+   contradicts it. The design rests its central mechanism on an authority that
+   does not support (and textually contradicts) it.
+
+2. Misstated delegate default-yield. "Final-stage surfacing" claims a `:delegate`
+   step "yields its delegated run's text result by default". The documented rule
+   (concepts § default yielded-value) is: delegate "yields the called workflow's
+   yielded value unchanged" — not specifically text. The terminal output is text
+   only because the chain bottoms out in session steps
+   (`review-task-implementation` → `review-code-shape` delegate → `review-step`
+   session yields `:final-llm-reply` text). The design states text-as-default as a
+   universal delegate property rather than tracing it through the
+   review-task-implementation → review-step chain.

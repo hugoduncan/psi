@@ -22,3 +22,24 @@
       example-led (not an exhaustive enumeration), and project-local-workflow
       user-visibility is undecided. State definitively whether this task must update
       `doc/workflows.md` and/or CHANGELOG.
+
+## Inconsistency review follow-ups
+
+- [ ] Resolve the doc-citation contradiction in "Input threading mechanism". The
+      design cites `doc/workflow-grammar-concepts.md` § "Workflow input and
+      original request" as authority for `:workflow-input` becoming the map
+      `{:input "<task-id>"}`, but that section describes `:workflow-input` as the
+      "fully rendered `:prompt-string`" / "final rendered prompt string" (a
+      string) and never documents the `:map` form. Either cite the actual
+      authority (runtime `render-delegate-prompt-string` in
+      `source_resolution.clj`, which returns a map for `{:type :map}`) and/or note
+      the doc gap, so the design's mechanism is not justified by a contradicting
+      reference.
+- [ ] Correct the "Final-stage surfacing" claim that a `:delegate` step "yields
+      its delegated run's text result by default". The documented default
+      (concepts § default yielded-value composition) is that a delegate "yields
+      the called workflow's yielded value unchanged". State that the terminal
+      output is text because the chain terminates in session steps
+      (`review-task-implementation` → `review-code-shape` delegate → `review-step`
+      session text yield), rather than asserting text-as-default as a universal
+      delegate property.
