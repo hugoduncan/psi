@@ -1439,3 +1439,46 @@ synchronously before the wait/launch). Verified: `started_test` 2 tests / 12
 assertions / 0 failures; full focused project-nrepl suite (8 ns) 26 tests /
 151 assertions / 0 failures (count unchanged — pure dead-setup removal);
 `clj-kondo` 0/0 on `started_test.clj`.
+
+### Eighth test-shaper pass — REVIEW_COMPLETE (2026-06-01)
+
+Independent test-shaper pass over all eight `project-nrepl` test namespaces
+(`client`/`attach`/`started`/`config`/`commands`/`ops`/`eval`/`runtime`) plus
+shared `test_support.clj`. Empirically verified: 26 tests / 151 assertions / 0
+failures; zero `with-redefs`; zero interaction-capture atoms; all infra deps
+injected via `[:runtime-handle <seam-key>]` seeds.
+
+Assessed against `test-shaper` predicates:
+
+- `simple` ∧ `single_concern`: each `testing` block proves one
+  behaviour/boundary/invariant; setup is minimal (helpers compress ceremony).
+- `consistent`: naming/structure/data-shapes/assertion-style uniform; all
+  fixture ceremony single-sourced in `test-support` (`make-ctx`,
+  `session-ctx-at`, `install-instance!`, `seed-connector!`, `fake-connector`,
+  `session-fn-with-id`, `temp-dir`, `delete-tree!`).
+- `behavior_focused`: every assertion is state/output, not interaction.
+- `deterministic`: readiness is file-backed and written synchronously (no
+  `future`/`Thread/sleep` races); no time/randomness dependence.
+- `meaningful_failures`: each block names the contract under test.
+- `economical`: representative cases, no case-explosion, no redundant tests.
+
+Candidates considered and deliberately NOT raised (would be scope creep or
+re-litigation of accepted design):
+
+- `config_test.clj` `with-temp-home` mutates the global JVM `user.home`
+  property. This is a documented, accepted design decision (the real
+  `read-user-config` reader derives its path from `user.home`); the kaocha
+  unit suite runs serially, so it is not flaky in practice. Re-flagging an
+  accepted design choice is not new actionable feedback.
+- Minor setup-before-`try` resource-leak-on-failure pattern in a few
+  file-backed config tests is pre-existing, low-signal, and consistent across
+  the suite.
+- `commands_test`/`ops_test`/`eval_test` install instances keyed at
+  `(System/getProperty "user.dir")`: the managed-instance registry is a
+  per-ctx atom (`runtime.clj:13`, `create-test-session` gives each test a
+  fresh registry), `user.dir` is read-only here (no writes), so there is no
+  cross-test contamination or determinism hazard.
+
+Conclusion: the test suite is well-shaped. The seven prior test-shaper passes
+(4th–7th converging) have exhausted actionable improvements. No new actionable
+issues found — review complete.

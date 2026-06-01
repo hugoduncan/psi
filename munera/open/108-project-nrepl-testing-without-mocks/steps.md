@@ -383,3 +383,17 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
   full focused project-nrepl suite (8 ns) 26 tests/151 assertions/0 failures unchanged
   (pure dead-setup removal); `clj-kondo` 0/0 on `started_test.clj`. (Detail in
   implementation.md.)
+
+## Test-shaper follow-ups (2026-06-01, eighth test-shaper pass)
+
+- (none) Eighth independent test-shaper pass found no new actionable issues.
+  Verified empirically: 26 tests / 151 assertions / 0 failures; zero
+  `with-redefs`; zero interaction-capture atoms; all infra deps injected via
+  `[:runtime-handle <seam-key>]` seeds; readiness file-backed and synchronous
+  (deterministic, no thread races); all fixture ceremony single-sourced in
+  `test-support`. Candidates considered and deliberately NOT raised: the
+  accepted/documented `config_test.clj` global `user.home` mutation (serial
+  suite → not flaky; re-litigating an accepted design); a pre-existing
+  low-signal setup-before-`try` leak pattern; and the per-ctx-isolated,
+  read-only `user.dir` instance keying (no cross-test contamination). Review
+  complete — no follow-up steps added. (Detail in implementation.md.)
