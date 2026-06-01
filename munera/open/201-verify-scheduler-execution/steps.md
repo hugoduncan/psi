@@ -84,17 +84,27 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Slice 3 — Busy-session queue + drain-on-idle
 
-- [ ] Audit existing busy/queue/drain coverage
+- [x] Audit existing busy/queue/drain coverage
       (`busy-session-fire-queues-then-idle-drains-fifo-test` →
       `scheduler_lifecycle_test.clj`;
       `scheduler-drain-queue-delivers-oldest-queued-schedule-test` →
       `scheduler_dispatch_test.clj`).
-- [ ] Ensure a test: fire while origin non-idle (`:is-streaming` or
+      Done: lifecycle test fires-while-busy → both `:queued`, sets idle, drains
+      FIFO oldest-first; dispatch test drives `dispatch-in! :scheduler/drain-queue`
+      and delivers the earliest fire-at even when 2nd in queue order. Joint
+      coverage satisfies the sufficient-coverage criterion.
+- [x] Ensure a test: fire while origin non-idle (`:is-streaming` or
       `:is-compacting` true) → schedule `:queued`; set session idle; dispatch
       `:scheduler/drain-queue` directly → `drain-one` delivers oldest queued
       (by `fire-at`, `created-at`, `schedule-id`). Add if missing.
-- [ ] Record busy-queue/drain finding as an entry in the **same single shared
+      Done: existing tests jointly cover this (fire-while-busy → queued in
+      lifecycle + dispatch tests; set-idle-then-drain in lifecycle; oldest-by-
+      fire-at via `dispatch-in! :scheduler/drain-queue` in dispatch test). No new
+      test needed; both cited tests verified green (8 tests / 46 assertions).
+- [x] Record busy-queue/drain finding as an entry in the **same single shared
       "Live execution path"** `findings.md` section, citing covering deftest.
+      Done: two entries recorded (`verified-correct`), citing the lifecycle +
+      dispatch deftests.
 
 ## Slice 4 — Live execution: session kind
 

@@ -280,3 +280,26 @@ the timer callback; assert pending before fire; invoke the callback (no
 `Thread/sleep`); assert the origin-session journal carries a `user` message with
 `:source :scheduled` + matching `:schedule-id`, schedule `:delivered`, queue
 empty. Green (2 tests / 9 assertions in `scheduler_end_to_end_test`).
+
+## Slice 3 execution — Busy-session queue + drain-on-idle (2026-06-01)
+
+Audit found **sufficient** existing coverage (cite, do not add):
+
+- `scheduler-lifecycle-test/busy-session-fire-queues-then-idle-drains-fifo`:
+  sets `:is-streaming true`, fires two schedules → both `:queued`, sets idle,
+  drives `:scheduler/drain-queue` (handler) → delivers `sch-q-1` then `sch-q-2`
+  FIFO, asserts queue mutation + `:delivered`/`:queued` statuses + scheduled
+  user-message timestamp from the runtime scheduler time source.
+- `scheduler-dispatch-test/scheduler-drain-queue-delivers-oldest-queued-schedule`:
+  drives the real `dispatch-in! :scheduler/drain-queue` with queue
+  `["sch-1" "sch-2" "missing"]` where `sch-2` has the **earlier** fire-at →
+  delivers `sch-2` (oldest by fire-at, not queue position), drops the missing id,
+  no effects on the no-op path.
+- `scheduler-dispatch-test/scheduler-fired-queues-while-session-busy`: fire while
+  `:is-streaming true` → `:queued` + queue membership.
+
+Per the sufficient-coverage criterion these jointly satisfy (1) named queue/
+delivered outputs, (2) drive the real drain via the `:scheduler/drain-queue`
+dispatch event (the design's stated drain trigger — drain is dispatch-driven,
+not timer-driven, so no timer seam is required here), and (3) assert state/
+outputs not interactions. Both cited tests verified green. No new test added.

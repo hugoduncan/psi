@@ -56,6 +56,8 @@ Baseline `bb test` (scheduler subset, 2026-06-01): `35 tests, 338 assertions, 0 
 | status | summary | covering test | repro / task-ref |
 | ------ | ------- | ------------- | ---------------- |
 | verified-correct | **message kind** — real timer-seam round trip: create message-kind → captured timer callback invoked (no sleep) → delivered prompt with scheduled provenance (`:source :scheduled`, `:schedule-id`, role `"user"`) appears in the **origin session**; status `:delivered`, queue empty. | `scheduler-end-to-end-test/scheduler-message-kind-fires-via-timer-seam-and-delivers-to-origin` (new) | — |
+| verified-correct | **busy queue + drain-on-idle** — fire while `:is-streaming` true → schedule `:queued`; set idle → dispatch `:scheduler/drain-queue` → oldest queued delivered FIFO; queue mutates; scheduled-message timestamp from runtime scheduler time source. | `scheduler-lifecycle-test/busy-session-fire-queues-then-idle-drains-fifo`, `scheduler-dispatch-test/scheduler-fired-queues-while-session-busy` (cited) | — |
+| verified-correct | **drain oldest-by-fire-at via dispatch** — `dispatch-in! :scheduler/drain-queue` delivers the earliest `fire-at` even when it is second in queue order (`["sch-1" "sch-2"]`, `sch-2` earlier → `sch-2` delivered); skips a missing queue id; no effects on no-op. | `scheduler-dispatch-test/scheduler-drain-queue-delivers-oldest-queued-schedule` (cited) | — |
 
 ---
 
