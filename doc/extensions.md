@@ -528,7 +528,7 @@ for every event — this is broadcast semantics, not first-match.
 | `"session_fork"`          | `{}`                                      | —       | After fork completes                       |
 | `"model_select"`          | `{:model ... :source :set}`               | —       | After model change                         |
 | `"tool_call"`             | `{:type :tool-name :tool-call-id :input}` | block   | See [Tool Wrapping](#tool-wrapping)        |
-| `"tool_result"`           | `{:type :tool-name :content :is-error}`   | modify  | See [Tool Wrapping](#tool-wrapping)        |
+| `"tool_result"`           | `{:type :tool-name :tool-call-id :input :content :details :is-error}` | modify  | `:input` matches the `tool_call` event on both paths. See [Tool Wrapping](#tool-wrapping) |
 
 **Cancel semantics**: If *any* handler returns `{:cancel true}`, the
 associated action is blocked.  Remaining handlers still fire.
@@ -569,7 +569,9 @@ Subscribe to `"tool_call"` (before) and `"tool_result"` (after):
 
 A `"tool_call"` handler returning `{:block true}` prevents execution.
 A `"tool_result"` handler may return `:content`, `:details`, or
-`:is-error` to modify the result.
+`:is-error` to modify the result. The `"tool_result"` event also carries
+`:input` (the parsed tool arguments, matching the `"tool_call"` event) and
+`:details`, so a handler can correlate the result with its originating call.
 
 ## Flags
 

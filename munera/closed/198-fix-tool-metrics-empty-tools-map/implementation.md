@@ -1250,3 +1250,17 @@ the canonical `tool-result-event` key set (`:tool-call-id`, `:input`,
 `:content`, `:details`, `:is-error`), optionally noting `:input` parity with the
 `tool_call` event. Prior docs-review passes did not examine this table (scoped to
 the metrics entry only), so this is a new finding, not a duplicate.
+
+**RESOLVED (review-task-docs accuracy/consistency follow-up).** Aligned the
+`"tool_result"` row of the extension-bus event-reference table in
+`doc/extensions.md` with the canonical payload built by `ext/tool-result-event`.
+Old: `{:type :tool-name :content :is-error}`. New:
+`{:type :tool-name :tool-call-id :input :content :details :is-error}` — keys in
+payload order, exactly matching the builder (`:type "tool_result"` plus
+`:tool-name :tool-call-id :input :content :details :is-error`), with a Notes
+clause stating `:input` matches the `tool_call` event on both paths. Also
+surfaced `:input`/`:details` availability in the adjacent Tool Wrapping prose so
+a handler reader knows it can correlate a result with its originating call.
+Verified the `"tool_call"` row already matches `ext/tool-call-event`
+(`:tool-name :tool-call-id :input`) — left unchanged. Doc-only change; no code,
+tests, or lint affected.
