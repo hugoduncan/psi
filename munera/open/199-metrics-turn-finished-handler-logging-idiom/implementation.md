@@ -146,3 +146,36 @@ behavioural contract. **One actionable test gap.**
   covers it. The behaviour the task touched (the catch body) has zero coverage;
   a regression that broke swallowing (e.g. re-throwing) would not be caught.
   Actionable: add the catch-branch test.
+
+## Test review follow-up execution (2026-06-01)
+
+Added the catch-branch test flagged by the test-review pass:
+`turn-finished-swallows-query-error-and-returns-nil-test` in
+`extensions/metrics/test/psi/metrics/extension_test.clj`.
+
+- Reuses the existing `make-api` + `:query-session` injection seam (no mocks):
+  injects a `query-session` fn that throws `(ex-info "boom" {})`.
+- Captures the registered `session_turn_finished` handler directly
+  (`(first (get-in @state [:handlers "session_turn_finished"]))`) rather than
+  via the `fire-event` helper, since the swallow-and-`nil`-return assertion
+  needs the handler's return value (the helper discards it).
+- Asserts (a) the handler returns `nil` despite the throwing query, and
+  (b) `(:metrics @ext/store)` is identical before/after — token tracking is
+  skipped, store unchanged. No exception escapes (the `is` forms would error
+  otherwise).
+
+Verification:
+- Full Kaocha `:extensions` suite green: 228 tests, 788 assertions,
+  0 failures, 0 errors (the new test is listed and passing).
+- `clj-kondo --lint extension_test.clj` clean (0/0).
+- `clj-paren-repair` applied after the edit (balanced/formatted).
+
+Note: the standalone-directory `clojure -A:test` invocation cannot run this
+suite — `psi.extension-test-helpers.nullable-api` transitively requires
+`psi.prompt-registry.root-storage` → `psi/root_registry/registry`, which is
+absent on the metrics-local `:test` classpath. This is pre-existing (every
+test in the file errors the same way under that invocation) and unrelated to
+this change; the canonical run path is the root `bb clojure:test:extensions`
+suite, which passes.
+
+No blocked items remain.

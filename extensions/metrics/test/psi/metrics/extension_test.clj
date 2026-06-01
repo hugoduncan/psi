@@ -222,6 +222,22 @@
       ;; Total output: 50 + 30 = 80.
       (is (= 80  (get-in metrics [:tokens "claude-3" :output]))))))
 
+(deftest turn-finished-swallows-query-error-and-returns-nil-test
+  ;; When query-session throws, make-turn-finished-handler must swallow the
+  ;; exception, return nil, and leave the metrics store unchanged (the
+  ;; design's swallow-and-return-nil acceptance criterion).
+  (let [query-session-fn (fn [_session-id _eql]
+                           (throw (ex-info "boom" {})))
+        {:keys [api state]} (make-api {:query-fn (fn [_q] {})})
+        api* (assoc api :query-session query-session-fn)]
+    (ext/init api*)
+    (let [metrics-before (:metrics @ext/store)
+          handler        (first (get-in @state [:handlers "session_turn_finished"]))]
+      (is (nil? (handler {:session-id "s1" :turn-id "t1"}))
+          "handler returns nil even when the query throws")
+      (is (= metrics-before (:metrics @ext/store))
+          "metrics store is unchanged when token tracking is skipped"))))
+
 (deftest turn-finished-uses-unknown-when-model-id-nil-test
   ;; When model-id is nil, token delta is accumulated under "unknown".
   (let [query-session-fn (fn [_session-id _eql]

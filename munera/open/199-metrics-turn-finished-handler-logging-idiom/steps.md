@@ -48,9 +48,13 @@
 
 ## Test review follow-up (2026-06-01)
 
-- [ ] Add a `make-turn-finished-handler` catch-branch test to
+- [x] Add a `make-turn-finished-handler` catch-branch test to
       `extensions/metrics/test/psi/metrics/extension_test.clj`: inject a
       `query-session` fn that throws, fire `session_turn_finished`, and assert
       the handler returns `nil`, no exception escapes, and `@ext/store` metrics
       are unchanged (covers the design's swallow-and-`nil`-return acceptance
-      criterion, which currently has zero coverage).
+      criterion, which currently has zero coverage). →
+      `turn-finished-swallows-query-error-and-returns-nil-test`: captures the
+      registered handler directly to assert its `nil` return, and compares
+      `(:metrics @ext/store)` before/after. Suite green
+      (228 tests, 788 assertions, 0 failures/errors); `clj-kondo` clean.
