@@ -381,3 +381,27 @@ boundary failure signal. With a `capture-payload` helper they collapse to two
 visible `(is (… (:is-error (capture-payload {…} <raw>))))` lines.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Test-shaper second-pass follow-up execution: S3 (2026-06-01)
+
+Executed S3 (the one newly-added unchecked item from the test-shaper second
+pass). Extracted a sibling `capture-payload` helper next to `result-override`
+that registers the `(fn [p] (reset! payload p) nil)` capture handler, invokes
+`dispatch-tool-result-in` with the given raw result/`is-error?`, and returns the
+captured incoming payload. Rewrote both coercion tests to state only their
+varying input axis and asserted field:
+
+- `dispatch-tool-result-normalizes-content-test` → one
+  `(is (= [{:type :text :text "raw string"}] (:content (capture-payload {…} false))))`.
+- `dispatch-tool-result-coerces-is-error-test` → two visible
+  `(is (false?/true? (:is-error (capture-payload {…} <raw>))))` lines, keeping
+  the nil/non-boolean boundary cases as distinct assertions for failure signal.
+
+This restores fixture/abstraction consistency across the cluster: override tests
+use `result-override`; coercion tests now use the sibling `capture-payload`
+helper instead of hand-rolling the registry/atom/dispatch ceremony. Pure shape
+change — no behaviour or coverage change.
+
+Verification: `clj-paren-repair` (balanced + formatted), `clj-kondo` clean
+(0 errors, 0 warnings), Kaocha focus `psi.agent-session.extensions-test`
+**30 tests, 98 assertions, 0 failures** (coverage unchanged, 30/98 as expected).

@@ -397,35 +397,34 @@
     (ext/dispatch-tool-result-in reg "read" "call-1" {"path" "x"}
                                  inert-original-result false)))
 
+(defn- capture-payload
+  "Register a tool_result handler that captures (and does not override) the
+   incoming payload, then invoke dispatch-tool-result-in with the given raw
+   result and is-error?. Returns the captured incoming payload — the normalized
+   shape the bus delivers to handlers."
+  [result is-error?]
+  (let [reg     (ext/create-registry)
+        payload (atom nil)]
+    (ext/register-extension-in! reg "/ext/a")
+    (ext/register-handler-in! reg "/ext/a" "tool_result"
+                              (fn [p] (reset! payload p) nil))
+    (ext/dispatch-tool-result-in reg "read" "call-1" {"path" "x"}
+                                 result is-error?)
+    @payload))
+
 (deftest dispatch-tool-result-normalizes-content-test
   (testing "plan-path tool_result bus event delivers :content as normalized content-blocks"
-    (let [reg     (ext/create-registry)
-          payload (atom nil)
-          _       (ext/register-extension-in! reg "/ext/a")
-          _       (ext/register-handler-in! reg "/ext/a" "tool_result"
-                                            (fn [p] (reset! payload p) nil))]
-      ;; raw runtime result carries :content as a plain string
-      (ext/dispatch-tool-result-in reg "read" "call-1" {"path" "x"}
-                                   {:content "raw string" :is-error false}
-                                   false)
-      (is (= [{:type :text :text "raw string"}] (:content @payload))
-          "string content is coerced to canonical text blocks, matching the interactive bridge"))))
+    ;; raw runtime result carries :content as a plain string
+    (is (= [{:type :text :text "raw string"}]
+           (:content (capture-payload {:content "raw string" :is-error false} false)))
+        "string content is coerced to canonical text blocks, matching the interactive bridge")))
 
 (deftest dispatch-tool-result-coerces-is-error-test
   (testing "plan-path tool_result bus event delivers :is-error as a strict boolean"
-    (let [reg     (ext/create-registry)
-          payload (atom nil)
-          _       (ext/register-extension-in! reg "/ext/a")
-          _       (ext/register-handler-in! reg "/ext/a" "tool_result"
-                                            (fn [p] (reset! payload p) nil))]
-      (testing "raw nil is-error? coerces to strict false, matching the interactive bridge"
-        (ext/dispatch-tool-result-in reg "read" "call-1" {"path" "x"}
-                                     {:content "ok"} nil)
-        (is (false? (:is-error @payload))))
-      (testing "raw truthy non-boolean is-error? coerces to strict true"
-        (ext/dispatch-tool-result-in reg "read" "call-2" {"path" "x"}
-                                     {:content "boom"} "some-error")
-        (is (true? (:is-error @payload)))))))
+    (testing "raw nil is-error? coerces to strict false, matching the interactive bridge"
+      (is (false? (:is-error (capture-payload {:content "ok"} nil)))))
+    (testing "raw truthy non-boolean is-error? coerces to strict true"
+      (is (true? (:is-error (capture-payload {:content "boom"} "some-error")))))))
 
 (deftest dispatch-tool-result-non-map-return-test
   (testing "tool_result handler returning a non-map yields no override (nil)"

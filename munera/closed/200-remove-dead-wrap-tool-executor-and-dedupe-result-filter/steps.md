@@ -97,7 +97,7 @@
 
 ## Test review follow-ups (test-shaper second pass, 2026-06-01)
 
-- [ ] S3: Extract a sibling helper for the payload-capture coercion tests
+- [x] S3: Extract a sibling helper for the payload-capture coercion tests
   (`dispatch-tool-result-normalizes-content-test` @400,
   `dispatch-tool-result-coerces-is-error-test` @414), e.g.
   `(capture-payload <result> <is-error?>)` that registers the
