@@ -77,3 +77,29 @@
       name=target unambiguous here) or rename steps to purpose-style names
       matching the actual exemplar convention; keep the verification-test
       `:name` assertions in sync with whichever is chosen.
+
+## Inconsistency review follow-ups (pass 3)
+
+- [ ] Correct the verification "same surface" over-claim (Acceptance criteria).
+      design.md prescribes a test asserting "the five step
+      names/types/**targets** in order" and calls it "the same
+      parser/compiler/definition surface used by the sibling `*-test` deftests
+      (e.g. `review-task-implementation-test`, `create-task-plan-test`)". Those
+      siblings assert only `:name`s and `:type`s, NOT `:target`s
+      (`review-task-implementation-test`: `(mapv :name steps)` + `(mapv :type
+      steps)`; `create-task-plan-test` likewise, single `:session` step has no
+      target). Either drop/soften the "targets ... same surface" framing or
+      state explicitly that the `:target` assertion is an addition beyond the
+      cited exemplars.
+- [ ] Fix the acceptance criterion that over-claims `(empty? errors)`. design.md
+      states "The workflow parses and compiles cleanly (delegate targets resolve
+      to workflow references). Verification is done by ... `load-edn-only` ...
+      asserts `(empty? errors)`". `load-edn-only` loads ONLY `task-lifecycle.edn`
+      in isolation (`with-workflow-dir`: global dirs → [], project dir → temp dir
+      containing just that file), and the loader performs no cross-workflow
+      target-resolution check — `review-task-implementation-test` loads its own
+      .edn without `review-step.edn` yet asserts `(empty? errors)`. So
+      `(empty? errors)` does NOT verify "delegate targets resolve to workflow
+      references". Either remove the target-resolution claim from what
+      `(empty? errors)` establishes, or verify target resolution via a mechanism
+      that loads all targets together (cf. `review-workflow-set-loads-together-test`).

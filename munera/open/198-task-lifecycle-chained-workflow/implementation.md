@@ -248,3 +248,43 @@ inconsistency passes. Verified the previously-resolved items hold against code:
 
 No new actionable ambiguity found. Design is concretely specified and every
 checked claim matches the runtime and exemplars.
+
+## 2026-06-01 — design inconsistency review pass 3 (ψ)
+
+Re-reviewed design.md against the referenced test/loader artifacts
+(`workflow_definitions_test.clj`: `load-edn-only`, `with-workflow-dir`,
+`review-task-implementation-test`, `create-task-plan-test`;
+`workflow-loader/core.clj` `load-workflow-definitions`). Prior inconsistency
+items (doc-citation, delegate default-yield, name=target justification) remain
+resolved and verified against runtime/exemplars. Two NEW actionable
+inconsistencies between design.md and the cited artifacts:
+
+1. Verification "same surface" over-claim (Acceptance criteria, ~L208-211).
+   design.md prescribes a test asserting "the five step names/types/**targets**
+   in order" and calls this "the same parser/compiler/definition surface used by
+   the sibling `*-test` deftests (e.g. `review-task-implementation-test`,
+   `create-task-plan-test`)". But the cited siblings assert only `:name`s and
+   `:type`s — NOT `:target`s. `review-task-implementation-test` asserts
+   `(mapv :name steps)` + `(mapv :type steps)` only; `create-task-plan-test`
+   likewise (and its single step is a `:session` with no target). The prescribed
+   target assertion is a superset beyond the cited exemplars, so "same surface"
+   is inaccurate. Either drop "targets" / soften to "names and types like the
+   siblings", or state explicitly that the target assertion is an addition the
+   cited exemplars do not make.
+
+2. Acceptance criterion over-claims what `(empty? errors)` proves (~L203-207).
+   design.md: "The workflow parses and compiles cleanly (delegate targets
+   resolve to workflow references). Verification is done by ... `load-edn-only`
+   ... asserts `(empty? errors)`". `load-edn-only` writes ONLY the single
+   `task-lifecycle.edn` into the temp `with-workflow-dir` (global dirs → [],
+   project dir → temp dir), so the five target workflows are absent at load. The
+   loader (`core.clj` `load-workflow-definitions` → `compiler/compile-workflow-files`)
+   performs no cross-workflow target-resolution check — confirmed because the
+   pure-delegate `review-task-implementation-test` loads only its own .edn
+   (target `review-step` absent) yet asserts `(empty? errors)`. Therefore
+   `(empty? errors)` does NOT verify "delegate targets resolve to workflow
+   references"; the parenthetical claim that this verification establishes
+   target resolution is unsupported by the cited loader/test artifacts. Either
+   remove the target-resolution claim from what `(empty? errors)` proves, or
+   move target-resolution verification to a mechanism that actually loads all
+   targets together (cf. `review-workflow-set-loads-together-test`).
