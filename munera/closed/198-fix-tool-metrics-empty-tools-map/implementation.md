@@ -1212,3 +1212,41 @@ future token-tracking task, not added to this task's steps.
 **Verification.** `clojure -M:test --focus psi.metrics.extension-test --focus
 psi.agent-session.tool-execution-test --focus psi.agent-session.extensions-test`
 → **61 tests, 214 assertions, 0 failures**.
+
+## 2026-06-01 — docs review (independent, review-task-docs skill)
+
+Re-applied the skill against source, widening the lens beyond the new
+`psi/metrics` entry (the only surface prior docs-review passes examined) to the
+**user-facing extension-bus event-reference table** and **Tool Wrapping** section
+in `doc/extensions.md` — the public contract surface task 198 actually changed.
+
+- **CHANGELOG — ✓.** `[Unreleased]/Fixed` (`:tools` map populated) and
+  `[Unreleased]/Changed` (`tool_result` now carries `:input` on the
+  interactive/batch path) entries present and accurate against source
+  (`tool-result-event`/`tool-call-event` in `extensions.clj`,
+  `emit-tool-lifecycle!`, `record-tool-call-result!`).
+- **`psi/metrics` entry (`doc/extensions.md`) — ✓.** Re-verified accurate:
+  6 subscribed events match `init`; `:tools`/`counter`/`token`/`provider`
+  shapes match `schema.clj`; atomic-write + schema-validate-on-load match
+  `persistence.clj`; `metrics/summary` + `/metrics` + `.psi/extensions.edn`
+  activation + bridge attribution all correct.
+
+**ACTIONABLE (accuracy/consistency — `doc/extensions.md` extension-bus event
+reference table is stale w.r.t. this task's contract change).** The
+"Tool Wrapping" / extension-bus event table (≈ line 531) documents the
+`"tool_result"` event data as `{:type :tool-name :content :is-error}`. The
+canonical payload built by `ext/tool-result-event` (single source for both the
+plan path and the `emit-tool-lifecycle!` bridge) is
+`{:type :tool-name :tool-call-id :input :content :details :is-error}`. The doc
+row omits `:tool-call-id`, `:input`, and `:details`. The `:input` key is the
+field **this task added/unified** on the interactive/batch path (CHANGELOG'd as
+user-visible Changed), so the public contract table now understates the
+`tool_result` event that task 198 changed (the `"tool_call"` row already lists
+`:input` and is fine). The Tool Wrapping code example (`(fn [{:keys [tool-name
+content]}] …)`) is not wrong but does not surface that `:input`/`:details` are
+now available. `consistent` / `accuracy` gap: documentation language does not
+match implementation. Recorded as a follow-up: align the `"tool_result"` row to
+the canonical `tool-result-event` key set (`:tool-call-id`, `:input`,
+`:content`, `:details`, `:is-error`), optionally noting `:input` parity with the
+`tool_call` event. Prior docs-review passes did not examine this table (scoped to
+the metrics entry only), so this is a new finding, not a duplicate.
