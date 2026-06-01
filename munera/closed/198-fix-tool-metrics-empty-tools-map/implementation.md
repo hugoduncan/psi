@@ -53,6 +53,26 @@ Two inconsistencies found:
    blocking tests cover the plan path only), but a reader could infer blocking is preserved
    on the interactive path too.
 
+## 2026-06-01 — implementation review
+
+**Fix correct.** `emit-tool-lifecycle!` change is minimal, single-responsibility, and
+matches the payload shapes consumed by `on-tool-call`/`on-tool-result`. Changelog entry
+present. Design, plan, and code are coherent.
+
+**Gap: no regression test for the bridge itself.**
+`tool_execution_test.clj` exercises `run-tool-call!` but no test registers a `"tool_call"`
+or `"tool_result"` handler on the `extension-registry` in the session ctx and asserts it
+fires. The new `case` branch in `emit-tool-lifecycle!` has zero unit coverage at the
+integration point — the fix could be silently reverted without any test failing.
+
+The metrics `extension_test.clj` tests fire events directly via `fire-event` (bypassing the
+adapter), so they don't cover the bridge either.
+
+**Minor: `{:block true}` silently ignored on interactive path — untested.**
+Design documents this intentional asymmetry (blocking only enforced on the plan path) but no
+test asserts the non-blocking behavior, leaving it unguarded against future accidental
+enforcement.
+
 ## 2026-06-01 — ambiguity resolution
 
 1. **Double-dispatch — resolved**: `run-tool-plan-step-in!` calls `dispatch-tool-call-in` /
