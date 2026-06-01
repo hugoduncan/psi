@@ -1,5 +1,32 @@
 # Implementation Notes
 
+## 2026-06-01 — test review (test-shaper)
+
+Reviewed task tests against test-shaper (`clarity ∧ signal ∧ robustness`).
+Suites green: 58 tests, 210 assertions, 0 failures
+(`tool-execution-test` + `metrics.extension-test` + `extensions-test`).
+
+**ACTIONABLE — `behavior_focused` / `meaningful_failures` gap: the actual
+interactive-path `:error-reasons` key value is never asserted.**
+`error-reason` derives the key via `(str content)`. This task normalized
+`:content` to canonical content-blocks on *both* paths. So on the
+interactive/batch (and now plan) path the metrics `:error-reasons` key is the
+stringified *data structure*:
+`"[{:type :text, :text \"boom: command failed\"}]"` — not the human-readable
+error text. The `extension-test` unit tests only fire `tool_result` with
+`:content` as a plain **string** (`"Command not found"`, `"fail"`), asserting
+clean reasons (`:error-reasons "Command not found"`) — a value shape that can
+no longer occur on the real bridge path. The sole block-content test
+(`metrics-extension-accumulates-errors-via-bridge-test`) asserts only
+`(str/includes? key "boom: command failed")`, which passes precisely *because*
+it tolerates the malformed wrapping (substring survives stringification). Net:
+the suite gives false confidence that error reasons are human-readable single
+lines; the malformed key the system actually persists is unasserted, and a
+regression that fixed (or further mangled) reason derivation would not be
+caught at the contract level. This is the test-aspect of a likely `:content`
+shape/`error-reason` code defect — flagging the missing/weak coverage here;
+the underlying value-quality question is a code/spec concern.
+
 ## 2026-06-01 — docs review follow-up: document psi/metrics built-in extension
 
 Executed the newly added unchecked docs-review follow-up. `doc/extensions.md`
