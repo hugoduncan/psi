@@ -380,3 +380,44 @@ Acceptance-criteria verification bullet rewritten.
    wanted, needs a combined-load test (cf. `review-workflow-set-loads-together-test`,
    which writes every member `.edn` into one `with-workflow-dir`) — declared
    optional / not required for this task's first cut.
+
+## 2026-06-01 — implementation review (task-implementation-review skill) (ψ)
+
+Applied `task-implementation-review` to the committed implementation
+(`.psi/workflows/task-lifecycle.edn`, the `task-lifecycle-test` deftest, and the
+CHANGELOG `[Unreleased]` Added entry). Re-read design/plan/steps and verified the
+code against the runtime and exemplars.
+
+Findings — no new actionable feedback:
+
+1. matches(design): the `.edn` is byte-for-byte the design's "Concrete step and
+   file shape" — top-level `:name "task-lifecycle"` + `:description`, five
+   `:type :delegate` steps in order with `:name` = `:target`, each
+   `:prompt-string {:type :map :fields {:input {:from :workflow-input :path
+   [:input]}}}` and `:context [{:type :source :from :workflow-original}]`,
+   terminal step with no `:yields`/`:terminal-contract`. ✓
+2. follows(architecture): uses only the existing converged `:delegate` grammar
+   and the established `:map` prompt-string / `:workflow-original` context
+   patterns (cf. `gh-issue-implement.edn`, `review-task-implementation.edn`); no
+   new step shape, operation, prompt, or grammar. ✓
+3. Runtime correctness of the central mechanism — VERIFIED against code (not just
+   doc). `delegate.clj` `delegate-step-runtime-result` calls
+   `source_resolution/render-delegate-prompt-string` (which returns the map
+   `{:input "<task-id>"}` for `{:type :map}`) and passes it directly as the
+   sub-workflow's `:workflow-input` (`create-run … :workflow-input prompt-string`).
+   So `{:from :workflow-input :path [:input]}` resolves in the four explicit-ref
+   targets, and `compiler.clj` `standard-vars` auto-wires `{{input}}` →
+   `{:from :workflow-input :path [:input]}` for `create-task-plan`'s `:session`
+   prompt-workflow — all five stages resolve the identifier uniformly. Top-level
+   invocation is also covered: `core.clj` builds `{:input prompt-text :original
+   prompt-text}`, so the orchestrator's own `:workflow-input` is a map. ✓
+4. No reusable-pattern duplication, no unnecessary abstraction, no structural /
+   performance issue: the file is a minimal pure-delegate chain; no synthesizing
+   step, no yield-chaining, no redundant context.
+5. Proof + docs: focused `task-lifecycle-test` green (1 test, 6 assertions);
+   full `psi.workflow-loader.workflow-definitions-test` green (10 tests, 110
+   assertions); `clj-kondo` on the edited test file clean (0/0). CHANGELOG
+   `[Unreleased]` Added entry present and matches the
+   `review-task-design`/`create-task-plan` precedent.
+
+PASS_STATUS: REVIEW_COMPLETE — no new steps.md items added.
