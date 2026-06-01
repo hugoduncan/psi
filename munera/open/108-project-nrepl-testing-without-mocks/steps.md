@@ -185,7 +185,7 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
 
 ## Test-shaper follow-ups (2026-06-01, second test-shaper pass)
 
-- [ ] Split `config_test.clj` `read-dot-nrepl-port-test`'s "fails when
+- [x] Split `config_test.clj` `read-dot-nrepl-port-test`'s "fails when
   .nrepl-port is missing or invalid" block into two single-concern `testing`
   blocks, each with its own fresh `temp-dir`/`delete-tree!`: (1) absent
   `.nrepl-port` throws `clojure.lang.ExceptionInfo`; (2) malformed
@@ -193,4 +193,12 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
   Removes the intra-test `spit`-then-reassert ordering coupling and gives each
   boundary contract its own meaningful failure name, matching the
   one-concern-per-block style already used by `read-project-preferences-test`.
-  Keep tests green + lint clean.
+  Keep tests green + lint clean. — DONE: replaced the single combined block
+  with "fails when .nrepl-port is absent" (fresh `temp-dir`, assert throws on a
+  bare empty dir) and "fails when .nrepl-port content is malformed" (fresh
+  `temp-dir`, `spit` `"not-a-port"`, assert throws). No intra-test
+  `spit`-then-reassert ordering coupling remains; each block has its own
+  `temp-dir`/`delete-tree!` lifecycle and a meaningful failure name. Assertion
+  count unchanged (2 `thrown?` checks total). `config_test` 7 tests/32
+  assertions green; full focused project-nrepl suite (8 ns) 26 tests/151
+  assertions/0 failures unchanged; `clj-kondo` 0/0 on `config_test.clj`.

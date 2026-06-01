@@ -1012,3 +1012,25 @@ the real cwd (`user.dir`) existing rather than an explicit temp dir, but it is
 a pre-existing pure-config test outside this task's de-mock reshape set;
 raising it would be scope expansion, so it is deliberately NOT added as a
 follow-up.
+
+## Test-shaper follow-up (2026-06-01, second test-shaper pass) — single-concern split
+
+Split `config_test.clj` `read-dot-nrepl-port-test`'s "fails when .nrepl-port is
+missing or invalid" block into two single-concern `testing` blocks:
+
+- "fails when .nrepl-port is absent" — fresh `(temp-dir "psi-project-nrepl-")`,
+  assert `read-dot-nrepl-port` throws `ExceptionInfo` on the bare empty dir,
+  `delete-tree!` in `finally`.
+- "fails when .nrepl-port content is malformed" — fresh `temp-dir`,
+  `(spit (io/file dir ".nrepl-port") "not-a-port")`, assert throws
+  `ExceptionInfo`, `delete-tree!` in `finally`.
+
+Removes the prior intra-test `spit`-then-reassert ordering coupling (the old
+single block asserted on the absent file, then mutated the dir mid-test and
+reasserted). Each boundary contract now has its own fixture lifecycle and a
+meaningful failure name, matching `read-project-preferences-test`'s
+one-concern-per-block style. Assertion count unchanged (2 `thrown?` total).
+
+Verified: `config_test` 7 tests/32 assertions/0 failures; full focused
+project-nrepl suite (8 ns) 26 tests/151 assertions/0 failures (unchanged);
+`clj-kondo --lint config_test.clj` 0 errors/0 warnings.

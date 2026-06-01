@@ -203,11 +203,17 @@
         (finally
           (delete-tree! dir)))))
 
-  (testing "fails when .nrepl-port is missing or invalid"
+  (testing "fails when .nrepl-port is absent"
     (let [dir (temp-dir "psi-project-nrepl-")]
       (try
         (is (thrown? clojure.lang.ExceptionInfo
                      (project-nrepl-config/read-dot-nrepl-port dir)))
+        (finally
+          (delete-tree! dir)))))
+
+  (testing "fails when .nrepl-port content is malformed"
+    (let [dir (temp-dir "psi-project-nrepl-")]
+      (try
         (spit (io/file dir ".nrepl-port") "not-a-port")
         (is (thrown? clojure.lang.ExceptionInfo
                      (project-nrepl-config/read-dot-nrepl-port dir)))
