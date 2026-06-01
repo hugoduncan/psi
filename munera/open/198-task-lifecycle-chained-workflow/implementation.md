@@ -651,3 +651,32 @@ Verification: `clj-paren-repair` clean; `clojure -M:test --focus
 psi.workflow-loader.workflow-definitions-test` → 10 tests, 113 assertions,
 0 failures; `clj-kondo --lint` on the test file → 0 errors, 0 warnings.
 Both `steps.md` test-shaper items checked.
+
+## 2026-06-01 — test review (test-shaper skill) pass 2 (ψ)
+
+Re-applied `test-shaper` to `task-lifecycle-test`
+(`workflow_definitions_test.clj` L437-476) after the prior pass-1 test-shaper
+follow-ups landed (projected-collection equalities + `let`-bound
+`expected-targets`). Focused run green: 1 test, 9 assertions, 0 failures.
+
+Evaluation vs test-shaper criteria — all satisfied:
+- simple / single_concern: ✓ one workflow's loaded shape; clean AAA.
+- consistent(assertion_style): ✓ now uniformly `(= (repeat 5 …) (mapv …))` /
+  `(mapv :name/:target …)` projections, matching the sibling `*-test` surface.
+- meaningful_failures: ✓ projected equalities name the offending step + actual
+  value on failure (the pass-1 fix to the former `(every? pred steps)` checks).
+- economical / minimal_incidental_variation: ✓ name=target literal bound once
+  as `expected-targets` (pass-1 fix), referenced by both assertions.
+- robust: ✓ real loader (`loader/load-workflow-definitions`) over temp
+  `with-workflow-dir`; no mocks/stubs; deterministic; behaviour-focused
+  (asserts loaded definition shape, not internals).
+
+Considered residual and rejected as NON-actionable: the count `5` is encoded in
+four `(repeat 5 …)` forms independently of `(count expected-targets)`. Not
+actionable — the explicit `(= 5 (count steps))` assertion fails first on any
+count change, so a wrong-length `repeat` cannot yield a false green; deriving the
+count from `expected-targets` would add low-signal ceremony that diverges from
+the established sibling assertion style. The two prior-pass test-shaper fixes
+already resolved the only genuine clarity/signal/economy issues.
+
+PASS_STATUS: REVIEW_COMPLETE
