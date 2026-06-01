@@ -785,3 +785,49 @@ config/client/runtime) → 25 tests, 150 assertions, 0 failures (down 3 from 153
 exactly the three removed interaction assertions); `clj-kondo --lint` over the
 file → 0 errors, 0 warnings. No remaining interaction-style assertions in any
 project-nrepl test file.
+
+2026-06-01 — Implementation review (fourth pass, task-implementation-review)
+
+Fresh independent review after the third-pass interaction-assertion follow-up
+landed (09f27106b, working tree clean). Re-verified empirically myself (not
+relying on prior recorded counts):
+- focused project-nrepl suite (8 ns: client/attach/started/config/commands/ops/
+  eval/runtime) — 25 tests, 150 assertions, 0 failures
+- `clj-kondo --lint components/project-nrepl/{src,test}` — 0 errors, 0 warnings
+- zero `with-redefs` in the test tree (`grep -rn` → no matches)
+- zero `calls*`/`@calls` interaction-capture atoms in any test file (including
+  the canonical `eval_test.clj`)
+- zero inline `with-meta`/`:nrepl.core/taking-until` metadata-shape copies
+  (all derive the session fn via the shared `session-fn-with-id`)
+
+Production parity with design (re-read source): the three required changes are
+present and exact —
+- `client.clj`: `real-nrepl-connector` ({:host :port} → {:transport :client
+  :client-session}); `connect-instance-in!` resolves via
+  `(or (get-in instance [:runtime-handle :nrepl-connector]) real-nrepl-connector)`;
+  session-id derivation + throw-on-missing retained in `connect-instance-in!`.
+- `started.clj`: `real-process-launcher` (promoted private `start-process!`);
+  `start-instance-in!` uses `(update :runtime-handle merge {...})` (not
+  overwrite); resolves launcher via `(or (get-in … :process-launcher)
+  real-process-launcher)`.
+- `attach.clj`/`started.clj`: optional `:runtime-handle` seam seed threaded into
+  `ensure-instance-in!` (`attach-instance-in!` 4th-positional `opts` arity;
+  `start-instance-in!` `(:runtime-handle opts)`).
+
+Acceptance criteria — all met:
+- six in-scope files `with-redefs`-free ✓
+- new seams thin, component-owned, justified by real infra boundaries ✓
+- `runtime_test`/`eval_test` state-based and green ✓
+- focused component tests green ✓
+- two SEPARATE per-seam strategy notes (`:nrepl-connector`, `:process-launcher`)
+  present in this file ✓
+- component-boundary behaviour preserved (real callers in `ops.clj` use original
+  arities; `started_test` failure-case seeds only `:process-launcher`, correctly,
+  since failure precedes the internal connect) ✓
+
+Quality (testing-without-mocks standard): tests are sociable/state-based,
+assert on returned values + runtime-handle state, shared `test-support`
+consolidates the seeded `:runtime-handle` shape, no shims/adapters introduced.
+
+No new actionable findings. The three prior-pass follow-ups are genuinely
+landed (verified, not just recorded). Review complete.

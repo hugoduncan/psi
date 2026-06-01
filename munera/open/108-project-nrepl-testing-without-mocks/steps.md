@@ -116,3 +116,11 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
 ## Implementation review follow-ups (2026-06-01, third pass)
 
 - [x] Remove the interaction-style `@calls*` assertions from the canonical `eval_test.clj` so the reference pattern matches `¬assert(interactions(test))` (the same standard the 2nd-pass follow-up applied to `client_test.clj`): drop `(is (= "eval" (:op (first @calls*))))` (line 30) and `(is (= "interrupt" (:op (first @calls*))))` + `(is (= "eval-123" (:interrupt-id (first @calls*))))` (lines 84–85). The behaviour is already proven by state/result assertions in the same tests — eval `:op` by the `:success`/`:value "3"` result; interrupt `:op`/`:interrupt-id` by `(:interrupted-op-id result)` and `(:last-interrupt instance)`. Keep the `swap! conj` capture only where a returned value still needs the message; otherwise drop the `calls*` atom too. Keep tests green + lint clean. — DONE: dropped all three interaction assertions; the `calls*` atom + its `(swap! calls* conj msg)` capture were dead once the assertions went (the `client-session` fn's return uses only `(:id msg)`, an input→output mapping needing no capture), so removed `calls*` from both `eval-instance-in-test` (success block) and `interrupt-instance-in-test` (active-op block). The canonical reference pattern now carries zero interaction-style assertions, consistent with the standard this task enforced across the six in-scope files. Behaviour still proven by state/result: eval `:op` by `:success`/`:value "3"`; interrupt `:op`/`:interrupt-id` by `(:interrupted-op-id result)` + `(:last-interrupt instance)`. Verified: focused project-nrepl suite (8 ns) → 25 tests, 150 assertions, 0 failures (down 3 from 153, the three removed assertions); `clj-kondo --lint …/eval_test.clj` → 0 errors, 0 warnings.
+
+## Implementation review follow-ups (2026-06-01, fourth pass)
+
+- (none) Fourth independent review pass found no new actionable issues. Verified
+  empirically: 25 tests / 150 assertions / 0 failures; lint 0/0; zero
+  `with-redefs`, zero interaction-capture atoms, zero inline session-fn metadata
+  copies; three production seams match design exactly; all acceptance criteria
+  met. Review complete — no follow-up steps added.
