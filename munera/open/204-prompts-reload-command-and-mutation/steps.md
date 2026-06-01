@@ -89,3 +89,21 @@ Vertical slices from plan.md. Tick each item with its sha / decision note.
 - [ ] Run full `bb test`; confirm green.
 - [ ] Re-read changed files (sync) and confirm coherence across
       handler/core/mutation/command/docs/changelog.
+
+## Plan/steps ambiguity follow-ups (2026-06-01)
+
+- [ ] P1: Pin the correct per-file worktree-helper alias (only
+      `psi.session-state.state` defines `session-worktree-path-in`). Use
+      `session/session-worktree-path-in` in `session_mutations.clj`
+      (`session` = `psi.session-state.state`; `ss` there =
+      `psi.session-state.init`, which lacks it) and
+      `ss/session-worktree-path-in` in `session_settings.clj` / `commands.clj`.
+      Remove the ambiguous "`ss`/`session`" slash-alternative from slice 1 and
+      the plan "Surfaces touched" note.
+- [ ] P2: In slice 1, name the single worktree binding so the opts
+      `:project-prompts-dir` and the `:return :worktree` value derive from one
+      computed path (replace the bare `<path>` placeholder); avoid recomputing
+      `session-worktree-path-in` twice in the handler.
+- [ ] P3: Resolve the slice-3 mutation entry-point either/or to
+      `reload-prompts-in!` only (the plan's single shared entry point); drop
+      the `dispatch!` alternative from the step wording.

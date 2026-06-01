@@ -201,3 +201,45 @@ handlers — so the design's effect-scoped claim holds and is correctly qualifie
 Result: **no new actionable internal inconsistency**. Prior architecture-fit and
 ambiguity reviews already resolved the substantive issues; design.md is internally
 coherent and consistent with the referenced artifacts.
+
+## Plan/steps ambiguity review (2026-06-01)
+
+Reviewed plan.md + steps.md (not design — already A1–A6/arch/inconsistency
+reviewed) for build-time ambiguities. Cross-checked alias mappings and
+`dispatch!` return semantics against the live tree.
+
+New actionable ambiguities:
+
+- 🌀 P1 — Worktree-helper alias is conflated across files. `session-worktree-path-in`
+  lives **only** in `psi.session-state.state`. Per-file aliases differ:
+  `session_mutations.clj` → `session` = `psi.session-state.state` (has it),
+  `ss` = `psi.session-state.init` (does **not** have it);
+  `session_settings.clj` → `ss` = `psi.session-state.state`,
+  `session` = `psi.session-state.model`; `commands.clj` → `ss` =
+  `psi.session-state.state`. Steps slice-1 says "confirm the worktree helper
+  `ss`/`session/session-worktree-path-in` is already in scope" and plan's
+  "Surfaces touched" says "session-settings/`ss` worktree helper" — the
+  `ss`/`session` slash-alternative is wrong for `session_mutations.clj` (the
+  `ss` variant won't resolve there). Pin the correct per-file alias:
+  `session/session-worktree-path-in` in `session_mutations.clj`,
+  `ss/session-worktree-path-in` in `session_settings.clj`/`commands.clj`.
+
+- 🌀 P2 — Slice-1 `:return ... :worktree <path>` uses a bare `<path>`
+  placeholder. Two candidate forms exist (recompute
+  `(session/session-worktree-path-in ctx session-id)` vs reuse a `let`-bound
+  worktree value used for the opts `:project-prompts-dir`). Name the single
+  binding so opts and the `:worktree` return value derive from the same
+  computed path (avoids double IO / divergence).
+
+- 🌀 P3 — Slice-3 mutation entry point left as an either/or. Steps say the
+  mutation body "calls the core path (`reload-prompts-in!` **or** `dispatch!`)",
+  contradicting the plan/design's single-shared-entry-point decision
+  (`reload-prompts-in!` "so the command and mutation share one entry point").
+  Resolve to `reload-prompts-in!` only; drop the `dispatch!` alternative.
+
+Verified NOT ambiguous (no step added): the slice-2 "confirm `dispatch!`
+surfaces the handler `:return`" risk is sound — `state-kernel/dispatch`
+`apply-pure-result` sets `:result (:return pure-result)` and `dispatch!`
+returns `(:result result-ictx)`, so `reload-prompts-in!`'s
+`(dispatch/dispatch! ...)` yields the `{:reloaded? :count :worktree}` map
+directly (no `:return-effect-result?` needed). Mechanism confirmed in code.
