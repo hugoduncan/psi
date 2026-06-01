@@ -7,6 +7,34 @@ single **Live execution path** section holds the three live-execution slices
 Status legend: `verified-correct` | `defect`. For defects: reproduction notes +
 raised remediation task ref (`NNN-slug` or `not-yet-raised`).
 
+## Outcome (2026-06-01)
+
+**All 7 Scope areas verified-correct — no defects found.** No remediation task
+created. Scheduler suite grew from baseline **35 tests / 338 assertions** to
+**45 tests / 410 assertions**, all green. No scheduler source or
+`doc/scheduler.md` modified (coherence gate passes: only `scheduler_*` /
+`psi_tool_scheduler_test.clj` test files + this task dir changed).
+
+New verification tests added (10):
+- `scheduler-test`: `create-schedule-rejects-duplicate-id`,
+  `fire-schedule-rejects-non-pending-status`,
+  `cancel-schedule-rejects-terminal-status`,
+  `fail-schedule-records-failure-detail-and-dequeues`,
+  `drain-one-orders-by-fire-at-not-queue-insertion-order`
+- `scheduler-end-to-end-test`:
+  `scheduler-message-kind-fires-via-timer-seam-and-delivers-to-origin`,
+  `scheduler-session-kind-fires-via-timer-seam-and-creates-top-level-session`
+- `scheduler-timer-seam-test`:
+  `scheduler-cancel-before-stale-timer-callback-does-not-resurrect`
+- `scheduler-context-shutdown-test`:
+  `shutdown-context-prevents-captured-timer-callback-from-firing`
+- `scheduler-resolvers-test`:
+  `scheduler-resolver-projects-rich-attrs-across-statuses`
+
+Extended (in place): `psi-tool-scheduler-create-list-cancel` (`:at` matrix),
+`scheduler-session-deliver-records-failed-status-on-prompt-submit-error`
+(error-summary + created-session-id).
+
 ---
 
 ## Baseline

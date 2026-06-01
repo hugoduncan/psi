@@ -407,3 +407,23 @@ psi-tool summary projection (`:psi-tool/scheduler :schedule`/`:schedules`) is
 exercised by Slice 5's create/list/cancel tests. `scheduler_resolvers_test` +
 `scheduler_background_jobs_test` + `scheduler_cancel_job_test`: 4 tests / 27
 assertions green. clj-kondo clean.
+
+## Slice 9 + 10 — Defect handling + close-out (2026-06-01)
+
+Slice 9 (conditional): **no defects found** in any Scope area — all findings are
+`verified-correct`. No `munera/open/NNN-slug` remediation task created.
+
+Slice 10 close-out:
+- `findings.md` finalised: 7 sections, 30 entries, all `verified-correct`, with an
+  Outcome summary.
+- `clj-kondo --lint`: 0 errors / 0 warnings on all 7 touched test files.
+- `cljfmt check`: all formatted correctly.
+- Full scheduler suite: **45 tests / 410 assertions / 0 fail / 0 error**
+  (baseline 35/338 → +10 tests / +72 assertions).
+- Coherence gate: `git diff --name-only 87140947b~1..HEAD` → only 7 scheduler
+  test files (`scheduler_*` / `psi_tool_scheduler_test.clj`) + 3 task-dir files;
+  **zero** `components/agent-session/src/**` or `doc/scheduler.md` changes. PASSES.
+
+Task verification-only deliverable complete: green end-to-end coverage (incl.
+message-kind + session-kind live timer-seam round trips) plus a structured
+`findings.md` recording every area verified-correct.

@@ -252,7 +252,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Slice 9 — Defect handling (conditional)
 
-- [ ] For each `defect` recorded in `findings.md`: create
+- [x] For each `defect` recorded in `findings.md`: create
       `munera/open/NNN-slug` remediation task with `design.md` and a reproducing
       **failing** test that stays in that new task (do NOT commit it green here).
       Allocate NNN by the munera rule:
@@ -260,19 +260,29 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       directories, never just one). Current max across both is 201 (this task),
       so the next remediation id is **202** (re-scan at creation time in case
       ids were added concurrently).
-- [ ] Reference each remediation task `NNN-slug` from the corresponding
+      Done: **no defects found** in Slices 1–8 — every finding is
+      `verified-correct`. No remediation task created (conditional slice skipped).
+- [x] Reference each remediation task `NNN-slug` from the corresponding
       `findings.md` entry.
-- [ ] If no defect found: confirm no remediation dir is created; all areas read
+      Done: n/a — no defects, no remediation refs.
+- [x] If no defect found: confirm no remediation dir is created; all areas read
       `verified-correct`.
+      Done: confirmed — `git diff --name-only` shows no new `munera/open/NNN-slug`
+      dir; all 7 findings sections read `verified-correct`.
 
 ## Slice 10 — Close-out
 
-- [ ] Finalise `findings.md`: every Scope area has a status + covering-test
+- [x] Finalise `findings.md`: every Scope area has a status + covering-test
       citation (+ repro/task-ref for defects).
-- [ ] `cljfmt` and `clj-kondo --lint` clean on all touched test files.
-- [ ] `bb test` green (new verification tests pass against current behaviour;
+      Done: all 7 sections populated; 30 entries, all `verified-correct`.
+- [x] `cljfmt` and `clj-kondo --lint` clean on all touched test files.
+      Done: `clj-kondo` 0 errors / 0 warnings; `cljfmt check` "All source files
+      formatted correctly" on all 7 touched test files.
+- [x] `bb test` green (new verification tests pass against current behaviour;
       any defect repro lives only in its remediation task).
-- [ ] Coherence check: no scheduler source/doc/behaviour modified; deliverable =
+      Done: full scheduler suite **45 tests / 410 assertions / 0 fail / 0 error**
+      (baseline was 35/338; +10 tests, +72 assertions all green).
+- [x] Coherence check: no scheduler source/doc/behaviour modified; deliverable =
       green coverage + `findings.md`. Prove it with a touched-path allowlist via
       `git diff --stat <base>...HEAD`: the only changed paths permitted are
       (a) test files under
@@ -285,6 +295,10 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       any newly created `munera/open/NNN-slug/` remediation dir from Slice 9.
       Any changed path under `components/agent-session/src/**` or
       `doc/scheduler.md` fails the gate.
+      Done: `git diff --name-only 87140947b~1..HEAD` shows 7 scheduler test files
+      (all matching `scheduler_*` or `psi_tool_scheduler_test.clj`) + 3 task-dir
+      files only. **Zero** `components/agent-session/src/**` or `doc/scheduler.md`
+      changes → gate PASSES.
 
 ## Plan/steps ambiguity follow-ups (2026-06-01)
 
