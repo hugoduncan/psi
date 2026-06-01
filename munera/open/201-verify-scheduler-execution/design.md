@@ -124,4 +124,124 @@ in the new remediation task, not committed green here).
   injectable time source; tests must use a controlled source, never wall-clock.
 - **timer seam** — the live `:scheduler/start-timer` effect supports an
   injectable `:scheduler-run-after-delay-fn`, enabling deterministic
-  firing in tests without real delays.
+  firing in tests without real delays. The full set of injectable
+  timer/cancel seams available on `ctx` is:
+  - `:scheduler-run-after-delay-fn` — `(fn [ctx delay-ms f] handle)`; tests
+    capture `f` and the returned `handle` to fire on demand instead of
+    sleeping. Returned handle is stored in both the internal
+    `scheduler-timer-handles*` atom and any provided `:scheduler-timers*`.
+  - `:scheduler-cancel-delay-fn` — `(fn [ctx handle] …)`; invoked by
+    `:scheduler/cancel-timer` for non-`Thread` handles, giving tests a
+    deterministic cancel observation point (the default path interrupts a
+    `Thread`).
+  - `:scheduler-timers*` — an atom map `schedule-id → handle` mirrored by
+    start/cancel/fire, letting tests assert outstanding-timer membership
+    without reaching into the private `scheduler-timer-handles*` atom.
+  - `:daemon-thread-fn` — `(fn [thunk] …)`; the default
+    `:scheduler-run-after-delay-fn` uses it to spawn the sleeping daemon;
+    tests can substitute a synchronous runner.
+
+## Verification mechanics (resolved 2026-06-01)
+
+These resolve the ambiguities recorded in `implementation.md`. They constrain
+*how* the verification tests drive behaviour; they do not change scheduler
+source.
+
+### Drain-on-idle trigger
+
+There is no idle detector. Queue drain is driven explicitly by the
+`:scheduler/drain-queue` dispatch event (emitted in production by statechart
+actions on session-turn termination / on-abort, and surfaced as the
+`:scheduler/drain-queue` effect which re-dispatches the same event). The
+message-kind busy/queue test therefore: (1) fires while the origin session is
+non-idle (`:is-streaming` or `:is-compacting` true) → schedule moves to
+`:queued`; (2) sets the session idle; (3) dispatches `:scheduler/drain-queue`
+directly → asserts `drain-one` delivers the next queued schedule (oldest by
+`fire-at`, `created-at`, `schedule-id`). The test drives drain via the dispatch
+event, not via wall-clock idle transitions.
+
+### Cancel-racing-the-timer races
+
+Two distinct races, each verified:
+
+1. **Cancel before the timer callback dispatches `:scheduler/fired`.** Using
+   the captured seam, cancel runs (`:scheduler/cancel` → status `:cancelled`,
+   `:scheduler/cancel-timer` removes the handle) *before* the captured callback
+   is invoked. Expected: schedule is `:cancelled`; if the stale callback is
+   then invoked, `fire-schedule` throws `"only pending schedules can fire"`
+   (non-`:pending`), and the live callback swallows `InterruptedException` only
+   — a thrown `ex-info` from a stale fire surfaces. The verification asserts the
+   schedule stays `:cancelled` and that invoking the stale callback does not
+   resurrect it.
+2. **`:scheduler/fired` already dispatched (schedule past `:pending`).** Here
+   the timer has fired and the schedule is `:queued`/`:delivered`/`:failed`
+   before cancel. Expected: `cancel-schedule` succeeds only from
+   `:pending`/`:queued` (it throws `"schedule is not cancellable"` for terminal
+   statuses); the `:queued`→cancel path is the deliverable race and is asserted
+   to move `:queued` → `:cancelled` and remove the id from the queue.
+
+### Context-shutdown surface
+
+The shutdown entry point is `psi.agent-session.context/shutdown-context!`,
+which (a) dispatches `:scheduler/cancel-all` per session and (b) calls
+`psi.agent-session.dispatch-effects/cancel-all-scheduler-timers!` and resets
+`:scheduler-timers*`. The observable assertions are:
+`dispatch-effects/scheduler-timer-handle-count` returns `0` after shutdown, the
+`:scheduler-timers*` atom is empty, and no captured callback fires a
+`:scheduler/fired` after shutdown (handles removed). Tests may assert against
+either `cancel-all-scheduler-timers!` directly or the full
+`shutdown-context!` surface.
+
+### `:at` past / sub-min-delay behaviour
+
+`:at` is *not* min-delay-bounds-validated when it resolves to the present or
+past. `resolve-fire-time!` computes `delay = max(0, between(now, at))` and only
+calls `validate-delay-ms!` when `delay` is strictly positive. Consequences,
+which the psi-tool-surface test asserts:
+- past or now `:at` → `delay = 0`, no min-delay check → schedule is created and
+  fires immediately (delay 0); matches `doc/scheduler.md` "past absolute
+  instants fire immediately".
+- future `:at` resolving below `min-delay-ms` (1–999ms ahead) → `delay` is
+  positive but `< 1000` → `validate-delay-ms!` throws "below the minimum
+  bound". So sub-min-delay future `:at` is rejected exactly like a sub-min
+  `:delay-ms`.
+- `:at` above `max-delay-ms` (>24h ahead) → rejected "exceeds the maximum
+  bound".
+This asymmetry (past allowed, near-future rejected) is current behaviour; if it
+reads as a doc/behaviour drift it is recorded as a finding, not changed.
+
+### "Real effect/dispatch round trip"
+
+Live tests drive the *real dispatch pipeline and real effect executor*
+synchronously — they call `dispatch-in!`/`dispatch!` and let the registered
+effect handlers run, but replace only the *time/delay boundary* via the timer
+seams above so firing is deterministic rather than wall-clock. They do **not**
+substitute the handlers themselves. The handler-purity / runtime-owned-deliver
+frontier means delivery (`:scheduler/deliver`, synthetic-prompt submission,
+top-level session creation) executes through the same runtime-owned effects as
+production; the seam only controls *when* `:scheduler/fired` is dispatched. "No
+wall-clock sleeps" therefore means: no `Thread/sleep`-based waiting in tests —
+the captured callback is invoked directly to advance time.
+
+### Findings-inventory artifact
+
+The findings inventory is a single Markdown file in the task directory:
+`munera/open/201-verify-scheduler-execution/findings.md`. Required structure —
+one section per Scope area (Baseline, Pure model, Live execution path, psi-tool
+surface, Cancellation & lifecycle, Failure path, Projections). Each section
+lists entries with: status (`verified-correct` | `defect`), a one-line summary,
+the covering verification test (ns + deftest), and — for defects —
+reproduction notes plus the raised remediation task reference (`NNN-slug` or
+"not-yet-raised"). `implementation.md` remains the append-only working log;
+`findings.md` is the structured deliverable.
+
+### Remediation-task creation policy
+
+Given the verification-only framing, this task **describes** defects in
+`findings.md` and creates remediation tasks **only when a defect is actually
+found** during execution. When a defect is found, a new `munera/open/NNN-slug`
+dir is created (carrying the reproducing failing test, which stays *in that new
+task*, not committed green here) and referenced from `findings.md`. If no
+defect is found, no remediation dirs are created — the deliverable is the
+green verification coverage plus a `findings.md` recording all areas as
+`verified-correct`.
