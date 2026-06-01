@@ -239,3 +239,26 @@ Seam availability confirmed: `test_support/make-session-ctx` wires
 
 Created `findings.md` with the fixed 7-section skeleton; Baseline recorded
 `verified-correct` with the full inventory.
+
+## Slice 1 execution — Pure model (2026-06-01)
+
+Audited `scheduler_test.clj`. Existing 7 deftests cover transitions, delay
+bounds, kind-required, fire(idle/busy), deliver, cancel(queued), drain-one
+FIFO + busy no-op. Per the sufficient-coverage criterion, four design-named
+behaviours were **insufficiently** covered:
+
+- duplicate `schedule-id` create guard ("schedule-id already exists")
+- `fire-schedule` non-pending guard ("only pending schedules can fire") for
+  delivered/queued source statuses
+- `cancel-schedule` terminal-status guard ("schedule is not cancellable")
+- `drain-one` ordering by `[fire-at created-at schedule-id]` — the existing
+  `drain-one-test` queues in fire-at order, so it can't distinguish
+  sort-by-fire-at from FIFO-by-insertion.
+
+Added 4 green deftests asserting current behaviour. The drain-ordering test
+deliberately fires the **later**-firing schedule first so queue-insertion order
+(`[late early]`) disagrees with fire-at order, then asserts `drain-one` delivers
+the earliest fire-at (`sch-early`) — confirming the sort, not insertion order.
+
+`scheduler_test` now: 11 tests / 44 assertions / 0 fail / 0 error. clj-kondo
+clean. No scheduler source touched.

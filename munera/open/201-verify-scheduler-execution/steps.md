@@ -34,13 +34,22 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Slice 1 — Pure model (`scheduler.clj`)
 
-- [ ] Audit `scheduler_test.clj` against design: state transitions (`:pending`
+- [x] Audit `scheduler_test.clj` against design: state transitions (`:pending`
       → `:queued`/`:delivered`/`:cancelled`/`:failed`), `min/max-delay-ms`
       bounds via `validate-delay-ms`, duplicate/terminal-status guards, queue
       ordering `[fire-at created-at schedule-id]`, `drain-one`.
-- [ ] If any of the above lacks coverage, add a verification test (new deftest)
+      Done: existing tests cover transitions, bounds, kind-required, fire/deliver/
+      cancel/drain-busy. Gaps: duplicate-id guard, fire non-pending guard, cancel
+      terminal guard, and drain-one ordering when insertion order ≠ fire-at order.
+- [x] If any of the above lacks coverage, add a verification test (new deftest)
       asserting current behaviour green.
-- [ ] Record Pure-model finding(s) in `findings.md` citing covering deftests.
+      Done: added 4 deftests — `create-schedule-rejects-duplicate-id`,
+      `fire-schedule-rejects-non-pending-status`,
+      `cancel-schedule-rejects-terminal-status`,
+      `drain-one-orders-by-fire-at-not-queue-insertion-order`. All green
+      (11 tests / 44 assertions in `scheduler_test`).
+- [x] Record Pure-model finding(s) in `findings.md` citing covering deftests.
+      Done: 8 Pure-model entries recorded (all `verified-correct`).
 
 ## Slice 2 — Live execution: message kind
 

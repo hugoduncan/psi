@@ -129,3 +129,123 @@
         (is (false? drained?))
         (is (= :session-busy reason))
         (is (= (:queue state3) (:queue state4)))))))
+
+;; --- 201 verification: pure-model guards + ordering (verified-correct) ---
+
+(deftest create-schedule-rejects-duplicate-id-test
+  (let [{state :state}
+        (scheduler/create-schedule
+         (scheduler/empty-state)
+         {:schedule-id "sch-dup"
+          :kind :message
+          :message "first"
+          :created-at (instant "2026-04-21T18:00:00Z")
+          :fire-at (instant "2026-04-21T18:05:00Z")
+          :session-id "sid-1"})]
+    (testing "a second create with the same id throws and leaves state unchanged"
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"schedule-id already exists"
+           (scheduler/create-schedule
+            state
+            {:schedule-id "sch-dup"
+             :kind :message
+             :message "second"
+             :created-at (instant "2026-04-21T18:01:00Z")
+             :fire-at (instant "2026-04-21T18:06:00Z")
+             :session-id "sid-1"})))
+      (is (= 1 (scheduler/schedule-count state))))))
+
+(deftest fire-schedule-rejects-non-pending-status-test
+  (let [{state0 :state}
+        (scheduler/create-schedule
+         (scheduler/empty-state)
+         {:schedule-id "sch-1"
+          :kind :message
+          :message "wake"
+          :created-at (instant "2026-04-21T18:00:00Z")
+          :fire-at (instant "2026-04-21T18:05:00Z")
+          :session-id "sid-1"})
+        idle  {:is-streaming false :is-compacting false}
+        busy  {:is-streaming true :is-compacting false}]
+    (testing "firing a delivered schedule throws (terminal guard)"
+      (let [delivered (:state (scheduler/deliver-schedule state0 "sch-1"))]
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"only pending schedules can fire"
+             (scheduler/fire-schedule delivered idle "sch-1")))))
+    (testing "firing an already-queued schedule throws (non-pending guard)"
+      (let [queued (:state (scheduler/fire-schedule state0 busy "sch-1"))]
+        (is (= :queued (:status (scheduler/get-schedule queued "sch-1"))))
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"only pending schedules can fire"
+             (scheduler/fire-schedule queued busy "sch-1")))))))
+
+(deftest cancel-schedule-rejects-terminal-status-test
+  (let [{state0 :state}
+        (scheduler/create-schedule
+         (scheduler/empty-state)
+         {:schedule-id "sch-1"
+          :kind :message
+          :message "wake"
+          :created-at (instant "2026-04-21T18:00:00Z")
+          :fire-at (instant "2026-04-21T18:05:00Z")
+          :session-id "sid-1"})
+        delivered (:state (scheduler/deliver-schedule state0 "sch-1"))]
+    (testing "cancelling a delivered (terminal) schedule throws"
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"schedule is not cancellable"
+           (scheduler/cancel-schedule delivered "sch-1"))))
+    (testing "cancelling an already-cancelled schedule throws"
+      (let [cancelled (:state (scheduler/cancel-schedule
+                               (:state (scheduler/create-schedule
+                                        (scheduler/empty-state)
+                                        {:schedule-id "sch-2"
+                                         :kind :message
+                                         :message "wake"
+                                         :created-at (instant "2026-04-21T18:00:00Z")
+                                         :fire-at (instant "2026-04-21T18:05:00Z")
+                                         :session-id "sid-1"}))
+                               "sch-2"))]
+        (is (= :cancelled (:status (scheduler/get-schedule cancelled "sch-2"))))
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"schedule is not cancellable"
+             (scheduler/cancel-schedule cancelled "sch-2")))))))
+
+(deftest drain-one-orders-by-fire-at-not-queue-insertion-order-test
+  ;; Queue the later-firing schedule FIRST so queue-insertion order and
+  ;; fire-at order disagree; drain-one must still pick the earliest fire-at,
+  ;; demonstrating it sorts by [fire-at created-at schedule-id], not FIFO.
+  (let [busy {:is-streaming true :is-compacting false}
+        idle {:is-streaming false :is-compacting false}
+        {s0 :state} (scheduler/create-schedule
+                     (scheduler/empty-state)
+                     {:schedule-id "sch-late"
+                      :kind :message
+                      :message "late"
+                      :created-at (instant "2026-04-21T18:00:00Z")
+                      :fire-at (instant "2026-04-21T18:10:00Z")
+                      :session-id "sid-1"})
+        {s1 :state} (scheduler/create-schedule
+                     s0
+                     {:schedule-id "sch-early"
+                      :kind :message
+                      :message "early"
+                      :created-at (instant "2026-04-21T18:00:01Z")
+                      :fire-at (instant "2026-04-21T18:05:00Z")
+                      :session-id "sid-1"})
+        ;; fire the late one first, then the early one → queue = [late early]
+        s2 (:state (scheduler/fire-schedule s1 busy "sch-late"))
+        s3 (:state (scheduler/fire-schedule s2 busy "sch-early"))]
+    (is (= ["sch-late" "sch-early"] (:queue s3))
+        "queue insertion order is late-then-early")
+    (testing "drain-one delivers the earliest fire-at (sch-early) despite later insertion"
+      (let [{drained? :drained? schedule :schedule state4 :state}
+            (scheduler/drain-one s3 idle)]
+        (is (true? drained?))
+        (is (= "sch-early" (:schedule-id schedule)))
+        (is (= ["sch-late"] (:queue state4)))
+        (is (= :delivered (:status (scheduler/get-schedule state4 "sch-early"))))))))

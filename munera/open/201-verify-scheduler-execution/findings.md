@@ -40,6 +40,14 @@ Baseline `bb test` (scheduler subset, 2026-06-01): `35 tests, 338 assertions, 0 
 
 | status | summary | covering test | repro / task-ref |
 | ------ | ------- | ------------- | ---------------- |
+| verified-correct | State transitions `:pending`→`:queued`/`:delivered`/`:cancelled` and create/list/count. | `scheduler-test/create-and-list-schedule`, `fire-schedule`, `deliver-and-cancel` | — |
+| verified-correct | Explicit `:kind` required on create ("kind is invalid"). | `scheduler-test/create-schedule-requires-explicit-kind` | — |
+| verified-correct | `validate-delay-ms!` bounds: inclusive min/max accepted, <1000 "minimum", >24h "maximum". | `scheduler-test/validate-delay-ms` | — |
+| verified-correct | Duplicate-id guard: second create with same id throws "schedule-id already exists", state unchanged. | `scheduler-test/create-schedule-rejects-duplicate-id` (new) | — |
+| verified-correct | `fire-schedule` non-pending guard: firing a delivered or already-queued schedule throws "only pending schedules can fire". | `scheduler-test/fire-schedule-rejects-non-pending-status` (new) | — |
+| verified-correct | `cancel-schedule` terminal guard: cancelling a delivered or already-cancelled schedule throws "schedule is not cancellable". | `scheduler-test/cancel-schedule-rejects-terminal-status` (new) | — |
+| verified-correct | `drain-one` ordering: with queue-insertion order ≠ fire-at order, drains the earliest `fire-at` (sorts by `[fire-at created-at schedule-id]`, not FIFO-by-insertion). | `scheduler-test/drain-one-orders-by-fire-at-not-queue-insertion-order` (new) | — |
+| verified-correct | `drain-one` is a no-op (`:session-busy`) while session non-idle. | `scheduler-test/drain-one` | — |
 
 ---
 
