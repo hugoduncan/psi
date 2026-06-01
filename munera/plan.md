@@ -7,6 +7,7 @@ open-task reconciliation audit (completed-task closure, NNN-collision renumber).
 
 Not yet started:
 
+- `munera/open/198-task-lifecycle-chained-workflow/` — new orchestration workflow chaining review-task-design → create-task-plan → review-task-plan → implement-task → review-task-implementation. Design-only; open questions on stage gating and context threading.
 - `munera/open/197-ui-action-invocation/` — renumbered from 191 (NNN collision); side-effecting UI action invocation deferred from closed 190/194 UI work.
 - `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 - `munera/open/108-project-nrepl-testing-without-mocks/`

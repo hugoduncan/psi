@@ -6,6 +6,9 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 
 ## [Unreleased]
 
+### Added
+- New `task-lifecycle` workflow: runs a Munera task through its full design → plan → implement → review lifecycle by chaining `review-task-design`, `create-task-plan`, `review-task-plan`, `implement-task`, and `review-task-implementation` in order. Invokable via `/delegate task-lifecycle`.
+
 ## [0.1.2166] - 2026-06-01
 
 ### Added

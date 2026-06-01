@@ -430,3 +430,37 @@
               (is (contains? definitions "review-task-plan"))
               (is (contains? definitions "review-task-implementation"))
               (is (contains? definitions "review-implementation-in-worktree"))))))))))
+
+;;; ---------------------------------------------------------------------------
+;;; task-lifecycle
+
+(deftest task-lifecycle-test
+  (load-edn-only
+   "task-lifecycle.edn"
+   (fn [{:keys [definitions errors]}]
+     (testing "loads without error"
+       (is (empty? errors))
+       (is (contains? definitions "task-lifecycle")))
+     (let [steps (get-in definitions ["task-lifecycle" :steps])
+           expected-targets ["review-task-design"
+                             "create-task-plan"
+                             "review-task-plan"
+                             "implement-task"
+                             "review-task-implementation"]]
+       (testing "has 5 delegate steps with correct names, types, and targets"
+         (is (= 5 (count steps)))
+         (is (= expected-targets (mapv :name steps)))
+         (is (= [:delegate :delegate :delegate :delegate :delegate]
+                (mapv :type steps)))
+         (is (= expected-targets (mapv :target steps))))
+       (testing "every step threads the task id via the :map :prompt-string"
+         (is (= (repeat 5 {:type :map
+                           :fields {:input {:from :workflow-input
+                                            :path [:input]}}})
+                (mapv :prompt-string steps))))
+       (testing "every step carries only :workflow-original context (no prior-step yield)"
+         (is (= (repeat 5 [{:type :source :from :workflow-original}])
+                (mapv :context steps))))
+       (testing "no step declares :yields or :terminal-contract (terminal relies on propagated session default yield)"
+         (is (= (repeat 5 {})
+                (mapv #(select-keys % [:yields :terminal-contract]) steps))))))))
