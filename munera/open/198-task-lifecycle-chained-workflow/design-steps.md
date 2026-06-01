@@ -46,16 +46,16 @@
 
 ## Ambiguity review follow-ups (pass 2)
 
-- [ ] Specify the five delegate step `:name` values. Acceptance criteria says the
+- [x] Specify the five delegate step `:name` values. Acceptance criteria says the
       verification test asserts "the five step names/types/targets in order", but
       design fixes no step names. State the five `:name`s so the test target is
       concrete and the test can assert them.
-- [ ] Specify the required top-level workflow keys. Every target `.edn` carries
+- [x] Specify the required top-level workflow keys. Every target `.edn` carries
       top-level `:name` and `:description`; registry presence and the test's
       "definition `task-lifecycle` is present" assertion are keyed off
       `:name "task-lifecycle"`. State that `task-lifecycle.edn` must include the
       top-level `:name "task-lifecycle"` and a `:description`.
-- [ ] State whether each delegate step declares `:context`. Exemplars
+- [x] State whether each delegate step declares `:context`. Exemplars
       (`gh-issue-implement.edn`, `review-task-implementation.edn`) carry
       `:context [{:type :source :from :workflow-original}]`; grammar makes
       `:context` optional (omitted ≡ empty vector). Given the "input-only context

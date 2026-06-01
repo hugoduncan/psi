@@ -137,3 +137,30 @@ resolved. New actionable ambiguities found:
    each step declares `:context` at all (and whether `:workflow-original` is
    carried). Per-step shape is ambiguous beyond `:name`/`:type`/`:target`/
    `:prompt-string`.
+
+## 2026-06-01 — ambiguity follow-up execution pass 2 (ψ)
+
+Executed all three pass-2 ambiguity-review follow-up items; design.md updated
+(new "Concrete step and file shape" subsection + Acceptance criteria).
+
+1. Step `:name` values — RESOLVED. Each delegate step's `:name` equals its
+   `:target` (convention from `review-task-implementation.edn`, whose first
+   step name mirrors its purpose). Stated as a 5-row table mapping order →
+   `:name` → `:target`: `review-task-design`, `create-task-plan`,
+   `review-task-plan`, `implement-task`, `review-task-implementation`. The
+   verification test asserts these five `:name`/`:type :delegate`/`:target`
+   triples in order.
+2. Top-level keys — RESOLVED. design.md (Concrete step shape + Acceptance
+   criteria) now requires top-level `:name "task-lifecycle"` and a
+   `:description`. Verified all five target `.edn` files carry top-level
+   `:name` + `:description`; registry presence and the test's definition-presence
+   assertion key off the top-level `:name`.
+3. Per-step `:context` — RESOLVED. Each delegate step carries
+   `:context [{:type :source :from :workflow-original}]` and nothing else.
+   Verified against exemplars: `gh-issue-implement.edn` and the first step of
+   `review-task-implementation.edn` carry `:workflow-original`; grammar makes
+   `:context` optional. Consistent with input-only threading — `:workflow-original`
+   supplies the original request, NOT prior-stage summaries; no step references a
+   prior step's yield (contrast later `review-task-implementation.edn` steps which
+   deliberately chain yields). Task id travels via the `:map` `:prompt-string`
+   `:input` field only.

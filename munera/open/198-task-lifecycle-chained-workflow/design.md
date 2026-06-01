@@ -85,6 +85,43 @@ This uses only the existing `:delegate` grammar; the `:map` `:prompt-string`
 form is part of the converged grammar (cf. `gh-issue-implement.edn`,
 `review-task-implementation.edn`) and is not a new step shape.
 
+### Concrete step and file shape
+
+Top-level workflow keys (every target `.edn` carries these; registry presence and
+the verification test's "definition `\"task-lifecycle\"` is present" assertion are
+keyed off the top-level `:name`):
+
+- `:name "task-lifecycle"` — required.
+- `:description` — required, e.g. "Run a Munera task through its full
+  design → plan → implement → review lifecycle by chaining the five
+  task-lifecycle workflows in order."
+
+The five delegate steps, in order, with their `:name` and `:target`. Each step's
+`:name` mirrors its `:target` (the convention used by
+`review-task-implementation.edn`, whose first step is named for its purpose):
+
+| order | `:name`                       | `:target`                     |
+| ----- | ----------------------------- | ----------------------------- |
+| 1     | `"review-task-design"`        | `"review-task-design"`        |
+| 2     | `"create-task-plan"`          | `"create-task-plan"`          |
+| 3     | `"review-task-plan"`          | `"review-task-plan"`          |
+| 4     | `"implement-task"`            | `"implement-task"`            |
+| 5     | `"review-task-implementation"`| `"review-task-implementation"`|
+
+These are the five `:name`/`:type :delegate`/`:target` triples the verification
+test asserts in order.
+
+Per-step `:context`: each delegate step carries
+`:context [{:type :source :from :workflow-original}]` and nothing else. This
+matches the exemplar delegate steps (`gh-issue-implement.edn`,
+`review-task-implementation.edn` first step), and is consistent with the
+input-only context-threading decision: `:workflow-original` carries the original
+request only — it does **not** thread prior-stage summaries forward. No step
+references a prior step's yield in its `:context` (contrast the later steps of
+`review-task-implementation.edn`, which deliberately chain prior-step yields; the
+task-lifecycle orchestrator does not). The task identifier travels solely via the
+`:map` `:prompt-string` `:input` field, not via `:context`.
+
 Out of scope:
 
 - Any change to the five existing target workflows.
@@ -144,10 +181,15 @@ but is out of scope for the first cut.
 ## Acceptance criteria
 
 - A `task-lifecycle` workflow exists under `.psi/workflows/` and appears in the
-  workflow definition registry after reload.
-- It contains exactly five sequential delegate steps targeting, in order,
-  `review-task-design`, `create-task-plan`, `review-task-plan`,
-  `implement-task`, `review-task-implementation`.
+  workflow definition registry after reload. The file declares top-level
+  `:name "task-lifecycle"` and a `:description` (registry presence and the
+  verification test's definition-presence assertion are keyed off the top-level
+  `:name`).
+- It contains exactly five sequential delegate steps whose `:name` equals its
+  `:target`, targeting, in order, `review-task-design`, `create-task-plan`,
+  `review-task-plan`, `implement-task`, `review-task-implementation`.
+- Each delegate step carries `:context [{:type :source :from :workflow-original}]`
+  and no prior-step yield context (input-only threading).
 - Each step passes the Munera task identifier as the delegated workflow's input
   via `:prompt-string {:type :map :fields {:input {:from :workflow-input :path
   [:input]}}}`.
