@@ -405,3 +405,38 @@ change — no behaviour or coverage change.
 Verification: `clj-paren-repair` (balanced + formatted), `clj-kondo` clean
 (0 errors, 0 warnings), Kaocha focus `psi.agent-session.extensions-test`
 **30 tests, 98 assertions, 0 failures** (coverage unchanged, 30/98 as expected).
+
+## Test review: test-shaper (third pass, 2026-06-01)
+
+Re-applied test-shaper to the `dispatch-tool-result-*` cluster
+(extensions_test.clj:383–461) after S1/S2 (override cluster) and S3 (coercion
+cluster) landed. Verified at runtime: 30 tests, 98 assertions, 0 failures
+(Kaocha focus `psi.agent-session.extensions-test`).
+
+- **simple** ✓ override tests are one visible `(is (= … (result-override …)))` /
+  `nil?` line; coercion tests state only their varying input axis and asserted
+  field via `capture-payload`. Minimal incidental setup; arrange/act/assert clear.
+- **consistent** ✓ Fixture/abstraction consistency restored across the whole
+  cluster: override-selection tests use `result-override`; payload-capture
+  coercion tests use the sibling `capture-payload`. Consistent naming
+  (`dispatch-tool-result-*-test`), structure, assertion style.
+- **economical** ✓ Both ceremony axes (override-selection, payload-capture)
+  compressed into two helpers; per-disjunct override deftests deliberately
+  retained for branch failure signal (not collapsed into an `are`-table).
+  No redundant tests, no incidental variation. The per-test code comments add
+  per-disjunct contract rationale (which `or` branch / why) beyond the `testing`
+  string's *what* — justified documentation, not duplication.
+- **robust** ✓ Deterministic (no time/io/randomness/concurrency); behaviour-
+  focused (asserts return values / captured payload, not interactions); real
+  `create-registry`, plain in-test handler fns, no mocks; meaningful per-branch
+  failure signal.
+
+`tool-event-payload-constructors-test` (the payload *constructor*, A2 out of
+scope) is a distinct concern and is itself clean/economical — not folded into
+the dispatch helpers (different surface).
+
+No new actionable shape issues within this task's scope. The three prior
+test-shaper passes (S1/S2, S3) drove the cluster to a clean shaped state;
+this pass confirms convergence.
+
+PASS_STATUS: REVIEW_COMPLETE
