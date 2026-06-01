@@ -303,3 +303,25 @@ delivered outputs, (2) drive the real drain via the `:scheduler/drain-queue`
 dispatch event (the design's stated drain trigger — drain is dispatch-driven,
 not timer-driven, so no timer seam is required here), and (3) assert state/
 outputs not interactions. Both cited tests verified green. No new test added.
+
+## Slice 4 execution — Live execution: session kind (2026-06-01)
+
+Audit: `scheduler-session-kind-fires-without-origin-idle` and
+`scheduler-session-deliver-creates-top-level-session-without-switching` invoke
+the handler directly, assert `:scheduler/deliver` emission + stored kind/config,
+but stop **before** running `:scheduler/deliver` — so they never create the
+session nor assert `:created-session-id`/`:delivery-phase :prompt-submit`, and
+never cross the timer seam. Insufficient for the live round trip.
+
+Added `scheduler-session-kind-fires-via-timer-seam-and-creates-top-level-session`
+on the full `create-context` (real effect executor). Origin deliberately set
+`:is-streaming true` (session-kind must deliver regardless of origin idle).
+Capture the timer callback via `:scheduler-run-after-delay-fn`; snapshot the
+pre-fire session set; invoke the callback (no sleep). Asserts: schedule
+`:delivered`, `:delivery-phase :prompt-submit`, `:created-session-id` present and
+**not** in the pre-fire set (fresh), present in the post-fire set, distinct from
+origin; created session carries `:scheduled-origin-session-id` /
+`:scheduled-from-schedule-id` / `:scheduled-from-label`; origin still present
+(not switched away). `with-redefs` stubs `execute-prepared-request!` (no live
+model) as the lifecycle test does. Green: `scheduler_end_to_end_test` now
+3 tests / 20 assertions.

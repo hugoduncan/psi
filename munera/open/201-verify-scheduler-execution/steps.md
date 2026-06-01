@@ -108,16 +108,30 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Slice 4 — Live execution: session kind
 
-- [ ] Audit session-kind coverage in `scheduler_handlers_test.clj`
+- [x] Audit session-kind coverage in `scheduler_handlers_test.clj`
       (`scheduler-session-kind-fires-without-origin-idle-test`,
       `scheduler-session-deliver-creates-top-level-session-without-switching-test`).
-- [ ] Ensure a real-round-trip test: session-kind fires (delivers regardless of
+      Done: existing tests assert fired emits `:scheduler/deliver` with
+      `:delivery-phase :create-session` and the stored schedule kind/config, but
+      stop **before** delivery — they never run `:scheduler/deliver` to create the
+      session, nor assert `:created-session-id`/`:delivery-phase :prompt-submit`,
+      and never cross the timer seam → insufficient for the live round trip.
+- [x] Ensure a real-round-trip test: session-kind fires (delivers regardless of
       origin idle) → fresh **top-level session** created in origin worktree/
       context → prompt submitted into it → `created-session-id` and
       `delivery-phase` recorded. Add if missing.
-- [ ] Record session-kind finding as an entry in the **same single shared "Live
+      Done: added
+      `scheduler-session-kind-fires-via-timer-seam-and-creates-top-level-session`.
+      Origin set busy (`:is-streaming true`) to prove session-kind delivers
+      regardless; capture+invoke the timer callback (no sleep); assert a fresh
+      top-level session appears (not in the pre-fire session set), schedule
+      `:delivered` with `:created-session-id` + `:delivery-phase :prompt-submit`,
+      provenance fields on the created session, and origin still present.
+- [x] Record session-kind finding as an entry in the **same single shared "Live
       execution path"** `findings.md` section (the three live-execution slices
       2/3/4 all write into this one section), citing covering deftest.
+      Done: session-kind entry recorded as `verified-correct` in the shared
+      Live execution path section.
 
 ## Slice 5 — psi-tool surface
 

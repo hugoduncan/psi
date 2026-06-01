@@ -3,6 +3,7 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
    [psi.session-state.state :as ss]
+   [psi.turn-runtime.core]
    [psi.agent-session.test-support :as test-support]))
 
 (defn- create-session-context
@@ -92,3 +93,71 @@
                                    :data :scheduler :schedules "sch-msg" :status])))
         (is (= [] (get-in @(:state* ctx*)
                           [:agent-session :sessions session-id :data :scheduler :queue])))))))
+
+;; --- 201 verification: session-kind live round trip via the timer seam ---
+;; session-kind always delivers (origin idle state irrelevant): the captured
+;; timer callback fires -> :scheduler/deliver creates a FRESH TOP-LEVEL session
+;; in the origin worktree/context and submits the scheduled prompt into it.
+;; Asserts the new session exists with scheduler provenance, the schedule records
+;; :created-session-id + :delivery-phase :prompt-submit, and the origin session
+;; is NOT switched away from.
+
+(deftest scheduler-session-kind-fires-via-timer-seam-and-creates-top-level-session-test
+  (testing "create session-kind -> captured timer callback fires -> fresh top-level session created + prompt submitted; created-session-id/delivery-phase recorded"
+    (let [now              (java.time.Instant/parse "2026-04-21T18:00:00Z")
+          [ctx session-id] (create-session-context
+                            {:persist? false
+                             :scheduler-time-source (test-support/fixed-scheduler-time-source now)})
+          callback*        (atom nil)
+          ctx*             (assoc ctx
+                                  :scheduler-run-after-delay-fn
+                                  (fn [_ctx _delay-ms f]
+                                    (reset! callback* f)
+                                    {:handle :captured}))]
+      (with-redefs [psi.turn-runtime.core/execute-prepared-request!
+                    (fn [_ai-ctx _ctx sid prepared _pq]
+                      {:execution-result/turn-id (:prepared-request/id prepared)
+                       :execution-result/session-id sid
+                       :execution-result/assistant-message {:role "assistant"
+                                                            :content [{:type :text :text "scheduled ack"}]
+                                                            :stop-reason :stop
+                                                            :timestamp (java.time.Instant/now)}
+                       :execution-result/turn-outcome :turn.outcome/stop
+                       :execution-result/tool-calls []
+                       :execution-result/stop-reason :stop})]
+        ;; origin session busy on purpose: session-kind must deliver regardless.
+        (swap! (:state* ctx*)
+               (ss/session-update session-id (fn [sd] (assoc sd :is-streaming true))))
+        (session/dispatch-in! ctx* :scheduler/create
+                              {:session-id session-id
+                               :schedule-id "sch-sess"
+                               :kind :session
+                               :label "morning-review"
+                               :message "review overnight changes"
+                               :session-config {:session-name "Morning review"}
+                               :created-at now
+                               :fire-at (.plusMillis now 5000)}
+                              {:origin :core})
+        (is (some? @callback*) "timer callback captured via the seam")
+        (let [sessions-before (set (map :session-id (ss/list-context-sessions-in ctx*)))]
+          ;; fire the timer (no Thread/sleep)
+          (@callback*)
+          (let [schedule    (get-in (ss/get-session-data-in ctx* session-id)
+                                    [:scheduler :schedules "sch-sess"])
+                created-id  (:created-session-id schedule)
+                created-sd  (when created-id (ss/get-session-data-in ctx* created-id))
+                sessions-after (set (map :session-id (ss/list-context-sessions-in ctx*)))]
+            (is (= :delivered (:status schedule)))
+            (is (= :prompt-submit (:delivery-phase schedule)))
+            (is (some? created-id) "schedule records the created-session-id")
+            (is (not (contains? sessions-before created-id))
+                "created session is fresh (not the origin)")
+            (is (contains? sessions-after created-id)
+                "created top-level session is present in the context")
+            (is (not= session-id created-id) "created session is a new top-level session")
+            ;; scheduler provenance recorded on the created session
+            (is (= session-id (:scheduled-origin-session-id created-sd)))
+            (is (= "sch-sess" (:scheduled-from-schedule-id created-sd)))
+            (is (= "morning-review" (:scheduled-from-label created-sd)))
+            ;; origin not switched away from: origin still exists, schedule done
+            (is (contains? sessions-after session-id))))))))
