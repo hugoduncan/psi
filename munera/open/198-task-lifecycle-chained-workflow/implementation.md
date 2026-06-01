@@ -953,3 +953,30 @@ scope) were left in place under `[0.1.2166]`, untouched. Verified the resulting
 `[Unreleased]` section holds exactly the `### Added` + `task-lifecycle` line and
 `[0.1.2166]` no longer contains it. CHANGELOG footer/version links untouched
 (owned by `bb release:tag`). steps.md item marked done.
+
+## 2026-06-01 — docs review pass 4 (review-task-docs, ψ)
+
+Re-applied `review-task-docs` independently after the pass-3 CHANGELOG move.
+No new actionable feedback; all prior docs follow-ups verified landed:
+
+- CHANGELOG: `task-lifecycle` Added entry now correctly under `[Unreleased]`
+  (commit `0dee7f1ee`); description text matches `task-lifecycle.edn`
+  `:description` verbatim; the five chained workflow names match the file's five
+  `:target`s exactly; `/delegate task-lifecycle` matches top-level `:name`;
+  format/precedent matches sibling `review-task-design` / `create-task-plan`
+  entries.
+- `doc/workflow-grammar-concepts.md`: the `:map` `:prompt-string` form is now
+  documented (§ Delegation boundary line ~148, § "Workflow input and original
+  request" lines ~203-205); the documented `{:type :map :fields {<key>
+  <source-spec>}}` shape and `{:from :workflow-input :path [<key>]}` resolution
+  match the shipped file and runtime (`render-delegate-prompt-string`). Accurate
+  and complete.
+- `doc/workflows.md`: confirmed example-led authoring guide ("the primary
+  example-led guide"), not an exhaustive workflow enumeration; no
+  `task-lifecycle` listing required — design acceptance criterion holds.
+- `README.md`: no task-lifecycle reference needed (not the workflow-listing
+  surface); no removed behaviours to clean up.
+
+Accuracy / completeness / consistency all hold. No new `steps.md` items added.
+
+PASS_STATUS: REVIEW_COMPLETE
