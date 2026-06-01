@@ -140,3 +140,28 @@ scheduler source/doc edits. Tests use time/timer seams, never wall-clock sleeps.
       any defect repro lives only in its remediation task).
 - [ ] Coherence check: no scheduler source/doc/behaviour modified; deliverable =
       green coverage + `findings.md`.
+
+## Plan/steps ambiguity follow-ups (2026-06-01)
+
+- [ ] Define an operational "sufficient coverage" criterion for the
+      audit→cite-vs-add decision (used by Slices 2/3/4/6/7/8 and plan step 4 /
+      "Reuse before adding"): state, per area, what an existing test must
+      assert (the area's named state/outputs), whether it must drive via the
+      time/timer seam, and what counts as "insufficient" → triggers a new test.
+- [ ] Correct the audit-location pointers in steps.md to the real files:
+      busy/drain-fifo + cancel-pending-and-queued → `scheduler_lifecycle_test.clj`;
+      drain-queue-delivers-oldest + cancel-marks-pending-or-queued →
+      `scheduler_dispatch_test.clj`; session-kind-fires / creates-top-level /
+      records-failed → `scheduler_handlers_test.clj`. Add the missing file refs
+      to Slice 4 and Slice 7.
+- [ ] Slice 5 `:at` past/now: decide and state whether the test must assert the
+      schedule *fires* (drive the delay-0 timer via the seam) or only that it is
+      *created/accepted* without min-delay rejection; update the Slice 5 item to
+      the chosen contract.
+- [ ] Slice 9: replace "alloc next NNN" with the explicit munera rule —
+      `NNN = max(NNN over munera/open ∪ munera/closed) + 1` — and note the
+      current next id (202) to avoid a colliding remediation-task id.
+- [ ] Slice 10: specify the mechanism that proves "no scheduler source/doc/
+      behaviour modified" — e.g. a touched-path allowlist (new test files +
+      `findings.md` only) checked via `git diff --stat`, or equivalent — so the
+      coherence gate is falsifiable.

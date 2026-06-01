@@ -92,3 +92,51 @@ on-abort") is non-exhaustive — `:on-compact-done` also emits
 `:scheduler/drain-queue` — but tests drive drain via the dispatch event
 directly, so the omission does not affect the design's verification approach.
 No new design-steps items added.
+
+## Plan/steps review — ambiguities (2026-06-01)
+
+Reviewed plan.md + steps.md (design ambiguities already resolved earlier; this
+pass targets the execution plan/checklist). Grounded against the actual
+`scheduler_*_test.clj` files and the munera task-id rule. Found 5 actionable
+ambiguities; added unchecked follow-ups to steps.md:
+
+1. No operational "sufficient coverage" criterion. Plan step 4 / "Reuse before
+   adding" gate adding a new test on coverage being "missing or insufficient" /
+   "not already demonstrably covered", and Slices 2/3/4/6/7/8 say "Ensure a
+   test exists … Add if missing" — but neither defines what makes existing
+   coverage *sufficient* for an acceptance area (must assert state/outputs the
+   area names? must drive via the seam? must be a single test?). Without a rule,
+   the add-vs-cite decision (and thus duplicate-test risk) is per-judgement.
+
+2. steps.md audit-location pointers are partly wrong. Slice 2 audits
+   `scheduler_end_to_end_test.clj`/`scheduler_lifecycle_test.clj`; Slice 3/4
+   name deftests but not files. Verified actual locations:
+   `busy-session-fire-queues-then-idle-drains-fifo-test` and
+   `cancel-pending-and-queued-schedules-test` → `scheduler_lifecycle_test.clj`;
+   `scheduler-drain-queue-delivers-oldest-queued-schedule-test` +
+   `scheduler-cancel-marks-pending-or-queued-schedule-cancelled-test` →
+   `scheduler_dispatch_test.clj`; the three session-kind / failure deftests
+   (`scheduler-session-kind-fires-without-origin-idle-test`,
+   `…-creates-top-level-session-without-switching-test`,
+   `…-records-failed-status-on-prompt-submit-error-test`) →
+   `scheduler_handlers_test.clj` (Slice 4/7 cite no file). The mismatched
+   pointers will send the executor to the wrong file during audit.
+
+3. Slice 5 `:at` past/now: "created + fires immediately (delay 0)". Ambiguous
+   whether the psi-tool-surface test must *assert the schedule actually fires*
+   (drive the delay-0 timer via the seam) or only assert it is *created /
+   accepted* (no min-delay rejection). The two readings produce materially
+   different tests.
+
+4. Slice 9 "alloc next NNN" is unqualified. Munera rule is
+   `max(open ∪ closed) + 1`; current max across both is 201 (this task) →
+   next = 202. But "next NNN" alone admits scanning only `open/` or only
+   `closed/`, and plan.md's own reconciliation log documents prior NNN
+   collisions — so the allocation scope must be stated explicitly to avoid a
+   colliding remediation-task id.
+
+5. Slice 10 "no scheduler source/doc/behaviour modified" coherence check has no
+   stated verification mechanism. Ambiguous how the executor *proves* it — e.g.
+   `git diff --stat` restricted to non-`src`/non-`doc/scheduler.md` paths, an
+   explicit touched-path allowlist (new test files + `findings.md` only), or
+   manual inspection. Without a mechanism the close-out gate is unfalsifiable.
