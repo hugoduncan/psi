@@ -77,3 +77,25 @@ No new actionable inconsistency. Minor (non-actionable) note: the design cites
 `app_runtime.clj:222` with a bare filename; the file lives in the `app-runtime`
 component, not `agent-session` — but the cited site exists and supports the
 structured-`e` claim, so it does not mislead an implementer.
+
+## Implementation pass (2026-06-01)
+
+Executed Slice 1 (the sole vertical slice). No deviations from the plan:
+
+- `deps.edn`: added `com.taoensso/timbre {:mvn/version "6.8.0"}` to `:deps`.
+- `extension.clj`: added `[taoensso.timbre :as timbre]` require; replaced the
+  `catch` branch `println` with
+  `(timbre/warn e "skipping token tracking for session" session-id)`.
+
+Verification (all green):
+
+- Standalone `src` classpath resolves `timbre-6.8.0.jar`.
+- `:test` alias classpath resolves `timbre-6.8.0.jar` — same version, no conflict.
+- `clojure -e "(require 'psi.metrics.extension)"` loads standalone without error.
+- `clj-kondo --lint ...extension.clj` clean (0 errors, 0 warnings).
+- `catch` branch re-read: no `println`/`"DEBUG"` prefix remains, handler outer
+  `nil` return preserved, token-tracking success path untouched.
+
+No spec/test artifacts added — behavioural contract unchanged (exception
+swallowed, `nil` returned). No CHANGELOG/doc entry (internal `¬user_visible`
+idiom alignment). Implementation complete pending review/closure.

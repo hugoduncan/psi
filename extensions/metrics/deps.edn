@@ -1,6 +1,7 @@
 {:paths ["src"]
  :deps {org.clojure/clojure {:mvn/version "1.12.0"}
-        metosin/malli       {:mvn/version "0.16.4"}}
+        metosin/malli       {:mvn/version "0.16.4"}
+        com.taoensso/timbre {:mvn/version "6.8.0"}}
  :aliases
  {:test {:extra-paths ["test"]
          :extra-deps {lambdaisland/kaocha         {:mvn/version "1.91.1392"}

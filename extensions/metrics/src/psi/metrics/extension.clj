@@ -11,7 +11,8 @@
    [clojure.string :as str]
    [psi.metrics.counters :as counters]
    [psi.metrics.persistence :as persist]
-   [psi.metrics.schema :as schema]))
+   [psi.metrics.schema :as schema]
+   [taoensso.timbre :as timbre]))
 
 ;;; State
 
@@ -96,8 +97,7 @@
           (swap! store assoc-in [:session-usage-cache session-id] cur-usage)
           (update-metrics! counters/add-token-delta model-id delta))
         (catch Exception e
-          (println (str "DEBUG [psi/metrics] skipping token tracking for session "
-                        session-id ": " (ex-message e))))))
+          (timbre/warn e "skipping token tracking for session" session-id))))
     nil))
 
 (defn- on-provider-request-started
