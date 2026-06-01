@@ -960,3 +960,41 @@ runs, not notes. Verified the committed state at `c68081bc1` (working tree clean
 
 All prior review follow-ups (steps.md) are ticked and independently confirmed.
 No new actionable items.
+
+## 2026-06-01 — test review (independent, task-test-review skill, verification pass)
+
+Re-applied the skill (`well_formed ∧ (∀b∈behaviour(design). ∃t. covers(t,b)) ∧
+(∀d∈infra_deps. injectable ∧ nullable ∧ ¬mock ∧ ¬stub)`) against source + live runs,
+not notes. Verified committed state `e7795fabe`, working tree clean.
+
+- **well_formed — ✓.** The four bridge/e2e deftests in `tool_execution_test.clj`
+  (`emit-tool-lifecycle-bridge-fires-extension-handlers-test`,
+  `tool-call-handler-block-ignored-on-interactive-path-test`,
+  `metrics-extension-accumulates-tools-via-bridge-test`,
+  `metrics-extension-accumulates-errors-via-bridge-test`) are single-concern, AAA,
+  deterministic (defonce store/writing? atoms reset in `try/finally`; infra redefs
+  canned), with meaningful per-`is` messages. e2e ceremony deduplicated via
+  `run-tool-call-through-metrics-ext!`.
+- **coverage — ✓ (all 4 ACs executing).** AC1 (`:tools` invocations) — e2e
+  `metrics-extension-accumulates-tools-via-bridge-test` (full adapter→bridge→handler→store)
+  + `emit-tool-lifecycle-bridge-fires-extension-handlers-test`. AC2 (`:is-error true` →
+  `:errors`) — `metrics-extension-accumulates-errors-via-bridge-test` drives `run-tool-call!`
+  with `execute-tool-runtime-in!` returning `:is-error true`, asserts `:invocations 1`,
+  `:errors 1`, and a propagated error reason (split-coverage gap closed). AC3 (interactive
+  blocking non-enforcement) — `tool-call-handler-block-ignored-on-interactive-path-test`.
+  AC4 (clj-kondo clean) — verified.
+- **infra_deps — ✓.** `with-redefs` only on infra/side-effect deps
+  (`tool-plan/execute-tool-runtime-in!`, `agent/emit-tool-start-in!`,
+  `agent/emit-tool-end-in!`, `agent/record-tool-result-in!`) with canned nullable returns.
+  No interaction-asserting mocks/stubs. Assertions target state/outputs (`@calls`,
+  `@result-atom`, `@metrics-ext/store`), never interactions. The metrics `store`/`writing?`
+  are production `defonce` atoms (the extension's real shape), exercised live and reset for
+  isolation — not test-introduced mocks.
+
+**Verification.** `clojure -M:test --focus psi.agent-session.tool-execution-test` →
+**13 tests, 68 assertions, 0 failures**; `--focus psi.metrics.extension-test` →
+**20 tests, 44 assertions, 0 failures**. Metrics test dir wired into `:extensions`/
+`:integration` suites (`c68081bc1`) so the authored guards run in CI.
+
+**No new actionable test issues under the skill criteria.** All prior findings closed and
+confirmed executing; not re-raised (no duplication).
