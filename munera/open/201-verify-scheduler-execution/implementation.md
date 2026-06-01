@@ -164,3 +164,36 @@ no blockers. No scheduler source/doc/test code touched (plan/steps/impl only).
 5. Slice 10 coherence proof → specified git diff --stat touched-path allowlist
    (scheduler_* test files + task dir + any Slice-9 remediation dir); any src/**
    or doc/scheduler.md change fails the gate.
+
+## Plan/steps review — inconsistencies (2026-06-01)
+
+Reviewed plan.md + steps.md for internal consistency, against design.md Scope
+areas and the actual `scheduler_*`/`psi_tool_scheduler_test.clj` files. Verified
+consistent: all 7 cited deftest→file pointers (grep-confirmed), `findings.md`
+section list identical in design.md and steps.md, slice statuses, NNN rule.
+Found 2 actionable inconsistencies; added unchecked follow-ups to steps.md.
+
+1. Slice↔Scope-area↔findings-section mapping contradicts plan.md's own claim.
+   plan.md "Slice order" asserts "Slices map to design Scope areas", but
+   design.md defines 7 Scope areas with a *single* "Live execution path" area
+   (#3, covering message-kind + busy/drain + session-kind), and the
+   `findings.md` skeleton (design.md + steps.md Slice 0) has one
+   "Live execution path" section. plan.md/steps.md instead split that area into
+   THREE slices (2 message-kind, 3 busy/drain, 4 session-kind), and each of
+   steps Slices 2/3/4 says "Record …-live-path finding" without stating they
+   all write into the one shared "Live execution path" findings section. So the
+   3-slices→1-area→1-section relationship is left implicit/contradictory: the
+   "Slices map to design Scope areas" claim is false as written (3:1), and an
+   executor could create three separate findings sections, diverging from the
+   fixed 7-section skeleton.
+
+2. Slice 10 coherence-gate allowlist excludes a file Slices 0/5 use. Slice 10's
+   touched-path allowlist permits changed test files only under
+   `components/agent-session/test/psi/agent_session/scheduler_*`, but Slice 0
+   inventories and Slice 5 audits/"Add tests for any uncovered case" against
+   `psi_tool_scheduler_test.clj`, which does NOT match the `scheduler_*` glob
+   (it is `psi_tool_scheduler_test.clj`). If Slice 5 adds psi-tool-surface
+   coverage there, the Slice 10 gate fails a legitimately-changed test file —
+   an internal contradiction between the work the plan authorises and the gate
+   that validates it. (`scheduler_tools_test.clj`, the other Slice 5 file, does
+   match.)

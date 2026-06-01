@@ -206,3 +206,23 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       Done: Slice 10 close-out item now specifies a `git diff --stat` touched-path
       allowlist (scheduler test files + task dir + any Slice-9 remediation dir),
       failing on any `src/**` or `doc/scheduler.md` change.
+
+## Plan/steps inconsistency follow-ups (2026-06-01)
+
+- [ ] Reconcile the slice↔Scope-area↔findings-section mapping. plan.md "Slice
+      order" claims "Slices map to design Scope areas", but design.md's single
+      "Live execution path" Scope area (and the one `findings.md` "Live execution
+      path" section in the Slice 0 skeleton) is split across Slices 2/3/4
+      (message / busy-drain / session). Either (a) correct the plan claim to a
+      stated 3-slices→1-area mapping and make steps Slices 2/3/4 explicitly
+      record into the single shared "Live execution path" findings section, or
+      (b) split the design Scope area / findings skeleton to match the three
+      slices — pick one and align plan.md + steps.md (+ design.md/findings
+      skeleton if option b) so the mapping is 1:1 and the 7-section skeleton is
+      not silently violated.
+- [ ] Fix the Slice 10 coherence-gate allowlist to include
+      `psi_tool_scheduler_test.clj`. Slice 0 inventories and Slice 5 audits/may
+      add tests to `psi_tool_scheduler_test.clj`, which the current
+      `scheduler_*` allowlist glob excludes; broaden the Slice 10 allowed-path
+      pattern (e.g. `psi_tool_scheduler_test.clj` ∪ `scheduler_*`) so a
+      legitimately-changed psi-tool-surface test file does not fail the gate.
