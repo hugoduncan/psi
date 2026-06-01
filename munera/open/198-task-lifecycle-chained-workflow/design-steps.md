@@ -2,23 +2,23 @@
 
 ## Ambiguity review follow-ups
 
-- [ ] Specify the exact `:prompt-string` form for each delegate step. Confirm that
+- [x] Specify the exact `:prompt-string` form for each delegate step. Confirm that
       input threading requires the `:map` form `{:type :map :fields {:input {:from
       :workflow-input :path [:input]}}}` (per `gh-issue-implement.edn`) so the
       delegated sub-workflow's `:workflow-input` resolves `:path [:input]`. Reconcile
       with the "Constraints" wording that names only `:invoke|:session|:delegate`.
-- [ ] Correct the Scope claim that "all five target workflows consume
+- [x] Correct the Scope claim that "all five target workflows consume
       `{:from :workflow-input :path [:input]}`". `create-task-plan.edn` has no such
       ref; its `{{input}}` resolves inside `create-task-plan-create-plan.md`. State
       per-stage how the task identifier reaches each target.
-- [ ] Define how the orchestrator "surfaces the outcome of the final stage":
+- [x] Define how the orchestrator "surfaces the outcome of the final stage":
       whether there is a final synthesizing step (cf. other workflows'
       `final-summary`) or the last delegate's yield is surfaced directly, and what
       `:yields` the terminal step declares.
-- [ ] Make the acceptance verification surface concrete: name the actual
+- [x] Make the acceptance verification surface concrete: name the actual
       parser/compiler/definition entry point (ns / test / REPL call) instead of
       "narrowest relevant ... surface".
-- [ ] Resolve the doc/CHANGELOG obligation: `doc/workflows.md` exists but is
+- [x] Resolve the doc/CHANGELOG obligation: `doc/workflows.md` exists but is
       example-led (not an exhaustive enumeration), and project-local-workflow
       user-visibility is undecided. State definitively whether this task must update
       `doc/workflows.md` and/or CHANGELOG.
