@@ -44,3 +44,25 @@ Executed A1–A3. All resolved in design.md (no blockers).
   (currently only exercised through the wrapper) → add a direct
   `dispatch-tool-result-in` non-map test. Acceptance Criteria updated to make
   removal + single-migration explicit.
+
+## Design review: inconsistency pass (2026-06-01)
+
+Reviewed design.md against `extensions.clj` and `extensions_test.clj` (and
+`tool_runtime_adapter.clj`). Found 3 actionable inconsistencies → added to
+design-steps.md. None duplicate the prior ambiguity pass.
+
+- I1 (substantive): A2's justification misdescribes `tool_runtime_adapter.clj`.
+  Design says the adapter "reads those keys *off the constructed event* … i.e.
+  it consumes the payload." Code reads `:content`/`:details`/`:is-error` from the
+  *incoming* `lifecycle-event` and passes them *into* `tool-result-event` as
+  constructor args (`extensions.clj:37–42` adapter call). The adapter sources the
+  constructor inputs; it does not consume `tool-result-event`'s output. The
+  factual basis for the A2 exclusion is inverted.
+- I2 (citation): `tool-result-event` cited as `extensions.clj:311–313` (Context,
+  A2, Out of Scope) but the `defn` spans **299–313**; 311–313 are only its
+  trailing `:content`/`:details`/`:is-error` map entries — mislabels the function.
+- I3 (citation): A3 cites the two coercion tests as `extensions_test.clj:453–490`;
+  actual span is **445–473** (`dispatch-tool-result-normalizes-content-test` @445,
+  `dispatch-tool-result-coerces-is-error-test` @459). Line 453 is mid-first-test;
+  490 falls inside the unrelated `tool-event-payload-constructors-test` (@475).
+  (design-steps.md A3 separately cites `453–471` — also inaccurate.)
