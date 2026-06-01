@@ -164,3 +164,20 @@ contract whose *selection* behaviour has no test. Add a positive-selection test
 covered.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Test review follow-up execution (2026-06-01)
+
+Executed T1a and T1b from the task-test-review pass. Both close the coverage gap
+on the surviving `dispatch-tool-result-in` filter predicate's `contains?` branch
+— the single source of the modifiable-key contract.
+
+- T1a → `dispatch-tool-result-modifiable-key-override-test`: handler returns
+  `{:content "override"}`; asserts `dispatch-tool-result-in` returns that map
+  (positive selection of the modifiable-key branch). Placed after
+  `dispatch-tool-result-non-map-return-test`.
+- T1b → `dispatch-tool-result-map-without-modifiable-key-test`: handler returns
+  `{:other 1}` (no `:content`/`:details`/`:is-error`); asserts return is `nil`
+  (the `contains?` guard rejects map returns lacking all modifiable keys).
+- Verify: clj-paren-repair (no changes), clj-kondo clean (0/0); Kaocha focus
+  `psi.agent-session.extensions-test` → 28 tests, 96 assertions, 0 failures
+  (was 26/94 before; +2 tests, +2 assertions). No deviations.

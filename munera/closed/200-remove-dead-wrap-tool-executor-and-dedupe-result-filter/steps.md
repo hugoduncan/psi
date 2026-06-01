@@ -42,13 +42,15 @@
 
 ## Test review follow-ups (task-test-review, 2026-06-01)
 
-- [ ] T1a: Add a positive-selection test for `dispatch-tool-result-in`: register
+- [x] T1a: Add a positive-selection test for `dispatch-tool-result-in`: register
   a `tool_result` handler returning a map containing a modifiable key (e.g.
   `{:content "override"}`), assert `dispatch-tool-result-in` returns that map
   (the override is selected). Covers the surviving filter predicate's
   `(or (contains? :content) (contains? :details) (contains? :is-error))` branch
   — currently untested, yet it is the single-sourced modifiable-key contract.
-- [ ] T1b: Add a negative test: register a handler returning a map containing
+  Added `dispatch-tool-result-modifiable-key-override-test`.
+- [x] T1b: Add a negative test: register a handler returning a map containing
   *none* of `:content`/`:details`/`:is-error` (e.g. `{:other 1}`), assert
   `dispatch-tool-result-in` returns `nil` (the `contains?` guard rejects it).
   Completes coverage of the predicate's modifiable-key branch.
+  Added `dispatch-tool-result-map-without-modifiable-key-test`.

@@ -422,6 +422,32 @@
                                              {:content "original" :is-error false}
                                              false))))))
 
+(deftest dispatch-tool-result-modifiable-key-override-test
+  (testing "tool_result handler returning a map with a modifiable key is selected as the override"
+    (let [reg (ext/create-registry)
+          _   (ext/register-extension-in! reg "/ext/a")
+          _   (ext/register-handler-in! reg "/ext/a" "tool_result"
+                                        (fn [_] {:content "override"}))]
+      ;; The surviving filter predicate's contains? guard selects map returns
+      ;; carrying a modifiable key (:content/:details/:is-error) — the single
+      ;; source of the modifiable-key contract.
+      (is (= {:content "override"}
+             (ext/dispatch-tool-result-in reg "read" "call-1" {"path" "x"}
+                                          {:content "original" :is-error false}
+                                          false))))))
+
+(deftest dispatch-tool-result-map-without-modifiable-key-test
+  (testing "tool_result handler returning a map lacking all modifiable keys yields no override (nil)"
+    (let [reg (ext/create-registry)
+          _   (ext/register-extension-in! reg "/ext/a")
+          _   (ext/register-handler-in! reg "/ext/a" "tool_result"
+                                        (fn [_] {:other 1}))]
+      ;; The filter predicate's contains? guard rejects map returns without any
+      ;; of :content/:details/:is-error, so no modifiable-key override is produced.
+      (is (nil? (ext/dispatch-tool-result-in reg "read" "call-1" {"path" "x"}
+                                             {:content "original" :is-error false}
+                                             false))))))
+
 (deftest tool-event-payload-constructors-test
   (testing "tool-call-event builds the canonical tool_call payload shape"
     (is (= {:type         "tool_call"
