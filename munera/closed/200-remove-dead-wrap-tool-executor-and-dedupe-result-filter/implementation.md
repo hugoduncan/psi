@@ -440,3 +440,39 @@ test-shaper passes (S1/S2, S3) drove the cluster to a clean shaped state;
 this pass confirms convergence.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Docs review: review-task-docs (2026-06-01)
+
+Applied review-task-docs (README ∧ doc/ ∧ CHANGELOG; accuracy ∧ completeness ∧
+consistency) to task 200's removal of `wrap-tool-executor` and single-sourcing of
+the tool-result modifiable-key filter. Verified doc claims against
+`extensions.clj` at runtime, not just text.
+
+- **CHANGELOG** ✓ Correctly absent. The change is internal (dead-code removal +
+  test reshaping); no command/flag/behaviour/extension-capability change.
+  `¬user_visible → ∅` per the changelog rule — no entry required.
+- **"Tool Wrapping" section** (`doc/extensions.md:550`) ✓ Accurate, no change
+  needed. It documents the *public* event-subscription API
+  (`(:on api) "tool_result"` returning `:content`/`:details`/`:is-error` to
+  modify), which survives via `dispatch-tool-result-in`. The section name
+  coincides with the removed internal `wrap-tool-executor` function, but the
+  documented *behaviour* (the surviving filter predicate's modifiable-key
+  contract) is unchanged and correct. The `#tool-wrapping` anchors (530/531) are
+  intact.
+- **Implementation table role label** (`doc/extensions.md:898`) ✗ One stale
+  terminology item (actionable, D1 below).
+
+D1 (actionable — stale internal terminology in user-facing doc): the
+"Implementation" namespace table at `doc/extensions.md:898` lists the Role of
+`psi.agent-session.extensions` as "Registry, loading, event dispatch, **tool
+wrapping**". The "tool wrapping" responsibility named the now-removed
+`wrap-tool-executor` mechanism (zero production callers, deleted in slice 1). The
+namespace no longer wraps tool execution; it dispatches/filters `tool_result`
+events through `dispatch-tool-result-in`. The label is now stale — it points the
+reader at a mechanism that no longer exists. Update the Role to reflect the
+surviving responsibility (e.g. "Registry, loading, event dispatch, tool-result
+filtering" or drop the "tool wrapping" clause), keeping the user-facing "Tool
+Wrapping" event-API section (550) — which documents the surviving public
+capability — unchanged.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

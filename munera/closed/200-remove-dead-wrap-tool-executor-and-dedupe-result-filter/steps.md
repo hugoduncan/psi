@@ -113,3 +113,17 @@
   `result-override`; coercion tests should use the sibling helper rather than
   hand-rolling). Run clj-kondo + Kaocha focus; coverage must be unchanged
   (pure shape change, 30/98 expected).
+
+## Docs review follow-ups (review-task-docs, 2026-06-01)
+
+- [ ] D1: Fix stale internal terminology in the user-facing
+  `doc/extensions.md:898` "Implementation" namespace table — the
+  `psi.agent-session.extensions` Role still reads "Registry, loading, event
+  dispatch, **tool wrapping**", but the `wrap-tool-executor` tool-wrapping
+  mechanism it named was removed in slice 1 (zero production callers). The
+  namespace now dispatches/filters `tool_result` events via
+  `dispatch-tool-result-in`. Update the Role label (e.g. "…event dispatch,
+  tool-result filtering" or drop the "tool wrapping" clause). Leave the public
+  "Tool Wrapping" event-API section (`doc/extensions.md:550`) and its
+  `#tool-wrapping` anchors unchanged — that section documents the surviving
+  event-subscription capability, not the removed internal function.
