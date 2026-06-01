@@ -29,32 +29,94 @@ Resolving these reduces duplication and removes a dead maintenance surface.
 - The modifiable-key set is `#{:content :details :is-error}`, expressed both in
   the filter predicate and in `wrap-tool-executor`'s `cond->`.
 
-## Scope (to be decided during planning)
+## Scope (decided)
 
-Candidate directions — the plan must choose and justify one:
+**Direction 1 — remove `wrap-tool-executor` entirely.**
 
-1. **Remove `wrap-tool-executor` entirely** (it is dead), and delete or migrate
-   its test coverage. Then simplify `dispatch-tool-result-in`'s predicate if the
-   duplication driver (the mirrored `cond->`) is gone.
-2. **Keep `wrap-tool-executor`** but single-source the modifiable-key contract
-   (a shared predicate / key-set / helper) consumed by both the
-   `dispatch-tool-result-in` filter and the `wrap-tool-executor` `cond->`.
+### Scope-decision criterion (A1, resolved)
 
-Decision input: confirm at planning time whether `wrap-tool-executor` is an
-intentional public compatibility surface (a test asserts it "remains an
-extension-local compatibility wrapper") or genuinely removable. If it is a
-documented public surface, prefer direction 2; if it is internal dead code,
-prefer direction 1.
+The direction is selected deterministically by a single rule:
+
+> A function is *internal dead code* (→ remove) iff it has **zero production
+> callers** AND it is **not a documented public-API surface**. A test that
+> merely asserts pass-through behaviour does not constitute a documented public
+> surface, regardless of the test's name.
+
+Applying the rule to `wrap-tool-executor`:
+
+- Production callers: **zero** (only its own `defn` plus test references —
+  confirmed by grep over `components/**.clj` excluding `*_test.clj`).
+- Public-surface evidence: the test named "wrap-tool-executor remains an
+  extension-local compatibility wrapper" (`extensions_test.clj:393`) asserts
+  only that the wrapper passes tool-name/args through to `execute-fn`; it
+  records no intentional public contract. The test *name* is not evidence.
+
+Both conditions for "internal dead code" hold ⇒ **direction 1 (remove)**. There
+is no documented public compatibility surface to preserve, so direction 2 is
+not applicable.
+
+### `tool-result-event` is intentionally excluded (A2, resolved)
+
+The "expressed once" contract is the **set of result keys an extension may
+modify** (`:content` / `:details` / `:is-error`). It is currently expressed in
+two places:
+
+1. the `dispatch-tool-result-in` filter predicate
+   (`#(and (map? %) (or (contains? % :content) …))`), and
+2. the `wrap-tool-executor` post-result `cond->`.
+
+`tool-result-event` (`extensions.clj:311–313`) is a **different concern**: it is
+the canonical *bus-event payload constructor* — the single source of the
+cross-path payload *shape*, building the `tool_result` event consumed by the
+plan path and the `emit-tool-lifecycle!` bridge. Its key enumeration constructs
+a payload; it does not declare which keys are extension-*modifiable*.
+`tool_runtime_adapter.clj` reads those keys *off the constructed event*
+(`(:content lifecycle-event)` etc.), i.e. it consumes the payload, not the
+modifiable-key contract. `tool-result-event` is therefore **intentionally
+excluded** from the single-sourcing; this task does not refactor it.
+
+Once `wrap-tool-executor` is removed, the `cond->` (place 2) disappears, leaving
+the modifiable-key contract expressed exactly once — in the
+`dispatch-tool-result-in` filter predicate. No shared helper/key-set is required
+to satisfy the "expressed once" acceptance criterion; removal alone achieves it.
+
+### Coverage that must remain after removal (A3, resolved)
+
+`wrap-tool-executor` is removed, so its test (`tool-wrapping-test`,
+`extensions_test.clj:386–441`) is removed. Before removal, audit which
+behaviours that test *uniquely* covers, and ensure each is independently
+covered afterward:
+
+- **`:content` / `:is-error` / `:details` coercion and normalization on the
+  plan path** — already independently covered by
+  `dispatch-tool-result-normalizes-content-test` and
+  `dispatch-tool-result-coerces-is-error-test` (`extensions_test.clj:453–490`),
+  which exercise `dispatch-tool-result-in` directly. **No migration needed.**
+- **tool_call blocking** — `wrap-tool-executor`'s blocking sub-test exercises
+  `dispatch-tool-call-in`'s `:block` return *through the wrapper*. The wrapper's
+  blocked-result shaping (`{:content reason :is-error true}`) is wrapper-only
+  glue and dies with the wrapper; `dispatch-tool-call-in` `:block` detection is
+  covered by the plan-path / `dispatch-in` tests. **No migration needed.**
+- **non-map filter return-shape** — the "tool_result handler returning non-map
+  is silently ignored" sub-test is the *only* assertion exercising the
+  `dispatch-tool-result-in` filter predicate's map?/contains? guard at the
+  `dispatch-tool-result-in` return boundary. This is **the one behaviour to
+  migrate**: add a direct `dispatch-tool-result-in` test asserting a non-map
+  handler return yields `nil` (no override), so the surviving predicate keeps
+  test coverage.
 
 ## Acceptance Criteria
 
-- The "which tool-result keys are extension-modifiable" contract
-  (`:content` / `:details` / `:is-error`) is expressed once, not duplicated
-  across `dispatch-tool-result-in` and `wrap-tool-executor`.
-- If `wrap-tool-executor` is removed, its tests are removed/migrated and no
-  production caller breaks (there are none today).
-- If `wrap-tool-executor` is retained, the duplication is eliminated via a shared
-  helper/key-set and its compatibility-wrapper tests still pass.
+- `wrap-tool-executor` is removed; the modifiable-key contract
+  (`:content` / `:details` / `:is-error`) is then expressed exactly once, in the
+  `dispatch-tool-result-in` filter predicate. `tool-result-event` is unchanged
+  (intentionally excluded — it constructs the payload, it does not declare the
+  modifiable-key contract).
+- `tool-wrapping-test` is removed; its uniquely-covered behaviour
+  (non-map handler return ⇒ no override from `dispatch-tool-result-in`) is
+  migrated to a direct `dispatch-tool-result-in` test. Coercion/normalization
+  and `:block` detection need no migration (already independently covered).
+- No production caller breaks (there are none today).
 - `clj-kondo` clean on changed files.
 - Existing extension tests pass (no regression on plan-path tool blocking /
   result override behaviour).
@@ -66,3 +128,7 @@ prefer direction 1.
 - Any change to the interactive/batch `emit-tool-lifecycle!` bridge added by
   task 198 (that path is correct and deliberately does not route through
   `wrap-tool-executor`).
+- Any change to `tool-result-event` (`extensions.clj:311–313`) or its consumer
+  `tool_runtime_adapter.clj`. It constructs/consumes the canonical bus-event
+  payload shape, a separate concern from the modifiable-key contract being
+  single-sourced here (see A2 resolution above).
