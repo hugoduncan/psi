@@ -11,7 +11,7 @@ raised remediation task ref (`NNN-slug` or `not-yet-raised`).
 
 **All 7 Scope areas verified-correct — no defects found.** No remediation task
 created. Scheduler suite grew from baseline **35 tests / 338 assertions** to
-**45 tests / 410 assertions**, all green. No scheduler source or
+**45 tests / 412 assertions**, all green. No scheduler source or
 `doc/scheduler.md` modified (coherence gate passes: only `scheduler_*` /
 `psi_tool_scheduler_test.clj` test files + this task dir changed).
 

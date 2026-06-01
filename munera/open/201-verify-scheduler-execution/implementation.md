@@ -418,8 +418,9 @@ Slice 10 close-out:
   Outcome summary.
 - `clj-kondo --lint`: 0 errors / 0 warnings on all 7 touched test files.
 - `cljfmt check`: all formatted correctly.
-- Full scheduler suite: **45 tests / 410 assertions / 0 fail / 0 error**
-  (baseline 35/338 → +10 tests / +72 assertions).
+- Full scheduler suite: **45 tests / 412 assertions / 0 fail / 0 error**
+  (baseline 35/338 → +10 tests / +74 assertions). (Count updated 410 → 412 in
+  review pass 4 after the pass-2 `:at` named-bound follow-up added two assertions.)
 - Coherence gate: `git diff --name-only 87140947b~1..HEAD` → only 7 scheduler
   test files (`scheduler_*` / `psi_tool_scheduler_test.clj`) + 3 task-dir files;
   **zero** `components/agent-session/src/**` or `doc/scheduler.md` changes. PASSES.
@@ -451,7 +452,8 @@ abstraction / structural-perf). Verified directly, not just from the log:
   immediately, matching `doc/scheduler.md:99` "past absolute instants fire
   immediately". Recording it `verified-correct` (not a doc/behaviour-drift
   defect) is correct.
-- **Suite re-run green here:** 45 tests / 410 assertions / 0 fail / 0 error;
+- **Suite re-run green here:** 45 tests / 410 assertions / 0 fail / 0 error
+  (pass-1 time; later raised to 412 by the pass-2 `:at` named-bound follow-up);
   clj-kondo 0/0 on all 7 touched files.
 
 ### Flag — reusable test-support pattern (test-quality, non-blocking)
@@ -504,13 +506,15 @@ no `doc/scheduler.md`):
 - clj-kondo 0 errors / 0 warnings on all 5 touched files.
 - cljfmt: "All source files formatted correctly".
 - Four touched scheduler test namespaces: 9 tests / 148 assertions / 0 fail.
-- Full scheduler suite: **45 tests / 410 assertions / 0 failures** — identical
-  to the cited baseline → no behaviour change, pure test-quality DRY.
+- Full scheduler suite: **45 tests / 410 assertions / 0 failures** at pass-1
+  time — identical to the cited baseline → no behaviour change, pure
+  test-quality DRY. (Later raised to 412 by the pass-2 `:at` named-bound
+  follow-up.)
 
 ## Implementation review pass 2 (2026-06-01)
 
 Fresh review pass via task-implementation-review skill. Re-verified against
-runtime (suite re-run here: 45 tests / 410 assertions / 0 fail / 0 error;
+runtime (suite re-run here: 45 tests / 412 assertions / 0 fail / 0 error;
 clj-kondo 0/0 on all 8 touched test files incl. `test_support.clj`). Spot-read
 the new test source, not just the log:
 
@@ -689,3 +693,30 @@ as a follow-up step.
 
 No other new actionable issues. The verification-only deliverable is otherwise
 accurate, coherent, and green against current behaviour.
+
+## Implementation review follow-ups executed — pass 4 (2026-06-01)
+
+Executed the pass-4 doc-accuracy follow-up: corrected the stale **410 → 412**
+assertion count across the deliverable.
+
+- **Runtime truth confirmed (`runtime ≡ truth`).** Focused `clojure -M:test`
+  across the 13 scheduler namespaces reports **45 tests / 412 assertions**
+  (= 338 baseline + 74; pass-2 took psi-tool 107 → 109). Full `bb test` is green
+  for scheduler.
+- **Counts corrected to 412:**
+  - `findings.md` Outcome ("45 tests / 410 assertions" → 412).
+  - `steps.md` Slice-10 close-out (`+72` → `+74` delta) with a 410→412 note.
+  - `implementation.md` Slice-10 close-out (`+72`/`+74`) + pass-2 review re-run
+    note (genuinely stale: pass-2 *added* the +2, so its own re-run already read
+    412).
+- **Pass-1 review notes left intact** (410 was accurate at pass-1 time, before
+  pass-2's increment) with forward-pointer parentheticals to 412 so no stale
+  figure misleads. The pass-4 flag note + the step's own 410→412 description are
+  preserved as documentation of the fix.
+- **Scope held:** doc-accuracy only — no `components/agent-session/src/**` or
+  `doc/scheduler.md` change; no test behaviour change.
+- **Observation (out of scope):** running the scheduler namespaces *in isolation
+  together* surfaces 4 ordering-dependent failures that do **not** occur under
+  the canonical full `bb test` run (each ns is green standalone). Pre-existing
+  cross-namespace test-isolation artifact; not introduced by this step and not
+  in scope for a doc-accuracy correction.

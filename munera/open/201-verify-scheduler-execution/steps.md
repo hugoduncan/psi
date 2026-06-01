@@ -280,8 +280,10 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       formatted correctly" on all 7 touched test files.
 - [x] `bb test` green (new verification tests pass against current behaviour;
       any defect repro lives only in its remediation task).
-      Done: full scheduler suite **45 tests / 410 assertions / 0 fail / 0 error**
-      (baseline was 35/338; +10 tests, +72 assertions all green).
+      Done: full scheduler suite **45 tests / 412 assertions / 0 fail / 0 error**
+      (baseline was 35/338; +10 tests, +74 assertions all green). (Count updated
+      from 410 → 412 in review pass 4 after the pass-2 `:at` named-bound
+      follow-up added two assertions.)
 - [x] Coherence check: no scheduler source/doc/behaviour modified; deliverable =
       green coverage + `findings.md`. The gate's **true invariant** is: **zero**
       changed paths under `components/agent-session/src/**` or `doc/scheduler.md`.
@@ -394,7 +396,9 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       `scheduler_timer_seam_test` (capture observed-delay; capture cancelled
       handle) are intentionally left — not the named idiom. clj-kondo 0/0,
       cljfmt clean; full scheduler suite still 45 tests / 410 assertions / 0
-      failures (unchanged baseline). No `src/**` or `doc/scheduler.md` touched.
+      failures (unchanged baseline at pass-1 time; later raised to 412 by the
+      pass-2 `:at` named-bound follow-up). No `src/**` or `doc/scheduler.md`
+      touched.
 
 ## Implementation review follow-ups — pass 2 (2026-06-01)
 
@@ -455,7 +459,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Implementation review follow-ups — pass 4 (2026-06-01)
 
-- [ ] Correct the stale assertion count in the deliverable summaries from
+- [x] Correct the stale assertion count in the deliverable summaries from
       **410** to **412** to match the green runtime. The pass-2 `:at`
       named-bound follow-up added two assertions (psi-tool test 107 → 109,
       committed), but the aggregate "45 tests / 410 assertions" claim was never
@@ -467,3 +471,18 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       change; within the verification-only scope (zero `components/agent-session/
       src/**` or `doc/scheduler.md`). (If the task is treated as closed, raise it
       as a small standalone task-hygiene fix instead.)
+      Done: confirmed runtime truth — scheduler suite reports **45 tests / 412
+      assertions** (verified via focused `clojure -M:test` on the 13 scheduler
+      namespaces; full `bb test` green for scheduler). Corrected the deliverable
+      counts 410 → 412: `findings.md` Outcome; `steps.md` Slice-10 close-out
+      (+74 delta); `implementation.md` Slice-10 close-out + pass-2 review re-run
+      note (genuinely stale — pass-2 *added* the +2). The pass-1 review notes
+      (410 was accurate at pass-1 time, pre-pass-2) are left intact with a
+      forward-pointer parenthetical to 412 to avoid misleading the reader. The
+      pass-4 flag note and this step's own 410→412 description are intentionally
+      preserved (they document the fix). Doc-accuracy only — no test/src/doc
+      change; verification-only scope held (zero `src/**` / `doc/scheduler.md`).
+      Note: scheduler namespaces run *in isolation together* surface 4 ordering-
+      dependent failures that do NOT occur under the canonical full `bb test`
+      run (each ns green standalone) — a pre-existing cross-ns test-isolation
+      artifact, out of scope for this doc-accuracy step.
