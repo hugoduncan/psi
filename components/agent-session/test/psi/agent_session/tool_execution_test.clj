@@ -12,6 +12,7 @@
    [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.tool-plan :as tool-plan]
+   [psi.metrics.extension :as metrics-ext]
    [psi.turn-runtime.accumulator :as accum])
   (:import
    [java.util.concurrent LinkedBlockingQueue TimeUnit]))
@@ -372,3 +373,38 @@
           (is (some? result) "tool execution completes even when handler returns {:block true}")
           (is (= "call-block" (:tool-call-id result)) "result carries the tool-call-id")
           (is (some? @result-atom) "tool result was recorded — execution was not blocked"))))))
+
+;;; End-to-end: metrics extension accumulates :tools via the bridge
+
+(deftest metrics-extension-accumulates-tools-via-bridge-test
+  (testing "register metrics ext on real session ctx, call run-tool-call!, assert :tools entry accumulated — full path: adapter → bridge → metrics handler → store"
+    ;; Reset metrics defonce atoms for a clean slate.
+    (reset! metrics-ext/store nil)
+    (reset! metrics-ext/writing? false)
+    (try
+      (let [agent-ctx   (setup-agent-ctx!)
+            [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
+            reg         (:extension-registry session-ctx)
+            ;; Minimal runtime-fns: query-fn returns nil worktree-path; no mutate-fn so
+            ;; (:on api) falls back to register-handler-in! directly on the registry.
+            runtime-fns {:query-fn (fn [q]
+                                     (when (= q [:psi.agent-session/worktree-path])
+                                       {:psi.agent-session/worktree-path nil}))}
+            tc          {:id "call-e2e" :name "read" :arguments "{}"}]
+        ;; Load the real metrics extension into the session ctx's extension registry.
+        (ext/load-init-var-extension-in! reg "manifest:psi/metrics" 'psi.metrics.extension/init runtime-fns)
+        (with-redefs [tool-plan/execute-tool-runtime-in!
+                      (fn [_ _ _ _]
+                        {:content "file contents"
+                         :is-error false
+                         :details {:truncation {:truncated false}}})
+                      agent/emit-tool-start-in! (fn [_ _] nil)
+                      agent/emit-tool-end-in! (fn [_ _ _ _] nil)
+                      agent/record-tool-result-in! (fn [_ _] nil)]
+          (#'tool-runtime-adapter/run-tool-call! session-ctx session-ctx-id tc nil))
+        ;; Assert the full path fired: metrics store now has a :tools entry for "read".
+        (is (= 1 (get-in @metrics-ext/store [:metrics :tools "read" :invocations]))
+            "metrics extension accumulated :tools entry via adapter → bridge → handler → store"))
+      (finally
+        (reset! metrics-ext/store nil)
+        (reset! metrics-ext/writing? false)))))

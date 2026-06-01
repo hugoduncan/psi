@@ -1,5 +1,34 @@
 # Implementation Notes
 
+## 2026-06-01 — end-to-end test added
+
+Added `metrics-extension-accumulates-tools-via-bridge-test` to
+`components/agent-session/test/psi/agent_session/tool_execution_test.clj`.
+
+The test:
+1. Creates a real session ctx via `test-support/make-session-ctx`
+2. Calls `ext/load-init-var-extension-in!` with `'psi.metrics.extension/init` and a
+   minimal `runtime-fns` (query-fn returning nil worktree-path; no mutate-fn so
+   `(:on api)` falls back to `register-handler-in!` directly on the registry)
+3. Calls `run-tool-call!` with infrastructure redefs (no real tool execution)
+4. Asserts `metrics-ext/store` has `:tools "read" :invocations 1`
+
+This covers the full path: adapter → `emit-tool-lifecycle!` bridge → `dispatch-in` →
+metrics `on-tool-call` handler → `update-metrics!` → store. A regression that
+disconnects the bridge or the metrics registration would be caught.
+
+Implementation notes:
+- `load-init-var-extension-in!` requires a symbol (`'psi.metrics.extension/init`),
+  not a var reference (`#'metrics-ext/init`) — the loader calls `namespace`/`name`
+  on the init-var which requires the `Named` interface.
+- `metrics-ext/store` and `metrics-ext/writing?` are `defonce` atoms; the test
+  resets them before/after to ensure isolation.
+- `psi.metrics.extension` src is already on the `:test` alias classpath via
+  `extensions/metrics/src` in `deps.edn`, so no classpath changes were needed.
+
+Verification: `clojure -M:test --focus psi.agent-session.tool-execution-test` →
+`12 tests, 61 assertions, 0 failures`. `clj-kondo` clean.
+
 ## 2026-06-01 — test review
 
 **Tests well-formed.** All acceptance criteria have test coverage. `with-redefs` is used
