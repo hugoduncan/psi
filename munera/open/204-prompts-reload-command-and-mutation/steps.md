@@ -38,31 +38,26 @@ Vertical slices from plan.md. Tick each item with its sha / decision note.
 
 ## Slice 3 — `psi.extension/reload-prompts` mutation
 
-- [ ] Add `reload-prompts` `pco/defmutation` to `mutations/prompts.clj`:
+- [x] Added `reload-prompts` `pco/defmutation` to `mutations/prompts.clj`:
       `::pco/op-name 'psi.extension/reload-prompts`,
       `::pco/params [:psi/agent-session-ctx :session-id]`,
       `::pco/output [:psi.prompt-template/reloaded? :psi.prompt-template/count]`.
-- [ ] Mutation body calls the single shared core entry point
-      `core/reload-prompts-in!` (passing `agent-session-ctx` as the `ctx` arg
-      of `reload-prompts-in! [ctx session-id]`), **not** `dispatch!` directly,
-      and returns
+- [x] Mutation body calls `core/reload-prompts-in!` (added `[psi.agent-session.core
+      :as core]` require, mirroring `mutations/session.clj`'s
+      `core/reload-models-in!` use); returns
       `{:psi.prompt-template/reloaded? (boolean reloaded?)
-        :psi.prompt-template/count (or count 0)}` — does **not** surface
-      `:worktree`. This matches the live `reload-models` mutation
-      (`mutations/session.clj:283`), which already calls `core/reload-models-in!`
-      (not `dispatch!`); it is **not** a divergence from that reload idiom.
-      (The `add-prompt-template`/`register-*` mutations in `prompts.clj` call
-      `dispatch!` directly only because they have no shared core fn; mirror
-      `add-prompt-template` for the `::pco/output` shape, but `reload-models`
-      for the core-fn invocation.)
-- [ ] Add `reload-prompts` to `all-mutations` in `mutations/prompts.clj`.
-- [ ] Add a mutation test: invoke the mutation, assert output keys/values and
-      that `:prompt-templates` was replaced via dispatch (AC5).
-- [ ] Add a psi-tool visibility test (extend/mirror `psi_tool_mutate_test`):
-      assert `'psi.extension/reload-prompts` is in the registered-mutation set
-      and is invokable via `action: "mutate"` with
-      `params {:session-id "..."}` (AC5).
-- [ ] `clj-kondo` clean; focused mutation + psi-tool tests green.
+        :psi.prompt-template/count (or count 0)}` — **no** `:worktree`.
+- [x] Added `reload-prompts` to `all-mutations` (after `add-prompt-template`).
+- [x] Mutation test (`reload-prompts-mutation-output-and-replace-test`): live
+      psi-tool `action: "mutate"` invocation with worktree session; asserts
+      output keys/values, no `:worktree`, and `:prompt-templates` replaced via
+      dispatch (AC5).
+- [x] psi-tool visibility test (`reload-prompts-mutation-psi-tool-visible-test`):
+      asserts `'psi.extension/reload-prompts` op-name is in
+      `mutations/all-mutations` (the aggregate the registered-mutation set
+      derives from); the mutate test above proves live invokability (AC5).
+- [x] `clj-kondo` clean; focused mutation + psi-tool tests green (5 tests / 17
+      assertions).
 
 ## Slice 4 — `/prompts-reload` command
 

@@ -8,7 +8,9 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.dispatch]
    [psi.agent-session.dispatch-handlers.session-mutations]
+   [psi.agent-session.mutations :as mutations]
    [psi.agent-session.test-support :as test-support]
+   [psi.agent-session.tools :as tools]
    [psi.session-state.state :as ss]
    [psi.state-kernel.dispatch :as kernel]))
 
@@ -32,12 +34,14 @@
 
 (defn- session-at-worktree
   "Create a [ctx session-id] whose worktree path is `wt`."
-  [wt]
-  (let [ctx (session/create-context
-             (test-support/safe-context-opts
-              {:cwd wt :persist? false}))
-        sd  (session/new-session-in! ctx nil {:worktree-path wt})]
-    [ctx (:session-id sd)]))
+  ([wt] (session-at-worktree wt {}))
+  ([wt ctx-opts]
+   (let [ctx (session/create-context
+              (merge (test-support/safe-context-opts
+                      {:cwd wt :persist? false})
+                     ctx-opts))
+         sd  (session/new-session-in! ctx nil {:worktree-path wt})]
+     [ctx (:session-id sd)])))
 
 (deftest reload-prompts-handler-replaces-templates-test
   (testing "dispatch :session/reload-prompts replaces :prompt-templates with the freshly discovered set"
@@ -85,3 +89,33 @@
           (is (= 2 (:count result)))
           (is (= wt (:worktree result))))
         (finally (delete-tree! wt))))))
+
+(deftest reload-prompts-mutation-output-and-replace-test
+  (testing "psi.extension/reload-prompts mutation replaces templates via dispatch and returns output keys"
+    (let [wt (worktree-with-prompts! {"foo" "foo body" "bar" "bar body"})]
+      (try
+        (let [[ctx session-id] (session-at-worktree wt {:mutations mutations/all-mutations})
+              tool   (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
+              result ((:execute tool) {"action" "mutate"
+                                       "mutation" "psi.extension/reload-prompts"
+                                       "params" {"session-id" session-id}})
+              parsed (read-string (:content result))]
+          (is (false? (:is-error result)))
+          (is (= :ok (:psi-tool/overall-status parsed)))
+          (is (= {:psi.prompt-template/reloaded? true
+                  :psi.prompt-template/count     2}
+                 (:psi-tool/result parsed)))
+          ;; :worktree is NOT surfaced by the mutation.
+          (is (not (contains? (:psi-tool/result parsed) :worktree)))
+          ;; Replace semantics applied through dispatch.
+          (is (= #{"foo" "bar"}
+                 (set (map :name (:prompt-templates (ss/get-session-data-in ctx session-id)))))))
+        (finally (delete-tree! wt))))))
+
+(deftest reload-prompts-mutation-psi-tool-visible-test
+  (testing "psi.extension/reload-prompts is in the registered mutation set (psi-tool visible)"
+    (letfn [(op-name [m]
+              (or (some-> m :config :com.wsscode.pathom3.connect.operation/op-name)
+                  (some-> m meta :com.wsscode.pathom3.connect.operation/op-name)))]
+      (is (some #(= 'psi.extension/reload-prompts (op-name %))
+                mutations/all-mutations)))))

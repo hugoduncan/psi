@@ -399,3 +399,24 @@ Test-setup notes:
 - Stale template seeded via `ss/update-state-value-in!` on
   `(ss/session-data-path session-id)` (no `update-session-data-in!` helper
   exists).
+
+## Implementation — Slice 3 (2026-06-01)
+
+`psi.extension/reload-prompts` mutation in `mutations/prompts.clj`:
+`::pco/output [:psi.prompt-template/reloaded? :psi.prompt-template/count]`
+(mirrors `add-prompt-template`'s `[:added? :count]` shape); body calls
+`core/reload-prompts-in!` (added `[psi.agent-session.core :as core]` require —
+no circular dep; `mutations/session.clj` already requires `core` for
+`reload-models-in!`). Does **not** surface `:worktree`. Added to `all-mutations`.
+
+Tests: live psi-tool `action: "mutate"` invocation
+(`reload-prompts-mutation-output-and-replace-test`) — ctx built with
+`:mutations mutations/all-mutations` (the create-context opt key; **not**
+`:all-mutations` — that's the internal stored key). Asserts output map,
+absent `:worktree`, dispatch replace. Visibility test reads op-name via
+`(:config m)`/`meta` `::pco/op-name` (mirroring psi_tool's `mutation-op-name`).
+
+Deviation note: the visibility assertion checks membership in
+`mutations/all-mutations` (the aggregate `registered-mutation-syms` derives
+from) rather than re-deriving the registered set; the live mutate test already
+exercises the full registered-mutation resolution path end-to-end.
