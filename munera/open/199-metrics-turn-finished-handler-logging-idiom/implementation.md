@@ -122,3 +122,27 @@ codebase. **PASS — no new actionable issues.**
   out of scope (no behavioural change).
 
 No follow-up items added.
+
+## Test review — task-test-review (2026-06-01)
+
+Reviewed `extension_test.clj` (the relevant suite) against the design's
+behavioural contract. **One actionable test gap.**
+
+- **Well-formed / nullable-compliant** ✓: tests use
+  `nullable/create-nullable-extension-api` and inject `query-session` as a plain
+  fn — no mocks/stubs; assertions are state/output, not interactions. Satisfies
+  `injectable ∧ nullable ∧ ¬mock ∧ ¬stub`.
+- **Success-path coverage** ✓: `turn-finished-accumulates-...`,
+  `...computes-delta-on-second-turn`, `...uses-unknown-when-model-id-nil`
+  exercise `make-turn-finished-handler`'s happy path.
+- **Gap — catch-branch contract untested**: design Acceptance pins the
+  swallow-and-return-`nil` contract ("the exception remains swallowed and the
+  handler still returns `nil`"), but **no test drives the `catch` branch**. The
+  injection seam already exists: passing a `query-session` that throws would let
+  a test assert (a) the handler returns `nil`, (b) no exception escapes, (c) the
+  metrics store is unmodified. This is a trivial, nullable-friendly test of an
+  explicit acceptance criterion — the prior implementation-review dismissed it
+  as "pre-existing / out of scope" without noting how cheaply the existing seam
+  covers it. The behaviour the task touched (the catch body) has zero coverage;
+  a regression that broke swallowing (e.g. re-throwing) would not be caught.
+  Actionable: add the catch-branch test.

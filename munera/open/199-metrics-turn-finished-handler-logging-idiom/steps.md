@@ -45,3 +45,12 @@
 
 - [x] Commit the changed `extension.clj` and `deps.edn` with a `⚒`-tagged
       message referencing task 199 (timbre logging idiom).
+
+## Test review follow-up (2026-06-01)
+
+- [ ] Add a `make-turn-finished-handler` catch-branch test to
+      `extensions/metrics/test/psi/metrics/extension_test.clj`: inject a
+      `query-session` fn that throws, fire `session_turn_finished`, and assert
+      the handler returns `nil`, no exception escapes, and `@ext/store` metrics
+      are unchanged (covers the design's swallow-and-`nil`-return acceptance
+      criterion, which currently has zero coverage).
