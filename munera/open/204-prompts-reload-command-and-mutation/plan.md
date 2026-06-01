@@ -54,6 +54,17 @@ handle and returns no `:root-state-update`).
 - **psi-tool visibility** is automatic via adding `reload-prompts` to
   `prompts/all-mutations` (aggregated into `mutations/all-mutations`,
   enumerated by the registered-mutation set). No psi-tool code change.
+- **Single shared entry point via `core.clj` re-export** — `reload-prompts-in!`
+  is defined in `session_settings.clj` (`settings/`) and re-exported from
+  `psi.agent-session.core` (mirroring `core.clj:181`'s `reload-models-in!`
+  re-export). **Both** the `/prompts-reload` command and the `reload-prompts`
+  mutation call the `core/reload-prompts-in!` re-export. This is **not** a
+  divergence from the existing reload idiom: the live `reload-models` mutation
+  (`mutations/session.clj:283`) already calls `core/reload-models-in!` directly
+  (and `commands.clj:255` calls the same `core/` re-export), so routing the
+  prompt-reload mutation + command through one `core/` re-export mirrors the
+  `reload-models` surface pair exactly. The mutation passes `agent-session-ctx`
+  as the `ctx` arg of `reload-prompts-in! [ctx session-id]`.
 
 ### Surfaces touched
 
@@ -62,8 +73,13 @@ handle and returns no `:root-state-update`).
   `session/session-worktree-path-in`, `session` = `psi.session-state.state` —
   **not** the `ss` = `psi.session-state.init` alias, which lacks it).
 - `session_settings.clj` — a thin `reload-prompts-in!` core fn dispatching
-  `:session/reload-prompts` (mirrors `reload-models-in!`), so the command and
-  mutation share one entry point.
+  `:session/reload-prompts` (mirrors `settings/reload-models-in!`), so the
+  command and mutation share one entry point.
+- `core.clj` — a `reload-prompts-in!` re-export delegating to
+  `settings/reload-prompts-in!` (mirrors `core.clj:181`'s `reload-models-in!`
+  re-export); this is the surface the command **and** the mutation call as
+  `session/reload-prompts-in!` (command) / `core/reload-prompts-in!`
+  (mutation).
 - `mutations/prompts.clj` — new `reload-prompts` mutation; added to
   `all-mutations`.
 - `commands.clj` — `format-prompts-reload`, `/prompts-reload` →
@@ -95,8 +111,9 @@ handle and returns no `:root-state-update`).
 
 1. **Reload handler** — `:session/reload-prompts` dispatch handler + tests
    (replace semantics, return shape, no effects). Core of the feature.
-2. **Core entry fn** — `reload-prompts-in!` in `session_settings.clj` (shared
-   by command + mutation) + test.
+2. **Core entry fn** — `reload-prompts-in!` in `session_settings.clj` plus a
+   `core.clj` re-export (shared by command + mutation, mirroring the
+   `reload-models-in!` settings-fn + `core.clj` re-export pair) + test.
 3. **Mutation** — `reload-prompts` in `mutations/prompts.clj`, added to
    `all-mutations`; tests for output keys, dispatch, and psi-tool
    registered-mutation visibility.

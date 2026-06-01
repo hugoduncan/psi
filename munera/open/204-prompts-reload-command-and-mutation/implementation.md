@@ -331,3 +331,35 @@ Verified consistent (no step added):
 Result: **two new actionable cross-file inconsistencies (I1, I2)** — both about
 mirroring existing reload surfaces (command core re-export; mutation invocation
 idiom). Added as slice-2/4 follow-up steps.
+
+## Plan/steps inconsistency-review follow-ups executed (2026-06-01)
+
+I1 + I2 (the two plan/steps inconsistency follow-ups) resolved in plan.md +
+steps.md (docs-only; implementation slices not yet started, no code touched).
+Design unchanged (read-only context).
+
+- ✅ I1 — Command core-fn surface pinned to **mirror `/reload-models` exactly**.
+  Chose the `core.clj` re-export option (not the `settings/`-direct divergence).
+  Plan: added `core.clj` to "Surfaces touched", a "single shared entry point via
+  core.clj re-export" key decision, and slice-2 now names the settings fn + the
+  core re-export. Steps: slice-2 gained a `psi.agent-session.core`
+  `reload-prompts-in!` re-export step (mirrors `core.clj:181`); slice-4 command
+  now calls `session/reload-prompts-in!` (`session` = `psi.agent-session.core`),
+  exactly as `format-reload-models` (`commands.clj:255`).
+
+- ✅ I2 — Mutation-idiom "divergence" resolved as **not a divergence**. Verified
+  against the live tree: the `reload-models` *mutation*
+  (`mutations/session.clj:283`) already calls `core/reload-models-in!` directly
+  (not `dispatch!`), and `send-prompt` (`prompts.clj:130`) calls a core fn
+  (`ext-rt/send-extension-prompt-in!`). The "every mutation calls dispatch!"
+  premise held only for the `add-prompt-template`/`register-*` mutations in
+  `prompts.clj` (which simply have no shared core fn). So routing
+  `reload-prompts` through `core/reload-prompts-in!` mirrors the closest analog
+  (`reload-models` mutation), and the earlier "intentional divergence" framing
+  is wrong. Steps slice-3 now: mirror `add-prompt-template` for `::pco/output`
+  shape, `reload-models` for core-fn invocation; mutation passes
+  `agent-session-ctx` as the `ctx` arg of `reload-prompts-in! [ctx session-id]`.
+
+Net effect: the command and mutation share **one** `core/reload-prompts-in!`
+re-export, matching the existing `reload-models` surface pair precisely. No
+blockers; remaining work = implementation slices 1–5, unchanged in structure.

@@ -36,6 +36,14 @@ Vertical slices from plan.md. Tick each item with its sha / decision note.
       `reload-models-in!`: `(dispatch/dispatch! ctx :session/reload-prompts
       {:session-id session-id} {:origin :core})`, returning the handler
       `:return` map `{:reloaded? :count :worktree}`.
+- [ ] Add a `reload-prompts-in!` **re-export** to `psi.agent-session.core`
+      delegating to `settings/reload-prompts-in!` (mirror `core.clj:181`'s
+      `reload-models-in!` re-export). This is the surface both the command
+      (`session/reload-prompts-in!`, `session` = `psi.agent-session.core`) and
+      the mutation (`core/reload-prompts-in!`) call — matching the live
+      `reload-models` surface pair (command `commands.clj:255` →
+      `core/reload-models-in!`; mutation `mutations/session.clj:283` →
+      `core/reload-models-in!`).
 - [ ] Confirm `dispatch!` surfaces the handler `:return` map (not an effect
       result) — add/extend a focused test asserting the returned
       `:reloaded?`/`:count`/`:worktree` values.
@@ -48,10 +56,18 @@ Vertical slices from plan.md. Tick each item with its sha / decision note.
       `::pco/params [:psi/agent-session-ctx :session-id]`,
       `::pco/output [:psi.prompt-template/reloaded? :psi.prompt-template/count]`.
 - [ ] Mutation body calls the single shared core entry point
-      `reload-prompts-in!` (not `dispatch!` directly) and returns
+      `core/reload-prompts-in!` (passing `agent-session-ctx` as the `ctx` arg
+      of `reload-prompts-in! [ctx session-id]`), **not** `dispatch!` directly,
+      and returns
       `{:psi.prompt-template/reloaded? (boolean reloaded?)
         :psi.prompt-template/count (or count 0)}` — does **not** surface
-      `:worktree`.
+      `:worktree`. This matches the live `reload-models` mutation
+      (`mutations/session.clj:283`), which already calls `core/reload-models-in!`
+      (not `dispatch!`); it is **not** a divergence from that reload idiom.
+      (The `add-prompt-template`/`register-*` mutations in `prompts.clj` call
+      `dispatch!` directly only because they have no shared core fn; mirror
+      `add-prompt-template` for the `::pco/output` shape, but `reload-models`
+      for the core-fn invocation.)
 - [ ] Add `reload-prompts` to `all-mutations` in `mutations/prompts.clj`.
 - [ ] Add a mutation test: invoke the mutation, assert output keys/values and
       that `:prompt-templates` was replaced via dispatch (AC5).
@@ -65,8 +81,11 @@ Vertical slices from plan.md. Tick each item with its sha / decision note.
 
 - [ ] Add `format-prompts-reload` in `commands.clj` mirroring
       `format-reload-models`: read `worktree-path` via
-      `ss/session-worktree-path-in`, call the core reload fn, build a `:text`
-      summary with **worktree + count only** (no diagnostics line) (AC4).
+      `ss/session-worktree-path-in`, call `session/reload-prompts-in!`
+      (`session` = `psi.agent-session.core`, the slice-2 re-export — exactly as
+      `format-reload-models` (`commands.clj:255`) calls
+      `session/reload-models-in!`), build a `:text` summary with **worktree +
+      count only** (no diagnostics line) (AC4).
 - [ ] Add `"/prompts-reload" :prompts-reload` to `exact-command-handlers`.
 - [ ] Add `:prompts-reload {:type :text :message (format-prompts-reload ctx
       session-id)}` to the exact-command `case`.
@@ -114,22 +133,22 @@ Vertical slices from plan.md. Tick each item with its sha / decision note.
 
 ## Plan/steps inconsistency follow-ups (2026-06-01)
 
-- [ ] I1: Resolve the command core-fn surface. `format-reload-models`
-      (commands.clj) calls `session/reload-models-in!` where `session` =
-      `psi.agent-session.core` (a re-export at `core.clj:181` delegating to
-      `settings/reload-models-in!`). To mirror it: add a `reload-prompts-in!`
-      re-export to `psi.agent-session.core`, add `core.clj` to the plan's
-      "Surfaces touched", and have slice 4 call `session/reload-prompts-in!`.
-      Alternatively, state explicitly that the command calls
-      `session-settings`/`settings/reload-prompts-in!` directly and note that
-      divergence from the `format-reload-models` idiom. Pin one and update
-      slice 2/4 + plan accordingly.
-- [ ] I2: Note the mutation-idiom divergence. Every existing mutation in
-      `mutations/prompts.clj` (incl. `add-prompt-template`, which the design
-      tells the builder to mirror) calls `dispatch/dispatch!` **directly** with
-      `agent-session-ctx`; the plan/steps mandate `reload-prompts`'s body call
-      the shared `reload-prompts-in!` core fn instead. Add an explicit note in
-      plan/steps that this is an intentional divergence from the direct-
-      `dispatch!` mutation idiom, and pin that the mutation passes
-      `agent-session-ctx` as the `ctx` arg of
-      `reload-prompts-in! [ctx session-id]`.
+- [x] I1: Command core-fn surface pinned to **mirror `/reload-models` exactly**.
+      Added a `reload-prompts-in!` re-export to `psi.agent-session.core`
+      (delegating to `settings/reload-prompts-in!`, paralleling `core.clj:181`);
+      added `core.clj` to plan "Surfaces touched" + slice order 2; slice 2 now
+      has a re-export step and slice 4 calls `session/reload-prompts-in!`
+      (`session` = `psi.agent-session.core`) — exactly as
+      `format-reload-models` (`commands.clj:255`) calls `session/reload-models-in!`.
+      No direct-`settings/` divergence taken.
+- [x] I2: Mutation-idiom contradiction **resolved as no divergence**. The
+      premise ("every `prompts.clj` mutation calls `dispatch!` directly") held
+      only for `prompts.clj`; the live `reload-models` mutation
+      (`mutations/session.clj:283`) — the true reload analog — already calls
+      `core/reload-models-in!`, **not** `dispatch!`. So routing `reload-prompts`
+      through `core/reload-prompts-in!` mirrors the `reload-models` mutation
+      surface; it is not a departure. Slice-3 step now: mirror
+      `add-prompt-template` for `::pco/output` shape but `reload-models` for the
+      core-fn invocation; mutation passes `agent-session-ctx` as the `ctx` arg
+      of `reload-prompts-in! [ctx session-id]`. Plan "Key decisions" records the
+      shared-`core.clj`-re-export rationale.
