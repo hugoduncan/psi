@@ -7,6 +7,7 @@
    [psi.agent-session.extensions.loader :as loader]
    [psi.command-registry.registry :as command-registry]
    [psi.tool-registry.registry :as tool-registry]
+   [psi.tool-runtime.core :as tool-runtime]
    [taoensso.timbre :as timbre]))
 
 (defrecord ExtensionRegistry [state])
@@ -284,53 +285,103 @@
      :override          override
      :results           results}))
 
+(defn tool-call-event
+  "Build the canonical `tool_call` bus-event payload.
+   Single source of the cross-path payload shape — used by both
+   `dispatch-tool-call-in` (plan path) and the session
+   `emit-tool-lifecycle!` bridge (interactive/batch path)."
+  [tool-name tool-call-id args]
+  {:type         "tool_call"
+   :tool-name    tool-name
+   :tool-call-id tool-call-id
+   :input        args})
+
+(def modifiable-tool-result-coercions
+  "Per-key value coercions for the modifiable tool-result keys.
+
+   Single source of the *value semantics* half of the modifiable-key contract:
+   `:content` normalizes to content-blocks and `:is-error` coerces to a strict
+   boolean. `:details` carries no coercion (identity). Both the *inbound*
+   payload constructor (`tool-result-event`) and the *override application*
+   (`merge-tool-result-override`) derive from this table, so a key's value
+   shape is enumerated once and both halves stay in lockstep."
+  {:content  tool-runtime/normalize-tool-content
+   :is-error boolean})
+
+(defn- coerce-tool-result-value
+  "Coerce `v` for modifiable-key `k` per `modifiable-tool-result-coercions`,
+   returning `v` unchanged when the key carries no coercion."
+  [k v]
+  ((get modifiable-tool-result-coercions k identity) v))
+
+(defn tool-result-event
+  "Build the canonical `tool_result` bus-event payload.
+   Single source of the cross-path payload shape and value semantics —
+   used by both `dispatch-tool-result-in` (plan path) and the session
+   `emit-tool-lifecycle!` bridge (interactive/batch path). Coerces
+   `:content` to normalized content-blocks and `:is-error` to a strict
+   boolean (via `modifiable-tool-result-coercions`) so both paths deliver an
+   identical contract."
+  [tool-name tool-call-id args content details is-error?]
+  {:type         "tool_result"
+   :tool-name    tool-name
+   :tool-call-id tool-call-id
+   :input        args
+   :content      (coerce-tool-result-value :content content)
+   :details      details
+   :is-error     (coerce-tool-result-value :is-error is-error?)})
+
 (defn dispatch-tool-call-in
   "Dispatch a tool_call event. Returns {:block true :reason s} or nil."
   [reg tool-name tool-call-id args]
   (let [{:keys [results]} (dispatch-in reg "tool_call"
-                                       {:type         "tool_call"
-                                        :tool-name    tool-name
-                                        :tool-call-id tool-call-id
-                                        :input        args})]
+                                       (tool-call-event tool-name tool-call-id args))]
     (first (filter :block results))))
+
+(def modifiable-tool-result-keys
+  "The set of `tool_result` keys an extension handler may modify.
+
+   Single source of the modifiable-key contract for the tool-result path:
+   `dispatch-tool-result-in` *selects* a handler return as an override iff it is
+   a map containing at least one of these keys (the selection guard), and
+   `merge-tool-result-override` *applies* exactly these keys from the override
+   onto the result (the application). Both the producer (selection) and the
+   consumer (application) derive from this one set, so adding a modifiable key
+   is a single-site edit."
+  #{:content :details :is-error})
+
+(defn modifiable-tool-result-override?
+  "True when `x` is a map carrying at least one modifiable tool-result key,
+   i.e. a handler return eligible to override the result. The selection guard."
+  [x]
+  (and (map? x)
+       (boolean (some #(contains? x %) modifiable-tool-result-keys))))
+
+(defn merge-tool-result-override
+  "Apply `override`'s modifiable keys onto `result`, copying only the keys in
+   `modifiable-tool-result-keys` that `override` actually carries. Each copied
+   value is coerced per `modifiable-tool-result-coercions`, so an override's
+   `:content`/`:is-error` receive the same normalization the inbound
+   `tool-result-event` constructor applies. When `override` is nil/absent,
+   `result` is returned unchanged. The application half of the modifiable-key
+   contract."
+  [result override]
+  (reduce (fn [acc k]
+            (cond-> acc
+              (contains? override k)
+              (assoc k (coerce-tool-result-value k (get override k)))))
+          result
+          modifiable-tool-result-keys))
 
 (defn dispatch-tool-result-in
   "Dispatch a tool_result event. Returns modified result map or nil."
   [reg tool-name tool-call-id args result is-error?]
   (let [{:keys [results]} (dispatch-in reg "tool_result"
-                                       {:type         "tool_result"
-                                        :tool-name    tool-name
-                                        :tool-call-id tool-call-id
-                                        :input        args
-                                        :content      (:content result)
-                                        :details      (:details result)
-                                        :is-error     is-error?})]
-    (first (filter #(and (map? %)
-                         (or (contains? % :content) (contains? % :details)
-                             (contains? % :is-error)))
-                   results))))
-
-(defn wrap-tool-executor
-  "Wrap a tool executor fn with extension pre/post hooks.
-   `execute-fn` is (fn [tool-name args] → {:content s :is-error bool}).
-   Returns a wrapped fn with the same signature."
-  [reg execute-fn]
-  (fn [tool-name args]
-    (let [block-result (dispatch-tool-call-in reg tool-name nil args)]
-      (if (:block block-result)
-        {:content  (or (:reason block-result)
-                       "Tool execution was blocked by an extension")
-         :is-error true}
-        (let [result   (execute-fn tool-name args)
-              is-error (:is-error result false)
-              modified (dispatch-tool-result-in
-                        reg tool-name nil args result is-error)]
-          (if modified
-            (cond-> result
-              (contains? modified :content)  (assoc :content (:content modified))
-              (contains? modified :details)  (assoc :details (:details modified))
-              (contains? modified :is-error) (assoc :is-error (:is-error modified)))
-            result))))))
+                                       (tool-result-event tool-name tool-call-id args
+                                                          (:content result)
+                                                          (:details result)
+                                                          is-error?))]
+    (first (filter modifiable-tool-result-override? results))))
 
 (defn extensions-in
   "Return sequence of all registered extension paths in `reg`."

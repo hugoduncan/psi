@@ -1,0 +1,791 @@
+# Implementation notes — 200
+
+## Design review: ambiguity pass (2026-06-01)
+
+Reviewed design.md against `components/agent-session/src/psi/agent_session/extensions.clj`
+and `.../test/psi/agent_session/extensions_test.clj`. Verified: zero production
+callers of `wrap-tool-executor` (only `defn` + tests). Found 3 actionable
+ambiguities → added to design-steps.md:
+
+- A1 Scope-decision criterion is undetermined: the "compatibility wrapper" test
+  (extensions_test.clj:393) only asserts pass-through behaviour; its name is not
+  evidence of an intentional public surface, yet the design uses it to gate
+  direction 2 (keep) against the confirmed zero-caller fact for direction 1
+  (remove). The planner cannot deterministically pick a direction as written.
+- A2 The "expressed once" key-set contract names only 2 sites
+  (`dispatch-tool-result-in` filter + `wrap-tool-executor` `cond->`), but
+  `tool-result-event` (extensions.clj:311–313) is a third co-located
+  enumeration of the same `:content`/`:details`/`:is-error` keys (also used by
+  `tool_runtime_adapter.clj`). Unspecified whether single-sourcing must subsume it.
+- A3 "delete or migrate its test coverage" (direction 1) does not state what
+  behaviour must remain covered after removal. (`dispatch-tool-result-in` filter
+  is already independently tested at extensions_test.clj:453–471, but the design
+  does not say so, leaving migrate-vs-delete undetermined.)
+
+## Ambiguity follow-up execution (2026-06-01)
+
+Executed A1–A3. All resolved in design.md (no blockers).
+
+- A1 → **direction 1 (remove)**. Deterministic rule added: zero production
+  callers ∧ ¬documented-public-surface ⇒ internal dead code. Test *name*
+  ("compatibility wrapper") is not surface evidence. Both conditions hold for
+  `wrap-tool-executor` ⇒ remove. Scope section rewritten from "to be decided"
+  to "decided".
+- A2 → `tool-result-event` **intentionally excluded**. It is the bus-event
+  *payload constructor* (cross-path shape), a different concern from the
+  *modifiable-key* contract. `tool_runtime_adapter.clj` consumes the constructed
+  payload, not the contract. After removing `wrap-tool-executor` the contract is
+  expressed once (the `dispatch-tool-result-in` filter) — no shared helper
+  needed. Added to Out of Scope.
+- A3 → coverage audit added. Of `tool-wrapping-test`'s behaviours: coercion/
+  normalization already covered by `dispatch-tool-result-{normalizes-content,
+  coerces-is-error}-test`; `:block` detection covered by dispatch tests; the one
+  behaviour to **migrate** is the non-map-return ⇒ no-override filter guard
+  (currently only exercised through the wrapper) → add a direct
+  `dispatch-tool-result-in` non-map test. Acceptance Criteria updated to make
+  removal + single-migration explicit.
+
+## Design review: inconsistency pass (2026-06-01)
+
+Reviewed design.md against `extensions.clj` and `extensions_test.clj` (and
+`tool_runtime_adapter.clj`). Found 3 actionable inconsistencies → added to
+design-steps.md. None duplicate the prior ambiguity pass.
+
+- I1 (substantive): A2's justification misdescribes `tool_runtime_adapter.clj`.
+  Design says the adapter "reads those keys *off the constructed event* … i.e.
+  it consumes the payload." Code reads `:content`/`:details`/`:is-error` from the
+  *incoming* `lifecycle-event` and passes them *into* `tool-result-event` as
+  constructor args (`extensions.clj:37–42` adapter call). The adapter sources the
+  constructor inputs; it does not consume `tool-result-event`'s output. The
+  factual basis for the A2 exclusion is inverted.
+- I2 (citation): `tool-result-event` cited as `extensions.clj:311–313` (Context,
+  A2, Out of Scope) but the `defn` spans **299–313**; 311–313 are only its
+  trailing `:content`/`:details`/`:is-error` map entries — mislabels the function.
+- I3 (citation): A3 cites the two coercion tests as `extensions_test.clj:453–490`;
+  actual span is **445–473** (`dispatch-tool-result-normalizes-content-test` @445,
+  `dispatch-tool-result-coerces-is-error-test` @459). Line 453 is mid-first-test;
+  490 falls inside the unrelated `tool-event-payload-constructors-test` (@475).
+  (design-steps.md A3 separately cites `453–471` — also inaccurate.)
+
+## Inconsistency follow-up execution (2026-06-01)
+
+Executed I1–I3. All resolved in design.md (no blockers). Verified against source.
+
+- I1 → A2 prose corrected. Verified `tool_runtime_adapter.clj:37–42`: adapter
+  reads `:content`/`:details`/`:is-error` off the *incoming* `lifecycle-event`
+  (40–42) and passes them as *constructor args into* `ext/tool-result-event`
+  (37). It sources inputs, does not consume the constructed payload — the prior
+  prose was inverted. Reworded to "sources the constructor inputs"; A2 exclusion
+  conclusion still holds (it touches payload shape, not the modifiable-key
+  contract).
+- I2 → citations corrected. Verified `extensions.clj`: `tool-result-event`
+  `defn` spans **299–313** (311–313 are only its trailing map entries). Fixed
+  Context (added explicit entry), A2, and Out of Scope to cite `defn` at 299–313.
+- I3 → A3 citations corrected. Verified `extensions_test.clj`:
+  `dispatch-tool-result-normalizes-content-test` @445,
+  `dispatch-tool-result-coerces-is-error-test` @459 (ends 473);
+  `tool-event-payload-constructors-test` @475 (unrelated). Two coercion tests
+  span **445–473**. Fixed design.md A3 (`453–490` → `445`/`459`, span 445–473)
+  and reconciled design-steps.md A3 (`453–471` → `445–473`).
+
+## Slice 1 execution (2026-06-01)
+
+Implemented as designed; no deviations from plan.
+
+- Re-confirmed zero production callers (only the `defn` + tests).
+- Added `dispatch-tool-result-non-map-return-test` after
+  `dispatch-tool-result-coerces-is-error-test` (extensions_test.clj:413):
+  registers a `tool_result` handler returning `"not-a-map"`, asserts
+  `dispatch-tool-result-in` returns `nil`. Migrates the one wrapper-only
+  behaviour (map?/contains? guard).
+- Removed `tool-wrapping-test` (and its `;; ── Tool wrapping ──` section comment).
+- Removed `wrap-tool-executor` from extensions.clj. Modifiable-key contract now
+  appears exactly once (filter predicate, extensions.clj:331).
+- Verify: clj-paren-repair (no changes), clj-kondo clean (0/0), Kaocha focus
+  `psi.agent-session.extensions-test` → 26 tests, 94 assertions, 0 failures.
+  No project nREPL available; used Kaocha runner instead.
+
+## Implementation review: task-implementation-review (2026-06-01)
+
+Reviewed code/tests against design.md + plan.md. Verified at runtime, not just docs.
+
+- **matches design** ✓ `wrap-tool-executor` removed (grep: no refs anywhere in
+  `components`); modifiable-key contract (`:content`/`:details`/`:is-error`)
+  expressed exactly once — `dispatch-tool-result-in` filter predicate
+  (extensions.clj:331). `tool-result-event` (defn 299–313) and
+  `tool_runtime_adapter.clj` (37–42, sources constructor inputs off the incoming
+  `lifecycle-event`) untouched — confirmed against source; matches corrected A2/I1.
+- **architecture** ✓ pure removal of dead code; no shim/adapter introduced; no
+  `one_way` violation.
+- **test quality** ✓ `dispatch-tool-result-non-map-return-test` is non-vacuous:
+  the handler IS registered, so `"not-a-map"` flows into `dispatch-in` `:results`
+  and the `map?` guard is genuinely exercised (verified `dispatch-in` shape,
+  extensions.clj:240–264). Migrates the one wrapper-only behaviour.
+- **no unnecessary abstraction / no new pattern** ✓ new test reuses the existing
+  direct `dispatch-tool-result-in` call pattern; change reduces abstraction.
+- **runtime verification** ✓ clj-kondo clean (0/0 on both changed files);
+  `clojure -M:test:kaocha --focus psi.agent-session.extensions-test` →
+  26 tests, 94 assertions, 0 failures (re-run during this review).
+
+No new actionable issues. REVIEW_COMPLETE.
+
+## Test review: task-test-review (2026-06-01)
+
+Applied task-test-review (well-formed ∧ behaviour-coverage ∧ injectable-nullable
+infra deps). Verified at runtime: 26 tests, 94 assertions, 0 failures.
+
+- **well-formed** ✓ Tests use `deftest`/`testing`/`is`, assert on return values
+  (state/output), not interactions. Real `create-registry` used; no mocks/stubs.
+- **infra deps** ✓ No infra deps to null — handlers are plain in-test fns; the
+  registry is the real domain object.
+- **behaviour coverage** ✗ One gap (actionable, T1 below).
+
+T1 (actionable — coverage gap on the single-sourced contract): the task's stated
+purpose is that the `dispatch-tool-result-in` filter predicate
+(extensions.clj:330–332) becomes the *sole* expression of the modifiable-key
+contract. That predicate has two guard branches: `(map? %)` AND
+`(or (contains? % :content) (contains? % :details) (contains? % :is-error))`.
+The migrated `dispatch-tool-result-non-map-return-test` exercises only the
+`map?` branch (handler returns `"not-a-map"` ⇒ nil). The `contains?` branch —
+which *is* the modifiable-key contract — is untested in both directions:
+  - **positive (selection):** no test feeds a handler return that is a map
+    containing a modifiable key and asserts it is selected/returned as the
+    override. The two coercion tests (extensions_test.clj:383/397) register
+    handlers returning `nil` (`(fn [p] (reset! payload p) nil)`), so they
+    exercise plan-path payload construction, never the filter's positive select.
+  - **negative (map-without-keys):** no test feeds a map handler return lacking
+    all three keys (expected ⇒ nil).
+A `:content`/`:details`/`:is-error` key could be dropped from the predicate (or
+the positive selection broken) with the whole suite still green. The design A3
+audit framed migration around the "non-map filter return-shape" only and missed
+that the surviving predicate is now the single source of the modifiable-key
+contract whose *selection* behaviour has no test. Add a positive-selection test
+(and ideally the map-without-keys negative) so the single-sourced contract is
+covered.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Test review follow-up execution (2026-06-01)
+
+Executed T1a and T1b from the task-test-review pass. Both close the coverage gap
+on the surviving `dispatch-tool-result-in` filter predicate's `contains?` branch
+— the single source of the modifiable-key contract.
+
+- T1a → `dispatch-tool-result-modifiable-key-override-test`: handler returns
+  `{:content "override"}`; asserts `dispatch-tool-result-in` returns that map
+  (positive selection of the modifiable-key branch). Placed after
+  `dispatch-tool-result-non-map-return-test`.
+- T1b → `dispatch-tool-result-map-without-modifiable-key-test`: handler returns
+  `{:other 1}` (no `:content`/`:details`/`:is-error`); asserts return is `nil`
+  (the `contains?` guard rejects map returns lacking all modifiable keys).
+- Verify: clj-paren-repair (no changes), clj-kondo clean (0/0); Kaocha focus
+  `psi.agent-session.extensions-test` → 28 tests, 96 assertions, 0 failures
+  (was 26/94 before; +2 tests, +2 assertions). No deviations.
+
+## Test review: task-test-review (second pass, 2026-06-01)
+
+Re-applied task-test-review after the T1a/T1b follow-ups landed. Verified at
+runtime: 28 tests, 96 assertions, 0 failures (Kaocha focus
+`psi.agent-session.extensions-test`).
+
+- **well-formed** ✓ `deftest`/`testing`/`is`; assert on return values; real
+  `create-registry`, no mocks/stubs. New tests are non-vacuous (handlers
+  registered; returns flow through `dispatch-in` into the filter).
+- **infra deps** ✓ None to null.
+- **behaviour coverage** ✗ One residual gap (actionable, T2 below).
+
+T2 (actionable — per-key selection coverage of the single-sourced contract):
+the surviving `dispatch-tool-result-in` filter predicate (extensions.clj:331–333)
+is the *sole* expression of the modifiable-key contract, an `or` over three
+independent branches: `(contains? :content)`, `(contains? :details)`,
+`(contains? :is-error)`. T1a's `dispatch-tool-result-modifiable-key-override-test`
+proves positive selection only for the `:content` branch; T1b proves rejection
+of maps with *none* of the keys. The `:details`-only and `:is-error`-only
+positive-selection branches have no test: a handler returning `{:details {...}}`
+or `{:is-error true}` (and no `:content`) is never asserted to be selected as the
+override. Each `or` disjunct is independently mutable — dropping `:details` or
+`:is-error` from the predicate would leave the whole suite green, silently
+narrowing the very contract this task exists to single-source. The prior T1 pass
+closed the `:content` branch and the all-keys-absent boundary but did not split
+the modifiable-key set into its per-key disjuncts. Add a positive-selection test
+for the `:details`-only and `:is-error`-only handler returns so each disjunct of
+the single-sourced contract is protected against silent removal.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Test review follow-up execution (second pass, 2026-06-01)
+
+Executed T2a and T2b from the second task-test-review pass. Both add
+per-disjunct positive-selection coverage for the surviving
+`dispatch-tool-result-in` filter predicate's modifiable-key `or`, so each
+branch of the single-sourced contract is independently protected.
+
+- T2a → `dispatch-tool-result-details-only-override-test`: handler returns
+  `{:details {:k :v}}` (no `:content`/`:is-error`); asserts
+  `dispatch-tool-result-in` returns that map (positive selection of the
+  `(contains? % :details)` disjunct). Placed after
+  `dispatch-tool-result-map-without-modifiable-key-test`.
+- T2b → `dispatch-tool-result-is-error-only-override-test`: handler returns
+  `{:is-error true}` (no `:content`/`:details`); asserts return is that map
+  (positive selection of the `(contains? % :is-error)` disjunct).
+- Verify: clj-paren-repair (no changes), clj-kondo clean (0/0); Kaocha focus
+  `psi.agent-session.extensions-test` → 30 tests, 98 assertions, 0 failures
+  (was 28/96 before; +2 tests, +2 assertions). No deviations.
+
+## Test review: task-test-review (third pass, 2026-06-01)
+
+Re-applied task-test-review after T2a/T2b landed. Verified at runtime: 30 tests,
+98 assertions, 0 failures (Kaocha focus `psi.agent-session.extensions-test`).
+
+- **well-formed** ✓ `deftest`/`testing`/`is`; assert on return values, not
+  interactions. Real `create-registry`; handlers are plain in-test fns; no
+  mocks/stubs.
+- **infra deps** ✓ None to null — registry is the real domain object.
+- **behaviour coverage** ✓ The surviving `dispatch-tool-result-in` filter
+  predicate (the single-sourced modifiable-key contract, extensions.clj:330–332)
+  is now fully covered: `map?` guard (non-map ⇒ nil); each modifiable-key
+  disjunct positively selected (`:content` T1a, `:details` T2a, `:is-error`
+  T2b); map-without-modifiable-keys rejected (T1b). Coercion/normalization
+  covered by `dispatch-tool-result-{normalizes-content,coerces-is-error}-test`.
+  No predicate branch is silently mutable.
+
+No new actionable test issues within this task's scope. The remaining untested
+behaviours touching `dispatch-tool-result-in` — `first (filter …)` first-writer
+selection across multiple modifiable handler returns, and the `{:error …}`
+handler-exception map being rejected by the filter — are pre-existing `dispatch-in`
+semantics neither introduced nor changed by this task (override precedence is
+covered by `dispatch-override-test`; exception wrapping by `dispatch-exception-test`).
+They are out of scope for this dead-code-removal / single-sourcing task.
+
+PASS_STATUS: REVIEW_COMPLETE
+
+## Test review: test-shaper (2026-06-01)
+
+Applied test-shaper (clarity ∧ signal ∧ robustness ∧ economy) to the
+`dispatch-tool-result-*` test cluster (extensions_test.clj:383–478). Prior passes
+were task-test-review (coverage-focused) and reached full branch coverage; this
+pass reviews test *shape*, a distinct lens. Two actionable shape issues (S1, S2);
+no coverage regressions.
+
+S1 (actionable — economy / repeated ceremony): the six `dispatch-tool-result-*`
+tests (383–478) each rebuild identical scaffolding — `create-registry` +
+`register-extension-in!` + `register-handler-in!` + the full 5-arg
+`dispatch-tool-result-in` call (`"read" "call-N" {"path" "x"} {…original…}
+false`). Only the handler return and the expected value vary. This is
+incidental setup repeated 6× (`λ economical`: `minimal(incidental_variation)`;
+`prefer helpers_that_compress(ceremony)`). No shared helper exists (confirmed:
+the test ns defines none for this cluster). Extract a helper that registers a
+single `tool_result` handler returning a fixed value and invokes
+`dispatch-tool-result-in`, e.g. `(result-override <handler-return>) ⇒
+<dispatch return>`, so each test states only its one varying axis (return →
+selected/nil). This compresses ceremony without hiding intent.
+
+S2 (actionable — incidental detail obscures signal): the override-selection
+tests (`-modifiable-key-override`, `-map-without-modifiable-key`,
+`-details-only-override`, `-is-error-only-override`, `-non-map-return`) pass an
+*original* result `{:content "original" :is-error false}` that is never
+asserted against — the override fully replaces it, so the literal "original"
+content is incidental noise that does not aid comprehension of the
+filter-selection behaviour under test (`λ simple`: `minimal_incidental_setup`,
+`¬embed(unrelated_details)`). Either fold the original payload into the S1
+helper as a single fixed constant (so it stops varying / drawing attention) or
+use a clearly-inert marker, so the reader's eye lands on the handler-return vs
+expected-override contract, not the discarded original.
+
+Note (¬actionable, recorded for shape rationale): the four override-selection
+tests are one parameterized behaviour ("which handler return is selected") split
+per-disjunct deliberately (per the T2 coverage rationale — each `or` disjunct
+must be independently mutation-protected). Keeping them as distinct deftests
+preserves per-branch failure signal (`meaningful_failures`); they need not be
+collapsed into one `are`-table. The S1 helper alone suffices to remove the
+ceremony while retaining per-test signal.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Test review follow-up execution (test-shaper pass, 2026-06-01)
+
+Executed S1 and S2 from the test-shaper pass. Both reshape the
+`dispatch-tool-result-*` override-selection cluster without changing coverage.
+
+- S1 → added a private `result-override` helper (placed just before
+  `dispatch-tool-result-normalizes-content-test`): registers one `tool_result`
+  handler returning a fixed value and invokes `dispatch-tool-result-in` with the
+  inert original result, returning the dispatch result. Rewrote the five
+  override-selection tests (`-non-map-return`, `-modifiable-key-override`,
+  `-map-without-modifiable-key`, `-details-only-override`,
+  `-is-error-only-override`) so each is a single
+  `(is (= <expected> (result-override <handler-return>)))` (or `nil?`) line —
+  the handler return and expected override stay visible per test; per-disjunct
+  deftests retained for per-branch failure signal (per the test-shaper note).
+  The two payload-capturing coercion tests
+  (`-normalizes-content`, `-coerces-is-error`) were intentionally left out of the
+  helper: they vary the *input* result and `is-error?` arg and assert on the
+  captured *incoming* payload — a different axis the override helper does not
+  model.
+- S2 → removed the never-asserted original payload
+  `{:content "original" :is-error false}` from the override-selection tests;
+  folded into the helper as a single inert marker constant
+  `inert-original-result` (`::original`). The original is incidental to
+  override-selection (the handler return fully replaces it), so a non-map marker
+  is safe — `dispatch-tool-result-in` only reads `(:content result)`/`(:details
+  result)` to build the event the handler ignores.
+- Also corrected the now-stale ns docstring ("…dispatch, tool wrapping, and
+  introspection" → "…dispatch, and introspection"): tool wrapping was removed in
+  slice 1.
+- Verify: clj-paren-repair (no changes), clj-kondo clean (0/0); Kaocha focus
+  `psi.agent-session.extensions-test` → 30 tests, 98 assertions, 0 failures
+  (unchanged from before — pure shape change, no coverage delta). No deviations.
+
+PASS_STATUS: REVIEW_COMPLETE (test-shaper S1/S2 resolved)
+
+## Test review: test-shaper (second pass, 2026-06-01)
+
+Re-applied test-shaper to the `dispatch-tool-result-*` cluster
+(extensions_test.clj:383–461) after the prior S1/S2 reshape landed. Verified at
+runtime: 30 tests, 98 assertions, 0 failures (Kaocha focus
+`psi.agent-session.extensions-test`).
+
+- **override-selection cluster** ✓ S1/S2 resolved: the five override tests are
+  one-line `(is (= <expected> (result-override <return>)))` / `nil?`,
+  per-disjunct deftests retained for branch failure signal, original payload
+  folded into the inert `inert-original-result` marker. Clear, economical,
+  behaviour-focused. No regression.
+
+- **coercion cluster** ✗ One residual shape issue (actionable, S3 below).
+
+S3 (actionable — economy / consistency: payload-capture ceremony):
+`dispatch-tool-result-normalizes-content-test` (400) and
+`dispatch-tool-result-coerces-is-error-test` (414) each rebuild the same
+payload-capturing scaffold — `create-registry` + `register-extension-in!` +
+`register-handler-in!` with the `(fn [p] (reset! payload p) nil)` capture
+handler — and inline a full 6-arg `dispatch-tool-result-in` call per assertion
+(three calls total across the two tests). This is the *same kind* of incidental
+ceremony S1 compressed for the override cluster, on a different axis: these tests
+vary the *input* result/`is-error?` and assert on the *captured incoming
+payload*. S1 deliberately scoped itself to override-selection and left these out;
+the payload-capture ceremony was therefore never compressed (`λ economical`:
+`minimal(incidental_variation)`; `λ simple`: `minimal_incidental_setup`). It also
+leaves the cluster inconsistent (`λ consistent`: `consistent(fixtures)` ∧
+`consistent(test_abstractions)`): override tests go through `result-override`,
+coercion tests hand-roll the registry+capture+dispatch. Extract a sibling helper
+(e.g. `(capture-payload <result> <is-error?>)` that registers the capture
+handler, dispatches, and returns the captured incoming payload) so each coercion
+test states only its varying input axis and asserted field. Helper must compress
+ceremony without hiding intent — the input result/`is-error?` and the asserted
+payload field stay visible per test.
+
+Note (¬actionable): `dispatch-tool-result-coerces-is-error-test` holds two
+`testing` blocks (nil→false, truthy-non-bool→true) — two boundary cases of one
+coercion behaviour, correctly grouped; keep them as distinct assertions for
+boundary failure signal. With a `capture-payload` helper they collapse to two
+visible `(is (… (:is-error (capture-payload {…} <raw>))))` lines.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Test-shaper second-pass follow-up execution: S3 (2026-06-01)
+
+Executed S3 (the one newly-added unchecked item from the test-shaper second
+pass). Extracted a sibling `capture-payload` helper next to `result-override`
+that registers the `(fn [p] (reset! payload p) nil)` capture handler, invokes
+`dispatch-tool-result-in` with the given raw result/`is-error?`, and returns the
+captured incoming payload. Rewrote both coercion tests to state only their
+varying input axis and asserted field:
+
+- `dispatch-tool-result-normalizes-content-test` → one
+  `(is (= [{:type :text :text "raw string"}] (:content (capture-payload {…} false))))`.
+- `dispatch-tool-result-coerces-is-error-test` → two visible
+  `(is (false?/true? (:is-error (capture-payload {…} <raw>))))` lines, keeping
+  the nil/non-boolean boundary cases as distinct assertions for failure signal.
+
+This restores fixture/abstraction consistency across the cluster: override tests
+use `result-override`; coercion tests now use the sibling `capture-payload`
+helper instead of hand-rolling the registry/atom/dispatch ceremony. Pure shape
+change — no behaviour or coverage change.
+
+Verification: `clj-paren-repair` (balanced + formatted), `clj-kondo` clean
+(0 errors, 0 warnings), Kaocha focus `psi.agent-session.extensions-test`
+**30 tests, 98 assertions, 0 failures** (coverage unchanged, 30/98 as expected).
+
+## Test review: test-shaper (third pass, 2026-06-01)
+
+Re-applied test-shaper to the `dispatch-tool-result-*` cluster
+(extensions_test.clj:383–461) after S1/S2 (override cluster) and S3 (coercion
+cluster) landed. Verified at runtime: 30 tests, 98 assertions, 0 failures
+(Kaocha focus `psi.agent-session.extensions-test`).
+
+- **simple** ✓ override tests are one visible `(is (= … (result-override …)))` /
+  `nil?` line; coercion tests state only their varying input axis and asserted
+  field via `capture-payload`. Minimal incidental setup; arrange/act/assert clear.
+- **consistent** ✓ Fixture/abstraction consistency restored across the whole
+  cluster: override-selection tests use `result-override`; payload-capture
+  coercion tests use the sibling `capture-payload`. Consistent naming
+  (`dispatch-tool-result-*-test`), structure, assertion style.
+- **economical** ✓ Both ceremony axes (override-selection, payload-capture)
+  compressed into two helpers; per-disjunct override deftests deliberately
+  retained for branch failure signal (not collapsed into an `are`-table).
+  No redundant tests, no incidental variation. The per-test code comments add
+  per-disjunct contract rationale (which `or` branch / why) beyond the `testing`
+  string's *what* — justified documentation, not duplication.
+- **robust** ✓ Deterministic (no time/io/randomness/concurrency); behaviour-
+  focused (asserts return values / captured payload, not interactions); real
+  `create-registry`, plain in-test handler fns, no mocks; meaningful per-branch
+  failure signal.
+
+`tool-event-payload-constructors-test` (the payload *constructor*, A2 out of
+scope) is a distinct concern and is itself clean/economical — not folded into
+the dispatch helpers (different surface).
+
+No new actionable shape issues within this task's scope. The three prior
+test-shaper passes (S1/S2, S3) drove the cluster to a clean shaped state;
+this pass confirms convergence.
+
+PASS_STATUS: REVIEW_COMPLETE
+
+## Docs review: review-task-docs (2026-06-01)
+
+Applied review-task-docs (README ∧ doc/ ∧ CHANGELOG; accuracy ∧ completeness ∧
+consistency) to task 200's removal of `wrap-tool-executor` and single-sourcing of
+the tool-result modifiable-key filter. Verified doc claims against
+`extensions.clj` at runtime, not just text.
+
+- **CHANGELOG** ✓ Correctly absent. The change is internal (dead-code removal +
+  test reshaping); no command/flag/behaviour/extension-capability change.
+  `¬user_visible → ∅` per the changelog rule — no entry required.
+- **"Tool Wrapping" section** (`doc/extensions.md:550`) ✓ Accurate, no change
+  needed. It documents the *public* event-subscription API
+  (`(:on api) "tool_result"` returning `:content`/`:details`/`:is-error` to
+  modify), which survives via `dispatch-tool-result-in`. The section name
+  coincides with the removed internal `wrap-tool-executor` function, but the
+  documented *behaviour* (the surviving filter predicate's modifiable-key
+  contract) is unchanged and correct. The `#tool-wrapping` anchors (530/531) are
+  intact.
+- **Implementation table role label** (`doc/extensions.md:898`) ✗ One stale
+  terminology item (actionable, D1 below).
+
+D1 (actionable — stale internal terminology in user-facing doc): the
+"Implementation" namespace table at `doc/extensions.md:898` lists the Role of
+`psi.agent-session.extensions` as "Registry, loading, event dispatch, **tool
+wrapping**". The "tool wrapping" responsibility named the now-removed
+`wrap-tool-executor` mechanism (zero production callers, deleted in slice 1). The
+namespace no longer wraps tool execution; it dispatches/filters `tool_result`
+events through `dispatch-tool-result-in`. The label is now stale — it points the
+reader at a mechanism that no longer exists. Update the Role to reflect the
+surviving responsibility (e.g. "Registry, loading, event dispatch, tool-result
+filtering" or drop the "tool wrapping" clause), keeping the user-facing "Tool
+Wrapping" event-API section (550) — which documents the surviving public
+capability — unchanged.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Docs review follow-up execution: D1 (2026-06-01)
+
+Executed D1. Edited `doc/extensions.md:898` "Implementation" namespace table:
+`psi.agent-session.extensions` Role changed from
+"Registry, loading, event dispatch, **tool wrapping**" to
+"Registry, loading, event dispatch, **tool-result filtering**". The stale "tool
+wrapping" clause named the removed `wrap-tool-executor` mechanism; the surviving
+responsibility is `tool_result` dispatch/filtering via `dispatch-tool-result-in`.
+
+Verified scope: lowercase internal "tool wrapping" label no longer present
+(`grep`); the public "Tool Wrapping" event-API section (`doc/extensions.md:550`)
+and its `#tool-wrapping` anchors (530/531) left unchanged; no `wrap-tool-executor`
+references remain anywhere under `doc/`.
+
+PASS_STATUS: REVIEW_COMPLETE
+
+## Docs review: review-task-docs (second pass, 2026-06-01)
+
+Re-applied review-task-docs after the prior pass's D1 follow-up landed (commit
+c832116ea). Verified doc claims against `extensions.clj` at runtime, not just text.
+
+- **D1 resolved** ✓ `doc/extensions.md:898` "Implementation" table now reads
+  "Registry, loading, event dispatch, **tool-result filtering**" — the stale
+  "tool wrapping" clause (named the removed `wrap-tool-executor`) is gone.
+- **No stale references** ✓ `grep -rn "wrap-tool-executor|tool wrapping"
+  doc/ README.md CHANGELOG.md` → no matches (lowercase internal label and the
+  removed function name absent everywhere user-facing).
+- **"Tool Wrapping" event-API section** (`doc/extensions.md:550`) ✓ Accurate.
+  Documents the surviving *public* event-subscription capability; verified
+  against source: `dispatch-tool-call-in` returns `{:block true :reason s}`
+  (matches the doc's `{:block true :reason …}` example) and
+  `dispatch-tool-result-in` filters for `:content`/`:details`/`:is-error`
+  (matches the doc's "may return :content, :details, or :is-error to modify").
+  The section name coincides with the removed internal function but documents
+  the surviving filter contract — unchanged and correct. `#tool-wrapping`
+  anchors (530/531) intact.
+- **CHANGELOG** ✓ Correctly absent — internal dead-code removal + test reshaping;
+  not user-visible (`¬user_visible → ∅`).
+
+No new actionable docs issues. Docs are accurate, complete, and consistent with
+the implementation; the prior pass's D1 closed the only stale terminology.
+
+PASS_STATUS: REVIEW_COMPLETE
+
+## Code review: code-shaper (2026-06-01)
+
+Applied code-shaper (simple ∧ consistent ∧ robust) to the *production* code
+surface — a distinct lens from the prior test-shaper / task-test-review / docs
+passes, none of which examined the live tool-result application path. Read
+`extensions.clj` (`dispatch-tool-result-in` filter @331–332, `tool-result-event`
+@299–313) and its production consumer `tool_plan.clj` @219–224. Verified key-set
+usage by grep over `components/**.clj` excluding `*_test.clj`.
+
+One actionable finding (C1).
+
+C1 (actionable — robust/consistent: modifiable-key contract is NOT expressed
+once in production). The task's central acceptance criterion is that after
+removing `wrap-tool-executor`'s `cond->`, the modifiable-key contract
+(`#{:content :details :is-error}`) is "expressed exactly once" — in the
+`dispatch-tool-result-in` filter predicate (`extensions.clj:331–332`). This is
+false for the production code. The same key set is *also* enumerated in
+`tool_plan.clj:222–224`, the live `cond->` that **applies** the override:
+
+```clojure
+(cond-> result
+  (contains? modified :content)  (assoc :content (:content modified))
+  (contains? modified :details)  (assoc :details (:details modified))
+  (contains? modified :is-error) (assoc :is-error (:is-error modified)))
+```
+
+This is the producer/consumer pair of the same contract: `extensions.clj` decides
+*which keys make a handler return count as an override* (selection guard);
+`tool_plan.clj` decides *which keys are copied from the override into the result*
+(application). They must stay in lockstep — adding a fourth modifiable key
+requires editing two non-adjacent sites in two different namespaces, with no
+compiler/lint enforcement that they agree (`λ robust`:
+`shaped_by(code, formalisms) → enforceable(invariants(code))` — violated: the
+key set is an implicit ad-hoc `or`/`cond->` triple, not a named formalism). The
+design enumerated exactly two sites for the contract (`dispatch-tool-result-in`
+filter + `wrap-tool-executor` `cond->`) and concluded that removing the wrapper's
+`cond->` left it expressed once — it **missed** the *live* `tool_plan.clj`
+`cond->`, which is the production duplicate the dead wrapper merely mirrored. The
+task removed the dead copy and left the live coupling in place; the "expressed
+once" criterion is not met in production.
+
+Remediation (smallest shape that restores the invariant): introduce a single
+named source for the modifiable-key set / override-merge — e.g. a
+`modifiable-tool-result-keys` def (or a `merge-tool-result-override` /
+`select-tool-result-override` helper in `extensions.clj`) used by both the
+`dispatch-tool-result-in` selection predicate and the `tool_plan.clj`
+application `cond->` — so the contract is enumerated once and the two sites
+derive from it. (Note: this widens the task scope beyond pure removal; if scope
+is to stay fixed, the design/acceptance criterion must be corrected to state the
+contract is expressed in *two* coupled production sites, not one — but the
+honest fix is single-sourcing across the producer/consumer pair.)
+
+Out of scope confirmation: `tool-result-event` (@299–313) remains correctly
+excluded — it constructs the payload shape, a different concern (per A2). C1 is
+about the *modifiable-key* selection/application contract, which genuinely spans
+two live sites.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Code review follow-up execution: C1 (2026-06-01)
+
+Executed C1 (the one newly-added unchecked item from the code-shaper pass).
+Single-sourced the modifiable-key contract across the producer/consumer pair the
+prior slice missed.
+
+Finding confirmed at runtime: the key set `#{:content :details :is-error}` was
+enumerated in **two** live production sites — the `dispatch-tool-result-in`
+*selection* predicate (`extensions.clj`) and the override *application* `cond->`
+in `tool_plan.clj:222–224`. Removing the dead wrapper's `cond->` left these two
+coupled, with no enforcement they agree; the "expressed exactly once" criterion
+was not met in production. (Audited the other `cond-> result` sites: `post_tool.clj`
+applies the `:content/append`/`:details/merge`/`:enrichments` *processor-contribution*
+contract — a different concern; `turn/handlers.clj` accumulates `:effects` — unrelated.
+Neither touches the modifiable-key set. C1's two-site analysis is exact.)
+
+Fix (honest single-sourcing, per C1's recommended remediation):
+- `extensions.clj`: introduced `modifiable-tool-result-keys` (the named set —
+  the one enumeration), `modifiable-tool-result-override?` (selection guard,
+  derives from the set via `some`), and `merge-tool-result-override` (application,
+  copies only the set's keys the override carries; nil override ⇒ result
+  unchanged via `(contains? nil k) ⇒ false`). `dispatch-tool-result-in` now
+  filters with `modifiable-tool-result-override?`.
+- `tool_plan.clj`: `run-tool-plan-step-in!` replaced the 3-key `cond->` with
+  `(ext/merge-tool-result-override result modified)`. Both sites now derive from
+  the single named set; adding a modifiable key is a one-site edit.
+
+Tests (application half was previously untested — only the dead wrapper's `cond->`,
+now the live `tool_plan.clj` path, exercised it):
+- Added a `merge-tool-result-override` cluster to `extensions_test.clj`:
+  `-applies-present-keys` (each present modifiable key copied),
+  `-ignores-absent-keys` (omitted keys not clobbered),
+  `-ignores-non-modifiable-keys` (keys outside the set never copied),
+  `-nil-override` (nil ⇒ result unchanged). The selection half stays covered by
+  the existing `result-override` cluster (now exercising
+  `modifiable-tool-result-override?`).
+
+design.md Acceptance Criteria corrected: "expressed exactly once in the filter
+predicate" → single-sourced via the named set with both producer/consumer sites
+deriving from it (the live `tool_plan.clj` `cond->` the prior design missed).
+
+Verification: clj-paren-repair (no changes on all 3 files), clj-kondo clean
+(0/0 on extensions.clj, tool_plan.clj, extensions_test.clj); Kaocha focus
+`psi.agent-session.extensions-test` → **34 tests, 102 assertions, 0 failures**
+(was 30/98; +4 tests/+4 assertions for the application half) and
+`psi.agent-session.tool-execution-test` → **13 tests, 66 assertions, 0 failures**
+(plan-path override application unchanged). No deviations.
+
+PASS_STATUS: REVIEW_COMPLETE (code-shaper C1 resolved)
+
+## Code review: code-shaper second pass (2026-06-01)
+
+Independent code-shaper pass on the *current* production surface after the C1
+single-sourcing fix. Re-read `extensions.clj` (`tool-result-event` @299–317,
+`modifiable-tool-result-keys` @322, `modifiable-tool-result-override?` @334,
+`merge-tool-result-override` @341, `dispatch-tool-result-in` @353) and the live
+consumer `tool_plan.clj` `run-tool-plan-step-in!` @219–221. Verified C1 is fully
+applied: the key set is enumerated once and both the selection guard (`some`)
+and application (`reduce`/`cond->`) derive from it; `tool_plan.clj` calls
+`merge-tool-result-override`; grep confirms no other production enumeration of
+the three keys. clj-kondo clean (0/0) on all three files.
+
+One new actionable finding (C2) — distinct from every prior pass (test-shaper /
+task-test-review / docs / code-shaper-C1), none of which examined the override
+*value semantics* on the application path.
+
+C2 (actionable — consistent/robust: the modifiable-key contract single-sources
+the *key set* but not the *value semantics* of those keys, leaving an
+inbound/applied asymmetry). `tool-result-event` (@312–314) is documented as "the
+single source of the cross-path payload shape **and value semantics**": it
+coerces `:content` via `tool-runtime/normalize-tool-content` and `:is-error` via
+`(boolean …)` so handlers always receive a normalized, strictly-typed payload.
+But on the override *return* path, `merge-tool-result-override` copies the
+handler's raw `:content`/`:is-error` straight onto `result` with **no**
+normalization/coercion. A handler returning `{:content "raw string"}` or
+`{:is-error "yes"}` therefore writes an un-normalized content value / a
+non-boolean `:is-error` into the result map that flows downstream
+(`tool_plan.clj:221` → result consumers) — bypassing the very coercion
+`tool-result-event` is documented to guarantee. The contract is thus only
+*half* single-sourced: the `λ robust` invariant
+(`shaped_by(code, formalisms) → enforceable(invariants(code))`) holds for *which
+keys* are modifiable but is silently violated for the *value shape* of those
+keys, and the reader of `merge-tool-result-override` cannot see the asymmetry
+locally (`λ locally_comprehensible` violated — the normalization happens in a
+non-adjacent constructor on the *inbound* half only). This pre-dates the task
+(the dead wrapper's `cond->` copied raw too), but it is exactly the kind of
+implicit-contract divergence the single-sourcing work was meant to close, and it
+is now the *only* remaining duplication-of-intent in the contract.
+
+Remediation (smallest shape restoring symmetry): route override `:content`/
+`:is-error` through the same `tool-result-event` coercions when applied — e.g.
+have `merge-tool-result-override` normalize `:content` and `(boolean …)`-coerce
+`:is-error` for the keys the override carries, or extract the per-key
+coercion table once and let both `tool-result-event` and
+`merge-tool-result-override` derive from it (true single-sourcing of value
+semantics, matching the key-set single-sourcing). Add focused coverage: a
+handler override returning `{:content "raw string"}` yields normalized
+content-blocks in the merged result, and `{:is-error "truthy"}` yields strict
+`true`. If a deliberate decision is instead to trust handler-supplied override
+values verbatim, document that asymmetry explicitly on `merge-tool-result-override`
+and amend `tool-result-event`'s "value semantics" claim so the divergence is
+not silent — but the honest fix is symmetric coercion.
+
+Out-of-scope confirmation: `tool-result-event` itself (@299–317) and its caller
+`tool_runtime_adapter.clj` remain correctly excluded (A2 — payload constructor).
+C2 is about applying the *same* coercions on the override path, not changing the
+constructor.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Code review follow-up execution: C2 (2026-06-01)
+
+Executed the C2 code-shaper second-pass follow-up: restored value-semantics
+symmetry between the inbound `tool-result-event` constructor and the override
+application `merge-tool-result-override`, choosing the honest single-sourcing
+fix (not the documentation-of-asymmetry alternative).
+
+Change (`components/agent-session/src/psi/agent_session/extensions.clj`):
+- Added `modifiable-tool-result-coercions` — a single per-key coercion table
+  `{:content normalize-tool-content :is-error boolean}` documenting and owning
+  the *value semantics* half of the modifiable-key contract (`:details` carries
+  no coercion / identity).
+- Added private `coerce-tool-result-value` deriving from that table
+  (identity fallback for keys without a coercion).
+- `tool-result-event` now coerces `:content`/`:is-error` via
+  `coerce-tool-result-value` (behaviour unchanged; same coercions, now sourced
+  from the shared table).
+- `merge-tool-result-override` now coerces each copied override value via
+  `coerce-tool-result-value`, so a handler override's `:content` (raw string →
+  normalized content-blocks) and `:is-error` (truthy/falsey → strict boolean)
+  land identically to the inbound path. This closes the inbound/applied
+  asymmetry: both halves of the contract (key set *and* value semantics) are now
+  single-sourced.
+
+`tool_plan.clj` consumer is unchanged — it already routes overrides through
+`merge-tool-result-override`, so it now benefits from coercion automatically.
+
+Tests (`components/agent-session/test/psi/agent_session/extensions_test.clj`):
+- Added `merge-tool-result-override-normalizes-content-test`: override
+  `{:content "raw string"}` ⇒ `{:content [{:type :text :text "raw string"}]}`.
+- Added `merge-tool-result-override-coerces-is-error-test`: override
+  `{:is-error "truthy"}` ⇒ strict `true`; `{:is-error nil}` ⇒ strict `false`.
+- Updated the two pre-existing merge assertions
+  (`merge-tool-result-override-applies-present-keys-test`,
+  `merge-tool-result-override-ignores-absent-keys-test`) that expected the raw
+  override `:content "new"` — they now expect normalized content-blocks,
+  reflecting the symmetric coercion.
+
+Verify: `clj-paren-repair` balanced/formatted both changed files; clj-kondo
+clean (0 errors, 0 warnings) on extensions.clj, tool_plan.clj, and the test ns;
+full `bb clojure:test:unit` suite green (all new and updated tests present and
+passing). The `result-override` selection-helper tests are unaffected —
+`dispatch-tool-result-in` selects but does not coerce; coercion is the
+application path's responsibility.
+
+C2 follow-up item checked.
+
+## Code review: code-shaper (third pass, 2026-06-01)
+
+Independent code-shaper pass on the *current* production surface after C1
+(key-set single-sourcing) and C2 (value-semantics single-sourcing) landed.
+Re-read `extensions.clj` (`modifiable-tool-result-coercions` @299,
+`coerce-tool-result-value` @311, `tool-result-event` @317,
+`modifiable-tool-result-keys` @341, `modifiable-tool-result-override?` @353,
+`merge-tool-result-override` @360, `dispatch-tool-result-in` @376) and the live
+consumer `tool_plan.clj` `run-tool-plan-step-in!` @219–221. Verified at runtime
+against source; clj-kondo clean (0/0) on both production files; working tree
+clean.
+
+- **simple** ✓ Each new def has a single responsibility: the keys set
+  *enumerates*, the coercion table *maps value semantics*, the override?
+  predicate *selects*, `merge-tool-result-override` *applies*,
+  `coerce-tool-result-value` *coerces one key*. All locally comprehensible;
+  computation/flow separated.
+- **consistent** ✓ Selection guard and application both derive from
+  `modifiable-tool-result-keys` (one set); `tool-result-event` and
+  `merge-tool-result-override` both derive value semantics from
+  `modifiable-tool-result-coercions` (one table). `tool_plan.clj` calls
+  `merge-tool-result-override` rather than re-enumerating. Naming, argument
+  order, and idioms are consistent across the cluster.
+- **robust** ✓ The modifiable-key contract is now shaped by named formalisms
+  (set + coercion table) → its invariants are enforceable at one site: adding a
+  key is a single-set edit; changing a key's value semantics is a single-table
+  edit; both producer and consumer track automatically. nil override ⇒ result
+  unchanged (`(contains? nil k) ⇒ false`). `reduce` over a set is order-safe
+  here (distinct-key `assoc`s are commutative).
+
+Confirmed both prior findings fully applied:
+- C1: grep over `components/**.clj` excluding `*_test.clj` finds the three keys
+  enumerated once (the named set); no other production site re-enumerates.
+- C2: `merge-tool-result-override` routes copied `:content`/`:is-error` through
+  `coerce-tool-result-value`, matching the inbound `tool-result-event`
+  constructor; both derive from `modifiable-tool-result-coercions`.
+
+Considered and rejected as out-of-scope (¬actionable): in the *no-override*
+branch `tool_plan.clj` returns the runtime executor's base `result` unchanged,
+so its `:content`/`:is-error` are coerced only when a handler override happens
+to carry that key. This base-result normalization is the runtime executor's
+pre-existing responsibility, not the *modifiable-key contract* this task owns
+(A2 boundary: `tool-result-event` constructs the bus-event payload; the returned
+`result` is the executor's output). The override-application coercion correctly
+matches the *event payload* contract — its stated boundary. No change introduced
+by this task creates a new asymmetry here.
+
+No new actionable code-shape issues within this task's scope. C1/C2 drove the
+production contract to a single-sourced, well-shaped state (key set *and* value
+semantics); this pass confirms convergence.
+
+PASS_STATUS: REVIEW_COMPLETE

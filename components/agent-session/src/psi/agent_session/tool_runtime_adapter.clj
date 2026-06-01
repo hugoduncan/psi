@@ -3,6 +3,7 @@
    telemetry, post-tool processing, output accounting, and progress emission."
   (:require
    [psi.agent-session.dispatch :as dispatch]
+   [psi.agent-session.extensions :as ext]
    [psi.agent-session.post-tool :as post-tool]
    [psi.agent-session.psi-tool :as psi-tool]
    [psi.agent-session.state-accessors :as sa]
@@ -20,6 +21,26 @@
                       :session/tool-lifecycle-event
                       {:session-id session-id :entry lifecycle-event}
                       {:origin :core})
+  ;; Bridge interactive/batch lifecycle events onto the same extension bus
+  ;; contract as the plan path, via the canonical payload constructors in
+  ;; `extensions`. The bridge deliberately discards the dispatch return value
+  ;; ({:block true}/override) — interactive-path non-enforcement (documented).
+  (when-let [reg (:extension-registry ctx)]
+    (case (:event-kind lifecycle-event)
+      :tool-start
+      (ext/dispatch-in reg "tool_call"
+                       (ext/tool-call-event (:tool-name lifecycle-event)
+                                            (:tool-call-id lifecycle-event)
+                                            (:parsed-args lifecycle-event)))
+      :tool-result
+      (ext/dispatch-in reg "tool_result"
+                       (ext/tool-result-event (:tool-name lifecycle-event)
+                                              (:tool-call-id lifecycle-event)
+                                              (:parsed-args lifecycle-event)
+                                              (:content lifecycle-event)
+                                              (:details lifecycle-event)
+                                              (:is-error lifecycle-event)))
+      nil))
   lifecycle-event)
 
 (defn- record-tool-output-stat!

@@ -200,6 +200,39 @@ The example project config in this repo defines these bb tasks:
   - fails on dispatch effect parity drift in `agent-session`
   - reports advisory warnings for handler side-effect candidates and direct canonical state writes outside an allowlist
 
+### `extensions/metrics/src/psi/metrics/extension.clj` (`psi.metrics.extension`)
+
+Purpose: accumulate persistent per-capability usage counters and persist them to
+`.psi/metrics.edn` in the session worktree (`worktree/.psi/metrics.edn`).
+
+- Triggers (events subscribed):
+  - `tool_call` — increments per-tool `:invocations`
+  - `tool_result` — when `:is-error`, increments per-tool `:errors` and the
+    matching `:error-reasons` reason count (first error line, trimmed/truncated)
+  - `session_turn_finished` — accrues per-model token totals from session usage
+  - `provider_request_started` / `provider_retry_scheduled` /
+    `provider_request_finished` — provider request/retry/outcome counters
+- Persistence:
+  - `worktree/.psi/metrics.edn`, written atomically via a temp file
+  - schema-validated on load; invalid files are logged and ignored
+- Deterministic operation:
+  - `metrics/summary` — returns the current metrics map
+- Command:
+  - `/metrics` — renders a markdown usage summary
+- Persisted shape (`metrics.edn`):
+  - `:tools {tool-name {:invocations :int :errors :int :error-reasons {reason :int}}}`
+  - `:workflows` / `:commands` / `:operations` `{name {:invocations :int}}`
+  - `:tokens {model {:input :output :cache-read :cache-write}}`
+  - `:providers {provider {:requests :successes :failures :final-failures
+    :retries :retry-backoff-ms :error-types {kind :int}
+    :models {model {…same counters…}}}}`
+  - `:updated-at` timestamp
+
+  The `:tools` map is populated for interactive/batch tool execution by the
+  `tool_call` / `tool_result` extension-bus bridge in
+  `psi.agent-session.tool-runtime-adapter/emit-tool-lifecycle!` (see task 198);
+  before that bridge existed `:tools` was always `{}`.
+
 ### `extensions/plan-state-learning/src/extensions/plan_state_learning.clj` (`extensions.plan-state-learning`)
 
 Purpose: automate munera + mementum working-memory follow-up after non-PSL commits.
@@ -495,7 +528,7 @@ for every event — this is broadcast semantics, not first-match.
 | `"session_fork"`          | `{}`                                      | —       | After fork completes                       |
 | `"model_select"`          | `{:model ... :source :set}`               | —       | After model change                         |
 | `"tool_call"`             | `{:type :tool-name :tool-call-id :input}` | block   | See [Tool Wrapping](#tool-wrapping)        |
-| `"tool_result"`           | `{:type :tool-name :content :is-error}`   | modify  | See [Tool Wrapping](#tool-wrapping)        |
+| `"tool_result"`           | `{:type :tool-name :tool-call-id :input :content :details :is-error}` | modify  | `:input` matches the `tool_call` event on both paths. See [Tool Wrapping](#tool-wrapping) |
 
 **Cancel semantics**: If *any* handler returns `{:cancel true}`, the
 associated action is blocked.  Remaining handlers still fire.
@@ -536,7 +569,9 @@ Subscribe to `"tool_call"` (before) and `"tool_result"` (after):
 
 A `"tool_call"` handler returning `{:block true}` prevents execution.
 A `"tool_result"` handler may return `:content`, `:details`, or
-`:is-error` to modify the result.
+`:is-error` to modify the result. The `"tool_result"` event also carries
+`:input` (the parsed tool arguments, matching the `"tool_call"` event) and
+`:details`, so a handler can correlate the result with its originating call.
 
 ## Flags
 
@@ -860,7 +895,7 @@ The extension system spans two components:
 
 | Namespace                     | Component       | Role                                     |
 |-------------------------------|-----------------|------------------------------------------|
-| `psi.agent-session.extensions`| agent-session   | Registry, loading, event dispatch, tool wrapping |
+| `psi.agent-session.extensions`| agent-session   | Registry, loading, event dispatch, tool-result filtering |
 | `psi.tui.extension-ui`       | tui             | UI state atom, dialogs, widgets, renderers |
 | `psi.agent-session.resolvers` | agent-session  | EQL resolvers (`:psi.extension/*`, `:psi.ui/*`) |
 | `psi.agent-session.core`     | agent-session   | Context wiring, `make-extension-action-fns` |

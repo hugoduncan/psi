@@ -176,6 +176,7 @@
                                             :result-text result-text
                                             :details details
                                             :is-error is-error
+                                            :parsed-args (:parsed-args tool-call)
                                             :call-summary (:call-summary tool-call)))
     (when record-output-stat!
       (let [truncation   (:truncation details)

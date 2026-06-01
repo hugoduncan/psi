@@ -6,11 +6,13 @@
    [psi.agent-core.core :as agent]
    [psi.agent-session.core :as session]
    [psi.agent-session.dispatch :as dispatch]
+   [psi.agent-session.extensions :as ext]
    [psi.agent-session.post-tool :as post-tool]
    [psi.agent-session.tool-runtime-adapter :as tool-runtime-adapter]
    [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.tool-plan :as tool-plan]
+   [psi.metrics.extension :as metrics-ext]
    [psi.turn-runtime.accumulator :as accum])
   (:import
    [java.util.concurrent LinkedBlockingQueue TimeUnit]))
@@ -314,3 +316,132 @@
       (let [projected (.poll q 5 TimeUnit/MILLISECONDS)]
         (is (= :agent-event (:type projected)))
         (is (= event (dissoc projected :type)))))))
+
+(deftest emit-tool-lifecycle-bridge-fires-extension-handlers-test
+  (testing "run-tool-call! fires registered tool_call and tool_result extension handlers (regression guard for emit-tool-lifecycle! bridge)"
+    (let [agent-ctx   (setup-agent-ctx!)
+          [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
+          tc          {:id "call-bridge" :name "read" :arguments "{\"path\":\"x\"}"
+                       :parsed-args {:path "x"}}
+          reg         (:extension-registry session-ctx)
+          calls       (atom [])]
+      (ext/register-extension-in! reg "/ext/test-bridge")
+      (ext/register-handler-in! reg "/ext/test-bridge" "tool_call"
+                                (fn [event] (swap! calls conj [:tool-call event]) nil))
+      (ext/register-handler-in! reg "/ext/test-bridge" "tool_result"
+                                (fn [event] (swap! calls conj [:tool-result event]) nil))
+      (with-redefs [tool-plan/execute-tool-runtime-in!
+                    (fn [_ _ _ _]
+                      {:content "result-text"
+                       :is-error false
+                       :details {:truncation {:truncated false}}})
+                    agent/emit-tool-start-in! (fn [_ _] nil)
+                    agent/emit-tool-end-in! (fn [_ _ _ _] nil)
+                    agent/record-tool-result-in! (fn [_ _] nil)]
+        (#'tool-runtime-adapter/run-tool-call! session-ctx session-ctx-id tc nil)
+        (let [recorded @calls
+              call-event   (second (first (filter #(= :tool-call (first %)) recorded)))
+              result-event (second (first (filter #(= :tool-result (first %)) recorded)))]
+          (is (= 2 (count recorded)) "both tool_call and tool_result handlers fire")
+          (is (= "tool_call" (:type call-event)))
+          (is (= "read" (:tool-name call-event)))
+          (is (= "call-bridge" (:tool-call-id call-event)))
+          (is (= "tool_result" (:type result-event)))
+          (is (= "read" (:tool-name result-event)))
+          (is (= "call-bridge" (:tool-call-id result-event)))
+          (is (= false (:is-error result-event)))
+          ;; Contract: both tool_call and tool_result carry :input (parsed-args),
+          ;; matching the plan-path dispatch-tool-{call,result}-in shape.
+          (is (= {:path "x"} (:input call-event)))
+          (is (= {:path "x"} (:input result-event))
+              "interactive-path tool_result carries :input, unifying the cross-path contract"))))))
+
+(deftest tool-call-handler-block-ignored-on-interactive-path-test
+  (testing "{:block true} from a tool_call handler does NOT block execution on the interactive path (intentional non-enforcement)"
+    (let [agent-ctx   (setup-agent-ctx!)
+          [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
+          tc          {:id "call-block" :name "bash" :arguments "{}"}
+          reg         (:extension-registry session-ctx)
+          result-atom (atom nil)]
+      (ext/register-extension-in! reg "/ext/test-block")
+      (ext/register-handler-in! reg "/ext/test-block" "tool_call"
+                                (fn [_] {:block true :reason "blocked by extension"}))
+      (with-redefs [tool-plan/execute-tool-runtime-in!
+                    (fn [_ _ _ _]
+                      {:content "executed despite block"
+                       :is-error false
+                       :details {:truncation {:truncated false}}})
+                    agent/emit-tool-start-in! (fn [_ _] nil)
+                    agent/emit-tool-end-in! (fn [_ _ _ _] nil)
+                    agent/record-tool-result-in!
+                    (fn [_ msg] (reset! result-atom msg) nil)]
+        (let [result (#'tool-runtime-adapter/run-tool-call! session-ctx session-ctx-id tc nil)]
+          (is (some? result) "tool execution completes even when handler returns {:block true}")
+          (is (= "call-block" (:tool-call-id result)) "result carries the tool-call-id")
+          (is (some? @result-atom) "tool result was recorded — execution was not blocked"))))))
+
+;;; End-to-end: metrics extension accumulates :tools via the bridge
+
+(defn- run-tool-call-through-metrics-ext!
+  "Drive `tool-call` through `run-tool-call!` with the real metrics extension loaded
+  on a fresh session ctx, while `execute-tool-runtime-in!` returns `runtime-result`.
+
+  Compresses the e2e ceremony — defonce-atom reset/cleanup, registry-only runtime-fns,
+  metrics-ext load, and infra `with-redefs` — so each test states only its per-test
+  intent (the runtime result and the store assertions, run after this returns)."
+  [tool-call runtime-result]
+  (reset! metrics-ext/store nil)
+  (reset! metrics-ext/writing? false)
+  (let [agent-ctx   (setup-agent-ctx!)
+        [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
+        reg         (:extension-registry session-ctx)
+        ;; Minimal runtime-fns: query-fn returns nil worktree-path; no mutate-fn so
+        ;; (:on api) falls back to register-handler-in! directly on the registry.
+        runtime-fns {:query-fn (fn [q]
+                                 (when (= q [:psi.agent-session/worktree-path])
+                                   {:psi.agent-session/worktree-path nil}))}]
+    (ext/load-init-var-extension-in! reg "manifest:psi/metrics" 'psi.metrics.extension/init runtime-fns)
+    (with-redefs [tool-plan/execute-tool-runtime-in! (fn [_ _ _ _] runtime-result)
+                  agent/emit-tool-start-in! (fn [_ _] nil)
+                  agent/emit-tool-end-in! (fn [_ _ _ _] nil)
+                  agent/record-tool-result-in! (fn [_ _] nil)]
+      (#'tool-runtime-adapter/run-tool-call! session-ctx session-ctx-id tool-call nil))))
+
+(deftest metrics-extension-accumulates-tools-via-bridge-test
+  (testing "register metrics ext on real session ctx, call run-tool-call!, assert :tools entry accumulated — full path: adapter → bridge → metrics handler → store"
+    (try
+      (run-tool-call-through-metrics-ext!
+       {:id "call-e2e" :name "read" :arguments "{}"}
+       {:content "file contents"
+        :is-error false
+        :details {:truncation {:truncated false}}})
+      ;; Assert the full path fired: metrics store now has a :tools entry for "read".
+      (is (= 1 (get-in @metrics-ext/store [:metrics :tools "read" :invocations]))
+          "metrics extension accumulated :tools entry via adapter → bridge → handler → store")
+      (finally
+        (reset! metrics-ext/store nil)
+        (reset! metrics-ext/writing? false)))))
+
+(deftest metrics-extension-accumulates-errors-via-bridge-test
+  (testing "register metrics ext on real session ctx, drive run-tool-call! with :is-error true, assert :errors entry accumulated — full error path: adapter → bridge → metrics on-tool-result → store (AC2)"
+    (try
+      (run-tool-call-through-metrics-ext!
+       {:id "call-e2e-err" :name "bash" :arguments "{}"}
+       {:content "boom: command failed"
+        :is-error true
+        :details {:truncation {:truncated false}}})
+      ;; Assert the full error path fired: the bridge propagated :is-error true so
+      ;; on-tool-result incremented :errors (and on-tool-call recorded the invocation).
+      (is (= 1 (get-in @metrics-ext/store [:metrics :tools "bash" :invocations]))
+          "invocation counter incremented via bridge")
+      (is (= 1 (get-in @metrics-ext/store [:metrics :tools "bash" :errors]))
+          "error counter incremented via adapter → bridge → on-tool-result → store")
+      ;; The lifecycle :tool-result event carries shaped structured-block content;
+      ;; the metrics handler extracts the human-readable :text from the blocks.
+      ;; Assert the exact cross-path reason key (no stringified-data-structure wrapping).
+      (let [reasons (get-in @metrics-ext/store [:metrics :tools "bash" :error-reasons])]
+        (is (= {"boom: command failed" 1} reasons)
+            "exact human-readable reason key derived from propagated content blocks"))
+      (finally
+        (reset! metrics-ext/store nil)
+        (reset! metrics-ext/writing? false)))))

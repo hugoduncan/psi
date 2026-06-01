@@ -1,9 +1,7 @@
 (ns psi.agent-session.extensions-test
-  "Tests for the extension registry, tool wrapping, introspection, and extension API."
+  "Tests for the extension registry, dispatch, and introspection."
   (:require
    [clojure.test :refer [deftest testing is]]
-   [com.wsscode.pathom3.connect.operation :as pco]
-   [psi.agent-session.mutations.extensions :as extension-mutations]
    [psi.deterministic-operation-runtime.core :as deterministic-op-runtime]
    [psi.deterministic-operation-registry.registry :as op-reg]
    [psi.agent-session.extensions :as ext]
@@ -382,67 +380,158 @@
       (ext/bus-emit-in! reg "ch" :x)
       (is (= [[:a :x] [:b :x]] @fired)))))
 
-;; ── Tool wrapping ───────────────────────────────────────────────────────────
+;; The original runtime result passed to dispatch-tool-result-in is incidental
+;; to override-selection: the handler return fully replaces it. Keep it a single
+;; inert marker so each override-selection test states only its varying axis
+;; (handler return → selected override / nil).
+(def ^:private inert-original-result ::original)
 
-(deftest tool-wrapping-test
-  (testing "wrap-tool-executor passes through when no handlers"
-    (let [reg        (ext/create-registry)
-          execute-fn (fn [tool-name _args] {:content (str tool-name " ok") :is-error false})
-          wrapped    (ext/wrap-tool-executor reg execute-fn)]
-      (is (= {:content "read ok" :is-error false}
-             (wrapped "read" {})))))
+(defn- result-override
+  "Register one tool_result handler returning handler-return, then invoke
+   dispatch-tool-result-in with the inert original result. Returns the dispatch
+   result: the selected override map, or nil when the filter rejects the return."
+  [handler-return]
+  (let [reg (ext/create-registry)]
+    (ext/register-extension-in! reg "/ext/a")
+    (ext/register-handler-in! reg "/ext/a" "tool_result" (fn [_] handler-return))
+    (ext/dispatch-tool-result-in reg "read" "call-1" {"path" "x"}
+                                 inert-original-result false)))
 
-  (testing "wrap-tool-executor remains an extension-local compatibility wrapper"
-    (let [reg        (ext/create-registry)
-          calls      (atom [])
-          execute-fn (fn [tool-name args]
-                       (swap! calls conj {:tool-name tool-name :args args})
-                       {:content "ok" :is-error false})
-          wrapped    (ext/wrap-tool-executor reg execute-fn)]
-      (is (= {:content "ok" :is-error false}
-             (wrapped "echo" {"x" 1})))
-      (is (= [{:tool-name "echo" :args {"x" 1}}] @calls))))
+(defn- capture-payload
+  "Register a tool_result handler that captures (and does not override) the
+   incoming payload, then invoke dispatch-tool-result-in with the given raw
+   result and is-error?. Returns the captured incoming payload — the normalized
+   shape the bus delivers to handlers."
+  [result is-error?]
+  (let [reg     (ext/create-registry)
+        payload (atom nil)]
+    (ext/register-extension-in! reg "/ext/a")
+    (ext/register-handler-in! reg "/ext/a" "tool_result"
+                              (fn [p] (reset! payload p) nil))
+    (ext/dispatch-tool-result-in reg "read" "call-1" {"path" "x"}
+                                 result is-error?)
+    @payload))
 
-  (testing "tool_call handler can block execution"
-    (let [reg        (ext/create-registry)
-          execute-fn (fn [_tool-name _args]
-                       (throw (Exception. "should not be called")))
-          _          (ext/register-extension-in! reg "/ext/a")
-          _          (ext/register-handler-in! reg "/ext/a" "tool_call"
-                                               (fn [_] {:block true :reason "blocked!"}))
-          wrapped    (ext/wrap-tool-executor reg execute-fn)]
-      (is (= {:content "blocked!" :is-error true}
-             (wrapped "bash" {"command" "rm -rf /"})))))
+(deftest dispatch-tool-result-normalizes-content-test
+  (testing "plan-path tool_result bus event delivers :content as normalized content-blocks"
+    ;; raw runtime result carries :content as a plain string
+    (is (= [{:type :text :text "raw string"}]
+           (:content (capture-payload {:content "raw string" :is-error false} false)))
+        "string content is coerced to canonical text blocks, matching the interactive bridge")))
 
-  (testing "tool_result handler can modify result"
-    (let [reg        (ext/create-registry)
-          execute-fn (fn [_tool-name _args] {:content "original" :is-error false})
-          _          (ext/register-extension-in! reg "/ext/a")
-          _          (ext/register-handler-in! reg "/ext/a" "tool_result"
-                                               (fn [_] {:content "modified"}))
-          wrapped    (ext/wrap-tool-executor reg execute-fn)]
-      (is (= {:content "modified" :is-error false}
-             (wrapped "read" {"path" "test.txt"})))))
+(deftest dispatch-tool-result-coerces-is-error-test
+  (testing "plan-path tool_result bus event delivers :is-error as a strict boolean"
+    (testing "raw nil is-error? coerces to strict false, matching the interactive bridge"
+      (is (false? (:is-error (capture-payload {:content "ok"} nil)))))
+    (testing "raw truthy non-boolean is-error? coerces to strict true"
+      (is (true? (:is-error (capture-payload {:content "boom"} "some-error")))))))
 
-  (testing "tool_result handler can modify is-error"
-    (let [reg        (ext/create-registry)
-          execute-fn (fn [_tool-name _args] {:content "result" :is-error false})
-          _          (ext/register-extension-in! reg "/ext/a")
-          _          (ext/register-handler-in! reg "/ext/a" "tool_result"
-                                               (fn [_] {:is-error true}))
-          wrapped    (ext/wrap-tool-executor reg execute-fn)]
-      (is (= {:content "result" :is-error true}
-             (wrapped "read" {"path" "test.txt"})))))
+(deftest dispatch-tool-result-non-map-return-test
+  (testing "tool_result handler returning a non-map yields no override (nil)"
+    ;; The surviving filter predicate's map?/contains? guard rejects non-map
+    ;; handler returns, so no modifiable-key override is produced.
+    (is (nil? (result-override "not-a-map")))))
 
-  (testing "tool_result handler returning non-map is silently ignored"
-    (let [reg        (ext/create-registry)
-          execute-fn (fn [_tool-name _args] {:content "original" :is-error false})
-          _          (ext/register-extension-in! reg "/ext/a")
-          _          (ext/register-handler-in! reg "/ext/a" "tool_result"
-                                               (fn [_] "not-a-map"))
-          wrapped    (ext/wrap-tool-executor reg execute-fn)]
-      (is (= {:content "original" :is-error false}
-             (wrapped "read" {"path" "test.txt"}))))))
+(deftest dispatch-tool-result-modifiable-key-override-test
+  (testing "tool_result handler returning a map with a modifiable key is selected as the override"
+    ;; The surviving filter predicate's contains? guard selects map returns
+    ;; carrying a modifiable key (:content/:details/:is-error) — the single
+    ;; source of the modifiable-key contract.
+    (is (= {:content "override"} (result-override {:content "override"})))))
+
+(deftest dispatch-tool-result-map-without-modifiable-key-test
+  (testing "tool_result handler returning a map lacking all modifiable keys yields no override (nil)"
+    ;; The filter predicate's contains? guard rejects map returns without any
+    ;; of :content/:details/:is-error, so no modifiable-key override is produced.
+    (is (nil? (result-override {:other 1})))))
+
+(deftest dispatch-tool-result-details-only-override-test
+  (testing "tool_result handler returning a map with only :details is selected as the override"
+    ;; Protects the (contains? :details) disjunct of the single-sourced
+    ;; modifiable-key contract — a map carrying only :details (no
+    ;; :content/:is-error) is selected as the override.
+    (is (= {:details {:k :v}} (result-override {:details {:k :v}})))))
+
+(deftest dispatch-tool-result-is-error-only-override-test
+  (testing "tool_result handler returning a map with only :is-error is selected as the override"
+    ;; Protects the (contains? :is-error) disjunct of the single-sourced
+    ;; modifiable-key contract — a map carrying only :is-error (no
+    ;; :content/:details) is selected as the override.
+    (is (= {:is-error true} (result-override {:is-error true})))))
+
+(deftest merge-tool-result-override-applies-present-keys-test
+  (testing "merge-tool-result-override copies each present modifiable key onto result"
+    ;; The application half of the single-sourced modifiable-key contract:
+    ;; only keys the override actually carries are copied; each modifiable key
+    ;; is applied (mirrors the selection guard's :content/:details/:is-error or).
+    ;; Copied :content/:is-error values are coerced via
+    ;; modifiable-tool-result-coercions, matching the inbound tool-result-event.
+    (is (= {:content [{:type :text :text "new"}] :details {:k :v} :is-error true}
+           (ext/merge-tool-result-override
+            {:content "old" :details nil :is-error false}
+            {:content "new" :details {:k :v} :is-error true})))))
+
+(deftest merge-tool-result-override-ignores-absent-keys-test
+  (testing "merge-tool-result-override leaves result keys the override omits unchanged"
+    ;; An override carrying only :content must not clobber :details/:is-error.
+    (is (= {:content [{:type :text :text "new"}] :details {:orig true} :is-error false}
+           (ext/merge-tool-result-override
+            {:content "old" :details {:orig true} :is-error false}
+            {:content "new"})))))
+
+(deftest merge-tool-result-override-ignores-non-modifiable-keys-test
+  (testing "merge-tool-result-override copies no key outside the modifiable set"
+    ;; Keys not in modifiable-tool-result-keys are never copied from the override.
+    (is (= {:content "old"}
+           (ext/merge-tool-result-override {:content "old"} {:other 1})))))
+
+(deftest merge-tool-result-override-nil-override-test
+  (testing "merge-tool-result-override returns result unchanged when override is nil"
+    ;; dispatch-tool-result-in returns nil when no handler produces an override;
+    ;; the application half must pass result through untouched.
+    (is (= {:content "old" :is-error false}
+           (ext/merge-tool-result-override {:content "old" :is-error false} nil)))))
+
+(deftest merge-tool-result-override-normalizes-content-test
+  (testing "merge-tool-result-override normalizes override :content like the inbound event"
+    ;; C2 value-semantics symmetry: a handler override returning a raw string
+    ;; :content must land as normalized content-blocks in the merged result,
+    ;; matching tool-result-event's inbound :content coercion.
+    (is (= {:content [{:type :text :text "raw string"}]}
+           (ext/merge-tool-result-override {} {:content "raw string"})))))
+
+(deftest merge-tool-result-override-coerces-is-error-test
+  (testing "merge-tool-result-override coerces override :is-error to a strict boolean"
+    ;; C2 value-semantics symmetry: a truthy non-boolean override :is-error must
+    ;; become strict true (matching tool-result-event's (boolean …) coercion),
+    ;; and a falsey nil must become strict false.
+    (is (true? (:is-error (ext/merge-tool-result-override {} {:is-error "truthy"}))))
+    (is (false? (:is-error (ext/merge-tool-result-override {} {:is-error nil}))))))
+
+(deftest tool-event-payload-constructors-test
+  (testing "tool-call-event builds the canonical tool_call payload shape"
+    (is (= {:type         "tool_call"
+            :tool-name    "read"
+            :tool-call-id "call-1"
+            :input        {"path" "x"}}
+           (ext/tool-call-event "read" "call-1" {"path" "x"}))))
+  (testing "tool-result-event builds the canonical tool_result payload shape"
+    (is (= {:type         "tool_result"
+            :tool-name    "read"
+            :tool-call-id "call-1"
+            :input        {"path" "x"}
+            :content      [{:type :text :text "raw string"}]
+            :details      {:k :v}
+            :is-error     false}
+           (ext/tool-result-event "read" "call-1" {"path" "x"}
+                                  "raw string" {:k :v} nil))
+        "string content normalized to blocks; nil is-error? coerced to strict false")
+    (is (true? (:is-error (ext/tool-result-event "read" "c" {} "boom" nil "oops")))
+        "non-boolean is-error? coerced to strict true")
+    (is (= [{:type :text :text "already"}]
+           (:content (ext/tool-result-event "read" "c" {}
+                                            [{:type :text :text "already"}] nil false)))
+        "already-normalized content (interactive bridge) is idempotent through the builder")))
 
 ;; ── Introspection: handler event names ──────────────────────────────────────
 
@@ -571,178 +660,3 @@
          #"not found"
          (op-reg/invoke-operation-in op-registry "github/search-issues-by-label" {:args {}} deterministic-op-runtime/invoke-operation)))))
 
-(deftest extension-api-registration-test
-  (testing "API :on registers handlers"
-    (let [reg (ext/create-registry)
-          _   (ext/register-extension-in! reg "/ext/test")
-          api (ext/create-extension-api reg "/ext/test" {})]
-      ((:on api) "session_switch" (fn [_] nil))
-      (is (= 1 (ext/handler-count-in reg)))))
-
-  (testing "API :register-tool registers tools"
-    (let [reg (ext/create-registry)
-          _   (ext/register-extension-in! reg "/ext/test")
-          api (ext/create-extension-api reg "/ext/test" {})]
-      ((:register-tool api) {:name "ext-tool" :label "ET" :description "test" :format-request (fn [_] "ext-tool")})
-      (is (contains? (tool-registry/tool-names-in reg) "ext-tool"))))
-
-  (testing "API :register-command registers commands"
-    (let [reg (ext/create-registry)
-          _   (ext/register-extension-in! reg "/ext/test")
-          api (ext/create-extension-api reg "/ext/test" {})]
-      ((:register-command api) "greet" {:handler (fn [_] nil) :description "Say hi"})
-      (is (contains? (ext/command-names-in reg) "greet"))))
-
-  (testing "API :register-operation delegates to deterministic operation runtime registration"
-    (let [reg (ext/create-registry)
-          _   (ext/register-extension-in! reg "/ext/test")
-          calls (atom [])
-          api (ext/create-extension-api reg "/ext/test"
-                                        {:register-deterministic-operation-fn
-                                         (fn [ext-path op]
-                                           (swap! calls conj [ext-path op])
-                                           {:id (:id op)})})]
-      (is (= {:id "github/search-issues-by-label"}
-             ((:register-operation api)
-              {:id "github/search-issues-by-label"
-               :handler (fn [_] {:status :ok :data {}})})))
-      (is (= [["/ext/test" "github/search-issues-by-label"]]
-             (mapv (fn [[ext-path op]] [ext-path (:id op)]) @calls)))))
-
-  (testing "API :register-flag with default"
-    (let [reg (ext/create-registry)
-          _   (ext/register-extension-in! reg "/ext/test")
-          api (ext/create-extension-api reg "/ext/test" {})]
-      ((:register-flag api) "debug" {:type :boolean :default false})
-      (is (= false ((:get-flag api) "debug")))))
-
-  (testing "API :query delegates to runtime query fn"
-    (let [reg         (ext/create-registry)
-          _           (ext/register-extension-in! reg "/ext/test")
-          runtime-fns {:query-fn (fn [q] {:echo q})}
-          api         (ext/create-extension-api reg "/ext/test" runtime-fns)]
-      (is (= {:echo [:x]} ((:query api) [:x])))))
-
-  (testing "API :query can read runtime UI capabilities through real extension runtime fns"
-    (let [[ctx session-id] (test-support/create-test-session {:persist? false
-                                                              :ui-type :console})
-          reg             (:extension-registry ctx)
-          ext-path        "/ext/test"
-          _               (ext/register-extension-in! reg ext-path)
-          _               (ext/set-allowed-events-in! reg ext-path #{})
-          runtime-fns     (runtime-fns/make-extension-runtime-fns ctx session-id ext-path)
-          api             (ext/create-extension-api reg ext-path runtime-fns)]
-      (is (= {:psi.ui/type :console
-              :psi.ui/available? true
-              :psi.ui/capabilities []
-              :psi.ui/actions []
-              :psi.ui/make-visible-action
-              {:psi.ui.action/id :psi.ui.action/make-visible
-               :psi.ui.action/capability :psi.ui.capability/make-visible
-               :psi.ui.action/label "Show Psi UI"
-               :psi.ui.action/description "Bring the active Psi UI to the foreground."
-               :psi.ui.action/available? false
-               :psi.ui.action/unavailable-reason :psi.ui.unavailable.reason/unsupported-capability
-               :psi.ui.action/unavailable-message "The attached UI does not support making itself visible."}
-              :psi.ui/diagnostic nil}
-             ((:query api) [:psi.ui/type
-                            :psi.ui/available?
-                            :psi.ui/capabilities
-                            :psi.ui/actions
-                            :psi.ui/make-visible-action
-                            :psi.ui/diagnostic])))))
-
-  (testing "API :list-services delegates to runtime query fn"
-    (let [reg         (ext/create-registry)
-          _           (ext/register-extension-in! reg "/ext/test")
-          services    [{:psi.service/key [:svc "/repo"]
-                        :psi.service/status :running}]
-          runtime-fns {:query-fn (fn [q]
-                                   (is (= [{:psi.service/services [:psi.service/key
-                                                                   :psi.service/status
-                                                                   :psi.service/command
-                                                                   :psi.service/cwd
-                                                                   :psi.service/transport
-                                                                   :psi.service/ext-path
-                                                                   :psi.service/notification-count]}]
-                                          q))
-                                   {:psi.service/services services})}
-          api         (ext/create-extension-api reg "/ext/test" runtime-fns)]
-      (is (= services ((:list-services api))))))
-
-  (testing "API :ui-type delegates to runtime ui-type fn"
-    (let [reg         (ext/create-registry)
-          _           (ext/register-extension-in! reg "/ext/test")
-          runtime-fns {:ui-type-fn (fn [] :emacs)}
-          api         (ext/create-extension-api reg "/ext/test" runtime-fns)]
-      (is (= :emacs (:ui-type api)))))
-
-  (testing "API :mutate delegates to runtime mutate fn"
-    (let [reg         (ext/create-registry)
-          _           (ext/register-extension-in! reg "/ext/test")
-          runtime-fns {:mutate-fn (fn [op params] {:op op :params params})}
-          api         (ext/create-extension-api reg "/ext/test" runtime-fns)]
-      (is (= {:op 'psi.extension/test :params {:a 1 :ext-path "/ext/test"}}
-             ((:mutate api) 'psi.extension/test {:a 1})))
-      (is (= {:op 'psi.other/test :params {:a 1}}
-             ((:mutate api) 'psi.other/test {:a 1})))
-      (is (= {:op 'psi.extension/test :params {:a 1 :ext-path "/custom"}}
-             ((:mutate api) 'psi.extension/test {:a 1 :ext-path "/custom"})))
-      (is (= {:op 'psi.extension.workflow/create :params {:type :agent :ext-path "/ext/test"}}
-             ((:mutate api) 'psi.extension.workflow/create {:type :agent})))))
-
-  (testing "mid-system mutation declares optional provenance params"
-    (is (= [:psi/agent-session-ctx :session-id :text :source :ext-path]
-           (-> extension-mutations/inject-mid-system-message
-               :config
-               ::pco/params))))
-
-  (testing "API mid-system helper delegates to runtime mutation and normalizes result"
-    (let [reg         (ext/create-registry)
-          _           (ext/register-extension-in! reg "/ext/test")
-          calls       (atom [])
-          runtime-fns {:mutate-fn (fn [op params]
-                                    (swap! calls conj {:op op :params params})
-                                    {:psi.extension/ok? true})}
-          api         (ext/create-extension-api reg "/ext/test" runtime-fns)]
-      (is (= {:ok true :error nil :reason nil}
-             ((:inject-mid-system-message api) "Use shorter answers")))
-      (is (= {:ok true :error nil :reason nil}
-             ((:inject-mid-system-message api) "Use citations" {:source :trusted})))
-      (is (= [{:op 'psi.extension/inject-mid-system-message
-               :params {:text "Use shorter answers" :ext-path "/ext/test"}}
-              {:op 'psi.extension/inject-mid-system-message
-               :params {:text "Use citations" :source :trusted :ext-path "/ext/test"}}]
-             @calls))))
-
-  (testing "API session lifecycle helpers delegate to runtime mutate fn"
-    (let [reg         (ext/create-registry)
-          _           (ext/register-extension-in! reg "/ext/test")
-          runtime-fns {:mutate-fn (fn [op params] {:op op :params params})}
-          api         (ext/create-extension-api reg "/ext/test" runtime-fns)]
-      (is (= {:op 'psi.extension/create-session
-              :params {:session-name "feature"
-                       :worktree-path "/repo/feature"
-                       :system-prompt "prompt"}}
-             ((:create-session api) {:session-name "feature"
-                                     :worktree-path "/repo/feature"
-                                     :system-prompt "prompt"})))
-      (is (= {:op 'psi.extension/switch-session
-              :params {:session-id "s1"}}
-             ((:switch-session api) "s1")))
-      (is (= {:op 'psi.extension/set-worktree-path
-              :params {:session-id "s1"
-                       :worktree-path "/repo/feature"}}
-             ((:set-worktree-path api) "s1" "/repo/feature")))
-      (is (= {:op 'psi.extension/notify
-              :params {:content "done"}}
-             ((:notify api) "done")))
-      (is (= {:op 'psi.extension/notify
-              :params {:content "done"
-                       :role "assistant"
-                       :custom-type "workflow-status"}}
-             ((:notify api) "done" {:role "assistant" :custom-type "workflow-status"})))
-      (is (= {:op 'psi.extension/append-message
-              :params {:role "user"
-                       :content "Please continue"}}
-             ((:append-message api) "user" "Please continue"))))))

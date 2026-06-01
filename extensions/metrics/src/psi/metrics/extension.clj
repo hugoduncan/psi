@@ -11,7 +11,8 @@
    [clojure.string :as str]
    [psi.metrics.counters :as counters]
    [psi.metrics.persistence :as persist]
-   [psi.metrics.schema :as schema]))
+   [psi.metrics.schema :as schema]
+   [taoensso.timbre :as timbre]))
 
 ;;; State
 
@@ -43,19 +44,33 @@
     (update-metrics! counters/inc-tool-invocation tool-name))
   nil)
 
+(defn- content->text
+  "Extract human-readable text from tool result content.
+
+   Content is canonically a vec of `{:type :text :text ...}` blocks (both the
+   interactive/batch bridge and the plan path normalise via
+   `tool-runtime/normalize-tool-content`). Join the `:text` of each block so the
+   derived reason is the human-readable error text, not a stringified data
+   structure. Falls back to `(str content)` for any non-block-vector value."
+  [content]
+  (if (and (sequential? content)
+           (every? map? content))
+    (str/join " " (keep :text content))
+    (str content)))
+
+(defn- error-reason
+  "Derive a single-line, ≤80-char error reason key from tool result content."
+  [content]
+  (let [first-line (-> (content->text content) str/split-lines first str/trim)]
+    (subs first-line 0 (min 80 (count first-line)))))
+
 (defn- on-tool-result
   "Increment error counters when the tool result is an error."
   [payload]
   (when (and (:tool-name payload) (:is-error payload))
-    (let [tool-name (:tool-name payload)
-          content   (str (:content payload))
-          reason    (-> content
-                        (str/split-lines)
-                        first
-                        (or "")
-                        (str/trim)
-                        (subs 0 (min 80 (count (str/trim (first (str/split-lines content)))))))]
-      (update-metrics! counters/inc-tool-error tool-name reason)))
+    (update-metrics! counters/inc-tool-error
+                     (:tool-name payload)
+                     (error-reason (:content payload))))
   nil)
 
 (defn- make-turn-finished-handler
@@ -82,8 +97,7 @@
           (swap! store assoc-in [:session-usage-cache session-id] cur-usage)
           (update-metrics! counters/add-token-delta model-id delta))
         (catch Exception e
-          (println (str "DEBUG [psi/metrics] skipping token tracking for session "
-                        session-id ": " (ex-message e))))))
+          (timbre/warn e "skipping token tracking for session" session-id))))
     nil))
 
 (defn- on-provider-request-started

@@ -35,10 +35,14 @@
      {:api api* :state state :ops ops})))
 
 (defn- fire-event
-  "Fire all registered handlers for event-name with payload."
+  "Fire all registered handlers for event-name with payload, returning the
+   last handler's result. Use the return value when a test needs to assert on
+   a handler's result (e.g. the swallow-and-return-nil contract); most callers
+   discard it."
   [state event-name payload]
-  (doseq [h (get-in @state [:handlers event-name])]
-    (h payload)))
+  (reduce (fn [_ h] (h payload))
+          nil
+          (get-in @state [:handlers event-name])))
 
 ;;; init registration
 
@@ -113,16 +117,68 @@
     (let [metrics (:metrics @ext/store)]
       (is (nil? (get-in metrics [:tools "bash" :errors]))))))
 
-(deftest tool-result-error-reason-truncated-to-80-chars-test
-  ;; The error reason key is derived from the first line, max 80 chars.
-  (let [{:keys [api state]} (make-api)
-        long-message (apply str (repeat 100 "x"))]
+(deftest tool-result-error-reason-extracts-text-from-content-blocks-test
+  ;; On both paths :content is normalised to a vec of {:type :text :text ...}
+  ;; blocks. The reason key must be the human-readable :text, not a stringified
+  ;; data structure.
+  (let [{:keys [api state]} (make-api)]
     (ext/init api)
     (fire-event state "tool_result"
-                {:tool-name "read" :tool-call-id "c1" :is-error true :content long-message})
-    (let [reasons (get-in @ext/store [:metrics :tools "read" :error-reasons])]
+                {:tool-name "bash" :tool-call-id "c1" :is-error true
+                 :content [{:type :text :text "boom: command failed"}]})
+    (let [reasons (get-in @ext/store [:metrics :tools "bash" :error-reasons])]
       (is (= 1 (count reasons)))
-      (is (<= (count (first (keys reasons))) 80)))))
+      (is (= 1 (get reasons "boom: command failed"))
+          "reason key is the human-readable :text from the content block"))))
+
+(deftest tool-result-error-reason-joins-multiple-content-blocks-test
+  ;; Multiple text blocks are joined; the first-line/80-char rule then applies.
+  (let [{:keys [api state]} (make-api)]
+    (ext/init api)
+    (fire-event state "tool_result"
+                {:tool-name "bash" :tool-call-id "c1" :is-error true
+                 :content [{:type :text :text "first part"}
+                           {:type :text :text "second part"}]})
+    (let [reasons (get-in @ext/store [:metrics :tools "bash" :error-reasons])]
+      (is (= 1 (count reasons)))
+      (is (= 1 (get reasons "first part second part"))
+          "text blocks joined into a single reason key"))))
+
+(deftest tool-result-error-reason-non-text-blocks-dropped-test
+  ;; content->text uses (keep :text content): non-text blocks (no :text key,
+  ;; e.g. image blocks preserved by normalize-tool-content) are silently
+  ;; dropped. Pin the chosen behaviour at the boundary:
+  ;; - image-only error content -> empty-string reason key
+  ;; - mixed text+image -> text-only key (image dropped)
+  (let [{:keys [api state]} (make-api)]
+    (ext/init api)
+    (fire-event state "tool_result"
+                {:tool-name "bash" :tool-call-id "c1" :is-error true
+                 :content [{:type :image :data "x"}]})
+    (let [reasons (get-in @ext/store [:metrics :tools "bash" :error-reasons])]
+      (is (= {"" 1} reasons)
+          "image-only content has no :text, so the reason key is empty"))
+    (fire-event state "tool_result"
+                {:tool-name "read" :tool-call-id "c2" :is-error true
+                 :content [{:type :text :text "boom"} {:type :image :data "x"}]})
+    (let [reasons (get-in @ext/store [:metrics :tools "read" :error-reasons])]
+      (is (= {"boom" 1} reasons)
+          "mixed content keeps text blocks only; image block dropped"))))
+
+(deftest tool-result-error-reason-multiline-truncated-to-first-line-80-chars-test
+  ;; Multi-line error content >80 chars: reason is the first line, trimmed,
+  ;; capped at 80 chars (single key, no StringIndexOutOfBounds on the bound).
+  (let [{:keys [api state]} (make-api)
+        long-first-line (apply str (repeat 100 "x"))
+        content         (str "   " long-first-line "\nsecond line\nthird line")]
+    (ext/init api)
+    (fire-event state "tool_result"
+                {:tool-name "read" :tool-call-id "c1" :is-error true :content content})
+    (let [reasons (get-in @ext/store [:metrics :tools "read" :error-reasons])
+          reason  (first (keys reasons))]
+      (is (= 1 (count reasons)))
+      (is (= 80 (count reason)))
+      (is (= (apply str (repeat 80 "x")) reason)))))
 
 ;;; session_turn_finished event — token accumulation
 
@@ -134,7 +190,7 @@
                             :psi.agent-session/usage-cache-read 0
                             :psi.agent-session/usage-cache-write 0
                             :psi.agent-session/model-id "claude-3"})
-        {:keys [api state]} (make-api {:query-fn (fn [_q] {})})
+        {:keys [api state]} (make-api)
         api* (assoc api :query-session query-session-fn)]
     (ext/init api*)
     (fire-event state "session_turn_finished" {:session-id "s1" :turn-id "t1"})
@@ -159,7 +215,7 @@
                            (let [idx @call-count]
                              (swap! call-count inc)
                              (nth responses idx nil)))
-        {:keys [api state]} (make-api {:query-fn (fn [_q] {})})
+        {:keys [api state]} (make-api)
         api* (assoc api :query-session query-session-fn)]
     (ext/init api*)
     (fire-event state "session_turn_finished" {:session-id "s1" :turn-id "t1"})
@@ -170,6 +226,21 @@
       ;; Total output: 50 + 30 = 80.
       (is (= 80  (get-in metrics [:tokens "claude-3" :output]))))))
 
+(deftest turn-finished-swallows-query-error-and-returns-nil-test
+  ;; When query-session throws, make-turn-finished-handler must swallow the
+  ;; exception, return nil, and leave the metrics store unchanged (the
+  ;; design's swallow-and-return-nil acceptance criterion).
+  (let [query-session-fn (fn [_session-id _eql]
+                           (throw (ex-info "boom" {})))
+        {:keys [api state]} (make-api)
+        api* (assoc api :query-session query-session-fn)]
+    (ext/init api*)
+    (let [metrics-before (:metrics @ext/store)]
+      (is (nil? (fire-event state "session_turn_finished" {:session-id "s1" :turn-id "t1"}))
+          "handler returns nil even when the query throws")
+      (is (= metrics-before (:metrics @ext/store))
+          "metrics store is unchanged when token tracking is skipped"))))
+
 (deftest turn-finished-uses-unknown-when-model-id-nil-test
   ;; When model-id is nil, token delta is accumulated under "unknown".
   (let [query-session-fn (fn [_session-id _eql]
@@ -178,7 +249,7 @@
                             :psi.agent-session/usage-cache-read 0
                             :psi.agent-session/usage-cache-write 0
                             :psi.agent-session/model-id nil})
-        {:keys [api state]} (make-api {:query-fn (fn [_q] {})})
+        {:keys [api state]} (make-api)
         api* (assoc api :query-session query-session-fn)]
     (ext/init api*)
     (fire-event state "session_turn_finished" {:session-id "s1" :turn-id "t1"})
