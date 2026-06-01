@@ -748,3 +748,35 @@ Verification of accuracy against runtime: re-read
 (`gh-issue-implement.edn`, `review-task-implementation.edn`) confirmed to use
 `:type :map`. The doc note now matches runtime authority; the design's
 "known gap" / textual contradiction is closed. steps.md item marked done.
+
+## 2026-06-01 — user-facing docs review pass 2 (review-task-docs, ψ)
+
+Re-applied the `review-task-docs` checklist after the prior pass's `:map`
+prompt-string doc follow-up landed (`c5083b3ce`). Re-verified all five checklist
+items against the committed state:
+
+- **CHANGELOG**: `task-lifecycle` Added entry is present and accurate (named
+  five-stage chain + `/delegate task-lifecycle` invocation match
+  `task-lifecycle.edn` `:target` order and `:description` exactly). It now sits
+  under released `[0.1.2166] - 2026-06-01` (a release was stamped after the
+  entry was added to `[Unreleased]`; `[Unreleased]` is now empty) — correct
+  per `bb release:tag` semantics, not a regression. ✅
+- **`doc/workflow-grammar-concepts.md`** `:map` prompt-string note (lines 148,
+  157, 203-205): re-verified accurate against runtime —
+  `source_resolution/render-delegate-prompt-string` returns a map via
+  `(into {} … (:fields …))` for `{:type :map}` (confirmed at L188-192). The
+  edit is additive, minimal, cites the shipping exemplars, and closes the prior
+  doc-contradiction gap. ✅
+- **`doc/workflows.md`**: correctly NOT updated — "authoritative example set"
+  (L58) is a curated teaching list (`planner`/`builder`/`reviewer`, `plan-build`,
+  `plan-build-review`, `delegate-build-review`, `gh-bug-triage-modular`), not an
+  exhaustive workflow enumeration; design's no-edit decision holds. ✅
+- **README**: no per-workflow enumeration to update (L127 points to workflow
+  usage docs generically). ✅
+- **Removed behaviours / stale references**: none. ✅
+
+No new actionable docs feedback. The single prior actionable finding (the `:map`
+prompt-string doc gap) is fully and accurately resolved. No `steps.md` items
+added.
+
+PASS_STATUS: REVIEW_COMPLETE
