@@ -1,4 +1,4 @@
-# Design follow-up steps — 198
+# Design follow-up steps — 201
 
 ## Ambiguity review (2026-06-01)
 
@@ -7,7 +7,7 @@
   "the existing dedicated per-aspect follow-up pattern (one follow-up prompt per
   aspect)" and that consolidation into a single reusable step is a *separate*
   task. But the existing ambiguity/inconsistency follow-up steps already share one
-  `review-follow-up-design.md` prompt (landed by task 199). Update design.md to
+  `review-follow-up-design.md` prompt (landed by task 202). Update design.md to
   reflect the shared-profile reality and decide whether `architecture-follow-up`
   reuses `review-follow-up-design.md` or introduces a new prompt.
 - [x] A2: Reconcile follow-up prompt filename. AC2a and Scope name

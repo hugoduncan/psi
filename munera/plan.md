@@ -15,6 +15,8 @@ Not yet started:
 
 ## Recently closed
 
+- `202-reusable-review-follow-up-step` — unified the review-workflow follow-ups onto two shared profile prompts (`review-follow-up-design.md`, `review-follow-up-steps.md`); removed the four per-aspect follow-up files and the inline `review-step` template; tests + docs + changelog updated (2026-06-01). Renumbered from 199 (NNN collision with master).
+- `201-task-design-architectural-fit-review` — added `review-task-architecture` skill + `review-task-design-architecture-review.md` prompt; prepended an `architecture-review`/`architecture-follow-up` aspect pair (runs first) to `review-task-design.edn`, reusing the shared `review-follow-up-design.md` profile; final-summary sources the architecture yield + prose; tests (8 steps) + `doc/workflows.md` updated (2026-06-01). Renumbered from 198 (NNN collision with master).
 - `200-remove-dead-wrap-tool-executor-and-dedupe-result-filter` — removed dead `wrap-tool-executor`; modifiable-key contract (`:content`/`:details`/`:is-error`) now expressed once in the `dispatch-tool-result-in` filter; migrated the non-map-return guard to a direct test.
 - `198-fix-tool-metrics-empty-tools-map` — `:tools {}` always empty in metrics.edn; fixed by bridging `:tool-start`/`:tool-result` lifecycle events → extension `dispatch-in` in `emit-tool-lifecycle!`.
 
@@ -22,12 +24,10 @@ Not yet started:
 
 Closed as complete (moved to `munera/closed/`):
 
-- `198-task-design-architectural-fit-review` — added `review-task-architecture` skill + `review-task-design-architecture-review.md` prompt; prepended an `architecture-review`/`architecture-follow-up` aspect pair (runs first) to `review-task-design.edn`, reusing the shared `review-follow-up-design.md` profile; final-summary sources the architecture yield + prose; tests (8 steps) + `doc/workflows.md` updated (2026-06-01).
 - `164-registry-semantics-unification-audit` — registry-unification audit done; arc complete through 177.
 - `187-md-workflow-input-expansion`
 - `188-openai-codex-native-structured-output` — complete (PR #132); one deferred conditional-future Codex non-streaming test remains by design.
 - `190-conditional-review-follow-ups-for-design-and-plan-workflows`
-- `199-reusable-review-follow-up-step` — unified the review-workflow follow-ups onto two shared profile prompts (`review-follow-up-design.md`, `review-follow-up-steps.md`); removed the four per-aspect follow-up files and the inline `review-step` template; tests + docs + changelog updated (2026-06-01).
 - `191-fix-judge-structured-output-non-object-schema`
 - `193-improve-project-workflows`
 - `173`, `175`, `186`, `189` — closed earlier in the session.

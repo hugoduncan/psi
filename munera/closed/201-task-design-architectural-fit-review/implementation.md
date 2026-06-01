@@ -1,14 +1,14 @@
-# Implementation notes — 198 task-design architectural-fit review
+# Implementation notes — 201 task-design architectural-fit review
 
 ## 2026-06-01 — design ambiguity review (pass 1)
 
 Reviewed `design.md` against the actual `review-task-design.edn`, the existing
 ambiguity/inconsistency review/follow-up `.md` prompts, the shared
 `review-follow-up-design.md` profile, the `task-design` skill, and the workflow
-grammar docs. Recent git history shows task 199 already landed the shared
+grammar docs. Recent git history shows task 202 already landed the shared
 follow-up profile. Found new actionable ambiguities (see design-steps.md A1–A6):
 
-- A1: Design's per-aspect follow-up premise is stale post-199. The existing
+- A1: Design's per-aspect follow-up premise is stale post-202. The existing
   ambiguity/inconsistency follow-ups already share `review-follow-up-design.md`;
   there are no dedicated per-aspect follow-up `.md` files. AC2/scope/"Adjacent
   task-like work" all assume a per-aspect follow-up shape that no longer exists.
@@ -38,7 +38,7 @@ follow-up profile. Found new actionable ambiguities (see design-steps.md A1–A6
 
 Verified semantics against authoritative sources before editing design.md:
 - `.psi/workflows/review-task-design.edn`: follow-ups already use shared
-  `review-follow-up-design.md`; no per-aspect follow-up files exist (199). Existing
+  `review-follow-up-design.md`; no per-aspect follow-up files exist (202). Existing
   follow-up steps route DONE→next review aspect via `:on {"DONE" {:goto ...}}`.
   `clarity-status` is a non-judged step with **no `:on`**; `final-summary` is the
   last step. `final-summary` `:contributions` explicitly source ambiguity-review +
@@ -73,7 +73,7 @@ shape, `doc/workflows.md` shared-follow-up section, the
 `workflow_definitions_test.clj` review-task-design test, and the
 `statechart.clj` start-step / leaf fall-through logic.
 
-Verified consistent (no action): post-199 shared-profile reuse claims (AC2a,
+Verified consistent (no action): post-202 shared-profile reuse claims (AC2a,
 decision 5); `architecture-review`/`architecture-follow-up` `:on` targets mirror
 the existing `*-review`/`*-follow-up` DONE-to-next-aspect routing (decisions 7,
 A5-resolved); `final-summary` `:contributions` `:yield :text` shape (AC3,

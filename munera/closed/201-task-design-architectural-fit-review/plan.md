@@ -1,4 +1,4 @@
-# 198 — Plan: task-design architectural-fit review
+# 201 — Plan: task-design architectural-fit review
 
 ## Approach
 
@@ -27,7 +27,7 @@ in the repository:
    `PASS_STATUS: ACTIONABLE_FEEDBACK` / `PASS_STATUS: REVIEW_COMPLETE`). It loads
    the new skill instead of `task-design`, and its body frames architectural fit
    rather than ambiguity. **No new follow-up prompt** — the follow-up reuses the
-   shared `review-follow-up-design.md` profile (post-199).
+   shared `review-follow-up-design.md` profile (post-202).
 
 3. **Rewire `review-task-design.edn`** — prepend an `architecture-review` /
    `architecture-follow-up` step pair as the **first two `:steps` elements**, so

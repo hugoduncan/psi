@@ -1,4 +1,4 @@
-# Implementation notes — 199
+# Implementation notes — 202
 
 ## Design review — ambiguity pass (2026-06-01)
 
@@ -496,7 +496,7 @@ Independent re-application of test-shaper (clarity ∧ signal ∧ robustness ∧
 economical) to `workflow_definitions_test.clj`. Suite green (9 tests, 135
 assertions, 0 failures).
 
-Verified the task-199-authored assertions now carry genuine, symmetric signal
+Verified the task-202-authored assertions now carry genuine, symmetric signal
 (TS1/TS2/TS3 all closed). Confirmed by grep that each profile-discriminator
 anchor is present in exactly one profile body and absent in the other:
 `design-steps.md`, `Do not touch plan.md or steps.md` → design-only;
@@ -511,8 +511,8 @@ via `with-redefs` of dir resolvers, no mocks.
 No new actionable issues.
 
 Two `economical`/`simple` candidate defects considered and rejected as
-out-of-scope (both predate task 199, introduced in be16dd244 tasks 188/189;
-199 only updated filename lists within them — confirmed via `git log -S`):
+out-of-scope (both predate task 202, introduced in be16dd244 tasks 188/189;
+202 only updated filename lists within them — confirmed via `git log -S`):
 - Cross-deftest duplication: `review-task-design-test` and `review-task-plan-test`
   duplicate ~80 lines of identical routing/judge/wiring assertions (incidental
   variation). Pre-existing; flagged for awareness only by the prior pass too.
@@ -520,7 +520,7 @@ out-of-scope (both predate task 199, introduced in be16dd244 tasks 188/189;
   `load-edn-with-md-refs` calls discard their results `(fn [_] ...)` and the
   innermost `with-workflow-dir` re-slurps and re-loads every file itself, so the
   outer two calls are pure dead nesting (violates `minimal_incidental_setup`).
-  Pre-existing structure; only its filename lists were touched by 199.
+  Pre-existing structure; only its filename lists were touched by 202.
 
 PASS_STATUS: REVIEW_COMPLETE
 

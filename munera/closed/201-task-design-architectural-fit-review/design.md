@@ -1,4 +1,4 @@
-# 198 — Task design architectural-fit review
+# 201 — Task design architectural-fit review
 
 ## Intent
 
@@ -14,7 +14,7 @@ or the "no silent shims/adapters/compatibility layers" rule — before they reac
 plan creation and implementation.
 
 The new `architecture-follow-up` step **reuses the existing shared design
-follow-up profile prompt** `review-follow-up-design.md` (landed by task 199),
+follow-up profile prompt** `review-follow-up-design.md` (landed by task 202),
 exactly as the current `ambiguity-follow-up` and `inconsistency-follow-up` steps
 do. There are no per-aspect follow-up `.md` files to mirror; the design/plan
 review follow-ups already share one profile prompt per artifact scope. No new
@@ -95,7 +95,7 @@ review loop independently verifies that alignment.
 
 ### Adjacent task-like work (noted, not included)
 
-- **Reusable review follow-up step**: already landed by task 199 — the
+- **Reusable review follow-up step**: already landed by task 202 — the
   design/plan review follow-ups now share `review-follow-up-design.md` /
   `review-follow-up-steps.md` profile prompts. This task's `architecture-follow-up`
   step reuses the shared design profile directly; no further consolidation work is
@@ -169,7 +169,7 @@ ones:
 - The new step reuses the established review-aspect shape (session review step +
   shared-profile follow-up step gated by `workflow/constant-routing`, review step
   gated by `workflow/pass-status-routing`) — `follow` not `introduce`. The
-  follow-up reuses the shared `review-follow-up-design.md` profile (post-199),
+  follow-up reuses the shared `review-follow-up-design.md` profile (post-202),
   adding no new prompt file.
 - The new skill follows the existing standalone-review-skill shape
   (`review-task-docs`, `task-*-review`) — a focused lens loaded by a workflow
@@ -189,7 +189,7 @@ ones:
    architecture"; the reviewing agent finds what it needs from the in-context
    architecture sources. No duplicated principles.
 5. **Follow-up prompt** → the `architecture-follow-up` step reuses the shared
-   `review-follow-up-design.md` profile prompt (landed by task 199), not a new
+   `review-follow-up-design.md` profile prompt (landed by task 202), not a new
    dedicated per-aspect file. The stale "per-aspect follow-up pattern" premise is
    retired; there are no per-aspect follow-up `.md` files to mirror.
 6. **Workflow start step** → determined positionally as the first element of the

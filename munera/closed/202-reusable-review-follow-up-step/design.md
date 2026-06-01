@@ -1,4 +1,4 @@
-# 199 — Unified review follow-up step
+# 202 — Unified review follow-up step
 
 ## Intent
 
@@ -21,7 +21,7 @@ There are currently five near-identical follow-up prompts across the review fami
 - `review-task-plan-inconsistency-follow-up.md`
 - the inline follow-up template inside `review-step.edn`
 
-(Task 198 would add a sixth for architectural-fit if nothing changes.)
+(Task 201 would add a sixth for architectural-fit if nothing changes.)
 
 Every one of them implements the same contract: *execute only the unchecked items
 the preceding review pass just added, update the relevant artifacts, mark completed
@@ -194,12 +194,12 @@ via `:workflow-input`; the follow-up cannot be parameterized the same way
 because its writable/forbidden artifact instructions are profile-specific prose,
 not a single interpolated token — hence one file per profile.
 
-## Relationship to task 198
+## Relationship to task 201
 
-Task 198 adds the architectural-fit review aspect using the existing dedicated
-per-aspect follow-up pattern. If 199 lands first, 198's `architecture-follow-up`
-targets the shared follow-up directly (no throwaway prompt). If 198 lands first,
-199 folds its follow-up into the shared step. Recommend **199 first** to avoid the
+Task 201 adds the architectural-fit review aspect using the existing dedicated
+per-aspect follow-up pattern. If 202 lands first, 201's `architecture-follow-up`
+targets the shared follow-up directly (no throwaway prompt). If 201 lands first,
+202 folds its follow-up into the shared step. Recommend **202 first** to avoid the
 throwaway, since this task touches the follow-up mechanism wholesale anyway.
 
 ## Sharing mechanism (resolved)
