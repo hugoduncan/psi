@@ -1106,3 +1106,44 @@ now single-sourced — the last un-consolidated seam-seeding idiom in the test
 tree is gone. Focused project-nrepl suite (8 ns): 26 tests / 151 assertions /
 0 failures (unchanged). `clj-kondo` 0/0 on `client_test.clj` +
 `test_support.clj`.
+
+## Test-shaper review (2026-06-01, fourth test-shaper pass)
+
+Independent test-shaper pass (clarity ∧ signal ∧ robustness ∧ economy ∧
+determinism) re-reading all eight `project-nrepl` `*_test.clj` files plus
+`test_support.clj`. The suite remains strong: zero `with-redefs`, zero
+interaction-capture atoms, state/result-based, deterministic (readiness race
+removed in an earlier pass), single-concern blocks, shared `test-support`
+compresses ceremony without hiding intent.
+
+One new actionable `minimal_incidental_setup` / `meaningful_failures` finding:
+
+1. `ops_test.clj` `eval-op-test` seeds a misleading `:ns "user"` in the
+   in-memory `client-session` response in BOTH the success block (line 37) and
+   the interrupted block (line 59), then each block asserts `(is (nil? (:ns
+   result)))`. Verified against source why the assertion is correct:
+   `summarize-response` (eval.clj:40) DOES carry `:ns (:ns combined)` and
+   `nrepl.core/combine-responses` DOES preserve `:ns "user"` — but
+   `eval-instance-in!`'s built `result` map (eval.clj ~78) lists
+   `:status :value :out :err :summary` and **omits `:ns`**, so `eval-op`'s
+   `(:ns result)` is `nil` regardless of the response's `:ns`. The seeded
+   `:ns "user"` therefore feeds nothing the test asserts on — it is dead,
+   misleading incidental setup that implies `:ns` flows through when it is
+   dropped one layer below the assertion. It weakens `meaningful_failures`: a
+   reader sees `:ns "user"` seeded and `:ns` asserted nil and cannot tell
+   whether the nil is the contract or a setup bug. (The `:err "Interrupted"`
+   seeded alongside in the interrupted block IS asserted — `(= "Interrupted"
+   (:err result))` — so that one is real, not incidental.) Fix: drop `:ns
+   "user"` from both seeded responses (the `:status`/`:value`/`:err` keys
+   already drive every assertion); keep the `(nil? (:ns result))` assertion and
+   its explanatory comment, which document the real drop-`:ns` contract without
+   needing a seeded `:ns` to "prove" it. The `:ns nil` contract is best proven
+   by NOT seeding `:ns` at all and still observing nil. Non-blocking: tests are
+   green and the assertion is correct, but the seeded `:ns` is the one remaining
+   piece of misleading incidental setup in the in-scope files.
+
+Considered but NOT raised: the `commands_test.clj` interrupt-ok response seeds
+`:status #{"done" "interrupted"}` (both statuses) where `#{"interrupted"}` alone
+would drive the `:interrupted` summary — but `#{"done" "interrupted"}` is a
+realistic nREPL interrupt-completion status set (interrupt and done both arrive),
+so it is representative-case fidelity rather than misleading setup; not raised.

@@ -231,3 +231,20 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
   :nrepl-connector]` shape + endpoint map are now single-sourced. Focused
   project-nrepl suite (8 ns) 26 tests / 151 assertions / 0 failures unchanged;
   `clj-kondo` 0/0 on `client_test.clj` + `test_support.clj`.
+
+## Test-shaper follow-ups (2026-06-01, fourth test-shaper pass)
+
+- [ ] Remove the misleading `:ns "user"` incidental setup from `ops_test.clj`
+  `eval-op-test`. Both the success block (line 37) and the interrupted block
+  (line 59) seed `:ns "user"` in the in-memory `client-session` response, then
+  each asserts `(is (nil? (:ns result)))`. The seeded `:ns` feeds nothing the
+  test asserts: `summarize-response` carries `:ns` and `combine-responses`
+  preserves it, but `eval-instance-in!`'s built `result` map omits `:ns`, so
+  `eval-op`'s `(:ns result)` is nil regardless of the response. The seeded
+  `:ns "user"` is dead/misleading setup (`minimal_incidental_setup`,
+  `meaningful_failures`) — it implies `:ns` flows through when it is dropped a
+  layer below the assertion. Fix: drop `:ns "user"` from both seeded responses;
+  keep the `(nil? (:ns result))` assertion + explanatory comment (the real
+  drop-`:ns` contract is best proven by NOT seeding `:ns` and still observing
+  nil). The `:err "Interrupted"` seeded in the interrupted block stays — it is
+  asserted (`(= "Interrupted" (:err result))`). Keep tests green + lint clean.
