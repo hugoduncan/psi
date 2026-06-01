@@ -19,7 +19,12 @@ Prompt templates are Markdown files discovered once at session startup from:
 
 - Global: `~/.psi/agent/prompts/*.md`
 - Project: `<worktree>/.psi/prompts/*.md`
-- CLI `--prompt-template <path>` extra paths
+
+(`discover-templates` also accepts an `:extra-paths` opt, but **no CLI flag
+currently wires it**: startup calls `(pt/discover-templates)` with no opts, so
+`:extra-paths` is never populated in practice. The `--prompt-template <path>`
+flag referenced in a `prompt_templates.clj` doc-comment is **not implemented**.
+Reload therefore omits `:extra-paths` — there is nothing to persist or drop.)
 
 Today, editing a prompt `.md` file (or adding a new one) requires starting a
 new session to pick up the change: `discover-templates` runs only in
@@ -42,8 +47,9 @@ Authoring/iterating on prompts is a common loop; a reload closes it.
   `psi.agent-session.mutations.prompts`, added to `all-mutations` so it is
   visible to `psi-tool` `mutate` (which enumerates registered mutation syms).
 - A `/prompts-reload` exact command handler in `psi.agent-session.commands`,
-  returning a `:text` result summarizing the reload (worktree, count, and any
-  discovery diagnostics), mirroring `format-reload-models`.
+  returning a `:text` result summarizing the reload (worktree + template
+  count; no diagnostics line — see Return shape A3), mirroring
+  `format-reload-models`.
 - Tests covering: dispatch-handler replace semantics, mutation
   output/dispatch, command result text, and psi-tool mutation visibility.
 - CHANGELOG `[Unreleased]` entry (user-visible: new command + new mutation).
@@ -72,41 +78,97 @@ of a fresh `discover-templates`, so that:
 - Newly added `.md` files appear.
 - Deleted `.md` files disappear.
 
-Open question for plan: confirm whether a dedicated
-`:session/set-prompt-templates` replace handler is cleaner than reusing
-`register` in a loop after a clear. Design preference: a single replace
-handler that sets `:prompt-templates` to the discovered vector
-(analogous to `:session/set-skills` / `set-active-tools` replace semantics).
+**Resolved handler shape.** There is **no** dedicated
+`:session/set-prompt-templates` handler and **no** register-in-a-loop. The
+`:session/reload-prompts` handler itself:
+
+1. derives the discovery opts (see Discovery inputs),
+2. calls `pt/discover-templates` **inline** (handler-local file IO),
+3. returns a single `:root-state-update` that **replaces**
+   `:prompt-templates` with the freshly discovered vector via
+   `(session/session-update session-id #(assoc % :prompt-templates discovered))`.
+
+This mirrors the `:session/set-active-tools` / `:session/set-skills` replace
+handlers (which set `:tool-ids` / skills wholesale through a single
+`:root-state-update`), rather than the appending
+`:session/register-prompt-template` handler. The handler also returns
+`{:reloaded? true :count (count discovered) :worktree <path>}` for the command
+and mutation surfaces (see Return shape).
 
 ### Discovery inputs
 
-Reload must use the **session's worktree path** to resolve the project
-prompts dir (`<worktree>/.psi/prompts`), not process `cwd`. The startup path
-calls `(pt/discover-templates)` with defaults (process-relative project dir);
-reload must pass `:project-prompts-dir` derived from
-`(ss/session-worktree-path-in ctx session-id)` so the correct project
-prompts are picked up. CLI `--prompt-template` extra paths: decide in plan
-whether reload re-applies them (they are not currently persisted on the
-session — likely dropped on reload unless captured; document the chosen
-behaviour).
+Reload re-runs `pt/discover-templates` with this **exact** opts map:
+
+```clojure
+{:global-prompts-dir  (:global-prompts-dir pt/default-config)  ; ~/.psi/agent/prompts
+ :project-prompts-dir (str (ss/session-worktree-path-in ctx session-id) "/.psi/prompts")}
+```
+
+- `:global-prompts-dir` is passed **explicitly** as the `default-config`
+  value (rather than relying on the no-arg default) so the resolved opts map
+  is fully determined at the reload call site and the worktree-derived project
+  dir is the only intentional divergence from startup.
+- `:project-prompts-dir` is derived from the **session worktree path**
+  (`<worktree>/.psi/prompts`), not process `cwd`.
+- `:extra-paths` is **omitted** (none exist — see A2 / OQ#2).
+- `:disabled` is **not** passed (reload always discovers).
+
+**Intentional startup divergence.** Startup calls `(pt/discover-templates)`
+with **no opts**, which resolves `:project-prompts-dir` to the *process-relative*
+`.psi/prompts` (the `default-config` value). Reload instead resolves the
+project dir from the **session worktree**. For worktree sessions where
+`cwd ≠ worktree`, startup and reload therefore read from **different project
+prompt directories** by design — reload is worktree-correct, startup is
+cwd-relative. This divergence is intentional: the session's templates belong
+to its worktree, and reload corrects the discovery root accordingly. (Aligning
+startup to also use the worktree path is out of scope here.)
 
 ### Return shape
 
-Reload operation returns at least:
+The `:session/reload-prompts` handler returns:
 
-- `:reloaded?` / count of templates after reload
-- discovery `:diagnostics` (if `discover-templates` surfaces any — currently
-  it does not return diagnostics; skills do. Document that prompt discovery
-  has no diagnostics channel, or add minimal error capture.)
-- worktree path used (for the command summary)
+- `:reloaded?` — `true` on a completed reload
+- `:count` — number of templates after reload (`(count discovered)`)
+- `:worktree` — the worktree path used (for the command summary)
 
-Mutation `psi.extension/reload-prompts` output keys (namespaced), e.g.:
+**No `:diagnostics` key.** `discover-templates` returns a plain vector of
+templates and surfaces **no diagnostics channel** (unlike skill discovery).
+This task does **not** add error capture to prompt discovery. The return shape
+therefore omits `:diagnostics`, and the AC4 command summary reports only
+worktree + count (see AC4). (Adding a diagnostics channel to prompt discovery
+is a separate task if ever desired.)
 
-- `:psi.prompt-template/reloaded?`
-- `:psi.prompt-template/count`
+The `psi.extension/reload-prompts` mutation exposes exactly these
+namespaced `::pco/output` keys (mirroring `add-prompt-template`'s
+`:added?`/`:count`):
 
-mirroring the existing `:psi.prompt-template/added?` / `count` convention in
-`add-prompt-template`.
+```clojure
+::pco/output [:psi.prompt-template/reloaded?
+              :psi.prompt-template/count]
+```
+
+returning:
+
+```clojure
+{:psi.prompt-template/reloaded? (boolean reloaded?)
+ :psi.prompt-template/count     (or count 0)}
+```
+
+The mutation does **not** surface `:worktree` (that is a command-summary
+concern only).
+
+### No system-prompt refresh
+
+`:session/reload-prompts` does **not** emit `:runtime/refresh-system-prompt`.
+`:session/set-skills` and `:session/set-active-tools` emit that effect because
+skills and active tools are **enumerated in the system prompt**, so changing
+those sets requires rebuilding it. By contrast, `:prompt-templates` are
+**`/name`-invoked at message time** and are **not enumerated by any
+system-prompt builder** (no system-prompt module reads `:prompt-templates`).
+Reloading templates therefore changes only the `/name → expansion` lookup
+table consulted on invocation, with no system-prompt content to refresh. The
+handler emits **no effects**; it returns only the `:root-state-update` and the
+`:reloaded?`/`:count`/`:worktree` return value.
 
 ### psi-tool visibility
 
@@ -126,11 +188,14 @@ the registered mutation set.
   discoverable (appears in `/prompts`) and invokable.
 - AC3: Deleting a previously-discovered `.psi/prompts/baz.md`, then
   `/prompts-reload`, removes `/baz` from the session's templates.
-- AC4: `/prompts-reload` returns a `:text` result summarizing worktree and
-  resulting template count (consistent with `/reload-models` formatting).
+- AC4: `/prompts-reload` returns a `:text` result summarizing worktree path
+  and resulting template count (consistent with `/reload-models` formatting).
+  The summary reports **only** worktree + count — there is no diagnostics line
+  (prompt discovery has no diagnostics channel).
 - AC5: `psi.extension/reload-prompts` is a registered mutation present in
-  `mutations/all-mutations` and enumerated by psi-tool's registered-mutation
-  set, invokable via `psi-tool action: "mutate"`.
+  `mutations/all-mutations`, enumerated by psi-tool's registered-mutation set,
+  invokable via `psi-tool action: "mutate"`, with `::pco/output`
+  `[:psi.prompt-template/reloaded? :psi.prompt-template/count]`.
 - AC6: Reload uses the session's worktree path to resolve the project prompts
   directory.
 - AC7: Reload replaces (does not append to) the session's prompt-template set.
@@ -184,7 +249,11 @@ the registered mutation set.
    (it mutates an external runtime handle, not canonical state), and there is no
    "effect for replay fidelity" benefit (replay suppresses effects, preserves
    state application).
-2. CLI `--prompt-template` extra-path persistence across reload.
+2. ~~CLI `--prompt-template` extra-path persistence across reload.~~
+   **Resolved / moot.** No `--prompt-template` flag exists; startup never
+   passes `:extra-paths`, so there is nothing to persist or drop. Reload omits
+   `:extra-paths`. If an extra-paths CLI flag is ever implemented and persisted
+   on the session, reload-persistence becomes a follow-up task at that time.
 3. Whether `/prompts-reload` joins a generalized `/reload` umbrella later
    (out of scope here; keep dedicated command consistent with existing
    `/reload-models`, `/reload-extension-installs`).

@@ -123,3 +123,38 @@ New actionable ambiguities:
   design is silent. State explicitly that reload need not emit
   `:runtime/refresh-system-prompt` (and why), or specify it if `/prompts`-style
   surfaces require it.
+
+## Ambiguity-review follow-ups executed (2026-06-01)
+
+All six A1–A6 follow-ups resolved in design.md (code cross-checked, no
+blockers). ✅ all six marked done in design-steps.md.
+
+- ✅ A1 — Pinned the exact reload opts map in "Discovery inputs":
+  `:global-prompts-dir` passed **explicitly** as `default-config` value,
+  `:project-prompts-dir` = `<session-worktree>/.psi/prompts`, `:extra-paths`
+  omitted, `:disabled` not passed. Documented the **intentional** worktree-vs-cwd
+  divergence from startup (startup `(discover-templates)` uses process-relative
+  `.psi/prompts`; reload is worktree-correct). Confirmed against
+  `prompt_templates/default-config` (process-relative `:project-prompts-dir`)
+  and `app_runtime` startup `(pt/discover-templates)` no-arg call.
+- ✅ A2 — `--prompt-template` confirmed **phantom**: only a `prompt_templates.clj`
+  doc-comment mentions it; no CLI flag parses it, startup never passes
+  `:extra-paths`. Reframed "Why" (dropped CLI source bullet, added unimplemented
+  note) and resolved OQ#2 as moot (nothing to persist/drop; reload omits
+  extra-paths).
+- ✅ A3 — Diagnostics resolved to **no channel**: `discover-templates` returns a
+  plain vector with no diagnostics. Dropped `:diagnostics` from the return shape
+  and AC4 summary (worktree + count only). Not adding error capture in this task.
+- ✅ A4 — Replace-handler shape fixed: `:session/reload-prompts` itself runs
+  `discover-templates` inline and returns a single `:root-state-update`
+  replacing `:prompt-templates` (mirrors `set-active-tools`/`set-skills`); no
+  dedicated `set-prompt-templates` handler, no register-loop. Removed the open
+  "preference".
+- ✅ A5 — Mutation `::pco/output` pinned to
+  `[:psi.prompt-template/reloaded? :psi.prompt-template/count]` with exact return
+  map (mirrors `add-prompt-template`); "e.g." removed; AC5 updated to name the
+  output set.
+- ✅ A6 — Documented **no** `:runtime/refresh-system-prompt`: confirmed no
+  system-prompt builder reads `:prompt-templates` (grep). Templates are
+  `/name`-invoked, not enumerated in the system prompt; handler emits **no
+  effects**. Added a "No system-prompt refresh" subsection.
