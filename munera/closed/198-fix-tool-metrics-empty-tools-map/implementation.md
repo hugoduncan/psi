@@ -799,3 +799,43 @@ Verify: `clojure -M:test --focus psi.agent-session.extensions-test --focus
 psi.agent-session.tool-execution-test --focus psi.tool-runtime.core-test` →
 45 tests, 195 assertions, 0 failures. `clj-kondo` clean on all three changed
 files (0 errors, 0 warnings).
+
+## Code review (code-shaper) — `on-tool-result` reason truncation (extension/metrics)
+
+`extensions/metrics/src/psi/metrics/extension.clj` `on-tool-result` computes the
+truncated error `reason` with duplicated work and a fragile `subs` bound:
+
+```clojure
+reason (-> content
+           (str/split-lines)
+           first
+           (or "")
+           (str/trim)
+           (subs 0 (min 80 (count (str/trim (first (str/split-lines content)))))))
+```
+
+Issues (`simple` / `consistent(idioms)` / `robust`):
+
+- **Duplicated computation**: `(str/trim (first (str/split-lines content)))` is
+  evaluated twice — once threaded as the `subs` *subject*, once recomputed inline
+  as the `subs` *length bound*. The two expressions must stay equal by hand; any
+  future edit to one (e.g. dropping `str/trim`) silently diverges the bound from
+  the value — a `StringIndexOutOfBoundsException` hazard (`subs` start `0`, end >
+  length). The bound should be derived from the *same* value being truncated.
+- **`xor(computation, flow_control)` / locally-comprehensible**: the bound
+  expression buries a second `str/split-lines`+`first`+`str/trim` pipeline inside
+  the `min` arg of the truncating `subs`, so the line's single responsibility
+  (take the first line, trim, cap at 80 chars) is not readable locally.
+- **Idiom**: `(subs s 0 (min 80 (count s)))` is the manual truncate idiom; a
+  named local (`first-line`) + a small `truncate`/`take`-based form expresses the
+  intent once. Note `(or "")` after `first` guards `nil`, but `str/split-lines`
+  on `""`/`nil`-coerced `(str content)` already yields `[""]`/`[]`; the `(str
+  (:content payload))` upstream means `content` is never `nil` here, so the path
+  is over-guarded relative to its single caller.
+
+No live defect (the duplicated expressions are currently equal), but a standing
+fragility + readability cost in the one handler this task exists to make live.
+Recommended: bind `first-line` once, then truncate that single value (e.g.
+`(subs first-line 0 (min 80 (count first-line)))` or a `truncate` helper), and
+add/extend a focused assertion that a multi-line error `:content` longer than 80
+chars yields a single trimmed ≤80-char `:error-reasons` entry.
