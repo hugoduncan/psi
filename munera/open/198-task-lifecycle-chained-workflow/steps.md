@@ -63,7 +63,7 @@
       equals `[{:type :source :from :workflow-original}]` and references no
       prior-step yield (covers the input-only context-threading acceptance
       criterion).
-- [ ] Add an assertion to `task-lifecycle-test` that no step declares `:yields`
+- [x] Add an assertion to `task-lifecycle-test` that no step declares `:yields`
       or `:terminal-contract` (and in particular the terminal
       `review-task-implementation` step omits both), guarding the design's
       "Final-stage surfacing" contract that the terminal output relies on the

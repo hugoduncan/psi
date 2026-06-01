@@ -516,3 +516,28 @@ Residual coverage gap (NEW, not a duplicate of pass-1):
    specifically that the terminal step omits both).
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## 2026-06-01 — test review pass-2 follow-up execution (ψ)
+
+Executed the single pass-2 task-test-review follow-up item; `task-lifecycle-test`
+now guards the terminal-surfacing contract.
+
+1. `:yields` / `:terminal-contract` absence — ADDED. New `testing` block asserts
+   `(every? ...)` that no step declares `:yields` or `:terminal-contract` (via
+   `(not (contains? step :yields/:terminal-contract))`), plus an explicit
+   `(last steps)` terminal check that the terminal `review-task-implementation`
+   step omits both. Guards the design's "Final-stage surfacing" contract: the
+   terminal output relies on the propagated session default yield, so any
+   regression adding `:yields`/`:terminal-contract` (especially on the terminal
+   step) now fails the test instead of silently changing the contract.
+
+Shape rationale: same as the pass-1 follow-ups — `compiler.clj` passes
+non-`:prompt-workflow` `:delegate` steps through unchanged, so the loaded steps
+retain the authored EDN shape and `:yields`/`:terminal-contract` (if present)
+would be top-level step keys. The authored `task-lifecycle.edn` declares neither
+on any step, so `contains?`-absence assertions hold.
+
+Verification: focused `task-lifecycle-test` → 1 test, 11 assertions (was 8),
+0 failures. `clj-kondo` on the edited test file: 0 errors / 0 warnings.
+
+PASS_STATUS: follow-up complete.

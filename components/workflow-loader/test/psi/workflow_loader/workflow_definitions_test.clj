@@ -469,4 +469,12 @@
          (is (every? (fn [step]
                        (= [{:type :source :from :workflow-original}]
                           (:context step)))
-                     steps)))))))
+                     steps)))
+       (testing "no step declares :yields or :terminal-contract (terminal relies on propagated session default yield)"
+         (is (every? (fn [step]
+                       (and (not (contains? step :yields))
+                            (not (contains? step :terminal-contract))))
+                     steps))
+         (let [terminal (last steps)]
+           (is (not (contains? terminal :yields)))
+           (is (not (contains? terminal :terminal-contract)))))))))
