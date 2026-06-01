@@ -181,3 +181,34 @@ on the surviving `dispatch-tool-result-in` filter predicate's `contains?` branch
 - Verify: clj-paren-repair (no changes), clj-kondo clean (0/0); Kaocha focus
   `psi.agent-session.extensions-test` → 28 tests, 96 assertions, 0 failures
   (was 26/94 before; +2 tests, +2 assertions). No deviations.
+
+## Test review: task-test-review (second pass, 2026-06-01)
+
+Re-applied task-test-review after the T1a/T1b follow-ups landed. Verified at
+runtime: 28 tests, 96 assertions, 0 failures (Kaocha focus
+`psi.agent-session.extensions-test`).
+
+- **well-formed** ✓ `deftest`/`testing`/`is`; assert on return values; real
+  `create-registry`, no mocks/stubs. New tests are non-vacuous (handlers
+  registered; returns flow through `dispatch-in` into the filter).
+- **infra deps** ✓ None to null.
+- **behaviour coverage** ✗ One residual gap (actionable, T2 below).
+
+T2 (actionable — per-key selection coverage of the single-sourced contract):
+the surviving `dispatch-tool-result-in` filter predicate (extensions.clj:331–333)
+is the *sole* expression of the modifiable-key contract, an `or` over three
+independent branches: `(contains? :content)`, `(contains? :details)`,
+`(contains? :is-error)`. T1a's `dispatch-tool-result-modifiable-key-override-test`
+proves positive selection only for the `:content` branch; T1b proves rejection
+of maps with *none* of the keys. The `:details`-only and `:is-error`-only
+positive-selection branches have no test: a handler returning `{:details {...}}`
+or `{:is-error true}` (and no `:content`) is never asserted to be selected as the
+override. Each `or` disjunct is independently mutable — dropping `:details` or
+`:is-error` from the predicate would leave the whole suite green, silently
+narrowing the very contract this task exists to single-source. The prior T1 pass
+closed the `:content` branch and the all-keys-absent boundary but did not split
+the modifiable-key set into its per-key disjuncts. Add a positive-selection test
+for the `:details`-only and `:is-error`-only handler returns so each disjunct of
+the single-sourced contract is protected against silent removal.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
