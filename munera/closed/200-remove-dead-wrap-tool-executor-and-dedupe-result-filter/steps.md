@@ -155,3 +155,27 @@
   `extensions.clj`; selection guard (`modifiable-tool-result-override?`) and
   application (`merge-tool-result-override`) both derive from it; `tool_plan.clj`
   now calls `merge-tool-result-override` instead of re-enumerating the keys.
+
+## Code review follow-ups (code-shaper second pass, 2026-06-01)
+
+- [ ] C2: The modifiable-key contract single-sources the *key set* but not the
+  *value semantics*. `tool-result-event` (`extensions.clj:312–314`) coerces the
+  *inbound* payload (`:content` → `tool-runtime/normalize-tool-content`,
+  `:is-error` → `(boolean …)`) and is documented as the single source of "payload
+  shape and value semantics", but `merge-tool-result-override`
+  (`extensions.clj:341`) copies the handler's *override* `:content`/`:is-error`
+  onto `result` raw — no normalization/coercion. A handler returning
+  `{:content "raw string"}` or `{:is-error "yes"}` writes an un-normalized /
+  non-boolean value into the result that flows downstream
+  (`tool_plan.clj:221`), bypassing the coercion `tool-result-event` guarantees.
+  Restore symmetry: apply the same `:content`/`:is-error` coercions on the
+  override-application path (in `merge-tool-result-override`, or extract a single
+  per-key coercion table both it and `tool-result-event` derive from). Add
+  focused coverage — override `{:content "raw string"}` ⇒ normalized
+  content-blocks in the merged result; `{:is-error "truthy"}` ⇒ strict `true`.
+  Alternatively, if handler override values are deliberately trusted verbatim,
+  document that asymmetry on `merge-tool-result-override` and correct
+  `tool-result-event`'s "value semantics" claim so the divergence is not silent.
+  Run clj-kondo + Kaocha focus `psi.agent-session.extensions-test` and
+  `psi.agent-session.tool-execution-test`; behaviour change limited to override
+  value coercion.

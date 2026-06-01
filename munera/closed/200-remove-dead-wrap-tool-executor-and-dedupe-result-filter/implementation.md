@@ -629,3 +629,63 @@ Verification: clj-paren-repair (no changes on all 3 files), clj-kondo clean
 (plan-path override application unchanged). No deviations.
 
 PASS_STATUS: REVIEW_COMPLETE (code-shaper C1 resolved)
+
+## Code review: code-shaper second pass (2026-06-01)
+
+Independent code-shaper pass on the *current* production surface after the C1
+single-sourcing fix. Re-read `extensions.clj` (`tool-result-event` @299–317,
+`modifiable-tool-result-keys` @322, `modifiable-tool-result-override?` @334,
+`merge-tool-result-override` @341, `dispatch-tool-result-in` @353) and the live
+consumer `tool_plan.clj` `run-tool-plan-step-in!` @219–221. Verified C1 is fully
+applied: the key set is enumerated once and both the selection guard (`some`)
+and application (`reduce`/`cond->`) derive from it; `tool_plan.clj` calls
+`merge-tool-result-override`; grep confirms no other production enumeration of
+the three keys. clj-kondo clean (0/0) on all three files.
+
+One new actionable finding (C2) — distinct from every prior pass (test-shaper /
+task-test-review / docs / code-shaper-C1), none of which examined the override
+*value semantics* on the application path.
+
+C2 (actionable — consistent/robust: the modifiable-key contract single-sources
+the *key set* but not the *value semantics* of those keys, leaving an
+inbound/applied asymmetry). `tool-result-event` (@312–314) is documented as "the
+single source of the cross-path payload shape **and value semantics**": it
+coerces `:content` via `tool-runtime/normalize-tool-content` and `:is-error` via
+`(boolean …)` so handlers always receive a normalized, strictly-typed payload.
+But on the override *return* path, `merge-tool-result-override` copies the
+handler's raw `:content`/`:is-error` straight onto `result` with **no**
+normalization/coercion. A handler returning `{:content "raw string"}` or
+`{:is-error "yes"}` therefore writes an un-normalized content value / a
+non-boolean `:is-error` into the result map that flows downstream
+(`tool_plan.clj:221` → result consumers) — bypassing the very coercion
+`tool-result-event` is documented to guarantee. The contract is thus only
+*half* single-sourced: the `λ robust` invariant
+(`shaped_by(code, formalisms) → enforceable(invariants(code))`) holds for *which
+keys* are modifiable but is silently violated for the *value shape* of those
+keys, and the reader of `merge-tool-result-override` cannot see the asymmetry
+locally (`λ locally_comprehensible` violated — the normalization happens in a
+non-adjacent constructor on the *inbound* half only). This pre-dates the task
+(the dead wrapper's `cond->` copied raw too), but it is exactly the kind of
+implicit-contract divergence the single-sourcing work was meant to close, and it
+is now the *only* remaining duplication-of-intent in the contract.
+
+Remediation (smallest shape restoring symmetry): route override `:content`/
+`:is-error` through the same `tool-result-event` coercions when applied — e.g.
+have `merge-tool-result-override` normalize `:content` and `(boolean …)`-coerce
+`:is-error` for the keys the override carries, or extract the per-key
+coercion table once and let both `tool-result-event` and
+`merge-tool-result-override` derive from it (true single-sourcing of value
+semantics, matching the key-set single-sourcing). Add focused coverage: a
+handler override returning `{:content "raw string"}` yields normalized
+content-blocks in the merged result, and `{:is-error "truthy"}` yields strict
+`true`. If a deliberate decision is instead to trust handler-supplied override
+values verbatim, document that asymmetry explicitly on `merge-tool-result-override`
+and amend `tool-result-event`'s "value semantics" claim so the divergence is
+not silent — but the honest fix is symmetric coercion.
+
+Out-of-scope confirmation: `tool-result-event` itself (@299–317) and its caller
+`tool_runtime_adapter.clj` remain correctly excluded (A2 — payload constructor).
+C2 is about applying the *same* coercions on the override path, not changing the
+constructor.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
