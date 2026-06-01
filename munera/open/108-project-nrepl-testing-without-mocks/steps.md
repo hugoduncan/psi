@@ -34,9 +34,9 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
 
 ## Slice 5 — `attach_test.clj`
 
-- [ ] Remove `connect-instance-in!` redefs; seed `[:runtime-handle :nrepl-connector]` via the new `attach-instance-in!` seed param
-- [ ] Assert attach behavior through resulting instance state (no interaction assertions)
-- [ ] Run `attach_test.clj` green
+- [x] Remove `connect-instance-in!` redefs; seed `[:runtime-handle :nrepl-connector]` via the new `attach-instance-in!` seed param
+- [x] Assert attach behavior through resulting instance state (no interaction assertions)
+- [x] Run `attach_test.clj` green (2 tests, 17 assertions)
 
 ## Slice 6 — `:process-launcher` seam + started-mode merge (production)
 

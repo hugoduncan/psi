@@ -2,7 +2,6 @@
   (:require
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
-   [psi.project-nrepl.client]
    [psi.project-nrepl.attach :as project-nrepl-attach]
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
    [psi.agent-session.test-support :as test-support]))
@@ -42,38 +41,44 @@
         (finally
           (delete-tree! dir))))))
 
+(defn- session-fn-with-id
+  [session-id]
+  (with-meta (fn [_] nil)
+    {(keyword "nrepl.core" "taking-until") {:session session-id}}))
+
 (deftest attach-instance-in-test
   (testing "attach establishes attached instance and managed client session"
-    (let [ctx      (make-ctx)
-          worktree (System/getProperty "user.dir")]
-      (with-redefs [psi.project-nrepl.client/connect-instance-in! (fn [ctx worktree-path]
-                                                                    (project-nrepl-runtime/update-instance-in!
-                                                                     ctx worktree-path
-                                                                     #(assoc %
-                                                                             :lifecycle-state :ready
-                                                                             :readiness true
-                                                                             :active-session-id "nrepl-session-1"
-                                                                             :can-eval? true
-                                                                             :can-interrupt? true)))]
-        (let [instance (project-nrepl-attach/attach-instance-in! ctx worktree {:port 7888})]
-          (is (= :attached (:acquisition-mode instance)))
-          (is (= :ready (:lifecycle-state instance)))
-          (is (= {:host "127.0.0.1" :port 7888 :port-source :explicit}
-                 (:endpoint instance)))
-          (is (= "nrepl-session-1" (:active-session-id instance)))))))
+    (let [ctx       (make-ctx)
+          worktree  (System/getProperty "user.dir")
+          connector (fn [_endpoint]
+                      {:transport {:transport :fake}
+                       :client (fn ([] nil) ([_] nil))
+                       :client-session (session-fn-with-id "nrepl-session-1")})
+          instance  (project-nrepl-attach/attach-instance-in!
+                     ctx worktree {:port 7888} {:runtime-handle {:nrepl-connector connector}})]
+      (is (= :attached (:acquisition-mode instance)))
+      (is (= :ready (:lifecycle-state instance)))
+      (is (= true (:readiness instance)))
+      (is (= {:host "127.0.0.1" :port 7888 :port-source :explicit}
+             (:endpoint instance)))
+      (is (= "nrepl-session-1" (:active-session-id instance)))
+      (is (= "nrepl-session-1" (get-in instance [:runtime-handle :session-id])))
+      (is (= true (:can-eval? instance)))
+      (is (= true (:can-interrupt? instance)))))
 
   (testing "attach failure is projected as failed state"
-    (let [ctx      (make-ctx)
-          worktree (System/getProperty "user.dir")]
-      (with-redefs [psi.project-nrepl.client/connect-instance-in! (fn [_ _]
-                                                                    (throw (ex-info "attach-boom" {:phase :connect})))]
-        (is (thrown-with-msg?
-             clojure.lang.ExceptionInfo
-             #"attach-boom"
-             (project-nrepl-attach/attach-instance-in! ctx worktree {:port 7888})))
-        (let [instance (project-nrepl-runtime/instance-in ctx worktree)]
-          (is (= :failed (:lifecycle-state instance)))
-          (is (= false (:readiness instance)))
-          (is (= {:host "127.0.0.1" :port 7888 :port-source :explicit}
-                 (:endpoint instance)))
-          (is (= "attach-boom" (get-in instance [:last-error :message]))))))))
+    (let [ctx       (make-ctx)
+          worktree  (System/getProperty "user.dir")
+          connector (fn [_endpoint]
+                      (throw (ex-info "attach-boom" {:phase :connect})))]
+      (is (thrown-with-msg?
+           clojure.lang.ExceptionInfo
+           #"attach-boom"
+           (project-nrepl-attach/attach-instance-in!
+            ctx worktree {:port 7888} {:runtime-handle {:nrepl-connector connector}})))
+      (let [instance (project-nrepl-runtime/instance-in ctx worktree)]
+        (is (= :failed (:lifecycle-state instance)))
+        (is (= false (:readiness instance)))
+        (is (= {:host "127.0.0.1" :port 7888 :port-source :explicit}
+               (:endpoint instance)))
+        (is (= "attach-boom" (get-in instance [:last-error :message])))))))
