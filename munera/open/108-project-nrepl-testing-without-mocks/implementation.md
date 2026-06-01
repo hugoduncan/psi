@@ -209,3 +209,28 @@ config_test.clj, started_test.clj, and shared-config user reader/test).
 
 No blocking reasons; all four items completed at the design level. Production
 seam code + test reshaping remain for the build phase per steps.md.
+
+2026-06-01 — Design ambiguity review (second pass)
+
+Re-read design.md plus the real source (`client.clj`, `attach.clj`, `started.clj`,
+`eval.clj`, `runtime.clj`, `config.clj`) and tests (`eval_test`, `attach_test`,
+`config_test`). The five first-pass ambiguity items and four inconsistency items
+are resolved/checked. Found one NEW actionable ambiguity (added to
+`design-steps.md`):
+
+- Seam seed-injection point for composite acquisition entry points is
+  unspecified. `attach-instance-in!` and `start-instance-in!` each call
+  `ensure-instance-in!` (no seam seed) immediately followed by the internal
+  `connect-instance-in!` / `start-process!`, with no interleaving point and no
+  seam param in their current signatures (attach's 3rd arg is `attach-input`;
+  started's 4th `opts` only feeds `wait-for-started-endpoint!`). The cited
+  `eval_test.clj` idiom works only because `eval` is a separate post-seed call;
+  attach/started have no separate step. The design's mechanism bullet asserts
+  these entry points "accept an optional `:runtime-handle` seed" yet also claims
+  "production call sites unchanged" and lists only the runtime-handle merge as a
+  required production change — adding a seed param to these two entry points is
+  itself a production signature change that is unlisted and contradicts the
+  unchanged-call-sites claim. Verified `ensure-instance-in!`/`build-instance`
+  already accept `:runtime-handle`, but neither composite caller forwards one.
+
+No production/test code changed in this review pass.
