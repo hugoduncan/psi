@@ -27,40 +27,39 @@
    establish the first-slice single managed client session."
   [ctx worktree-path]
   (let [effective-worktree (project-nrepl-config/absolute-directory-path! worktree-path)
-        instance           (project-nrepl-runtime/instance-in ctx effective-worktree)
-        {:keys [host port]} (:endpoint instance)]
+        instance           (project-nrepl-runtime/instance-in ctx effective-worktree)]
     (when-not instance
       (throw (ex-info "Managed project nREPL instance not found"
                       {:phase :connect-instance
                        :worktree-path effective-worktree})))
-    (when-not (and (string? host) (integer? port))
-      (throw (ex-info "Managed project nREPL instance requires discovered host/port before connect"
-                      {:phase :connect-instance
-                       :worktree-path effective-worktree
-                       :endpoint (:endpoint instance)})))
-    (let [connector      (or (get-in instance [:runtime-handle :nrepl-connector])
-                             real-nrepl-connector)
-          {:keys [transport client client-session]} (connector {:host host :port port})
-          session-fn     client-session
-          session-id     (or (-> session-fn meta (get (keyword "nrepl.core" "taking-until")) :session)
-                             (throw (ex-info "Managed project nREPL client session did not expose a session id"
-                                             {:phase :connect-instance
-                                              :worktree-path effective-worktree
-                                              :endpoint (:endpoint instance)})))]
-      (project-nrepl-runtime/update-instance-in!
-       ctx effective-worktree
-       #(-> %
-            (assoc :lifecycle-state :ready
-                   :readiness true
-                   :active-session-id session-id
-                   :can-eval? true
-                   :can-interrupt? true
-                   :runtime-handle (merge (:runtime-handle %)
-                                          {:transport transport
-                                           :client client
-                                           :client-session client-session
-                                           :session-id session-id})
-                   :last-error nil))))))
+    (let [{:keys [host port]} (:endpoint instance)]
+      (when-not (and (string? host) (integer? port))
+        (throw (ex-info "Managed project nREPL instance requires discovered host/port before connect"
+                        {:phase :connect-instance
+                         :worktree-path effective-worktree
+                         :endpoint (:endpoint instance)})))
+      (let [connector      (or (get-in instance [:runtime-handle :nrepl-connector])
+                               real-nrepl-connector)
+            {:keys [transport client client-session]} (connector {:host host :port port})
+            session-id     (or (-> client-session meta (get (keyword "nrepl.core" "taking-until")) :session)
+                               (throw (ex-info "Managed project nREPL client session did not expose a session id"
+                                               {:phase :connect-instance
+                                                :worktree-path effective-worktree
+                                                :endpoint (:endpoint instance)})))]
+        (project-nrepl-runtime/update-instance-in!
+         ctx effective-worktree
+         #(-> %
+              (assoc :lifecycle-state :ready
+                     :readiness true
+                     :active-session-id session-id
+                     :can-eval? true
+                     :can-interrupt? true
+                     :runtime-handle (merge (:runtime-handle %)
+                                            {:transport transport
+                                             :client client
+                                             :client-session client-session
+                                             :session-id session-id})
+                     :last-error nil)))))))
 
 (defn disconnect-instance-in!
   [ctx worktree-path]

@@ -47,7 +47,8 @@
    (wait-for-started-endpoint! worktree-path process {}))
   ([worktree-path process opts]
    (let [effective-worktree (project-nrepl-config/absolute-directory-path! worktree-path)
-         deadline           (+ (System/currentTimeMillis) (long (or (:timeout-ms opts) default-readiness-timeout-ms)))
+         effective-timeout-ms (long (or (:timeout-ms opts) default-readiness-timeout-ms))
+         deadline           (+ (System/currentTimeMillis) effective-timeout-ms)
          poll-ms            (long (or (:poll-interval-ms opts) default-poll-interval-ms))]
      (loop []
        (if-let [endpoint (read-dot-nrepl-port-safe effective-worktree)]
@@ -63,7 +64,7 @@
              (throw (ex-info "Timed out waiting for started project nREPL .nrepl-port"
                              {:phase :started-readiness
                               :worktree-path effective-worktree
-                              :timeout-ms (:timeout-ms opts)
+                              :timeout-ms effective-timeout-ms
                               :path (.getAbsolutePath (io/file effective-worktree ".nrepl-port"))})))
            (Thread/sleep poll-ms)
            (recur)))))))

@@ -1555,3 +1555,27 @@ real callers):
 
 None of these change user-facing behaviour or the component boundary; all are
 internal source-shape improvements to the seams this task introduced.
+
+## Code-shaper follow-up execution (2026-06-01)
+
+Executed the three code-shaper review follow-ups added by `be0cb7284`:
+
+1. `client.clj connect-instance-in!` — moved the `{:keys [host port]}
+   (:endpoint instance)` destructure below the `(when-not instance ...)`
+   existence guard. The destructure now lives in a nested `let` after `instance`
+   is proven non-nil, removing the latent nil-deref read (`locally_comprehensible`).
+2. `client.clj connect-instance-in!` — dropped the redundant `session-fn` alias;
+   the `:nrepl.core/taking-until` session-id is now read directly off
+   `client-session`, the same binding the runtime-handle merge uses, so one
+   concept carries one name (`simple`).
+3. `started.clj wait-for-started-endpoint!` — bound `effective-timeout-ms` once
+   from `(or (:timeout-ms opts) default-readiness-timeout-ms)` and used it for
+   both the deadline and the timeout `ex-info` `:timeout-ms` value. The reported
+   timeout now matches the deadline enforced instead of reporting `nil` for
+   default-timeout callers (`robust`/`consistent`).
+
+Verification: `clj-paren-repair` + `clj-kondo` clean on both files;
+`psi.project-nrepl.client-test` + `psi.project-nrepl.started-test`
+(`5 tests, 26 assertions`), plus commands/runtime/eval/ops/attach
+(`14 tests, 93 assertions`) all green. Behaviour and the component boundary are
+unchanged; no user-facing doc/changelog impact. All three `steps.md` items checked.
