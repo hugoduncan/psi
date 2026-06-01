@@ -158,3 +158,46 @@ blockers). ✅ all six marked done in design-steps.md.
   system-prompt builder reads `:prompt-templates` (grep). Templates are
   `/name`-invoked, not enumerated in the system prompt; handler emits **no
   effects**. Added a "No system-prompt refresh" subsection.
+
+## Inconsistency review (2026-06-01)
+
+Reviewed design.md for internal inconsistency only (not architecture/ambiguity).
+Cross-checked every concrete code claim against the live tree:
+
+- `:session/reload-models` dispatch handler (`dispatch_handlers/session_mutations.clj`):
+  returns `:effects [:model-registry/reload]` + `:return-effect-result? true`,
+  **no** `:root-state-update` → matches design's "external runtime handle" claim. ✓
+- `:session/set-active-tools` / `:session/set-skills`: `:root-state-update`
+  wholesale replace + `:runtime/refresh-system-prompt` effect → matches design. ✓
+- `:session/register-prompt-template` appends via `(fnil conj [])`
+  (`dispatch_handlers/prompt_handlers.clj`) → matches "append" claim. ✓
+- `:prompt-templates` is canonical session state written via `session-update`/
+  `:root-state-update` → matches. ✓
+- `mutations.clj` aggregates `prompts/all-mutations`; adding `reload-prompts`
+  to `prompts/all-mutations` makes it psi-tool-visible via the aggregate → matches. ✓
+- `add-prompt-template` `::pco/output` `[:added? :count]` → design's
+  `[:reloaded? :count]` mirror is consistent. ✓
+- `discover-templates` returns a plain vector, no diagnostics channel;
+  `:extra-paths` opt exists but is never wired from a CLI flag (`--prompt-template`
+  appears only in a doc-comment, line 13) → matches Why/A2/A3 framing. ✓
+- `build-startup-plan` calls `(pt/discover-templates)` no-arg (process-relative
+  `default-config` `:project-prompts-dir = ".psi/prompts"`); skill discovery
+  returns `{:keys [skills diagnostics]}` (has a channel) vs prompt discovery
+  (none) → matches startup-divergence + diagnostics-asymmetry claims. ✓
+- `/help` text enumerates `/reload-models` + `/reload-extension-installs`;
+  `/prompts` command exists → AC2/AC9 conditional references now confirmed true. ✓
+
+Internal AC↔body consistency: diagnostics dropped from both AC4 and Return shape;
+OQ#1/#2 resolved consistently with the Architectural-alignment / Discovery-inputs
+bodies; global-prompts-dir passed as the same default value (not a divergence) is
+consistent with "worktree project dir is the only intentional divergence". ✓
+
+Considered (arguable, NOT actionable): design calls `mark-flushed`
+(`dispatch_effects.clj:278`) "the only existing precedent for an **effect**
+writing canonical state." `apply-root-state-update-in!` is also called widely in
+turn-runtime, but those call sites are core/runtime functions, not effect
+handlers — so the design's effect-scoped claim holds and is correctly qualified.
+
+Result: **no new actionable internal inconsistency**. Prior architecture-fit and
+ambiguity reviews already resolved the substantive issues; design.md is internally
+coherent and consistent with the referenced artifacts.
