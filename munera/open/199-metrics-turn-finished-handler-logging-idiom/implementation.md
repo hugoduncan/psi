@@ -328,3 +328,30 @@ consistency). **PASS — no new actionable doc issues.**
   against `extension.clj`. No doc example references the changed logging.
 
 No follow-up items added.
+
+## Code review — code-shaper (2026-06-01)
+
+Applied code-shaper (simple ∧ consistent ∧ robust) to the code under change:
+the `make-turn-finished-handler` `catch` body in `extension.clj`, the
+`taoensso.timbre` require, and the `deps.edn` `:deps` entry. **PASS — no new
+actionable shaping issues.**
+
+- **simple** ✓: `catch` body is the lone
+  `(timbre/warn e "skipping token tracking for session" session-id)` —
+  single responsibility (log + swallow), locally comprehensible, no control-flow
+  branching; outer `nil` return + success path untouched.
+- **consistent** ✓: argument order + idiom match the project Throwable-first +
+  trailing-structured-arg convention — verified against
+  `tui_session_nav.clj:50` (`timbre/error e "Resume failed:" session-path`),
+  `runtime.clj:217` (`timbre/warn e "Extension run-fn failed"`), and
+  `app_runtime.clj:222`. The `[taoensso.timbre :as timbre]` require is in
+  alphabetical order within `:require`. `deps.edn` pins `6.8.0`, matching the
+  project-wide declaration (state-kernel/root) and the transitive `:test`
+  classpath version (no conflict).
+- **robust** ✓: behaviourally equivalent (exception still swallowed, handler
+  still returns `nil`); no orthogonality regression; the log mechanism is now
+  enforceable under timbre level/routing control (the `println` bypass removed),
+  and the structured `e` arg preserves the stack trace.
+- `clj-kondo --lint extension.clj`: clean (0 errors, 0 warnings).
+
+No follow-up items added.
