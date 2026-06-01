@@ -283,22 +283,25 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       Done: full scheduler suite **45 tests / 410 assertions / 0 fail / 0 error**
       (baseline was 35/338; +10 tests, +72 assertions all green).
 - [x] Coherence check: no scheduler source/doc/behaviour modified; deliverable =
-      green coverage + `findings.md`. Prove it with a touched-path allowlist via
+      green coverage + `findings.md`. The gate's **true invariant** is: **zero**
+      changed paths under `components/agent-session/src/**` or `doc/scheduler.md`.
+      Prove it with a touched-path allowlist via
       `git diff --stat <base>...HEAD`: the only changed paths permitted are
-      (a) test files under
-      `components/agent-session/test/psi/agent_session/` matching
-      `scheduler_*` **or** `psi_tool_scheduler_test.clj` (new or extended
-      verification tests — the psi-tool-surface file does not match the
-      `scheduler_*` glob, so it is named explicitly; Slices 0/5 inventory and
-      may extend it), and (b) files under
+      (a) **test files** under
+      `components/agent-session/test/**` — this covers the verification tests
+      matching `scheduler_*` **or** `psi_tool_scheduler_test.clj`, **and** shared
+      test-support files such as `test_support.clj` (added by the pass-1
+      `capturing-delay-fn` extraction), all of which live under `test/`, not
+      `src/**`/`doc/`; and (b) files under
       `munera/open/201-verify-scheduler-execution/` (incl. `findings.md`) plus
       any newly created `munera/open/NNN-slug/` remediation dir from Slice 9.
       Any changed path under `components/agent-session/src/**` or
       `doc/scheduler.md` fails the gate.
-      Done: `git diff --name-only 87140947b~1..HEAD` shows 7 scheduler test files
-      (all matching `scheduler_*` or `psi_tool_scheduler_test.clj`) + 3 task-dir
-      files only. **Zero** `components/agent-session/src/**` or `doc/scheduler.md`
-      changes → gate PASSES.
+      Done: `git diff --name-only 87140947b~1..HEAD` shows 8 test files (7
+      scheduler test files matching `scheduler_*`/`psi_tool_scheduler_test.clj`
+      + `test_support.clj`, all under `components/agent-session/test/**`) + 3
+      task-dir files only. **Zero** `components/agent-session/src/**` or
+      `doc/scheduler.md` changes → gate PASSES.
 
 ## Plan/steps ambiguity follow-ups (2026-06-01)
 
@@ -423,7 +426,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Implementation review follow-ups — pass 3 (2026-06-01)
 
-- [ ] Broaden the Slice-10 coherence-gate allowlist to admit shared
+- [x] Broaden the Slice-10 coherence-gate allowlist to admit shared
       test-support files. The gate currently permits only test files matching
       `scheduler_*` **or** `psi_tool_scheduler_test.clj` (+ task dir + Slice-9
       remediation dir), but the actual changeset includes
@@ -439,3 +442,13 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       changes". steps.md doc edit only — no test/src/doc behaviour change. (If
       the task is treated as closed, raise it as a small standalone
       task-hygiene task instead.)
+      Done: generalised the Slice-10 allowlist to **test files under
+      `components/agent-session/test/**`** (covering `scheduler_*` /
+      `psi_tool_scheduler_test.clj` **and** shared `test_support.clj`), and
+      hoisted the gate's **true invariant** to the front of the close-out item:
+      "zero `components/agent-session/src/**` or `doc/scheduler.md` changes".
+      Updated the "Done:" note to the actual 8-test-file changeset
+      (`git diff --name-only 87140947b~1..HEAD` = 7 scheduler test files +
+      `test_support.clj`, all under `test/`, + 3 task-dir files; zero `src/**` /
+      `doc/scheduler.md`). steps.md doc edit only — no test/src/doc change; gate
+      now passes on a literal application against the real changeset.

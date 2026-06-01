@@ -619,3 +619,30 @@ One new actionable issue (test-doc accuracy, non-blocking):
 
 No other new actionable issues. Earlier flags (capture-timer DRY, `:at`
 named-bound precision) already executed.
+
+## Implementation review follow-up — pass 3 executed (2026-06-01)
+
+Executed the single pass-3 follow-up: broadened the Slice-10 coherence-gate
+allowlist so it no longer FAILs on the legitimately-touched shared test-support
+file. steps.md doc edit only — no test/src/doc behaviour change.
+
+- **Grounded the flag:** `git diff --name-only 87140947b~1..HEAD` confirms the
+  changeset includes `components/agent-session/test/psi/agent_session/test_support.clj`
+  (pass-1 `capturing-delay-fn` extraction), which matched neither the
+  `scheduler_*` glob nor the named `psi_tool_scheduler_test.clj` exception — so a
+  literal application of the old gate would have failed on it.
+- **Generalised the allowed-path rule** in the Slice-10 close-out item to
+  **test files under `components/agent-session/test/**`** (covers `scheduler_*`
+  / `psi_tool_scheduler_test.clj` **and** shared `test_support.clj`, all under
+  `test/`, not `src/**`/`doc/`).
+- **Hoisted the gate's true invariant** to the front of the item: "zero
+  `components/agent-session/src/**` or `doc/scheduler.md` changes" — making the
+  gate a falsifiable statement about source/doc, with the test-path allowlist as
+  the supporting enumeration.
+- **Updated the "Done:" note** to the real 8-test-file changeset (7 scheduler
+  test files + `test_support.clj`, all under `components/agent-session/test/**`,
+  + 3 task-dir files; zero `src/**` / `doc/scheduler.md`) → gate now passes on a
+  literal application.
+
+No `src/**` or `doc/scheduler.md` touched; no test code changed. Verification-
+only invariant intact.
