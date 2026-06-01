@@ -1034,3 +1034,50 @@ one-concern-per-block style. Assertion count unchanged (2 `thrown?` total).
 Verified: `config_test` 7 tests/32 assertions/0 failures; full focused
 project-nrepl suite (8 ns) 26 tests/151 assertions/0 failures (unchanged);
 `clj-kondo --lint config_test.clj` 0 errors/0 warnings.
+
+## Test-shaper review (2026-06-01, third test-shaper pass)
+
+Independent test-shaper pass (clarity ∧ signal ∧ robustness ∧ economy ∧
+determinism) re-reading all eight `project-nrepl` `*_test.clj` files plus
+`test_support.clj`. The suite remains strong: zero `with-redefs`, zero
+interaction-capture atoms, state/result-based assertions, deterministic (the
+prior pass removed the readiness wall-clock/thread race), single-concern
+`testing` blocks, and shared `test-support` helpers compress ceremony without
+hiding intent. Focused `client_test`+`config_test` re-run: 10 tests, 46
+assertions, 0 failures.
+
+One new actionable economy/consistency finding (`λ economical` minimal
+incidental variation; `λ helpers_that_compress(ceremony)`):
+
+1. `client_test.clj`'s two `connect-instance-in!` tests
+   (`connect-instance-in-test` and `connect-instance-in-missing-session-id-test`)
+   each repeat the full connector-seed ceremony verbatim: an
+   `ensure-instance-in!` (same `:worktree-path`/`:acquisition-mode
+   :attached`/`:endpoint {:host "127.0.0.1" :port 7888 :port-source :explicit}`
+   map) followed by an `update-instance-in!` that `assoc-in`s the test's
+   `connector` under `[:runtime-handle :nrepl-connector]`. This is the same
+   per-file seam-seeding duplication the earlier consolidation targeted for
+   `install-instance!`/`session-fn-with-id`/`temp-dir`/`delete-tree!`, but the
+   connector-seed two-step was never folded into `test-support`. The two copies
+   couple both tests to the literal endpoint map and the exact
+   `[:runtime-handle :nrepl-connector]` seed path; a drift in either (e.g. the
+   endpoint shape or the seam key) would have to be edited in two places. A
+   shared `seed-connector!` helper in `psi.project-nrepl.test-support` (mirroring
+   `install-instance!`: `(seed-connector! ctx worktree connector)` →
+   `ensure-instance-in!` + `update-instance-in!` seeding
+   `[:runtime-handle :nrepl-connector]`) would single-source the seeded-connector
+   shape, compress the ceremony in both tests, and align `client_test.clj` with
+   the rest of the consolidated suite. Each test would keep its own `connector`
+   fn (its distinct behaviour: happy vs. metadata-less session fn) and its own
+   assertions — only the install ceremony is shared. Non-blocking: tests are
+   green and the duplication is small (2 sites), but it is the one remaining
+   un-consolidated seam-seeding idiom in the test tree.
+
+Considered but NOT raised as actionable (scope/precedent): the pervasive
+`worktree (System/getProperty "user.dir")` instance-key idiom (a pre-existing
+ambient-cwd coupling inherited from before the de-mock work, used uniformly and
+not introduced by this task) and `disconnect-instance-in-test`'s `closed*` atom
+(records that the real `Closeable` transport's `.close` fired — disconnect's
+sole observable effect on an opaque object, defensible as a real-effect state
+check rather than a call-count interaction assertion; seen and accepted by the
+prior task-test-review passes). Raising either would be scope expansion.
