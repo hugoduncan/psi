@@ -161,7 +161,7 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
 
 ## Test review follow-ups (2026-06-01, test-shaper)
 
-- [ ] Remove the wall-clock/thread-scheduling dependency from `started_test.clj`
+- [x] Remove the wall-clock/thread-scheduling dependency from `started_test.clj`
   so the readiness tests are deterministic (`control(time)` ∧ `control(concurrency)`
   ∧ `¬flaky`). Both `wait-for-started-endpoint-test` (happy case) and
   `start-instance-in-test` currently drive `.nrepl-port` appearance via
@@ -177,4 +177,8 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
   first poll finds the file. Preserve the file-backed-readiness signal (still
   discover the endpoint from a real on-disk `.nrepl-port`); leave the
   process-exit failure case unchanged (already deterministic). Keep tests green +
-  lint clean.
+  lint clean. — DONE: both readiness tests now write `.nrepl-port` synchronously
+  before the wait/launch (dropped both `future`/`Thread/sleep` races);
+  file-backed-readiness signal preserved; process-exit failure case unchanged.
+  `started_test` 2 tests/12 assertions green; full focused suite 26/151/0
+  unchanged; lint 0/0. (Detail in implementation.md.)

@@ -31,9 +31,9 @@
     (let [dir     (temp-dir "psi-project-nrepl-started-")
           process (fake-process {:alive? true :exit-code 0 :pid 1234})]
       (try
-        (future
-          (Thread/sleep 100)
-          (spit (io/file dir ".nrepl-port") "7888\n"))
+        ;; file-backed readiness: write the .nrepl-port synchronously before
+        ;; the wait; wait-for-started-endpoint! finds it on the first poll.
+        (spit (io/file dir ".nrepl-port") "7888\n")
         (is (= {:host "127.0.0.1" :port 7888 :port-source :dot-nrepl-port}
                (project-nrepl-started/wait-for-started-endpoint! dir process {:timeout-ms 1000 :poll-interval-ms 20})))
         (finally
@@ -57,10 +57,10 @@
           fake-proc    (fake-process {:alive? true :exit-code 0 :pid 4321})
           launcher     (fn [_worktree _command]
                          ;; file-backed readiness: write a real .nrepl-port in the
-                         ;; temp worktree, consumed by wait-for-started-endpoint!.
-                         (future
-                           (Thread/sleep 50)
-                           (spit (io/file worktree ".nrepl-port") "7777\n"))
+                         ;; temp worktree synchronously before returning the
+                         ;; process; the launcher runs before
+                         ;; wait-for-started-endpoint!, so the first poll finds it.
+                         (spit (io/file worktree ".nrepl-port") "7777\n")
                          fake-proc)
           connector    (fn [_endpoint]
                          {:transport {:transport :fake}

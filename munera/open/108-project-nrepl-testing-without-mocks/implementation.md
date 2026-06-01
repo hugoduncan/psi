@@ -958,3 +958,27 @@ One actionable robustness/determinism gap (skill: `λ deterministic(tests)` →
 The `process-exited?` failure case (`fail when process exits before port
 discovery`) is already deterministic (process reports `isAlive=false`
 immediately, no file write) and needs no change.
+
+2026-06-01 — Test review follow-up executed (test-shaper determinism gap)
+
+Removed the wall-clock/thread-scheduling dependency from `started_test.clj`
+readiness tests (the lone unchecked test-shaper follow-up):
+
+- `wait-for-started-endpoint-test` (happy case): now `spit`s `.nrepl-port`
+  synchronously before invoking `wait-for-started-endpoint!`; dropped the
+  `(future (Thread/sleep 100) (spit …))` background race.
+- `start-instance-in-test`: the seeded `launcher` now writes `.nrepl-port`
+  synchronously before returning the fake process; dropped its
+  `(future (Thread/sleep 50) (spit …))`.
+
+Both rely on `wait-for-started-endpoint!` (started.clj:52–53) checking
+`read-dot-nrepl-port-safe` on the FIRST loop iteration — the launcher runs
+synchronously before the wait, so the first poll finds the file. The
+file-backed-readiness signal is preserved (endpoint still discovered from a
+real on-disk `.nrepl-port`). The `process-exited?` failure case was left
+unchanged (already deterministic). `io/file` still used (no unused require).
+
+Result: no wall-clock/thread-scheduling dependency, no per-run sleep latency.
+Verified: `started_test` 2 tests/12 assertions/0 failures; full focused
+project-nrepl suite (8 ns) 26 tests/151 assertions/0 failures (unchanged);
+`clj-kondo --lint started_test.clj` → 0 errors / 0 warnings.
