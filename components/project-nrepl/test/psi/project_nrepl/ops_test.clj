@@ -3,13 +3,31 @@
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
    [psi.project-nrepl.config]
-   [psi.project-nrepl.eval]
+   [psi.project-nrepl.runtime :as project-nrepl-runtime]
    [psi.project-nrepl.ops :as project-nrepl-ops]
    [psi.agent-session.test-support :as test-support]))
 
 (defn- make-ctx []
   (let [[ctx _] (test-support/create-test-session {:persist? false})]
     ctx))
+
+(defn- install-instance!
+  "Install a real managed attached instance at `worktree-path` with an in-memory
+   `[:runtime-handle :client-session]` fn (the eval_test pattern)."
+  [ctx worktree-path client-session]
+  (project-nrepl-runtime/ensure-instance-in!
+   ctx
+   {:worktree-path worktree-path
+    :acquisition-mode :attached
+    :endpoint {:host "127.0.0.1" :port 7888 :port-source :explicit}})
+  (project-nrepl-runtime/update-instance-in!
+   ctx worktree-path
+   #(assoc %
+           :lifecycle-state :ready
+           :readiness true
+           :active-session-id "nrepl-session-1"
+           :runtime-handle {:client-session client-session
+                            :session-id "nrepl-session-1"})))
 
 (defn- temp-dir []
   (str (java.nio.file.Files/createTempDirectory
@@ -44,48 +62,41 @@
           (delete-tree! worktree))))))
 
 (deftest eval-op-test
-  (testing "eval-op preserves the public success contract"
-    (let [ctx      (make-ctx)
-          worktree (System/getProperty "user.dir")
-          started  (java.time.Instant/parse "2026-05-07T20:00:00Z")
-          finished (java.time.Instant/parse "2026-05-07T20:00:01Z")]
-      (with-redefs [psi.project-nrepl.eval/eval-instance-in! (fn [_ctx _worktree-path _code]
-                                                               {:status :success
-                                                                :value "3"
-                                                                :out ""
-                                                                :err ""
-                                                                :ns "user"
-                                                                :started-at started
-                                                                :finished-at finished})]
-        (let [result (project-nrepl-ops/eval-op ctx worktree "(+ 1 2)")]
-          (is (= {:status :ok
-                  :value "3"
-                  :out ""
-                  :err ""
-                  :ns "user"
-                  :timing {:started-at started
-                           :finished-at finished}}
-                 result))))))
+  (testing "eval-op preserves the public success contract through real eval-instance-in!"
+    (let [ctx            (make-ctx)
+          worktree       (System/getProperty "user.dir")
+          client-session (fn [msg]
+                           [{:id (:id msg)
+                             :session "nrepl-session-1"
+                             :value "3"
+                             :ns "user"
+                             :status #{"done"}}])]
+      (install-instance! ctx worktree client-session)
+      (let [result (project-nrepl-ops/eval-op ctx worktree "(+ 1 2)")]
+        (is (= :ok (:status result)))
+        (is (= "3" (:value result)))
+        ;; eval-instance-in!'s result map omits :ns, so the public payload's
+        ;; :ns is nil — real-behavior contract (the prior mock fabricated :ns).
+        (is (nil? (:ns result)))
+        (is (contains? (:timing result) :started-at))
+        (is (contains? (:timing result) :finished-at)))))
 
-  (testing "eval-op preserves the public interrupted contract"
-    (let [ctx      (make-ctx)
-          worktree (System/getProperty "user.dir")
-          started  (java.time.Instant/parse "2026-05-07T20:00:00Z")
-          finished (java.time.Instant/parse "2026-05-07T20:00:01Z")]
-      (with-redefs [psi.project-nrepl.eval/eval-instance-in! (fn [_ctx _worktree-path _code]
-                                                               {:status :interrupted
-                                                                :value nil
-                                                                :out ""
-                                                                :err "Interrupted"
-                                                                :ns "user"
-                                                                :started-at started
-                                                                :finished-at finished})]
-        (let [result (project-nrepl-ops/eval-op ctx worktree "(+ 1 2)")]
-          (is (= {:status :interrupted
-                  :value nil
-                  :out ""
-                  :err "Interrupted"
-                  :ns "user"
-                  :timing {:started-at started
-                           :finished-at finished}}
-                 result)))))))
+  (testing "eval-op preserves the public interrupted contract through real eval-instance-in!"
+    (let [ctx            (make-ctx)
+          worktree       (System/getProperty "user.dir")
+          ;; :interrupted is derived from the response statuses (status
+          ;; "interrupted") through real eval-instance-in! → summarize-response,
+          ;; not from a canned op result.
+          client-session (fn [msg]
+                           [{:id (:id msg)
+                             :session "nrepl-session-1"
+                             :err "Interrupted"
+                             :ns "user"
+                             :status #{"interrupted"}}])]
+      (install-instance! ctx worktree client-session)
+      (let [result (project-nrepl-ops/eval-op ctx worktree "(+ 1 2)")]
+        (is (= :interrupted (:status result)))
+        (is (nil? (:ns result)))
+        (is (= "Interrupted" (:err result)))
+        (is (contains? (:timing result) :started-at))
+        (is (contains? (:timing result) :finished-at))))))

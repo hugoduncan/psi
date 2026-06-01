@@ -73,10 +73,10 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
 
 ## Slice 10 — `ops_test.clj`
 
-- [ ] Remove `eval/eval-instance-in!` redefs (success + interrupted cases)
-- [ ] Install a real managed instance with deterministic in-memory `[:runtime-handle :client-session]`. To drive the `:interrupted` case, the seeded `client-session` fn must return responses carrying nREPL status `"interrupted"` (e.g. `[{:status #{"interrupted"}}]`) so `summarize-response` → `:interrupted`; the `:success` case uses the eval_test-style `[{:value "…" :status #{"done"}}]`. No canned op result is injected — `:interrupted` is derived from the response statuses through real `eval-instance-in!`
-- [ ] Assert `eval-op` public success/interrupted contract through real `eval-instance-in!`
-- [ ] Run `ops_test.clj` green
+- [x] Remove `eval/eval-instance-in!` redefs (success + interrupted cases)
+- [x] Install a real managed instance with deterministic in-memory `[:runtime-handle :client-session]`; `:interrupted` driven by `[{:status #{"interrupted"}}]`, `:success` by `[{:value "3" :status #{"done"}}]`
+- [x] Assert `eval-op` public success/interrupted contract through real `eval-instance-in!` (timing keys present, not exact instants; `:ns` is nil — real-behavior contract, prior mock fabricated `:ns`)
+- [x] Run `ops_test.clj` green (2 tests, 17 assertions)
 
 ## Slice 11 — Verification
 
