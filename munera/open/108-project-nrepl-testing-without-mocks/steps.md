@@ -27,7 +27,7 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
 
 ## Slice 4 — Composite seed param (production)
 
-- [ ] Add optional `:runtime-handle` seam-seed to `attach-instance-in!`; thread into its `ensure-instance-in!` call (`{:worktree-path … :acquisition-mode :attached :endpoint … :runtime-handle <seed>}`)
+- [ ] Add a new trailing optional `opts` arity to `attach-instance-in!` — `([ctx wt] [ctx wt attach-input] [ctx wt attach-input opts])` — and thread `(:runtime-handle opts)` into its `ensure-instance-in!` call (`{:worktree-path … :acquisition-mode :attached :endpoint … :runtime-handle (:runtime-handle opts)}`). Keep `attach-input` (3rd positional map) purely domain input for `resolve-attach-endpoint`; the seam seed lives only in the new 4th-positional `opts` map (symmetric with `start-instance-in!`'s existing `opts`). Do NOT overload `attach-input` with the seam key.
 - [ ] Add optional `:runtime-handle` seam-seed (from opts) to `start-instance-in!`; thread into its `ensure-instance-in!` call (`{... :acquisition-mode :started :command-vector … :runtime-handle <seed>}`)
 - [ ] Confirm real callers (no seed) observe unchanged behavior
 - [ ] `clj-paren-repair` + targeted lint the changed namespaces
@@ -49,7 +49,7 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
 
 - [ ] Remove `start-process!` and `connect-instance-in!` redefs
 - [ ] Seed **both** `[:runtime-handle :process-launcher]` (returning a `fake-process`-shaped object: `isAlive`/`exitValue`/`pid`/`destroy`) and `[:runtime-handle :nrepl-connector]` via the `start-instance-in!` seed param
-- [ ] Drive `.nrepl-port` appearance / readiness through state; assert on resulting instance state
+- [ ] Make readiness file-backed (not runtime-handle-state-backed): `wait-for-started-endpoint!` → `read-dot-nrepl-port-safe` reads a REAL on-disk `.nrepl-port` in the temp worktree. The test MUST write a real `.nrepl-port` file in the temp worktree (so `read-dot-nrepl-port` parses a host/port) before/while the started process polls; assert on the resulting instance state (endpoint discovered from the file). Do NOT seed readiness via runtime-handle state.
 - [ ] Run `started_test.clj` green
 
 ## Slice 8 — `config_test.clj`
@@ -65,14 +65,15 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
 
 - [ ] Remove `ops/eval-op` and `ops/interrupt` redefs
 - [ ] Install a real managed instance with in-memory `[:runtime-handle :client-session]` (eval_test `install-instance!` pattern)
-- [ ] Dispatch real `/project-repl eval` and `/project-repl interrupt` strings through real `commands → ops → eval`; assert `{:type :text :message ...}` results
+- [ ] Seed session-state so the dispatch `session-id` resolves to the instance's worktree-path: `dispatch-project-nrepl-command` derives `(ss/session-worktree-path-in ctx session-id)` and looks up the managed instance at that worktree, so the test must register the same `session-id → worktree-path` mapping (e.g. via the session-state surface `ss/session-worktree-path-in` reads) as where the instance is installed, or the dispatch instance lookup misses and the command never reaches real `ops → eval`
+- [ ] Dispatch real `/project-repl eval` and `/project-repl interrupt` strings through real `commands → ops → eval`; assert `{:type :text :message ...}` results. For the `:interrupted` path, the in-memory `[:runtime-handle :client-session]` fn must return responses whose `summarize-response` yields `:interrupted` — i.e. a response seq carrying nREPL status `"interrupted"` (e.g. `[{:status #{"interrupted"}}]` or `[{:status #{"done" "interrupted"}}]`); `eval_test.clj` provides only a `:success` template (`[{:value "3" :status #{"done"}}]`) and no `:interrupted` template, so this response must be constructed here
 - [ ] Leave pure formatting/parsing/missing-start-command tests seamless (already real-value)
 - [ ] Run `commands_test.clj` green
 
 ## Slice 10 — `ops_test.clj`
 
 - [ ] Remove `eval/eval-instance-in!` redefs (success + interrupted cases)
-- [ ] Install a real managed instance with deterministic in-memory `[:runtime-handle :client-session]`
+- [ ] Install a real managed instance with deterministic in-memory `[:runtime-handle :client-session]`. To drive the `:interrupted` case, the seeded `client-session` fn must return responses carrying nREPL status `"interrupted"` (e.g. `[{:status #{"interrupted"}}]`) so `summarize-response` → `:interrupted`; the `:success` case uses the eval_test-style `[{:value "…" :status #{"done"}}]`. No canned op result is injected — `:interrupted` is derived from the response statuses through real `eval-instance-in!`
 - [ ] Assert `eval-op` public success/interrupted contract through real `eval-instance-in!`
 - [ ] Run `ops_test.clj` green
 
@@ -92,7 +93,7 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
 
 ## Plan/steps ambiguity follow-ups (2026-06-01 review)
 
-- [ ] Slice 4: specify the concrete `:runtime-handle` seed placement on `attach-instance-in!` (new arity vs. key merged into the existing `attach-input` 3rd-positional map vs. a new opts map) so the seam-seed thread into `ensure-instance-in!` is deterministic; `start-instance-in!` already has an `opts` map and is unambiguous
-- [ ] Slice 9: state that the `commands_test.clj` operational tests must seed session-state so the dispatch `session-id` resolves (via `ss/session-worktree-path-in`) to the same worktree-path where the real managed instance is installed, or the dispatch instance lookup misses
-- [ ] Slices 9 & 10: specify what the in-memory `[:runtime-handle :client-session]` fn must return to drive the `:interrupted` path (responses whose `summarize-response` yields `:interrupted`, i.e. a `"interrupted"` status), since `eval_test.clj` provides only a `:success` eval template and no `:interrupted` eval template
-- [ ] Slice 7: replace "drive `.nrepl-port` appearance / readiness through state" with the concrete file-backed mechanism — `started_test.clj` must write a real `.nrepl-port` file in the temp worktree (consumed by `wait-for-started-endpoint!` / `read-dot-nrepl-port-safe`); readiness is file-backed, not runtime-handle-state-backed (also fix the matching wording in plan.md's started_test reshape bullet)
+- [x] Slice 4: specify the concrete `:runtime-handle` seed placement on `attach-instance-in!` (new arity vs. key merged into the existing `attach-input` 3rd-positional map vs. a new opts map) so the seam-seed thread into `ensure-instance-in!` is deterministic; `start-instance-in!` already has an `opts` map and is unambiguous — RESOLVED: new 4th-positional `opts` map on `attach-instance-in!` (`[ctx wt attach-input opts]`), forward `(:runtime-handle opts)`; `attach-input` stays domain-only. Concretized in Slice 4 step + plan.md production-change #3.
+- [x] Slice 9: state that the `commands_test.clj` operational tests must seed session-state so the dispatch `session-id` resolves (via `ss/session-worktree-path-in`) to the same worktree-path where the real managed instance is installed, or the dispatch instance lookup misses — RESOLVED: added explicit session-state→worktree binding step to Slice 9.
+- [x] Slices 9 & 10: specify what the in-memory `[:runtime-handle :client-session]` fn must return to drive the `:interrupted` path (responses whose `summarize-response` yields `:interrupted`, i.e. a `"interrupted"` status), since `eval_test.clj` provides only a `:success` eval template and no `:interrupted` eval template — RESOLVED: specified `[{:status #{"interrupted"}}]`-shaped response in both Slice 9 and Slice 10 steps; success template `[{:value "…" :status #{"done"}}]`.
+- [x] Slice 7: replace "drive `.nrepl-port` appearance / readiness through state" with the concrete file-backed mechanism — `started_test.clj` must write a real `.nrepl-port` file in the temp worktree (consumed by `wait-for-started-endpoint!` / `read-dot-nrepl-port-safe`); readiness is file-backed, not runtime-handle-state-backed (also fix the matching wording in plan.md's started_test reshape bullet) — RESOLVED: rewrote Slice 7 readiness step as file-backed `.nrepl-port` write; updated matching plan.md started_test reshape bullet.

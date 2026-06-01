@@ -374,3 +374,47 @@ four NEW actionable plan/steps ambiguities (added to steps.md as follow-up items
    state with the file mechanism and could lead an implementer to seed readiness
    via runtime-handle instead of writing a real `.nrepl-port` file. Plan's
    started_test reshape bullet carries the same wording.
+
+2026-06-01 — Plan/steps ambiguity follow-up execution
+
+Resolved all four 2026-06-01 plan/steps-ambiguity follow-up items (added by the
+preceding plan/steps ambiguity-review pass), grounded in re-reading the real
+source (`attach.clj`, `started.clj`, `commands.clj`, `eval.clj`, `ops.clj`,
+`eval_test.clj`). These are plan/steps clarifications — no production or test
+code changed.
+
+1. Slice 4 attach seed placement — verified `attach-instance-in!` arities are
+   `([ctx wt] [ctx wt attach-input])` and the 3rd `attach-input` map feeds
+   `resolve-attach-endpoint` (domain input). Chose a NEW 4th-positional optional
+   `opts` map (`[ctx wt attach-input opts]`), forwarding `(:runtime-handle opts)`
+   into `ensure-instance-in!`, symmetric with `start-instance-in!`'s existing
+   `opts`. Rejected overloading `attach-input` (conflates domain input with a
+   test-only seam carrier). Concretized in steps.md Slice 4 + plan.md
+   production-change #3.
+
+2. Slice 9 session-state→worktree binding — verified
+   `dispatch-project-nrepl-command` derives worktree via
+   `(ss/session-worktree-path-in ctx session-id)` then looks up the instance at
+   that worktree. Added an explicit step: the test must register the same
+   `session-id → worktree-path` mapping as where the instance is installed, or
+   the dispatch lookup misses and the command never reaches real `ops → eval`.
+
+3. Slices 9 & 10 `:interrupted` response shape — verified `summarize-response`
+   derives `:interrupted` from nREPL status `"interrupted"` in the
+   `client-session` fn's returned response seq (via `nrepl.core/combine-responses`),
+   not from a canned op result. `eval_test.clj` has only a `:success` template
+   (`[{:value "3" :status #{"done"}}]`) and its interrupt test exercises a
+   different fn (`interrupt-instance-in!`). Specified the in-memory
+   `client-session` fn must return `[{:status #{"interrupted"}}]` (or
+   `#{"done" "interrupted"}`) to drive the `:interrupted` path through real
+   `eval-instance-in!`; added to both Slice 9 and Slice 10 steps.
+
+4. Slice 7 file-backed readiness — verified `wait-for-started-endpoint!` →
+   `read-dot-nrepl-port-safe` reads a REAL on-disk `.nrepl-port` in the temp
+   worktree (file-backed), not runtime-handle state. Rewrote the Slice 7
+   readiness step: the test writes a real `.nrepl-port` file in the temp worktree
+   to drive endpoint discovery; do NOT seed readiness via runtime-handle state.
+   Also fixed the matching wording in plan.md's started_test reshape bullet.
+
+No blocking reasons; all four items completed at the plan/steps level. Production
+seam code + test reshaping remain for the build phase per steps.md (Slices 1–12).

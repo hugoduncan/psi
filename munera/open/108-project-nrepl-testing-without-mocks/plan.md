@@ -51,7 +51,13 @@ Seam keys:
    callers (handle was empty/nil before acquisition completes).
 3. **Add optional `:runtime-handle` seam-seed to the two composite acquisition
    entry points** `attach-instance-in!` and `start-instance-in!`, threaded into
-   their `ensure-instance-in!` call as `:runtime-handle`. `ensure-instance-in!`
+   their `ensure-instance-in!` call as `:runtime-handle`. `start-instance-in!`
+   already has a 4th-positional `opts` map → forward `(:runtime-handle opts)`.
+   `attach-instance-in!` gains a NEW 4th-positional optional `opts` map
+   (`([ctx wt] [ctx wt attach-input] [ctx wt attach-input opts])`) → forward
+   `(:runtime-handle opts)`; `attach-input` (3rd map) stays purely domain input
+   for `resolve-attach-endpoint` and is NOT overloaded with the seam key.
+   `ensure-instance-in!`
    forwards `:runtime-handle` to `build-instance` via its `:as opts` passthrough
    (it is not in `ensure-instance-in!`'s own `:keys`). Real callers seed nothing →
    unchanged runtime behavior; only the signatures gain an optional seed.
@@ -71,6 +77,10 @@ These three are the *only* production changes. Everything else is test reshape.
   `[:runtime-handle :nrepl-connector]` (the latter because `start-instance-in!`
   calls `connect-instance-in!` internally). Depends on production change #2 (merge)
   and #3 (seed param). Stop redefining `start-process!` and `connect-instance-in!`.
+  Readiness is **file-backed, not runtime-handle-state-backed**: `wait-for-started-endpoint!`
+  reads a real on-disk `.nrepl-port` (`read-dot-nrepl-port-safe`) in the temp
+  worktree, so the test writes a real `.nrepl-port` file there to drive endpoint
+  discovery — it does not seed readiness through runtime-handle state.
 - `config_test.clj` — Option 1 (real file-backed config). Reshape the two
   `resolve-config` tests to drive real readers against real on-disk files at
   **both** scopes: temp `user.home` `<tmp>/.psi/agent/config.edn` (user) and temp
