@@ -300,3 +300,27 @@ source, not just notes:
 **No new actionable issues.** The AC2 error-path gap is already documented (note above,
 `bfe2ea561`) and already has a matching unchecked follow-up in steps.md — not re-added to
 avoid duplication.
+
+## 2026-06-01 — error-path e2e test added (AC2 split-coverage closed)
+
+Added `metrics-extension-accumulates-errors-via-bridge-test` to
+`tool_execution_test.clj`, mirroring the success-path e2e test but driving
+`execute-tool-runtime-in!` to return `:is-error true`. The test loads the real
+metrics extension on a session ctx, calls `run-tool-call!`, and asserts
+`@metrics-ext/store` accumulates `:tools "bash" {:invocations 1 :errors 1 :error-reasons {…}}`.
+
+This closes the split-coverage gap: previously the `:errors` increment was only
+exercised via a direct `fire-event` (bridge bypassed), and the bridge's
+`:is-error (boolean …)` propagation was only asserted on the success path. The
+full error path (adapter → `emit-tool-lifecycle!` bridge → `on-tool-result` →
+`counters/inc-tool-error` → store) is now a single executing regression guard.
+
+Note on `:error-reasons`: the lifecycle `:tool-result` event carries the *shaped*
+structured-block content (`[{:type :text :text "…"}]`), and `on-tool-result`
+derives the reason via `(str content)`. The test asserts a single reason recorded
+with count 1 and that the reason string includes the underlying message text,
+rather than asserting an exact key — the stringified-block shape is the real
+propagated value, not a defect.
+
+Verification: `clojure -M:test --focus psi.agent-session.tool-execution-test` →
+**13 tests, 66 assertions, 0 failures**. `clj-kondo --lint` → 0 errors, 0 warnings.
