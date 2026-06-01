@@ -179,3 +179,31 @@ this change; the canonical run path is the root `bb clojure:test:extensions`
 suite, which passes.
 
 No blocked items remain.
+
+## Test review — re-pass (task-test-review, 2026-06-01)
+
+Re-applied the skill's three criteria against the post-follow-up suite.
+**PASS — no new actionable test issues.**
+
+- **well-formed** ✓: suite green (228 tests, 788 assertions, 0 failures/0
+  errors via `bb clojure:test:extensions`); `clj-kondo` clean on
+  `extension_test.clj` (0/0).
+- **behaviour coverage** ✓: the design's observable acceptance criteria are
+  covered — success path (`turn-finished-accumulates-...`,
+  `...computes-delta-on-second-turn`, `...uses-unknown-when-model-id-nil`) and
+  the previously-flagged swallow-and-return-`nil` contract
+  (`turn-finished-swallows-query-error-and-returns-nil-test`). The
+  logging-mechanism specifics (timbre `warn` level, structured-`e` first arg)
+  are correctly **not** asserted: doing so would require interaction assertions
+  on the logger (violates `¬mock`) and the log mechanism is non-behavioural /
+  `¬user_visible`.
+- **¬mock/¬stub** ✓: `query-session` injected as a plain fn via the existing
+  nullable seam; the throwing-fn double drives the error path without
+  interaction assertions — assertions are on return value (`nil`) and store
+  state, not on calls. Compliant with `injectable ∧ nullable ∧ ¬mock ∧ ¬stub`.
+- **store-unchanged assertion is sound**: the injected query throws on the
+  first `try`-body line, before any `swap!` to `:session-usage-cache` or
+  `:metrics`, so asserting `(:metrics @ext/store)` is unchanged is a valid
+  swallow proof.
+
+No follow-up items added.
