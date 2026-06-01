@@ -1149,3 +1149,21 @@ Prior `economical` dedup and the block-content human-readable-key fix stand.
 
 **Verification.** `clojure -M:test --focus psi.metrics.extension-test` →
 **21 tests, 46 assertions, 0 failures**.
+
+---
+
+## Follow-up executed: non-text-block `:error-reasons` boundary test
+
+Added `tool-result-error-reason-non-text-blocks-dropped-test` to
+`extension_test.clj`, pinning the previously-implicit `content->text`
+silent-drop contract at the boundary:
+
+- image-only `:content [{:type :image :data "x"}]` → `:error-reasons {"" 1}`
+  (`(keep :text)` drops the block → `""` text → empty first-line key).
+- mixed `[{:type :text :text "boom"} {:type :image :data "x"}]` →
+  `{"boom" 1}` (text block kept, image block dropped).
+
+Boundary behaviour verified empirically before authoring the assertions.
+`clojure -M:test --focus psi.metrics.extension-test` → **22 tests, 48
+assertions, 0 failures** (was 21/46); `clj-kondo --lint` on the file → 0
+errors, 0 warnings. This was the last unchecked step in steps.md.

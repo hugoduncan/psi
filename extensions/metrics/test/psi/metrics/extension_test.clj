@@ -140,6 +140,27 @@
       (is (= 1 (get reasons "first part second part"))
           "text blocks joined into a single reason key"))))
 
+(deftest tool-result-error-reason-non-text-blocks-dropped-test
+  ;; content->text uses (keep :text content): non-text blocks (no :text key,
+  ;; e.g. image blocks preserved by normalize-tool-content) are silently
+  ;; dropped. Pin the chosen behaviour at the boundary:
+  ;; - image-only error content -> empty-string reason key
+  ;; - mixed text+image -> text-only key (image dropped)
+  (let [{:keys [api state]} (make-api)]
+    (ext/init api)
+    (fire-event state "tool_result"
+                {:tool-name "bash" :tool-call-id "c1" :is-error true
+                 :content [{:type :image :data "x"}]})
+    (let [reasons (get-in @ext/store [:metrics :tools "bash" :error-reasons])]
+      (is (= {"" 1} reasons)
+          "image-only content has no :text, so the reason key is empty"))
+    (fire-event state "tool_result"
+                {:tool-name "read" :tool-call-id "c2" :is-error true
+                 :content [{:type :text :text "boom"} {:type :image :data "x"}]})
+    (let [reasons (get-in @ext/store [:metrics :tools "read" :error-reasons])]
+      (is (= {"boom" 1} reasons)
+          "mixed content keeps text blocks only; image block dropped"))))
+
 (deftest tool-result-error-reason-multiline-truncated-to-first-line-80-chars-test
   ;; Multi-line error content >80 chars: reason is the first line, trimmed,
   ;; capped at 80 chars (single key, no StringIndexOutOfBounds on the bound).
