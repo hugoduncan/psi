@@ -43,19 +43,19 @@
     (update-metrics! counters/inc-tool-invocation tool-name))
   nil)
 
+(defn- error-reason
+  "Derive a single-line, ≤80-char error reason key from tool result content."
+  [content]
+  (let [first-line (-> (str content) str/split-lines first str/trim)]
+    (subs first-line 0 (min 80 (count first-line)))))
+
 (defn- on-tool-result
   "Increment error counters when the tool result is an error."
   [payload]
   (when (and (:tool-name payload) (:is-error payload))
-    (let [tool-name (:tool-name payload)
-          content   (str (:content payload))
-          reason    (-> content
-                        (str/split-lines)
-                        first
-                        (or "")
-                        (str/trim)
-                        (subs 0 (min 80 (count (str/trim (first (str/split-lines content)))))))]
-      (update-metrics! counters/inc-tool-error tool-name reason)))
+    (update-metrics! counters/inc-tool-error
+                     (:tool-name payload)
+                     (error-reason (:content payload))))
   nil)
 
 (defn- make-turn-finished-handler

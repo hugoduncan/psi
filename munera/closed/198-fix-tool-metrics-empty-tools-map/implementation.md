@@ -839,3 +839,46 @@ Recommended: bind `first-line` once, then truncate that single value (e.g.
 `(subs first-line 0 (min 80 (count first-line)))` or a `truncate` helper), and
 add/extend a focused assertion that a multi-line error `:content` longer than 80
 chars yields a single trimmed ≤80-char `:error-reasons` entry.
+
+## Follow-up: `error-reason` extraction (code-shaper, resolved)
+
+DONE. Extracted a private `error-reason` helper in `extension.clj`:
+
+```clojure
+(defn- error-reason
+  "Derive a single-line, ≤80-char error reason key from tool result content."
+  [content]
+  (let [first-line (-> (str content) str/split-lines first str/trim)]
+    (subs first-line 0 (min 80 (count first-line)))))
+```
+
+`on-tool-result` is now a thin guard + single call
+`(error-reason (:content payload))`. The first-line/trim pipeline runs once and
+the `subs` bound is computed off that single bound value (`first-line`), closing
+the divergence/`StringIndexOutOfBounds` hazard and restoring
+`xor(computation, flow_control)`: the helper computes the reason, the handler
+controls the conditional increment.
+
+Dropped the redundant `(or "")`: `(str nil)` → `""`, and
+`(str/split-lines "")` → `[""]`, so the empty/nil-content path already yields a
+safe empty reason. `(str (:content payload))` upstream guarantees a non-nil
+string, so the extra guard was dead.
+
+Test: added `tool-result-error-reason-multiline-truncated-to-first-line-80-chars-test`
+(leading whitespace + 100-char first line + trailing lines → single
+`:error-reasons` key == exactly 80 `x` chars), which exercises first-line
+selection, trim, and the bound-off-single-value truncation together. The
+pre-existing single-line 80-char test (`x`*100, no newlines) did not vary trim
+vs. raw length, so the multi-line/leading-whitespace case is the real regression
+guard for the prior duplicated-bound fragility.
+
+Verification: `psi.metrics.extension-test` → 20 tests, 44 assertions, 0 failures
+(run on the repo-root `:test` classpath; the metrics extension's standalone
+`deps.edn` lacks the transitive `psi/root-registry` dep that
+`extension-test-helpers` pulls in). `clj-kondo --lint` on the changed src + test
+→ 0 errors, 0 warnings.
+
+Note: `extensions/metrics/test` is not on any `tests.edn` suite test-path, so
+these tests are not run by `clojure -M:test`. That gap is out of scope for this
+follow-up item (which targets the `on-tool-result` simplification); flagging it
+here for visibility.

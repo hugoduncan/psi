@@ -124,6 +124,21 @@
       (is (= 1 (count reasons)))
       (is (<= (count (first (keys reasons))) 80)))))
 
+(deftest tool-result-error-reason-multiline-truncated-to-first-line-80-chars-test
+  ;; Multi-line error content >80 chars: reason is the first line, trimmed,
+  ;; capped at 80 chars (single key, no StringIndexOutOfBounds on the bound).
+  (let [{:keys [api state]} (make-api)
+        long-first-line (apply str (repeat 100 "x"))
+        content         (str "   " long-first-line "\nsecond line\nthird line")]
+    (ext/init api)
+    (fire-event state "tool_result"
+                {:tool-name "read" :tool-call-id "c1" :is-error true :content content})
+    (let [reasons (get-in @ext/store [:metrics :tools "read" :error-reasons])
+          reason  (first (keys reasons))]
+      (is (= 1 (count reasons)))
+      (is (= 80 (count reason)))
+      (is (= (apply str (repeat 80 "x")) reason)))))
+
 ;;; session_turn_finished event — token accumulation
 
 (deftest turn-finished-accumulates-token-delta-per-model-test
