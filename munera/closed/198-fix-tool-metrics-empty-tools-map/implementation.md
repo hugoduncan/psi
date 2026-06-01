@@ -662,3 +662,38 @@ Verification: `clojure -M:test --focus psi.agent-session.extensions-test
 `extensions.clj` (src) and `extensions_test.clj`.
 
 `steps.md` final unchecked item is now checked; no remaining unchecked items.
+
+## 2026-06-01 — code review (independent, code-shaper skill)
+
+Re-applied code-shaper (`simple ∧ consistent ∧ robust`) against source + the two
+disjoint `"tool_result"` paths. The `:input` (`6a517aa8d`) and `:content`
+(`1a897ea0d`) cross-path unifications are confirmed closed. simple/robust: ✓
+(`emit-tool-lifecycle!` single-responsibility; `case` flow-control isolated;
+`case` default passthrough correct).
+
+**Actionable (consistency, low — third leg of the same `:is-error` triple): the
+`"tool_result"` bus event's `:is-error` *value type* still differs across the two
+paths.** The interactive/batch bridge (`emit-tool-lifecycle!`) emits
+`:is-error (boolean (:is-error lifecycle-event))` — always a strict boolean. The
+plan path (`dispatch-tool-result-in`) passes `:is-error is-error?` straight through,
+and its sole caller `run-tool-plan-step-in!` (`tool_plan.clj`) supplies
+`(:is-error result)`, which is **not coerced** and can be `nil` (or any truthy
+non-boolean) when the tool result omits/varies the key. So the same extension bus
+contract delivers `:is-error` as a strict boolean on one path and a possibly-`nil`
+value on the other — the identical `consistent(data_shapes)` class the `:input` and
+`:content` unifications closed, one field deeper and not yet addressed.
+
+Severity: low. The sole current consumer (`on-tool-result`) reads `:is-error` only
+in a truthiness `when`, so `nil`/`false` behave identically today — no live defect,
+exactly like the pre-fix `:content` case. But it is a genuine cross-path contract
+divergence at the untrusted-extension boundary; an extension distinguishing
+`false` from `nil` (e.g. `(contains? payload :is-error)` vs explicit `false`) would
+observe path-dependent behaviour.
+
+Resolution options (mirroring the prior two unifications): (a) coerce in
+`dispatch-tool-result-in` — `:is-error (boolean is-error?)` — so both paths emit a
+strict boolean (normalise-by-addition; idempotent for the bridge path); (b) drop the
+bridge's `(boolean …)` coercion and document `:is-error` as raw-passthrough on both
+paths (uniform-by-removal, but reintroduces the `nil` hazard); (c) declare divergence
+acceptable with a documented contract note. Recommend (a) for symmetry with the
+`:input`/`:content` resolutions and `one_way ¬ambiguity`. Recorded as a follow-up.
