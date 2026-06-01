@@ -1,6 +1,6 @@
 # Design follow-up steps — architecture-fit review
 
-- [ ] Resolve the effect-vs-state kind mismatch: prompt templates are
+- [x] Resolve the effect-vs-state kind mismatch: prompt templates are
       canonical session state, not an external runtime handle, so the
       `model-registry/reload` effect analogy does not transfer. Specify the
       reload as a pure handler returning `:root-state-update` that sets
@@ -9,7 +9,7 @@
       writes canonical state via a second apply (the `mark-flushed`
       precedent) as a deliberate exception. Remove the "mirror
       model-registry effect shape" framing as the default.
-- [ ] Correct the replay-fidelity rationale: replay suppresses effects, so
+- [x] Correct the replay-fidelity rationale: replay suppresses effects, so
       effect-modeled discovery does NOT replay the template set. Drop the
       "effect for replay fidelity" justification and instead state plainly
       that file-IO-derived template state is non-replay-deterministic for

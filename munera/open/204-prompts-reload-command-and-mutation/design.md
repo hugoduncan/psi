@@ -143,19 +143,47 @@ the registered mutation set.
 
 - Reads via resolvers, writes via mutations through the dispatch pipeline
   (one-way guideline).
-- Mirror the existing `/reload-models` + `:session/reload-models` +
-  `model-registry/reload` effect shape, but prompt reload is a pure
-  root-state replacement (re-discover from disk → set `:prompt-templates`),
-  so it likely needs no impure effect beyond reading files during discovery.
-  Decide in plan whether discovery (file IO) belongs in an effect or directly
-  in the handler; `discover-templates` is IO. Prefer modeling the disk read as
-  an effect for replay fidelity, consistent with `model-registry/reload`.
+- Prompt reload is a **pure root-state replacement**: the `:session/reload-prompts`
+  handler performs the `discover-templates` file IO inline and returns a
+  `:root-state-update` that sets `:prompt-templates` to the freshly discovered
+  vector. This is the architecturally aligned shape because:
+  - `:prompt-templates` is **canonical session state** (in `:state*`, written
+    via `:root-state-update`), not an external runtime handle.
+  - The dispatch sequencing contract runs effects **last** (handler → apply →
+    validate → trim → effects), so an effect's result cannot feed a
+    `:root-state-update`. To replace canonical state with a discovery result,
+    the discovery must happen in the handler.
+- This deliberately does **not** mirror the `model-registry/reload` effect
+  shape. `model-registry/reload` mutates an **external runtime handle** (the
+  ctx-owned, mutable model registry) and its handler returns no
+  `:root-state-update`; that surface differs in kind from canonical-state
+  replacement and its analogy does not transfer to prompt templates.
+  - The only existing precedent for an effect writing canonical state is
+    `mark-flushed` calling `apply-root-state-update-in!` from inside the effect
+    (a second apply). If an effect path were ever pursued instead of the pure
+    handler, it would be a deliberate, documented exception to the pure
+    handler-result model — not the default. The default here is the pure
+    handler.
+- Replay consequences: replay **suppresses effects** but **preserves state
+  application** (state application is replayed from the log). Because the
+  discovery IO lives in the pure handler, the **last applied `:prompt-templates`
+  value is preserved on replay** (the applied `:root-state-update` is part of
+  the event record). File-IO-derived template state is inherently
+  non-replay-deterministic (the filesystem may differ at replay time), so
+  replay does not re-run discovery; it reproduces the value that was applied
+  when the reload originally dispatched. There is no "effect for replay
+  fidelity" benefit — that framing is incorrect and is dropped.
 - No new shim/adapter; reuse `psi.prompt-assets.prompt-templates/discover-templates`.
 
 ## Open questions for plan stage
 
-1. Effect vs in-handler discovery: model file IO as a `:prompt-templates/reload`
-   effect (replay-faithful, mirrors `model-registry/reload`) or read in-handler?
+1. ~~Effect vs in-handler discovery.~~ **Resolved** (see Architectural
+   alignment): discovery file IO runs **in the pure `:session/reload-prompts`
+   handler**, which returns a `:root-state-update` replacing `:prompt-templates`.
+   No reload effect; the `model-registry/reload` effect analogy does not apply
+   (it mutates an external runtime handle, not canonical state), and there is no
+   "effect for replay fidelity" benefit (replay suppresses effects, preserves
+   state application).
 2. CLI `--prompt-template` extra-path persistence across reload.
 3. Whether `/prompts-reload` joins a generalized `/reload` umbrella later
    (out of scope here; keep dedicated command consistent with existing

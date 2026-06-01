@@ -42,3 +42,24 @@ Findings (actionable misfits):
 One-way / reads-via-resolvers / writes-via-dispatch alignment: OK. No new
 shim/adapter: OK (reuses `discover-templates`). Worktree-path discovery
 input: correctly identified as session worktree, not cwd — aligned.
+
+## Design-step follow-ups executed (2026-06-01)
+
+Both architecture-fit follow-up design-steps applied to design.md:
+
+- ✅ Effect-vs-state mismatch resolved. Rewrote "Architectural alignment" to
+  specify the reload as a **pure `:session/reload-prompts` handler** performing
+  `discover-templates` IO inline and returning a `:root-state-update` that sets
+  `:prompt-templates`. Removed the "mirror `model-registry/reload` effect shape"
+  default; documented the kind difference (external runtime handle vs canonical
+  state) and the dispatch sequencing reason (effects run last, so an effect
+  result cannot feed `:root-state-update`). Noted `mark-flushed`'s
+  second-apply as the only effect-writes-state precedent and an explicit
+  exception, not the default.
+- ✅ Replay-fidelity rationale corrected. Replaced the "effect for replay
+  fidelity" claim with the accurate statement: replay suppresses effects but
+  preserves state application, so the last applied `:prompt-templates` value is
+  preserved on replay; file-IO-derived state is non-replay-deterministic
+  regardless. Dropped the inverted justification.
+- Open question #1 (effect vs in-handler) marked resolved in design.md,
+  pointing to the Architectural alignment section.
