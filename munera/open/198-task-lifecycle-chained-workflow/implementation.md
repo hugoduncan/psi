@@ -421,3 +421,39 @@ Findings — no new actionable feedback:
    `review-task-design`/`create-task-plan` precedent.
 
 PASS_STATUS: REVIEW_COMPLETE — no new steps.md items added.
+
+## 2026-06-01 — test review (task-test-review skill) (ψ)
+
+Applied `task-test-review` to `task-lifecycle-test`
+(`components/workflow-loader/test/psi/workflow_loader/workflow_definitions_test.clj`
+L437-460) against design acceptance criteria. Skill criteria:
+
+- well_formed: ✓ — mirrors `review-task-implementation-test` `load-edn-only`
+  shape; clean assertions.
+- ¬mock ∧ ¬stub ∧ nullable infra: ✓ — uses the real loader
+  (`loader/load-workflow-definitions`) over a temp `with-workflow-dir`; no
+  mocks/stubs.
+- ∀ behaviour(design) ∃ covering test: ✗ — **coverage gap** (actionable).
+
+Coverage gaps (acceptance criteria not asserted by the test):
+
+1. **Input-threading `:prompt-string` not asserted.** Design's central
+   mechanism and an explicit acceptance criterion: each step must carry
+   `:prompt-string {:type :map :fields {:input {:from :workflow-input :path
+   [:input]}}}`. The test asserts only `:name`/`:type`/`:target`. A regression
+   in `:prompt-string` (wrong `:path`, missing `:fields`, string instead of
+   `:map`, dropped key) would leave the test green while breaking the whole
+   workflow's identifier threading — the single highest-value invariant, and it
+   is unguarded. `create-task-plan-test` precedent already asserts input wiring
+   via `step-has-input-var-wired?`; this test makes no equivalent assertion.
+
+2. **Per-step `:context` not asserted.** Acceptance criterion: each step must
+   carry `:context [{:type :source :from :workflow-original}]` and no prior-step
+   yield (input-only threading). The test does not assert `:context` on any
+   step, so a missing/altered/yield-chained `:context` would pass undetected.
+
+Both are explicit `design.md` acceptance criteria, both unverified. The prior
+implementation-review note ("REVIEW_COMPLETE") assessed code-vs-design but did
+not evaluate test coverage of these criteria.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

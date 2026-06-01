@@ -52,3 +52,14 @@
       implementation; record outcomes in `implementation.md`.
 - [x] Commit the workflow file, test, and CHANGELOG entry with a descriptive
       message (e.g. `⚒ Add task-lifecycle chained workflow (198)`).
+
+## Test review follow-ups (task-test-review)
+
+- [ ] Add an assertion to `task-lifecycle-test` that every step's
+      `:prompt-string` equals `{:type :map :fields {:input {:from :workflow-input
+      :path [:input]}}}` (covers the design's central input-threading acceptance
+      criterion, currently unguarded).
+- [ ] Add an assertion to `task-lifecycle-test` that every step's `:context`
+      equals `[{:type :source :from :workflow-original}]` and references no
+      prior-step yield (covers the input-only context-threading acceptance
+      criterion).
