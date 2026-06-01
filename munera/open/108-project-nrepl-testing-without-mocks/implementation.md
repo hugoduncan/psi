@@ -831,3 +831,40 @@ consolidates the seeded `:runtime-handle` shape, no shims/adapters introduced.
 
 No new actionable findings. The three prior-pass follow-ups are genuinely
 landed (verified, not just recorded). Review complete.
+
+2026-06-01 — Test review (task-test-review)
+
+First test-focused review pass (skill criteria: well_formed ∧ behaviour
+coverage ∧ infra deps injectable/nullable/¬mock/¬stub). The four prior passes
+were implementation reviews; none examined behaviour-coverage explicitly.
+
+Re-verified empirically myself:
+- focused project-nrepl suite (8 ns): 25 tests, 150 assertions, 0 failures
+- zero `with-redefs` (git grep → none); zero interaction-capture atoms
+- all infra seams are injectable/nullable via `[:runtime-handle <seam-key>]`
+  (`:nrepl-connector`, `:process-launcher`, `:client-session`) with embedded
+  stubs (fake-process proxy, in-memory client-session/connector fns) — not
+  mocks/stubs-as-redefs. Criterion 3 ✓.
+- tests are sociable, state/result-based, well isolated (temp dirs cleaned in
+  `finally`, `user.home` restored in `finally`). Criterion 1 ✓.
+
+One actionable behaviour-coverage gap (criterion 2):
+
+1. The missing-session-id throw in `connect-instance-in!` is uncovered.
+   `connect-instance-in!` retains a throw-on-missing-session-id branch
+   (`"… client session did not expose a session id"`) — design names this as a
+   deliberately-retained behaviour and the `:nrepl-connector` seam is shaped
+   specifically so this derivation lives in `connect-instance-in!` (not the
+   seam). The de-mocking work newly makes this path trivially testable through
+   the seam (seed a `:nrepl-connector` whose returned `:client-session` fn
+   carries NO `:nrepl.core/taking-until` metadata → the throw fires), yet no
+   test exercises it. The pre-redef `client_test.clj` did not cover it either,
+   so this is not a regression — but it is a covering-test gap for a
+   design-retained behaviour that this task made cheaply testable via the same
+   seam the migrated `client_test`/`attach_test`/`started_test` already use.
+   `attach_test` covers a connector that THROWS (`attach-boom`) and the happy
+   path; neither covers the connector returning a session fn without the
+   session-id metadata. Adding one `client_test.clj` case (seed a connector
+   returning a metadata-less session-fn, assert the
+   `did not expose a session id` `ExceptionInfo`) closes it with the existing
+   seam mechanism — no new seam needed.

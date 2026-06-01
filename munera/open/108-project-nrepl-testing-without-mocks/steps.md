@@ -124,3 +124,17 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
   `with-redefs`, zero interaction-capture atoms, zero inline session-fn metadata
   copies; three production seams match design exactly; all acceptance criteria
   met. Review complete — no follow-up steps added.
+
+## Test review follow-ups (2026-06-01, task-test-review)
+
+- [ ] Add a `client_test.clj` covering test for the missing-session-id throw in
+  `connect-instance-in!`. The `:nrepl-connector` seam was shaped so session-id
+  derivation (and its throw-on-missing branch, `"… did not expose a session
+  id"`) stays in `connect-instance-in!` — a design-retained behaviour now
+  trivially testable through the same seam the migrated tests already use, yet
+  uncovered. Seed a `[:runtime-handle :nrepl-connector]` whose returned
+  `:client-session` fn carries NO `:nrepl.core/taking-until` metadata (i.e. a
+  bare `(fn [_] nil)`, not `session-fn-with-id`), invoke `connect-instance-in!`,
+  and assert it throws `clojure.lang.ExceptionInfo` with message `#"did not
+  expose a session id"`. No new seam needed; reuse the existing
+  `connect-instance-in-test` setup pattern. Keep tests green + lint clean.
