@@ -57,16 +57,18 @@
 
 ## Test review follow-ups (task-test-review second pass, 2026-06-01)
 
-- [ ] T2a: Add a positive-selection test for the `:details`-only branch of the
+- [x] T2a: Add a positive-selection test for the `:details`-only branch of the
   `dispatch-tool-result-in` filter predicate: register a `tool_result` handler
   returning a map containing `:details` and *no* `:content`/`:is-error` (e.g.
   `{:details {:k :v}}`), assert `dispatch-tool-result-in` returns that map.
   Covers the `(contains? % :details)` disjunct of the single-sourced
   modifiable-key contract, currently unprotected (only the `:content` disjunct
   is tested by `dispatch-tool-result-modifiable-key-override-test`).
-- [ ] T2b: Add a positive-selection test for the `:is-error`-only branch:
+  Added `dispatch-tool-result-details-only-override-test`.
+- [x] T2b: Add a positive-selection test for the `:is-error`-only branch:
   register a handler returning a map containing `:is-error` and *no*
   `:content`/`:details` (e.g. `{:is-error true}`), assert
   `dispatch-tool-result-in` returns that map. Covers the
   `(contains? % :is-error)` disjunct so each branch of the modifiable-key `or`
   is protected against silent removal.
+  Added `dispatch-tool-result-is-error-only-override-test`.

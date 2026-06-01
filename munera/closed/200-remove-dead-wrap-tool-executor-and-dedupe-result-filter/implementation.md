@@ -212,3 +212,22 @@ for the `:details`-only and `:is-error`-only handler returns so each disjunct of
 the single-sourced contract is protected against silent removal.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Test review follow-up execution (second pass, 2026-06-01)
+
+Executed T2a and T2b from the second task-test-review pass. Both add
+per-disjunct positive-selection coverage for the surviving
+`dispatch-tool-result-in` filter predicate's modifiable-key `or`, so each
+branch of the single-sourced contract is independently protected.
+
+- T2a → `dispatch-tool-result-details-only-override-test`: handler returns
+  `{:details {:k :v}}` (no `:content`/`:is-error`); asserts
+  `dispatch-tool-result-in` returns that map (positive selection of the
+  `(contains? % :details)` disjunct). Placed after
+  `dispatch-tool-result-map-without-modifiable-key-test`.
+- T2b → `dispatch-tool-result-is-error-only-override-test`: handler returns
+  `{:is-error true}` (no `:content`/`:details`); asserts return is that map
+  (positive selection of the `(contains? % :is-error)` disjunct).
+- Verify: clj-paren-repair (no changes), clj-kondo clean (0/0); Kaocha focus
+  `psi.agent-session.extensions-test` → 30 tests, 98 assertions, 0 failures
+  (was 28/96 before; +2 tests, +2 assertions). No deviations.

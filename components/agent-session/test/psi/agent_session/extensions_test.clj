@@ -448,6 +448,34 @@
                                              {:content "original" :is-error false}
                                              false))))))
 
+(deftest dispatch-tool-result-details-only-override-test
+  (testing "tool_result handler returning a map with only :details is selected as the override"
+    (let [reg (ext/create-registry)
+          _   (ext/register-extension-in! reg "/ext/a")
+          _   (ext/register-handler-in! reg "/ext/a" "tool_result"
+                                        (fn [_] {:details {:k :v}}))]
+      ;; Protects the (contains? :details) disjunct of the single-sourced
+      ;; modifiable-key contract — a map carrying only :details (no
+      ;; :content/:is-error) is selected as the override.
+      (is (= {:details {:k :v}}
+             (ext/dispatch-tool-result-in reg "read" "call-1" {"path" "x"}
+                                          {:content "original" :is-error false}
+                                          false))))))
+
+(deftest dispatch-tool-result-is-error-only-override-test
+  (testing "tool_result handler returning a map with only :is-error is selected as the override"
+    (let [reg (ext/create-registry)
+          _   (ext/register-extension-in! reg "/ext/a")
+          _   (ext/register-handler-in! reg "/ext/a" "tool_result"
+                                        (fn [_] {:is-error true}))]
+      ;; Protects the (contains? :is-error) disjunct of the single-sourced
+      ;; modifiable-key contract — a map carrying only :is-error (no
+      ;; :content/:details) is selected as the override.
+      (is (= {:is-error true}
+             (ext/dispatch-tool-result-in reg "read" "call-1" {"path" "x"}
+                                          {:content "original" :is-error false}
+                                          false))))))
+
 (deftest tool-event-payload-constructors-test
   (testing "tool-call-event builds the canonical tool_call payload shape"
     (is (= {:type         "tool_call"
