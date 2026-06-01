@@ -882,3 +882,25 @@ Note: `extensions/metrics/test` is not on any `tests.edn` suite test-path, so
 these tests are not run by `clojure -M:test`. That gap is out of scope for this
 follow-up item (which targets the `on-tool-result` simplification); flagging it
 here for visibility.
+
+## Code-shaper review pass (2026-06-01)
+
+Reviewed code/spec/tests/docs under code-shaper (simple ∧ consistent ∧ robust).
+The src is in good shape after the prior passes: the bus-event payload is
+single-sourced (`ext/tool-call-event`/`ext/tool-result-event`), the
+`:input`/`:content`/`:is-error` triple is unified across both paths, and
+`on-tool-result`'s `error-reason` helper restores `xor(computation, flow_control)`.
+Lint clean; the agent-session + tool-runtime contract guards pass (45/195/0).
+
+One actionable robustness gap remains (`robust → enforceable(invariants)`):
+`extensions/metrics/test` is on **no** `tests.edn` suite `:test-paths`, so
+`psi.metrics.extension-test` — including this task's authored contract guards
+(`error-reason` truncation, etc.) — is never collected by `clojure -M:test` /
+CI. A test that does not run enforces nothing. This task touched `tests.edn`
+(`c00f4feda`) to wire metrics `:source-paths` into `:unit` for the e2e ns load
+but left the test directory unregistered. The gap was noted-but-deferred in the
+prior item and never promoted to an actionable step; promoting it now. The
+`:extensions` suite omits metrics from both `:test-paths` and `:source-paths`,
+so the fix is to register `extensions/metrics/test` (and `extensions/metrics/src`)
+in the `:extensions` suite (and `:integration`), then verify the suite collects
+and passes the 20 metrics tests via `bb clojure:test:extensions`.
