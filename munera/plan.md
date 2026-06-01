@@ -12,10 +12,10 @@ Not yet started:
 - `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 - `munera/open/108-project-nrepl-testing-without-mocks/`
 - `munera/open/199-metrics-turn-finished-handler-logging-idiom/` — replace raw `println` debug logging in metrics `make-turn-finished-handler` with timbre (out-of-scope item from task 198 review).
-- `munera/open/200-remove-dead-wrap-tool-executor-and-dedupe-result-filter/` — remove dead `wrap-tool-executor` and single-source the tool-result modifiable-key filter contract (out-of-scope item from task 198 review).
 
 ## Recently closed
 
+- `200-remove-dead-wrap-tool-executor-and-dedupe-result-filter` — removed dead `wrap-tool-executor`; modifiable-key contract (`:content`/`:details`/`:is-error`) now expressed once in the `dispatch-tool-result-in` filter; migrated the non-map-return guard to a direct test.
 - `198-fix-tool-metrics-empty-tools-map` — `:tools {}` always empty in metrics.edn; fixed by bridging `:tool-start`/`:tool-result` lifecycle events → extension `dispatch-in` in `emit-tool-lifecycle!`.
 
 ## Audit outcome (2026-05-31)
