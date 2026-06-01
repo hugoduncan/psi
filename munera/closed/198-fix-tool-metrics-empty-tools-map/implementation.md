@@ -1110,3 +1110,42 @@ failures**. `--focus psi.agent-session.extensions-test
 psi.tool-runtime.core-test` → **32 tests, 127 assertions, 0 failures** (no
 regressions). `clj-kondo --lint` on all three changed files → 0 errors, 0
 warnings.
+
+---
+
+## 2026-06-01 — test review (independent, test-shaper skill)
+
+Re-applied test-shaper against source + live run (`extension_test.clj`,
+`tool_execution_test.clj`, `extensions_test.clj`; metrics suite 21/46 green).
+Prior passes pinned single-block, multi-text-block, and multiline-truncation
+`:error-reasons` derivation. This pass examined the `content->text` branch
+boundaries and found one new low-severity `behavior_focused` / `cover_by(boundaries)`
+gap not previously raised.
+
+**ACTIONABLE (low — uncovered boundary).** `content->text` derives the
+`:error-reasons` key via `(str/join " " (keep :text content))` over the block
+vector. `normalize-tool-content` (the canonical coercion on both paths)
+preserves arbitrary blocks in its `(sequential? content)` branch — including
+non-text blocks (`{:type :image :data …}`) that carry **no `:text`**. `keep
+:text` silently drops those, so an error result whose content is image-only
+yields `:error-reasons {"" 1}` (empty-string key), and a mixed text+image
+error drops the image silently. Verified empirically: image-only → `""`,
+empty-vec → `""`, text+image → text only. No existing test pins this
+non-text-block boundary; per test-shaper `cover_by(partitions ∧ boundaries)`
+and `behavior_focused`, the empty/dropped-block reason behaviour is unasserted
+and surprising (silent empty key). Low severity — image-only error content is
+rare and an empty key is benign grouping, not a correctness defect — but a real
+untested boundary of the task-introduced `content->text` helper. Follow-up: add
+a focused unit test pinning the chosen behaviour for non-text-block content
+(image-only → exact key; mixed text+image → text-only key), making the
+silent-drop contract explicit.
+
+**Otherwise well-shaped — ✓.** `simple ∧ consistent ∧ robust ∧ economical`
+hold across the suites: single-concern deftests, uniform `make-api`/`fire-event`
+and `run-tool-call-through-metrics-ext!` helpers (compress ceremony, keep intent
+local), deterministic (defonce atoms reset in fixtures/`finally`), state/output
+assertions only (no interaction-mocking), schema-conformance guards on summary.
+Prior `economical` dedup and the block-content human-readable-key fix stand.
+
+**Verification.** `clojure -M:test --focus psi.metrics.extension-test` →
+**21 tests, 46 assertions, 0 failures**.
