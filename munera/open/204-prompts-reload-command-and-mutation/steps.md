@@ -111,3 +111,25 @@ Vertical slices from plan.md. Tick each item with its sha / decision note.
       call). Plan opts example shows the `let` binding.
 - [x] P3: Resolved slice-3 mutation entry point to `reload-prompts-in!` only;
       dropped the `dispatch!` alternative from the step wording.
+
+## Plan/steps inconsistency follow-ups (2026-06-01)
+
+- [ ] I1: Resolve the command core-fn surface. `format-reload-models`
+      (commands.clj) calls `session/reload-models-in!` where `session` =
+      `psi.agent-session.core` (a re-export at `core.clj:181` delegating to
+      `settings/reload-models-in!`). To mirror it: add a `reload-prompts-in!`
+      re-export to `psi.agent-session.core`, add `core.clj` to the plan's
+      "Surfaces touched", and have slice 4 call `session/reload-prompts-in!`.
+      Alternatively, state explicitly that the command calls
+      `session-settings`/`settings/reload-prompts-in!` directly and note that
+      divergence from the `format-reload-models` idiom. Pin one and update
+      slice 2/4 + plan accordingly.
+- [ ] I2: Note the mutation-idiom divergence. Every existing mutation in
+      `mutations/prompts.clj` (incl. `add-prompt-template`, which the design
+      tells the builder to mirror) calls `dispatch/dispatch!` **directly** with
+      `agent-session-ctx`; the plan/steps mandate `reload-prompts`'s body call
+      the shared `reload-prompts-in!` core fn instead. Add an explicit note in
+      plan/steps that this is an intentional divergence from the direct-
+      `dispatch!` mutation idiom, and pin that the mutation passes
+      `agent-session-ctx` as the `ctx` arg of
+      `reload-prompts-in! [ctx session-id]`.

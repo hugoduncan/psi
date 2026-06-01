@@ -266,3 +266,68 @@ steps.md (docs-only; no code touched — implementation slices not yet started).
 
 No blockers. Design unchanged (read-only context). Remaining work = the
 implementation slices 1–5, unchanged by these clarifications.
+
+## Plan/steps inconsistency review (2026-06-01)
+
+Reviewed plan.md + steps.md for **cross-file inconsistencies** (plan ↔ steps ↔
+design, and vs the live mutation/command idioms). Cross-checked
+`mutations/prompts.clj`, `session_settings.clj`, `commands.clj`, and
+`core.clj` against the plan's "mirror existing surfaces" claims.
+
+New actionable inconsistencies:
+
+- 🌀 I1 — Command surface omits the required `core.clj` re-export. Plan
+  "Surfaces touched" + steps slice 4 say `format-prompts-reload` should "call
+  the core reload fn" **mirroring `format-reload-models`**. But the live
+  `format-reload-models` (`commands.clj:255`) calls
+  `session/reload-models-in!` where `session` = **`psi.agent-session.core`**
+  (commands.clj alias, line 30), and `core.clj:181` **re-exports**
+  `reload-models-in!` delegating to `settings/reload-models-in!`. The plan
+  only adds `reload-prompts-in!` to `session_settings.clj` (slice 2) and lists
+  surfaces `session_settings.clj / mutations/prompts.clj / commands.clj /
+  CHANGELOG / docs` — **`core.clj` is missing**. To mirror `/reload-models`
+  the command needs a `reload-prompts-in!` re-export in `psi.agent-session.core`
+  (paralleling `core.clj:181`); otherwise slice 4 must call `settings/` (or
+  add a `session-settings` alias) directly, **diverging** from the
+  `format-reload-models` idiom. Resolve: add `core.clj` to "Surfaces touched"
+  + a slice-2/4 step adding the `core.clj` re-export, OR explicitly state the
+  command calls `session-settings` directly and note the divergence.
+
+- 🌀 I2 — Mutation invocation idiom contradicts "mirror `add-prompt-template`".
+  Design pins the mutation `::pco/output` "mirroring `add-prompt-template`"
+  (design L142) and plan/steps mandate the mutation body call the shared
+  `reload-prompts-in!` core fn (P3 resolution; plan L64–66). But **every**
+  existing mutation in `mutations/prompts.clj` — including `add-prompt-template`
+  — calls `dispatch/dispatch!` **directly** with `agent-session-ctx`; **none**
+  routes through a `session_settings.clj` `*-in!` core fn. So the mutation
+  body deliberately diverges from the established `prompts.clj` idiom that the
+  output-shape instruction tells the builder to mirror. The task files never
+  acknowledge this departure, leaving a builder a genuine contradiction
+  ("mirror add-prompt-template" ⇒ call `dispatch!` directly vs "share one
+  entry point" ⇒ call `reload-prompts-in!`). Resolve: keep the
+  `reload-prompts-in!` shared-entry decision but add an explicit note in
+  plan/steps that this is an intentional divergence from the direct-`dispatch!`
+  mutation idiom (mutation passes `agent-session-ctx` as the `ctx` arg of
+  `reload-prompts-in! [ctx session-id]`).
+
+Verified consistent (no step added):
+- Per-file worktree-helper aliases (P1 resolution) match the live nss:
+  `session_mutations.clj` `session`=`state`/`ss`=`init`;
+  `session_settings.clj` `ss`=`state`/`session`=`model`;
+  `commands.clj` `ss`=`state`. ✓
+- `reload-models` handler returns `:return-effect-result? true` with no
+  `:root-state-update` (session_mutations L282–287) → plan's risk note +
+  design "external runtime handle" framing accurate. ✓
+- `set-skills`/`set-active-tools` replace shape (`:root-state-update` +
+  `:runtime/refresh-system-prompt` + `:return`) matches the design's cited
+  replace-handler model. ✓
+- `add-prompt-template` `::pco/output [:added? :count]` and
+  `::pco/params [:psi/agent-session-ctx :session-id :template]` → steps slice-3
+  `[:reloaded? :count]` / `[:psi/agent-session-ctx :session-id]` mirror is
+  consistent. ✓
+- `discover-templates` plain-vector / no-diagnostics matches AC4 + return
+  shape. ✓
+
+Result: **two new actionable cross-file inconsistencies (I1, I2)** — both about
+mirroring existing reload surfaces (command core re-export; mutation invocation
+idiom). Added as slice-2/4 follow-up steps.
