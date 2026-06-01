@@ -346,3 +346,16 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
   seams match design exactly; real `ops.clj` callers preserve original arities;
   all helper idioms consolidated in shared `test-support`; all acceptance
   criteria met. Review complete — no follow-up steps added.
+
+## Test review follow-ups (2026-06-01, task-test-review 3rd pass)
+
+- (none) Third independent test-review pass found no new actionable issues.
+  Verified empirically: 26 tests / 151 assertions / 0 failures; zero
+  `with-redefs`; zero interaction-capture atoms; all infra deps
+  injectable/nullable/¬mock/¬stub via `[:runtime-handle <seam-key>]`; every
+  design-named behaviour covered. Candidate gaps (untested `/project-repl
+  attach` + `/project-repl stop` dispatch branches, `wait-for-started-endpoint!`
+  timeout branch, pre-existing `connect-instance-in!` guard branches) were
+  considered and deliberately NOT raised — all are pre-existing or outside this
+  de-mocking task's named behaviour set; raising them would be scope expansion.
+  No follow-up steps added.

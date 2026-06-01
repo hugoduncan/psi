@@ -1348,3 +1348,41 @@ Acceptance criteria — all met (re-verified). No new actionable findings of any
 kind (no acceptance blockers, no quality/consistency issues, no unnecessary
 abstractions, no structural performance concerns, no new patterns that should
 reuse existing ones). Review complete.
+
+---
+
+2026-06-01 — task-test-review (3rd test-review pass)
+
+Independent test review against the skill criteria
+(`well_formed ∧ ∀b∈behaviour(design).∃t.covers(t,b) ∧
+∀d∈infra_deps. injectable ∧ nullable ∧ ¬mock ∧ ¬stub`). Verified empirically:
+focused project-nrepl suite (8 ns) 26 tests / 151 assertions / 0 failures.
+
+- well_formed: all eight test files are state/result-based; `git grep` confirms
+  zero `with-redefs` and zero interaction-capture atoms (`calls*`/`@calls`/
+  `swap! … conj … msg`) component-wide.
+- infra-deps: every infrastructure dependency is injected via
+  `[:runtime-handle <seam-key>]` (`:nrepl-connector`, `:process-launcher`,
+  `:client-session`) with nullable embedded stubs (fake-process Process proxy,
+  in-memory connector/session fns) and real-default fallback. No mocks/stubs in
+  the prohibited sense.
+- coverage: every design-named behaviour has a covering test — `:nrepl-connector`
+  happy + missing-session-id throw (`client_test`), attach success + failure
+  projection (`attach_test`), `:process-launcher` + started-mode merge + startup
+  failure (`started_test`), config user-vs-project precedence + empty case
+  (`config_test`), commands eval/interrupt routing + no-active-eval
+  (`commands_test`), ops eval-op success/interrupted contract (`ops_test`).
+
+Candidate gaps considered and deliberately NOT raised (scope discipline,
+consistent with the 2nd-pass rationale):
+- `/project-repl attach` and `/project-repl stop` dispatch branches in
+  `commands.clj` are untested — confirmed via git history to be PRE-EXISTING gaps
+  (never tested), outside this de-mocking task's named behaviour set.
+- `wait-for-started-endpoint!` timeout branch is uncovered — covering it would
+  re-introduce the wall-clock dependence the test-shaper pass deliberately
+  removed; declining is consistent.
+- pre-existing `connect-instance-in!` guard branches (instance-not-found,
+  missing-host/port) — already declined in the 2nd pass as pre-existing infra
+  guards outside scope.
+
+No new actionable issues. Review complete.
