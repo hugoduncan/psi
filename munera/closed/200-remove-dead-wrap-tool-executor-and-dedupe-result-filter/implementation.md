@@ -520,3 +520,62 @@ No new actionable docs issues. Docs are accurate, complete, and consistent with
 the implementation; the prior pass's D1 closed the only stale terminology.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Code review: code-shaper (2026-06-01)
+
+Applied code-shaper (simple ∧ consistent ∧ robust) to the *production* code
+surface — a distinct lens from the prior test-shaper / task-test-review / docs
+passes, none of which examined the live tool-result application path. Read
+`extensions.clj` (`dispatch-tool-result-in` filter @331–332, `tool-result-event`
+@299–313) and its production consumer `tool_plan.clj` @219–224. Verified key-set
+usage by grep over `components/**.clj` excluding `*_test.clj`.
+
+One actionable finding (C1).
+
+C1 (actionable — robust/consistent: modifiable-key contract is NOT expressed
+once in production). The task's central acceptance criterion is that after
+removing `wrap-tool-executor`'s `cond->`, the modifiable-key contract
+(`#{:content :details :is-error}`) is "expressed exactly once" — in the
+`dispatch-tool-result-in` filter predicate (`extensions.clj:331–332`). This is
+false for the production code. The same key set is *also* enumerated in
+`tool_plan.clj:222–224`, the live `cond->` that **applies** the override:
+
+```clojure
+(cond-> result
+  (contains? modified :content)  (assoc :content (:content modified))
+  (contains? modified :details)  (assoc :details (:details modified))
+  (contains? modified :is-error) (assoc :is-error (:is-error modified)))
+```
+
+This is the producer/consumer pair of the same contract: `extensions.clj` decides
+*which keys make a handler return count as an override* (selection guard);
+`tool_plan.clj` decides *which keys are copied from the override into the result*
+(application). They must stay in lockstep — adding a fourth modifiable key
+requires editing two non-adjacent sites in two different namespaces, with no
+compiler/lint enforcement that they agree (`λ robust`:
+`shaped_by(code, formalisms) → enforceable(invariants(code))` — violated: the
+key set is an implicit ad-hoc `or`/`cond->` triple, not a named formalism). The
+design enumerated exactly two sites for the contract (`dispatch-tool-result-in`
+filter + `wrap-tool-executor` `cond->`) and concluded that removing the wrapper's
+`cond->` left it expressed once — it **missed** the *live* `tool_plan.clj`
+`cond->`, which is the production duplicate the dead wrapper merely mirrored. The
+task removed the dead copy and left the live coupling in place; the "expressed
+once" criterion is not met in production.
+
+Remediation (smallest shape that restores the invariant): introduce a single
+named source for the modifiable-key set / override-merge — e.g. a
+`modifiable-tool-result-keys` def (or a `merge-tool-result-override` /
+`select-tool-result-override` helper in `extensions.clj`) used by both the
+`dispatch-tool-result-in` selection predicate and the `tool_plan.clj`
+application `cond->` — so the contract is enumerated once and the two sites
+derive from it. (Note: this widens the task scope beyond pure removal; if scope
+is to stay fixed, the design/acceptance criterion must be corrected to state the
+contract is expressed in *two* coupled production sites, not one — but the
+honest fix is single-sourcing across the producer/consumer pair.)
+
+Out of scope confirmation: `tool-result-event` (@299–313) remains correctly
+excluded — it constructs the payload shape, a different concern (per A2). C1 is
+about the *modifiable-key* selection/application contract, which genuinely spans
+two live sites.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

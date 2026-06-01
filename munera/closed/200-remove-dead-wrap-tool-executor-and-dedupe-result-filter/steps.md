@@ -127,3 +127,27 @@
   "Tool Wrapping" event-API section (`doc/extensions.md:550`) and its
   `#tool-wrapping` anchors unchanged — that section documents the surviving
   event-subscription capability, not the removed internal function.
+
+## Code review follow-ups (code-shaper, 2026-06-01)
+
+- [ ] C1: The modifiable-key contract (`#{:content :details :is-error}`) is
+  expressed in **two** live production sites, not one — contradicting the
+  task's "expressed exactly once" acceptance criterion. Besides the
+  `dispatch-tool-result-in` *selection* predicate
+  (`extensions.clj:331–332`), the *application* `cond->` in
+  `tool_plan.clj:222–224` re-enumerates the same three keys to copy the
+  override into the result. They are the producer/consumer of one contract and
+  must stay in lockstep, with no compiler/lint enforcement of agreement
+  (robust: invariant not enforceable). The design enumerated only the
+  filter + the (now-removed) wrapper `cond->` and missed the live
+  `tool_plan.clj` `cond->`. Single-source the contract: introduce a named
+  modifiable-key set / shared helper (e.g. `modifiable-tool-result-keys`, or a
+  `merge-tool-result-override` / `select-tool-result-override` fn in
+  `extensions.clj`) used by both the selection predicate and the
+  `tool_plan.clj` application `cond->`, so the key set is enumerated once and
+  both sites derive from it. If task scope must stay fixed at pure removal,
+  instead correct design.md / Acceptance Criteria to state the contract spans
+  two coupled production sites (not one) — but the honest fix is single-sourcing
+  across the producer/consumer pair. Run clj-kondo + Kaocha focus
+  `psi.agent-session.extensions-test` (plus any tool-plan tests touched);
+  behaviour must be unchanged.
