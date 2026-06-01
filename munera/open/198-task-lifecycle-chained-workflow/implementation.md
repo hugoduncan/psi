@@ -164,3 +164,30 @@ Executed all three pass-2 ambiguity-review follow-up items; design.md updated
    prior step's yield (contrast later `review-task-implementation.edn` steps which
    deliberately chain yields). Task id travels via the `:map` `:prompt-string`
    `:input` field only.
+
+## 2026-06-01 — design inconsistency review pass 2 (ψ)
+
+Re-reviewed design.md after the pass-2 ambiguity follow-up added the "Concrete
+step and file shape" subsection. Checked the new step-naming claim against the
+cited exemplars (`review-task-implementation.edn`, `gh-issue-implement.edn`),
+the verification-test surface (`workflow_definitions_test.clj`), and runtime
+(`source_resolution.clj`). New actionable inconsistency found:
+
+1. Step `:name`-equals-`:target` convention is contradicted by its own cited
+   authority. design.md ("Concrete step and file shape" + Acceptance criteria)
+   states each delegate step's `:name` "mirrors its `:target`" / "`:name` equals
+   its `:target`", attributing this to "the convention used by
+   `review-task-implementation.edn`, whose first step is named for its purpose".
+   But in `review-task-implementation.edn` all five steps `:target "review-step"`
+   while their `:name`s are `review-task-implementation`, `review-task-tests`,
+   `review-test-shape`, `review-task-docs`, `review-code-shape` — names do NOT
+   equal targets. `gh-issue-implement.edn` likewise: `:name "implement"` →
+   `:target "implement-task-in-worktree"`, `:name "review"` →
+   `:target "review-implementation-in-worktree"`. The exemplars show the
+   opposite convention (names describe the step's role/purpose, distinct from
+   target). The parenthetical "named for its purpose" is itself inconsistent
+   with "mirrors its `:target`": being named for purpose ≠ equalling the target.
+   The name=target choice may still be acceptable for this workflow (each stage
+   delegates to a distinctly-named target, so name=target is unambiguous here),
+   but the stated justification is wrong and must not claim exemplar precedent
+   it lacks.

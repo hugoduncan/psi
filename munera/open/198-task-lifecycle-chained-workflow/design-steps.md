@@ -62,3 +62,18 @@
       threading" decision (id travels via `:prompt-string`, not `:context`), state
       definitively whether each step omits `:context` or carries
       `:workflow-original`, so the per-step shape is fully specified.
+
+## Inconsistency review follow-ups (pass 2)
+
+- [ ] Correct the step `:name`-equals-`:target` justification. design.md claims
+      each delegate step's `:name` "mirrors its `:target`" / "`:name` equals its
+      `:target`" is "the convention used by `review-task-implementation.edn`", but
+      that file's five steps all `:target "review-step"` with purpose-named
+      `:name`s (`review-task-implementation`, `review-task-tests`, …) — names do
+      NOT equal targets; `gh-issue-implement.edn` is the same (`implement` →
+      `implement-task-in-worktree`). Remove the false exemplar-precedent claim
+      (and the self-contradicting "named for its purpose" parenthetical). Either
+      justify name=target on its own merits (distinct per-stage targets make
+      name=target unambiguous here) or rename steps to purpose-style names
+      matching the actual exemplar convention; keep the verification-test
+      `:name` assertions in sync with whichever is chosen.
