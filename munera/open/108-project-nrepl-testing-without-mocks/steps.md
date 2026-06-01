@@ -182,3 +182,15 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
   file-backed-readiness signal preserved; process-exit failure case unchanged.
   `started_test` 2 tests/12 assertions green; full focused suite 26/151/0
   unchanged; lint 0/0. (Detail in implementation.md.)
+
+## Test-shaper follow-ups (2026-06-01, second test-shaper pass)
+
+- [ ] Split `config_test.clj` `read-dot-nrepl-port-test`'s "fails when
+  .nrepl-port is missing or invalid" block into two single-concern `testing`
+  blocks, each with its own fresh `temp-dir`/`delete-tree!`: (1) absent
+  `.nrepl-port` throws `clojure.lang.ExceptionInfo`; (2) malformed
+  `.nrepl-port` (non-integer content) throws `clojure.lang.ExceptionInfo`.
+  Removes the intra-test `spit`-then-reassert ordering coupling and gives each
+  boundary contract its own meaningful failure name, matching the
+  one-concern-per-block style already used by `read-project-preferences-test`.
+  Keep tests green + lint clean.

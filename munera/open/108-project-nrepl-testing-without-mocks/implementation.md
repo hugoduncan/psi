@@ -982,3 +982,33 @@ Result: no wall-clock/thread-scheduling dependency, no per-run sleep latency.
 Verified: `started_test` 2 tests/12 assertions/0 failures; full focused
 project-nrepl suite (8 ns) 26 tests/151 assertions/0 failures (unchanged);
 `clj-kondo --lint started_test.clj` → 0 errors / 0 warnings.
+
+## Test-shaper review (2026-06-01, second test-shaper pass)
+
+Re-read all eight `project-nrepl` `*_test.clj` files plus `test_support.clj`
+against the test-shaper lens (simple ∧ consistent ∧ robust ∧ economical). The
+suite is in strong shape: zero `with-redefs`, zero interaction-capture atoms,
+state-based assertions throughout, shared `test-support` helpers (consistent
+seam/temp-dir idioms), and the prior pass already removed the
+wall-clock/thread-scheduling race from the readiness tests (deterministic).
+
+One new actionable `single_concern` issue found:
+
+- `config_test.clj` `read-dot-nrepl-port-test` "fails when .nrepl-port is
+  missing or invalid" packs TWO distinct boundary contracts into one `testing`
+  block: (1) absent `.nrepl-port` throws, then it mutates the same dir
+  (`spit` invalid content) and asserts (2) malformed `.nrepl-port` throws.
+  This violates `single_concern` (one boundary contract per test) and the
+  intervening `spit` creates intra-test ordering coupling — a failure in either
+  branch surfaces under one test name, weakening `meaningful_failures`. The two
+  failure modes are independent boundary contracts and should be separate
+  `testing` blocks (each with its own fresh temp dir), matching the
+  one-assertion-cluster-per-concern style the rest of the file already uses
+  (e.g. `read-project-preferences-test`'s three separate blocks).
+
+No other new actionable test-shaping feedback. The pre-existing
+`absolute-directory-path-test` "accepts existing absolute directory" relies on
+the real cwd (`user.dir`) existing rather than an explicit temp dir, but it is
+a pre-existing pure-config test outside this task's de-mock reshape set;
+raising it would be scope expansion, so it is deliberately NOT added as a
+follow-up.
