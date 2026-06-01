@@ -301,6 +301,34 @@ source, not just notes:
 `bfe2ea561`) and already has a matching unchecked follow-up in steps.md — not re-added to
 avoid duplication.
 
+## 2026-06-01 — test review (independent, test-shaper skill)
+
+Re-applied test-shaper against source + live run, not just notes.
+
+**AC2 error-path test now exists but is UNCOMMITTED.** The previously-documented AC2 gap is
+addressed by `metrics-extension-accumulates-errors-via-bridge-test` in `tool_execution_test.clj`,
+which drives `run-tool-call!` with `execute-tool-runtime-in!` returning `:is-error true`,
+loads the real metrics ext, and asserts `@metrics-ext/store` accumulates `:tools "bash"
+:invocations 1`, `:errors 1`, and the propagated error reason. This closes the split-coverage
+gap: bridge `:is-error` propagation (`tool_runtime_adapter.clj`) is now guarded on the truthy
+path. Verified: `clojure -M:test --focus psi.agent-session.tool-execution-test` →
+**13 tests, 66 assertions, 0 failures**; `clj-kondo` clean. However the test is in the working
+tree only — not committed. Until committed it does not survive the session boundary and the
+task's git state still lacks the AC2 guard.
+
+**Economy: two e2e metrics tests duplicate ~15 lines of identical ceremony.**
+`metrics-extension-accumulates-tools-via-bridge-test` and
+`metrics-extension-accumulates-errors-via-bridge-test` share verbatim setup: defonce-atom
+reset in try/finally, identical `runtime-fns` map, and the `load-init-var-extension-in!` +
+`with-redefs` infra scaffold. Per test-shaper (`minimal(incidental_variation)`,
+`helpers_that_compress(ceremony) ∧ ¬helpers_that_hide(intent)`), this is a candidate for a
+shared helper/macro (e.g. `with-metrics-ext-session`) that isolates the per-test intent
+(`:is-error` value + store assertions). Minor; clarity issue, not correctness.
+
+**Tests otherwise well-shaped.** All bridge/e2e tests: single concern, state/output
+assertions (no interaction-mocking), deterministic (atoms reset in finally, infra redefs
+canned), meaningful failure messages on each `is`. No further issues.
+
 ## 2026-06-01 — error-path e2e test added (AC2 split-coverage closed)
 
 Added `metrics-extension-accumulates-errors-via-bridge-test` to
