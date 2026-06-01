@@ -526,3 +526,39 @@ user-facing doc change for this task; verified it for accuracy/completeness/cons
 
 **No new actionable docs issues.** All prior docs findings are closed and confirmed.
 Working tree clean; steps.md has no open follow-ups.
+
+## 2026-06-01 — code review (independent, code-shaper skill)
+
+Applied code-shaper (`simple ∧ consistent ∧ robust`) to the `emit-tool-lifecycle!`
+bridge and the two disjoint paths firing the same extension bus events.
+
+- **simple — ✓.** `emit-tool-lifecycle!` is single-responsibility (telemetry dispatch
+  + extension bridge); the `case` is flow-control isolated from the per-branch payload
+  construction. `(boolean (:is-error …))` coercion is correct; `case` default `nil`
+  passes through non-bridged kinds.
+- **`tool_call` shape — ✓ consistent.** Bridge payload
+  `{:type :tool-name :tool-call-id :input}` matches `dispatch-tool-call-in` exactly.
+
+**Actionable (consistency/robustness): the `"tool_result"` extension event has two
+divergent payload shapes across the two disjoint paths.** The data-driven plan path
+(`dispatch-tool-result-in`) fires `"tool_result"` with
+`{:type :tool-name :tool-call-id :input :content :details :is-error}`, but the
+interactive/batch bridge fires it with `{:type :tool-name :tool-call-id :content
+:details :is-error}` — **`:input` is absent**. The same extension contract therefore
+delivers different keys depending on which path triggered it. An untrusted-extension
+`tool_result` handler that reads `:input` works on the plan path and silently receives
+`nil` on the interactive path (`consistent(data_shapes)` violation;
+`robust → enforceable(invariants)` weakened at the extension boundary).
+
+This differs from the previously-considered-and-rejected `:input`/`:details` note
+(that was scoped to *test assertions* of unconsumed fields). The concern here is the
+cross-path contract divergence of the bus event itself, regardless of current
+consumers. Structural cause: the `:tool-result` lifecycle event built in
+`tool-runtime/core` (`record-tool-call-result!`) does not carry `:parsed-args`/args, so
+the bridge cannot supply `:input` without threading the original args through the
+result path. Resolution options: (a) thread `parsed-args` into the `:tool-result`
+lifecycle event so the bridge can emit `:input`, unifying both paths' `tool_result`
+shape; (b) explicitly document `:input` as plan-path-only on `tool_result` and align
+`dispatch-tool-result-in` to drop it, making the contract uniform by removal; or
+(c) declare divergence acceptable with a documented contract note. Recorded as a
+follow-up.
