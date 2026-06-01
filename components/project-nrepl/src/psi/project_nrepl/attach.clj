@@ -30,10 +30,19 @@
          :port-source port-source}))))
 
 (defn attach-instance-in!
-  "Attach to an existing nREPL endpoint and establish the managed client session."
+  "Attach to an existing nREPL endpoint and establish the managed client session.
+
+   The optional 4th-positional `opts` map carries an optional `:runtime-handle`
+   seam seed that is threaded into the underlying `ensure-instance-in!` call so a
+   seeded `:nrepl-connector` survives into the internal `connect-instance-in!`.
+   `attach-input` (3rd positional map) stays purely domain input for
+   `resolve-attach-endpoint`. Real callers seed nothing, so behaviour is
+   unchanged."
   ([ctx worktree-path]
    (attach-instance-in! ctx worktree-path {}))
   ([ctx worktree-path attach-input]
+   (attach-instance-in! ctx worktree-path attach-input {}))
+  ([ctx worktree-path attach-input opts]
    (let [effective-worktree (project-nrepl-config/absolute-directory-path! worktree-path)
          endpoint           (resolve-attach-endpoint effective-worktree attach-input)]
      (try
@@ -41,7 +50,8 @@
         ctx
         {:worktree-path effective-worktree
          :acquisition-mode :attached
-         :endpoint endpoint})
+         :endpoint endpoint
+         :runtime-handle (:runtime-handle opts)})
        (project-nrepl-client/connect-instance-in! ctx effective-worktree)
        (catch Throwable t
          (if (project-nrepl-runtime/instance-in ctx effective-worktree)

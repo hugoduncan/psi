@@ -2,11 +2,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
-   [psi.agent-session.test-support :as test-support]))
-
-(defn- make-ctx []
-  (let [[ctx _] (test-support/create-test-session {:persist? false})]
-    ctx))
+   [psi.project-nrepl.test-support :refer [make-ctx]]))
 
 (deftest ensure-instance-creates-starting-instance-test
   (testing "ensure-instance-in! creates one managed instance per worktree"

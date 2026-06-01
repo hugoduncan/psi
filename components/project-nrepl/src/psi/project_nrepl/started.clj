@@ -19,7 +19,11 @@
   [command-vector]
   (mapv str command-vector))
 
-(defn- start-process!
+(defn real-process-launcher
+  "Real-default `:process-launcher` seam implementation.
+
+   Launches `command-vector` as a real OS process in `worktree-path`, returning
+   the `java.lang.Process`."
   [worktree-path command-vector]
   (let [pb (ProcessBuilder. ^java.util.List (normalize-command command-vector))]
     (.directory pb (File. worktree-path))
@@ -43,7 +47,8 @@
    (wait-for-started-endpoint! worktree-path process {}))
   ([worktree-path process opts]
    (let [effective-worktree (project-nrepl-config/absolute-directory-path! worktree-path)
-         deadline           (+ (System/currentTimeMillis) (long (or (:timeout-ms opts) default-readiness-timeout-ms)))
+         effective-timeout-ms (long (or (:timeout-ms opts) default-readiness-timeout-ms))
+         deadline           (+ (System/currentTimeMillis) effective-timeout-ms)
          poll-ms            (long (or (:poll-interval-ms opts) default-poll-interval-ms))]
      (loop []
        (if-let [endpoint (read-dot-nrepl-port-safe effective-worktree)]
@@ -59,7 +64,7 @@
              (throw (ex-info "Timed out waiting for started project nREPL .nrepl-port"
                              {:phase :started-readiness
                               :worktree-path effective-worktree
-                              :timeout-ms (:timeout-ms opts)
+                              :timeout-ms effective-timeout-ms
                               :path (.getAbsolutePath (io/file effective-worktree ".nrepl-port"))})))
            (Thread/sleep poll-ms)
            (recur)))))))
@@ -78,21 +83,25 @@
                              ctx
                              {:worktree-path effective-worktree
                               :acquisition-mode :started
-                              :command-vector validated-command})]
+                              :command-vector validated-command
+                              :runtime-handle (:runtime-handle opts)})]
      (try
-       (let [process  (start-process! effective-worktree validated-command)
+       (let [instance (project-nrepl-runtime/instance-in ctx effective-worktree)
+             launcher (or (get-in instance [:runtime-handle :process-launcher])
+                          real-process-launcher)
+             process  (launcher effective-worktree validated-command)
              endpoint (wait-for-started-endpoint! effective-worktree process opts)]
          (project-nrepl-runtime/update-instance-in!
           ctx effective-worktree
-          #(assoc %
-                  :lifecycle-state :starting
-                  :readiness false
-                  :endpoint endpoint
-                  :runtime-handle {:process process
-                                   :pid (.pid process)
-                                   :started-at (now)
-                                   :launch-id (str (UUID/randomUUID))}
-                  :last-error nil))
+          #(-> %
+               (assoc :lifecycle-state :starting
+                      :readiness false
+                      :endpoint endpoint
+                      :last-error nil)
+               (update :runtime-handle merge {:process process
+                                              :pid (.pid process)
+                                              :started-at (now)
+                                              :launch-id (str (UUID/randomUUID))})))
          (project-nrepl-client/connect-instance-in! ctx effective-worktree))
        (catch Throwable t
          (project-nrepl-runtime/update-instance-in!

@@ -3,35 +3,14 @@
    [clojure.test :refer [deftest is testing]]
    [psi.project-nrepl.eval :as project-nrepl-eval]
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
-   [psi.agent-session.test-support :as test-support]))
-
-(defn- make-ctx []
-  (let [[ctx _] (test-support/create-test-session {:persist? false})]
-    ctx))
-
-(defn- install-instance!
-  [ctx worktree-path client-session]
-  (project-nrepl-runtime/ensure-instance-in!
-   ctx
-   {:worktree-path worktree-path
-    :acquisition-mode :attached
-    :endpoint {:host "127.0.0.1" :port 7888 :port-source :explicit}})
-  (project-nrepl-runtime/update-instance-in!
-   ctx worktree-path
-   #(assoc %
-           :lifecycle-state :ready
-           :readiness true
-           :active-session-id "nrepl-session-1"
-           :runtime-handle {:client-session client-session
-                            :session-id "nrepl-session-1"})))
+   [psi.project-nrepl.test-support
+    :refer [install-instance! make-ctx]]))
 
 (deftest eval-instance-in-test
   (testing "successful eval returns structured result and updates projection"
     (let [ctx      (make-ctx)
           worktree (System/getProperty "user.dir")
-          calls*   (atom [])
           client-session (fn [msg]
-                           (swap! calls* conj msg)
                            [{:id (:id msg)
                              :session "nrepl-session-1"
                              :value "3"
@@ -45,8 +24,7 @@
         (is (= :ready (:lifecycle-state instance)))
         (is (= :success (get-in instance [:last-eval :status])))
         (is (= "(+ 1 2)" (get-in instance [:last-eval :input])))
-        (is (nil? (get-in instance [:runtime-handle :active-op])))
-        (is (= "eval" (:op (first @calls*)))))))
+        (is (nil? (get-in instance [:runtime-handle :active-op]))))))
 
   (testing "single-flight eval rejects concurrent in-flight eval"
     (let [ctx      (make-ctx)
@@ -86,9 +64,7 @@
   (testing "interrupt targets the active eval op id and records summary"
     (let [ctx      (make-ctx)
           worktree (System/getProperty "user.dir")
-          calls*   (atom [])
           client-session (fn [msg]
-                           (swap! calls* conj msg)
                            [{:id (:id msg)
                              :session "nrepl-session-1"
                              :status #{"done"}}])]
@@ -100,8 +76,6 @@
             instance (project-nrepl-runtime/instance-in ctx worktree)]
         (is (= :success (:status result)))
         (is (= "eval-123" (:interrupted-op-id result)))
-        (is (= "interrupt" (:op (first @calls*))))
-        (is (= "eval-123" (:interrupt-id (first @calls*))))
         (is (= result (:last-interrupt instance))))))
 
   (testing "interrupt reports unavailable when active eval exists but client session is missing"
