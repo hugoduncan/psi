@@ -25,6 +25,33 @@ Work is an **audit-then-fill** loop, executed Scope area by Scope area:
    the reproducing **failing** test (which stays in the new task, NOT committed
    green here); reference it from `findings.md`.
 
+### Sufficient-coverage criterion (audit → cite-vs-add)
+
+Operational rule for the step-4 / "Reuse before adding" gate and every
+Slice "Ensure a test exists … Add if missing" item. Existing coverage is
+**sufficient** for an acceptance area (→ cite it, do not add) iff all hold:
+
+1. **Asserts the area's named state/outputs.** The test asserts on the specific
+   state/output that area enumerates (e.g. delivered prompt + scheduled
+   provenance for message-kind; `created-session-id`/`delivery-phase` for
+   session-kind; `:cancelled` + handle/queue removal for cancel; `:failed` +
+   `error-summary`/`delivery-phase` for failure; handle-count 0 + empty
+   `:scheduler-timers*` for shutdown), not just a status enum in isolation.
+2. **Drives the real path via the seam where the area is a *live* path.** For
+   live-execution / timer / drain / shutdown areas (Slices 2/3/4/6 shutdown/7),
+   the existing test must drive the real dispatch+effect path and cross the
+   time/timer boundary through the seams (capture+invoke the callback, or
+   dispatch `:scheduler/drain-queue`), not stub delivery and not wall-clock
+   sleep. Pure-model areas (Slice 1) need no seam.
+3. **Asserts state/outputs, not handler interactions.**
+
+Coverage is **insufficient** (→ add a new verifying test, green against current
+behaviour) if any clause fails — e.g. the behaviour is only exercised
+indirectly, asserts interactions, or never crosses the timer seam for a live
+area. A single existing test satisfying (1)–(3) suffices; multiple tests may
+jointly satisfy them. `findings.md` cites the authoritative test(s) per area
+regardless of pre-existing vs new.
+
 ### Key decisions (from resolved design)
 
 - **No new source/doc edits.** Only new test/characterisation namespaces and the

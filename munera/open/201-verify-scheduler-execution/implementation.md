@@ -140,3 +140,27 @@ ambiguities; added unchecked follow-ups to steps.md:
    `git diff --stat` restricted to non-`src`/non-`doc/scheduler.md` paths, an
    explicit touched-path allowlist (new test files + `findings.md` only), or
    manual inspection. Without a mechanism the close-out gate is unfalsifiable.
+
+## Plan/steps ambiguity follow-up execution (2026-06-01)
+
+Executed all 5 newly added plan/steps ambiguity follow-ups (from the preceding
+ambiguity-review pass). All resolvable from current behaviour / artifact facts;
+no blockers. No scheduler source/doc/test code touched (plan/steps/impl only).
+
+1. Sufficient-coverage criterion → added "Sufficient-coverage criterion" section
+   to plan.md (3 clauses: asserts named state/outputs; drives real path via timer
+   seam for *live* areas; asserts state/outputs not interactions). steps.md
+   convention header now points at it as the audit→cite-vs-add governor.
+2. Audit-location pointers → verified all 7 deftest locations by grep:
+   busy-fifo + cancel-pending-and-queued → scheduler_lifecycle_test.clj;
+   drain-queue-delivers-oldest + cancel-marks-pending-or-queued →
+   scheduler_dispatch_test.clj; session-kind-fires / creates-top-level /
+   records-failed → scheduler_handlers_test.clj. Corrected Slices 2/3/4/6/7.
+3. Slice 5 `:at` past/now contract → chose *fires* (drive delay-0 timer via seam,
+   assert fired/delivered), grounded in resolve-fire-time! (delay = max(0,until);
+   validate-delay-ms! only when delay>0). Slice 5 item updated.
+4. Slice 9 NNN allocation → replaced "alloc next NNN" with explicit munera rule
+   max(open ∪ closed)+1; verified current max=201 → next=202; scan-both note added.
+5. Slice 10 coherence proof → specified git diff --stat touched-path allowlist
+   (scheduler_* test files + task dir + any Slice-9 remediation dir); any src/**
+   or doc/scheduler.md change fails the gate.

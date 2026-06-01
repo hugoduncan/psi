@@ -4,6 +4,12 @@ Convention: each verification slice = audit existing coverage → fill any gap w
 a green-against-current-behaviour test → record the area in `findings.md`. No
 scheduler source/doc edits. Tests use time/timer seams, never wall-clock sleeps.
 
+The audit→cite-vs-add decision in every "Ensure a test exists … Add if missing"
+item is governed by the **Sufficient-coverage criterion** in `plan.md`: existing
+coverage is sufficient (cite it) iff it (1) asserts the area's named
+state/outputs, (2) drives the real path via the timer seam for *live* areas, and
+(3) asserts state/outputs not interactions; otherwise add a new verifying test.
+
 ## Slice 0 — Baseline
 
 - [ ] Inventory existing scheduler tests under
@@ -31,7 +37,9 @@ scheduler source/doc edits. Tests use time/timer seams, never wall-clock sleeps.
 ## Slice 2 — Live execution: message kind
 
 - [ ] Audit `scheduler_end_to_end_test.clj` / `scheduler_lifecycle_test.clj`
-      for a real-round-trip message-kind idle-delivery test.
+      / `scheduler_handlers_test.clj` for a real-round-trip message-kind
+      idle-delivery test (handler-level message-kind delivery lives in
+      `scheduler_handlers_test.clj`).
 - [ ] Ensure a test exists that, via `test_support/make-session-ctx` seams:
       creates a message-kind schedule → captures the timer callback → invokes it
       (no sleep) → `:scheduler/fired` → schedule delivered → asserts the
@@ -44,8 +52,10 @@ scheduler source/doc edits. Tests use time/timer seams, never wall-clock sleeps.
 ## Slice 3 — Busy-session queue + drain-on-idle
 
 - [ ] Audit existing busy/queue/drain coverage
-      (`busy-session-fire-queues-then-idle-drains-fifo-test`,
-      `scheduler-drain-queue-delivers-oldest-queued-schedule-test`).
+      (`busy-session-fire-queues-then-idle-drains-fifo-test` →
+      `scheduler_lifecycle_test.clj`;
+      `scheduler-drain-queue-delivers-oldest-queued-schedule-test` →
+      `scheduler_dispatch_test.clj`).
 - [ ] Ensure a test: fire while origin non-idle (`:is-streaming` or
       `:is-compacting` true) → schedule `:queued`; set session idle; dispatch
       `:scheduler/drain-queue` directly → `drain-one` delivers oldest queued
@@ -54,7 +64,7 @@ scheduler source/doc edits. Tests use time/timer seams, never wall-clock sleeps.
 
 ## Slice 4 — Live execution: session kind
 
-- [ ] Audit session-kind coverage
+- [ ] Audit session-kind coverage in `scheduler_handlers_test.clj`
       (`scheduler-session-kind-fires-without-origin-idle-test`,
       `scheduler-session-deliver-creates-top-level-session-without-switching-test`).
 - [ ] Ensure a real-round-trip test: session-kind fires (delivers regardless of
@@ -70,7 +80,10 @@ scheduler source/doc edits. Tests use time/timer seams, never wall-clock sleeps.
 - [ ] Ensure coverage for input resolution:
       - [ ] `:delay-ms` relative path (valid; below-min rejected "below … bound";
             above-max rejected "exceeds … bound").
-      - [ ] `:at` past/now → `delay = 0`, no min check → created + fires immediately.
+      - [ ] `:at` past/now → `delay = 0`, no min check → created **and fires**:
+            the test must drive the delay-0 timer via the seam (capture the
+            timer callback and invoke it) and assert the schedule reaches a
+            fired/delivered state — not merely that creation was accepted.
       - [ ] `:at` future <`min-delay-ms` (1–999ms) → `validate-delay-ms!` throws
             "below the minimum bound".
       - [ ] `:at` > `max-delay-ms` (>24h) → throws "exceeds the maximum bound".
@@ -82,8 +95,11 @@ scheduler source/doc edits. Tests use time/timer seams, never wall-clock sleeps.
 
 ## Slice 6 — Cancellation & lifecycle
 
-- [ ] Audit cancel coverage (`cancel-pending-and-queued-schedules-test`,
-      `scheduler-cancel-marks-pending-or-queued-schedule-cancelled-test`,
+- [ ] Audit cancel coverage
+      (`cancel-pending-and-queued-schedules-test` →
+      `scheduler_lifecycle_test.clj`;
+      `scheduler-cancel-marks-pending-or-queued-schedule-cancelled-test` →
+      `scheduler_dispatch_test.clj`;
       `scheduler_context_shutdown_test.clj`, `scheduler_effects_test.clj`).
 - [ ] Ensure: cancel before fire → `:cancelled`.
 - [ ] Ensure race A — cancel before captured callback dispatches `:scheduler/fired`:
@@ -104,7 +120,8 @@ scheduler source/doc edits. Tests use time/timer seams, never wall-clock sleeps.
 ## Slice 7 — Failure path
 
 - [ ] Audit failure coverage
-      (`scheduler-session-deliver-records-failed-status-on-prompt-submit-error-test`,
+      (`scheduler-session-deliver-records-failed-status-on-prompt-submit-error-test`
+      → `scheduler_handlers_test.clj`;
       `fail-schedule` in `scheduler_test.clj`).
 - [ ] Ensure: delivery/creation failure records `:failed` with `error-summary`
       and `delivery-phase`; status guard `{:pending :queued :delivered}`; queue
@@ -123,9 +140,13 @@ scheduler source/doc edits. Tests use time/timer seams, never wall-clock sleeps.
 ## Slice 9 — Defect handling (conditional)
 
 - [ ] For each `defect` recorded in `findings.md`: create
-      `munera/open/NNN-slug` remediation task (alloc next NNN) with `design.md`
-      and a reproducing **failing** test that stays in that new task (do NOT
-      commit it green here).
+      `munera/open/NNN-slug` remediation task with `design.md` and a reproducing
+      **failing** test that stays in that new task (do NOT commit it green here).
+      Allocate NNN by the munera rule:
+      `NNN = max(NNN over munera/open ∪ munera/closed) + 1` (scan **both**
+      directories, never just one). Current max across both is 201 (this task),
+      so the next remediation id is **202** (re-scan at creation time in case
+      ids were added concurrently).
 - [ ] Reference each remediation task `NNN-slug` from the corresponding
       `findings.md` entry.
 - [ ] If no defect found: confirm no remediation dir is created; all areas read
@@ -139,29 +160,49 @@ scheduler source/doc edits. Tests use time/timer seams, never wall-clock sleeps.
 - [ ] `bb test` green (new verification tests pass against current behaviour;
       any defect repro lives only in its remediation task).
 - [ ] Coherence check: no scheduler source/doc/behaviour modified; deliverable =
-      green coverage + `findings.md`.
+      green coverage + `findings.md`. Prove it with a touched-path allowlist via
+      `git diff --stat <base>...HEAD`: the only changed paths permitted are
+      (a) test files under
+      `components/agent-session/test/psi/agent_session/scheduler_*` (new or
+      extended verification tests), and (b) files under
+      `munera/open/201-verify-scheduler-execution/` (incl. `findings.md`) plus
+      any newly created `munera/open/NNN-slug/` remediation dir from Slice 9.
+      Any changed path under `components/agent-session/src/**` or
+      `doc/scheduler.md` fails the gate.
 
 ## Plan/steps ambiguity follow-ups (2026-06-01)
 
-- [ ] Define an operational "sufficient coverage" criterion for the
+- [x] Define an operational "sufficient coverage" criterion for the
       audit→cite-vs-add decision (used by Slices 2/3/4/6/7/8 and plan step 4 /
       "Reuse before adding"): state, per area, what an existing test must
       assert (the area's named state/outputs), whether it must drive via the
       time/timer seam, and what counts as "insufficient" → triggers a new test.
-- [ ] Correct the audit-location pointers in steps.md to the real files:
+      Done: added "Sufficient-coverage criterion" section to plan.md and a
+      pointer in the steps.md convention header.
+- [x] Correct the audit-location pointers in steps.md to the real files:
       busy/drain-fifo + cancel-pending-and-queued → `scheduler_lifecycle_test.clj`;
       drain-queue-delivers-oldest + cancel-marks-pending-or-queued →
       `scheduler_dispatch_test.clj`; session-kind-fires / creates-top-level /
       records-failed → `scheduler_handlers_test.clj`. Add the missing file refs
       to Slice 4 and Slice 7.
-- [ ] Slice 5 `:at` past/now: decide and state whether the test must assert the
+      Done: verified all 7 deftest locations via grep; updated Slices 2/3/4/6/7
+      pointers.
+- [x] Slice 5 `:at` past/now: decide and state whether the test must assert the
       schedule *fires* (drive the delay-0 timer via the seam) or only that it is
       *created/accepted* without min-delay rejection; update the Slice 5 item to
       the chosen contract.
-- [ ] Slice 9: replace "alloc next NNN" with the explicit munera rule —
+      Done: chose *fires* (drive the delay-0 timer via the seam, assert
+      fired/delivered) — grounded in `resolve-fire-time!` delay-0 path; Slice 5
+      item updated.
+- [x] Slice 9: replace "alloc next NNN" with the explicit munera rule —
       `NNN = max(NNN over munera/open ∪ munera/closed) + 1` — and note the
       current next id (202) to avoid a colliding remediation-task id.
-- [ ] Slice 10: specify the mechanism that proves "no scheduler source/doc/
+      Done: verified max across both dirs = 201 → next 202; Slice 9 item updated
+      with the explicit scan-both rule.
+- [x] Slice 10: specify the mechanism that proves "no scheduler source/doc/
       behaviour modified" — e.g. a touched-path allowlist (new test files +
       `findings.md` only) checked via `git diff --stat`, or equivalent — so the
       coherence gate is falsifiable.
+      Done: Slice 10 close-out item now specifies a `git diff --stat` touched-path
+      allowlist (scheduler test files + task dir + any Slice-9 remediation dir),
+      failing on any `src/**` or `doc/scheduler.md` change.
