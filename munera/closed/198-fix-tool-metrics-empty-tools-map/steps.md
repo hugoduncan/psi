@@ -8,3 +8,4 @@
 - [x] Add integration test: register a `"tool_call"` handler on the session ctx's `extension-registry`, call `run-tool-call!`, assert handler was invoked (regression guard for the `emit-tool-lifecycle!` bridge)
 - [x] Add test: assert `{:block true}` from a `"tool_call"` handler on the interactive path does NOT block execution (documents intentional non-enforcement)
 - [x] Close task
+- [ ] Add end-to-end test: register the metrics extension on a real session ctx (via `ext/init`), call `run-tool-call!`, and assert `ext/store` accumulates a `:tools` entry — covers the full path (adapter → bridge → metrics handler → store) as a single regression guard for the primary acceptance criterion

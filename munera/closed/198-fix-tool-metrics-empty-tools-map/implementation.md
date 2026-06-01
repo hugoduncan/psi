@@ -1,5 +1,25 @@
 # Implementation Notes
 
+## 2026-06-01 — test review
+
+**Tests well-formed.** All acceptance criteria have test coverage. `with-redefs` is used
+only for infra deps (actual tool execution, agent-core side effects) — acceptable nullable
+pattern.
+
+**Gap: no end-to-end test for the primary acceptance criterion.**
+The primary AC ("tool invocations appear in `:tools` in `.psi/metrics.edn`") is tested in
+two separate halves:
+- `emit-tool-lifecycle-bridge-fires-extension-handlers-test`: confirms bridge fires
+  registered handlers.
+- `extension_test.clj` tool-call tests: confirm `on-tool-call` increments `:tools` counters
+  when fired directly via `fire-event`.
+
+No single test wires both: register the metrics extension on a real session ctx, call
+`run-tool-call!`, and assert `ext/store` accumulates `:tools` entries. The full path
+(adapter → bridge → metrics handler → store) is not exercised as a unit. A regression that
+silently disconnects the metrics extension from the session ctx would not be caught by any
+existing test.
+
 ## 2026-06-01 — fix implemented (d16e90286)
 
 Root cause confirmed by tracing the call graph:
