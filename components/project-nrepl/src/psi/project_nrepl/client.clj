@@ -4,6 +4,24 @@
    [psi.project-nrepl.config :as project-nrepl-config]
    [psi.project-nrepl.runtime :as project-nrepl-runtime]))
 
+(defn real-nrepl-connector
+  "Real-default `:nrepl-connector` seam implementation.
+
+   Establishes a real nREPL `connect → client → client-session` against
+   `host`/`port`, returning `{:transport :client :client-session}`. Session-id
+   derivation is intentionally NOT part of this seam — it stays in
+   `connect-instance-in!` (interpretation of the returned session fn)."
+  [{:keys [host port]}]
+  (let [connect        (requiring-resolve 'nrepl.core/connect)
+        client         (requiring-resolve 'nrepl.core/client)
+        client-session (requiring-resolve 'nrepl.core/client-session)
+        transport      (connect :host host :port port)
+        client-fn      (client transport 1000)
+        session-fn     (client-session client-fn)]
+    {:transport      transport
+     :client         client-fn
+     :client-session session-fn}))
+
 (defn connect-instance-in!
   "Connect to the discovered nREPL endpoint for a managed project instance and
    establish the first-slice single managed client session."
@@ -20,12 +38,10 @@
                       {:phase :connect-instance
                        :worktree-path effective-worktree
                        :endpoint (:endpoint instance)})))
-    (let [connect        (requiring-resolve 'nrepl.core/connect)
-          client         (requiring-resolve 'nrepl.core/client)
-          client-session (requiring-resolve 'nrepl.core/client-session)
-          transport      (connect :host host :port port)
-          client-fn      (client transport 1000)
-          session-fn     (client-session client-fn)
+    (let [connector      (or (get-in instance [:runtime-handle :nrepl-connector])
+                             real-nrepl-connector)
+          {:keys [transport client client-session]} (connector {:host host :port port})
+          session-fn     client-session
           session-id     (or (-> session-fn meta (get (keyword "nrepl.core" "taking-until")) :session)
                              (throw (ex-info "Managed project nREPL client session did not expose a session id"
                                              {:phase :connect-instance
@@ -41,8 +57,8 @@
                    :can-interrupt? true
                    :runtime-handle (merge (:runtime-handle %)
                                           {:transport transport
-                                           :client client-fn
-                                           :client-session session-fn
+                                           :client client
+                                           :client-session client-session
                                            :session-id session-id})
                    :last-error nil))))))
 

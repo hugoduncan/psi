@@ -4,20 +4,20 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
 
 ## Slice 1 — Audit + source confirmation
 
-- [ ] Re-read the six in-scope tests and confirm `with-redefs` sites: `config_test.clj` (`read-user-config`, `read-project-preferences`), `client_test.clj` (`nrepl.core/connect|client|client-session`), `attach_test.clj` (`connect-instance-in!`), `started_test.clj` (`start-process!`, `connect-instance-in!`), `commands_test.clj` (`ops/eval-op`, `ops/interrupt`), `ops_test.clj` (`eval/eval-instance-in!`)
-- [ ] Confirm `eval_test.clj` `[:runtime-handle :client-session]` idiom and `install-instance!` pattern as the reuse template
-- [ ] Verify in `client.clj` the inline `requiring-resolve` connect/client/session block and the session-id derivation + throw in `connect-instance-in!`
-- [ ] Verify `connect-instance-in!` `merge`s into existing `:runtime-handle`
-- [ ] Verify `start-instance-in!` currently **overwrites** `:runtime-handle` with process keys
-- [ ] Verify `ensure-instance-in!` forwards `:runtime-handle` to `build-instance` only via `:as opts` passthrough (not its own `:keys`)
-- [ ] Grep for all callers of `attach-instance-in!` and `start-instance-in!` to bound the signature-change blast radius
+- [x] Re-read the six in-scope tests and confirm `with-redefs` sites: `config_test.clj` (`read-user-config`, `read-project-preferences`), `client_test.clj` (`nrepl.core/connect|client|client-session`), `attach_test.clj` (`connect-instance-in!`), `started_test.clj` (`start-process!`, `connect-instance-in!`), `commands_test.clj` (`ops/eval-op`, `ops/interrupt`), `ops_test.clj` (`eval/eval-instance-in!`)
+- [x] Confirm `eval_test.clj` `[:runtime-handle :client-session]` idiom and `install-instance!` pattern as the reuse template
+- [x] Verify in `client.clj` the inline `requiring-resolve` connect/client/session block and the session-id derivation + throw in `connect-instance-in!`
+- [x] Verify `connect-instance-in!` `merge`s into existing `:runtime-handle`
+- [x] Verify `start-instance-in!` currently **overwrites** `:runtime-handle` with process keys
+- [x] Verify `ensure-instance-in!` forwards `:runtime-handle` to `build-instance` only via `:as opts` passthrough (not its own `:keys`)
+- [x] Grep for all callers of `attach-instance-in!` and `start-instance-in!` to bound the signature-change blast radius — only `ops.clj` (internal) calls both; `project_nrepl_extension_install_test.clj` redefs `start-instance-in!` wholesale (unaffected by an added optional arg)
 
 ## Slice 2 — `:nrepl-connector` seam (production)
 
-- [ ] Promote the inline `requiring-resolve` connect/client/session block in `client.clj` into a real-default connector fn returning `{:transport :client :client-session}`
-- [ ] Resolve the connector via `(or (get-in instance [:runtime-handle :nrepl-connector]) <real-default>)` in `connect-instance-in!`
-- [ ] Keep session-id derivation (`session-fn` meta `:nrepl.core/taking-until :session`) and the throw-on-missing-session-id behavior in `connect-instance-in!`
-- [ ] `clj-paren-repair` + targeted lint `client.clj`
+- [x] Promote the inline `requiring-resolve` connect/client/session block in `client.clj` into a real-default connector fn returning `{:transport :client :client-session}` (`real-nrepl-connector`, takes `{:host :port}`)
+- [x] Resolve the connector via `(or (get-in instance [:runtime-handle :nrepl-connector]) <real-default>)` in `connect-instance-in!`
+- [x] Keep session-id derivation (`session-fn` meta `:nrepl.core/taking-until :session`) and the throw-on-missing-session-id behavior in `connect-instance-in!`
+- [x] `clj-paren-repair` + targeted lint `client.clj` (green)
 
 ## Slice 3 — `client_test.clj`
 
