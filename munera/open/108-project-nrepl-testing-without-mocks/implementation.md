@@ -648,3 +648,44 @@ drops by 1 (154 → 153).
 Verification: focused project-nrepl suite (eval/commands/ops/attach/started/
 config/client/runtime) — 25 tests, 153 assertions, 0 failures; targeted
 clj-kondo over `components/project-nrepl/test` (+ src) — 0 errors, 0 warnings.
+
+2026-06-01 — Implementation review (second pass, task-implementation-review)
+
+Fresh review pass after the consolidation/interaction-assertion follow-ups
+landed (35ddb3f). Re-verified empirically:
+- focused project-nrepl suite (8 namespaces) green: 25 tests, 153 assertions, 0 failures
+- targeted clj-kondo (`components/project-nrepl/{src,test}`): 0 errors, 0 warnings
+- zero `with-redefs` in the test tree (git grep → no matches)
+- three production changes match design exactly: `client.clj` `real-nrepl-connector`
+  + `(or (get-in … :nrepl-connector) real-nrepl-connector)`; `started.clj`
+  `real-process-launcher` + `(update :runtime-handle merge {…})`; `attach.clj`
+  4th-positional `opts` arity threading `(:runtime-handle opts)` into
+  `ensure-instance-in!`
+Acceptance criteria: all met. No new acceptance blockers.
+
+New actionable findings (quality, not acceptance blockers) — the prior
+consolidation follow-up claimed "all seven test files now :refer the shared
+helpers", but that completeness does not hold empirically; residual hand-rolled
+equivalents remain:
+
+1. `client_test.clj` `connect-instance-in-test` inlines its own `session-fn`
+   `(with-meta (fn [_] nil) {(keyword "nrepl.core" "taking-until") {:session
+   "nrepl-session-1"}})` instead of using the shared
+   `psi.project-nrepl.test-support/session-fn-with-id`. This is exactly the
+   metadata-shape drift the consolidation aimed to eliminate (the shared helper
+   already encodes that `:nrepl.core/taking-until` shape). `started_test.clj`
+   uses the shared helper; `client_test.clj` does not. Low-risk but inconsistent.
+
+2. Pre-existing (non-reshaped) test bodies still hand-roll temp-dir create +
+   recursive delete despite the shared `temp-dir`/`delete-tree!` now existing:
+   - `config_test.clj` `read-project-preferences-test` (×2 dirs) and
+     `read-dot-nrepl-port-test` use `(io/file (System/getProperty "java.io.tmpdir")
+     (str "…-" (UUID/randomUUID)))` + inline `(doseq [f (reverse (file-seq dir))]
+     (.delete f))`.
+   - `commands_test.clj` missing-start-command test uses
+     `(java.nio.file.Files/createTempDirectory …)` + the same inline `doseq` delete.
+   The reshaped cases in those files already use the shared helpers, so the same
+   file mixes both idioms — a within-file consistency gap. Non-blocking
+   (these tests are green and were out of the de-mock reshape set), but folding
+   them onto `temp-dir`/`delete-tree!` would complete the consolidation the prior
+   note asserted was already complete.
