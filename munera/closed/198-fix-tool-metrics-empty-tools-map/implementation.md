@@ -716,3 +716,49 @@ Verification: `clojure -M:test --focus psi.agent-session.extensions-test --focus
 psi.agent-session.tool-execution-test --focus psi.tool-runtime.core-test` →
 **44 tests, 191 assertions, 0 failures** (up from 43/189, confirming the new
 test executes). `clj-kondo` clean on changed src + test files.
+
+## 2026-06-01 — code review (independent, code-shaper skill)
+
+Re-applied code-shaper (`simple ∧ consistent ∧ robust`) against source (not
+notes). Baseline green: `--focus psi.agent-session.tool-execution-test --focus
+psi.agent-session.extensions-test` → 38 tests, 164 assertions, 0 failures;
+`clj-kondo` clean on all three changed files.
+
+Confirmed closed: the per-field `:input` (`6a517aa8d`) / `:content` (`1a897ea0d`)
+/ `:is-error` (`8f17692a6`) cross-path value-alignment triple. simple/robust on
+the `case` flow-control and coercions: ✓.
+
+**Actionable (consistency/robustness, structural — root cause beneath the closed
+triple): the `"tool_call"`/`"tool_result"` bus-event payload shapes are
+constructed in two independent places.** `emit-tool-lifecycle!`
+(`tool_runtime_adapter.clj`) hand-builds both payloads inline via raw
+`ext/dispatch-in`, duplicating the exact maps already defined in
+`ext/dispatch-tool-call-in` / `ext/dispatch-tool-result-in` (`extensions.clj`) —
+the canonical constructors for these two bus events (also used by the plan path
+in `tool_plan.clj`). The entire three-commit `:input`/`:content`/`:is-error`
+divergence saga was *caused by* this duplication: the same contract encoded in
+two constructors drifted field-by-field. The triple fixes aligned the values but
+left the structural cause — two payload constructors for one bus contract —
+intact. Any future field added to either constructor reintroduces the identical
+divergence class (`consistent(idioms)` / DRY violation;
+`robust → enforceable(invariants)` weakened — the contract is not single-sourced;
+`one_way ¬ambiguity` violated — two obvious paths to build the same payload).
+
+This differs from the three prior notes: those were per-field *value* alignment;
+this is the *structural* single-sourcing of the payload shape itself. Fixing it
+would make the closed triple structurally impossible to reopen rather than
+defended per-field.
+
+Severity: low-medium. No live defect (the triple is currently value-aligned), but
+a standing regression hazard at the untrusted-extension boundary.
+
+Resolution options: (a) have `emit-tool-lifecycle!`'s bridge branches call
+`ext/dispatch-tool-call-in` / `ext/dispatch-tool-result-in` directly (adapting
+the lifecycle-event fields to their arglists), so both paths route through the
+single canonical payload constructor — the bridge then deliberately discards the
+`{:block true}`/override return (documented interactive-path non-enforcement);
+(b) extract a shared `tool-call-event` / `tool-result-event` payload-builder fn in
+`extensions.clj` and call it from both the `dispatch-tool-*-in` fns and the
+bridge; (c) declare the duplication acceptable with a contract note + a
+cross-path payload-parity test as the guard. Recommend (a) or (b) for
+`addition > modification` and single-source contract. Recorded as a follow-up.
