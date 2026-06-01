@@ -881,3 +881,41 @@ only — no interaction capture. Reused the existing `ensure-instance-in!` +
 `update-instance-in!` seed pattern; no new seam introduced. `client_test`:
 3 tests, 14 assertions, 0 failures (up from 2/12). Focused project-nrepl suite
 (8 ns) all green; `clj-kondo` 0/0.
+
+2026-06-01 — Test review (task-test-review, 2nd pass)
+
+Second independent test-focused review pass (skill criteria: well_formed ∧
+behaviour coverage ∧ infra deps injectable/nullable/¬mock/¬stub). Re-verified
+empirically: focused project-nrepl suite (8 ns) → 26 tests, 151 assertions,
+0 failures; `git grep with-redefs components/project-nrepl/test` → none.
+
+- Criterion 1 (well-formed) ✓ — sociable, state/result-based, isolated (temp
+  dirs cleaned in `finally`, `user.home` restored in `finally`), no interaction
+  assertions, no leftover capture atoms.
+- Criterion 3 (infra deps) ✓ — every infra dep injected via
+  `[:runtime-handle <seam-key>]` (`:nrepl-connector`, `:process-launcher`,
+  `:client-session`) with embedded stubs (fake-process `Process` proxy,
+  in-memory connector/client-session fns). No mocks, no `with-redefs`, no
+  stub-via-redef.
+- Criterion 2 (behaviour coverage) ✓ for the design's named behaviours. The
+  one design-named retained behaviour previously flagged (missing-session-id
+  throw in `connect-instance-in!`) is now covered by
+  `connect-instance-in-missing-session-id-test`. Each seam's nullable path is
+  exercised (connector happy/throw/missing-session-id; launcher
+  happy/throw/file-backed-readiness; client-session eval-ok/interrupted/
+  unavailable). Started-mode runtime-handle merge survival is proven by
+  `start-instance-in-test` (seeded `:nrepl-connector` survives into the internal
+  `connect-instance-in!`, session-id derived). The user-vs-project config
+  precedence is proven file-backed.
+
+Considered but NOT raised as actionable (scope-bounded judgment):
+`connect-instance-in!` retains two PRE-EXISTING guard branches — "instance not
+found" and "requires discovered host/port before connect" — that no test
+exercises. These are infrastructure guards that pre-date this task, are not
+behaviours the de-mocking design names or changed, and reach into
+acquisition-precondition territory rather than the seam contract this task
+introduced. Unlike the missing-session-id throw (a design-named retained
+behaviour the seam shaping deliberately preserved), these guards are outside
+this task's behaviour set; covering them would be scope expansion beyond the
+de-mocking intent. No new follow-up step added. No actionable test-quality
+issue found this pass.

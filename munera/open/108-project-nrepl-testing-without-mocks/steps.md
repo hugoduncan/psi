@@ -146,3 +146,15 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
   `update-instance-in!` connector-seed setup; state-only, no interaction
   assertions. `client_test`: 3 tests, 14 assertions, 0 failures (up from 2/12).
   Focused project-nrepl suite (8 ns) green; `clj-kondo` 0/0 on `client_test.clj`.
+
+## Test review follow-ups (2026-06-01, task-test-review 2nd pass)
+
+- (none) Second independent test review pass found no new actionable issues.
+  Verified empirically: 26 tests / 151 assertions / 0 failures; zero
+  `with-redefs`; all infra deps injectable/nullable/¬mock/¬stub via
+  `[:runtime-handle <seam-key>]`; all design-named behaviours covered (the
+  previously-flagged missing-session-id throw is now covered). The two
+  pre-existing `connect-instance-in!` guard branches (instance-not-found,
+  missing-host/port) were considered but deliberately NOT raised — they are
+  pre-existing infra guards outside this de-mocking task's behaviour set;
+  covering them would be scope expansion. No follow-up steps added.
