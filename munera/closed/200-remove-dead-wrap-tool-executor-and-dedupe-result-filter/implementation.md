@@ -492,3 +492,31 @@ and its `#tool-wrapping` anchors (530/531) left unchanged; no `wrap-tool-executo
 references remain anywhere under `doc/`.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Docs review: review-task-docs (second pass, 2026-06-01)
+
+Re-applied review-task-docs after the prior pass's D1 follow-up landed (commit
+c832116ea). Verified doc claims against `extensions.clj` at runtime, not just text.
+
+- **D1 resolved** ✓ `doc/extensions.md:898` "Implementation" table now reads
+  "Registry, loading, event dispatch, **tool-result filtering**" — the stale
+  "tool wrapping" clause (named the removed `wrap-tool-executor`) is gone.
+- **No stale references** ✓ `grep -rn "wrap-tool-executor|tool wrapping"
+  doc/ README.md CHANGELOG.md` → no matches (lowercase internal label and the
+  removed function name absent everywhere user-facing).
+- **"Tool Wrapping" event-API section** (`doc/extensions.md:550`) ✓ Accurate.
+  Documents the surviving *public* event-subscription capability; verified
+  against source: `dispatch-tool-call-in` returns `{:block true :reason s}`
+  (matches the doc's `{:block true :reason …}` example) and
+  `dispatch-tool-result-in` filters for `:content`/`:details`/`:is-error`
+  (matches the doc's "may return :content, :details, or :is-error to modify").
+  The section name coincides with the removed internal function but documents
+  the surviving filter contract — unchanged and correct. `#tool-wrapping`
+  anchors (530/531) intact.
+- **CHANGELOG** ✓ Correctly absent — internal dead-code removal + test reshaping;
+  not user-visible (`¬user_visible → ∅`).
+
+No new actionable docs issues. Docs are accurate, complete, and consistent with
+the implementation; the prior pass's D1 closed the only stale terminology.
+
+PASS_STATUS: REVIEW_COMPLETE
