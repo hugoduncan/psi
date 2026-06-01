@@ -353,6 +353,34 @@ propagated value, not a defect.
 Verification: `clojure -M:test --focus psi.agent-session.tool-execution-test` →
 **13 tests, 66 assertions, 0 failures**. `clj-kondo --lint` → 0 errors, 0 warnings.
 
+## 2026-06-01 — e2e ceremony deduplicated (test-shaper follow-up)
+
+Extracted the shared e2e ceremony from the two metrics bridge tests into
+`run-tool-call-through-metrics-ext!`. The helper resets the metrics `defonce`
+atoms, builds the registry-only `runtime-fns`, loads the real metrics extension
+on a fresh session ctx, and drives `run-tool-call!` under the infra `with-redefs`
+scaffold (canned `execute-tool-runtime-in!` returning the caller-supplied
+`runtime-result`; no-op `emit-tool-start-in!`/`emit-tool-end-in!`/`record-tool-result-in!`).
+
+Each test now states only its per-test intent at the call site: the tool-call map,
+the runtime-result (the `:is-error`/`:content` distinction is the whole point of the
+two tests), and the store assertions. ~15 lines of verbatim setup removed from each
+test body.
+
+Design note on cleanup placement: the post-run `(reset! …)` stays in each test's
+`finally`, not the helper. The helper returns *before* assertions run, and the
+assertions read `@metrics-ext/store` — so the helper cannot tear down the store
+without breaking the assertions. The split is clean: helper owns pre-run isolation,
+test owns post-run cleanup. This satisfies test-shaper's
+`helpers_that_compress(ceremony) ∧ ¬helpers_that_hide(intent)` — the intent (which
+tool, what result, what counters) is fully visible at the call site.
+
+The AC2-test-commit follow-up was already resolved (committed `ad7d0f975`) in a prior
+pass; no uncommitted test existed at this pass's start (working tree was clean).
+
+Verification: `clojure -M:test --focus psi.agent-session.tool-execution-test` →
+**13 tests, 66 assertions, 0 failures**. `clj-kondo --lint` → 0 errors, 0 warnings.
+
 ## 2026-06-01 — test review (independent, task-test-review skill, verification pass)
 
 Re-applied the skill against source + live run, not just notes. Skill criteria:

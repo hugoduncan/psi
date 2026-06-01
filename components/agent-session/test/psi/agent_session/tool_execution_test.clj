@@ -377,79 +377,68 @@
 
 ;;; End-to-end: metrics extension accumulates :tools via the bridge
 
+(defn- run-tool-call-through-metrics-ext!
+  "Drive `tool-call` through `run-tool-call!` with the real metrics extension loaded
+  on a fresh session ctx, while `execute-tool-runtime-in!` returns `runtime-result`.
+
+  Compresses the e2e ceremony — defonce-atom reset/cleanup, registry-only runtime-fns,
+  metrics-ext load, and infra `with-redefs` — so each test states only its per-test
+  intent (the runtime result and the store assertions, run after this returns)."
+  [tool-call runtime-result]
+  (reset! metrics-ext/store nil)
+  (reset! metrics-ext/writing? false)
+  (let [agent-ctx   (setup-agent-ctx!)
+        [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
+        reg         (:extension-registry session-ctx)
+        ;; Minimal runtime-fns: query-fn returns nil worktree-path; no mutate-fn so
+        ;; (:on api) falls back to register-handler-in! directly on the registry.
+        runtime-fns {:query-fn (fn [q]
+                                 (when (= q [:psi.agent-session/worktree-path])
+                                   {:psi.agent-session/worktree-path nil}))}]
+    (ext/load-init-var-extension-in! reg "manifest:psi/metrics" 'psi.metrics.extension/init runtime-fns)
+    (with-redefs [tool-plan/execute-tool-runtime-in! (fn [_ _ _ _] runtime-result)
+                  agent/emit-tool-start-in! (fn [_ _] nil)
+                  agent/emit-tool-end-in! (fn [_ _ _ _] nil)
+                  agent/record-tool-result-in! (fn [_ _] nil)]
+      (#'tool-runtime-adapter/run-tool-call! session-ctx session-ctx-id tool-call nil))))
+
 (deftest metrics-extension-accumulates-tools-via-bridge-test
   (testing "register metrics ext on real session ctx, call run-tool-call!, assert :tools entry accumulated — full path: adapter → bridge → metrics handler → store"
-    ;; Reset metrics defonce atoms for a clean slate.
-    (reset! metrics-ext/store nil)
-    (reset! metrics-ext/writing? false)
     (try
-      (let [agent-ctx   (setup-agent-ctx!)
-            [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
-            reg         (:extension-registry session-ctx)
-            ;; Minimal runtime-fns: query-fn returns nil worktree-path; no mutate-fn so
-            ;; (:on api) falls back to register-handler-in! directly on the registry.
-            runtime-fns {:query-fn (fn [q]
-                                     (when (= q [:psi.agent-session/worktree-path])
-                                       {:psi.agent-session/worktree-path nil}))}
-            tc          {:id "call-e2e" :name "read" :arguments "{}"}]
-        ;; Load the real metrics extension into the session ctx's extension registry.
-        (ext/load-init-var-extension-in! reg "manifest:psi/metrics" 'psi.metrics.extension/init runtime-fns)
-        (with-redefs [tool-plan/execute-tool-runtime-in!
-                      (fn [_ _ _ _]
-                        {:content "file contents"
-                         :is-error false
-                         :details {:truncation {:truncated false}}})
-                      agent/emit-tool-start-in! (fn [_ _] nil)
-                      agent/emit-tool-end-in! (fn [_ _ _ _] nil)
-                      agent/record-tool-result-in! (fn [_ _] nil)]
-          (#'tool-runtime-adapter/run-tool-call! session-ctx session-ctx-id tc nil))
-        ;; Assert the full path fired: metrics store now has a :tools entry for "read".
-        (is (= 1 (get-in @metrics-ext/store [:metrics :tools "read" :invocations]))
-            "metrics extension accumulated :tools entry via adapter → bridge → handler → store"))
+      (run-tool-call-through-metrics-ext!
+       {:id "call-e2e" :name "read" :arguments "{}"}
+       {:content "file contents"
+        :is-error false
+        :details {:truncation {:truncated false}}})
+      ;; Assert the full path fired: metrics store now has a :tools entry for "read".
+      (is (= 1 (get-in @metrics-ext/store [:metrics :tools "read" :invocations]))
+          "metrics extension accumulated :tools entry via adapter → bridge → handler → store")
       (finally
         (reset! metrics-ext/store nil)
         (reset! metrics-ext/writing? false)))))
 
 (deftest metrics-extension-accumulates-errors-via-bridge-test
   (testing "register metrics ext on real session ctx, drive run-tool-call! with :is-error true, assert :errors entry accumulated — full error path: adapter → bridge → metrics on-tool-result → store (AC2)"
-    ;; Reset metrics defonce atoms for a clean slate.
-    (reset! metrics-ext/store nil)
-    (reset! metrics-ext/writing? false)
     (try
-      (let [agent-ctx   (setup-agent-ctx!)
-            [session-ctx session-ctx-id] (setup-session-ctx! agent-ctx)
-            reg         (:extension-registry session-ctx)
-            ;; Minimal runtime-fns: query-fn returns nil worktree-path; no mutate-fn so
-            ;; (:on api) falls back to register-handler-in! directly on the registry.
-            runtime-fns {:query-fn (fn [q]
-                                     (when (= q [:psi.agent-session/worktree-path])
-                                       {:psi.agent-session/worktree-path nil}))}
-            tc          {:id "call-e2e-err" :name "bash" :arguments "{}"}]
-        ;; Load the real metrics extension into the session ctx's extension registry.
-        (ext/load-init-var-extension-in! reg "manifest:psi/metrics" 'psi.metrics.extension/init runtime-fns)
-        (with-redefs [tool-plan/execute-tool-runtime-in!
-                      (fn [_ _ _ _]
-                        {:content "boom: command failed"
-                         :is-error true
-                         :details {:truncation {:truncated false}}})
-                      agent/emit-tool-start-in! (fn [_ _] nil)
-                      agent/emit-tool-end-in! (fn [_ _ _ _] nil)
-                      agent/record-tool-result-in! (fn [_ _] nil)]
-          (#'tool-runtime-adapter/run-tool-call! session-ctx session-ctx-id tc nil))
-        ;; Assert the full error path fired: the bridge propagated :is-error true so
-        ;; on-tool-result incremented :errors (and on-tool-call recorded the invocation).
-        (is (= 1 (get-in @metrics-ext/store [:metrics :tools "bash" :invocations]))
-            "invocation counter incremented via bridge")
-        (is (= 1 (get-in @metrics-ext/store [:metrics :tools "bash" :errors]))
-            "error counter incremented via adapter → bridge → on-tool-result → store")
-        ;; The lifecycle :tool-result event carries shaped structured-block content; the
-        ;; metrics handler derives the reason from (str content). Assert a single reason
-        ;; was recorded with count 1 (exact text is the stringified content block).
-        (let [reasons (get-in @metrics-ext/store [:metrics :tools "bash" :error-reasons])]
-          (is (= 1 (count reasons)) "one error reason recorded")
-          (is (= 1 (val (first reasons))) "reason count is 1")
-          (is (str/includes? (key (first reasons)) "boom: command failed")
-              "reason derived from propagated :content")))
+      (run-tool-call-through-metrics-ext!
+       {:id "call-e2e-err" :name "bash" :arguments "{}"}
+       {:content "boom: command failed"
+        :is-error true
+        :details {:truncation {:truncated false}}})
+      ;; Assert the full error path fired: the bridge propagated :is-error true so
+      ;; on-tool-result incremented :errors (and on-tool-call recorded the invocation).
+      (is (= 1 (get-in @metrics-ext/store [:metrics :tools "bash" :invocations]))
+          "invocation counter incremented via bridge")
+      (is (= 1 (get-in @metrics-ext/store [:metrics :tools "bash" :errors]))
+          "error counter incremented via adapter → bridge → on-tool-result → store")
+      ;; The lifecycle :tool-result event carries shaped structured-block content; the
+      ;; metrics handler derives the reason from (str content). Assert a single reason
+      ;; was recorded with count 1 (exact text is the stringified content block).
+      (let [reasons (get-in @metrics-ext/store [:metrics :tools "bash" :error-reasons])]
+        (is (= 1 (count reasons)) "one error reason recorded")
+        (is (= 1 (val (first reasons))) "reason count is 1")
+        (is (str/includes? (key (first reasons)) "boom: command failed")
+            "reason derived from propagated :content"))
       (finally
         (reset! metrics-ext/store nil)
         (reset! metrics-ext/writing? false)))))
