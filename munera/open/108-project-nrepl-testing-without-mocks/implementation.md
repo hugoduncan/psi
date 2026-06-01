@@ -73,3 +73,13 @@ Scope discrepancy to resolve before/while executing:
 Source namespaces available to seam: `components/project-nrepl/src/psi/project_nrepl/{attach,client,commands,config,eval,ops,runtime,started}.clj`.
 
 Prior exploration status: the 2026-05-13 actionable-config work is described in this file but the working tree is clean on branch `testing-without-mocks`, so none of the de-mocking refactor has landed; all `steps.md` items remain unchecked.
+
+2026-06-01 — Design ambiguity review
+
+Read design.md plus testing-without-mocks SKILL, the five named test files, `ops_test.clj`, and the source namespaces (`config`, `client`, `started`, `eval`, `commands`, `ops`). Found new actionable ambiguities (added to `design-steps.md`):
+
+- Seam-injection mechanism is unspecified: design mandates "thin wrapper" + forbids `with-redefs` but never states *how* the nullable nREPL-client / process-start seam is supplied at test time. `eval_test.clj` succeeds only because `client-session` is carried in runtime state; `client.clj` resolves `nrepl.core/*` inline via `requiring-resolve` and `started.clj`'s `start-process!` is private, so no analogous injection point exists yet. Implementers could choose incompatible vectors per file.
+- `ops_test.clj` scope contradiction: 2026-06-01 re-audit found `with-redefs` on `eval-instance-in!` there and recommended inclusion, but design.md Problem audit and Acceptance still name only five files. In/out-of-scope status is undecided in design.
+- `config_test.clj` `resolve-config` target shape undefined: real `read-project-preferences` returns `:version 1` (redef tests omit it), and an already-file-backed `read-project-preferences-test` exists; design does not say whether the merge-precedence proof becomes redundant, moves to a config-source seam, or which of the three preferred options applies to it.
+- Acceptance wording "at least one note ... for nREPL and process infrastructure" is ambiguous between one combined note and per-seam strategy notes.
+- `commands_test.clj` operational (`eval-op`/`interrupt`) target uses an "or" (real runtime+config vs. split formatting/parsing tests), leaving unclear whether command-layer operational routing must still be proven through real `eval-instance-in!` (eval_test style) or may be reduced to formatting tests.
