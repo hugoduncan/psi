@@ -51,3 +51,25 @@ Actionable missing-config behaviour check:
   - `psi.project-nrepl.ops-test` now exercises a real temp worktree with no config and asserts the structured actionable payload
   - `psi.project-nrepl.commands-test` now exercises `/project-repl start` in a real temp worktree and asserts the user-facing actionable message
   - `psi.agent-session.tools-test` now exercises `psi-tool` `project-repl start` in a real temp worktree and asserts the structured missing-config payload
+
+2026-06-01
+
+Re-audit before execution (orientation pass; working tree clean, no task work committed yet):
+
+Confirmed `with-redefs` footprint in `components/project-nrepl/test/psi/project_nrepl/` and the exact symbols each test replaces:
+
+- `config_test.clj` (2) — `read-user-config`, `read-project-preferences`, `resolve-config`
+- `client_test.clj` (1) — `nrepl.core/connect`, `nrepl.core/client`, `nrepl.core/client-session`
+- `attach_test.clj` (2) — `psi.project-nrepl.client/connect-instance-in!`
+- `started_test.clj` (2) — `start-process!`, `connect-instance-in!`
+- `commands_test.clj` (2) — `psi.project-nrepl.config/resolve-config`, `psi.project-nrepl.ops/eval-op`, `psi.project-nrepl.ops/interrupt`
+- `ops_test.clj` (2) — `psi.project-nrepl.eval/eval-instance-in!` (×2)
+
+Scope discrepancy to resolve before/while executing:
+- design.md names FIVE files for de-mocking (config, client, attach, started, commands) but `ops_test.clj` also carries two `with-redefs` that replace an internal collaborator (`psi.project-nrepl.eval/eval-instance-in!`) to return canned `:success` / `:interrupted` op results. This is the same mock-style seam-patching the task targets.
+- The earlier 2026-05-13 note already reshaped `ops-test` actionable-payload proofs but left these `eval-instance-in!` redefs in place.
+- Decision needed: either (a) extend scope to include `ops_test.clj` (it shares the `eval`/process infra seam this task is introducing), or (b) explicitly mark it out of scope in design.md. Recommendation: include it — the nullable `eval`/client seam built for `client_test`/`commands_test` should naturally cover `ops_test`'s `eval-instance-in!` patching, so excluding it would leave a residual mock pocket in the same namespace family.
+
+Source namespaces available to seam: `components/project-nrepl/src/psi/project_nrepl/{attach,client,commands,config,eval,ops,runtime,started}.clj`.
+
+Prior exploration status: the 2026-05-13 actionable-config work is described in this file but the working tree is clean on branch `testing-without-mocks`, so none of the de-mocking refactor has landed; all `steps.md` items remain unchecked.
