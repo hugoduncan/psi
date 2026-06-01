@@ -63,13 +63,13 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
 
 ## Slice 9 — `commands_test.clj`
 
-- [ ] Remove `ops/eval-op` and `ops/interrupt` redefs
-- [ ] Install a real managed instance with in-memory `[:runtime-handle :client-session]` (eval_test `install-instance!` pattern)
-- [ ] Seed session-state so the dispatch `session-id` resolves to the instance's worktree-path: `dispatch-project-nrepl-command` derives `(ss/session-worktree-path-in ctx session-id)` and looks up the managed instance at that worktree, so the test must register the same `session-id → worktree-path` mapping (e.g. via the session-state surface `ss/session-worktree-path-in` reads) as where the instance is installed, or the dispatch instance lookup misses and the command never reaches real `ops → eval`
-- [ ] Dispatch real `/project-repl eval` through real `commands → ops/eval-op → eval/eval-instance-in!`; assert `{:type :text :message ...}` results. The eval `client-session` fn returns the `:success` template `[{:value "3" :status #{"done"}}]` (`eval_test.clj` provides this template)
-- [ ] Dispatch real `/project-repl interrupt` through real `commands → ops/interrupt → eval/interrupt-instance-in!` (NOT `eval-op`/`eval-instance-in!`); assert `{:type :text :message ...}` result. PRECONDITION: `interrupt-instance-in!` short-circuits to `{:status :unavailable :reason :no-active-eval}` when `[:runtime-handle :active-op]` is absent, so the test MUST establish an `:active-op` on the installed instance before dispatching `/project-repl interrupt` — either by triggering an in-flight eval, or by directly seeding `[:runtime-handle :active-op]` (e.g. `{:op-id "…" :started-at …}`). Only with `:active-op` present does `interrupt-instance-in!` invoke the seeded `client-session {:op "interrupt" :interrupt-id (:op-id active-op) …}`; that fn must then return a response seq carrying nREPL status `"interrupted"` (e.g. `[{:status #{"interrupted"}}]` or `[{:status #{"done" "interrupted"}}]`) so `summarize-response` yields `:interrupted`. `eval_test.clj` provides only a `:success` template and no `:interrupted` template, so this interrupt response must be constructed here
-- [ ] Leave pure formatting/parsing/missing-start-command tests seamless (already real-value)
-- [ ] Run `commands_test.clj` green
+- [x] Remove `ops/eval-op` and `ops/interrupt` redefs
+- [x] Install a real managed instance with in-memory `[:runtime-handle :client-session]` (eval_test `install-instance!` pattern)
+- [x] Seed session-state so the dispatch `session-id` resolves to the instance's worktree-path — instance installed at `(System/getProperty "user.dir")`, the same `:worktree-path` passed to `create-test-session` `:session-defaults`, so `ss/session-worktree-path-in` resolves to it
+- [x] Dispatch real `/project-repl eval` through real `commands → ops/eval-op → eval/eval-instance-in!`; `client-session` returns `[{:value "3" :status #{"done"}}]`; assert eval-ok + value
+- [x] Dispatch real `/project-repl interrupt` through real `commands → ops/interrupt → eval/interrupt-instance-in!` with seeded `[:runtime-handle :active-op]` precondition; `client-session` returns `[{:status #{"done" "interrupted"}}]` → `:interrupted`; added a separate no-active-eval `:unavailable` case
+- [x] Leave pure formatting/parsing/missing-start-command tests seamless (already real-value)
+- [x] Run `commands_test.clj` green (2 tests, 19 assertions)
 
 ## Slice 10 — `ops_test.clj`
 
