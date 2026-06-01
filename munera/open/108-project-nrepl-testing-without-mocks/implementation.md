@@ -124,3 +124,41 @@ Resolved all five 2026-06-01 design-ambiguity follow-up items in design.md
 No blocking reasons; all five items completed at the design level. Implementation
 (production seam code + test reshaping) remains for the build phase per the
 existing steps.md.
+
+2026-06-01 — Design inconsistency review
+
+Read design.md plus the six named test files, `eval_test.clj`, and the source
+namespaces (`client`, `started`, `attach`, `config`, `eval`, `ops`, `runtime`).
+Found four actionable inconsistencies (added to `design-steps.md`):
+
+1. `:nrepl-connector` seam contract vs. `client.clj`: design says the seam returns
+   `{:transport :client :client-session :session-id}` and that "the inline
+   `requiring-resolve` block currently in `client.clj` becomes the default
+   implementation." But that block produces only transport/client/session-fn; the
+   `:session-id` is derived afterward from `session-fn` metadata with a
+   throw-on-missing. The seam contract and the named source region disagree, and
+   the missing-session-id throw is unaccounted for.
+2. `commands_test.clj` redef list wrong: design Problem audit lists it as redefining
+   `resolve-config`, `eval-op`, `interrupt`. The actual file redefines only
+   `psi.project-nrepl.ops/eval-op` and `psi.project-nrepl.ops/interrupt` (no
+   `resolve-config`; missing-start-command test uses a real temp worktree). The
+   2026-06-01 implementation.md re-audit (line 65) repeats the same error.
+3. `config_test.clj` precedence claim self-contradicts: design says the reshaped
+   `resolve-config` test uses shared `project.edn` + local `project.local.edn` and
+   "exercises the same merge precedence the redef test asserted." But that is the
+   project-internal shared/local merge (handled inside `read-project-preferences`,
+   already covered by `read-project-preferences-test`), not the user-vs-project
+   precedence the redef `resolve-config-test` actually proves. This conflicts with
+   the design's own claim that the merge proof is NOT redundant with
+   `read-project-preferences-test`.
+4. `started_test.clj` seam assignment incomplete + overwrite conflict: design says
+   started_test must stop redefining both `start-process!` and
+   `connect-instance-in!`, but the Seam-injection section only assigns
+   `:process-launcher` to it and never states it must also seed `:nrepl-connector`
+   (needed because `start-instance-in!` calls `connect-instance-in!` internally).
+   Worse, `start-instance-in!` OVERWRITES `:runtime-handle {:process ...}` before
+   calling connect, dropping any pre-seeded `:nrepl-connector`/`:client-session` —
+   so the stated "seed at acquisition, resolve at call time, production call sites
+   unchanged" mechanism cannot work for started-mode without a production change
+   (merge instead of overwrite, or seed differently). Design does not acknowledge
+   this.
