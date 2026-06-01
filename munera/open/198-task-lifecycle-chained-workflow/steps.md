@@ -72,7 +72,7 @@
 
 ## Test-shaper follow-ups (test-shaper)
 
-- [ ] Reshape the per-step `(is (every? pred steps))` checks in
+- [x] Reshape the per-step `(is (every? pred steps))` checks in
       `task-lifecycle-test` (the `:prompt-string`, `:context`, and
       `:yields`/`:terminal-contract` assertions) into projected-collection
       equalities (e.g. `(is (= (repeat 5 <expected>) (mapv :prompt-string
@@ -81,7 +81,7 @@
       step and its actual value instead of collapsing to a bare `false`
       (`meaningful_failures`), matching the existing `(mapv :name …)` /
       `(mapv :target …)` assertion style (`consistent(assertion_style)`).
-- [ ] Remove the incidental duplication of the five-element step-name vector in
+- [x] Remove the incidental duplication of the five-element step-name vector in
       `task-lifecycle-test` (currently written verbatim twice, for `:name` and
       `:target`) by binding it once in a `let` (e.g. `expected-targets`) and
       referencing it from both assertions, making the name=target invariant

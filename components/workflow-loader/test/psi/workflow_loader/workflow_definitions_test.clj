@@ -441,40 +441,26 @@
      (testing "loads without error"
        (is (empty? errors))
        (is (contains? definitions "task-lifecycle")))
-     (let [steps (get-in definitions ["task-lifecycle" :steps])]
+     (let [steps (get-in definitions ["task-lifecycle" :steps])
+           expected-targets ["review-task-design"
+                             "create-task-plan"
+                             "review-task-plan"
+                             "implement-task"
+                             "review-task-implementation"]]
        (testing "has 5 delegate steps with correct names, types, and targets"
          (is (= 5 (count steps)))
-         (is (= ["review-task-design"
-                 "create-task-plan"
-                 "review-task-plan"
-                 "implement-task"
-                 "review-task-implementation"]
-                (mapv :name steps)))
+         (is (= expected-targets (mapv :name steps)))
          (is (= [:delegate :delegate :delegate :delegate :delegate]
                 (mapv :type steps)))
-         (is (= ["review-task-design"
-                 "create-task-plan"
-                 "review-task-plan"
-                 "implement-task"
-                 "review-task-implementation"]
-                (mapv :target steps))))
+         (is (= expected-targets (mapv :target steps))))
        (testing "every step threads the task id via the :map :prompt-string"
-         (is (every? (fn [step]
-                       (= {:type :map
+         (is (= (repeat 5 {:type :map
                            :fields {:input {:from :workflow-input
-                                            :path [:input]}}}
-                          (:prompt-string step)))
-                     steps)))
+                                            :path [:input]}}})
+                (mapv :prompt-string steps))))
        (testing "every step carries only :workflow-original context (no prior-step yield)"
-         (is (every? (fn [step]
-                       (= [{:type :source :from :workflow-original}]
-                          (:context step)))
-                     steps)))
+         (is (= (repeat 5 [{:type :source :from :workflow-original}])
+                (mapv :context steps))))
        (testing "no step declares :yields or :terminal-contract (terminal relies on propagated session default yield)"
-         (is (every? (fn [step]
-                       (and (not (contains? step :yields))
-                            (not (contains? step :terminal-contract))))
-                     steps))
-         (let [terminal (last steps)]
-           (is (not (contains? terminal :yields)))
-           (is (not (contains? terminal :terminal-contract)))))))))
+         (is (= (repeat 5 {})
+                (mapv #(select-keys % [:yields :terminal-contract]) steps))))))))

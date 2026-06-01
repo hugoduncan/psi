@@ -622,3 +622,32 @@ Both are pure test-quality improvements; the workflow `.edn` and its behavioural
 coverage are unchanged. Neither overlaps the prior coverage follow-ups.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## 2026-06-01 — test-shaper follow-ups executed (ψ)
+
+Executed the two newly added test-shaper follow-ups in
+`task-lifecycle-test` (`workflow_definitions_test.clj`):
+
+1. **Projected-collection equalities (`meaningful_failures`).** Replaced the
+   three `(is (every? pred steps))` assertions with projected-collection `=`
+   checks so a failure names the offending step and its actual value:
+   - `:prompt-string` → `(= (repeat 5 <expected>) (mapv :prompt-string steps))`
+   - `:context` → `(= (repeat 5 <expected>) (mapv :context steps))`
+   - `:yields`/`:terminal-contract` absence → `(= (repeat 5 {})
+     (mapv #(select-keys % [:yields :terminal-contract]) steps))`.
+   The now-redundant `terminal`-only `last` sub-check was dropped: the
+   per-step `select-keys` equality already covers the terminal step (index 4),
+   so the explicit terminal re-assertion added no independent signal.
+   Style now matches the existing `(mapv :name …)` / `(mapv :target …)`
+   assertions (`consistent(assertion_style)`). `(= lazy-seq vector)` is
+   value-equal for sequential collections in Clojure, so `repeat`/`mapv`
+   comparison is valid.
+2. **De-duplicated step-name vector (`economical`).** Bound the five-element
+   name/target vector once as `expected-targets` in the enclosing `let` and
+   referenced it from both the `:name` and `:target` assertions, making the
+   name=target invariant explicit instead of two copy-pasted literals.
+
+Verification: `clj-paren-repair` clean; `clojure -M:test --focus
+psi.workflow-loader.workflow-definitions-test` → 10 tests, 113 assertions,
+0 failures; `clj-kondo --lint` on the test file → 0 errors, 0 warnings.
+Both `steps.md` test-shaper items checked.
