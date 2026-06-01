@@ -219,3 +219,23 @@ blockers. No scheduler source/doc/test code touched (plan/steps/impl only).
    (the psi-tool-surface file is named explicitly because it does not match the
    `scheduler_*` glob, and Slices 0/5 inventory/extend it). `src/**` and
    `doc/scheduler.md` changes still fail the gate.
+
+## Slice 0 execution — Baseline (2026-06-01)
+
+Ran the 13 scheduler test namespaces via a focused `clojure.test/run-tests`
+script under the `:test-paths` alias (the `:test` alias pins kaocha main;
+`--focus` did substring-matching and ran the whole suite, so used a script).
+Result: **35 tests, 338 assertions, 0 failures, 0 errors** — clean baseline, no
+pre-existing scheduler failures.
+
+Note: timbre DEBUG logging from the statecharts engine is very noisy in test
+output; suppress with `(timbre/set-min-level! :warn)` for readable runs. Test
+correctness is unaffected.
+
+Seam availability confirmed: `test_support/make-session-ctx` wires
+`:scheduler-run-after-delay-fn`, `:scheduler-cancel-delay-fn`,
+`:scheduler-timers*`, `:daemon-thread-fn` (exercised by
+`scheduler_timer_seam_test.clj` and `scheduler_effects_test.clj`).
+
+Created `findings.md` with the fixed 7-section skeleton; Baseline recorded
+`verified-correct` with the full inventory.

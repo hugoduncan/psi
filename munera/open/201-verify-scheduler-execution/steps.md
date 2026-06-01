@@ -12,20 +12,25 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Slice 0 — Baseline
 
-- [ ] Inventory existing scheduler tests under
+- [x] Inventory existing scheduler tests under
       `components/agent-session/test/psi/agent_session/scheduler_*_test.clj`
       and `psi_tool_scheduler_test.clj`; list each `ns + deftest`.
-- [ ] Run `bb test`; capture current pass/fail state (note any pre-existing
+      Done: 13 ns, 35 deftests inventoried in `findings.md` Baseline section.
+- [x] Run `bb test`; capture current pass/fail state (note any pre-existing
       failures) in `implementation.md`.
-- [ ] Create `munera/open/201-verify-scheduler-execution/findings.md` skeleton:
+      Done: scheduler subset = `35 tests, 338 assertions, 0 failures, 0 errors`
+      (clean). No pre-existing failures.
+- [x] Create `munera/open/201-verify-scheduler-execution/findings.md` skeleton:
       exactly **7** `##` sections, one per design Scope area (Baseline, Pure
       model, Live execution path, psi-tool surface, Cancellation & lifecycle,
       Failure path, Projections), each with an entry table for {status, summary,
       covering test, repro+task-ref}. The single "Live execution path" section
       holds all three live-execution slices (2 message-kind / 3 busy-drain /
       4 session-kind) as separate entries — do not split it into three sections.
-- [ ] Record Baseline finding: suite present, current pass/fail, seam helpers
+      Done: `findings.md` created with the fixed 7-section skeleton.
+- [x] Record Baseline finding: suite present, current pass/fail, seam helpers
       available in `test_support`.
+      Done: Baseline section records suite green + seam availability.
 
 ## Slice 1 — Pure model (`scheduler.clj`)
 
