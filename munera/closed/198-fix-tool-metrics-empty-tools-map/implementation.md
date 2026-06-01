@@ -1,5 +1,28 @@
 # Implementation Notes
 
+## 2026-06-01 — docs review follow-up: document psi/metrics built-in extension
+
+Executed the newly added unchecked docs-review follow-up. `doc/extensions.md`
+had no `psi/metrics` entry even though it ships and is activated via
+`.psi/extensions.edn` (`psi/metrics {}`). Added an entry under "Built-in
+extensions in this repo" (before `plan-state-learning`), matching the
+`commit-checks`/`mcp-tasks-run` format.
+
+Documented against the source of truth (`psi.metrics.extension/init`,
+`psi.metrics.schema/metrics-schema`):
+- subscribed events: `tool_call`, `tool_result`, `session_turn_finished`,
+  `provider_request_started`, `provider_retry_scheduled`,
+  `provider_request_finished`
+- persistence: atomic write to `worktree/.psi/metrics.edn`, schema-validated on
+  load
+- `metrics/summary` deterministic operation, `/metrics` command
+- full persisted shape (`:tools`/`:workflows`/`:commands`/`:operations`/
+  `:tokens`/`:providers`/`:updated-at`)
+- note that the task-198 `emit-tool-lifecycle!` bridge is what populates
+  `:tools` (was always `{}` before the fix)
+
+Docs-only change; no code/tests touched. steps.md item checked.
+
 ## 2026-06-01 — end-to-end test added
 
 Added `metrics-extension-accumulates-tools-via-bridge-test` to
