@@ -104,3 +104,27 @@ Implemented as designed; no deviations from plan.
 - Verify: clj-paren-repair (no changes), clj-kondo clean (0/0), Kaocha focus
   `psi.agent-session.extensions-test` → 26 tests, 94 assertions, 0 failures.
   No project nREPL available; used Kaocha runner instead.
+
+## Implementation review: task-implementation-review (2026-06-01)
+
+Reviewed code/tests against design.md + plan.md. Verified at runtime, not just docs.
+
+- **matches design** ✓ `wrap-tool-executor` removed (grep: no refs anywhere in
+  `components`); modifiable-key contract (`:content`/`:details`/`:is-error`)
+  expressed exactly once — `dispatch-tool-result-in` filter predicate
+  (extensions.clj:331). `tool-result-event` (defn 299–313) and
+  `tool_runtime_adapter.clj` (37–42, sources constructor inputs off the incoming
+  `lifecycle-event`) untouched — confirmed against source; matches corrected A2/I1.
+- **architecture** ✓ pure removal of dead code; no shim/adapter introduced; no
+  `one_way` violation.
+- **test quality** ✓ `dispatch-tool-result-non-map-return-test` is non-vacuous:
+  the handler IS registered, so `"not-a-map"` flows into `dispatch-in` `:results`
+  and the `map?` guard is genuinely exercised (verified `dispatch-in` shape,
+  extensions.clj:240–264). Migrates the one wrapper-only behaviour.
+- **no unnecessary abstraction / no new pattern** ✓ new test reuses the existing
+  direct `dispatch-tool-result-in` call pattern; change reduces abstraction.
+- **runtime verification** ✓ clj-kondo clean (0/0 on both changed files);
+  `clojure -M:test:kaocha --focus psi.agent-session.extensions-test` →
+  26 tests, 94 assertions, 0 failures (re-run during this review).
+
+No new actionable issues. REVIEW_COMPLETE.
