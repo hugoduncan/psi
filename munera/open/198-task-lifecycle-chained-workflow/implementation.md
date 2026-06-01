@@ -541,3 +541,41 @@ Verification: focused `task-lifecycle-test` → 1 test, 11 assertions (was 8),
 0 failures. `clj-kondo` on the edited test file: 0 errors / 0 warnings.
 
 PASS_STATUS: follow-up complete.
+
+## 2026-06-01 — test review pass 3 (task-test-review skill) (ψ)
+
+Re-applied `task-test-review` to `task-lifecycle-test`
+(`workflow_definitions_test.clj` L437-482) after the pass-1/2 follow-ups landed
+(now 11 assertions, green). Re-read design acceptance criteria, the `.edn`, and
+the test.
+
+Skill criteria:
+- well_formed: ✓ — clean `load-edn-only` shape, mirrors `review-task-implementation-test`.
+- ¬mock ∧ ¬stub ∧ nullable infra: ✓ — real loader (`loader/load-workflow-definitions`)
+  over temp `with-workflow-dir`; no mocks/stubs/fakes.
+- ∀ behaviour(design) ∃ covering test: ✓ — no new actionable gap.
+
+Behavioural acceptance criteria now all covered (no duplication):
+- definition presence (keyed off top-level `:name "task-lifecycle"`) ✓
+- exactly five `:delegate` steps, `:name`=`:target`, in prescribed order ✓
+- `:prompt-string {:type :map ...}` input threading (central invariant) ✓ (pass-1)
+- `:context [{:type :source :from :workflow-original}]` input-only ✓ (pass-1)
+- terminal `:yields`/`:terminal-contract` absence ✓ (pass-2)
+
+Considered residual gap and rejected as non-actionable: the only acceptance-criterion
+field the test does not assert is the top-level `:description` presence. Judged
+NOT actionable — `:description` is registry-listing metadata, not behaviour;
+the skill's coverage criterion ranges over `behaviour(design)`, and no sibling
+exemplar (`review-task-implementation-test`, `create-task-plan-test`) asserts
+`:description`. `(contains? definitions "task-lifecycle")` already establishes
+the top-level `:name` (the only behaviourally load-bearing top-level key, since
+the definition is keyed by it). Asserting a free-text blurb would add brittle
+low-signal coverage diverging from the established sibling surface.
+
+Registry-presence-after-reload criterion is covered by design scope: isolated
+parse/compile is the required test surface; the combined-load/registry check is
+optional (and was performed once manually, recorded in Slice 3+4).
+
+Verification: focused `task-lifecycle-test` → 1 test, 11 assertions, 0 failures.
+
+PASS_STATUS: REVIEW_COMPLETE
