@@ -419,3 +419,27 @@ handler behaviour. The earlier test-shaper economy observation (two e2e metrics 
 documented above — not re-raised.
 
 **No new actionable test issues under the task-test-review skill criteria.**
+
+## 2026-06-01 — test review (independent, test-shaper skill, confirming pass)
+
+Re-applied test-shaper against source (`tool_execution_test.clj`,
+`tool_runtime_adapter.clj`, `metrics/extension_test.clj`) + live run — not notes.
+
+- `simple ∧ consistent ∧ robust ∧ economical` — ✓. The four bridge/e2e deftests are
+  single-concern, AAA-explicit, locally comprehensible; uniform `with-redefs` infra
+  pattern; deterministic (defonce atoms reset in `try/finally`, canned infra redefs);
+  meaningful per-`is` failure messages; e2e ceremony already deduplicated via
+  `run-tool-call-through-metrics-ext!`.
+- `behavior_focused` — ✓. Assertions target the fields consumers actually read
+  (`:tool-name`, `:is-error`) and observable store state, never interactions.
+- Considered `:input`/`:details` bridge-payload propagation as a candidate gap:
+  **rejected as over-specification.** Metrics handlers read only `:tool-name`/`:is-error`
+  (asserted) and `:content` (asserted indirectly via the error-reason test). Asserting the
+  unconsumed `:input`/`:details` payload fields would assert implementation detail of the
+  payload shape, violating test-shaper `¬assert(implementation_details)`. Not added.
+
+Verification: `clojure -M:test --focus psi.agent-session.tool-execution-test` →
+**13 tests, 66 assertions, 0 failures**. `clj-kondo --lint` on the test file → 0/0.
+
+**No new actionable test issues.** All prior findings (AC1/AC2 e2e coverage, ceremony
+dedup, block-ignored guard) are closed and confirmed executing.
