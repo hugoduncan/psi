@@ -1,19 +1,31 @@
 (ns psi.project-nrepl.test-support
   "Shared component-local test helpers for the project-nrepl component tests.
 
-   Consolidates the per-file copies of `make-ctx`, `install-instance!`,
-   `temp-dir`, `delete-tree!`, and `session-fn-with-id` so the seeded
-   `:runtime-handle` shape and temp-dir lifecycle stay identical across the
-   eval/commands/ops/attach/started/client tests."
+   Consolidates the per-file copies of `make-ctx`, `session-ctx-at`,
+   `install-instance!`, `seed-connector!`, `temp-dir`, `delete-tree!`,
+   `session-fn-with-id`, and `fake-connector` so the seeded `:runtime-handle`
+   shape, session-construction shape, and temp-dir lifecycle stay identical
+   across the eval/commands/ops/attach/started/client tests."
   (:require
    [clojure.java.io :as io]
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
    [psi.agent-session.test-support :as test-support]))
 
+(defn session-ctx-at
+  "A non-persisting test ctx + session-id whose `ss/session-worktree-path-in`
+   resolves to `worktree-path`. Single-sources the
+   `{:persist? false :session-defaults {:worktree-path …}}` session-construction
+   shape shared by `make-ctx` and the commands_test dispatch tests. Returns
+   `[ctx session-id]`."
+  [worktree-path]
+  (test-support/create-test-session
+   {:persist? false
+    :session-defaults {:worktree-path worktree-path}}))
+
 (defn make-ctx
   "A non-persisting test ctx from a fresh test session (no session-id needed)."
   []
-  (let [[ctx _] (test-support/create-test-session {:persist? false})]
+  (let [[ctx _] (session-ctx-at (System/getProperty "user.dir"))]
     ctx))
 
 (defn install-instance!

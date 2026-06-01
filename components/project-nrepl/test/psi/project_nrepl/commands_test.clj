@@ -3,29 +3,26 @@
    [clojure.test :refer [deftest is testing]]
    [psi.project-nrepl.commands :as project-nrepl-commands]
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
-   [psi.project-nrepl.test-support :refer [delete-tree! install-instance! temp-dir]]
-   [psi.agent-session.test-support :as test-support]))
+   [psi.project-nrepl.test-support :refer [delete-tree! install-instance!
+                                           session-ctx-at temp-dir]]))
 
 (deftest format-project-nrepl-status-test
   (testing "status formatting shows absent instance"
-    (let [[ctx session-id] (test-support/create-test-session {:persist? false
-                                                              :session-defaults {:worktree-path (System/getProperty "user.dir")}})
+    (let [[ctx session-id] (session-ctx-at (System/getProperty "user.dir"))
           message (project-nrepl-commands/format-project-nrepl-status ctx session-id)]
       (is (re-find #"Project nREPL" message))
       (is (re-find #"state    : absent" message)))))
 
 (deftest dispatch-project-nrepl-command-test
   (testing "/project-repl returns formatted status"
-    (let [[ctx session-id] (test-support/create-test-session {:persist? false
-                                                              :session-defaults {:worktree-path (System/getProperty "user.dir")}})
+    (let [[ctx session-id] (session-ctx-at (System/getProperty "user.dir"))
           result (project-nrepl-commands/dispatch-project-nrepl-command ctx session-id "/project-repl")]
       (is (= :text (:type result)))
       (is (re-find #"Project nREPL" (:message result)))))
 
   (testing "/project-repl start reports missing command configuration clearly"
     (let [worktree-path    (temp-dir "psi-project-nrepl-commands-")
-          [ctx session-id] (test-support/create-test-session {:persist? false
-                                                              :session-defaults {:worktree-path worktree-path}})]
+          [ctx session-id] (session-ctx-at worktree-path)]
       (try
         (let [result (project-nrepl-commands/dispatch-project-nrepl-command ctx session-id "/project-repl start")]
           (is (= :text (:type result)))
@@ -39,8 +36,7 @@
 
   (testing "/project-repl eval routes through real commands → ops/eval-op → eval/eval-instance-in!"
     (let [worktree         (System/getProperty "user.dir")
-          [ctx session-id] (test-support/create-test-session {:persist? false
-                                                              :session-defaults {:worktree-path worktree}})
+          [ctx session-id] (session-ctx-at worktree)
           client-session   (fn [msg]
                              [{:id (:id msg)
                                :session "nrepl-session-1"
@@ -56,8 +52,7 @@
 
   (testing "/project-repl interrupt routes through real commands → ops/interrupt → eval/interrupt-instance-in!"
     (let [worktree         (System/getProperty "user.dir")
-          [ctx session-id] (test-support/create-test-session {:persist? false
-                                                              :session-defaults {:worktree-path worktree}})
+          [ctx session-id] (session-ctx-at worktree)
           client-session   (fn [msg]
                              [{:id (:id msg)
                                :session "nrepl-session-1"
@@ -76,8 +71,7 @@
 
   (testing "/project-repl interrupt with no active eval reports unavailable clearly"
     (let [worktree         (System/getProperty "user.dir")
-          [ctx session-id] (test-support/create-test-session {:persist? false
-                                                              :session-defaults {:worktree-path worktree}})]
+          [ctx session-id] (session-ctx-at worktree)]
       (install-instance! ctx worktree (fn [_] []))
       (let [result (project-nrepl-commands/dispatch-project-nrepl-command ctx session-id "/project-repl interrupt")]
         (is (= :text (:type result)))

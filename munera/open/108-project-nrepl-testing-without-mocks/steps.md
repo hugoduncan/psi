@@ -304,7 +304,7 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
 
 ## Test-shaper follow-ups (2026-06-01, sixth test-shaper pass)
 
-- [ ] Consolidate the duplicated session-with-resolvable-worktree construction
+- [x] Consolidate the duplicated session-with-resolvable-worktree construction
   ceremony in `commands_test.clj` into a shared `psi.project-nrepl.test-support`
   helper. The call `(test-support/create-test-session {:persist? false
   :session-defaults {:worktree-path <wt>}})` is open-coded verbatim at SIX sites
@@ -326,3 +326,14 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
   returned session-id) so one source owns session construction. `create-test-session`
   is called directly only in `commands_test` (×6) + inside `make-ctx` (verified),
   so the helper genuinely single-sources the idiom. Keep tests green + lint clean.
+  — DONE: added `psi.project-nrepl.test-support/session-ctx-at` (`[worktree-path]
+  → [ctx session-id]`) single-sourcing the `{:persist? false :session-defaults
+  {:worktree-path …}}` shape. The six `commands_test` sites now `:refer` and call
+  `(session-ctx-at <wt>)` (the agent-session `test-support` alias was dropped —
+  no other reference remained). Re-expressed `make-ctx` in terms of
+  `session-ctx-at` (passing `(System/getProperty "user.dir")`, discarding the
+  session-id) so one source owns session construction. `create-test-session` is
+  now called directly only inside `session-ctx-at`. Verified: focused
+  project-nrepl suite (8 ns) 26 tests / 151 assertions / 0 failures (count
+  unchanged — pure helper extraction); `clj-kondo` 0/0 on `test_support.clj` +
+  `commands_test.clj`.

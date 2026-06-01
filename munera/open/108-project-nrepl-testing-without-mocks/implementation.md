@@ -1272,3 +1272,43 @@ pervasive `worktree (System/getProperty "user.dir")` ambient-cwd instance key
 `disconnect-instance-in-test`'s `closed*` real-effect atom + hand-rolled
 ensure+update setup (distinct Closeable-proxy intent, not connector-seeding;
 accepted by prior passes). Raising either is scope expansion.
+
+## Sixth test-shaper follow-up execution (2026-06-01)
+
+Executed the single newly-added unchecked `steps.md` item from the sixth
+test-shaper review pass: consolidated the triplicated... (no, sextupled)
+session-with-resolvable-worktree construction ceremony in `commands_test.clj`.
+
+Added `psi.project-nrepl.test-support/session-ctx-at`:
+
+    (defn session-ctx-at [worktree-path]
+      (test-support/create-test-session
+       {:persist? false
+        :session-defaults {:worktree-path worktree-path}}))
+
+returning `[ctx session-id]` and single-sourcing the `{:persist? false
+:session-defaults {:worktree-path …}}` shape. The six `commands_test` sites
+(status-format, dispatch-status, missing-start-command, eval-route,
+interrupt-route, interrupt-no-active-eval) now `:refer` and call
+`(session-ctx-at <wt>)`. Each site keeps its own `<wt>` (`user.dir` for the
+instance-resolving tests; a fresh `temp-dir` for the missing-start-command
+test) and its own assertions — only the session-construction map is shared.
+
+The agent-session `test-support` alias in `commands_test` was dropped: after the
+substitution no `test-support/` reference remained (all six were
+`create-test-session`). `session-ctx-at` is now `:refer`-ed from
+`psi.project-nrepl.test-support` alongside `delete-tree!`/`install-instance!`/
+`temp-dir`.
+
+`make-ctx` re-expressed in terms of `session-ctx-at` (passing
+`(System/getProperty "user.dir")`, discarding the returned session-id), so
+`create-test-session` is now called directly only inside `session-ctx-at` —
+one source owns project-nrepl test session construction. Note: `make-ctx`
+previously passed only `{:persist? false}` (no `:session-defaults`); adding a
+`:worktree-path` default is harmless because `make-ctx`'s callers
+(eval/ops/runtime/attach/started/client tests) never read the session-id and
+install instances at their own explicit worktree-path.
+
+Verification: focused project-nrepl suite (8 ns) 26 tests / 151 assertions / 0
+failures (unchanged — pure helper extraction, no behaviour change); `clj-kondo`
+0/0 on `test_support.clj` + `commands_test.clj`; `clj-paren-repair` clean on both.
