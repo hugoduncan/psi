@@ -105,3 +105,16 @@
       shipping exemplars (`gh-issue-implement.edn`,
       `review-task-implementation.edn`). Keep it minimal — do not restructure the
       authoring guide.
+
+## Docs review follow-ups (review-task-docs) — pass 3
+
+- [ ] Move the `task-lifecycle` CHANGELOG entry from under the released
+      `## [0.1.2166] - 2026-06-01` section into the empty `## [Unreleased]`
+      section (add a `### Added` subheading under `[Unreleased]` and place the
+      entry there), satisfying the acceptance criterion that `[Unreleased]`
+      MUST carry the entry and avoiding mislabelling an unreleased change as
+      shipped in `v0.1.2166`. The entry was authored into the released section
+      (commit `8a1ac8501`, two commits after the `v0.1.2166` tag), so this is a
+      placement defect, not a release stamp. Move only the `task-lifecycle`
+      line; leave the sibling `review-task-design` / `create-task-plan` entries
+      (out of this task's scope) untouched.

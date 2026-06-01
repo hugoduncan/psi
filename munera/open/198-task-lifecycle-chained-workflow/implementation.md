@@ -900,3 +900,39 @@ No new actionable test-shaping feedback; no new `steps.md` items. Converges with
 prior test-shaper passes 1–2.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## 2026-06-01 — user-facing docs review pass 3 (review-task-docs, ψ)
+
+Re-applied the `review-task-docs` checklist against the committed state.
+The `:map` prompt-string doc gap (passes 1–2) remains correctly closed.
+
+One **new actionable finding** that passes 1–2 missed/mis-judged:
+
+1. **The `task-lifecycle` CHANGELOG entry is under the released
+   `[0.1.2166]` section, not `[Unreleased]` — violating the acceptance
+   criterion.** `CHANGELOG.md` line 7 `## [Unreleased]` is empty; the
+   `task-lifecycle` entry sits at line 21, inside `## [0.1.2166] - 2026-06-01`
+   (released section starts line 9). Git proves this is a defect, not a release
+   stamp: the entry was added at commit `8a1ac8501` (`git show 8a1ac8501 --
+   CHANGELOG.md` inserts it after the `create-task-plan` line, line 18 region),
+   which is **two commits after** the release tag `1b064e2e9 release:
+   v0.1.2166`. A `bb release:tag` stamp moves *pre-existing* `[Unreleased]`
+   content down under a new version header; it cannot retroactively absorb an
+   entry authored after the tag. So the entry was written directly into the
+   already-released section.
+   - Acceptance impact: design's acceptance criterion states "CHANGELOG
+     `[Unreleased]` MUST gain an `Added` entry for the new `task-lifecycle`
+     workflow." The entry exists but in the wrong section → criterion unmet.
+   - User-facing impact: an unreleased change is mislabelled as shipped in
+     `v0.1.2166`.
+   - Pass 2 explicitly rationalized this as "correct per `bb release:tag`
+     semantics, not a regression" — that reasoning is wrong (the tag predates
+     the entry by two commits).
+   - Fix (minimal, in-scope): move only the `task-lifecycle` line from under
+     `[0.1.2166]` up into the empty `[Unreleased]` `### Added` block (create
+     the `### Added` subheading under `[Unreleased]`). The sibling
+     `review-task-design` / `create-task-plan` entries are similarly stranded
+     but are out of this task's scope; note but do not move them here.
+   Follow-up added to `steps.md`.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
