@@ -35,6 +35,24 @@ Three ambiguities found:
    skips extension dispatch when the registry is absent. Design doesn't state whether absence
    is a valid production state or a test-only artifact.
 
+## 2026-06-01 — inconsistency review
+
+Two inconsistencies found:
+
+1. **"All tool executions" claim contradicts disjoint-paths clarification**: Fix section
+   states "all tool executions (interactive, batch, background) pass through
+   `emit-tool-lifecycle!`". Clarifications section states the plan path "does NOT route
+   through `emit-tool-lifecycle!`" and the two paths are "disjoint". These are directly
+   contradictory within design.md. The Fix section claim should be scoped to
+   "interactive/batch" only.
+
+2. **Acceptance criterion "no regressions on tool blocking/override" is ambiguous**: The
+   bridge calls `dispatch-in` directly (not `dispatch-tool-call-in`), so `{:block true}`
+   handler returns are silently ignored on the interactive/batch path. The design does not
+   state whether this is intentional. The criterion is vacuously satisfied (existing
+   blocking tests cover the plan path only), but a reader could infer blocking is preserved
+   on the interactive path too.
+
 ## 2026-06-01 — ambiguity resolution
 
 1. **Double-dispatch — resolved**: `run-tool-plan-step-in!` calls `dispatch-tool-call-in` /
