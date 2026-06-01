@@ -366,3 +366,18 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       Done: Slice 10 close-out allowlist now permits test files matching
       `scheduler_*` **or** `psi_tool_scheduler_test.clj` (named explicitly since
       it does not match the glob); `src/**` and `doc/scheduler.md` still fail.
+
+## Implementation review follow-ups (2026-06-01)
+
+- [ ] Extract the duplicated capture-timer override idiom
+      `(assoc ctx :scheduler-run-after-delay-fn (fn [_ _ f] (reset! cb* f) {:handle :captured}))`
+      + external `cb*` atom (currently inlined in 4 files / 5 sites:
+      `scheduler_end_to_end_test` ×2, `scheduler_timer_seam_test`,
+      `scheduler_context_shutdown_test`, `psi_tool_scheduler_test`) into a shared
+      `test-support` helper (e.g. `capturing-delay-fn` → `[override-fn cb*]`, or a
+      `with-captured-timer` macro), and have the verification tests use it.
+      Test-quality DRY only — no behaviour change; keep suite green + kondo clean.
+      (Verification-only-scope note: this edits test files only, within the
+      Slice-10 allowlist; does not touch `src/**` or `doc/scheduler.md`. If the
+      task is treated as closed, raise it as a small standalone test-hygiene task
+      instead.)

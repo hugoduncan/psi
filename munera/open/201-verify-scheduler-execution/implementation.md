@@ -427,3 +427,44 @@ Slice 10 close-out:
 Task verification-only deliverable complete: green end-to-end coverage (incl.
 message-kind + session-kind live timer-seam round trips) plus a structured
 `findings.md` recording every area verified-correct.
+
+## Implementation review (2026-06-01)
+
+Reviewed against design.md/plan.md via task-implementation-review skill
+(matches-design ∧ follows-architecture ∧ flag reusable-pattern / unnecessary-
+abstraction / structural-perf). Verified directly, not just from the log:
+
+- **Matches design + acceptance criteria.** All 7 Scope areas covered; both
+  live round trips (message-kind + session-kind) drive the real dispatch+effect
+  path and cross the timer seam via `:scheduler-run-after-delay-fn` (callback
+  captured + invoked, no wall-clock sleep); busy-queue/drain, cancel races,
+  failure recording, shutdown timer-cleanup each have passing coverage.
+- **Follows architecture (`λtest`).** New tests assert state/outputs
+  (delivered-prompt provenance, `:created-session-id`/`:delivery-phase`,
+  `:cancelled`+handle/queue removal, `:failed`+`:error-summary`, EQL attrs),
+  not handler interactions. Pure-model guards assert exact error strings.
+- **No source/doc drift.** `git diff --stat 611b037bb..HEAD -- components/`
+  shows only the 7 test files (no `src/**`, no `doc/scheduler.md`); confirmed
+  against the Slice-10 allowlist.
+- **`:at` asymmetry judgment is sound.** `resolve-fire-time!` only calls
+  `validate-delay-ms!` `(when (pos? delay))`; past/now → delay 0 → fires
+  immediately, matching `doc/scheduler.md:99` "past absolute instants fire
+  immediately". Recording it `verified-correct` (not a doc/behaviour-drift
+  defect) is correct.
+- **Suite re-run green here:** 45 tests / 410 assertions / 0 fail / 0 error;
+  clj-kondo 0/0 on all 7 touched files.
+
+### Flag — reusable test-support pattern (test-quality, non-blocking)
+
+The capture-timer override idiom
+`(assoc ctx :scheduler-run-after-delay-fn (fn [_ctx _delay-ms f] (reset! cb* f) {:handle :captured}))`
+paired with an external `cb*` atom is duplicated across **4 files / 5 sites**
+(`scheduler_end_to_end_test` ×2, `scheduler_timer_seam_test`,
+`scheduler_context_shutdown_test`, `psi_tool_scheduler_test`). The
+`test_support/make-session-ctx` default `:scheduler-run-after-delay-fn` *sleeps*
+rather than captures, so every verification test re-implements its own capturing
+override inline. Per `λreq → reusable_existing_pattern → flag`, this is a
+candidate for a shared `test-support` helper (e.g. a `capturing-delay-fn`
+returning `[override-fn cb*]`, or a `with-captured-timer` macro) to remove the
+duplication. Not a correctness defect and does not affect the verification-only
+deliverable — a test-DRY follow-up.
