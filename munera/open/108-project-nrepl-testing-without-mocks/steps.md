@@ -406,3 +406,9 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
   `README.md`, `doc/project-nrepl.md`, `doc/tui.md`, `doc/architecture.md`, and
   `CHANGELOG.md` remain accurate and consistent with the implementation; no
   changelog entry warranted (¬user_visible). No follow-up steps added.
+
+## Code-shaper review follow-ups (2026-06-01)
+
+- [ ] `client.clj connect-instance-in!`: move the `{:keys [host port]} (:endpoint instance)` destructure below the `(when-not instance ...)` existence guard so `instance` is validated to exist before its contents are read (the throw already fires first, but the binding reads as a latent nil-deref — `locally_comprehensible`). Keep tests green + lint clean.
+- [ ] `client.clj connect-instance-in!`: drop the redundant `session-fn` alias of `client-session` — read the `:nrepl.core/taking-until` meta off `client-session` directly (the runtime-handle merge already uses `client-session`), so one concept carries one name (`simple`). Keep tests green + lint clean.
+- [ ] `started.clj wait-for-started-endpoint!`: bind the effective timeout once (`effective-timeout-ms = (or (:timeout-ms opts) default-readiness-timeout-ms)`) and use it for BOTH the deadline and the timeout `ex-info` `:timeout-ms` value, so the reported timeout matches the deadline enforced instead of reporting `nil` when a caller uses the default (`robust`/`consistent`). Keep tests green + lint clean.

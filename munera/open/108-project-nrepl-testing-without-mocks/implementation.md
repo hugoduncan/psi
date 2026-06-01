@@ -1516,3 +1516,42 @@ Findings:
 Conclusion: user-facing docs (`README.md` + `doc/`) and `CHANGELOG.md` remain
 synchronized with the implementation; this task required no doc edits. Review
 complete — no follow-up steps added.
+
+## Code-shaper review (2026-06-01)
+
+Code-shaper pass over the three production seams shaped by this task
+(`client.clj`, `started.clj`, `attach.clj`) + supporting `config.clj`. Tests
+already extensively shaped; this pass targets the production source only. Three
+actionable shaping findings (all `simple`/`robust`, none behaviour-changing for
+real callers):
+
+1. `client.clj connect-instance-in!` — **clarity/locality of the instance
+   nil-guard.** The `let` binds `{:keys [host port]} (:endpoint instance)`
+   *before* the body's `(when-not instance ...)` existence throw. The throw
+   still fires first at runtime (it is the first body form, and `(:endpoint
+   nil)` is benign), so behaviour is correct — but a reader sees `host`/`port`
+   derived from `instance` before `instance` is validated to exist, which
+   reads as a latent nil-deref. `locally_comprehensible`: move the
+   `{:keys [host port]}` destructure out of the binding `let` and below the
+   `when-not instance` guard (or fold both endpoint checks together) so the
+   existence guard precedes any use of `instance`'s contents.
+
+2. `client.clj connect-instance-in!` — **redundant `session-fn` alias.**
+   `client-session` is destructured from the connector result, then immediately
+   rebound `session-fn client-session` and used only for the session-id meta
+   lookup; the runtime-handle merge uses `client-session` directly. `session-fn`
+   is a pure alias adding a name without a distinct concept. `simple`: drop the
+   `session-fn` binding and read the meta off `client-session` directly (or keep
+   one name throughout). One concept, one name.
+
+3. `started.clj wait-for-started-endpoint!` — **timeout error reports `nil`
+   instead of the effective timeout.** The deadline is computed from
+   `(or (:timeout-ms opts) default-readiness-timeout-ms)`, but the timeout
+   `ex-info` reports `:timeout-ms (:timeout-ms opts)` — which is `nil` when a
+   caller relies on the default. The diagnostic then claims a nil timeout for a
+   real 5000ms deadline. `robust`/`consistent`: bind the effective timeout once
+   (`effective-timeout-ms`) and use it for both the deadline and the error data
+   so the reported value matches the deadline actually enforced.
+
+None of these change user-facing behaviour or the component boundary; all are
+internal source-shape improvements to the seams this task introduced.
