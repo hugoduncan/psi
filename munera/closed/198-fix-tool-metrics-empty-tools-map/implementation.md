@@ -1294,3 +1294,35 @@ extension-bus event-reference table, and the Tool Wrapping section.
 
 **No new actionable docs issues.** All prior docs-review findings are closed and
 independently confirmed against source. Working tree clean.
+
+## Code review (code-shaper) — 2026-06-01
+
+Reviewed task-198 changes (`extensions.clj`, `tool_runtime_adapter.clj`,
+`tool_runtime/core.clj`, `metrics/extension.clj`) against
+`simple ∧ consistent ∧ robust`.
+
+- **simple — ✓.** `emit-tool-lifecycle!` keeps `xor(computation, flow_control)`:
+  the `case` is pure routing, payload construction delegated to the pure
+  `tool-call-event`/`tool-result-event` builders. `content->text`/`error-reason`
+  cleanly split (helper computes, `on-tool-result` controls); locally
+  comprehensible.
+- **consistent — ✓.** Cross-path `"tool_call"`/`"tool_result"` payload shape and
+  value coercions (`:input`/`:content`/`:is-error`) single-sourced in two
+  builders, consumed by both the plan-path `dispatch-tool-*-in` and the
+  interactive bridge. Argument order, naming, idioms aligned.
+- **robust — ✓.** Single-sourced contract → invariant enforceable;
+  `tool-event-payload-constructors-test` pins shape + content-normalize +
+  is-error coercion as the cross-path guard. `dispatch-in` catches handler
+  exceptions per-handler. Root cause (duplicated inline payload construction)
+  was resolved structurally, not symptom-patched.
+
+**Out of scope (pre-existing, untouched by task 198):**
+- `make-turn-finished-handler` logs a swallowed exception via raw `println`
+  with a `"DEBUG"` prefix rather than `timbre` (`consistent(idioms)` drift) —
+  introduced in `2a04436fb` (#94), not this task.
+- `dispatch-tool-result-in`'s verbose result-filter predicate and the
+  `wrap-tool-executor` `cond->` it mirrors — pre-existing; `wrap-tool-executor`
+  is documented dead code.
+
+**No new actionable code-shaper issues in the task-198 changes.** clj-kondo clean
+(0/0) on all four changed source files. Working tree clean.
