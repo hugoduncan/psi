@@ -13,13 +13,13 @@
   `:extension-registry` in `ctx` is a valid production scenario or test-only. If
   test-only, consider asserting its presence rather than silently skipping.
 
-- [ ] Fix scope of "all tool executions" claim in Fix section: currently says "all tool
+- [x] Fix scope of "all tool executions" claim in Fix section: currently says "all tool
   executions (interactive, batch, background) pass through `emit-tool-lifecycle!`" but
   Clarifications states the plan path is disjoint and does NOT route through it. Narrow
   the Fix section claim to "interactive/batch" (or "non-plan") to eliminate the
   contradiction.
 
-- [ ] Clarify blocking semantics on interactive path in Acceptance Criteria: the bridge
+- [x] Clarify blocking semantics on interactive path in Acceptance Criteria: the bridge
   calls `dispatch-in` directly (not `dispatch-tool-call-in`), so `{:block true}` handler
   returns are silently ignored. State explicitly that blocking is intentionally not
   enforced on the interactive/batch path, and update the acceptance criterion

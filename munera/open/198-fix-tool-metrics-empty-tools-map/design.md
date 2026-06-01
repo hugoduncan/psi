@@ -37,8 +37,9 @@ Bridge the lifecycle event path to the extension handler dispatch in
 - `:tool-start` lifecycle event → `dispatch-in "tool_call"`
 - `:tool-result` lifecycle event → `dispatch-in "tool_result"`
 
-This is the single correct injection point: all tool executions (interactive,
-batch, background) pass through `emit-tool-lifecycle!`.
+This is the single correct injection point for the interactive/batch path:
+all interactive and batch tool executions pass through `emit-tool-lifecycle!`.
+(The data-driven plan path is disjoint and retains its own direct dispatch.)
 
 ## Scope
 
@@ -82,5 +83,8 @@ legitimately omit the registry.
 
 - After the fix, tool invocations appear in `:tools` in `.psi/metrics.edn`
 - Tool errors (`:is-error true`) increment `:errors` counters
-- Existing extension tests pass (no regressions on tool blocking/override)
+- Existing extension tests pass (no regressions on tool blocking/override on the
+  plan path; blocking is intentionally not enforced on the interactive/batch path
+  because the bridge calls `dispatch-in` directly and `{:block true}` returns are
+  silently ignored there)
 - `clj-kondo` clean on changed file
