@@ -494,3 +494,35 @@ documentation completeness gap surfaced by the behaviour change.
 Severity note: arguably pre-existing (metrics was undocumented before too), but this task
 is what makes the behaviour observable, so it is the natural point to document it. Recorded
 as a follow-up.
+
+## 2026-06-01 — docs review (independent, review-task-docs skill, verification pass)
+
+Re-applied the review-task-docs checklist against source, not notes. The prior
+docs-review follow-up (the `psi/metrics` entry in `doc/extensions.md`) is the only
+user-facing doc change for this task; verified it for accuracy/completeness/consistency.
+
+- **CHANGELOG — ✓.** `[Unreleased]/### Fixed` entry present and accurate: `:tools` map
+  in `.psi/metrics.edn`, `on-tool-call`/`on-tool-result` handlers, interactive path — all
+  match `extensions/metrics/src/psi/metrics/extension.clj` and `tool_runtime_adapter.clj`.
+  User-visible bug fix → changelog correctly required and present.
+- **`doc/extensions.md` `psi/metrics` entry — ✓ accurate against source:**
+  - Subscribed events (6) match `init`'s `(:on api)` registrations exactly:
+    `tool_call`, `tool_result`, `session_turn_finished`, `provider_request_started`,
+    `provider_retry_scheduled`, `provider_request_finished`.
+  - `:tools` shape `{:invocations :errors :error-reasons {reason :int}}` matches
+    `schema/tool-counter-schema`; `:tokens`/`:providers`/`:workflows`/`:commands`/
+    `:operations`/`:updated-at` all match `metrics-schema`.
+  - Error-reason derivation ("first error line, trimmed/truncated") matches
+    `on-tool-result` (`first (str/split-lines content)` → trim → subs ≤80).
+  - Persistence ("atomic temp-file write; schema-validated on load; invalid logged and
+    ignored") matches `persistence/save-metrics!` (tmp + `ATOMIC_MOVE`) and
+    `load-metrics` (schema/valid? → WARN → nil).
+  - `metrics/summary` operation and `/metrics` command both registered in `init`.
+  - Activation note correct: `.psi/extensions.edn` activates `psi/metrics {}`.
+  - Bridge note correctly attributes `:tools` population to `emit-tool-lifecycle!`
+    (task 198) and notes the pre-fix always-`{}` state.
+- **README / removed-behaviour / examples — ✓.** No README metrics references; no stale
+  references; no examples needing update; nothing removed.
+
+**No new actionable docs issues.** All prior docs findings are closed and confirmed.
+Working tree clean; steps.md has no open follow-ups.
