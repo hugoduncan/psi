@@ -474,3 +474,94 @@ Changes:
   precondition for interrupt.
 
 No production/test code changed.
+
+2026-06-01 — Implementation build (Slices 1–12)
+
+Executed the full de-mocking refactor. Production changes (the three the design
+required) plus six test-file reshapes. Six in-scope files now carry zero
+`with-redefs`; `runtime_test.clj` and `eval_test.clj` were untouched and remain
+green.
+
+Production changes landed:
+1. `client.clj`: promoted the inline `requiring-resolve` nrepl.core block to
+   `real-nrepl-connector` (takes `{:host :port}`, returns
+   `{:transport :client :client-session}`); `connect-instance-in!` resolves
+   `(or (get-in instance [:runtime-handle :nrepl-connector]) real-nrepl-connector)`.
+   Session-id derivation + throw-on-missing stay in `connect-instance-in!`.
+2. `started.clj`: promoted private `start-process!` to `real-process-launcher`
+   behind `[:runtime-handle :process-launcher]`; changed `start-instance-in!` to
+   `(update :runtime-handle merge {...})` (was overwrite) so seeded seam fns
+   survive into the internal `connect-instance-in!`.
+3. `attach.clj` + `started.clj`: added optional `:runtime-handle` seam seed —
+   `attach-instance-in!` gained a new 4th-positional `opts` arity
+   (`[ctx wt attach-input opts]`); `start-instance-in!` forwards
+   `(:runtime-handle opts)` from its existing `opts`. Both thread the seed into
+   `ensure-instance-in!`. Real callers seed nothing → unchanged behaviour
+   (verified by the unchanged attach/started/install tests).
+
+Deviations from the initial design: none of substance. One discovered
+real-behavior fact recorded in `ops_test.clj`: `eval-instance-in!`'s result map
+omits `:ns`, so the public `eval-op` payload's `:ns` is always nil — the prior
+mocked `ops_test` fabricated a `:ns "user"` value that real eval never produces.
+The reshaped test asserts the real `:ns nil` contract. Timing instants are
+asserted as present (real `now`) rather than fixed instants.
+
+### Seam strategy note — nREPL client seam (`:nrepl-connector`)
+
+- Boundary: the external `nrepl.core` `connect → client → client-session`
+  establishment. This is true infrastructure (a real socket + nREPL protocol),
+  appropriate to wrap.
+- Mechanism: a function value carried in per-instance runtime state under
+  `[:runtime-handle :nrepl-connector]`, seeded at acquisition, resolved at call
+  time in `connect-instance-in!` via `(or seeded real-nrepl-connector)`.
+- Contract: connector takes `{:host :port}`, returns
+  `{:transport :client :client-session}`. Session-id derivation is deliberately
+  NOT part of the seam — it stays in `connect-instance-in!` (interpretation of
+  the returned session fn's `:nrepl.core/taking-until {:session ...}` metadata),
+  retaining the throw-on-missing-session-id behaviour. A nullable connector
+  returns a `client-session` fn carrying that metadata so the derivation
+  succeeds deterministically.
+- Production default: `real-nrepl-connector` (the promoted inline block) still
+  performs the real nREPL establishment, so the production path is unchanged.
+- Test consumption: `client_test.clj` seeds it before a standalone
+  `connect-instance-in!`; `attach_test.clj` seeds it via the attach `opts` seed,
+  consumed transitively through `attach-instance-in! → connect-instance-in!`;
+  `started_test.clj` seeds it via the start `opts` seed, consumed by the internal
+  `connect-instance-in!` after the runtime-handle merge.
+- Nullable behaviour: deterministic in-memory transport/client/session-fn; tests
+  assert on resulting instance `:runtime-handle` state
+  (`:transport :client :client-session :session-id`) and lifecycle flags, never
+  on var replacement or call counts.
+
+### Seam strategy note — process-start seam (`:process-launcher`)
+
+- Boundary: launching the configured start command as an OS process via
+  `ProcessBuilder`. This is true infrastructure (a real subprocess), appropriate
+  to wrap.
+- Mechanism: a function value carried in per-instance runtime state under
+  `[:runtime-handle :process-launcher]`, seeded at acquisition through the
+  `start-instance-in!` `opts` seed, resolved at call time via
+  `(or seeded real-process-launcher)`.
+- Contract: launcher takes `(worktree-path command-vector)` and returns a
+  `Process`-shaped object. The nullable surface only needs `isAlive`,
+  `exitValue`, `pid`, `destroy` (the `fake-process` proxy in `started_test.clj`).
+- Production default: `real-process-launcher` (the promoted private
+  `start-process!`) still launches a real subprocess, so the production path is
+  unchanged.
+- Readiness is **file-backed, not seam-state-backed**: `start-instance-in!`'s
+  readiness still flows through `wait-for-started-endpoint! → read-dot-nrepl-port`
+  reading a real on-disk `.nrepl-port` in the temp worktree. The started test's
+  seeded launcher writes a real `.nrepl-port` file to drive endpoint discovery;
+  readiness is never injected through runtime-handle state.
+- Required companion change: `start-instance-in!` merges (no longer overwrites)
+  the process handle keys into `:runtime-handle`, so a co-seeded
+  `:nrepl-connector` (needed by the internal `connect-instance-in!`) survives
+  acquisition. Behaviour-preserving for real callers (the handle is nil/empty
+  until process keys are set).
+
+### Remaining justified exceptions
+
+None. All six in-scope files are `with-redefs`-free. The two seams wrap genuine
+infrastructure boundaries (nREPL socket establishment, OS process launch); no
+test-only helper layer was introduced beyond the per-file `install-instance!`
+seeding helpers that mirror the already-proven `eval_test.clj` idiom.

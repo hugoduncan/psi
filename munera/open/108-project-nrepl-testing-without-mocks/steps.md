@@ -80,17 +80,17 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
 
 ## Slice 11 — Verification
 
-- [ ] Confirm no remaining `with-redefs` in the six in-scope test files (`git grep`)
-- [ ] Run all focused `project-nrepl` component tests green (incl. unchanged `runtime_test.clj`, `eval_test.clj`)
-- [ ] Run targeted `clj-kondo` lint on changed source/test namespaces
-- [ ] If entry-point ownership shifted, run one higher-level consuming-path proof to confirm no boundary behavior drift
+- [x] Confirm no remaining `with-redefs` in the six in-scope test files (`git grep` → NONE)
+- [x] Run all focused `project-nrepl` component tests green (incl. unchanged `runtime_test.clj`, `eval_test.clj`) — 25 tests, 154 assertions, 0 failures
+- [x] Run targeted `clj-kondo` lint on changed source/test namespaces — `components/project-nrepl/src` + `/test`, 0 errors, 0 warnings
+- [x] Entry-point ownership shifted (attach/start signatures gained optional seed) → ran `psi.agent-session.project-nrepl-extension-install-test` (consuming path that redefs `start-instance-in!`): 1 test, 5 assertions, 0 failures — no boundary drift
 
 ## Slice 12 — Document
 
-- [ ] Record a **separate** `implementation.md` strategy note for the `:nrepl-connector` seam
-- [ ] Record a **separate** `implementation.md` strategy note for the `:process-launcher` seam
-- [ ] Record any remaining justified exception
-- [ ] Update `mementum/state.md` with task-108 completion state
+- [x] Record a **separate** `implementation.md` strategy note for the `:nrepl-connector` seam
+- [x] Record a **separate** `implementation.md` strategy note for the `:process-launcher` seam
+- [x] Record any remaining justified exception (none — all six files with-redefs-free)
+- [x] Update `mementum/state.md` with task-108 completion state
 
 ## Plan/steps ambiguity follow-ups (2026-06-01 review)
 
