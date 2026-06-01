@@ -359,3 +359,19 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
   considered and deliberately NOT raised — all are pre-existing or outside this
   de-mocking task's named behaviour set; raising them would be scope expansion.
   No follow-up steps added.
+
+## Test-shaper follow-ups (2026-06-01, seventh test-shaper pass)
+
+- [ ] Remove the vestigial timing opts from `started_test.clj`'s two happy-path
+  readiness tests (`minimal_incidental_setup` ∧ `simple(tests)`). Since the third
+  test-shaper pass made readiness file-backed (the `.nrepl-port` is written
+  synchronously before the wait/launch), `wait-for-started-endpoint!` succeeds on
+  its FIRST loop iteration (started.clj:54), so the `:timeout-ms`/`:poll-interval-ms`
+  opts are never consulted on these paths — dead setup implying timing/polling
+  matters when determinism removed it. Fix: (a) in `wait-for-started-endpoint-test`
+  happy block, drop the `{:timeout-ms 1000 :poll-interval-ms 20}` opts arg (use the
+  2-arity `(wait-for-started-endpoint! dir process)` which defaults both); (b) in
+  `start-instance-in-test`, drop only the `:timeout-ms 1000`/`:poll-interval-ms 10`
+  keys from the opts map — keep the map for `:runtime-handle` (the seam seed). Leave
+  the process-exit FAILURE case's `{:timeout-ms 100 :poll-interval-ms 10}` unchanged
+  (it legitimately loops until deadline/exit). Keep tests green + lint clean.

@@ -1386,3 +1386,35 @@ consistent with the 2nd-pass rationale):
   guards outside scope.
 
 No new actionable issues. Review complete.
+
+---
+
+2026-06-01 — test-shaper (seventh test-shaper pass)
+
+Independent test-shaper review (`λtests. clarity ∧ signal ∧ robustness → shape`).
+Re-verified focused project-nrepl suite (8 ns): 26 tests / 151 assertions / 0
+failures. Suite remains state/result-based, zero `with-redefs`, zero
+interaction-capture atoms, all helper idioms single-sourced in `test-support`.
+
+One new actionable `minimal_incidental_setup` finding:
+
+1. `started_test.clj` happy-path readiness tests carry vestigial timing opts.
+   After the third test-shaper pass made readiness file-backed (the `.nrepl-port`
+   is written SYNCHRONOUSLY before the wait/launch), `wait-for-started-endpoint!`
+   succeeds on its FIRST loop iteration (started.clj:54 `read-dot-nrepl-port-safe`
+   hits before any `Thread/sleep`). The `:timeout-ms`/`:poll-interval-ms` opts are
+   therefore never consulted on these paths, yet both happy tests still pass them:
+   - `wait-for-started-endpoint-test` happy block: `{:timeout-ms 1000
+     :poll-interval-ms 20}` (line 38) — fully dead; the 2-arity
+     `(wait-for-started-endpoint! dir process)` defaults both, so the opts map can
+     be dropped entirely.
+   - `start-instance-in-test`: `{:timeout-ms 1000 :poll-interval-ms 10 ...}` (lines
+     69–70) — the timing keys are dead; the opts map must stay for `:runtime-handle`
+     (the seam seed), but the `:timeout-ms`/`:poll-interval-ms` keys can be removed.
+   This is dead incidental setup that implies timing/polling matters on the happy
+   path when determinism has removed it (`minimal_incidental_setup`,
+   `simple(tests)`). The process-exit failure case legitimately keeps `:timeout-ms
+   100 :poll-interval-ms 10` (it loops until the deadline/exit), so leave it.
+   Fix: drop the opts arg from the happy `wait-for-started-endpoint!` call (use the
+   2-arity), and drop only the timing keys from `start-instance-in-test`'s opts map.
+   Keep tests green + lint clean.
