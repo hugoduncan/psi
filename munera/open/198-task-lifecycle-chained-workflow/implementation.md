@@ -847,3 +847,27 @@ No new actionable feedback; no new `steps.md` items. All prior review passes
 this pass converge on complete. Implementation is ready for closure.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## 2026-06-01 — test review pass 4 (task-test-review skill) (ψ)
+
+Re-applied `task-test-review` to `task-lifecycle-test`
+(`workflow_definitions_test.clj` L437-471) after the test-shaper reshape landed
+(now 9 assertions via projected-collection equalities, green).
+
+Skill criteria:
+- well_formed: ✓ — single `load-edn-only`, mirrors `review-task-implementation-test`;
+  projected-collection equalities give meaningful per-step failure diffs.
+- ¬mock ∧ ¬stub ∧ nullable infra: ✓ — real loader
+  (`loader/load-workflow-definitions`); `with-redefs` injects test workflow dirs
+  (config injection, not mocking the unit under test); no mocks/stubs/fakes.
+- ∀ behaviour(design) ∃ covering test: ✓ — every behavioural acceptance
+  criterion covered (definition presence; 5 delegate steps name=target+order;
+  `:map :prompt-string` threading; `:context` input-only; `:yields`/
+  `:terminal-contract` absence). `:description` gap already reasoned-rejected as
+  non-behavioural in pass 3; unchanged here.
+
+Verification: focused `task-lifecycle-test` → 1 test, 9 assertions, 0 failures.
+
+No new actionable feedback; no new `steps.md` items. Converges with prior passes.
+
+PASS_STATUS: REVIEW_COMPLETE
