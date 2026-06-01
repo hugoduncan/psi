@@ -3,19 +3,14 @@
    [clojure.test :refer [deftest is testing]]
    [psi.project-nrepl.client :as project-nrepl-client]
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
-   [psi.project-nrepl.test-support :refer [make-ctx seed-connector! session-fn-with-id]]))
+   [psi.project-nrepl.test-support :refer [fake-connector make-ctx seed-connector!]]))
 
 (deftest connect-instance-in-test
   (testing "connect establishes single managed client session and capability flags"
     (let [ctx        (make-ctx)
           worktree   (System/getProperty "user.dir")
-          transport  {:transport :fake}
-          client-fn  (fn ([] nil) ([_] nil))
-          session-fn (session-fn-with-id "nrepl-session-1")
-          connector  (fn [_endpoint]
-                       {:transport transport
-                        :client client-fn
-                        :client-session session-fn})]
+          connector  (fake-connector "nrepl-session-1")
+          {:keys [transport client client-session]} (connector nil)]
       (seed-connector! ctx worktree connector)
       (let [instance (project-nrepl-client/connect-instance-in! ctx worktree)]
         (is (= :ready (:lifecycle-state instance)))
@@ -24,8 +19,8 @@
         (is (= true (:can-eval? instance)))
         (is (= true (:can-interrupt? instance)))
         (is (= transport (get-in instance [:runtime-handle :transport])))
-        (is (= client-fn (get-in instance [:runtime-handle :client])))
-        (is (= session-fn (get-in instance [:runtime-handle :client-session])))
+        (is (= client (get-in instance [:runtime-handle :client])))
+        (is (= client-session (get-in instance [:runtime-handle :client-session])))
         (is (= "nrepl-session-1" (get-in instance [:runtime-handle :session-id])))))))
 
 (deftest connect-instance-in-missing-session-id-test

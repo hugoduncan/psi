@@ -260,7 +260,7 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
 
 ## Test-shaper follow-ups (2026-06-01, fifth test-shaper pass)
 
-- [ ] Consolidate the duplicated happy nullable-connector construction into a
+- [x] Consolidate the duplicated happy nullable-connector construction into a
   shared `psi.project-nrepl.test-support` helper (e.g. `fake-connector` /
   `nullable-connector`). The identical connector value
   `(fn [_endpoint] {:transport {:transport :fake} :client (fn ([] nil) ([_] nil))
@@ -283,4 +283,21 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
   metadata-less `:client-session (fn [_] nil)` connector (line 35) and
   `attach_test.clj` "attach failure" throwing connector (line 52) are NOT folded
   in — only the identical happy connector is shared. Keep tests green + lint
-  clean.
+  clean. — DONE: added `psi.project-nrepl.test-support/fake-connector`
+  (`([])`/`([session-id])`, default `"nrepl-session-1"`) returning a fn of
+  `_endpoint` that yields a constant `{:transport {:transport :fake} :client
+  (fn ([] nil) ([_] nil)) :client-session (session-fn-with-id session-id)}` map
+  (built once, closed over — so callers may invoke it once to obtain the
+  expected runtime-handle values). The three happy-path tests now `:refer`
+  `fake-connector` and drop their inline connector maps:
+  `client_test/connect-instance-in-test` (binds `connector (fake-connector …)`
+  and destructures `(connector nil)` for the `transport`/`client`/
+  `client-session` equality assertions — same objects flow through the seam),
+  `attach_test/attach-instance-in-test`, and
+  `started_test/start-instance-in-test`. The two distinct-behaviour connectors
+  stayed inline: `client_test`'s metadata-less `(fn [_] nil)` session-fn
+  connector and `attach_test`'s throwing connector. `session-fn-with-id` is no
+  longer `:refer`-ed by client/attach/started (folded into `fake-connector`).
+  Verified: focused project-nrepl suite (8 ns) 26 tests / 151 assertions / 0
+  failures (count unchanged — pure helper extraction); `clj-kondo` 0/0 on
+  `test_support.clj` + the three test files.

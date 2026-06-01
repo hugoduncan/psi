@@ -71,3 +71,17 @@
   [session-id]
   (with-meta (fn [_] nil)
     {(keyword "nrepl.core" "taking-until") {:session session-id}}))
+
+(defn fake-connector
+  "The canonical happy `:nrepl-connector` seam value: a fn of `_endpoint`
+   returning a deterministic `{:transport :client :client-session}` map whose
+   session fn derives `session-id` (default `\"nrepl-session-1\"`). Single-sources
+   the nullable transport/client/session-fn shape used by the attach/client/
+   started happy-path tests. The returned map is constant per call, so callers
+   may invoke the connector once to obtain the expected runtime-handle values."
+  ([] (fake-connector "nrepl-session-1"))
+  ([session-id]
+   (let [handle {:transport {:transport :fake}
+                 :client (fn ([] nil) ([_] nil))
+                 :client-session (session-fn-with-id session-id)}]
+     (fn [_endpoint] handle))))

@@ -5,7 +5,7 @@
    [psi.project-nrepl.attach :as project-nrepl-attach]
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
    [psi.project-nrepl.test-support
-    :refer [delete-tree! make-ctx session-fn-with-id temp-dir]]))
+    :refer [delete-tree! fake-connector make-ctx temp-dir]]))
 
 (deftest resolve-attach-endpoint-test
   (testing "explicit port wins and host defaults when omitted"
@@ -30,10 +30,7 @@
   (testing "attach establishes attached instance and managed client session"
     (let [ctx       (make-ctx)
           worktree  (System/getProperty "user.dir")
-          connector (fn [_endpoint]
-                      {:transport {:transport :fake}
-                       :client (fn ([] nil) ([_] nil))
-                       :client-session (session-fn-with-id "nrepl-session-1")})
+          connector (fake-connector "nrepl-session-1")
           instance  (project-nrepl-attach/attach-instance-in!
                      ctx worktree {:port 7888} {:runtime-handle {:nrepl-connector connector}})]
       (is (= :attached (:acquisition-mode instance)))

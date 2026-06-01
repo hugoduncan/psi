@@ -1195,3 +1195,35 @@ pervasive `worktree (System/getProperty "user.dir")` ambient-cwd instance key
 `disconnect-instance-in-test`'s `closed*` atom (real-effect state check on the
 opaque Closeable transport, accepted by prior passes). Raising either is scope
 expansion.
+
+## Test-shaper fifth-pass follow-up executed (2026-06-01)
+
+Executed the single newly-added unchecked steps.md item: consolidated the
+triplicated happy nullable-connector construction into
+`psi.project-nrepl.test-support/fake-connector`.
+
+- Added `fake-connector` (`([])`/`([session-id])`, default `"nrepl-session-1"`)
+  to `test_support.clj`. It builds the canonical happy connector return map
+  once and closes over it, returning `(fn [_endpoint] handle)` where
+  `handle = {:transport {:transport :fake}
+             :client (fn ([] nil) ([_] nil))
+             :client-session (session-fn-with-id session-id)}`. The map being
+  constant per call lets `client_test` invoke the connector once to recover the
+  exact `:transport`/`:client`/`:client-session` objects for its equality
+  assertions (same objects flow through the `connect-instance-in!` seam — no
+  behaviour change).
+- Folded the three identical happy connectors onto the helper:
+  `client_test/connect-instance-in-test`,
+  `attach_test/attach-instance-in-test`,
+  `started_test/start-instance-in-test`. Each now `:refer`s `fake-connector`.
+  `session-fn-with-id` is no longer `:refer`-ed by these three files (folded
+  into the helper).
+- Left the two distinct-behaviour connectors inline (their shape IS the test
+  intent, not ceremony): `client_test`'s metadata-less `(fn [_] nil)`
+  session-fn connector (missing-session-id throw) and `attach_test`'s throwing
+  connector (attach-failure projection).
+
+Verification: focused project-nrepl suite (8 ns) → 26 tests / 151 assertions /
+0 failures (count unchanged — pure helper extraction, no assertions
+added/removed); `clj-kondo --lint` on `test_support.clj` + the three test
+files → 0 errors / 0 warnings.

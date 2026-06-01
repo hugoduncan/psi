@@ -5,7 +5,7 @@
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
    [psi.project-nrepl.started :as project-nrepl-started]
    [psi.project-nrepl.test-support
-    :refer [delete-tree! make-ctx session-fn-with-id temp-dir]]))
+    :refer [delete-tree! fake-connector make-ctx temp-dir]]))
 
 (defn- fake-process
   [{:keys [alive? exit-code pid destroyed*]}]
@@ -62,10 +62,7 @@
                          ;; wait-for-started-endpoint!, so the first poll finds it.
                          (spit (io/file worktree ".nrepl-port") "7777\n")
                          fake-proc)
-          connector    (fn [_endpoint]
-                         {:transport {:transport :fake}
-                          :client (fn ([] nil) ([_] nil))
-                          :client-session (session-fn-with-id "nrepl-session-1")})]
+          connector    (fake-connector "nrepl-session-1")]
       (try
         (let [instance (project-nrepl-started/start-instance-in!
                         ctx worktree ["bb" "nrepl-server"]
