@@ -130,7 +130,7 @@
 
 ## Code review follow-ups (code-shaper, 2026-06-01)
 
-- [ ] C1: The modifiable-key contract (`#{:content :details :is-error}`) is
+- [x] C1: The modifiable-key contract (`#{:content :details :is-error}`) is
   expressed in **two** live production sites, not one — contradicting the
   task's "expressed exactly once" acceptance criterion. Besides the
   `dispatch-tool-result-in` *selection* predicate
@@ -151,3 +151,7 @@
   across the producer/consumer pair. Run clj-kondo + Kaocha focus
   `psi.agent-session.extensions-test` (plus any tool-plan tests touched);
   behaviour must be unchanged.
+  Single-sourced via a named `modifiable-tool-result-keys` set in
+  `extensions.clj`; selection guard (`modifiable-tool-result-override?`) and
+  application (`merge-tool-result-override`) both derive from it; `tool_plan.clj`
+  now calls `merge-tool-result-override` instead of re-enumerating the keys.

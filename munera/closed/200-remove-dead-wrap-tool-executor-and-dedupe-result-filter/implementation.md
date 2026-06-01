@@ -579,3 +579,53 @@ about the *modifiable-key* selection/application contract, which genuinely spans
 two live sites.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Code review follow-up execution: C1 (2026-06-01)
+
+Executed C1 (the one newly-added unchecked item from the code-shaper pass).
+Single-sourced the modifiable-key contract across the producer/consumer pair the
+prior slice missed.
+
+Finding confirmed at runtime: the key set `#{:content :details :is-error}` was
+enumerated in **two** live production sites — the `dispatch-tool-result-in`
+*selection* predicate (`extensions.clj`) and the override *application* `cond->`
+in `tool_plan.clj:222–224`. Removing the dead wrapper's `cond->` left these two
+coupled, with no enforcement they agree; the "expressed exactly once" criterion
+was not met in production. (Audited the other `cond-> result` sites: `post_tool.clj`
+applies the `:content/append`/`:details/merge`/`:enrichments` *processor-contribution*
+contract — a different concern; `turn/handlers.clj` accumulates `:effects` — unrelated.
+Neither touches the modifiable-key set. C1's two-site analysis is exact.)
+
+Fix (honest single-sourcing, per C1's recommended remediation):
+- `extensions.clj`: introduced `modifiable-tool-result-keys` (the named set —
+  the one enumeration), `modifiable-tool-result-override?` (selection guard,
+  derives from the set via `some`), and `merge-tool-result-override` (application,
+  copies only the set's keys the override carries; nil override ⇒ result
+  unchanged via `(contains? nil k) ⇒ false`). `dispatch-tool-result-in` now
+  filters with `modifiable-tool-result-override?`.
+- `tool_plan.clj`: `run-tool-plan-step-in!` replaced the 3-key `cond->` with
+  `(ext/merge-tool-result-override result modified)`. Both sites now derive from
+  the single named set; adding a modifiable key is a one-site edit.
+
+Tests (application half was previously untested — only the dead wrapper's `cond->`,
+now the live `tool_plan.clj` path, exercised it):
+- Added a `merge-tool-result-override` cluster to `extensions_test.clj`:
+  `-applies-present-keys` (each present modifiable key copied),
+  `-ignores-absent-keys` (omitted keys not clobbered),
+  `-ignores-non-modifiable-keys` (keys outside the set never copied),
+  `-nil-override` (nil ⇒ result unchanged). The selection half stays covered by
+  the existing `result-override` cluster (now exercising
+  `modifiable-tool-result-override?`).
+
+design.md Acceptance Criteria corrected: "expressed exactly once in the filter
+predicate" → single-sourced via the named set with both producer/consumer sites
+deriving from it (the live `tool_plan.clj` `cond->` the prior design missed).
+
+Verification: clj-paren-repair (no changes on all 3 files), clj-kondo clean
+(0/0 on extensions.clj, tool_plan.clj, extensions_test.clj); Kaocha focus
+`psi.agent-session.extensions-test` → **34 tests, 102 assertions, 0 failures**
+(was 30/98; +4 tests/+4 assertions for the application half) and
+`psi.agent-session.tool-execution-test` → **13 tests, 66 assertions, 0 failures**
+(plan-path override application unchanged). No deviations.
+
+PASS_STATUS: REVIEW_COMPLETE (code-shaper C1 resolved)

@@ -114,11 +114,18 @@ covered afterward:
 
 ## Acceptance Criteria
 
-- `wrap-tool-executor` is removed; the modifiable-key contract
-  (`:content` / `:details` / `:is-error`) is then expressed exactly once, in the
-  `dispatch-tool-result-in` filter predicate. `tool-result-event` is unchanged
-  (intentionally excluded — it constructs the payload, it does not declare the
-  modifiable-key contract).
+- `wrap-tool-executor` is removed. The modifiable-key contract
+  (`:content` / `:details` / `:is-error`) is **single-sourced**: the key set is
+  enumerated exactly once in the named `modifiable-tool-result-keys` set, and
+  both production sites of the producer/consumer pair derive from it — the
+  `dispatch-tool-result-in` *selection* guard (`modifiable-tool-result-override?`)
+  and the `tool_plan.clj` override *application* (`merge-tool-result-override`).
+  (The code-shaper C1 review found the live application `cond->` in
+  `tool_plan.clj` re-enumerated the same three keys, so removal of the dead
+  wrapper alone did *not* leave the contract expressed once — single-sourcing
+  across the producer/consumer pair is the honest fix.) `tool-result-event` is
+  unchanged (intentionally excluded — it constructs the payload, it does not
+  declare the modifiable-key contract).
 - `tool-wrapping-test` is removed; its uniquely-covered behaviour
   (non-map handler return ⇒ no override from `dispatch-tool-result-in`) is
   migrated to a direct `dispatch-tool-result-in` test. Coercion/normalization

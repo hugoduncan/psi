@@ -218,10 +218,7 @@
                           :is-error true}))
             modified (ext/dispatch-tool-result-in
                       reg tool-name tool-call-id args result (:is-error result))]
-        (cond-> result
-          (contains? modified :content)  (assoc :content (:content modified))
-          (contains? modified :details)  (assoc :details (:details modified))
-          (contains? modified :is-error) (assoc :is-error (:is-error modified)))))))
+        (ext/merge-tool-result-override result modified)))))
 
 (defn run-tool-plan-in!
   "Execute a data-driven tool plan sequentially.

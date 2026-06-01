@@ -459,6 +459,37 @@
     ;; :content/:details) is selected as the override.
     (is (= {:is-error true} (result-override {:is-error true})))))
 
+(deftest merge-tool-result-override-applies-present-keys-test
+  (testing "merge-tool-result-override copies each present modifiable key onto result"
+    ;; The application half of the single-sourced modifiable-key contract:
+    ;; only keys the override actually carries are copied; each modifiable key
+    ;; is applied (mirrors the selection guard's :content/:details/:is-error or).
+    (is (= {:content "new" :details {:k :v} :is-error true}
+           (ext/merge-tool-result-override
+            {:content "old" :details nil :is-error false}
+            {:content "new" :details {:k :v} :is-error true})))))
+
+(deftest merge-tool-result-override-ignores-absent-keys-test
+  (testing "merge-tool-result-override leaves result keys the override omits unchanged"
+    ;; An override carrying only :content must not clobber :details/:is-error.
+    (is (= {:content "new" :details {:orig true} :is-error false}
+           (ext/merge-tool-result-override
+            {:content "old" :details {:orig true} :is-error false}
+            {:content "new"})))))
+
+(deftest merge-tool-result-override-ignores-non-modifiable-keys-test
+  (testing "merge-tool-result-override copies no key outside the modifiable set"
+    ;; Keys not in modifiable-tool-result-keys are never copied from the override.
+    (is (= {:content "old"}
+           (ext/merge-tool-result-override {:content "old"} {:other 1})))))
+
+(deftest merge-tool-result-override-nil-override-test
+  (testing "merge-tool-result-override returns result unchanged when override is nil"
+    ;; dispatch-tool-result-in returns nil when no handler produces an override;
+    ;; the application half must pass result through untouched.
+    (is (= {:content "old" :is-error false}
+           (ext/merge-tool-result-override {:content "old" :is-error false} nil)))))
+
 (deftest tool-event-payload-constructors-test
   (testing "tool-call-event builds the canonical tool_call payload shape"
     (is (= {:type         "tool_call"

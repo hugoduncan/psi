@@ -319,6 +319,37 @@
                                        (tool-call-event tool-name tool-call-id args))]
     (first (filter :block results))))
 
+(def modifiable-tool-result-keys
+  "The set of `tool_result` keys an extension handler may modify.
+
+   Single source of the modifiable-key contract for the tool-result path:
+   `dispatch-tool-result-in` *selects* a handler return as an override iff it is
+   a map containing at least one of these keys (the selection guard), and
+   `merge-tool-result-override` *applies* exactly these keys from the override
+   onto the result (the application). Both the producer (selection) and the
+   consumer (application) derive from this one set, so adding a modifiable key
+   is a single-site edit."
+  #{:content :details :is-error})
+
+(defn modifiable-tool-result-override?
+  "True when `x` is a map carrying at least one modifiable tool-result key,
+   i.e. a handler return eligible to override the result. The selection guard."
+  [x]
+  (and (map? x)
+       (boolean (some #(contains? x %) modifiable-tool-result-keys))))
+
+(defn merge-tool-result-override
+  "Apply `override`'s modifiable keys onto `result`, copying only the keys in
+   `modifiable-tool-result-keys` that `override` actually carries. When
+   `override` is nil/absent, `result` is returned unchanged. The application
+   half of the modifiable-key contract."
+  [result override]
+  (reduce (fn [acc k]
+            (cond-> acc
+              (contains? override k) (assoc k (get override k))))
+          result
+          modifiable-tool-result-keys))
+
 (defn dispatch-tool-result-in
   "Dispatch a tool_result event. Returns modified result map or nil."
   [reg tool-name tool-call-id args result is-error?]
@@ -327,10 +358,7 @@
                                                           (:content result)
                                                           (:details result)
                                                           is-error?))]
-    (first (filter #(and (map? %)
-                         (or (contains? % :content) (contains? % :details)
-                             (contains? % :is-error)))
-                   results))))
+    (first (filter modifiable-tool-result-override? results))))
 
 (defn extensions-in
   "Return sequence of all registered extension paths in `reg`."
