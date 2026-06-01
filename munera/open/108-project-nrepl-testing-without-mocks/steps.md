@@ -337,3 +337,12 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
   project-nrepl suite (8 ns) 26 tests / 151 assertions / 0 failures (count
   unchanged — pure helper extraction); `clj-kondo` 0/0 on `test_support.clj` +
   `commands_test.clj`.
+
+## Implementation review follow-ups (2026-06-01, fifth pass)
+
+- (none) Fifth independent implementation-review pass found no new actionable
+  issues. Verified empirically: 26 tests / 151 assertions / 0 failures; lint
+  0/0; zero `with-redefs`, zero interaction-capture atoms; three production
+  seams match design exactly; real `ops.clj` callers preserve original arities;
+  all helper idioms consolidated in shared `test-support`; all acceptance
+  criteria met. Review complete — no follow-up steps added.

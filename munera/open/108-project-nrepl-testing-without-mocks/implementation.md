@@ -1312,3 +1312,39 @@ install instances at their own explicit worktree-path.
 Verification: focused project-nrepl suite (8 ns) 26 tests / 151 assertions / 0
 failures (unchanged — pure helper extraction, no behaviour change); `clj-kondo`
 0/0 on `test_support.clj` + `commands_test.clj`; `clj-paren-repair` clean on both.
+
+2026-06-01 — Implementation review (fifth pass, task-implementation-review)
+
+Independent review after all six test-shaper passes and the
+`session-ctx-at`/`fake-connector`/`seed-connector!` consolidations landed
+(629ce347d, working tree clean). Re-verified empirically myself (not relying on
+recorded counts):
+- focused project-nrepl suite (8 ns: client/attach/started/config/commands/ops/
+  eval/runtime) — 26 tests, 151 assertions, 0 failures
+- `clj-kondo --lint components/project-nrepl/{src,test}` — 0 errors, 0 warnings
+- zero `with-redefs` and zero interaction-capture atoms (`calls*`/`@calls`) in
+  the component (grep → none)
+
+Re-read the source against design: the three required production changes are
+present and exact — `client.clj` `real-nrepl-connector` + `(or (get-in …
+:nrepl-connector) real-nrepl-connector)` with session-id derivation +
+throw-on-missing retained in `connect-instance-in!`; `started.clj`
+`real-process-launcher` + `(update :runtime-handle merge {…})`; `attach.clj`
+4th-positional `opts` arity threading `(:runtime-handle opts)`. Real callers in
+`ops.clj` still use the original `attach-instance-in!`/`start-instance-in!`
+arities (3-arg) → behaviour preserved.
+
+Re-read all eight test files: state-based/sociable throughout, every infra dep
+injected via `[:runtime-handle <seam-key>]` (`:nrepl-connector`,
+`:process-launcher`, `:client-session`) with embedded stubs (fake-process proxy,
+in-memory connector/session fns), temp dirs + `user.home` restored in `finally`,
+shared `test-support` single-sources every helper idiom
+(`make-ctx`/`session-ctx-at`/`install-instance!`/`seed-connector!`/`fake-connector`/
+`session-fn-with-id`/`temp-dir`/`delete-tree!`). The seam mechanism reuses the
+proven `[:runtime-handle :client-session]` idiom — no new abstraction, no
+shims/adapters, both seams wrap genuine infrastructure boundaries.
+
+Acceptance criteria — all met (re-verified). No new actionable findings of any
+kind (no acceptance blockers, no quality/consistency issues, no unnecessary
+abstractions, no structural performance concerns, no new patterns that should
+reuse existing ones). Review complete.
