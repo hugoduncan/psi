@@ -579,3 +579,46 @@ optional (and was performed once manually, recorded in Slice 3+4).
 Verification: focused `task-lifecycle-test` → 1 test, 11 assertions, 0 failures.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## 2026-06-01 — test review (test-shaper skill) (ψ)
+
+Applied `test-shaper` to `task-lifecycle-test`
+(`workflow_definitions_test.clj` L437-482, 11 assertions, green). Unlike the
+three prior `task-test-review` passes (which addressed *coverage* gaps), this
+pass evaluates the existing assertions for clarity / signal / robustness /
+economy. The test is well-shaped overall: single concern, real loader over temp
+`with-workflow-dir` (no mocks), deterministic, behaviour-focused (asserts loaded
+definition shape, not internals), mirrors the sibling `*-test` `load-edn-only`
+surface. Two NEW actionable shaping issues found (neither a coverage gap, so not
+a duplicate of the prior passes):
+
+1. **Low-signal per-step assertions (`meaningful_failures`).** The
+   `:prompt-string`, `:context`, and `:yields`/`:terminal-contract` checks all
+   use `(is (every? pred steps))`, which collapses to a bare `false` on failure
+   — the message names neither the offending step nor the divergent value, so a
+   regression in step 3's `:prompt-string` reports only "expected true, got
+   false". test-shaper's `meaningful_failures` wants a failing test to explain
+   the contract violation. Reshaping each to a projected-collection equality —
+   e.g. `(is (= (repeat 5 <expected>) (mapv :prompt-string steps)))` (or
+   `(mapv #(select-keys % [:yields :terminal-contract]) steps)` for the absence
+   check) — surfaces the offending step's actual value in the failure diff
+   while asserting the identical contract. The already-present `(mapv :name
+   steps)` / `(mapv :target steps)` assertions are exactly this shape, so this
+   also restores intra-test assertion-style consistency
+   (`consistent(assertion_style)`).
+
+2. **Incidental literal duplication (`economical` / `minimal_incidental_variation`).**
+   The five-element vector `["review-task-design" "create-task-plan"
+   "review-task-plan" "implement-task" "review-task-implementation"]` is written
+   verbatim twice (for `:name` and again for `:target`). The name=target
+   invariant is the *point* of the assertion, yet it is currently encoded as two
+   independent copy-pasted literals that could silently drift. A single
+   `let`-bound `expected-targets` referenced by both the `:name` and `:target`
+   assertions compresses the ceremony and makes name=target explicit rather than
+   coincidental. (If the projected-equality reshape in #1 is taken, the same
+   binding can seed the `(repeat 5 ...)` expectations too.)
+
+Both are pure test-quality improvements; the workflow `.edn` and its behavioural
+coverage are unchanged. Neither overlaps the prior coverage follow-ups.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

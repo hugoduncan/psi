@@ -69,3 +69,21 @@
       "Final-stage surfacing" contract that the terminal output relies on the
       propagated session default yield — currently confirmed only by inspection,
       not by the test.
+
+## Test-shaper follow-ups (test-shaper)
+
+- [ ] Reshape the per-step `(is (every? pred steps))` checks in
+      `task-lifecycle-test` (the `:prompt-string`, `:context`, and
+      `:yields`/`:terminal-contract` assertions) into projected-collection
+      equalities (e.g. `(is (= (repeat 5 <expected>) (mapv :prompt-string
+      steps)))`, and `(mapv #(select-keys % [:yields :terminal-contract])
+      steps)` for the absence check) so a failing assertion names the offending
+      step and its actual value instead of collapsing to a bare `false`
+      (`meaningful_failures`), matching the existing `(mapv :name …)` /
+      `(mapv :target …)` assertion style (`consistent(assertion_style)`).
+- [ ] Remove the incidental duplication of the five-element step-name vector in
+      `task-lifecycle-test` (currently written verbatim twice, for `:name` and
+      `:target`) by binding it once in a `let` (e.g. `expected-targets`) and
+      referencing it from both assertions, making the name=target invariant
+      explicit rather than two copy-pasted literals that can silently drift
+      (`economical` / `minimal_incidental_variation`).
