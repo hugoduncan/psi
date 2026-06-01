@@ -11,7 +11,7 @@
         "DONE" {:goto "inconsistency-review"}}}
   {:name "ambiguity-follow-up",
    :type :session,
-   :prompt-workflow "review-task-plan-ambiguity-follow-up.md",
+   :prompt-workflow "review-follow-up-steps.md",
    :judge {:type :invoke,
            :operation "workflow/constant-routing",
            :args {:route "DONE"}},
@@ -28,7 +28,7 @@
         "DONE" {:goto "clarity-status"}}}
   {:name "inconsistency-follow-up",
    :type :session,
-   :prompt-workflow "review-task-plan-inconsistency-follow-up.md",
+   :prompt-workflow "review-follow-up-steps.md",
    :judge {:type :invoke,
            :operation "workflow/constant-routing",
            :args {:route "DONE"}},

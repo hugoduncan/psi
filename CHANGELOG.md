@@ -8,10 +8,12 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 
 ### Added
 - New `task-lifecycle` workflow: runs a Munera task through its full design → plan → implement → review lifecycle by chaining `review-task-design`, `create-task-plan`, `review-task-plan`, `implement-task`, and `review-task-implementation` in order. Invokable via `/delegate task-lifecycle`.
+- `review-task-design` (invokable via `/delegate review-task-design`) now includes an architectural-fit review aspect that runs first, before the ambiguity and inconsistency aspects. It checks the task design's fit with the current architecture (consulting the in-context architecture sources) and loops on actionable feedback like the other aspects.
 
 ### Changed
 - Extension `tool_result` events fired on the interactive/batch tool execution path now carry the parsed tool arguments under `:input`, matching the data-driven plan path; previously `:input` was present only on the plan path, so a handler reading it silently received `nil` on the interactive path.
 - Extension `tool_result` handler overrides now coerce `:content` to normalized content-blocks and `:is-error` to a strict boolean — the same coercions applied to the inbound payload; previously an override's raw `:content`/`:is-error` values were copied onto the result unchanged, bypassing normalization.
+- The review workflows (`review-task-design`, `review-task-plan`, and the `review-step` loop behind `review-task-implementation`) now share two profile follow-up steps instead of five near-identical per-aspect follow-up prompts. Follow-up behaviour is unchanged for design and plan reviews; the implementation-review (`review-step`) follow-up now explicitly executes only the items the immediately preceding review pass added, leaving any pre-existing unchecked items untouched across loop iterations.
 
 ### Fixed
 - Tool invocations now appear in the `:tools` map in `.psi/metrics.edn`; previously the map was always empty because the `psi/metrics` extension's `on-tool-call`/`on-tool-result` handlers were never fired on the interactive tool execution path.

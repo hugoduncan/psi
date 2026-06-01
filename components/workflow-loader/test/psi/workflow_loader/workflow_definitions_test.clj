@@ -65,6 +65,14 @@
                (input-var-wired? c)))
         (:contributions step)))
 
+(defn- step-template-text
+  "Concatenated text of all template contributions in step."
+  [step]
+  (->> (:contributions step)
+       (filter #(= :template (:type %)))
+       (map :text)
+       (apply str)))
+
 (defn- pass-status-judge-from-step
   ([step-name]
    (pass-status-judge-from-step step-name nil))
@@ -93,25 +101,27 @@
 (deftest review-task-design-test
   (load-edn-with-md-refs
    "review-task-design.edn"
-   ["review-task-design-ambiguity-review.md"
-    "review-task-design-ambiguity-follow-up.md"
+   ["review-task-design-architecture-review.md"
+    "review-task-design-ambiguity-review.md"
     "review-task-design-inconsistency-review.md"
-    "review-task-design-inconsistency-follow-up.md"]
+    "review-follow-up-design.md"]
    (fn [{:keys [definitions errors]}]
      (testing "loads without error"
        (is (empty? errors))
        (is (contains? definitions "review-task-design")))
      (let [steps (get-in definitions ["review-task-design" :steps])]
-       (testing "has 6 steps with correct names and types"
-         (is (= 6 (count steps)))
-         (is (= ["ambiguity-review"
+       (testing "has 8 steps with correct names and types"
+         (is (= 8 (count steps)))
+         (is (= ["architecture-review"
+                 "architecture-follow-up"
+                 "ambiguity-review"
                  "ambiguity-follow-up"
                  "inconsistency-review"
                  "inconsistency-follow-up"
                  "clarity-status"
                  "final-summary"]
                 (mapv :name steps)))
-         (is (= [:session :session :session :session :invoke :session]
+         (is (= [:session :session :session :session :session :session :invoke :session]
                 (mapv :type steps))))
        (let [wired-steps (filter #(= :session (:type %)) (remove #(= "final-summary" (:name %)) steps))
              final-step (first (filter #(= "final-summary" (:name %)) steps))]
@@ -122,14 +132,28 @@
          (testing "final-summary step is inline (not prompt-workflow wired)"
            ;; final-summary carries :source contributions and is intentionally kept inline
            (is (some? final-step) "final-summary step should exist")
-           (is (seq (:contributions final-step)) "final-summary step should have inline contributions")))
+           (is (seq (:contributions final-step)) "final-summary step should have inline contributions")
+           (testing "final-summary sources the architecture-review yield"
+             (is (some #(= {:type :source :from {:step "architecture-review" :yield :text}} %)
+                       (:contributions final-step))
+                 "final-summary :contributions includes the architecture-review :yield :text source"))))
        (let [step-by-name (into {} (map (juxt :name identity) steps))
+             architecture-review (get step-by-name "architecture-review")
+             architecture-follow-up (get step-by-name "architecture-follow-up")
              ambiguity-review (get step-by-name "ambiguity-review")
              ambiguity-follow-up (get step-by-name "ambiguity-follow-up")
              inconsistency-review (get step-by-name "inconsistency-review")
              inconsistency-follow-up (get step-by-name "inconsistency-follow-up")
              clarity-step (get step-by-name "clarity-status")]
          (testing "per-reviewer follow-up steps route conditionally from deterministic PASS_STATUS"
+           (is (= (pass-status-judge-from-step "architecture-review" ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"])
+                  (:judge architecture-review)))
+           (is (= {"REPEAT" {:goto "architecture-follow-up"}
+                   "DONE" {:goto "ambiguity-review"}}
+                  (:on architecture-review)))
+           (is (= (constant-routing-judge "DONE")
+                  (:judge architecture-follow-up)))
+           (is (= {"DONE" {:goto "ambiguity-review"}} (:on architecture-follow-up)))
            (is (= (pass-status-judge-from-step "ambiguity-review" ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"])
                   (:judge ambiguity-review)))
            (is (= {"REPEAT" {:goto "ambiguity-follow-up"}
@@ -146,6 +170,35 @@
            (is (= (constant-routing-judge "DONE")
                   (:judge inconsistency-follow-up)))
            (is (= {"DONE" {:goto "clarity-status"}} (:on inconsistency-follow-up))))
+         (testing "both follow-up steps share the design-profile follow-up body"
+           (doseq [follow-up [architecture-follow-up ambiguity-follow-up inconsistency-follow-up]]
+             (let [text (step-template-text follow-up)]
+               (is (.contains text "design-steps.md")
+                   (str (:name follow-up) " uses the design profile (design-steps.md)"))
+               (is (.contains text "Do not touch plan.md or steps.md")
+                   (str (:name follow-up) " forbids plan.md/steps.md"))
+               ;; Negative discriminator symmetric with the steps-profile tests'
+               ;; (not (.contains text "design-steps.md")) guard (TS3). The
+               ;; design profile (A3/R1) never edits real source and never
+               ;; treats design.md as read-only context, so these steps-profile
+               ;; clauses must be absent. Without the guard, wiring the
+               ;; steps-profile body into the design host — or broadening the
+               ;; design body to permit code/test/doc edits — would pass
+               ;; silently.
+               (is (not (.contains text "code, tests, and docs"))
+                   (str (:name follow-up)
+                        " does not carry the steps-profile code/test/doc"
+                        " broadening clause"))
+               (is (not (.contains text "design.md as read-only context"))
+                   (str (:name follow-up)
+                        " does not treat design.md as read-only context")))))
+         (testing "follow-up steps carry the predate-exclusion guard"
+           ;; Locks in the design Concepts predate guard so a future edit cannot
+           ;; silently regress it (T1).
+           (doseq [follow-up [architecture-follow-up ambiguity-follow-up inconsistency-follow-up]]
+             (is (.contains (step-template-text follow-up)
+                            "predate the preceding review pass")
+                 (str (:name follow-up) " carries the predate-exclusion guard"))))
          (testing "clarity-status is deterministic invoke routing, not an LLM judge"
            (is (= (constant-routing-step "clarity-status" "DONE")
                   (select-keys clarity-step [:name :type :operation :args])))
@@ -159,9 +212,8 @@
   (load-edn-with-md-refs
    "review-task-plan.edn"
    ["review-task-plan-ambiguity-review.md"
-    "review-task-plan-ambiguity-follow-up.md"
     "review-task-plan-inconsistency-review.md"
-    "review-task-plan-inconsistency-follow-up.md"]
+    "review-follow-up-steps.md"]
    (fn [{:keys [definitions errors]}]
      (testing "loads without error"
        (is (empty? errors))
@@ -211,6 +263,30 @@
            (is (= (constant-routing-judge "DONE")
                   (:judge inconsistency-follow-up)))
            (is (= {"DONE" {:goto "clarity-status"}} (:on inconsistency-follow-up))))
+         (testing "both follow-up steps share the steps-profile follow-up body"
+           (doseq [follow-up [ambiguity-follow-up inconsistency-follow-up]]
+             (let [text (step-template-text follow-up)]
+               ;; Anchor on the steps-profile-unique "design.md as read-only
+               ;; context" clause: the design profile *writes* design.md, so it
+               ;; cannot satisfy this — a failure means a non-steps profile was
+               ;; wired in (TS1). The paired negative still catches
+               ;; design-steps.md.
+               (is (.contains text "design.md as read-only context")
+                   (str (:name follow-up) " uses the steps profile (design.md read-only)"))
+               (is (not (.contains text "design-steps.md"))
+                   (str (:name follow-up) " does not target design-steps.md")))))
+         (testing "follow-up steps carry the predate-exclusion guard"
+           ;; Locks in the design Concepts predate guard (T1).
+           (doseq [follow-up [ambiguity-follow-up inconsistency-follow-up]]
+             (is (.contains (step-template-text follow-up)
+                            "predate the preceding review pass")
+                 (str (:name follow-up) " carries the predate-exclusion guard"))))
+         (testing "follow-up steps permit editing referenced code/tests/docs"
+           ;; Guards the R1 broadening (AC4 implementation-follow-up scope) so a
+           ;; regress to plan/steps-only wording cannot pass (T2).
+           (doseq [follow-up [ambiguity-follow-up inconsistency-follow-up]]
+             (is (.contains (step-template-text follow-up) "code, tests, and docs")
+                 (str (:name follow-up) " permits editing referenced code/tests/docs"))))
          (testing "clarity-status is deterministic invoke routing, not an LLM judge"
            (is (= (constant-routing-step "clarity-status" "DONE")
                   (select-keys clarity-step [:name :type :operation :args])))
@@ -224,20 +300,58 @@
   ;; Tests review prompt artifact ownership: design review uses design-steps.md,
   ;; plan review uses steps.md and never design-steps.md.
   (testing "design review prompts target design-steps.md"
-    (doseq [filename ["review-task-design-ambiguity-review.md"
-                      "review-task-design-ambiguity-follow-up.md"
+    (doseq [filename ["review-task-design-architecture-review.md"
+                      "review-task-design-ambiguity-review.md"
                       "review-task-design-inconsistency-review.md"
-                      "review-task-design-inconsistency-follow-up.md"]]
+                      "review-follow-up-design.md"]]
       (let [content (slurp-workflow-file filename)]
         (is (.contains content "design-steps.md") filename))))
   (testing "plan review prompts target steps.md rather than design-steps.md"
     (doseq [filename ["review-task-plan-ambiguity-review.md"
-                      "review-task-plan-ambiguity-follow-up.md"
                       "review-task-plan-inconsistency-review.md"
-                      "review-task-plan-inconsistency-follow-up.md"]]
+                      "review-follow-up-steps.md"]]
       (let [content (slurp-workflow-file filename)]
-        (is (.contains content "steps.md") filename)
-        (is (not (.contains content "design-steps.md")) filename)))))
+        ;; Standalone (non-"design-") steps.md reference: a bare substring
+        ;; check passes trivially on "design-steps.md", so anchor on a
+        ;; non-"-" boundary to give the positive independent signal (TS2).
+        (is (re-find #"(^|[^-])steps\.md" content) filename)
+        (is (not (.contains content "design-steps.md")) filename))))
+  (testing "rewired host edns leave no orphan references to removed per-aspect files"
+    ;; AC3 regression guard (T3): the four removed per-aspect follow-up files
+    ;; must not be referenced by any rewired host workflow edn.
+    (doseq [edn-filename ["review-task-design.edn"
+                          "review-task-plan.edn"
+                          "review-step.edn"]
+            removed-filename ["review-task-design-ambiguity-follow-up.md"
+                              "review-task-design-inconsistency-follow-up.md"
+                              "review-task-plan-ambiguity-follow-up.md"
+                              "review-task-plan-inconsistency-follow-up.md"]]
+      (is (not (.contains (slurp-workflow-file edn-filename) removed-filename))
+          (str edn-filename " must not reference removed " removed-filename)))))
+
+(deftest architecture-review-prompt-contract-test
+  ;; AC2a contract guard for review-task-design-architecture-review.md.
+  ;; Relocated here (SH2) from review-task-prompt-artifact-targets-test, whose
+  ;; scope is artifact ownership (design-steps.md vs steps.md); a menu/skill
+  ;; regression should fail under a name that describes the violated AC2a
+  ;; contract. The prompt must (a) load the review-task-architecture skill (not
+  ;; task-design) and (b) *end with* the two-line PASS_STATUS menu. I1 flagged
+  ;; the menu convention as contradiction-prone.
+  (let [content (slurp-workflow-file "review-task-design-architecture-review.md")]
+    (testing "loads the review-task-architecture skill (not task-design)"
+      (is (.contains content "review-task-architecture")
+          "architecture-review prompt loads the review-task-architecture skill"))
+    (testing "ends with the contiguous two-line PASS_STATUS menu (SH1)"
+      ;; Enforce the *ends-with* contract, not mere presence: the menu lead-in
+      ;; and the two PASS_STATUS lines must form a contiguous, terminal block.
+      ;; Trailing whitespace is trimmed before anchoring to end-of-string so a
+      ;; future edit that appends prose after the menu, or splits the lead-in
+      ;; from the status lines, fails this guard.
+      (is (re-find #"(?s)End your final response with exactly one of:\nPASS_STATUS: ACTIONABLE_FEEDBACK\nPASS_STATUS: REVIEW_COMPLETE\s*\z"
+                   content)
+          (str "architecture-review prompt must end with the contiguous "
+               "two-line PASS_STATUS menu (lead-in + ACTIONABLE_FEEDBACK + "
+               "REVIEW_COMPLETE), with nothing but whitespace after it")))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-implementation
@@ -288,8 +402,9 @@
 ;;; review-step
 
 (deftest review-step-test
-  (load-edn-only
+  (load-edn-with-md-refs
    "review-step.edn"
+   ["review-follow-up-steps.md"]
    (fn [{:keys [definitions errors]}]
      (testing "loads without error"
        (is (empty? errors))
@@ -325,6 +440,19 @@
                 (:judge follow-up-step)))
          (is (= {"REPEAT" {:goto "review" :max-iterations 6}}
                 (:on follow-up-step))))
+       (testing "follow-up step uses the shared steps-profile follow-up body"
+         (let [text (step-template-text follow-up-step)]
+           ;; Steps-profile-unique anchor (TS1): the design profile writes
+           ;; design.md, so "design.md as read-only context" discriminates the
+           ;; profiles where a bare "steps.md" substring cannot.
+           (is (.contains text "design.md as read-only context")
+               "follow-up uses the steps profile (design.md read-only)")
+           (is (not (.contains text "design-steps.md"))
+               "follow-up does not target design-steps.md")
+           (is (.contains text "predate the preceding review pass")
+               "follow-up carries the predate-exclusion guard (T1)")
+           (is (.contains text "code, tests, and docs")
+               "follow-up permits editing referenced code/tests/docs (T2)")))
        (testing "legacy review-status session step is removed"
          (is (nil? (first (filter #(= "review-status" (:name %)) steps)))))))))
 
@@ -394,17 +522,16 @@
 (deftest review-workflow-set-loads-together-test
   (load-edn-with-md-refs
    "review-task-design.edn"
-   ["review-task-design-ambiguity-review.md"
-    "review-task-design-ambiguity-follow-up.md"
+   ["review-task-design-architecture-review.md"
+    "review-task-design-ambiguity-review.md"
     "review-task-design-inconsistency-review.md"
-    "review-task-design-inconsistency-follow-up.md"]
+    "review-follow-up-design.md"]
    (fn [_]
      (load-edn-with-md-refs
       "review-task-plan.edn"
       ["review-task-plan-ambiguity-review.md"
-       "review-task-plan-ambiguity-follow-up.md"
        "review-task-plan-inconsistency-review.md"
-       "review-task-plan-inconsistency-follow-up.md"]
+       "review-follow-up-steps.md"]
       (fn [_]
         (with-workflow-dir
           {"review-step.edn" (slurp-workflow-file "review-step.edn")
@@ -412,15 +539,14 @@
            "review-implementation-in-worktree.edn" (slurp-workflow-file "review-implementation-in-worktree.edn")
            "review-design-turn.edn" (slurp-workflow-file "review-design-turn.edn")
            "review-task-design.edn" (slurp-workflow-file "review-task-design.edn")
+           "review-task-design-architecture-review.md" (slurp-workflow-file "review-task-design-architecture-review.md")
            "review-task-design-ambiguity-review.md" (slurp-workflow-file "review-task-design-ambiguity-review.md")
-           "review-task-design-ambiguity-follow-up.md" (slurp-workflow-file "review-task-design-ambiguity-follow-up.md")
            "review-task-design-inconsistency-review.md" (slurp-workflow-file "review-task-design-inconsistency-review.md")
-           "review-task-design-inconsistency-follow-up.md" (slurp-workflow-file "review-task-design-inconsistency-follow-up.md")
            "review-task-plan.edn" (slurp-workflow-file "review-task-plan.edn")
            "review-task-plan-ambiguity-review.md" (slurp-workflow-file "review-task-plan-ambiguity-review.md")
-           "review-task-plan-ambiguity-follow-up.md" (slurp-workflow-file "review-task-plan-ambiguity-follow-up.md")
            "review-task-plan-inconsistency-review.md" (slurp-workflow-file "review-task-plan-inconsistency-review.md")
-           "review-task-plan-inconsistency-follow-up.md" (slurp-workflow-file "review-task-plan-inconsistency-follow-up.md")}
+           "review-follow-up-design.md" (slurp-workflow-file "review-follow-up-design.md")
+           "review-follow-up-steps.md" (slurp-workflow-file "review-follow-up-steps.md")}
           (fn [{:keys [definitions errors]}]
             (testing "all review workflows load together without compilation errors"
               (is (empty? errors))

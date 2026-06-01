@@ -1,5 +1,22 @@
 {:steps
- [{:name "ambiguity-review",
+ [{:name "architecture-review",
+   :type :session,
+   :prompt-workflow "review-task-design-architecture-review.md",
+   :judge
+   {:type :invoke,
+    :operation "workflow/pass-status-routing",
+    :args {:text {:from {:step "architecture-review", :output :final-llm-reply}},
+           :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}},
+   :on {"REPEAT" {:goto "architecture-follow-up"},
+        "DONE" {:goto "ambiguity-review"}}}
+  {:name "architecture-follow-up",
+   :type :session,
+   :prompt-workflow "review-follow-up-design.md",
+   :judge {:type :invoke,
+           :operation "workflow/constant-routing",
+           :args {:route "DONE"}},
+   :on {"DONE" {:goto "ambiguity-review"}}}
+  {:name "ambiguity-review",
    :type :session,
    :prompt-workflow "review-task-design-ambiguity-review.md",
    :judge
@@ -11,7 +28,7 @@
         "DONE" {:goto "inconsistency-review"}}}
   {:name "ambiguity-follow-up",
    :type :session,
-   :prompt-workflow "review-task-design-ambiguity-follow-up.md",
+   :prompt-workflow "review-follow-up-design.md",
    :judge {:type :invoke,
            :operation "workflow/constant-routing",
            :args {:route "DONE"}},
@@ -28,7 +45,7 @@
         "DONE" {:goto "clarity-status"}}}
   {:name "inconsistency-follow-up",
    :type :session,
-   :prompt-workflow "review-task-design-inconsistency-follow-up.md",
+   :prompt-workflow "review-follow-up-design.md",
    :judge {:type :invoke,
            :operation "workflow/constant-routing",
            :args {:route "DONE"}},
@@ -42,12 +59,13 @@
    :tools ["read" "bash"],
    :contributions
    [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "architecture-review", :yield :text}}
     {:type :source, :from {:step "ambiguity-review", :yield :text}}
     {:type :source, :from {:step "inconsistency-review", :yield :text}}
     {:type :template,
      :text
-     "Produce the user-facing final result for the Munera task identified by {{input}} after a design review. Independently inspect that specific task's design.md, design-steps.md, and implementation.md, and use the prior step outputs as supporting context.\n\nRespond with a concise summary for the user, not an internal control token. Include:\n- whether the design review loop completed cleanly\n- the key ambiguities or inconsistencies found and resolved in this run\n- the task artifact files updated (design.md, design-steps.md, implementation.md)\n- any commit ids created during the run that are evident from the provided step outputs\n- whether the design is now clear enough to proceed to plan creation\n\nDo not output REPEAT or DONE unless quoting prior workflow behavior.",
+     "Produce the user-facing final result for the Munera task identified by {{input}} after a design review. Independently inspect that specific task's design.md, design-steps.md, and implementation.md, and use the prior step outputs as supporting context.\n\nRespond with a concise summary for the user, not an internal control token. Include:\n- whether the design review loop completed cleanly\n- the key architectural-fit misfits, ambiguities, or inconsistencies found and resolved in this run\n- the task artifact files updated (design.md, design-steps.md, implementation.md)\n- any commit ids created during the run that are evident from the provided step outputs\n- whether the design is now clear enough to proceed to plan creation\n\nDo not output REPEAT or DONE unless quoting prior workflow behavior.",
      :vars {"input" {:from :workflow-input, :path [:input]}}}]}],
  :name "review-task-design",
  :description
- "Repeatedly review a Munera task design for ambiguities and inconsistencies, record terse notes, execute follow-up steps, and loop until no actionable feedback remains"}
+ "Repeatedly review a Munera task design for architectural fit, ambiguities, and inconsistencies, record terse notes, execute follow-up steps, and loop until no actionable feedback remains"}

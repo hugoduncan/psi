@@ -9,7 +9,7 @@ Produce the user-facing final result for the Munera task identified by {{input}}
 
 Respond with a concise summary for the user, not an internal control token. Include:
 - whether the design review loop completed cleanly
-- the key ambiguities or inconsistencies found and resolved in this run
+- the key architectural-fit misfits, ambiguities, or inconsistencies found and resolved in this run
 - the task artifact files updated (design.md, design-steps.md, implementation.md)
 - any commit ids created during the run that are evident from the provided step outputs
 - whether the design is now clear enough to proceed to plan creation
