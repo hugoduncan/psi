@@ -40,17 +40,17 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
 
 ## Slice 6 — `:process-launcher` seam + started-mode merge (production)
 
-- [ ] Promote private `start-process!` to the real default behind `[:runtime-handle :process-launcher]`; resolve via `(or (get-in instance [:runtime-handle :process-launcher]) start-process!)`
-- [ ] Change `start-instance-in!` `:runtime-handle` overwrite to `(update % :runtime-handle merge {:process … :pid … :started-at … :launch-id …})`
-- [ ] Confirm seeded `:process-launcher`/`:nrepl-connector` survive the merge into the internal `connect-instance-in!`
-- [ ] `clj-paren-repair` + targeted lint `started.clj`
+- [x] Promote private `start-process!` to the real default behind `[:runtime-handle :process-launcher]` (renamed `real-process-launcher`); resolve via `(or (get-in instance [:runtime-handle :process-launcher]) real-process-launcher)`
+- [x] Change `start-instance-in!` `:runtime-handle` overwrite to `(update % :runtime-handle merge {:process … :pid … :started-at … :launch-id …})`
+- [x] Confirm seeded `:process-launcher`/`:nrepl-connector` survive the merge into the internal `connect-instance-in!` (verified in Slice 7 test run)
+- [x] `clj-paren-repair` + targeted lint `started.clj` (green)
 
 ## Slice 7 — `started_test.clj`
 
-- [ ] Remove `start-process!` and `connect-instance-in!` redefs
-- [ ] Seed **both** `[:runtime-handle :process-launcher]` (returning a `fake-process`-shaped object: `isAlive`/`exitValue`/`pid`/`destroy`) and `[:runtime-handle :nrepl-connector]` via the `start-instance-in!` seed param
-- [ ] Make readiness file-backed (not runtime-handle-state-backed): `wait-for-started-endpoint!` → `read-dot-nrepl-port-safe` reads a REAL on-disk `.nrepl-port` in the temp worktree. The test MUST write a real `.nrepl-port` file in the temp worktree (so `read-dot-nrepl-port` parses a host/port) before/while the started process polls; assert on the resulting instance state (endpoint discovered from the file). Do NOT seed readiness via runtime-handle state.
-- [ ] Run `started_test.clj` green
+- [x] Remove `start-process!` and `connect-instance-in!` redefs
+- [x] Seed **both** `[:runtime-handle :process-launcher]` (returning a `fake-process`-shaped object: `isAlive`/`exitValue`/`pid`/`destroy`) and `[:runtime-handle :nrepl-connector]` via the `start-instance-in!` seed param
+- [x] Make readiness file-backed (not runtime-handle-state-backed): launcher writes a real `.nrepl-port` in the temp worktree, consumed by `wait-for-started-endpoint!` → `read-dot-nrepl-port-safe`; assert endpoint discovered from the file
+- [x] Run `started_test.clj` green (2 tests, 12 assertions). Seeded `:nrepl-connector` survived the runtime-handle merge into the internal `connect-instance-in!` (session-id derived from the seeded session fn)
 
 ## Slice 8 — `config_test.clj`
 
