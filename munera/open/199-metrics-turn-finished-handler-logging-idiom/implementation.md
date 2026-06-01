@@ -99,3 +99,26 @@ Verification (all green):
 No spec/test artifacts added — behavioural contract unchanged (exception
 swallowed, `nil` returned). No CHANGELOG/doc entry (internal `¬user_visible`
 idiom alignment). Implementation complete pending review/closure.
+
+## Implementation review — code pass (task-implementation-review, 2026-06-01)
+
+Reviewed the committed change (`a9d814c37`) against design/plan/steps and the
+codebase. **PASS — no new actionable issues.**
+
+- **Matches design**: `catch` body is the lone
+  `(timbre/warn e "skipping token tracking for session" session-id)`; `println`
+  + `"DEBUG"` prefix removed; outer `nil` return + success path untouched.
+  `deps.edn :deps` has `com.taoensso/timbre {:mvn/version "6.8.0"}`; ns requires
+  `[taoensso.timbre :as timbre]` (alphabetical order).
+- **Idiom corroborated**: Throwable-first + trailing structured-data-arg shape
+  verified against `runtime.clj:217`, `app_runtime.clj:222`, and
+  `tui_session_nav.clj:50` (`timbre/error e "Resume failed:" session-path`).
+- **No new pattern / abstraction / perf issue**: single-line idiom alignment.
+- **No orphaned require**: `clojure.string :as str` still used (str/join etc.).
+- **Lint clean** (0/0); timbre `6.8.0` resolves on both standalone `src` and
+  `:test` classpaths (no version conflict).
+- **No test breakage**: no test asserts on the old stdout `"DEBUG ..."` string;
+  the swallowing catch branch has no dedicated test, which is pre-existing and
+  out of scope (no behavioural change).
+
+No follow-up items added.
