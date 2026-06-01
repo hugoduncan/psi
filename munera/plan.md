@@ -12,6 +12,10 @@ Not yet started:
 - `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 - `munera/open/108-project-nrepl-testing-without-mocks/`
 
+## Recently closed
+
+- `198-fix-tool-metrics-empty-tools-map` — `:tools {}` always empty in metrics.edn; fixed by bridging `:tool-start`/`:tool-result` lifecycle events → extension `dispatch-in` in `emit-tool-lifecycle!`.
+
 ## Audit outcome (2026-05-31)
 
 Closed as complete (moved to `munera/closed/`):
