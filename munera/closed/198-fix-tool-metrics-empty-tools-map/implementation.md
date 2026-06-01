@@ -230,3 +230,49 @@ commit `4630d40c0`, which: keeps `:refer [deftest testing is]` (no unused `use-f
 uses a quoted `'psi.metrics.extension/init` symbol (no inline-def warning), and touches no
 kondo config. `clj-kondo --lint` on `tool_execution_test.clj` and `tests.edn` → 0 errors,
 0 warnings. No revert needed; no warnings to fix.
+
+## 2026-06-01 — implementation review (independent, verification pass)
+
+**PASS — no new actionable issues.** Verified against live runtime and source, not just notes:
+
+- Code (`emit-tool-lifecycle!`): minimal `case` bridge, single responsibility, coherent with
+  design. Payload field names verified end-to-end against `tool-runtime/core` event shapes
+  (`:event-kind`, `:tool-start`/`:tool-result`, `:parsed-args`, `:content`, `:details`,
+  `:is-error`) and against metrics handlers (`on-tool-call` reads `:tool-name`; `on-tool-result`
+  reads `:tool-name`+`:is-error`). `(boolean (:is-error …))` coercion correct.
+- E2e test runs: `clojure -M:test --focus psi.agent-session.tool-execution-test` →
+  **12 tests, 61 assertions, 0 failures**. The historically-contested "11 tests" gap is
+  resolved; `metrics-extension-accumulates-tools-via-bridge-test` (line 379) executes.
+- Error-counter AC covered: metrics `extension_test.clj` asserts `:is-error true` →
+  `:errors` increment and `:is-error false` → no increment.
+- Lint clean: `clj-kondo` on changed src + test → 0 errors, 0 warnings.
+- Working tree clean; changelog `[Unreleased]` entry present (line 10).
+- All prior review follow-ups (steps.md) ticked and independently confirmed.
+
+No new patterns/abstractions/perf concerns. No regression tests missing. Implementation
+complete and correct.
+
+## 2026-06-01 — test review (independent, task-test-review skill)
+
+**Tests well-formed; infra deps acceptable.** All three bridge/e2e tests in
+`tool_execution_test.clj` use `with-redefs` only on infra/side-effect deps
+(`execute-tool-runtime-in!`, `emit-tool-start-in!`, `emit-tool-end-in!`,
+`record-tool-result-in!`) with canned nullable returns — not interaction-asserting
+mocks. Assertions are on state/outputs (`@calls`, `@result-atom`, `@metrics-ext/store`),
+not interactions. e2e test executes under the standard command: `--focus
+psi.agent-session.tool-execution-test` → 12 tests, 61 assertions, 0 failures. `tests.edn`
+metrics-src addition committed (`c00f4feda`); working tree clean.
+
+**Gap: AC2 (error counter) has no end-to-end coverage through the bridge.**
+Acceptance criterion 2 — "Tool errors (`:is-error true`) increment `:errors` counters" —
+is verified only with the bridge bypassed. `metrics/extension_test.clj` exercises the
+`:errors` increment by calling `fire-event` directly with `:is-error true`, and the bridge
+test (`emit-tool-lifecycle-bridge-fires-extension-handlers-test`) only asserts
+`(= false (:is-error result-event))` for a success result. No test wires an erroring
+`run-tool-call!` (where `execute-tool-runtime-in!` returns `:is-error true`) through the
+`emit-tool-lifecycle!` bridge and asserts `:errors` accumulates in the metrics store. The
+bridge's `:is-error (boolean (:is-error lifecycle-event))` propagation
+(`tool_runtime_adapter.clj:39`) on the truthy path is therefore unguarded — a regression
+that drops or hardcodes `:is-error` on `tool_result` would not fail any test while the
+success-path e2e test still passes. This is the same split-coverage class previously
+closed for the invocation path, but the error path remains split.
