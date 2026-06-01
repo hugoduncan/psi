@@ -689,3 +689,30 @@ equivalents remain:
    (these tests are green and were out of the de-mock reshape set), but folding
    them onto `temp-dir`/`delete-tree!` would complete the consolidation the prior
    note asserted was already complete.
+
+## 2026-06-01 — Second-pass implementation-review follow-ups executed
+
+Both newly-added unchecked second-pass review items completed:
+
+1. `client_test.clj` `connect-instance-in-test` now `:refer`s
+   `session-fn-with-id` and binds `session-fn (session-fn-with-id
+   "nrepl-session-1")`; the inline `with-meta`/`:nrepl.core/taking-until`
+   copy is removed. A grep confirms no inline copies of that metadata shape
+   remain in any test file — the metadata-shape drift is eliminated.
+
+2. Hand-rolled temp-dir create/delete folded onto the shared
+   `temp-dir`/`delete-tree!` helpers in the previously-untouched test bodies:
+   - `config_test.clj` `read-project-preferences-test` (×3 testing blocks) and
+     `read-dot-nrepl-port-test` (×2 testing blocks) now bind
+     `dir (temp-dir "prefix-")` and clean up via `(delete-tree! dir)`.
+     `temp-dir` returns a path string, consumed directly by the
+     config readers; on-disk fixtures still built with `(io/file dir ...)`.
+   - `commands_test.clj` missing-start-command test now uses
+     `(temp-dir "psi-project-nrepl-commands-")` + `(delete-tree! worktree-path)`;
+     its now-unused `[clojure.java.io :as io]` require was dropped.
+   Each of the two files now uses one temp-dir idiom (the shared helpers).
+
+Verification: focused (config/client/commands) → 11 tests, 64 assertions, 0
+failures; full project-nrepl suite (8 ns) → 25 tests, 153 assertions, 0
+failures; `clj-kondo --lint components/project-nrepl/test` → 0 errors, 0
+warnings. No remaining second-pass review exceptions.

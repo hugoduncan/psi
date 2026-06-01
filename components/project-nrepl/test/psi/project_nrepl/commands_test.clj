@@ -1,10 +1,9 @@
 (ns psi.project-nrepl.commands-test
   (:require
-   [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
    [psi.project-nrepl.commands :as project-nrepl-commands]
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
-   [psi.project-nrepl.test-support :refer [install-instance!]]
+   [psi.project-nrepl.test-support :refer [delete-tree! install-instance! temp-dir]]
    [psi.agent-session.test-support :as test-support]))
 
 (deftest format-project-nrepl-status-test
@@ -24,9 +23,7 @@
       (is (re-find #"Project nREPL" (:message result)))))
 
   (testing "/project-repl start reports missing command configuration clearly"
-    (let [worktree-path    (str (java.nio.file.Files/createTempDirectory
-                                 "psi-project-nrepl-commands-"
-                                 (make-array java.nio.file.attribute.FileAttribute 0)))
+    (let [worktree-path    (temp-dir "psi-project-nrepl-commands-")
           [ctx session-id] (test-support/create-test-session {:persist? false
                                                               :session-defaults {:worktree-path worktree-path}})]
       (try
@@ -38,8 +35,7 @@
           (is (re-find #"/.psi/project.edn" (:message result)))
           (is (re-find #"/.psi/project.local.edn" (:message result))))
         (finally
-          (doseq [f (reverse (file-seq (io/file worktree-path)))]
-            (.delete f))))))
+          (delete-tree! worktree-path)))))
 
   (testing "/project-repl eval routes through real commands → ops/eval-op → eval/eval-instance-in!"
     (let [worktree         (System/getProperty "user.dir")

@@ -3,7 +3,7 @@
    [clojure.test :refer [deftest is testing]]
    [psi.project-nrepl.client :as project-nrepl-client]
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
-   [psi.project-nrepl.test-support :refer [make-ctx]]))
+   [psi.project-nrepl.test-support :refer [make-ctx session-fn-with-id]]))
 
 (deftest connect-instance-in-test
   (testing "connect establishes single managed client session and capability flags"
@@ -11,8 +11,7 @@
           worktree   (System/getProperty "user.dir")
           transport  {:transport :fake}
           client-fn  (fn ([] nil) ([_] nil))
-          session-fn (with-meta (fn [_] nil)
-                       {(keyword "nrepl.core" "taking-until") {:session "nrepl-session-1"}})
+          session-fn (session-fn-with-id "nrepl-session-1")
           connector  (fn [_endpoint]
                        {:transport transport
                         :client client-fn

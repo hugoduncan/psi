@@ -64,7 +64,7 @@
 
 (deftest read-project-preferences-test
   (testing "deep-merges shared then local with local precedence"
-    (let [dir      (io/file (System/getProperty "java.io.tmpdir") (str "psi-project-nrepl-pref-" (java.util.UUID/randomUUID)))
+    (let [dir      (temp-dir "psi-project-nrepl-pref-")
           shared-f (io/file dir ".psi" "project.edn")
           local-f  (io/file dir ".psi" "project.local.edn")]
       (.mkdirs (.getParentFile shared-f))
@@ -75,13 +75,12 @@
         (is (= {:version 1
                 :agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]
                                                 :attach {:host "localhost" :port 9999}}}}
-               (project-nrepl-config/read-project-preferences (.getAbsolutePath dir))))
+               (project-nrepl-config/read-project-preferences dir)))
         (finally
-          (doseq [f (reverse (file-seq dir))]
-            (.delete f))))))
+          (delete-tree! dir)))))
 
   (testing "malformed local warns and falls back to shared"
-    (let [dir      (io/file (System/getProperty "java.io.tmpdir") (str "psi-project-nrepl-pref-" (java.util.UUID/randomUUID)))
+    (let [dir      (temp-dir "psi-project-nrepl-pref-")
           shared-f (io/file dir ".psi" "project.edn")
           local-f  (io/file dir ".psi" "project.local.edn")]
       (.mkdirs (.getParentFile shared-f))
@@ -91,15 +90,14 @@
         (let [err (capture-stderr
                    #(is (= {:version 1
                             :agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]}}}
-                           (project-nrepl-config/read-project-preferences (.getAbsolutePath dir)))))]
+                           (project-nrepl-config/read-project-preferences dir))))]
           (is (.contains err "WARNING: ignoring malformed project preferences file"))
           (is (.contains err "project.local.edn")))
         (finally
-          (doseq [f (reverse (file-seq dir))]
-            (.delete f))))))
+          (delete-tree! dir)))))
 
   (testing "malformed shared warns and falls back to local"
-    (let [dir      (io/file (System/getProperty "java.io.tmpdir") (str "psi-project-nrepl-pref-" (java.util.UUID/randomUUID)))
+    (let [dir      (temp-dir "psi-project-nrepl-pref-")
           shared-f (io/file dir ".psi" "project.edn")
           local-f  (io/file dir ".psi" "project.local.edn")]
       (.mkdirs (.getParentFile shared-f))
@@ -109,12 +107,11 @@
         (let [err (capture-stderr
                    #(is (= {:version 1
                             :agent-session {:project-nrepl {:attach {:port 7888}}}}
-                           (project-nrepl-config/read-project-preferences (.getAbsolutePath dir)))))]
+                           (project-nrepl-config/read-project-preferences dir))))]
           (is (.contains err "WARNING: ignoring malformed project preferences file"))
           (is (.contains err "project.edn")))
         (finally
-          (doseq [f (reverse (file-seq dir))]
-            (.delete f)))))))
+          (delete-tree! dir))))))
 
 (deftest resolve-target-worktree-test
   (testing "explicit target wins over session worktree"
@@ -198,25 +195,21 @@
 
 (deftest read-dot-nrepl-port-test
   (testing "reads integer port from target worktree .nrepl-port"
-    (let [dir (io/file (System/getProperty "java.io.tmpdir") (str "psi-project-nrepl-" (java.util.UUID/randomUUID)))]
-      (.mkdirs dir)
+    (let [dir (temp-dir "psi-project-nrepl-")]
       (spit (io/file dir ".nrepl-port") "7888\n")
       (try
         (is (= {:port 7888 :port-source :dot-nrepl-port}
-               (project-nrepl-config/read-dot-nrepl-port (.getAbsolutePath dir))))
+               (project-nrepl-config/read-dot-nrepl-port dir)))
         (finally
-          (doseq [f (reverse (file-seq dir))]
-            (.delete f))))))
+          (delete-tree! dir)))))
 
   (testing "fails when .nrepl-port is missing or invalid"
-    (let [dir (io/file (System/getProperty "java.io.tmpdir") (str "psi-project-nrepl-" (java.util.UUID/randomUUID)))]
-      (.mkdirs dir)
+    (let [dir (temp-dir "psi-project-nrepl-")]
       (try
         (is (thrown? clojure.lang.ExceptionInfo
-                     (project-nrepl-config/read-dot-nrepl-port (.getAbsolutePath dir))))
+                     (project-nrepl-config/read-dot-nrepl-port dir)))
         (spit (io/file dir ".nrepl-port") "not-a-port")
         (is (thrown? clojure.lang.ExceptionInfo
-                     (project-nrepl-config/read-dot-nrepl-port (.getAbsolutePath dir))))
+                     (project-nrepl-config/read-dot-nrepl-port dir)))
         (finally
-          (doseq [f (reverse (file-seq dir))]
-            (.delete f)))))))
+          (delete-tree! dir))))))
