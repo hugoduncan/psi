@@ -813,3 +813,37 @@ Verification: `clj-kondo --lint …workflow_definitions_test.clj` → 0 errors /
 No new actionable code-shaping feedback. No `steps.md` items added.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## 2026-06-01 — implementation review pass 2 (task-implementation-review skill) (ψ)
+
+Re-applied `task-implementation-review` to the committed implementation
+(`.psi/workflows/task-lifecycle.edn`, the `task-lifecycle-test` deftest, the
+CHANGELOG `[Unreleased]→[0.1.2166]` Added entry, and the additive
+`doc/workflow-grammar-concepts.md` `:map` note) after the intervening
+test-shaper / docs / code-shaper passes landed. Independent re-verification:
+
+1. matches(design): `.edn` is byte-for-byte the design's "Concrete step and file
+   shape" — top-level `:name "task-lifecycle"` + `:description`, five
+   `:type :delegate` steps in order, `:name` = `:target`, uniform
+   `:prompt-string {:type :map :fields {:input {:from :workflow-input :path
+   [:input]}}}` and `:context [{:type :source :from :workflow-original}]`,
+   terminal step with no `:yields`/`:terminal-contract`. ✓ (re-read the file)
+2. follows(architecture): existing converged `:delegate` grammar only; no new
+   step shape, operation, prompt, or grammar. ✓
+3. central mechanism re-verified against code (not doc): re-read
+   `source_resolution/render-delegate-prompt-string` (L182-195) — `{:type :map}`
+   returns `(into {} (map … (:fields …)))`, a map; so `{:from :workflow-input
+   :path [:input]}` resolves in the four explicit-ref targets and `{{input}}`
+   auto-wires for `create-task-plan`'s `:session`. ✓
+4. no reusable-pattern duplication, no unnecessary abstraction, no structural /
+   performance issue: minimal pure-delegate chain; per-step map repetition is
+   intrinsic to the declarative grammar (no step-level templating primitive),
+   matching every exemplar.
+5. proof: focused `task-lifecycle-test` re-run green (1 test, 9 assertions, 0
+   failures); CHANGELOG `task-lifecycle` Added entry present and accurate.
+
+No new actionable feedback; no new `steps.md` items. All prior review passes
+(implementation, three test-review, two test-shaper, two docs, code-shaper) plus
+this pass converge on complete. Implementation is ready for closure.
+
+PASS_STATUS: REVIEW_COMPLETE
