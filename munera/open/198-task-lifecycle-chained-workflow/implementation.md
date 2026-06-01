@@ -457,3 +457,27 @@ implementation-review note ("REVIEW_COMPLETE") assessed code-vs-design but did
 not evaluate test coverage of these criteria.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## 2026-06-01 — test review follow-up execution (ψ)
+
+Executed both task-test-review follow-up items; `task-lifecycle-test` now guards
+the two previously-unverified acceptance criteria.
+
+1. `:prompt-string` assertion — ADDED. `(every? ...)` asserts each step's
+   `:prompt-string` equals `{:type :map :fields {:input {:from :workflow-input
+   :path [:input]}}}`. Guards the central identifier-threading invariant.
+2. `:context` assertion — ADDED. `(every? ...)` asserts each step's `:context`
+   equals `[{:type :source :from :workflow-original}]` — input-only threading,
+   no prior-step yield reference.
+
+Shape rationale: verified `compiler.clj` `compile-edn-steps` passes
+non-`:prompt-workflow` steps through UNCHANGED (no `target-ir-compiler`
+nesting under `:delegate`), so `:steps` retain the raw authored EDN shape —
+`:target`/`:prompt-string`/`:context` are top-level on each step (consistent
+with the pre-existing `(mapv :target steps)` assertion). The new assertions
+therefore compare against the authored `.edn` map shape directly.
+
+Verification: focused `task-lifecycle-test` → 1 test, 8 assertions (was 6),
+0 failures. `clj-kondo` on the edited test file: 0 errors / 0 warnings.
+
+PASS_STATUS: follow-ups complete.

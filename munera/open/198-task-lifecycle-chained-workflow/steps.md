@@ -55,11 +55,11 @@
 
 ## Test review follow-ups (task-test-review)
 
-- [ ] Add an assertion to `task-lifecycle-test` that every step's
+- [x] Add an assertion to `task-lifecycle-test` that every step's
       `:prompt-string` equals `{:type :map :fields {:input {:from :workflow-input
       :path [:input]}}}` (covers the design's central input-threading acceptance
       criterion, currently unguarded).
-- [ ] Add an assertion to `task-lifecycle-test` that every step's `:context`
+- [x] Add an assertion to `task-lifecycle-test` that every step's `:context`
       equals `[{:type :source :from :workflow-original}]` and references no
       prior-step yield (covers the input-only context-threading acceptance
       criterion).

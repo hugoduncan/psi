@@ -457,4 +457,16 @@
                  "review-task-plan"
                  "implement-task"
                  "review-task-implementation"]
-                (mapv :target steps))))))))
+                (mapv :target steps))))
+       (testing "every step threads the task id via the :map :prompt-string"
+         (is (every? (fn [step]
+                       (= {:type :map
+                           :fields {:input {:from :workflow-input
+                                            :path [:input]}}}
+                          (:prompt-string step)))
+                     steps)))
+       (testing "every step carries only :workflow-original context (no prior-step yield)"
+         (is (every? (fn [step]
+                       (= [{:type :source :from :workflow-original}]
+                          (:context step)))
+                     steps)))))))
