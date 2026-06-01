@@ -99,6 +99,18 @@ over document-divergence — eliminates the path-dependent value hazard rather
 than codifying it; the change is idempotent for the already-normalised
 interactive path).
 
+`:is-error` value type is also unified to a strict boolean on both paths.
+The interactive/batch bridge already emits `:is-error (boolean …)`. The plan
+path's `dispatch-tool-result-in` previously passed its `is-error?` argument
+through raw, and `run-tool-plan-step-in!` supplies the uncoerced
+`(:is-error result)`, which can be `nil`. The same bus event therefore carried
+`:is-error` as a strict boolean on one path and a possibly-`nil` value on the
+other. `dispatch-tool-result-in` now coerces `:is-error (boolean is-error?)`,
+so a `tool_result` handler sees a strict boolean regardless of triggering path
+(chosen resolution: coerce-by-addition for symmetry with the `:input`/`:content`
+unifications and `one_way ¬ambiguity`; idempotent for the already-boolean
+interactive path).
+
 ### `extension-registry` nil guard
 
 `context.clj` always sets `:extension-registry (ext/create-registry)` in

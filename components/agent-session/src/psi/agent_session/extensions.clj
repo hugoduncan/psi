@@ -306,7 +306,7 @@
                                         :content      (tool-runtime/normalize-tool-content
                                                        (:content result))
                                         :details      (:details result)
-                                        :is-error     is-error?})]
+                                        :is-error     (boolean is-error?)})]
     (first (filter #(and (map? %)
                          (or (contains? % :content) (contains? % :details)
                              (contains? % :is-error)))

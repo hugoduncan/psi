@@ -697,3 +697,22 @@ bridge's `(boolean …)` coercion and document `:is-error` as raw-passthrough on
 paths (uniform-by-removal, but reintroduces the `nil` hazard); (c) declare divergence
 acceptable with a documented contract note. Recommend (a) for symmetry with the
 `:input`/`:content` resolutions and `one_way ¬ambiguity`. Recorded as a follow-up.
+
+### `:is-error` cross-path coercion — DONE (resolution (a))
+
+Applied resolution (a): `dispatch-tool-result-in` now emits
+`:is-error (boolean is-error?)`, so the plan path delivers a strict boolean
+matching the interactive/batch bridge (`emit-tool-lifecycle!` already coerced).
+The coercion is idempotent for the already-boolean bridge path and closes the
+final leg of the `:input`/`:content`/`:is-error` cross-path contract triple at
+the untrusted-extension boundary (`consistent(data_shapes)`, `one_way`).
+
+Added focused contract proof `dispatch-tool-result-coerces-is-error-test`
+(extensions_test.clj): raw `nil` is-error? → strict `false`; raw truthy
+non-boolean → strict `true` at the handler payload. design.md updated with the
+chosen-resolution clarification.
+
+Verification: `clojure -M:test --focus psi.agent-session.extensions-test --focus
+psi.agent-session.tool-execution-test --focus psi.tool-runtime.core-test` →
+**44 tests, 191 assertions, 0 failures** (up from 43/189, confirming the new
+test executes). `clj-kondo` clean on changed src + test files.

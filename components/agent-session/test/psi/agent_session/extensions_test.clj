@@ -456,6 +456,22 @@
       (is (= [{:type :text :text "raw string"}] (:content @payload))
           "string content is coerced to canonical text blocks, matching the interactive bridge"))))
 
+(deftest dispatch-tool-result-coerces-is-error-test
+  (testing "plan-path tool_result bus event delivers :is-error as a strict boolean"
+    (let [reg     (ext/create-registry)
+          payload (atom nil)
+          _       (ext/register-extension-in! reg "/ext/a")
+          _       (ext/register-handler-in! reg "/ext/a" "tool_result"
+                                            (fn [p] (reset! payload p) nil))]
+      (testing "raw nil is-error? coerces to strict false, matching the interactive bridge"
+        (ext/dispatch-tool-result-in reg "read" "call-1" {"path" "x"}
+                                     {:content "ok"} nil)
+        (is (false? (:is-error @payload))))
+      (testing "raw truthy non-boolean is-error? coerces to strict true"
+        (ext/dispatch-tool-result-in reg "read" "call-2" {"path" "x"}
+                                     {:content "boom"} "some-error")
+        (is (true? (:is-error @payload)))))))
+
 ;; ── Introspection: handler event names ──────────────────────────────────────
 
 (deftest handler-event-names-test
