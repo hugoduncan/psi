@@ -66,3 +66,24 @@ design-steps.md. None duplicate the prior ambiguity pass.
   `dispatch-tool-result-coerces-is-error-test` @459). Line 453 is mid-first-test;
   490 falls inside the unrelated `tool-event-payload-constructors-test` (@475).
   (design-steps.md A3 separately cites `453–471` — also inaccurate.)
+
+## Inconsistency follow-up execution (2026-06-01)
+
+Executed I1–I3. All resolved in design.md (no blockers). Verified against source.
+
+- I1 → A2 prose corrected. Verified `tool_runtime_adapter.clj:37–42`: adapter
+  reads `:content`/`:details`/`:is-error` off the *incoming* `lifecycle-event`
+  (40–42) and passes them as *constructor args into* `ext/tool-result-event`
+  (37). It sources inputs, does not consume the constructed payload — the prior
+  prose was inverted. Reworded to "sources the constructor inputs"; A2 exclusion
+  conclusion still holds (it touches payload shape, not the modifiable-key
+  contract).
+- I2 → citations corrected. Verified `extensions.clj`: `tool-result-event`
+  `defn` spans **299–313** (311–313 are only its trailing map entries). Fixed
+  Context (added explicit entry), A2, and Out of Scope to cite `defn` at 299–313.
+- I3 → A3 citations corrected. Verified `extensions_test.clj`:
+  `dispatch-tool-result-normalizes-content-test` @445,
+  `dispatch-tool-result-coerces-is-error-test` @459 (ends 473);
+  `tool-event-payload-constructors-test` @475 (unrelated). Two coercion tests
+  span **445–473**. Fixed design.md A3 (`453–490` → `445`/`459`, span 445–473)
+  and reconciled design-steps.md A3 (`453–471` → `445–473`).

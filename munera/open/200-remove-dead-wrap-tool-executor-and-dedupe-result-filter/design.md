@@ -23,6 +23,9 @@ Resolving these reduces duplication and removes a dead maintenance surface.
 - `wrap-tool-executor` — defined ~line 335; production callers: none. Test
   references: `components/agent-session/test/psi/agent_session/extensions_test.clj`
   (~lines 386–441, multiple `testing` blocks).
+- `tool-result-event` — `defn` at lines 299–313 (the `:content`/`:details`/
+  `:is-error` map entries are its trailing lines 311–313); the canonical
+  bus-event payload constructor, intentionally out of scope (see A2).
 - `dispatch-tool-result-in` — defined ~line 322; contains the verbose
   `(first (filter #(and (map? %) (or (contains? % :content) ...)) results))`
   predicate.
@@ -65,15 +68,18 @@ two places:
    (`#(and (map? %) (or (contains? % :content) …))`), and
 2. the `wrap-tool-executor` post-result `cond->`.
 
-`tool-result-event` (`extensions.clj:311–313`) is a **different concern**: it is
-the canonical *bus-event payload constructor* — the single source of the
-cross-path payload *shape*, building the `tool_result` event consumed by the
-plan path and the `emit-tool-lifecycle!` bridge. Its key enumeration constructs
-a payload; it does not declare which keys are extension-*modifiable*.
-`tool_runtime_adapter.clj` reads those keys *off the constructed event*
-(`(:content lifecycle-event)` etc.), i.e. it consumes the payload, not the
-modifiable-key contract. `tool-result-event` is therefore **intentionally
-excluded** from the single-sourcing; this task does not refactor it.
+`tool-result-event` (`extensions.clj`, `defn` at lines 299–313) is a
+**different concern**: it is the canonical *bus-event payload constructor* — the
+single source of the cross-path payload *shape*, building the `tool_result` event
+consumed by the plan path and the `emit-tool-lifecycle!` bridge. Its key
+enumeration constructs a payload; it does not declare which keys are
+extension-*modifiable*. `tool_runtime_adapter.clj` (lines 37–42) reads
+`:content`/`:details`/`:is-error` off the *incoming* `lifecycle-event` and passes
+them *as constructor arguments into* `tool-result-event`; it sources the
+constructor inputs, it does not consume the constructed payload. Either way it
+touches the *payload shape*, not the modifiable-key contract. `tool-result-event`
+is therefore **intentionally excluded** from the single-sourcing; this task does
+not refactor it.
 
 Once `wrap-tool-executor` is removed, the `cond->` (place 2) disappears, leaving
 the modifiable-key contract expressed exactly once — in the
@@ -89,9 +95,10 @@ covered afterward:
 
 - **`:content` / `:is-error` / `:details` coercion and normalization on the
   plan path** — already independently covered by
-  `dispatch-tool-result-normalizes-content-test` and
-  `dispatch-tool-result-coerces-is-error-test` (`extensions_test.clj:453–490`),
-  which exercise `dispatch-tool-result-in` directly. **No migration needed.**
+  `dispatch-tool-result-normalizes-content-test` (`extensions_test.clj:445`) and
+  `dispatch-tool-result-coerces-is-error-test` (`extensions_test.clj:459`),
+  spanning lines 445–473, which exercise `dispatch-tool-result-in` directly.
+  **No migration needed.**
 - **tool_call blocking** — `wrap-tool-executor`'s blocking sub-test exercises
   `dispatch-tool-call-in`'s `:block` return *through the wrapper*. The wrapper's
   blocked-result shaping (`{:content reason :is-error true}`) is wrapper-only
@@ -128,7 +135,8 @@ covered afterward:
 - Any change to the interactive/batch `emit-tool-lifecycle!` bridge added by
   task 198 (that path is correct and deliberately does not route through
   `wrap-tool-executor`).
-- Any change to `tool-result-event` (`extensions.clj:311–313`) or its consumer
-  `tool_runtime_adapter.clj`. It constructs/consumes the canonical bus-event
-  payload shape, a separate concern from the modifiable-key contract being
-  single-sourced here (see A2 resolution above).
+- Any change to `tool-result-event` (`extensions.clj`, `defn` at lines 299–313)
+  or its caller `tool_runtime_adapter.clj` (lines 37–42, which sources the
+  constructor inputs). It constructs the canonical bus-event payload shape, a
+  separate concern from the modifiable-key contract being single-sourced here
+  (see A2 resolution above).

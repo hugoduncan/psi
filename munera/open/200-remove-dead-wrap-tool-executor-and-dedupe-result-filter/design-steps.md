@@ -13,23 +13,23 @@
   `tool_runtime_adapter.clj`), or whether it is intentionally excluded.
 - [x] A3: Specify, for direction 1 (remove), what behaviour must remain covered
   after `wrap-tool-executor` tests are removed/migrated — e.g. note that
-  `dispatch-tool-result-in` filter behaviour is independently covered
-  (extensions_test.clj:453–471), so its tests need not be migrated.
+  `dispatch-tool-result-in` coercion/normalization behaviour is independently
+  covered (extensions_test.clj:445–473), so those tests need not be migrated.
 
 ## Inconsistency review follow-ups
 
-- [ ] I1: Fix A2's description of `tool_runtime_adapter.clj`. The design states
+- [x] I1: Fix A2's description of `tool_runtime_adapter.clj`. The design states
   the adapter "reads those keys off the constructed event … consumes the
   payload," but the code reads `:content`/`:details`/`:is-error` from the
   *incoming* `lifecycle-event` and passes them as *arguments into*
   `tool-result-event` (it sources the constructor inputs, it does not consume the
   constructed payload). Correct the prose so the A2 exclusion rests on an accurate
   account of the code; re-confirm the exclusion conclusion still holds.
-- [ ] I2: Correct the `tool-result-event` citation. Design cites it as
+- [x] I2: Correct the `tool-result-event` citation. Design cites it as
   `extensions.clj:311–313` (Context, A2, Out of Scope), but the `defn` spans
   299–313; 311–313 are only its trailing map keys. Cite the function's actual
   location (or use line-stable references).
-- [ ] I3: Correct the A3 test-coverage citation. Design cites the two coercion
+- [x] I3: Correct the A3 test-coverage citation. Design cites the two coercion
   tests as `extensions_test.clj:453–490`; they actually span 445–473
   (`dispatch-tool-result-normalizes-content-test` @445,
   `dispatch-tool-result-coerces-is-error-test` @459), and 490 falls inside the
