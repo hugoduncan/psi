@@ -998,3 +998,33 @@ not notes. Verified committed state `e7795fabe`, working tree clean.
 
 **No new actionable test issues under the skill criteria.** All prior findings closed and
 confirmed executing; not re-raised (no duplication).
+
+## 2026-06-01 — test review (independent, test-shaper skill)
+
+Re-applied test-shaper against source + live run. Prior test-shaper/task-test-review
+passes focused on `tool_execution_test.clj` (bridge/e2e). This pass widened the lens to
+the task-authored guards in `extensions/metrics/test/.../extension_test.clj` and found one
+new low-severity `economical` (`minimal(redundant_tests)`) issue not previously raised.
+
+**ACTIONABLE (low — redundant test).** Two error-reason truncation tests overlap:
+`tool-result-error-reason-truncated-to-80-chars-test` (single-line 100×`x`, asserts
+`(<= count 80)`) is strictly subsumed by the later code-shaper follow-up test
+`tool-result-error-reason-multiline-truncated-to-first-line-80-chars-test` (multiline,
+100×`x` first line, asserts the *stronger* `(= 80 count)` + exact 80×`x` value, plus
+first-line selection and trim). `str/split-lines` on a single line yields `[line]`, so the
+multiline test's path already exercises the single-line case with a tighter bound; the older
+test contributes no distinct signal. Per `economical = maximal(coverage) ∧ minimal(redundant_tests)`,
+the older single-line test should be removed (the multiline test is the canonical guard for
+the 80-char first-line truncation behavior). Low severity — both pass; this is dedup, not
+correctness.
+
+**Otherwise well-shaped — ✓.** `simple ∧ consistent ∧ robust` across `extension_test.clj`:
+single-concern deftests, AAA-explicit, uniform `make-api`/`fire-event` helpers (compress
+ceremony without hiding intent), deterministic (defonce atoms reset in `use-fixtures`),
+state/output assertions only (no interaction-mocking), schema-conformance guards on the
+summary path. `behavior_focused` — ✓; the earlier-rejected `:input`/`:details` over-spec
+finding stands (not re-raised).
+
+**Verification.** `clojure -M:test --focus psi.agent-session.tool-execution-test --focus
+psi.metrics.extension-test --focus psi.agent-session.extensions-test` → **59 tests, 212
+assertions, 0 failures**.
