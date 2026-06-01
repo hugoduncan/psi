@@ -352,3 +352,42 @@ propagated value, not a defect.
 
 Verification: `clojure -M:test --focus psi.agent-session.tool-execution-test` →
 **13 tests, 66 assertions, 0 failures**. `clj-kondo --lint` → 0 errors, 0 warnings.
+
+## 2026-06-01 — test review (independent, task-test-review skill, verification pass)
+
+Re-applied the skill against source + live run, not just notes. Skill criteria:
+`well_formed ∧ (∀b∈behaviour(design). ∃t. covers(t,b)) ∧ (∀d∈infra_deps. injectable ∧ nullable ∧ ¬mock ∧ ¬stub)`.
+
+**well_formed — ✓.** The three bridge/e2e deftests in `tool_execution_test.clj`
+(`emit-tool-lifecycle-bridge-fires-extension-handlers-test`,
+`tool-call-handler-block-ignored-on-interactive-path-test`,
+`metrics-extension-accumulates-tools-via-bridge-test`,
+`metrics-extension-accumulates-errors-via-bridge-test`) are single-concern, deterministic
+(defonce atoms reset in `try/finally`, infra redefs canned), with meaningful failure
+messages on each `is`.
+
+**coverage — ✓ (AC2 gap now CLOSED).** All four acceptance criteria have executing tests:
+- AC1 (`:tools` invocations) — `metrics-extension-accumulates-tools-via-bridge-test` (full
+  path adapter→bridge→handler→store) + `emit-tool-lifecycle-bridge-fires-extension-handlers-test`.
+- AC2 (`:is-error true` → `:errors`) — `metrics-extension-accumulates-errors-via-bridge-test`,
+  committed `ad7d0f975`, drives `run-tool-call!` with `execute-tool-runtime-in!` returning
+  `:is-error true` and asserts `@metrics-ext/store` accumulates `:tools "bash" :invocations 1`,
+  `:errors 1`, and a propagated error reason. The previously-documented split-coverage gap
+  (error path only via direct `fire-event`, bridge bypassed) is now closed and executing.
+- AC3 (interactive blocking non-enforcement) — `tool-call-handler-block-ignored-on-interactive-path-test`.
+- AC4 (clj-kondo clean) — verified 0 errors, 0 warnings on the changed test file.
+
+**infra_deps — ✓.** `with-redefs` only on infra/side-effect deps
+(`tool-plan/execute-tool-runtime-in!`, `agent/emit-tool-start-in!`, `agent/emit-tool-end-in!`,
+`agent/record-tool-result-in!`, and capture-wrapped `dispatch/dispatch!` calling the original).
+Canned nullable returns; no interaction-asserting mocks/stubs. Assertions target state/outputs
+(`@calls`, `@result-atom`, `@metrics-ext/store`, recorded messages), never interactions.
+
+**Verification.** `clojure -M:test --focus psi.agent-session.tool-execution-test` →
+**13 tests, 66 assertions, 0 failures** (stable). `clj-kondo --lint` on the test file → 0/0.
+Metrics ext's own `extension_test.clj` independently covers `inc-tool-error` / `:is-error`
+handler behaviour. The earlier test-shaper economy observation (two e2e metrics tests share
+~15 lines of ceremony) is a clarity refinement outside this skill's scope and already
+documented above — not re-raised.
+
+**No new actionable test issues under the task-test-review skill criteria.**
