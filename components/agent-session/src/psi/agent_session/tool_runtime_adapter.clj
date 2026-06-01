@@ -3,6 +3,7 @@
    telemetry, post-tool processing, output accounting, and progress emission."
   (:require
    [psi.agent-session.dispatch :as dispatch]
+   [psi.agent-session.extensions :as ext]
    [psi.agent-session.post-tool :as post-tool]
    [psi.agent-session.psi-tool :as psi-tool]
    [psi.agent-session.state-accessors :as sa]
@@ -20,6 +21,23 @@
                       :session/tool-lifecycle-event
                       {:session-id session-id :entry lifecycle-event}
                       {:origin :core})
+  (when-let [reg (:extension-registry ctx)]
+    (case (:event-kind lifecycle-event)
+      :tool-start
+      (ext/dispatch-in reg "tool_call"
+                       {:type         "tool_call"
+                        :tool-name    (:tool-name lifecycle-event)
+                        :tool-call-id (:tool-call-id lifecycle-event)
+                        :input        (:parsed-args lifecycle-event)})
+      :tool-result
+      (ext/dispatch-in reg "tool_result"
+                       {:type         "tool_result"
+                        :tool-name    (:tool-name lifecycle-event)
+                        :tool-call-id (:tool-call-id lifecycle-event)
+                        :content      (:content lifecycle-event)
+                        :details      (:details lifecycle-event)
+                        :is-error     (boolean (:is-error lifecycle-event))})
+      nil))
   lifecycle-event)
 
 (defn- record-tool-output-stat!
