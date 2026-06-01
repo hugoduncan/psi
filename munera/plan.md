@@ -11,6 +11,8 @@ Not yet started:
 - `munera/open/197-ui-action-invocation/` — renumbered from 191 (NNN collision); side-effecting UI action invocation deferred from closed 190/194 UI work.
 - `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
 - `munera/open/108-project-nrepl-testing-without-mocks/`
+- `munera/open/199-metrics-turn-finished-handler-logging-idiom/` — replace raw `println` debug logging in metrics `make-turn-finished-handler` with timbre (out-of-scope item from task 198 review).
+- `munera/open/200-remove-dead-wrap-tool-executor-and-dedupe-result-filter/` — remove dead `wrap-tool-executor` and single-source the tool-result modifiable-key filter contract (out-of-scope item from task 198 review).
 
 ## Recently closed
 
