@@ -63,3 +63,63 @@ Both architecture-fit follow-up design-steps applied to design.md:
   regardless. Dropped the inverted justification.
 - Open question #1 (effect vs in-handler) marked resolved in design.md,
   pointing to the Architectural alignment section.
+
+## Ambiguity review (2026-06-01)
+
+Reviewed design.md for ambiguities only (not architecture/inconsistency).
+Cross-checked against live code: `app-runtime/build-startup-plan` (startup
+`(pt/discover-templates)` call), `prompt_templates/discover-templates` +
+`default-config`, `mutations/prompts` (`add-prompt-template` output
+convention + `all-mutations`), `dispatch_handlers/prompt_handlers`
+(`:session/register-prompt-template` append), `session_mutations`
+(`reload-models`, `set-active-tools`/`set-skills` replace shape +
+`:runtime/refresh-system-prompt`), and `commands/format-reload-models`.
+
+New actionable ambiguities:
+
+- 🌀 A1 — Discovery-input set underspecified + startup divergence. AC6/Discovery
+  inputs require reload to pass worktree-derived `:project-prompts-dir`, but
+  startup calls `(pt/discover-templates)` with NO opts (default *process-relative*
+  `.psi/prompts`, default global dir). Design neither (a) specifies whether
+  reload also passes `:global-prompts-dir` (default vs explicit) nor (b)
+  acknowledges that worktree-relative reload **intentionally diverges** from
+  cwd-relative startup. For worktree sessions (cwd ≠ worktree) the same edits
+  yield different sets at startup vs reload. Pin the full opts map and state the
+  divergence as intended.
+
+- 🌀 A2 — `--prompt-template` is a phantom source. "Why" lists CLI
+  `--prompt-template` extra-paths as a current discovery source, and OQ#2 defers
+  its "persistence across reload." But no `--prompt-template` flag exists in the
+  codebase; startup never passes `:extra-paths`. There is nothing to persist or
+  drop. Reframe OQ#2 / "Why": extra-paths are not currently wired into startup;
+  reload likewise omits them (or note the flag is unimplemented).
+
+- 🌀 A3 — Diagnostics return shape is unresolved either/or. Return shape says
+  return `:diagnostics` "(if discover-templates surfaces any — currently it does
+  not... Document that prompt discovery has no diagnostics channel, OR add
+  minimal error capture)". AC4 promises the command summary shows "any discovery
+  diagnostics", which is unreachable if there is no diagnostics channel. Decide:
+  no diagnostics (drop from return shape + AC4 summary) vs add capture; do not
+  leave both.
+
+- 🌀 A4 — Replace handler shape left open. "Replace, not append" poses an open
+  question (dedicated `:session/set-prompt-templates` vs reuse `register` in a
+  loop) and states only a "design preference". AC8 fixes the *event* as
+  `:session/reload-prompts` but does not say whether that handler does the
+  inline replace itself or delegates. Resolve to one shape (preferred: the
+  `reload-prompts` handler computes the discovered vector and returns a
+  `:root-state-update` replacing `:prompt-templates`, mirroring
+  `set-skills`/`set-active-tools` replace handlers).
+
+- 🌀 A5 — Mutation output schema non-committal. Return shape gives output keys
+  "e.g. `:psi.prompt-template/reloaded?` / `:count`"; AC5 pins no `::pco/output`.
+  Fix the exact mutation output set (mirroring `add-prompt-template`'s
+  `:added?`/`:count` → `:reloaded?`/`:count`) and remove "e.g.".
+
+- 🌀 A6 (low-confidence) — System-prompt refresh unspecified. `set-skills` and
+  `set-active-tools` emit `:runtime/refresh-system-prompt` because those sets
+  feed the system prompt. No system-prompt module enumerates `:prompt-templates`
+  (templates are `/name`-invoked), so refresh is likely NOT needed — but the
+  design is silent. State explicitly that reload need not emit
+  `:runtime/refresh-system-prompt` (and why), or specify it if `/prompts`-style
+  surfaces require it.
