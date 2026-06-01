@@ -300,3 +300,36 @@ resolved. Found TWO NEW actionable inconsistencies (added to `design-steps.md`):
    through its `opts` passthrough; only `build-instance` destructures it."
 
 No production/test code changed in this review pass.
+
+2026-06-01 — Inconsistency follow-up execution (second pass)
+
+Resolved both 2026-06-01 second-pass design-inconsistency follow-up items in
+design.md, grounded in re-reading config.clj, shared-config resolution.clj +
+user.clj, and runtime.clj.
+
+1. `config_test.clj` `:agent-session` wrapping — verified `resolve-config`
+   extracts via `(:project-nrepl (shared-resolution/agent-session-map
+   (read-...)))` and `agent-session-map` returns `(:agent-session cfg)`, so a
+   file written as `{:project-nrepl {...}}` resolves to `{:project-nrepl {}}`.
+   Added an explicit Decision to the "Concrete target for `config_test.clj`
+   `resolve-config`" section: on-disk content MUST be nested under
+   `{:agent-session {:project-nrepl {...}}}` at both scopes, with the concrete
+   user file `{:agent-session {:project-nrepl {:attach {:host "localhost" :port
+   7888}}}}` and project file `{:agent-session {:project-nrepl {:attach {:port
+   9999}}}}`. Noted the real user reader `merge`s `default-config`
+   `{:version 1 :agent-session {}}` over the file (file `:agent-session` wins),
+   so the user file need not carry `:version`.
+
+2. `ensure-instance-in!` "destructures" claim — verified source:
+   `ensure-instance-in!` destructures only `{:keys [worktree-path
+   acquisition-mode endpoint command-vector] :as opts}`; `:runtime-handle` is NOT
+   in its `:keys`. It reaches `build-instance` via the `:as opts` passthrough, and
+   `build-instance` is the function that destructures `:runtime-handle`. Restated
+   the Verified-source-facts bullet in "Composite acquisition entry-point seed
+   injection" to say `ensure-instance-in!` forwards `:runtime-handle` through its
+   `opts` passthrough (not destructures), matching the named source. The
+   functional claim (a seeded `:runtime-handle` reaches `build-instance`) is
+   unchanged and remains correct.
+
+No blocking reasons; both items completed at the design level. Production seam
+code + test reshaping remain for the build phase per steps.md.

@@ -254,10 +254,13 @@ internal infra call.
 
 Verified source facts:
 
-- `ensure-instance-in!` already destructures and forwards `:runtime-handle` into
-  `build-instance`, and `build-instance` already accepts `:runtime-handle`. The
-  registry layer can carry a seeded seam fn from acquisition; it is the two
-  composite entry points that do not forward one.
+- `ensure-instance-in!` forwards `:runtime-handle` into `build-instance` through
+  its `opts` passthrough — it destructures only
+  `{:keys [worktree-path acquisition-mode endpoint command-vector] :as opts}`, so
+  `:runtime-handle` is not in its own `:keys`; it reaches `build-instance` via the
+  `:as opts` value, and `build-instance` is the function that destructures
+  `:runtime-handle`. The registry layer can therefore carry a seeded seam fn from
+  acquisition; it is the two composite entry points that do not forward one.
 - `connect-instance-in!` already `merge`s into the existing `:runtime-handle`, so
   a seam fn seeded at acquisition survives the connect update.
 - `start-instance-in!` currently overwrites `:runtime-handle` (see "Started-mode
@@ -379,6 +382,21 @@ Decisions:
   writes a real `<tmp-home>/.psi/agent/config.edn` user config there, and restores
   the original `user.home` in a `finally`. This exercises the **real**
   `read-user-config` reader (no redef) against a deterministic on-disk user file.
+- **On-disk content MUST be nested under `[:agent-session :project-nrepl]`.**
+  `resolve-config` extracts each scope's project-nrepl config via
+  `(:project-nrepl (shared-resolution/agent-session-map (read-... )))`, and
+  `agent-session-map` returns `(:agent-session cfg)`. So a file written literally
+  as `{:project-nrepl {...}}` resolves to `{:project-nrepl {}}` (extraction
+  misses). The reshaped test therefore writes file content as
+  `{:agent-session {:project-nrepl {...}}}` at both scopes — matching the shape
+  the current redef maps return. Concretely: the user file is
+  `{:agent-session {:project-nrepl {:attach {:host "localhost" :port 7888}}}}`
+  and the project file is
+  `{:agent-session {:project-nrepl {:attach {:port 9999}}}}`. Note the real user
+  reader (`user-config/read-config`) `merge`s its `default-config`
+  `{:version 1 :agent-session {}}` over the file map (file values win for
+  `:agent-session`), so the user file need not carry `:version` for the test to
+  work; the merged `:agent-session` still carries the file's `:project-nrepl`.
 - The merge-precedence proof writes a real user config (lower precedence) under
   the temp `user.home` and a real project config (higher precedence) in the temp
   worktree (`<worktree>/.psi/project.edn`), then asserts `resolve-config` returns
