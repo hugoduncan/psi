@@ -112,3 +112,28 @@ Executed both inconsistency-review follow-up items; design.md updated.
    `review-task-implementation.edn` (last step `review-code-shape` :delegate →
    "review-step") and `review-step.edn` (terminal `:session` steps). Text is the
    propagated session default, not a delegate property.
+
+## 2026-06-01 — design ambiguity review pass 2 (ψ)
+
+Re-reviewed design.md against `.psi/workflows/` exemplars (`gh-issue-implement.edn`,
+`review-task-implementation.edn`, `review-task-design.edn`, `create-task-plan.edn`,
+`implement-task.edn`, `review-step.edn`) and `doc/workflow-grammar.md` /
+`-concepts.md`. Prior passes (input threading, create-task-plan claim, final-stage
+surfacing, verification surface, doc/CHANGELOG, doc-citation, delegate yield) are
+resolved. New actionable ambiguities found:
+
+1. Step `:name` values unspecified. Acceptance criteria says the test asserts
+   "the five step names/types/targets in order", but design fixes no step names.
+   The test cannot assert names the design leaves open. Specify the five `:name`s.
+2. Top-level `:name` / `:description` keys unspecified. Every target `.edn` has
+   top-level `:name` and `:description`; registry presence (and the test's
+   "definition `\"task-lifecycle\"` is present" assertion) is keyed off
+   `:name "task-lifecycle"`. design.md never states these required top-level keys.
+3. Per-step `:context` unspecified. Exemplar delegate steps carry
+   `:context [{:type :source :from :workflow-original}]` (`gh-issue-implement.edn`,
+   `review-task-implementation.edn`); grammar makes `:context` optional
+   (omitted ≡ empty vector). The "input-only context threading" decision threads
+   the id via `:prompt-string`, not `:context`, but design never states whether
+   each step declares `:context` at all (and whether `:workflow-original` is
+   carried). Per-step shape is ambiguous beyond `:name`/`:type`/`:target`/
+   `:prompt-string`.
