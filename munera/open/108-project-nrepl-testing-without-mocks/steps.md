@@ -257,3 +257,30 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
   project-nrepl suite (8 ns) 26 tests/151 assertions/0 failures unchanged
   (assertion count steady — only dead setup removed); `clj-kondo` 0/0 on
   `ops_test.clj`.
+
+## Test-shaper follow-ups (2026-06-01, fifth test-shaper pass)
+
+- [ ] Consolidate the duplicated happy nullable-connector construction into a
+  shared `psi.project-nrepl.test-support` helper (e.g. `fake-connector` /
+  `nullable-connector`). The identical connector value
+  `(fn [_endpoint] {:transport {:transport :fake} :client (fn ([] nil) ([_] nil))
+  :client-session (session-fn-with-id "nrepl-session-1")})` is constructed
+  verbatim at THREE sites — `attach_test.clj` `attach-instance-in-test` (line 33),
+  `client_test.clj` `connect-instance-in-test` (line 15), and `started_test.clj`
+  `start-instance-in-test` (line 65). This is the one nullable-seam *fixture
+  value* never folded into `test-support`: the prior consolidation passes shared
+  the connector *seeding* ceremony (`seed-connector!`) and the session fn
+  (`session-fn-with-id`), but not the connector return-map construction itself,
+  so the deterministic transport/client/session-fn shape is triplicated.
+  Violates `consistent(test_abstractions)` ∧ `minimal(incidental_variation)` ∧
+  `helpers_that_compress(ceremony)` — a drift in the nullable transport/client
+  shape (or the `{:transport :client :client-session}` connector contract) must
+  be edited in three places. Add a `test-support` helper returning the canonical
+  happy connector (parameterised by session-id, defaulting to
+  `"nrepl-session-1"`), and have the three happy-path tests `:refer` it. The
+  distinct-behaviour connectors stay inline (each is its own intent, not
+  ceremony): `client_test.clj` `connect-instance-in-missing-session-id-test`'s
+  metadata-less `:client-session (fn [_] nil)` connector (line 35) and
+  `attach_test.clj` "attach failure" throwing connector (line 52) are NOT folded
+  in — only the identical happy connector is shared. Keep tests green + lint
+  clean.

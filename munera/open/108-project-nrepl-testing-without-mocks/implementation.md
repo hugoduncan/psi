@@ -1159,3 +1159,39 @@ comment to drop the now-inaccurate "prior mock fabricated :ns" framing. The
 interrupted block's `:err "Interrupted"` seed stays (asserted). `ops_test` 2/17
 green; full focused project-nrepl suite (8 ns) 26 tests/151 assertions/0 —
 assertion count unchanged (only dead setup removed); `clj-kondo` 0/0.
+
+## Test-shaper review (2026-06-01, fifth test-shaper pass)
+
+Independent test-shaper pass (clarity ∧ signal ∧ robustness ∧ economy ∧
+determinism) re-reading all eight `project-nrepl` `*_test.clj` files plus
+`test_support.clj`. Suite remains strong: zero `with-redefs`, zero
+interaction-capture atoms, state/result-based, deterministic (readiness race
+removed earlier), single-concern blocks, shared `test-support` consolidates
+`make-ctx`/`install-instance!`/`seed-connector!`/`session-fn-with-id`/`temp-dir`/
+`delete-tree!`.
+
+One new actionable economy/consistency finding (`consistent(test_abstractions)`
+∧ `minimal(incidental_variation)` ∧ `helpers_that_compress(ceremony)`):
+
+1. The happy nullable-connector VALUE is constructed verbatim at three sites —
+   `attach_test.clj` `attach-instance-in-test` (l.33), `client_test.clj`
+   `connect-instance-in-test` (l.15), `started_test.clj` `start-instance-in-test`
+   (l.65): `(fn [_endpoint] {:transport {:transport :fake} :client (fn ([] nil)
+   ([_] nil)) :client-session (session-fn-with-id "nrepl-session-1")})`. Prior
+   consolidation passes shared the connector *seeding* ceremony (`seed-connector!`)
+   and the session fn (`session-fn-with-id`) but never the connector return-map
+   construction, so the deterministic transport/client/session shape is
+   triplicated; a drift in the nullable transport/client shape or the
+   `{:transport :client :client-session}` connector contract must be edited in
+   three places. A `test-support` helper returning the canonical happy connector
+   (session-id-parameterised) would single-source it. The distinct-behaviour
+   connectors stay inline (their behaviour IS the intent): the metadata-less
+   `:client-session (fn [_] nil)` connector (client_test l.35) and the throwing
+   connector (attach_test l.52). Follow-up step added.
+
+Considered but NOT raised (scope/precedent, consistent with prior passes): the
+pervasive `worktree (System/getProperty "user.dir")` ambient-cwd instance key
+(pre-existing, uniform, not introduced by this task) and
+`disconnect-instance-in-test`'s `closed*` atom (real-effect state check on the
+opaque Closeable transport, accepted by prior passes). Raising either is scope
+expansion.
