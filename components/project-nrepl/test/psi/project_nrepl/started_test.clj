@@ -35,7 +35,7 @@
         ;; the wait; wait-for-started-endpoint! finds it on the first poll.
         (spit (io/file dir ".nrepl-port") "7888\n")
         (is (= {:host "127.0.0.1" :port 7888 :port-source :dot-nrepl-port}
-               (project-nrepl-started/wait-for-started-endpoint! dir process {:timeout-ms 1000 :poll-interval-ms 20})))
+               (project-nrepl-started/wait-for-started-endpoint! dir process)))
         (finally
           (delete-tree! dir)))))
 
@@ -66,9 +66,7 @@
       (try
         (let [instance (project-nrepl-started/start-instance-in!
                         ctx worktree ["bb" "nrepl-server"]
-                        {:timeout-ms 1000
-                         :poll-interval-ms 10
-                         :runtime-handle {:process-launcher launcher
+                        {:runtime-handle {:process-launcher launcher
                                           :nrepl-connector connector}})]
           (is (= :ready (:lifecycle-state instance)))
           (is (= true (:readiness instance)))

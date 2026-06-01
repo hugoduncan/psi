@@ -1418,3 +1418,24 @@ One new actionable `minimal_incidental_setup` finding:
    Fix: drop the opts arg from the happy `wait-for-started-endpoint!` call (use the
    2-arity), and drop only the timing keys from `start-instance-in-test`'s opts map.
    Keep tests green + lint clean.
+
+### Seventh test-shaper pass — DONE (2026-06-01)
+
+Removed the vestigial timing opts from `started_test.clj`'s two happy-path
+readiness tests:
+
+- `wait-for-started-endpoint-test` happy block: dropped the
+  `{:timeout-ms 1000 :poll-interval-ms 20}` arg; now calls the 2-arity
+  `(wait-for-started-endpoint! dir process)` (both opts default).
+- `start-instance-in-test`: dropped only the `:timeout-ms 1000` /
+  `:poll-interval-ms 10` keys from the opts map; the map stays for
+  `:runtime-handle` (the `:process-launcher`/`:nrepl-connector` seam seed).
+
+The process-exit FAILURE case's `{:timeout-ms 100 :poll-interval-ms 10}` is
+left unchanged — it legitimately loops until the deadline/exit.
+
+File-backed-readiness signal preserved (the `.nrepl-port` is still written
+synchronously before the wait/launch). Verified: `started_test` 2 tests / 12
+assertions / 0 failures; full focused project-nrepl suite (8 ns) 26 tests /
+151 assertions / 0 failures (count unchanged — pure dead-setup removal);
+`clj-kondo` 0/0 on `started_test.clj`.

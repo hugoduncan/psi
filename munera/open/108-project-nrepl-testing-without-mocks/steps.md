@@ -362,7 +362,7 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
 
 ## Test-shaper follow-ups (2026-06-01, seventh test-shaper pass)
 
-- [ ] Remove the vestigial timing opts from `started_test.clj`'s two happy-path
+- [x] Remove the vestigial timing opts from `started_test.clj`'s two happy-path
   readiness tests (`minimal_incidental_setup` ∧ `simple(tests)`). Since the third
   test-shaper pass made readiness file-backed (the `.nrepl-port` is written
   synchronously before the wait/launch), `wait-for-started-endpoint!` succeeds on
@@ -374,4 +374,12 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
   `start-instance-in-test`, drop only the `:timeout-ms 1000`/`:poll-interval-ms 10`
   keys from the opts map — keep the map for `:runtime-handle` (the seam seed). Leave
   the process-exit FAILURE case's `{:timeout-ms 100 :poll-interval-ms 10}` unchanged
-  (it legitimately loops until deadline/exit). Keep tests green + lint clean.
+  (it legitimately loops until deadline/exit). Keep tests green + lint clean. —
+  DONE: `wait-for-started-endpoint-test` happy block now calls the 2-arity
+  `(wait-for-started-endpoint! dir process)` (both opts default); `start-instance-in-test`
+  dropped only the `:timeout-ms`/`:poll-interval-ms` keys, keeping the opts map for
+  `:runtime-handle` (the seam seed); the process-exit failure case is unchanged.
+  File-backed-readiness signal preserved. `started_test` 2 tests/12 assertions green;
+  full focused project-nrepl suite (8 ns) 26 tests/151 assertions/0 failures unchanged
+  (pure dead-setup removal); `clj-kondo` 0/0 on `started_test.clj`. (Detail in
+  implementation.md.)
