@@ -46,6 +46,38 @@ batch, background) pass through `emit-tool-lifecycle!`.
 - Add `[psi.agent-session.extensions :as ext]` require
 - No schema changes, no new files, no other components touched
 
+## Clarifications
+
+### Double-dispatch on tool-plan path
+
+`run-tool-plan-step-in!` in `tool_plan.clj` calls `ext/dispatch-tool-call-in` /
+`ext/dispatch-tool-result-in` directly — it does **not** route through
+`emit-tool-lifecycle!`. The two paths are disjoint:
+
+- Interactive/batch path: `emit-tool-lifecycle!` → new `ext/dispatch-in` bridge
+- Data-driven plan path: `run-tool-plan-step-in!` → `dispatch-tool-call-in` / `dispatch-tool-result-in`
+
+No double-dispatch occurs. `emit-tool-lifecycle!` is the single correct
+injection point for the interactive/batch path only; the plan path retains
+its own direct dispatch.
+
+### `wrap-tool-executor` status
+
+`wrap-tool-executor` is dead code in production. It is defined in
+`extensions.clj` and exercised only in `extensions_test.clj`. No production
+caller exists. The new `emit-tool-lifecycle!` bridge creates no double-dispatch
+through this function.
+
+### `extension-registry` nil guard
+
+`context.clj` always sets `:extension-registry (ext/create-registry)` in
+production ctx construction. `test_support.clj` also always sets it. Absence
+of `:extension-registry` in ctx is **not a valid production state** — it can
+only arise in minimal unit-test contexts that bypass `make-session-ctx`. The
+`when-let` guard is defensive/test-safe; it is acceptable to keep it as-is
+rather than asserting, since asserting would break low-level unit tests that
+legitimately omit the registry.
+
 ## Acceptance Criteria
 
 - After the fix, tool invocations appear in `:tools` in `.psi/metrics.edn`

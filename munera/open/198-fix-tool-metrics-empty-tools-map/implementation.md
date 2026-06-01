@@ -34,3 +34,19 @@ Three ambiguities found:
 3. **`extension-registry` nil guard**: `(when-let [reg (:extension-registry ctx)])` silently
    skips extension dispatch when the registry is absent. Design doesn't state whether absence
    is a valid production state or a test-only artifact.
+
+## 2026-06-01 — ambiguity resolution
+
+1. **Double-dispatch — resolved**: `run-tool-plan-step-in!` calls `dispatch-tool-call-in` /
+   `dispatch-tool-result-in` directly and does NOT call `emit-tool-lifecycle!`. The two
+   paths are fully disjoint. No double-dispatch. Design updated with explicit path map.
+
+2. **`wrap-tool-executor` — resolved**: Confirmed dead code in production. Defined in
+   `extensions.clj`, referenced only in `extensions_test.clj`. No production caller exists
+   anywhere in the codebase. No double-dispatch risk.
+
+3. **`extension-registry` nil guard — resolved**: `context.clj` line 277 always sets
+   `:extension-registry (ext/create-registry)`. `test_support.clj` line 208 also always
+   sets it. Absence is test-only (minimal unit-test ctx bypassing `make-session-ctx`).
+   Decision: keep `when-let` guard as-is — asserting presence would break low-level unit
+   tests that legitimately omit the registry.
