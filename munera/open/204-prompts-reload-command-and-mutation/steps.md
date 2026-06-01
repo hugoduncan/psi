@@ -4,50 +4,37 @@ Vertical slices from plan.md. Tick each item with its sha / decision note.
 
 ## Slice 1 — `:session/reload-prompts` dispatch handler
 
-- [ ] Add `[psi.prompt-assets.prompt-templates :as pt]` require to
-      `dispatch_handlers/session_mutations.clj` (and confirm
-      `session/session-worktree-path-in` — `session` =
-      `psi.session-state.state` — is already in scope; the `ss` alias in this
-      ns is `psi.session-state.init`, which does **not** define it).
-- [ ] Register `:session/reload-prompts` core handler: `let`-bind a single
-      `worktree-path` = `(session/session-worktree-path-in ctx session-id)`,
-      then resolve opts
-      `{:global-prompts-dir (:global-prompts-dir pt/default-config)
-        :project-prompts-dir (str worktree-path "/.psi/prompts")}`,
-      call `(pt/discover-templates opts)` inline.
-- [ ] Handler returns a single `:root-state-update`
+- [x] Add `[psi.prompt-assets.prompt-templates :as pt]` require to
+      `dispatch_handlers/session_mutations.clj` (`session/session-worktree-path-in`
+      = `psi.session-state.state` already in scope). (handler ns require added)
+- [x] Register `:session/reload-prompts` core handler: single `worktree-path`
+      `let` binding, opts `{:global-prompts-dir (:global-prompts-dir
+      pt/default-config) :project-prompts-dir (str worktree-path "/.psi/prompts")}`,
+      `(pt/discover-templates opts)` inline.
+- [x] Handler returns a single `:root-state-update`
       `(session/session-update session-id #(assoc % :prompt-templates discovered))`
-      and a `:return {:reloaded? true :count (count discovered) :worktree worktree-path}`
-      (reusing the same `worktree-path` binding from the opts step — no second
-      `session-worktree-path-in` call); emits **no** `:effects` (no
-      `:runtime/refresh-system-prompt`).
-- [ ] Add a dispatch-handler test: seed a session with an explicit worktree
-      path and pre-existing `:prompt-templates`; dispatch
-      `:session/reload-prompts`; assert `:prompt-templates` is **replaced** by
-      the discovered vector (AC7) and the return map carries
+      + `:return {:reloaded? true :count (count discovered) :worktree worktree-path}`;
+      emits **no** `:effects`.
+- [x] Dispatch-handler test (`reload-prompts-handler-replaces-templates-test`):
+      worktree with `foo`/`bar`, seeded stale template; dispatch replaces
+      `:prompt-templates` with discovered vector (AC7); return map carries
       `:reloaded?`/`:count`/`:worktree`.
-- [ ] Add a test asserting the handler emits **no** effects (no
-      `:runtime/refresh-system-prompt`).
-- [ ] `clj-kondo` clean for the changed handler ns; focused handler test green.
+- [x] No-effects test (`reload-prompts-handler-emits-no-effects-test`): direct
+      handler call asserts `(nil? (:effects result))`, has `:root-state-update`.
+- [x] `clj-kondo` clean (0/0); focused test green (3 tests / 11 assertions).
 
 ## Slice 2 — `reload-prompts-in!` core entry fn
 
-- [ ] Add `reload-prompts-in!` to `session_settings.clj` mirroring
+- [x] Added `reload-prompts-in!` to `session_settings.clj` mirroring
       `reload-models-in!`: `(dispatch/dispatch! ctx :session/reload-prompts
-      {:session-id session-id} {:origin :core})`, returning the handler
-      `:return` map `{:reloaded? :count :worktree}`.
-- [ ] Add a `reload-prompts-in!` **re-export** to `psi.agent-session.core`
-      delegating to `settings/reload-prompts-in!` (mirror `core.clj:181`'s
-      `reload-models-in!` re-export). This is the surface both the command
-      (`session/reload-prompts-in!`, `session` = `psi.agent-session.core`) and
-      the mutation (`core/reload-prompts-in!`) call — matching the live
-      `reload-models` surface pair (command `commands.clj:255` →
-      `core/reload-models-in!`; mutation `mutations/session.clj:283` →
-      `core/reload-models-in!`).
-- [ ] Confirm `dispatch!` surfaces the handler `:return` map (not an effect
-      result) — add/extend a focused test asserting the returned
-      `:reloaded?`/`:count`/`:worktree` values.
-- [ ] `clj-kondo` clean; focused test green.
+      {:session-id session-id} {:origin :core})`.
+- [x] Added `reload-prompts-in!` **re-export** to `psi.agent-session.core`
+      delegating to `settings/reload-prompts-in!` (mirrors the
+      `reload-models-in!` re-export).
+- [x] Confirmed `dispatch!` surfaces handler `:return` map
+      (`reload-prompts-in-core-fn-surfaces-return-test`): asserts
+      `:reloaded?`/`:count`/`:worktree`.
+- [x] `clj-kondo` clean; focused test green.
 
 ## Slice 3 — `psi.extension/reload-prompts` mutation
 

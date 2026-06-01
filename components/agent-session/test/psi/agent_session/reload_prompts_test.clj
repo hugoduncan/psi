@@ -1,0 +1,87 @@
+(ns psi.agent-session.reload-prompts-test
+  "Tests for the :session/reload-prompts dispatch handler and the
+   reload-prompts-in! core entry fn: replace semantics, return shape, and
+   no system-prompt refresh effect."
+  (:require
+   [clojure.java.io :as io]
+   [clojure.test :refer [deftest is testing]]
+   [psi.agent-session.core :as session]
+   [psi.agent-session.dispatch]
+   [psi.agent-session.dispatch-handlers.session-mutations]
+   [psi.agent-session.test-support :as test-support]
+   [psi.session-state.state :as ss]
+   [psi.state-kernel.dispatch :as kernel]))
+
+(defn- delete-tree! [path]
+  (when path
+    (doseq [f (reverse (file-seq (io/file path)))]
+      (.delete ^java.io.File f))))
+
+(defn- worktree-with-prompts!
+  "Create a temp worktree dir with a `.psi/prompts` dir and write each
+   {name -> body} entry as `<name>.md`. Returns the worktree path."
+  [name->body]
+  (let [wt      (str (java.nio.file.Files/createTempDirectory
+                      "psi-reload-prompts-test-"
+                      (make-array java.nio.file.attribute.FileAttribute 0)))
+        prompts (io/file wt ".psi/prompts")]
+    (.mkdirs prompts)
+    (doseq [[name body] name->body]
+      (spit (io/file prompts (str name ".md")) body))
+    wt))
+
+(defn- session-at-worktree
+  "Create a [ctx session-id] whose worktree path is `wt`."
+  [wt]
+  (let [ctx (session/create-context
+             (test-support/safe-context-opts
+              {:cwd wt :persist? false}))
+        sd  (session/new-session-in! ctx nil {:worktree-path wt})]
+    [ctx (:session-id sd)]))
+
+(deftest reload-prompts-handler-replaces-templates-test
+  (testing "dispatch :session/reload-prompts replaces :prompt-templates with the freshly discovered set"
+    (let [wt (worktree-with-prompts! {"foo" "foo body v1"
+                                      "bar" "bar body"})]
+      (try
+        (let [[ctx session-id] (session-at-worktree wt)]
+          ;; Seed a stale template that should be replaced (not appended to).
+          (ss/update-state-value-in! ctx (ss/session-data-path session-id)
+                                     assoc :prompt-templates
+                                     [{:name "stale" :content "old"}])
+          (let [result (session/dispatch-in! ctx :session/reload-prompts
+                                             {:session-id session-id})
+                templates (:prompt-templates (ss/get-session-data-in ctx session-id))
+                names (set (map :name templates))]
+            ;; AC7: replace, not append — "stale" is gone, discovered set present.
+            (is (= #{"foo" "bar"} names))
+            (is (= "foo body v1" (:content (first (filter #(= "foo" (:name %)) templates)))))
+            ;; Return shape carries :reloaded?/:count/:worktree.
+            (is (true? (:reloaded? result)))
+            (is (= 2 (:count result)))
+            (is (= wt (:worktree result)))))
+        (finally (delete-tree! wt))))))
+
+(deftest reload-prompts-handler-emits-no-effects-test
+  (testing "the :session/reload-prompts handler returns a pure result with no effects"
+    (let [wt (worktree-with-prompts! {"foo" "foo body"})]
+      (try
+        (let [[ctx session-id] (session-at-worktree wt)
+              handler (:fn (kernel/handler-entry :session/reload-prompts))
+              result  (handler ctx {:session-id session-id})]
+          ;; No :runtime/refresh-system-prompt (or any) effect.
+          (is (nil? (:effects result)))
+          (is (some? (:root-state-update result)))
+          (is (true? (:reloaded? (:return result)))))
+        (finally (delete-tree! wt))))))
+
+(deftest reload-prompts-in-core-fn-surfaces-return-test
+  (testing "reload-prompts-in! returns the handler :return map (not an effect result)"
+    (let [wt (worktree-with-prompts! {"foo" "foo body" "bar" "bar body"})]
+      (try
+        (let [[ctx session-id] (session-at-worktree wt)
+              result (session/reload-prompts-in! ctx session-id)]
+          (is (true? (:reloaded? result)))
+          (is (= 2 (:count result)))
+          (is (= wt (:worktree result))))
+        (finally (delete-tree! wt))))))

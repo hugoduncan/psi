@@ -8,6 +8,7 @@
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.journal-append-effect :as journal-append-effect]
    [psi.agent-session.model-capabilities :as model-capabilities]
+   [psi.prompt-assets.prompt-templates :as pt]
    [psi.session-persistence.core :as persist]
    [psi.session-state.init :as ss]
    [psi.state-kernel.dispatch :as kernel]
@@ -285,6 +286,20 @@
        {:effects [{:effect/type :model-registry/reload
                    :cwd cwd}]
         :return-effect-result? true})))
+
+  (register-core-handler!
+   :session/reload-prompts
+   (fn [ctx {:keys [session-id]}]
+     (let [worktree-path (session/session-worktree-path-in ctx session-id)
+           opts          {:global-prompts-dir  (:global-prompts-dir pt/default-config)
+                          :project-prompts-dir (str worktree-path "/.psi/prompts")}
+           discovered    (pt/discover-templates opts)]
+       {:root-state-update (session/session-update
+                            session-id
+                            #(assoc % :prompt-templates discovered))
+        :return {:reloaded? true
+                 :count     (count discovered)
+                 :worktree  worktree-path}})))
 
   (register-core-handler!
    :session/set-active-tools

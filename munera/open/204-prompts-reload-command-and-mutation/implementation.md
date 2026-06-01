@@ -363,3 +363,39 @@ Design unchanged (read-only context).
 Net effect: the command and mutation share **one** `core/reload-prompts-in!`
 re-export, matching the existing `reload-models` surface pair precisely. No
 blockers; remaining work = implementation slices 1–5, unchanged in structure.
+
+## Implementation — Slices 1 & 2 (2026-06-01)
+
+Built the reload handler + core entry fn.
+
+- **Slice 1** — `:session/reload-prompts` handler in
+  `dispatch_handlers/session_mutations.clj` (added `[psi.prompt-assets.prompt-templates :as pt]`
+  require). Single `worktree-path` `let` binding → opts
+  `{:global-prompts-dir (:global-prompts-dir pt/default-config)
+    :project-prompts-dir (str worktree-path "/.psi/prompts")}` → inline
+  `(pt/discover-templates opts)`. Returns `:root-state-update`
+  (`session/session-update` wholesale `assoc :prompt-templates discovered`) +
+  `:return {:reloaded? true :count … :worktree …}`. **No `:effects`** (templates
+  are `/name`-invoked, not enumerated in the system prompt).
+- **Slice 2** — `reload-prompts-in!` in `session_settings.clj`
+  (`dispatch! … :session/reload-prompts … {:origin :core}`) + a `core.clj`
+  re-export delegating to `settings/reload-prompts-in!`. Both mirror the
+  `reload-models-in!` settings-fn + core re-export pair.
+
+Tests (`reload_prompts_test.clj`, 3 tests / 11 assertions):
+- replace semantics (seeded `stale` template gone; discovered `foo`/`bar`
+  present with new content) + return shape;
+- no-effects (direct handler call: `(nil? (:effects result))`);
+- `reload-prompts-in!` core fn surfaces the `:return` map (confirms `dispatch!`
+  return semantics — no `:return-effect-result?` needed; `apply-pure-result`
+  sets `:result (:return pure-result)`).
+
+Verification: `clj-kondo` 0/0 over the 4 changed files; focused suite green.
+
+Test-setup notes:
+- `session-at-worktree` creates the session with `{:worktree-path wt}` and
+  `:cwd wt`, so `session-worktree-path-in` resolves to the temp worktree (not
+  process cwd), exercising AC6's worktree-correct discovery root.
+- Stale template seeded via `ss/update-state-value-in!` on
+  `(ss/session-data-path session-id)` (no `update-session-data-in!` helper
+  exists).
