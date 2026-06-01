@@ -736,3 +736,56 @@ passing). The `result-override` selection-helper tests are unaffected —
 application path's responsibility.
 
 C2 follow-up item checked.
+
+## Code review: code-shaper (third pass, 2026-06-01)
+
+Independent code-shaper pass on the *current* production surface after C1
+(key-set single-sourcing) and C2 (value-semantics single-sourcing) landed.
+Re-read `extensions.clj` (`modifiable-tool-result-coercions` @299,
+`coerce-tool-result-value` @311, `tool-result-event` @317,
+`modifiable-tool-result-keys` @341, `modifiable-tool-result-override?` @353,
+`merge-tool-result-override` @360, `dispatch-tool-result-in` @376) and the live
+consumer `tool_plan.clj` `run-tool-plan-step-in!` @219–221. Verified at runtime
+against source; clj-kondo clean (0/0) on both production files; working tree
+clean.
+
+- **simple** ✓ Each new def has a single responsibility: the keys set
+  *enumerates*, the coercion table *maps value semantics*, the override?
+  predicate *selects*, `merge-tool-result-override` *applies*,
+  `coerce-tool-result-value` *coerces one key*. All locally comprehensible;
+  computation/flow separated.
+- **consistent** ✓ Selection guard and application both derive from
+  `modifiable-tool-result-keys` (one set); `tool-result-event` and
+  `merge-tool-result-override` both derive value semantics from
+  `modifiable-tool-result-coercions` (one table). `tool_plan.clj` calls
+  `merge-tool-result-override` rather than re-enumerating. Naming, argument
+  order, and idioms are consistent across the cluster.
+- **robust** ✓ The modifiable-key contract is now shaped by named formalisms
+  (set + coercion table) → its invariants are enforceable at one site: adding a
+  key is a single-set edit; changing a key's value semantics is a single-table
+  edit; both producer and consumer track automatically. nil override ⇒ result
+  unchanged (`(contains? nil k) ⇒ false`). `reduce` over a set is order-safe
+  here (distinct-key `assoc`s are commutative).
+
+Confirmed both prior findings fully applied:
+- C1: grep over `components/**.clj` excluding `*_test.clj` finds the three keys
+  enumerated once (the named set); no other production site re-enumerates.
+- C2: `merge-tool-result-override` routes copied `:content`/`:is-error` through
+  `coerce-tool-result-value`, matching the inbound `tool-result-event`
+  constructor; both derive from `modifiable-tool-result-coercions`.
+
+Considered and rejected as out-of-scope (¬actionable): in the *no-override*
+branch `tool_plan.clj` returns the runtime executor's base `result` unchanged,
+so its `:content`/`:is-error` are coerced only when a handler override happens
+to carry that key. This base-result normalization is the runtime executor's
+pre-existing responsibility, not the *modifiable-key contract* this task owns
+(A2 boundary: `tool-result-event` constructs the bus-event payload; the returned
+`result` is the executor's output). The override-application coercion correctly
+matches the *event payload* contract — its stated boundary. No change introduced
+by this task creates a new asymmetry here.
+
+No new actionable code-shape issues within this task's scope. C1/C2 drove the
+production contract to a single-sourced, well-shaped state (key set *and* value
+semantics); this pass confirms convergence.
+
+PASS_STATUS: REVIEW_COMPLETE
