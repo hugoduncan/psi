@@ -598,3 +598,41 @@ Verification:
 
 design.md updated: new "`tool_result` cross-path payload shape (unified)"
 clarification records the chosen resolution. steps.md item checked.
+
+## 2026-06-01 — code review (independent, code-shaper skill, verification pass)
+
+Re-applied code-shaper (`simple ∧ consistent ∧ robust`) against source + live run,
+not notes. Verified the committed state at `6a517aa8d`.
+
+- **simple — ✓.** `emit-tool-lifecycle!` is single-responsibility (telemetry dispatch
+  + extension bridge); the `case` flow-control is isolated from per-branch payload
+  construction. `(boolean (:is-error …))` coercion correct; `case` default `nil`
+  passes through non-bridged kinds (`:tool-executing`, `:tool-execution-update`).
+- **`:input` key parity — ✓ (closed).** `record-tool-call-result!` threads
+  `:parsed-args (:parsed-args tool-call)` into both `:tool-start` (core.clj:81) and
+  `:tool-result` (core.clj:179) lifecycle events; the bridge emits `:input` for both
+  `tool_call` and `tool_result`, matching `dispatch-tool-call-in` /
+  `dispatch-tool-result-in` key sets. Verified end-to-end:
+  `--focus psi.agent-session.tool-execution-test` → 13 tests, 68 assertions, 0 failures;
+  `clj-kondo --lint` on all three changed files → 0/0; working tree clean.
+
+**Residual (consistency, marginal): `:content` *value semantics* still differ across
+the two `"tool_result"` paths.** The prior unification (`6a517aa8d`) aligned the
+`:input` *key presence* but not `:content`'s value shape:
+- Bridge path (`emit-tool-lifecycle!`): `:content (:content lifecycle-event)` =
+  `(:content result-message)` = **normalised content-blocks** (`[{:type :text :text …}]`,
+  via `normalize-tool-content` in `execute-tool-call!`).
+- Plan path (`dispatch-tool-result-in`): `:content (:content result)` = the **raw,
+  un-normalised** tool-result content passed by `run-tool-plan-step-in!`.
+So the same `"tool_result"` bus event delivers `:content` in two different shapes
+depending on the triggering path — the same `consistent(data_shapes)` class the
+`:input` unification was meant to close, one field deeper.
+
+Severity: low / arguably out-of-scope. (a) The paths are disjoint and the plan path
+is data-driven, pre-existing, and not touched by task 198. (b) The sole current
+consumer (`on-tool-result`) reads `:content` only via `(str content)` for error-reason
+derivation, so it is robust to either shape. (c) No invalid-state hazard like the
+silent-`nil` `:input` case. Recorded as a single low-priority follow-up for
+cross-path-contract completeness; not a blocker for this fix.
+
+No other simplicity/consistency/robustness issues. Implementation complete and correct.
