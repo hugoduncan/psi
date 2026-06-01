@@ -80,7 +80,7 @@
 
 ## Inconsistency review follow-ups (pass 3)
 
-- [ ] Correct the verification "same surface" over-claim (Acceptance criteria).
+- [x] Correct the verification "same surface" over-claim (Acceptance criteria).
       design.md prescribes a test asserting "the five step
       names/types/**targets** in order" and calls it "the same
       parser/compiler/definition surface used by the sibling `*-test` deftests
@@ -91,7 +91,7 @@
       target). Either drop/soften the "targets ... same surface" framing or
       state explicitly that the `:target` assertion is an addition beyond the
       cited exemplars.
-- [ ] Fix the acceptance criterion that over-claims `(empty? errors)`. design.md
+- [x] Fix the acceptance criterion that over-claims `(empty? errors)`. design.md
       states "The workflow parses and compiles cleanly (delegate targets resolve
       to workflow references). Verification is done by ... `load-edn-only` ...
       asserts `(empty? errors)`". `load-edn-only` loads ONLY `task-lifecycle.edn`

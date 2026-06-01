@@ -288,3 +288,31 @@ inconsistencies between design.md and the cited artifacts:
    remove the target-resolution claim from what `(empty? errors)` proves, or
    move target-resolution verification to a mechanism that actually loads all
    targets together (cf. `review-workflow-set-loads-together-test`).
+
+## 2026-06-01 — inconsistency follow-up execution pass 3 (ψ)
+
+Executed both pass-3 inconsistency-review follow-up items; design.md
+Acceptance-criteria verification bullet rewritten.
+
+1. "Same surface" over-claim — CORRECTED. Verified against
+   `workflow_definitions_test.clj`: `review-task-implementation-test` asserts
+   `(mapv :name steps)` + `(mapv :type steps)` only (no `:target`);
+   `create-task-plan-test` likewise (single `:session` step, no target). design.md
+   no longer calls the prescribed test "the same parser/compiler/definition
+   surface" as the siblings. It now states the names/types assertions match the
+   siblings and that the `:target` assertion is an explicit **addition** beyond
+   them (justified: distinct per-stage targets make target order a meaningful
+   invariant).
+
+2. `(empty? errors)` over-claim — CORRECTED. Verified `load-edn-only` →
+   `with-workflow-dir` writes ONLY the single `.edn` (global dirs → [], project
+   dir → temp dir); loader does no cross-workflow target-resolution check
+   (proof: pure-delegate `review-task-implementation-test` loads only its own
+   `.edn`, target `review-step` absent, still asserts `(empty? errors)`).
+   design.md now scopes `(empty? errors)` to "parses and compiles in isolation"
+   and explicitly states it does NOT verify delegate-target resolution. Removed
+   the "(delegate targets resolve to workflow references)" parenthetical from
+   what the isolated test establishes. Added that actual target resolution, if
+   wanted, needs a combined-load test (cf. `review-workflow-set-loads-together-test`,
+   which writes every member `.edn` into one `with-workflow-dir`) — declared
+   optional / not required for this task's first cut.

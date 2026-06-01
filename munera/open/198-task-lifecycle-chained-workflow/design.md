@@ -200,15 +200,39 @@ but is out of scope for the first cut.
 - Each step passes the Munera task identifier as the delegated workflow's input
   via `:prompt-string {:type :map :fields {:input {:from :workflow-input :path
   [:input]}}}`.
-- The workflow parses and compiles cleanly (delegate targets resolve to
-  workflow references). Verification is done by adding a `deftest` to
+- The workflow parses and compiles cleanly **in isolation**. Verification is
+  done by adding a `deftest` to
   `components/workflow-loader/test/psi/workflow_loader/workflow_definitions_test.clj`
   that loads `task-lifecycle.edn` via the existing `load-edn-only` helper
   (which calls `psi.workflow-loader.loader/load-workflow-definitions`), asserts
   `(empty? errors)`, asserts the definition `"task-lifecycle"` is present, and
-  asserts the five step names/types/targets in order. This is the same
-  parser/compiler/definition surface used by the sibling `*-test` deftests in
-  that namespace (e.g. `review-task-implementation-test`, `create-task-plan-test`).
+  asserts the five step names/types/targets in order.
+
+  Scope of what each assertion establishes (do not over-claim):
+
+  - `(empty? errors)` here establishes only that `task-lifecycle.edn` *parses
+    and compiles in isolation*. It does **not** verify that delegate
+    `:target`s resolve to real workflow references: `load-edn-only` writes only
+    the single `.edn` into the temp `with-workflow-dir` (global dirs → `[]`,
+    project dir → temp dir), so the five target workflows are absent at load,
+    and the loader performs no cross-workflow target-resolution check. (Proof:
+    the pure-delegate `review-task-implementation-test` loads only its own
+    `.edn` — target `review-step` absent — yet still asserts `(empty? errors)`.)
+  - The names/types assertions match the sibling `*-test` deftests
+    (`review-task-implementation-test`, `create-task-plan-test`), which assert
+    `(mapv :name steps)` and `(mapv :type steps)`. The **`:target` assertion is
+    an addition** beyond those exemplars — they assert names and types only, not
+    targets (and `create-task-plan-test`'s single `:session` step has no
+    target). It is included here because each stage delegates to a distinct
+    target, making target order a meaningful invariant to pin.
+  - Actual cross-workflow target resolution (each `:target` resolving to a
+    loaded definition) is **not** established by the isolated `load-edn-only`
+    test. If that guarantee is wanted, it must be verified by a test that loads
+    all five targets together (cf. `review-workflow-set-loads-together-test`,
+    which writes every member `.edn` into one `with-workflow-dir`). For this
+    task's first cut, isolated parse/compile + step-shape assertions are the
+    required surface; a combined-load target-resolution test is optional and not
+    required by these acceptance criteria.
 - CHANGELOG `[Unreleased]` MUST gain an `Added` entry for the new
   `task-lifecycle` workflow, following the precedent set by the existing
   `review-task-design` / `create-task-plan` entries (user-visible because it is
