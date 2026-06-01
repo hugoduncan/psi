@@ -1264,3 +1264,33 @@ a handler reader knows it can correlate a result with its originating call.
 Verified the `"tool_call"` row already matches `ext/tool-call-event`
 (`:tool-name :tool-call-id :input`) — left unchanged. Doc-only change; no code,
 tests, or lint affected.
+
+## 2026-06-01 — docs review (independent, review-task-docs skill, verification pass)
+
+Re-applied the full review-task-docs checklist against **source** (not notes),
+covering `CHANGELOG.md`, the `doc/extensions.md` `psi/metrics` entry, the
+extension-bus event-reference table, and the Tool Wrapping section.
+
+- **New/changed behaviours — ✓.** Both user-visible changes are documented:
+  `:tools` map now populated (`psi/metrics` entry + CHANGELOG `Fixed`), and
+  `tool_result` now carries `:input` on the interactive/batch path (CHANGELOG
+  `Changed` + the `"tool_result"` table row + Tool Wrapping prose).
+- **Event-reference table — ✓ accurate against canonical builders.** Verified
+  the two rows key-for-key against `extensions.clj`:
+  `tool-call-event` → `{:type "tool_call" :tool-name :tool-call-id :input}` ≡
+  table `{:type :tool-name :tool-call-id :input}`; `tool-result-event` →
+  `{:type "tool_result" :tool-name :tool-call-id :input :content :details
+  :is-error}` ≡ table `{:type :tool-name :tool-call-id :input :content :details
+  :is-error}`. The prior pass's `fe1a47a1e` alignment is correct.
+- **`psi/metrics` entry — ✓.** Subscribed events (6), `:tools`/token/provider
+  shapes, atomic-write + schema-validate-on-load, `metrics/summary`, `/metrics`,
+  `.psi/extensions.edn` activation, and the `emit-tool-lifecycle!` bridge
+  attribution all match source (`init`, `schema.clj`, `persistence.clj`,
+  `extension.clj` `content->text`/`error-reason`).
+- **Removed behaviours / README / examples — ✓.** Nothing removed; no stale
+  references; Tool Wrapping example consistent and surfaces `:input`/`:details`.
+- **CHANGELOG — ✓.** `[Unreleased]` `Changed` + `Fixed` entries present,
+  accurate, and user-visible-appropriate (bug fix + extension-capability change).
+
+**No new actionable docs issues.** All prior docs-review findings are closed and
+independently confirmed against source. Working tree clean.
