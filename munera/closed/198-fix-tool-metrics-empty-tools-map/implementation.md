@@ -108,3 +108,18 @@ Added two tests to `tool_execution_test.clj`:
 
 Verification: `clojure -M:test --focus psi.agent-session.tool-execution-test` →
 `11 tests, 60 assertions, 0 failures`. `clj-kondo` clean.
+
+## 2026-06-01 — final implementation review
+
+**Implementation complete and correct.** All acceptance criteria satisfied:
+- `emit-tool-lifecycle!` change is minimal and single-responsibility.
+- Payload shapes match what `on-tool-call`/`on-tool-result` consume (`:tool-name`, `:is-error`).
+- `(boolean (:is-error ...))` coercion correctly normalises `nil` → `false`.
+- `case` default `nil` correctly passes through non-bridged lifecycle events (`:tool-executing`, `:tool-execution-update`).
+- Bridge regression test and block-ignored non-enforcement test added and passing.
+- Changelog entry present. `clj-kondo` clean.
+
+**Pre-existing issue (not introduced by this task):** `extensions/metrics/deps.edn` is missing
+`psi/root-registry` as a transitive test dep, so `clojure -M:test -m kaocha.runner` in that
+directory fails to load. The metrics extension tests pass when run via the main `tests.edn`
+suite (which has the full classpath). No action required for this task.
