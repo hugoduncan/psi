@@ -346,3 +346,24 @@ The past-allowed / near-future-rejected **asymmetry** is recorded
 verified-correct (NOT a defect): it matches `doc/scheduler.md` "past absolute
 instants fire immediately" — no doc/behaviour drift. `psi_tool_scheduler_test`:
 1 test / 107 assertions / green. clj-kondo clean.
+
+## Slice 6 execution — Cancellation & lifecycle (2026-06-01)
+
+Audit found cancel-before-fire, `:queued`→cancel, cancel-all, and shutdown
+handle-clearing already covered. Two gaps filled:
+
+- **Race A** (`scheduler-cancel-before-stale-timer-callback-does-not-resurrect`,
+  seam test): capture the timer callback; cancel BEFORE invoking it; assert
+  `:cancelled` + handle removed; then invoke the **stale** callback and assert
+  the schedule stays `:cancelled` (not resurrected). The stale fire hits
+  `fire-schedule`'s non-`:pending` guard internally; the live callback path does
+  not re-store the schedule.
+- **No fire-after-shutdown**
+  (`shutdown-context-prevents-captured-timer-callback-from-firing`): capture the
+  callback; `shutdown-context!`; assert handle gone + schedule `:cancelled`; then
+  invoke the stale callback and assert it does not deliver (stays `:cancelled`).
+
+Both use non-`Thread` handles + a no-op `:scheduler-cancel-delay-fn` so cancel is
+deterministic. Race B terminal-status guard is the Slice-1
+`cancel-schedule-rejects-terminal-status`. 7 tests / 33 assertions green across
+seam + shutdown + effects.

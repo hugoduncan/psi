@@ -81,6 +81,11 @@ Baseline `bb test` (scheduler subset, 2026-06-01): `35 tests, 338 assertions, 0 
 
 | status | summary | covering test | repro / task-ref |
 | ------ | ------- | ------------- | ---------------- |
+| verified-correct | Cancel **before fire** → `:pending`→`:cancelled`; timer handle removed. | `scheduler-lifecycle-test/cancel-pending-and-queued-schedules`, `scheduler-dispatch-test/scheduler-cancel-marks-pending-or-queued-schedule-cancelled` (cited) | — |
+| verified-correct | **Race B** — `:queued`→cancel deliverable race → `:cancelled` + id removed from queue; terminal-status cancel throws "schedule is not cancellable" (pure). | `scheduler-lifecycle-test/cancel-pending-and-queued-schedules` (queued branch), `scheduler-test/cancel-schedule-rejects-terminal-status` (cited/new) | — |
+| verified-correct | **Race A** — cancel before the captured timer callback dispatches `:scheduler/fired`: cancel wins (`:cancelled`, handle removed); invoking the **stale** callback does **not** resurrect the schedule (stays `:cancelled`). | `scheduler-timer-seam-test/scheduler-cancel-before-stale-timer-callback-does-not-resurrect` (new) | — |
+| verified-correct | `cancel-all` / context shutdown clears all scheduler timer handles (`scheduler-timer-handle-count` 0, `:scheduler-timers*` empty) and cancels outstanding schedules. | `scheduler-context-shutdown-test/shutdown-context-clears-scheduler-timers`, `scheduler-effects-test/shutdown-context-cancels-scheduler-timers` (cited) | — |
+| verified-correct | **No fire-after-shutdown** — after `shutdown-context!`, the handle is gone, the schedule is `:cancelled`, and invoking a captured stale callback does not deliver (stays `:cancelled`). | `scheduler-context-shutdown-test/shutdown-context-prevents-captured-timer-callback-from-firing` (new) | — |
 
 ---
 

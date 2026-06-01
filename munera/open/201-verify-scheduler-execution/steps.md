@@ -170,27 +170,42 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Slice 6 — Cancellation & lifecycle
 
-- [ ] Audit cancel coverage
+- [x] Audit cancel coverage
       (`cancel-pending-and-queued-schedules-test` →
       `scheduler_lifecycle_test.clj`;
       `scheduler-cancel-marks-pending-or-queued-schedule-cancelled-test` →
       `scheduler_dispatch_test.clj`;
       `scheduler_context_shutdown_test.clj`, `scheduler_effects_test.clj`).
-- [ ] Ensure: cancel before fire → `:cancelled`.
-- [ ] Ensure race A — cancel before captured callback dispatches `:scheduler/fired`:
+      Done: cancel-before-fire, queued-cancel, cancel-all, shutdown handle-clear
+      all covered; race A and post-shutdown-no-fire were missing.
+- [x] Ensure: cancel before fire → `:cancelled`.
+      Done: covered by lifecycle + dispatch cancel tests.
+- [x] Ensure race A — cancel before captured callback dispatches `:scheduler/fired`:
       cancel runs (`:cancelled`, handle removed) before invoking captured callback;
       invoking the stale callback hits `fire-schedule` non-`:pending` →
       "only pending schedules can fire"; assert schedule stays `:cancelled`,
       not resurrected. Add if missing.
-- [ ] Ensure race B — `:queued` → cancel deliverable race: `:queued` → cancel
+      Done: added
+      `scheduler-cancel-before-stale-timer-callback-does-not-resurrect`
+      (seam test): capture callback → cancel → assert `:cancelled` + handle gone
+      → invoke stale callback → still `:cancelled`.
+- [x] Ensure race B — `:queued` → cancel deliverable race: `:queued` → cancel
       → `:cancelled` + id removed from queue; terminal-status cancel throws
       "schedule is not cancellable". Add if missing.
-- [ ] Ensure `cancel-all` coverage.
-- [ ] Ensure context-shutdown coverage via `context/shutdown-context!` (or
+      Done: `:queued`→cancel covered by lifecycle test; terminal-status guard by
+      Slice 1 `cancel-schedule-rejects-terminal-status`.
+- [x] Ensure `cancel-all` coverage.
+      Done: shutdown tests exercise per-session cancel-all-schedules.
+- [x] Ensure context-shutdown coverage via `context/shutdown-context!` (or
       `dispatch-effects/cancel-all-scheduler-timers!`): after shutdown
       `scheduler-timer-handle-count` = 0, `:scheduler-timers*` empty, no captured
       callback fires `:scheduler/fired` post-shutdown. Add if missing.
-- [ ] Record cancellation & lifecycle finding(s) citing covering deftests.
+      Done: handle-count 0 + empty + `:cancelled` covered by existing shutdown
+      tests; added `shutdown-context-prevents-captured-timer-callback-from-firing`
+      for the no-fire-after-shutdown assertion (invoke stale callback → no
+      delivery).
+- [x] Record cancellation & lifecycle finding(s) citing covering deftests.
+      Done: 5 entries recorded (all `verified-correct`).
 
 ## Slice 7 — Failure path
 

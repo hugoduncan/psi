@@ -63,6 +63,52 @@
       (is (= {:handle :fake} @cancelled*))
       (is (= :cancelled (get-in @(:state* ctx*) [:agent-session :sessions session-id :data :scheduler :schedules "sch-1" :status]))))))
 
+;; --- 201 verification: cancel racing the timer (Race A — cancel before the
+;; captured callback dispatches :scheduler/fired). Cancel wins; invoking the
+;; stale callback must NOT resurrect the schedule (fire-schedule hits the
+;; non-:pending guard "only pending schedules can fire").
+
+(deftest scheduler-cancel-before-stale-timer-callback-does-not-resurrect-test
+  (testing "cancel runs before the captured callback; invoking the stale callback leaves the schedule :cancelled"
+    (let [now              (java.time.Instant/parse "2026-04-21T17:30:00Z")
+          [ctx session-id] (create-session-context
+                            {:persist? false
+                             :scheduler-time-source (test-support/fixed-scheduler-time-source now)})
+          callback*        (atom nil)
+          ctx*             (assoc ctx
+                                  :scheduler-run-after-delay-fn
+                                  (fn [_ctx _delay-ms f]
+                                    (reset! callback* f)
+                                    {:handle :fake})
+                                  ;; non-Thread handle → cancel uses the cancel-delay-fn path
+                                  :scheduler-cancel-delay-fn (fn [_ctx _handle] nil))]
+      (session/dispatch-in! ctx* :scheduler/create
+                            {:session-id session-id
+                             :schedule-id "sch-race"
+                             :kind :message
+                             :label "race"
+                             :message "race"
+                             :created-at now
+                             :fire-at (.plusMillis now 5000)}
+                            {:origin :core})
+      (is (some? @callback*) "timer callback captured")
+      ;; cancel BEFORE the captured callback fires
+      (session/dispatch-in! ctx* :scheduler/cancel
+                            {:session-id session-id
+                             :schedule-id "sch-race"}
+                            {:origin :core})
+      (is (= :cancelled (get-in @(:state* ctx*)
+                                [:agent-session :sessions session-id
+                                 :data :scheduler :schedules "sch-race" :status])))
+      (is (nil? (get @(:scheduler-timers* ctx*) "sch-race"))
+          "cancel removed the timer handle")
+      ;; now invoke the stale callback — must not resurrect the schedule
+      (@callback*)
+      (is (= :cancelled (get-in @(:state* ctx*)
+                                [:agent-session :sessions session-id
+                                 :data :scheduler :schedules "sch-race" :status]))
+          "stale callback did not resurrect the cancelled schedule"))))
+
 (deftest scheduler-cancelled-default-delay-thread-exits-without-uncaught-interrupted-exception-test
   (testing "cancelling the default delayed scheduler thread interrupts sleep without leaking an uncaught exception"
     (let [now              (java.time.Instant/parse "2026-04-21T17:20:00Z")
