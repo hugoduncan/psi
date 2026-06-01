@@ -1,0 +1,40 @@
+{:steps
+ [{:name "review-task-design",
+   :type :delegate,
+   :target "review-task-design",
+   :prompt-string
+   {:type :map,
+    :fields {:input {:from :workflow-input, :path [:input]}}},
+   :context [{:type :source, :from :workflow-original}]}
+  {:name "create-task-plan",
+   :type :delegate,
+   :target "create-task-plan",
+   :prompt-string
+   {:type :map,
+    :fields {:input {:from :workflow-input, :path [:input]}}},
+   :context [{:type :source, :from :workflow-original}]}
+  {:name "review-task-plan",
+   :type :delegate,
+   :target "review-task-plan",
+   :prompt-string
+   {:type :map,
+    :fields {:input {:from :workflow-input, :path [:input]}}},
+   :context [{:type :source, :from :workflow-original}]}
+  {:name "implement-task",
+   :type :delegate,
+   :target "implement-task",
+   :prompt-string
+   {:type :map,
+    :fields {:input {:from :workflow-input, :path [:input]}}},
+   :context [{:type :source, :from :workflow-original}]}
+  {:name "review-task-implementation",
+   :type :delegate,
+   :target "review-task-implementation",
+   :prompt-string
+   {:type :map,
+    :fields {:input {:from :workflow-input, :path [:input]}}},
+   :context [{:type :source, :from :workflow-original}]}],
+ :name "task-lifecycle",
+ :description
+ "Run a Munera task through its full design → plan → implement → review lifecycle by chaining the five task-lifecycle workflows in order."}
+

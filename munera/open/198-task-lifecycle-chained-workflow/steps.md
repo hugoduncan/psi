@@ -2,23 +2,23 @@
 
 ## Slice 1 — Workflow file
 
-- [ ] Re-read `review-task-implementation.edn` and `gh-issue-implement.edn` to
+- [x] Re-read `review-task-implementation.edn` and `gh-issue-implement.edn` to
       confirm the exact `:map` `:prompt-string` shape and the top-level
       `{:steps [...] :name ... :description ...}` map layout.
-- [ ] Write `.psi/workflows/task-lifecycle.edn` with top-level
+- [x] Write `.psi/workflows/task-lifecycle.edn` with top-level
       `:name "task-lifecycle"` and a `:description` ("Run a Munera task through
       its full design → plan → implement → review lifecycle by chaining the five
       task-lifecycle workflows in order.").
-- [ ] Add the five `:type :delegate` steps in order, each with `:name` = `:target`:
+- [x] Add the five `:type :delegate` steps in order, each with `:name` = `:target`:
       `review-task-design`, `create-task-plan`, `review-task-plan`,
       `implement-task`, `review-task-implementation`.
-- [ ] Give every step
+- [x] Give every step
       `:prompt-string {:type :map :fields {:input {:from :workflow-input :path [:input]}}}`.
-- [ ] Give every step `:context [{:type :source :from :workflow-original}]` and
+- [x] Give every step `:context [{:type :source :from :workflow-original}]` and
       no other context (no prior-step yield references).
-- [ ] Confirm the terminal (`review-task-implementation`) step declares no
+- [x] Confirm the terminal (`review-task-implementation`) step declares no
       explicit `:yields` and no `:terminal-contract`.
-- [ ] Run `clj-paren-repair .psi/workflows/task-lifecycle.edn` to balance
+- [x] Run `clj-paren-repair .psi/workflows/task-lifecycle.edn` to balance
       delimiters and format.
 
 ## Slice 2 — Verification test

@@ -289,6 +289,20 @@ inconsistencies between design.md and the cited artifacts:
    move target-resolution verification to a mechanism that actually loads all
    targets together (cf. `review-workflow-set-loads-together-test`).
 
+## 2026-06-01 — Slice 1: workflow file authored (ψ)
+
+Wrote `.psi/workflows/task-lifecycle.edn` exactly per design "Concrete step and
+file shape": top-level `:name "task-lifecycle"` + `:description`, five
+`:type :delegate` steps in order with `:name` = `:target`
+(`review-task-design`, `create-task-plan`, `review-task-plan`, `implement-task`,
+`review-task-implementation`), each step `:prompt-string {:type :map :fields
+{:input {:from :workflow-input :path [:input]}}}` and
+`:context [{:type :source :from :workflow-original}]`. Terminal step declares no
+`:yields` / `:terminal-contract` (relies on propagated session default yield).
+Description uses literal `→` to match sibling convention (`gh-pr-refine.edn`),
+not a `\u2192` escape. `clj-paren-repair` reports Success: 1 / Failed: 0; file
+reads as valid EDN.
+
 ## 2026-06-01 — inconsistency follow-up execution pass 3 (ψ)
 
 Executed both pass-3 inconsistency-review follow-up items; design.md
