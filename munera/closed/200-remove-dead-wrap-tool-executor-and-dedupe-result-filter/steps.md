@@ -75,15 +75,22 @@
 
 ## Test review follow-ups (test-shaper, 2026-06-01)
 
-- [ ] S1: Extract a shared helper for the `dispatch-tool-result-*` test cluster
+- [x] S1: Extract a shared helper for the `dispatch-tool-result-*` test cluster
   (extensions_test.clj:383–478) that registers one `tool_result` handler
   returning a fixed value and invokes `dispatch-tool-result-in`, compressing the
   6× repeated `create-registry`/`register-extension-in!`/`register-handler-in!`/
   5-arg-dispatch ceremony so each test states only its varying axis
   (handler return → selected map / nil). Helper must compress ceremony without
   hiding intent (keep the handler-return and expected-override visible per test).
-- [ ] S2: Remove the incidental, never-asserted original-result detail
+  Added `result-override` helper; rewrote the 5 override-selection tests to one
+  visible `(is (= <expected> (result-override <handler-return>)))` line each.
+  (The two payload-capturing coercion tests vary the *input* result/is-error?
+  and assert on the captured incoming payload, a different axis, so they are
+  intentionally left outside the override-selection helper.)
+- [x] S2: Remove the incidental, never-asserted original-result detail
   (`{:content "original" :is-error false}`) from the override-selection tests —
   fold it into the S1 helper as a single fixed constant (or an inert marker) so
   the reader focuses on the handler-return vs expected-override contract, not the
   discarded original payload.
+  Replaced with the inert marker `inert-original-result` (`::original`) held
+  inside the `result-override` helper; no test references it.

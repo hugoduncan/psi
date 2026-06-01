@@ -1,5 +1,5 @@
 (ns psi.agent-session.extensions-test
-  "Tests for the extension registry, dispatch, tool wrapping, and introspection."
+  "Tests for the extension registry, dispatch, and introspection."
   (:require
    [clojure.test :refer [deftest testing is]]
    [psi.deterministic-operation-runtime.core :as deterministic-op-runtime]
@@ -380,6 +380,23 @@
       (ext/bus-emit-in! reg "ch" :x)
       (is (= [[:a :x] [:b :x]] @fired)))))
 
+;; The original runtime result passed to dispatch-tool-result-in is incidental
+;; to override-selection: the handler return fully replaces it. Keep it a single
+;; inert marker so each override-selection test states only its varying axis
+;; (handler return → selected override / nil).
+(def ^:private inert-original-result ::original)
+
+(defn- result-override
+  "Register one tool_result handler returning handler-return, then invoke
+   dispatch-tool-result-in with the inert original result. Returns the dispatch
+   result: the selected override map, or nil when the filter rejects the return."
+  [handler-return]
+  (let [reg (ext/create-registry)]
+    (ext/register-extension-in! reg "/ext/a")
+    (ext/register-handler-in! reg "/ext/a" "tool_result" (fn [_] handler-return))
+    (ext/dispatch-tool-result-in reg "read" "call-1" {"path" "x"}
+                                 inert-original-result false)))
+
 (deftest dispatch-tool-result-normalizes-content-test
   (testing "plan-path tool_result bus event delivers :content as normalized content-blocks"
     (let [reg     (ext/create-registry)
@@ -412,69 +429,36 @@
 
 (deftest dispatch-tool-result-non-map-return-test
   (testing "tool_result handler returning a non-map yields no override (nil)"
-    (let [reg (ext/create-registry)
-          _   (ext/register-extension-in! reg "/ext/a")
-          _   (ext/register-handler-in! reg "/ext/a" "tool_result"
-                                        (fn [_] "not-a-map"))]
-      ;; The surviving filter predicate's map?/contains? guard rejects non-map
-      ;; handler returns, so no modifiable-key override is produced.
-      (is (nil? (ext/dispatch-tool-result-in reg "read" "call-1" {"path" "x"}
-                                             {:content "original" :is-error false}
-                                             false))))))
+    ;; The surviving filter predicate's map?/contains? guard rejects non-map
+    ;; handler returns, so no modifiable-key override is produced.
+    (is (nil? (result-override "not-a-map")))))
 
 (deftest dispatch-tool-result-modifiable-key-override-test
   (testing "tool_result handler returning a map with a modifiable key is selected as the override"
-    (let [reg (ext/create-registry)
-          _   (ext/register-extension-in! reg "/ext/a")
-          _   (ext/register-handler-in! reg "/ext/a" "tool_result"
-                                        (fn [_] {:content "override"}))]
-      ;; The surviving filter predicate's contains? guard selects map returns
-      ;; carrying a modifiable key (:content/:details/:is-error) — the single
-      ;; source of the modifiable-key contract.
-      (is (= {:content "override"}
-             (ext/dispatch-tool-result-in reg "read" "call-1" {"path" "x"}
-                                          {:content "original" :is-error false}
-                                          false))))))
+    ;; The surviving filter predicate's contains? guard selects map returns
+    ;; carrying a modifiable key (:content/:details/:is-error) — the single
+    ;; source of the modifiable-key contract.
+    (is (= {:content "override"} (result-override {:content "override"})))))
 
 (deftest dispatch-tool-result-map-without-modifiable-key-test
   (testing "tool_result handler returning a map lacking all modifiable keys yields no override (nil)"
-    (let [reg (ext/create-registry)
-          _   (ext/register-extension-in! reg "/ext/a")
-          _   (ext/register-handler-in! reg "/ext/a" "tool_result"
-                                        (fn [_] {:other 1}))]
-      ;; The filter predicate's contains? guard rejects map returns without any
-      ;; of :content/:details/:is-error, so no modifiable-key override is produced.
-      (is (nil? (ext/dispatch-tool-result-in reg "read" "call-1" {"path" "x"}
-                                             {:content "original" :is-error false}
-                                             false))))))
+    ;; The filter predicate's contains? guard rejects map returns without any
+    ;; of :content/:details/:is-error, so no modifiable-key override is produced.
+    (is (nil? (result-override {:other 1})))))
 
 (deftest dispatch-tool-result-details-only-override-test
   (testing "tool_result handler returning a map with only :details is selected as the override"
-    (let [reg (ext/create-registry)
-          _   (ext/register-extension-in! reg "/ext/a")
-          _   (ext/register-handler-in! reg "/ext/a" "tool_result"
-                                        (fn [_] {:details {:k :v}}))]
-      ;; Protects the (contains? :details) disjunct of the single-sourced
-      ;; modifiable-key contract — a map carrying only :details (no
-      ;; :content/:is-error) is selected as the override.
-      (is (= {:details {:k :v}}
-             (ext/dispatch-tool-result-in reg "read" "call-1" {"path" "x"}
-                                          {:content "original" :is-error false}
-                                          false))))))
+    ;; Protects the (contains? :details) disjunct of the single-sourced
+    ;; modifiable-key contract — a map carrying only :details (no
+    ;; :content/:is-error) is selected as the override.
+    (is (= {:details {:k :v}} (result-override {:details {:k :v}})))))
 
 (deftest dispatch-tool-result-is-error-only-override-test
   (testing "tool_result handler returning a map with only :is-error is selected as the override"
-    (let [reg (ext/create-registry)
-          _   (ext/register-extension-in! reg "/ext/a")
-          _   (ext/register-handler-in! reg "/ext/a" "tool_result"
-                                        (fn [_] {:is-error true}))]
-      ;; Protects the (contains? :is-error) disjunct of the single-sourced
-      ;; modifiable-key contract — a map carrying only :is-error (no
-      ;; :content/:details) is selected as the override.
-      (is (= {:is-error true}
-             (ext/dispatch-tool-result-in reg "read" "call-1" {"path" "x"}
-                                          {:content "original" :is-error false}
-                                          false))))))
+    ;; Protects the (contains? :is-error) disjunct of the single-sourced
+    ;; modifiable-key contract — a map carrying only :is-error (no
+    ;; :content/:details) is selected as the override.
+    (is (= {:is-error true} (result-override {:is-error true})))))
 
 (deftest tool-event-payload-constructors-test
   (testing "tool-call-event builds the canonical tool_call payload shape"

@@ -301,3 +301,39 @@ collapsed into one `are`-table. The S1 helper alone suffices to remove the
 ceremony while retaining per-test signal.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Test review follow-up execution (test-shaper pass, 2026-06-01)
+
+Executed S1 and S2 from the test-shaper pass. Both reshape the
+`dispatch-tool-result-*` override-selection cluster without changing coverage.
+
+- S1 → added a private `result-override` helper (placed just before
+  `dispatch-tool-result-normalizes-content-test`): registers one `tool_result`
+  handler returning a fixed value and invokes `dispatch-tool-result-in` with the
+  inert original result, returning the dispatch result. Rewrote the five
+  override-selection tests (`-non-map-return`, `-modifiable-key-override`,
+  `-map-without-modifiable-key`, `-details-only-override`,
+  `-is-error-only-override`) so each is a single
+  `(is (= <expected> (result-override <handler-return>)))` (or `nil?`) line —
+  the handler return and expected override stay visible per test; per-disjunct
+  deftests retained for per-branch failure signal (per the test-shaper note).
+  The two payload-capturing coercion tests
+  (`-normalizes-content`, `-coerces-is-error`) were intentionally left out of the
+  helper: they vary the *input* result and `is-error?` arg and assert on the
+  captured *incoming* payload — a different axis the override helper does not
+  model.
+- S2 → removed the never-asserted original payload
+  `{:content "original" :is-error false}` from the override-selection tests;
+  folded into the helper as a single inert marker constant
+  `inert-original-result` (`::original`). The original is incidental to
+  override-selection (the handler return fully replaces it), so a non-map marker
+  is safe — `dispatch-tool-result-in` only reads `(:content result)`/`(:details
+  result)` to build the event the handler ignores.
+- Also corrected the now-stale ns docstring ("…dispatch, tool wrapping, and
+  introspection" → "…dispatch, and introspection"): tool wrapping was removed in
+  slice 1.
+- Verify: clj-paren-repair (no changes), clj-kondo clean (0/0); Kaocha focus
+  `psi.agent-session.extensions-test` → 30 tests, 98 assertions, 0 failures
+  (unchanged from before — pure shape change, no coverage delta). No deviations.
+
+PASS_STATUS: REVIEW_COMPLETE (test-shaper S1/S2 resolved)
