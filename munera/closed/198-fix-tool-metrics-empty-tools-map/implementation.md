@@ -1167,3 +1167,48 @@ Boundary behaviour verified empirically before authoring the assertions.
 `clojure -M:test --focus psi.metrics.extension-test` → **22 tests, 48
 assertions, 0 failures** (was 21/46); `clj-kondo --lint` on the file → 0
 errors, 0 warnings. This was the last unchecked step in steps.md.
+
+---
+
+## 2026-06-01 — test review (independent, test-shaper skill)
+
+Re-applied test-shaper against the in-scope test surface (`extension_test.clj`,
+`tool_execution_test.clj`, `extensions_test.clj`) and live run (61 tests, 214
+assertions, 0 failures across the three foci). Verified `tests.edn` registers
+`extensions/metrics/test` in `:unit`/`:extensions`/`:integration` — the
+regression guards are collected by CI.
+
+**No new actionable issue within task scope.** The task's own contract surface
+is convergently covered:
+- bridge fires both `tool_call`/`tool_result` handlers, carrying `:type`,
+  `:tool-name`, `:tool-call-id`, `:is-error`, `:input` (parsed-args)
+  (`emit-tool-lifecycle-bridge-fires-extension-handlers-test`);
+- cross-path `:content` normalization (`dispatch-tool-result-normalizes-content-test`),
+  `:is-error` coercion (`dispatch-tool-result-coerces-is-error-test`), and the
+  single-sourced builder + idempotence (`tool-event-payload-constructors-test`);
+- `content->text` / `error-reason` derivation pinned over single-block,
+  multi-text-block, multiline-80-char-truncation, and non-text-block (image
+  drop → empty key) boundaries; `:error-reasons` key asserted exactly on both
+  the unit and e2e (bridge) paths;
+- block/non-block `:tool-call` ignore path, interactive-path `{:block true}`
+  non-enforcement, reload-preserves-counters, summary schema-conformance.
+
+`simple ∧ consistent ∧ robust ∧ economical` hold: single-concern deftests,
+uniform `make-api`/`fire-event` and `run-tool-call-through-metrics-ext!` helpers
+(compress ceremony, intent stays local), deterministic (defonce atoms reset in
+fixtures/`finally`), state/output assertions only (no interaction-mocking). The
+prior pass's non-text-block boundary finding was executed and pinned
+(`f219d03c7`); it is the last unchecked item resolved.
+
+**Out-of-scope note (not actionable here).** The `session_turn_finished` token
+tests assert `:input`/`:output` accumulation and the second-turn delta but never
+assert non-zero `:cache-read`/`:cache-write` (always 0 in the fixtures), so the
+cache-token accumulation path is exercised structurally but unasserted — a
+`cover_by(boundaries)` gap in token tracking. This is pre-existing behaviour
+outside task 198's tool-metrics-bridge scope; raising it as a task-198 follow-up
+would be scope drift (`scope_drift → close ∧ create new task`). Recorded for a
+future token-tracking task, not added to this task's steps.
+
+**Verification.** `clojure -M:test --focus psi.metrics.extension-test --focus
+psi.agent-session.tool-execution-test --focus psi.agent-session.extensions-test`
+→ **61 tests, 214 assertions, 0 failures**.
