@@ -1,14 +1,17 @@
-# 201 — Verify scheduler and scheduled task execution
+# 201 — Verify scheduler and scheduled task execution (verification-only)
 
 ## Intent
 
-Establish confidence that the scheduler subsystem is correct **end-to-end** —
-both the pure state model and the live runtime firing/delivery path — and
-remediate any defects discovered along the way.
+Establish confidence that the scheduler subsystem behaves correctly
+**end-to-end** — both the pure state model and the live runtime firing/delivery
+path — by exercising and documenting its behaviour.
 
-The verification is the primary deliverable; fixes are whatever the
-verification exposes. The success of this task is measured by *demonstrated
-correct behaviour*, not by a predetermined code change.
+This is a **verification-only** task. The deliverable is demonstrated evidence
+of behaviour (passing characterisation/integration coverage) plus a clear
+findings record. Defects discovered are **reported**, not fixed here: each is
+captured as a new task (and a reproducing failing test where practical). The
+success of this task is measured by *coverage and a defect inventory*, not by
+any remediation.
 
 ## Problem
 
@@ -41,7 +44,7 @@ session-kind creation, failure recording, and context-shutdown timer cleanup.
 ## Scope
 
 Verification, layer by layer, of existing behaviour against documented intent
-(`doc/scheduler.md`), plus fixes for any defect found:
+(`doc/scheduler.md`):
 
 1. **Baseline** — inventory and run the existing scheduler test suite; confirm
    current pass/fail state and capture it.
@@ -68,15 +71,22 @@ Verification, layer by layer, of existing behaviour against documented intent
    background-job projections stay coherent with underlying state across
    statuses.
 
-For every defect found: write a failing test that reproduces it, fix at root
-cause (prefer structural over patch), and follow the change_chain
-(meta/spec/tests/code/doc). If no defects are found in an area, the deliverable
-for that area is the verifying test/evidence itself.
+The deliverable for each area is the verifying test/evidence itself. Where a
+defect is found, record it in the findings inventory and (where practical)
+write a failing test that reproduces it — but **do not fix it here**; raise a
+separate task for remediation. New verification tests added by this task must
+pass against current behaviour (a reproducing failing test for a defect stays
+in the new remediation task, not committed green here).
 
 ## Out of scope
 
-- Adding schedule **persistence** across process restart — the scheduler is
-  intentionally volatile by design.
+- **Fixing** any defect found — remediation is a separate task per defect. This
+  task only verifies and reports.
+- **Changing** scheduler source code, `doc/scheduler.md`, or behaviour. (Drift
+  found between doc and behaviour is *recorded as a finding*, not corrected
+  here.) Only new test/characterisation namespaces are added.
+- Adding schedule **persistence** across process restart — intentionally
+  volatile by design.
 - **Recurring** schedules — intentionally one-shot by design.
 - Architectural redesign of the scheduler layering.
 - New scheduler features or new psi-tool ops beyond create / list / cancel.
@@ -84,6 +94,8 @@ for that area is the verifying test/evidence itself.
 
 ## Adjacent task-like work
 
+- Each defect found → a **new remediation task** (carrying its reproducing
+  failing test), not handled here.
 - If verification surfaces a desirable feature (persistence, recurrence, richer
   UI), capture it as a **new** task rather than expanding this one.
 
@@ -91,16 +103,16 @@ for that area is the verifying test/evidence itself.
 
 - The existing scheduler test suite passes (`bb test`), and the
   message-kind and session-kind **live execution paths** are each covered by a
-  test that drives the real effect/dispatch round trip via an injectable
-  time/delay seam (no wall-clock sleeps in tests).
+  new verification test that drives the real effect/dispatch round trip via an
+  injectable time/delay seam (no wall-clock sleeps in tests).
 - Busy-session queueing + drain-on-idle, cancellation (including cancel-racing
   the timer), failure recording, and context-shutdown timer cleanup each have
   passing verifying coverage.
-- Every defect discovered is captured by a failing-then-passing test and fixed
-  at root cause; coherence across meta/spec/tests/code/doc is maintained.
-- `doc/scheduler.md` accurately reflects verified behaviour; corrected if drift
-  is found.
-- `clj-kondo` is clean on all touched files; `bb test` is green.
+- A **findings inventory** records, per area: verified-correct, or defect
+  (with reproduction notes and a raised remediation task reference).
+- New verification tests pass against current behaviour; no scheduler
+  source/doc/behaviour is modified by this task.
+- `clj-kondo` is clean on all touched (test) files; `bb test` is green.
 
 ## Key concepts
 
