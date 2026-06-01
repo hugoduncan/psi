@@ -205,7 +205,7 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
 
 ## Test-shaper follow-ups (2026-06-01, third test-shaper pass)
 
-- [ ] Consolidate the duplicated connector-seed ceremony in `client_test.clj`
+- [x] Consolidate the duplicated connector-seed ceremony in `client_test.clj`
   into a shared `psi.project-nrepl.test-support/seed-connector!` helper. Both
   `connect-instance-in-test` and `connect-instance-in-missing-session-id-test`
   repeat the same `ensure-instance-in!` (`:worktree-path`/`:acquisition-mode
@@ -218,4 +218,16 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
   single-sourcing the seeded `[:runtime-handle :nrepl-connector]` shape and the
   endpoint map. Each test keeps its own `connector` fn (happy vs. metadata-less
   session fn) and its own assertions; only the install ceremony is shared. Keep
-  tests green + lint clean.
+  tests green + lint clean. — DONE: added
+  `psi.project-nrepl.test-support/seed-connector!` (ensure attached instance +
+  `assoc-in` connector under `[:runtime-handle :nrepl-connector]`, mirroring
+  `install-instance!`). Both `connect-instance-in-test` and
+  `connect-instance-in-missing-session-id-test` now `:refer` and call
+  `(seed-connector! ctx worktree connector)`, dropping the duplicated
+  ensure+update ceremony and the inline endpoint map. Each test keeps its own
+  `connector` fn and assertions; `disconnect-instance-in-test` (distinct
+  proxy-Closeable setup, not connector-seeding) still uses
+  `project-nrepl-runtime` directly. The seeded `[:runtime-handle
+  :nrepl-connector]` shape + endpoint map are now single-sourced. Focused
+  project-nrepl suite (8 ns) 26 tests / 151 assertions / 0 failures unchanged;
+  `clj-kondo` 0/0 on `client_test.clj` + `test_support.clj`.

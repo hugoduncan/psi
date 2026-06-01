@@ -34,6 +34,21 @@
            :runtime-handle {:client-session client-session
                             :session-id "nrepl-session-1"})))
 
+(defn seed-connector!
+  "Ensure a managed attached instance at `worktree-path` and seed `connector`
+   under `[:runtime-handle :nrepl-connector]` (the `connect-instance-in!` seam).
+   Single-sources the ensure ceremony and the endpoint map shared by the
+   client_test connector-seam tests."
+  [ctx worktree-path connector]
+  (project-nrepl-runtime/ensure-instance-in!
+   ctx
+   {:worktree-path worktree-path
+    :acquisition-mode :attached
+    :endpoint {:host "127.0.0.1" :port 7888 :port-source :explicit}})
+  (project-nrepl-runtime/update-instance-in!
+   ctx worktree-path
+   #(assoc-in % [:runtime-handle :nrepl-connector] connector)))
+
 (defn temp-dir
   "Create a fresh temp directory and return its absolute path string."
   [prefix]

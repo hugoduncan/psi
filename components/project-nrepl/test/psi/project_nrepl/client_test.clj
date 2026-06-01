@@ -3,7 +3,7 @@
    [clojure.test :refer [deftest is testing]]
    [psi.project-nrepl.client :as project-nrepl-client]
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
-   [psi.project-nrepl.test-support :refer [make-ctx session-fn-with-id]]))
+   [psi.project-nrepl.test-support :refer [make-ctx seed-connector! session-fn-with-id]]))
 
 (deftest connect-instance-in-test
   (testing "connect establishes single managed client session and capability flags"
@@ -16,14 +16,7 @@
                        {:transport transport
                         :client client-fn
                         :client-session session-fn})]
-      (project-nrepl-runtime/ensure-instance-in!
-       ctx
-       {:worktree-path worktree
-        :acquisition-mode :attached
-        :endpoint {:host "127.0.0.1" :port 7888 :port-source :explicit}})
-      (project-nrepl-runtime/update-instance-in!
-       ctx worktree
-       #(assoc-in % [:runtime-handle :nrepl-connector] connector))
+      (seed-connector! ctx worktree connector)
       (let [instance (project-nrepl-client/connect-instance-in! ctx worktree)]
         (is (= :ready (:lifecycle-state instance)))
         (is (= true (:readiness instance)))
@@ -43,14 +36,7 @@
                        {:transport {:transport :fake}
                         :client (fn ([] nil) ([_] nil))
                         :client-session (fn [_] nil)})]
-      (project-nrepl-runtime/ensure-instance-in!
-       ctx
-       {:worktree-path worktree
-        :acquisition-mode :attached
-        :endpoint {:host "127.0.0.1" :port 7888 :port-source :explicit}})
-      (project-nrepl-runtime/update-instance-in!
-       ctx worktree
-       #(assoc-in % [:runtime-handle :nrepl-connector] connector))
+      (seed-connector! ctx worktree connector)
       (is (thrown-with-msg?
            clojure.lang.ExceptionInfo
            #"did not expose a session id"

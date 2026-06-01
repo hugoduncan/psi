@@ -1081,3 +1081,28 @@ not introduced by this task) and `disconnect-instance-in-test`'s `closed*` atom
 sole observable effect on an opaque object, defensible as a real-effect state
 check rather than a call-count interaction assertion; seen and accepted by the
 prior task-test-review passes). Raising either would be scope expansion.
+
+## seed-connector! consolidation (2026-06-01, third test-shaper follow-up)
+
+Implemented the `seed-connector!` consolidation described in the prior note.
+Added `psi.project-nrepl.test-support/seed-connector!`:
+`(seed-connector! ctx worktree-path connector)` → `ensure-instance-in!`
+(attached, endpoint `{:host "127.0.0.1" :port 7888 :port-source :explicit}`) +
+`update-instance-in!` that `assoc-in`s `connector` under
+`[:runtime-handle :nrepl-connector]`. Mirrors `install-instance!`.
+
+`client_test.clj`: both `connect-instance-in-test` and
+`connect-instance-in-missing-session-id-test` now `:refer` and call
+`seed-connector!`, dropping the duplicated ensure+update ceremony and the
+inline endpoint map. Each test retains its own `connector` fn (happy vs.
+metadata-less session fn) and assertions. `disconnect-instance-in-test` keeps
+its direct `project-nrepl-runtime` usage — its setup is a proxy-`Closeable`
+runtime-handle, not connector seeding, so it is not a `seed-connector!` site.
+The `project-nrepl-runtime` require stays (still used by
+`disconnect-instance-in-test`).
+
+The seeded `[:runtime-handle :nrepl-connector]` shape and the endpoint map are
+now single-sourced — the last un-consolidated seam-seeding idiom in the test
+tree is gone. Focused project-nrepl suite (8 ns): 26 tests / 151 assertions /
+0 failures (unchanged). `clj-kondo` 0/0 on `client_test.clj` +
+`test_support.clj`.
