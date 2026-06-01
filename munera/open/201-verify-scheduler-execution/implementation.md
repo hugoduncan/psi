@@ -57,3 +57,38 @@ timer-seam list added:
    entries {status, summary, covering test ns+deftest, repro+task-ref for defects}.
 8. remediation policy → describe in findings.md; create `munera/open/NNN-slug`
    only when a defect is actually found (failing repro stays in that new task).
+
+## Design review — inconsistencies (2026-06-01)
+
+Reviewed design.md for internal consistency and against referenced source
+(scheduler.clj, dispatch_handlers/scheduler.clj, dispatch_effects.clj,
+dispatch_handlers/statechart_actions.clj, context.clj, psi_tool_scheduler.clj,
+scheduler_time.clj, scheduler_runtime.clj) + doc/scheduler.md. Verified:
+
+- Quoted error strings exact ("below/exceeds the … bound", "not cancellable",
+  "only pending schedules can fire", "only pending schedules can fire").
+- Timer/cancel seams (`:scheduler-run-after-delay-fn`,
+  `:scheduler-cancel-delay-fn`, `:scheduler-timers*`, `:daemon-thread-fn`),
+  handle mirroring (start assoc / cancel dissoc / fire `finally` dissoc), and
+  `scheduler-timer-handle-count`/`cancel-all-scheduler-timers!` match
+  dispatch_effects.clj.
+- Shutdown surface matches `context/shutdown-context!` (cancel-all per session +
+  `cancel-all-scheduler-timers!` + reset `:scheduler-timers*`).
+- Drain via explicit `:scheduler/drain-queue` dispatch (no idle detector);
+  drain ordering `[fire-at created-at schedule-id]` matches `drain-one`.
+- `:session` always delivers; `:message` queues when ¬idle (idle = ¬streaming ∧
+  ¬compacting) — matches `fire-schedule`/`idle-session?`.
+- `:at` bounds: past/now→delay 0 unvalidated (fires immediately, matches doc);
+  future <1000ms→below-min throw; >24h→exceeds-max — matches `resolve-fire-time!`.
+- Cancel-race outcomes (non-pending stale fire throw surfaces; `:queued`→cancel
+  dequeues; terminal cancel throws) match `fire-schedule`/`cancel-schedule`.
+- Failure path status guard `{:pending :queued :delivered}` and `:session`
+  deliver-then-fail flow match `fail-schedule`/`:scheduler/deliver`.
+- EQL `:psi.scheduler/*` attrs match scheduler_runtime.clj.
+
+No new actionable inconsistency found. Minor non-actionable note (not a
+contradiction): design's drain-emitter list ("session-turn termination /
+on-abort") is non-exhaustive — `:on-compact-done` also emits
+`:scheduler/drain-queue` — but tests drive drain via the dispatch event
+directly, so the omission does not affect the design's verification approach.
+No new design-steps items added.
