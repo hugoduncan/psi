@@ -318,6 +318,41 @@ Per design, `(empty? errors)` here only proves isolated parse/compile — not
 cross-workflow target resolution (the temp `with-workflow-dir` holds only
 `task-lifecycle.edn`); this matches the accepted design scope.
 
+## 2026-06-01 — Slice 3 + Slice 4: CHANGELOG, registry check, acceptance (ψ)
+
+CHANGELOG: added `[Unreleased]` → `### Added` entry for `task-lifecycle`
+immediately after the `create-task-plan` precedent line, noting invocation via
+`/delegate task-lifecycle`.
+
+Registry check (optional, beyond the required isolated loader test): ran a real
+full-directory load via `psi.workflow-loader.core/load-workflow-definitions`
+against the worktree root (NOT the isolated temp-dir helper). Result: 52
+definitions loaded together with all five targets present; `task-lifecycle`
+registered? true; no errors mentioning task-lifecycle; steps resolve in order as
+`[name type target]` triples
+`[review-task-design :delegate review-task-design]` …
+`[review-task-implementation :delegate review-task-implementation]`. This
+confirms registry presence after a real load and, incidentally, that the five
+delegate targets exist in the real registry (the isolated loader test
+deliberately does not establish this — see design Acceptance scope).
+
+Acceptance criteria re-check vs `design.md`:
+- `task-lifecycle` under `.psi/workflows/`, top-level `:name` + `:description`,
+  registry-present after reload — ✅ (registry check above).
+- Exactly five sequential `:delegate` steps, `:name` = `:target`, in the
+  prescribed order — ✅ (file + loader test + registry check).
+- Each step `:context [{:type :source :from :workflow-original}]`, no prior-step
+  yield — ✅ (file).
+- Each step `:prompt-string {:type :map :fields {:input {:from :workflow-input
+  :path [:input]}}}` — ✅ (file).
+- Parses/compiles in isolation; verification deftest with `(empty? errors)` +
+  definition presence + five names/types/targets in order — ✅ (Slice 2 test,
+  green).
+- CHANGELOG `[Unreleased]` Added entry — ✅ (Slice 3).
+- No `doc/workflows.md` edit required — ✅ (none made).
+
+No deviations from the design. Implementation matches the concrete shape exactly.
+
 ## 2026-06-01 — inconsistency follow-up execution pass 3 (ψ)
 
 Executed both pass-3 inconsistency-review follow-up items; design.md

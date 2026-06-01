@@ -39,16 +39,16 @@
 
 ## Slice 3 — CHANGELOG
 
-- [ ] Add a `[Unreleased]` → `### Added` entry for the new `task-lifecycle`
+- [x] Add a `[Unreleased]` → `### Added` entry for the new `task-lifecycle`
       workflow, matching the `review-task-design` / `create-task-plan` precedent
       (note: invokable via `/delegate task-lifecycle`).
 
 ## Slice 4 — Coherence and close-out
 
-- [ ] Lint with `clj-kondo` the edited test file (and confirm no new warnings).
-- [ ] (Optional) Reload workflows / inspect the registry to confirm
+- [x] Lint with `clj-kondo` the edited test file (and confirm no new warnings).
+- [x] (Optional) Reload workflows / inspect the registry to confirm
       `task-lifecycle` is registered after reload.
-- [ ] Re-check every Acceptance criterion in `design.md` against the
+- [x] Re-check every Acceptance criterion in `design.md` against the
       implementation; record outcomes in `implementation.md`.
-- [ ] Commit the workflow file, test, and CHANGELOG entry with a descriptive
+- [x] Commit the workflow file, test, and CHANGELOG entry with a descriptive
       message (e.g. `⚒ Add task-lifecycle chained workflow (198)`).
