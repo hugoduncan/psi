@@ -27,10 +27,10 @@ Rewritten 2026-06-01 to match the stabilised design and slice order in plan.md.
 
 ## Slice 4 — Composite seed param (production)
 
-- [ ] Add a new trailing optional `opts` arity to `attach-instance-in!` — `([ctx wt] [ctx wt attach-input] [ctx wt attach-input opts])` — and thread `(:runtime-handle opts)` into its `ensure-instance-in!` call (`{:worktree-path … :acquisition-mode :attached :endpoint … :runtime-handle (:runtime-handle opts)}`). Keep `attach-input` (3rd positional map) purely domain input for `resolve-attach-endpoint`; the seam seed lives only in the new 4th-positional `opts` map (symmetric with `start-instance-in!`'s existing `opts`). Do NOT overload `attach-input` with the seam key.
-- [ ] Add optional `:runtime-handle` seam-seed (from opts) to `start-instance-in!`; thread into its `ensure-instance-in!` call (`{... :acquisition-mode :started :command-vector … :runtime-handle <seed>}`)
-- [ ] Confirm real callers (no seed) observe unchanged behavior
-- [ ] `clj-paren-repair` + targeted lint the changed namespaces
+- [x] Add a new trailing optional `opts` arity to `attach-instance-in!` — `([ctx wt] [ctx wt attach-input] [ctx wt attach-input opts])` — and thread `(:runtime-handle opts)` into its `ensure-instance-in!` call. `attach-input` stays domain-only; seam seed lives only in the new 4th-positional `opts` map.
+- [x] Add optional `:runtime-handle` seam-seed (from opts) to `start-instance-in!`; thread into its `ensure-instance-in!` call
+- [x] Confirm real callers (no seed) observe unchanged behavior — existing attach/started tests (still with-redefs) pass: 4 tests, 23 assertions
+- [x] `clj-paren-repair` + targeted lint the changed namespaces (green)
 
 ## Slice 5 — `attach_test.clj`
 

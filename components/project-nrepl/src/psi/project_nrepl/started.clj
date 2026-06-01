@@ -78,7 +78,8 @@
                              ctx
                              {:worktree-path effective-worktree
                               :acquisition-mode :started
-                              :command-vector validated-command})]
+                              :command-vector validated-command
+                              :runtime-handle (:runtime-handle opts)})]
      (try
        (let [process  (start-process! effective-worktree validated-command)
              endpoint (wait-for-started-endpoint! effective-worktree process opts)]
