@@ -143,10 +143,14 @@ Concretely:
 
 - Production code resolves each seam via a small helper of the form
   `(or (get-in instance [:runtime-handle <seam-key>]) <real-default-fn>)`.
-- `ensure-instance-in!` / `replace-instance-in!` (and the acquisition entry
-  points `attach-instance-in!`, `start-instance-in!`) accept an optional
-  `:runtime-handle` (or seam-specific) seed so a test can install a deterministic
-  seam fn into instance state before the code path runs.
+- `ensure-instance-in!` / `replace-instance-in!` already accept a
+  `:runtime-handle` seed (verified: both forward it into `build-instance`), so a
+  test can install a deterministic seam fn into instance state at acquisition.
+  The composite acquisition entry points `attach-instance-in!` and
+  `start-instance-in!` do **not** currently forward such a seed and must be
+  changed to accept an optional `:runtime-handle` seed and thread it into their
+  `ensure-instance-in!` call — an explicit production signature change (see
+  "Composite acquisition entry-point seed injection").
 - Tests install the deterministic seam fn through that seed (no `with-redefs`,
   no passed-through ad-hoc argument that production callers must thread).
 
@@ -222,19 +226,86 @@ of replacing it, so seeded seam fns survive into the internal
 - the seeded `:nrepl-connector` is still present when `connect-instance-in!`
   runs.
 
-This is the only production behavioural change required by the seam mechanism
-beyond promoting the two seam defaults; it is behaviour-preserving for real
-callers (who seed nothing, so the merge adds the same keys the overwrite would
-have set, and `:runtime-handle` was empty/`nil` before acquisition completes the
-process keys).
+This merge is one of the two production changes the seam mechanism requires
+beyond promoting the two seam defaults (the other is the optional seed parameter
+on the composite acquisition entry points — see "Composite acquisition
+entry-point seed injection"). It is behaviour-preserving for real callers (who
+seed nothing, so the merge adds the same keys the overwrite would have set, and
+`:runtime-handle` was empty/`nil` before acquisition completes the process keys).
+
+##### Composite acquisition entry-point seed injection (required production change)
+
+The seam mechanism requires the seam fn to be present in instance
+`:runtime-handle` **before** the internal `connect-instance-in!` /
+`start-process!` call. For the standalone `connect-instance-in!` test
+(`client_test.clj`) this is achievable because the test seeds the instance with a
+separate `ensure-instance-in!`/`update-instance-in!` call *before* invoking
+`connect-instance-in!` — the same separate-step pattern `eval_test.clj` uses for
+`eval-instance-in!`.
+
+The composite acquisition entry points `attach-instance-in!` and
+`start-instance-in!` have **no such separate step**: each calls
+`ensure-instance-in!` and then the internal connect/launch within a single
+top-level call, and neither currently forwards a seam seed to
+`ensure-instance-in!` (attach's third arg is `attach-input`; started's fourth
+`opts` only feeds `wait-for-started-endpoint!` timeout/poll options). A test
+therefore has no point at which to install the seam between acquisition and the
+internal infra call.
+
+Verified source facts:
+
+- `ensure-instance-in!` already destructures and forwards `:runtime-handle` into
+  `build-instance`, and `build-instance` already accepts `:runtime-handle`. The
+  registry layer can carry a seeded seam fn from acquisition; it is the two
+  composite entry points that do not forward one.
+- `connect-instance-in!` already `merge`s into the existing `:runtime-handle`, so
+  a seam fn seeded at acquisition survives the connect update.
+- `start-instance-in!` currently overwrites `:runtime-handle` (see "Started-mode
+  runtime-handle merge"), which must change to a merge for any seeded seam fn to
+  survive into the internal `connect-instance-in!`.
+
+Required production change (in addition to the started-mode merge above): both
+composite entry points MUST accept an explicit, optional seam-seed and thread it
+into `ensure-instance-in!` as `:runtime-handle`:
+
+- `attach-instance-in!` gains an optional trailing `:runtime-handle` seed
+  (passed alongside or within its opts) that it forwards into the
+  `ensure-instance-in!` call (`{:worktree-path … :acquisition-mode :attached
+  :endpoint … :runtime-handle <seed>}`). The seeded `:nrepl-connector` then
+  survives into the internal `connect-instance-in!`.
+- `start-instance-in!` forwards a `:runtime-handle` seed from its `opts` map into
+  the `ensure-instance-in!` call (`{:worktree-path … :acquisition-mode :started
+  :command-vector … :runtime-handle <seed>}`). Combined with the started-mode
+  merge, the seeded `:process-launcher` is present when `start-process!` resolves
+  and the seeded `:nrepl-connector` is present when the internal
+  `connect-instance-in!` runs.
+
+This is an **explicit, acknowledged production signature/behaviour change** to
+these two entry points, listed here as required. The earlier mechanism phrasing
+"production call sites unchanged" is narrowed to its accurate meaning: **real
+callers that seed nothing observe unchanged behaviour** (the optional seed is
+absent, so the same real-default seams apply and the same `:runtime-handle` keys
+result). The signatures themselves do change to accept the optional seed; only
+the runtime behaviour for real callers is preserved. The complete set of required
+production changes for the seam mechanism is therefore:
+
+1. promote the two seam defaults (`:nrepl-connector`, `:process-launcher`) and
+   resolve each via `(or (get-in instance [:runtime-handle <seam-key>])
+   <real-default>)`,
+2. merge (not overwrite) `:runtime-handle` in `start-instance-in!`, and
+3. add the optional `:runtime-handle` seed parameter to `attach-instance-in!` and
+   `start-instance-in!`, threaded into their `ensure-instance-in!` calls.
 
 Rationale for choosing runtime-state injection over a passed argument or options
 map: it is the only mechanism already present and proven in this component
-(`eval_test.clj`), it keeps production call sites unchanged for real callers
-(seam defaults apply automatically), and it avoids threading test-only parameters
-through `ops`/`commands` callers. A passed-argument or options-map mechanism was
-rejected because it would force every intermediate caller (`ops`, `commands`) to
-thread a seam parameter that only tests supply.
+(`eval_test.clj`), it keeps runtime behaviour unchanged for real callers
+(seam defaults apply automatically when no seed is supplied), and it avoids
+threading test-only parameters through `ops`/`commands` callers. A
+passed-argument or options-map mechanism was rejected because it would force every
+intermediate caller (`ops`, `commands`) to thread a seam parameter that only tests
+supply. The optional seed added to the two acquisition entry points is the minimal
+surface needed for tests to install seams at the single acquisition point those
+composite paths expose.
 
 ### Preferred seam shapes
 

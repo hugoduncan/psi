@@ -234,3 +234,35 @@ are resolved/checked. Found one NEW actionable ambiguity (added to
   already accept `:runtime-handle`, but neither composite caller forwards one.
 
 No production/test code changed in this review pass.
+
+2026-06-01 — Ambiguity follow-up execution (second pass)
+
+Resolved the one new second-pass ambiguity item (composite-entry-point
+seed-injection point) in design.md, grounded in re-reading attach.clj,
+started.clj, runtime.clj, client.clj, and eval_test.clj.
+
+Resolution:
+- Added "Composite acquisition entry-point seed injection (required production
+  change)" subsection. attach-instance-in! and start-instance-in! have no
+  separate post-acquisition step where a test could install a seam (unlike
+  eval-instance-in! / connect-instance-in!, which are invoked separately after
+  the test's own ensure/update seed). Therefore both composite entry points MUST
+  accept an explicit optional :runtime-handle seed and thread it into their
+  ensure-instance-in! call.
+- Verified ensure-instance-in! and build-instance already accept/forward
+  :runtime-handle; only the two composite entry points fail to forward one.
+- Verified connect-instance-in! already merges into :runtime-handle, so a seeded
+  connector survives connect (after the seam change makes connect read it).
+- Narrowed the contradictory "production call sites unchanged" claim: signatures
+  DO change (new optional seed param); only runtime behaviour for real callers
+  (who seed nothing) is preserved. Listed the complete set of THREE required
+  production changes: (1) promote two seam defaults + resolve via or-default,
+  (2) merge-not-overwrite :runtime-handle in start-instance-in!, (3) optional
+  :runtime-handle seed param on attach/start entry points threaded into
+  ensure-instance-in!.
+- Reconciled the prior mechanism bullet ("accept an optional :runtime-handle
+  seed") and the started-mode-merge "only production change" claim with the new
+  third change to remove internal contradictions.
+
+No blocking reasons; item completed at the design level. Production seam code +
+test reshaping remain for the build phase per steps.md.
