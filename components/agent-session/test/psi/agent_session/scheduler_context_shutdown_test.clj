@@ -36,12 +36,9 @@
           [ctx session-id] (create-session-context
                             {:persist? false
                              :scheduler-time-source (test-support/fixed-scheduler-time-source now)})
-          callback*        (atom nil)
+          [capture* callback*] (test-support/capturing-delay-fn)
           ctx*             (assoc ctx
-                                  :scheduler-run-after-delay-fn
-                                  (fn [_ctx _delay-ms f]
-                                    (reset! callback* f)
-                                    {:handle :fake})
+                                  :scheduler-run-after-delay-fn capture*
                                   :scheduler-cancel-delay-fn (fn [_ctx _handle] nil))]
       (session/dispatch-in! ctx* :scheduler/create
                             {:session-id session-id
@@ -62,7 +59,7 @@
                                  :data :scheduler :schedules "sch-shutdown" :status]))
           "shutdown cancelled the outstanding schedule")
       ;; invoking the stale captured callback post-shutdown must not deliver
-      (@callback*)
+      ((:f @callback*))
       (is (= :cancelled (get-in @(:state* ctx*)
                                 [:agent-session :sessions session-id
                                  :data :scheduler :schedules "sch-shutdown" :status]))

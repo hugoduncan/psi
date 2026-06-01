@@ -468,3 +468,41 @@ candidate for a shared `test-support` helper (e.g. a `capturing-delay-fn`
 returning `[override-fn cb*]`, or a `with-captured-timer` macro) to remove the
 duplication. Not a correctness defect and does not affect the verification-only
 deliverable — a test-DRY follow-up.
+
+### Implementation-review follow-up executed (2026-06-01) — capturing-delay-fn helper
+
+Executed the test-DRY follow-up flagged above. Added
+`test-support/capturing-delay-fn` (in `components/agent-session/test/psi/agent_session/test_support.clj`,
+after `advance-scheduler-instant!`), returning `[override-fn cb*]`:
+
+- `override-fn` = `(fn [_ctx delay-ms f] (reset! cb* {:delay-ms delay-ms :f f}) {:handle :captured})`
+- `cb*` = an atom holding `{:delay-ms delay-ms :f f}` (richer shape — superset of
+  the 4 capture-only sites; needed by the psi-tool delay-0 site that asserts
+  `:delay-ms`).
+
+Migrated all **5 named sites** to `[capture* callback*] (test-support/capturing-delay-fn)`
++ `:scheduler-run-after-delay-fn capture*`, with uniform invocation
+`((:f @callback*))`:
+
+- `scheduler_end_to_end_test` message-kind + session-kind round-trip tests
+- `scheduler_context_shutdown_test` shutdown-prevents-fire test
+  (kept its explicit no-op `:scheduler-cancel-delay-fn`)
+- `scheduler_timer_seam_test` race-A cancel-before-stale-callback test
+  (kept its explicit no-op `:scheduler-cancel-delay-fn`)
+- `psi_tool_scheduler_test` past-`:at`-fires-immediately test (already read
+  `(:delay-ms @cb*)` / `((:f @cb*))` — directly compatible)
+
+The handle sentinel value (`:fake` at the shutdown + timer-seam sites) was
+irrelevant — those sites override cancel-delay-fn to a no-op, so the helper's
+`{:handle :captured}` is equivalent. The **two extra-state override forms** in
+`scheduler_timer_seam_test` (one capturing `observed-delay*`, one capturing the
+cancelled `handle`) are intentionally *not* migrated — they are not the named
+single-callback idiom and capture different state.
+
+Verification (test-files-only, within the Slice-10 allowlist; no `src/**`,
+no `doc/scheduler.md`):
+- clj-kondo 0 errors / 0 warnings on all 5 touched files.
+- cljfmt: "All source files formatted correctly".
+- Four touched scheduler test namespaces: 9 tests / 148 assertions / 0 fail.
+- Full scheduler suite: **45 tests / 410 assertions / 0 failures** — identical
+  to the cited baseline → no behaviour change, pure test-quality DRY.

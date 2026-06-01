@@ -59,6 +59,21 @@
   [instant* millis]
   (swap! instant* #(.plusMillis ^java.time.Instant % millis)))
 
+(defn capturing-delay-fn
+  "Return `[override-fn cb*]` for the scheduler timer seam.
+
+  `override-fn` is suitable as a `:scheduler-run-after-delay-fn` override: it
+  captures the requested delay and fire callback into `cb*` (an atom holding
+  `{:delay-ms delay-ms :f f}`) instead of scheduling on a real timer, and
+  returns a sentinel `{:handle :captured}`. Tests then invoke the captured
+  callback directly (no wall-clock sleep), e.g. `((:f @cb*))`."
+  []
+  (let [cb* (atom nil)]
+    [(fn [_ctx delay-ms f]
+       (reset! cb* {:delay-ms delay-ms :f f})
+       {:handle :captured})
+     cb*]))
+
 (defn temp-cwd []
   (let [p (str (java.nio.file.Files/createTempDirectory
                 "psi-agent-session-test-"

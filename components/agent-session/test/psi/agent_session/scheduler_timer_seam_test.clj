@@ -74,12 +74,9 @@
           [ctx session-id] (create-session-context
                             {:persist? false
                              :scheduler-time-source (test-support/fixed-scheduler-time-source now)})
-          callback*        (atom nil)
+          [capture* callback*] (test-support/capturing-delay-fn)
           ctx*             (assoc ctx
-                                  :scheduler-run-after-delay-fn
-                                  (fn [_ctx _delay-ms f]
-                                    (reset! callback* f)
-                                    {:handle :fake})
+                                  :scheduler-run-after-delay-fn capture*
                                   ;; non-Thread handle → cancel uses the cancel-delay-fn path
                                   :scheduler-cancel-delay-fn (fn [_ctx _handle] nil))]
       (session/dispatch-in! ctx* :scheduler/create
@@ -103,7 +100,7 @@
       (is (nil? (get @(:scheduler-timers* ctx*) "sch-race"))
           "cancel removed the timer handle")
       ;; now invoke the stale callback — must not resurrect the schedule
-      (@callback*)
+      ((:f @callback*))
       (is (= :cancelled (get-in @(:state* ctx*)
                                 [:agent-session :sessions session-id
                                  :data :scheduler :schedules "sch-race" :status]))

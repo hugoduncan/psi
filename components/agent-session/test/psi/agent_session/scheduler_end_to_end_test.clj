@@ -56,12 +56,8 @@
           [ctx session-id] (create-session-context
                             {:persist? false
                              :scheduler-time-source (test-support/fixed-scheduler-time-source now)})
-          callback*        (atom nil)
-          ctx*             (assoc ctx
-                                  :scheduler-run-after-delay-fn
-                                  (fn [_ctx _delay-ms f]
-                                    (reset! callback* f)
-                                    {:handle :captured}))]
+          [capture* callback*] (test-support/capturing-delay-fn)
+          ctx*             (assoc ctx :scheduler-run-after-delay-fn capture*)]
       (session/dispatch-in! ctx* :scheduler/create
                             {:session-id session-id
                              :schedule-id "sch-msg"
@@ -77,7 +73,7 @@
                                  :data :scheduler :schedules "sch-msg" :status])))
         (is (some? @callback*) "timer callback captured via the seam"))
       ;; fire the timer by invoking the captured callback (no Thread/sleep)
-      (@callback*)
+      ((:f @callback*))
       (let [journal       (ss/get-state-value-in ctx* (ss/state-path :journal session-id))
             scheduled-msg (some->> journal
                                    (keep #(get-in % [:data :message]))
@@ -108,12 +104,8 @@
           [ctx session-id] (create-session-context
                             {:persist? false
                              :scheduler-time-source (test-support/fixed-scheduler-time-source now)})
-          callback*        (atom nil)
-          ctx*             (assoc ctx
-                                  :scheduler-run-after-delay-fn
-                                  (fn [_ctx _delay-ms f]
-                                    (reset! callback* f)
-                                    {:handle :captured}))]
+          [capture* callback*] (test-support/capturing-delay-fn)
+          ctx*             (assoc ctx :scheduler-run-after-delay-fn capture*)]
       (with-redefs [psi.turn-runtime.core/execute-prepared-request!
                     (fn [_ai-ctx _ctx sid prepared _pq]
                       {:execution-result/turn-id (:prepared-request/id prepared)
@@ -141,7 +133,7 @@
         (is (some? @callback*) "timer callback captured via the seam")
         (let [sessions-before (set (map :session-id (ss/list-context-sessions-in ctx*)))]
           ;; fire the timer (no Thread/sleep)
-          (@callback*)
+          ((:f @callback*))
           (let [schedule    (get-in (ss/get-session-data-in ctx* session-id)
                                     [:scheduler :schedules "sch-sess"])
                 created-id  (:created-session-id schedule)

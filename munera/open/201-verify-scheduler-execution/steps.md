@@ -369,7 +369,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Implementation review follow-ups (2026-06-01)
 
-- [ ] Extract the duplicated capture-timer override idiom
+- [x] Extract the duplicated capture-timer override idiom
       `(assoc ctx :scheduler-run-after-delay-fn (fn [_ _ f] (reset! cb* f) {:handle :captured}))`
       + external `cb*` atom (currently inlined in 4 files / 5 sites:
       `scheduler_end_to_end_test` ×2, `scheduler_timer_seam_test`,
@@ -381,3 +381,14 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       Slice-10 allowlist; does not touch `src/**` or `doc/scheduler.md`. If the
       task is treated as closed, raise it as a small standalone test-hygiene task
       instead.)
+      Done: added `test-support/capturing-delay-fn` → `[override-fn cb*]` where
+      `cb*` holds `{:delay-ms delay-ms :f f}` and `override-fn` returns
+      `{:handle :captured}`. Migrated all 5 named sites to
+      `[capture* callback*] (test-support/capturing-delay-fn)` +
+      `:scheduler-run-after-delay-fn capture*`; callback invocation is now the
+      uniform `((:f @callback*))` (psi-tool site already read `(:delay-ms @cb*)`
+      / `((:f @cb*))`). The two extra-state override forms in
+      `scheduler_timer_seam_test` (capture observed-delay; capture cancelled
+      handle) are intentionally left — not the named idiom. clj-kondo 0/0,
+      cljfmt clean; full scheduler suite still 45 tests / 410 assertions / 0
+      failures (unchanged baseline). No `src/**` or `doc/scheduler.md` touched.

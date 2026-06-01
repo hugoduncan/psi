@@ -205,12 +205,8 @@
           past-at          (.minusSeconds fixed-now 60)
           [ctx session-id] (create-session-context
                             {:scheduler-time-source (test-support/fixed-scheduler-time-source fixed-now)})
-          callback*        (atom nil)
-          ctx*             (assoc ctx
-                                  :scheduler-run-after-delay-fn
-                                  (fn [_ctx delay-ms f]
-                                    (reset! callback* {:delay-ms delay-ms :f f})
-                                    {:handle :captured}))
+          [capture* callback*] (test-support/capturing-delay-fn)
+          ctx*             (assoc ctx :scheduler-run-after-delay-fn capture*)
           tool             (tools/make-psi-tool (fn [_q] {}) {:ctx ctx* :session-id session-id})
           result           ((:execute tool) {"action" "scheduler"
                                              "op" "create"
