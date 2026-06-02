@@ -765,7 +765,7 @@ with the commit sha / decision when done.
 
 ## Test review follow-ups (review pass 8)
 
-- [ ] TR10 — `task-lifecycle-in-worktree-test`'s `summary`-step coverage locks
+- [x] TR10 — `task-lifecycle-in-worktree-test`'s `summary`-step coverage locks
       only the NO_TARGET (negative) branch (prompt `.contains "NO_TARGET"` +
       sources `resolve-worktree :yield :text`); it never locks the summary's
       **positive (target-present) terminal contract** — the symmetric gap TR7
@@ -788,6 +788,26 @@ with the commit sha / decision when done.
       design→plan→implement→review report contract, and (b) an assertion that
       `summary` sources the `lifecycle` step `:yield :text` contribution. Run
       focused suite + `clj-kondo`.
+      RESOLUTION: extended `task-lifecycle-in-worktree-test`'s `summary` coverage
+      (same ns, test-only, no production change) with two new `testing` blocks
+      symmetric to TR7's `resolve-worktree` positive-path lock. (a) "summary
+      prompt reports the positive-path lifecycle terminal contract" asserts four
+      positive-branch substrings on the `summary` template text: "independently
+      inspect that specific task" (independent artifact inspection on a
+      target-present run), "completed cleanly (design → plan → implement →
+      review)" (the lifecycle-clean report), "task artifact files updated" (the
+      artifacts-updated report), and "closed (moved to munera/closed/) or remains
+      open" (the closed/open endpoint, Locked decision 7). (b) "summary sources
+      the lifecycle step :yield :text" asserts the `{:step "lifecycle" :yield
+      :text}` source contribution is present on the `summary` step — so a regress
+      dropping the `lifecycle` output sourcing (which the positive-path report
+      depends on) fails green. A regress dropping the positive-path contract
+      while keeping the NO_TARGET branch + the resolve-worktree sourcing now
+      fails. All asserted strings already present in the EDN summary template; no
+      production change. Focused definitions suite green (13 tests, 208
+      assertions, 0 failures — +5 over pass-7's 203); `clj-kondo` 0 findings;
+      `clj-paren-repair` Success; file 772 lines (< 800). (See implementation.md
+      pass-8 test-review TR10 entry.)
 
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 

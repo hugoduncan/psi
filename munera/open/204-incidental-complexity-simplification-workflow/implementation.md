@@ -2072,3 +2072,28 @@ PASS_STATUS: REVIEW_COMPLETE.
   `summary` sources the `lifecycle` step `:yield :text` contribution. Run
   focused suite + `clj-kondo`.
 
+
+### Pass 8 — test-review TR10 resolution
+
+- TR10 — RESOLVED. Extended `task-lifecycle-in-worktree-test`'s `summary`
+  coverage (in `workflow_definitions_test.clj`, same ns; test-only, no
+  production change) with two new `testing` blocks symmetric to TR7's
+  `resolve-worktree` positive-path lock:
+  - `"summary prompt reports the positive-path lifecycle terminal contract
+    (TR10)"` — asserts four positive-branch substrings on the `summary` template
+    text: `"independently inspect that specific task"` (independent artifact
+    inspection on a target-present run), `"completed cleanly (design → plan →
+    implement → review)"` (the lifecycle-clean report), `"task artifact files
+    updated"` (artifacts-updated report), and
+    `"closed (moved to munera/closed/) or remains open"` (the closed/open
+    endpoint, Locked decision 7).
+  - `"summary sources the lifecycle step :yield :text … (TR10)"` — asserts the
+    `{:step "lifecycle" :yield :text}` source contribution is present on the
+    `summary` step, so a regress dropping the `lifecycle` output sourcing (which
+    the positive-path report depends on) fails green.
+  A regress dropping the positive-path contract while keeping the NO_TARGET
+  branch + the resolve-worktree sourcing now fails green. All asserted strings
+  already exist verbatim in the EDN `summary` template — no production change.
+  Focused definitions suite green: 13 tests, 208 assertions, 0 failures (+5 over
+  pass-7's 203). `clj-paren-repair` Success; `clj-kondo` 0 findings;
+  `workflow_definitions_test.clj` 772 lines (< 800 `components/` guard).

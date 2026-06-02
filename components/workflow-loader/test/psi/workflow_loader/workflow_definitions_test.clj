@@ -642,6 +642,32 @@
                                 (:from %))
                             (:contributions summary-step)))
                "summary sources the resolve-worktree :yield :text so it can detect NO_TARGET")))
+       ;; TR10 (test review pass 8): the prior summary assertions lock only the
+       ;; NO_TARGET (negative) branch — the symmetric gap TR7 fixed for
+       ;; resolve-worktree. The summary template is the workflow's user-facing
+       ;; terminal report (three-step … -> summary(:session) adapter; design
+       ;; Locked decision 7's completed/reviewed-task endpoint is what summary
+       ;; reports). On a real munera/... path it must independently inspect the
+       ;; task artifacts and report the design → plan → implement → review run,
+       ;; the artifacts updated, and the closed/open outcome, sourcing the
+       ;; lifecycle step :yield :text. A regress dropping the positive-path
+       ;; contract (or the lifecycle contribution) while keeping the NO_TARGET
+       ;; branch would pass green yet gut the terminal report. Lock it.
+       (testing "summary prompt reports the positive-path lifecycle terminal contract (TR10)"
+         (let [summary-text (step-template-text summary-step)]
+           (is (re-find #"(?i)independently inspect that specific task" summary-text)
+               "summary independently inspects the resolved task's artifacts on a target-present run")
+           (is (.contains summary-text "completed cleanly (design → plan → implement → review)")
+               "summary reports whether the task-lifecycle run completed cleanly (design → plan → implement → review)")
+           (is (re-find #"(?i)task artifact files updated" summary-text)
+               "summary reports the task artifact files updated")
+           (is (re-find #"(?i)closed \(moved to munera/closed/\) or remains open" summary-text)
+               "summary reports whether the task was closed or remains open")))
+       (testing "summary sources the lifecycle step :yield :text to report lifecycle outcomes (TR10)"
+         (is (some? (some #(= {:step "lifecycle" :yield :text}
+                              (:from %))
+                          (:contributions summary-step)))
+             "summary sources the lifecycle :yield :text so it can report the lifecycle run outcomes"))
        ;; TR7 (test review): the prior assertions lock only the NO_TARGET
        ;; (negative) branch + the work-on tool entry + {{input}} wiring. The
        ;; positive (target-present) branch is the verified cross-:delegate
