@@ -54,8 +54,9 @@ repo-local startup.
 
 ## In-session commands
 
-`/status` `/history` `/new` `/resume` `/tree [session-id]` `/worktree` `/help` `/quit` `/skills` `/prompts` `/reload-prompts` `/remember [text]`
+`/status` `/history` `/new` `/resume` `/tree [session-id]` `/worktree` `/help` `/quit` `/skills` `/prompts` `/reload-prompts` `/reload-models` `/reload-extension-installs` `/remember [text]`
 `/model <provider> <model-id>` `/thinking <off|minimal|low|medium|high|xhigh>` `/speed [normal|fast [session|project|user]]` `/effort [low|medium|high|xhigh|none [session|project|user]]`
+`/jobs [status ...]` `/job <job-id>` `/cancel-job <job-id>`
 `/project-repl` `/project-repl start` `/project-repl attach` `/project-repl stop` `/project-repl eval <code>` `/project-repl interrupt`
 `/skill:<name>` plus any extension commands such as `/work-on`, `/work-done`, `/work-rebase`, `/work-status`
 

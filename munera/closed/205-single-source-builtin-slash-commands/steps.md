@@ -432,7 +432,20 @@ Tick with sha/decision on completion.
 
 ## Docs review follow-ups (review-task-docs pass 2)
 
-- [ ] D2 — `doc/tui.md` "In-session commands" reference list (lines ~57–60) is
+- [x] D2 — Completed the `doc/tui.md` "In-session commands" reference block to
+      match the now-authoritative `builtin-command-specs` table. Added the five
+      missing user-invokable built-ins this task single-sourced:
+      `/reload-models` and `/reload-extension-installs` (appended to the
+      first/reload line beside `/reload-prompts`), and a new `/jobs [status ...]`
+      `/job <job-id>` `/cancel-job <job-id>` line (usage hints lifted verbatim
+      from the spec table's `:usage` fields). Help-hidden aliases `/?`/`/exit`
+      and the dual-kind help-hidden `/project-repl` autocomplete entry correctly
+      omitted (`/project-repl` already documented as its own sub-command line;
+      `/login` already covered in the OAuth section). The TUI user reference now
+      lists exactly the help-visible built-in surface. Pure doc-accuracy fix; no
+      source/test change (original item text below).
+      Original item text:
+      `doc/tui.md` "In-session commands" reference list (lines ~57–60) is
       incomplete relative to the now-authoritative `builtin-command-specs`
       table. Add the missing user-invokable built-ins this task single-sourced:
       `/reload-models`, `/reload-extension-installs`, `/jobs [status ...]`,

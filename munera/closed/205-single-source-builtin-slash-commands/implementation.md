@@ -1600,3 +1600,26 @@ New actionable finding (→ D2):
   touched `doc/architecture.md` and did not check `doc/tui.md`'s command
   reference for completeness. (`/reload-models` is documented in
   `doc/custom-providers.md`, but absent from the canonical TUI command list.)
+
+## 2026-06-01 — Docs review follow-up execution (D2)
+
+Completed D2 (the sole newly-added unchecked item from the review-task-docs
+pass 2). Grounded the additions against the authoritative single source
+`commands/builtin_specs.clj` `builtin-command-specs` rather than re-deriving:
+filtered to help-visible, user-invokable entries (skipping the three
+`:hide-in-help? true` autocomplete-only entries `/?`, `/exit`, `/project-repl`,
+the last already documented as its own sub-command block; `/login` already lives
+in the OAuth section).
+
+`doc/tui.md` "In-session commands" edits:
+- Appended `/reload-models` and `/reload-extension-installs` to the reload line
+  beside the already-present `/reload-prompts`.
+- Added a new line `/jobs [status ...]` `/job <job-id>` `/cancel-job <job-id>`,
+  usage hints lifted verbatim from the spec table `:usage` fields
+  (`/jobs` `[status ...]`, `/job` `<job-id>`, `/cancel-job` `<job-id>`).
+
+The TUI command reference now enumerates exactly the help-visible built-in
+surface (matches `builtin-help-block`'s membership). Pure doc-accuracy change;
+no source/test/changelog edit (the CHANGELOG `[Unreleased]` entry already covers
+the user-visible behaviour; this only corrects a stale reference list). No
+blocking reasons.
