@@ -3157,3 +3157,52 @@ Checklist verdict:
 consistent with meta/spec/code. No follow-up steps added.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## code-shaper review (pass 1)
+
+Applied `code-shaper` (`simple ∧ consistent ∧ robust → shape`) to the task's
+deliverables: the SKILL.md `gap` jq recipe, the two EDN workflows
+(`reduce-incidental-complexity.edn`, `task-lifecycle-in-worktree.edn`), and the
+two task-204 test namespaces.
+
+**Production deliverables — clean.** The jq recipe is a single canonical
+artifact (single responsibility, locally comprehensible). Both EDN workflows are
+consistent with their sibling precedents (`gh-issue-implement.edn`,
+`review-implementation-in-worktree.edn`): consistent step shapes, handoff
+wiring, and `:context`/`:prompt-string` idioms. No actionable production issues.
+
+**Test harness — incidental duplication (actionable).** The recipe-test cluster
+in `incidental_complexity_finder_skill_test.clj` has accreted two repeated,
+incidental fixtures across its 7 recipe `deftest`s — a direct
+`consistent(idioms)` + `locally_comprehensible` shape defect (each call site
+forces the reader to re-decode the literal, and a change must thread through all
+sites). These were introduced incidentally: TR12 propagated the jq-availability
+guard to every test when adding the structural-fallback branches, and no pass
+since has factored the duplication.
+
+- **CS1 — `jq`-availability guard literal duplicated 7×.** The predicate
+  `(try (zero? (:exit (shell/sh "jq" "--version"))) (catch Exception _ false))`
+  appears verbatim at lines 158/213/278/342/375/409/462. Its *meaning* ("is jq
+  available?") is buried in a try/catch literal; the intent is illegible at the
+  call sites and a change (e.g. caching, a different probe) must edit 7 places.
+  Fix: extract a named `jq-available?` predicate (`defn-`, memoised or plain),
+  and call it at each `if` site. Mechanical, behaviour-identical.
+
+- **CS2 — recipe-test `let` preamble duplicated 7×.** Every recipe `deftest`
+  opens with the same
+  `(let [{:keys [skill]} (incidental-complexity-finder-skill)
+         body (slurp (io/file (:file-path skill)))
+         recipe (extract-jq-recipe body)] (is (some? recipe) …) …)`
+  shape (8 `body`-slurps, 7 `recipe`-extracts). This is a repeated
+  setup idiom that obscures each test's distinct payload. Fix: extract a single
+  `(defn- skill-recipe [] …)` helper returning the recipe (it can carry the
+  `(some? recipe)` floor assertion or callers keep it), collapsing the preamble
+  to one line per test. Behaviour-identical; reduces the working set a reader
+  must hold per test.
+
+Both are test-only (no production/skill/EDN change), keep all assertions
+identical, and must leave the focused skill-test + task-204 suite green,
+`clj-kondo` 0, `clj-paren-repair` Success, and `bb commit-check:file-lengths`
+clean (the file is 524 lines; the extraction reduces it).
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

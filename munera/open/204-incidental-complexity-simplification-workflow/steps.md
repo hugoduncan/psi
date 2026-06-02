@@ -1312,3 +1312,34 @@ with the commit sha / decision when done.
       findings; `clj-paren-repair` Success; skill-test file **524 lines** (< 800);
       `bb commit-check:file-lengths` exit 0. (See implementation.md pass-17
       test-review TR21 entry.)
+
+## Code-shaper review follow-ups (review pass 1 — code-shaper)
+
+Source: code-shaper review of the task deliverables (SKILL.md recipe, both EDN
+workflows, both test namespaces). Production deliverables are clean; the two
+items below are incidental duplication accreted in the recipe-test harness.
+Both are test-only — no production/skill/EDN change, all assertions identical.
+
+- [ ] CS1 — De-duplicate the `jq`-availability guard in
+      `components/workflow-loader/test/psi/workflow_loader/incidental_complexity_finder_skill_test.clj`.
+      The literal `(try (zero? (:exit (shell/sh "jq" "--version")))
+      (catch Exception _ false))` is repeated verbatim at 7 sites
+      (lines 158/213/278/342/375/409/462), one per recipe `deftest`. Its meaning
+      ("is jq available?") is illegible at the call sites and a change must
+      thread through all 7 (`consistent(idioms)` + `locally_comprehensible`
+      defect). Fix: extract a named `jq-available?` `defn-` predicate and call it
+      at each `if` site. Mechanical, behaviour-identical. Verify the focused
+      skill-test ns green (jq-present path), `clj-kondo` 0, `clj-paren-repair`
+      Success, `bb commit-check:file-lengths` clean.
+
+- [ ] CS2 — Collapse the repeated recipe-test `let` preamble in the same ns.
+      Every recipe `deftest` opens with the identical
+      `{:keys [skill]} (incidental-complexity-finder-skill)` →
+      `body (slurp (io/file (:file-path skill)))` →
+      `recipe (extract-jq-recipe body)` shape (8 `body`-slurps, 7
+      `recipe`-extracts), obscuring each test's distinct payload. Fix: extract a
+      single `(defn- skill-recipe [] …)` helper returning the recipe so each test
+      binds the recipe in one line. Behaviour-identical; reduces both the
+      per-test working set and the file length (currently 524 lines). Verify the
+      focused skill-test ns green, `clj-kondo` 0, `clj-paren-repair` Success,
+      `bb commit-check:file-lengths` clean.
