@@ -7,7 +7,7 @@
    [psi.agent-session.tools :as tools]))
 
 (deftest psi-tool-scheduler-create-list-cancel-test
-  (let [fixed-now (java.time.Instant/parse "2026-04-21T18:00:00Z")
+  (let [fixed-now (test-support/instant "2026-04-21T18:00:00Z")
         [ctx session-id] (test-support/create-test-session {:scheduler-time-source (test-support/fixed-scheduler-time-source fixed-now)})
         tool (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})]
     (testing "create adds a pending schedule"
@@ -180,7 +180,7 @@
 
 (deftest psi-tool-scheduler-at-resolution-matrix-test
   (testing "absolute instant calculates delay from scheduler time source"
-    (let [fixed-now (java.time.Instant/parse "2026-04-21T18:00:00Z")
+    (let [fixed-now (test-support/instant "2026-04-21T18:00:00Z")
           fire-at (.plusMillis fixed-now 5000)
           [ctx session-id] (test-support/create-test-session {:scheduler-time-source (test-support/fixed-scheduler-time-source fixed-now)})
           tool (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
@@ -198,7 +198,7 @@
       (is (string? (:schedule-id schedule)))))
 
   (testing "past :at resolves to delay 0, skips min-delay check, and FIRES immediately via the seam"
-    (let [fixed-now        (java.time.Instant/parse "2026-04-21T18:00:00Z")
+    (let [fixed-now        (test-support/instant "2026-04-21T18:00:00Z")
           past-at          (.minusSeconds fixed-now 60)
           [ctx session-id] (test-support/create-test-session
                             {:scheduler-time-source (test-support/fixed-scheduler-time-source fixed-now)})
@@ -222,7 +222,7 @@
           "delay-0 schedule fires and delivers")))
 
   (testing "future :at below min-delay-ms (1-999ms) is rejected with the below-minimum bound error"
-    (let [fixed-now        (java.time.Instant/parse "2026-04-21T18:00:00Z")
+    (let [fixed-now        (test-support/instant "2026-04-21T18:00:00Z")
           near-future-at   (.plusMillis fixed-now 500)
           [ctx session-id] (test-support/create-test-session
                             {:scheduler-time-source (test-support/fixed-scheduler-time-source fixed-now)})
@@ -240,7 +240,7 @@
           "near-future :at is rejected by the minimum (not maximum) bound")))
 
   (testing "future :at above max-delay-ms (>24h) is rejected with the exceeds-maximum bound error"
-    (let [fixed-now        (java.time.Instant/parse "2026-04-21T18:00:00Z")
+    (let [fixed-now        (test-support/instant "2026-04-21T18:00:00Z")
           far-future-at    (.plusMillis fixed-now (inc scheduler/max-delay-ms))
           [ctx session-id] (test-support/create-test-session
                             {:scheduler-time-source (test-support/fixed-scheduler-time-source fixed-now)})

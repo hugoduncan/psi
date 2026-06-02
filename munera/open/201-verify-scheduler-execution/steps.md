@@ -1359,7 +1359,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Test-shaper follow-ups — pass 15 (test-shaper, 2026-06-01)
 
-- [ ] Converge the 5 remaining open-coded literal-instant setup sites in
+- [x] Converge the 5 remaining open-coded literal-instant setup sites in
       `psi_tool_scheduler_test.clj` onto `test-support/instant`
       (`consistent(idioms)` — finish the convergence commit `5e5fe10af` started
       across the 201 scheduler test set). Replace
@@ -1386,3 +1386,20 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       the 201 set, where `5e5fe10af` already chose `test-support/instant` as the
       convergence target. If 201 is treated as closed instead, raise as a small
       standalone test-hygiene task.
+      Done: replaced all 5 open-coded literal-instant *setup* bindings
+      (`fixed-now (java.time.Instant/parse "2026-04-21T18:00:00Z")` at L10, L183,
+      L201, L225, L243) with `(test-support/instant "2026-04-21T18:00:00Z")` —
+      `psi_tool_scheduler_test.clj` now matches the 5 sibling 201 files
+      (0 `Instant/parse` literal-setup sites). The 5 runtime-output-parse sites
+      (L30/L31 `:created-at`/`:fire-at`, L196/L197, L218 `:fire-at`) were left
+      untouched as specified — they deserialize tool-result strings (a distinct
+      concern, not the literal-test-instant idiom). The ns already required
+      `[psi.agent-session.test-support :as test-support]`, so no require change.
+      Behaviour- and assertion-preserving: `--focus
+      psi.agent-session.psi-tool-scheduler-test` = 6 tests / 109 assertions / 0
+      failures (no deftest renamed → `findings.md` citations unchanged; aggregate
+      stays 51 tests / 411 assertions); full `bb test` green; clj-kondo 0/0;
+      `bb fmt:check` "All source files formatted correctly". Test-file-only —
+      `git status --short` = the single `psi_tool_scheduler_test.clj` path; zero
+      `components/agent-session/src/**` or `doc/scheduler.md` (verification-only
+      invariant; Slice-10 allowlist held).
