@@ -56,3 +56,32 @@ Verified against live code:
 
 Conclusion: no resolver work needed; listing-via-`all-operations-in` is the
 architecturally aligned choice. design.md updated accordingly.
+
+## Ambiguity review (ψ)
+
+Reviewed design.md for ambiguities; grounded against psi_tool.clj, commands.clj,
+step_execution.clj, registry.clj, defs.clj. Five actionable ambiguities:
+
+1. **Per-key truncation unspecified** (decision #7 / AC2). "Per-key truncation
+   to bound oversized values" gives no limit, unit (chars/lines/depth/coll
+   size), or truncation marker. Both surfaces must render identically but the
+   bound is undefined → not implementable as written.
+2. **`:session-id` vs `:parent-session-id` semantics** (Scope / Minimum
+   concepts). Scope says direct invocation builds `:session-id` (and
+   `:parent-session-id` "where available"). The existing workflow path
+   (step_execution) passes `:parent-session-id` and NOT `:session-id`. What each
+   id means for a direct call, and when `:parent-session-id` is "available", are
+   undefined → invocation-map shape ambiguous.
+3. **Result-key projection: enumerated vs all keys** (AC2 vs decision #7). AC
+   says success projects `:ok → :data/:summary/:details`; decision #7 says render
+   *all* top-level result keys. Error results also carry `:reason/:message`. The
+   authoritative projection rule is contradictory.
+4. **Command arg grammar / args optionality** (decision #3 & #4). `/operation
+   <id> {edn-args}`: how `<id>` is split from `{edn-args}`, whether args may be
+   omitted (default `{}` like workflow), and the rendering path for malformed
+   EDN (only unknown-op error is specified) are all undefined for both the
+   command and the psi-tool `args` param.
+5. **List op param validation + ordering** (decision #6). Whether `op: list`
+   rejects/ignores `operation-id`/`args`, the listing order (sorted-by-id vs
+   registry order — relevant given the "deterministic" framing), and empty-list
+   rendering are unspecified.
