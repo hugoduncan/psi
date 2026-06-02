@@ -774,3 +774,17 @@ prior test-shaper note as benign. The `'t1`/`'t2`/`'live-timer` quoted-symbol
 fake timers are idiomatic ERT fixtures, not a defect.
 
 Verdict: ACTIONABLE_FEEDBACK (minor economy refinement S3).
+
+## Test-shaper pass-2 follow-up — S3 executed (2026-06-02)
+
+Applied `pwpt--seed-button-in-flight "w1" "b1"` to
+`pwpt-on-mutation-timeout-clears-in-flight` in
+`test/psi-widget-projection-timers-test.el`, replacing the inline
+spec+`setf projection-widget-specs`+`--sync-lstates`+`--set-lstate(in-flight)`
+block (13 lines → 8). The `cl-letf`/act/assert stays inline. The seed now reads
+one way file-wide (`consistent(fixtures)` ∧ `minimal_incidental_variation`).
+Confirmed the helper is verbatim-equivalent: helper uses ID as both spec id and
+`--set-lstate` widget-id with KEY as the in-flight node key — exactly the prior
+inline `"w1"`/`"b1"` shape. Did NOT touch
+`pwpt-on-mutation-timeout-calls-error-handler` (no in-flight `--set-lstate`).
+`bb emacs:check` green (340/340); byte-compile clean; reloaded `.el`.

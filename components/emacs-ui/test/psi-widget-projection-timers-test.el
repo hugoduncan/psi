@@ -133,17 +133,12 @@ locked, not only exercised indirectly."
 
 (ert-deftest pwpt-on-mutation-timeout-clears-in-flight ()
   (pwpt--with-state
-   (let* ((spec   (pwpt--make-button-spec "w1" "b1"))
-          (lstate (psi-widget-renderer-make-lstate))
-          (lstate (psi-widget-renderer-lstate-set-in-flight lstate "b1" t)))
-     (setf (psi-emacs-state-projection-widget-specs psi-emacs--state) (list spec))
-     (psi-widget-projection--sync-lstates (list spec))
-     (psi-widget-projection--set-lstate "ext" "w1" lstate)
-     (cl-letf (((symbol-function 'psi-emacs--upsert-projection-block) #'ignore))
-       (psi-widget-projection--on-mutation-timeout
-        (current-buffer) psi-emacs--state "ext" "w1" "b1" 5000))
-     (should-not (psi-widget-renderer--in-flight-p
-                  (psi-widget-projection--get-lstate "ext" "w1") "b1")))))
+   (pwpt--seed-button-in-flight "w1" "b1")
+   (cl-letf (((symbol-function 'psi-emacs--upsert-projection-block) #'ignore))
+     (psi-widget-projection--on-mutation-timeout
+      (current-buffer) psi-emacs--state "ext" "w1" "b1" 5000))
+   (should-not (psi-widget-renderer--in-flight-p
+                (psi-widget-projection--get-lstate "ext" "w1") "b1"))))
 
 (ert-deftest pwpt-on-mutation-timeout-calls-error-handler ()
   (pwpt--with-state

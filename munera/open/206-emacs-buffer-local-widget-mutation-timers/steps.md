@@ -246,7 +246,7 @@
 
 ## Test-shaper review pass 2 follow-ups (ψ)
 
-- [ ] S3 — Apply `pwpt--seed-button-in-flight` to the single-buffer timeout
+- [x] S3 — Apply `pwpt--seed-button-in-flight` to the single-buffer timeout
       test (minor, economy/consistency). `pwpt-on-mutation-timeout-clears-in-flight`
       (`test/psi-widget-projection-timers-test.el`) hand-rolls the exact arrange
       ceremony the S1 helper `pwpt--seed-button-in-flight` already encapsulates:
