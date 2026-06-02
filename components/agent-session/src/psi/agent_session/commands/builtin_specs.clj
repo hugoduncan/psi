@@ -25,7 +25,34 @@
      :hide-in-help? — optional boolean, help-only suppression (not exposed,
                       not UI-consulted) for routed-but-help-absent entries."
   (:require
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [malli.core :as m]))
+
+(def entry-schema
+  "Malli schema for a single `builtin-command-specs` entry value — the primary
+   per-entry invariant every projection silently assumes. Promotes the entry
+   shape from a runtime-test (forbidden) to a load-time (unreachable) guard,
+   matching the `unreachable > forbidden` ethos and the sibling load-time
+   `case`-seam asserts in `commands.clj`.
+
+   Captures: `:kinds` non-empty ⊆ #{:exact :prefixed}; `:exact ∈ :kinds ⇒
+   :handler present; `:description` non-blank string; optional `:usage`
+   string; optional `:hide-in-help?` boolean. The `:exact ⇒ :handler` cross-key
+   constraint is expressed as an entry-level `:fn` predicate (a malli `:map`
+   cannot make one key's requiredness depend on another's value)."
+  [:and
+   [:map
+    [:kinds [:and
+             [:set [:enum :exact :prefixed]]
+             [:fn {:error/message "must be non-empty"} seq]]]
+    [:handler {:optional true} :keyword]
+    [:description [:and :string [:fn {:error/message "must be non-blank"}
+                                 (complement str/blank?)]]]
+    [:usage {:optional true} :string]
+    [:hide-in-help? {:optional true} :boolean]]
+   [:fn {:error/message ":exact entries must carry a :handler"}
+    (fn [{:keys [kinds handler]}]
+      (or (not (contains? kinds :exact)) (some? handler)))]])
 
 (def builtin-command-specs
   (array-map
@@ -73,6 +100,14 @@
    "/project-repl" {:kinds #{:exact :prefixed} :handler :project-repl
                     :description "open/manage the project nREPL"
                     :hide-in-help? true}))
+
+(assert (every? #(m/validate entry-schema (val %)) builtin-command-specs)
+        (str "builtin-command-specs has malformed entries: "
+             (->> builtin-command-specs
+                  (remove #(m/validate entry-schema (val %)))
+                  (map (fn [[k spec]]
+                         (str k " → " (m/explain entry-schema spec))))
+                  (str/join "; "))))
 
 (defn strip-slash
   "Strip a single leading slash from a command name."

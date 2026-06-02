@@ -1838,3 +1838,33 @@ Non-actionable observations (recorded, no follow-up):
   (tolerant of bare-or-`/`-prefixed) but `templates`/`skills` via raw `(str "/" name)`.
   The new built-in code is *consistent with* its nearest neighbour (`ext-cmds`);
   the templates/skills idiom predates this task and is out of its remit.
+
+### 2026-06-01 — CS3 execution (code-shaper pass-2 follow-up)
+
+Tightened the `builtin-command-specs` per-entry-shape invariant from *forbidden*
+(runtime test TT3) to *unreachable* (load-time), matching `unreachable >
+forbidden` and the sibling load-time `case`-seam asserts in `commands.clj`.
+
+- `builtin_specs.clj`: added `(:require [malli.core :as m])` and a public
+  `entry-schema`. `:kinds` is a non-empty `[:set [:enum :exact :prefixed]]`;
+  `:description` a non-blank `:string`; `:usage` optional `:string`;
+  `:hide-in-help?` optional `:boolean`. The `:exact ⇒ :handler` cross-key
+  constraint is an entry-level `[:fn …]` (a malli `:map` cannot make one key's
+  requiredness depend on another's value). `:handler` is optional `:keyword` at
+  the map level, required-when-`:exact` via the `:fn`. Added a load-time
+  `(assert (every? #(m/validate entry-schema (val %)) builtin-command-specs) …)`
+  whose message `m/explain`s the offending entries, so a malformed entry fails
+  at namespace load rather than only when a test runs. Both `case`-seam asserts
+  in `commands.clj` left unchanged.
+- `commands_builtin_specs_test.clj`: shrank TT3 from per-entry `doseq` runtime
+  checks (now covered by the load-time guard) to
+  `builtin-command-specs-entry-schema-rejects-malformations-test`, which locks
+  that the schema *rejects* the representative malformations the projections
+  silently assume away — empty `:kinds`, `:exact`-without-`:handler`,
+  out-of-enum `:kinds`, blank `:description` — and *accepts* a well-formed
+  entry (plus a guard that the shipped table validates).
+- Verification: namespace loads clean (shipped table passes the load-time
+  guard); schema rejects all four malformations and accepts a valid entry
+  (REPL-checked). `clojure -M:test` focus on commands-builtin-specs +
+  builtin-commands-resolver + commands-test → 66 tests / 284 assertions / 0
+  failures. clj-kondo over both changed files → 0/0.

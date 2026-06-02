@@ -6,6 +6,7 @@
   (:require
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
+   [malli.core :as m]
    [psi.agent-session.commands :as commands]
    [psi.agent-session.commands.builtin-specs :as bspec]
    [psi.agent-session.core :as session]
@@ -79,30 +80,34 @@
     "reload-extension-installs" "project-repl" "tree" "jobs" "job" "cancel-job"
     "remember" "model" "thinking" "speed" "effort" "login"})
 
-(deftest builtin-command-specs-well-formed-test
-  ;; TT3: lock the per-entry well-formedness invariant of the single source
-  ;; (design "Spec-entry field set" / AC2). The projections silently assume
-  ;; the entry shape: an empty-`:kinds` entry is named-but-unroutable, and an
-  ;; `:exact`-without-`:handler` entry projects into exact-command-handlers as
-  ;; `"/name" → nil`. R1/R2 only lock the projection↔`case` seam, not the entry
-  ;; shape itself, so both malformations are currently representable in the
-  ;; single source yet caught by no test. Assert directly on every entry.
-  (testing ":kinds is a non-empty subset of #{:exact :prefixed}"
-    (doseq [[k spec] bspec/builtin-command-specs]
-      (is (set? (:kinds spec)) (str k " :kinds must be a set"))
-      (is (seq (:kinds spec)) (str k " :kinds must be non-empty"))
-      (is (every? #{:exact :prefixed} (:kinds spec))
-          (str k " :kinds must be ⊆ #{:exact :prefixed}"))))
-  (testing ":exact ∈ :kinds ⇒ :handler is present"
-    (doseq [[k spec] bspec/builtin-command-specs
-            :when (contains? (:kinds spec) :exact)]
-      (is (some? (:handler spec))
-          (str k " is :exact and must carry a :handler"))))
-  (testing ":description is a non-blank string on every entry"
-    (doseq [[k spec] bspec/builtin-command-specs]
-      (is (string? (:description spec)) (str k " :description must be a string"))
-      (is (not (str/blank? (:description spec)))
-          (str k " :description must be non-blank")))))
+(deftest builtin-command-specs-entry-schema-rejects-malformations-test
+  ;; CS3/TT3: the per-entry well-formedness invariant of the single source
+  ;; (design "Spec-entry field set" / AC2) is now enforced at *namespace load*
+  ;; by a malli `entry-schema` + load-time `assert` in `builtin_specs.clj`
+  ;; (`unreachable`, matching the sibling load-time `case`-seam asserts in
+  ;; `commands.clj`). The shipped table's conformance is therefore proven by the
+  ;; ns loading at all; this test instead locks that the schema *rejects* the
+  ;; representative malformations the projections silently assume away — an
+  ;; empty-`:kinds` entry (named-but-unroutable) and an `:exact`-without-
+  ;; `:handler` entry (projects `"/name" → nil`) — plus a blank `:description`.
+  (testing "the shipped table validates (the load-time guard would have thrown)"
+    (is (every? #(m/validate bspec/entry-schema (val %))
+                bspec/builtin-command-specs)))
+  (testing "rejects empty :kinds (named-but-unroutable)"
+    (is (not (m/validate bspec/entry-schema
+                         {:kinds #{} :description "x"}))))
+  (testing "rejects :exact without :handler (projects \"/name\" → nil)"
+    (is (not (m/validate bspec/entry-schema
+                         {:kinds #{:exact} :description "x"}))))
+  (testing "rejects :kinds outside #{:exact :prefixed}"
+    (is (not (m/validate bspec/entry-schema
+                         {:kinds #{:bogus} :description "x"}))))
+  (testing "rejects a blank :description"
+    (is (not (m/validate bspec/entry-schema
+                         {:kinds #{:exact} :handler :x :description "  "}))))
+  (testing "accepts a well-formed exact entry"
+    (is (m/validate bspec/entry-schema
+                    {:kinds #{:exact} :handler :x :description "ok"}))))
 
 (deftest exact-command-handlers-projection-unchanged-test
   ;; Static snapshot lock: proves the *derived* exact-command-handlers map

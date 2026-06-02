@@ -495,7 +495,7 @@ Tick with sha/decision on completion.
 
 ## Code-shaper review follow-ups (code-shaper pass 2)
 
-- [ ] CS3 — Tighten the `builtin-command-specs` per-entry-shape invariant from
+- [x] CS3 — Tighten the `builtin-command-specs` per-entry-shape invariant from
       *forbidden* (runtime test TT3) to *unreachable* (load-time), matching the
       `unreachable > forbidden` ethos AND the sibling idiom already used in this
       ns cluster (`commands.clj` guards both `case` seams with load-time
