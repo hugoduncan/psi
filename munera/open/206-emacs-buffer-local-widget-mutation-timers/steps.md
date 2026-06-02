@@ -322,3 +322,30 @@
   new user-facing surface; the existing CHANGELOG `Fixed` entry is accurate and
   warranted, and README/`doc/` carry no stale or missing references. Verdict:
   REVIEW_COMPLETE.
+
+## Code-shaper review follow-ups (ψ)
+
+- [ ] CS1 — Extract the duplicated clear-in-flight / finalize-watchdog idiom
+      (`consistent(idioms)` ∧ `simple/single_responsibility`).
+      `psi-widget-projection--on-mutation-timeout` (`:346-360`) and the
+      `--dispatch-mutation` response lambda (`:386-393`) hand-roll the identical
+      sequence: `--cancel-mutation-timer state tkey` → `--get-lstate` →
+      `--set-lstate (lstate-set-in-flight lstate node-key nil)` →
+      `--upsert-projection-block` (timeout adds an interposed
+      `--call-error-handler`). Add a `psi-widget-projection--clear-mutation-in-flight
+      (ext-id widget-id node-key)` helper for the byte-identical get/set-in-flight
+      block (and optionally a `--finalize-mutation (state ext-id widget-id
+      node-key)` for cancel+clear+upsert), then call it from both callbacks so the
+      shared finalize lives in one place and each callback body reads as its
+      distinct intent. Keep existing tests green (the helpers are pure
+      refactors). Re-run `bb emacs:check`; byte-compile clean; reload `.el`.
+- [ ] CS2 — Align the `--dispatch-mutation` response-callback live-guard with
+      the R1-aligned timeout callback and the `schedule-notification-dismiss`
+      precedent (`consistent(idioms)`). The response lambda
+      (`psi-widget-projection.el:382`) guards only `(when (buffer-live-p buffer)
+      …)`, while `--on-mutation-timeout` and the precedent guard `(and
+      (buffer-live-p buffer) state)`. Change the response guard to `(and
+      (buffer-live-p buffer) state)` (or document the intentional divergence),
+      so both sibling store-targeting callbacks use the same guard. Benign
+      (state is captured non-nil at dispatch) — consistency item. Re-run
+      `bb emacs:check`; byte-compile clean; reload `.el`.

@@ -1005,3 +1005,43 @@ flags, config defcustoms, or documented behaviours beyond the bug fix itself.
   content required. accuracy ∧ completeness ∧ consistency hold.
 
 No new actionable docs issues. Verdict: REVIEW_COMPLETE.
+
+## Code-shaper review (ψ) — 2026-06-02
+
+Applied code-shaper skill (simplicity ∧ consistency ∧ robustness) over the
+production code (`psi-widget-projection.el` arm/cancel/timeout/dispatch +
+`--clear-mutation-timers`). Two actionable items, both consistency-class (not
+correctness); the existing structure is otherwise simple and mirrors the
+notification-timer precedent well.
+
+- CS1 — Duplicated "clear-in-flight + finalize watchdog" idiom across the two
+  callbacks (`consistent(idioms)` ∧ `simple/single_responsibility`). Both
+  `psi-widget-projection--on-mutation-timeout` (`:346-360`) and the
+  `--dispatch-mutation` response lambda (`:386-393`) hand-roll the identical
+  sequence: `--cancel-mutation-timer state tkey` → `--get-lstate` →
+  `--set-lstate (lstate-set-in-flight lstate node-key nil)` →
+  `--upsert-projection-block`. The 4-line get/set-in-flight block in particular
+  is byte-identical between the two sites. The timeout path only differs by an
+  interposed `--call-error-handler`. This is a single-responsibility extraction
+  candidate: a `psi-widget-projection--clear-mutation-in-flight (ext-id
+  widget-id node-key)` helper (the get/set/in-flight block) and/or a
+  `--finalize-mutation (state ext-id widget-id node-key)` helper (cancel +
+  clear-in-flight + upsert). Extracting it would let both callback bodies read
+  as their distinct intent (timeout = "fire error handler"; response = "ack")
+  rather than re-deriving the shared finalize each time, and would localize a
+  future change to the in-flight-clear shape to one place. (Benign duplication
+  today — both copies are correct and uniform — but a shaping/economy item.)
+
+- CS2 — Inconsistent live-guard between the two sibling callbacks
+  (`consistent(idioms)`). R1 already brought `--on-mutation-timeout`'s guard to
+  `(and (buffer-live-p buffer) state)` to match the
+  `schedule-notification-dismiss` precedent. The `--dispatch-mutation` response
+  lambda (`:382`) still guards only `(when (buffer-live-p buffer) …)` — it
+  relies on the captured `state` being non-nil implicitly rather than asserting
+  it. The two callbacks do the same store-targeting work behind different
+  guards. For consistency with the precedent the design repeatedly invokes
+  ("mirror `schedule-notification-dismiss`") and with the now-aligned timeout
+  callback, the response guard should also be `(and (buffer-live-p buffer)
+  state)`. (Benign — `state` is captured non-nil at dispatch and the inner
+  helpers null-guard — a consistency item, not a correctness fix; mirrors the
+  R1 rationale.)
