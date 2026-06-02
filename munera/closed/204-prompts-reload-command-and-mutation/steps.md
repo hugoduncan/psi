@@ -154,3 +154,10 @@ Vertical slices from plan.md. Tick each item with its sha / decision note.
       templates are replaced with `[]`. Focused ns green (8 tests / 36
       assertions, up from 6/—); `clj-kondo` 0/0. Closes the `{boundary}`
       coverage gap.
+
+## Test-review second pass (2026-06-01)
+
+- [x] Re-ran task-test-review independently: `reload-prompts-test` 8/36 green,
+      command + help tests 2/31 green. Well-formed, full code-testable AC
+      coverage, ¬mock ¬stub. No new actionable findings (see implementation.md
+      "Test review — second pass"). Review complete.

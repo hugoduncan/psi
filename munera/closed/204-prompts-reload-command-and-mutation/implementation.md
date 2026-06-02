@@ -563,3 +563,44 @@ Considered, NOT actionable:
     assertions (was 6). No production code change required — the handler already
     returns `[]` for absent/empty dirs and the mutation already has the
     `(or count 0)` guard; this only closes the missing-coverage gap.
+
+## Test review — second pass (2026-06-01)
+
+Re-ran the task-test-review skill independently against the current tree
+(criteria: well-formed, ∀b∈behaviour(design)∃t covering, infra-deps
+injectable/nullable ∧ ¬mock ∧ ¬stub). Read `reload_prompts_test.clj` (8
+deftests / 36 assertions) + `commands_test.clj` `prompts-reload-command-test` +
+`format-help-includes-all-commands-test`. Ran focused suites:
+`reload-prompts-test` 8/36 green; command + help tests 2/31 green.
+
+Verified (no new actionable finding):
+- ✅ Well-formed. Deterministic, temp-worktree isolated
+  (`createTempDirectory`), cleaned in `finally`; real `discover-templates` IO,
+  real dispatch, real psi-tool `mutate` resolution.
+- ✅ ¬mock ¬stub ¬with-redefs in the prompt-reload tests. `(fn [_q] {})` is a
+  real null query-fn for the unused-on-mutate query dependency, not a mock of
+  the unit under test.
+- ✅ AC coverage complete for code-testable ACs: AC1/2/3/6 (end-to-end
+  edit/add/delete, worktree-rooted), AC4 (command text worktree+count, no
+  diagnostics), AC5 (mutation output keys + live mutate + all-mutations
+  membership), AC7 (replace: seeded `stale` gone, incl. T1 replace-to-empty
+  boundary), AC8-write (state via `:session/reload-prompts` dispatch). No-effects
+  test guards the "no system-prompt refresh" decision.
+- ✅ T1 boundary (empty/absent `.psi/prompts`) closed in the prior pass and
+  passing (handler + mutation `(or count 0)` path).
+
+Considered, NOT actionable (consistent with prior pass):
+- AC8 read-via-resolver: tests read `:prompt-templates` via direct
+  `ss/get-session-data-in`, not a resolver. Resolver reads of
+  `:prompt-templates` are pre-existing (not added by this task); read-side AC8
+  is out of scope for this task's tests.
+- `psi-tool-visible-test` asserts `all-mutations` membership rather than
+  re-deriving the registered set; the live `mutate` test already exercises the
+  full registered-mutation resolution path end-to-end. Adequate.
+- Command test sets `:cwd` = `:worktree-path`, so it doesn't exercise the
+  worktree≠cwd divergence in the command path; the handler + end-to-end tests
+  already cover worktree-correct discovery (AC6). Adequate.
+
+Result: **no new actionable test-level feedback.** Tests are well-formed,
+cover every code-testable design AC, and use real infrastructure without
+mocks/stubs. Test review complete.
