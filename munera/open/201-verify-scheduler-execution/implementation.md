@@ -857,3 +857,46 @@ seeds `:delivered`/`:cancelled`/`:failed` via direct `swap!`/`assoc-in` rather
 than the live path — acceptable for a *projection* unit test (asserts outputs,
 not interactions; reaching those terminal statuses live is out of the
 projection unit's concern and already covered live elsewhere).
+
+## Test review follow-up — pass 7 executed (2026-06-01)
+
+Resolved the pass-7 actionable issue (infra-boundary `with-redefs` in the
+Slice-7 failure-path deliverable test) with a **third path** that the step's
+options (a)/(b) did not enumerate but that strictly dominates both for a
+verification-only task:
+
+- **Problem.** `scheduler-handlers-test/...-records-failed-status-on-prompt-submit-error-test`
+  forced the prompt-submit failure via `(with-redefs [dispatch/dispatch! …] …)`
+  — a global redef of the dispatch infra boundary (`infra_deps → ¬stub`), the
+  same class pass-6 removed from the e2e session-kind test.
+- **Why not option (a).** Introducing a ctx-level
+  `:submit-synthetic-user-prompt-fn` seam means editing
+  `dispatch_handlers/scheduler.clj` (`src/**`) — outside this verification-only
+  task's Slice-10 allowlist (zero `src/**` / `doc/scheduler.md`). Rejected.
+- **Why not option (b).** Deleting the handler test and resting solely on the
+  pure `fail-schedule-records-failure-detail-and-dequeues-test` is scope-safe
+  but *loses* the only live coverage that the `:scheduler/deliver` catch branch
+  maps error data into `fail-schedule` correctly (real session creation, real
+  ex-info → `:error-summary`/`:created-session-id`/`:delivery-phase`). Avoided.
+- **Chosen path — re-register the handler in the kernel registry.** Inside the
+  existing `with-registered-handlers` (which already installs the real handlers
+  via `kernel/clear-handlers!` + each `register!`), re-register
+  `:session/submit-synthetic-user-prompt` via `kernel/register-handler!` to
+  return `{:return {:submitted? false …}}`. `dispatch/dispatch!` routes through
+  `kernel/dispatch!` against this same registry, so the real `:scheduler/deliver`
+  catch branch runs end-to-end: a genuine top-level session is created, then the
+  `(:submitted? result)` guard trips and the handler throws its own
+  `"scheduled session prompt submission failed"` ex-info carrying the real
+  `:created-session-id` + `:delivery-phase :prompt-submit`. This is
+  injection-over-redef using the project's own dispatch seam — not a var stub.
+- **Edits.** Dropped the `with-redefs [dispatch/dispatch! …]` and the now-orphan
+  `[psi.agent-session.dispatch :as dispatch]` require. The error-message
+  assertion changed from the stub's `"boom"` to the real surfaced message; the
+  `:failed` / `:delivery-phase` / non-nil `:error-summary` / `:created-session-id`
+  assertions are unchanged. Assertion count unchanged (6 `is`).
+- **Verification.** `scheduler_handlers_test` green (9 tests / 51 assertions);
+  full `bb test` green; clj-kondo 0/0, cljfmt clean on the touched file.
+  Aggregate scheduler-suite count unchanged at **45 tests / 412 assertions**
+  (no assertion added/removed — only an asserted value changed). Test file only
+  — zero `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10
+  allowlist held). All other infra deps remain injectable via ctx/kernel seams.

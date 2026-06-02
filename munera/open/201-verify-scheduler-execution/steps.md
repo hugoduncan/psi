@@ -523,7 +523,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Test review follow-ups — pass 7 (task-test-review, 2026-06-01)
 
-- [ ] Remove the `with-redefs` boundary-stub from the Slice-7 failure-path
+- [x] Remove the `with-redefs` boundary-stub from the Slice-7 failure-path
       deliverable test
       `scheduler_handlers_test/scheduler-session-deliver-records-failed-status-on-prompt-submit-error-test`
       (~L337). It forces the prompt-submit failure by redefining
@@ -546,3 +546,26 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       task is treated as closed, raise it as a small standalone test-hygiene task;
       note option (a) would touch `src/**` and so falls outside this
       verification-only task's Slice-10 allowlist — option (b) does not.)
+      Done: chose a **third, scope-safe path that preserves the live failure
+      round trip** without an infra var-stub and without touching `src/**`:
+      re-register the `:session/submit-synthetic-user-prompt` handler in the
+      kernel handler registry (`kernel/register-handler!`) to return
+      `{:submitted? false}`, driving the *real* `:scheduler/deliver` catch
+      branch through the *real* dispatch pipeline. The kernel registry is the
+      project's own dispatch seam (the same one `with-registered-handlers`
+      already uses to install the real handlers), so this is injection-over-redef
+      (`infra_deps → injectable ∧ ¬stub`) rather than the rejected option (a)
+      ctx-seam-in-`src` or option (b) test-deletion. Dropped the
+      `with-redefs [dispatch/dispatch! …]` stub and the now-orphan
+      `[psi.agent-session.dispatch :as dispatch]` require. The catch branch now
+      throws its own `"scheduled session prompt submission failed"` ex-info with
+      the **real** `:created-session-id` (a genuine top-level session is created
+      before the prompt-submit fails) and `:delivery-phase :prompt-submit`, so
+      the assertions still verify `:failed` + `:delivery-phase` + non-nil
+      `:error-summary`/`:created-session-id`; the error-message assertion changed
+      from the stub's `"boom"` to the real surfaced message. Assertion count
+      unchanged (6 `is`), so the aggregate stays 45 tests / 412 assertions.
+      `scheduler_handlers_test` green (9 tests / 51 assertions); full `bb test`
+      green. clj-kondo 0/0, cljfmt clean. Test file only — zero
+      `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist
+      held).

@@ -1,7 +1,6 @@
 (ns psi.agent-session.scheduler-handlers-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.dispatch-handlers.prompt-handlers :as prompt-handlers]
    [psi.state-kernel.dispatch :as kernel]
    [psi.agent-session.dispatch-handlers.prompt-lifecycle :as prompt-lifecycle]
@@ -334,13 +333,19 @@
   (let [[ctx session-id] (test-support/make-session-ctx {:persist? false})]
     (with-registered-handlers
       ctx
-      #(with-redefs [dispatch/dispatch!
-                     (let [real-dispatch dispatch/dispatch!]
-                       (fn [ctx* event-type event-data opts]
-                         (if (= :session/submit-synthetic-user-prompt event-type)
-                           (throw (ex-info "boom" {:created-session-id (:session-id event-data)
-                                                   :delivery-phase :prompt-submit}))
-                           (real-dispatch ctx* event-type event-data opts))))]
+      #(do
+         ;; Drive the prompt-submit failure through the *real* dispatch pipeline
+         ;; rather than stubbing dispatch/dispatch! (an infra-boundary var redef):
+         ;; re-register the synthetic-prompt-submit handler to return
+         ;; {:submitted? false}, which the real :scheduler/deliver catch branch
+         ;; surfaces. This keeps the live session-kind failure round trip (real
+         ;; top-level session creation, real catch-branch error mapping) while
+         ;; using the kernel handler registry — the project's own dispatch seam —
+         ;; not a global var stub.
+         (kernel/register-handler!
+          :session/submit-synthetic-user-prompt
+          (fn [_ctx {:keys [user-msg]}]
+            {:return {:submitted? false :user-msg user-msg}}))
          (let [create-r (invoke-handler ctx :scheduler/create {:session-id session-id
                                                                :schedule-id "sch-session-fail"
                                                                :kind :session
@@ -357,7 +362,8 @@
                (is (= :prompt-submit (:delivery-phase failed)))
                ;; 201 verification: failure records error-summary and the created-session-id
                (is (some? (:error-summary failed)) "failure records an error summary")
-               (is (= "boom" (get-in failed [:error-summary :message])))
+               (is (= "scheduled session prompt submission failed"
+                      (get-in failed [:error-summary :message])))
                (is (some? (:created-session-id failed))
                    "session created before prompt-submit failure is still recorded"))))))))
 
