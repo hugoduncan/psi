@@ -5,6 +5,7 @@
    same way as `:psi.extension/command-names`."
   (:require
    [clojure.test :refer [deftest testing is]]
+   [psi.agent-session.commands.builtin-specs :as bspec]
    [psi.agent-session.core :as session]
    [psi.agent-session.test-support :as test-support]))
 
@@ -51,6 +52,21 @@
         (is (< (idx "status") (idx "help")))))
     (testing "the bare-name vector mirrors the spec names in the same order"
       (is (= names (mapv :name specs))))))
+
+(deftest builtin-commands-resolver-exposes-full-spec-table-membership-test
+  ;; AC6 end-to-end lock: the resolver is the single surface both UIs consume.
+  ;; Every built-in command name (the sole source = the spec-table keys, via
+  ;; `builtin-command-names`) appears in the resolver output, so adding a
+  ;; spec-table entry flows to TUI + Emacs autocomplete with NO UI-side list edit
+  ;; (the UIs build candidates purely from this resolver surface — see
+  ;; tui app-input-selector-test and emacs psi-capf-test).
+  (let [[ctx session-id] (create-session-context)
+        specs    (:psi.agent-session/builtin-command-specs
+                  (session/query-in ctx session-id [:psi.agent-session/builtin-command-specs]))
+        resolved (set (map :name specs))
+        sourced  bspec/builtin-command-names]
+    (is (= sourced resolved)
+        "resolver bare-name set equals the single-sourced built-in name set")))
 
 (deftest builtin-commands-resolver-graph-discovery-test
   (let [[ctx session-id] (create-session-context)]

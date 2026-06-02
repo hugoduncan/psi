@@ -123,18 +123,25 @@ Tick with sha/decision on completion.
 
 ## Slice 5 — Coherence lock + docs/changelog + full verify
 
-- [ ] Add end-to-end coherence test (AC6): a representative built-in spec-table
-      entry surfaces in both TUI and Emacs autocomplete with no UI-side list edit.
-- [ ] CHANGELOG `[Unreleased]`: built-in commands now appear consistently in
+- [x] Add end-to-end coherence lock (AC6): backend resolver exposes the full
+      single-sourced spec-table membership (resolver bare-name set ==
+      `builtin-command-names`), and the UIs build candidates purely from that
+      surface (TUI: empty-specs→no-builtins + backend-sourced `/reload-models`;
+      Emacs: state-sourced `/reload-models` + backend-desc-wins + builtin-only
+      refresh). Adding a spec-table entry therefore flows to both UIs with no
+      UI-side list edit.
+- [x] CHANGELOG `[Unreleased]`: built-in commands now appear consistently in
       TUI/Emacs autocomplete; previously-missing commands (`/reload-models`,
-      `/reload-prompts`, `/speed`, `/effort`, `/project-repl`, …) now listed.
-- [ ] Update docs describing how slash commands are surfaced to UIs (single
-      backend spec table → resolver → UI projections).
-- [ ] Full `bb test` green; targeted lint clean across all changed files.
-- [ ] Verify ACs: AC1 (resolver shape/order), AC2 (single keyed table /
+      `/reload-prompts`, `/reload-extension-installs`, `/speed`, `/effort`,
+      `/project-repl`) now listed; Emacs `defcustom` repurposed.
+- [x] Update docs describing how slash commands are surfaced to UIs (single
+      backend spec table → resolver → UI projections) — `doc/architecture.md`
+      EQL Introspection Tips.
+- [x] Full clj unit suite + emacs check green; lint clean across changed files.
+- [x] Verify ACs: AC1 (resolver shape/order), AC2 (single keyed table /
       projections), AC3 (help derivation, aliases hidden), AC4/AC5 (TUI/Emacs
       `/reload-models`), AC6 (end-to-end flow), AC7 (one-way), AC8 (changelog +
-      docs).
+      docs). See implementation.md "AC verification".
 
 ## Plan ambiguity follow-ups (review pass 1)
 

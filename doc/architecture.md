@@ -117,6 +117,20 @@ or session navigation domain logic.
     extension-authoring contract for invokable UI behaviour
 - For prompt sizing (chars + estimated tokens), use:
   - `[{:psi.agent-session/request-shape [:psi.request-shape/system-prompt-chars :psi.request-shape/estimated-tokens :psi.request-shape/total-chars]}]`
+- For the slash-command surface offered to UIs, the backend is the single
+  authoritative source. Both the TUI and Emacs build their slash autocomplete by
+  querying the graph — they hold no hardcoded command lists:
+  - extension commands: `[:psi.extension/command-names]`
+  - built-in commands: `[:psi.agent-session/builtin-command-specs]` (a vector of
+    `{:name :description}`, bare names, in table order) and the symmetric
+    `[:psi.agent-session/builtin-command-names]`
+  - built-in command identity lives in exactly one place — the
+    `builtin-command-specs` table in `psi.agent-session.commands.builtin-specs`.
+    The routing maps (`exact-command-handlers`, `prefixed-command-prefixes`),
+    `format-help`'s built-in lines, and the `builtin-commands-resolver` are all
+    pure projections of that table, so a routed-but-undescribed (or vice-versa)
+    command is structurally unrepresentable, and adding a built-in flows to both
+    UIs with no UI-side list edit.
 - For prompt lifecycle introspection summaries, use:
   - `[:psi.agent-session/last-prepared-request-summary :psi.agent-session/last-execution-result-summary]`
 - For normalized prompt lifecycle fields, use attrs such as:

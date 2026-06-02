@@ -597,3 +597,46 @@ built-in-spec-only session event refresh (I2 lock).
 
 Verification: `bb emacs:byte-compile` clean; `bb emacs:check` 324/324, 0
 unexpected.
+
+## Slice 5 implementation + AC verification (2026-06-01)
+
+Coherence lock, changelog, docs, full verify.
+
+- AC6 backend coherence lock: `builtin-commands-resolver-exposes-full-spec-table
+  -membership-test` asserts the resolver bare-name set == `builtin-command-names`
+  (the single source). Combined with the TUI test (candidates derive purely from
+  `:builtin-command-specs`; empty→none) and Emacs tests (candidates derive from
+  the `builtin-command-specs` state slot), adding a spec-table entry surfaces in
+  both UIs with no UI-side list edit.
+- CHANGELOG `[Unreleased]` → Changed: built-in commands now appear consistently
+  in TUI/Emacs autocomplete; previously-missing commands listed; Emacs
+  `defcustom` repurposed.
+- `doc/architecture.md` EQL Introspection Tips: documents the single-source spec
+  table → resolver → UI-projection surfacing of slash commands.
+
+### AC verification
+
+- AC1 ✓ `:psi.agent-session/builtin-command-specs` = vector of
+  `{:name :description}`, bare names, short descriptions (no `:usage`),
+  graph-discoverable, resolvable, in spec-table order — `builtin-commands
+  -resolver-shape-test`.
+- AC2 ✓ single keyed `builtin-command-specs` table; `exact-command-handlers`,
+  `prefixed-command-prefixes`, resolver specs are derived projections;
+  `/project-repl` `#{:exact :prefixed}` feeds both; prefixed-`case` branch
+  coherence is a separate narrow test — Slice-1 projection/dual-kind/branch
+  tests.
+- AC3 ✓ `format-help` built-in lines derive from the table in order, `:usage`
+  inline, `:hide-in-help?` (`/?`,`/exit`,`/project-repl`) skipped, `/skill:name`
+  literal — `format-help-derived-from-spec-table-test`.
+- AC4 ✓ TUI autocomplete includes backend-sourced `/reload-models` —
+  `autocomplete-slash-includes-backend-builtin-commands-test`.
+- AC5 ✓ Emacs autocomplete includes backend-sourced `/reload-models` —
+  `psi-capf-slash-includes-backend-builtin-commands`; built-in-only refresh
+  (`psi-session-updated-applies-builtin-specs-only-change`).
+- AC6 ✓ end-to-end membership lock (above) + UI tests prove no UI-side list.
+- AC7 ✓ UIs read via EQL resolvers; no UI hardcoded built-in list remains
+  (`shared/builtin-slash-commands` deleted; Emacs `defcustom` trimmed).
+- AC8 ✓ CHANGELOG `[Unreleased]` + `doc/architecture.md` updated.
+
+Verification: full `clojure -M:test` exits 0; `bb lint` 0 errors/0 warnings;
+`bb emacs:check` 324/324; `bb fmt:check` clean.
