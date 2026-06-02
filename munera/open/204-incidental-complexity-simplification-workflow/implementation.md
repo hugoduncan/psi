@@ -901,3 +901,80 @@ Non-actionable observations (no follow-up):
   action.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK.
+
+## 2026-06-01 — Implementation review (pass 2) follow-up executed (F2)
+
+Executed the single newly-added unchecked `steps.md` item (F2) from the pass-2
+implementation review. (The "Contingency" item predates this pass — a
+non-planned design-stated fallback, not a review follow-up — and was left
+untouched.)
+
+**Bug confirmed live before fixing.** Ran `bb gordian complexity --json` and
+`bb gordian local --json`:
+- 51 `psi.agent-session.dispatch-effects/execute-effect!` defmethods all emit
+  `arity: null` on **both** lenses, collapsing to one key
+  `…/execute-effect!/null` (verified: `group_by` → `{k: …/execute-effect!/null,
+  n: 51}`).
+- The old recipe's `from_entries` over that non-unique key is **last-wins**:
+  every null-arity `execute-effect!` unit inherited a single `cc` value
+  (live: all `cc = 1`), so `cc`/`gap` for any null-arity unit was
+  **non-deterministic w.r.t. emit order** — contradicting the SKILL's "fixed
+  recipe … reproducible" claim and the A1 "join is total" framing.
+- Currently no null-arity unit qualifies (`lcc-total ≥ 5.0` over null-arity
+  units = ∅), so the live top-5 was unaffected — but a future high-burden
+  null-arity defmethod would be mis-ranked.
+
+**Fix chosen: option (c) — re-key on something unique.** Picked over (a) "exclude
+null-arity" (would silently drop legitimate `defmethod` units from unit-level
+scope — data loss) and (b) "group cc by key and reduce" (order-independent but
+still **aggregates** the 51 distinct defmethods into one bogus unit — wrong
+granularity). Both lenses already carry `line` (the unit's start line);
+`(ns, var, arity, line)` is **fully unique** on both sides (verified: 0 dups
+across 3526 cc units / 3520 local units, `line` always present). Adding `@line`
+to the join key makes `from_entries` lossless — each defmethod gets its own
+correct `cc` regardless of emit order.
+
+**Verification of determinism:**
+- OLD recipe: all 51 `execute-effect!` units → `distinct cc = [1]` (last-wins).
+- NEW recipe: each defmethod → `distinct cc = [1..8]` (own correct cc).
+- NEW recipe top-5 is **identical** to the documented expected result
+  (`start-tui-runtime!/5` gap≈7.03, `print-help!/0` gap≈5.86, …) — no regression
+  for arity-bearing units.
+- Extracted the verbatim recipe from SKILL.md and ran it through `jq`
+  end-to-end: parses (inline `#` comments are valid jq) and emits the correct
+  ranked top-5.
+
+**Edits (confined to the skill recipe + its A1 prose, per F2 scope):**
+`.psi/skills/incidental-complexity-finder/SKILL.md`:
+- Step-2 recipe: `$ccmap`/`gap_key` keys now append `+ "@" + (.line|tostring)`;
+  added an inline comment on the `$ccmap` line.
+- Step-1 field-shape sentence: notes both lenses carry `line`, used for the
+  unique key; the selector-only `--sort` note now cites the
+  `(ns, var, arity, line)`-keyed join.
+- Step-3 (A1): added a "Why `line` is part of the key (A1 determinism)"
+  paragraph explaining the null-arity collision, the last-wins hazard, and how
+  `@line` restores a total, deterministic join over the
+  `(ns, var, arity, line)` key space — correcting the prior "total over the
+  shared key space" framing that implicitly assumed `(ns, var, arity)`
+  uniqueness. (No literal "A4 prose" / "total over the shared key space" string
+  existed in SKILL.md; F2's reference was the reviewer's paraphrase of the A1
+  rule, now corrected.)
+
+Left `(ns, var, arity)` intact where it denotes the **unit's logical identity**
+(lambda line 4 `join(ns,var,arity)`; Scope "a `(ns, var, arity)`") — `line` is a
+join-key disambiguator, not part of a unit's logical identity. The SKILL prose
+makes the distinction explicit.
+
+**Doc coherence:** `doc/workflows.md` join-key mention updated
+`(ns, var, arity)` → `(ns, var, arity, line)` with a parenthetical on why
+(`line` disambiguates same-named null-arity defmethods → deterministic join).
+
+**No workflow/test change forced** (F2: optional). The recipe is markdown, not
+executed by tests; the skill-registration definition test already covers
+loadability. Verified the skill still loads and both workflows still register:
+- `clojure -M:test --focus psi.workflow-loader.workflow-definitions-test`:
+  **14 tests, 196 assertions, 0 failures**.
+- `clj-kondo --lint` on the (unchanged) definition test: 0 errors, 0 warnings.
+  (SKILL.md / doc/workflows.md are markdown — not cljfmt/clj-kondo-parseable.)
+
+F2 checked in steps.md. PASS_STATUS: REVIEW_COMPLETE.

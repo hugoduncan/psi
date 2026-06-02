@@ -251,7 +251,8 @@ with the commit sha / decision when done.
 
 ## Implementation review follow-ups (review pass 2)
 
-- [ ] F2 — The skill's fixed `jq` join recipe keys `$ccmap`/the join on
+- [x] F2 — RESOLVED (option (c), re-key on `line`). The skill's fixed `jq` join
+      recipe keyed `$ccmap`/the join on
       `(ns + "/" + var + "/" + (arity|tostring))`, but that key is **non-unique**
       when `arity` is `null`: every `defmethod`-style unit emits `arity: null`,
       so all 51 `psi.agent-session.dispatch-effects/execute-effect!` defmethods
@@ -273,6 +274,17 @@ with the commit sha / decision when done.
       null-arity collision. Confined to the skill recipe + its A1/A4 prose; no
       workflow/test change forced (optionally assert recipe determinism). (See
       implementation.md pass-2 entry.)
+      RESOLUTION: re-keyed the join on `(ns, var, arity, line)` — `line` is
+      present on both lenses and fully unique (verified: 0 dups across 3526 cc /
+      3520 local units), so `from_entries` is lossless and each null-arity
+      defmethod gets its own correct `cc` (no last-wins). New recipe top-5 is
+      identical to the documented expected result (no regression); old vs new
+      determinism demonstrated live (51 `execute-effect!` units: old → all
+      `cc=1`, new → `cc ∈ {1..8}`). A1 prose gained a "Why `line` is part of the
+      key (A1 determinism)" paragraph correcting the prior implicit
+      `(ns,var,arity)`-uniqueness framing. `doc/workflows.md` join-key mention
+      updated for coherence. Skill still registers; both workflows still load
+      (14 tests, 196 assertions, 0 failures); clj-kondo clean.
 
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 

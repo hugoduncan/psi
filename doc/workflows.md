@@ -640,7 +640,9 @@ discriminator for *incidental* complexity is **comprehension burden the
 branching does not explain**: high `gordian local` burden against low/moderate
 cyclomatic complexity. The `incidental-complexity-finder` skill encodes this as
 `gap = lcc-total / max(cc, 1)`, joins the two `gordian` lenses on
-`(ns, var, arity)`, qualifies units with `lcc-total ≥ 5.0 ∧ gap ≥ 2.0`, ranks by
+`(ns, var, arity, line)` (`line` disambiguates same-named null-arity
+`defmethod` units so the join stays deterministic), qualifies units with
+`lcc-total ≥ 5.0 ∧ gap ≥ 2.0`, ranks by
 `gap`, and applies an essential-vs-incidental judgment guard over the top 5 to
 discard false positives. It selects exactly one unit, or reports that none
 qualifies.
