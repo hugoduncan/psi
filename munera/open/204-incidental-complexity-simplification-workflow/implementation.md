@@ -1245,3 +1245,38 @@ existing `workflow_definitions_test.clj` ns (no new ns / no production Clojure,
 per C1).
 
 PASS_STATUS: ACTIONABLE_FEEDBACK.
+
+## Test review pass 1 — TR1/TR2 resolution
+
+Executed the two test-review follow-ups (skill + generated-contract coverage
+gaps) in `components/workflow-loader/test/.../workflow_definitions_test.clj`
+(same ns, no new ns / no production Clojure, honouring C1).
+
+- **TR1 resolved** — added two deftests. `incidental-complexity-finder-skill-
+  content-lock-test` reads the loaded skill's `:file-path` SKILL.md (the skill
+  map carries `:file-path`, not a `:body`, so the body is slurped) and locks the
+  design Deliverable-1 behaviours by substring: `gap = lcc-total / max(cc, 1)`,
+  the `5.0`/`2.0` thresholds, the single-unit scope + "High cc alone is not a
+  target" guard (matched whitespace-tolerantly — the phrase wraps a newline in
+  SKILL.md), the A1 drop / never-default-cc=1 rule, and the F2
+  `(ns, var, arity, line)`/`@line` key. `incidental-complexity-finder-recipe-
+  determinism-test` extracts the embedded `jq` recipe (regex on the `jq -n…`
+  fenced block), rewrites its `/tmp/icf-*.json` paths to temp fixtures, and runs
+  it over two same-`(ns,var,arity)` null-arity units differing only by `line`;
+  asserts both survive with their OWN cc (3 and 4), i.e. `from_entries` is
+  lossless — the exact F2 property a `(ns,var,arity)` key would collapse
+  last-wins. Guarded with a jq-absent fallback that asserts the recipe keys on
+  `@line` twice (cc-map build + local gap_key). This lands the "optionally
+  assert recipe determinism" deferred by F2/F3.
+
+- **TR2 resolved** — extended `reduce-incidental-complexity-test` with three
+  `testing` blocks over step-1's generated-contract prompt: the Phase-0
+  characterization-test green-net gate, the behaviour-identical / meta-spec-
+  unchanged constraint, and the F3 A5/A2 `(ns, var, arity, line)` keys (both the
+  A5 "keyed by" and A2 "identified by" occurrences), so an F3 regress fails
+  green.
+
+Verification: focused `psi.workflow-loader.workflow-definitions-test` green
+(16 tests, 218 assertions, 0 failures); `clj-kondo --lint` on the test file:
+0 errors, 0 warnings. No production/skill/workflow/doc change required — both
+follow-ups were pure coverage additions against existing design behaviours.

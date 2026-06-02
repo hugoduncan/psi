@@ -349,7 +349,7 @@ with the commit sha / decision when done.
 
 ## Test review follow-ups (review pass 1)
 
-- [ ] TR1 — The `incidental-complexity-finder` skill's **core behaviours** are
+- [x] TR1 — The `incidental-complexity-finder` skill's **core behaviours** are
       untested. `incidental-complexity-finder-skill-registers-test` asserts only
       discovery + a non-empty `:description` + zero diagnostics. None of the
       design Deliverable-1 behaviours the skill exists to encode are covered by
@@ -374,8 +374,25 @@ with the commit sha / decision when done.
       (the F2/F3 "optionally assert recipe determinism" the prior passes
       deferred). Scope: extend `workflow_definitions_test.clj`'s skill test (no
       new ns, per C1).
+      RESOLUTION: added two deftests in `workflow_definitions_test.clj` (same ns,
+      no new ns / no production Clojure, per C1). (1)
+      `incidental-complexity-finder-skill-content-lock-test` slurps the loaded
+      skill's `:file-path` SKILL.md and locks the design Deliverable-1
+      behaviours: the `gap = lcc-total / max(cc, 1)` method, the `lcc-total ≥ 5.0`
+      / `gap ≥ 2.0` thresholds, the single-executable-unit scope + "High cc alone
+      is not a target" false-positive guard, the A1 drop rule ("dropped" /
+      "**never** defaulted to `cc = 1`"), and the F2 `(ns, var, arity, line)` /
+      `@line` join key. (2)
+      `incidental-complexity-finder-recipe-determinism-test` extracts the
+      embedded `jq` recipe and runs it (via `clojure.java.shell`) over a synthetic
+      input with two same-`(ns,var,arity)` null-arity units differing only by
+      `line` — asserting both survive the join with their OWN distinct `cc` (the
+      F2 losslessness the pre-F2 `(ns,var,arity)` key would collapse last-wins). A
+      jq-absent fallback asserts the recipe keys on `@line` on both the `$ccmap`
+      build and the `$loc` `gap_key`. Focused suite green (16 tests, 218
+      assertions, 0 failures); `clj-kondo` 0 findings.
 
-- [ ] TR2 — The generated two-phase behaviour-preserving contract embedded in
+- [x] TR2 — The generated two-phase behaviour-preserving contract embedded in
       `reduce-incidental-complexity.edn` step-7 is **under-covered**.
       `reduce-incidental-complexity-test` asserts the enforcing gate flags and
       both baseline filenames (`before-local.json`/`before-diagnose.edn`), but
@@ -394,6 +411,17 @@ with the commit sha / decision when done.
       the Phase-0 characterization-test gate, the behaviour-identical constraint,
       and the `(ns, var, arity, line)` A5/A2 key (so F3 cannot silently regress).
       Scope: extend the existing test (no new ns).
+      RESOLUTION: extended `reduce-incidental-complexity-test` (same ns, no new
+      ns) with three new `testing` blocks asserting prompt substrings in step-1's
+      generated-contract text: (a) the Phase-0 characterization-test gate
+      ("These tests must be GREEN against the unmodified code before any
+      refactoring begins" + "add characterization tests"), (b) the
+      behaviour-identical constraint ("behaviour is identical — meta/spec are
+      unchanged; existing test expectations are not weakened"), and (c) the F3
+      A5/A2 key — both "keyed by `(ns, var, arity, line)`" (A5) and "identified by
+      `(ns, var, arity, line)`" (A2) — so a regress to `(ns, var, arity)` in the
+      generated contract fails green. Focused suite green (16 tests, 218
+      assertions, 0 failures); `clj-kondo` 0 findings.
 
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 
