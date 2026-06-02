@@ -127,3 +127,10 @@
         rendered (pr-str big)]
     (is (= (op-action/truncate-value rendered) (:data projected)))
     (is (> (count rendered) 2000))))
+
+(deftest project-result-includes-details-nested-map
+  (testing "optional :details (nested map) is projected via pr-str (decision #7)"
+    (let [result {:status :ok :data {:a 1} :details {:k :v :n 2}}
+          projected (op-action/project-result result)]
+      (is (contains? projected :details))
+      (is (= (pr-str {:k :v :n 2}) (:details projected))))))

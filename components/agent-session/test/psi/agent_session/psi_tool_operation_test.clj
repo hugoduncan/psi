@@ -47,6 +47,21 @@
       (is (= #{:status :data :summary} (set (keys (:psi-tool/result report)))))
       (is (= ":ok" (-> report :psi-tool/result :status))))))
 
+(deftest invoke-projects-details-nested-map
+  (testing "optional :details (nested map) carried in :psi-tool/result (decision #7)"
+    (let [reg (registry/create-registry)]
+      (registry/register-operation-in!
+       reg {:id "alpha/details"
+            :description "carries details"
+            :handler (fn [_] {:status :ok :data {:n 1} :details {:k :v :n 2}})})
+      (let [report (psi-tool-operation/execute-psi-tool-operation-report
+                    {:ctx (make-ctx reg) :session-id "s1"}
+                    {:op "invoke" :operation-id "alpha/details" :args {}})]
+        (is (= :ok (:psi-tool/overall-status report)))
+        (is (contains? (:psi-tool/result report) :details))
+        (is (= (pr-str {:k :v :n 2})
+               (-> report :psi-tool/result :details)))))))
+
 (deftest invoke-error-sets-overall-status
   (let [reg (registry/create-registry)]
     (registry/register-operation-in!

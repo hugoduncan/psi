@@ -53,6 +53,16 @@
         (is (= ":status :ok" (first lines)))
         (is (= [":data 7" ":summary \"yep\""] (rest lines)))))))
 
+(deftest operation-invoke-renders-details-nested-map
+  (let [[ctx session-id] (create-session-context)]
+    (register-op! ctx {:id "alpha/details" :description "a"
+                       :handler (fn [_] {:status :ok :data 1 :details {:k :v :n 2}})})
+    (testing "optional :details (nested map) line appears in :text output (decision #7)"
+      (let [result (dispatch ctx session-id "/operation alpha/details")]
+        (is (= :text (:type result)))
+        (is (str/includes? (:message result)
+                           (str ":details " (pr-str {:k :v :n 2}))))))))
+
 (deftest operation-invoke-default-args
   (let [[ctx session-id] (create-session-context)]
     (register-op! ctx {:id "alpha/op" :description "a"

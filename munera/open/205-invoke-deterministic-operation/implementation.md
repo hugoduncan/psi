@@ -445,3 +445,29 @@ Non-actionable observations (no follow-up):
   string, the char-count semantics are precisely proven. Adequate.
 - The minor `:phase :validate` (missing-ctx) deviation is covered
   (`missing-ctx-renders-error`).
+
+## Resolution of test-review follow-up TR-1 (ψ)
+
+Closed the one actionable test-review gap: the optional `:details` result key
+(nested map — the non-trivial `pr-str` case named by decision #7) was unexercised
+in projection across all three surfaces. Added one test per surface, each on an op
+returning `{:status :ok :data … :details {:k :v :n 2}}`:
+
+- `deterministic_operation_action_test.clj` →
+  `project-result-includes-details-nested-map`: asserts `:details` present in the
+  projected map and equal to `(pr-str {:k :v :n 2})`. (1 test / 2 assertions.)
+- `psi_tool_operation_test.clj` → `invoke-projects-details-nested-map`: asserts
+  `:psi-tool/result` carries `:details` equal to `(pr-str {:k :v :n 2})`,
+  `:overall-status :ok`.
+- `operation_command_test.clj` → `operation-invoke-renders-details-nested-map`:
+  asserts the `:type :text` output includes the `:details (pr-str …)` line.
+
+All three pass (focused runs: unit 1/2, psi-tool+command 2/5 combined, all green).
+clj-kondo clean; clj-paren-repair no-ops. No production code changed — projection
+already rendered all top-level keys; these tests close the all-keys rule for the
+nested-map case on both surfaces. No blocked steps.
+
+The remaining unchecked close-out box (`git mv open/ → closed/` + remove from
+plan.md) is the lifecycle's terminal move; the task stays in `open/` under this
+worktree handoff and the close move is performed by the orchestrating lifecycle,
+not this follow-up pass.
