@@ -347,6 +347,54 @@ with the commit sha / decision when done.
       change (the SKILL recipe already keys on `@line`); SKILL §2/§3 cross-ref
       verified accurate. design(spec)↔SKILL(mechanism) coherence gap closed.
 
+## Test review follow-ups (review pass 1)
+
+- [ ] TR1 — The `incidental-complexity-finder` skill's **core behaviours** are
+      untested. `incidental-complexity-finder-skill-registers-test` asserts only
+      discovery + a non-empty `:description` + zero diagnostics. None of the
+      design Deliverable-1 behaviours the skill exists to encode are covered by
+      any test: the `gap = lcc-total / max(cc, 1)` method, the qualification
+      thresholds (`lcc-total ≥ 5.0 ∧ gap ≥ 2.0`), the top-5 essential-vs-
+      incidental judgment guard, the single-executable-unit scope, the A1
+      unmatched-row rule (drop, never default `cc=1`), and — most pointedly —
+      the F2 determinism fix (the `(ns, var, arity, line)`/`@line` join key that
+      passes 1–5 manual reviews repeatedly leaned on but never locked). A skill
+      whose frontmatter is valid but whose recipe body is empty, paraphrased,
+      or regressed to the pre-F2 `(ns, var, arity)` key would pass this test
+      green. Per the task-test-review criterion `∀b ∈ behaviour(design). ∃t.
+      covers(t,b)`, the skill's central behaviour is the design's first
+      acceptance criterion ("documents the `gap` method and the false-positive
+      guard, is scoped to a single unit") yet has no covering assertion. Add a
+      content/behaviour lock for the skill — at minimum substring assertions on
+      SKILL.md for the threshold strings (`5.0`, `2.0`), the `gap`/`max(cc, 1)`
+      formula, the single-unit scope, the A1 drop rule, and the F2 `@line`/
+      `(ns, var, arity, line)` join key (mirroring how the workflow tests anchor
+      on prompt substrings); ideally also an executable determinism assertion
+      that the embedded `jq` recipe is lossless over a non-unique-arity input
+      (the F2/F3 "optionally assert recipe determinism" the prior passes
+      deferred). Scope: extend `workflow_definitions_test.clj`'s skill test (no
+      new ns, per C1).
+
+- [ ] TR2 — The generated two-phase behaviour-preserving contract embedded in
+      `reduce-incidental-complexity.edn` step-7 is **under-covered**.
+      `reduce-incidental-complexity-test` asserts the enforcing gate flags and
+      both baseline filenames (`before-local.json`/`before-diagnose.edn`), but
+      not the contract's substantive shape: the Phase-0 characterization-test
+      gate ("green net before any refactor"), the behaviour-identical constraint
+      (meta/spec unchanged, existing expectations not weakened), and — directly
+      relevant to F3 — the A5/A2 acceptance keys. F3 specifically re-keyed A5/A2
+      in this prompt onto `(ns, var, arity, line)` and its own resolution noted
+      "no test change forced (optionally assert the key string for coherence)",
+      so a regression of that key back to `(ns, var, arity)` in the generated
+      contract passes green. Per `∀b ∈ behaviour(design). ∃t. covers(t,b)`, the
+      design acceptance "Generated tasks carry the two-phase behaviour-preserving
+      contract: a Phase 0 test-coverage gate … and Phase 1 refactor with the
+      `local`-lens + `gate` + green-tests acceptance" is only partially covered.
+      Add prompt-substring assertions in `reduce-incidental-complexity-test` for
+      the Phase-0 characterization-test gate, the behaviour-identical constraint,
+      and the `(ns, var, arity, line)` A5/A2 key (so F3 cannot silently regress).
+      Scope: extend the existing test (no new ns).
+
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 
 - [ ] Split step-1 selection from task-creation into two `:session` steps,

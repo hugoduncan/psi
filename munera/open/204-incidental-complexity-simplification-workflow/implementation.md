@@ -1171,3 +1171,77 @@ No new actionable issues found. design/plan/implementation reviews (architecture
 + A1–A5 + I1 + C1–C3 + F1–F4) are all resolved.
 
 PASS_STATUS: REVIEW_COMPLETE.
+
+## 2026-06-01 — Test review (task-test-review skill, pass 1)
+
+Reviewed the task's tests against the `task-test-review` skill:
+`well_formed(tests) ∧ ∀b∈behaviour(design). ∃t. covers(t,b) ∧ ∀d∈infra_deps.
+injectable(d) ∧ nullable(d) ∧ ¬mock(d) ∧ ¬stub(d)`. The task added no production
+Clojure and no new test ns; it **extended** `workflow_definitions_test.clj` with
+three new deftests — `task-lifecycle-in-worktree-test`,
+`reduce-incidental-complexity-test`, and
+`incidental-complexity-finder-skill-registers-test`. Ran the focused suite live:
+**14 tests, 196 assertions, 0 failures**.
+
+Verified sound (no findings):
+- **well_formed.** All three new deftests pass, are structured with named
+  `testing` blocks and descriptive failure messages, and assert on **state/
+  outputs** (parsed workflow definitions from a real `load-workflow-definitions`
+  over real files copied to a temp dir; real `load-skills-from-dir` output) —
+  never on interactions. Consistent with the project Test formalism.
+- **¬mock / ¬stub of logic-under-test.** No mocks or stubs of the parser/
+  compiler/skill-loader. The only `with-redefs` (`global-workflow-dirs`→`[]`,
+  `project-workflow-dir`→temp dir) is the **pre-existing shared `with-workflow-dir`
+  harness** isolating the filesystem scan root from `~/.psi` — environment
+  isolation (nullable-style), not stubbing the code under test; every other
+  deftest in the ns uses it. Criterion satisfied.
+- **Structural-shape coverage is strong.** The wrapper three-step shape
+  (resolve-worktree `:session`+`work-on` → `lifecycle` `:delegate
+  :target "task-lifecycle"` → `summary`), the outer two-step shape, the
+  `:prompt-string {:type :map :fields {:input {:from {:step … :yield :text}}}}`
+  handoff wiring, the F1 `NO_TARGET` short-circuit (both session steps), the
+  early-stop intent, the gate flags, and both baseline filenames are all locked
+  with exact-value assertions — these design-acceptance behaviours are covered.
+
+Two actionable **coverage** findings (added to steps.md — net-new; no prior pass
+was a *test* review):
+
+- **TR1 — the `incidental-complexity-finder` skill's core behaviour is
+  untested.** `incidental-complexity-finder-skill-registers-test` asserts only
+  discovery + non-empty `:description` + zero diagnostics. The design's *first*
+  acceptance criterion (the skill "documents the `gap` method and the
+  false-positive guard, is scoped to a single unit") and every substantive
+  Deliverable-1 behaviour — `gap = lcc-total / max(cc,1)`, the
+  `lcc-total ≥ 5.0 ∧ gap ≥ 2.0` thresholds, the top-5 judgment guard, the
+  single-unit scope, the A1 drop-unmatched rule, and especially the F2
+  `(ns, var, arity, line)`/`@line` determinism fix — have **zero** covering
+  assertion. A skill with valid frontmatter but an empty/paraphrased/pre-F2
+  recipe body would pass green. F2's own resolution flagged this ("optionally
+  assert recipe determinism") and deferred it; per `∀b. ∃t. covers(t,b)` it is
+  an open coverage gap. Fix: lock the skill's threshold/formula/scope/A1/`@line`
+  substrings (mirroring the workflow tests' prompt-substring anchors), ideally
+  plus an executable determinism check that the embedded `jq` recipe is lossless
+  over null-arity input.
+
+- **TR2 — the generated two-phase contract is under-covered.**
+  `reduce-incidental-complexity-test` locks the gate flags + baseline filenames
+  but not the contract's substantive shape: the Phase-0 characterization-test
+  gate ("green net before refactor"), the behaviour-identical constraint, and
+  the F3-re-keyed A5/A2 `(ns, var, arity, line)` acceptance key. F3 explicitly
+  noted "no test change forced (optionally assert the key string for
+  coherence)", so a regression of that key back to `(ns, var, arity)` in the
+  generated contract passes green. The design acceptance "Generated tasks carry
+  the two-phase behaviour-preserving contract: a Phase 0 test-coverage gate …
+  and Phase 1 refactor with the `local`-lens + `gate` + green-tests acceptance"
+  is only partially covered. Fix: add prompt-substring assertions for the
+  Phase-0 gate, the behaviour-identical constraint, and the
+  `(ns, var, arity, line)` A5/A2 key.
+
+Both findings are coverage gaps (the design acceptance behaviours exist; tests
+do not yet cover them). Neither is a well-formedness or mock/stub defect — the
+existing assertions are sound; they are simply incomplete against the design's
+skill-content and generated-contract behaviours. Scope of both fixes: extend the
+existing `workflow_definitions_test.clj` ns (no new ns / no production Clojure,
+per C1).
+
+PASS_STATUS: ACTIONABLE_FEEDBACK.
