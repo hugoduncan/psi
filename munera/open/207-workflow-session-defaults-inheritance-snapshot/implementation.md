@@ -1602,3 +1602,71 @@ that does not exercise capture.) New requires: `psi.agent-core.core`,
 `psi.agent-session.core`, `psi.session-state.state` — all on the main base test
 classpath. Test-only change (no behaviour/code/doc/changelog delta).
 inheritance-snapshot suite green (10 tests, 53 assertions); lint clean.
+
+## Test-review pass 7 (ψ, 2026-06-02)
+
+Re-applied `task-test-review` (well-formed ∧ ∀-AC-coverage ∧ no-mock infra
+deps) across the full 207 test surface. All 9 ACs map to tests; suites green
+(inheritance-snapshot 10/53; canonical-workflows-snapshot + child-session-state
++ child-session-context + workflow-runtime core 23/140). Infra deps are real /
+nullable (`support/create-session-context {:persist? false}`, real
+ctx/state/dispatch); the delegate test's two no-op injected fns are legitimate
+dependency injection (the design mandates injected fns), not mocks. No mocks /
+`with-redefs` / stubs of logic.
+
+One actionable behaviour-coverage gap (T7):
+
+- **T7 — nested/delegated path isolation from a post-invoke live-parent
+  mutation is untested directly.** AC4 has two halves: (i) the nested run
+  inherits the delegating step's EFFECTIVE config (overridden model
+  propagates), and (ii) it is captured "**not the (possibly-since-mutated)
+  invoking session**" — the anti-leak invariant for the nested path. Both AC4
+  tests cover (i): `nested-delegation-effective-snapshot-propagates-overridden-
+  model-test` (function-composition level) and
+  `delegate-step-runtime-result-persists-child-inherited-defaults-test`
+  (delegate.clj wiring). Neither mutates the LIVE parent session AFTER invoke
+  before delegating, so half (ii) — the nested child snapshot's isolation from
+  a since-mutated invoking session — is proven only TRANSITIVELY (via the
+  AC1/AC2/AC3 `resolve-step-session-config` isolation tests, since the nested
+  path reads the parent RUN snapshot through `effective-config->snapshot` and
+  the resolver is snapshot-gated, R1). A future change reintroducing a live
+  read on the nested derivation path (e.g. the injected closure re-reading the
+  live session instead of `(:inherited-defaults workflow-run)`) would NOT be
+  caught by any current test. The top-level path got exactly this direct
+  isolation assertion in T2 (tools/skills) — the nested path should have the
+  parallel one. See T7.
+
+## Test-shaper review (ψ, 2026-06-02 — post-T6)
+
+Re-applied `test-shaper` after T6 committed (`f338e5f4b`). Tree clean, HEAD
+`a30abd809`. Re-read the full 207 test surface (`inheritance_snapshot_test.clj`,
+`workflow_runtime/core_test.clj`, `canonical_workflows_snapshot_test.clj`,
+`workflow_child_session_context_test.clj`) + resolver/schema source
+(`workflow-step-session-config/core.clj`, `workflow-runtime/model.clj`).
+Focused suites green: inheritance-snapshot + workflow-child-session-context
+(14 tests, 92 assertions, 0 failures).
+
+Quality: HIGH. simple ∧ consistent ∧ robust ∧ economical all hold. Real
+ctx/state throughout; nullable adapters at infra boundary only (no-mock).
+Behavior/state assertions, no interaction assertions. Every `is` carries a
+meaningful failure message. Distinguishing-value assertions (snapshot-vs-live
+model/prompt/speed/effort/tools/skills) prove the actual isolation contract,
+not just shape. Positive+negative control blocks for the `:inherited-snapshot?`
+flag. AC1–9 each map to a focused test; T6 closed the last capture-side value
+gap. No case-explosion.
+
+One candidate smell considered and judged NON-actionable: the
+`inherited-defaults-schema` (model.clj:179) is asserted only on the positive
+path (`valid-workflow-run?` true) — no negative test proves it REJECTS a
+malformed snapshot (e.g. bare-string `:model`, non-keyword `:prompt-mode`). I
+deliberately do NOT raise this as a follow-up: (1) the schema is consumed only
+inside pure `create-run` via `valid-workflow-run?`, and (2) every production
+producer (`resolve-inherited-defaults-snapshot`, `effective-config->snapshot`)
+is already value-tested to emit exactly the typed key set, so a malformed
+snapshot can only originate from a producer bug the producer tests already
+guard. A negative schema test would assert malli's own constraint enforcement
+— framework-level, low-signal, redundant — which `economical(tests)` /
+`behavior_focused(tests)` steer away from. The behavioral contract (capture →
+persist → consume → isolate) is fully covered.
+
+No new actionable test-shaper findings. Review complete.
