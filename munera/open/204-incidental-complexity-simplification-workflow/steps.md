@@ -944,7 +944,7 @@ with the commit sha / decision when done.
 
 ## Test review follow-ups (review pass 12 — test-shaper)
 
-- [ ] TR14 — `task-lifecycle-in-worktree-test`'s `lifecycle` `:delegate`
+- [x] TR14 — `task-lifecycle-in-worktree-test`'s `lifecycle` `:delegate`
       coverage asserts only `:type`/`:target`/`:prompt-string`; it never locks
       the delegate's `:context`. The wrapper's `lifecycle` step carries
       `:context [{:type :source :from :workflow-original}]` (EDN line 17) —
@@ -967,3 +967,20 @@ with the commit sha / decision when done.
       Test-only, no production/EDN change; `workflow_definitions_test.clj` is
       799 lines — keep the edit under the 800 `components/` guard (trim verbose
       TR-comment headroom if needed). Run focused suite + `clj-kondo`.
+      RESOLUTION: added a `testing` block to `task-lifecycle-in-worktree-test`
+      (same ns, test-only, no production/EDN change) — "lifecycle :delegate
+      :context is only :workflow-original (no prior-step yield) (TR14)" —
+      asserting the wrapper `lifecycle` delegate's `:context` equals
+      `[{:type :source :from :workflow-original}]`, mirroring
+      `task-lifecycle-test`'s `:context` lock and TR13's outer-delegate lock.
+      Verified the EDN's `lifecycle` step carries exactly that `:context` (only
+      `:workflow-original`, NOT the `resolve-worktree` yield) before locking. A
+      regress adding `{:step "resolve-worktree" :yield :text}` (re-injecting the
+      handoff into the lifecycle context) or dropping `:workflow-original` now
+      fails green. To stay under the 800 `components/` file guard (the file was
+      at 799, the new block pushed it to 810), trimmed verbose prose headroom in
+      the TR7/TR10/TR13 comment blocks (assertions untouched) → file now 797
+      lines. Focused suite green: `task-lifecycle-in-worktree-test` 26 assertions
+      (+1 over pass-11's 25); full definitions ns 13 tests, 212 assertions, 0
+      failures (+1 over pass-11's 211); `clj-kondo` 0 findings; `clj-paren-repair`
+      Success; `bb commit-check:file-lengths` clean (797 < 800).

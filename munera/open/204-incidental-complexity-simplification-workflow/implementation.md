@@ -2340,3 +2340,40 @@ Fix: add a `testing` block to `task-lifecycle-in-worktree-test` asserting the
 change; `workflow_definitions_test.clj` is 799 lines — keep the edit under the
 800 `components/` guard (trim the existing verbose TR-comment headroom if
 needed). See steps.md "Test review follow-ups (review pass 12 — test-shaper)".
+
+### TR14 resolution
+
+Added a `testing` block to `task-lifecycle-in-worktree-test` (same ns,
+test-only, no production/EDN change):
+
+```clojure
+(testing "lifecycle :delegate :context is only :workflow-original (no prior-step yield) (TR14)"
+  (is (= [{:type :source :from :workflow-original}]
+         (:context lifecycle-step))))
+```
+
+`lifecycle-step` was already bound in the test's `let`. Verified against the
+live EDN before locking: the wrapper `lifecycle` step's `:context` is exactly
+`[{:type :source, :from :workflow-original}]` — only `:workflow-original`, NOT
+the `resolve-worktree` `:yield :text` handoff (inner `task-lifecycle` reads the
+task path solely via `:prompt-string {:input …}`; re-injecting the handoff blob
+would pollute the lifecycle context). The block mirrors `task-lifecycle-test`'s
+`:context` lock and TR13's outer-delegate `:context` lock. A regress adding
+`{:step "resolve-worktree" :yield :text}` to the wrapper lifecycle `:context`,
+or dropping `:workflow-original`, now fails green.
+
+File-length guard: the new block pushed `workflow_definitions_test.clj` from 799
+to 810 lines (over the 800 `components/` guard). Trimmed verbose prose headroom
+in the TR7, TR10, and TR13 explanatory comment blocks (no assertion changes) →
+file now **797 lines** (`bb commit-check:file-lengths` clean).
+
+Verification:
+- `task-lifecycle-in-worktree-test` (focused): 1 test, **26 assertions**, 0
+  failures (+1 over pass-11's 25).
+- `psi.workflow-loader.workflow-definitions-test` (full ns): **13 tests, 212
+  assertions, 0 failures** (+1 over pass-11's 211).
+- `clj-kondo --lint` on the test file: 0 errors, 0 warnings.
+- `clj-paren-repair` on the test file: Success.
+- `bb commit-check:file-lengths`: clean (797 < 800).
+
+TR14 checked in steps.md. PASS_STATUS: REVIEW_COMPLETE.

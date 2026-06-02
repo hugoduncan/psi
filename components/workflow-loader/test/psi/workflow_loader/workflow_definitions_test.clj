@@ -621,6 +621,17 @@
          (is (= {:type :map
                  :fields {:input {:from {:step "resolve-worktree" :yield :text}}}}
                 (:prompt-string lifecycle-step))))
+       ;; TR14 (test review pass 12, test-shaper): lock the wrapper lifecycle
+       ;; delegate's :context — deliberately ONLY :workflow-original, NOT the
+       ;; resolve-worktree handoff yield (inner task-lifecycle reads the task
+       ;; path solely via :prompt-string :input; re-injecting the handoff blob
+       ;; would pollute the lifecycle context). Mirrors task-lifecycle-test's
+       ;; :context lock and TR13's outer-delegate lock. A regress adding
+       ;; {:step "resolve-worktree" :yield :text} or dropping :workflow-original
+       ;; previously passed green.
+       (testing "lifecycle :delegate :context is only :workflow-original (no prior-step yield) (TR14)"
+         (is (= [{:type :source :from :workflow-original}]
+                (:context lifecycle-step))))
        (testing "trailing summary :session step is present (terminal user-facing summary)"
          (is (some? summary-step))
          (is (= :session (:type summary-step)))
@@ -642,17 +653,11 @@
                                 (:from %))
                             (:contributions summary-step)))
                "summary sources the resolve-worktree :yield :text so it can detect NO_TARGET")))
-       ;; TR10 (test review pass 8): the prior summary assertions lock only the
-       ;; NO_TARGET (negative) branch — the symmetric gap TR7 fixed for
-       ;; resolve-worktree. The summary template is the workflow's user-facing
-       ;; terminal report (three-step … -> summary(:session) adapter; design
-       ;; Locked decision 7's completed/reviewed-task endpoint is what summary
-       ;; reports). On a real munera/... path it must independently inspect the
-       ;; task artifacts and report the design → plan → implement → review run,
-       ;; the artifacts updated, and the closed/open outcome, sourcing the
-       ;; lifecycle step :yield :text. A regress dropping the positive-path
-       ;; contract (or the lifecycle contribution) while keeping the NO_TARGET
-       ;; branch would pass green yet gut the terminal report. Lock it.
+       ;; TR10 (test review pass 8): lock the summary's positive-path terminal
+       ;; contract (symmetric to TR7 for resolve-worktree). On a real munera/...
+       ;; path summary must inspect the task artifacts and report the design →
+       ;; plan → implement → review run, the artifacts updated, and the
+       ;; closed/open outcome, sourcing the lifecycle step :yield :text.
        (testing "summary prompt reports the positive-path lifecycle terminal contract (TR10)"
          (let [summary-text (step-template-text summary-step)]
            (is (re-find #"(?i)independently inspect that specific task" summary-text)
@@ -668,14 +673,10 @@
                               (:from %))
                           (:contributions summary-step)))
              "summary sources the lifecycle :yield :text so it can report the lifecycle run outcomes"))
-       ;; TR7 (test review): the prior assertions lock only the NO_TARGET
-       ;; (negative) branch + the work-on tool entry + {{input}} wiring. The
-       ;; positive (target-present) branch is the verified cross-:delegate
-       ;; worktree-continuity mechanism the design chose (Locked decision 11 /
-       ;; Verified Facts: the wrapper re-calls work-on before sub-delegating).
-       ;; A regress dropping that positive-path instruction (keeping the
-       ;; NO_TARGET branch + the work-on tool entry) would pass green yet break
-       ;; the design's central continuity claim. Lock it.
+       ;; TR7 (test review): lock the positive (target-present) branch — the
+       ;; verified cross-:delegate worktree-continuity mechanism (Locked
+       ;; decision 11): the wrapper re-calls work-on before sub-delegating. The
+       ;; NO_TARGET-only locks above let a regress dropping this pass green.
        (testing "resolve-worktree prompt re-calls work-on and yields only the task path on a target-present handoff (TR7)"
          (let [resolve-text (step-template-text resolve-step)]
            (is (re-find #"(?i)call `?work-on`? with the extracted worktree path"
@@ -716,14 +717,11 @@
          (is (= {:type :map
                  :fields {:input {:from {:step "select-and-create" :yield :text}}}}
                 (:prompt-string delegate-step))))
-       ;; TR13 (test review pass 11, test-shaper): the delegate's :context — not
-       ;; just its :prompt-string :input — propagates the step-1 structured
-       ;; handoff blob into the delegated wrapper's context (the second source is
-       ;; the companion to the :input wiring, part of the verified cross-:delegate
-       ;; worktree-continuity mechanism — Locked decision 11). Previously the
-       ;; delegate was asserted only on :type/:target/:prompt-string, so a regress
-       ;; dropping the {:step ... :yield :text} context source passed green. Lock
-       ;; it, mirroring task-lifecycle-test's :context lock.
+       ;; TR13 (test review pass 11, test-shaper): lock the delegate's :context —
+       ;; the second source propagates the step-1 handoff blob into the delegated
+       ;; wrapper (companion to the :input wiring, Locked decision 11). The
+       ;; :type/:target/:prompt-string-only locks let a regress dropping the
+       ;; {:step ... :yield :text} source pass green.
        (testing "lifecycle-in-worktree :delegate :context propagates workflow-original + the select-and-create handoff yield (TR13)"
          (is (= [{:type :source :from :workflow-original}
                  {:type :source :from {:step "select-and-create" :yield :text}}]
