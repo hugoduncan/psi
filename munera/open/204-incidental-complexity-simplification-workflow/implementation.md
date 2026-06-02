@@ -2097,3 +2097,30 @@ PASS_STATUS: REVIEW_COMPLETE.
   Focused definitions suite green: 13 tests, 208 assertions, 0 failures (+5 over
   pass-7's 203). `clj-paren-repair` Success; `clj-kondo` 0 findings;
   `workflow_definitions_test.clj` 772 lines (< 800 `components/` guard).
+
+### Pass 9 — test-shaper review (independent)
+
+Applied `test-shaper` to the 204 tests (`workflow_definitions_test.clj` +
+`incidental_complexity_finder_skill_test.clj`). Focused suite green: 18 tests,
+255 assertions, 0 failures. Coverage is strong and economical — TR1–TR10
+collectively lock the skill recipe (join losslessness/order-independence/
+filter/drop/ranking/cap), the SKILL prose behaviours, the wrapper three-step
+shape + NO_TARGET + positive-path worktree-continuity + summary terminal
+contract, and the outer two-step shape + handoff fields + early-stop + gate
+flags + Phase-0 gate + behaviour-identical constraint + (ns,var,arity,line)
+keys + no-push/PR endpoint.
+
+One actionable gap (TR11): the **A3 baseline-path-resolution** behaviour is
+named (design "Generated task design" + R3) with an explicit failure mode —
+the gate `--baseline` must reference the **worktree-root-relative task-dir
+path** (`munera/open/NNN-slug/before-diagnose.edn`), NOT a bare filename, "where
+a bare filename does not resolve" from cwd. The current
+`reduce-incidental-complexity-test` asserts only the `--fail-on
+new-cycles,new-high-findings --max-new-medium-findings 0` flag tail; a regress
+changing `--baseline munera/open/NNN-slug/before-diagnose.edn` to a bare
+`--baseline before-diagnose.edn` (the exact R3-warned bug) passes green. The
+same class applies to the A5 `before-local.json` comparison, locked only as a
+bare filename substring, not its worktree-relative read path. test-shaper
+`economical` (cover named acceptance) + `meaningful_failures`: a named design
+behaviour with a called-out failure mode should have a test that fails on the
+regress.

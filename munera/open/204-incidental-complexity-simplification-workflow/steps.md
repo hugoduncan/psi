@@ -809,6 +809,35 @@ with the commit sha / decision when done.
       `clj-paren-repair` Success; file 772 lines (< 800). (See implementation.md
       pass-8 test-review TR10 entry.)
 
+## Test review follow-ups (review pass 9 — test-shaper)
+
+- [ ] TR11 — The **A3 baseline-path-resolution** behaviour is named in the
+      design ("Generated task design" Phase-1 A3 + R3) with an explicit,
+      called-out failure mode: the gate `--baseline` must reference the
+      **worktree-root-relative task-dir path**
+      (`munera/open/NNN-slug/before-diagnose.edn`), NOT a bare filename, because
+      "a bare filename does not resolve" from the worktree-root cwd where Phase 1
+      runs `gordian gate`. `reduce-incidental-complexity-test`'s "embeds the
+      enforcing gate flags + both baselines" block asserts only the `--fail-on
+      new-cycles,new-high-findings --max-new-medium-findings 0` flag tail and the
+      bare filename substrings `before-local.json`/`before-diagnose.edn`; it never
+      anchors the baseline on its **worktree-relative path in the gate command**.
+      A regress changing `--baseline munera/open/NNN-slug/before-diagnose.edn` to
+      a bare `--baseline before-diagnose.edn` (the exact R3-warned bug) passes
+      every existing test green. The same class applies to the A5
+      `before-local.json` read — locked only as a bare filename, not as the
+      worktree-relative comparison path. Per `∀b ∈ behaviour(design). ∃t.
+      covers(t,b)` and test-shaper `economical` (cover named acceptance) +
+      `meaningful_failures` (a named behaviour with a called-out failure mode
+      should have a test that fails on the regress), this is an uncovered
+      named behaviour. Fix: extend `reduce-incidental-complexity-test` (same ns,
+      test-only, no production change) to assert the gate command embeds the
+      full worktree-root-relative baseline path
+      `--baseline munera/open/NNN-slug/before-diagnose.edn` (not just the
+      `--fail-on` tail), and that the A5 burden-reduction instruction names the
+      worktree-relative `munera/open/NNN-slug/before-local.json` read path. Run
+      focused suite + `clj-kondo`.
+
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 
 - [ ] Split step-1 selection from task-creation into two `:session` steps,
