@@ -3,20 +3,11 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.commands :as commands]
-   [psi.agent-session.core :as session]
    [psi.agent-session.deterministic-operation-action :as op-action]
-   [psi.agent-session.test-support :as test-support]
-   [psi.deterministic-operation-registry.registry :as registry]))
+   [psi.agent-session.test-support :as test-support]))
 
-(defn- create-session-context
-  []
-  (let [ctx (session/create-context (test-support/safe-context-opts {:persist? false}))
-        sd  (session/new-session-in! ctx nil {})]
-    [ctx (:session-id sd)]))
-
-(defn- register-op!
-  [ctx op]
-  (registry/register-operation-in! (:deterministic-operation-registry ctx) op))
+(def ^:private create-session-context test-support/create-op-session-context)
+(def ^:private register-op! test-support/register-op!)
 
 (defn- dispatch
   [ctx session-id text]
@@ -41,8 +32,9 @@
                        :handler (fn [invocation] {:status :ok :data (:args invocation)})})
     (let [result (dispatch ctx session-id "/operation alpha/op {:x 1}")]
       (is (= :text (:type result)))
-      (is (str/includes? (:message result) ":status :ok"))
-      (is (str/includes? (:message result) ":data {:x 1}")))))
+      (testing "exact line layout: :status first, then keys sorted by pr-str"
+        (is (= [":status :ok" ":data {:x 1}"]
+               (str/split-lines (:message result))))))))
 
 (deftest operation-invoke-status-line-first
   (let [[ctx session-id] (create-session-context)]

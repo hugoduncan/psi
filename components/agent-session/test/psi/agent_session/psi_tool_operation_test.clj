@@ -3,18 +3,11 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.deterministic-operation-action :as op-action]
    [psi.agent-session.psi-tool-operation :as psi-tool-operation]
+   [psi.agent-session.test-support :as test-support]
    [psi.deterministic-operation-registry.registry :as registry]))
 
-(defn- make-ctx
-  [reg]
-  {:deterministic-operation-registry reg
-   :state* (atom {:agent-session {:sessions {}}})})
-
-(defn- ok-op
-  [id]
-  {:id id
-   :description (str "desc " id)
-   :handler (fn [invocation] {:status :ok :data {:echo (:args invocation)}})})
+(def ^:private make-ctx test-support/make-op-ctx)
+(def ^:private ok-op test-support/ok-op)
 
 (deftest list-returns-sorted-operations
   (let [reg (registry/create-registry)]
@@ -23,8 +16,8 @@
     (let [report (psi-tool-operation/execute-psi-tool-operation-report
                   {:ctx (make-ctx reg) :session-id "s1"} {:op "list"})]
       (is (= :ok (:psi-tool/overall-status report)))
-      (is (= [{:id "alpha/op" :description "desc alpha/op"}
-              {:id "zeta/op" :description "desc zeta/op"}]
+      (is (= [{:id "alpha/op" :description "desc for alpha/op"}
+              {:id "zeta/op" :description "desc for zeta/op"}]
              (:psi-tool/operations report))))))
 
 (deftest list-empty-registry

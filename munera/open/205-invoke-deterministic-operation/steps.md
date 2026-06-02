@@ -293,7 +293,7 @@
 
 ## Test-shaper follow-ups (ψ, sixth pass)
 
-- [ ] (TS-1) Consolidate the duplicated/inconsistent test fixtures across the
+- [x] (TS-1) Consolidate the duplicated/inconsistent test fixtures across the
   four task suites. The `make-ctx` (two variants — one takes `sessions`, one
   hard-codes `{}`), `ok-op` (two variants — whole-invocation echo vs `:args`
   echo), `create-session-context`, and `register-op!` are independently
@@ -305,18 +305,29 @@
   helpers_that_compress(ceremony)`. Keep helpers that compress ceremony, not
   ones that hide intent. Re-run the four suites; `clj-paren-repair`;
   `clj-kondo --lint`; commit.
-- [ ] (TS-2) Strengthen `operation-invoke-renders-result` (command) signal.
+  → Added canonical `make-op-ctx`/`ok-op`/`create-op-session-context`/
+  `register-op!` to `test_support.clj`; all four suites now alias them. One
+  canonical `ok-op` (whole-invocation echo, `"desc for " id`); both unit suites
+  rebind to it (psi-tool list assertion updated to the canonical description).
+- [x] (TS-2) Strengthen `operation-invoke-renders-result` (command) signal.
   Replace the `str/includes? ":status :ok"` / `":data {:x 1}"` substring
   assertions with an exact line-set/line-equality assertion (as
   `operation-invoke-status-line-first` already does), or fold the case into the
   exact-line test, so a malformed concatenation cannot pass. Avoid leaving two
   overlapping layout tests where one is weaker-signal. Re-run; commit.
-- [ ] (TS-3) Make `operation-list-ignores-args-and-id` (integration) actually
+  → Replaced the two `str/includes?` assertions with an exact
+  `(= [":status :ok" ":data {:x 1}"] (str/split-lines …))` line-equality check.
+- [x] (TS-3) Make `operation-list-ignores-args-and-id` (integration) actually
   verify the *id*-ignored half. Register an op whose handler writes a sink (or
   has an observable effect) under the id passed as `operation-id "ignored"`,
   then assert the sink is **untouched** by the `op list` call (list neither
   invokes nor errors on the supplied id) — or rename the test to reflect that
   only the args-ignored half is asserted. Re-run; commit.
+  → Registered a sink-writing op under a valid id `side/effect`, passed that as
+  `operation-id`, and asserted the sink stays `:untouched` and the op still
+  appears in `:psi-tool/operations` (list neither invokes nor errors on the id).
+  (Used a schema-valid `ns/name` id; the literal `"ignored"` fails the
+  `^ns/name$` operation-id schema at registration.)
 
 ## Close-out
 

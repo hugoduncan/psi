@@ -779,3 +779,41 @@ acceptance criteria remain covered.
 
 These are shaping refinements, not coverage/correctness gaps; behaviour and AC
 coverage are intact. Recorded as actionable follow-ups (TS-1..TS-3).
+
+## Resolution of test-shaper follow-ups TS-1..TS-3 (ψ)
+
+Executed all three sixth-pass test-shaper follow-ups. No production code
+touched — pure test-fixture/assertion shaping. Four suites green afterward
+(48 tests / 108 assertions, 0 failures; was 107 — TS-3 +2, TS-2 −1 from
+substring→exact line-equality); psi-tool-mutate + psi-tool-scheduler suites
+green (no regression from the shared `test_support.clj` change); clj-kondo 0/0;
+clj-paren-repair no-ops.
+
+- **TS-1 (fixture economy).** Added one canonical fixture set to
+  `test_support.clj`: `make-op-ctx` (arities `[reg]`/`[reg sessions]`, the
+  production `{:agent-session {:sessions …}}` `:state*` shape), `ok-op`
+  (whole-invocation echo under `[:data :echo]`, description `"desc for " id`),
+  `create-op-session-context`, and `register-op!`. All four suites now alias
+  these (`(def ^:private … test-support/…)`), dropping their local re-defs.
+  Resolved the two incidental `ok-op` variants by standardising on the
+  whole-invocation echo (the unit action test already reaches `:args` via
+  `[:data :echo :args]`; the psi-tool list test only lists, so the handler
+  shape is irrelevant — its assertion was updated to the canonical
+  `"desc for …"` description). Removed now-unused `psi.agent-session.core` /
+  registry requires from the integration + command suites.
+- **TS-2 (signal).** `operation-invoke-renders-result` now asserts the exact
+  two-line vector `[":status :ok" ":data {:x 1}"]` via `str/split-lines`,
+  matching the strong-signal style of `operation-invoke-status-line-first`; a
+  malformed concatenation can no longer pass on substring overlap.
+- **TS-3 (signal vs name).** `operation-list-ignores-args-and-id` now registers
+  a sink-writing op under a **valid** `ns/name` id (`side/effect`), passes that
+  id as `operation-id`, and asserts the sink stays `:untouched` plus the op
+  appears in `:psi-tool/operations` — proving the *id*-ignored half (list
+  neither invokes nor errors on the supplied id), not just the args-ignored
+  half. Note: the literal `"ignored"` from the follow-up text fails the
+  `^[a-z0-9-]+/[a-z0-9-]+$` operation-id schema at registration, so a
+  schema-valid id was used.
+
+No blocked steps. The remaining unchecked close-out box (`git mv open/ →
+closed/` + remove from plan.md) is the lifecycle's terminal move, performed by
+the orchestrating lifecycle, not this follow-up pass.

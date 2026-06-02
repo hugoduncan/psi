@@ -2,20 +2,11 @@
   "End-to-end psi-tool `operation` action: validate → dispatch → outer-catch."
   (:require
    [clojure.test :refer [deftest is testing]]
-   [psi.agent-session.core :as session]
    [psi.agent-session.test-support :as test-support]
-   [psi.agent-session.tools :as tools]
-   [psi.deterministic-operation-registry.registry :as registry]))
+   [psi.agent-session.tools :as tools]))
 
-(defn- create-session-context
-  []
-  (let [ctx (session/create-context (test-support/safe-context-opts {:persist? false}))
-        sd  (session/new-session-in! ctx nil {})]
-    [ctx (:session-id sd)]))
-
-(defn- register-op!
-  [ctx op]
-  (registry/register-operation-in! (:deterministic-operation-registry ctx) op))
+(def ^:private create-session-context test-support/create-op-session-context)
+(def ^:private register-op! test-support/register-op!)
 
 (deftest operation-list-end-to-end
   (let [[ctx session-id] (create-session-context)]
@@ -32,15 +23,23 @@
              (:psi-tool/operations parsed))))))
 
 (deftest operation-list-ignores-args-and-id
-  (let [[ctx session-id] (create-session-context)]
-    (register-op! ctx {:id "alpha/op" :description "a" :handler (fn [_] {:status :ok :data 1})})
+  (let [[ctx session-id] (create-session-context)
+        sink (atom :untouched)]
+    ;; Register the op under the id we will pass as `operation-id`. If `list`
+    ;; mistakenly invoked (or errored on) the supplied id, the sink would change.
+    (register-op! ctx {:id "side/effect" :description "would-write"
+                       :handler (fn [_] (reset! sink :invoked) {:status :ok :data 1})})
     (let [tool (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
           result ((:execute tool) {"action" "operation" "op" "list"
-                                   "operation-id" "ignored" "args" "not-edn-at-all ["})
+                                   "operation-id" "side/effect" "args" "not-edn-at-all ["})
           parsed (read-string (:content result))]
       (testing "list with malformed args still lists, not an error (D5)"
         (is (false? (:is-error result)))
-        (is (= :ok (:psi-tool/overall-status parsed)))))))
+        (is (= :ok (:psi-tool/overall-status parsed))))
+      (testing "list ignores the supplied operation-id (does not invoke it)"
+        (is (= :untouched @sink))
+        (is (= [{:id "side/effect" :description "would-write"}]
+               (:psi-tool/operations parsed)))))))
 
 (deftest operation-invoke-ok-end-to-end
   (let [[ctx session-id] (create-session-context)]

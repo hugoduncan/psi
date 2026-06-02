@@ -2,20 +2,11 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.deterministic-operation-action :as op-action]
+   [psi.agent-session.test-support :as test-support]
    [psi.deterministic-operation-registry.registry :as registry]))
 
-(defn- make-ctx
-  ([reg] (make-ctx reg {}))
-  ([reg sessions]
-   {:deterministic-operation-registry reg
-    :state* (atom {:agent-session {:sessions sessions}})}))
-
-(defn- ok-op
-  [id]
-  {:id id
-   :description (str "desc for " id)
-   :handler (fn [invocation]
-              {:status :ok :data {:echo invocation}})})
+(def ^:private make-ctx test-support/make-op-ctx)
+(def ^:private ok-op test-support/ok-op)
 
 (deftest list-operations-sorted-by-id
   (let [reg (registry/create-registry)]

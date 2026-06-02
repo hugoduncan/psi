@@ -27,6 +27,7 @@
    [psi.agent-session.statechart :as session-sc]
    [psi.agent-session.tool-plan :as tool-plan]
    [psi.agent-session.extension-workflow-runtime :as extension-workflow-runtime]
+   [psi.deterministic-operation-registry.registry :as op-registry]
    [psi.ui.state :as ui-state])
   (:import
    (java.util.concurrent Executors)))
@@ -319,3 +320,39 @@
    (let [ctx (session-core/create-context (safe-context-opts opts))
          sd  (session-core/new-session-in! ctx nil {})]
      [ctx (:session-id sd)])))
+
+;; --- Deterministic-operation surface fixtures (task 205) ---
+;; Shared canonical fixtures for the four deterministic-operation test suites
+;; (unit action, psi-tool report, psi-tool integration, command). One home,
+;; no incidental per-suite variation.
+
+(defn make-op-ctx
+  "Minimal canonical-root-backed ctx for unit deterministic-operation tests.
+   Carries the registry and a `:state*` atom whose
+   `{:agent-session {:sessions sessions}}` shape matches production
+   `get-session-data-in`. `sessions` defaults to `{}`."
+  ([reg] (make-op-ctx reg {}))
+  ([reg sessions]
+   {:deterministic-operation-registry reg
+    :state* (atom {:agent-session {:sessions sessions}})}))
+
+(defn ok-op
+  "A deterministic operation that succeeds, echoing the whole invocation map
+   under `[:data :echo]`. Callers reach `:args` via `[:data :echo :args]`."
+  [id]
+  {:id id
+   :description (str "desc for " id)
+   :handler (fn [invocation] {:status :ok :data {:echo invocation}})})
+
+(defn create-op-session-context
+  "Create a real session context for end-to-end deterministic-operation tests.
+   Returns [ctx session-id]."
+  []
+  (let [ctx (session-core/create-context (safe-context-opts {:persist? false}))
+        sd  (session-core/new-session-in! ctx nil {})]
+    [ctx (:session-id sd)]))
+
+(defn register-op!
+  "Register a deterministic operation on `ctx`'s registry."
+  [ctx op]
+  (op-registry/register-operation-in! (:deterministic-operation-registry ctx) op))
