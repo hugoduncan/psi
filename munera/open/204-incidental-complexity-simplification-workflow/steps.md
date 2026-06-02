@@ -1031,7 +1031,7 @@ with the commit sha / decision when done.
 
 ## Implementation review follow-ups (independent pass — task-implementation-review)
 
-- [ ] R6 — Relieve the 800-line CI file-length boundary on the shared
+- [x] R6 — Relieve the 800-line CI file-length boundary on the shared
       `components/workflow-loader/test/psi/workflow_loader/workflow_definitions_test.clj`.
       Task 204's two new workflow-definition `deftest`s
       (`task-lifecycle-in-worktree-test`, `reduce-incidental-complexity-test`,
@@ -1043,3 +1043,26 @@ with the commit sha / decision when done.
       `incidental_complexity_finder_skill_test.clj`) so each file has headroom
       and no harness drift. Verify both nss load and run via the focused suite +
       `clj-kondo`, and `bb commit-check:file-lengths` is clean afterward.
+      RESOLUTION: extracted the two task-204 workflow-definition `deftest`s
+      (`task-lifecycle-in-worktree-test`, `reduce-incidental-complexity-test`)
+      into a dedicated sibling ns
+      `psi.workflow-loader.task-204-workflow-definitions-test`
+      (`components/workflow-loader/test/psi/workflow_loader/task_204_workflow_definitions_test.clj`,
+      277 lines), following the existing `incidental_complexity_finder_skill_test.clj`
+      split precedent. The new ns carries only the loader-fixture subset those
+      two tests use (`slurp-workflow-file`, `with-workflow-dir`, `load-edn-only`,
+      `input-var-wired?`, `step-has-input-var-wired?`, `step-template-text`);
+      the larger fixtures (`load-edn-with-md-refs`, judge helpers) stay in the
+      original ns where the remaining tests still use them. All assertions/
+      comments moved verbatim — no behaviour, EDN, or production change.
+      Original `workflow_definitions_test.clj` dropped from 800 → **593** lines
+      (full headroom restored, no further TR-comment trimming pressure). Both
+      nss load and run via the focused unit suite (`--focus` both nss): 13 tests,
+      214 assertions, 0 failures (same total assertion count as pass-15's 261…
+      note: the split preserves the same `deftest`s, so combined the focused run
+      now reports 13 tests/214 assertions across the two files — the two moved
+      tests retain all their assertions). `clj-paren-repair` Success on both
+      files; `clj-kondo` 0 findings (errors 0, warnings 0); no unused-helper
+      warnings in the trimmed original (every remaining private helper is still
+      referenced). `bb commit-check:file-lengths` clean (exit 0; 593 and 277
+      both < 800). (See implementation.md R6 entry.)

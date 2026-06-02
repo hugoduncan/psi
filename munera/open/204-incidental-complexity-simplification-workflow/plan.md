@@ -9,10 +9,15 @@ Three authoring deliverables, all S1 capability-catalog artifacts (a skill and
 two workflows). No production Clojure changes are required — the workflows are
 data (`.edn`/`.md` definitions) and the skill is markdown. Verification is by the
 existing workflow-loader/parse/definition tests plus live loadability: **no new
-production Clojure and no new test namespace in `components/`** — the Slice-4
-assertions for the two new workflows + skill registration **extend the existing**
-`workflow_definitions_test.clj` namespace (see R4 + Slice 4), they do not add a
-new ns or any production code.
+production Clojure** — the Slice-4 assertions for the two new workflows + skill
+registration are test-only. They initially **extended the existing**
+`workflow_definitions_test.clj` namespace (see R4 + Slice 4); R6 (independent
+impl-review follow-up) later **extracted the two task-204 workflow-definition
+deftests into a dedicated sibling test ns**
+(`task_204_workflow_definitions_test.clj`) once the shared file reached the hard
+800-line `bb commit-check:file-lengths` boundary — superseding the original
+single-ns intent. This follows the existing `incidental_complexity_finder_skill_test.clj`
+split precedent and restored full headroom (shared ns 800 → 593 lines).
 
 Build order is **dependency-first**: the inner `task-lifecycle-in-worktree`
 wrapper before the outer `reduce-incidental-complexity` workflow that delegates
@@ -108,8 +113,11 @@ resolve as it is added.
 - **R4 — Definition-test coverage location.** Workflow-loader definition tests
   live in `components/workflow-loader/test/.../workflow_definitions_test.clj`;
   per-artifact-target assertions exist for other workflows. New assertions for
-  the two workflows + skill registration should slot into the existing test ns
-  conventions, not a new ns, to avoid harness drift.
+  the two workflows + skill registration slot into the existing test ns
+  conventions. (Superseded by R6: once the shared ns hit the 800-line CI
+  boundary, the two task-204 deftests were extracted into a dedicated sibling
+  ns — the `incidental_complexity_finder_skill_test.clj` precedent shows this is
+  the established same-component split convention, so it adds no harness drift.)
 - **R5 — `bb gordian` flag/lens stability.** The skill embeds verbatim
   `bb gordian local/complexity` JSON-join recipe and the generated task embeds
   `bb gordian gate --fail-on …`. These were verified live during design review.

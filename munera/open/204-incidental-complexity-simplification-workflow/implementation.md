@@ -2510,3 +2510,45 @@ One new actionable structural issue (R5-class maintainability, not previously fl
   clean (800)" but did not flag the boundary as actionable.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK.
+
+---
+
+## R6 — file-length boundary relief via sibling-ns extraction (independent impl-review follow-up)
+
+ITEM: R6 (Implementation review follow-ups — independent pass, task-implementation-review).
+The shared `components/workflow-loader/test/psi/workflow_loader/workflow_definitions_test.clj`
+had grown to **exactly 800** lines (the hard `bb commit-check:file-lengths`
+limit for `components/`). Task 204's two workflow-definition deftests
+accounted for the headroom-eating tail; TR15 already had to trim TR-comment
+prose to fit, so the next addition would have failed the gate.
+
+ACTION: extracted the two task-204 deftests into a new sibling ns
+`psi.workflow-loader.task-204-workflow-definitions-test`
+(`task_204_workflow_definitions_test.clj`), following the existing
+`incidental_complexity_finder_skill_test.clj` split precedent.
+
+- Moved verbatim: `task-lifecycle-in-worktree-test` (Slice 2) and
+  `reduce-incidental-complexity-test` (Slice 3), with all `testing` blocks,
+  assertions, and TR2/TR7/TR8/TR10/TR11/TR13/TR14/TR15/F1/F3 lock comments.
+- New ns carries only the loader-fixture **subset** the two tests use:
+  `slurp-workflow-file`, `with-workflow-dir`, `load-edn-only`,
+  `input-var-wired?`, `step-has-input-var-wired?`, `step-template-text`.
+  (Duplicated, not shared — same approach as the skill-test sibling, which
+  shares no fixtures; keeps each file independently loadable, no harness drift.)
+- Left in the original ns: `load-edn-with-md-refs`, `pass-status-judge-from-step`,
+  `constant-routing-judge`, `constant-routing-step` — still referenced by the
+  11 remaining definitions tests (verified each remaining private helper has
+  ≥1 caller; no dead-code warnings).
+
+VERIFICATION:
+- `workflow_definitions_test.clj`: 800 → **593** lines (full headroom restored).
+- `task_204_workflow_definitions_test.clj`: **277** lines.
+- `clj-paren-repair`: Success on both files (no changes needed).
+- `clj-kondo --lint` both files: errors 0, warnings 0.
+- Focused unit suite (`--focus` both nss): **13 tests, 214 assertions, 0
+  failures** — the two moved tests retain all assertions; the original ns's 11
+  tests are unaffected.
+- `bb commit-check:file-lengths`: clean (exit 0; both files < 800).
+
+No production code, EDN workflow, skill, meta, spec, or doc change — this is a
+test-file split for CI-boundary relief only. Behaviour and coverage identical.
