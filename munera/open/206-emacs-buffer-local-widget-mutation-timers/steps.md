@@ -315,3 +315,10 @@
   economy after S1–S5 landed; the only residual observations
   (`…-roundtrip` "cancel" name, the timeout test's distinct inline `cl-letf`)
   are already-recorded non-actionable. Verdict: REVIEW_COMPLETE.
+
+## Docs review follow-ups (ψ)
+
+- No new actionable items. Internal `emacs-ui` resource-cleanup refactor with no
+  new user-facing surface; the existing CHANGELOG `Fixed` entry is accurate and
+  warranted, and README/`doc/` carry no stale or missing references. Verdict:
+  REVIEW_COMPLETE.

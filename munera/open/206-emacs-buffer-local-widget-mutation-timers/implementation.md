@@ -975,3 +975,33 @@ all already-recorded non-actionable items:
   ceremony. Correctly left inline.
 
 Verdict: REVIEW_COMPLETE.
+
+## Docs review (ψ) — 2026-06-02
+
+Applied review-task-docs skill (accuracy ∧ completeness ∧ consistency over
+README ∧ doc/ ∧ CHANGELOG).
+
+Scope assessment: this task is an internal `emacs-ui` frontend resource-cleanup
+refactor (buffer-local timer store, teardown/reset cancellation, callback
+buffer-targeting). It introduces no new user-facing surface — no commands,
+flags, config defcustoms, or documented behaviours beyond the bug fix itself.
+
+- **CHANGELOG**: A `Fixed` entry already exists (CHANGELOG.md `[Unreleased]`):
+  "Killing an Emacs psi buffer while a widget-projection mutation is in flight
+  …". The change is a genuine user-visible bug fix (orphaned / non-deterministic
+  / cross-buffer-colliding watchdog timers on buffer kill), so an entry is
+  correctly warranted and correctly filed under Fixed. Claims verified against
+  the implementation: buffer-local store in `psi-emacs-state`
+  (`psi-globals.el:73`, init `psi-lifecycle.el:59`) ✓; cancelled on teardown +
+  transcript reset (`psi-lifecycle.el:298`, `:396`) ✓; timeout + RPC-response
+  callbacks target originating buffer and no-op when dead
+  (`psi-widget-projection.el`) ✓; module-global defvar removed (git grep: zero
+  refs) ✓. The `psi-emacs-state` internal-name reference is consistent with the
+  existing CHANGELOG convention (cf. line 15 `psi-emacs-slash-command-specs`).
+- **README.md / doc/**: No user-facing doc documents widget-projection
+  internals, timer storage, or buffer-teardown mechanics. `doc/emacs-ui.md`
+  references only the unrelated, unchanged `psi-emacs-stream-timeout-seconds`.
+  Therefore: no stale references to remove, no examples to correct, no new
+  content required. accuracy ∧ completeness ∧ consistency hold.
+
+No new actionable docs issues. Verdict: REVIEW_COMPLETE.
