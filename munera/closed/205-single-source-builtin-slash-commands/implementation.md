@@ -1953,3 +1953,51 @@ Tests (`test/psi-capf-test.el`):
 
 `bb emacs:check` green: 329 tests / 329 expected / 0 unexpected; byte-compile
 clean (0 warnings).
+
+## Code-shaper review (code-shaper pass 4)
+
+Re-reviewed 205's changed surfaces against `simple ∧ consistent ∧ robust`.
+
+Backend (`builtin_specs.clj`, `commands.clj`, resolver) and TUI
+(`autocomplete.clj`, `support.clj`) remain well-shaped: single keyed source,
+derived projections, load-time `assert`/malli seams (`unreachable > forbidden`),
+zero lint. Prior passes (CS1–CS4) hold and are not re-litigated. CS4's two
+pair-segment builders (`psi-emacs--alist-pair-segment` /
+`psi-emacs--event-pair-segment`) differ only in the irreducible getter
+(`alist-get-any` vs `event-data-get` — the two source shapes genuinely differ)
+and both route through the shared `psi-emacs--slash-completion-pair` normalizer;
+that residual is correct, not a finding.
+
+One new Emacs finding (CS5, consistency ∧ robustness — open-coded
+slash-prefix idiom duplicated). `psi-emacs--state-slash-command-specs`
+(`psi-completion.el`) open-codes the ensure-leading-slash idiom
+`(if (string-prefix-p "/" x) x (concat "/" x))` **twice** in one function:
+once in the `backend-specs` block (line 109 — the path 205 *added* to consume
+backend built-in specs) and once in the pre-existing `ext-specs` block
+(line 118). The TUI consumer of the same backend surface extracted exactly this
+normalization into a named `as-slash-command` helper
+(`tui/app/autocomplete.clj`) and reuses it for both `builtins` and `ext-cmds`;
+the Emacs consumer has no equivalent and repeats the shape inline. Because 205
+introduced the second occurrence (backend-specs) adjacent to the existing one,
+the duplication is in-scope here.
+
+Why it matters (`consistent ∧ robust`): the slash-prefix rule now lives in two
+literal sites in one function (and a third bare-concat form at
+`psi-session-commands.el:363`), so a change to the prefixing rule (e.g. trimming
+empties, normalizing `//`) must be made in lock-step or the backend-command and
+extension-command surfaces silently diverge — the same class of open-coded-shape
+duplication CS1 and CS4 eliminated, in Emacs. It is a `forbidden`-not-`unreachable`
+shape the rest of this task removes.
+
+Remedy: extract one shared `psi-emacs--ensure-slash-prefix` helper (parallel to
+the TUI `as-slash-command`; place in `psi-globals.el` next to
+`psi-emacs--slash-completion-normalize-text` so both consumers `require` it
+without new `declare-function`s) and call it from both the `backend-specs` and
+`ext-specs` blocks. Folding the `psi-session-commands.el:363` `(concat "/" name)`
+template form onto the same helper is a welcome consistency win if low-risk.
+`bb emacs:check` must stay green.
+
+No duplication of prior notes: CS1 = backend help-line render formula; CS2 =
+unused resolver attribute; CS3 = entry-shape load-time guard; CS4 = token-
+constructor normalization. CS5 is a distinct surface (Emacs slash-prefix
+idiom in `psi-completion.el`'s merged-specs builder), untouched by CS1–CS4.

@@ -544,3 +544,23 @@ Tick with sha/decision on completion.
       false-positive refresh). The `:builtins` segment 205 added to both sites is
       in-scope; folding `:commands`/`:templates` into the same shared builder is
       a welcome consistency win if low-risk. `bb emacs:check` must stay green.
+
+## Code-shaper review follow-ups (code-shaper pass 4)
+
+- [ ] CS5 — Extract the open-coded ensure-leading-slash idiom in
+      `psi-emacs--state-slash-command-specs` (`psi-completion.el`) into one
+      shared helper (`consistent ∧ robust`). The form
+      `(if (string-prefix-p "/" x) x (concat "/" x))` is repeated twice in that
+      one function: the `backend-specs` block (line 109 — added by 205 to consume
+      `:psi.agent-session/builtin-command-specs`) and the pre-existing `ext-specs`
+      block (line 118). The TUI consumer of the same backend surface already
+      extracted this as `as-slash-command` (`tui/app/autocomplete.clj`) and
+      reuses it for both built-ins and extension commands; Emacs has no
+      equivalent. Add `psi-emacs--ensure-slash-prefix` (place in `psi-globals.el`
+      beside `psi-emacs--slash-completion-normalize-text` so both call sites
+      already `require` it — no new `declare-function`) and call it from BOTH the
+      backend-specs and ext-specs blocks so the slash-prefix rule lives in one
+      place and the backend-command/extension-command surfaces cannot diverge.
+      Folding the `psi-session-commands.el:363` `(concat "/" name)` template form
+      onto the same helper is a welcome consistency win if low-risk. `bb
+      emacs:check` must stay green.
