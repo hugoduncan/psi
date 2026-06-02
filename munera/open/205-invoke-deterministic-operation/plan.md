@@ -144,3 +144,64 @@ Vertical slices, each independently testable; ship in order:
 
 Slice 1 has no dependents-on-surface; slices 2 and 3 both depend only on 1 and
 are independent of each other. Slice 4 last.
+
+## Plan/steps-review resolutions (decisions D1–D5)
+
+Resolving the five plan/steps-review follow-ups. Grounded against
+`psi_tool.clj` (`validate-psi-tool-request`, `make-psi-tool` outer-catch `case
+action`, tool schema `:op`/`:action` enums), `psi_tool_workflow.clj`
+(`parse-workflow-input-string` validates inside the report fn AND the outer
+catch has a `"workflow"` arm as backstop), `commands.clj`, and runtime
+`invoke-operation` (canonicalizes arbitrary throwables → `:error`; only
+`:missing-deterministic-operation` and `:malformed-operation-result`
+propagate).
+
+**D1 — `args` parse location + outer-catch arm.** Parse/validate `args` as an
+EDN map **inside `validate-psi-tool-request`** (outer-try path), mirroring how
+`workflow` validates `workflow-input` and is caught by the outer-catch
+`"workflow"` arm. Consequently **add an `"operation"` arm to `make-psi-tool`'s
+outer exception `case action`** (~L766) rendering a structured
+`{:psi-tool/action :operation :psi-tool/operation-op <op> :psi-tool/duration-ms
+0 :psi-tool/overall-status :error :psi-tool/error (psi-tool-error-summary
+:operation e)}` so malformed `args` (and any validate-phase ex-info) render as a
+structured operation error, not the generic fallback. `execute-psi-tool-
+operation-report` keeps its own try/catch for runtime/invocation errors; the two
+layers are complementary (validate-phase → outer; invocation-phase → helper).
+
+**D2 — Command text layout of `project-result`.** `project-result` returns a
+`{k truncated-string}` map. The command renders it as `:type :text` with **one
+line per top-level key**, each line `"<key> <truncated-value>"` where `<key>` is
+the keyword printed via `pr-str` (e.g. `:status`). **Key ordering:** `:status`
+first (always present), then the remaining keys sorted ascending by their
+`pr-str` (deterministic, stable, surface-independent). `format-operations`
+(listing) is unchanged: one `"<id> — <description>"` line per op. Add a command
+test asserting the exact multi-line text for a known result.
+
+**D3 — Surface catch predicate.** Both surfaces dispatch on
+`(:type (ex-data e))`, **not** a blanket catch. Only two ex-info types
+propagate from the runtime: `:missing-deterministic-operation` and
+`:malformed-operation-result`. Each renders distinctly:
+- `:missing-deterministic-operation` → "unknown operation: <id>" style message.
+- `:malformed-operation-result` → "operation returned a malformed result"
+  style message.
+Any other throwable is already canonicalized to an `:error` tagged result by
+the runtime and never reaches the surface catch; if one somehow does (predicate
+miss), re-throw rather than swallow. psi-tool: render via the structured
+`:psi-tool/overall-status :error` + `:psi-tool/error` summary keyed by type.
+Command: render as `:type :text` distinct messages. Test both propagated types
+on both surfaces.
+
+**D4 — Tool-schema `:op` enum policy.** **Do not** add `list`/`invoke` to the
+schema `:op` `:enum`. The existing convention is that only project-repl ops are
+enumerated there; `workflow` and `scheduler` `op` values are deliberately not
+in the `:op` enum (they are validated in `validate-psi-tool-request` instead).
+The `operation` action follows that established pattern: `op ∈ #{"list"
+"invoke"}` is enforced only in `validate-psi-tool-request`. Only the `:action`
+enum gains `"operation"`. (Avoids schema-drift between two enum lists.)
+
+**D5 — `args` parsing for `op: list`.** Per decision #12, `args` is **ignored**
+for `list`. The `args` EDN parse/validate is therefore **skipped when `op` is
+`"list"`** — parse `args` only on the `"invoke"` branch of
+`validate-psi-tool-request`. A `list` call with a malformed `args` string still
+lists successfully (does not error). `operation-id` is likewise not required for
+`list`. Add a test: `op list` with bad `args` → still lists, not an error.

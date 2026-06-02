@@ -57,9 +57,11 @@
     `project-result`, build `{:psi-tool/action :operation
       :psi-tool/operation-op :invoke :psi-tool/overall-status (:status result)
       :psi-tool/result <projected>}`.
-  - [ ] wrap in try/catch → on exception build
-    `:psi-tool/overall-status :error` + `:psi-tool/error` summary (mirror
-    `psi-tool-workflow`), so missing/malformed/bad-arg render not-crash.
+  - [ ] wrap in try/catch dispatching on `(:type (ex-data e))` (D3, not a
+    blanket catch): `:missing-deterministic-operation` and
+    `:malformed-operation-result` each render `:psi-tool/overall-status :error`
+    + a distinct `:psi-tool/error` summary; any other throwable is re-thrown
+    (runtime already canonicalizes non-propagating throwables to `:error`).
   - [ ] add `:psi-tool/duration-ms`.
 - [ ] In `psi_tool.clj`: add `"operation"` to `psi-tool-supported-actions`.
 - [ ] In `psi_tool.clj` tool schema: add `"operation"` to
@@ -68,11 +70,23 @@
   `:description` text listing the new action.
 - [ ] In `validate-psi-tool-request`: add `operation-id`/`args` to destructuring;
   add `(= effective-action "operation")` cond branch — require
-  `op ∈ #{"list" "invoke"}`; for `"invoke"` require non-blank `operation-id`;
-  return `{:action "operation" :op op :operation-id operation-id :args args}`.
+  `op ∈ #{"list" "invoke"}`; for `"invoke"` require non-blank `operation-id`
+  AND parse+validate `args` as an EDN map (default `{}`, "must be an EDN map"
+  error); for `"list"` **skip** `args` parse and do not require `operation-id`
+  (D5 — `args` ignored for list). Return `{:action "operation" :op op
+  :operation-id operation-id :args parsed-args}`. (D4: do **not** add
+  `list`/`invoke` to the schema `:op` `:enum` — `op` is validated here only,
+  matching the workflow/scheduler convention.)
 - [ ] Add EDN-map parse+validate for `args` (default `{}`, "must be an EDN map"
   error) — reuse shared parse helper (place in shared helper ns or mirror
-  `parse-workflow-input-string`); call it where `args` is consumed.
+  `parse-workflow-input-string`); call it on the `"invoke"` branch only (D1:
+  parse in `validate-psi-tool-request`, outer-try path).
+- [ ] (D1) Add an `"operation"` arm to `make-psi-tool`'s **outer** exception
+  `case action` (~L766) rendering `{:psi-tool/action :operation
+  :psi-tool/operation-op (some-> (get args "op") keyword) :psi-tool/duration-ms
+  0 :psi-tool/overall-status :error :psi-tool/error (psi-tool-error-summary
+  :operation e)}` so validate-phase errors (e.g. malformed `args`) render as a
+  structured operation error, not the generic fallback.
 - [ ] In `make-psi-tool` `case action`: add `"operation"` arm calling
   `execute-psi-tool-operation-report`, `sanitize-psi-tool-data`, `pr-str`,
   `serialize-operation-output`, set `:is-error` on non-`:ok` overall-status.
@@ -81,6 +95,9 @@
   `components/agent-session/test/psi/agent_session/psi_tool_operation_test.clj`:
   - [ ] `op list` returns sorted operations; empty registry → `:operations []`.
   - [ ] `op list` ignores `operation-id`/`args`.
+  - [ ] (D5) `op list` with malformed `args` string → still lists, not error.
+  - [ ] (D3) `op invoke` malformed-result op → `:malformed-operation-result`
+    rendered distinctly from unknown-id.
   - [ ] `op invoke` ok-result projected, all keys present.
   - [ ] `op invoke` error-result → `:is-error true`, projected.
   - [ ] unknown id → error report, not crash.
@@ -109,14 +126,21 @@
   → `args {}`; parse remaining as EDN map, non-map/unreadable →
   `{:type :text :message "<clear parse error>"}`; else call shared
   `invoke-operation`, render projected result via `project-result` as
-  `:type :text` (catch `:missing-deterministic-operation`/malformed → clear
-  text error, not crash).
+  `:type :text` using the D2 layout: one `"<key> <value>"` line per top-level
+  key, `:status` line first, remaining keys sorted ascending by `pr-str`.
+  Catch dispatching on `(:type (ex-data e))` (D3):
+  `:missing-deterministic-operation` → distinct "unknown operation" text;
+  `:malformed-operation-result` → distinct "malformed result" text; any other
+  throwable re-thrown (not a blanket catch).
 - [ ] Confirm precedence: `/operations` matched as exact before `/operation`
   prefix; add a test asserting `/operations` does not dispatch as `/operation`.
 - [ ] Write tests
   `components/agent-session/test/psi/agent_session/operation_command_test.clj`:
   - [ ] `/operations` lists id+description sorted; empty → exact message.
   - [ ] `/operation <id> {args}` invokes, renders result text (all keys).
+  - [ ] (D2) exact multi-line text for a known result: `:status` line first,
+    remaining keys sorted ascending by `pr-str`, one `"<key> <value>"` per line.
+  - [ ] (D3) malformed-result op → distinct text from unknown-id text.
   - [ ] `/operation <id>` (no args) → `args {}` default.
   - [ ] blank id → usage message.
   - [ ] malformed/non-map args → clear text error, not crash.
@@ -139,29 +163,40 @@
 
 ## Plan/steps-review follow-ups (ψ)
 
-- [ ] Decide where `args` EDN parse/validate runs (psi-tool): in
+- [x] Decide where `args` EDN parse/validate runs (psi-tool): in
   `validate-psi-tool-request` (outer-try → add an `"operation"` arm to
   `make-psi-tool`'s outer exception `case action` so it renders a structured
   `:psi-tool/action :operation … :overall-status :error`, not the generic
   fallback) **or** inside `execute-psi-tool-operation-report` (covered by its
   own try/catch). Record the choice in plan.md and wire accordingly.
-- [ ] Specify the command text layout for the projected result: define the
+  → **D1** (plan.md): parse in `validate-psi-tool-request` + add outer-catch
+  `"operation"` arm. Slice-2 steps updated.
+- [x] Specify the command text layout for the projected result: define the
   per-key line format (e.g. one `<key> <value>` line per top-level key), key
   ordering, and how `:status` renders. Update `dispatch-operation-command` /
   `format-operations` step + add a test asserting the exact text.
-- [ ] Specify the surface catch predicate: dispatch on `(:type (ex-data e))`
+  → **D2** (plan.md): one `"<key> <value>"` line per top-level key, `:status`
+  first, rest sorted ascending by `pr-str`. Slice-3 step + test updated.
+- [x] Specify the surface catch predicate: dispatch on `(:type (ex-data e))`
   for `:missing-deterministic-operation` vs `:malformed-operation-result`,
   render each distinctly (not a blanket catch), and only those two propagate
   (runtime swallows other throwables into `:error`). Apply to both psi-tool and
   command surfaces; test both propagated types.
-- [ ] Decide the tool-schema `:op` enum policy for the `operation` action:
+  → **D3** (plan.md): dispatch on `(:type (ex-data e))`, render each distinctly,
+  re-throw others. Slice-2/3 steps + tests updated.
+- [x] Decide the tool-schema `:op` enum policy for the `operation` action:
   either extend `:op` `:enum` with `list`/`invoke`, or follow the existing
   non-enumerated convention (workflow/scheduler ops are not in the enum).
   Record the decision in plan.md and apply consistently.
-- [ ] State whether `args` is parsed for `op: "list"`: per decision #12 `args`
+  → **D4** (plan.md): follow the non-enumerated convention; `op` validated in
+  `validate-psi-tool-request` only; only `:action` enum gains `"operation"`.
+  Slice-2 step updated.
+- [x] State whether `args` is parsed for `op: "list"`: per decision #12 `args`
   is ignored for list — skip `args` EDN parse/validate when `op` is `list` so a
   malformed `args` string does not error a list call. Update the validate/parse
   step and add a test (`op list` with bad `args` → still lists, not error).
+  → **D5** (plan.md): `args` parsed only on the `"invoke"` branch; `list` skips
+  it. Slice-2 step + test updated.
 
 ## Close-out
 

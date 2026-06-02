@@ -223,3 +223,36 @@ and :malformed-operation-result propagate). Five actionable ambiguities:
    `args` is parsed at all for `list`.
 
 No code touched (plan/steps-review only).
+
+## Resolution of plan/steps-review follow-ups (ψ)
+
+Resolved all five plan/steps-review follow-ups by recording decisions D1–D5 in
+plan.md ("Plan/steps-review resolutions") and wiring them into the slice-2/3
+steps + tests. Grounded against live code:
+- `psi_tool.clj`: tool schema `:op` `:enum` lists only project-repl ops
+  (status/start/attach/stop/eval/interrupt); `workflow`/`scheduler` `op` values
+  are NOT enumerated — they validate in `validate-psi-tool-request`. The outer
+  `make-psi-tool` exception `case action` (~L766) has per-action arms
+  (`workflow`, `scheduler`, …) rendering structured `:psi-tool/...` errors;
+  unmatched actions fall to `format-psi-tool-error`.
+- `psi_tool_workflow.clj`: `parse-workflow-input-string` validates the EDN map
+  inside the report fn (throws `:phase :validate` ex-info); the outer-catch
+  `"workflow"` arm is the structured backstop.
+- runtime `invoke-operation`: canonicalizes arbitrary throwables to `:error`;
+  only `:missing-deterministic-operation` and `:malformed-operation-result`
+  ex-infos propagate to callers.
+
+Decisions:
+- D1 — parse `args` in `validate-psi-tool-request` (outer-try), add an
+  `"operation"` arm to the outer exception `case action`.
+- D2 — command text: one `"<key> <value>"` line per top-level key, `:status`
+  first then keys sorted ascending by `pr-str`.
+- D3 — surface catch dispatches on `(:type (ex-data e))` for the two
+  propagating types, renders each distinctly, re-throws others (not blanket).
+- D4 — do not extend the `:op` schema enum; `op` validated in
+  `validate-psi-tool-request` only (matches workflow/scheduler convention).
+- D5 — parse `args` only on the `"invoke"` branch; `list` skips it, so a
+  malformed `args` string never errors a `list` call.
+
+No code touched (plan/steps-review resolution only — implementation slices not
+yet started). No blocked steps.
