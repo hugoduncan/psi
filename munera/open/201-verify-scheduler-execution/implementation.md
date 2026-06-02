@@ -2661,3 +2661,48 @@ lifecycle test must drive the genuinely-async path, await a settle condition
 no `Thread/sleep`-based fixed wait) before asserting. Then re-verify ≥10× full
 scheduler-suite runs green and correct findings.md Outcome/Baseline to reflect
 the actual (now genuinely deterministic) state.
+
+## Implementation-review pass (2026-06-02, second) — REVIEW_COMPLETE
+
+Re-ran the implementation-review skill against runtime truth, verifying the
+prior pass's ACTIONABLE_FEEDBACK (the ~1-in-8 full-suite lifecycle flake) was
+actually resolved by the `6a6bb3226` fix rather than trusting the deliverable's
+"10× green / deterministic" claim.
+
+**Flakiness — verified resolved.** Ran the full 12-ns scheduler suite focused
+under the canonical kaocha runner (`clojure -M:test --focus …`) **8×
+consecutively → all green (50 tests / 339 assertions each)**, then the full
+`bb test` **2× consecutively → both `✅ All tests passed`** (cross-ns
+concurrency pressure is where the flake actually surfaced, per the prior
+passes). The `scheduler-lifecycle-test/scheduled-deliver-runs-canonical-prompt-
+lifecycle` event-log assertions are now deterministic. The fix is a genuine
+root-cause fix, not a workaround: it scopes the read of the **process-global
+bounded ring buffer** `kernel/event-log-entries` (the S4 audit ring noted in
+AGENTS.md) to this test's own `session-id` via
+`filterv #(= session-id (get-in % [:event-data :session-id]))`, which is immune
+to cross-ns eviction regardless of suite load — matching the AGENTS.md guideline
+"scope shared-global reads to the test's own key".
+
+**Architecture / reuse.** The fix correctly *reuses* the existing
+`:execute-prepared-request-fn` ctx seam plus shared
+`test-support/stub-execution-result` (matching `scheduler-end-to-end-test`)
+instead of the prior bespoke `with-redefs` of `turn/execute-prepared-request!`
+— removing a one-off pattern in favour of the established seam idiom, and
+dropping the now-unused `[psi.turn-runtime.core]` require. No new abstraction,
+no structural-performance concern introduced.
+
+**Verification-only constraint held.** No scheduler source
+(`scheduler.clj`, `dispatch_effects.clj`) or `doc/scheduler.md` was modified by
+any task-201 commit (confirmed via `git log -- <path>`); only the
+`scheduler_lifecycle_test.clj` test file and the task dir changed (Slice-10
+allowlist). The lone doc-gap defect (future `:at` min/max-delay bounds undocumented)
+is recorded in `findings.md` and raised as `202-document-at-bounds-in-scheduler-doc`
+(present in `munera/open/`).
+
+**Coherence.** `findings.md` Outcome carries the corrected root cause and the
+genuinely-deterministic state; aggregate `50 tests / 339 assertions` matches
+runtime; all 85 `steps.md` items checked. `clj-kondo` 0/0 on the touched test
+file; `bb fmt:check` clean.
+
+No new actionable implementation feedback. The prior ACTIONABLE_FEEDBACK is
+resolved and verified against runtime truth. **REVIEW_COMPLETE.**
