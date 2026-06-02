@@ -2800,3 +2800,45 @@ assertions / 0 failures; full `bb test` ✅ all green; clj-kondo 0/0;
 `bb fmt:check` "All source files formatted correctly". `git diff --name-only` =
 `scheduler_lifecycle_test.clj` + `findings.md` + `steps.md` — zero
 `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist held).
+
+## Test-shaper review — pass 22 (test-shaper, 2026-06-01) — ACTIONABLE_FEEDBACK
+
+Re-applied `test-shaper` (`clarity ∧ signal ∧ robustness ∧ economy`) firsthand
+against current HEAD (`26665f024`), reading every 201-touched scheduler test
+namespace. `clj-kondo` 0/0 across the 9 new/extended scheduler test files. The
+suite is high-quality: single-concern deftests with clear AAA + `testing`
+labels, seam-driven live paths (no wall-clock sleeps on cited paths),
+state/output assertions (¬interaction), named-message bound assertions, and the
+fire-at-vs-insertion ordering proven by a dedicated test.
+
+**One new actionable issue (`consistent(test_abstractions)` ∧
+`locally_comprehensible` ∧ `robust` — non-duplicate of passes 12/13):** the raw
+6-segment internal-state-path idiom that passes 12 (reads) and 13 (writes)
+removed from every other 201 file **survives in the two Projections-area
+covering tests**, which were explicitly scoped out of both passes:
+
+- `scheduler_background_jobs_test.clj` — `scheduler-background-job-projection-test`
+  seeds queued state via two raw `(swap! (:state* ctx) assoc-in [:agent-session
+  :sessions session-id :data :scheduler …] …)` writes (L30–31) and asserts via a
+  raw `(get-in @(:state* ctx) [:agent-session :sessions session-id :data
+  :scheduler :schedules "sch-1" :status])` read (L51).
+- `scheduler_cancel_job_test.clj` — `session-cancel-job-routes-…-test` asserts
+  via the same raw 6-segment `(get-in @(:state* ctx) [:agent-session :sessions
+  session-id :data :scheduler :schedules "sch-1" :status])` read (L20).
+
+Both are cited Projections-area covering tests in `findings.md` and are within
+the 201 deliverable's standardisation scope (their instant-literals were
+converted in the pass-15-era cleanup; only the path-coupling was left). The raw
+literals couple each assertion to the internal `[:agent-session :sessions … :data]`
+nesting (brittle to state-shape drift) and read noisier than the helper form
+every sibling now uses. Standardise on the established helpers, no new
+abstraction:
+
+- reads → `(test-support/schedule-status ctx session-id "sch-1")` (the helper
+  used pervasively across the 201 set), or `(get-in (ss/get-session-data-in ctx
+  session-id) [:scheduler …])` for the queue/non-status seed (matching pass-12).
+- writes → `(ss/session-update session-id (fn [sd] …))` (matching pass-13).
+
+Follow-up filed below. No scheduler-source/doc/behaviour concern; verification-only
+invariant intact (this review touched no `components/agent-session/src/**` or
+`doc/scheduler.md`). **ACTIONABLE_FEEDBACK.**

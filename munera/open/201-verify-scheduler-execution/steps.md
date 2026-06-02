@@ -1797,3 +1797,36 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       task-dir only — `git diff --name-only` = `scheduler_lifecycle_test.clj`
       + `findings.md` + `steps.md`; zero `components/agent-session/src/**` or
       `doc/scheduler.md` (Slice-10 allowlist held).
+
+## Test-shaper follow-ups — pass 22 (test-shaper, 2026-06-01)
+
+- [ ] Standardise the residual raw 6-segment internal-state-path idiom in the
+      two Projections-area covering tests onto the established helpers — the
+      read/write analogue passes 12 and 13 removed from every *other* 201 file
+      but explicitly scoped out of these two. Sites:
+      - `scheduler_background_jobs_test.clj` /
+        `scheduler-background-job-projection-test`: the two raw queued-state
+        *writes* `(swap! (:state* ctx) assoc-in [:agent-session :sessions
+        session-id :data :scheduler :schedules "sch-2" :status] :queued)` and
+        `(… :data :scheduler :queue] ["sch-2"])` (L30–31), and the raw
+        cancel-route *read* `(get-in @(:state* ctx) [:agent-session :sessions
+        session-id :data :scheduler :schedules "sch-1" :status])` (L51).
+      - `scheduler_cancel_job_test.clj` /
+        `session-cancel-job-routes-scheduler-projection-to-scheduler-cancel-test`:
+        the raw *read* `(get-in @(:state* ctx) [:agent-session :sessions
+        session-id :data :scheduler :schedules "sch-1" :status])` (L20).
+      Convert: status *reads* → `(test-support/schedule-status ctx session-id
+      "sch-1")` (the helper used pervasively across the 201 set); the queue/non-
+      status seed `:queue` write → `(ss/session-update session-id (fn [sd]
+      (assoc-in sd [:scheduler …] …)))` (matching pass-13's write idiom), and the
+      `:schedules … :status` write similarly via `ss/session-update`. Both files
+      already require `[psi.agent-session.test-support :as test-support]`;
+      `scheduler_background_jobs_test` will need `[psi.session-state.state :as
+      ss]` added if the writes use `ss/session-update`. Behaviour- and
+      assertion-preserving (no deftest renamed → `findings.md` citations
+      unchanged; aggregate count unchanged). test-shaper
+      `consistent(test_abstractions) ∧ locally_comprehensible ∧ robust`.
+      Test-file + task-dir only (Slice-10 allowlist — zero
+      `components/agent-session/src/**` or `doc/scheduler.md`); keep `bb test`
+      green + clj-kondo/cljfmt clean. If 201 is treated as closed instead, raise
+      as a small standalone test-hygiene task.
