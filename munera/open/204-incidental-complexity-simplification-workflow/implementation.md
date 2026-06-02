@@ -214,3 +214,72 @@ One new actionable inconsistency (added to design-steps.md):
 
 Added I1 as an unchecked item to design-steps.md. PASS_STATUS:
 ACTIONABLE_FEEDBACK.
+
+## 2026-06-01 — Inconsistency (pass 1) follow-up executed (I1)
+
+Executed the single newly-added unchecked item (I1) from the pass-1
+inconsistency review. (The architecture-fit and A1–A5 items predate this pass
+and were already checked.)
+
+**Grounding performed before editing the design:**
+- Re-read `gh-issue-implement.edn`: its `implement` step delegates to the
+  **`implement-task-in-worktree` wrapper**, NOT directly to `implement-task`.
+- Read `implement-task-in-worktree.md`: confirmed the wrapper's first step,
+  `resolve-worktree` (`:session`, tools include `work-on`), extracts
+  `worktree_path:` from a structured handoff blob and **re-calls `work-on`**
+  before sub-delegating to `implement-task`. So worktree continuity is carried
+  by (1) an explicit `worktree_path:` handoff field + (2) a worktree-resolving
+  wrapper — exactly as the reviewer found; the design's "bare sibling-step
+  inheritance, verified behaviour" claim was wrong.
+- Read `task-lifecycle.edn`: all five sub-workflows read only
+  `{:from :workflow-input :path [:input]}` and none has a `work-on` step, so a
+  **direct** `:delegate` to `task-lifecycle` has no worktree-establishing path.
+- Read `complexity-reduction-pr.edn`: does select+worktree+refactor+push+PR in a
+  single `:session` step — never crosses a `:delegate` boundary post-worktree,
+  so it is not a precedent for cross-delegate inheritance either.
+- Runtime check: `child-session-state/child-session-base-state*`
+  (`child_session_state.clj:131`) unconditionally copies
+  `{:worktree-path (:worktree-path parent-sd)}` into child sessions, and
+  `:session/create-child` resolves `parent-sd` from the parent session-id. So
+  worktree inheritance *is* runtime-supported in principle — but whether a
+  *direct* `task-lifecycle` delegate's sub-session chain roots at step-1's
+  worktree-establishing session is an untested cross-run-session assumption with
+  no workflow precedent.
+
+**Resolution chosen: option (a) — adopt the verified worktree-resolving-wrapper
+pattern + correct the false citation.** Picked over (b) "cite the actual direct
+mechanism" (unverified, no precedent) and (c) "weaken to open risk" (leaves the
+design on an unproven path, violating `one_way`/robustness). The wrapper path is
+the only *proven* mechanism, identical to `implement-task-in-worktree` with
+`task-lifecycle` substituted for `implement-task`.
+
+**design.md edits (coherence-propagated across all affected sections):**
+- **Verified facts → "Worktree ownership"**: rewritten to describe the actual
+  verified mechanism (wrapper + `work-on` re-call + threaded `worktree_path:`),
+  explicitly correcting the prior false "bare sibling-step inheritance" claim;
+  added a runtime note that child sessions do copy `:worktree-path` but that a
+  direct delegate relying on it is unverified.
+- **Verified facts → "Step→step delegate-yield handoff"**: updated to the
+  through-wrapper handoff (step-2 routes the whole handoff blob into the
+  wrapper's `resolve-worktree`, which re-yields the bare path to the inner
+  `lifecycle` delegate).
+- **Step 1**: now emits a *structured handoff* (`worktree_path:` +
+  `munera_task_path:`) instead of "only the bare task path".
+- **Step 2**: now delegates to a thin `task-lifecycle-in-worktree` wrapper
+  (resolve-worktree `:session`+`work-on` → `lifecycle` `:delegate`
+  `:target "task-lifecycle"`); worktree continuity is *established* by the
+  `work-on` re-call, not assumed.
+- **Scope Deliverable 2** + the "stays at two steps" paragraph: reflect the
+  wrapper.
+- **Acceptance criteria**: handoff-conformance criterion rewritten to the
+  worktree-resolving contract; added a criterion that the
+  `task-lifecycle-in-worktree` wrapper exists and parses (mirroring
+  `implement-task-in-worktree`).
+- **Locked decisions**: added decision 11 recording the wrapper-pattern choice
+  and the rejected direct-inheritance alternative (explicitly "Resolves I1").
+
+Net new artifact introduced by this resolution: a `task-lifecycle-in-worktree`
+wrapper workflow (thin, two-step, structurally identical to the existing
+verified `implement-task-in-worktree`). I1 checked in design-steps.md
+(unchecked count 0). No `steps.md` / `plan.md` touched. PASS_STATUS:
+REVIEW_COMPLETE.

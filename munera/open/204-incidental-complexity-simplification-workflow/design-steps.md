@@ -45,7 +45,7 @@
 
 ## Inconsistency (pass 1)
 
-- [ ] I1 — Reconcile the worktree-inheritance claim with its cited precedent.
+- [x] I1 — Reconcile the worktree-inheritance claim with its cited precedent.
       "Verified facts" claims a `:delegate` step inherits the worktree set by a
       prior `:session` `work-on` call, citing `implement-task-in-worktree.md`,
       and Step 2 calls the `task-lifecycle` delegate's inheritance "verified

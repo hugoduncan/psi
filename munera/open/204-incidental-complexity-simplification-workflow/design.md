@@ -31,7 +31,9 @@ Two deliverables:
    highest incidental-complexity unit, including the essential-vs-incidental
    judgment guard. Usable both interactively and from the workflow.
 2. **A two-step orchestration workflow** — selects a target, creates a
-   constrained Munera task, and delegates to `task-lifecycle`.
+   constrained Munera task, and delegates the task through `task-lifecycle` via
+   a thin worktree-resolving wrapper (`task-lifecycle-in-worktree`) so the
+   lifecycle runs in the worktree established in step 1.
 
 ### In scope (v1)
 - Function/executable-unit-level incidental complexity (the `gap` method).
@@ -122,34 +124,54 @@ end. Required behaviour:
 - Allocate the next task id, create `munera/open/NNN-slug/design.md` for the
   refactor task (see "Generated task design" below).
 - Commit the task creation.
-- Emit **only** the Munera task path (e.g. `munera/open/NNN-slug`) on a single
-  line as the step output.
+- Emit a **structured handoff** as the step output: a small Markdown block
+  carrying machine-friendly bullet lines, at minimum:
+  - `worktree_path:` — the absolute path of the worktree created via `work-on`,
+  - `munera_task_path:` — the `munera/open/NNN-slug` task path.
+  This mirrors the `worktree_path:`/`munera_task_path:` handoff blob that
+  `gh-issue-implement.edn`'s `design` step emits and that
+  `implement-task-in-worktree`'s `resolve-worktree` step consumes. Emitting the
+  worktree path explicitly (rather than only the bare task path) is what makes
+  cross-`:delegate` worktree continuity work on the **verified** wrapper path
+  (see Verified Facts) instead of an unverified silent-inheritance assumption.
 
-**Step 2 — run the lifecycle (`:delegate`)**
-- Delegate to `task-lifecycle` (`:target "task-lifecycle"`).
+**Step 2 — run the lifecycle in the worktree (`:delegate`)**
+- Delegate to a thin **worktree-resolving wrapper** around `task-lifecycle`
+  (`:target "task-lifecycle-in-worktree"`), structurally identical to the
+  verified `implement-task-in-worktree` wrapper but sub-delegating to
+  `task-lifecycle` instead of `implement-task`. The wrapper:
+  1. `resolve-worktree` (`:session`, tools include `work-on`): extract
+     `worktree_path:` and `munera_task_path:` from the step-1 handoff, call
+     `work-on` with the extracted worktree path to set the delegated run's
+     session worktree, then emit **only** the bare task path on a single line.
+  2. `lifecycle` (`:delegate` `:target "task-lifecycle"`): wired
+     `:prompt-string {:type :map :fields {:input {:from {:step "resolve-worktree" :yield :text}}}}`,
+     so it receives `{:input "munera/open/NNN-slug"}` — the exact map shape every
+     `task-lifecycle` sub-workflow reads via `{:from :workflow-input :path [:input]}`.
 - **Handoff wiring (grammar-conformant):** step-2 sources its `:input` from
-  step-1's yielded text via the verified delegate-yield grammar:
+  step-1's yielded handoff text via the verified delegate-yield grammar:
   ```
   :prompt-string {:type :map
                   :fields {:input {:from {:step "<step-1-name>" :yield :text}}}}
   ```
-  Because step-1 emits **only** the Munera task path on a single line as its
-  step output (see Step 1), step-1's `:yield :text` *is* the bare task-path
-  string. This routes `{:input "munera/open/NNN-slug"}` into the delegate — the
-  exact map shape every `task-lifecycle` sub-workflow reads via
-  `{:from :workflow-input :path [:input]}`. This mirrors the verified
-  `gh-issue-implement.edn` precedent, whose `implement`/`review` `:delegate`
-  steps wire `:input` from a prior step's `:yield :text` with this identical
-  `:prompt-string {:type :map :fields {:input {:from {:step … :yield :text}}}}`
-  form. Naming this mechanism keeps the handoff on the one verified data-flow
-  path (the `one_way` principle) rather than an implicit, non-grammatical
-  contract.
-- The delegate **inherits the worktree** established in step 1 (verified
-  behaviour; see Verified Facts).
+  This routes the whole structured handoff blob into the wrapper's
+  `resolve-worktree` step (which reads `{{input}}` and re-establishes the
+  worktree), exactly as `gh-issue-implement.edn`'s `implement` delegate routes
+  its `design`-step handoff into `implement-task-in-worktree`. Keeping the
+  handoff on this one verified data-flow path honours the `one_way` principle.
+- **Worktree continuity is established, not assumed:** the wrapper's
+  `resolve-worktree` `:session` step **re-calls `work-on`** from the threaded
+  `worktree_path:` field before sub-delegating, so the lifecycle runs in
+  step-1's worktree by the same proven mechanism as `implement-task-in-worktree`
+  — not by relying on a fresh `:delegate` silently inheriting an outer sibling
+  step's worktree (see Verified Facts).
 
-The workflow stays at two steps and ends with a completed, reviewed task on the
-local worktree branch — it does **not** push or open a PR (the user decides on
-PR). No workflow-level verification step is added: the generated task's
+The outer workflow stays at two steps (select+create, then delegate to the
+worktree-resolving lifecycle wrapper) and ends with a completed, reviewed task
+on the local worktree branch — it does **not** push or open a PR (the user
+decides on PR). The `task-lifecycle-in-worktree` wrapper is a thin two-step
+adapter (resolve-worktree + lifecycle delegate), not additional orchestration
+logic. No workflow-level verification step is added: the generated task's
 acceptance criteria carry the objective checks, and the lifecycle's own
 implement/review steps enforce them.
 
@@ -257,6 +279,16 @@ inconsistency in place of live user collaboration.
 9. No persistent skip-list in v1: repeated runs rely on the judgment guard to
    avoid re-picking an essential unit. Explicit v1 limitation.
 10. Workflow name: `reduce-incidental-complexity` (tunable).
+11. **Cross-`:delegate` worktree continuity uses the verified
+    worktree-resolving-wrapper pattern, not bare sibling-step inheritance.**
+    Step-1 emits a structured handoff carrying `worktree_path:` +
+    `munera_task_path:`; step-2 delegates to a thin `task-lifecycle-in-worktree`
+    wrapper (resolve-worktree `:session` re-calls `work-on`, then sub-delegates
+    to `task-lifecycle`), structurally identical to `implement-task-in-worktree`.
+    Chosen over a direct `task-lifecycle` delegate relying on session
+    `:worktree-path` inheritance, which — though the runtime copies the parent
+    worktree into child sessions — has no workflow precedent for a *direct*
+    delegate and would be an unverified assumption. (Resolves design-review I1.)
 
 ## Verified facts (grounding)
 
@@ -268,14 +300,39 @@ inconsistency in place of live user collaboration.
   `:prompt-string` `:map` field from a prior step's text output via
   `:fields {:input {:from {:step "<name>" :yield :text}}}`. Verified precedent:
   `gh-issue-implement.edn`'s `implement` and `review` `:delegate` steps wire
-  `:input` from a prior step's `:yield :text` with exactly this form. Since
-  step-1 here emits only the task-path line, its `:yield :text` is the bare path
-  string, producing the `{:input "munera/open/NNN-slug"}` map `task-lifecycle`
-  expects.
-- **Worktree ownership:** neither `task-lifecycle` nor `implement-task` creates
-  a worktree; the caller establishes it, and a `:delegate` step inherits the
-  worktree set by a prior `:session` step's `work-on` call (precedent:
-  `implement-task-in-worktree.md`).
+  `:input` from a prior step's `:yield :text` with exactly this form. Here the
+  outer step-2 routes step-1's whole structured-handoff `:yield :text` into the
+  `task-lifecycle-in-worktree` wrapper; the wrapper's `resolve-worktree`
+  `:session` step extracts the bare task path and re-yields it, and the
+  wrapper's inner `lifecycle` delegate wires that bare path into `{:input "…"}`
+  for `task-lifecycle` — identical to how `implement-task-in-worktree`'s
+  `resolve-worktree` → `implement` delegate produces `{:input <task-path>}` for
+  `implement-task`.
+- **Worktree ownership (and the verified handoff mechanism):** neither
+  `task-lifecycle` nor any of its sub-workflows (`review-task-design`,
+  `create-task-plan`, `review-task-plan`, `implement-task`,
+  `review-task-implementation`) creates a worktree or contains a `work-on`
+  step; each sub-workflow reads only `{:input <task-path>}`. So a `:delegate`
+  step that targets `task-lifecycle` **directly** has no mechanism to establish
+  step-1's worktree. The verified precedent for crossing a `:delegate` boundary
+  into a prior step's worktree is **not** bare sibling-step inheritance: in
+  `gh-issue-implement.edn` the outer `implement` step delegates to the
+  **`implement-task-in-worktree` wrapper**, whose own first `:session` step
+  (`resolve-worktree`, tools include `work-on`) re-extracts a `worktree_path:`
+  field from a structured handoff blob and **re-calls `work-on`** to set the
+  delegated run's session worktree *before* it sub-delegates to `implement-task`.
+  Worktree continuity is therefore carried by (1) an explicit `worktree_path:`
+  field threaded through the handoff text and (2) a worktree-resolving wrapper
+  that re-calls `work-on` — not by a fresh `:delegate` silently inheriting an
+  outer sibling step's worktree. This task adopts that same verified pattern (see
+  Step 1 / Step 2): step-1 emits a structured handoff carrying both
+  `worktree_path:` and `munera_task_path:`, and step-2 delegates to a thin
+  worktree-resolving wrapper around `task-lifecycle`.
+  (Runtime note: child sessions do inherit `:worktree-path` from their parent
+  session data — `child-session-state` copies `(:worktree-path parent-sd)` —
+  but relying on that for a *direct* `task-lifecycle` delegate is an unverified
+  cross-run-session assumption with no workflow precedent; the wrapper pattern
+  above is the proven path and is used instead.)
 
 ## Acceptance criteria (this task)
 
@@ -286,11 +343,20 @@ inconsistency in place of live user collaboration.
   the verified grammar (`:session` + `:delegate`), and matches the two-step
   shape above including the early-stop-on-no-target behaviour.
 - The workflow's step-1 output and step-2 input wiring conform to the verified
-  task-path handoff contract: step-1 yields only the bare task-path line, and
-  step-2's `:delegate` sources `:input` via
-  `:prompt-string {:type :map :fields {:input {:from {:step "<step-1-name>" :yield :text}}}}`,
-  producing the `{:input "munera/open/NNN-slug"}` map every `task-lifecycle`
-  sub-workflow reads.
+  worktree-resolving handoff contract: step-1 yields a structured handoff blob
+  carrying `worktree_path:` and `munera_task_path:`; step-2's `:delegate`
+  targets the `task-lifecycle-in-worktree` wrapper and sources `:input` via
+  `:prompt-string {:type :map :fields {:input {:from {:step "<step-1-name>" :yield :text}}}}`;
+  the wrapper's `resolve-worktree` `:session` step re-calls `work-on` from the
+  threaded `worktree_path:` and emits the bare task path, and the wrapper's inner
+  `lifecycle` delegate routes `{:input "munera/open/NNN-slug"}` into
+  `task-lifecycle` — the map shape every sub-workflow reads. (This mirrors
+  `implement-task-in-worktree` exactly, with `task-lifecycle` substituted for
+  `implement-task`.)
+- The `task-lifecycle-in-worktree` wrapper workflow exists, parses and loads, and
+  is structurally a two-step `resolve-worktree`(`:session`,+`work-on`) →
+  `lifecycle`(`:delegate` `:target "task-lifecycle"`) adapter — verified against
+  the workflow definition/parse tests, mirroring `implement-task-in-worktree`.
 - Generated tasks carry the two-phase behaviour-preserving contract: a Phase 0
   test-coverage gate (characterization tests + green net before refactoring) and
   Phase 1 refactor with the `local`-lens + `gate` + green-tests acceptance.
