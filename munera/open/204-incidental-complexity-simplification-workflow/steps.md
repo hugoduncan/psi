@@ -234,6 +234,21 @@ with the commit sha / decision when done.
       baselines (`before-local.json` → A5, `before-diagnose.edn` → A3 gate source).
       plan.md's baseline set matches steps.md and the gate acceptance it cites.
 
+## Implementation review follow-ups (review pass 1)
+
+- [ ] F1 — Early-stop is prompt-only; step-2 runs unconditionally on a
+      no-target handoff. The workflow grammar has no conditional/skip step
+      execution, so when step-1 early-stops (no qualifying unit → no worktree,
+      no task, a handoff lacking `worktree_path:`/`munera_task_path:`), step-2's
+      `:delegate` to `task-lifecycle-in-worktree` still runs and would call
+      `work-on`/delegate on empty input. Fix at the prompt level (the only
+      available mechanism): make step-2's prompt and/or the wrapper's
+      `resolve-worktree` (and `summary`) prompts explicitly detect the absence of
+      the handoff fields and short-circuit to a clean "no target this run;
+      nothing to do" report instead of calling `work-on` / delegating into
+      `task-lifecycle` on empty input. Re-verify the two affected workflows still
+      load and the definition tests stay green after the prompt edit.
+
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 
 - [ ] Split step-1 selection from task-creation into two `:session` steps,

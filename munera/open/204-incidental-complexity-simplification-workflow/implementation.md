@@ -698,3 +698,71 @@ Final verification:
   markdown — not cljfmt-parseable, expected).
 
 All five slices (1–5) complete. Task implementation done.
+
+## 2026-06-01 — Implementation review (task-implementation-review)
+
+Reviewed the implemented artifacts against `design.md`/`plan.md` for fit,
+reusable-pattern adherence, unnecessary abstraction, and structural issues.
+Grounded against live runtime (`bb gordian local --json` keys; the join recipe
+run end-to-end), `load-workflow-definitions`, the focused definition tests
+(**14 tests, 192 assertions, 0 failures**), and the verified precedents
+(`review-implementation-in-worktree.edn`, `gh-issue-implement.edn`,
+`task-lifecycle.edn`).
+
+Verified sound (no findings):
+- **Skill correctness — recipe runs live.** The `incidental-complexity-finder`
+  verbatim `jq` join recipe was run against the live repo and produces a
+  ranked top-5 (e.g. `psi.app-runtime/start-tui-runtime!/5` gap≈7.03). Every
+  key the recipe reads (`ns`/`var`/`arity`/`lcc-total`/`end-line`/`findings`/
+  per-dimension burdens) is present in live `bb gordian local --json` output;
+  `complexity` units carry `cc`. A1 unmatched-row rule, qualification filter,
+  and `max(cc,1)` zero-cc guard are all faithfully encoded.
+- **Wrapper mirrors the loadable precedent exactly.** `task-lifecycle-in-worktree.edn`
+  is structurally identical to `review-implementation-in-worktree.edn`
+  (resolve-worktree `:session`+`work-on` → delegate → summary `:session`),
+  with `task-lifecycle` substituted for `review-task-implementation`. No new
+  pattern; reuses the verified wrapper shape. D1 (`.edn` over the design's
+  `.md`) is correct and runtime-justified — the cited `.md` precedent does not
+  load under the live parser; `doc/workflows.md` documents `.edn` as the
+  correct multi-step form. `λassert (runtime > docs)` honoured.
+- **Outer-step-2 handoff wiring matches `gh-issue-implement.edn`.** Step-2
+  `:delegate :target "task-lifecycle-in-worktree"` with
+  `:prompt-string {:type :map :fields {:input {:from {:step "select-and-create" :yield :text}}}}`
+  and `:context [{:from :workflow-original} {:from {:step "select-and-create" :yield :text}}]`
+  is grammar-identical to that workflow's `implement` step. The two-phase
+  generated-design contract in step-1's prompt reproduces design's "Generated
+  task design" verbatim (gate flags, both baselines, A2/A3/A5, Phase-0 net).
+- **No atom bypass / no shim.** S1 capability-catalog artifacts (skill + two
+  workflow definitions); no dispatch path, no production Clojure, no adapter.
+
+One actionable finding (added to steps.md):
+
+- **F1 — Early-stop is prompt-only; step-2 still runs on a no-target handoff.**
+  The workflow grammar has **no conditional/skip step execution** (verified:
+  `compiler.clj` only requires each step carry `:type`; no `:when`/`:skip`).
+  So when step-1 early-stops (no qualifying unit → no worktree, no task, a
+  handoff with no `worktree_path:`/`munera_task_path:`), step-2's `:delegate`
+  to `task-lifecycle-in-worktree` **still executes unconditionally**. The
+  wrapper's `resolve-worktree` prompt ("Extract the worktree path and Munera
+  task path … Call `work-on` … respond with ONLY the Munera task path") has no
+  no-target branch, and the inner `task-lifecycle` delegate would then receive
+  an empty/garbage task path. design.md claims "Early stop … drives the
+  workflow's early stop", but step-1 cannot stop the workflow — only its own
+  emitted text changes. The single-fat-step precedents
+  (`complexity-reduction-pr.edn`) sidestep this by never crossing a `:delegate`
+  after the no-target decision; this two-step shape reintroduces it. Mitigation
+  is prompt-level (the only available mechanism): step-2's prompt and/or the
+  wrapper's `resolve-worktree`/`summary` prompts must explicitly handle the
+  no-target handoff — detect the absence of `worktree_path:`/`munera_task_path:`
+  and short-circuit to a clean "no target this run; nothing to do" report
+  rather than calling `work-on`/delegating on empty input. This is the robust,
+  `one_way`-consistent fix given no engine-level conditional.
+
+Non-actionable observation (correctly scoped out, recorded for visibility):
+- D1 surfaced that `implement-task-in-worktree.md` is a live load **error**
+  (the `.md`-begins-with-EDN-map rejection). The implementation correctly
+  scoped this out as a pre-existing latent repo bug. No follow-up artifact was
+  filed; if desired, a separate task could migrate the remaining `.md` EDN
+  wrappers to `.edn`. Out of scope for 204 — not added as a step.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK.
