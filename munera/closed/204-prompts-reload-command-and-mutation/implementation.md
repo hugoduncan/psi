@@ -775,3 +775,32 @@ absence assertion). Does not block correctness.
 - Verify: `clj-kondo` 0/0; focused ns 8 tests / 35 assertions / 0 failures
   (+1 vs prior 34). No production code change — this only strengthens the
   existing no-refresh test's signal. Test review arc complete.
+
+## Test-shaper review — third pass (2026-06-01)
+
+Re-applied test-shaper (clarity ∧ signal ∧ robustness ∧ economical)
+independently to `reload_prompts_test.clj` (8/35 green) +
+`commands_test.clj` `prompts-reload-command-test`. Verified TS1–TS4
+follow-ups are in the tree (e2e baseline trimmed to one
+`template-names` assert; TS2 observable refresh-callback boundary with the
+TS4 positive control; `seed-stale!`/`template-names`/`invoke-reload-mutation`
+compressing helpers). Cross-checked candidate findings:
+
+- TS-A (mutation success double-assert): `(false? (:is-error result))` +
+  `(= :ok (:psi-tool/overall-status parsed))` in both mutation tests are
+  **orthogonal contract checks** (psi-tool tool-error flag vs. pathom op
+  status), not redundancy ⇒ keep. Not actionable.
+- TS-B (command-test temp-cwd cleanup): `prompts-reload-command-test` omits
+  temp-dir cleanup, but this **matches the established convention** of
+  sibling command tests (`/reload-models` at L693 also omits it; `temp-cwd`
+  is non-self-cleaning by design). Adding cleanup to one test would be a
+  consistency regression ⇒ leave. Not actionable.
+- Command assertions use loose `str/includes?` (`"Prompts reloaded"`, cwd,
+  `"count : 2"`) ⇒ robust to border-format tweaks. Good.
+- psi-tool visibility test extracts op-name from both `:config` and `meta`
+  and `some`s over `all-mutations` ⇒ order-independent, robust. Good.
+
+Result: no new actionable findings. The three prior passes (redundancy,
+white-box reach, ceremony helpers, positive control) leave the suite simple,
+consistent, behavior-focused, deterministic, and economical. Test-shaper
+arc complete.
