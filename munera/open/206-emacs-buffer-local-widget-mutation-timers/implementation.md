@@ -788,3 +788,48 @@ Confirmed the helper is verbatim-equivalent: helper uses ID as both spec id and
 inline `"w1"`/`"b1"` shape. Did NOT touch
 `pwpt-on-mutation-timeout-calls-error-handler` (no in-flight `--set-lstate`).
 `bb emacs:check` green (340/340); byte-compile clean; reloaded `.el`.
+
+## Test-shaper review pass 3 (ψ)
+
+Independent re-application of test-shaper (clarity ∧ signal ∧ robustness ∧
+economy) to `test/psi-widget-projection-timers-test.el` after S1/S2/S3 landed.
+Full suite 340/340 green. Grounded on the current test file +
+`psi-lifecycle.el:271/374` (teardown/reset under test).
+
+Re-confirmed strong: determinism (`run-at-time`/`cancel-timer`/`timerp`/
+`send-request-function`/`upsert-projection-block` all substituted — infra only),
+state-based (¬interaction) assertions, complete design behaviour coverage, and
+the S1 `pwpt--with-psi-buffer` / `pwpt--seed-button-in-flight` + S2
+`psi-test--should-not-error` factorings compress ceremony without hiding intent.
+
+One NEW minor actionable economy/consistency gap (S4):
+`pwpt-teardown-cancels-in-flight-mutation-timers` (`:387`) and
+`pwpt-reset-transcript-clears-mutation-timers` (`:409`) each hand-roll the same
+~5-line MODE-BEARING buffer ceremony —
+`generate-new-buffer` + `with-current-buffer` + `(psi-emacs-mode)` +
+`setq-local psi-emacs--state` + `unwind-protect`/`kill-buffer` — plus an
+identical `cl-letf` `timerp`/`cancel-timer` capture preamble. The S1
+`pwpt--with-psi-buffer` macro does NOT fit them because it omits
+`(psi-emacs-mode)`, which these two tests require (they exercise
+`psi-emacs--teardown-buffer`/`psi-emacs--reset-transcript-state`, which touch
+mode-bound machinery: window-config hook, regions, header-line). So the
+mode-bearing variant is a distinct, twice-repeated scaffold with no compressing
+helper, costing `minimal_incidental_variation` ∧ `consistent(fixtures)` against
+the non-mode cross-buffer tests that S1 already factored. A
+`pwpt--with-psi-mode-buffer (var &rest body)` (macro mirroring
+`pwpt--with-psi-buffer` but adding `(psi-emacs-mode)`) would let both tests read
+as their distinct arrange/act/assert intent (puthash live-timer → run
+teardown/reset → assert store empty + timer cancelled) rather than buried under
+buffer+mode boilerplate. Minor: only two callers, the `kill-buffer` is genuine
+teardown (not the act, unlike `…-noop-when-buffer-dead`), coverage/correctness
+unaffected — deferrable. Not a duplicate of S1 (which scoped only the non-mode
+cross-buffer trio).
+
+Non-actionable (noted, no follow-up): the timerp/cancel-timer `cl-letf`
+preamble shared by the same two tests could fold into the same helper, but
+that couples capture-list shape to the helper and risks hiding the act's
+substitution intent — leave inline. `pwpt-arm-cancel-mutation-timer-roundtrip`
+name still slightly oversells "cancel" (remhash path) — already recorded benign
+in the prior pass.
+
+Verdict: ACTIONABLE_FEEDBACK (minor economy refinement S4).

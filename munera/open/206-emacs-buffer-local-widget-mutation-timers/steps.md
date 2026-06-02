@@ -260,3 +260,23 @@
       clean fit there (leave inline, or factor only a narrower spec+sync helper if
       a third caller appears). Deferrable. Re-run `bb emacs:check`; byte-compile
       clean; reload `.el`.
+
+## Test-shaper review pass 3 follow-ups (ψ)
+
+- [ ] S4 — Factor the repeated MODE-BEARING buffer ceremony (minor,
+      economy/consistency). `pwpt-teardown-cancels-in-flight-mutation-timers`
+      and `pwpt-reset-transcript-clears-mutation-timers` in
+      `test/psi-widget-projection-timers-test.el` each hand-roll the same
+      `generate-new-buffer` + `(psi-emacs-mode)` + `setq-local psi-emacs--state`
+      + `unwind-protect`/`kill-buffer` scaffold. The S1 `pwpt--with-psi-buffer`
+      macro does not fit them because it omits `(psi-emacs-mode)`, which these
+      two tests require (they exercise `psi-emacs--teardown-buffer` /
+      `psi-emacs--reset-transcript-state`, which touch mode-bound machinery).
+      Add a `pwpt--with-psi-mode-buffer (var &rest body)` macro (mirroring
+      `pwpt--with-psi-buffer` but adding `(psi-emacs-mode)`) and apply it to both
+      tests so each reads as its distinct arrange/act/assert intent rather than
+      buried under buffer+mode boilerplate
+      (`minimal_incidental_variation` ∧ `consistent(fixtures)`). Keep the
+      `cl-letf`/puthash/assert bodies inline (they are the intent). Deferrable —
+      only two callers, coverage/correctness unaffected. Re-run `bb emacs:check`;
+      byte-compile clean; reload `.el`.
