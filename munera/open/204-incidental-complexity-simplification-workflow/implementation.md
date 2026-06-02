@@ -1029,3 +1029,49 @@ abstraction.
   the key string for coherence).
 
 PASS_STATUS: ACTIONABLE_FEEDBACK.
+
+## 2026-06-01 — Review follow-up (pass 3) — F3 resolution
+
+F3 RESOLVED. Propagated F2's `(ns, var, arity, line)` unique-key decision from
+the **selector** recipe into the **generated design contract's** acceptance keys
+so a future high-burden null-arity `defmethod` target is not mis-compared (the
+51 `psi.agent-session.dispatch-effects/execute-effect!` defmethods all share
+`(ns, var, arity) = …/execute-effect!/null`; only `line` disambiguates them).
+
+Edited the generated-contract prose in two coherent places:
+
+- `.psi/workflows/reduce-incidental-complexity.edn` (step-7 generated `design.md`
+  instructions):
+  - **A5** — "target `lcc-total` (keyed by `(ns, var, arity)`) decreased" →
+    keyed by `(ns, var, arity, line)`, with an inline note that this is the same
+    unique key the selector's join uses and why (`line` disambiguates same-named
+    null-arity defmethods).
+  - **A2** — touched-set identity `{u | before(u) != after(u)}` now states each
+    unit `u` is identified by `(ns, var, arity, line)` (selector's unique join
+    key, so null-arity defmethods don't collapse).
+  - **P2 note** — "Phase-1 before/after comparison is keyed by `(ns, var, arity)`"
+    → `(ns, var, arity, line)` for coherence with A5/A2.
+- `munera/open/204-…/design.md` (Phase-1 acceptance, mirroring the EDN):
+  - A5 line 217 and A2 touched-set line ~228 updated identically.
+
+Chose option "key A5/A2 on `(ns, var, arity, line)` to match the selector" over
+"declare null-arity units out of acceptance scope" — keeping selector and
+acceptance keys identical avoids a second key-space rule and matches the SKILL
+A1 framing (`@line`-disambiguated unique join key). Unit *logical identity*
+`(ns, var, arity)` left intact where it denotes identity, not the comparison key
+(consistent with the pass-2 SKILL distinction).
+
+Scope per F3: generated-design prose + `design.md` only. No test change forced
+(definition tests don't assert the generated-contract key text);
+`doc/workflows.md`'s `(ns, var, arity, line)` join-key mention (from F2) already
+coheres — it describes the selector join, not A5/A2, so no further doc edit.
+
+Verification:
+- `clj-paren-repair .psi/workflows/reduce-incidental-complexity.edn`: Success
+  (1/0) — EDN still parses.
+- `clojure -M:test --focus psi.workflow-loader.workflow-definitions-test`:
+  **14 tests, 196 assertions, 0 failures** — both workflows still load with the
+  edited prompt string.
+- No `.clj`/`.cljc` source changed (EDN + markdown only), so no clj-kondo delta.
+
+F3 checked in steps.md. PASS_STATUS: REVIEW_COMPLETE.

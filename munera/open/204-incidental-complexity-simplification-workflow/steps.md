@@ -288,7 +288,7 @@ with the commit sha / decision when done.
 
 ## Implementation review follow-ups (review pass 3)
 
-- [ ] F3 — F2's `(ns, var, arity, line)` join-key uniqueness fix did not
+- [x] F3 — F2's `(ns, var, arity, line)` join-key uniqueness fix did not
       propagate to the **generated design contract's** acceptance keys. The
       generated `design.md` template embedded in
       `.psi/workflows/reduce-incidental-complexity.edn` (and `design.md` line
@@ -305,6 +305,19 @@ with the commit sha / decision when done.
       `design.md` A5 line — or state explicitly that null-arity units are out of
       unit-level acceptance scope. Generated-design prose + `design.md` only; no
       forced test change (optionally assert the key string for coherence).
+      RESOLUTION: keyed A5/A2 (and the P2 before/after note) on
+      `(ns, var, arity, line)` to match the selector's unique join key in both
+      the generated-contract prose in `reduce-incidental-complexity.edn`
+      (step-7) and the mirrored `design.md` Phase-1 acceptance, each with an
+      inline note that `line` disambiguates same-named null-arity `defmethod`
+      units (the 51 `execute-effect!` defmethods). Chose key-matching over
+      out-of-scope declaration so selector and acceptance share one key space.
+      `(ns, var, arity)` left intact where it denotes a unit's logical identity
+      (per the pass-2 SKILL distinction). `doc/workflows.md`'s F2 join-key
+      mention already coheres (it describes the selector join, not A5/A2). EDN
+      still parses (`clj-paren-repair` Success); both workflows still load
+      (14 tests, 196 assertions, 0 failures); no `.clj` change → no clj-kondo
+      delta. (See implementation.md pass-3 F3 resolution entry.)
 
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 

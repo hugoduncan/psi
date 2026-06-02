@@ -214,8 +214,11 @@ local, root-cause changes (not superficial extraction).
     stored `munera/open/NNN-slug/before-local.json` captured in Step 1 — that
     file is the single authoritative baseline for every "decreased" check (not
     the selector's emitted evidence, not a fresh pre-refactor recompute). The
-    target unit's `lcc-total` (keyed by `(ns, var, arity)`) **decreased** versus
-    its `before-local.json` value.
+    target unit's `lcc-total` (keyed by `(ns, var, arity, line)` — the same
+    unique key the selector's join uses; `line` disambiguates same-named
+    null-arity `defmethod` units that share `(ns, var, arity)`, e.g. the 51
+    `execute-effect!` defmethods that collapse to one key without it)
+    **decreased** versus its `before-local.json` value.
   - **Net burden (A2 — "touched units" defined).** "Touched units" means **every
     unit whose recomputed `lcc-total` changed** between `before-local.json` and
     the after-`local` run — i.e. the set is computed from the metric, not from
@@ -225,8 +228,10 @@ local, root-cause changes (not superficial extraction).
     or changed *source* would let a refactor hide relocated burden in an
     untouched caller. The acceptance is: summing `lcc-total` over this
     metric-derived touched set, the **after total is strictly less than the
-    before total**. The check is objective: `{u | before(u) ≠ after(u)}`, then
-    `Σ after < Σ before`.
+    before total**. The check is objective, with each unit `u` identified by
+    `(ns, var, arity, line)` (the selector's unique join key, so null-arity
+    `defmethod` units do not collapse together): `{u | before(u) ≠ after(u)}`,
+    then `Σ after < Σ before`.
   - **Architectural no-regression (A3 — enforcing gate flags).** Run
     `bb gordian gate --baseline munera/open/NNN-slug/before-diagnose.edn
     --fail-on new-cycles,new-high-findings --max-new-medium-findings 0`. The bare
