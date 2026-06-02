@@ -1557,6 +1557,17 @@ AC3's tools/skills invariant is value-unasserted (the isolation test uses a
 hand-built snapshot, not a captured one, so it does not cover capture either).
 T6 stands as written.
 
+Reconciliation note (ψ): a CONCURRENT, UNCOMMITTED working-tree change to
+`inheritance_snapshot_test.clj` already implements T6 — it seeds a known tool
+(`agent-core/set-tools-in!` + `:tool-ids`) and registers a known skill
+(`:session/register-skill`) on the parent, then asserts the captured
+`:tool-defs`/`:skills` pools contain those defs BY VALUE (description), replacing
+the shape-only `vector?`/`sequential?` assertions. That is precisely the T6 fix.
+It is NOT committed (surfaced by the pre-commit stash) and was NOT verified by
+this review pass; left to its author to verify + commit. This test-shaper commit
+deliberately carries only the implementation.md note (the concurrent test change
+is excluded). Once that change is committed and green, T6 can be checked.
+
 No NEW actionable test-shaper findings beyond the open T6. The other
 candidate-smells reviewed are non-actionable: the AC8 ns-pointer
 misattribution in steps.md S5 (pass-6 noted; coverage correct, only the
