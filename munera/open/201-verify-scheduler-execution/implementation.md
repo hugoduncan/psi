@@ -2220,3 +2220,43 @@ loop-bound literals in `scheduler_lifecycle_test.clj` L111-112 ARE literals
 Verification-only invariant intact (this review touched no
 `components/agent-session/src/**` or `doc/scheduler.md`; the follow-up is
 test-only). Recorded as a follow-up step.
+
+## Test-shaper review — pass 17 (test-shaper, 2026-06-01) — ACTIONABLE_FEEDBACK
+
+Re-applied test-shaper firsthand (clarity ∧ signal ∧ robustness ∧ economy) to
+the full 201-touched scheduler test set. Verified prior chain converged:
+pass-16's literal-instant convergence is **complete** — `grep "Instant/parse"`
+over all 14 files shows the only remaining sites are the deliberately-excluded
+runtime-output/deserialization parses (`psi_tool_scheduler_test` L30/31/196/197/
+218 over tool-result strings; `scheduler_handlers_test:27` private `instant` over
+a runtime string). No regression there.
+
+**One actionable `meaningful_failures` ∧ `consistent(assertion_style)` issue —
+non-duplicate.** `psi-tool-scheduler-bounds-and-cap-test` exercises two
+*distinct* rejections but asserts both with assertion-indistinguishable generic
+predicates only:
+- below-min `:delay-ms` (10ms) block → asserts only `(true? (:is-error result))`
+  + `(= :error (:psi-tool/overall-status parsed))`.
+- cap-overflow (51st pending) block → same two generic assertions.
+These two would pass for *any* error (a swapped/unrelated rejection, a
+validation-phase error, etc.) and cannot tell the below-min bound apart from the
+cap. The distinct messages exist and surface through `:psi-tool/error :message`:
+- below-min → `"delay-ms is below the minimum bound"` (`scheduler.clj:85`)
+- cap → `"scheduler pending cap exceeded"` (`psi_tool_scheduler.clj:149`)
+This is the *same* precision gap that implementation-review pass-2 already fixed
+for the **`:at` matrix** near-future/far-future blocks (which now assert the
+named bound), and that the pure-model `scheduler_test.clj` guard tests already
+follow via `thrown-with-msg?`. The `:delay-ms`/cap blocks were left on the old
+generic idiom — a real inconsistency within the converged 201 set against the
+precedent the task itself established. Fix is test-only, behaviour- and
+deftest-name-preserving (findings citations unchanged), within the Slice-10
+allowlist: add `(= <named-msg> (get-in parsed [:psi-tool/error :message]))` to
+each of the two blocks.
+
+Non-duplicate check: pass-2's fix was scoped explicitly to the `:at` matrix
+blocks; the `bounds-and-cap` `:delay-ms`/cap blocks were never tightened (still
+generic). No existing follow-up step targets them.
+
+Verification-only invariant intact (this review reads only; the follow-up is
+test-only and touches no `components/agent-session/src/**` or `doc/scheduler.md`).
+Recorded as a follow-up step.

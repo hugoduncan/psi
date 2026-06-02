@@ -1457,3 +1457,22 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       `components/agent-session/test/**` scheduler files; zero
       `components/agent-session/src/**` or `doc/scheduler.md` (verification-only
       invariant; Slice-10 allowlist held).
+
+## Test-shaper follow-ups — pass 17 (test-shaper, 2026-06-01)
+
+- [ ] Tighten the two generic-only bound/cap rejection assertions in
+      `psi_tool_scheduler_test.clj/psi-tool-scheduler-bounds-and-cap-test` to
+      assert the *named* error message (meaningful_failures ∧
+      consistent(assertion_style)), matching the precedent already set for the
+      `:at` matrix blocks and the `scheduler_test.clj` `thrown-with-msg?` guards:
+      - below-min `:delay-ms` (10ms) block → add
+        `(= "delay-ms is below the minimum bound" (get-in parsed [:psi-tool/error :message]))`
+        (`scheduler.clj:85`).
+      - cap-overflow (51st pending) block → add
+        `(= "scheduler pending cap exceeded" (get-in parsed [:psi-tool/error :message]))`
+        (`psi_tool_scheduler.clj:149`).
+      Leave the existing `:is-error`/`:overall-status` assertions in place.
+      Verify: test-file-only edit (Slice-10 allowlist; no
+      `components/agent-session/src/**` or `doc/scheduler.md`); deftest name
+      unchanged (findings citations stable); clj-kondo 0/0; `bb fmt:check`
+      clean; scheduler `bb test` subset green.
