@@ -675,7 +675,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Test review follow-ups — test-shaper pass 2 (2026-06-01)
 
-- [ ] Split the megatest
+- [x] Split the megatest
       `psi_tool_scheduler_test/psi-tool-scheduler-create-list-cancel-test`
       (one deftest, 17 `testing` blocks, 109 assertions) into focused deftests
       by concern, so each distinct behaviour has its own name + minimal ctx
@@ -695,3 +695,17 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       `components/agent-session/src/**` or `doc/scheduler.md`); keep the suite
       green + clj-kondo/cljfmt clean. If 201 is treated as closed, raise it as a
       small standalone test-hygiene task instead.
+      Done: split into the 6 suggested focused deftests —
+      `psi-tool-scheduler-create-list-cancel` (happy path),
+      `…-time-source-required`, `…-bounds-and-cap`, `…-session-id-resolution`,
+      `…-kind-validation`, `…-at-resolution-matrix` — each with its own minimal
+      ctx setup. The previously top-level "absolute instant" `testing` block
+      (written outside the megatest deftest) was folded into the `:at` matrix
+      deftest by concern. Assertions + messages intact → aggregate **unchanged
+      at 412 assertions**; scheduler-suite deftest count 45 → **50** (psi-tool
+      1 → 6). `findings.md` psi-tool-surface citations updated to the precise new
+      deftests (Outcome 45 → 50; inventory + "Extended in place" note). Verified:
+      `--focus psi.agent-session.psi-tool-scheduler-test` = 6 tests / 109
+      assertions / 0 failures; full `bb test` green; clj-kondo 0/0, cljfmt clean.
+      Test file + task-dir docs only — zero `components/agent-session/src/**` or
+      `doc/scheduler.md` (Slice-10 allowlist held).

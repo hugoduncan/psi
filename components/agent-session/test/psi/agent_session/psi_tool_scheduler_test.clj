@@ -56,26 +56,9 @@
             parsed (read-string (:content result))]
         (is (false? (:is-error result)))
         (is (= :cancel (:psi-tool/scheduler-op parsed)))
-        (is (= :cancelled (get-in parsed [:psi-tool/scheduler :schedule :status]))))))
+        (is (= :cancelled (get-in parsed [:psi-tool/scheduler :schedule :status])))))))
 
-  (testing "absolute instant calculates delay from scheduler time source"
-    (let [fixed-now (java.time.Instant/parse "2026-04-21T18:00:00Z")
-          fire-at (.plusMillis fixed-now 5000)
-          [ctx session-id] (create-session-context {:scheduler-time-source (test-support/fixed-scheduler-time-source fixed-now)})
-          tool (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
-          result ((:execute tool) {"action" "scheduler"
-                                   "op" "create"
-                                   "kind" "message"
-                                   "message" "wake later"
-                                   "at" (str fire-at)})
-          parsed (read-string (:content result))
-          schedule (get-in parsed [:psi-tool/scheduler :schedule])]
-      (is (false? (:is-error result)))
-      (is (= :ok (:psi-tool/overall-status parsed)))
-      (is (= fixed-now (java.time.Instant/parse (:created-at schedule))))
-      (is (= fire-at (java.time.Instant/parse (:fire-at schedule))))
-      (is (string? (:schedule-id schedule)))))
-
+(deftest psi-tool-scheduler-time-source-required-test
   (testing "missing scheduler time source fails create instead of falling back to wall-clock"
     (let [[ctx session-id] (create-session-context)
           tool (tools/make-psi-tool (fn [_q] {}) {:ctx (dissoc ctx :scheduler-time-source)
@@ -102,8 +85,9 @@
           parsed (read-string (:content result))]
       (is (true? (:is-error result)))
       (is (= :error (:psi-tool/overall-status parsed)))
-      (is (= :scheduler-time-source (get-in parsed [:psi-tool/error :data :boundary])))))
+      (is (= :scheduler-time-source (get-in parsed [:psi-tool/error :data :boundary]))))))
 
+(deftest psi-tool-scheduler-bounds-and-cap-test
   (testing "bounds rejection surfaces as scheduler error"
     (let [[ctx session-id] (create-session-context)
           tool (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
@@ -133,8 +117,9 @@
                                      "delay-ms" 1000})
             parsed (read-string (:content result))]
         (is (true? (:is-error result)))
-        (is (= :error (:psi-tool/overall-status parsed))))))
+        (is (= :error (:psi-tool/overall-status parsed)))))))
 
+(deftest psi-tool-scheduler-session-id-resolution-test
   (testing "scheduler requires invoking or explicit session-id"
     (let [[ctx _session-id] (create-session-context)
           tool (tools/make-psi-tool (fn [_q] {}) {:ctx ctx})
@@ -155,8 +140,9 @@
                    :delay-ms 1000})]
       (is (= :ok (:psi-tool/overall-status report)))
       (is (= :message (get-in report [:psi-tool/scheduler :schedule :kind])))
-      (is (= :pending (get-in report [:psi-tool/scheduler :schedule :status])))))
+      (is (= :pending (get-in report [:psi-tool/scheduler :schedule :status]))))))
 
+(deftest psi-tool-scheduler-kind-validation-test
   (testing "scheduler create kind :session requires session-config"
     (let [[ctx session-id] (create-session-context)
           tool (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
@@ -196,9 +182,29 @@
           parsed (read-string (:content result))]
       (is (true? (:is-error result)))
       (is (= :error (:psi-tool/overall-status parsed)))
-      (is (= :validate (get-in parsed [:psi-tool/error :phase])))))
+      (is (= :validate (get-in parsed [:psi-tool/error :phase]))))))
 
-  ;; --- 201 verification: :at resolution matrix (past fires / near-future rejected / above-max rejected) ---
+;; --- 201 verification: :at resolution matrix
+;;     (absolute-instant delay calc / past fires / near-future rejected / above-max rejected) ---
+
+(deftest psi-tool-scheduler-at-resolution-matrix-test
+  (testing "absolute instant calculates delay from scheduler time source"
+    (let [fixed-now (java.time.Instant/parse "2026-04-21T18:00:00Z")
+          fire-at (.plusMillis fixed-now 5000)
+          [ctx session-id] (create-session-context {:scheduler-time-source (test-support/fixed-scheduler-time-source fixed-now)})
+          tool (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
+          result ((:execute tool) {"action" "scheduler"
+                                   "op" "create"
+                                   "kind" "message"
+                                   "message" "wake later"
+                                   "at" (str fire-at)})
+          parsed (read-string (:content result))
+          schedule (get-in parsed [:psi-tool/scheduler :schedule])]
+      (is (false? (:is-error result)))
+      (is (= :ok (:psi-tool/overall-status parsed)))
+      (is (= fixed-now (java.time.Instant/parse (:created-at schedule))))
+      (is (= fire-at (java.time.Instant/parse (:fire-at schedule))))
+      (is (string? (:schedule-id schedule)))))
 
   (testing "past :at resolves to delay 0, skips min-delay check, and FIRES immediately via the seam"
     (let [fixed-now        (java.time.Instant/parse "2026-04-21T18:00:00Z")

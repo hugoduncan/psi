@@ -1136,3 +1136,38 @@ stubs). Suite green; clj-kondo 0/0; cljfmt clean.
   `components/agent-session/src/**` or `doc/scheduler.md`); keep the suite green
   + clj-kondo/cljfmt clean and the aggregate assertion count unchanged. If 201
   is treated as closed, raise it as a small standalone test-hygiene task instead.
+
+## Test review follow-ups — test-shaper pass 2 execution (2026-06-01)
+
+Executed the megatest-split follow-up. Split
+`psi_tool_scheduler_test/psi-tool-scheduler-create-list-cancel-test` (1 deftest,
+17 `testing` blocks, 109 assertions) into 6 focused deftests by concern, each
+with its own minimal ctx setup, restoring per-behaviour failure localisation:
+
+- `psi-tool-scheduler-create-list-cancel-test` — happy path only
+  (create pending → list → cancel), keeps the shared `let` ctx (one coherent
+  arrange across the three sequential steps).
+- `psi-tool-scheduler-time-source-required-test` — missing / invalid
+  scheduler-time-source → error (no wall-clock fallback).
+- `psi-tool-scheduler-bounds-and-cap-test` — below-min `delay-ms` rejected +
+  51st-pending cap.
+- `psi-tool-scheduler-session-id-resolution-test` — invoking/explicit session-id
+  required + explicit-session-id report path.
+- `psi-tool-scheduler-kind-validation-test` — `session` requires session-config /
+  `message` rejects session-config / unsupported session-config keys rejected.
+- `psi-tool-scheduler-at-resolution-matrix-test` — absolute-instant delay calc /
+  past `:at` fires immediately via the seam / near-future `<min` → below-minimum
+  bound / above-max → exceeds-maximum bound.
+
+The previously top-level "absolute instant calculates delay" `testing` block
+(it had been written *outside* the megatest deftest) was folded into the `:at`
+matrix deftest where it belongs by concern. Assertions and their messages kept
+intact — aggregate assertion count **unchanged at 412**; the scheduler-suite
+deftest count rises 45 → **50** (psi-tool 1 → 6). `findings.md` psi-tool-surface
+citations updated to point at the precise new deftests (Outcome figure 45 → 50;
+inventory + "Extended in place" note updated).
+
+Verification: `clojure -M:test --focus psi.agent-session.psi-tool-scheduler-test`
+= **6 tests / 109 assertions / 0 failures**; full `bb test` green; clj-kondo 0/0,
+cljfmt clean on the touched test file. Test file + task-dir docs only — zero
+`components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist held).

@@ -11,9 +11,11 @@ raised remediation task ref (`NNN-slug` or `not-yet-raised`).
 
 **All 7 Scope areas verified-correct — no defects found.** No remediation task
 created. Scheduler suite grew from baseline **35 tests / 338 assertions** to
-**45 tests / 412 assertions**, all green. No scheduler source or
-`doc/scheduler.md` modified (coherence gate passes: only `scheduler_*` /
-`psi_tool_scheduler_test.clj` test files + this task dir changed).
+**50 tests / 412 assertions**, all green (the test-shaper-pass-2 split of the
+psi-tool megatest into 6 focused deftests raised the deftest count 45 → 50;
+assertions unchanged). No scheduler source or `doc/scheduler.md` modified
+(coherence gate passes: only test files under
+`components/agent-session/test/**` + this task dir changed).
 
 New verification tests added (10):
 - `scheduler-test`: `create-schedule-rejects-duplicate-id`,
@@ -31,7 +33,12 @@ New verification tests added (10):
 - `scheduler-resolvers-test`:
   `scheduler-resolver-projects-rich-attrs-across-statuses`
 
-Extended (in place): `psi-tool-scheduler-create-list-cancel` (`:at` matrix),
+Extended (in place): the psi-tool-surface `:at` matrix + bounds/cap/kind/
+session-id/time-source coverage (since split test-shaper pass 2 into focused
+deftests: `psi-tool-scheduler-create-list-cancel`,
+`psi-tool-scheduler-time-source-required`, `psi-tool-scheduler-bounds-and-cap`,
+`psi-tool-scheduler-session-id-resolution`,
+`psi-tool-scheduler-kind-validation`, `psi-tool-scheduler-at-resolution-matrix`);
 `scheduler-session-deliver-records-failed-status-on-prompt-submit-error`
 (error-summary + created-session-id).
 
@@ -58,7 +65,10 @@ Extended (in place): `psi-tool-scheduler-create-list-cancel` (`:at` matrix),
 - `scheduler-cancel-job-test`: session-cancel-job-routes-scheduler-projection-to-scheduler-cancel
 - `scheduler-resolvers-test`: scheduler-resolver
 - `scheduler-tools-test`: make-psi-tool-scheduler
-- `psi-tool-scheduler-test`: psi-tool-scheduler-create-list-cancel
+- `psi-tool-scheduler-test`: psi-tool-scheduler-create-list-cancel,
+  psi-tool-scheduler-time-source-required, psi-tool-scheduler-bounds-and-cap,
+  psi-tool-scheduler-session-id-resolution, psi-tool-scheduler-kind-validation,
+  psi-tool-scheduler-at-resolution-matrix
 
 Baseline `bb test` (scheduler subset, 2026-06-01): `35 tests, 338 assertions, 0 failures, 0 errors`.
 
@@ -95,13 +105,15 @@ Baseline `bb test` (scheduler subset, 2026-06-01): `35 tests, 338 assertions, 0 
 | status | summary | covering test | repro / task-ref |
 | ------ | ------- | ------------- | ---------------- |
 | verified-correct | create / list / cancel happy paths; message-kind stored pending; list returns pending+queued; cancel marks cancelled. | `psi-tool-scheduler-test/psi-tool-scheduler-create-list-cancel`, `scheduler-tools-test/make-psi-tool-scheduler` | — |
-| verified-correct | `:delay-ms` relative path: valid 1000ms accepted; below-min (10ms) rejected as scheduler error; cap (51st pending) rejected. | `psi-tool-scheduler-test/psi-tool-scheduler-create-list-cancel` | — |
-| verified-correct | `:at` future absolute resolves delay from scheduler time source (5000ms → fire-at). | `psi-tool-scheduler-test/psi-tool-scheduler-create-list-cancel` | — |
-| verified-correct | `:at` **past/now** → delay 0, no min-delay check → created **and fires immediately** (delay-0 timer driven via the captured seam, asserts `:delivered`). | `psi-tool-scheduler-test/psi-tool-scheduler-create-list-cancel` (new `past :at … FIRES immediately via the seam` testing block) | — |
-| verified-correct | `:at` future **<min-delay-ms** (500ms) → rejected (below-minimum bound). | `psi-tool-scheduler-test/psi-tool-scheduler-create-list-cancel` (new near-future block) | — |
-| verified-correct | `:at` **>max-delay-ms** (>24h) → rejected (exceeds-maximum bound). | `psi-tool-scheduler-test/psi-tool-scheduler-create-list-cancel` (new far-future block) | — |
-| verified-correct | `:at` asymmetry (past allowed-and-fires / near-future-rejected): this is **current behaviour and matches** `doc/scheduler.md` ("past absolute instants fire immediately"). Not a doc/behaviour drift — recorded as verified-correct, not a defect. | (same `:at` blocks) | — |
-| verified-correct | kind selection + validation: `message` vs `session`; session-kind requires `:session-config`; message-kind forbids `:session-config`; unsupported session-config keys rejected; explicit-vs-invoking session-id; missing/invalid scheduler-time-source fails create (no wall-clock fallback). | `psi-tool-scheduler-test/psi-tool-scheduler-create-list-cancel` | — |
+| verified-correct | `:delay-ms` relative path: valid 1000ms accepted; below-min (10ms) rejected as scheduler error; cap (51st pending) rejected. | `psi-tool-scheduler-test/psi-tool-scheduler-bounds-and-cap` (below-min + cap); valid 1000ms exercised in `…/psi-tool-scheduler-create-list-cancel` | — |
+| verified-correct | `:at` future absolute resolves delay from scheduler time source (5000ms → fire-at). | `psi-tool-scheduler-test/psi-tool-scheduler-at-resolution-matrix` (absolute-instant block) | — |
+| verified-correct | `:at` **past/now** → delay 0, no min-delay check → created **and fires immediately** (delay-0 timer driven via the captured seam, asserts `:delivered`). | `psi-tool-scheduler-test/psi-tool-scheduler-at-resolution-matrix` (`past :at … FIRES immediately via the seam` block) | — |
+| verified-correct | `:at` future **<min-delay-ms** (500ms) → rejected (below-minimum bound). | `psi-tool-scheduler-test/psi-tool-scheduler-at-resolution-matrix` (near-future block) | — |
+| verified-correct | `:at` **>max-delay-ms** (>24h) → rejected (exceeds-maximum bound). | `psi-tool-scheduler-test/psi-tool-scheduler-at-resolution-matrix` (far-future block) | — |
+| verified-correct | `:at` asymmetry (past allowed-and-fires / near-future-rejected): this is **current behaviour and matches** `doc/scheduler.md` ("past absolute instants fire immediately"). Not a doc/behaviour drift — recorded as verified-correct, not a defect. | `psi-tool-scheduler-test/psi-tool-scheduler-at-resolution-matrix` (same `:at` blocks) | — |
+| verified-correct | kind selection + validation: `message` vs `session`; session-kind requires `:session-config`; message-kind forbids `:session-config`; unsupported session-config keys rejected. | `psi-tool-scheduler-test/psi-tool-scheduler-kind-validation` | — |
+| verified-correct | session-id resolution: explicit-vs-invoking session-id; report path with explicit session-id. | `psi-tool-scheduler-test/psi-tool-scheduler-session-id-resolution` | — |
+| verified-correct | missing/invalid scheduler-time-source fails create (no wall-clock fallback). | `psi-tool-scheduler-test/psi-tool-scheduler-time-source-required` | — |
 
 ---
 
