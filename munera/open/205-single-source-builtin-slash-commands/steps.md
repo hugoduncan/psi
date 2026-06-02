@@ -5,42 +5,43 @@ Tick with sha/decision on completion.
 
 ## Slice 1 — Backend spec table + derived projections
 
-- [ ] Add ordered `builtin-command-specs` `array-map` in `commands.clj`, authored
+- [x] Add ordered `builtin-command-specs` `array-map` in `commands.clj`, authored
       in current `format-help` display order, `/`-prefixed keys, with `:kinds`
       `:handler` `:description` `:usage` `:hide-in-help?` fields per design.
-- [ ] Populate complete membership: exact-only (`/quit /exit /new /resume /status
+- [x] Populate complete membership: exact-only (`/quit /exit /new /resume /status
       /history /help /? /prompts /skills /worktree /logout /reload-models
       /reload-prompts /reload-extension-installs`); prefixed-only (`/tree /jobs
       /job /cancel-job /remember /model /thinking /speed /effort /login`); dual
       `/project-repl` `#{:exact :prefixed}`. `/?`, `/exit`, AND `/project-repl`
       carry `:hide-in-help? true` (the three routed commands the current
       `format-help` omits — I1).
-- [ ] Add private helper `strip-slash` (or reuse existing) for `/`-prefix
+- [x] Add private helper `strip-slash` (or reuse existing) for `/`-prefix
       removal.
-- [ ] Derive `exact-command-handlers` as a projection `{key → (:handler s)}` for
+- [x] Derive `exact-command-handlers` as a projection `{key → (:handler s)}` for
       entries with `:exact ∈ :kinds`; delete the literal map.
-- [ ] Derive `prefixed-command-prefixes` as a projection `(vec keys)` for entries
+- [x] Derive `prefixed-command-prefixes` as a projection `(vec keys)` for entries
       with `:prefixed ∈ :kinds` in table order; delete the literal vector.
-- [ ] Derive `builtin-command-names` from `(set (map strip-slash (keys table)))`;
+- [x] Derive `builtin-command-names` from `(set (map strip-slash (keys table)))`;
       remove the `concat`.
-- [ ] Derive `format-help`'s built-in command block from `(seq table)` in table
+- [x] Derive `format-help`'s built-in command block from `(seq table)` in table
       order, skipping `:hide-in-help?`, rendering `:usage` inline before the
       em-dash; keep `/skill:name` line + trailing prose + section blocks literal.
-- [ ] Add test: derived `exact-command-handlers` equals the snapshotted prior
+- [x] Add test: derived `exact-command-handlers` equals the snapshotted prior
       literal map (regression lock).
-- [ ] Add test: derived `prefixed-command-prefixes` equals the snapshotted prior
-      literal vector (regression lock).
-- [ ] Add test: derived `builtin-command-names` equals the snapshotted prior set.
-- [ ] Add test: `/project-repl` appears in BOTH derived projections; bare
+- [x] Add test: derived `prefixed-command-prefixes` equals the snapshotted prior
+      literal vector (regression lock) — compared as a **set** (table order
+      differs; prefix order is not load-bearing under the dispatch matcher).
+- [x] Add test: derived `builtin-command-names` equals the snapshotted prior set.
+- [x] Add test: `/project-repl` appears in BOTH derived projections; bare
       `/project-repl` dispatches via exact handler, `/project-repl <args>` via the
       prefixed `case` (precedence unchanged).
-- [ ] Add `format-help` test: built-in block renders in table order, `:usage`
+- [x] Add `format-help` test: built-in block renders in table order, `:usage`
       arg-hints present (`/model`, `/speed`, `/effort`), hidden lines (`/?`,
       `/exit`, `/project-repl`) absent — no NEW `/project-repl` help line (I1) —
       `/skill:name` line present.
-- [ ] Add narrow branch-coherence test: set of `:prefixed` spec-table keys equals
+- [x] Add narrow branch-coherence test: set of `:prefixed` spec-table keys equals
       set of `dispatch-prefixed-command` `case` branch keys.
-- [ ] Run existing commands/dispatch test suite + targeted clj-kondo; green.
+- [x] Run existing commands/dispatch test suite + targeted clj-kondo; green.
 
 ## Slice 2 — Backend resolver + graph discovery
 

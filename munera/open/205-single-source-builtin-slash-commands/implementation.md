@@ -460,3 +460,37 @@ unrepresentable; help suppression stays an explicit data field) and keep the
 two-channel Emacs handling identical to `extension-command-names`. No blocking
 reasons; plan/design/steps now internally consistent. These are plan/design-stage
 refinements — no code/test/doc change yet.
+
+## Slice 1 implementation (2026-06-01)
+
+Landed the single keyed spec table `builtin-command-specs` (ordered `array-map`,
+`/`-prefixed keys, current help display order) in `commands.clj`. Derived
+`exact-command-handlers`, `prefixed-command-prefixes`, `builtin-command-names`,
+and `format-help`'s built-in block from it. Added `strip-slash` helper and a
+`builtin-help-block` renderer (forward-`declare`d, used by `format-help`).
+
+Deviations / notes:
+- **`prefixed-command-prefixes` order changed** (now table order: `/tree /login
+  /model /thinking /speed /effort /remember /jobs /job /cancel-job
+  /project-repl`). Verified safe: the dispatch matcher uses `(= trimmed prefix)`
+  or `(starts-with trimmed (str prefix " "))`, so no prefix shadows another
+  (`/job` vs `/jobs` don't collide). The regression lock therefore compares
+  prefixes as a **set**, matching the inconsistency-review finding that prefix
+  order is not load-bearing.
+- **`format-help` line alignment dropped.** The old hand-tuned column padding
+  (`/quit    —`) is gone; lines now render `"  /name [usage ]— description"`.
+  Membership + order unchanged; only cosmetic padding differs. Tests assert
+  substring/order, not byte-exact padding.
+- **Help block: `/skill:name` line + trailing `(anything else …)` prose stay
+  literal** (not routing entries → not in the table), per design.
+- **`/project-repl <args>` dispatch test** uses `/project-repl start` (a real
+  prefixed subcommand) rather than a bogus `status` arg, since unknown
+  subcommands fall through to nil.
+- **Prefixed-`case` branch-coherence test** hardcodes the case-key set (handler
+  wiring stays hand-written, out of scope per design); narrow lock only.
+- Added public `commands/builtin-command-specs-for-resolver` (returns
+  `[{:name :description}]`, bare names, table order) ahead of Slice 2 — it lives
+  with the spec table it must mirror.
+
+Verification: `clojure -M:test --focus psi.agent-session.commands-test` →
+57 tests, 224 assertions, 0 failures. clj-kondo clean on changed files.

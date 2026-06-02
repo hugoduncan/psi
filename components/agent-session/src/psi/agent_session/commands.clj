@@ -108,6 +108,8 @@
       (when (every? valid-job-statuses statuses)
         statuses))))
 
+(declare builtin-help-block)
+
 (defn format-help
   "Return a help string listing all available commands."
   [ctx session-id]
@@ -119,29 +121,7 @@
         loaded-skills (:psi.agent-session/skills d)
         ext-cmds      (:psi.extension/command-names d)]
     (str "── Commands ───────────────────────────\n"
-         "  /quit    — exit the session\n"
-         "  /status  — show session diagnostics\n"
-         "  /history — show message history\n"
-         "  /prompts — list available prompt templates\n"
-         "  /skills  — list available skills\n"
-         "  /new     — start a fresh session\n"
-         "  /resume  — resume a previous session\n"
-         "  /tree [session-id] — open/switch live session tree (TUI)\n"
-         "  /login [provider] — login with an OAuth provider\n"
-         "  /logout  — logout from an OAuth provider\n"
-         "  /model [provider model-id [session|project|user]] — show current model or set model\n"
-         "  /thinking [level] — show current thinking level or set level\n"
-         "  /speed [normal|fast [session|project|user]] — show or set speed mode\n"
-         "  /effort [low|medium|high|xhigh|none [session|project|user]] — show or set effort override\n"
-         "  /remember [text] — capture a memory note for future ψ\n"
-         "  /worktree — show git worktree context\n"
-         "  /reload-models — reload custom model definitions from ~/.psi/agent/models.edn and .psi/models.edn\n"
-         "  /reload-prompts — re-discover prompt templates from ~/.psi/agent/prompts and <worktree>/.psi/prompts\n"
-         "  /reload-extension-installs — reload/apply extension installs from extensions.edn\n"
-         "  /jobs [status ...] — list background jobs (default: running,pending-cancel)\n"
-         "  /job <job-id> — inspect a background job\n"
-         "  /cancel-job <job-id> — request background job cancellation\n"
-         "  /help    — show this help\n"
+         (builtin-help-block) "\n"
          "  /skill:name — invoke a skill (loads full content)"
          (when (seq templates)
            (str "\n  ── Prompt Templates ─────────────────\n"
@@ -661,26 +641,111 @@
      :message "[New session started]"
      :rehydrate rehydrate}))
 
+;; ============================================================
+;; Built-in command spec table — single source of names
+;; ============================================================
+;;
+;; One ordered map is the *sole* place built-in command names exist; every
+;; other name surface (routing maps, `builtin-command-names`, `format-help`'s
+;; built-in lines, the resolver) is a pure projection of these keys, so name
+;; divergence between routing and the exposed/help surfaces is structurally
+;; unrepresentable (see task 205 design — Option B, `unreachable > forbidden`).
+;;
+;; Keys are leading-slash-prefixed (matching the routing-projection key form,
+;; zero transform); only `builtin-command-names` and the resolver `strip-slash`.
+;; The table is authored in the current `format-help` display order so the help
+;; listing is reproduced unchanged in order and membership.
+;;
+;; Per-entry fields:
+;;   :kinds         — required set ⊆ #{:exact :prefixed}, non-empty.
+;;   :handler       — required iff :exact ∈ :kinds (dispatch keyword).
+;;   :description   — required short string (resolver-exposed).
+;;   :usage         — optional help-only arg-hint string (not resolver-exposed).
+;;   :hide-in-help? — optional boolean, help-only suppression (not exposed,
+;;                    not UI-consulted) for routed-but-help-absent entries.
+(def ^:private builtin-command-specs
+  (array-map
+   "/quit"    {:kinds #{:exact} :handler :quit :description "exit the session"}
+   "/status"  {:kinds #{:exact} :handler :status :description "show session diagnostics"}
+   "/history" {:kinds #{:exact} :handler :history :description "show message history"}
+   "/prompts" {:kinds #{:exact} :handler :prompts :description "list available prompt templates"}
+   "/skills"  {:kinds #{:exact} :handler :skills :description "list available skills"}
+   "/new"     {:kinds #{:exact} :handler :new :description "start a fresh session"}
+   "/resume"  {:kinds #{:exact} :handler :resume :description "resume a previous session"}
+   "/tree"    {:kinds #{:prefixed} :description "open/switch live session tree (TUI)"
+               :usage "[session-id]"}
+   "/login"   {:kinds #{:prefixed} :description "login with an OAuth provider"
+               :usage "[provider]"}
+   "/logout"  {:kinds #{:exact} :handler :logout :description "logout from an OAuth provider"}
+   "/model"   {:kinds #{:prefixed} :description "show current model or set model"
+               :usage "[provider model-id [session|project|user]]"}
+   "/thinking" {:kinds #{:prefixed} :description "show current thinking level or set level"
+                :usage "[level]"}
+   "/speed"   {:kinds #{:prefixed} :description "show or set speed mode"
+               :usage "[normal|fast [session|project|user]]"}
+   "/effort"  {:kinds #{:prefixed} :description "show or set effort override"
+               :usage "[low|medium|high|xhigh|none [session|project|user]]"}
+   "/remember" {:kinds #{:prefixed} :description "capture a memory note for future ψ"
+                :usage "[text]"}
+   "/worktree" {:kinds #{:exact} :handler :worktree :description "show git worktree context"}
+   "/reload-models" {:kinds #{:exact} :handler :reload-models
+                     :description "reload custom model definitions from ~/.psi/agent/models.edn and .psi/models.edn"}
+   "/reload-prompts" {:kinds #{:exact} :handler :reload-prompts
+                      :description "re-discover prompt templates from ~/.psi/agent/prompts and <worktree>/.psi/prompts"}
+   "/reload-extension-installs" {:kinds #{:exact} :handler :reload-extension-installs
+                                 :description "reload/apply extension installs from extensions.edn"}
+   "/jobs"    {:kinds #{:prefixed} :description "list background jobs (default: running,pending-cancel)"
+               :usage "[status ...]"}
+   "/job"     {:kinds #{:prefixed} :description "inspect a background job"
+               :usage "<job-id>"}
+   "/cancel-job" {:kinds #{:prefixed} :description "request background job cancellation"
+                  :usage "<job-id>"}
+   "/help"    {:kinds #{:exact} :handler :help :description "show this help"}
+   ;; Routed but help-absent (autocomplete only): aliases + dual-kind command.
+   "/?"       {:kinds #{:exact} :handler :help :description "show this help"
+               :hide-in-help? true}
+   "/exit"    {:kinds #{:exact} :handler :quit :description "exit the session"
+               :hide-in-help? true}
+   "/project-repl" {:kinds #{:exact :prefixed} :handler :project-repl
+                    :description "open/manage the project nREPL"
+                    :hide-in-help? true}))
+
+(defn- strip-slash
+  "Strip a single leading slash from a command name."
+  [s]
+  (str/replace s #"^/" ""))
+
+(defn- builtin-help-block
+  "Render the built-in command help lines from the single spec table, in table
+   order, skipping `:hide-in-help?` entries. Each line renders
+   \"  /name [usage ]— description\" (usage inserted before the em-dash when
+   present). Returns a newline-joined string with no trailing newline."
+  []
+  (str/join "\n"
+            (for [[k {:keys [description usage hide-in-help?]}] builtin-command-specs
+                  :when (not hide-in-help?)]
+              (str "  " k " " (when usage (str usage " ")) "— " description))))
+
+(defn builtin-command-specs-for-resolver
+  "Return built-in command specs as a vector of `{:name :description}` maps
+   (bare names, no leading slash) in spec-table order, for the EQL resolver.
+
+   Internal fields (`:kinds`/`:handler`/`:usage`/`:hide-in-help?`) are not
+   exposed — the resolver surface mirrors `:psi.extension/command-names`."
+  []
+  (vec (for [[k {:keys [description]}] builtin-command-specs]
+         {:name (strip-slash k) :description description})))
+
 (def ^:private exact-command-handlers
-  {"/quit" :quit
-   "/exit" :quit
-   "/new" :new
-   "/resume" :resume
-   "/status" :status
-   "/history" :history
-   "/help" :help
-   "/?" :help
-   "/prompts" :prompts
-   "/skills" :skills
-   "/worktree" :worktree
-   "/logout" :logout
-   "/reload-models" :reload-models
-   "/reload-prompts" :reload-prompts
-   "/reload-extension-installs" :reload-extension-installs
-   "/project-repl" :project-repl})
+  (into {}
+        (for [[k spec] builtin-command-specs
+              :when (contains? (:kinds spec) :exact)]
+          [k (:handler spec)])))
 
 (def ^:private prefixed-command-prefixes
-  ["/tree" "/jobs" "/job" "/cancel-job" "/remember" "/model" "/thinking" "/speed" "/effort" "/login" "/project-repl"])
+  (vec (for [[k spec] builtin-command-specs
+             :when (contains? (:kinds spec) :prefixed)]
+         k)))
 
 (defn- exact-command-handler
   [trimmed]
@@ -713,9 +778,7 @@
 (declare dispatch*)
 
 (def ^:private builtin-command-names
-  (->> (concat (keys exact-command-handlers) prefixed-command-prefixes)
-       (map #(str/replace % #"^/" ""))
-       set))
+  (set (map strip-slash (keys builtin-command-specs))))
 
 (defn loaded-command-names-in
   "Return the authoritative slash-command name set for `session-id`.
