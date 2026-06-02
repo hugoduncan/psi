@@ -2009,3 +2009,39 @@ definitions 13 tests / 203 assertions; `clj-kondo` 0 findings; skill-test file
 executable cover).
 
 PASS_STATUS: RESOLVED.
+
+## Test review (pass 8)
+
+Reviewed implementation tests against `task-test-review` (well-formed ∧ ∀b∈behaviour(design).∃t.covers(t,b) ∧ infra-deps injectable/nullable, ¬mock/¬stub).
+
+Test surface examined:
+- `incidental_complexity_finder_skill_test.clj` — registration, content-lock
+  (gap method, 5.0/2.0 thresholds, single-unit scope, high-cc guard, A1 drop
+  rule, F2 `(ns,var,arity,line)`/`@line` key, F5 frontmatter lambda key, step-5
+  top-5 judgment guard, step-6 evidence+coverage-hint), plus executable
+  `run-jq-recipe` coverage: determinism (losslessness + order-independence/TR4),
+  filter+drop (TR6), ranking+cap (TR9).
+- `workflow_definitions_test.clj` — `task-lifecycle-in-worktree` three-step
+  shape, work-on tool, `{{input}}` wiring, lifecycle delegate target/prompt-map,
+  summary presence + resolve-worktree source, NO_TARGET short-circuit (F1),
+  positive worktree-continuity path (TR7); `reduce-incidental-complexity`
+  two-step shape, handoff fields, early-stop, gate flags + both baselines,
+  Phase-0 gate + behaviour-identical constraint + A5/A2 `(ns,var,arity,line)`
+  keys (TR2/F3), no-push/PR endpoint (TR8).
+
+Findings: **none actionable.** Coverage maps onto every named design
+Deliverable-1/2 behaviour (∀b.∃t holds). Executable recipe tests exercise the
+real `jq` recipe over synthetic fixtures (no paraphrase drift). Infra dependency
+is the workflow loader, injected via temp-dir `with-redefs` of
+`global-workflow-dirs`/`project-workflow-dir` (configuration injection, not a
+logic mock); skills/recipe tests use the real loader + real `jq`. Assertions are
+on parsed state / recipe output only — no interaction assertions, no mocks/stubs
+of logic, consistent with the project Test formalism. Suite green: 18 tests, 250
+assertions, 0 failures; no mocks/stubs.
+
+The prior seven test-review passes (TR1–TR9) already resolved the gaps a fresh
+review would raise (skill behaviour cover, generated-contract cover, recipe
+determinism/order-independence/filter/drop/ranking/cap, wrapper positive path,
+no-push/PR endpoint). No new follow-ups added.
+
+PASS_STATUS: REVIEW_COMPLETE.
