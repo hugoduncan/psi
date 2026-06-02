@@ -470,3 +470,48 @@ structural/performance concerns. No new actionable issues. All prior
 follow-ups (B1, I1, P1–P3, N1, R1) confirmed resolved in code+tests.
 
 Verdict: REVIEW_COMPLETE.
+
+## Test review (ψ)
+
+Applied task-test-review skill (well-formed ∧ behaviour-coverage ∧
+infra-deps injectable/¬mock). Tests live in
+`test/psi-widget-projection-timers-test.el` (338/338 ERT green). Reviewed
+against design.md acceptance + Scope test list (a)–(e), grounded on real
+source (`psi-widget-projection.el:310/323/337/361`).
+
+Strong overall: tests assert state (store contents, in-flight lstate,
+cancel/timerp calls) not interactions; `cl-letf` substitutes only
+infrastructure primitives (`run-at-time`, `cancel-timer`, `timerp`,
+`send-request-function`, `upsert-projection-block`) — consistent with the
+testing-without-mocks "infrastructure → controllable" rule, no logic mocked.
+Covered: arm/cancel roundtrip, timeout clears-in-flight + error-handler,
+dispatch arms, response cancels, dead-buffer + nil-state timeout no-ops,
+response cross-buffer targeting, response dead-buffer no-op, teardown cancel,
+transcript-reset clear, two-buffer independence, clear-mutation-timers
+cancel+clear and nil-state no-op.
+
+Two actionable test-coverage gaps:
+
+- **T1 (minor) — arm's buffer/state threading is not directly asserted.**
+  design.md AC: "arm captures `(current-buffer)` + `state` and threads both
+  into the scheduled `run-at-time` callback args, mirroring
+  `psi-emacs--schedule-notification-dismiss`". `pwpt-arm-cancel-mutation-timer-roundtrip`
+  stubs `run-at-time` as `(apply #'list fn args)` but never inspects the
+  captured args to assert `buffer`/`state` precede `ext-id widget-id node-key
+  timeout-ms` in the threaded call. The threading mechanism — the very thing
+  that makes the dead-buffer/cross-buffer timeout behaviour reachable — is
+  only exercised indirectly. A direct assertion on the captured scheduled-arg
+  shape would lock the contract.
+
+- **T3 (actionable) — no positive cross-buffer-current test for the TIMEOUT
+  path.** design.md Scope (d): "a response (**and a timeout**) arriving while
+  a *different* buffer is current cancels/clears the originating buffer's
+  store, not the current buffer's." There IS such a positive cross-buffer test
+  for the response path (`pwpt-dispatch-response-targets-originating-buffer`)
+  but NOT for the timeout path. The timeout path has only dead-buffer
+  (`…-noop-when-buffer-dead`) and nil-state (`…-noop-when-state-nil`) no-op
+  cases plus same-buffer-current clears-in-flight/error-handler cases — the
+  positive "different buffer current, originating store cleared, other store
+  untouched" case is absent. The skill's `∀b ∈ behaviour(design). ∃t.
+  covers(t,b)` is unmet for this design-named timeout behaviour, even though
+  the symmetric response case is covered.

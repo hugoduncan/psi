@@ -177,3 +177,21 @@
       "mirror the precedent" claim is accurate. (Benign in practice — the
       captured `state` is non-nil when the buffer was live at arm and the inner
       paths null-guard — so this is a consistency item, not a correctness fix.)
+
+## Test review follow-ups (ψ)
+
+- [ ] T3 — Add a positive cross-buffer-current test for the TIMEOUT path,
+      mirroring `pwpt-dispatch-response-targets-originating-buffer` but invoking
+      `psi-widget-projection--on-mutation-timeout` against an origin buffer's
+      captured `buffer`/`state` while a *different* buffer is current: assert the
+      origin buffer's mutation-timer store + in-flight lstate are cleared and the
+      other (live) buffer's store is left untouched. design.md Scope (d) names
+      "a response (and a timeout)" — the response cross-buffer case exists but the
+      timeout cross-buffer case does not.
+- [ ] T1 — Strengthen `pwpt-arm-cancel-mutation-timer-roundtrip` (or add a
+      dedicated test) to directly assert arm threads the originating `buffer`
+      (`current-buffer`) and `state` into the scheduled `run-at-time` callback
+      args ahead of `ext-id widget-id node-key timeout-ms` — e.g. capture the
+      `run-at-time` fn+args and assert the threaded arg order/values — so the
+      design AC "arm captures+threads buffer/state" is asserted directly, not
+      only exercised indirectly via dead-buffer/cross-buffer behaviour.
