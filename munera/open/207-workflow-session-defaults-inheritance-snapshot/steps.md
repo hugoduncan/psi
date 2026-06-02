@@ -26,26 +26,26 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
 
 ## S2 — Snapshot derivation functions
 
-- [ ] Add `resolve-inherited-defaults-snapshot (ctx parent-session-id) → snapshot`
-      to `workflow-step-session-config/core.clj`: read parent via
+- [x] Add `resolve-inherited-defaults-snapshot (ctx parent-session-id) → snapshot`
+      to `workflow-step-session-config/core.clj`: reads parent via
       `execution-adapter/get-session-data` → `:model`, `:prompt-mode`,
       `:speed-mode`, `:effort-override`; `skill-storage/all-skills` → `:skills`;
       `ss/agent-tool-source-in` + `:tool-ids` via `tool-defs/resolve-tool-defs`
       → `:tool-defs`; `:thinking-level` (default `:off`).
-- [ ] Confirm `resolve-inherited-defaults-snapshot` returns exactly the snapshot
-      resolved-key set (S1 constant); no extra keys.
-- [ ] Add `effective-config->snapshot (effective-config parent-snapshot) →
+- [x] `resolve-inherited-defaults-snapshot` returns exactly the snapshot
+      resolved-key set (asserted in test); no extra keys.
+- [x] Add `effective-config->snapshot (effective-config parent-snapshot) →
       snapshot` — pure projection; no ctx reads. The 5 resolver-emitted inherited
-      keys (`:model :prompt-mode :tool-defs :skills :thinking-level`) come from
-      the effective config; `:speed-mode`/`:effort-override` come from
-      `parent-snapshot` (resolver emits neither — resolved P2). `:model` is the
-      effective config's already `{:provider :id}`-shaped value (resolved P3).
-- [ ] Unit-test `resolve-inherited-defaults-snapshot` against a fixture
-      parent session (asserts `:speed-mode`/`:effort-override` captured).
-- [ ] Unit-test `effective-config->snapshot` projects only snapshot keys from
-      an effective config + parent snapshot (overridden model preserved;
-      `:speed-mode`/`:effort-override` sourced from the parent snapshot — P2).
-- [ ] Lint + repair.
+      keys come from the effective config; `:speed-mode`/`:effort-override` come
+      from `parent-snapshot` (P2). `:model` is the effective config's already
+      `{:provider :id}`-shaped value (P3).
+- [x] Unit-test `resolve-inherited-defaults-snapshot` against a fixture parent
+      session (asserts `:speed-mode`/`:effort-override` captured; key set exact;
+      thinking-level defaults to `:off`).
+- [x] Unit-test `effective-config->snapshot` projects only snapshot keys
+      (overridden model preserved; `:speed-mode`/`:effort-override` sourced from
+      the parent snapshot, not the effective config — P2).
+- [x] Lint clean.
 
 ## S3 — Persist snapshot on the run
 

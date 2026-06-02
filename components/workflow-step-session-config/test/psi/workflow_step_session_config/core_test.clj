@@ -11,6 +11,85 @@
    [psi.workflow-step-session-config.core :as workflow-step-session-config]
    [psi.workflow-registry.registry :as workflow-registry]))
 
+(defn- assoc-session-data!
+  [ctx session-id kvs]
+  (swap! (:state* ctx) update-in [:agent-session :sessions session-id :data] merge kvs))
+
+(deftest resolve-inherited-defaults-snapshot-test
+  (testing "captures the resolved inherited defaults from the live parent session,
+            including :speed-mode and :effort-override"
+    (let [[ctx session-id] (support/create-session-context {:persist? false})]
+      (assoc-session-data! ctx session-id
+                           {:model {:provider "anthropic" :id "claude-test"}
+                            :prompt-mode :concise
+                            :thinking-level :high
+                            :speed-mode :fast
+                            :effort-override :xhigh})
+      (let [snapshot (workflow-step-session-config/resolve-inherited-defaults-snapshot ctx session-id)]
+        (is (= workflow-step-session-config/inherited-defaults-snapshot-keys
+               (set (keys snapshot)))
+            "snapshot returns exactly the declared resolved-key set")
+        (is (= {:provider "anthropic" :id "claude-test"} (:model snapshot)))
+        (is (= :concise (:prompt-mode snapshot)))
+        (is (= :high (:thinking-level snapshot)))
+        (is (= :fast (:speed-mode snapshot)))
+        (is (= :xhigh (:effort-override snapshot)))
+        (is (vector? (:tool-defs snapshot)))
+        (is (sequential? (:skills snapshot))))))
+
+  (testing "thinking-level defaults to :off when the parent has none"
+    (let [[ctx session-id] (support/create-session-context {:persist? false})]
+      (assoc-session-data! ctx session-id {:model {:provider "anthropic" :id "claude-test"}})
+      (let [snapshot (workflow-step-session-config/resolve-inherited-defaults-snapshot ctx session-id)]
+        (is (= :off (:thinking-level snapshot)))
+        (is (nil? (:speed-mode snapshot)))
+        (is (nil? (:effort-override snapshot)))))))
+
+(deftest effective-config->snapshot-test
+  (testing "projects only the snapshot keys; the overridden model and the five
+            resolver-emitted inherited keys come from the effective config"
+    (let [effective {:model {:provider "anthropic" :id "claude-override"}
+                     :prompt-mode :verbose
+                     :tool-defs [{:name "read"}]
+                     :skills [{:name "skill-a"}]
+                     :thinking-level :medium
+                     ;; non-snapshot resolver outputs that must not leak through
+                     :developer-prompt "ignored"
+                     :response-mode :streaming
+                     :temperature 0.7}
+          parent-snapshot {:speed-mode :fast :effort-override :high}
+          snapshot (workflow-step-session-config/effective-config->snapshot
+                    effective parent-snapshot)]
+      (is (= workflow-step-session-config/inherited-defaults-snapshot-keys
+             (set (keys snapshot)))
+          "projection yields exactly the snapshot key set")
+      (is (= {:provider "anthropic" :id "claude-override"} (:model snapshot))
+          "overridden model preserved from the effective config")
+      (is (= :verbose (:prompt-mode snapshot)))
+      (is (= [{:name "read"}] (:tool-defs snapshot)))
+      (is (= [{:name "skill-a"}] (:skills snapshot)))
+      (is (= :medium (:thinking-level snapshot)))))
+
+  (testing ":speed-mode/:effort-override are sourced from the parent snapshot
+            (the effective config emits neither — P2)"
+    (let [effective {:model {:provider "anthropic" :id "claude-x"}
+                     :prompt-mode :concise
+                     :tool-defs []
+                     :skills []
+                     :thinking-level :off
+                     ;; effective config carries no speed/effort keys
+                     :speed-mode :should-be-ignored}
+          parent-snapshot {:speed-mode :fast :effort-override :xhigh}
+          snapshot (workflow-step-session-config/effective-config->snapshot
+                    effective parent-snapshot)]
+      (is (= :fast (:speed-mode snapshot)))
+      (is (= :xhigh (:effort-override snapshot)))))
+
+  (testing "thinking-level defaults to :off when the effective config has none"
+    (let [snapshot (workflow-step-session-config/effective-config->snapshot
+                    {:model {:provider "anthropic" :id "x"}} {})]
+      (is (= :off (:thinking-level snapshot))))))
+
 (deftest inherited-defaults-field-set-authority-test
   (testing "every :from-common source key is a member of the canonical
             common-inherited-fields authority"

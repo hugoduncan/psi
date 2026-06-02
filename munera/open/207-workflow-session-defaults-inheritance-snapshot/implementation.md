@@ -503,3 +503,29 @@ authority and the resolved key set = source keys with `:tool-ids`→`:tool-defs`
 Verification: `psi.workflow-step-session-config.core-test` (19 tests, 49
 assertions) and `psi.session-state.init-test` (4 tests, 46 assertions) green;
 clj-kondo clean on touched files.
+
+## S2 build — snapshot derivation functions (ψ, 2026-06-02)
+
+Added two functions to `workflow-step-session-config/core.clj`:
+
+- `resolve-inherited-defaults-snapshot (ctx parent-session-id)` — impure
+  top-level resolver. Mirrors the resolver's no-override reads
+  (`get-session-data` → model/prompt-mode/thinking-level, `all-skills`,
+  `agent-tool-source-in` + `:tool-ids` → tool-defs) and **adds** the two new
+  `:speed-mode`/`:effort-override` parent-session reads (Decision 1 / I1).
+  Returns exactly `inherited-defaults-snapshot-keys`; `:model` copied verbatim
+  as the parent's `{:provider :id}` map.
+- `effective-config->snapshot (effective-config parent-snapshot)` — pure
+  projection (no ctx reads). Five inherited keys from the effective config;
+  `:speed-mode`/`:effort-override` from the parent snapshot (the effective
+  config / resolver emits neither — P2).
+
+Tests: `resolve-inherited-defaults-snapshot-test` (speed/effort captured, exact
+key set, thinking-level `:off` default) and `effective-config->snapshot-test`
+(only snapshot keys projected, overridden model preserved, speed/effort sourced
+from parent snapshot even when the effective config carries a stray speed key).
+Used `update-in [:agent-session :sessions sid :data] merge` to seed parent
+session fields for the live-read resolver test (no mocks — real ctx/state).
+
+Verification: `psi.workflow-step-session-config.core-test` (21 tests, 69
+assertions) green; clj-kondo clean.

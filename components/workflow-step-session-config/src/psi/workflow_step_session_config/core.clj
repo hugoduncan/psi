@@ -235,3 +235,55 @@
 
       model-fallback
       (assoc :model-fallback model-fallback))))
+
+(defn resolve-inherited-defaults-snapshot
+  "Top-level inherited-defaults snapshot resolver (Decisions 6a, 7a).
+
+   Resolves the inheritable default session details from the live parent
+   session at workflow-invoke time, producing the resolved snapshot map captured
+   on the run's canonical state. Impure: performs ctx reads
+   (`get-session-data`, `all-skills`, tool source resolution).
+
+   The five model/prompt/tools/skills/thinking-level reads mirror
+   `resolve-step-session-config`'s no-override path. It additionally reads
+   `:speed-mode` and `:effort-override` from the parent session — two reads the
+   resolver does not have today (Decision 1 / I1).
+
+   Returns exactly `inherited-defaults-snapshot-keys`. `:model` is the parent's
+   `{:provider :id}`-shaped value, copied verbatim (resolved P3)."
+  [ctx parent-session-id]
+  (let [parent-session (execution-adapter/get-session-data ctx parent-session-id)
+        session-skills (skill-storage/all-skills @(:state* ctx) parent-session)
+        tool-source (ss/agent-tool-source-in ctx parent-session-id)
+        session-tool-defs (tool-defs/resolve-tool-defs tool-source (:tool-ids parent-session))]
+    {:model (:model parent-session)
+     :prompt-mode (:prompt-mode parent-session)
+     :tool-defs session-tool-defs
+     :skills session-skills
+     :thinking-level (or (:thinking-level parent-session) :off)
+     :speed-mode (:speed-mode parent-session)
+     :effort-override (:effort-override parent-session)}))
+
+(defn effective-config->snapshot
+  "Nested inherited-defaults snapshot projection (Decisions 3, 7a).
+
+   Pure projection: maps a delegating step's already-resolved effective config
+   (run snapshot ⊕ step overrides, as produced by `resolve-step-session-config`)
+   plus the parent run's snapshot into the inherited-defaults snapshot field set.
+   No ctx reads.
+
+   The five resolver-emitted inherited keys (`:model :prompt-mode :tool-defs
+   :skills :thinking-level`) come from the effective config. `:speed-mode` and
+   `:effort-override` come from `parent-snapshot` because
+   `resolve-step-session-config` emits neither (resolved I1/P2) — a projection
+   over the effective config alone would silently drop them under delegation.
+   `:model` is the effective config's already `{:provider :id}`-shaped value
+   (resolved P3)."
+  [effective-config parent-snapshot]
+  {:model (:model effective-config)
+   :prompt-mode (:prompt-mode effective-config)
+   :tool-defs (:tool-defs effective-config)
+   :skills (:skills effective-config)
+   :thinking-level (or (:thinking-level effective-config) :off)
+   :speed-mode (:speed-mode parent-snapshot)
+   :effort-override (:effort-override parent-snapshot)})
