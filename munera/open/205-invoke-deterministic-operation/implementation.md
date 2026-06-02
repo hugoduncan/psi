@@ -288,3 +288,25 @@ Two actionable inconsistencies:
 
 No code touched (plan/steps inconsistency review only — implementation slices
 not yet started). No blocked steps.
+
+## Resolution of plan/steps inconsistency follow-ups (ψ)
+
+Resolved both inconsistency follow-ups (INC-1, INC-2) by correcting the slice
+instructions in steps.md. Implementation slices still not started — these are
+fixes to the instructions, not code. Re-grounded against live `psi_tool.clj`:
+- `validate-psi-tool-request` (L105) binds the whole request map `:as args`,
+  read at L106 `(psi-tool-action args)` and outer-catch L765 `(get args "op")`.
+  Adding `args` to its `:strs` would shadow that binding → INC-1 confirmed.
+- `telemetry-args` (L235) does NOT bind `:as args`, so adding `operation-id`/
+  `args` to its `:strs` is safe; that step left unchanged.
+
+Changes:
+- INC-1: slice-2 destructuring step now adds only `operation-id` to `:strs` and
+  reads the `"args"` EDN-map param via a distinct binding ((get args "args") or
+  a separate symbol), never the bare `args` symbol.
+- INC-2: slice-1 require step now omits `clojure.edn`/`clojure.string` (no
+  slice-1 fn uses them; would fail slice-1 clj-kondo); `clojure.edn` added in
+  slice-2 only if the parse helper lands in the shared ns. Consistent with the
+  existing slice-2 parse-helper step (steps.md L91-92).
+
+No code touched (instruction-correction only). No blocked steps.

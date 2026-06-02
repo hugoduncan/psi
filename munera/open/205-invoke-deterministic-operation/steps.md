@@ -6,7 +6,12 @@
   `components/agent-session/src/psi/agent_session/deterministic_operation_action.clj`,
   requiring `psi.deterministic-operation-registry.registry :as registry`,
   `psi.deterministic-operation-runtime.core :as runtime`, and
-  `psi.session-state.state :as session-state`, `clojure.edn`, `clojure.string`.
+  `psi.session-state.state :as session-state`. (INC-2: do **not** require
+  `clojure.edn` or `clojure.string` here — no slice-1 fn uses them
+  (`truncate-value` uses core `subs`/`str`/`count`; `args` EDN parsing is a
+  slice-2 concern in `validate-psi-tool-request` per D1/D5), and unused
+  requires fail the slice-1 `clj-kondo --lint` step. Add `clojure.edn` only in
+  slice-2 if the EDN parse helper is placed in this shared ns.)
 - [ ] Implement `list-operations [ctx]`: read
   `(registry/all-operations-in (:deterministic-operation-registry ctx))`,
   map each to `{:id (:id op) :description (:description op)}`, sort ascending by
@@ -68,15 +73,21 @@
   `:properties :action :enum`; add `:operation-id` property; ensure `:args`
   property exists (add if absent) with EDN-map-string description; extend the
   `:description` text listing the new action.
-- [ ] In `validate-psi-tool-request`: add `operation-id`/`args` to destructuring;
-  add `(= effective-action "operation")` cond branch — require
+- [ ] In `validate-psi-tool-request`: add `operation-id` to the `:strs`
+  destructuring (INC-1: do **not** add `args` to `:strs` — the fn already binds
+  the whole request map `:as args`, used by `(psi-tool-action args)` and the
+  outer-catch `(get args "op")`; read the `"args"` EDN-map-string param via a
+  distinct binding, e.g. `(get args "args")` or a separate `:strs` symbol such
+  as `operation-args`, never the bare `args` symbol).
+  Add `(= effective-action "operation")` cond branch — require
   `op ∈ #{"list" "invoke"}`; for `"invoke"` require non-blank `operation-id`
-  AND parse+validate `args` as an EDN map (default `{}`, "must be an EDN map"
-  error); for `"list"` **skip** `args` parse and do not require `operation-id`
-  (D5 — `args` ignored for list). Return `{:action "operation" :op op
-  :operation-id operation-id :args parsed-args}`. (D4: do **not** add
-  `list`/`invoke` to the schema `:op` `:enum` — `op` is validated here only,
-  matching the workflow/scheduler convention.)
+  AND parse+validate the `"args"` param (read via the distinct binding) as an
+  EDN map (default `{}`, "must be an EDN map" error); for `"list"` **skip** the
+  `"args"` parse and do not require `operation-id` (D5 — `args` ignored for
+  list). Return `{:action "operation" :op op :operation-id operation-id
+  :args parsed-args}`. (D4: do **not** add `list`/`invoke` to the schema `:op`
+  `:enum` — `op` is validated here only, matching the workflow/scheduler
+  convention.)
 - [ ] Add EDN-map parse+validate for `args` (default `{}`, "must be an EDN map"
   error) — reuse shared parse helper (place in shared helper ns or mirror
   `parse-workflow-input-string`); call it on the `"invoke"` branch only (D1:
@@ -200,14 +211,14 @@
 
 ## Plan/steps inconsistency follow-ups (ψ)
 
-- [ ] (INC-1) Fix the `args` binding collision in `validate-psi-tool-request`:
+- [x] (INC-1) Fix the `args` binding collision in `validate-psi-tool-request`:
   do **not** add `args` to the fn's `:strs` destructuring (it already binds the
   whole request map `:as args`, used by `(psi-tool-action args)` and the
   outer-catch `(get args "op")`). Read the `"args"` EDN-map-string param via a
   distinct binding (`(get args "args")` or a separate symbol e.g.
   `operation-args`). Update the slice-2 "add `operation-id`/`args` to
   destructuring" item accordingly.
-- [ ] (INC-2) Remove `clojure.edn` and `clojure.string` from the slice-1
+- [x] (INC-2) Remove `clojure.edn` and `clojure.string` from the slice-1
   `deterministic-operation-action` ns requires — no slice-1 function uses them
   (`truncate-value` uses core `subs`/`str`/`count`; `args` EDN parsing is a
   slice-2 concern per D1/D5). Add `clojure.edn` only in slice-2 if the EDN
