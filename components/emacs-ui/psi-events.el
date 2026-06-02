@@ -25,7 +25,7 @@
 (declare-function psi-emacs--dispatch-request "psi-compose" (op params &optional callback))
 (declare-function psi-emacs--append-assistant-message "psi-compose" (text))
 (declare-function psi-emacs--append-user-message-to-transcript "psi-compose" (text))
-(declare-function psi-emacs--apply-slash-completion-data "psi-session-commands" (names templates))
+(declare-function psi-emacs--apply-slash-completion-data "psi-session-commands" (names builtin-specs templates))
 (declare-function psi-emacs--refresh-slash-completion-data "psi-session-commands")
 (declare-function psi-emacs--request-switch-session-by-id "psi-session-commands" (state session-id))
 (declare-function psi-emacs--request-frontend-exit "psi-session-commands")
@@ -77,36 +77,51 @@ payloads can seed state before the first canonical session-targeted update."
     (or (null current-session-id)
         (equal event-session-id current-session-id))))
 
+(defun psi-emacs--event-pair-segment (specs)
+  "Return canonical (NAME DESCRIPTION) token pairs from event-data SPECS.
+
+Each spec is an event-data alist read with `psi-emacs--event-data-get' and
+normalized via the shared `psi-emacs--slash-completion-pair', so this inline
+comparison path yields tokens identical to the apply-path constructor
+(`psi-emacs--slash-completion-token') for equal backend data."
+  (mapcar (lambda (spec)
+            (psi-emacs--slash-completion-pair
+             (psi-emacs--event-data-get spec '(:name name))
+             (psi-emacs--event-data-get spec '(:description description))))
+          (or specs [])))
+
 (defun psi-emacs--slash-completion-data-changed-p (data)
   "Return non-nil when session update DATA carries changed slash completion state."
   (when psi-emacs--state
     (let* ((raw-command-names (psi-emacs--event-data-get data '(:extension-command-names extension-command-names)))
+           (raw-builtin-specs (psi-emacs--event-data-get data '(:builtin-command-specs builtin-command-specs)))
            (raw-templates (psi-emacs--event-data-get data '(:prompt-templates prompt-templates)))
            (has-command-names (not (null raw-command-names)))
+           (has-builtin-specs (not (null raw-builtin-specs)))
            (has-templates (not (null raw-templates)))
            (command-names (cond
                            ((vectorp raw-command-names) (append raw-command-names nil))
                            ((listp raw-command-names) raw-command-names)
                            (t nil)))
+           (builtin-specs (cond
+                           ((vectorp raw-builtin-specs) (append raw-builtin-specs nil))
+                           ((listp raw-builtin-specs) raw-builtin-specs)
+                           (t nil)))
            (templates (cond
                        ((vectorp raw-templates) (append raw-templates nil))
                        ((listp raw-templates) raw-templates)
                        (t nil)))
-           (next-token (and (or has-command-names has-templates)
+           (next-token (and (or has-command-names has-builtin-specs has-templates)
                             (list :commands (mapcar (lambda (name)
                                                       (string-trim (format "%s" (or name ""))))
                                                     (or command-names []))
-                                  :templates (mapcar (lambda (tpl)
-                                                       (list (psi-emacs--non-blank-text
-                                                              (psi-emacs--event-data-get tpl '(:name name)))
-                                                             (psi-emacs--non-blank-text
-                                                              (psi-emacs--event-data-get tpl '(:description description)))))
-                                                     (or templates [])))))
+                                  :builtins (psi-emacs--event-pair-segment builtin-specs)
+                                  :templates (psi-emacs--event-pair-segment templates))))
            (current-token (psi-emacs-state-slash-completion-token psi-emacs--state)))
       (when next-token
         (unless (equal current-token next-token)
           (when (fboundp 'psi-emacs--apply-slash-completion-data)
-            (psi-emacs--apply-slash-completion-data command-names templates))
+            (psi-emacs--apply-slash-completion-data command-names builtin-specs templates))
           t)))))
 
 (defun psi-emacs--handle-session-updated-event (data)

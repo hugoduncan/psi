@@ -3,6 +3,7 @@
   (:require
    [com.wsscode.pathom3.connect.operation :as pco]
    [psi.agent-session.extension-installs :as installs]
+   [psi.agent-session.commands.builtin-specs :as builtin-specs]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.extension-workflow-runtime :as extension-workflow-runtime]
    [psi.agent-session.resolvers.support :as support]
@@ -141,6 +142,25 @@
     {:psi.extension/commands      (mapv #(dissoc % :handler) cmds)
      :psi.extension/command-names (vec (command-registry/command-names-in reg))}))
 
+(pco/defresolver builtin-commands-resolver
+  "Expose the backend's authoritative built-in slash-command surface, derived
+   from the single `builtin-command-specs` table in `commands`. Mirrors
+   `extension-commands-resolver`: bare names (no leading slash, UIs prefix), so
+   TUI + Emacs consume built-ins exactly like `:psi.extension/command-names`.
+
+   Deliberate deviation from the mirrored `extension-commands-resolver` (and
+   from plan.md's \"reads agent-session-ctx\"): this resolver takes no input
+   (`::pco/input []`, `_env`). The built-in spec table is a compile-time
+   constant — session-independent, not derived from `agent-session-ctx` — so an
+   `:psi/agent-session-ctx` input would be inert ceremony. The input-free form
+   keeps the resolver honest about its (lack of) dependencies and lets it resolve
+   without an agent-session context being present."
+  [_env]
+  {::pco/input  []
+   ::pco/output [:psi.agent-session/builtin-command-specs]}
+  (let [specs (builtin-specs/builtin-command-specs-for-resolver)]
+    {:psi.agent-session/builtin-command-specs specs}))
+
 (pco/defresolver extension-flags-resolver
   [{:keys [psi/agent-session-ctx]}]
   {::pco/input  [:psi/agent-session-ctx]
@@ -266,6 +286,7 @@
    extension-handlers-resolver
    extension-tools-resolver
    extension-commands-resolver
+   builtin-commands-resolver
    extension-flags-resolver
    extension-details-resolver
    extension-prompt-contributions-resolver

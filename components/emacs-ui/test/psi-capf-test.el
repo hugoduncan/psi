@@ -10,6 +10,19 @@
 (require 'psi-test-support)
 (require 'psi)
 
+(defconst psi-capf-test--builtin-command-specs
+  '((( :name . "resume") (:description . "resume a previous session"))
+    (( :name . "jobs") (:description . "list background jobs"))
+    (( :name . "job") (:description . "inspect a background job"))
+    (( :name . "remember") (:description . "capture a memory note for future ψ"))
+    (( :name . "history") (:description . "show message history"))
+    (( :name . "help") (:description . "show this help"))
+    (( :name . "reload-models") (:description . "reload custom model definitions"))
+    (( :name . "speed") (:description . "show or set speed mode"))
+    (( :name . "effort") (:description . "show or set effort override")))
+  "Representative backend built-in command specs (single-sourced via the
+`:psi.agent-session/builtin-command-specs' resolver) seeded into test state.")
+
 (ert-deftest psi-capf-installed-in-psi-mode-buffer ()
   (with-temp-buffer
     (psi-emacs-mode)
@@ -18,6 +31,9 @@
 (ert-deftest psi-capf-slash-context-returns-command-candidates-with-category ()
   (with-temp-buffer
     (psi-emacs-mode)
+    (setq-local psi-emacs--state
+                (make-psi-emacs-state
+                 :builtin-command-specs psi-capf-test--builtin-command-specs))
     (insert "/re")
     (let* ((capf (psi-emacs-prompt-capf))
            (table (nth 2 capf))
@@ -30,6 +46,9 @@
 (ert-deftest psi-capf-slash-context-includes-background-job-commands ()
   (with-temp-buffer
     (psi-emacs-mode)
+    (setq-local psi-emacs--state
+                (make-psi-emacs-state
+                 :builtin-command-specs psi-capf-test--builtin-command-specs))
     (insert "/j")
     (let* ((capf (psi-emacs-prompt-capf))
            (table (nth 2 capf))
@@ -41,6 +60,9 @@
 (ert-deftest psi-capf-slash-context-includes-server-command-candidates ()
   (with-temp-buffer
     (psi-emacs-mode)
+    (setq-local psi-emacs--state
+                (make-psi-emacs-state
+                 :builtin-command-specs psi-capf-test--builtin-command-specs))
     (insert "/re")
     (let* ((capf (psi-emacs-prompt-capf))
            (table (nth 2 capf))
@@ -49,12 +71,75 @@
       (should (member "/remember" cands))))
   (with-temp-buffer
     (psi-emacs-mode)
+    (setq-local psi-emacs--state
+                (make-psi-emacs-state
+                 :builtin-command-specs psi-capf-test--builtin-command-specs))
     (insert "/hi")
     (let* ((capf (psi-emacs-prompt-capf))
            (table (nth 2 capf))
            (cands (all-completions "/hi" table)))
       (should capf)
       (should (member "/history" cands)))))
+
+(ert-deftest psi-capf-slash-includes-backend-builtin-commands ()
+  "Built-in commands come from backend specs (task 205); /reload-models was
+previously missing from the hardcoded Emacs defcustom."
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state
+                (make-psi-emacs-state
+                 :builtin-command-specs psi-capf-test--builtin-command-specs))
+    (insert "/rel")
+    (let* ((capf (psi-emacs-prompt-capf))
+           (table (nth 2 capf))
+           (cands (all-completions "/rel" table)))
+      (should capf)
+      (should (member "/reload-models" cands)))))
+
+(ert-deftest psi-capf-slash-backend-builtin-description-wins-over-custom ()
+  "Backend built-in descriptions win over a stale `psi-emacs-slash-command-specs'
+custom value on name collision."
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (let ((psi-emacs-slash-command-specs '(("/help" . "STALE custom help"))))
+      (setq-local psi-emacs--state
+                  (make-psi-emacs-state
+                   :builtin-command-specs
+                   '((( :name . "help") (:description . "show this help")))))
+      (should (equal "show this help"
+                     (cdr (assoc "/help" (psi-emacs--state-slash-command-specs))))))))
+
+(ert-deftest psi-capf-slash-no-backend-yields-no-builtins ()
+  "With no backend built-in specs the trimmed default
+`psi-emacs-slash-command-specs' (`/skill:' only) supplies no built-in slash
+commands (task 205 TT4; symmetric to the TUI empty-specs guard). A regression
+re-adding built-ins to the defcustom default — or a
+`psi-emacs--state-slash-command-specs' edit re-introducing a hardcoded built-in
+list — would make this fail. Only the Emacs-only `/skill:' affordance survives."
+  ;; Intentionally does NOT bind `psi-emacs-slash-command-specs': it exercises
+  ;; the shipped trimmed default value.
+  (should (equal '(("/skill:" . "Invoke a skill (append skill name)"))
+                 (default-value 'psi-emacs-slash-command-specs)))
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state
+                (make-psi-emacs-state :builtin-command-specs nil))
+    (insert "/qu")
+    (let* ((capf (psi-emacs-prompt-capf))
+           (table (nth 2 capf))
+           (cands (all-completions "/qu" table)))
+      (should capf)
+      (should-not (member "/quit" cands))))
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state
+                (make-psi-emacs-state :builtin-command-specs nil))
+    (insert "/he")
+    (let* ((capf (psi-emacs-prompt-capf))
+           (table (nth 2 capf))
+           (cands (all-completions "/he" table)))
+      (should capf)
+      (should-not (member "/help" cands)))))
 
 (ert-deftest psi-capf-slash-includes-extension-commands-from-state ()
   (with-temp-buffer
@@ -97,6 +182,48 @@
       (should capf)
       (should (= 1 (length (seq-filter (lambda (cand) (equal cand "/resume")) cands)))))))
 
+(ert-deftest psi-capf-slash-dedupes-builtin-template-collision-by-command-name ()
+  "TS1: a backend built-in command colliding by name with a prompt template is
+deduped to a single candidate by the backend-first `seq-uniq' merge in
+`psi-emacs--state-slash-command-specs'. A regression dropping `seq-uniq' (or
+merging so two same-named candidates survive) would fail. Symmetric to the TUI
+built-in/template dedup lock."
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state
+                (make-psi-emacs-state
+                 :builtin-command-specs '((( :name . "resume")
+                                           (:description . "resume the session")))
+                 :prompt-templates '((( :name . "resume")
+                                      (:description . "Shadow resume template")))))
+    (insert "/re")
+    (let* ((capf (psi-emacs-prompt-capf))
+           (table (nth 2 capf))
+           (cands (all-completions "/re" table)))
+      (should capf)
+      (should (= 1 (length (seq-filter (lambda (cand) (equal cand "/resume")) cands))))
+      ;; Backend wins on collision: the built-in description survives.
+      (should (equal "resume the session"
+                     (cdr (assoc "/resume" (psi-emacs--state-slash-command-specs))))))))
+
+(ert-deftest psi-capf-slash-dedupes-builtin-extension-collision-by-command-name ()
+  "TS1: a backend built-in command colliding by name with an extension command
+is deduped to a single candidate. A regression dropping the backend-first
+`seq-uniq' merge would fail."
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state
+                (make-psi-emacs-state
+                 :builtin-command-specs '((( :name . "resume")
+                                           (:description . "resume the session")))
+                 :extension-command-names '("resume")))
+    (insert "/re")
+    (let* ((capf (psi-emacs-prompt-capf))
+           (table (nth 2 capf))
+           (cands (all-completions "/re" table)))
+      (should capf)
+      (should (= 1 (length (seq-filter (lambda (cand) (equal cand "/resume")) cands)))))))
+
 (ert-deftest psi-session-updated-applies-inline-slash-completion-state-when-changed ()
   (with-temp-buffer
     (psi-emacs-mode)
@@ -117,7 +244,37 @@
     (should (equal "gh-issue-work-on"
                    (alist-get :name (car (psi-emacs-state-prompt-templates psi-emacs--state)) nil nil #'equal)))
     (should (equal '(:commands ("delegate")
+                     :builtins nil
                      :templates (("gh-issue-work-on" "Work on a GitHub issue")))
+                   (psi-emacs-state-slash-completion-token psi-emacs--state)))))
+
+(ert-deftest psi-session-updated-applies-builtin-specs-only-change ()
+  "A session update carrying ONLY built-in specs (no extension names, no
+templates) still produces a non-nil token and refreshes (I2/AC5/AC6)."
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state
+                (make-psi-emacs-state :session-id "s1"
+                                      :prompt-templates nil
+                                      :extension-command-names nil
+                                      :builtin-command-specs nil
+                                      :slash-completion-token nil))
+    (psi-emacs--handle-session-updated-event
+     '((:session-id . "s1")
+       (:phase . "idle")
+       (:is-streaming . nil)
+       (:is-compacting . nil)
+       (:pending-message-count . 0)
+       (:retry-attempt . 0)
+       (:interrupt-pending . nil)
+       (:builtin-command-specs . [((:name . "reload-models")
+                                   (:description . "reload custom model definitions"))])))
+    (should (equal "reload-models"
+                   (alist-get :name (car (psi-emacs-state-builtin-command-specs psi-emacs--state))
+                              nil nil #'equal)))
+    (should (equal '(:commands nil
+                     :builtins (("reload-models" "reload custom model definitions"))
+                     :templates nil)
                    (psi-emacs-state-slash-completion-token psi-emacs--state)))))
 
 (ert-deftest psi-session-updated-does-not-touch-slash-completion-state-when-unrelated ()
@@ -144,6 +301,74 @@
                      (psi-emacs-state-slash-completion-token psi-emacs--state)))
       (should (equal '("delegate")
                      (psi-emacs-state-extension-command-names psi-emacs--state))))))
+
+(ert-deftest psi-slash-completion-token-constructors-agree-on-padded-edge-data ()
+  "Both slash-completion token constructors normalize equal backend data to
+`equal' tokens (CS4).  The apply-path constructor reads query-frame `:keyword'
+alists; the event-data path reads `psi-emacs--event-data-get' alists.  Seeding
+the same logical built-in specs — with surrounding whitespace and a non-string
+description — through both paths must yield identical tokens, so no spurious
+refresh fires for unchanged data."
+  (let* ((apply-token
+          (psi-emacs--slash-completion-token
+           nil
+           '((( :name . "  reload-models  ")
+              (:description . "  reload custom model definitions  "))
+             (( :name . "speed")
+              (:description . 42)))
+           nil))
+         (event-builtin-specs
+          '((( :name . "  reload-models  ")
+             (:description . "  reload custom model definitions  "))
+            (( :name . "speed")
+             (:description . 42))))
+         (event-token
+          (list :commands nil
+                :builtins (psi-emacs--event-pair-segment event-builtin-specs)
+                :templates (psi-emacs--event-pair-segment nil))))
+    ;; Padded `:name' is trimmed, non-string `:description' is coerced and
+    ;; trimmed identically on both sides.
+    (should (equal '(:commands nil
+                     :builtins (("reload-models" "reload custom model definitions")
+                                ("speed" "42"))
+                     :templates nil)
+                   apply-token))
+    (should (equal apply-token event-token))))
+
+(ert-deftest psi-session-updated-no-false-positive-refresh-on-padded-equal-data ()
+  "An incoming session update whose built-in specs differ only by surrounding
+whitespace / value type from the already-stored token produces NO change (CS4):
+the event-data token must be `equal' to the apply-path token, so the cached
+slash-completion state is left untouched."
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (let ((stored-token
+           (psi-emacs--slash-completion-token
+            nil
+            '((( :name . "reload-models")
+               (:description . "reload custom model definitions")))
+            nil)))
+      (setq-local psi-emacs--state
+                  (make-psi-emacs-state
+                   :session-id "s1"
+                   :prompt-templates nil
+                   :extension-command-names nil
+                   :builtin-command-specs '((( :name . "reload-models")
+                                             (:description . "reload custom model definitions")))
+                   :slash-completion-token stored-token))
+      (psi-emacs--handle-session-updated-event
+       '((:session-id . "s1")
+         (:phase . "idle")
+         (:is-streaming . nil)
+         (:is-compacting . nil)
+         (:pending-message-count . 0)
+         (:retry-attempt . 0)
+         (:interrupt-pending . nil)
+         (:builtin-command-specs . [((:name . "  reload-models  ")
+                                     (:description . "  reload custom model definitions  "))])))
+      ;; Token unchanged → no spurious refresh.
+      (should (equal stored-token
+                     (psi-emacs-state-slash-completion-token psi-emacs--state))))))
 
 (ert-deftest psi-capf-at-reference-context-returns-file-candidates-and-category ()
   (let* ((tmp (make-temp-file "psi-capf-ref-" t))
@@ -278,6 +503,13 @@
       (when (file-directory-p tmp)
         (delete-directory tmp t)))))
 
+
+(ert-deftest psi-capf-ensure-slash-prefix-is-shared-idempotent-rule ()
+  "CS5: the single shared `psi-emacs--ensure-slash-prefix' helper adds a leading
+slash when missing and preserves an already-prefixed command, so the backend
+built-in and extension slash-command surfaces cannot diverge on the rule."
+  (should (equal "/delegate" (psi-emacs--ensure-slash-prefix "delegate")))
+  (should (equal "/delegate" (psi-emacs--ensure-slash-prefix "/delegate"))))
 
 (provide 'psi-capf-test)
 

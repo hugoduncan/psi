@@ -531,9 +531,13 @@ summaries and made toggling body visibility ineffective after returning."
                    (car (cadr candidates))))))
 
 (ert-deftest psi-tree-capf-includes-tree-command ()
-  "'/tree' appears in slash CAPF candidates."
+  "'/tree' appears in slash CAPF candidates (sourced from backend built-in specs)."
   (with-temp-buffer
     (psi-emacs-mode)
+    (setq-local psi-emacs--state
+                (make-psi-emacs-state
+                 :builtin-command-specs
+                 '((( :name . "tree") (:description . "open/switch live session tree (TUI)")))))
     (insert "/tr")
     (let* ((capf (psi-emacs-prompt-capf))
            (cands (all-completions "/tr" (nth 2 capf))))

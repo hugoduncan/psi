@@ -254,7 +254,7 @@ Returns selected MODEL-ENTRY map or nil when cancelled/no selection."
 
 (defun psi-emacs--prompt-template-query ()
   "Return canonical EQL query string for slash completion data."
-  "[:psi.extension/command-names :psi.agent-session/prompt-templates]")
+  "[:psi.extension/command-names :psi.agent-session/builtin-command-specs :psi.agent-session/prompt-templates]")
 
 (defun psi-emacs--request-slash-completion-data (callback)
   "Fetch slash completion data via `query_eql` and invoke CALLBACK."
@@ -273,6 +273,19 @@ Returns selected MODEL-ENTRY map or nil when cancelled/no selection."
      ((listp names) names)
      (t nil))))
 
+(defun psi-emacs--builtin-command-specs-from-query-frame (frame)
+  "Extract built-in command specs vector/list from `query_eql' FRAME.
+
+Mirrors `psi-emacs--extension-command-names-from-query-frame'; the backend is
+the single authoritative source of the built-in command surface (task 205)."
+  (let* ((result (psi-emacs--query-result-from-frame frame))
+         (specs (and (listp result)
+                     (alist-get :psi.agent-session/builtin-command-specs result nil nil #'equal))))
+    (cond
+     ((vectorp specs) (append specs nil))
+     ((listp specs) specs)
+     (t nil))))
+
 (defun psi-emacs--prompt-templates-from-query-frame (frame)
   "Extract prompt templates vector/list from `query_eql` FRAME."
   (let* ((result (psi-emacs--query-result-from-frame frame))
@@ -289,25 +302,39 @@ Returns selected MODEL-ENTRY map or nil when cancelled/no selection."
             (string-trim (format "%s" (or name ""))))
           (or names [])))
 
-(defun psi-emacs--slash-completion-token (names templates)
-  "Return deterministic token representing slash completion source state."
-  (list :commands (psi-emacs--normalize-slash-completion-names names)
-        :templates (mapcar (lambda (tpl)
-                             (list (psi-emacs--trim-optional-input
-                                    (psi-emacs--alist-get-any tpl '(:name name)))
-                                   (psi-emacs--trim-optional-input
-                                    (psi-emacs--alist-get-any tpl '(:description description)))))
-                           (or templates []))))
+(defun psi-emacs--alist-pair-segment (specs)
+  "Return canonical (NAME DESCRIPTION) token pairs from alist SPECS.
 
-(defun psi-emacs--apply-slash-completion-data (names templates)
-  "Store slash completion NAMES and TEMPLATES on frontend state."
+Each spec is an alist read with `psi-emacs--alist-get-any' and normalized via
+the shared `psi-emacs--slash-completion-pair', so built-in command specs and
+prompt templates produce identical token segments for equal backend data (see
+`psi-emacs--slash-completion-token')."
+  (mapcar (lambda (spec)
+            (psi-emacs--slash-completion-pair
+             (psi-emacs--alist-get-any spec '(:name name))
+             (psi-emacs--alist-get-any spec '(:description description))))
+          (or specs [])))
+
+(defun psi-emacs--slash-completion-token (names builtin-specs templates)
+  "Return deterministic token representing slash completion source state.
+Segment order is fixed (:commands :builtins :templates) and identical to the
+inline token in `psi-emacs--slash-completion-data-changed-p' so equal data
+yields equal tokens."
+  (list :commands (psi-emacs--normalize-slash-completion-names names)
+        :builtins (psi-emacs--alist-pair-segment builtin-specs)
+        :templates (psi-emacs--alist-pair-segment templates)))
+
+(defun psi-emacs--apply-slash-completion-data (names builtin-specs templates)
+  "Store slash completion NAMES, BUILTIN-SPECS, and TEMPLATES on frontend state."
   (let ((normalized-names (psi-emacs--normalize-slash-completion-names names)))
     (setf (psi-emacs-state-extension-command-names psi-emacs--state)
           normalized-names)
+    (setf (psi-emacs-state-builtin-command-specs psi-emacs--state)
+          (or builtin-specs []))
     (setf (psi-emacs-state-prompt-templates psi-emacs--state)
           (or templates []))
     (setf (psi-emacs-state-slash-completion-token psi-emacs--state)
-          (psi-emacs--slash-completion-token normalized-names templates))))
+          (psi-emacs--slash-completion-token normalized-names builtin-specs templates))))
 
 (defun psi-emacs--refresh-slash-completion-data ()
   "Refresh cached slash-completion command names and prompt templates."
@@ -319,8 +346,9 @@ Returns selected MODEL-ENTRY map or nil when cancelled/no selection."
          (with-current-buffer buffer
            (when (eq state psi-emacs--state)
              (let ((names (psi-emacs--extension-command-names-from-query-frame frame))
+                   (builtin-specs (psi-emacs--builtin-command-specs-from-query-frame frame))
                    (templates (psi-emacs--prompt-templates-from-query-frame frame)))
-               (psi-emacs--apply-slash-completion-data names templates)))))))))
+               (psi-emacs--apply-slash-completion-data names builtin-specs templates)))))))))
 
 (defun psi-emacs--state-prompt-template-specs ()
   "Return prompt-template slash specs sourced from frontend state."

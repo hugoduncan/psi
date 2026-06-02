@@ -1,6 +1,7 @@
 (ns psi.agent-session.mutations.prompts
   (:require
    [com.wsscode.pathom3.connect.operation :as pco]
+   [psi.agent-session.core :as core]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.extension-runtime :as ext-rt]))
 
@@ -29,6 +30,19 @@
                             {:origin :mutations})]
     {:psi.prompt-template/added? (boolean added?)
      :psi.prompt-template/count  (or count 0)}))
+
+(pco/defmutation reload-prompts
+  "Re-discover prompt templates from disk for the session worktree and replace
+   the session's registered templates."
+  [_ {:keys [psi/agent-session-ctx session-id]}]
+  {::pco/op-name 'psi.extension/reload-prompts
+   ::pco/params  [:psi/agent-session-ctx :session-id]
+   ::pco/output  [:psi.prompt-template/reloaded?
+                  :psi.prompt-template/count]}
+  (let [{:keys [reloaded? count]}
+        (core/reload-prompts-in! agent-session-ctx session-id)]
+    {:psi.prompt-template/reloaded? (boolean reloaded?)
+     :psi.prompt-template/count     (or count 0)}))
 
 (pco/defmutation add-skill
   "Add a skill to the session if its :name is not already present."
@@ -133,6 +147,7 @@
 
 (def all-mutations
   [add-prompt-template
+   reload-prompts
    add-skill
    register-prompt-contribution
    update-prompt-contribution

@@ -154,6 +154,13 @@
   [ctx session-id]
   (dispatch/dispatch! ctx :session/reload-models {:session-id session-id} {:origin :core}))
 
+(defn reload-prompts-in!
+  "Re-discover prompt templates from disk for `session-id`'s worktree path and
+   replace the session's `:prompt-templates`.
+   Returns {:reloaded? bool :count int :worktree string}."
+  [ctx session-id]
+  (dispatch/dispatch! ctx :session/reload-prompts {:session-id session-id} {:origin :core}))
+
 (defn reload-extension-installs-in!
   "Reload/apply extension installs for `session-id`'s worktree path.
    Returns the extension-runtime reload report including `:install-state`."

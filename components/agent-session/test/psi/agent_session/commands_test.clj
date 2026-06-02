@@ -644,7 +644,7 @@
         s          (commands/format-help ctx session-id)]
     (doseq [cmd ["/quit" "/status" "/history" "/new" "/resume" "/tree"
                  "/login" "/logout" "/remember" "/worktree"
-                 "/reload-models"
+                 "/reload-models" "/reload-prompts"
                  "/jobs" "/job" "/cancel-job"
                  "/help" "/prompts" "/skills"]]
       (is (str/includes? s cmd) (str "help should mention " cmd)))
@@ -707,6 +707,26 @@
       (model-registry/init! {:user-models-path    nil
                              :project-models-path nil}))))
 
+;; ── /reload-prompts ─────────────────────────────────────────
+
+(deftest reload-prompts-command-test
+  (testing "/reload-prompts returns :text result with worktree + count"
+    (let [cwd (test-support/temp-cwd)
+          _   (.mkdirs (java.io.File. (str cwd "/.psi/prompts")))
+          _   (spit (str cwd "/.psi/prompts/foo.md") "foo body")
+          _   (spit (str cwd "/.psi/prompts/bar.md") "bar body")
+          [ctx session-id] (create-session-context
+                            {:session-defaults {:worktree-path cwd}
+                             :cwd cwd
+                             :persist? false})
+          result (commands/dispatch-in ctx session-id "/reload-prompts" cmd-opts)]
+      (is (= :text (:type result)))
+      (is (str/includes? (:message result) "Prompts reloaded"))
+      (is (str/includes? (:message result) cwd))
+      (is (str/includes? (:message result) "count : 2"))
+      ;; No diagnostics line (prompt discovery has no diagnostics channel).
+      (is (not (str/includes? (:message result) "diagnostics"))))))
+
 (deftest reload-extension-installs-command-test
   (testing "/reload-extension-installs returns :text result with apply summary"
     (let [[ctx session-id] (make-test-ctx)]
@@ -728,4 +748,3 @@
           (is (str/includes? (:message result) "Extension installs reloaded"))
           (is (str/includes? (:message result) "restart-required"))
           (is (str/includes? (:message result) "diagnostics")))))))
-

@@ -25,6 +25,7 @@
   (:require
    [clojure.string :as str]
    [psi.agent-session.background-jobs :as bg-jobs]
+   [psi.agent-session.commands.builtin-specs :as bspec]
    [psi.agent-session.commands.effort :as effort-command]
    [psi.agent-session.commands.speed :as speed-command]
    [psi.agent-session.core :as session]
@@ -119,28 +120,7 @@
         loaded-skills (:psi.agent-session/skills d)
         ext-cmds      (:psi.extension/command-names d)]
     (str "── Commands ───────────────────────────\n"
-         "  /quit    — exit the session\n"
-         "  /status  — show session diagnostics\n"
-         "  /history — show message history\n"
-         "  /prompts — list available prompt templates\n"
-         "  /skills  — list available skills\n"
-         "  /new     — start a fresh session\n"
-         "  /resume  — resume a previous session\n"
-         "  /tree [session-id] — open/switch live session tree (TUI)\n"
-         "  /login [provider] — login with an OAuth provider\n"
-         "  /logout  — logout from an OAuth provider\n"
-         "  /model [provider model-id [session|project|user]] — show current model or set model\n"
-         "  /thinking [level] — show current thinking level or set level\n"
-         "  /speed [normal|fast [session|project|user]] — show or set speed mode\n"
-         "  /effort [low|medium|high|xhigh|none [session|project|user]] — show or set effort override\n"
-         "  /remember [text] — capture a memory note for future ψ\n"
-         "  /worktree — show git worktree context\n"
-         "  /reload-models — reload custom model definitions from ~/.psi/agent/models.edn and .psi/models.edn\n"
-         "  /reload-extension-installs — reload/apply extension installs from extensions.edn\n"
-         "  /jobs [status ...] — list background jobs (default: running,pending-cancel)\n"
-         "  /job <job-id> — inspect a background job\n"
-         "  /cancel-job <job-id> — request background job cancellation\n"
-         "  /help    — show this help\n"
+         (bspec/builtin-help-block) "\n"
          "  /skill:name — invoke a skill (loads full content)"
          (when (seq templates)
            (str "\n  ── Prompt Templates ─────────────────\n"
@@ -263,6 +243,16 @@
            "  worktree : " worktree-path "\n"
            "  count : " count "\n"
            "───────────────────────────────────────"))))
+
+(defn- format-reload-prompts
+  "Re-discover prompt templates from disk and return a status string.
+   Reports worktree + resulting template count only (no diagnostics channel)."
+  [ctx session-id]
+  (let [{:keys [count worktree]} (session/reload-prompts-in! ctx session-id)]
+    (str "── Prompts reloaded ──────────────────\n"
+         "  worktree : " worktree "\n"
+         "  count : " count "\n"
+         "───────────────────────────────────────")))
 
 (defn- format-reload-extension-installs
   "Reload/apply extension installs from extensions.edn and return a status string."
@@ -650,29 +640,9 @@
      :message "[New session started]"
      :rehydrate rehydrate}))
 
-(def ^:private exact-command-handlers
-  {"/quit" :quit
-   "/exit" :quit
-   "/new" :new
-   "/resume" :resume
-   "/status" :status
-   "/history" :history
-   "/help" :help
-   "/?" :help
-   "/prompts" :prompts
-   "/skills" :skills
-   "/worktree" :worktree
-   "/logout" :logout
-   "/reload-models" :reload-models
-   "/reload-extension-installs" :reload-extension-installs
-   "/project-repl" :project-repl})
-
-(def ^:private prefixed-command-prefixes
-  ["/tree" "/jobs" "/job" "/cancel-job" "/remember" "/model" "/thinking" "/speed" "/effort" "/login" "/project-repl"])
-
 (defn- exact-command-handler
   [trimmed]
-  (get exact-command-handlers trimmed))
+  (get bspec/exact-command-handlers trimmed))
 
 (defn- prefixed-command
   [trimmed]
@@ -680,7 +650,24 @@
           (when (or (= trimmed prefix)
                     (str/starts-with? trimmed (str prefix " ")))
             prefix))
-        prefixed-command-prefixes))
+        bspec/prefixed-command-prefixes))
+
+(def ^:private prefixed-case-branches
+  "The set of `/`-prefixed command keys that `dispatch-prefixed-command`'s
+   `case` form actually routes (its live branch set).
+
+   `case` requires compile-time literal keys, so this set is authored adjacent
+   to the `case` form as the single literal expression of its branches; the
+   `case` is hand-written (heterogeneous handler arities are design-scoped out
+   of data-driven dispatch). The load-time assertion below proves this branch
+   set stays coherent with the spec-table prefixed projection, and the
+   coherence test reads this same def — so there is no duplicate literal and
+   drift between the spec table and the real `case` is caught at load."
+  #{"/tree" "/jobs" "/job" "/cancel-job" "/remember" "/model" "/thinking"
+    "/speed" "/effort" "/login" "/project-repl"})
+
+(assert (= prefixed-case-branches (set bspec/prefixed-command-prefixes))
+        "dispatch-prefixed-command case branches must match the spec-table prefixed projection")
 
 (defn- dispatch-prefixed-command
   [ctx session-id trimmed {:keys [oauth-ctx ai-model supports-session-tree?]}]
@@ -700,11 +687,6 @@
 
 (declare dispatch*)
 
-(def ^:private builtin-command-names
-  (->> (concat (keys exact-command-handlers) prefixed-command-prefixes)
-       (map #(str/replace % #"^/" ""))
-       set))
-
 (defn loaded-command-names-in
   "Return the authoritative slash-command name set for `session-id`.
 
@@ -714,7 +696,7 @@
   [ctx session-id]
   (let [ext-names (:psi.extension/command-names
                    (session/query-in ctx session-id [:psi.extension/command-names]))]
-    (into builtin-command-names (remove str/blank? ext-names))))
+    (into bspec/builtin-command-names (remove str/blank? ext-names))))
 
 (defn slash-resolution-in
   "Resolve slash-prefixed `text` against the shared backend surfaces for
@@ -746,6 +728,25 @@
              {:kind :template :template-match template-match}
              {:kind :unknown})))))))
 
+(def ^:private exact-case-branches
+  "The set of `:handler` keywords that `dispatch*`'s exact-command `case` form
+   actually routes (its live branch set).
+
+   Like `prefixed-case-branches`, `case` requires compile-time literal keys, so
+   this set is authored adjacent to the `case` form as the single literal
+   expression of its branches; the `case` is hand-written (heterogeneous handler
+   bodies are design-scoped out of data-driven dispatch). The load-time
+   assertion below proves this branch set stays coherent with the spec-table
+   exact projection's handler values, and the coherence test reads this same def
+   — so an `:exact` spec entry whose `:handler` is absent from the `case` is
+   caught at load (`unreachable > forbidden`), symmetric with the prefixed seam."
+  #{:quit :new :resume :status :history :help :prompts :skills :worktree
+    :reload-models :reload-prompts :reload-extension-installs :project-repl
+    :logout})
+
+(assert (= exact-case-branches (set (vals bspec/exact-command-handlers)))
+        "dispatch* exact-command case branches must match the spec-table exact projection handler values")
+
 (defn- dispatch*
   "Single command dispatch pipeline.
 
@@ -764,6 +765,7 @@
        :skills {:type :text :message (format-skills ctx session-id)}
        :worktree {:type :text :message (format-worktree ctx session-id)}
        :reload-models {:type :text :message (format-reload-models ctx session-id)}
+       :reload-prompts {:type :text :message (format-reload-prompts ctx session-id)}
        :reload-extension-installs {:type :text :message (format-reload-extension-installs ctx session-id)}
        :project-repl (project-nrepl-commands/dispatch-project-nrepl-command ctx session-id trimmed)
        :logout (dispatch-logout-command ctx session-id oauth-ctx)
