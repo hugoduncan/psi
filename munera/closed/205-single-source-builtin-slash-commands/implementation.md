@@ -1623,3 +1623,40 @@ surface (matches `builtin-help-block`'s membership). Pure doc-accuracy change;
 no source/test/changelog edit (the CHANGELOG `[Unreleased]` entry already covers
 the user-visible behaviour; this only corrects a stale reference list). No
 blocking reasons.
+
+## Docs review — review-task-docs pass 3
+
+Independent re-run of the review-task-docs checklist
+{accuracy ∧ completeness ∧ consistency} over `README.md`, `doc/`, `CHANGELOG.md`,
+grounded against the authoritative `commands/builtin_specs.clj`
+`builtin-command-specs` table, the resolver, and `psi-completion.el:19-20`.
+
+Verified accurate + complete (no new actionable findings):
+- CHANGELOG `[Unreleased]` "Changed" entry — correct attribute
+  `:psi.agent-session/builtin-command-specs`, correct previously-missing command
+  set (`/reload-models /reload-prompts /reload-extension-installs /speed /effort
+  /project-repl`), correct `defcustom` repurposing wording. ✓
+- `doc/architecture.md` "slash-command surface" bullet — D1 reconciliation holds:
+  "no hardcoded built-in *command* lists", both graph attrs, the single-source
+  projection claim, ns `psi.agent-session.commands.builtin-specs`, and the Emacs
+  `defcustom` user-override sub-bullet all match source. ✓
+- `doc/tui.md` "In-session commands" — D2 complete: the reference block now
+  enumerates exactly the help-visible built-in surface (matches
+  `builtin-help-block` membership); usage hints (`/jobs [status ...]`,
+  `/job <job-id>`, `/cancel-job <job-id>`, `/reload-models`,
+  `/reload-extension-installs`) match the spec table; help-hidden `/?`/`/exit`
+  correctly omitted, `/project-repl` documented as its own sub-command line. ✓
+- `/thinking <off|minimal|low|medium|high|xhigh>` in tui.md is a more explicit
+  enum than the spec table's `:usage "[level]"` — informative, not stale. ✓
+- No stale references to the deleted `shared/builtin-slash-commands` in any
+  user-facing doc (grep clean over `doc/` + `README.md`). ✓
+- `doc/emacs-ui.md` correctly describes backend-sourced capf with no hardcoded
+  built-in list; `doc/graph-surface.md` relies on dynamic attr-index discovery
+  (no per-attr enumeration needed); `doc/custom-providers.md` `/reload-models`
+  references are accurate; `README.md:105` correctly points to the doc set. ✓
+
+D1 + D2 from prior passes verified resolved. No new actionable docs issues; no
+follow-up steps added (criterion 3: nothing to add without duplicating the prior
+D1/D2 coverage).
+
+PASS_STATUS: REVIEW_COMPLETE
