@@ -283,3 +283,53 @@ wrapper workflow (thin, two-step, structurally identical to the existing
 verified `implement-task-in-worktree`). I1 checked in design-steps.md
 (unchecked count 0). No `steps.md` / `plan.md` touched. PASS_STATUS:
 REVIEW_COMPLETE.
+
+## 2026-06-01 — Plan/steps ambiguity review (pass 1)
+
+Reviewed `plan.md` and `steps.md` for ambiguities only (not the already-locked
+design, and not architecture/inconsistency/correctness). Grounded against the
+verified `implement-task-in-worktree.md` (3-step: resolve-worktree → implement →
+summary), `task-lifecycle.edn` (5 sub-workflows, each reads
+`{:from :workflow-input :path [:input]}`), and the design's Deliverable-2 +
+"Generated task design" sections. Four new actionable plan/steps ambiguities
+(P1–P4; none duplicate the prior design-level architecture/A1–A5/I1 follow-ups):
+
+- **P1 — wrapper `summary` step decision has no deciding criterion.** Slice 2
+  (plan grammar anchors + steps "(Decision) … record whether a trailing
+  `summary` `:session` step is added … or deliberately omitted") leaves the
+  add-vs-omit choice to the builder with **no rule**. The verified precedent
+  `implement-task-in-worktree.md` *has* a third `summary` step, and outer step-2
+  is the workflow's terminal step — so whether the outer workflow needs a
+  user-facing terminal summary is the actual deciding factor, but neither
+  plan.md nor steps.md states it. Two reasonable interpretations remain open.
+
+- **P2 — `before-local.json` capture (`local --json`) vs selector
+  `local --sort total --json` not reconciled.** steps.md line 8 verifies/uses
+  `bb gordian local --sort total --json`; line 75 captures the authoritative
+  `before-local.json` with bare `bb gordian local --json` (no `--sort`). The
+  steps never state these are intentionally different invocations nor that sort
+  is irrelevant to the `(ns,var,arity)`-keyed before/after (the design's
+  inconsistency review concluded it is, but that conclusion is not carried into
+  steps). A builder cannot tell whether `--sort total` must match for the
+  baseline to be valid.
+
+- **P3 — task-id allocation scan root undefined for the `origin/master`
+  worktree.** Slice 3 step "allocate next task id, create
+  `munera/open/NNN-slug/design.md`" runs after a `work-on` worktree based on
+  `origin/master`, while the workflow itself executes from the current checkout
+  (which already has 204 + other open tasks). The Munera `alloc → max(NNN over
+  open/ ∪ closed/) + 1` rule needs a defined scan root; steps don't say whether
+  NNN is allocated by scanning the worktree's `open/ ∪ closed/` (post
+  `origin/master`) or the outer checkout — a real collision risk.
+
+- **P4 — task-creation commit location (worktree vs outer checkout)
+  unspecified.** Slice 3 "Commit the task creation" item does not state the
+  commit happens *inside* the `work-on` worktree branch (off `origin/master`).
+  Combined with P3, it is ambiguous whether task-dir creation + commit occur in
+  the worktree (so `munera_task_path:` resolves there for the delegated
+  lifecycle) or in the outer checkout before handoff. The handoff's
+  `munera_task_path:` only resolves for step-2's `resolve-worktree`/`work-on` if
+  the task dir was committed on the worktree branch — steps must say so.
+
+Added P1–P4 as unchecked follow-up items to steps.md. PASS_STATUS:
+ACTIONABLE_FEEDBACK.

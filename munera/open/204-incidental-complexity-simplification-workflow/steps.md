@@ -139,6 +139,27 @@ with the commit sha / decision when done.
       `implementation.md`.
 - [ ] Commit Slice 5 (`⚒ doc: document reduce-incidental-complexity workflow`).
 
+## Plan/steps ambiguity follow-ups (review pass 1)
+
+- [ ] P1 — State the criterion for the Slice-2 wrapper `summary` step: decide
+      add-vs-omit by whether the outer workflow needs a user-facing *terminal*
+      summary (outer step-2 is terminal; `implement-task-in-worktree` keeps the
+      summary step). Resolve the choice in plan.md/steps.md, don't leave it open.
+- [ ] P2 — Reconcile the two `local` invocations in steps.md: explicitly note
+      that `before-local.json` is captured with `bb gordian local --json` (no
+      `--sort`) and that `--sort total` (selector-only, line 8) is irrelevant to
+      the `(ns,var,arity)`-keyed before/after comparison, so the baseline is
+      valid regardless of sort. Carry the design's inconsistency-review
+      conclusion into the steps.
+- [ ] P3 — Define the task-id allocation scan root: state that NNN is allocated
+      by scanning `open/ ∪ closed/` in the `origin/master`-based **worktree**
+      (where the task is created), per Munera `alloc → max(NNN)+1`, to avoid
+      collision with the outer checkout's open tasks.
+- [ ] P4 — Make the task-creation commit location explicit in Slice 3: the task
+      dir is created **and committed on the `work-on` worktree branch** (off
+      `origin/master`), so the handoff's `munera_task_path:` resolves for
+      step-2's `resolve-worktree`/`work-on` before the delegated lifecycle runs.
+
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 
 - [ ] Split step-1 selection from task-creation into two `:session` steps,
