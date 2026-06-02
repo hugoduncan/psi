@@ -7,7 +7,7 @@
 
 (deftest scheduler-start-timer-uses-injected-time-source-and-delay-runner-test
   (testing "scheduler timer computes delay from injected scheduler time source and dispatches via injected runner"
-    (let [now              (java.time.Instant/parse "2026-04-21T17:00:00Z")
+    (let [now              (test-support/instant "2026-04-21T17:00:00Z")
           [ctx session-id] (test-support/create-test-session {:persist? false
                                                               :scheduler-time-source (test-support/fixed-scheduler-time-source now)})
           fire-at          (.plusMillis now 5000)
@@ -33,7 +33,7 @@
       (is (= :delivered (get-in (ss/get-session-data-in ctx* session-id) [:scheduler :schedules "sch-1" :status])))))
 
   (testing "scheduler cancel uses injected cancel fn for non-thread handles"
-    (let [now              (java.time.Instant/parse "2026-04-21T17:10:00Z")
+    (let [now              (test-support/instant "2026-04-21T17:10:00Z")
           [ctx session-id] (test-support/create-test-session {:persist? false
                                                               :scheduler-time-source (test-support/fixed-scheduler-time-source now)})
           cancelled*       (atom nil)
@@ -65,7 +65,7 @@
 
 (deftest scheduler-cancel-before-stale-timer-callback-does-not-resurrect-test
   (testing "cancel runs before the captured callback; invoking the stale callback leaves the schedule :cancelled"
-    (let [now              (java.time.Instant/parse "2026-04-21T17:30:00Z")
+    (let [now              (test-support/instant "2026-04-21T17:30:00Z")
           [ctx session-id] (test-support/create-test-session
                             {:persist? false
                              :scheduler-time-source (test-support/fixed-scheduler-time-source now)})
@@ -101,7 +101,7 @@
 
 (deftest scheduler-cancelled-default-delay-thread-exits-without-uncaught-interrupted-exception-test
   (testing "cancelling the default delayed scheduler thread interrupts sleep without leaking an uncaught exception"
-    (let [now              (java.time.Instant/parse "2026-04-21T17:20:00Z")
+    (let [now              (test-support/instant "2026-04-21T17:20:00Z")
           [ctx session-id] (test-support/create-test-session {:persist? false
                                                               :scheduler-time-source (test-support/fixed-scheduler-time-source now)})
           started-thread*  (atom nil)

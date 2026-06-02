@@ -1,11 +1,8 @@
 (ns psi.agent-session.scheduler-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [psi.agent-session.scheduler :as scheduler]))
-
-(defn- instant
-  [s]
-  (java.time.Instant/parse s))
+   [psi.agent-session.scheduler :as scheduler]
+   [psi.agent-session.test-support :refer [instant]]))
 
 (deftest empty-state-test
   (is (= {:schedules {} :queue []}

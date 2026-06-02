@@ -1229,7 +1229,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Code-shaper follow-ups — pass 2 (code-shaper, 2026-06-01)
 
-- [ ] Converge the literal-instant idiom across the 201 test files on a single
+- [x] Converge the literal-instant idiom across the 201 test files on a single
       shared helper. `scheduler_test.clj` defines a private `(defn- instant [s]
       (java.time.Instant/parse s))` and uses it throughout, but the four new
       integration test files open-code `(java.time.Instant/parse …)`:
@@ -1251,3 +1251,22 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       invariant; Slice-10 allowlist). `findings.md` citations unchanged (no
       deftest renamed). If 201 is treated as closed instead, raise as a small
       standalone test-hygiene task.
+      Done: promoted `instant` to `test-support` (public
+      `(defn instant [s] (java.time.Instant/parse s))`, beside
+      `fixed-scheduler-time-source`). `scheduler_test.clj` now consumes the
+      shared helper via `[psi.agent-session.test-support :refer [instant]]` and
+      its private `(defn- instant …)` copy is deleted (30 `(instant …)` call
+      sites unchanged). Replaced all 15 open-coded `(java.time.Instant/parse
+      "…")` literal sites with `(test-support/instant "…")`:
+      `scheduler_end_to_end_test` ×4, `scheduler_timer_seam_test` ×4,
+      `scheduler_resolvers_test` ×4, `scheduler_context_shutdown_test` ×3
+      (verified: zero `java.time.Instant/parse` literals remain in the four
+      integration files). Runtime-derived instants (`(.plusMillis now …)` /
+      `(.plusSeconds now …)`) left as-is — not literal parses. Behaviour- and
+      assertion-preserving (no deftest renamed → `findings.md` citations
+      unchanged; aggregate stays 51 tests / 411 assertions). clj-kondo 0/0 on
+      all 6 touched files; `bb fmt:check` "All source files formatted
+      correctly"; full `bb test` green. Test/`test_support`-only —
+      `git diff --name-only` = 6 test files (5 scheduler test ns +
+      `test_support.clj`); zero `components/agent-session/src/**` or
+      `doc/scheduler.md` (Slice-10 allowlist held).

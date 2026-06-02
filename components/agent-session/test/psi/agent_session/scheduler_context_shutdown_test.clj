@@ -14,8 +14,8 @@
                                                   :kind :message
                                                   :label "later"
                                                   :message "later"
-                                                  :created-at (java.time.Instant/parse "2099-04-21T17:59:00Z")
-                                                  :fire-at (java.time.Instant/parse "2099-04-21T18:00:00Z")}
+                                                  :created-at (test-support/instant "2099-04-21T17:59:00Z")
+                                                  :fire-at (test-support/instant "2099-04-21T18:00:00Z")}
                                                  {:origin :core})]
       (is (contains? @(:scheduler-timers* ctx) "sch-1"))
       (session/shutdown-context! ctx)
@@ -26,7 +26,7 @@
 
 (deftest shutdown-context-prevents-captured-timer-callback-from-firing-test
   (testing "after shutdown the schedule is cancelled and invoking a captured stale callback does not fire/deliver"
-    (let [now              (java.time.Instant/parse "2026-04-21T17:40:00Z")
+    (let [now              (test-support/instant "2026-04-21T17:40:00Z")
           [ctx session-id] (test-support/create-test-session
                             {:persist? false
                              :scheduler-time-source (test-support/fixed-scheduler-time-source now)})

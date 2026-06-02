@@ -1959,3 +1959,19 @@ no such helper. Recorded as a follow-up below. (Not flagged: the deeper
 standardised the *outer* read fn and left that inner path; converging it would
 be a larger cross-cutting change reaching pre-existing baseline files outside
 201's new-test scope, so it is intentionally not raised here.)
+
+## Code-shaper pass 2 — execution (2026-06-01)
+
+Executed the literal-instant idiom convergence follow-up. Promoted `instant`
+to `test-support` as a public helper beside `fixed-scheduler-time-source`, then
+deleted the private `(defn- instant …)` in `scheduler_test.clj` and pulled the
+shared one in via `:refer [instant]` (its 30 `(instant …)` call sites left
+untouched). Replaced the 15 open-coded `(java.time.Instant/parse "…")` literal
+sites with `(test-support/instant "…")` across the four integration files
+(end-to-end ×4, timer-seam ×4, resolvers ×4, context-shutdown ×3); runtime-
+derived instants (`.plusMillis`/`.plusSeconds`) deliberately left as-is.
+Behaviour/assertion-preserving — no deftest renamed (`findings.md` citations
+unchanged), aggregate stays 51 tests / 411 assertions. clj-kondo 0/0 on all 6
+touched files, `bb fmt:check` clean, full `bb test` green. Verification-only
+invariant held: `git diff --name-only` = 6 files (5 scheduler test ns +
+`test_support.clj`), zero `components/agent-session/src/**` / `doc/scheduler.md`.

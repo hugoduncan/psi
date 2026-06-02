@@ -39,6 +39,11 @@
     :tool-output-stats :tool-call-attempts :tool-lifecycle-events
     :provider-requests :provider-replies :provider-events})
 
+(defn instant
+  "Parse an ISO-8601 string into a `java.time.Instant`."
+  [s]
+  (java.time.Instant/parse s))
+
 (defn fixed-scheduler-time-source
   "Return a scheduler test time source fixed at `instant`."
   [instant]
