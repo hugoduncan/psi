@@ -22,32 +22,32 @@
 
 ## Slice 2 — Helper signatures → explicit state
 
-- [ ] Change `psi-widget-projection--cancel-mutation-timer` signature to
+- [x] Change `psi-widget-projection--cancel-mutation-timer` signature to
       `(state tkey)`; resolve store via
       `(psi-emacs-state-projection-mutation-timers state)`; cancel + remhash;
       no read of dynamic `psi-emacs--state`.
-- [ ] Change `psi-widget-projection--arm-mutation-timer` signature to
+- [x] Change `psi-widget-projection--arm-mutation-timer` signature to
       `(state ext-id widget-id node-key timeout-ms)`: inline pre-cancel via
       `(psi-widget-projection--cancel-mutation-timer state tkey)`; capture
       `(current-buffer)` and `state` locally; thread both into the `run-at-time`
       callback args ahead of `ext-id widget-id node-key timeout-ms`; puthash
       into the passed `state`'s store.
-- [ ] Change `psi-widget-projection--on-mutation-timeout` signature to
+- [x] Change `psi-widget-projection--on-mutation-timeout` signature to
       `(buffer state ext-id widget-id node-key timeout-ms)`: no-op unless
       `(buffer-live-p buffer)`; otherwise wrap body in
       `(with-current-buffer buffer ...)`; cancel/clear via
       `(psi-widget-projection--cancel-mutation-timer state tkey)`; then clear
       in-flight lstate, call error-handler, and `--upsert-projection-block`.
-- [ ] Update arm call site in `--dispatch-mutation` (`psi-widget-projection.el:349`)
+- [x] Update arm call site in `--dispatch-mutation` (`psi-widget-projection.el:349`)
       to pass `psi-emacs--state` as the leading `state` arg.
-- [ ] Update existing tests `pwpt-arm-cancel-mutation-timer-roundtrip`,
+- [x] Update existing tests `pwpt-arm-cancel-mutation-timer-roundtrip`,
       `pwpt-on-mutation-timeout-clears-in-flight`,
       `pwpt-on-mutation-timeout-calls-error-handler`,
       `pwpt-dispatch-mutation-arms-timer`
       to the new signatures: drive the buffer-local store via state instead of
       `let`-binding the global defvar; pass `buffer`/`state` to timeout calls
       (live buffer + valid `state`, asserting the post-change behaviour holds).
-- [ ] Repurpose existing test `pwpt-on-mutation-timeout-noop-when-no-state`
+- [x] Repurpose existing test `pwpt-on-mutation-timeout-noop-when-no-state`
       (`psi-widget-projection-test.el:542`) into the dead-buffer no-op case
       (P3): rename to reflect the new pivot (e.g.
       `pwpt-on-mutation-timeout-noop-when-buffer-dead`), drive it by
@@ -57,31 +57,31 @@
       post-change no-op turns on `(buffer-live-p buffer)`, not dynamic state.
       This is the single dead-buffer-no-op test for the timeout path; do NOT
       additionally add a separate dead-buffer test (the repurposed one is it).
-- [ ] Run tests; lint; reload.
-- [ ] Commit: `⚒ 206: resolve mutation-timer store from explicit state + thread buffer into timeout`.
+- [x] Run tests; lint; reload.
+- [x] Commit: `⚒ 206: resolve mutation-timer store from explicit state + thread buffer into timeout`.
 
 ## Slice 3 — Response callback targeting
 
-- [ ] In `--dispatch-mutation` response lambda (`psi-widget-projection.el:354`),
+- [x] In `--dispatch-mutation` response lambda (`psi-widget-projection.el:354`),
       capture `buffer` (`(current-buffer)`) and `state` (`psi-emacs--state`) at
       dispatch time in the enclosing `let*`.
-- [ ] Rewrite the response callback to: guard `(buffer-live-p buffer)`; cancel via
+- [x] Rewrite the response callback to: guard `(buffer-live-p buffer)`; cancel via
       `(psi-widget-projection--cancel-mutation-timer state tkey)`; clear in-flight
       lstate + `--upsert-projection-block` inside `(with-current-buffer buffer ...)`;
       no read of dynamic `psi-emacs--state` for store resolution.
-- [ ] Update existing test `pwpt-dispatch-mutation-cancels-timer-on-response`
+- [x] Update existing test `pwpt-dispatch-mutation-cancels-timer-on-response`
       (`psi-widget-projection-test.el:565`) to the response-targeting rework
       (P1): drive the buffer-local store via `state` instead of `let`-binding
       the global defvar, so it exercises cancel against the originating
       buffer's store. Slice 3 owns this migration (it reworks the response
       callback), so Slice 5's defvar deletion + "remove leftover let-binds"
       finds no remaining `let`-bind here.
-- [ ] Add test: response arriving while a *different* buffer is current
+- [x] Add test: response arriving while a *different* buffer is current
       cancels/clears the originating buffer's store, not the current buffer's.
-- [ ] Add test: response for a dead originating buffer is a no-op (store of a
+- [x] Add test: response for a dead originating buffer is a no-op (store of a
       live buffer untouched, no error).
-- [ ] Run tests; lint; reload.
-- [ ] Commit: `⚒ 206: target originating buffer in mutation dispatch response callback`.
+- [x] Run tests; lint; reload.
+- [x] Commit: `⚒ 206: target originating buffer in mutation dispatch response callback`.
 
 ## Slice 4 — Teardown + transcript reset cancel-all
 

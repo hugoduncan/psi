@@ -310,3 +310,32 @@ matching Slice 1's lint step so both slices name the same linter for the same
 files (`consistent(code)` / `one_way`).
 
 No code changes (design/plan-only task). steps.md N1 checked.
+
+## Implementation pass 1 (ψ) — Slices 1–3
+
+- Slice 1 landed as planned: `projection-mutation-timers` struct field
+  (`psi-globals.el`), init (`psi-lifecycle.el`), and the
+  `--clear-mutation-timers (state)` helper with the precedent's outer
+  `(when state ...)` null-guard. Commit `⚒ 206: add buffer-local
+  projection-mutation-timers field + clear helper`.
+- Slices 2 and 3 implemented together in one commit because both rework the
+  single `psi-widget-projection--dispatch-mutation` function (arm call site +
+  response callback) — splitting them would have left the function in an
+  intermediate non-compiling state (response callback still calling the old
+  `--cancel-mutation-timer tkey` arity). Deviation from the slice-per-commit
+  plan; same end state, fewer broken intermediate commits.
+  - `--cancel-mutation-timer (state tkey)`, `--arm-mutation-timer (state ext-id
+    widget-id node-key timeout-ms)` (captures `(current-buffer)` + threads
+    `buffer`/`state` into the scheduled callback), `--on-mutation-timeout
+    (buffer state ext-id widget-id node-key timeout-ms)` with `buffer-live-p`
+    no-op + `with-current-buffer`.
+  - `--dispatch-mutation` captures `buffer`/`state` at dispatch; response
+    callback guards `buffer-live-p`, cancels/clears against the captured
+    `state`/`buffer`.
+- Tests: roundtrip/timeout/error-handler/arms/cancels-on-response migrated to
+  the buffer-local store via `state`; `…-noop-when-no-state` repurposed to
+  `…-noop-when-buffer-dead`. Added `pwpt-dispatch-response-targets-originating-buffer`
+  and `pwpt-dispatch-response-noop-when-buffer-dead`. 98/98 green.
+- Note: the module-global `psi-widget-projection--mutation-timers` defvar is now
+  unreferenced by source (still present; deleted in Slice 5). Tests no longer
+  bind it.

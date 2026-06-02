@@ -310,41 +310,55 @@ Priority: mutation :timeout-ms > button :timeout-ms > default."
       (alist-get :timeout-ms button-node nil nil #'equal)
       psi-widget-projection--default-timeout-ms))
 
-(defun psi-widget-projection--arm-mutation-timer (ext-id widget-id node-key timeout-ms)
-  "Arm a watchdog timer for EXT-ID/WIDGET-ID/NODE-KEY firing after TIMEOUT-MS."
-  (let ((tkey (psi-widget-projection--timer-key ext-id widget-id node-key)))
-    (psi-widget-projection--cancel-mutation-timer tkey)
+(defun psi-widget-projection--cancel-mutation-timer (state tkey)
+  "Cancel and remove the mutation timer for TKEY in STATE's timer store.
+Resolves the store solely from the passed STATE; never reads the dynamic
+`psi-emacs--state'."
+  (when state
+    (let* ((timers (psi-emacs-state-projection-mutation-timers state))
+           (timer (and (hash-table-p timers)
+                       (gethash tkey timers))))
+      (when (timerp timer)
+        (cancel-timer timer))
+      (when (hash-table-p timers)
+        (remhash tkey timers)))))
+
+(defun psi-widget-projection--arm-mutation-timer (state ext-id widget-id node-key timeout-ms)
+  "Arm a watchdog timer for EXT-ID/WIDGET-ID/NODE-KEY firing after TIMEOUT-MS.
+Arms against STATE's buffer-local timer store.  Captures the originating
+buffer (`current-buffer') and STATE and threads both into the scheduled
+callback args, mirroring `psi-emacs--schedule-notification-dismiss'."
+  (let ((tkey (psi-widget-projection--timer-key ext-id widget-id node-key))
+        (buffer (current-buffer)))
+    (psi-widget-projection--cancel-mutation-timer state tkey)
     (puthash tkey
              (run-at-time (/ timeout-ms 1000.0) nil
                           #'psi-widget-projection--on-mutation-timeout
-                          ext-id widget-id node-key timeout-ms)
-             psi-widget-projection--mutation-timers)))
+                          buffer state ext-id widget-id node-key timeout-ms)
+             (psi-emacs-state-projection-mutation-timers state))))
 
-(defun psi-widget-projection--cancel-mutation-timer (tkey)
-  "Cancel and remove timer for TKEY."
-  (let ((timer (gethash tkey psi-widget-projection--mutation-timers)))
-    (when (timerp timer)
-      (cancel-timer timer))
-    (remhash tkey psi-widget-projection--mutation-timers)))
-
-(defun psi-widget-projection--on-mutation-timeout (ext-id widget-id node-key timeout-ms)
-  "Watchdog callback: mutation for EXT-ID/WIDGET-ID/NODE-KEY timed out."
-  (when psi-emacs--state
-    (let ((tkey (psi-widget-projection--timer-key ext-id widget-id node-key)))
-      (remhash tkey psi-widget-projection--mutation-timers)
-      ;; Clear in-flight
-      (let ((lstate (psi-widget-projection--get-lstate ext-id widget-id)))
-        (psi-widget-projection--set-lstate
-         ext-id widget-id
-         (psi-widget-renderer-lstate-set-in-flight lstate node-key nil)))
-      ;; Call global error handler
-      (psi-widget-projection--call-error-handler
-       `((:widget-id    . ,widget-id)
-         (:extension-id . ,ext-id)
-         (:error-code   . "mutation-timeout")
-         (:message      . ,(format "Mutation timed out after %dms" timeout-ms))
-         (:context      . mutation-timeout)))
-      (psi-emacs--upsert-projection-block))))
+(defun psi-widget-projection--on-mutation-timeout (buffer state ext-id widget-id node-key timeout-ms)
+  "Watchdog callback: mutation for EXT-ID/WIDGET-ID/NODE-KEY timed out.
+No-op unless BUFFER is live; otherwise runs inside BUFFER and cancels/clears
+against STATE's timer store, with no dependence on the incidental current
+buffer."
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (let ((tkey (psi-widget-projection--timer-key ext-id widget-id node-key)))
+        (psi-widget-projection--cancel-mutation-timer state tkey)
+        ;; Clear in-flight
+        (let ((lstate (psi-widget-projection--get-lstate ext-id widget-id)))
+          (psi-widget-projection--set-lstate
+           ext-id widget-id
+           (psi-widget-renderer-lstate-set-in-flight lstate node-key nil)))
+        ;; Call global error handler
+        (psi-widget-projection--call-error-handler
+         `((:widget-id    . ,widget-id)
+           (:extension-id . ,ext-id)
+           (:error-code   . "mutation-timeout")
+           (:message      . ,(format "Mutation timed out after %dms" timeout-ms))
+           (:context      . mutation-timeout)))
+        (psi-emacs--upsert-projection-block)))))
 
 (defun psi-widget-projection--dispatch-mutation (mutation ext-id widget-id node-key
                                                            &optional button-node)
@@ -358,21 +372,25 @@ Arms a timeout watchdog; cancels it on any response."
                                 (psi-widget-projection--edn-encode mut-params)))
            (timeout-ms  (psi-widget-projection--effective-timeout-ms
                          button-node mutation))
-           (tkey        (psi-widget-projection--timer-key ext-id widget-id node-key)))
-      (psi-widget-projection--arm-mutation-timer ext-id widget-id node-key timeout-ms)
+           (tkey        (psi-widget-projection--timer-key ext-id widget-id node-key))
+           (buffer      (current-buffer))
+           (state       psi-emacs--state))
+      (psi-widget-projection--arm-mutation-timer state ext-id widget-id node-key timeout-ms)
       (funcall psi-emacs--send-request-function
-               psi-emacs--state
+               state
                "query_eql"
                `((:query . ,query-str))
                (lambda (_frame)
-                 ;; Cancel watchdog and clear in-flight on any response
-                 (psi-widget-projection--cancel-mutation-timer tkey)
-                 (when psi-emacs--state
-                   (let ((lstate (psi-widget-projection--get-lstate ext-id widget-id)))
-                     (psi-widget-projection--set-lstate
-                      ext-id widget-id
-                      (psi-widget-renderer-lstate-set-in-flight lstate node-key nil)))
-                   (psi-emacs--upsert-projection-block)))))))
+                 ;; Cancel watchdog and clear in-flight against the originating
+                 ;; buffer's store on any response; no-op if it is dead.
+                 (when (buffer-live-p buffer)
+                   (with-current-buffer buffer
+                     (psi-widget-projection--cancel-mutation-timer state tkey)
+                     (let ((lstate (psi-widget-projection--get-lstate ext-id widget-id)))
+                       (psi-widget-projection--set-lstate
+                        ext-id widget-id
+                        (psi-widget-renderer-lstate-set-in-flight lstate node-key nil)))
+                     (psi-emacs--upsert-projection-block))))))))
 
 (defun psi-widget-projection--on-collapsible-toggle (widget-id node-key)
   "Handle collapsible toggle for WIDGET-ID / NODE-KEY.
