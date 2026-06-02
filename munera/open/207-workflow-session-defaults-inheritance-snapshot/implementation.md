@@ -334,3 +334,61 @@ ambiguities (distinct from the resolved design notes):
   those).
 
 PASS_STATUS: ACTIONABLE_FEEDBACK.
+
+## Plan ambiguity follow-up resolution (ψ, 2026-06-02)
+
+All five plan-ambiguity follow-ups (P1–P5) resolved into plan.md + steps.md
+(plan-phase only; S1–S7 code not yet started). Grounded against real code first:
+
+- **P1 (dependency cycle — certain, not conditional).** Confirmed
+  `workflow-step-session-config/deps.edn` already declares
+  `psi/workflow-runtime {:local/root "../workflow-runtime"}` (and `core.clj:16/17`
+  require `execution-adapter`/`statechart`). So a reverse `delegate.clj` →
+  `workflow-step-session-config` require is a genuine cycle. Resolved by
+  committing S6 to **injected-fn**: add `resolve-inherited-defaults-fn` to
+  `delegate-step-runtime-result` (already takes injected
+  `create-workflow-context-fn`/`send-and-drain-fn` at `delegate.clj:36`); caller
+  (depends on both) binds the closure. Rewrote plan Risks "Layering" bullet, plan
+  slice-order S6, and steps S6 to make this a decided mechanism, not an "if it
+  introduces a cycle" branch.
+
+- **P2 (speed/effort not projectable).** Confirmed `resolve-step-session-config`
+  (`core.clj:145–211`) output set = `:developer-prompt :prompt-mode
+  :response-mode :tool-defs :thinking-level :skills :model
+  :prompt-component-selection` (+ optional `:temperature`/`:model-fallback`/
+  logprob) — emits NEITHER `:speed-mode` NOR `:effort-override`. A `select-keys`
+  projection yields only 5/7 snapshot keys. Resolved by changing the signature to
+  `effective-config->snapshot (effective-config parent-snapshot)`: the 5
+  resolver-emitted inherited keys come from the effective config; speed/effort
+  come from the parent run's snapshot (`(:inherited-defaults workflow-run)`),
+  which is correct since neither is per-step overridable today. Updated plan S2
+  approach + slice-order S6, steps S2 + S6.
+
+- **P3 (snapshot `:model` shape).** Confirmed live `(:model parent-session)` is a
+  `{:provider :id}` map: `model-query->selection-request` (`core.clj:104`) reads
+  `(:provider …)`/`(:id …)`, `candidate->session-model` (`:114`) emits
+  `{:provider (name …) :id …}`. Resolved: snapshot stores `:model` as that same
+  `{:provider :id}` map (verbatim copy), drops directly into
+  `parent-session-model` with no reshaping; `inherited-defaults-schema` encodes
+  it as a map. Added a Risks bullet + steps S3/S5 notes.
+
+- **P4 (`parent-session-model` wholesale replacement).** Confirmed the single
+  `parent-session-model` binding (`core.clj:164`) feeds four sites:
+  `resolved-step-model-config` step override (`:173`), base-meta override
+  (`:175`), bare no-override fallback (`:183`), and transitively
+  `resolved-model-query`. Resolved: set the binding itself to the snapshot
+  `:model` (single binding, all four consumers see it). AC5 preserved — the
+  override path's OUTPUT still wins; only its selection CONTEXT is snapshot-
+  sourced. Added a Consumption sub-bullet + rewrote steps S5 model item.
+
+- **P5 (per-field source swap, not whole-path fork).** Confirmed the resolver
+  always derives `:developer-prompt`/`:response-mode`/
+  `:prompt-component-selection`/`:temperature`/logprob/`:model-fallback` from
+  step-def/base-meta (never from the parent). Resolved: snapshot substitution is
+  scoped to ONLY the 7 inherited keys; non-inherited outputs stay on their
+  current code path regardless of snapshot presence. Rewrote the Consumption
+  paragraph + steps S5 source-fields item.
+
+No plan-ambiguity follow-ups blocked; all five resolved as plan/steps
+refinements. Code implementation remains for the build phase (S1–S7), not this
+plan-review pass.

@@ -34,13 +34,17 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       → `:tool-defs`; `:thinking-level` (default `:off`).
 - [ ] Confirm `resolve-inherited-defaults-snapshot` returns exactly the snapshot
       resolved-key set (S1 constant); no extra keys.
-- [ ] Add `effective-config->snapshot (effective-config) → snapshot` — pure
-      `select-keys`/projection of an effective `resolve-step-session-config`
-      result into the snapshot field set; no ctx reads.
+- [ ] Add `effective-config->snapshot (effective-config parent-snapshot) →
+      snapshot` — pure projection; no ctx reads. The 5 resolver-emitted inherited
+      keys (`:model :prompt-mode :tool-defs :skills :thinking-level`) come from
+      the effective config; `:speed-mode`/`:effort-override` come from
+      `parent-snapshot` (resolver emits neither — resolved P2). `:model` is the
+      effective config's already `{:provider :id}`-shaped value (resolved P3).
 - [ ] Unit-test `resolve-inherited-defaults-snapshot` against a fixture
       parent session (asserts `:speed-mode`/`:effort-override` captured).
 - [ ] Unit-test `effective-config->snapshot` projects only snapshot keys from
-      an effective config (and that an overridden model is preserved).
+      an effective config + parent snapshot (overridden model preserved;
+      `:speed-mode`/`:effort-override` sourced from the parent snapshot — P2).
 - [ ] Lint + repair.
 
 ## S3 — Persist snapshot on the run
@@ -48,6 +52,9 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
 - [ ] Add an `inherited-defaults-schema` (optional fields:
       `:model :prompt-mode :tool-defs :skills :thinking-level :speed-mode
       :effort-override`) in `workflow-runtime/src/psi/workflow_runtime/model.clj`.
+      `:model` is a `{:provider :id}`-shaped map (matches live
+      `(:model parent-session)` / `model-query->selection-request` consumer —
+      resolved P3), not a bare id string.
 - [ ] Add `[:inherited-defaults {:optional true} [:maybe inherited-defaults-schema]]`
       to `workflow-run-schema` (model.clj:179).
 - [ ] In `workflow-runtime/core.clj` `create-run` (line 110): destructure
@@ -82,18 +89,30 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
 ## S5 — Consume snapshot in step config resolution
 
 - [ ] In `resolve-step-session-config` (core.clj:145): when
-      `(:inherited-defaults workflow-run)` present, source the no-override
-      inherited fields (`:model`, `:prompt-mode`, `:tool-defs`, `:skills`,
+      `(:inherited-defaults workflow-run)` present, source ONLY the 7 inherited
+      fields (`:model`, `:prompt-mode`, `:tool-defs`, `:skills`,
       `:thinking-level`, `:speed-mode`, `:effort-override`) from the snapshot
-      instead of the live parent reads.
+      instead of the live parent reads. This is a per-field source swap, NOT a
+      whole-path fork (resolved P5): non-inherited outputs
+      (`:developer-prompt`, `:response-mode`, `:prompt-component-selection`,
+      `:temperature`, logprob, `:model-fallback`) stay on their current
+      step-def/base-meta code path regardless of snapshot presence.
 - [ ] When `:inherited-defaults` absent (pre-existing runs), retain the current
       live-read path (forward-looking-only fallback; AC 6).
-- [ ] Feed the snapshot's `:model` as `parent-session-model` into
-      `resolved-model-query`/`resolved-step-model-config` (AC 7).
+- [ ] Set the single `parent-session-model` binding (`core.clj:164`) to the
+      snapshot's `{:provider :id}` `:model` when a snapshot is present, so ALL
+      FOUR consumers observe it (resolved P4): `resolved-step-model-config` step
+      override (`:173`), base-meta override (`:175`), bare no-override fallback
+      (`:183`), and (transitively) `resolved-model-query` (AC 7). Do NOT replace
+      only the model-query/no-override subset — override resolution must also see
+      the snapshot model or AC1/AC2 leak.
 - [ ] Ensure `:speed-mode`/`:effort-override` from the snapshot flow into the
-      step's resolved config output (extend output map if currently absent).
+      step's resolved config output (extend output map — resolver emits neither
+      today, resolved I1/P2).
 - [ ] Verify explicit overrides (`:session` spec / base-meta) still win over the
-      snapshot defaults (AC 5).
+      snapshot defaults (AC 5): the override path's OUTPUT still takes precedence;
+      only its model-selection CONTEXT (`parent-session-model`) is snapshot-sourced
+      (P4).
 - [ ] Test AC 1: switching invoking session model after invoke → no effect on
       subsequent steps.
 - [ ] Test AC 2: changing user/project default model after invoke → no effect.
@@ -109,19 +128,23 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
 
 ## S6 — Nested/delegated capture
 
-- [ ] In `workflow-runtime/statechart_runtime/delegate.clj`
-      `delegate-step-runtime-result` (line ~37): call
+- [ ] Add a new injected fn param (e.g. `resolve-inherited-defaults-fn`) to
+      `delegate-step-runtime-result` (`delegate.clj:36`), alongside the existing
+      `create-workflow-context-fn`/`send-and-drain-fn`. The caller (depends on
+      both components) binds it to a closure that calls
       `resolve-step-session-config ctx parent-session-id workflow-run step-id`
-      to obtain the delegating step's effective config.
-- [ ] Project it via `effective-config->snapshot` and pass the result as
-      `:inherited-defaults` into the child `create-run` (line ~44).
-- [ ] Resolve the dependency: `delegate.clj` (workflow-runtime) calling into
-      `workflow-step-session-config` — confirm direction. If it introduces a
-      cycle (workflow-step-session-config already requires workflow-runtime),
-      inject the resolver as a ctx op / passed fn instead of a direct require
-      (record the decision in implementation.md).
+      then `effective-config->snapshot effective-config parent-snapshot`
+      (parent-snapshot = `(:inherited-defaults workflow-run)`, supplying
+      `:speed-mode`/`:effort-override` per P2). `delegate.clj` does NOT require
+      `workflow-step-session-config` (the reverse require is a CERTAIN cycle —
+      wssc deps.edn already pulls workflow-runtime; resolved P1).
+- [ ] Pass the injected fn's result as `:inherited-defaults` into the child
+      `create-run` (line ~44).
+- [ ] Wire the injected fn at the delegate caller site(s); update the existing
+      injected-param call signatures accordingly.
 - [ ] Confirm `delegate.clj` does **not** call
-      `resolve-inherited-defaults-snapshot` (would lose step overrides).
+      `resolve-inherited-defaults-snapshot` (would re-read live parent + lose
+      step overrides).
 - [ ] Test AC 4: a step overrides the model then delegates → sub-delegation and
       its steps see the overridden model, captured at sub-delegation creation,
       not the (since-mutated) invoking session.
@@ -142,7 +165,7 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
 
 ## Plan-ambiguity follow-ups (review 2026-06-02)
 
-- [ ] P1: Resolve the S6 dependency-direction contradiction. The Risks section
+- [x] P1: Resolve the S6 dependency-direction contradiction. The Risks section
       claims `workflow-runtime` must NOT depend on `workflow-step-session-config`
       and "direction stays caller→both", but `workflow-step-session-config`
       already requires `workflow-runtime` (`core.clj:16/17`), so S6's direct
@@ -151,7 +174,7 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       injecting the snapshot resolver as a passed fn / ctx op (mirroring
       delegate's existing `create-workflow-context-fn`/`send-and-drain-fn`
       injected params), not a conditional "if it introduces a cycle" choice.
-- [ ] P2: Specify where the nested (`effective-config->snapshot`) path obtains
+- [x] P2: Specify where the nested (`effective-config->snapshot`) path obtains
       `:speed-mode`/`:effort-override`. `resolve-step-session-config`'s result
       set excludes both (resolved I1), so a pure `select-keys` projection yields
       only 5 of the 7 snapshot keys and silently drops them under delegation
@@ -159,12 +182,12 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       speed-mode/effort-override into the nested derivation, or extend
       `resolve-step-session-config` to emit them — projection alone is
       insufficient.
-- [ ] P3: Pin the snapshot `:model` shape against `resolved-model-query`'s
+- [x] P3: Pin the snapshot `:model` shape against `resolved-model-query`'s
       consumer. `model-query->selection-request` (`core.clj:104`) reads
       `(:provider parent-session-model)`/`(:id parent-session-model)`; state
       whether the snapshot stores `:model` as that `{:provider :id}` map (drops
       in directly) or a bare id (would break the destructure).
-- [ ] P4: State that snapshot `:model` replaces `parent-session-model`
+- [x] P4: State that snapshot `:model` replaces `parent-session-model`
       wholesale. `resolve-step-session-config` feeds `parent-session-model`
       (`:164`) to four sites — `resolved-step-model-config` for step override
       (`:173`) and base-meta override (`:175`), the bare no-override fallback
@@ -172,7 +195,7 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       model-query/no-override subset; require ALL `parent-session-model` uses to
       switch to the snapshot model, or AC1/AC2 leak via override resolution
       still reading the live parent.
-- [ ] P5: Clarify S5's snapshot substitution is a per-field source swap for the
+- [x] P5: Clarify S5's snapshot substitution is a per-field source swap for the
       seven inherited keys, not a whole-path binary fork. Fields
       `resolve-step-session-config` always derives from step-def/base-meta
       (`:developer-prompt`, `:response-mode`, `:prompt-component-selection`,
