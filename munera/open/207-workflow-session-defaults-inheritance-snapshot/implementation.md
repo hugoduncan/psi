@@ -1393,3 +1393,68 @@ One NEW behaviour-coverage gap (distinct from T4):
   created child session's state reflects the snapshot/initial-session default,
   NOT the live parent — proving the `:inherited-snapshot?` flag survives the
   full `context`/`session_lifecycle` threading, not just the two endpoints.
+
+## Test-review T4/T5 follow-ups executed (ψ, 2026-06-02)
+
+Both newly-added test-review follow-ups (T4 from pass 4, T5 from pass 5)
+completed in one pass. No code/doc changes required — both are pure
+behavioural-coverage additions closing seam/contract gaps that the existing
+endpoint tests left unguarded.
+
+- **T4 — Decision 5b continue-terminal fresh-snapshot + session-id
+  auto-injection (production-grounded; reconciled with concurrent work).** This
+  worktree was being worked concurrently; a concurrent session landed the
+  stronger, real-path T4 resolution in the working tree, which ψ adopted in
+  preference to an initially-drafted test-only mirror. The genuine fix makes the
+  session-id auto-injection T4 depends on a REAL production behaviour:
+  `psi.workflow/create-run` is added to
+  `runtime-eql/session-scoped-extension-mutation-ops`
+  (`extensions/runtime_eql.clj`), so `run-extension-mutation-in!` injects the
+  invoking `:session-id` when the caller passes none. That is precisely the path
+  `orchestration/continue-terminal-run-async!` and the top-level invoke
+  (`workflow/core.clj`) rely on — both call `mutate! 'psi.workflow/create-run`
+  with no explicit `:session-id`. Behavioural coverage:
+  `continue-terminal-run-captures-fresh-snapshot-test` in
+  `canonical_workflows_test.clj` drives the REAL `continue-terminal-run-async!`
+  with a `production-like-mutate!` reproducing the session-scoped injection
+  contract (inject from `*active-workflow-session-id*` when absent) and routing
+  to the real `create-workflow-run`. Original invoke captures `claude-ORIGINAL`;
+  the continuing session switches to `claude-CHANGED` AFTER invoke; the
+  continuation NEW run's persisted `:inherited-defaults :model` =
+  `claude-CHANGED` (FRESH) and `≠` the original terminal run's snapshot —
+  proving 5b captures fresh, never reuses, and pinning the session-id injection
+  contract every top-level capture relies on (the S4 tests bypass it with an
+  explicit `:session-id`). canonical-workflows + workflow-async-path suites
+  green; clj-kondo clean.
+
+  Reconciliation note: ψ initially drafted a separate test-only ns
+  (`orchestration_continue_snapshot_test.clj`) mirroring the injection in a test
+  closure. On detecting the concurrent working-tree changes
+  (`runtime_eql.clj` production fix + the canonical-workflows T4 test, both
+  uncommitted, HEAD advanced to `3cea68aeb` mid-session), ψ removed the
+  redundant draft and kept the concurrent session's stronger production-grounded
+  resolution. This mirrors the prior T3 concurrent-commit reconciliation
+  recorded in state.md.
+
+- **T5 — `:inherited-snapshot?` contract threading seam.** New test
+  `create-workflow-child-session-inherited-snapshot-flag-survives-threading-test`
+  in `workflow_child_session_context_test.clj`, driving the REAL private
+  `create-workflow-child-session!` (`context.clj`) → `:session/create-child`
+  dispatch (`session_lifecycle.clj`) → `child-session-base-state*`
+  (`child_session_state.clj`) with real ctx/state. The R4/R5 fix gates child
+  snapshot isolation on `:inherited-snapshot?`; the producer (`attempts-test`)
+  and consumer (`child-session-state-test`) each had a unit test, but the middle
+  `context.clj:159` `(assoc :inherited-snapshot? …)` → handler → builder hop was
+  untested — both endpoints would stay green if the flag were dropped on the
+  wire (the same incoherence class R5 caught with the dangling contract field).
+  Block 1 (`:inherited-snapshot? true`, nil snapshot-governed fields, parent
+  carrying non-default `live-model`/`:prose`/`:flex`/`:low`): the persisted
+  child uses the initial-session defaults (`:model` nil, `:prompt-mode :lambda`,
+  `:speed-mode`/`:effort-override` nil), NOT the live parent — proving the flag
+  survives threading. Block 2 (control, no flag): the same nil-supplied fields
+  fall back to the live parent through the identical chain — proving the
+  distinction is carried by the flag, not lost on the wire. 2 blocks / 39
+  assertions in the (4-test) suite green; clj-kondo clean.
+
+Both T4 and T5 checked in steps.md; all 207 follow-up steps now checked. No new
+actionable findings; no follow-up items added.

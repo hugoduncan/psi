@@ -92,6 +92,89 @@
       (is (some? (ss/sc-session-id-in ctx child-session-id)))
       (session-core/shutdown-context! ctx))))
 
+(deftest create-workflow-child-session-inherited-snapshot-flag-survives-threading-test
+  ;; Task 207 T5: end-to-end seam test for the `:inherited-snapshot?` contract.
+  ;; The R4/R5 child-state snapshot isolation is gated on `:inherited-snapshot?`;
+  ;; its producer (attempts) and consumer (child-session-base-state*) each have a
+  ;; unit test, but the threading hop between them —
+  ;; `create-workflow-child-session!` (`context.clj`) →
+  ;; `:session/create-child` (`session_lifecycle.clj`) →
+  ;; `child-session-base-state*` — was untested: both endpoints stay green even
+  ;; if the flag were dropped on the wire. This drives the real chain and proves
+  ;; the flag survives it.
+  (testing "with :inherited-snapshot? true, nil snapshot-governed fields resolve
+            to the initial-session default and a post-invoke live-parent mutation
+            does NOT leak in (flag survives context → session_lifecycle → builder)"
+    (let [[ctx parent-session-id] (create-session-context {:persist? false})
+          ;; Live parent carries non-default snapshot-governed values that would
+          ;; leak via the (or arg parent-sd) fallback if the flag did not cross
+          ;; the wire. :prompt-mode :prose ≠ the :lambda initial-session default.
+          _ (swap! (:state* ctx) update-in
+                   [:agent-session :sessions parent-session-id :data]
+                   merge {:model {:provider "prov" :id "live-model"}
+                          :prompt-mode :prose
+                          :speed-mode :flex
+                          :effort-override :low})
+          child-session-id "snapshot-flag-child"
+          request {:child-session-id child-session-id
+                   :session-name "workflow snapshot child"
+                   :system-prompt "system"
+                   :tool-ids []
+                   :thinking-level :off
+                   :skills []
+                   :workflow-run-id "run-1"
+                   :workflow-step-id "plan"
+                   :workflow-attempt-id "attempt-1"
+                   :workflow-owned? true
+                   :inherited-snapshot? true
+                   ;; nil-at-invoke snapshot-governed fields (resolver emits none)
+                   :model nil
+                   :prompt-mode nil
+                   :speed-mode nil
+                   :effort-override nil}
+          _ (call-private-create-workflow-child-session! ctx parent-session-id request)
+          child-sd (ss/get-session-data-in ctx child-session-id)]
+      (is (nil? (:model child-sd))
+          ":model = initial-session default (nil), not the live parent model — flag survived threading")
+      (is (= :lambda (:prompt-mode child-sd))
+          ":prompt-mode = initial-session default (:lambda), not live parent (:prose)")
+      (is (nil? (:speed-mode child-sd))
+          ":speed-mode = initial-session nil default, no live parent leak")
+      (is (nil? (:effort-override child-sd))
+          ":effort-override = initial-session nil default, no live parent leak")
+      (session-core/shutdown-context! ctx)))
+
+  (testing "control: WITHOUT :inherited-snapshot? the same nil-supplied fields
+            fall back to the live parent through the full chain — proving the
+            distinction is carried by the flag, not lost on the wire"
+    (let [[ctx parent-session-id] (create-session-context {:persist? false})
+          _ (swap! (:state* ctx) update-in
+                   [:agent-session :sessions parent-session-id :data]
+                   merge {:model {:provider "prov" :id "live-model"}
+                          :prompt-mode :prose
+                          :speed-mode :flex
+                          :effort-override :low})
+          child-session-id "no-flag-child"
+          request {:child-session-id child-session-id
+                   :session-name "workflow non-snapshot child"
+                   :system-prompt "system"
+                   :tool-ids []
+                   :thinking-level :off
+                   :skills []
+                   :workflow-owned? true
+                   :model nil
+                   :prompt-mode nil
+                   :speed-mode nil
+                   :effort-override nil}
+          _ (call-private-create-workflow-child-session! ctx parent-session-id request)
+          child-sd (ss/get-session-data-in ctx child-session-id)]
+      (is (= {:provider "prov" :id "live-model"} (:model child-sd))
+          "no flag → live parent model inherited through the chain")
+      (is (= :prose (:prompt-mode child-sd)))
+      (is (= :flex (:speed-mode child-sd)))
+      (is (= :low (:effort-override child-sd)))
+      (session-core/shutdown-context! ctx))))
+
 (deftest create-workflow-child-session-invalid-request-fails-locally-test
   (testing "realization edge rejects malformed workflow child-session create requests clearly"
     (let [[ctx parent-session-id] (create-session-context {:persist? false})

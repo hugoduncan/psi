@@ -461,7 +461,7 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
 
 ## Test-review pass 4 follow-ups (review 2026-06-02)
 
-- [ ] T4: Add behavioural coverage for Decision 5b (continue-terminal fresh
+- [x] T4: Add behavioural coverage for Decision 5b (continue-terminal fresh
       snapshot) and the session-id auto-injection it depends on. Today AC8 covers
       only Decision 5a (resume REUSES the snapshot); Decision 5b — a terminal-run
       continuation creating a NEW run that captures a FRESH snapshot from the
@@ -483,10 +483,37 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       (continuing-session) model — distinguishable from the original terminal
       run's snapshot. Closes the 5b coverage hole and pins the session-id
       auto-injection contract all top-level capture relies on.
+      DONE (production-grounded; reconciled with concurrent session work in this
+      worktree): the session-id auto-injection T4 depends on is now a REAL
+      production fix, not just a test mirror. `psi.workflow/create-run` was added
+      to `runtime-eql/session-scoped-extension-mutation-ops`
+      (`extensions/runtime_eql.clj`), so `run-extension-mutation-in!` injects the
+      invoking `:session-id` when the caller passes none — exactly the path
+      `continue-terminal-run-async!` and the top-level invoke
+      (`workflow/core.clj`) rely on (both call `mutate! 'psi.workflow/create-run`
+      with no explicit `:session-id`). Behavioural coverage:
+      `continue-terminal-run-captures-fresh-snapshot-test` in
+      `canonical_workflows_test.clj` drives the REAL
+      `orchestration/continue-terminal-run-async!` with a production-like
+      `mutate!` that reproduces the runtime-fns/session-scoped contract (inject
+      from `*active-workflow-session-id*` when `:session-id` absent) routing to
+      the real `create-workflow-run`. Original invoke captures `claude-ORIGINAL`;
+      the continuing session switches to `claude-CHANGED` AFTER invoke; the
+      continuation NEW run's persisted `:inherited-defaults :model` =
+      `claude-CHANGED` (FRESH) and `≠` the original terminal run's snapshot —
+      proving 5b captures fresh, not reuses, and pinning the session-id
+      injection contract all top-level capture relies on (the S4 tests bypass it
+      by passing an explicit `:session-id`). canonical-workflows +
+      workflow-async-path suites green; lint clean.
+      NOTE (ψ reconciliation): an earlier test-only mirror
+      (`orchestration_continue_snapshot_test.clj`) was drafted in this pass but
+      removed as redundant once the concurrent production fix
+      (`runtime_eql.clj` session-scoped op + the canonical-workflows T4 test)
+      proved the stronger, real-path resolution.
 
 ## Test-review pass 5 follow-ups (review 2026-06-02)
 
-- [ ] T5: Add an end-to-end seam test for the `:inherited-snapshot?` contract.
+- [x] T5: Add an end-to-end seam test for the `:inherited-snapshot?` contract.
       The R4/R5 child-state snapshot isolation is gated on a `:inherited-snapshot?`
       request flag. Its producer (`create-step-attempt-session!` →
       `:inherited-snapshot? true`) is asserted at `attempts-test:140` and its
@@ -503,3 +530,18 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       and asserts the created child session's state uses the snapshot /
       initial-session default and NOT the live parent — proving the flag survives
       the full `context`/`session_lifecycle` threading, not just the two endpoints.
+      DONE: added
+      `create-workflow-child-session-inherited-snapshot-flag-survives-threading-test`
+      to `workflow_child_session_context_test.clj`, driving the REAL private
+      `create-workflow-child-session!` → `:session/create-child` dispatch →
+      `child-session-base-state*` chain (real ctx/state, nullable adapter via
+      `create-session-context`). Parent carries non-default
+      model/prompt-mode/speed/effort; the request sets `:inherited-snapshot? true`
+      with nil snapshot-governed fields. Asserts the persisted child session uses
+      the initial-session defaults (`:model` nil, `:prompt-mode :lambda`,
+      `:speed-mode`/`:effort-override` nil) — NOT the live parent — proving the
+      flag crosses the `context` → `session_lifecycle` wire. Control block: the
+      same request WITHOUT the flag falls back to the live parent
+      (`live-model`/`:prose`/`:flex`/`:low`) through the identical chain,
+      proving the distinction is carried by the flag rather than lost on the
+      wire. 2 blocks, 39 assertions in the (now 4-test) suite green; lint clean.
