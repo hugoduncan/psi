@@ -549,7 +549,7 @@ with the commit sha / decision when done.
 
 ## Test review follow-ups (review pass 5)
 
-- [ ] TR7 — `task-lifecycle-in-worktree-test` locks the wrapper's NO_TARGET
+- [x] TR7 — `task-lifecycle-in-worktree-test` locks the wrapper's NO_TARGET
       (negative) branch (work-on NOT called + NO_TARGET sentinel, F1) and that
       the `work-on` tool is present + `{{input}}` is wired, but never asserts the
       **positive (target-present) branch** of the `resolve-worktree` prompt: that
@@ -568,6 +568,21 @@ with the commit sha / decision when done.
       positive-path instruction — calls `work-on` with the extracted worktree
       path, then responds with ONLY the Munera task path on a single line. Run
       focused suite + `clj-kondo`.
+      RESOLUTION: extended `task-lifecycle-in-worktree-test`'s `resolve-worktree`
+      coverage (same ns, test-only, no production change) with a new `testing`
+      block locking the **positive (target-present)** branch of the
+      `resolve-worktree` template text via three substring/regex asserts: (1)
+      "call `work-on` with the extracted worktree path" — the re-call that
+      establishes cross-`:delegate` worktree continuity (Locked decision 11);
+      (2) "respond with ONLY the Munera task path" — the bare-path yield; (3)
+      "on a single line" — the single-line yield constraint. The "on a single
+      line" phrase occurs **only** on the positive path (the NO_TARGET branch
+      uses "this exact single line"), so the asserts disambiguate the two
+      branches and a regress dropping the positive-path instruction (while
+      keeping the NO_TARGET branch + the `work-on` tool entry) now fails green.
+      Focused definitions suite green (13 tests, 201 assertions, 0 failures —
+      +3 over pass-5's 198); `clj-kondo` 0 findings; `cljfmt` clean; file 734
+      lines (< 800). (See implementation.md pass-5 test-review TR7 entry.)
 
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 

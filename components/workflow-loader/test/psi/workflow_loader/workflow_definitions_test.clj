@@ -641,7 +641,24 @@
            (is (some? (some #(= {:step "resolve-worktree" :yield :text}
                                 (:from %))
                             (:contributions summary-step)))
-               "summary sources the resolve-worktree :yield :text so it can detect NO_TARGET")))))))
+               "summary sources the resolve-worktree :yield :text so it can detect NO_TARGET")))
+       ;; TR7 (test review): the prior assertions lock only the NO_TARGET
+       ;; (negative) branch + the work-on tool entry + {{input}} wiring. The
+       ;; positive (target-present) branch is the verified cross-:delegate
+       ;; worktree-continuity mechanism the design chose (Locked decision 11 /
+       ;; Verified Facts: the wrapper re-calls work-on before sub-delegating).
+       ;; A regress dropping that positive-path instruction (keeping the
+       ;; NO_TARGET branch + the work-on tool entry) would pass green yet break
+       ;; the design's central continuity claim. Lock it.
+       (testing "resolve-worktree prompt re-calls work-on and yields only the task path on a target-present handoff (TR7)"
+         (let [resolve-text (step-template-text resolve-step)]
+           (is (re-find #"(?i)call `?work-on`? with the extracted worktree path"
+                        resolve-text)
+               "resolve-worktree calls work-on with the extracted worktree path when both handoff fields are present")
+           (is (re-find #"(?i)respond with ONLY the Munera task path" resolve-text)
+               "resolve-worktree yields only the bare Munera task path on the positive path")
+           (is (re-find #"(?i)on a single line" resolve-text)
+               "resolve-worktree constrains the positive-path yield to a single line")))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; reduce-incidental-complexity (Slice 3 of task 204)

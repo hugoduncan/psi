@@ -1580,3 +1580,47 @@ substring locks on `resolve-step`'s template text for the positive-path
 instruction — that it calls `work-on` with the extracted worktree path and
 responds with only the Munera task path. Test-only; same ns; no production
 change.
+
+## 2026-06-01 — Test review (pass 5) follow-up executed (TR7)
+
+Executed the single newly-added unchecked `steps.md` item (TR7) from the pass-5
+test review. The "Contingency" item predates this pass (a non-planned,
+design-stated fallback gated on Slice-3 step-1 proving unwieldy — it did not)
+and was left untouched.
+
+**Grounding before editing.** Re-read `.psi/workflows/task-lifecycle-in-worktree.edn`
+`resolve-worktree` template text and confirmed the positive-path phrasing:
+"Otherwise (both fields present): call `work-on` with the extracted worktree
+path to set the session worktree, then respond with ONLY the Munera task path
+(e.g. `munera/open/003-foo`) on a single line — nothing else." Verified the
+phrase **"on a single line"** occurs exactly once in the file and **only** on
+the positive path — the NO_TARGET branch uses "this exact single line" — so a
+positive-path lock keyed on it cannot accidentally match the negative branch.
+
+**Fix (test-only, same ns, no production change), in
+`components/workflow-loader/test/psi/workflow_loader/workflow_definitions_test.clj`:**
+Added a TR7 `testing` block to `task-lifecycle-in-worktree-test` locking the
+positive (target-present) branch of `resolve-worktree`'s template text with
+three case-insensitive regex asserts:
+1. `call \`work-on\` with the extracted worktree path` — the work-on re-call
+   that establishes cross-`:delegate` worktree continuity (Locked decision 11 /
+   Verified Facts: the wrapper re-calls `work-on` before sub-delegating).
+2. `respond with ONLY the Munera task path` — the bare-path yield.
+3. `on a single line` — the single-line yield constraint (positive-path-only
+   phrase; disambiguates from the NO_TARGET branch).
+
+A regress dropping the positive-path instruction (while keeping the NO_TARGET
+branch + the `work-on` tool entry) now fails green — closing the uncovered
+design behaviour (the design's central worktree-continuity mechanism) per
+`∀b ∈ behaviour(design). ∃t. covers(t,b)`.
+
+**Verification:**
+- `clojure -M:test --focus psi.workflow-loader.workflow-definitions-test`:
+  **13 tests, 201 assertions, 0 failures** (+3 over pass-5's 198).
+- `clj-kondo --lint` on the test file: 0 errors, 0 warnings.
+- `cljfmt check` on the test file: formatted correctly.
+- File length 734 lines (< 800-line `components/` guard).
+
+TR7 checked in steps.md. No production/skill/workflow/doc change (the wrapper
+prompt already carries the positive-path instruction; this pass only adds its
+covering assertion). PASS_STATUS: REVIEW_COMPLETE.
