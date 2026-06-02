@@ -1975,3 +1975,38 @@ unchanged), aggregate stays 51 tests / 411 assertions. clj-kondo 0/0 on all 6
 touched files, `bb fmt:check` clean, full `bb test` green. Verification-only
 invariant held: `git diff --name-only` = 6 files (5 scheduler test ns +
 `test_support.clj`), zero `components/agent-session/src/**` / `doc/scheduler.md`.
+
+## Code-shaper review — pass 3 (code-shaper, 2026-06-01)
+
+Re-audited the 201 test surface firsthand (simplicity ∧ consistency ∧
+robustness). Pass-1 (shared `stub-execution-result` + fixed execution-stub
+instant) and pass-2 (literal-instant `instant` helper convergence) confirmed
+landed. Suite green, deliverable shape sound.
+
+One **new actionable** `consistent(idioms)` ∧ DRY finding — and a correction to
+a pass-2 claim. Pass-2 explicitly considered, then **declined**, converging the
+`[:scheduler :schedules <id> …]` read path literal, on the stated rationale that
+doing so "would be a larger cross-cutting change reaching pre-existing baseline
+files outside 201's new-test scope." **That rationale is factually wrong**: all
+8 test files carrying this path literal were *already touched* by task 201
+(verified via `git diff 2335116a4..HEAD`: `scheduler_context_shutdown_test`,
+`scheduler_dispatch_test`, `scheduler_effects_test`, `scheduler_end_to_end_test`,
+`scheduler_handlers_test`, `scheduler_lifecycle_test`, `scheduler_timer_seam_test`,
+`psi_tool_scheduler_test` — every one `touched`, none `UNTOUCHED`). There are no
+out-of-scope baseline files; the decline reason does not hold.
+
+The substance: the open-coded `(get-in (ss/get-session-data-in ctx sid)
+[:scheduler :schedules <id> …])` shape repeats **41×** across those 8 files —
+**29** of them the `:status` read — plus **14×** for `[:scheduler :queue]`. This
+is the same class pass-2 *did* act on (one verbose idiom → one shared
+`test-support` helper) and a *stronger* DRY signal than the 15 instant literals
+it converged. Precedent already exists: `test-support/scheduled-message-by-id`
+is the established "shared scheduler-read abstraction" home, sitting beside the
+`*-scheduler-time-source` helpers; there is simply no parallel
+`schedule-by-id`/`schedule-status`/`schedule-queue` despite being the dominant
+read. Promoting these collapses the four-element path literal + outer read fn to
+a one-word, locally-comprehensible call, removes path duplication, and isolates
+the `[:scheduler :schedules id …]` shape to a single source of truth. Recorded
+as a follow-up below. Behaviour/assertion-preserving (no deftest renamed →
+`findings.md` citations unchanged); test/`test_support`-only (verification-only
+invariant; Slice-10 allowlist).

@@ -1270,3 +1270,41 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       `git diff --name-only` = 6 test files (5 scheduler test ns +
       `test_support.clj`); zero `components/agent-session/src/**` or
       `doc/scheduler.md` (Slice-10 allowlist held).
+
+## Code-shaper follow-ups — pass 3 (code-shaper, 2026-06-01)
+
+- [ ] Converge the duplicated `[:scheduler :schedules <id> …]` read-path idiom
+      across the 201 test files onto shared `test-support` helpers
+      (`consistent(idioms)` ∧ DRY ∧ `locally_comprehensible`). The open-coded
+      `(get-in (ss/get-session-data-in ctx sid) [:scheduler :schedules <id> …])`
+      shape repeats **41×** across the 8 scheduler test files all touched by 201
+      (`scheduler_context_shutdown_test`, `scheduler_dispatch_test`,
+      `scheduler_effects_test`, `scheduler_end_to_end_test`,
+      `scheduler_handlers_test`, `scheduler_lifecycle_test`,
+      `scheduler_timer_seam_test`, `psi_tool_scheduler_test`) — **29** of them the
+      `:status` read — plus **14×** for `[:scheduler :queue]`. NOTE: this
+      *corrects* pass-2's deliberate decline of this same convergence; pass-2's
+      stated rationale ("reaches pre-existing baseline files outside 201's
+      new-test scope") is factually wrong — `git diff 2335116a4..HEAD` shows all
+      8 files are `touched` by 201, none `UNTOUCHED`. Add to `test-support`,
+      beside the existing `scheduled-message-by-id` precedent (the established
+      shared scheduler-read home): `(defn schedule-by-id [ctx session-id
+      schedule-id] (get-in (ss/get-session-data-in ctx session-id) [:scheduler
+      :schedules schedule-id]))`, `(defn schedule-status [ctx session-id
+      schedule-id] (:status (schedule-by-id ctx session-id schedule-id)))`, and
+      `(defn schedule-queue [ctx session-id] (get-in (ss/get-session-data-in ctx
+      session-id) [:scheduler :queue]))`. Replace the 41 `[:scheduler :schedules
+      …]` sites: pure `… :status` reads → `(test-support/schedule-status ctx sid
+      id)`; reads of other schedule keys (`:delivery-phase`,
+      `:created-session-id`, `:kind`, `:session-config-summary`, full-map
+      `[:scheduler :schedules id]`) → `(test-support/schedule-by-id ctx sid id)`
+      then key-access; and the 14 `[:scheduler :queue]` sites →
+      `(test-support/schedule-queue ctx sid)`. Behaviour- and
+      assertion-preserving — no deftest renamed (`findings.md` citations
+      unchanged); aggregate stays 51 tests / 411 assertions. Keep suite green +
+      clj-kondo/cljfmt clean. Test/`test_support`-only — verify
+      `git diff --name-only` touches only `components/agent-session/test/**` +
+      `test_support.clj`; zero `components/agent-session/src/**` or
+      `doc/scheduler.md` (verification-only invariant; Slice-10 allowlist). If
+      201 is treated as closed instead, raise as a small standalone
+      test-hygiene task.
