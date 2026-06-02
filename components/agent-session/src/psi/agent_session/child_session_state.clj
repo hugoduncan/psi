@@ -21,16 +21,18 @@
 ;;; not use select-keys composition. This comment documents the child-session's
 ;;; relationship to those three constant groups.
 ;;;
-;;; common-inherited-fields (17 keys in init.clj):
-;;;   Inherited from parent (7 of 17):
+;;; common-inherited-fields (19 keys in init.clj):
+;;;   Inherited from parent (9 of 19):
 ;;;     :skill-ids              — derived via derive-child-prompt-state from parent skills
 ;;;     :tool-ids               — derived via derive-child-prompt-state (or explicit child opts)
 ;;;     :prompt-contribution-ids — resolved from parent via prompt-storage/prompt-ids
 ;;;     :prompt-mode            — (or prompt-mode (:prompt-mode parent-sd))
+;;;     :speed-mode             — (or speed-mode (:speed-mode parent-sd)) — workflow snapshot (task 207)
+;;;     :effort-override        — (or effort-override (:effort-override parent-sd)) — workflow snapshot (task 207)
 ;;;     :developer-prompt       — (or developer-prompt (:developer-prompt parent-sd))
 ;;;     :developer-prompt-source — (or developer-prompt-source (:developer-prompt-source parent-sd))
 ;;;     :cache-breakpoints      — (or cache-breakpoints (:cache-breakpoints parent-sd) default)
-;;;   Not inherited — intentional defaults (10 of 17):
+;;;   Not inherited — intentional defaults (10 of 19):
 ;;;     :nucleus-prelude-override — consumed during prompt derivation inside
 ;;;                                 default-child-system-prompt-build-opts; flows into the child's
 ;;;                                 system-prompt-build-opts rather than being carried as a standalone field

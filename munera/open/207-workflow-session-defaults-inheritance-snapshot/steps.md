@@ -282,7 +282,7 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
 
 ## Implementation-review pass 2 follow-ups (review 2026-06-02)
 
-- [ ] R3: Update the `child_session_state.clj` header classification comment
+- [x] R3: Update the `child_session_state.clj` header classification comment
       (`:14-50`) so it stops drifting from `common-inherited-fields` after S5
       added speed/effort inheritance to `child-session-base-state*`
       (`:166-169`, `(or speed-mode (:speed-mode parent-sd))` /
@@ -296,3 +296,12 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       Decision 8's authority test guards on the workflow-snapshot side; the
       hand-maintained child-session classification mirror has no such guard and
       has drifted. At minimum reconcile the comment with the code + authority.
+      DONE: comment header now reads "common-inherited-fields (19 keys)";
+      "Inherited from parent (9 of 19)" adds `:speed-mode` /`:effort-override`
+      with their `(or … (:… parent-sd)) — workflow snapshot (task 207)`
+      derivation notes (mirroring `child-session-base-state*`:166-169);
+      "Not inherited — intentional defaults (10 of 19)" count corrected
+      (its 10-key enumeration is unchanged — `:nucleus-prelude-override` stays
+      classified as not-carried). 9 + 10 = 19 reconciles with the constant.
+      Comment-only change (no behaviour/code path touched), so no test/doc
+      delta; lint clean on the touched file.

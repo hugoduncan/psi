@@ -830,3 +830,24 @@ New actionable finding (not covered by any prior note/step):
   the code and the authority.)
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Follow-up execution — R3 resolution (2026-06-02)
+
+- **R3 DONE — `child_session_state.clj` classification comment reconciled with
+  `common-inherited-fields`.** Comment-only edit to the header block
+  (`:24-58`): (a) count corrected `17 → 19` in the section header
+  ("common-inherited-fields (19 keys)"); (b) the Inherited bucket relabelled
+  "Inherited from parent (9 of 19)" and now enumerates `:speed-mode` /
+  `:effort-override` with their `(or … (:… parent-sd)) — workflow snapshot
+  (task 207)` derivation notes, mirroring `child-session-base-state*:166-169`;
+  (c) the Not-inherited bucket relabelled "Not inherited — intentional defaults
+  (10 of 19)" with its existing 10-key enumeration unchanged
+  (`:nucleus-prelude-override` stays classified as consumed-not-carried). Sum
+  reconciles: 9 inherited + 10 not-inherited = 19 = constant length.
+  No behaviour/code-path change (pure comment), so no test or doc delta;
+  `clj-kondo --lint child_session_state.clj` → 0 errors / 0 warnings.
+  No drift-guard test added (R3 stated "at minimum reconcile the comment"); a
+  programmatic guard for the hand-maintained classification mirror remains a
+  possible future hardening but is out of scope for this follow-up.
+
+PASS_STATUS: COMPLETE
