@@ -310,3 +310,41 @@ Changes:
   existing slice-2 parse-helper step (steps.md L91-92).
 
 No code touched (instruction-correction only). No blocked steps.
+
+## Implementation (ψ)
+
+All four slices implemented and tested; design followed without material
+deviation. Notable concrete decisions made during implementation:
+
+- **Slice 1** `psi.agent-session.deterministic-operation-action`: `list-operations`,
+  `build-invocation`, `invoke-operation`, `truncate-value`, `project-result`.
+  `build-invocation` omits `:operation-id`/`:workflow-run-id`/`:step-id`;
+  conditionally assocs `:parent-session-id`. Verified the runtime injects
+  `:operation-id`. Requires only registry/runtime/session-state (INC-2 honoured).
+- **Slice 2** `psi.agent-session.psi-tool-operation` + wiring in `psi_tool.clj`.
+  `args` parsed in `validate-psi-tool-request` (D1) via a new
+  `parse-operation-args-string`, read through `(get args "args")` to avoid the
+  `:as args` collision (INC-1). Added `operation` to the `:action` enum,
+  `psi-tool-supported-actions`, the case-action dispatch arm, the outer-catch
+  arm (D1), `telemetry-args`, `truncation-visible-prefix`, and schema
+  `operation-id`/`args` properties. Did NOT extend the `:op` enum (D4).
+  - **Deviation (minor):** the report fn's own try/catch renders not only the
+    two propagating runtime ex-info types (`:missing-deterministic-operation`,
+    `:malformed-operation-result`, D3) but also its own `:phase :validate`
+    guard (e.g. missing ctx) as a structured operation error; any other
+    throwable is re-thrown. This keeps direct calls of the report fn (and the
+    no-ctx guard) returning a structured `:overall-status :error` rather than
+    leaking. Validate-phase errors raised by `validate-psi-tool-request` are
+    still handled by the outer-catch `"operation"` arm as designed.
+- **Slice 3** `commands.clj`: `/operations` (exact) + `/operation` (prefixed),
+  `format-operations`, `dispatch-operation-command`, `render-operation-result`
+  (D2: `:status` first then keys sorted by `pr-str`), `parse-operation-command-args`.
+  Precedence confirmed: `/operations` matched as exact before `/operation`
+  prefix; the prefix matcher requires `=`/`prefix " "` so no collision.
+- **Slice 4** docs: README psi-tool action list, `doc/tui.md` command list +
+  new "Deterministic operation commands" section, CHANGELOG `[Unreleased] >
+  Added`.
+
+Tests: 42 new tests / 89 assertions across the four test namespaces, all green;
+psi-tool-mutate + psi-tool-scheduler suites still green (no regression).
+clj-kondo clean on all new/modified files.

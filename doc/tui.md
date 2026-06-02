@@ -58,6 +58,7 @@ repo-local startup.
 `/model <provider> <model-id>` `/thinking <off|minimal|low|medium|high|xhigh>` `/speed [normal|fast [session|project|user]]` `/effort [low|medium|high|xhigh|none [session|project|user]]`
 `/jobs [status ...]` `/job <job-id>` `/cancel-job <job-id>`
 `/project-repl` `/project-repl start` `/project-repl attach` `/project-repl stop` `/project-repl eval <code>` `/project-repl interrupt`
+`/operations` `/operation <id> {edn-args}`
 `/skill:<name>` plus any extension commands such as `/work-on`, `/work-done`, `/work-rebase`, `/work-status`
 
 
@@ -107,3 +108,21 @@ only applies to newly created root sessions.
   keep deep trees and mixed session states visually stable.
 
 The selector UI is frontend-native, but candidate lists and command semantics are backend-owned.
+
+### Deterministic operation commands
+
+- `/operations` lists the deterministic operations registered in the session as
+  `<id> — <description>` lines, sorted by id. An empty registry prints
+  `No deterministic operations registered.`
+- `/operation <id> {edn-args}` invokes operation `<id>` with the EDN-map
+  `{edn-args}` (default `{}` when omitted) and renders the tagged result as text:
+  the `:status` line first, then the remaining top-level result keys sorted by
+  their printed form, one `<key> <value>` line per key. Each value is `pr-str`'d
+  and truncated to 2000 characters (with a `… (truncated, N chars total)` marker).
+- `<id>` is the first whitespace-delimited token; the remainder is parsed as the
+  EDN args map. A blank id prints the usage message; malformed or non-map args
+  print a clear parse error; an unknown id or a malformed operation result is
+  surfaced as a distinct text message (never a crash).
+- Both surfaces (this command and the psi-tool `operation` action) share one
+  invocation/listing mechanism and render identically; side-effecting operations
+  are invokable.

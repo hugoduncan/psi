@@ -163,14 +163,14 @@
 
 ## Slice 4 — docs + CHANGELOG
 
-- [ ] Update README and relevant `doc/` (command reference + psi-tool action
+- [x] Update README and relevant `doc/` (command reference + psi-tool action
   reference) documenting `/operations`, `/operation <id> {edn-args}`, and
   `action: "operation"` with `op list|invoke`, params, truncation, side-effects.
-- [ ] Add CHANGELOG `[Unreleased] > Added` entry for the new commands +
+- [x] Add CHANGELOG `[Unreleased] > Added` entry for the new commands +
   psi-tool action (before commit, user-visible).
-- [ ] Verify coherence: design ↔ commands/psi-tool ↔ tests ↔ docs.
-- [ ] Run full agent-session test suite for touched namespaces.
-- [ ] Commit: `⚒ 205: docs + CHANGELOG for deterministic-operation surfaces`.
+- [x] Verify coherence: design ↔ commands/psi-tool ↔ tests ↔ docs.
+- [x] Run full agent-session test suite for touched namespaces.
+- [x] Commit: `⚒ 205: docs + CHANGELOG for deterministic-operation surfaces`.
 
 ## Plan/steps-review follow-ups (ψ)
 
@@ -227,6 +227,6 @@
 
 ## Close-out
 
-- [ ] Re-read design acceptance criteria; confirm each is covered by a test.
+- [x] Re-read design acceptance criteria; confirm each is covered by a test.
 - [ ] `git mv` task dir `open/ → closed/` and remove from `munera/plan.md`
   (only when implementation + reviews complete).

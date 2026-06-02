@@ -116,6 +116,7 @@ For TUI login flow, in-session commands, and runtime behavior, see:
 - `reload-code` — explicit namespace/worktree code reload with distinct reload and graph-refresh reporting
 - `project-repl` — managed project REPL status/start/attach/stop/eval/interrupt operations with structured reports
 - `scheduler` — delayed one-shot work via explicit `create|list|cancel`, including both delayed same-session prompts and delayed fresh top-level session creation
+- `operation` — list and invoke registered deterministic operations via explicit `list|invoke`; `list` returns each operation's id and description (sorted by id), `invoke` runs `operation-id` with an EDN-map `args` (default `{}`) and returns the tagged result with every top-level key rendered (each value `pr-str`'d, truncated to 2000 chars). Side-effecting operations are invokable.
 
 See:
 - [`doc/psi-project-config.md`](doc/psi-project-config.md) for query/mutate/reload examples and worktree-authoritative reload targeting rules, including the recommended self-reload loop
