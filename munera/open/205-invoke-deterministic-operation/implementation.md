@@ -348,3 +348,48 @@ deviation. Notable concrete decisions made during implementation:
 Tests: 42 new tests / 89 assertions across the four test namespaces, all green;
 psi-tool-mutate + psi-tool-scheduler suites still green (no regression).
 clj-kondo clean on all new/modified files.
+
+## Implementation review (ψ)
+
+Reviewed code/tests/docs against design + architecture (task-implementation-review
+skill). Ran focused suites: 34 unit + 8 integration tests green; clj-kondo clean.
+
+Verified:
+- **Matches design** — all locked decisions #1–#12 + D1–D5 reflected in code:
+  shared `deterministic-operation-action` helper (list/invoke/truncate/project),
+  positional `operation-id` (no `:operation-id` caller-map key, runtime injects),
+  conditional `:parent-session-id`, 2000-char per-key truncation with exact
+  marker, all-top-level-key projection, `op` validated in
+  `validate-psi-tool-request` only (¬`:op` enum, D4), `args` parsed on invoke
+  only (D5), outer-catch `"operation"` arm (D1), `(:type (ex-data e))` dispatch
+  re-throwing others (D3), command `:status`-first sorted layout (D2).
+- **Architecture fit** — `operation` action mirrors `workflow`/`scheduler`
+  helper-per-ns shape (no shim); both surfaces route the single existing
+  registry+runtime boundary (`one_way`); no change to registry/runtime/
+  workflow-runtime (git diff --stat empty for those components).
+- **Tests** — real registry + real runtime, no mocks; assert state/outputs
+  (sinks for side-effects, exact text/keys), cover all AC incl. empty list,
+  sorted, default `{}`, blank-id usage, malformed/non-map args, unknown id,
+  malformed result distinct from missing, side-effecting op, >2000-char
+  truncation identical across surfaces, precedence `/operations` vs `/operation`.
+- **Docs/CHANGELOG** — README psi-tool action list, doc/tui.md command section,
+  CHANGELOG [Unreleased]>Added — all accurate and user-facing.
+- **No leak** — `malformed-operation-result-ex` dissocs `:ctx`; report is
+  `sanitize-psi-tool-data`'d at the make-psi-tool call site.
+
+Non-actionable observations (no follow-up):
+- `psi_tool_operation.clj` re-declares a private `psi-tool-error-summary`
+  identical to the copies already in `psi_tool_workflow.clj` /
+  `psi_tool_scheduler.clj`. This follows the *established* per-helper-ns
+  convention the design chose to mirror; it is pre-existing duplication across
+  the psi-tool helper family, not introduced by this task. A future cross-cutting
+  cleanup could hoist a shared `psi-tool-error-summary` for all four helpers, but
+  that is out of scope here and changing only this one file would worsen
+  inconsistency.
+- Report fn additionally renders its own `:phase :validate` guard (missing ctx)
+  as a structured error beyond the two propagating runtime ex-info types — already
+  documented as an intentional minor deviation; correct and tested
+  (`missing-ctx-renders-error`).
+
+Conclusion: implementation is simple, consistent, robust, and complete against
+design. No new actionable issues found.
