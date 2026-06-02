@@ -266,3 +266,35 @@ grounded in the notification precedent and the real test file
   steps Slice 2 + plan.md Decision 7.
 
 No code changes (design/plan-only). steps.md P1–P3 checked.
+
+## Plan/steps inconsistency review (ψ)
+
+Re-read plan.md/steps.md/design.md against real `emacs-ui` code and the
+notification precedent. Verified accurate: defvar (`psi-widget-projection.el:73`);
+arm/cancel/timeout defs (`:300/:310/:317`); inline pre-cancel (`:303`);
+dispatch-mutation (`:336`), arm call site (`:349`), response callback (`:354`);
+struct field `projection-notification-timers` (`psi-globals.el:72`),
+`defvar-local psi-emacs--state` (`:111`); init (`psi-lifecycle.el:57`), teardown
+(`:269/:295`), reset (`:371/:392`); precedent
+`psi-emacs--cancel-notification-timer (state notification-id)`
+(`psi-projection.el:368`), `clear-notification-lifecycle` outer `(when state)`
+(`:381`), `schedule-notification-dismiss` `(current-buffer)`+`state`+`buffer-live-p`
+(`:410`). The six existing global-defvar-binding tests (`:500/:511/:525/:542/:551/:565`)
+are all assigned (P1/P3 dispositions hold); buffer/state thread order
+(buffer before state) matches the pinned timeout signature `(buffer state ext-id
+…)`; dead-buffer disposition is split correctly (timeout = repurposed Slice 2,
+response = new Slice 3) with no duplicate.
+
+One NEW actionable inconsistency (N1, steps.md): the lint tool named for the
+final sweep contradicts the per-`.el` lint guidance and the file type this task
+edits. Slice 1 (steps.md:19) correctly lints the edited `.el` files with
+`clj-paren-repair`/lint; Slice 5 (steps.md:112) says "`clj-kondo`/lint clean".
+`clj-kondo` is the Clojure linter and does not lint Emacs Lisp `.el` files —
+this task touches only `.el` files (`psi-globals.el`, `psi-lifecycle.el`,
+`psi-widget-projection.el`, `psi-widget-projection-test.el`). The two slices
+disagree on the linter for the same files, and Slice 5 names a tool inapplicable
+to the edited file type. Resolve by replacing Slice 5's `clj-kondo` with the
+`.el`-appropriate lint (`clj-paren-repair`/byte-compile/`elisp` lint), matching
+Slice 1. Added unchecked follow-up to steps.md.
+
+No code changes (design/plan-only).

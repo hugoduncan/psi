@@ -140,6 +140,18 @@
       distinct nil/`state` guard with explicit `buffer`/`state` args + assertion,
       or delete it. Update Slice 2's test list to one unambiguous outcome.
 
+## Plan/steps inconsistency review follow-ups (ψ)
+
+- [ ] N1 — Reconcile the final-sweep lint tool with the per-`.el` lint guidance.
+      Slice 1 (`steps.md` lint step) lints the edited `.el` files with
+      `clj-paren-repair`/lint, but Slice 5 says "`clj-kondo`/lint clean".
+      `clj-kondo` is the Clojure linter and does not lint Emacs Lisp `.el`
+      files; this task edits only `.el` files (`psi-globals.el`,
+      `psi-lifecycle.el`, `psi-widget-projection.el`,
+      `psi-widget-projection-test.el`). Replace Slice 5's `clj-kondo` with the
+      `.el`-appropriate lint (`clj-paren-repair`/byte-compile/`elisp` lint),
+      matching Slice 1, so both slices name the same linter for the same files.
+
 ## Acceptance verification (final)
 
 - [ ] Confirm against design.md acceptance criteria: buffer-local store; single
