@@ -160,6 +160,77 @@
         (is (= :xhigh (:effort-override config))
             "effort-override comes from the snapshot (AC3)")))))
 
+(def ^:private tools-skills-definition
+  "A single-step workflow whose step references one tool and one skill BY NAME,
+   so the resolver resolves each name against the inherited resolution pool
+   (the snapshot's :tool-defs / :skills on the snapshot path)."
+  {:definition-id "tools-skills"
+   :name "tools-skills"
+   :steps [{:name "step-1"
+            :type :session
+            :session {:tools ["shared-tool"]
+                      :skills ["shared-skill"]}
+            :contributions [{:type :template
+                             :text "{{input}}"
+                             :vars {"input" {:from :workflow-input :path [:input]}}}]}]
+   :workflow-file-meta {:system-prompt "Tools and skills."}})
+
+(defn- run-tools-skills-with-snapshot
+  [ctx session-id snapshot run-id]
+  (swap! (:state* ctx)
+         (fn [state]
+           (let [[state' _ _] (workflow-registry/register-definition state tools-skills-definition)
+                 [state'' _ _] (workflow-runtime/create-run
+                                state'
+                                {:definition-id "tools-skills"
+                                 :run-id run-id
+                                 :parent-session-id session-id
+                                 :inherited-defaults snapshot
+                                 :workflow-input {:input "go"}})]
+             state'')))
+  (workflow-runtime/workflow-run-in @(:state* ctx) run-id))
+
+(deftest snapshot-isolates-tools-skills-from-live-parent-mutation-test
+  (testing "AC3: tools/skills resolve from the captured snapshot pool, not the
+            live parent. The step references `shared-tool`/`shared-skill` by
+            name; the snapshot and the (post-invoke) live parent each hold a
+            distinct def for those SAME names, so the resolved def's
+            distinguishing field proves which pool fed name resolution. A
+            regression re-reading the live tools/skills on the snapshot path
+            would flip these assertions."
+    (let [[ctx session-id] (support/create-session-context {:persist? false})
+          snapshot {:model {:provider "anthropic" :id "claude-snapshot"}
+                    :prompt-mode :concise
+                    :tool-defs [{:name "shared-tool" :description "from-snapshot"}]
+                    :skills [{:name "shared-skill"
+                              :description "from-snapshot"
+                              :file-path "" :base-dir "" :source :project
+                              :disable-model-invocation false}]
+                    :thinking-level :off
+                    :speed-mode nil
+                    :effort-override nil}
+          workflow-run (run-tools-skills-with-snapshot ctx session-id snapshot "run-ts")]
+      ;; Mutate the LIVE parent session's tools/skills after invoke: a DIFFERENT
+      ;; def for the same names. The snapshot path must not read these.
+      (assoc-session-data! ctx session-id
+                           {:tool-source {"shared-tool" {:name "shared-tool"
+                                                         :description "from-live"}}
+                            :tool-ids ["shared-tool"]
+                            :skills [{:name "shared-skill"
+                                      :description "from-live"
+                                      :file-path "" :base-dir "" :source :project
+                                      :disable-model-invocation false}]})
+      (let [config (workflow-step-session-config/resolve-step-session-config
+                    ctx nil workflow-run "step-1")
+            resolved-tool (first (:tool-defs config))
+            resolved-skill (first (:skills config))]
+        (is (= "shared-tool" (:name resolved-tool)))
+        (is (= "from-snapshot" (:description resolved-tool))
+            "resolved tool def comes from the snapshot pool, not the mutated live parent")
+        (is (= "shared-skill" (:name resolved-skill)))
+        (is (= "from-snapshot" (:description resolved-skill))
+            "resolved skill comes from the snapshot pool, not the mutated live parent")))))
+
 (deftest snapshot-model-feeds-model-query-selection-context-test
   (testing "AC7: resolved-model-query selection context comes from the snapshot
             model, not the live parent. Proven via a `:same-model-as-session`

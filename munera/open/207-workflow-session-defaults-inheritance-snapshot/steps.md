@@ -408,7 +408,7 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
 
 ## Test-review pass 2 follow-ups (review 2026-06-02)
 
-- [ ] T2: Close the AC3 tools/skills isolation coverage gap.
+- [x] T2: Close the AC3 tools/skills isolation coverage gap.
       `snapshot-isolates-resolution-from-live-parent-mutation-test`
       (`inheritance_snapshot_test.clj`) is the only AC1/AC2/AC3 isolation test;
       it sets `:tool-defs`/`:skills` in the snapshot but never asserts the
@@ -425,3 +425,26 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       snapshot pool AND stay unchanged after a post-invoke mutation of the live
       parent's tools/skills, matching the model/prompt-mode/speed/effort
       isolation coverage already in that test.
+      DONE: the closing test
+      `snapshot-isolates-tools-skills-from-live-parent-mutation-test`
+      (`inheritance_snapshot_test.clj`) references `shared-tool`/`shared-skill`
+      by name, captures them in the snapshot pool with `:description
+      "from-snapshot"`, mutates the live parent's tool-source/tool-ids/skills to
+      `"from-live"` AFTER invoke, and asserts the resolved config's
+      `:tool-defs`/`:skills` resolve from the snapshot pool (`"from-snapshot"`),
+      proving no live leak. Output assertion (resolved config), real ctx/state,
+      lint-clean; inheritance-snapshot suite 9 tests / 47 assertions green.
+
+## Test-review pass 3 follow-ups (review 2026-06-02)
+
+- [ ] T3: Commit the uncommitted T2 fix; HEAD still ships the AC3 tools/skills
+      gap. The T2 test (`snapshot-isolates-tools-skills-from-live-parent-mutation-test`,
+      +71 lines in `inheritance_snapshot_test.clj`) exists only in the working
+      tree — committed HEAD does NOT contain it (`git show HEAD:…` grep = 0;
+      `git diff --stat` = 1 file/+71), so HEAD ships the exact AC3 tools/skills
+      behavioural-coverage gap T2 identified while the closing test dangles
+      uncommitted (same dirty-tree / incoherent-HEAD failure mode as R5). Commit
+      the working-tree test with a `⚒ 207` message, then verify
+      `git status --short` is clean and HEAD self-consistent (AC3 tools/skills
+      isolation behaviourally covered in HEAD). Do NOT close the task with a
+      dirty tree.

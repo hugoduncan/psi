@@ -1254,3 +1254,37 @@ Behaviour-coverage gap (new, actionable; distinct from T1/R-series):
   model/prompt-mode/speed/effort coverage already present in the same test.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Test review pass 3 (ψ, 2026-06-02)
+
+Re-reviewed with task-test-review (well-formed ∧ behaviour-coverage ∧
+no-mock/no-stub) against committed HEAD and the working tree. AC→test map is
+otherwise complete and green (focused suites: inheritance-snapshot 9/47,
+child-session-state 9/62, attempts 7/32, core 9/35, canonical-workflows 12/123).
+Real collaborators throughout (`support/create-session-context`, real
+`create-run`/`resolve-step-session-config`/`delegate-step-runtime-result`/
+`child-session-base-state`); delegate e2e asserts persisted child-run state, not
+interactions; the only `with-redefs`/captured-opts usages are pre-existing
+infra-guard stubs in `attempts-test` (interaction-asserting `forwards-supported`
+predates 207 / #90 — 207 only appended the `:inherited-snapshot? true`
+assertion). T1 (AC7) verified strong.
+
+Actionable (coherence, same class as R5):
+
+- **T3 (T2 fix uncommitted; HEAD still has the AC3 tools/skills gap).** Test
+  review pass 2 raised T2 (AC3 tools/skills isolation behaviourally uncovered).
+  The fix — `snapshot-isolates-tools-skills-from-live-parent-mutation-test`
+  (`inheritance_snapshot_test.clj`, +71 lines) — exists ONLY in the working
+  tree (`git diff --stat`: 1 file, +71); committed HEAD
+  (`git show HEAD:…inheritance_snapshot_test.clj | grep -c …` = 0) does NOT
+  contain it, and steps.md T2 is still `[ ]` unchecked. So HEAD ships the exact
+  AC3 tools/skills behavioural-coverage gap T2 identified, while the closing
+  test dangles uncommitted — the same dirty-tree / incoherent-HEAD failure
+  mode as R5. The working-tree test is well-formed (real ctx/state, references
+  tools/skills by name, mutates the live parent post-invoke with a
+  distinguishing `from-live`/`from-snapshot` value, asserts resolved config
+  sources from the snapshot pool = output assertion, lint-clean, passes within
+  the 9/47 run). Fix: commit the working-tree test with a `⚒ 207` message and
+  check off T2; verify `git status --short` clean and HEAD self-consistent
+  (AC3 tools/skills isolation now behaviourally covered in HEAD, not just the
+  working tree). Do NOT close the task with a dirty tree.
