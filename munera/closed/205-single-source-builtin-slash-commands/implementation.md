@@ -1336,3 +1336,22 @@ single source rather than spot-checks. No follow-up steps added (criterion 3:
 nothing to add without duplicating existing TT1–TT6 coverage).
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Test review follow-ups (review pass 6)
+
+- TT7 (NEW, actionable): The resolver's **full** name-order is under-locked
+  against the spec table, asymmetrically with the help block (TT5 fully locks
+  help-block line order). AC1 requires resolver output "in spec-table order",
+  but `builtin-command-specs-resolver-shape-test` only asserts the representative
+  `quit < status < help` triple ("specs appear in table order"), and the
+  description-content lock (TT1) compares an **order-insensitive** `{name →
+  description}` map. So a middle-of-table reorder — or a future `sort`/`set`
+  introduced into `builtin-command-specs-for-resolver` — would pass every
+  resolver test while violating AC1's order guarantee. Prior pass 5's
+  REVIEW_COMPLETE note listed "resolver shape/order" as covered; the *full*
+  order is not. Symmetric to the TT5 help-block-order finding that prior passes
+  accepted as actionable. Lock the full sequence:
+  `(mapv :name specs) == (mapv #(bspec/strip-slash (key %)) bspec/builtin-command-specs)`
+  in `builtin-commands-resolver-test`, locking the whole resolver name order —
+  every interleaved entry — to the single source. See steps.md "Test review
+  follow-ups (review pass 6)".

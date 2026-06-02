@@ -345,3 +345,18 @@ Tick with sha/decision on completion.
       match `(commands/exact-command-handler "/project-repl") = :project-repl`,
       and that the prefixed matcher does not match the bare form (matches only
       `/project-repl <args>`), proving the bare form is genuinely exact-routed.
+
+## Test review follow-ups (review pass 6)
+
+- [ ] TT7 — Lock the resolver's FULL name-order to the single source (AC1 "in
+      spec-table order"), symmetric with TT5's help-block-order lock.
+      `builtin-command-specs-resolver-shape-test` only asserts the representative
+      `quit < status < help` triple, and the TT1 description-content lock
+      compares an order-INSENSITIVE `{name → description}` map — so a
+      middle-of-table reorder (or a `sort`/`set` slipped into
+      `builtin-command-specs-for-resolver`) passes every resolver test yet
+      breaks AC1. Add to `builtin-commands-resolver-test` an assertion that the
+      resolver's `(mapv :name specs)` equals
+      `(mapv #(bspec/strip-slash (key %)) bspec/builtin-command-specs)`
+      (the full, interleaved spec-table key order, stripped), locking the whole
+      output sequence — not just the leading triple — to the single source.
