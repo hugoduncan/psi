@@ -830,7 +830,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Test review follow-ups — test-shaper pass 5 (2026-06-01)
 
-- [ ] Add explicit `:kind :message` to the `:scheduler/create` payloads that
+- [x] Add explicit `:kind :message` to the `:scheduler/create` payloads that
       still omit it in `scheduler_lifecycle_test.clj` and
       `scheduler_dispatch_test.clj`, completing the data-shape alignment that
       test-shaper passes 1 & 3 applied only to `scheduler_timer_seam_test` /
@@ -847,8 +847,22 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       (Slice-10 allowlist — zero `components/agent-session/src/**` /
       `doc/scheduler.md`); keep suite green + clj-kondo/cljfmt clean. If 201 is
       treated as closed, raise as a small standalone test-hygiene task.
+      Done: added `:kind :message` to all 6 named sites — `scheduler_lifecycle_test`
+      ×4 (`scheduled-deliver-runs-canonical-prompt-lifecycle-test` ~L55;
+      `busy-session-fire-queues-then-idle-drains-fifo-test` ~L116;
+      `cancel-pending-and-queued-schedules-test` ~L152 & ~L167) and
+      `scheduler_dispatch_test` ×2 (the `schedule` helper map ~L9 — the stored
+      schedule shape used by the dispatch deftests; and the
+      `scheduler-create-stores-schedule-and-starts-timer-test`
+      `:scheduler/create` payload ~L23). The kind-under-test is now explicit,
+      matching every other 201 live create. No behaviour change (handler default
+      `(or kind :message)` already resolved `:message`); no assertions
+      added/removed by this item. clj-kondo 0/0, cljfmt/clj-paren-repair clean
+      on both files; full `bb test` green. Test files only — zero
+      `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist
+      held).
 
-- [ ] Remove the duplicated assertion in
+- [x] Remove the duplicated assertion in
       `scheduler_dispatch_test/scheduler-fired-queues-while-session-busy-test`
       (~L65–66): `(is (= :queued (:status stored)))` appears **twice** verbatim.
       Drop one copy (redundant — both assert the same thing, no extra signal;
@@ -857,3 +871,16 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       citations (`findings.md` / `steps.md` / `implementation.md`) that quote the
       total. Test-file only (Slice-10 allowlist); keep suite green +
       clj-kondo/cljfmt clean.
+      Done: dropped the second verbatim `(is (= :queued (:status stored)))` in
+      `scheduler-fired-queues-while-session-busy-test`; the remaining single copy
+      plus the queue-contents assertion preserve all signal. Recomputed the
+      aggregate: focused kaocha run of `scheduler-dispatch-test` now reports
+      **5 tests / 19 assertions** (was 20; −1), so the scheduler-suite
+      deliverable total is **50 tests / 411 assertions** (was 412; the `:kind`
+      alignment item adds no assertions). Updated the current deliverable count
+      citation in `findings.md` Outcome (412 → 411, noting the dropped
+      duplicate). Historical per-pass `412` Done-notes left intact as the record
+      of state at their pass time (matching the pass-4 precedent of preserving
+      historical counts). clj-kondo 0/0, cljfmt clean; full `bb test` green.
+      Test/task-doc files only — zero `components/agent-session/src/**` or
+      `doc/scheduler.md` (Slice-10 allowlist held).

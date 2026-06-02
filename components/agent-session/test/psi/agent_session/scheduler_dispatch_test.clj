@@ -8,6 +8,7 @@
 (defn- schedule
   [_ctx session-id schedule-id status]
   {:schedule-id schedule-id
+   :kind :message
    :label nil
    :message (str "message-" schedule-id)
    :source :scheduled
@@ -23,6 +24,7 @@
         result           (session/dispatch-in! ctx :scheduler/create
                                                {:session-id session-id
                                                 :schedule-id "sch-1"
+                                                :kind :message
                                                 :label "check-build"
                                                 :message "Check build"
                                                 :created-at created-at
@@ -64,7 +66,6 @@
                           {:origin :core})
     (let [stored (get-in (ss/get-session-data-in ctx session-id)
                          [:scheduler :schedules "sch-1"])]
-      (is (= :queued (:status stored)))
       (is (= :queued (:status stored)))
       (is (= ["sch-1"] (get-in (ss/get-session-data-in ctx session-id) [:scheduler :queue]))))))
 

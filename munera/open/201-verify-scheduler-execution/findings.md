@@ -11,9 +11,11 @@ raised remediation task ref (`NNN-slug` or `not-yet-raised`).
 
 **All 7 Scope areas verified-correct — no defects found.** No remediation task
 created. Scheduler suite grew from baseline **35 tests / 338 assertions** to
-**50 tests / 412 assertions**, all green (the test-shaper-pass-2 split of the
+**50 tests / 411 assertions**, all green (the test-shaper-pass-2 split of the
 psi-tool megatest into 6 focused deftests raised the deftest count 45 → 50;
-assertions unchanged). No scheduler source or `doc/scheduler.md` modified
+assertions unchanged. test-shaper pass 5 then dropped one duplicated
+`:queued`-status assertion in `scheduler-fired-queues-while-session-busy-test`,
+412 → 411). No scheduler source or `doc/scheduler.md` modified
 (coherence gate passes: only test files under
 `components/agent-session/test/**` + this task dir changed).
 

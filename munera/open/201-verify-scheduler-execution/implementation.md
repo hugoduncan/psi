@@ -1337,3 +1337,33 @@ Both are test-file-only (Slice-10 allowlist — zero `components/agent-session/s
 or `doc/scheduler.md`). Suite currently green (45 focused tests / 320 assertions
 in the 9-ns focused run; aggregate 50/412 under full `bb test`). Follow-ups
 added to steps.md.
+
+## Test review follow-ups — test-shaper pass 5 execution (2026-06-01)
+
+Executed both pass-5 follow-ups (test-file/task-doc only; Slice-10 allowlist held —
+zero `components/agent-session/src/**` or `doc/scheduler.md`):
+
+1. `:kind :message` data-shape alignment — added explicit `:kind :message` to the
+   6 omitting sites: `scheduler_lifecycle_test` ×4 (canonical-prompt-lifecycle
+   ~L55, busy-drain-fifo ~L116, cancel-pending-and-queued ~L152 & ~L167) and
+   `scheduler_dispatch_test` ×2 (the `schedule` stored-shape helper ~L9 + the
+   `scheduler-create-stores-schedule-and-starts-timer-test` `:scheduler/create`
+   payload ~L23). Kind-under-test now local in every 201 live create; no
+   behaviour change (handler default `(or kind :message)` already resolved). No
+   assertions added/removed.
+
+2. Duplicate-assertion removal — dropped the second verbatim
+   `(is (= :queued (:status stored)))` in
+   `scheduler-fired-queues-while-session-busy-test`. Aggregate recomputed:
+   `scheduler-dispatch-test` 20 → **19** assertions (focused kaocha), so the
+   scheduler-suite deliverable total is **50 tests / 411 assertions** (was 412).
+   Updated the current deliverable citation in `findings.md` Outcome (412 → 411).
+   Historical per-pass `412`/`410` Done-notes left intact (pass-4 precedent —
+   preserve state-at-pass-time record).
+
+Verification: `clojure -M:test --focus psi.agent-session.scheduler-dispatch-test`
+= 5 tests / 19 assertions / 0 failures; full `bb test` green; clj-kondo 0/0 and
+cljfmt/clj-paren-repair clean on both touched test files. The pre-existing
+cross-ns isolation artifact (scheduler namespaces run in isolation together
+surface ordering-dependent failures absent under canonical full `bb test`) is
+unchanged and out of scope. Review chain converges → no new actionable items.

@@ -55,6 +55,7 @@
       (session/dispatch-in! ctx :scheduler/create
                             {:session-id session-id
                              :schedule-id "sch-e2e-1"
+                             :kind :message
                              :label "wake-check"
                              :message "check status"
                              :created-at (java.time.Instant/parse "2099-04-21T18:00:00Z")
@@ -116,6 +117,7 @@
       (session/dispatch-in! ctx :scheduler/create
                             {:session-id session-id
                              :schedule-id schedule-id
+                             :kind :message
                              :label label
                              :message message
                              :created-at (java.time.Instant/parse created)
@@ -152,6 +154,7 @@
     (session/dispatch-in! ctx :scheduler/create
                           {:session-id session-id
                            :schedule-id "sch-cancel-pending"
+                           :kind :message
                            :message "pending"
                            :created-at (java.time.Instant/parse "2099-04-21T18:00:00Z")
                            :fire-at (java.time.Instant/parse "2099-04-21T18:05:00Z")
@@ -167,6 +170,7 @@
     (session/dispatch-in! ctx :scheduler/create
                           {:session-id session-id
                            :schedule-id "sch-cancel-queued"
+                           :kind :message
                            :message "queued"
                            :created-at (java.time.Instant/parse "2099-04-21T18:00:01Z")
                            :fire-at (java.time.Instant/parse "2099-04-21T18:05:01Z")
