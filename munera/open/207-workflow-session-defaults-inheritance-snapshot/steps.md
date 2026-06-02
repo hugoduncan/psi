@@ -237,14 +237,20 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
 
 ## Implementation-review follow-ups (review 2026-06-02)
 
-- [ ] R1: In `resolve-step-session-config`
+- [x] R1: In `resolve-step-session-config`
       (`workflow-step-session-config/core.clj:195`) make the live
       `parent-session` (`execution-adapter/get-session-data`) read snapshot-gated
       / lazy so it is NOT performed when `(:inherited-defaults workflow-run)` is
       present. Currently the live read is unconditional but unused on the
       snapshot path (only the else-branches consume `parent-session`), a dead
       read that partially defeats the "no live parent re-read" snapshot intent.
-- [ ] R2: Add an end-to-end AC4 test driving `delegate-step-runtime-result` with
+      DONE: gated the binding to `(when-not snapshot? (get-session-data …))` —
+      all three `parent-session` uses (model/prompt-mode at `:204/:205`, skills
+      `:208`, tool-ids `:212`) are in the `(if snapshot? …)` else-branches, so
+      the snapshot path now performs no live parent read. Existing AC1/AC2
+      isolation tests + `no-snapshot-falls-back-to-live-parent-test` cover both
+      paths (still green).
+- [x] R2: Add an end-to-end AC4 test driving `delegate-step-runtime-result` with
       the injected `resolve-inherited-defaults-fn` (or a full delegation through
       the bound closure) that asserts the CHILD run's persisted
       `:inherited-defaults` equals the delegating step's effective snapshot
@@ -253,3 +259,23 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       directly, leaving the `delegate.clj:54-60` wiring
       (`when resolve-inherited-defaults-fn` → `assoc :inherited-defaults` into
       child `create-run`) unasserted.
+      DONE: added
+      `delegate-step-runtime-result-persists-child-inherited-defaults-test` to
+      `inheritance_snapshot_test.clj` (requires
+      `psi.workflow-runtime.statechart-runtime.delegate`). It registers a child
+      + delegating definition, creates the delegating run with a parent-run
+      snapshot, then drives `delegate/delegate-step-runtime-result` with the
+      REAL injected closure (mirroring `context.clj`:
+      `effective-config->snapshot` ∘ `resolve-step-session-config`) and stub
+      no-op `send-and-drain-fn`/`create-workflow-context-fn`. Asserts the child
+      run's persisted `:inherited-defaults` carries the delegating step's
+      effective model + parent-snapshot speed/effort + exact key set, covering
+      the `delegate.clj:54-60` `assoc :inherited-defaults` wiring.
+      NOTE/correction to the review's parenthetical: a delegate step's COMPILED
+      effective definition drops per-step `:session` overrides, so the
+      delegating step's effective model is INHERITED from the parent run snapshot
+      (`claude-PARENT`), not a step override — the test asserts that real
+      behaviour. (The "overridden model" path is already covered at the
+      function-composition level by
+      `nested-delegation-effective-snapshot-propagates-overridden-model-test`.)
+      inheritance-snapshot suite green (9 tests, 45 assertions); lint clean.

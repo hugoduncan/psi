@@ -724,3 +724,58 @@ New actionable findings:
   delegate wiring, not just the two helper fns, is covered.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Implementation-review follow-ups R1/R2 executed (ψ, 2026-06-02)
+
+Both newly-added implementation-review follow-ups completed.
+
+- **R1 — snapshot-gate the live parent read.** In `resolve-step-session-config`
+  (`workflow-step-session-config/core.clj`) the `parent-session` binding was an
+  unconditional `(execution-adapter/get-session-data ctx …)`, but on the
+  snapshot path the value is consumed nowhere (model/prompt-mode/skills/tool-ids
+  all take the `(if snapshot? <snapshot> <else-using-parent-session>)`
+  snapshot branch). Changed the binding to
+  `(when-not snapshot? (execution-adapter/get-session-data …))` so the snapshot
+  path performs zero live parent reads, matching the "resolution isolated from
+  the live parent" design intent. All three `parent-session` consumers
+  (`:model`/`:prompt-mode` at the two `if` else-arms, `all-skills … parent-session`,
+  `:tool-ids parent-session`) are strictly in else-branches → non-nil when
+  reached. No new test: existing AC1/AC2 isolation tests
+  (`snapshot-isolates-resolution-from-live-parent-mutation-test`,
+  `snapshot-model-feeds-model-query-selection-context-test`) and the
+  back-compat `no-snapshot-falls-back-to-live-parent-test` cover both branches;
+  all green.
+
+- **R2 — AC4 end-to-end delegate-wiring test.** Added
+  `delegate-step-runtime-result-persists-child-inherited-defaults-test` to
+  `inheritance_snapshot_test.clj`, requiring
+  `psi.workflow-runtime.statechart-runtime.delegate`
+  (`workflow-step-session-config` already depends on `workflow-runtime`). Drives
+  `delegate/delegate-step-runtime-result` with the REAL injected
+  `resolve-inherited-defaults-fn` closure (identical composition to the one
+  bound in `agent-session/context.clj`:
+  `effective-config->snapshot` ∘ `resolve-step-session-config`), plus stub
+  no-op `send-and-drain-fn` (leaves the child run at created status) and
+  `create-workflow-context-fn`. Asserts the child run's persisted
+  `:inherited-defaults` (read back from canonical state) — exercising the
+  `delegate.clj:54-60` `when resolve-inherited-defaults-fn → cond-> assoc
+  :inherited-defaults` wiring into the child `create-run`, which the prior
+  function-level AC4 test did not cover.
+
+  Discovery / correction to the review's parenthetical "overridden model": a
+  delegate step's COMPILED effective definition drops per-step `:session`
+  overrides (the canonical-IR compiler keeps only delegate-relevant keys:
+  `:type :delegate :delegate :outputs :yields …`). So the delegating step's
+  effective model is INHERITED from the parent run snapshot, not a step
+  override. The e2e test therefore asserts the real behaviour (child model =
+  parent-snapshot `claude-PARENT`); the overridden-model composition is already
+  covered directly by
+  `nested-delegation-effective-snapshot-propagates-overridden-model-test`.
+  Also confirmed `:effective-definition :steps` is a NAME-keyed MAP, not a
+  vector (lookup by `"delegate-step"`).
+
+Verification: `psi.workflow-step-session-config.inheritance-snapshot-test`
+9 tests / 45 assertions (was 39) green; wssc core-test + workflow-runtime
+core-test + terminal-contract-execution-test 28 tests / 86 assertions green;
+clj-kondo clean on both touched files. Both R1 and R2 checked in steps.md; all
+207 steps now checked.

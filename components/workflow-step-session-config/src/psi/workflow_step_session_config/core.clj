@@ -192,7 +192,11 @@
         ;; when absent (pre-existing runs) the live-read path is retained (AC 6).
         snapshot (:inherited-defaults workflow-run)
         snapshot? (some? snapshot)
-        parent-session (execution-adapter/get-session-data ctx authoritative-parent-session-id)
+        ;; The live parent read is only consumed by the no-snapshot
+        ;; else-branches (R1); gate it on snapshot? so the snapshot path
+        ;; performs no live parent re-read, matching the isolation intent.
+        parent-session (when-not snapshot?
+                         (execution-adapter/get-session-data ctx authoritative-parent-session-id))
         ;; parent-session-model is replaced WHOLESALE by the snapshot model
         ;; (P4): all four consumers (step override, base-meta override,
         ;; no-override fallback, model-query selection context) see it.

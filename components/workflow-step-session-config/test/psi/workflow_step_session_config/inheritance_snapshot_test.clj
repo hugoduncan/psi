@@ -12,6 +12,7 @@
    [psi.session-state.init :as session-init]
    [psi.workflow-runtime.core :as workflow-runtime]
    [psi.workflow-runtime.execution-adapter]
+   [psi.workflow-runtime.statechart-runtime.delegate :as delegate]
    [psi.workflow-runtime.step-test-support :as support]
    [psi.workflow-step-session-config.core :as workflow-step-session-config]
    [psi.workflow-registry.registry :as workflow-registry]))
@@ -317,6 +318,93 @@
       (is (= workflow-step-session-config/inherited-defaults-snapshot-keys
              (set (keys nested-snapshot)))
           "nested snapshot has exactly the snapshot key set"))))
+
+(def ^:private delegate-child-definition
+  "Target definition for the delegated child run."
+  {:definition-id "child-wf"
+   :name "child-wf"
+   :steps [{:name "child-step"
+            :type :session
+            :contributions [{:type :template
+                             :text "{{input}}"
+                             :vars {"input" {:from :workflow-input :path [:input]}}}]}]
+   :workflow-file-meta {:system-prompt "Child."}})
+
+(def ^:private delegating-definition
+  "Delegating run definition whose step delegates to child-wf. A delegate
+   step's compiled effective definition carries no per-step model override, so
+   its effective config inherits the parent run's snapshot model — exactly the
+   nested-inheritance behaviour the child run must capture."
+  {:definition-id "delegating-e2e"
+   :name "delegating-e2e"
+   :steps [{:name "delegate-step"
+            :type :delegate
+            :target "child-wf"
+            :prompt-string "go"
+            :delegate {:target "child-wf"}}]
+   :workflow-file-meta {:system-prompt "Delegate."}})
+
+(deftest delegate-step-runtime-result-persists-child-inherited-defaults-test
+  (testing "AC4 end-to-end: delegate-step-runtime-result, given the real
+            injected resolve-inherited-defaults-fn closure, persists the
+            delegating step's effective snapshot (inherited parent-snapshot
+            model + parent-snapshot speed/effort) as the CHILD run's
+            :inherited-defaults via the delegate.clj wiring"
+    (let [[ctx session-id] (support/create-session-context {:persist? false})
+          parent-run-snapshot {:model {:provider "anthropic" :id "claude-PARENT"}
+                               :prompt-mode :concise
+                               :tool-defs []
+                               :skills []
+                               :thinking-level :off
+                               :speed-mode :fast
+                               :effort-override :xhigh}
+          workflow-run
+          (do (swap! (:state* ctx)
+                     (fn [state]
+                       (let [[s _ _] (workflow-registry/register-definition state delegate-child-definition)
+                             [s _ _] (workflow-registry/register-definition s delegating-definition)
+                             [s' _ _] (workflow-runtime/create-run
+                                       s {:definition-id "delegating-e2e"
+                                          :run-id "run-delegating-e2e"
+                                          :parent-session-id session-id
+                                          :inherited-defaults parent-run-snapshot
+                                          :workflow-input {:input "go"}})]
+                         s')))
+              (workflow-runtime/workflow-run-in @(:state* ctx) "run-delegating-e2e"))
+          ;; The real injected closure bound in context.clj for the nested path.
+          resolve-inherited-defaults-fn
+          (fn [ctx* parent-session-id* workflow-run* step-id*]
+            (workflow-step-session-config/effective-config->snapshot
+             (workflow-step-session-config/resolve-step-session-config
+              ctx* parent-session-id* workflow-run* step-id*)
+             (:inherited-defaults workflow-run*)))
+          ;; Stub the two other injected fns: a no-op send-and-drain leaves the
+          ;; child run at its created status; create-workflow-context returns a
+          ;; minimal ctx sharing the same state atom.
+          create-workflow-context-fn (fn [ctx* _psid _run-id] (assoc ctx* :wm nil))
+          send-and-drain-fn (fn [_wf-ctx _wm _event _payload] nil)
+          step-def (get-in workflow-run [:effective-definition :steps "delegate-step"])
+          result (delegate/delegate-step-runtime-result
+                  create-workflow-context-fn
+                  send-and-drain-fn
+                  resolve-inherited-defaults-fn
+                  ctx session-id "delegate-step" step-def workflow-run)
+          child-run-id (get-in result [:payload :delegate-run-id])
+          child-run (workflow-runtime/workflow-run-in @(:state* ctx) child-run-id)
+          child-snapshot (:inherited-defaults child-run)]
+      (is (some? child-run-id) "delegate created a child run")
+      (is (some? child-snapshot)
+          "the child run persists an :inherited-defaults snapshot")
+      (is (= {:provider "anthropic" :id "claude-PARENT"} (:model child-snapshot))
+          "child snapshot carries the delegating step's effective model
+           (inherited from the parent run snapshot)")
+      (is (= :fast (:speed-mode child-snapshot))
+          "speed-mode threaded from the parent run snapshot (P2)")
+      (is (= :xhigh (:effort-override child-snapshot))
+          "effort-override threaded from the parent run snapshot (P2)")
+      (is (= workflow-step-session-config/inherited-defaults-snapshot-keys
+             (set (keys child-snapshot)))
+          "child snapshot has exactly the snapshot key set"))))
 
 (deftest inherited-defaults-field-set-authority-test
   (testing "every :from-common source key is a member of the canonical
