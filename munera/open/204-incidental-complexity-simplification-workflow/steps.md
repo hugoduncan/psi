@@ -724,6 +724,29 @@ with the commit sha / decision when done.
       not a 204 precedent claim, so it stays coherent (no doc change). design(spec)
       ↔ implementation grounding contradiction closed.
 
+## Test review follow-ups (review pass 7)
+
+- [ ] TR9 — The selector recipe's **gap-descending ranking** (`sort_by(-.gap)`)
+      and **top-5 cap** (`.[0:5]`) are encoded only in the embedded `jq` recipe
+      and never exercised: every executable skill test feeds ≤3 units (just enough
+      for the join/determinism/filter/drop branches), so neither the ordering nor
+      the slice is asserted. Both are named Deliverable-1 behaviours — design step
+      4 / Locked decision 2: "Rank qualifying units by `gap`" and the step-5 guard
+      reads "the **top 5** qualifying units by `gap`". A regress to
+      `sort_by(.gap)` (ascending → picks the lowest-gap unit, guard reads the
+      wrong five) or a dropped/widened slice (`.[0:10]`/no slice → unbounded
+      candidate set) passes every test green; the TR3 content-lock asserts only
+      the SKILL *prose*, which can drift from the executed recipe. Per
+      `∀b ∈ behaviour(design). ∃t. covers(t,b)`, both are uncovered. Fix: extend
+      `incidental-complexity-finder-recipe-filter-and-drop-test` (or a sibling
+      deftest in the same skill-test ns; test-only, no new ns / no production
+      code), reusing `run-jq-recipe` + `named-{local,cc}-unit-json`: (a) a
+      **ranking** assertion — feed ≥3 qualifying units whose input emit order
+      differs from their gap order, assert output `gap` values are strictly
+      descending; (b) a **top-5 cap** assertion — feed >5 qualifying units, assert
+      exactly 5 survive. Run focused suite + `clj-kondo`; keep under the 800-line
+      `components/` file guard.
+
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 
 - [ ] Split step-1 selection from task-creation into two `:session` steps,

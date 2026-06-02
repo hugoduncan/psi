@@ -1927,3 +1927,54 @@ explicitly-non-planned step-1-split contingency (gated on "only if step-1 proves
 unwieldy" — it did not). The six implementation + eight test review follow-ups
 (F1–F6, TR1–TR8) are all resolved. Implementation quality: simple, consistent,
 robust; behaviour-preserving contract objective and enforced. REVIEW_COMPLETE.
+
+## Test review (pass 7)
+
+Applied the `task-test-review` skill criterion
+`∀b ∈ behaviour(design). ∃t. covers(t,b)` plus the well-formed / nullable-deps
+checks. Re-read design.md, SKILL.md, both workflow `.edn`s, and the two test
+nss (`incidental_complexity_finder_skill_test.clj`,
+`workflow_definitions_test.clj`). Focused suite green
+(17 tests, 243 assertions, 0 failures); `clj-kondo` 0 findings.
+
+Test quality is strong: no mocks, no `with-redefs`, no interaction assertions;
+the executable skill tests drive the real embedded `jq` recipe via a
+caller-controlled `run-jq-recipe` harness and assert state/outputs only. TR1–TR8
+already lock the gap method, thresholds, single-unit scope, A1 drop (prose +
+executable), F2 `@line` determinism (lossless + order-independent), F5 lambda
+key, the step-5/step-6 SKILL behaviours, the filter, the wrapper's positive +
+NO_TARGET branches, the generated two-phase contract, A5/A2 keys, and the
+no-push/PR endpoint.
+
+### TR9 — the recipe's gap-descending ranking and top-5 cap are unexercised
+
+`incidental-complexity-finder-recipe-*-test` exercise the recipe's join,
+determinism, filter, and drop branches, but **no executable test feeds more than
+the ≤3 units those branches need**, so two named Deliverable-1 behaviours encoded
+**only** in the `jq` recipe are never asserted:
+
+- **Gap-descending ranking** (`sort_by(-.gap)`): design step 4 / Locked decision 2
+  — "Rank qualifying units by `gap`" (descending); step 5 reads the top units "by
+  `gap`". The recipe's `sort_by(-.gap)` is the mechanism. No test feeds qualifying
+  units in non-gap order and asserts the output is gap-descending. A regress to
+  `sort_by(.gap)` (ascending) — which would make the workflow pick the *lowest*-gap
+  unit and the judgment guard read the wrong five — passes every test green.
+- **Top-5 cap** (`.[0:5]`): design step 4 / Locked decision 2 — the guard reads
+  "the **top 5** qualifying units by `gap`"; the recipe slices `.[0:5]`. No test
+  feeds >5 qualifying units and asserts exactly 5 survive. A regress dropping the
+  slice (or `.[0:10]`) — emitting an unbounded/wrong candidate set the guard then
+  over-reads — passes every test green. The TR3 content-lock asserts the SKILL
+  *prose* "top 5 qualifying units by `gap`", but the prose and the recipe slice
+  can drift independently (the recipe is the executed mechanism).
+
+Per `∀b ∈ behaviour(design). ∃t. covers(t,b)`, both are uncovered design
+acceptance behaviours of the executed recipe. Fix: extend
+`incidental-complexity-finder-recipe-filter-and-drop-test` (or a sibling deftest
+in the same skill-test ns; test-only, no new ns / no production code), reusing
+`run-jq-recipe` + `named-{local,cc}-unit-json`: (a) a **ranking** assertion —
+feed ≥3 qualifying units whose input emit order differs from their gap order, and
+assert the output `gap` values appear in strictly descending order; (b) a
+**top-5 cap** assertion — feed >5 qualifying units and assert exactly 5 survive.
+Keep under the 800-line `components/` file guard.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK.
