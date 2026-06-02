@@ -1167,3 +1167,77 @@ from prior passes are verified resolved. Design-fit, architecture-fit, and all
 ACs (AC1–AC8) hold.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## 2026-06-01 — Test review (task-test-review), pass 4
+
+Scope: test quality only per skill — well-formedness, behaviour coverage
+(∀ design behaviour ∃ covering test), infra-dep hygiene (injectable ∧ nullable
+∧ ¬mock ∧ ¬stub). Independent re-read of the full net-new test surface
+(`commands_builtin_specs_test.clj`, `builtin_commands_resolver_test.clj`, TUI
+`app_input_selector_test.clj`, Emacs `psi-capf-test.el`) against the spec source
+(`commands/builtin_specs.clj`), `dispatch*`/`format-help` in `commands.clj`, and
+every design AC.
+
+Confirmed prior strengths + all prior follow-ups (R1/R2/R3, TT1–TT4) landed and
+exact:
+- Infra-dep hygiene clean: no `with-redefs`/mock/stub in any net-new Clojure
+  test; TUI `query-fn`/`stub-agent-fn` are injected REAL boundary fns
+  (state-asserting); resolver tests drive the live Pathom graph via the real
+  session context; Emacs tests seed real `psi-emacs-state` structs. `cl-letf` at
+  psi-capf-test.el is a pre-existing unrelated tree-test stub.
+- Well-formedness lock (TT3), resolver description content (TT1),
+  `:hide-in-help?` block projection (TT2), both `case` seams (R1/R2),
+  projection-unchanged snapshots, resolver shape/order/membership/graph,
+  TUI/Emacs backend-sourced + empty-specs→none guards (TT4) — all present.
+
+Two new actionable coverage gaps (both non-blocking; current behaviour correct):
+
+- TT5 — **`format-help` whole-block table-order reproduction is under-asserted.**
+  `format-help-derived-from-spec-table-test` asserts only `quit < status < help`
+  — three positions where `quit`/`status` are the first two table entries and
+  `help` is the last non-hidden entry. The 18 intervening built-in lines,
+  including every `:usage`-bearing prefixed entry (`/tree`, `/model`, `/speed`,
+  `/effort`, `/thinking`, `/login`, `/jobs`, …), have **no** positional
+  assertion. The design's "format-help derivation" / AC3 claim is "the help
+  listing is reproduced unchanged **in order** and membership"; a regression
+  that re-ordered the *middle* of `builtin-command-specs` (e.g. moving `/effort`
+  before `/skills`, or `/model` after `/help`) would still pass `quit<status<help`
+  and every membership/`:usage`-presence/`:hide-in-help?` test. The order
+  invariant is therefore only spot-checked at the two endpoints, not locked
+  across the block. Tighten: assert the rendered built-in block line sequence
+  equals the spec-table-ordered, `:hide-in-help?`-filtered projection of
+  `bspec/builtin-command-specs` (the same `line-for` shape
+  `builtin-help-block-hide-in-help-projection-test` already builds), so the
+  whole-block order — including interleaved `:usage` lines — is locked to the
+  single source rather than the two endpoints. Closes the gap that AC3's
+  "unchanged in order" is currently provable only for 3 of ~21 lines.
+
+- TT6 — **Dual-kind `/project-repl` exact-first dispatch precedence is asserted
+  by behaviour, not by precedence.** The design "Dispatch-kind representation"
+  decision pins a specific invariant: bare `/project-repl` hits the **exact**
+  handler and `/project-repl <args>` falls through to the **prefixed** `case`,
+  with "dispatch precedence unchanged (exact-first then prefixed)".
+  `project-repl-dual-kind-test` proves (a) both projections contain
+  `/project-repl` and (b) bare → `:text` "Project nREPL" and `<args>` → `:text`.
+  But because both the exact handler and the prefixed `case` route
+  `/project-repl` to the same `dispatch-project-nrepl-command`, a behaviour
+  assertion cannot distinguish exact-first from prefixed-first for the **bare**
+  form — both paths yield the same `:text` result. So the precedence invariant
+  the design explicitly states (and that step 37 calls "precedence unchanged") is
+  not actually locked: a regression flipping `dispatch*`'s `(or (case …)
+  (dispatch-prefixed-command …))` order, or dropping `/project-repl` from the
+  exact projection, would still pass this test (the prefixed path would serve the
+  bare form identically). Tighten to lock the seam, e.g. assert
+  `(exact-command-handler "/project-repl") = :project-repl` (bare exact match) and
+  that the prefixed matcher does **not** match the bare form
+  (`(prefixed-command "/project-repl")` matches only `/project-repl <args>`, not
+  bare) — proving the bare form is genuinely served by the exact path, not merely
+  that "something returns Project nREPL". Closes the gap that the design's
+  exact-first precedence claim is behaviourally indistinguishable under the
+  current assertions.
+
+Note: the task is already closed (`munera/closed/`); both gaps guard future edits
+to the single source / dispatch ordering and harden AC3 + the dual-kind
+precedence contract. Neither indicates a current behaviour defect.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

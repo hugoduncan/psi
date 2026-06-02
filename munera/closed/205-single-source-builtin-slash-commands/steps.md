@@ -290,3 +290,31 @@ Tick with sha/decision on completion.
       `autocomplete-slash-includes-backend-builtin-commands-test`'s
       "built-in candidates come from state, not a hardcoded list" block on the
       TUI side.
+
+## Test review follow-ups (review pass 4)
+
+- [ ] TT5 — Lock the full `format-help` built-in block line *order* to the
+      single source (AC3 "unchanged in order"). `format-help-derived-from-spec-
+      table-test` only asserts `quit < status < help` (the two leading + the
+      trailing non-hidden entries), leaving the ~18 interleaved lines —
+      including every `:usage`-bearing prefixed entry (`/tree`, `/model`,
+      `/speed`, `/effort`, `/thinking`, `/login`, `/jobs`, …) — with no
+      positional assertion; a middle-of-table reorder would pass every current
+      test. Assert the rendered built-in block's line sequence equals the
+      spec-table-ordered, `:hide-in-help?`-filtered projection of
+      `bspec/builtin-command-specs` (reuse the `line-for` shape from
+      `builtin-help-block-hide-in-help-projection-test`), locking whole-block
+      order — interleaved `:usage` lines included — to the single source.
+- [ ] TT6 — Lock dual-kind `/project-repl` exact-first dispatch *precedence*
+      (design "Dispatch-kind representation"), not just behaviour.
+      `project-repl-dual-kind-test` asserts both projections contain
+      `/project-repl` and that bare/`<args>` forms each return `:text`, but
+      since both the exact handler and the prefixed `case` route to the same
+      `dispatch-project-nrepl-command`, a behaviour assertion cannot prove the
+      bare form is served by the exact path (exact-first) rather than the
+      prefixed path — a regression flipping `dispatch*`'s `(or (case …)
+      (dispatch-prefixed-command …))` order or dropping `/project-repl` from the
+      exact projection would still pass. Add seam-level assertions: bare exact
+      match `(commands/exact-command-handler "/project-repl") = :project-repl`,
+      and that the prefixed matcher does not match the bare form (matches only
+      `/project-repl <args>`), proving the bare form is genuinely exact-routed.
