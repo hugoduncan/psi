@@ -1858,3 +1858,25 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       `scheduler_background_jobs_test.clj` + `scheduler_cancel_job_test.clj`;
       zero `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10
       allowlist held).
+
+## Test-shaper follow-ups — pass 23 (test-shaper, 2026-06-01)
+
+- [ ] Add explicit `:kind :message` to the `:scheduler/create` dispatch in
+      `scheduler_cancel_job_test.clj` /
+      `session-cancel-job-routes-scheduler-projection-to-scheduler-cancel-test`
+      (~L15). This is the **sole** scheduler test (of 12 files) still omitting
+      `:kind`, relying on the dispatch handler's implicit
+      `(or kind :message)` default (`dispatch_handlers/scheduler.clj:123`).
+      Pass 5 systematically added explicit `:kind :message` across
+      `scheduler_lifecycle_test` / `scheduler_dispatch_test` (passes 1/3 did
+      `scheduler_timer_seam_test` / `scheduler_context_shutdown_test`) to make
+      the kind-under-test local and align data-shapes — this file was missed.
+      Add `"kind"`? No: the create here is a *dispatch* payload (keyword keys),
+      so add `:kind :message` to the `:scheduler/create` map. No behaviour
+      change (default already resolves `:message`); no assertions added/removed
+      → `findings.md` citations + aggregate count unchanged. test-shaper
+      `consistent(data_shapes) ∧ minimal_incidental_setup`. Test-file only
+      (Slice-10 allowlist — zero `components/agent-session/src/**` or
+      `doc/scheduler.md`); keep `bb test` green + clj-kondo/cljfmt clean. If 201
+      is treated as closed instead, raise as a small standalone test-hygiene
+      task.

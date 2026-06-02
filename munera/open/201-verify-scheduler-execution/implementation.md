@@ -2874,3 +2874,34 @@ flakes — they touch no edited file and clear on re-run (same flakes recorded i
 passes 16/20). clj-kondo 0/0; `bb fmt:check` clean. Test-file only — zero
 `components/agent-session/src/**` or `doc/scheduler.md` (verification-only
 invariant; Slice-10 allowlist held).
+
+## Test-shaper review — pass 23 (test-shaper, 2026-06-01)
+
+Fresh test-shaper pass over the 12 scheduler test ns against runtime truth
+(full `bb test` green; baseline confirmed). Tests are broadly well-shaped:
+AAA-explicit, behaviour-focused (assert state/outputs, not handler
+interactions), deterministic via the time/timer seams (no wall-clock), single-
+concern deftests, meaningful failure messages. The earlier passes' work holds.
+
+**One actionable consistency gap (`consistent(data_shapes)` /
+`minimal_incidental_setup`).** `scheduler_cancel_job_test.clj`
+(`session-cancel-job-routes-scheduler-projection-to-scheduler-cancel-test`,
+~L15) is the **sole** scheduler test (of 12 files) whose `:scheduler/create`
+dispatch **omits `:kind`**, relying on the dispatch handler's implicit
+`(or kind :message)` default (`dispatch_handlers/scheduler.clj:123`). Pass 5
+systematically added explicit `:kind :message` to align data-shapes across
+`scheduler_lifecycle_test` / `scheduler_dispatch_test` (and passes 1/3 did
+`scheduler_timer_seam_test` / `scheduler_context_shutdown_test`) — but this
+file was missed. The omission is incidental to the cancel-routing behaviour
+under test and obscures the kind-under-test; the pure-model layer even
+*requires* explicit kind (`create-schedule-requires-explicit-kind-test`). Fix
+= add `:kind :message`; no behaviour change (default already resolves
+`:message`), no assertions added/removed. Follow-up added to steps.md.
+
+Non-actionable (already well-shaped): the `(:content result) read-string`
+parse idiom repeats across `psi_tool_scheduler_test` but stays locally
+comprehensible (a helper would risk hiding intent — `helpers_that_compress(
+ceremony) ∧ ¬helpers_that_hide(intent)`); the background-jobs `:queued` seed
+via a raw `[:scheduler …]` path inside `ss/session-update` is acceptable (no
+write helper exists; pass-22 already standardised the wrapper). No further
+actionable shaping found.
