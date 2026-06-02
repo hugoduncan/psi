@@ -211,3 +211,20 @@ Done (2026-06-01, this pass):
       duplicate later defn). All call sites keep explicit arrange/act/assert.
       `clj-kondo` 0/0; focused ns 8 tests / 34 assertions green; command +
       help suite 51/206 green (shared-helper regression check).
+
+## Test-shaper second-pass follow-ups (2026-06-01)
+
+- [ ] TS4: Add a positive control to
+      `reload-prompts-does-not-refresh-system-prompt-test`. The test asserts
+      `(false? @refreshed?)` (absence) but never proves the rebound
+      `:refresh-system-prompt-fn` recorder would fire if a
+      `:runtime/refresh-system-prompt` effect were emitted — so it can pass
+      vacuously. In the same ctx, dispatch an event known to emit the refresh
+      effect (e.g. `:session/set-skills` / `:session/set-active-tools`) and
+      assert the recorder flips to `true`, **then** reset and assert reload
+      leaves it `false`. Keep `single_concern` in mind — if the positive
+      control dilutes focus more than it adds signal, instead document (in a
+      test comment) the verified code path (`dispatch_effects.clj:199` →
+      `:refresh-system-prompt-fn`; `context.clj:193-194` wires the real
+      `:execute-effect-fn`) that establishes the recorder is live; prefer the
+      real positive-control assertion.

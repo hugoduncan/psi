@@ -702,3 +702,52 @@ psi.agent-session.reload-prompts-test` → 8 tests / 34 assertions / 0 failures;
 `--focus psi.agent-session.commands-test` → 51 / 206 / 0 (shared-helper
 regression guard, no shared code touched there). All three shape follow-ups
 closed; no behavior change to the production reload path.
+
+## Test-shaper review — second pass (2026-06-01)
+
+Re-applied test-shaper (clarity ∧ signal ∧ robustness ∧ economical) to the
+current `reload_prompts_test.clj` (8 deftests / 34 assertions) +
+`commands_test.clj` `prompts-reload-command-test` / `format-help-includes-all-
+commands-test`. Confirmed the prior TS1–TS3 follow-ups are in the tree
+(e2e baseline trimmed; observable-boundary refresh test via recorder atom;
+`seed-stale!`/`template-names`/`invoke-reload-mutation`/`template-by-name`
+helpers). Focused ns green (8/34). Cross-checked the TS2 boundary claim against
+`dispatch_effects.clj:199` (`:runtime/refresh-system-prompt` →
+`(:refresh-system-prompt-fn ctx)`) and `context.clj:193-194` (default ctx wires
+`:execute-effect-fn` → real `execute-effect!`): the recorder is the genuine
+effect boundary and the dispatch path runs effects in the test ctx. ✓
+
+Actionable (signal / meaningful-failures, low confidence):
+
+- ❌ TS4 — `reload-prompts-does-not-refresh-system-prompt-test` is an absence
+  assertion (`(false? @refreshed?)`) with **no in-test positive control**
+  proving the rebound `:refresh-system-prompt-fn` recorder would actually fire
+  if a `:runtime/refresh-system-prompt` effect were emitted. If the rebind key
+  were wrong, or the test ctx's effect path were inert, the assertion would
+  pass vacuously — the test would still go green even if reload *did* (or a
+  future regression *started to*) refresh. The boundary is currently verified
+  only by code-reading (this note), not by the test itself. Add a minimal
+  positive control so the recorder's liveness is proven where the absence is
+  asserted — e.g. an `is` that, in the same ctx, an event known to refresh
+  (`:session/set-skills`/`:session/set-active-tools`) flips the recorder to
+  `true`, **then** assert reload leaves it `false`. Tension to weigh when
+  executing: this adds an unrelated event to a `single_concern` test and mild
+  `minimal_incidental_setup` cost; if the positive control is judged to dilute
+  the test's focus more than it strengthens signal, the alternative is a short
+  in-test comment asserting (via the verified code path) why the recorder is
+  live — but a real positive-control assertion is the stronger fix.
+
+Considered, NOT actionable (re-confirmed):
+- TS1 return-shape "redundancy": one return-shape proof per entry point
+  (dispatch / core-fn / mutation) is intentional, not redundant — settled.
+- Two mutation tests share a 4-line success-envelope preamble
+  (`:is-error`/`:overall-status`/full `:psi-tool/result`/replace) via the
+  shared `invoke-reload-mutation` helper; counts differ (2 vs 0 — the actual
+  behavior under test). Duplication is minimal and intent-revealing; a further
+  helper would hide intent. No step.
+- `prompts-reload-command-test` `"count : 2"` string assertion mirrors the
+  `format-reload-models` convention (`commands.clj:261/265/275`); consistent,
+  not brittle relative to the established surface. No step.
+
+Result: one new low-confidence shape follow-up (TS4 positive control for the
+absence assertion). Does not block correctness.
