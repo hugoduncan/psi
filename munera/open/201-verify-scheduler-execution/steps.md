@@ -827,3 +827,33 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       or `doc/scheduler.md` (Slice-10 allowlist held). The scheduler suite's
       fixture is now fully consolidated on `test-support/create-test-session`
       (no remaining `create-session-context` copies in scheduler test ns).
+
+## Test review follow-ups — test-shaper pass 5 (2026-06-01)
+
+- [ ] Add explicit `:kind :message` to the `:scheduler/create` payloads that
+      still omit it in `scheduler_lifecycle_test.clj` and
+      `scheduler_dispatch_test.clj`, completing the data-shape alignment that
+      test-shaper passes 1 & 3 applied only to `scheduler_timer_seam_test` /
+      `scheduler_context_shutdown_test`. Sites:
+      `scheduler_lifecycle_test/scheduled-deliver-runs-canonical-prompt-lifecycle-test`
+      (~L55); `…/busy-session-fire-queues-then-idle-drains-fifo-test` (~L116, the
+      `findings.md`-cited busy-drain covering test);
+      `…/cancel-pending-and-queued-schedules-test` (~L152 & ~L167, the cited
+      cancel covering test); `scheduler_dispatch_test/scheduler-create-stores-schedule-and-starts-timer-test`
+      (~L23); and the `schedule` helper (~L9) used by the dispatch deftests.
+      Makes the kind-under-test local + matches every other 201 live create
+      (`consistent(data_shapes)`); no behaviour change (handler default
+      `(or kind :message)` already resolves `:message`). Test-file only
+      (Slice-10 allowlist — zero `components/agent-session/src/**` /
+      `doc/scheduler.md`); keep suite green + clj-kondo/cljfmt clean. If 201 is
+      treated as closed, raise as a small standalone test-hygiene task.
+
+- [ ] Remove the duplicated assertion in
+      `scheduler_dispatch_test/scheduler-fired-queues-while-session-busy-test`
+      (~L65–66): `(is (= :queued (:status stored)))` appears **twice** verbatim.
+      Drop one copy (redundant — both assert the same thing, no extra signal;
+      `economical / minimal(redundant)`). Note the aggregate assertion count
+      drops by 1 after the edit — recompute and update any deliverable count
+      citations (`findings.md` / `steps.md` / `implementation.md`) that quote the
+      total. Test-file only (Slice-10 allowlist); keep suite green +
+      clj-kondo/cljfmt clean.

@@ -1300,3 +1300,40 @@ single `psi_tool_scheduler_test.clj` path — zero `components/agent-session/src
 or `doc/scheduler.md` (Slice-10 gate held). Scheduler-suite fixture now fully
 consolidated on `create-test-session`; no `create-session-context` copies remain
 in any scheduler test ns. No blockers.
+
+## Test review follow-ups — test-shaper pass 5 (2026-06-01)
+
+Fresh test-shaper audit of the full scheduler test changeset. Two **new**
+actionable issues (both `consistent` / `economical`), neither covered by the
+prior passes; passes 6–9 (task-test-review) + test-shaper passes 1–4 are all
+closed/converged.
+
+- **Issue A — `:kind :message` data-shape drift in `scheduler_lifecycle_test`
+  + `scheduler_dispatch_test` (consistent(data_shapes)).** test-shaper passes 1
+  & 3 added explicit `:kind :message` to the live `:scheduler/create` payloads
+  in `scheduler_timer_seam_test` and `scheduler_context_shutdown_test` to align
+  the data shape with every other 201 live create (the handler defaults
+  `(or kind :message)`, so the omission is invisible-but-implicit). Those passes
+  named only those two files; the same omission survives in
+  `scheduler_lifecycle_test.clj` (`scheduled-deliver-runs-canonical-prompt-lifecycle-test`
+  L55; `busy-session-fire-queues-then-idle-drains-fifo-test` L116 — a
+  **`findings.md`-cited busy-drain covering test**; `cancel-pending-and-queued-schedules-test`
+  L152 & L167 — the **cited cancel covering test**) and
+  `scheduler_dispatch_test.clj` (`scheduler-create-stores-schedule-and-starts-timer-test`
+  L23; the `schedule` helper at L9). Several are 201's own cited covering tests,
+  so the drift sits inside the deliverable. Add `:kind :message` to make the
+  kind-under-test local + consistent. No behaviour change (default already
+  resolves to `:message`).
+
+- **Issue B — duplicated assertion in
+  `scheduler_dispatch_test/scheduler-fired-queues-while-session-busy-test`
+  (economical / minimal(redundant)).** L65–66 assert
+  `(is (= :queued (:status stored)))` **twice** verbatim — a copy-paste
+  redundant `is`. Drop the duplicate (a failure in either is
+  indistinguishable, adding no signal). Removing it drops the dispatch-test
+  assertion count by 1 — recompute the aggregate after the edit.
+
+Both are test-file-only (Slice-10 allowlist — zero `components/agent-session/src/**`
+or `doc/scheduler.md`). Suite currently green (45 focused tests / 320 assertions
+in the 9-ns focused run; aggregate 50/412 under full `bb test`). Follow-ups
+added to steps.md.
