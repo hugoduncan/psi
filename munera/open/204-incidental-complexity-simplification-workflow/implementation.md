@@ -3206,3 +3206,33 @@ identical, and must leave the focused skill-test + task-204 suite green,
 clean (the file is 524 lines; the extraction reduces it).
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+---
+
+## code-shaper review pass 1 — CS1/CS2 resolution (follow-up execution)
+
+Executed the two code-shaper follow-ups against
+`components/workflow-loader/test/psi/workflow_loader/incidental_complexity_finder_skill_test.clj`.
+Both test-only, behaviour-identical — no production/skill/EDN change.
+
+- **CS1 — extracted `jq-available?`.** Added
+  `(defn- jq-available? [] (try (zero? (:exit (shell/sh "jq" "--version"))) (catch Exception _ false)))`
+  and replaced all 7 `(if (try …))` recipe-guard call sites with
+  `(if (jq-available?))`. The guard's intent is now named at every call site.
+
+- **CS2 — extracted `skill-recipe`.** Added
+  `(defn- skill-recipe [] (let [{:keys [skill]} (incidental-complexity-finder-skill)] (extract-jq-recipe (slurp (io/file (:file-path skill))))))`
+  and collapsed all 7 recipe `deftest` preambles to `(let [recipe (skill-recipe)] …)`.
+  The determinism/ranking/projection tests retain their additional per-test
+  bindings (fixtures, `gap-of`, `gap-key`). The content-lock test, which uses
+  `body` directly rather than the recipe, is intentionally left on its
+  `{:keys [skill]}`/`body` preamble. Net: eliminated 7 body-slurps + 7
+  recipe-extracts (one body-slurp remains in the content-lock test).
+
+VERIFICATION: focused skill-test ns green
+(`clojure -M:test --focus psi.workflow-loader.incidental-complexity-finder-skill-test`:
+**9 tests, 78 assertions, 0 failures** — identical to pass-17's TR21 baseline,
+confirming a pure refactor); `clj-kondo` 0 findings; `clj-paren-repair` Success;
+`bb commit-check:file-lengths` exit 0; file 524 lines (< 800).
+
+PASS_STATUS: FOLLOW_UPS_EXECUTED

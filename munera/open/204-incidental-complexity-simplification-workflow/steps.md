@@ -1320,7 +1320,7 @@ workflows, both test namespaces). Production deliverables are clean; the two
 items below are incidental duplication accreted in the recipe-test harness.
 Both are test-only — no production/skill/EDN change, all assertions identical.
 
-- [ ] CS1 — De-duplicate the `jq`-availability guard in
+- [x] CS1 — De-duplicate the `jq`-availability guard in
       `components/workflow-loader/test/psi/workflow_loader/incidental_complexity_finder_skill_test.clj`.
       The literal `(try (zero? (:exit (shell/sh "jq" "--version")))
       (catch Exception _ false))` is repeated verbatim at 7 sites
@@ -1331,8 +1331,19 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
       at each `if` site. Mechanical, behaviour-identical. Verify the focused
       skill-test ns green (jq-present path), `clj-kondo` 0, `clj-paren-repair`
       Success, `bb commit-check:file-lengths` clean.
+      RESOLUTION: extracted a named `(defn- jq-available? [] …)` predicate
+      wrapping the `(try (zero? (:exit (shell/sh "jq" "--version"))) (catch
+      Exception _ false))` literal, and replaced all 7 call sites' `(if (try …))`
+      with `(if (jq-available?))`. The guard's meaning is now legible at every
+      call site and a change threads through one definition. Test-only,
+      behaviour-identical — no production/skill/EDN change; assertions untouched.
+      Focused skill-test ns green (`clojure -M:test --focus
+      psi.workflow-loader.incidental-complexity-finder-skill-test`: 9 tests, 78
+      assertions, 0 failures — identical to pass-17, confirming a pure refactor);
+      `clj-kondo` 0 findings; `clj-paren-repair` Success;
+      `bb commit-check:file-lengths` exit 0. (Committed with CS2.)
 
-- [ ] CS2 — Collapse the repeated recipe-test `let` preamble in the same ns.
+- [x] CS2 — Collapse the repeated recipe-test `let` preamble in the same ns.
       Every recipe `deftest` opens with the identical
       `{:keys [skill]} (incidental-complexity-finder-skill)` →
       `body (slurp (io/file (:file-path skill)))` →
@@ -1343,3 +1354,17 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
       per-test working set and the file length (currently 524 lines). Verify the
       focused skill-test ns green, `clj-kondo` 0, `clj-paren-repair` Success,
       `bb commit-check:file-lengths` clean.
+      RESOLUTION: extracted `(defn- skill-recipe [] …)` — slurps the loaded
+      SKILL.md and returns its extracted jq recipe — and collapsed all 7 recipe
+      `deftest` preambles to a single `(let [recipe (skill-recipe)] …)` binding
+      (the determinism/ranking/projection tests keep their additional per-test
+      `let` bindings — fixture units, `gap-of`, `gap-key` — alongside the one-line
+      recipe bind). The content-lock test (which uses `body` directly, not the
+      recipe) is intentionally left on the `{:keys [skill]}`/`body` preamble.
+      Eliminated 7 `body`-slurps + 7 `recipe`-extracts (one `body` slurp remains,
+      in the content-lock test). Behaviour-identical, test-only — no
+      production/skill/EDN change; assertions untouched. Focused skill-test ns
+      green (9 tests, 78 assertions, 0 failures); `clj-kondo` 0 findings;
+      `clj-paren-repair` Success; `bb commit-check:file-lengths` exit 0; file
+      524 lines (< 800 — the net line delta is ~0: the two extracted helpers
+      offset the collapsed preambles).

@@ -37,6 +37,20 @@
            first
            second))
 
+(defn- jq-available?
+  "Is the `jq` CLI available on this machine? Gates the executable recipe tests
+   (which degrade to a structural fallback when jq is absent)."
+  []
+  (try (zero? (:exit (shell/sh "jq" "--version"))) (catch Exception _ false)))
+
+(defn- skill-recipe
+  "Slurp the loaded SKILL.md and extract its embedded join/gap jq recipe. Single
+   helper for every executable recipe test (their shared body-slurp + recipe-
+   extract preamble)."
+  []
+  (let [{:keys [skill]} (incidental-complexity-finder-skill)]
+    (extract-jq-recipe (slurp (io/file (:file-path skill))))))
+
 (deftest incidental-complexity-finder-skill-content-lock-test
   ;; TR1 (test review): the skill's central behaviours (the design's
   ;; Deliverable-1 acceptance) were untested — the registration test asserts
@@ -145,9 +159,7 @@
   ;; and assert the join is lossless — each unit keeps its own distinct `cc`.
   ;; A regress to the pre-F2 `(ns, var, arity)` key collapses both onto one
   ;; `from_entries` slot (last-wins), so one unit would inherit the other's cc.
-  (let [{:keys [skill]} (incidental-complexity-finder-skill)
-        body (slurp (io/file (:file-path skill)))
-        recipe (extract-jq-recipe body)
+  (let [recipe (skill-recipe)
         ;; two execute-effect!-style null-arity units sharing (ns, var, arity)
         ;; but distinct lines and distinct cc/burden, both above threshold.
         line-10-local (named-local-unit-json "x" "f" 10 "30.0")
@@ -155,7 +167,7 @@
         line-10-cc (named-cc-unit-json "x" "f" 10 3)
         line-40-cc (named-cc-unit-json "x" "f" 40 4)]
     (is (some? recipe) "the join/gap jq recipe is extractable from SKILL.md")
-    (if (try (zero? (:exit (shell/sh "jq" "--version"))) (catch Exception _ false))
+    (if (jq-available?)
       (do
         (testing "the join is lossless — each null-arity unit keeps its own cc"
           (let [{:keys [exit out err]}
@@ -206,11 +218,9 @@
   ;;       false qualification).
   ;; A regress (>= → > threshold typo, or defaulting unmatched rows to cc=1)
   ;; would pass the prose-only locks above but fail here.
-  (let [{:keys [skill]} (incidental-complexity-finder-skill)
-        body (slurp (io/file (:file-path skill)))
-        recipe (extract-jq-recipe body)]
+  (let [recipe (skill-recipe)]
     (is (some? recipe) "the join/gap jq recipe is extractable from SKILL.md")
-    (if (try (zero? (:exit (shell/sh "jq" "--version"))) (catch Exception _ false))
+    (if (jq-available?)
       (do
         (testing "qualification filter — only units with lcc-total >= 5.0 and gap >= 2.0 survive"
         ;; keep/qual:  lcc 30.0, cc 4  -> gap 7.5  -> qualifies
@@ -264,9 +274,7 @@
   ;; units by `gap`"). A regress to sort_by(.gap) (ascending) or a dropped/widened
   ;; slice passes every existing test green; the TR3 content-lock asserts only the
   ;; SKILL prose, which can drift from the executed recipe.
-  (let [{:keys [skill]} (incidental-complexity-finder-skill)
-        body (slurp (io/file (:file-path skill)))
-        recipe (extract-jq-recipe body)
+  (let [recipe (skill-recipe)
         gap-of (fn [out var-name]
                  ;; pull the "gap": <n> following this unit's var in the output.
                  (some-> (re-find (re-pattern (str "(?s)\"var\":\\s*\"" var-name
@@ -275,7 +283,7 @@
                          second
                          Double/parseDouble))]
     (is (some? recipe) "the join/gap jq recipe is extractable from SKILL.md")
-    (if (try (zero? (:exit (shell/sh "jq" "--version"))) (catch Exception _ false))
+    (if (jq-available?)
       (do
         (testing "gap-descending ranking — output gap values are strictly descending (sort_by(-.gap))"
         ;; Feed three qualifying units whose input emit order (lowmid, top, mid)
@@ -335,11 +343,9 @@
   ;; would yield gap = null / a divide error for a matched zero-cc unit, yet pass
   ;; every existing test green. Feed a single matched unit with lcc above
   ;; threshold and cc 0 and assert it survives with gap = lcc-total (max(0,1)=1).
-  (let [{:keys [skill]} (incidental-complexity-finder-skill)
-        body (slurp (io/file (:file-path skill)))
-        recipe (extract-jq-recipe body)]
+  (let [recipe (skill-recipe)]
     (is (some? recipe) "the join/gap jq recipe is extractable from SKILL.md")
-    (if (try (zero? (:exit (shell/sh "jq" "--version"))) (catch Exception _ false))
+    (if (jq-available?)
       (testing "max(cc, 1) guard — a matched zero-cc unit survives with gap = lcc-total"
         ;; matched unit: lcc 30.0, cc 0. With the `max(cc, 1)` guard the divisor
         ;; is 1, so gap = 30.0 (qualifies). Without the guard the divisor is 0,
@@ -368,11 +374,9 @@
   ;; qualification filter removes every candidate (the filter-and-drop test
   ;; always leaves >= 1 survivor). Feed only sub-threshold / unmatched units and
   ;; assert the recipe emits an empty result.
-  (let [{:keys [skill]} (incidental-complexity-finder-skill)
-        body (slurp (io/file (:file-path skill)))
-        recipe (extract-jq-recipe body)]
+  (let [recipe (skill-recipe)]
     (is (some? recipe) "the join/gap jq recipe is extractable from SKILL.md")
-    (if (try (zero? (:exit (shell/sh "jq" "--version"))) (catch Exception _ false))
+    (if (jq-available?)
       (testing "empty qualification — the recipe emits [] when no unit qualifies (early-stop signal)"
         ;; sub-threshold matched unit (lcc 4.0 < 5.0) + an unmatched local row
         ;; (no cc, dropped by A1): nothing qualifies, so the recipe must emit [].
@@ -402,11 +406,9 @@
   ;; inclusive `>=` boundary is unproven — a regress `>=` -> `>` (strict) passes
   ;; every existing test green. Feed units that sit EXACTLY on each boundary and
   ;; assert they survive the filter (inclusive `>=`, not strict `>`).
-  (let [{:keys [skill]} (incidental-complexity-finder-skill)
-        body (slurp (io/file (:file-path skill)))
-        recipe (extract-jq-recipe body)]
+  (let [recipe (skill-recipe)]
     (is (some? recipe) "the join/gap jq recipe is extractable from SKILL.md")
-    (if (try (zero? (:exit (shell/sh "jq" "--version"))) (catch Exception _ false))
+    (if (jq-available?)
       (testing "qualification filter is inclusive at the exact thresholds (>=, not >)"
         ;; gapedge:  lcc 10.0, cc 5 -> gap exactly 2.0 (gap == 2.0 boundary)
         ;; lccedge:  lcc 5.0,  cc 1 -> lcc exactly 5.0, gap 5.0 (lcc == 5.0 boundary)
@@ -454,12 +456,10 @@
   ;; evidence the generated task is built from. Feed one qualifying matched unit
   ;; whose burden dimensions carry distinct values and assert the surviving
   ;; object carries every projected evidence key with its expected value.
-  (let [{:keys [skill]} (incidental-complexity-finder-skill)
-        body (slurp (io/file (:file-path skill)))
-        recipe (extract-jq-recipe body)
+  (let [recipe (skill-recipe)
         gap-key (fn [out k] (re-find (re-pattern (str "\"" k "\":\\s*[^,}\\]]+")) out))]
     (is (some? recipe) "the join/gap jq recipe is extractable from SKILL.md")
-    (if (try (zero? (:exit (shell/sh "jq" "--version"))) (catch Exception _ false))
+    (if (jq-available?)
       (testing "projection emits every evidence key with the recipe's dash->underscore rename"
         ;; one qualifying matched unit: lcc 30.0, cc 4 -> gap 7.5 (qualifies),
         ;; distinct burden values 11..16 so the rename mapping is unambiguous.
