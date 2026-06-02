@@ -1485,3 +1485,29 @@ state assertions throughout.
   already-correct behaviour (AC6/AC7 were already satisfied — both UIs dedup via
   `distinct`/`seq-uniq`). Closes the pass-7 test-shaper finding that no test
   exercised a built-in name colliding with a template/extension on either UI.
+
+## Test review follow-ups (review pass 8)
+
+- test-shaper pass 8 — REVIEW_COMPLETE. Fresh independent review of the full
+  205 test surface across all five slices and seven prior passes (TT1–TT7, TS1).
+  Re-ran `bb clojure:test:unit` (all green; `commands-builtin-specs-test` +
+  `builtin-commands-resolver-test` confirmed executing) and inspected the Emacs
+  (`psi-capf-test.el`) + TUI (`app_input_selector_test.clj`) test files.
+  Assessment against test-shaper {simple ∧ consistent ∧ robust ∧ economical}:
+  - **single-concern / behavior-focused**: each lock targets one contract
+    (projection-unchanged snapshots, TT3 entry well-formedness, hide-in-help
+    projection, TT5 full help-block line order, resolver shape/order/content,
+    TT7 full resolver name-order, TS1 dedup, TT4 no-backend⇒no-builtins,
+    builtin-only refresh / I2).
+  - **meaningful failures / seam-level**: exact+prefixed case-branch coherence
+    read the *live* `commands/{exact,prefixed}-case-branches` defs (R1/R2);
+    TT6 locks dual-kind exact-first *precedence* at the seam (bare has exact
+    handler, `<args>` does not), not path-blind behaviour.
+  - **economical / deterministic**: representative commands over case explosion;
+    real session contexts (no mocks); symmetric TUI↔Emacs coverage; AC6 proven
+    end-to-end (resolver bare-name set == `builtin-command-names`); no
+    time/randomness/IO concerns.
+  No new actionable gap found. The `as-slash-command` nil-name drop on the TUI
+  builtin path is incidental robustness already exercised via the ext-cmds path
+  and made unreachable from the real backend by TT3 (every entry has a non-blank
+  string name) — not a task-contract behaviour warranting a dedicated test.
