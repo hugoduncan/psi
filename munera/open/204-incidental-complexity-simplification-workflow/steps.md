@@ -811,7 +811,7 @@ with the commit sha / decision when done.
 
 ## Test review follow-ups (review pass 9 — test-shaper)
 
-- [ ] TR11 — The **A3 baseline-path-resolution** behaviour is named in the
+- [x] TR11 — The **A3 baseline-path-resolution** behaviour is named in the
       design ("Generated task design" Phase-1 A3 + R3) with an explicit,
       called-out failure mode: the gate `--baseline` must reference the
       **worktree-root-relative task-dir path**
@@ -837,6 +837,23 @@ with the commit sha / decision when done.
       `--fail-on` tail), and that the A5 burden-reduction instruction names the
       worktree-relative `munera/open/NNN-slug/before-local.json` read path. Run
       focused suite + `clj-kondo`.
+      RESOLUTION: added a new `testing` block to `reduce-incidental-complexity-test`
+      (same ns, test-only, no production change) —
+      "select-and-create prompt resolves A3/A5 baselines by worktree-relative
+      path (TR11)" — asserting two step-1 prompt substrings: (a) the **A3 gate
+      command** embeds the full worktree-root-relative baseline path
+      `--baseline munera/open/NNN-slug/before-diagnose.edn` (not just the
+      `--fail-on` tail already locked above), so the exact R3-warned regress to a
+      bare `--baseline before-diagnose.edn` fails green; and (b) the **A5**
+      burden-reduction comparison names the worktree-relative read path
+      `` the stored `munera/open/NNN-slug/before-local.json` `` rather than the
+      bare filename. Both strings already present verbatim in step-1's prompt; no
+      production change. The pre-existing baseline-filename locks
+      (`before-local.json` / `before-diagnose.edn`) are kept — TR11 anchors the
+      *path resolution* the bare-filename locks did not. Focused suite green
+      (`bb clojure:test:unit` — all tests passed); `clj-kondo` 0 findings;
+      test file 787 lines (< 800). (See implementation.md pass-9 test-review TR11
+      entry.)
 
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 

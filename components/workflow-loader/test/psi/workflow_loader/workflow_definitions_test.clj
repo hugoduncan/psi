@@ -734,6 +734,21 @@
              "step-1 prompt names the before-local.json baseline (A5)")
          (is (.contains select-text "before-diagnose.edn")
              "step-1 prompt names the before-diagnose.edn baseline (A3)"))
+       ;; TR11 (test review pass 9, test-shaper): the A3 baseline-path-resolution
+       ;; behaviour is named in the design (Phase-1 A3 + R3) with an explicit
+       ;; failure mode — the gate `--baseline` and the A5 `before-local.json`
+       ;; read must reference the WORKTREE-ROOT-RELATIVE task-dir path
+       ;; (`munera/open/NNN-slug/...`), NOT a bare filename, which "does not
+       ;; resolve" from the worktree-root cwd where Phase 1 runs `gordian gate`.
+       ;; The bare-filename locks above do not anchor this path, so the exact
+       ;; R3-warned regress (`--baseline before-diagnose.edn`) would pass green.
+       (testing "select-and-create prompt resolves A3/A5 baselines by worktree-relative path (TR11)"
+         (is (.contains select-text
+                        "--baseline munera/open/NNN-slug/before-diagnose.edn")
+             "step-1 gate command embeds the worktree-root-relative A3 baseline path (not a bare filename)")
+         (is (.contains select-text
+                        "the stored `munera/open/NNN-slug/before-local.json`")
+             "step-1 prompt names the worktree-relative A5 before-local.json comparison path (not a bare filename)"))
        ;; TR2 (test review): the generated two-phase behaviour-preserving
        ;; contract embedded in step-7 is the design's substantive acceptance,
        ;; not just the gate flags/baseline filenames already locked above. Lock

@@ -2124,3 +2124,31 @@ bare filename substring, not its worktree-relative read path. test-shaper
 `economical` (cover named acceptance) + `meaningful_failures`: a named design
 behaviour with a called-out failure mode should have a test that fails on the
 regress.
+
+---
+
+## Pass 9 — test-review TR11 resolution (baseline-path resolution lock)
+
+Added one `testing` block to `reduce-incidental-complexity-test` in
+`components/workflow-loader/test/psi/workflow_loader/workflow_definitions_test.clj`
+(same ns, test-only, no production change), placed immediately after the existing
+"embeds the enforcing gate flags + both baselines" block:
+
+  "select-and-create prompt resolves A3/A5 baselines by worktree-relative path (TR11)"
+  - asserts step-1 prompt `.contains` `--baseline munera/open/NNN-slug/before-diagnose.edn`
+    — the full worktree-root-relative A3 gate baseline path (not the bare
+    `--baseline before-diagnose.edn` R3 warned against). The pre-existing block
+    locked only the `--fail-on …` tail, so this regress passed green before.
+  - asserts step-1 prompt `.contains` `` the stored `munera/open/NNN-slug/before-local.json` ``
+    — the worktree-relative A5 comparison read path, not the bare
+    `before-local.json` filename the earlier block locks.
+
+Both substrings already present verbatim in step-1's prompt (verified live before
+asserting); no production/EDN change. The existing bare-filename locks
+(`before-local.json` / `before-diagnose.edn`) are retained — TR11 anchors the
+*path resolution* (the R3-warned failure mode) the bare-filename locks did not.
+
+Verification: `bb clojure:test:unit` → ✅ All tests passed (full unit suite green,
+including the extended `reduce-incidental-complexity-test`). `clj-kondo --lint`
+on the test file → 0 errors, 0 warnings. File length 787 lines (< 800
+`components/` guard). Marked TR11 `[x]` in steps.md with resolution note.
