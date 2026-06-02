@@ -2706,3 +2706,39 @@ file; `bb fmt:check` clean.
 
 No new actionable implementation feedback. The prior ACTIONABLE_FEEDBACK is
 resolved and verified against runtime truth. **REVIEW_COMPLETE.**
+
+## Test review — pass 15 (task-test-review, 2026-06-02) — REVIEW_COMPLETE
+
+Re-applied `task-test-review` (`well_formed ∧ ∀b∈behaviour. ∃t. covers ∧
+infra_deps→injectable∧nullable∧¬mock∧¬stub`) firsthand against current HEAD
+(`b7c4ed1dc`, after the flaky-lifecycle fix landed). Verified against runtime
+truth, not just the log.
+
+- **well_formed** ✓ — full `bb test` "✅ All tests passed"; `clj-kondo --lint`
+  0/0 across all scheduler test files (`scheduler_*_test.clj` +
+  `psi_tool_scheduler_test.clj`).
+- **behaviour-coverage** ✓ — all 7 design Scope areas + every acceptance
+  criterion map to a cited covering deftest in `findings.md` (message/session
+  live round trip via timer seam, busy-queue+drain via `:scheduler/drain-queue`,
+  both cancel races, failure recording, shutdown timer cleanup, `:at`
+  past/near-future/far-future matrix, projection rich-attrs across statuses).
+- **infra_deps → injectable ∧ ¬stub** ✓ — every cited covering test drives
+  infra via ctx seams (`:scheduler-run-after-delay-fn`,
+  `:execute-prepared-request-fn`, `:scheduler-cancel-delay-fn`,
+  `:scheduler-timers*`, `kernel/register-handler!`) and asserts observable
+  state/outputs, not interactions. The flaky-lifecycle fix
+  (`scheduled-deliver-runs-canonical-prompt-lifecycle-test`) now uses the
+  `:execute-prepared-request-fn` ctx seam + a session-scoped event-log read
+  instead of a `with-redefs` of `turn/execute-prepared-request!` — confirmed
+  firsthand: zero `with-redefs` of an infra var remains among any cited/seam
+  path. The sole surviving `with-redefs dispatch/dispatch!` site
+  (`scheduler_effects_test/scheduler-start-and-cancel-timer-effects-test`) is
+  **pre-existing baseline, non-cited** — it intentionally exercises the
+  *default daemon-thread* path (so its real `Thread/sleep` wait is inherent to
+  what it verifies); `findings.md` cites the *seam-driven* path
+  (`scheduler_timer_seam_test`) for the acceptance area, not this file. Already
+  audited & scoped out in passes 7/9/11/14; not re-filed (no-duplicate).
+
+No new actionable issue; no follow-up steps added. The review chain has
+converged. Verification-only invariant intact (this review touched no
+`components/agent-session/src/**` or `doc/scheduler.md`). **REVIEW_COMPLETE.**
