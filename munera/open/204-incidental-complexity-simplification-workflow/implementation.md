@@ -2196,3 +2196,39 @@ test robustness only, and the skill-test file is 322 lines (well under the 800
 `components/` guard), so the fallbacks fit without a split.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK.
+
+---
+
+## Follow-up execution — pass 10 test-review TR12 (jq-absent recipe fallback)
+
+✅ TR12 resolved (test-only; no production/skill/EDN change).
+
+Converted both `when`-gated recipe tests in
+`components/workflow-loader/test/.../incidental_complexity_finder_skill_test.clj`
+from a bare `(when jq-available …)` (no else → vacuous green when jq absent) to
+the determinism test's `(if jq-available (do …) (testing …structural fallback…))`
+shape:
+
+- `incidental-complexity-finder-recipe-filter-and-drop-test` — jq-absent fallback
+  asserts the recipe carries `select(.["lcc-total"] >= 5.0 and .gap >= 2.0)`
+  (qualification filter) and `select($ccmap[.gap_key] != null)` (A1 inner-join /
+  unmatched-local drop).
+- `incidental-complexity-finder-recipe-ranking-and-cap-test` — jq-absent fallback
+  asserts `sort_by(-.gap)` (gap-descending, not ascending) and `.[0:5]` (top-5 cap).
+
+All four fragments verified present verbatim in the live SKILL.md jq recipe, so the
+exact regresses TR12 names (>= → > threshold typo, A1 drop-rule removal,
+`sort_by(.gap)` ascending, dropped/widened slice) now fail green whether or not jq
+is installed — closing the `meaningful_failures` + `deterministic` gap.
+
+Verification:
+- `clj-paren-repair` on the test file: Success 1 / Failed 0.
+- `clj-kondo --lint` on the test file: 0 errors, 0 warnings.
+- Focused recipe tests (filter-and-drop, ranking-and-cap, determinism) green via
+  `bb clojure:test:unit` (jq present path; jq 1.8.1 on PATH). One unrelated
+  pre-existing failure in `psi.turn-runtime.response-mode-test`
+  (`execute-prepared-request-retry-after-header-drives-delay-test`, a retry-after
+  timing test) — out of scope for TR12.
+- Test file 340 lines (< 800 `components/` guard).
+
+PASS_STATUS: FOLLOW_UP_COMPLETE.

@@ -855,7 +855,7 @@ with the commit sha / decision when done.
       test file 787 lines (< 800). (See implementation.md pass-9 test-review TR11
       entry.)
 
-- [ ] TR12 — Two of the three executable recipe tests in
+- [x] TR12 — Two of the three executable recipe tests in
       `incidental_complexity_finder_skill_test.clj`
       (`incidental-complexity-finder-recipe-filter-and-drop-test` and
       `incidental-complexity-finder-recipe-ranking-and-cap-test`) gate their
@@ -878,6 +878,20 @@ with the commit sha / decision when done.
       or not jq is installed. Test-only, no production/skill/EDN change; skill
       test file is 322 lines (well under the 800 `components/` guard). Run
       focused suite + `clj-kondo`.
+      RESOLUTION: converted both `when`-gated recipe tests
+      (`incidental-complexity-finder-recipe-filter-and-drop-test`,
+      `incidental-complexity-finder-recipe-ranking-and-cap-test`) to the
+      determinism test's `(if jq-available (do …) (testing …structural fallback…))`
+      shape (test-only; no production/skill/EDN change). filter-and-drop fallback
+      locks the recipe carries `select(.["lcc-total"] >= 5.0 and .gap >= 2.0)`
+      (filter) and `select($ccmap[.gap_key] != null)` (A1 inner-join/drop);
+      ranking-and-cap fallback locks `sort_by(-.gap)` (descending, not ascending)
+      and `.[0:5]` (top-5 cap). All four fragments verified present verbatim in
+      the live SKILL.md recipe, so the exact regresses TR12 names (>= typo,
+      drop-rule removal, ascending sort, dropped/widened slice) now fail green
+      whether or not jq is installed. Focused recipe tests green (jq present
+      path); `clj-paren-repair` + `clj-kondo` 0 findings; test file 340 lines
+      (< 800). (See implementation.md pass-10 test-review TR12 entry.)
 
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 
