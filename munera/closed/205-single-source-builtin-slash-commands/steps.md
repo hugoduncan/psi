@@ -518,3 +518,29 @@ Tick with sha/decision on completion.
       Keep the existing two `case`-seam asserts unchanged. Verify the namespace
       still loads clean (the well-formed shipped table must pass) and re-run the
       commands-builtin-specs suite + targeted clj-kondo.
+
+## Code-shaper review follow-ups (code-shaper pass 3)
+
+- [ ] CS4 — Unify the two slash-completion token constructors so equal backend
+      data provably yields equal tokens (`consistent ∧ robust`; closes the
+      comment-only "structurally identical" contract P2 relies on). Today
+      `psi-emacs--slash-completion-token` (`psi-session-commands.el`, via
+      `psi-emacs--normalize-builtin-command-specs`) normalizes with
+      `psi-emacs--trim-optional-input` + `psi-emacs--alist-get-any`, while the
+      inline `next-token` in `psi-emacs--slash-completion-data-changed-p`
+      (`psi-events.el`) normalizes with `psi-emacs--non-blank-text` +
+      `psi-emacs--event-data-get` — different trim/nil semantics, so a
+      whitespace-padded or non-string `:name`/`:description` produces **unequal**
+      tokens for equal data → spurious refresh or a missed change. Extract one
+      shared `(name description)`-pair normalizer (and ideally one segment
+      builder) used by BOTH constructors — parallel to CS1's `render-help-line`
+      — so the "equal data → equal tokens" invariant is structural, not asserted
+      by comment. The two sites read different alist shapes (query-frame
+      `:keyword` keys vs event-data `(:k k)` key-lists); pass already-extracted
+      pair lists (or a key-list arg) to the shared normalizer so only the
+      normalization is shared, not the extraction. Add a test seeding the same
+      logical built-in specs through both the query-frame and event-data paths
+      with padded/edge values and assert the tokens are `equal` (locks no
+      false-positive refresh). The `:builtins` segment 205 added to both sites is
+      in-scope; folding `:commands`/`:templates` into the same shared builder is
+      a welcome consistency win if low-risk. `bb emacs:check` must stay green.

@@ -1868,3 +1868,42 @@ forbidden` and the sibling load-time `case`-seam asserts in `commands.clj`.
   (REPL-checked). `clojure -M:test` focus on commands-builtin-specs +
   builtin-commands-resolver + commands-test → 66 tests / 284 assertions / 0
   failures. clj-kondo over both changed files → 0/0.
+
+## Code-shaper review (code-shaper pass 3)
+
+Reviewed 205's changed surfaces against `simple ∧ consistent ∧ robust`.
+
+Backend (`builtin_specs.clj`, `commands.clj`, resolver), TUI
+(`autocomplete.clj`, `support.clj`, `shared.clj` disposal) are well-shaped:
+single keyed source, derived projections, load-time `assert`/malli seams
+(`unreachable > forbidden`), zero lint. Prior passes (CS1–CS3, CS-incidental)
+hold. No new backend/TUI findings.
+
+One Emacs finding (CS4): the two slash-completion token constructors that this
+task extended with a `:builtins` segment are **not** structurally identical
+despite the comments on both asserting they are ("identical to the inline
+token …", "normalized identically"). They normalize via **different** helpers:
+
+- `psi-session-commands.el` `psi-emacs--slash-completion-token` /
+  `psi-emacs--normalize-builtin-command-specs`: `psi-emacs--trim-optional-input`
+  (trims via `(format "%s" …)`, nil-on-blank) + `psi-emacs--alist-get-any`.
+- `psi-events.el` inline `next-token`: `psi-emacs--non-blank-text` (returns the
+  **untrimmed** string, nil for non-strings) + `psi-emacs--event-data-get`.
+
+So for a `:name`/`:description` with surrounding whitespace, or a non-string
+value, the two constructors emit **different** token values for equal backend
+data → spurious "changed" detection (false-positive refresh) or a real change
+normalized away on one side. The contract P2 relies on ("equal data yields
+equal tokens, structurally identical constructors") is asserted only by comment,
+not enforced — the `forbidden`-but-not-`unreachable` shape this task otherwise
+eliminates. Same class as CS1's render-formula tautology, in Emacs. The
+divergence spans all three segments (`:commands`/`:builtins`/`:templates`), but
+the `:builtins` segment is the one 205 introduced into both sites, so the new
+duplication is in-scope here.
+
+Remedy: extract one shared token-segment builder (single normalization of a
+`(name description)` pair list) used by **both** call sites, parallel to CS1's
+`render-help-line`, so equal data provably yields equal tokens. Note the two
+sites read different alist shapes (query-frame `:keyword` keys vs event-data
+`(:k k)` key-lists), so the shared helper takes already-extracted pair lists or
+a key-list arg; the normalization itself must be the single shared fn.
