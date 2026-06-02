@@ -133,7 +133,8 @@ representation" below):
   "/model"        {:kinds #{:prefixed} :description "Show or set the model"
                                        :usage "[provider model-id [session|project|user]]"}
   "/project-repl" {:kinds #{:exact :prefixed} :handler :project-repl
-                                       :description "Open/manage the project nREPL"}
+                                       :description "Open/manage the project nREPL"
+                                       :hide-in-help? true}   ; routed but help-absent today (¬help)
   "/?"            {:kinds #{:exact}    :handler :help :description "Show this help"
                                        :hide-in-help? true}   ; alias, autocompletes but ¬help
   "/exit"         {:kinds #{:exact}    :handler :quit :description "Exit the session"
@@ -238,9 +239,10 @@ Scope of `format-help`'s single-sourcing is bounded as follows:
 - **Built-in command lines** (currently the hand-written `/quit … /skill:name`
   block) derive from `(seq spec-table)` in **table order** (see "Spec-table
   ordering"), **skipping entries whose `:hide-in-help?` is truthy** (aliases
-  `/?`, `/exit` — see "`/?` and aliases"). The spec table is authored in the
-  current help's intended display order so the help listing is unchanged in
-  order *and* in membership (hidden aliases stay out). Each line renders
+  `/?`, `/exit`, plus the routed-but-help-absent `/project-repl` — see "`/?` and
+  aliases"). The spec table is authored in the current help's intended display
+  order so the help listing is unchanged in order *and* in membership (hidden
+  entries stay out). Each line renders
   `"  /name — :description"`, optionally with the entry's `:usage` inserted
   before the em-dash (`"  /name :usage — :description"`) so arg hints like
   `/model [provider model-id …]` survive (see "Description granularity" for the
@@ -294,7 +296,8 @@ no arg hint simply omit `:usage`.
 `⊆ #{:exact :prefixed}`, non-empty — see "Dispatch-kind representation");
 `:handler` (required iff `:exact ∈ :kinds`); `:description` (required, short);
 `:usage` (optional, help-only arg hint); `:hide-in-help?` (optional boolean,
-help-only suppression for aliases — see "`/?` and aliases"). Only `:name`
+help-only suppression for routed-but-help-absent entries — aliases `/?`/`/exit`
+plus `/project-repl` — see "`/?` and aliases"). Only `:name`
 (derived from the key) and `:description` are resolver-exposed; `:usage` and
 `:hide-in-help?` are `format-help`-only.
 
@@ -319,38 +322,42 @@ which returns bare names that UIs prefix). Apply uniformly. (This governs
 resolver *output*; the spec-table *keys* are `/`-prefixed — see "Spec-table key
 form" — so the resolver applies one `strip-slash`.)
 
-### `/?` and aliases (resolves C1)
+### `/?` and aliases, and routed-but-help-absent commands (resolves C1, I1)
 
-`/?` (help alias) and `/exit` (quit alias) exist in routing
-(`exact-command-handlers`: `"/?" → :help`, `"/exit" → :quit`). Because Option B
-makes table keys the **only** place built-in names exist, aliases *must* be
-table keys to (a) keep `builtin-command-names`/routing projections complete and
-(b) autocomplete, matching current Emacs behaviour (which lists `/?` and
-`/exit`). But the current `format-help` deliberately **omits** `/?` and `/exit`
-lines, and "format-help derivation" claims the help listing is unchanged.
-Deriving help from the whole table would newly emit alias lines — an
-inconsistency.
+Three routed built-in commands exist in dispatch but are deliberately **omitted**
+from the current `format-help`: `/?` (help alias → `:help`), `/exit` (quit alias
+→ `:quit`), and `/project-repl` (a real dual-kind command that has never had a
+help line). Because Option B makes table keys the **only** place built-in names
+exist, all three *must* be table keys to (a) keep
+`builtin-command-names`/routing projections complete and (b) autocomplete,
+matching current Emacs behaviour (which lists `/?`, `/exit`, and `/project-repl`).
+But "format-help derivation" claims the help listing is unchanged; deriving help
+from the whole table would newly emit these lines — an inconsistency.
 
 **Decision: add a per-entry `:hide-in-help?` boolean** (default falsey).
 `format-help`'s built-in-line derivation iterates the spec table but **skips
-entries where `:hide-in-help?` is truthy**; `/?` and `/exit` carry
-`:hide-in-help? true`. This is a *help-rendering projection filter*, parallel to
-`:usage` (also help-only — see "Description granularity"): it governs only what
-`format-help` prints, never which names exist or which projections route.
+entries where `:hide-in-help?` is truthy**; `/?`, `/exit`, **and `/project-repl`**
+carry `:hide-in-help? true`. This is a *help-rendering projection filter*,
+parallel to `:usage` (also help-only — see "Description granularity"): it governs
+only what `format-help` prints, never which names exist or which projections
+route. (`:hide-in-help?` thus covers two cases: help-omitted aliases and the
+help-omitted real command `/project-repl`; both are routed and both must stay out
+of help to keep the listing unchanged.)
 
 Rationale (`unreachable > forbidden`): name drift stays structurally
-unrepresentable (aliases remain table keys feeding every name surface and the
-routing projections); help-suppression becomes an **explicit, intentional data
-field** rather than a hidden literal omission. Aliases autocomplete (they are in
-the table → resolver → UI candidates) yet stay out of help exactly as today, so
-the "help listing unchanged" claim holds. The alternative — accept alias lines
-in help and drop the "unchanged listing" claim — was rejected: it changes
-user-visible help output for no benefit and weakens AC3's "listing unchanged"
-target.
+unrepresentable (these entries remain table keys feeding every name surface and
+the routing projections); help-suppression becomes an **explicit, intentional
+data field** rather than a hidden literal omission. The hidden entries
+autocomplete (they are in the table → resolver → UI candidates) yet stay out of
+help exactly as today, so the "help listing unchanged" claim holds in order *and*
+membership. The alternative — accept new help lines and drop the "unchanged
+listing" claim — was rejected: it changes user-visible help output for no benefit
+and weakens AC3's "listing unchanged" target.
 
 Scope of `:hide-in-help?`: help only. Resolver output and autocomplete include
-hidden entries (aliases should still autocomplete), so `:hide-in-help?` is **not**
-exposed by the resolver and **not** consulted by the UI projections.
+hidden entries (aliases and `/project-repl` should still autocomplete), so
+`:hide-in-help?` is **not** exposed by the resolver and **not** consulted by the
+UI projections.
 
 ## Acceptance criteria
 
@@ -371,8 +378,9 @@ exposed by the resolver and **not** consulted by the UI projections.
   spec table in table order (no hardcoded built-in command name+description
   literals remain in `format-help`), **skipping `:hide-in-help?` entries** so
   the rendered help listing is unchanged in order and membership (aliases `/?`,
-  `/exit` stay out of help yet remain in the table for autocomplete — see "`/?`
-  and aliases"). The non-routed `/skill:name` helper line and trailing prose
+  `/exit` and the routed-but-help-absent `/project-repl` stay out of help yet
+  remain in the table for autocomplete — see "`/?` and aliases"). The non-routed
+  `/skill:name` helper line and trailing prose
   stay literal; `:usage` arg hints render inline in help only (see "format-help
   derivation").
 - AC4: TUI slash autocomplete includes `/reload-models` (and other

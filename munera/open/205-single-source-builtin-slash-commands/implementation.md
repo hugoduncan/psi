@@ -417,3 +417,46 @@ Two new actionable inconsistencies (I1–I2 in steps.md):
   `next-token`, or state why a built-in-spec-only event cannot occur on channel 2.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+### 2026-06-01 — Plan inconsistency follow-up (I1–I2) executed
+
+Both inconsistencies resolved at plan/design/steps level (no production code yet
+— Slices 1–5 remain unimplemented). Grounded against real code first.
+
+- **I1 (`/project-repl` routed-but-help-absent).** Verified against
+  `commands.clj`: `format-help` (111–161) lists `/quit … /cancel-job /help` but
+  **omits** `/?`, `/exit`, AND `/project-repl`; `/project-repl` is routed in both
+  `exact-command-handlers` (680) and `prefixed-command-prefixes` (683).
+  **Decision (first option): flag `/project-repl` `:hide-in-help? true`** so
+  whole-table help derivation reproduces the existing help membership exactly —
+  preserving the "unchanged in order *and* membership" claim (rejected the
+  alternative of accepting a new help line, which changes user-visible output for
+  no benefit and weakens AC3). `:hide-in-help?` now covers two cases: help-omitted
+  aliases (`/?`, `/exit`) and the help-omitted real command `/project-repl`.
+  Edits: design.md — `/project-repl` spec example gains `:hide-in-help? true`;
+  "format-help derivation" + "`/?` and aliases (… resolves C1, I1)" + AC3 widened
+  to enumerate `/project-repl` alongside the aliases. plan.md — `:hide-in-help?`
+  field doc, format-help derivation bullet, "Concrete spec-table membership", and
+  the "format-help output drift" risk all updated to flag `/project-repl`.
+  steps.md — Slice-1 populate-membership item and the `format-help` test item
+  (now asserts no NEW `/project-repl` line).
+
+- **I2 (built-in-spec-only change undetectable).** Verified against
+  `psi-events.el:80`: `next-token` is gated by
+  `(and (or has-command-names has-templates) …)` then `(when next-token …)`, so a
+  built-in-spec-only event (no `:extension-command-names`/`:prompt-templates`)
+  leaves `next-token` nil → no refresh, the `:builtins` segment alone being
+  insufficient. **Decision: extend the guard** — extract `raw-builtin-specs`
+  (`'(:builtin-command-specs builtin-command-specs)`), compute `has-builtin-specs`,
+  and add it to the `or`:
+  `(and (or has-command-names has-templates has-builtin-specs) …)`. Edits:
+  plan.md P2 — added a "Change-detection guard extension (resolves I2)" paragraph
+  enumerating the extraction + guard + the `when`-branch apply call (P1 site 4).
+  steps.md — the Slice-4 token step now also requires extending the guard with
+  `has-builtin-specs`.
+
+Both choices follow `unreachable > forbidden` (I1 keeps name drift structurally
+unrepresentable; help suppression stays an explicit data field) and keep the
+two-channel Emacs handling identical to `extension-command-names`. No blocking
+reasons; plan/design/steps now internally consistent. These are plan/design-stage
+refinements — no code/test/doc change yet.

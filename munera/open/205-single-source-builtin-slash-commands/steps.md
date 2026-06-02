@@ -12,8 +12,9 @@ Tick with sha/decision on completion.
       /history /help /? /prompts /skills /worktree /logout /reload-models
       /reload-prompts /reload-extension-installs`); prefixed-only (`/tree /jobs
       /job /cancel-job /remember /model /thinking /speed /effort /login`); dual
-      `/project-repl` `#{:exact :prefixed}`. `/?` and `/exit` carry
-      `:hide-in-help? true`.
+      `/project-repl` `#{:exact :prefixed}`. `/?`, `/exit`, AND `/project-repl`
+      carry `:hide-in-help? true` (the three routed commands the current
+      `format-help` omits — I1).
 - [ ] Add private helper `strip-slash` (or reuse existing) for `/`-prefix
       removal.
 - [ ] Derive `exact-command-handlers` as a projection `{key → (:handler s)}` for
@@ -34,8 +35,9 @@ Tick with sha/decision on completion.
       `/project-repl` dispatches via exact handler, `/project-repl <args>` via the
       prefixed `case` (precedence unchanged).
 - [ ] Add `format-help` test: built-in block renders in table order, `:usage`
-      arg-hints present (`/model`, `/speed`, `/effort`), alias lines (`/?`,
-      `/exit`) absent, `/skill:name` line present.
+      arg-hints present (`/model`, `/speed`, `/effort`), hidden lines (`/?`,
+      `/exit`, `/project-repl`) absent — no NEW `/project-repl` help line (I1) —
+      `/skill:name` line present.
 - [ ] Add narrow branch-coherence test: set of `:prefixed` spec-table keys equals
       set of `dispatch-prefixed-command` `case` branch keys.
 - [ ] Run existing commands/dispatch test suite + targeted clj-kondo; green.
@@ -96,7 +98,10 @@ Tick with sha/decision on completion.
       segment to `psi-emacs--slash-completion-token`
       (`psi-session-commands.el:292`) and to the inline `next-token` in
       `psi-emacs--slash-completion-data-changed-p` (`psi-events.el:80`), kept
-      structurally identical.
+      structurally identical. ALSO extend the change-detection guard (I2): add
+      `has-builtin-specs` (from `raw-builtin-specs`) to the
+      `(or has-command-names has-templates)` condition gating `next-token`, so a
+      built-in-spec-only event yields a non-nil token and refreshes (AC5/AC6).
 - [ ] Extract built-in specs on the session-update event-data path (P3 channel 2):
       `psi-emacs--slash-completion-data-changed-p` reads
       `(:builtin-command-specs builtin-command-specs)` from event data and passes
@@ -153,7 +158,7 @@ Tick with sha/decision on completion.
 
 ## Plan inconsistency follow-ups (review pass 1)
 
-- [ ] I1 — `/project-repl` is routed but **absent from the current
+- [x] I1 — `/project-repl` is routed but **absent from the current
       `format-help`** (like `/?` and `/exit`), yet plan/steps assign
       `:hide-in-help? true` to ONLY `/?` and `/exit`. Deriving help from the
       whole table (skipping only `:hide-in-help?`) would NEWLY emit a
@@ -164,7 +169,7 @@ Tick with sha/decision on completion.
       membership" list (keeping help membership unchanged), or explicitly accept
       a new `/project-repl` help line, drop the "unchanged membership" claim, and
       adjust the Slice-1 `format-help` golden/substring test expectation.
-- [ ] I2 — P2's "built-in-spec-only change is detected (AC5/AC6)" is inconsistent
+- [x] I2 — P2's "built-in-spec-only change is detected (AC5/AC6)" is inconsistent
       with its mechanism: `psi-emacs--slash-completion-data-changed-p`
       (`psi-events.el:80`) computes `next-token` only under
       `(and (or has-command-names has-templates) …)`, so an event with only

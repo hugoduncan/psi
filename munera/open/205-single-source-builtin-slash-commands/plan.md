@@ -25,8 +25,10 @@ Introduce one ordered `array-map`, `builtin-command-specs`, authored in the
 - `:description` — required short string (resolver-exposed).
 - `:usage` — optional help-only arg-hint (e.g.
   `"[provider model-id [session|project|user]]"`), not resolver-exposed.
-- `:hide-in-help?` — optional boolean, help-only suppression for aliases
-  (`/?`, `/exit`), not resolver-exposed, not UI-consulted.
+- `:hide-in-help?` — optional boolean, help-only suppression for routed-but-
+  help-absent entries (aliases `/?`, `/exit`, plus the real dual-kind command
+  `/project-repl`, which has never had a help line), not resolver-exposed, not
+  UI-consulted.
 
 Derive every existing name surface from this one table (no independent
 literals):
@@ -38,7 +40,8 @@ literals):
 - `builtin-command-names` = `(set (map strip-slash (keys table)))` — no
   `concat`.
 - `format-help` built-in lines = iterate `(seq table)` in order, **skip
-  `:hide-in-help?`**, render `"  /name [:usage ]— :description"`. `/skill:name`
+  `:hide-in-help?`** (`/?`, `/exit`, `/project-repl`), render
+  `"  /name [:usage ]— :description"`. `/skill:name`
   helper line + trailing prose stay literal; Prompt/Skills/Extension sections
   unchanged.
 
@@ -53,7 +56,10 @@ exact-only: `/quit /exit(alias) /new /resume /status /history /help /?(alias)
 /reload-extension-installs`; prefixed-only: `/tree /jobs /job /cancel-job
 /remember /model /thinking /speed /effort /login`; dual `#{:exact :prefixed}`:
 `/project-repl`. `/reload-prompts` (task 204) is included so it appears in both
-UIs for free.
+UIs for free. `:hide-in-help? true` is carried by `/?`, `/exit`, **and
+`/project-repl`** — the three routed commands the current `format-help` omits —
+so whole-table help derivation reproduces the existing help membership exactly
+(I1).
 
 ### Backend resolver
 
@@ -174,6 +180,20 @@ identical so equal data yields equal tokens:
   (`psi-events.el:80`) gains the matching `:builtins` segment built from the
   event-extracted built-in specs.
 
+**Change-detection guard extension (resolves I2).** Adding the `:builtins`
+segment alone is insufficient: `next-token` is currently computed only under
+`(and (or has-command-names has-templates) …)` and used under `(when next-token …)`,
+so an event carrying ONLY built-in specs (no `:extension-command-names`, no
+`:prompt-templates`) leaves both `has-command-names` and `has-templates` nil →
+`next-token` nil → no refresh, regardless of the new segment. P2 therefore also
+extracts `raw-builtin-specs`
+(`psi-emacs--event-data-get data '(:builtin-command-specs builtin-command-specs)`),
+computes `has-builtin-specs`, and adds it to the guard's `or`:
+`(and (or has-command-names has-templates has-builtin-specs) …)`. A
+built-in-spec-only event then produces a non-nil `next-token` and triggers the
+refresh (AC5/AC6), and the `apply-slash-completion-data` call inside the `when`
+passes the event-extracted built-in specs as its middle arg (P1 site 4).
+
 `psi-emacs--apply-slash-completion-data` recomputes the token via the updated
 `psi-emacs--slash-completion-token` call (now passing built-in specs). Token
 segment order is fixed (`:commands … :builtins … :templates …`) and identical in
@@ -251,8 +271,9 @@ isolated so the routing-unchanged proof gates everything downstream.
 - **`format-help` output drift.** Help text is user-visible and partly
   whitespace-sensitive. Mitigate: author the table in current help order, encode
   `:usage` so arg-hint lines (`/model …`, `/speed …`) render identically, skip
-  `:hide-in-help?`, and add a `format-help` golden/substring test that the
-  built-in block matches the current rendering (alias lines absent).
+  `:hide-in-help?` (`/?`, `/exit`, `/project-repl`), and add a `format-help`
+  golden/substring test that the built-in block matches the current rendering
+  (alias lines `/?`/`/exit` absent **and** no new `/project-repl` line — I1).
 - **Dual-kind `/project-repl`.** Must feed both projections; exact-first dispatch
   precedence unchanged. Mitigate: explicit test that `/project-repl` is in both
   derived projections and that bare vs `/project-repl <args>` dispatch is
