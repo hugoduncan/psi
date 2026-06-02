@@ -526,3 +526,61 @@ Verified field shapes (P2/A1 grounding, current run): `local` units carry
 `cc`. Recipe inputs all present as designed.
 
 No deviations from design. Slices 2–5 remain.
+
+## 2026-06-01 — Slice 2 built: task-lifecycle-in-worktree wrapper (+ D1 deviation)
+
+Authored `.psi/workflows/task-lifecycle-in-worktree.edn` — a three-step wrapper
+(`resolve-worktree` `:session`+`work-on` → `lifecycle` `:delegate`
+`:target "task-lifecycle"` → `summary` `:session`), structurally identical to the
+loadable `review-implementation-in-worktree.edn` precedent.
+
+### D1 — DEVIATION from design/plan: `.edn`, not `.md`-with-EDN-body
+
+design.md + plan.md + steps.md all specified authoring the wrapper as
+`.psi/workflows/task-lifecycle-in-worktree.**md**`, mirroring
+`implement-task-in-worktree.md` (`.md` with an EDN body + `name`/`description`
+frontmatter), and cited that file as a "verified" loadable wrapper.
+
+**That premise is false against the live loader.** Findings (grounded in the
+running code, not docs):
+
+- `psi.workflow-loader.parser/parse-markdown-workflow-file` explicitly
+  **rejects** any `.md` body that begins with `{` —
+  `body-starts-with-edn-map?` → error *"Markdown workflow body must not begin
+  with an EDN workflow definition block"*. The `.md` form is reserved for
+  single-step prompt workflows (its body becomes prompt contributions).
+- Running `load-workflow-definitions "."` over the real `.psi/workflows` dir,
+  `implement-task-in-worktree.md` **is itself an error entry** with exactly that
+  message — i.e. the cited precedent does not load. (Pre-existing latent repo
+  bug; out of scope for this task — noted for a possible follow-up.)
+- The actual loadable multi-step-wrapper precedent is
+  `review-implementation-in-worktree.**edn**` — a multi-step `.edn` map with
+  top-level `:name`/`:description`, covered green by `load-edn-only` in
+  `workflow_definitions_test.clj`. It is the same three-step
+  resolve-worktree → delegate → summary shape the design wants.
+
+**Resolution:** author the wrapper as `.edn` mirroring
+`review-implementation-in-worktree.edn`. This satisfies every *substantive*
+design/plan/steps requirement (three-step shape; `resolve-worktree`
+`:session`+`work-on` extracting `worktree_path:`/task-path and re-calling
+`work-on`; `lifecycle` `:delegate :target "task-lifecycle"` with
+`:prompt-string {:type :map :fields {:input {:from {:step "resolve-worktree"
+:yield :text}}}}`; trailing `summary` `:session`). Only the *file form* changes
+(`.edn` vs `.md`), forced by the loader contract. Per `one_way` /
+`λassert (runtime > docs)`, the runtime parser is authoritative over the design's
+file-form assumption.
+
+Slice 4 definition tests will assert the wrapper via `load-edn-only` (the
+review-implementation-in-worktree pattern), not the `.md` `load-edn-with-md-refs`
+path.
+
+Live verification: `clj-paren-repair` Success(1)/Failed(0);
+`load-workflow-definitions "."` registers `task-lifecycle-in-worktree` with steps
+`[resolve-worktree lifecycle summary]`, types `[:session :delegate :session]`,
+lifecycle `:target "task-lifecycle"`, prompt-string
+`{:type :map :fields {:input {:from {:step "resolve-worktree" :yield :text}}}}`,
+resolve-worktree tools `["read" "bash" "work-on"]`; no load errors for it.
+
+Implication for Slice 3: the outer `reduce-incidental-complexity.edn` step-2
+delegate `:target` remains `"task-lifecycle-in-worktree"` (name unchanged); only
+the wrapper's backing file extension changed. No other slice content is affected.

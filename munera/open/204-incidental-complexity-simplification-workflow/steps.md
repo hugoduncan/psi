@@ -51,28 +51,38 @@ with the commit sha / decision when done.
 
 ## Slice 2 — `task-lifecycle-in-worktree` wrapper workflow
 
-- [ ] Create `.psi/workflows/task-lifecycle-in-worktree.md` mirroring
-      `implement-task-in-worktree.md` (`.md` with EDN body + frontmatter
-      `name`/`description`).
-- [ ] Add `resolve-worktree` step: `:type :session`, tools
+- [x] Create the wrapper workflow. **DEVIATION (D1)**: authored as
+      `.psi/workflows/task-lifecycle-in-worktree.**edn**` (multi-step EDN map
+      with top-level `:name`/`:description`), **not** `.md`-with-EDN-body. Reason:
+      the live `workflow-loader` parser **rejects** any `.md` body that begins
+      with an EDN map ("Markdown workflow body must not begin with an EDN
+      workflow definition block"); the cited precedent `implement-task-in-worktree.md`
+      in fact **fails to load** under the current loader. The real loadable
+      multi-step-wrapper precedent is `review-implementation-in-worktree.**edn**`
+      (verified: loads via `load-edn-only`, 3-step resolve-worktree → delegate →
+      summary). Mirrored that instead. (See implementation.md D1.)
+- [x] Add `resolve-worktree` step: `:type :session`, tools
       `["read" "bash" "work-on"]`, contribution template extracts `worktree_path:`
       and the Munera task path from `{{input}}`, calls `work-on` with the
       extracted worktree path, then yields **only** the bare task path on one line.
-- [ ] Add `lifecycle` step: `:type :delegate`, `:target "task-lifecycle"`,
+- [x] Add `lifecycle` step: `:type :delegate`, `:target "task-lifecycle"`,
       `:prompt-string {:type :map :fields {:input {:from {:step "resolve-worktree" :yield :text}}}}`.
-- [ ] Add a trailing `summary` step (`:type :session`, per resolved P1):
+- [x] Add a trailing `summary` step (`:type :session`, per resolved P1):
       produce the user-facing terminal summary for the Munera task, mirroring
-      `implement-task-in-worktree.md`'s `summary` step. Rationale (P1): outer
+      `review-implementation-in-worktree.edn`'s `summary` step. Rationale (P1): outer
       step-2 (the delegate into this wrapper) is the `reduce-incidental-complexity`
       workflow's **terminal** step, so the workflow needs a user-facing terminal
-      summary; the wrapper's `summary` step is where it is produced (the precedent
-      keeps it for exactly this reason). The wrapper is therefore a three-step
-      adapter (resolve-worktree → lifecycle → summary), structurally identical to
-      `implement-task-in-worktree`; the design's "thin two-step adapter" framing is
-      superseded by this resolution.
-- [ ] Run `clj-paren-repair` on the EDN body if needed; verify the workflow
-      parses, loads, and is registered.
-- [ ] Commit Slice 2 (`⚒ workflow: add task-lifecycle-in-worktree wrapper`).
+      summary; the wrapper's `summary` step is where it is produced. The wrapper is
+      therefore a three-step adapter (resolve-worktree → lifecycle → summary),
+      structurally identical to the loadable `review-implementation-in-worktree.edn`
+      precedent (and to the intended `implement-task-in-worktree` shape); the
+      design's "thin two-step adapter" framing is superseded by this resolution.
+- [x] Run `clj-paren-repair` on the EDN; verify the workflow parses, loads, and
+      is registered. VERIFIED: `clj-paren-repair` Success; `load-workflow-definitions`
+      registers `task-lifecycle-in-worktree` (3 steps, types `[:session :delegate
+      :session]`, lifecycle target `task-lifecycle`, prompt-string `:map`/`:fields`
+      wiring, resolve-worktree tools include `work-on`); zero load errors for it.
+- [x] Commit Slice 2 (`⚒ workflow: add task-lifecycle-in-worktree wrapper`).
 
 ## Slice 3 — `reduce-incidental-complexity` outer workflow
 
