@@ -15,6 +15,8 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-06-02: Task 202 (`document-at-bounds-in-scheduler-doc`) test review found one actionable coverage gap: current focused matrix proves past delay-0, 500ms rejection, 5000ms acceptance, and >24h rejection, but not the documented sub-millisecond future `:at` truncation-to-delay-0 immediate-fire case. Added unchecked review follow-up; focused matrix still passes (1 test, 16 assertions).
+
 - 2026-06-02: Task 202 (`document-at-bounds-in-scheduler-doc`) independent implementation verification found no remaining concrete implementation work: all task/design steps already checked, `doc/scheduler.md` matches resolved-millisecond-delay absolute-`:at` acceptance criteria, and focused `psi-tool-scheduler-at-resolution-matrix-test` passed (1 test, 16 assertions). Implementation is complete pending closure.
 
 - 2026-06-02: Task 202 (`document-at-bounds-in-scheduler-doc`) plan inconsistency follow-up completed: reconciled `steps.md` with the already-applied `doc/scheduler.md` absolute-`:at` wording, checked the grounding/docs/verification/task-record items and the review follow-up, and appended implementation evidence. No code/doc changes were needed; existing task 201 `psi-tool-scheduler-at-resolution-matrix-test` proof remains sufficient for this doc-only reconciliation.
