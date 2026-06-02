@@ -72,3 +72,56 @@ Optionally covered by a narrow branch-coherence test (left to plan).
 
 No blocking reasons; A1 fully addressed at design level (plan/code stages will
 implement the projections).
+
+### 2026-06-01 — Ambiguity review (review-task-design ambiguity pass), pass 1
+
+Scope: ambiguities only (¬architecture, ¬correctness, ¬consistency). Read
+design.md + design-steps.md (A1 resolved) and grounded against real code:
+`commands.clj` `exact-command-handlers` (664), `prefixed-command-prefixes`
+(682), `builtin-command-names` (715), `dispatch-prefixed-command` (697),
+`format-help` (111), and `extension-commands-resolver` precedent.
+
+Five new actionable ambiguities (B1–B5 in design-steps.md):
+
+- B1 — **Dual-kind command unrepresentable.** `/project-repl` is in BOTH
+  `exact-command-handlers` (`:project-repl`) AND `prefixed-command-prefixes`
+  today; `dispatch*` tries exact first, then the prefixed `case` (both have a
+  `/project-repl` branch). Option B's single keyed entry carries one
+  `:dispatch`/`:handler` field — it cannot express "exact AND prefixed" without
+  a rule. Design must specify: does an entry carry a set/either of kinds, which
+  projection(s) it feeds, and which dispatch path wins? Unspecified → the
+  projection of `exact-command-handlers`/`prefixed-command-prefixes` is
+  ambiguous for this command.
+
+- B2 — **Spec-table key form still "pick one."** Scope says key "without leading
+  slash, or with — pick one and apply uniformly," yet "Slash prefix
+  normalization" fixes only the *resolver output* (bare). The table-key form
+  (Option B examples use `/`-prefixed keys; `strip-slash` is applied in the
+  projections) is never decided. Pin the canonical table-key form in design so
+  every projection's strip/keep is unambiguous.
+
+- B3 — **`format-help` ordering + non-built-in lines.** AC3 says help "derives
+  from the single spec source," but current `format-help` has hand-curated
+  ordering, an arg-usage hint per line, a `/skill:name` line that is NOT a
+  built-in routing entry (it's prose), and separate Prompt/Skill/Extension
+  sections. Design doesn't state whether spec-table iteration order must
+  reproduce the current help order, whether `/skill:name` stays hand-written,
+  and where the per-line `— description` vs `:usage` split renders. Ambiguous
+  what "no independent hardcoded built-in list remains in format-help" requires.
+
+- B4 — **Spec-table ordering authority.** AC2 mandates a "single keyed spec
+  table" but doesn't state whether it is an ordered map and whether resolver
+  output, help listing, and autocomplete must preserve that order. UIs and help
+  currently differ in order; "derived projection" leaves emission order
+  undefined. Specify ordered-map requirement (or explicitly that order is
+  unspecified) so AC4/AC5/AC6 tests have a deterministic target.
+
+- B5 — **`:usage` field decision deferred into AC-bearing scope.** "Description
+  granularity" leaves whether the spec carries `:usage` as a plan-stage
+  resolution, but Option B's example spec already shows a `:usage` key and AC1
+  fixes the resolver output to `{:name :description}` (no `:usage`). If `:usage`
+  lands in the table, the resolver-output shape in AC1 and the design's example
+  diverge. Decide at design whether `:usage` is a table field and whether it is
+  exposed by the resolver, so AC1's `{:name :description}` is or is not final.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
