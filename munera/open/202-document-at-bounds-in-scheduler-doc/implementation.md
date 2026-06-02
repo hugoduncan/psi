@@ -31,3 +31,7 @@ Completed the newly added reconciliation follow-up. Re-read `design.md`, `plan.m
 ## Independent implementation verification — 2026-06-02
 
 Re-read the task artifacts, current `doc/scheduler.md`, `resolve-fire-time!`/`millis-until`, `validate-delay-ms!`, and the task 201 `psi-tool-scheduler-at-resolution-matrix-test`. Confirmed all task checklist items are already complete and no further documentation or code change is needed. Ran focused verification: `clojure -M:test --focus psi.agent-session.psi-tool-scheduler-test/psi-tool-scheduler-at-resolution-matrix-test` → 1 test, 16 assertions, 0 failures.
+
+## Implementation review — 2026-06-02
+
+Applied `task-implementation-review`: re-read task artifacts, `doc/scheduler.md`, `resolve-fire-time!`/`millis-until`, `validate-delay-ms!`, and the task 201 `psi-tool-scheduler-at-resolution-matrix-test`. The doc-only implementation matches the design and runtime behaviour: absolute `:at` is documented by resolved millisecond delay; delay `0` fires immediately; positive `1–999ms` rejects by the minimum; positive delay beyond `24h` rejects by the maximum; relative `:delay-ms 0` remains rejected. Re-ran focused verification: `clojure -M:test --focus psi.agent-session.psi-tool-scheduler-test/psi-tool-scheduler-at-resolution-matrix-test` → 1 test, 16 assertions, 0 failures. No new actionable implementation issues found.
