@@ -351,3 +351,32 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       `claude-snapshot` and NOT `claude-LIVE-CHANGED` (expose the session-model
       context if `:model-fallback` surfaces nothing model-dependent), so AC7's
       isolation invariant is provable rather than just the fallback's shape.
+
+## Implementation-review pass 4 follow-ups (review 2026-06-02)
+
+- [ ] R5: Commit (or revert) the uncommitted R4 refinement. The genuine R4 fix
+      — re-gating child-state snapshot isolation on `:inherited-snapshot?`
+      instead of `:workflow-owned?` — is uncommitted across 5 files
+      (`child_session_state.clj`, `context.clj`, `session_lifecycle.clj`,
+      `attempts.clj`, `child_session_state_test.clj`). Committed HEAD is
+      incoherent: `child_session_contract` declares the `:inherited-snapshot?`
+      schema field + a judge-case comment, but nothing in HEAD produces or
+      consumes it (committed `child_session_state.clj` still gates on
+      `workflow-owned?'`), so HEAD ships a dangling schema field whose behaviour
+      is unimplemented. Commit the working-tree change with a `⚒ 207` message
+      (or revert and re-derive), then verify `git status --short` is clean and
+      HEAD is self-consistent (schema field has a producer in `attempts.clj` and
+      a consumer in `child_session_state.clj`). Do NOT close the task with a
+      dirty tree.
+- [ ] R6: Reconcile steps.md R4's `[x] DONE` note with the actual fix. R4's
+      note documents the `workflow-owned?'`-gated `inherited-default` helper, but
+      the real fix re-gates on `:inherited-snapshot?` (to keep live-parent
+      inheritance for the workflow judge / non-snapshot workflow children).
+      Update R4's steps.md note to describe the `:inherited-snapshot?` mechanism
+      after R5 is committed.
+- [ ] R7: Append the `:inherited-snapshot?` refinement to implementation.md's
+      "R4 follow-up executed" section: record the re-gate from `workflow-owned?`
+      to `:inherited-snapshot?`, the new contract-schema field, the threading
+      through `context`/`session_lifecycle`/`attempts`, and why `workflow-owned?`
+      was insufficient (the workflow judge is workflow-owned but supplies no
+      model/prompt-mode and must keep live-parent inheritance).

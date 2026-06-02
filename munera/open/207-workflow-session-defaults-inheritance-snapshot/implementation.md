@@ -1070,3 +1070,55 @@ fallback's shape.
 Verification: `psi.workflow-step-session-config.inheritance-snapshot-test`
 9 tests / 47 assertions green (was 45 — T1 added 2 assertions); clj-kondo clean.
 T1 checked.
+
+## Implementation-review pass 4 follow-ups (review 2026-06-02)
+
+ψ review of code against design/plan/steps. AC coverage and the snapshot purity
+boundary remain sound; tests in the working tree are green
+(child-session-state 9/62, inheritance-snapshot 24/130 incl. judge). One
+HIGH-severity coherence finding plus two related drifts:
+
+- **R5 (HIGH — R4 fix is uncommitted; HEAD is internally incoherent).** The
+  genuine R4 fix (re-gating child-state snapshot isolation on a dedicated
+  `:inherited-snapshot?` flag instead of `:workflow-owned?`) exists ONLY as
+  uncommitted working-tree changes across 5 files:
+  `agent_session/child_session_state.clj` (gate `inherited-default` on
+  `inherited-snapshot?'`), `agent_session/context.clj` +
+  `dispatch_handlers/session_lifecycle.clj` (thread `:inherited-snapshot?`
+  through `:session/create-child`), `workflow_runtime/attempts.clj` (set
+  `:inherited-snapshot? true` on step-attempt children), and
+  `agent_session/child_session_state_test.clj` (the judge-keeps-live-parent
+  test). Meanwhile committed HEAD (`9d3c52649`) has `child-session-contract`'s
+  `:inherited-snapshot?` schema entry + the contract comment naming the judge
+  case, but NOTHING in HEAD produces or consumes that flag — committed
+  `child_session_state.clj` still gates on `workflow-owned?'`. So HEAD ships a
+  dangling schema field and a contract comment whose behaviour is not
+  implemented, and the working tree's real fix is unsaved. Severity: the task is
+  presented as fully implemented/reviewed (steps S1–S7 + R1–R4 + T1 all `[x]`),
+  but a closing commit would either ship the incoherent HEAD (judge regression:
+  workflow-owned-but-not-snapshot-governed children lose live-parent
+  inheritance) or silently include unreviewed uncommitted work. Fix: commit the
+  5-file working-tree change with a `⚒ 207` message, OR revert it and re-derive
+  R4 — do not close with a dirty tree. Verify post-commit that
+  `git status --short` is clean and HEAD is self-consistent (schema field has a
+  producer + consumer).
+
+- **R6 (MED — steps.md R4 describes the superseded approach).** steps.md R4
+  `[x] DONE` note documents the `workflow-owned?'`-gated `inherited-default`
+  helper as the fix, but the working tree (and the committed
+  `child_session_contract` comment) moved to an `:inherited-snapshot?` gate to
+  spare the judge / non-snapshot workflow children. The DONE note contradicts
+  the actual fix. Reconcile R4's steps.md note with the `:inherited-snapshot?`
+  mechanism once R5 is committed.
+
+- **R7 (MED — implementation.md R4 note omits the `:inherited-snapshot?`
+  refinement).** The "R4 follow-up executed" section documents only the
+  `workflow-owned?` gate + `initial-session` default rationale; it does not
+  mention the subsequent re-gating onto `:inherited-snapshot?` (the judge
+  carve-out), nor the contract-schema field, nor the threading through
+  `context`/`session_lifecycle`/`attempts`. After R5 is committed, append a note
+  recording the `:inherited-snapshot?` gate and why `workflow-owned?` was
+  insufficient (workflow-owned judge children supply no model/prompt-mode and
+  must keep live-parent inheritance).
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
