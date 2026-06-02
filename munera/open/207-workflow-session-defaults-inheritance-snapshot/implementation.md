@@ -1485,3 +1485,45 @@ snapshot))` — never that the captured pools reflect the parent's actual
 produced by `resolve-inherited-defaults-snapshot`, so it does not cover the
 capture path's tools/skills value either. AC3 names tools/skills as inherited
 defaults; the capture half of that invariant is value-unasserted. See T6.
+
+## Test-review pass 6 (ψ, 2026-06-02)
+
+Full test-review re-pass after T1–T5 + the file-length split (`ee5dc140b`).
+Applied task-test-review skill: well-formed ∧ AC-coverage ∧ no-mock infra deps.
+
+- **AC→test coverage complete (all 9).** AC1/2 + model/prompt/thinking/speed/
+  effort AC3 → `snapshot-isolates-resolution-from-live-parent-mutation-test`;
+  tools/skills AC3 → `snapshot-isolates-tools-skills-from-live-parent-mutation-test`;
+  AC4 → `nested-delegation-…-overridden-model-test` +
+  `delegate-step-runtime-result-persists-child-inherited-defaults-test`;
+  AC5 → `snapshot-preserves-explicit-step-override-test`;
+  AC6 → `no-snapshot-falls-back-to-live-parent-test`;
+  AC7 → `snapshot-model-feeds-model-query-selection-context-test` (T1-strengthened,
+  snapshot-vs-live distinguishing winner);
+  AC8 → `resume-run-test` "AC8" block (`workflow-runtime/core_test.clj` — note
+  steps.md S5 misattributed the ns to agent-session `workflow_runtime_test`;
+  coverage is correct, only the pointer was wrong; non-actionable);
+  AC9 → `create-run-persists-inherited-defaults-snapshot-test` (canonical-state
+  residence + `workflow-run-schema` validation = the testable replayability claim).
+- **No-mock invariant holds.** 207 tests use real ctx/state + nullable adapter
+  (`support/create-session-context {:persist? false}`); zero `with-redefs`/mock/
+  stub of infra deps in the inheritance-snapshot, child-session-context, or
+  canonical-workflows-snapshot suites. The lone `with-redefs` in
+  `child_session_state_test.clj:239` is pre-existing non-207 prompt-rebuild
+  scaffolding.
+- **Nested-snapshot schema conformance transitively covered.** `create-run`
+  throws on `valid-workflow-run?` failure, so the e2e child-persist test
+  validates the `effective-config->snapshot` output against the schema (a
+  malformed `:model` shape would error the test), closing the apparent
+  "nested path only asserts key-set, not schema" concern.
+- **Tree/HEAD coherent.** The transiently-dirty working tree first observed
+  (T4 split mid-commit by a concurrent session) resolved to clean; HEAD
+  `ee5dc140b` self-consistent — T4 test lives solely in tracked
+  `canonical_workflows_snapshot_test.clj`, no duplication.
+- **Suites green (bounded heap):** workflow-runtime core (9/35),
+  inheritance-snapshot (10/51), canonical-workflows-snapshot +
+  workflow-child-session-context (5/43). 0 failures.
+
+No new actionable test issues. Prior passes closed every gap (weak assertions
+T1/T2, dirty-tree commits T3/R5, Decision 5b T4, `:inherited-snapshot?` seam T5).
+Test review complete.
