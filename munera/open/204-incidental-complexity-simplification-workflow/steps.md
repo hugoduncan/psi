@@ -941,3 +941,29 @@ with the commit sha / decision when done.
       — +3 over pass-9's 208); `clj-kondo` 0 findings; `clj-paren-repair`
       Success; test file trimmed to 799 lines (< 800 `components/` guard — the
       verbose TR13 comment was shortened to stay under).
+
+## Test review follow-ups (review pass 12 — test-shaper)
+
+- [ ] TR14 — `task-lifecycle-in-worktree-test`'s `lifecycle` `:delegate`
+      coverage asserts only `:type`/`:target`/`:prompt-string`; it never locks
+      the delegate's `:context`. The wrapper's `lifecycle` step carries
+      `:context [{:type :source :from :workflow-original}]` (EDN line 17) —
+      deliberately ONLY `:workflow-original`, NOT the `resolve-worktree` handoff
+      yield, because inner `task-lifecycle` reads the task path solely via
+      `:prompt-string {:input …}`; re-injecting the raw handoff/worktree-path
+      blob as a context source would pollute the lifecycle's context. This is
+      the exact TR13-class symmetry: `task-lifecycle-test` explicitly locks every
+      delegate's `:context` ("no prior-step yield"), and TR13 added the same lock
+      for the OUTER `reduce-incidental-complexity` delegate — but the WRAPPER's
+      inner lifecycle delegate `:context` was left uncovered. Per test-shaper
+      `meaningful_failures` + `behavior_focused`, a regress adding
+      `{:step "resolve-worktree" :yield :text}` to the wrapper lifecycle
+      `:context` (re-injecting the handoff into the lifecycle context) or
+      dropping `:workflow-original` passes every existing test green. Fix: add a
+      `testing` block to `task-lifecycle-in-worktree-test` asserting the
+      `lifecycle` delegate's `:context` equals
+      `[{:type :source :from :workflow-original}]`, mirroring
+      `task-lifecycle-test`'s `:context` lock and TR13's outer-delegate lock.
+      Test-only, no production/EDN change; `workflow_definitions_test.clj` is
+      799 lines — keep the edit under the 800 `components/` guard (trim verbose
+      TR-comment headroom if needed). Run focused suite + `clj-kondo`.
