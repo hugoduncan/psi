@@ -820,3 +820,40 @@ assert state/outputs, not interactions. One actionable test-quality finding:
   clj-kondo 0/0, cljfmt clean. Test file only — zero
   `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist
   held).
+
+## Test review — pass 7 (task-test-review, 2026-06-01)
+
+Re-applied `task-test-review` (well_formed ∧ behaviour-coverage ∧
+infra_deps→injectable∧nullable∧¬mock∧¬stub) across all 201 new/extended tests.
+Suite green per-ns (handlers 9/51, e2e 3/20, seam 3/14, scheduler 12/52,
+resolvers 2/21, shutdown 2/7, psi-tool 1/109).
+
+Verified good: pure-model guards, message/session live round trips (timer seam,
+no sleep), busy-queue/drain, cancel races, shutdown no-fire, `:at` matrix with
+named-bound assertions, projection rich-attrs. Pass-6's `with-redefs`→ctx-seam
+swap in the session-kind e2e test holds.
+
+**One new actionable test-quality issue:**
+
+- The failure-path **deliverable** test
+  `scheduler-handlers-test/scheduler-session-deliver-records-failed-status-on-prompt-submit-error-test`
+  forces the prompt-submit failure via `with-redefs` of `dispatch/dispatch!`
+  (handlers_test ~L337) — a **stub of the dispatch boundary**, the same class
+  the skill flags (`infra_deps → ¬stub`) and that pass-6 removed from the e2e
+  test. The `with-redefs` predates 201 (`59e338cb9`); 201 (`d9f2ca032`) adopted
+  it as its cited Slice-7 deliverable by adding `error-summary` /
+  `created-session-id` assertions on top. Unlike the e2e session-kind path
+  (driven by `:execute-prepared-request-fn`), the `:submitted? false` check
+  fires on the prompt-submit *dispatch result* before that ctx seam runs, so
+  there is no equally-clean ctx-level injection point today — the cleanest fix
+  is likely a small `:submit-synthetic-user-prompt-fn`-style seam (or asserting
+  the failure via the *pure* `fail-schedule` path already covered in
+  `scheduler-test`, treating the handler test as redundant). Recorded as a
+  follow-up; resolution may belong to a small standalone test-hygiene task given
+  the verification-only scope.
+
+Non-issue (no follow-up): `scheduler-resolvers-test/...-rich-attrs-across-statuses`
+seeds `:delivered`/`:cancelled`/`:failed` via direct `swap!`/`assoc-in` rather
+than the live path — acceptable for a *projection* unit test (asserts outputs,
+not interactions; reaching those terminal statuses live is out of the
+projection unit's concern and already covered live elsewhere).

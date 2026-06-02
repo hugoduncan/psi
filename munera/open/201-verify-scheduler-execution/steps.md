@@ -520,3 +520,29 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       suites green (19 tests / 104 assertions). clj-kondo 0/0, cljfmt clean.
       Test file only — zero `components/agent-session/src/**` or
       `doc/scheduler.md` (within the Slice-10 allowlist).
+
+## Test review follow-ups — pass 7 (task-test-review, 2026-06-01)
+
+- [ ] Remove the `with-redefs` boundary-stub from the Slice-7 failure-path
+      deliverable test
+      `scheduler_handlers_test/scheduler-session-deliver-records-failed-status-on-prompt-submit-error-test`
+      (~L337). It forces the prompt-submit failure by redefining
+      `dispatch/dispatch!` to throw on `:session/submit-synthetic-user-prompt`
+      — a stub of the dispatch infra dep, the same class the test-review skill
+      flags (`infra_deps → injectable ∧ ¬stub`) and that pass-6 removed from the
+      e2e session-kind test. (The `with-redefs` predates 201 — `59e338cb9` — but
+      201 `d9f2ca032` adopted it as its cited failure-path deliverable by adding
+      the `:error-summary`/`:created-session-id` assertions.) Unlike the e2e
+      path, the `:submitted? false` guard fires on the prompt-submit *dispatch
+      result* before `:execute-prepared-request-fn` runs, so there is no
+      equally-clean existing ctx seam: either (a) introduce a small injectable
+      seam for the synthetic-prompt-submit result (ctx-level fn returning
+      `{:submitted? false}`), or (b) drop the handler test as redundant and rely
+      on the **pure** `scheduler_test/fail-schedule-records-failure-detail-and-dequeues`
+      (which already covers `:failed` + `:delivery-phase` + `:error-summary` +
+      `:created-session-id` + dequeue without any stub). Option (a) preserves
+      the live failure-path round trip; option (b) is verification-only-scope-safe
+      (no `src/**` change). Keep the suite green + clj-kondo/cljfmt clean. (If the
+      task is treated as closed, raise it as a small standalone test-hygiene task;
+      note option (a) would touch `src/**` and so falls outside this
+      verification-only task's Slice-10 allowlist — option (b) does not.)
