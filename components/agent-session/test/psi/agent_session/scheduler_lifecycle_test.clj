@@ -48,7 +48,9 @@
                      :execution-result/assistant-message {:role "assistant"
                                                           :content [{:type :text :text "scheduled ack"}]
                                                           :stop-reason :stop
-                                                          :timestamp (java.time.Instant/now)}
+                                                          ;; fixed instant (test's delivery time) — no wall-clock,
+                                                          ;; matching the surrounding time-control discipline
+                                                          :timestamp delivered-at}
                      :execution-result/turn-outcome :turn.outcome/stop
                      :execution-result/tool-calls []
                      :execution-result/stop-reason :stop})]
@@ -103,7 +105,9 @@
            :execution-result/assistant-message {:role "assistant"
                                                 :content [{:type :text :text "scheduled ack"}]
                                                 :stop-reason :stop
-                                                :timestamp (java.time.Instant/now)}
+                                                ;; fixed instant (test's first delivery time) — no
+                                                ;; wall-clock, matching the time-control discipline
+                                                :timestamp delivered-at-1}
            :execution-result/turn-outcome :turn.outcome/stop
            :execution-result/tool-calls []
            :execution-result/stop-reason :stop})

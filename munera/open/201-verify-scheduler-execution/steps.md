@@ -887,7 +887,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Test review follow-ups — test-shaper pass 6 (2026-06-01)
 
-- [ ] Dedupe the journal-scan idiom (`consistent(test_abstractions)` /
+- [x] Dedupe the journal-scan idiom (`consistent(test_abstractions)` /
       `economical`). The "find the scheduled user message in the journal" block
       `(some->> journal (keep #(get-in % [:data :message])) (some (fn [m] (when (and (= "user" (:role m)) (= :scheduled (:source m)) (= "<id>" (:schedule-id m))) m))))`
       is repeated verbatim at `scheduler_end_to_end_test` L26 + L70 and
@@ -906,8 +906,29 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       keep suite green + clj-kondo/cljfmt clean; no deftest renamed →
       `findings.md` citations unchanged. If 201 is closed, raise as a standalone
       test-hygiene task.
+      Done: lifted `test-support/scheduled-message-by-id` (ctx, session-id,
+      schedule-id → the matching `"user"`-role message with `:source :scheduled`
+      + `:schedule-id`), reusing the existing `ss/get-state-value-in` +
+      `ss/state-path :journal` journal source. Replaced all **three** verbatim
+      inline copies — `scheduler_end_to_end_test` ×2 (the
+      `scheduler-fired-end-to-end-delivers-when-idle-test` "sch-1" scan and the
+      message-kind-seam "sch-msg" scan) and `scheduler_dispatch_test` ×1
+      (`scheduler-deliver-submits-canonical-prompt-lifecycle-test` "sch-1") —
+      with `(test-support/scheduled-message-by-id …)`; the surrounding
+      `(is (some? scheduled-msg))` assertions are preserved unchanged. The
+      `scheduler_lifecycle_test` `journal-messages`/`scheduled-user-messages`
+      helpers are deliberately **left as-is**: they read a *different* journal
+      source (`persist/all-entries-in`, persistence-backed) and filter only on
+      `:schedule-id` presence (not `:source :scheduled`), so they are not the
+      same abstraction and do not cleanly fold into the new state-journal
+      helper. No deftest renamed → `findings.md` citations unchanged; no
+      assertions added/removed → aggregate stays **50 tests / 411 assertions**.
+      Focused run of the three touched live nss = 11 tests / 65 assertions / 0
+      failures; full `bb test` green. clj-kondo 0/0, cljfmt clean. Test/
+      `test_support`-only — zero `components/agent-session/src/**` or
+      `doc/scheduler.md` (Slice-10 allowlist held).
 
-- [ ] Replace wall-clock `Instant/now` in execution-result stubs with a fixed
+- [x] Replace wall-clock `Instant/now` in execution-result stubs with a fixed
       instant (`deterministic(tests)` — control(time)). The stubbed
       assistant-message `:timestamp` is `(java.time.Instant/now)` at
       `scheduler_end_to_end_test` L111 (session-kind seam) and
@@ -921,3 +942,19 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       allowlist — zero `components/agent-session/src/**` / `doc/scheduler.md`);
       keep suite green + clj-kondo/cljfmt clean; no behaviour/assertion change.
       If 201 is closed, raise as a standalone test-hygiene task.
+      Done: replaced all three wall-clock `(java.time.Instant/now)`
+      assistant-message timestamps with fixed instants already in scope, derived
+      from each test's own time-controlled bindings (no new literals needed):
+      `scheduler_end_to_end_test` session-kind seam → `(.plusMillis now 5000)`
+      (the test's fire instant, consistent with its `:fire-at`);
+      `scheduler_lifecycle_test/scheduled-deliver-runs-canonical-prompt-lifecycle-test`
+      → `delivered-at` (the test's `fixed-scheduler-time-source` instant);
+      `scheduler_lifecycle_test/busy-session-fire-queues-then-idle-drains-fifo-test`
+      → `delivered-at-1` (the first drain's scheduler-clock instant). No
+      assertion reads the assistant timestamp, so behaviour + the aggregate
+      (50 tests / 411 assertions) are unchanged; the tests are now fully
+      wall-clock-free in the time-seamed paths. Focused run of the three touched
+      live nss = 11 tests / 65 assertions / 0 failures; full `bb test` green.
+      clj-kondo 0/0, cljfmt clean. Test-file-only — zero
+      `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist
+      held).

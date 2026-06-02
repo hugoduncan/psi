@@ -371,3 +371,18 @@
   "Register a deterministic operation on `ctx`'s registry."
   [ctx op]
   (op-registry/register-operation-in! (:deterministic-operation-registry ctx) op))
+(defn scheduled-message-by-id
+  "Return the scheduled user message delivered into `session-id`'s journal for
+  `schedule-id`, or nil.
+
+  Scans the session journal for a `\"user\"`-role message carrying scheduled
+  provenance (`:source :scheduled` + matching `:schedule-id`). One shared
+  journal-scan abstraction for the scheduler verification tests."
+  [ctx session-id schedule-id]
+  (->> (ss/get-state-value-in ctx (ss/state-path :journal session-id))
+       (keep #(get-in % [:data :message]))
+       (some (fn [message]
+               (when (and (= "user" (:role message))
+                          (= :scheduled (:source message))
+                          (= schedule-id (:schedule-id message)))
+                 message)))))

@@ -21,14 +21,7 @@
                                                  {:session-id session-id
                                                   :schedule-id "sch-1"}
                                                  {:origin :core})
-          journal          (ss/get-state-value-in ctx (ss/state-path :journal session-id))
-          scheduled-msg    (some->> journal
-                                    (keep #(get-in % [:data :message]))
-                                    (some (fn [message]
-                                            (when (and (= "user" (:role message))
-                                                       (= :scheduled (:source message))
-                                                       (= "sch-1" (:schedule-id message)))
-                                              message))))]
+          scheduled-msg    (test-support/scheduled-message-by-id ctx session-id "sch-1")]
       (is (some? scheduled-msg))
       (is (= :delivered (get-in @(:state* ctx) [:agent-session :sessions session-id :data :scheduler :schedules "sch-1" :status])))
       (is (= [] (get-in @(:state* ctx) [:agent-session :sessions session-id :data :scheduler :queue])))
@@ -65,14 +58,7 @@
         (is (some? @callback*) "timer callback captured via the seam"))
       ;; fire the timer by invoking the captured callback (no Thread/sleep)
       ((:f @callback*))
-      (let [journal       (ss/get-state-value-in ctx* (ss/state-path :journal session-id))
-            scheduled-msg (some->> journal
-                                   (keep #(get-in % [:data :message]))
-                                   (some (fn [message]
-                                           (when (and (= "user" (:role message))
-                                                      (= :scheduled (:source message))
-                                                      (= "sch-msg" (:schedule-id message)))
-                                             message))))]
+      (let [scheduled-msg (test-support/scheduled-message-by-id ctx* session-id "sch-msg")]
         (is (some? scheduled-msg)
             "scheduled user message delivered into origin session")
         (is (= :delivered (get-in @(:state* ctx*)
@@ -108,7 +94,9 @@
              :execution-result/assistant-message {:role "assistant"
                                                   :content [{:type :text :text "scheduled ack"}]
                                                   :stop-reason :stop
-                                                  :timestamp (java.time.Instant/now)}
+                                                  ;; fixed instant (test's fire time) — no wall-clock,
+                                                  ;; matching the surrounding time-control discipline
+                                                  :timestamp (.plusMillis now 5000)}
              :execution-result/turn-outcome :turn.outcome/stop
              :execution-result/tool-calls []
              :execution-result/stop-reason :stop})

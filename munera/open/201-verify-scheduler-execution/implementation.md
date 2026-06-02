@@ -1412,3 +1412,38 @@ Both are hygiene/consistency follow-ups, not correctness defects — the
 verification deliverable remains green and coherent. Follow-ups added to
 steps.md. If 201 is treated as closed, either may be raised as a small
 standalone test-hygiene task instead.
+
+## Execute test-shaper pass-6 follow-ups (2026-06-01)
+
+Both pass-6 hygiene follow-ups executed; no correctness change.
+
+- **Issue C — journal-scan dedup (done).** Added
+  `test-support/scheduled-message-by-id` (ctx, session-id, schedule-id → the
+  scheduled `"user"` message with `:source :scheduled` + matching
+  `:schedule-id`), reusing the `ss/get-state-value-in` + `ss/state-path
+  :journal` state-journal source. Replaced all three verbatim inline copies:
+  `scheduler_end_to_end_test` ×2 ("sch-1" end-to-end + "sch-msg" seam) and
+  `scheduler_dispatch_test` ×1 ("sch-1" deliver). The surrounding
+  `(is (some? scheduled-msg))` assertions are preserved. **Deliberately left**
+  the `scheduler_lifecycle_test` `journal-messages`/`scheduled-user-messages`
+  helpers: they read a *different* journal source (`persist/all-entries-in`,
+  persistence-backed) and filter only on `:schedule-id` presence (not
+  `:source :scheduled`), so they are not the same abstraction and do not fold
+  cleanly into the new state-journal helper (`¬helpers_that_hide(intent)`).
+
+- **Issue D — wall-clock `Instant/now` removal (done).** Replaced all three
+  `(java.time.Instant/now)` assistant-message `:timestamp`s with fixed instants
+  already in scope (no new literals): e2e session-kind seam →
+  `(.plusMillis now 5000)` (fire instant); lifecycle canonical-lifecycle →
+  `delivered-at`; lifecycle busy-drain → `delivered-at-1`. No assertion reads
+  the assistant timestamp, so behaviour is unchanged; the time-seamed paths are
+  now wall-clock-free.
+
+Gates: focused run of the three touched live nss = 11 tests / 65 assertions / 0
+failures; full `bb test` green; clj-kondo 0/0; cljfmt clean. No `is` forms
+added/removed → aggregate stays **50 tests / 411 assertions** (findings.md
+unchanged; no deftest renamed → citations unchanged). Touched paths =
+`scheduler_end_to_end_test.clj`, `scheduler_dispatch_test.clj`,
+`scheduler_lifecycle_test.clj`, `test_support.clj` — all under
+`components/agent-session/test/**`; zero `components/agent-session/src/**` or
+`doc/scheduler.md` (Slice-10 allowlist held).

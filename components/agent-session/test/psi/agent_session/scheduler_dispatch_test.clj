@@ -80,14 +80,7 @@
                                                {:origin :core})
         stored           (get-in (ss/get-session-data-in ctx session-id)
                                  [:scheduler :schedules "sch-1"])
-        journal          (ss/get-state-value-in ctx (ss/state-path :journal session-id))
-        scheduled-msg    (some->> journal
-                                  (keep #(get-in % [:data :message]))
-                                  (some (fn [message]
-                                          (when (and (= "user" (:role message))
-                                                     (= :scheduled (:source message))
-                                                     (= "sch-1" (:schedule-id message)))
-                                            message))))]
+        scheduled-msg    (test-support/scheduled-message-by-id ctx session-id "sch-1")]
     (is (= "sch-1" (:schedule-id (or (:return result) result))))
     (is (= :delivered (:status stored)))
     (is (= [] (get-in (ss/get-session-data-in ctx session-id) [:scheduler :queue])))
