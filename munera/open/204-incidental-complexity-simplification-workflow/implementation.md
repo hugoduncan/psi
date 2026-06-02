@@ -2730,3 +2730,50 @@ No new actionable test issues. The only unchecked steps.md item is the
 pre-existing non-planned Contingency (split step-1), correctly left unchecked.
 
 PASS_STATUS: REVIEW_COMPLETE.
+
+## Test review pass 14 (test-shaper)
+
+Applied `test-shaper` (economical ∧ behavior_focused ∧ meaningful_failures —
+specifically *cover_by(boundaries)* and *one_test_per_distinct_behavior*) to the
+two task-204 test nss. The workflow-definition + skill content/determinism/
+filter/drop/ranking locks (TR1–TR15, F1–F6) are strong and mock-free. Two
+recipe behaviours that SKILL.md §3/§4 name as distinct contracts are encoded in
+the embedded jq recipe but **never exercised executably** — only the
+determinism/filter/drop/ranking tests touch the recipe, and all feed `cc ≥ 1`
+with ≥1 survivor, so each gap below passes every existing test green:
+
+### TR16 — `max(cc, 1)` matched-zero-cc guard is unexercised
+
+The recipe computes `gap: (.["lcc-total"] / ([$ccmap[.gap_key], 1] | max))`.
+SKILL §3 names this a distinct A1 behaviour: "`max(cc, 1)` guards **only** the
+*matched zero-cc* case (a matched unit whose `cc` is reported as 0)." Every
+executable recipe test (`…-determinism-test`, `…-filter-and-drop-test`,
+`…-ranking-and-cap-test`) feeds `cc ≥ 1`, so the `| max` is never load-bearing.
+A regress dropping `| max` (so a matched cc=0 unit divides by zero → jq error or
+`gap: null`, dropping a genuine qualifying unit) passes all tests green.
+Verified live: with `max`, a matched `lcc 30.0 / cc 0` unit yields `gap 30` and
+survives; the boundary is real and observable. Per test-shaper
+`cover_by(boundaries)` + `meaningful_failures`, add an executable lock feeding a
+matched cc=0 unit and asserting it survives with `gap = lcc-total` (the cc=0
+boundary), with a jq-absent structural fallback on the `| max` fragment (mirrors
+the existing TR12 fallbacks).
+
+### TR17 — empty qualification (the early-stop driver) is content-locked only
+
+Design Locked decision 2: "A real early-stop exists when nothing qualifies." The
+recipe's empty-result emission (`[]` when zero units pass the filter) is the
+machine signal that drives the workflow's early stop, but it is locked only as
+SKILL prose (TR3: "report no qualifying target") — no executable test asserts
+the recipe emits `[]` when the qualification filter removes every candidate. The
+filter-and-drop test always leaves ≥1 survivor. A regress where the filter or
+`.[0:5]` mis-handles the empty case (e.g. emits a stray object, or errors on an
+empty array) passes green. Verified live: a sole `lcc 4.0` (sub-threshold) unit
+yields `[]`. Per test-shaper `cover_by(boundaries)` + `behavior_focused`, add an
+executable lock feeding only sub-threshold/unmatched units and asserting the
+recipe emits an empty result (the no-target / early-stop boundary).
+
+Both are test-only additions to
+`incidental_complexity_finder_skill_test.clj` (no production/EDN/skill change).
+Mind the `components/` 800-line guard when adding.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK.

@@ -1098,3 +1098,34 @@ with the commit sha / decision when done.
       verbatim. Committed `f9f1c5128`
       (`⚒ test: split task-204 workflow-definition deftests into sibling ns (R6)`).
       VERIFIED: `bb commit-check:file-lengths` exit 0 (593 + 277 both < 800).
+
+## Test review follow-ups (review pass 14 — test-shaper)
+
+- [ ] TR16 — Add an executable recipe test for the `max(cc, 1)` matched-zero-cc
+      guard in `incidental_complexity_finder_skill_test.clj`. The recipe's
+      `gap: (.["lcc-total"] / ([$ccmap[.gap_key], 1] | max))` is named by SKILL
+      §3 as a distinct A1 behaviour ("`max(cc, 1)` guards only the matched
+      zero-cc case"), but every executable recipe test feeds `cc ≥ 1`, so a
+      regress dropping `| max` (divide-by-zero / `gap: null` for a matched cc=0
+      unit) passes green. Feed a single matched unit with `lcc-total` above
+      threshold and `cc 0` (use the existing `named-local-unit-json` /
+      `named-cc-unit-json` helpers with cc 0) and assert it **survives** the
+      join+filter with `gap = lcc-total` (e.g. lcc 30.0 → gap 30). Add the
+      jq-absent structural fallback locking the `| max` / `, 1] | max` recipe
+      fragment, mirroring the existing TR12 fallbacks. Verify focused tests +
+      `clj-kondo` + `clj-paren-repair` green and `bb commit-check:file-lengths`
+      clean (sibling skill ns headroom).
+
+- [ ] TR17 — Add an executable recipe test for the empty-qualification (early-
+      stop) boundary in `incidental_complexity_finder_skill_test.clj`. Design
+      Locked decision 2 ("A real early-stop exists when nothing qualifies") and
+      the recipe's `[]` emission are the machine signal driving the workflow's
+      early stop, but this is locked only as SKILL prose (TR3) — no executable
+      test asserts the recipe emits an empty result when the qualification filter
+      removes every candidate (the filter-and-drop test always leaves ≥1
+      survivor). Feed only sub-threshold and/or unmatched `local` units (e.g. a
+      sole `lcc 4.0` unit) and assert the recipe output is an **empty** result
+      (`[]` / no surviving units). Add the jq-absent structural fallback if a
+      recipe fragment uniquely guards the empty case; otherwise note jq-required.
+      Verify focused tests + `clj-kondo` + `clj-paren-repair` green and
+      `bb commit-check:file-lengths` clean.
