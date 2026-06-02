@@ -8,7 +8,6 @@
    [psi.agent-session.dispatch-handlers.session-lifecycle :as session-lifecycle-handlers]
    [psi.agent-session.dispatch-handlers.session-mutations :as session-mutations]
    [psi.agent-session.dispatch-handlers.statechart-actions :as statechart-actions]
-   [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]))
 
 (defn- invoke-handler
@@ -66,7 +65,7 @@
                     (:effects result)))))
 
          (testing "fired queues when session is busy"
-           (swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming true))))
+           (test-support/set-session-streaming! ctx session-id true)
            (let [result (invoke-handler ctx :scheduler/fired {:session-id session-id :schedule-id "sch-1"})]
              (apply-root-state-update! ctx result)
              (is (= :queued (test-support/schedule-status ctx session-id "sch-1")))
@@ -149,7 +148,7 @@
              (apply-root-state-update! ctx result)
              (is (= delivered-at (-> result :effects first :event-data :user-msg :timestamp)))))
 
-         (swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming true))))
+         (test-support/set-session-streaming! ctx session-id true)
          (apply-root-state-update!
           ctx
           (invoke-handler ctx :scheduler/create {:session-id session-id
@@ -161,7 +160,7 @@
                                                  :delay-ms 1000}))
          (apply-root-state-update! ctx (invoke-handler ctx :scheduler/fired {:session-id session-id
                                                                              :schedule-id "sch-drain-from-source"}))
-         (swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming false))))
+         (test-support/set-session-streaming! ctx session-id false)
          (testing "drain stamps scheduled user message from scheduler time source"
            (let [result (invoke-handler ctx :scheduler/drain-queue {:session-id session-id})]
              (apply-root-state-update! ctx result)
@@ -188,10 +187,10 @@
                                                {:session-id session-id
                                                 :schedule-id "sch-deliver-needs-time"})))
 
-         (swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming true))))
+         (test-support/set-session-streaming! ctx session-id true)
          (apply-root-state-update! ctx (invoke-handler ctx :scheduler/fired {:session-id session-id
                                                                              :schedule-id "sch-deliver-needs-time"}))
-         (swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming false))))
+         (test-support/set-session-streaming! ctx session-id false)
          (is (thrown-with-msg? clojure.lang.ExceptionInfo
                                #"scheduler time-source"
                                (invoke-handler (dissoc ctx :scheduler-time-source)
@@ -386,7 +385,7 @@
              (apply-root-state-update! ctx create-b))
            (apply-root-state-update! ctx (invoke-handler ctx :scheduler/fired {:session-id session-id :schedule-id "sch-a"}))
            (apply-root-state-update! ctx (invoke-handler ctx :scheduler/fired {:session-id session-id :schedule-id "sch-b"}))
-           (swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming false))))
+           (test-support/set-session-streaming! ctx session-id false)
 
            (testing "drain-queue delivers one queued schedule when idle"
              (let [result (invoke-handler ctx :scheduler/drain-queue {:session-id session-id

@@ -94,8 +94,7 @@
                                   :scheduler-run-after-delay-fn capture*
                                   :execute-prepared-request-fn execute-prepared-request-fn)]
       ;; origin session busy on purpose: session-kind must deliver regardless.
-      (swap! (:state* ctx*)
-             (ss/session-update session-id (fn [sd] (assoc sd :is-streaming true))))
+      (test-support/set-session-streaming! ctx* session-id true)
       (session/dispatch-in! ctx* :scheduler/create
                             {:session-id session-id
                              :schedule-id "sch-sess"

@@ -1431,6 +1431,29 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       `components/agent-session/src/**` or `doc/scheduler.md` (verification-only
       invariant; Slice-10 allowlist). If 201 is treated as closed instead, raise
       as a small standalone test-hygiene task.
+      Done: added `test-support/set-session-streaming!` `[ctx session-id
+      streaming?]` beside the `schedule-status`/`schedule-queue` read helpers
+      (`(swap! (:state* ctx) (ss/session-update session-id #(assoc % :is-streaming
+      streaming?)))`). Routed all **12** duplicated busy/idle state-writes through
+      it: `scheduler_handlers_test` L69/152/164/191/194/389 (×6),
+      `scheduler_lifecycle_test` L114/136/164/178/201 (×5), and
+      `scheduler_end_to_end_test` (×1, on `ctx*`). The two `make-session-ctx
+      {:session-data {:is-streaming true}}` opts sites (handlers L276/367) and the
+      pure-fn/payload literal maps (`scheduler_test`, `scheduler_dispatch_test`
+      L66) were correctly **not** touched (per the explicit scope note). The
+      extraction left `ss` unused in `scheduler_handlers_test` (its only `ss/`
+      uses were these swaps) → dropped the `[psi.session-state.state :as ss]`
+      require there; `scheduler_lifecycle_test` (1×) and `scheduler_end_to_end_test`
+      (4×) still use `ss/` elsewhere so their requires stay. Behaviour- and
+      assertion-preserving: no deftest renamed → `findings.md` citations
+      unchanged; aggregate count unchanged (verified identical pre/post:
+      `50 tests / 339 assertions / 0 failures` on the focused 13-ns scheduler run,
+      both with and without the change via `git stash`). Touched ns green
+      (16 tests / 97 assertions). clj-kondo 0/0; cljfmt "All source files
+      formatted correctly". `git diff --name-only` = the 4 files
+      (`test_support.clj` + the 3 test ns), all under
+      `components/agent-session/test/**`; zero `components/agent-session/src/**`
+      or `doc/scheduler.md` (verification-only invariant; Slice-10 allowlist held).
       Done: replaced every open-coded literal-instant *setup*
       `(java.time.Instant/parse "…")` with `(test-support/instant "…")` across
       the five remaining 201-touched files — `scheduler_dispatch_test` (5 sites:
@@ -1948,7 +1971,7 @@ source/doc touched — verification-only invariant + Slice-10 allowlist held.)
 
 ## Code-shaper follow-ups — pass 5 (code-shaper, 2026-06-01)
 
-- [ ] Extract a shared `set-session-streaming!` write-helper into
+- [x] Extract a shared `set-session-streaming!` write-helper into
       `components/agent-session/test/psi/agent_session/test_support.clj` (beside
       the existing `schedule-status`/`schedule-queue`/`scheduled-message-by-id`
       read helpers) and route the duplicated origin-session busy/idle state-write

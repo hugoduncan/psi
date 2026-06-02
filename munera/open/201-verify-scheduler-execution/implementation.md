@@ -3097,3 +3097,40 @@ single-callsite over-abstraction threshold pass-4 cited when declining the
 it is **not** a duplicate of that declined item. Test-file/`test_support`-only;
 verification-only invariant + Slice-10 allowlist hold. No `bb test` re-run this
 pass (review-only; the follow-up step runs the suite).
+
+## Code-shaper follow-up — pass 5 executed (2026-06-01)
+
+Executed the pass-5 write-helper convergence follow-up: extracted
+`test-support/set-session-streaming!` `[ctx session-id streaming?]` (beside the
+existing `schedule-status`/`schedule-queue`/`scheduled-message-by-id` read
+helpers) wrapping
+`(swap! (:state* ctx) (ss/session-update session-id #(assoc % :is-streaming streaming?)))`,
+and routed all **12** duplicated origin-session busy/idle state-writes through
+it — symmetric to the read-helper convergence of passes 1–3.
+
+- **Sites migrated (12):** `scheduler_handlers_test` L69/152/164/191/194/389
+  (×6, → `set-session-streaming! ctx session-id true|false`),
+  `scheduler_lifecycle_test` L114/136/164/178/201 (×5), `scheduler_end_to_end_test`
+  (×1, on `ctx*`).
+- **Correctly out of scope (untouched):** the `make-session-ctx {:session-data
+  {:is-streaming true}}` *opts* sites (handlers L276/367) and the
+  `{:is-streaming … :is-compacting …}` *literal maps* in `scheduler_test` /
+  `scheduler_dispatch_test` (pure-fn args / dispatch payload, not state swaps) —
+  per the explicit scope note in the step.
+- **Require cleanup:** the extraction left `ss` unused in `scheduler_handlers_test`
+  (its only `ss/` uses were the migrated swaps) → dropped
+  `[psi.session-state.state :as ss]` there. `scheduler_lifecycle_test` (1 residual
+  `ss/`) and `scheduler_end_to_end_test` (4 residual `ss/`) keep the require.
+- **Behaviour- and assertion-preserving:** no deftest renamed → `findings.md`
+  citations unchanged; aggregate count unchanged — verified **identical pre/post**
+  via `git stash` (focused 13-ns scheduler run = `50 tests / 339 assertions /
+  0 failures` both with and without the change; the 339 here is a kaocha
+  focus-overlap measurement, distinct from the canonical `412` aggregate, but the
+  pre/post equality is what proves no assertion was added/removed). Touched ns
+  green: 16 tests / 97 assertions / 0 failures.
+- **Quality gates:** clj-kondo 0/0 on all 4 touched files; cljfmt "All source
+  files formatted correctly".
+- **Scope held:** `git diff --name-only` = `test_support.clj` + the 3 test ns,
+  all under `components/agent-session/test/**`; **zero**
+  `components/agent-session/src/**` or `doc/scheduler.md` (verification-only
+  invariant; Slice-10 allowlist).

@@ -428,3 +428,14 @@
   "Return the scheduler `:queue` vector for `session-id`."
   [ctx session-id]
   (get-in (ss/get-session-data-in ctx session-id) [:scheduler :queue]))
+
+(defn set-session-streaming!
+  "Set `session-id`'s `:is-streaming` flag to `streaming?` in `ctx`'s state.
+
+  Symmetric write-helper to the `schedule-status`/`schedule-queue` read helpers
+  for driving the origin-session busy/idle state in the scheduler verification
+  tests (busy = `:is-streaming true`)."
+  [ctx session-id streaming?]
+  (swap! (:state* ctx)
+         (ss/session-update session-id
+                            (fn [session] (assoc session :is-streaming streaming?)))))

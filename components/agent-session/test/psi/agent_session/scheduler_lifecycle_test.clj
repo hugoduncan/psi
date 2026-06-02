@@ -111,7 +111,7 @@
                          (test-support/instant "2099-04-21T18:06:00Z"))
         [ctx session-id] (test-support/create-test-session {:persist? false
                                                             :scheduler-time-source (:time-source scheduler-clock)})]
-    (swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming true))))
+    (test-support/set-session-streaming! ctx session-id true)
     (doseq [[schedule-id label message created fire]
             [["sch-q-1" "first" "first wake" "2099-04-21T18:00:00Z" "2099-04-21T18:05:00Z"]
              ["sch-q-2" "second" "second wake" "2099-04-21T18:00:01Z" "2099-04-21T18:05:01Z"]]]
@@ -133,7 +133,7 @@
            (test-support/schedule-queue ctx session-id))
         "fire-while-busy queues both schedules in creation order")
 
-    (swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming false))))
+    (test-support/set-session-streaming! ctx session-id false)
     (testing "first idle drain delivers the oldest queued schedule via real dispatch"
       (let [drain-1 (session/dispatch-in! ctx :scheduler/drain-queue
                                           {:session-id session-id}
@@ -161,7 +161,7 @@
         scheduler-clock (test-support/atom-scheduler-time-source delivered-at)
         [ctx session-id] (test-support/create-test-session {:persist? false
                                                             :scheduler-time-source (:time-source scheduler-clock)})]
-    (swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming true))))
+    (test-support/set-session-streaming! ctx session-id true)
     (session/dispatch-in! ctx :scheduler/create
                           {:session-id session-id
                            :schedule-id "sch-q-1"
@@ -175,7 +175,7 @@
     (session/dispatch-in! ctx :scheduler/fired
                           {:session-id session-id :schedule-id "sch-q-1"}
                           {:origin :core})
-    (swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming false))))
+    (test-support/set-session-streaming! ctx session-id false)
     (let [drain (invoke-scheduler-handler ctx :scheduler/drain-queue {:session-id session-id})]
       (is (= "sch-q-1" (get-in drain [:return :schedule-id])))
       (is (= delivered-at (-> drain :effects first :event-data :user-msg :timestamp))
@@ -198,7 +198,7 @@
                           {:origin :core})
     (is (= :cancelled (test-support/schedule-status ctx session-id "sch-cancel-pending")))
 
-    (swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming true))))
+    (test-support/set-session-streaming! ctx session-id true)
     (session/dispatch-in! ctx :scheduler/create
                           {:session-id session-id
                            :schedule-id "sch-cancel-queued"
