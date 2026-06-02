@@ -854,6 +854,39 @@ PASS_STATUS: COMPLETE
 
 ## Implementation review pass 3 (ψ, 2026-06-02)
 
+Independent re-review with task-implementation-review skill after R1/R2/R3
+resolved. Re-verified code ↔ design/plan against source + ran focused suites
+(all green): inheritance-snapshot (9/45), wssc core-test + workflow-runtime
+core-test + child-session-state (35/127). clj-kondo clean (0/0) on the four
+touched src files. `common-inherited-fields` confirmed 19 keys; the
+`child_session_state.clj` classification comment (9 inherited + 10 not = 19)
+reconciles with the constant and with `child-session-base-state*:167-171`
+(`(or speed-mode (:speed-mode parent-sd))` / effort-override).
+
+Verified fit (no regressions vs prior passes):
+- R1 present: `parent-session` is `(when-not snapshot? (get-session-data …))`
+  (`core.clj`), so the snapshot path performs no live parent read.
+- R2 present: `delegate-step-runtime-result-persists-child-inherited-defaults-test`
+  exercises the `delegate.clj` `cond-> … assoc :inherited-defaults` wiring.
+- R3 present: comment count/enumeration reconciled with the authority.
+- create-run pure (records `:inherited-defaults` verbatim via cond->, no ctx
+  reads); no require cycle (delegate reaches resolver only via injected
+  `resolve-inherited-defaults-fn`, bound in `context.clj`); schema
+  (`inherited-defaults-schema`, `:model` as `{:provider :id}`) + capture sites
+  (`canonical_workflows.clj:96`, `psi_tool_workflow.clj:144`) + per-field
+  consumption all match Decisions 5/6/6a/7/7a/8a. `parent-session-model`
+  replaced wholesale (P4); explicit-override precedence preserved (AC5).
+- docs (`doc/workflows.md` snapshot section) + `CHANGELOG.md [Unreleased]`
+  Fixed entry present and accurate (all seven inherited fields, nested
+  delegation, replayable canonical state).
+
+No new actionable findings. All seven slices + R1/R2/R3 follow-ups complete and
+coherent. Implementation ready for closure.
+
+PASS_STATUS: REVIEW_COMPLETE
+
+## Implementation review pass 3 (ψ, 2026-06-02)
+
 Re-reviewed code ↔ design/AC with task-implementation-review skill after the
 R1/R2/R3 follow-ups. Grounded against source and ran focused suites green:
 inheritance-snapshot (9/45), wssc core + workflow-runtime core + child-session-
