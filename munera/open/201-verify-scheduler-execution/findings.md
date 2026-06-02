@@ -9,6 +9,29 @@ raised remediation task ref (`NNN-slug` or `not-yet-raised`).
 
 ## Outcome (2026-06-01)
 
+> **Update (2026-06-02 — lifecycle-event read race fixed).** The cited
+> `scheduler-lifecycle-test/scheduled-deliver-runs-canonical-prompt-lifecycle`
+> was intermittently failing (~1-in-8 full-suite runs, 4 failures) on its
+> `:session/prompt-record-response` / `:session/prompt-finish` event-log
+> assertions. **Root cause:** it asserted against the **process-global bounded
+> ring** `kernel/event-log-entries` (shared across every namespace), so
+> concurrent cross-ns dispatch under full-suite load could pollute/evict this
+> session's lifecycle tail — *not* an async prompt-lifecycle tail (verified:
+> the scheduled-delivery effect runs the canonical lifecycle **synchronously**
+> on-thread — effect → `:session/prompt-record-response` → `:session/prompt-finish`
+> — all entries present in the just-cleared log before `:scheduler/fired`
+> returns; every entry carries this session-id). **Fix (test-only):** scope the
+> event-log read to this test's own session-id
+> (`filterv #(= session-id (get-in % [:event-data :session-id]))`), making the
+> assertion immune to cross-ns pollution; and swap the `with-redefs` of
+> `turn/execute-prepared-request!` for the local `:execute-prepared-request-fn`
+> ctx seam (matching `scheduler-end-to-end-test`). Re-verified: scheduler suite
+> 10× green; full `bb test` green. The "all green / deterministic" wording below
+> now genuinely holds (no lucky-run dependence). Slice-10 allowlist held — only
+> `scheduler_lifecycle_test.clj` + this task dir changed; zero scheduler source
+> / `doc/scheduler.md`. (Aggregate unchanged: 50 tests / 339 assertions — no
+> deftest renamed, same `is` count.)
+
 **All 7 Scope-area behaviours verified-correct.** One **doc-gap defect** found
 (behaviour correct, doc silent): `doc/scheduler.md` "Create validation rules"
 does not document that future absolute `:at` below `min-delay-ms` / above

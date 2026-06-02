@@ -1678,7 +1678,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       only — zero `components/agent-session/src/**` or `doc/scheduler.md`
       (Slice-10 allowlist held).
 
-- [ ] Fix the still-flaky cited lifecycle test
+- [x] Fix the still-flaky cited lifecycle test
       `scheduler_lifecycle_test/scheduled-deliver-runs-canonical-prompt-lifecycle-test`
       (implementation-review finding 2026-06-02). The full scheduler suite still
       fails intermittently under the canonical kaocha runner (**4 failures one
@@ -1709,3 +1709,40 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       `findings.md` Outcome/Baseline (and any "all green" wording) to reflect the
       now-genuinely-deterministic state. Keep clj-kondo 0/0 and `bb fmt:check`
       clean.
+      Done (2026-06-02): root-caused the flake — the failure was **not** an
+      async prompt-lifecycle tail. Instrumented the dispatch and proved the
+      scheduled-delivery effect runs the canonical lifecycle **synchronously**
+      on-thread (effect → `:session/prompt-record-response` →
+      `:session/prompt-finish`); all entries are present in the just-cleared log
+      before `:scheduler/fired` returns, and **every** lifecycle entry
+      (`:scheduler/fired`, `:scheduler/deliver`, `:session/prompt-submit`,
+      `:session/prompt-record-response`, `:session/prompt-finish`) carries this
+      test's session-id in `:event-data`. The real cause: the test asserted
+      against `kernel/event-log-entries`, a **process-global bounded ring buffer
+      shared across every namespace** (`state_kernel/dispatch.clj:105` defonce +
+      1000-entry trim) — under full-suite load, concurrent cross-ns dispatch
+      pollutes/evicts this session's lifecycle tail (~1-in-8). Fix (test-only):
+      (1) scope the event-log read to this session-id
+      (`entries = filterv #(= session-id (get-in % [:event-data :session-id]))
+      (kernel/event-log-entries)`), making the lifecycle-event assertions immune
+      to cross-ns pollution; (2) swap the `with-redefs` of
+      `turn/execute-prepared-request!` for the local `:execute-prepared-request-fn`
+      ctx seam via `(assoc ctx …)` using the shared
+      `test-support/stub-execution-result` builder (matching
+      `scheduler_end_to_end_test`), and dropped the now-unused
+      `[psi.turn-runtime.core]` require. Behaviour-/assertion-preserving (same
+      stub shape: role "assistant", text "scheduled ack", `:timestamp
+      delivered-at`; no deftest renamed → `findings.md` citations stable;
+      aggregate stays 50 tests / 339 assertions). Verified: scheduler-lifecycle
+      4 tests / 26 assertions green; the 12 scheduler ns together **10× green**
+      (50 tests / 339 assertions / 0 failures each run); full `bb test` green
+      (one earlier full run showed 3 failures isolated to **unrelated**
+      `turn-runtime` retry/streaming tests — the documented pre-existing
+      non-deterministic test-ordering flake, which pass 18/18 in isolation and
+      touch no file edited here; a subsequent full `bb test` was all green).
+      clj-kondo 0/0; `bb fmt:check` "All source files formatted correctly".
+      Updated `findings.md` Outcome with a dated note recording the correct
+      root cause and the now-genuinely-deterministic state. Test-file-only —
+      only `scheduler_lifecycle_test.clj` + task-dir `findings.md`/`steps.md`
+      changed; zero `components/agent-session/src/**` or `doc/scheduler.md`
+      (Slice-10 allowlist held).

@@ -4,7 +4,6 @@
    [psi.agent-session.core :as session]
    [psi.state-kernel.dispatch :as kernel]
    [psi.session-persistence.core :as persist]
-   [psi.turn-runtime.core]
    [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]))
 
@@ -39,19 +38,18 @@
                                                             :scheduler-time-source (test-support/fixed-scheduler-time-source delivered-at)})]
     (kernel/clear-event-log!)
     (kernel/clear-dispatch-trace!)
-    (with-redefs [psi.turn-runtime.core/execute-prepared-request!
-                  (fn [_ai-ctx _ctx sid prepared _pq]
-                    {:execution-result/turn-id (:prepared-request/id prepared)
-                     :execution-result/session-id sid
-                     :execution-result/assistant-message {:role "assistant"
-                                                          :content [{:type :text :text "scheduled ack"}]
-                                                          :stop-reason :stop
-                                                          ;; fixed instant (test's delivery time) — no wall-clock,
-                                                          ;; matching the surrounding time-control discipline
-                                                          :timestamp delivered-at}
-                     :execution-result/turn-outcome :turn.outcome/stop
-                     :execution-result/tool-calls []
-                     :execution-result/stop-reason :stop})]
+    ;; Drive the AI-execution boundary through the injectable ctx seam
+    ;; (:execute-prepared-request-fn, read by dispatch_effects.clj:154) rather
+    ;; than a with-redefs of turn/execute-prepared-request! — matching the
+    ;; scheduler_end_to_end_test idiom and keeping the seam local to this ctx.
+    ;; The scheduled-delivery effect runs synchronously, so this fixed,
+    ;; wall-clock-free execution-result lands the canonical lifecycle on-thread.
+    (let [ctx (assoc ctx
+                     :execute-prepared-request-fn
+                     (fn [_ai-ctx _ctx sid prepared _pq]
+                       (test-support/stub-execution-result
+                        {:sid sid :prepared prepared :text "scheduled ack"
+                         :timestamp delivered-at})))]
       (session/dispatch-in! ctx :scheduler/create
                             {:session-id session-id
                              :schedule-id "sch-e2e-1"
@@ -66,7 +64,19 @@
                             {:session-id session-id
                              :schedule-id "sch-e2e-1"}
                             {:origin :core})
-      (let [entries (kernel/event-log-entries)
+      (let [;; Scope the lifecycle-event read to THIS session's own dispatch
+            ;; entries. `kernel/event-log-entries` is a process-global bounded
+            ;; ring buffer shared across every namespace; under full-suite
+            ;; concurrency, cross-ns dispatch can flood/trim it between this
+            ;; synchronous fire and the read, evicting this session's lifecycle
+            ;; tail (~1-in-8 full-suite flake). The scheduled-delivery effect
+            ;; runs the canonical prompt lifecycle synchronously (effect →
+            ;; :session/prompt-record-response → :session/prompt-finish, all on
+            ;; this thread before `:scheduler/fired` returns), so filtering the
+            ;; log to this session-id is sufficient and deterministic — no async
+            ;; settle and no dependence on the global buffer window.
+            entries (filterv #(= session-id (get-in % [:event-data :session-id]))
+                             (kernel/event-log-entries))
             user-msg (first (scheduled-user-messages ctx session-id))
             assistant-msg (some #(when (= "assistant" (:role %)) %)
                                 (journal-messages ctx session-id))]
