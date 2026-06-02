@@ -1594,7 +1594,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Test-shaper follow-ups — pass 20 (test-shaper, 2026-06-01)
 
-- [ ] Relabel the misleading `testing` block in
+- [x] Relabel the misleading `testing` block in
       `scheduler-test/drain-one-test` (L119): "drain-one is FIFO by queue order
       when session is idle". `drain-one` sorts by `[fire-at created-at
       schedule-id]` (`scheduler.clj:262-264`), not FIFO-by-insertion; the block's
@@ -1612,3 +1612,14 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       citations stable. Test-file-only (Slice-10 allowlist — zero
       `components/agent-session/src/**` or `doc/scheduler.md`); keep the suite
       green + clj-kondo/cljfmt clean.
+      Done: reworded the `testing` docstring to "drain-one delivers the earliest
+      fire-at when session is idle" (no longer asserts a non-existent FIFO-by-
+      insertion contract) and added a 3-line comment above the block stating
+      sch-a is both first-inserted and earliest fire-at here, with a pointer to
+      the dedicated `drain-one-orders-by-fire-at-not-queue-insertion-order-test`
+      that proves the `[fire-at created-at schedule-id]` sort when insertion ≠
+      fire-at order. Assertions + deftest name unchanged → `findings.md`
+      Pure-model citations stable; aggregate assertion count unchanged. Full
+      `bb test` green; clj-kondo 0/0; `bb fmt:check` "All source files formatted
+      correctly". Test file only — zero `components/agent-session/src/**` or
+      `doc/scheduler.md` (Slice-10 allowlist held).

@@ -116,7 +116,10 @@
                                                            :session-id "sid-1"})
         state2 (:state (scheduler/fire-schedule state1 {:is-streaming true :is-compacting false} "sch-a"))
         state3 (:state (scheduler/fire-schedule state2 {:is-streaming true :is-compacting false} "sch-b"))]
-    (testing "drain-one is FIFO by queue order when session is idle"
+    ;; sch-a is both first-inserted and earliest fire-at here; the dedicated
+    ;; drain-one-orders-by-fire-at-not-queue-insertion-order-test proves the
+    ;; [fire-at created-at schedule-id] sort when insertion ≠ fire-at order.
+    (testing "drain-one delivers the earliest fire-at when session is idle"
       (let [{state4 :state drained? :drained? schedule :schedule} (scheduler/drain-one state3 {:is-streaming false :is-compacting false})]
         (is (true? drained?))
         (is (= "sch-a" (:schedule-id schedule)))

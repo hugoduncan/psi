@@ -2478,3 +2478,15 @@ misleading docstring was never corrected. Relabel the block to state it drains
 the earliest fire-at (= sch-a here), removing the false FIFO-by-insertion claim
 and the cross-test contradiction. Cosmetic/label-only (assertions unchanged,
 deftest name unchanged → `findings.md` citations stable).
+
+### Resolution — test-shaper pass 20 follow-up (2026-06-01)
+
+Relabelled the `drain-one-test` block (was "drain-one is FIFO by queue order
+when session is idle" → "drain-one delivers the earliest fire-at when session is
+idle") and added a 3-line comment noting sch-a is both first-inserted and
+earliest fire-at here, pointing at the dedicated
+`drain-one-orders-by-fire-at-not-queue-insertion-order-test` for the
+insertion≠fire-at proof. Assertions + deftest name unchanged → `findings.md`
+Pure-model citations stable; aggregate assertion count unchanged. `bb test`
+green; clj-kondo 0/0; `bb fmt:check` clean. Test file only — zero
+`components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist held).
