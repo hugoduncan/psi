@@ -1316,3 +1316,41 @@ assertions, 0 failures) and `clj-kondo` clean (0/0) on the touched test file.
 Committed the refinement with a `⚒ 207` message; `git status --short` clean
 afterwards. HEAD self-consistent: AC3 tools/skills isolation behaviourally
 covered, resolved-pool lookup order-independent.
+
+## Test-review pass 4 (review 2026-06-02)
+
+Applied `task-test-review` skill (well-formedness, ∀-behaviour-coverage,
+injectable/nullable infra deps). Existing tests are well-formed (real ctx/state,
+output assertions, no logic mocks; `execution-adapter/create` nullable-adapter
+injection at the infra boundary is acceptable). The 9 numbered ACs map to
+focused tests and the focused suite is green (10 tests, 51 assertions).
+
+One behavioural-coverage gap found (criterion: ∀ design behaviour ∃ covering
+test):
+
+- **T4 — Decision 5b (`continue-terminal-run-async!` fresh snapshot capture)
+  has no behavioural test, and the production `mutate!` session-id injection it
+  relies on is untested.** AC8 + `resume-run-test` cover Decision 5a (resume
+  REUSES the snapshot). Decision 5b — a *terminal*-run continuation creates a
+  NEW run that must capture a FRESH snapshot from the continuing session — is
+  asserted by steps.md S4 only "structurally" and has zero test coverage. The
+  structural argument is in fact subtle: both upstream `mutate!
+  'psi.workflow/create-run` callers (`workflow/core.clj:382`,
+  `orchestration.clj:208` `continue-terminal-run-async!`) pass NO `:session-id`
+  in their payload; capture works only because the bootstrap `mutate-fn` wrapper
+  (`workflow/bootstrap.clj:80`) auto-injects `:session-id sid` from
+  `*active-workflow-session-id*` (bound at `:128`) into every mutation. The
+  S4 capture tests (`canonical-workflows-test`, `workflow-tools-test`) BYPASS
+  this by calling the mutation DIRECTLY with an explicit `:session-id`, so they
+  prove only "mutation captures when session-id is supplied" — not that the
+  real invoke/continue path supplies it. A regression dropping the
+  `(assoc params :session-id sid)` injection, or 5b reusing the original
+  terminal run's snapshot instead of re-capturing, would pass all current
+  tests. Add a behavioural test driving `continue-terminal-run-async!` (or the
+  bootstrap mutate-fn wrapper with `*active-workflow-session-id*` bound) that
+  asserts the NEW continuation run's `:inherited-defaults` is a fresh snapshot
+  resolved from the continuing session — distinguishable from the original
+  terminal run's snapshot (e.g. mutate the session model between the original
+  invoke and the continue, then assert the continuation run captured the changed
+  model). This closes the 5b coverage hole and pins the session-id auto-injection
+  contract that ALL top-level capture depends on.

@@ -458,3 +458,28 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       (10 tests, 51 assertions, 0 failures); `clj-kondo` clean (0/0) on the
       touched file; committed with `⚒ 207`; `git status --short` clean
       afterwards. HEAD self-consistent.
+
+## Test-review pass 4 follow-ups (review 2026-06-02)
+
+- [ ] T4: Add behavioural coverage for Decision 5b (continue-terminal fresh
+      snapshot) and the session-id auto-injection it depends on. Today AC8 covers
+      only Decision 5a (resume REUSES the snapshot); Decision 5b — a terminal-run
+      continuation creating a NEW run that captures a FRESH snapshot from the
+      continuing session — has zero behavioural test and is asserted only
+      "structurally" in S4. The structural claim is subtle and untested: both
+      upstream `mutate! 'psi.workflow/create-run` callers
+      (`workflow/core.clj:382`, `orchestration.clj:208`
+      `continue-terminal-run-async!`) pass NO `:session-id`; capture works only
+      because `workflow/bootstrap.clj:80`'s `mutate-fn` wrapper auto-injects
+      `:session-id sid` from `*active-workflow-session-id*` (`:128`). The S4
+      capture tests (`canonical-workflows-test`/`workflow-tools-test`) bypass this
+      by calling the mutation directly with an explicit `:session-id`, so they
+      prove only "captures when session-id supplied", not that the real
+      invoke/continue path supplies it. Add a test driving
+      `continue-terminal-run-async!` (or the bootstrap mutate-fn wrapper with
+      `*active-workflow-session-id*` bound) that mutates the session model between
+      the original invoke and the continue and asserts the NEW continuation run's
+      `:inherited-defaults` is a FRESH snapshot reflecting the changed
+      (continuing-session) model — distinguishable from the original terminal
+      run's snapshot. Closes the 5b coverage hole and pins the session-id
+      auto-injection contract all top-level capture relies on.
