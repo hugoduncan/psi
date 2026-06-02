@@ -18,3 +18,32 @@
       `session-state/init.clj`, rather than a parallel hand-maintained list, to
       preserve single-source-of-truth for inheritance fields.
       → design.md Decision 8.
+
+## Ambiguity follow-ups
+
+- [ ] Decision 8: specify the exact snapshot field set as a *named subset* of
+      the canonical authority. `common-inherited-fields` has ~20 fields and
+      excludes `:model`/`:thinking-level` (those live in `model-identity-fields`
+      in `init.clj`). State which fields the snapshot includes/excludes and how
+      it is validated against the authority beyond the `:tool-defs`/`:skills`
+      resolved-vs-raw caveat (i.e. account for the dozen extra
+      authoritative/runtime fields and the cross-constant model/thinking-level
+      gap).
+- [ ] Decision 5: disambiguate "continue/resume". Define snapshot behaviour for
+      `continue-terminal-run-async!` (creates a NEW run via `create-run`)
+      separately from `resume-run` (same run-id). State whether continue reuses
+      the original run's snapshot or captures a fresh one, and how a new
+      create-run obtains the original snapshot if reuse is intended.
+- [ ] Decision 7: specify the entry point/signature for nested
+      effective-snapshot derivation. `delegate.clj`'s
+      `delegate-step-runtime-result` does not currently resolve the delegating
+      step's effective config. State whether delegate calls
+      `resolve-step-session-config` to obtain it and the function it then calls
+      to derive the child snapshot (effective config → snapshot), distinct from
+      `resolve-inherited-defaults-snapshot(ctx, parent-session-id)`.
+- [ ] Decision 6: pin the snapshot-resolution site for the mutation path.
+      `create-run` is reached via the `create-workflow-run` mutation
+      (`agent-session-ctx`+`session-id`) and via upstream `mutate!` callers
+      (`workflow/core.clj`, `orchestration.clj`). State whether the impure
+      `resolve-inherited-defaults-snapshot` call lives inside the mutation or in
+      the upstream caller, given the resolver needs `ctx`+`parent-session-id`.
