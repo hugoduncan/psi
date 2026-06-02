@@ -405,3 +405,23 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       suites green (25 tests/141 assertions); lint clean; tree clean; docs +
       changelog accurate. No new actionable findings — review complete. No
       follow-up items added.
+
+## Test-review pass 2 follow-ups (review 2026-06-02)
+
+- [ ] T2: Close the AC3 tools/skills isolation coverage gap.
+      `snapshot-isolates-resolution-from-live-parent-mutation-test`
+      (`inheritance_snapshot_test.clj`) is the only AC1/AC2/AC3 isolation test;
+      it sets `:tool-defs`/`:skills` in the snapshot but never asserts the
+      resolved config's `:tool-defs`/`:skills` come from the snapshot, nor does
+      it mutate the live parent's tool source / tool-ids / skills after invoke
+      to prove no leak. AC3 explicitly names `tools` and `skills` as inherited
+      defaults the invariant must hold for. The resolver sources both from the
+      snapshot pool with the live read gated `(when-not snapshot? …)`
+      (`core.clj:206-212`, R1), so the behaviour is structurally leak-free but
+      asserted only by the field-derivation unit tests, NOT by the AC3 isolation
+      test — which would still pass if a future change reintroduced a live
+      tools/skills read on the snapshot path. Fix: extend the AC3 isolation test
+      (or add a sibling) to assert resolved `:tool-defs`/`:skills` equal the
+      snapshot pool AND stay unchanged after a post-invoke mutation of the live
+      parent's tools/skills, matching the model/prompt-mode/speed/effort
+      isolation coverage already in that test.

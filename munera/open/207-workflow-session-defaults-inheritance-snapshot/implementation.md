@@ -1211,3 +1211,46 @@ No new actionable findings. All design decisions (1–8a) and acceptance criteri
 (1–9) traced to code + tests. Implementation review complete.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Test review pass 2 (ψ, 2026-06-02)
+
+Re-reviewed implementation tests with task-test-review skill
+(well-formed ∧ behaviour-coverage ∧ no-mock/no-stub) after the R4–R7 / T1
+follow-ups landed. Grounded against the test files and resolver code
+(`workflow-step-session-config/core.clj:195-265`).
+
+Well-formed ∧ no-mock: confirmed. Tests use real ctx/state
+(`support/create-session-context`, real `create-run`,
+`resolve-step-session-config`, `delegate-step-runtime-result`,
+`child-session-base-state`) and real `execution-adapter/create` with a
+captured-opts atom as a nullable (data-shape assertions, not interaction
+assertions). `attempts-test`'s `with-redefs valid-session?` stubs only a
+defensive validation guard, not domain logic — acceptable. T1's AC7
+strengthening verified: the `:same-model-as-session` preference makes the
+snapshot-vs-live distinction observable, so AC7 isolation is now provable.
+
+Behaviour-coverage gap (new, actionable; distinct from T1/R-series):
+
+- **T2 (AC3 tools/skills isolation behaviourally uncovered).** AC3 requires the
+  no-live-leak invariant to hold for **every** inherited default and explicitly
+  names `tools` and `skills`. The sole AC1/AC2/AC3 isolation test
+  (`snapshot-isolates-resolution-from-live-parent-mutation-test`,
+  `inheritance_snapshot_test.clj`) sets `:tool-defs`/`:skills` in the snapshot
+  but (a) never asserts the resolved config's `:tool-defs`/`:skills` come from
+  the snapshot, and (b) never mutates the live parent's tools/skills after
+  invoke to prove they do NOT leak. The resolver DOES source both from the
+  snapshot pool (`core.clj:206-212`: `session-skills`/`session-tool-defs` are
+  `(if snapshot? (:skills/:tool-defs snapshot) <live read>)`, with the live
+  read gated `(when-not snapshot? …)` per R1), so the behaviour exists and is
+  structurally leak-free — but it is asserted only by the field-derivation unit
+  tests (`resolve-inherited-defaults-snapshot-test`/`effective-config->snapshot-test`),
+  NOT by the AC3 isolation test that proves independence from a post-invoke
+  live-parent mutation. The isolation test would pass identically if a future
+  change reintroduced a live tools/skills read on the snapshot path. Fix:
+  extend the AC3 isolation test (or add a sibling) to assert resolved
+  `:tool-defs`/`:skills` equal the snapshot pool AND remain unchanged after
+  mutating the live parent session's tool source / tool-ids / skills after
+  invoke — closing the AC3-named tools/skills isolation coverage to match the
+  model/prompt-mode/speed/effort coverage already present in the same test.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
