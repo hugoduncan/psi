@@ -1134,3 +1134,40 @@ collision case that `line` resolves), consistent with the pass-2 SKILL §3
 identity-vs-join-key distinction — they are not selector/acceptance keys and
 must not change. design(spec)↔SKILL(mechanism) source-of-truth coherence gap
 closed. No `.clj` touched → no clj-kondo/cljfmt/test delta.
+
+## Implementation review (pass 5 — task-implementation-review skill)
+
+Reviewed against the `task-implementation-review` skill (design-match,
+architecture-fit, new-vs-reusable patterns, unnecessary abstraction, structural
+issues). Independently re-verified the live state and the prior passes' fixes:
+
+- **All three artifacts present, load, lint clean.** `clj-kondo --lint .psi` →
+  0 errors / 0 warnings. Focused definition tests **14 tests / 196 assertions /
+  0 failures**. Both `reduce-incidental-complexity` and
+  `task-lifecycle-in-worktree` register (per Slice-4 assertions).
+- **Skill recipe runs live and reproduces the documented top-5** (`start-tui-
+  runtime!/5` gap≈7.03, `print-help!/0` 5.86, `print-debug-summary!/1` 2.96,
+  `adopt-startup-plan-into-session!/5` 2.75, `start-nrepl!/4` 2.01) — selection
+  produces a target.
+- **F2 determinism claim independently confirmed.** `@line` join key is fully
+  unique on **both** lenses (0 duplicate keys across 3520 local / 3526 cc
+  units), and the inner join is **lossless** (0 of 3520 local rows dropped). The
+  reproducibility guarantee holds; `from_entries` cannot last-wins-collapse.
+- **D1 deviation correct.** Wrapper mirrors the loadable
+  `review-implementation-in-worktree.edn` (3-step resolve→delegate→summary)
+  rather than the non-loading `implement-task-in-worktree.md`; verified the
+  wrapper is byte-structurally the same shape with `task-lifecycle` substituted.
+- **Design-match / architecture-fit:** S1 capability-catalog artifacts only (no
+  production Clojure); no atom bypass, no shim/adapter, `one_way`-conformant
+  delegate-yield handoff. Generated two-phase contract (Phase 0 char-test gate +
+  Phase 1 A5/A2/A3 acceptance) reproduced verbatim in step-7 and coheres with
+  `design.md`. F1 no-target short-circuit, F3/F4 `(ns,var,arity,line)` keying all
+  present and coherent across SKILL ↔ workflow ↔ design ↔ doc.
+- **No unnecessary abstraction / structural issues:** thin 3-step wrapper, no
+  extra orchestration; `:thinking-level :high` and `rg` (coverage-hint) both
+  have precedent / are available.
+
+No new actionable issues found. design/plan/implementation reviews (architecture
++ A1–A5 + I1 + C1–C3 + F1–F4) are all resolved.
+
+PASS_STATUS: REVIEW_COMPLETE.
