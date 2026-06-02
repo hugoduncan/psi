@@ -612,3 +612,17 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       0/0, cljfmt clean. Test file only — zero
       `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist
       held; assertion count unchanged, aggregate stays 45 tests / 412 assertions).
+
+## Test review follow-ups — pass 9 (task-test-review, 2026-06-01)
+
+- [x] Re-audit all 201 verification-test deliverables + cited covering tests
+      against the task-test-review skill (well-formed, behaviour coverage,
+      infra-deps injectable not stubbed). No new actionable issues — the
+      passes 6/7/8 `with-redefs`-removal follow-ups are all closed; the only
+      surviving infra `with-redefs`/`Thread/sleep` sites are pre-existing
+      baseline tests (`scheduler_effects_test/scheduler-start-and-cancel-timer-effects-test`,
+      `scheduler_lifecycle_test/scheduled-deliver-runs-canonical-prompt-lifecycle-test`)
+      that are NOT cited as covering tests for any acceptance area, so they are
+      out of 201's verification-test scope. Suite green (45 tests / 412
+      assertions); clj-kondo 0/0; cljfmt clean. Review chain converged →
+      REVIEW_COMPLETE.

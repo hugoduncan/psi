@@ -987,3 +987,42 @@ the migrated test is unchanged, so the aggregate deliverable stays
 **45 tests / 412 assertions**. Test file only — zero
 `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist
 held).
+
+## Test review — pass 9 (task-test-review, 2026-06-01) — REVIEW_COMPLETE
+
+Re-audited all 201 verification-test deliverables and cited covering tests
+against the task-test-review skill (`well_formed ∧ behaviour-coverage ∧
+infra_deps→injectable ∧ ¬mock ∧ ¬stub`). No new actionable issues.
+
+- **well-formed + behaviour coverage**: all 7 Scope areas have cited covering
+  deftests; the acceptance-required behaviours (message/session live round trip,
+  busy-queue+drain, both cancel races, failure recording, shutdown timer
+  cleanup) each have a cited test that drives the real dispatch+effect path via
+  the time/timer seam and asserts state/outputs, not interactions.
+- **infra-dep injection**: every 201-added/cited covering test now uses
+  injectable seams — `:scheduler-run-after-delay-fn` (timer),
+  `:execute-prepared-request-fn` (AI-execution boundary, passes 6 & 8), and
+  `kernel/register-handler!` (failure-path dispatch seam, pass 7). The
+  `with-redefs` infra-stub follow-ups from passes 6/7/8 are all closed and
+  verified in source: `grep with-redefs` over the cited covering tests is empty.
+- **remaining `with-redefs` are out of scope**: the only surviving infra
+  `with-redefs` sites are `scheduler_effects_test/scheduler-start-and-cancel-timer-effects-test`
+  (+ its `cancel-timer` block) and `scheduler_lifecycle_test/scheduled-deliver-runs-canonical-prompt-lifecycle-test`.
+  Both are **pre-existing baseline tests** (effects_test last touched at commit
+  `166`; the lifecycle canonical test predates 201 and pass-8 explicitly scoped
+  it out), and **neither is cited as a covering test** for any acceptance area
+  in `findings.md` (effects_test appears only in the inventory + the clean
+  stub-free `shutdown-context-cancels-scheduler-timers-test` citation; the
+  canonical-lifecycle deftest appears only in the inventory). They are not 201
+  deliverables. The effects_test baseline deftest also uses `Thread/sleep`
+  polling, but again as pre-existing non-cited baseline, not a 201 verification
+  test (the "no wall-clock sleeps" invariant binds the 201-added tests, which
+  all fire by invoking the captured callback).
+- **green + clean**: full `bb test` green; scheduler aggregate 45 tests / 412
+  assertions; `clj-kondo` 0/0 and `cljfmt` clean on all touched test files +
+  `test_support.clj`. Verification-only invariant holds (zero
+  `components/agent-session/src/**` or `doc/scheduler.md`).
+
+Conclusion: the review chain has converged. The verification-test deliverables
+are well-formed, cover the design behaviour, and inject (rather than stub) their
+infra deps. No follow-up steps added.
