@@ -70,7 +70,7 @@
             user-msg (first (scheduled-user-messages ctx session-id))
             assistant-msg (some #(when (= "assistant" (:role %)) %)
                                 (journal-messages ctx session-id))]
-        (is (= :delivered (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-e2e-1" :status])))
+        (is (= :delivered (test-support/schedule-status ctx session-id "sch-e2e-1")))
         (is (= :idle (ss/sc-phase-in ctx session-id)))
         (is (= "user" (:role user-msg)))
         (is (= "check status" (get-in user-msg [:content 0 :text])))
@@ -117,7 +117,7 @@
                              :schedule-id schedule-id}
                             {:origin :core}))
     (is (= ["sch-q-1" "sch-q-2"]
-           (get-in (ss/get-session-data-in ctx session-id) [:scheduler :queue]))
+           (test-support/schedule-queue ctx session-id))
         "fire-while-busy queues both schedules in FIFO order")
 
     (swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming false))))
@@ -125,18 +125,18 @@
       (let [drain-1 (session/dispatch-in! ctx :scheduler/drain-queue
                                           {:session-id session-id}
                                           {:origin :core})]
-        (is (= ["sch-q-2"] (get-in (ss/get-session-data-in ctx session-id) [:scheduler :queue])))
+        (is (= ["sch-q-2"] (test-support/schedule-queue ctx session-id)))
         (is (= "sch-q-1" (:schedule-id (or (:return drain-1) drain-1))))
-        (is (= :delivered (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-q-1" :status])))
-        (is (= :queued (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-q-2" :status])))))
+        (is (= :delivered (test-support/schedule-status ctx session-id "sch-q-1")))
+        (is (= :queued (test-support/schedule-status ctx session-id "sch-q-2")))))
 
     (testing "second idle drain delivers the remaining queued schedule via real dispatch"
       (let [drain-2 (session/dispatch-in! ctx :scheduler/drain-queue
                                           {:session-id session-id}
                                           {:origin :core})]
-        (is (= [] (get-in (ss/get-session-data-in ctx session-id) [:scheduler :queue])))
+        (is (= [] (test-support/schedule-queue ctx session-id)))
         (is (= "sch-q-2" (:schedule-id (or (:return drain-2) drain-2))))
-        (is (= :delivered (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-q-2" :status])))))))
+        (is (= :delivered (test-support/schedule-status ctx session-id "sch-q-2")))))))
 
 (deftest drain-one-stamps-scheduled-user-message-from-scheduler-time-source-test
   ;; Handler-unit assertion (split out of busy-session-...-drains-fifo per
@@ -183,7 +183,7 @@
                           {:session-id session-id
                            :schedule-id "sch-cancel-pending"}
                           {:origin :core})
-    (is (= :cancelled (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-cancel-pending" :status])))
+    (is (= :cancelled (test-support/schedule-status ctx session-id "sch-cancel-pending")))
 
     (swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming true))))
     (session/dispatch-in! ctx :scheduler/create
@@ -203,5 +203,5 @@
                           {:session-id session-id
                            :schedule-id "sch-cancel-queued"}
                           {:origin :core})
-    (is (= :cancelled (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-cancel-queued" :status])))
-    (is (= [] (get-in (ss/get-session-data-in ctx session-id) [:scheduler :queue])))))
+    (is (= :cancelled (test-support/schedule-status ctx session-id "sch-cancel-queued")))
+    (is (= [] (test-support/schedule-queue ctx session-id)))))

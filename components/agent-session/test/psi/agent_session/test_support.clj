@@ -410,3 +410,21 @@
                           (= :scheduled (:source message))
                           (= schedule-id (:schedule-id message)))
                  message)))))
+
+(defn schedule-by-id
+  "Return the full schedule map for `schedule-id` in `session-id`'s scheduler
+  state, or nil. One shared schedule-read abstraction for the scheduler
+  verification tests."
+  [ctx session-id schedule-id]
+  (get-in (ss/get-session-data-in ctx session-id)
+          [:scheduler :schedules schedule-id]))
+
+(defn schedule-status
+  "Return the `:status` of `schedule-id` in `session-id`'s scheduler state."
+  [ctx session-id schedule-id]
+  (:status (schedule-by-id ctx session-id schedule-id)))
+
+(defn schedule-queue
+  "Return the scheduler `:queue` vector for `session-id`."
+  [ctx session-id]
+  (get-in (ss/get-session-data-in ctx session-id) [:scheduler :queue]))

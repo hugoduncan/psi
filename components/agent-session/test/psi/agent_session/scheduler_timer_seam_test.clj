@@ -2,8 +2,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
-   [psi.agent-session.test-support :as test-support]
-   [psi.session-state.state :as ss]))
+   [psi.agent-session.test-support :as test-support]))
 
 (deftest scheduler-start-timer-uses-injected-time-source-and-delay-runner-test
   (testing "scheduler timer computes delay from injected scheduler time source and dispatches via injected runner"
@@ -30,7 +29,7 @@
       (is (= 5000 @observed-delay*))
       (is (= {:handle :fake} (get @(:scheduler-timers* ctx*) "sch-1")))
       (@callback*)
-      (is (= :delivered (get-in (ss/get-session-data-in ctx* session-id) [:scheduler :schedules "sch-1" :status])))))
+      (is (= :delivered (test-support/schedule-status ctx* session-id "sch-1")))))
 
   (testing "scheduler cancel uses injected cancel fn for non-thread handles"
     (let [now              (test-support/instant "2026-04-21T17:10:00Z")
@@ -56,7 +55,7 @@
                              :schedule-id "sch-1"}
                             {:origin :core})
       (is (= {:handle :fake} @cancelled*))
-      (is (= :cancelled (get-in (ss/get-session-data-in ctx* session-id) [:scheduler :schedules "sch-1" :status]))))))
+      (is (= :cancelled (test-support/schedule-status ctx* session-id "sch-1"))))))
 
 ;; --- 201 verification: cancel racing the timer (Race A — cancel before the
 ;; captured callback dispatches :scheduler/fired). Cancel wins; invoking the
@@ -89,14 +88,12 @@
                             {:session-id session-id
                              :schedule-id "sch-race"}
                             {:origin :core})
-      (is (= :cancelled (get-in (ss/get-session-data-in ctx* session-id)
-                                [:scheduler :schedules "sch-race" :status])))
+      (is (= :cancelled (test-support/schedule-status ctx* session-id "sch-race")))
       (is (nil? (get @(:scheduler-timers* ctx*) "sch-race"))
           "cancel removed the timer handle")
       ;; now invoke the stale callback — must not resurrect the schedule
       ((:f @callback*))
-      (is (= :cancelled (get-in (ss/get-session-data-in ctx* session-id)
-                                [:scheduler :schedules "sch-race" :status]))
+      (is (= :cancelled (test-support/schedule-status ctx* session-id "sch-race"))
           "stale callback did not resurrect the cancelled schedule"))))
 
 (deftest scheduler-cancelled-default-delay-thread-exits-without-uncaught-interrupted-exception-test
@@ -140,4 +137,4 @@
       (is (false? (.isAlive ^Thread @started-thread*)))
       (is (nil? @uncaught*))
       (is (nil? (get @(:scheduler-timers* ctx*) "sch-1")))
-      (is (= :cancelled (get-in (ss/get-session-data-in ctx* session-id) [:scheduler :schedules "sch-1" :status]))))))
+      (is (= :cancelled (test-support/schedule-status ctx* session-id "sch-1"))))))

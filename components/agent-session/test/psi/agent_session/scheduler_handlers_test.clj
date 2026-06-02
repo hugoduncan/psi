@@ -56,9 +56,9 @@
                                                                :fire-at (instant "2026-04-21T18:05:00Z")
                                                                :delay-ms 5000})]
              (apply-root-state-update! ctx result)
-             (is (= :message (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-1" :kind])))
-             (is (= session-id (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-1" :origin-session-id])))
-             (is (= :pending (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-1" :status])))
+             (is (= :message (:kind (test-support/schedule-by-id ctx session-id "sch-1"))))
+             (is (= session-id (:origin-session-id (test-support/schedule-by-id ctx session-id "sch-1"))))
+             (is (= :pending (test-support/schedule-status ctx session-id "sch-1")))
              (is (= [{:effect/type :scheduler/start-timer
                       :session-id session-id
                       :schedule-id "sch-1"
@@ -69,15 +69,15 @@
            (swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming true))))
            (let [result (invoke-handler ctx :scheduler/fired {:session-id session-id :schedule-id "sch-1"})]
              (apply-root-state-update! ctx result)
-             (is (= :queued (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-1" :status])))
-             (is (= ["sch-1"] (get-in (ss/get-session-data-in ctx session-id) [:scheduler :queue])))
+             (is (= :queued (test-support/schedule-status ctx session-id "sch-1")))
+             (is (= ["sch-1"] (test-support/schedule-queue ctx session-id)))
              (is (nil? (:effects result)))))
 
          (testing "cancel removes queued schedule from queue and emits cancel effect"
            (let [result (invoke-handler ctx :scheduler/cancel {:session-id session-id :schedule-id "sch-1"})]
              (apply-root-state-update! ctx result)
-             (is (= :cancelled (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-1" :status])))
-             (is (= [] (get-in (ss/get-session-data-in ctx session-id) [:scheduler :queue])))
+             (is (= :cancelled (test-support/schedule-status ctx session-id "sch-1")))
+             (is (= [] (test-support/schedule-queue ctx session-id)))
              (is (= [{:effect/type :scheduler/cancel-timer
                       :schedule-id "sch-1"}]
                     (:effects result)))))
@@ -101,9 +101,9 @@
                  _ (apply-root-state-update! ctx create-b)
                  bulk-r (invoke-handler ctx :scheduler/cancel-all {:session-id session-id})]
              (apply-root-state-update! ctx bulk-r)
-             (is (= :cancelled (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-bulk-a" :status])))
-             (is (= :cancelled (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-bulk-b" :status])))
-             (is (= [] (get-in (ss/get-session-data-in ctx session-id) [:scheduler :queue])))
+             (is (= :cancelled (test-support/schedule-status ctx session-id "sch-bulk-a")))
+             (is (= :cancelled (test-support/schedule-status ctx session-id "sch-bulk-b")))
+             (is (= [] (test-support/schedule-queue ctx session-id)))
              (is (= 2 (count (:effects bulk-r))))
              (is (= #{"sch-bulk-a" "sch-bulk-b"}
                     (set (map :schedule-id (:effects bulk-r)))))))
@@ -121,7 +121,7 @@
                                                                   :schedule-id "sch-2"
                                                                   :delivered-at delivered-at})]
                (apply-root-state-update! ctx result)
-               (is (= :delivered (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-2" :status])))
+               (is (= :delivered (test-support/schedule-status ctx session-id "sch-2")))
                (is (= 1 (count (:effects result))))
                (is (= delivered-at (-> result :effects first :event-data :user-msg :timestamp)))
                (is (= :runtime/dispatch-event-with-effect-result (-> result :effects first :effect/type)))
@@ -220,8 +220,7 @@
                                                  :scheduler/deliver
                                                  {:session-id session-id
                                                   :schedule-id "sch-session-needs-missing-time"})))
-           (is (= :pending (get-in (ss/get-session-data-in ctx session-id)
-                                   [:scheduler :schedules "sch-session-needs-missing-time" :status]))))
+           (is (= :pending (test-support/schedule-status ctx session-id "sch-session-needs-missing-time"))))
 
          (apply-root-state-update!
           ctx
@@ -240,8 +239,7 @@
                                                  :scheduler/deliver
                                                  {:session-id session-id
                                                   :schedule-id "sch-session-needs-valid-time"})))
-           (is (= :pending (get-in (ss/get-session-data-in ctx session-id)
-                                   [:scheduler :schedules "sch-session-needs-valid-time" :status]))))))))
+           (is (= :pending (test-support/schedule-status ctx session-id "sch-session-needs-valid-time"))))))))
 
 (deftest scheduler-deliver-checks-schedule-before-time-source-test
   (let [[ctx session-id] (test-support/make-session-ctx {})]
@@ -290,8 +288,8 @@
            (apply-root-state-update! ctx result))
          (let [fired (invoke-handler ctx :scheduler/fired {:session-id session-id :schedule-id "sch-session"})]
            (apply-root-state-update! ctx fired)
-           (is (= :session (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-session" :kind])))
-           (is (= :pending (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-session" :status])))
+           (is (= :session (:kind (test-support/schedule-by-id ctx session-id "sch-session"))))
+           (is (= :pending (test-support/schedule-status ctx session-id "sch-session")))
            (is (= :create-session (get-in (first (:effects fired)) [:event-data :delivery-phase])))
            (is (= :scheduler/deliver (get-in (first (:effects fired)) [:event-type]))))))))
 
@@ -318,15 +316,12 @@
                                                              :fire-at (instant "2026-04-21T18:31:00Z")
                                                              :delay-ms 1000})]
          (apply-root-state-update! ctx create-r)
-         (is (= :session (get-in (ss/get-session-data-in ctx session-id)
-                                 [:scheduler :schedules "sch-session-deliver" :kind])))
+         (is (= :session (:kind (test-support/schedule-by-id ctx session-id "sch-session-deliver"))))
          (is (= "later session"
-                (get-in (ss/get-session-data-in ctx session-id)
-                        [:scheduler :schedules "sch-session-deliver" :session-config :session-name])))
+                (get-in (test-support/schedule-by-id ctx session-id "sch-session-deliver") [:session-config :session-name])))
          (is (= {:skill-count 1
                  :tool-count 1}
-                (select-keys (get-in (ss/get-session-data-in ctx session-id)
-                                     [:scheduler :schedules "sch-session-deliver" :session-config-summary])
+                (select-keys (:session-config-summary (test-support/schedule-by-id ctx session-id "sch-session-deliver"))
                              [:skill-count :tool-count])))))))
 
 (deftest scheduler-session-deliver-records-failed-status-on-prompt-submit-error-test
@@ -357,7 +352,7 @@
            (apply-root-state-update! ctx create-r)
            (let [result (invoke-handler ctx :scheduler/deliver {:session-id session-id :schedule-id "sch-session-fail"})]
              (apply-root-state-update! ctx result)
-             (let [failed (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-session-fail"])]
+             (let [failed (test-support/schedule-by-id ctx session-id "sch-session-fail")]
                (is (= :failed (:status failed)))
                (is (= :prompt-submit (:delivery-phase failed)))
                ;; 201 verification: failure records error-summary and the created-session-id
@@ -397,7 +392,7 @@
              (let [result (invoke-handler ctx :scheduler/drain-queue {:session-id session-id
                                                                       :delivered-at drained-at})]
                (apply-root-state-update! ctx result)
-               (is (= ["sch-b"] (get-in (ss/get-session-data-in ctx session-id) [:scheduler :queue])))
+               (is (= ["sch-b"] (test-support/schedule-queue ctx session-id)))
                (is (= "sch-a" (get-in result [:return :schedule-id])))
                (is (= 1 (count (:effects result))))
                (is (= drained-at (-> result :effects first :event-data :user-msg :timestamp)))

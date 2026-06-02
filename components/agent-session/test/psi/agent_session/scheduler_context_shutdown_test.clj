@@ -2,8 +2,7 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
-   [psi.agent-session.test-support :as test-support]
-   [psi.session-state.state :as ss]))
+   [psi.agent-session.test-support :as test-support]))
 
 (deftest shutdown-context-clears-scheduler-timers-test
   (testing "context shutdown interrupts and clears scheduler timer handles"
@@ -48,11 +47,9 @@
       (session/shutdown-context! ctx*)
       (is (nil? (get @(:scheduler-timers* ctx*) "sch-shutdown"))
           "shutdown removed the timer handle")
-      (is (= :cancelled (get-in (ss/get-session-data-in ctx* session-id)
-                                [:scheduler :schedules "sch-shutdown" :status]))
+      (is (= :cancelled (test-support/schedule-status ctx* session-id "sch-shutdown"))
           "shutdown cancelled the outstanding schedule")
       ;; invoking the stale captured callback post-shutdown must not deliver
       ((:f @callback*))
-      (is (= :cancelled (get-in (ss/get-session-data-in ctx* session-id)
-                                [:scheduler :schedules "sch-shutdown" :status]))
+      (is (= :cancelled (test-support/schedule-status ctx* session-id "sch-shutdown"))
           "no fire-after-shutdown: schedule stays :cancelled, not :delivered"))))

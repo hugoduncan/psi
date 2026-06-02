@@ -23,8 +23,8 @@
                                                  {:origin :core})
           scheduled-msg    (test-support/scheduled-message-by-id ctx session-id "sch-1")]
       (is (some? scheduled-msg))
-      (is (= :delivered (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-1" :status])))
-      (is (= [] (get-in (ss/get-session-data-in ctx session-id) [:scheduler :queue])))
+      (is (= :delivered (test-support/schedule-status ctx session-id "sch-1")))
+      (is (= [] (test-support/schedule-queue ctx session-id)))
       (is (= :idle (ss/sc-phase-in ctx session-id))))))
 
 ;; --- 201 verification: message-kind live round trip via the timer seam ---
@@ -52,18 +52,15 @@
                              :fire-at (.plusMillis now 5000)}
                             {:origin :core})
       (testing "before the timer fires, schedule is pending and nothing delivered"
-        (is (= :pending (get-in (ss/get-session-data-in ctx* session-id)
-                                [:scheduler :schedules "sch-msg" :status])))
+        (is (= :pending (test-support/schedule-status ctx* session-id "sch-msg")))
         (is (some? @callback*) "timer callback captured via the seam"))
       ;; fire the timer by invoking the captured callback (no Thread/sleep)
       ((:f @callback*))
       (let [scheduled-msg (test-support/scheduled-message-by-id ctx* session-id "sch-msg")]
         (is (some? scheduled-msg)
             "scheduled user message delivered into origin session")
-        (is (= :delivered (get-in (ss/get-session-data-in ctx* session-id)
-                                  [:scheduler :schedules "sch-msg" :status])))
-        (is (= [] (get-in (ss/get-session-data-in ctx* session-id)
-                          [:scheduler :queue])))))))
+        (is (= :delivered (test-support/schedule-status ctx* session-id "sch-msg")))
+        (is (= [] (test-support/schedule-queue ctx* session-id)))))))
 
 ;; --- 201 verification: session-kind live round trip via the timer seam ---
 ;; session-kind always delivers (origin idle state irrelevant): the captured
@@ -113,8 +110,7 @@
       (let [sessions-before (set (map :session-id (ss/list-context-sessions-in ctx*)))]
         ;; fire the timer (no Thread/sleep)
         ((:f @callback*))
-        (let [schedule    (get-in (ss/get-session-data-in ctx* session-id)
-                                  [:scheduler :schedules "sch-sess"])
+        (let [schedule    (test-support/schedule-by-id ctx* session-id "sch-sess")
               created-id  (:created-session-id schedule)
               created-sd  (when created-id (ss/get-session-data-in ctx* created-id))
               sessions-after (set (map :session-id (ss/list-context-sessions-in ctx*)))]

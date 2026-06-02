@@ -3,7 +3,6 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.psi-tool-scheduler :as psi-tool-scheduler]
    [psi.agent-session.scheduler :as scheduler]
-   [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.tools :as tools]))
 
@@ -219,8 +218,7 @@
       (is (= past-at (java.time.Instant/parse (:fire-at schedule))))
       ;; drive the delay-0 timer via the captured seam (no wall-clock wait)
       ((:f @callback*))
-      (is (= :delivered (get-in (ss/get-session-data-in ctx* session-id)
-                                [:scheduler :schedules (:schedule-id schedule) :status]))
+      (is (= :delivered (test-support/schedule-status ctx* session-id (:schedule-id schedule)))
           "delay-0 schedule fires and delivers")))
 
   (testing "future :at below min-delay-ms (1-999ms) is rejected with the below-minimum bound error"

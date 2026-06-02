@@ -4,7 +4,6 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.dispatch-effects :as dispatch-effects]
-   [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]))
 
 (deftest scheduler-start-and-cancel-timer-effects-test
@@ -93,6 +92,6 @@
     (session/shutdown-context! ctx)
     (is (= 0 (dispatch-effects/scheduler-timer-handle-count)))
     (is (= :cancelled
-           (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-3" :status])))
+           (test-support/schedule-status ctx session-id "sch-3")))
     (is (= :cancelled
-           (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-4" :status])))))
+           (test-support/schedule-status ctx session-id "sch-4")))))
