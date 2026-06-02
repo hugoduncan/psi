@@ -76,6 +76,30 @@
        (psi-widget-projection--cancel-mutation-timer psi-emacs--state "ext/w1:b1")
        (should (null (gethash "ext/w1:b1" timers)))))))
 
+(ert-deftest pwpt-arm-threads-buffer-and-state-into-scheduled-callback ()
+  "Arm threads originating BUFFER + STATE ahead of EXT-ID WIDGET-ID NODE-KEY
+TIMEOUT-MS into the scheduled `run-at-time' callback args, mirroring
+`psi-emacs--schedule-notification-dismiss'.  Asserts the threaded arg
+order/values directly so design AC \"arm captures+threads buffer/state\" is
+locked, not only exercised indirectly."
+  (pwpt--with-state
+   (let ((origin-state psi-emacs--state)
+         (captured-fn   nil)
+         (captured-args nil))
+     (cl-letf (((symbol-function 'run-at-time)
+                (lambda (_secs _rep fn &rest args)
+                  (setq captured-fn fn captured-args args)
+                  'fake-timer)))
+       (psi-widget-projection--arm-mutation-timer
+        origin-state "ext" "w1" "b1" 5000))
+     ;; Scheduled fn is the timeout callback.
+     (should (eq #'psi-widget-projection--on-mutation-timeout captured-fn))
+     ;; Threaded args lead with originating buffer + state, then the
+     ;; ext-id/widget-id/node-key/timeout-ms tail, matching the timeout
+     ;; callback's `(buffer state ext-id widget-id node-key timeout-ms)' arglist.
+     (should (equal (list (current-buffer) origin-state "ext" "w1" "b1" 5000)
+                    captured-args)))))
+
 (ert-deftest pwpt-on-mutation-timeout-clears-in-flight ()
   (pwpt--with-state
    (let* ((spec   (pwpt--make-button-spec "w1" "b1"))
@@ -238,6 +262,57 @@ originating buffer's store, not the current buffer's."
       (should-not (condition-case err
                       (progn (funcall captured-cb '((:data . ((:ok . t))))) nil)
                     (error err))))))
+
+(ert-deftest pwpt-on-mutation-timeout-targets-originating-buffer ()
+  "A timeout firing while a different buffer is current cancels/clears the
+originating buffer's store + in-flight lstate, not the current buffer's.
+Mirrors `pwpt-dispatch-response-targets-originating-buffer' for the timeout
+path (design.md Scope (d): \"a response (and a timeout)\")."
+  (let ((origin-buffer (generate-new-buffer " *pwpt-origin*"))
+        (other-buffer  (generate-new-buffer " *pwpt-other*")))
+    (unwind-protect
+        (cl-letf (((symbol-function 'cancel-timer) #'ignore)
+                  ((symbol-function 'timerp) (lambda (x) (eq x 'fake-timer)))
+                  ((symbol-function 'psi-emacs--upsert-projection-block) #'ignore))
+          ;; Origin buffer: armed timer + in-flight lstate for the spec's button.
+          (with-current-buffer origin-buffer
+            (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+            (let* ((spec   (pwpt--make-button-spec "w1" "b1"))
+                   (lstate (psi-widget-renderer-lstate-set-in-flight
+                            (psi-widget-renderer-make-lstate) "b1" t)))
+              (setf (psi-emacs-state-projection-widget-specs psi-emacs--state)
+                    (list spec))
+              (psi-widget-projection--sync-lstates (list spec))
+              (psi-widget-projection--set-lstate "ext" "w1" lstate)
+              (puthash "ext/w1:b1" 'fake-timer
+                       (psi-emacs-state-projection-mutation-timers
+                        psi-emacs--state))))
+          ;; Other buffer: independent store with the same key.
+          (with-current-buffer other-buffer
+            (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+            (puthash "ext/w1:b1" 'sentinel
+                     (psi-emacs-state-projection-mutation-timers psi-emacs--state)))
+          ;; Fire the timeout against the ORIGIN buffer/state while OTHER is
+          ;; current.
+          (let ((origin-state (with-current-buffer origin-buffer
+                                psi-emacs--state)))
+            (with-current-buffer other-buffer
+              (psi-widget-projection--on-mutation-timeout
+               origin-buffer origin-state "ext" "w1" "b1" 5000)))
+          ;; Origin store + in-flight cleared; other store untouched.
+          (with-current-buffer origin-buffer
+            (should (null (gethash "ext/w1:b1"
+                                   (psi-emacs-state-projection-mutation-timers
+                                    psi-emacs--state))))
+            (should-not (psi-widget-renderer--in-flight-p
+                         (psi-widget-projection--get-lstate "ext" "w1") "b1")))
+          (with-current-buffer other-buffer
+            (should (eq 'sentinel
+                        (gethash "ext/w1:b1"
+                                 (psi-emacs-state-projection-mutation-timers
+                                  psi-emacs--state))))))
+      (kill-buffer origin-buffer)
+      (kill-buffer other-buffer))))
 
 ;;; ─── Global error handler ────────────────────────────────────────────────────
 

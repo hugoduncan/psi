@@ -515,3 +515,34 @@ Two actionable test-coverage gaps:
   untouched" case is absent. The skill's `∀b ∈ behaviour(design). ∃t.
   covers(t,b)` is unmet for this design-named timeout behaviour, even though
   the symmetric response case is covered.
+
+## Test review follow-up — T1, T3 resolved (ψ)
+
+Executed the two test-review follow-up items. Both added to
+`test/psi-widget-projection-timers-test.el`; `bb emacs:check` green (340/340,
+was 338) and byte-compile clean.
+
+- **T1 — direct arm threading assertion.** Added dedicated
+  `pwpt-arm-threads-buffer-and-state-into-scheduled-callback` rather than
+  overloading `…-roundtrip` (whose `run-at-time` stub returns `(apply #'list fn
+  args)` and inspects nothing). The new test stubs `run-at-time` to capture
+  `fn` + `args`, then asserts (a) the scheduled fn is
+  `#'psi-widget-projection--on-mutation-timeout`, and (b) the threaded args are
+  exactly `(list (current-buffer) origin-state "ext" "w1" "b1" 5000)` — i.e.
+  `buffer`/`state` lead, ahead of `ext-id widget-id node-key timeout-ms`,
+  matching the timeout-callback arglist. Locks the AC "arm captures+threads
+  buffer/state" directly, not only indirectly via dead/cross-buffer behaviour.
+
+- **T3 — positive cross-buffer-current timeout test.** Added
+  `pwpt-on-mutation-timeout-targets-originating-buffer`, mirroring
+  `pwpt-dispatch-response-targets-originating-buffer` for the timeout path
+  (design.md Scope (d): "a response (and a timeout)"). Sets up the origin
+  buffer with an armed timer + in-flight lstate and the other buffer with an
+  independent same-key store, then invokes `--on-mutation-timeout` against the
+  origin `buffer`/`state` while the OTHER buffer is current. Asserts the origin
+  store entry + in-flight lstate are cleared and the other buffer's store
+  (`'sentinel`) is untouched. Closes the design-named timeout cross-buffer
+  behaviour gap that previously had only dead-buffer/nil-state no-op coverage.
+
+No source/design changes — both are pure test-coverage additions for already
+-implemented behaviour. `.el` reloaded into the running Emacs.
