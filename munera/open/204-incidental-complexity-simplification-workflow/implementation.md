@@ -2232,3 +2232,49 @@ Verification:
 - Test file 340 lines (< 800 `components/` guard).
 
 PASS_STATUS: FOLLOW_UP_COMPLETE.
+
+---
+
+## Pass 11 — test-shaper review (independent)
+
+Applied `test-shaper` (behavior_focused ∧ meaningful_failures ∧ economical) to
+the 204 tests (`workflow_definitions_test.clj` +
+`incidental_complexity_finder_skill_test.clj`). Focused suites green: skill ns +
+workflow-definitions ns both ✅ (jq 1.8.1 on PATH). 3 pre-existing unrelated
+failures in `psi.turn-runtime.response-mode-test` (retry/timing) — out of scope.
+TR1–TR12 coverage is strong, sociable, state/output-asserting, no mocks. One
+actionable gap.
+
+### TR13 — the outer delegate step's `:context` handoff propagation is unlocked
+
+`reduce-incidental-complexity.edn`'s `lifecycle-in-worktree` `:delegate` step
+carries a two-element `:context` vector:
+`[{:type :source :from :workflow-original}
+  {:type :source :from {:step "select-and-create" :yield :text}}]`.
+The second source — the `select-and-create` `:yield :text` — is what propagates
+the step-1 structured handoff blob into the delegated wrapper's context, the
+companion to the `:prompt-string` `:input` wiring and part of the verified
+cross-`:delegate` worktree-continuity mechanism (Locked decision 11 / Verified
+Facts). `task-lifecycle-test` precisely locks its workflow's `:context`
+(`"every step carries only :workflow-original context (no prior-step yield)"`),
+but `reduce-incidental-complexity-test` locks only `:type`/`:target`/
+`:prompt-string` of this delegate — its `:context` is asserted nowhere.
+
+A regress dropping the `{:step "select-and-create" :yield :text}` context source
+(keeping `:prompt-string`) would strip the handoff from the delegated run's
+context yet pass every existing test green. This violates `behavior_focused`
+(the context-propagation behaviour is observable and design-significant but
+unasserted) and `meaningful_failures` (the exact continuity-breaking regress
+fails silently). The asymmetry with `task-lifecycle-test`'s explicit `:context`
+lock is the tell.
+
+Minimal fix (mirror `task-lifecycle-test`'s `:context` assertion shape): add a
+`testing` block to `reduce-incidental-complexity-test` locking the
+`lifecycle-in-worktree` delegate's `:context` equals
+`[{:type :source :from :workflow-original}
+  {:type :source :from {:step "select-and-create" :yield :text}}]`, so dropping
+the handoff context source fails green. Test-only, no production/EDN change;
+`workflow_definitions_test.clj` is 787 lines (< 800 `components/` guard) — a
+small added block fits; verify the file stays under 800 after editing.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK.

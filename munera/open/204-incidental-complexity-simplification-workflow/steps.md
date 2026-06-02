@@ -898,3 +898,31 @@ with the commit sha / decision when done.
 - [ ] Split step-1 selection from task-creation into two `:session` steps,
       threading selection output forward (accepting added inter-step data flow).
       Per design "Open questions": keep as one step unless it proves unwieldy.
+
+## Test review follow-ups (review pass 11 — test-shaper)
+
+- [ ] TR13 — `reduce-incidental-complexity-test` does not lock the
+      `lifecycle-in-worktree` `:delegate` step's `:context`. That step carries
+      `[{:type :source :from :workflow-original}
+        {:type :source :from {:step "select-and-create" :yield :text}}]`; the
+      second source propagates the step-1 structured handoff blob into the
+      delegated wrapper's context — the companion to the `:prompt-string`
+      `:input` wiring and part of the verified cross-`:delegate`
+      worktree-continuity mechanism (Locked decision 11 / Verified Facts).
+      `task-lifecycle-test` explicitly locks its `:context`
+      ("every step carries only :workflow-original context (no prior-step
+      yield)"), but the outer-workflow test asserts only `:type`/`:target`/
+      `:prompt-string` of this delegate, leaving its `:context` uncovered. Per
+      test-shaper `behavior_focused` (the context-propagation behaviour is
+      observable and design-significant) + `meaningful_failures` (a regress
+      dropping the `{:step "select-and-create" :yield :text}` context source —
+      stripping the handoff from the delegated run's context — would pass green),
+      this is a coverage gap. Fix: add a `testing` block to
+      `reduce-incidental-complexity-test` asserting the `lifecycle-in-worktree`
+      delegate's `:context` equals
+      `[{:type :source :from :workflow-original}
+        {:type :source :from {:step "select-and-create" :yield :text}}]`,
+      mirroring `task-lifecycle-test`'s `:context` lock. Test-only, no
+      production/EDN change; `workflow_definitions_test.clj` is 787 lines — keep
+      the edit under the 800 `components/` guard. Run focused suite +
+      `clj-kondo`. (See implementation.md pass-11 test-shaper TR13 entry.)
