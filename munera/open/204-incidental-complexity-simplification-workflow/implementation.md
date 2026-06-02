@@ -2596,3 +2596,30 @@ steps.md's review-follow-ups section. Bookkeeping only — the work is done and
 verified; left as a steps.md follow-up below for completeness.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK.
+
+## 2026-06-01 — IR1 (bookkeeping) follow-up executed
+
+Executed the single newly-added unchecked `steps.md` item (IR1) from the
+preceding independent task-implementation-review pass. IR1 is pure bookkeeping:
+the R6 file-length extraction (commit `f9f1c5128`, shared
+`workflow_definitions_test.clj` 800 → 593, sibling
+`task_204_workflow_definitions_test.clj` 277) was recorded only as an
+implementation.md worklog entry, never as an explicit checked `- [x]` step.
+
+Resolution: in steps.md, marked IR1 itself checked and added an explicit checked
+`R6` step under a new "R6 — extract task-204 workflow-definition deftests into a
+sibling ns" sub-heading, recording the extraction, the line counts, the
+`f9f1c5128` commit, and the file-length verification — so the steps checklist
+now reflects the committed work.
+
+Re-verified the committed R6 state (no code/test/EDN change in this pass):
+- `wc -l`: `workflow_definitions_test.clj` 593, `task_204_workflow_definitions_test.clj` 277.
+- `bb commit-check:file-lengths`: exit 0 (both < 800 `components/` guard).
+
+The Contingency item (split step-1 selection from task-creation) predates this
+review pass — it is a non-planned design fallback, never triggered (step-1 is
+not unwieldy), so it was deliberately left unchecked per the "do not execute
+items that predate the preceding review pass" instruction.
+
+Pure steps.md/implementation.md bookkeeping; no code, test, EDN, or doc change.
+PASS_STATUS: REVIEW_COMPLETE.

@@ -1069,7 +1069,7 @@ with the commit sha / decision when done.
 
 ## Implementation review follow-ups (independent pass — task-implementation-review)
 
-- [ ] IR1 (bookkeeping) — The R6 file-length follow-up (extract task-204
+- [x] IR1 (bookkeeping) — The R6 file-length follow-up (extract task-204
       workflow-definition deftests into a sibling ns; committed `f9f1c5128`,
       shared ns 800 → 593) is recorded only as an implementation.md worklog
       entry, not as a checked `- [x]` item in steps.md. Add an explicit checked
@@ -1080,3 +1080,21 @@ with the commit sha / decision when done.
       CLI, wrapper mirrors the loadable `review-implementation-in-worktree.edn`
       precedent, handoff wiring matches `gh-issue-implement.edn`, tests/kondo
       green.
+      RESOLUTION: added the explicit checked steps.md item below recording the
+      committed R6 extraction; re-verified the committed state (shared ns 593
+      lines, sibling ns 277 lines, `bb commit-check:file-lengths` exit 0). No
+      code/test/EDN change — pure steps.md bookkeeping.
+
+### R6 — extract task-204 workflow-definition deftests into a sibling ns
+
+- [x] R6 — Extracted `task-lifecycle-in-worktree-test` and
+      `reduce-incidental-complexity-test` from the shared
+      `workflow_definitions_test.clj` into the dedicated sibling ns
+      `psi.workflow-loader.task-204-workflow-definitions-test`
+      (`components/workflow-loader/test/psi/workflow_loader/task_204_workflow_definitions_test.clj`),
+      following the `incidental_complexity_finder_skill_test.clj` split
+      precedent. Shared ns 800 → 593 lines; sibling ns 277 lines; both < 800
+      `components/` guard. Test-only, no production/EDN change; assertions moved
+      verbatim. Committed `f9f1c5128`
+      (`⚒ test: split task-204 workflow-definition deftests into sibling ns (R6)`).
+      VERIFIED: `bb commit-check:file-lengths` exit 0 (593 + 277 both < 800).
