@@ -137,6 +137,32 @@
 - [ ] Run full agent-session test suite for touched namespaces.
 - [ ] Commit: `⚒ 205: docs + CHANGELOG for deterministic-operation surfaces`.
 
+## Plan/steps-review follow-ups (ψ)
+
+- [ ] Decide where `args` EDN parse/validate runs (psi-tool): in
+  `validate-psi-tool-request` (outer-try → add an `"operation"` arm to
+  `make-psi-tool`'s outer exception `case action` so it renders a structured
+  `:psi-tool/action :operation … :overall-status :error`, not the generic
+  fallback) **or** inside `execute-psi-tool-operation-report` (covered by its
+  own try/catch). Record the choice in plan.md and wire accordingly.
+- [ ] Specify the command text layout for the projected result: define the
+  per-key line format (e.g. one `<key> <value>` line per top-level key), key
+  ordering, and how `:status` renders. Update `dispatch-operation-command` /
+  `format-operations` step + add a test asserting the exact text.
+- [ ] Specify the surface catch predicate: dispatch on `(:type (ex-data e))`
+  for `:missing-deterministic-operation` vs `:malformed-operation-result`,
+  render each distinctly (not a blanket catch), and only those two propagate
+  (runtime swallows other throwables into `:error`). Apply to both psi-tool and
+  command surfaces; test both propagated types.
+- [ ] Decide the tool-schema `:op` enum policy for the `operation` action:
+  either extend `:op` `:enum` with `list`/`invoke`, or follow the existing
+  non-enumerated convention (workflow/scheduler ops are not in the enum).
+  Record the decision in plan.md and apply consistently.
+- [ ] State whether `args` is parsed for `op: "list"`: per decision #12 `args`
+  is ignored for list — skip `args` EDN parse/validate when `op` is `list` so a
+  malformed `args` string does not error a list call. Update the validate/parse
+  step and add a test (`op list` with bad `args` → still lists, not error).
+
 ## Close-out
 
 - [ ] Re-read design acceptance criteria; confirm each is covered by a test.

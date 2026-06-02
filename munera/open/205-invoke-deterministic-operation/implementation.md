@@ -173,3 +173,53 @@ Changes:
   `:status`, `:reason`, and `:message` keys" for `:error`, matching defs.clj.
 
 No code touched (design-only). No blocked steps.
+
+## Plan/steps ambiguity review (ψ)
+
+Reviewed plan.md + steps.md for actionable ambiguities; grounded against
+psi_tool.clj (validate-psi-tool-request, make-psi-tool case/catch, tool schema
+:op enum), psi_tool_workflow.clj (parse-workflow-input-string), commands.clj
+(dispatch*, prefixed-command, exact handlers), registry.clj/core.clj
+(invoke-operation swallows Throwable → only :missing-deterministic-operation
+and :malformed-operation-result propagate). Five actionable ambiguities:
+
+1. **`args` parse location + outer-catch arm.** Steps put a try/catch *inside*
+   `execute-psi-tool-operation-report` and say parse `args` "where consumed",
+   but the *outer* `make-psi-tool` exception handler (psi_tool.clj `case action`
+   ~L766) has no `"operation"` arm → falls to generic `format-psi-tool-error`.
+   Whether `args` EDN parse/validate runs in `validate-psi-tool-request`
+   (outer-try; needs an outer-catch `"operation"` arm) or inside the helper
+   (covered by its try/catch) is undecided. Two materially different wirings;
+   pick one and, if validation-side, add the matching outer-catch arm.
+
+2. **Command text layout of `project-result`.** `project-result` yields a
+   `{k truncated-string}` map; the command step says render it "as `:type
+   :text`" but the actual text layout (one `key value` line per entry? key
+   order? how `:status` shows) is unspecified. AC only says "renders its
+   result." Define the line format (and ordering) so command output is
+   deterministic and testable.
+
+3. **Surface catch predicate for propagated ex-infos.** Runtime
+   `invoke-operation` canonicalizes arbitrary throwables to `:error` results;
+   only `:missing-deterministic-operation` and `:malformed-operation-result`
+   propagate. Steps say "catch :missing-deterministic-operation/malformed" but
+   not whether to dispatch on `(:type (ex-data e))` vs a blanket catch, nor how
+   to render the malformed case distinctly from missing. Specify the catch
+   predicate and the distinct rendering for each propagated type.
+
+4. **Tool schema `:op` enum extension.** Steps add `"operation"` to the
+   `:action` enum but are silent on the `:op` enum, which currently lists only
+   project-repl ops (`status start attach stop eval interrupt`); workflow and
+   scheduler `op` values are *not* enumerated there. Convention is therefore
+   unclear: extend `:op` with `list`/`invoke` or follow the existing
+   non-enumerated pattern. Decide explicitly (the plan's own "schema drift"
+   risk motivates this).
+
+5. **`args` handling when `op: list`.** Decision #12 says `args` is ignored for
+   `list`, but steps place `args` EDN parse/validate in the shared validation
+   path. It is unspecified whether a malformed `args` string is still rejected
+   when `op` is `list` (i.e. is parse skipped for `list`?). As written, a `list`
+   call with bad `args` could error, contradicting "ignored". State whether
+   `args` is parsed at all for `list`.
+
+No code touched (plan/steps-review only).
