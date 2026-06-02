@@ -1845,3 +1845,34 @@ Executed the two pass-1 docs-review follow-ups:
 Verification-only invariant held: only the new task dir + task-local
 `findings.md`/`steps.md`/`implementation.md` touched — zero
 `components/agent-session/src/**` or `doc/scheduler.md` change.
+
+## Docs review — pass 2 (review-task-docs skill, 2026-06-01) — REVIEW_COMPLETE
+
+Independent re-audit of user-facing docs against the verified implementation
+(`README.md`, `doc/scheduler.md`, `CHANGELOG.md`); re-checked the pass-1 doc-gap
+and swept for any missed gap.
+
+Scope reconfirmed: task 201 is verification-only and changed only test files +
+task artifacts — zero `README.md`/`doc/`/`CHANGELOG.md` edits. No behaviour
+added/changed/removed → no CHANGELOG entry required (`user_visible(δ) ≡ ∅`); no
+stale removed-behaviour references; absence of doc edits is correct.
+
+Verified accurate vs runtime/source:
+- `README.md` L118/L123 scheduler refs (`create|list|cancel`, message + session
+  kinds, points at `doc/scheduler.md`) — consistent.
+- `doc/scheduler.md` status model `#{:pending :queued :delivered :cancelled
+  :failed}` and delivery-phase `:create-session`/`:prompt-submit` match
+  `scheduler.clj` `delivery-phases` (`#{:create-session :prompt-submit}`).
+- session-config supported subset, list/cancel (pending+queued cancellable),
+  introspection attrs (`:psi.scheduler/*`), and the `:failed`+created-session-id
+  preservation note all match verified behaviour (findings Failure/Projections).
+
+Pass-1 doc-gap confirmed correctly resolved: the `:at` near-future(<min)/>max
+rejection asymmetry is recorded in `findings.md` as `defect (doc-gap)` with the
+correct source grounding (`resolve-fire-time!` runs `validate-delay-ms!` only
+when resolved delay is strictly positive; near-future test uses 500ms → below
+min), and remediation `202-document-at-bounds-in-scheduler-doc` is raised and
+referenced. No additional doc-gap found; no new actionable issue.
+
+Verification-only invariant held: no `components/agent-session/src/**` or
+`doc/scheduler.md` change in this review.
