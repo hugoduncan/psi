@@ -1039,7 +1039,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Test-shaper follow-ups — pass 12 (test-shaper, 2026-06-01)
 
-- [ ] Standardise the live-test schedule/queue *state reads* on the existing
+- [x] Standardise the live-test schedule/queue *state reads* on the existing
       `ss/get-session-data-in` helper, replacing the repeated raw 6-segment path
       literal `(get-in @(:state* ctx) [:agent-session :sessions session-id :data
       :scheduler :schedules id :status])`. Affected: `scheduler_end_to_end_test`
@@ -1055,3 +1055,18 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       invariant; Slice-10 allowlist). Update `findings.md` only if a covering-test
       citation’s read form changes (no status changes expected). If 201 is treated
       as closed instead, raise as a small standalone test-hygiene task.
+      Done: migrated all 12 raw schedule/queue *state reads* to
+      `(get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules id
+      :status])` / `[:scheduler :queue]` — `scheduler_end_to_end_test` (×5; the
+      ×2 already-helper sites unchanged → ns now single-idiom),
+      `scheduler_context_shutdown_test` (×2), `scheduler_timer_seam_test` (×5).
+      Added the `[psi.session-state.state :as ss]` require to the shutdown +
+      timer-seam ns (e2e already had it). The one remaining `:state* ctx*` site
+      (e2e ~L105) is a `swap!` busy-state *write*, not a schedule/queue read →
+      intentionally untouched (out of scope). `findings.md` unchanged: no
+      covering-test deftest was renamed and no status changed (the step's update
+      condition is not met). Affected ns green (8 tests / 41 assertions); full
+      `bb test` green; clj-kondo 0/0; `bb fmt:check` "All source files formatted
+      correctly". Test-file-only — `git status` shows only the 3 scheduler test
+      files; zero `components/agent-session/src/**` or `doc/scheduler.md`
+      (Slice-10 allowlist held; aggregate assertion count unchanged at 412).

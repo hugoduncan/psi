@@ -1661,3 +1661,28 @@ the mixed file). Not previously flagged (passes 1–11 covered with-redefs stubs
 `:kind` data-shape, fixture consolidation, megatest split, drain-via-real-
 dispatch — not this read-idiom inconsistency). Test-only; respects the
 verification-only invariant (no `src/**` or `doc/scheduler.md` change).
+
+## test-shaper pass 12 — read-idiom standardisation (2026-06-01, done)
+
+Executed the pass-12 follow-up. Migrated all 12 raw 6-segment schedule/queue
+*state reads* `(get-in @(:state* ctx) [:agent-session :sessions sid :data
+:scheduler …])` to the existing helper form `(get-in (ss/get-session-data-in
+ctx sid) [:scheduler …])`:
+
+- `scheduler_end_to_end_test` ×5 (×2 sites already on the helper → ns now
+  single-idiom).
+- `scheduler_context_shutdown_test` ×2 (added `[psi.session-state.state :as ss]`
+  require).
+- `scheduler_timer_seam_test` ×5 (added the `ss` require; the multi-line race
+  reads use `"sch-race"`, the single-line ones `"sch-1"`).
+
+Left untouched: e2e ~L105 `(swap! (:state* ctx*) …)` — a busy-state *write*, not
+a schedule/queue read, so out of this step's "state reads" scope.
+
+`findings.md` unchanged: no covering-test deftest renamed, no status changed →
+the step's "update only if a citation's read form changes" condition not met.
+
+Verification: affected ns green (8 tests / 41 assertions); full `bb test` green;
+clj-kondo 0/0; `bb fmt:check` clean. `git status` = only the 3 scheduler test
+files; zero `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10
+allowlist held; aggregate assertion count unchanged at 412).

@@ -23,8 +23,8 @@
                                                  {:origin :core})
           scheduled-msg    (test-support/scheduled-message-by-id ctx session-id "sch-1")]
       (is (some? scheduled-msg))
-      (is (= :delivered (get-in @(:state* ctx) [:agent-session :sessions session-id :data :scheduler :schedules "sch-1" :status])))
-      (is (= [] (get-in @(:state* ctx) [:agent-session :sessions session-id :data :scheduler :queue])))
+      (is (= :delivered (get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules "sch-1" :status])))
+      (is (= [] (get-in (ss/get-session-data-in ctx session-id) [:scheduler :queue])))
       (is (= :idle (ss/sc-phase-in ctx session-id))))))
 
 ;; --- 201 verification: message-kind live round trip via the timer seam ---
@@ -52,20 +52,18 @@
                              :fire-at (.plusMillis now 5000)}
                             {:origin :core})
       (testing "before the timer fires, schedule is pending and nothing delivered"
-        (is (= :pending (get-in @(:state* ctx*)
-                                [:agent-session :sessions session-id
-                                 :data :scheduler :schedules "sch-msg" :status])))
+        (is (= :pending (get-in (ss/get-session-data-in ctx* session-id)
+                                [:scheduler :schedules "sch-msg" :status])))
         (is (some? @callback*) "timer callback captured via the seam"))
       ;; fire the timer by invoking the captured callback (no Thread/sleep)
       ((:f @callback*))
       (let [scheduled-msg (test-support/scheduled-message-by-id ctx* session-id "sch-msg")]
         (is (some? scheduled-msg)
             "scheduled user message delivered into origin session")
-        (is (= :delivered (get-in @(:state* ctx*)
-                                  [:agent-session :sessions session-id
-                                   :data :scheduler :schedules "sch-msg" :status])))
-        (is (= [] (get-in @(:state* ctx*)
-                          [:agent-session :sessions session-id :data :scheduler :queue])))))))
+        (is (= :delivered (get-in (ss/get-session-data-in ctx* session-id)
+                                  [:scheduler :schedules "sch-msg" :status])))
+        (is (= [] (get-in (ss/get-session-data-in ctx* session-id)
+                          [:scheduler :queue])))))))
 
 ;; --- 201 verification: session-kind live round trip via the timer seam ---
 ;; session-kind always delivers (origin idle state irrelevant): the captured
