@@ -2286,3 +2286,49 @@ pass-4/5 precedent). clj-kondo 0/0; `bb fmt:check` "All source files formatted
 correctly"; full `bb test` green. Test/task-doc files only — zero
 `components/agent-session/src/**` or `doc/scheduler.md` (verification-only
 invariant; Slice-10 allowlist held).
+
+## Test-shaper review pass-18 (test-shaper, 2026-06-01)
+
+Reviewed the converged 201 scheduler verification suite with the test-shaper
+lens (clarity ∧ signal ∧ robustness). The suite is high quality after 17 passes;
+one genuine, grounded signal remains.
+
+**Finding — dead `(or (:return result) result)` / `(:return result result)`
+hedge on dispatch return assertions.** Five sites in `scheduler_dispatch_test`
+(L33, L49, L79, L98, L99) and two in `scheduler_lifecycle_test` (L129, L138)
+assert against the dispatch return value via `(:return result)` with a fallback
+to bare `result`. Grounded in source: `state_kernel/dispatch.clj` already
+unwraps the handler's pure `:return` into the interceptor `:result` (L272
+`(assoc :result (:return pure-result))`) and `dispatch!` returns `(:result
+result-ictx)` directly (L442). `agent-session/core.clj/dispatch-in!` is a
+straight pass-through. So `result` at the test site is already the handler's
+returned map (e.g. `{:schedule-id "sch-1"}` / `{:drained? true …}`) and has no
+`:return` key — `(:return result)` is always `nil`, so the `or` always falls
+through to `result`. The hedge is dead code.
+
+Why this is a test-shaper signal (not cosmetic):
+- meaningful_failures: the fallback masks the contract. A regression where
+  dispatch returned a `:return`-wrapped map (the wrong shape) would *pass* the
+  `or` branch instead of failing — the test no longer pins the real return
+  contract.
+- behavior_focused ∧ locally_comprehensible: the reader cannot tell which shape
+  is expected; the assertion implies two possible shapes when only one is real.
+- consistent(assertion_style): `scheduler_dispatch_test` L33 uses the
+  keyword-default spelling `(:return result result)` while L49/79/98/99 use
+  `(or (:return result) result)` — two idioms for the same dead hedge in one
+  file.
+
+Fix is test-only (within the Slice-10 verification-only allowlist; touches no
+`components/agent-session/src/**` or `doc/scheduler.md`), assertion-tightening
+and behaviour-preserving (deftest names unchanged → findings citations stable):
+replace each `(or (:return result) result)` / `(:return result result)` with the
+bare `result` (or `drain-1`/`drain-2`) the contract actually returns, asserting
+directly on the returned map's keys. Lint + `bb fmt:check` + scheduler `bb test`
+subset green after.
+
+Non-duplicate check: no existing follow-up step or finding targets the dispatch
+return-shape hedge (the two `grep "hedge"` hits in steps/impl concern unrelated
+ns-require hedges). Recorded as a follow-up step.
+
+Verification-only invariant intact: this review reads only; the follow-up is
+test-only.

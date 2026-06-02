@@ -1489,3 +1489,30 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       `bb fmt:check` "All source files formatted correctly"; full `bb test`
       green. Test/task-doc files only — zero `components/agent-session/src/**`
       or `doc/scheduler.md` (Slice-10 allowlist held).
+
+## Test-shaper follow-ups — pass 18 (test-shaper, 2026-06-01)
+
+- [ ] Remove the dead `(or (:return result) result)` / `(:return result result)`
+      dispatch-return hedge and assert on the bare returned map. `dispatch-in!`
+      → `dispatch!` returns `(:result result-ictx)` where the kernel already
+      unwraps the handler's pure `:return` (`state_kernel/dispatch.clj:272`
+      `(assoc :result (:return pure-result))`, returned at `:442`); so the test
+      `result` is already the handler's map and `(:return result)` is always
+      `nil`. The hedge is dead and masks the contract (meaningful_failures —
+      a `:return`-wrapped wrong shape would pass; consistent(assertion_style) —
+      L33 uses the keyword-default spelling, others use `(or …)`). Sites:
+      - `scheduler_dispatch_test.clj`: L33 `(:schedule-id (:return result result))`,
+        L49 `(:status (or (:return result) result))`,
+        L79 `(:schedule-id (or (:return result) result))`,
+        L98 `(:drained? (or (:return result) result))`,
+        L99 `(:schedule-id (or (:return result) result))` → assert on bare
+        `result` (e.g. `(:schedule-id result)`, `(:status result)`,
+        `(:drained? result)`).
+      - `scheduler_lifecycle_test.clj`: L129 `(:schedule-id (or (:return drain-1) drain-1))`,
+        L138 `(:schedule-id (or (:return drain-2) drain-2))` → assert on bare
+        `drain-1` / `drain-2`.
+      Keep deftest names unchanged (findings citations stable). Verify: test-only
+      edit (Slice-10 allowlist; no `components/agent-session/src/**` or
+      `doc/scheduler.md`); clj-kondo 0/0; `bb fmt:check` clean; scheduler
+      `bb test` subset green (assertions count unchanged — same number of
+      `is` forms, just tightened targets).
