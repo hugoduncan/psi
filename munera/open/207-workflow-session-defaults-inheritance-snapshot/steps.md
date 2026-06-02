@@ -584,3 +584,23 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       is a deliberate distractor on the consumption path, not the capture path).
       Test-only strengthening (no behaviour/code/doc change). inheritance-snapshot
       suite green (10 tests, 53 assertions); lint clean.
+
+## Test-review pass 7 follow-ups (review 2026-06-02)
+
+- [ ] T7: Add a direct nested-path isolation test for AC4's
+      "not-the-since-mutated-invoking-session" half. The two existing AC4 tests
+      (`nested-delegation-effective-snapshot-propagates-overridden-model-test`,
+      `delegate-step-runtime-result-persists-child-inherited-defaults-test`,
+      `inheritance_snapshot_test.clj`) only cover override PROPAGATION; neither
+      mutates the LIVE parent session AFTER invoke before delegating, so the
+      nested child snapshot's isolation from a since-mutated invoking session is
+      proven only transitively (via the AC1/AC2/AC3 resolver isolation tests +
+      the snapshot-gated R1 read). A future change reintroducing a live read on
+      the nested derivation path would pass every current test. Add a test that:
+      creates a delegating run with a parent-run snapshot, MUTATES the live
+      parent session's model/speed-mode/effort-override AFTER invoke, drives the
+      delegation (the real injected `resolve-inherited-defaults-fn` closure /
+      `delegate-step-runtime-result`), and asserts the CHILD run's persisted
+      `:inherited-defaults` reflects the parent-run snapshot (effective config),
+      NOT the mutated live parent — mirroring the direct top-level isolation
+      coverage T2 added for tools/skills.
