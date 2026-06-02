@@ -17,4 +17,4 @@
                                                  {:origin :core})
           result           (session/cancel-job-in! ctx session-id "sch-1" :user)]
       (is (= :cancelled (:status result)))
-      (is (= :cancelled (get-in @(:state* ctx) [:agent-session :sessions session-id :data :scheduler :schedules "sch-1" :status]))))))
+      (is (= :cancelled (test-support/schedule-status ctx session-id "sch-1"))))))

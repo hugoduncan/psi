@@ -2842,3 +2842,35 @@ abstraction:
 Follow-up filed below. No scheduler-source/doc/behaviour concern; verification-only
 invariant intact (this review touched no `components/agent-session/src/**` or
 `doc/scheduler.md`). **ACTIONABLE_FEEDBACK.**
+
+## Test-shaper follow-up — pass 22 executed (2026-06-01)
+
+Executed the single newly-added pass-22 follow-up: standardised the residual raw
+6-segment internal-state-path idiom in the two Projections-area covering tests
+onto the established `test-support`/`ss` helpers (read/write analogue of passes
+12/13, which scoped these two files out).
+
+- `scheduler_background_jobs_test.clj`: the two queued-state *writes* →
+  `(swap! (:state* ctx) (ss/session-update session-id (fn [sd] (assoc-in sd
+  [:scheduler …] …))))` (`:schedules "sch-2" :status` :queued + `:queue`
+  ["sch-2"]); added `[psi.session-state.state :as ss]` require; the cancel-route
+  *read* → `(test-support/schedule-status ctx session-id "sch-1")`.
+- `scheduler_cancel_job_test.clj`: the *read* →
+  `(test-support/schedule-status ctx session-id "sch-1")` (no require change;
+  no write → no `ss` needed).
+
+Both files now hold zero `[:agent-session :sessions … :data :scheduler …]` raw
+path literals — the read/write standardisation is complete across the full 201
+set. Behaviour-/assertion-preserving (no deftest renamed → `findings.md`
+citations unchanged; aggregate count unchanged).
+
+Verification: `--focus scheduler-background-jobs-test --focus
+scheduler-cancel-job-test` = 2 tests / 6 assertions / 0 failures; full `bb test`
+scheduler green (kaocha exit 0). The only 2 full-suite failures
+(`execute-prepared-request-retry-exhaustion-…`,
+`…-streaming-error-event-provider-headers-drive-retry`) are the documented
+pre-existing non-deterministic `turn-runtime` retry/streaming test-ordering
+flakes — they touch no edited file and clear on re-run (same flakes recorded in
+passes 16/20). clj-kondo 0/0; `bb fmt:check` clean. Test-file only — zero
+`components/agent-session/src/**` or `doc/scheduler.md` (verification-only
+invariant; Slice-10 allowlist held).

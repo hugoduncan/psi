@@ -3,7 +3,8 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.background-job-runtime :as bg-rt]
    [psi.agent-session.core :as session]
-   [psi.agent-session.test-support :as test-support]))
+   [psi.agent-session.test-support :as test-support]
+   [psi.session-state.state :as ss]))
 
 (deftest scheduler-background-job-projection-test
   (testing "pending and queued schedules project into background jobs"
@@ -27,8 +28,8 @@
                                                   :created-at (test-support/instant "2099-04-21T18:59:00Z")
                                                   :fire-at (test-support/instant "2099-04-21T19:00:00Z")}
                                                  {:origin :core})
-          _                (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data :scheduler :schedules "sch-2" :status] :queued)
-          _                (swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data :scheduler :queue] ["sch-2"])
+          _                (swap! (:state* ctx) (ss/session-update session-id (fn [sd] (assoc-in sd [:scheduler :schedules "sch-2" :status] :queued))))
+          _                (swap! (:state* ctx) (ss/session-update session-id (fn [sd] (assoc-in sd [:scheduler :queue] ["sch-2"]))))
           jobs             (bg-rt/list-background-jobs-in! ctx session-id [:pending :queued])]
       (is (= 2 (count jobs)))
       (is (= #{{:job-id "schedule/sch-1" :status :running :job-kind :scheduled-prompt :tool-name "check-build"}
@@ -48,4 +49,4 @@
                                                  {:origin :core})
           cancelled        (bg-rt/cancel-background-job-in! ctx session-id "schedule/sch-1" :user)]
       (is (= :cancelled (:status cancelled)))
-      (is (= :cancelled (get-in @(:state* ctx) [:agent-session :sessions session-id :data :scheduler :schedules "sch-1" :status]))))))
+      (is (= :cancelled (test-support/schedule-status ctx session-id "sch-1"))))))

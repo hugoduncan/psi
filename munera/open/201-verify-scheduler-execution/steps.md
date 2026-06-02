@@ -1800,7 +1800,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Test-shaper follow-ups — pass 22 (test-shaper, 2026-06-01)
 
-- [ ] Standardise the residual raw 6-segment internal-state-path idiom in the
+- [x] Standardise the residual raw 6-segment internal-state-path idiom in the
       two Projections-area covering tests onto the established helpers — the
       read/write analogue passes 12 and 13 removed from every *other* 201 file
       but explicitly scoped out of these two. Sites:
@@ -1830,3 +1830,31 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       `components/agent-session/src/**` or `doc/scheduler.md`); keep `bb test`
       green + clj-kondo/cljfmt clean. If 201 is treated as closed instead, raise
       as a small standalone test-hygiene task.
+      Done: converted the residual raw 6-segment internal-state-path idioms in
+      the two Projections-area covering tests onto the established helpers.
+      `scheduler_background_jobs_test`: the two queued-state *writes* (L30-31)
+      now use `(ss/session-update session-id (fn [sd] (assoc-in sd [:scheduler
+      …] …)))` (pass-13 write idiom — `:schedules "sch-2" :status` :queued and
+      `:queue` ["sch-2"]); added the `[psi.session-state.state :as ss]` require
+      (the writes use `ss/session-update`); the cancel-route *read* (L51) →
+      `(test-support/schedule-status ctx session-id "sch-1")`.
+      `scheduler_cancel_job_test`: the *read* (L20) →
+      `(test-support/schedule-status ctx session-id "sch-1")` (no require change
+      — `test-support` already required, no write so no `ss` needed). Both files
+      now hold zero `[:agent-session :sessions … :data :scheduler …]` raw path
+      literals — the read/write standardisation passes 12/13 applied to every
+      other 201 file is complete across the full set. Behaviour- and
+      assertion-preserving: no deftest renamed → `findings.md` citations
+      unchanged; aggregate count unchanged. Verified:
+      `--focus scheduler-background-jobs-test --focus scheduler-cancel-job-test`
+      = 2 tests / 6 assertions / 0 failures; full `bb test` green for scheduler
+      (kaocha exit 0; the only 2 full-suite failures are the documented
+      pre-existing non-deterministic `turn-runtime` retry/streaming
+      test-ordering flakes — `execute-prepared-request-retry-exhaustion-…` /
+      `…-streaming-error-event-provider-headers-drive-retry` — which touch no
+      file edited here and pass on re-run; same flakes recorded in passes
+      16/20). clj-kondo 0/0; `bb fmt:check` "All source files formatted
+      correctly". Test-file only — `git diff --name-only` =
+      `scheduler_background_jobs_test.clj` + `scheduler_cancel_job_test.clj`;
+      zero `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10
+      allowlist held).
