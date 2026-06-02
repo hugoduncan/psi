@@ -766,3 +766,59 @@ Non-actionable observation (correctly scoped out, recorded for visibility):
   wrappers to `.edn`. Out of scope for 204 — not added as a step.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK.
+
+## 2026-06-01 — Implementation review (pass 1) follow-up executed (F1)
+
+Executed the single newly-added unchecked `steps.md` item (F1) from the pass-1
+implementation review. The "Contingency" item predates this pass (a non-planned
+design-stated fallback, not a review follow-up) and was left untouched.
+
+**Constraint re-confirmed before fixing.** The workflow grammar has no
+conditional/skip step execution (compiler only requires each step carry
+`:type`), so outer step-2's `:delegate` runs unconditionally; and a `:delegate`
+step has no free prompt to branch on — only its `:prompt-string` wiring. The
+only available mechanism is therefore prompt-level handling **inside the
+wrapper's `:session` steps** (`resolve-worktree`, `summary`), which is exactly
+where F1 directed the fix.
+
+**Fix (prompt-level no-target short-circuit), in
+`.psi/workflows/task-lifecycle-in-worktree.edn`:**
+
+- `resolve-worktree` prompt: added a no-target branch. If the handoff lacks BOTH
+  `worktree_path:` and `munera_task_path:`, it does NOT call `work-on` and yields
+  ONLY the sentinel `NO_TARGET`. Otherwise (both present) it behaves as before
+  (call `work-on`, yield the bare task path). This stops the empty-input
+  `work-on` call the reviewer flagged.
+- `summary` prompt: now also sources `resolve-worktree`'s `:yield :text` (added a
+  `{:type :source :from {:step "resolve-worktree" :yield :text}}` contribution).
+  If that yield is exactly `NO_TARGET`, the summary ignores the `lifecycle` step
+  output entirely and reports a clean "no target qualified this run; nothing was
+  done" result — no worktree/task/lifecycle — without inspecting nonexistent
+  task artifacts. Otherwise it produces the normal lifecycle summary.
+
+Residual (engine-bounded, documented): the `lifecycle` `:delegate` itself still
+fires on `NO_TARGET` input because the grammar cannot skip it; its `task-lifecycle`
+sub-delegates would read the literal `NO_TARGET` task path and find nothing. The
+**user-facing** result is nonetheless correct because the wrapper's terminal
+`summary` step is authoritative and overrides that on the `NO_TARGET` signal. A
+true skip would require an engine-level conditional (out of scope; no grammar
+extension for this task). This is the robust, `one_way`-consistent fix given the
+available mechanism, matching F1's prescribed remedy.
+
+**Tests (Slice-4 ns extended, no new ns / no production code):**
+`task-lifecycle-in-worktree-test` gained F1 lock assertions — `resolve-worktree`
+emits `NO_TARGET` + does not call `work-on` on a no-target handoff; `summary`
+detects `NO_TARGET` and sources `resolve-worktree`'s `:yield :text`.
+
+**Docs:** `doc/workflows.md` incidental-complexity section gained a paragraph
+explaining the no-conditional-grammar / prompt-level `NO_TARGET` short-circuit,
+for coherence with the workflow.
+
+**Verification:**
+- `clj-paren-repair .psi/workflows/task-lifecycle-in-worktree.edn`: Success(1)/Failed(0).
+- `clojure -M:test --focus psi.workflow-loader.workflow-definitions-test`:
+  **14 tests, 196 assertions, 0 failures** (both workflows still load).
+- `clj-kondo` + `cljfmt check` on the changed test file: 0 errors, 0 warnings,
+  formatted correctly.
+
+F1 checked in steps.md. PASS_STATUS: REVIEW_COMPLETE.

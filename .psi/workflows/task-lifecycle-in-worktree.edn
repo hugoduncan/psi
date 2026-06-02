@@ -6,7 +6,7 @@
    [{:type :source, :from :workflow-original}
     {:type :template,
      :text
-     "Extract the worktree path and Munera task path from the following handoff data. Call `work-on` with the extracted worktree path to set the session worktree. Then respond with ONLY the Munera task path (e.g. `munera/open/003-foo`) on a single line — nothing else.\n\nHandoff data:\n{{input}}",
+     "Extract the worktree path and Munera task path from the following handoff data.\n\nFirst, check for a no-target handoff. If the handoff data does NOT contain BOTH a `worktree_path:` line AND a `munera_task_path:` line (for example, an upstream selection step found no qualifying unit and produced no worktree or task), then there is nothing to do this run. In that case do NOT call `work-on`, and respond with ONLY this exact single line:\n\nNO_TARGET\n\nOtherwise (both fields present): call `work-on` with the extracted worktree path to set the session worktree, then respond with ONLY the Munera task path (e.g. `munera/open/003-foo`) on a single line — nothing else.\n\nHandoff data:\n{{input}}",
      :vars {"input" {:from :workflow-input, :path [:input]}}}]}
   {:name "lifecycle",
    :type :delegate,
@@ -20,10 +20,11 @@
    :tools ["read" "bash"],
    :contributions
    [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "resolve-worktree", :yield :text}}
     {:type :source, :from {:step "lifecycle", :yield :text}}
     {:type :template,
      :text
-     "Produce the user-facing final result for the Munera task lifecycle run. Independently inspect that specific task's artifacts, especially design.md, plan.md, steps.md, and implementation.md, and use the prior step outputs as supporting context.\n\nRespond with a concise summary for the user. Include:\n- whether the task-lifecycle run completed cleanly (design → plan → implement → review)\n- the main work completed in this run\n- the task artifact files updated\n- whether the task was closed (moved to munera/closed/) or remains open, with the reason recorded in the task artifacts\n- any remaining notes or risks explicitly recorded in the task artifacts\n- any commit ids created during the run that are evident from the provided step outputs",
+     "Produce the user-facing final result for this run.\n\nFirst, check for the no-target case. If the `resolve-worktree` step output was exactly `NO_TARGET` (no worktree path and no Munera task path were available — an upstream selection step found no qualifying unit and produced no worktree or task), then there is no task to inspect. In that case, ignore the `lifecycle` step output entirely and respond with ONLY a short, clean report stating that no target qualified this run and that nothing was done — no worktree was created, no task was created, and no lifecycle ran. Do not inspect or invent task artifacts.\n\nOtherwise (the `resolve-worktree` step yielded a real `munera/...` task path): produce the user-facing final result for the Munera task lifecycle run. Independently inspect that specific task's artifacts, especially design.md, plan.md, steps.md, and implementation.md, and use the prior step outputs as supporting context.\n\nRespond with a concise summary for the user. Include:\n- whether the task-lifecycle run completed cleanly (design → plan → implement → review)\n- the main work completed in this run\n- the task artifact files updated\n- whether the task was closed (moved to munera/closed/) or remains open, with the reason recorded in the task artifacts\n- any remaining notes or risks explicitly recorded in the task artifacts\n- any commit ids created during the run that are evident from the provided step outputs",
      :vars {}}]}],
  :name "task-lifecycle-in-worktree",
  :description

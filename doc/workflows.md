@@ -663,6 +663,14 @@ The workflow has two steps:
    drives the generated task through the full design → plan → implement → review
    lifecycle.
 
+Because the workflow grammar has no conditional/skip step, the `:delegate`
+always runs even on an early-stop (no-target) handoff. The wrapper handles this
+at the prompt level: when the handoff carries no `worktree_path:` /
+`munera_task_path:`, `resolve-worktree` emits a `NO_TARGET` sentinel (without
+calling `work-on`) and the `summary` step detects it and reports a clean
+"no target this run; nothing done" result instead of inspecting a nonexistent
+task.
+
 Each generated task is a behaviour-preserving refactor: **Phase 0** establishes
 a green characterization-test safety net (gating all refactoring), and
 **Phase 1** decomplects the target under objective acceptance — the target's

@@ -236,18 +236,18 @@ with the commit sha / decision when done.
 
 ## Implementation review follow-ups (review pass 1)
 
-- [ ] F1 — Early-stop is prompt-only; step-2 runs unconditionally on a
-      no-target handoff. The workflow grammar has no conditional/skip step
-      execution, so when step-1 early-stops (no qualifying unit → no worktree,
-      no task, a handoff lacking `worktree_path:`/`munera_task_path:`), step-2's
-      `:delegate` to `task-lifecycle-in-worktree` still runs and would call
-      `work-on`/delegate on empty input. Fix at the prompt level (the only
-      available mechanism): make step-2's prompt and/or the wrapper's
-      `resolve-worktree` (and `summary`) prompts explicitly detect the absence of
-      the handoff fields and short-circuit to a clean "no target this run;
-      nothing to do" report instead of calling `work-on` / delegating into
-      `task-lifecycle` on empty input. Re-verify the two affected workflows still
-      load and the definition tests stay green after the prompt edit.
+- [x] F1 — Early-stop is prompt-only; step-2 runs unconditionally on a
+      no-target handoff. RESOLVED at the prompt level (the only available
+      mechanism; grammar has no conditional/skip). The wrapper's
+      `resolve-worktree` prompt now detects the absence of
+      `worktree_path:`/`munera_task_path:` in the handoff, emits a `NO_TARGET`
+      sentinel **without** calling `work-on`, and the `summary` step (now also
+      sourcing `resolve-worktree`'s `:yield :text`) detects `NO_TARGET` and
+      reports a clean "no target this run; nothing done" result instead of
+      inspecting a nonexistent task. Definition tests extended to lock both
+      short-circuits; both workflows still load (14 tests, 196 assertions, 0
+      failures); `clj-kondo`/`cljfmt` clean; `doc/workflows.md` updated for
+      coherence. (See implementation.md F1 entry.)
 
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 

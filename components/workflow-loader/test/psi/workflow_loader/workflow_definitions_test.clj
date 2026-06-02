@@ -625,7 +625,24 @@
        (testing "trailing summary :session step is present (terminal user-facing summary)"
          (is (some? summary-step))
          (is (= :session (:type summary-step)))
-         (is (seq (:contributions summary-step))))))))
+         (is (seq (:contributions summary-step))))
+       ;; F1 (implementation review): early-stop is prompt-only and the grammar
+       ;; has no conditional/skip step, so a no-target handoff must be detected
+       ;; and short-circuited at the prompt level in both session steps.
+       (testing "resolve-worktree prompt short-circuits a no-target handoff without calling work-on"
+         (let [resolve-text (step-template-text resolve-step)]
+           (is (.contains resolve-text "NO_TARGET")
+               "resolve-worktree emits the NO_TARGET sentinel on a no-target handoff")
+           (is (re-find #"(?i)do not call `?work-on" resolve-text)
+               "resolve-worktree does not call work-on when no handoff fields are present")))
+       (testing "summary prompt detects NO_TARGET and reports a clean nothing-to-do result"
+         (let [summary-text (step-template-text summary-step)]
+           (is (.contains summary-text "NO_TARGET")
+               "summary detects the NO_TARGET sentinel from resolve-worktree")
+           (is (some? (some #(= {:step "resolve-worktree" :yield :text}
+                                (:from %))
+                            (:contributions summary-step)))
+               "summary sources the resolve-worktree :yield :text so it can detect NO_TARGET")))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; reduce-incidental-complexity (Slice 3 of task 204)
