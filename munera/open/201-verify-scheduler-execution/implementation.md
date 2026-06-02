@@ -949,3 +949,41 @@ no-`with-redefs` `cancel-pending-and-queued-schedules-test` deftest (the redef
 sites are only in the two *deliver* deftests above it), so that citation is
 clean. `scheduler_effects_test`'s `with-redefs` of `dispatch/dispatch!` is
 neither modified nor cited by 201 — out of scope.
+
+## Test review follow-ups — pass 8 execution (2026-06-01)
+
+Resolved the pass-8 item via **option (a)**: migrated
+`scheduler_lifecycle_test/busy-session-fire-queues-then-idle-drains-fifo-test`
+off the `with-redefs [psi.turn-runtime.core/execute-prepared-request! …]` stub
+onto the injectable `:execute-prepared-request-fn` ctx seam, exactly mirroring
+the pass-6 e2e session-kind migration. The same shaped execution-result stub is
+now bound to a local fn and threaded onto the ctx with
+`(assoc ctx :execute-prepared-request-fn …)`; the `:runtime/prompt-execute-and-record`
+effect reads the seam from ctx (`dispatch_effects.clj:154`), so the busy-fire →
+queued → idle → drain-FIFO-oldest-by-fire-at round trip and the
+scheduler-time-source timestamp assertions are unchanged.
+
+Decision rationale (a over b): option (a) preserves the live busy-drain round
+trip *as a stub-free covering test* and keeps the existing `findings.md`
+Live-execution-path busy-drain citation valid, rather than thinning the cited
+authority down to the dispatch-test deftests alone. The migration is
+injection-over-redef (`infra_deps → injectable ∧ ¬stub`) using a seam that
+`make-session-ctx` already wires.
+
+Scope held: the file's first deftest
+(`scheduled-deliver-runs-canonical-prompt-lifecycle-test`) retains its own
+`with-redefs` and is **out of scope** for pass 8 (named target is only the
+busy-drain test), so the `[psi.turn-runtime.core]` require stays in the ns form.
+
+Mechanical note: removing the stub collapsed the redundant `(do …)` body
+wrapper; `clj-paren-repair` mis-nested the body into the leading `swap!` on the
+first pass, so the de-`do` re-indent was finished by hand and re-verified
+(cljfmt "All source files formatted correctly", clj-kondo 0/0).
+
+Verification: `scheduler-lifecycle-test` green (3 tests / 26 assertions);
+related `scheduler-dispatch-test` + `scheduler-end-to-end-test` +
+`scheduler-handlers-test` green (17 tests / 91 assertions). Assertion count for
+the migrated test is unchanged, so the aggregate deliverable stays
+**45 tests / 412 assertions**. Test file only — zero
+`components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist
+held).

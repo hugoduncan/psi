@@ -572,7 +572,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Test review follow-ups — pass 8 (task-test-review, 2026-06-01)
 
-- [ ] Resolve the infra-boundary `with-redefs` stub in the **cited** busy-drain
+- [x] Resolve the infra-boundary `with-redefs` stub in the **cited** busy-drain
       covering test
       `scheduler_lifecycle_test/busy-session-fire-queues-then-idle-drains-fifo-test`
       (L51 & L101: `(with-redefs [psi.turn-runtime.core/execute-prepared-request! …])`).
@@ -591,3 +591,24 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       finding and rest the area on the co-cited stub-free `scheduler_dispatch_test`
       deftests. Keep the suite green + clj-kondo/cljfmt clean. (If the task is
       treated as closed, raise it as a small standalone test-hygiene task instead.)
+      Done: chose **option (a)** — migrated
+      `busy-session-fire-queues-then-idle-drains-fifo-test` off the
+      `with-redefs [psi.turn-runtime.core/execute-prepared-request! …]` stub onto
+      the injectable `:execute-prepared-request-fn` ctx seam (mirroring pass-6's
+      e2e session-kind migration): bind the same shaped execution-result stub to
+      a local fn and thread it onto the ctx via
+      `(assoc ctx :execute-prepared-request-fn …)`. The effect reads this seam
+      from ctx (`dispatch_effects.clj:154`), so the busy-fire-queues →
+      idle-drain-FIFO round trip is unchanged (both `:scheduler/fired` dispatches
+      queue, drain delivers oldest-by-fire-at, scheduled-message timestamp from
+      the runtime scheduler time source). The `findings.md` Live-execution-path
+      busy-drain citation is **kept** (still an authoritative covering test, now
+      stub-free). The first test in the file
+      (`scheduled-deliver-runs-canonical-prompt-lifecycle-test`) still uses its
+      own `with-redefs` and is **out of scope** for pass 8 (which names only the
+      busy-drain test), so the `[psi.turn-runtime.core]` require stays.
+      `scheduler-lifecycle-test` green (3 tests / 26 assertions); related
+      dispatch/e2e/handlers suites green (17 tests / 91 assertions). clj-kondo
+      0/0, cljfmt clean. Test file only — zero
+      `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist
+      held; assertion count unchanged, aggregate stays 45 tests / 412 assertions).
