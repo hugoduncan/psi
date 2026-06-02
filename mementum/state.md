@@ -2,6 +2,8 @@
 
 Bootstrapped on 2026-04-02.
 
+- 2026-06-02: Task 207 test-review-pass-6 follow-up (T6) executed/committed `f338e5f4b`. T6 was the only newly-added review item; its value-level capture-path tools/skills assertions existed only in the working tree (HEAD shipped the shape-only `vector?`/`sequential?` check while steps.md already marked T6 `[x] DONE` + implementation.md documented it — the recurring R5/T3 dirty-tree/incoherent-HEAD failure mode). Verified focused suite (10 tests, 53 assertions) + clj-kondo (0/0) green, committed the working-tree fix, tree now clean and HEAD self-consistent. No other unchecked steps; no source/doc/changelog delta. Task remains open pending closure.
+
 ## Current orientation
 - Project: psi
 - Runtime: JVM Clojure
