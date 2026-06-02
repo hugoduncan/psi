@@ -1893,3 +1893,16 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       `scheduler_cancel_job_test.clj` + task-dir docs; zero
       `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist
       held).
+
+## Test-shaper review — pass 24 (test-shaper, 2026-06-01)
+
+Full-suite test-shaper re-read of all 12 scheduler test files
+(`clarity ∧ signal ∧ robustness ∧ economical`). **No new actionable shaping —
+no follow-up items added.** Suite is single-concern, AAA-explicit, consistently
+helper-driven, seam-deterministic, state-based + behaviour-focused (no mocks).
+The lone residual `with-redefs`/wall-clock site
+(`scheduler-effects-test/scheduler-start-and-cancel-timer-effects-test`) is a
+pre-existing non-cited default-daemon boundary test already scoped out by passes
+7/9/11 (`real_integration_at_boundaries`); not re-filed (no-duplicate). Review
+chain converged → REVIEW_COMPLETE. (Full `bb test` green; clj-kondo 0/0; no
+source/doc touched — verification-only invariant + Slice-10 allowlist held.)

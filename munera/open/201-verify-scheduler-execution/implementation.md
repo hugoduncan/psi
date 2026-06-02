@@ -2929,3 +2929,43 @@ rather than depending on the dispatch handler's `(or kind :message)` default
   `scheduler_cancel_job_test.clj` + task-dir docs; zero
   `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist
   held; verification-only invariant intact).
+
+## Test-shaper review — pass 24 (test-shaper, 2026-06-01)
+
+Full re-read of all 12 scheduler test files against the test-shaper skill
+(`clarity ∧ signal ∧ robustness ∧ economical`). **No new actionable shaping
+found — review chain converged.**
+
+Assessment per skill axes:
+- **simple/single-concern**: every deftest exercises one behaviour/guard/
+  invariant with explicit arrange-act-assert; intent-revealing `…-test` names
+  throughout (62 deftests). ✅
+- **consistent**: uniform helper vocabulary (`test-support/schedule-status`,
+  `schedule-queue`, `schedule-by-id`, `capturing-delay-fn`,
+  `fixed-scheduler-time-source`); consistent dispatch/data shapes; explicit
+  `:kind :message` now local in every live create (pass-23 closed the last
+  omission). ✅
+- **robust/deterministic**: live-path tests cross the timer boundary via the
+  captured-callback seam (no wall-clock); pure-model tests need no seam;
+  state-based + behaviour-focused assertions (no mocks, no interaction-asserts
+  in the 201-added/cited covering tests). ✅
+- **economical**: representative cases over case-explosion; the dedicated
+  `drain-one-orders-by-fire-at-not-queue-insertion-order-test` isolates the sort
+  invariant from the busy-drain live test; no redundant coverage detected. ✅
+
+**Lone residual candidate re-evaluated (no-duplicate):** the only surviving
+`with-redefs [dispatch/dispatch!]` + wall-clock-poll site is
+`scheduler-effects-test/scheduler-start-and-cancel-timer-effects-test`
+(`(deref fired 1000 ::timeout)`, `Thread/sleep 10/30`). This is a **pre-existing
+baseline, non-cited boundary test of the real default daemon effect path**
+(`:scheduler/start-timer`'s production `Thread/sleep` daemon + default
+`dispatch!`), distinct from the seam path the verification tests assert. Passes
+7/9/11 already evaluated this exact site and scoped it out as deliberate
+`real_integration_at_boundaries` coverage where the interaction-stub + wall-clock
+firing are intrinsic to verifying the production timer hop — converting it to the
+seam would only duplicate `scheduler_timer_seam_test`'s coverage and drop the
+default-path verification. Not re-filed (already-converged, justified analysis).
+
+Runtime-verified: full `bb test` ✅ green; clj-kondo 0/0 on touched test files.
+No source/doc touched (verification-only invariant + Slice-10 allowlist held).
+**PASS_STATUS: REVIEW_COMPLETE.**
