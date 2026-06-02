@@ -226,3 +226,13 @@ Done (2026-06-01, this pass):
       The absence assertion can no longer pass vacuously: a wrong rebind key or
       inert effect path now fails the positive-control `is`. Focused ns green
       (8 tests / 35 assertions, +1); `clj-kondo` 0/0.
+
+## Docs-review follow-ups (2026-06-01)
+
+- [x] Ran review-task-docs independently over `README.md` / `doc/` /
+      `CHANGELOG.md`. CHANGELOG `[Unreleased]` entry, `doc/tui.md` command
+      list + Prompt templates subsection, and `/help` text are accurate,
+      complete, and consistent with the implementation (worktree+count output,
+      discovery paths, mutation op-name). No stale references; no removed
+      behaviour. No new actionable docs findings (see implementation.md
+      "Docs review"). Review complete.

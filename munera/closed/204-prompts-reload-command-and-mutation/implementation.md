@@ -804,3 +804,38 @@ Result: no new actionable findings. The three prior passes (redundancy,
 white-box reach, ceremony helpers, positive control) leave the suite simple,
 consistent, behavior-focused, deterministic, and economical. Test-shaper
 arc complete.
+
+## Docs review (2026-06-01)
+
+Applied review-task-docs (accuracy ∧ completeness ∧ consistency) to all
+user-facing docs for the implemented task. Scope: `README.md`, `doc/`,
+`CHANGELOG.md`. Cross-checked every doc claim against the live
+implementation (`commands.clj` `format-prompts-reload`, `/help` text,
+`mutations/prompts.clj`).
+
+Verified (no actionable finding):
+- ✅ CHANGELOG `[Unreleased] → Added`: command + `psi.extension/reload-prompts`
+  mutation, psi-tool-visible, discovery paths (`~/.psi/agent/prompts` +
+  `<worktree>/.psi/prompts`), replace semantics, no-restart — all accurate and
+  user-visible (AC9). Entry precedes the work commits.
+- ✅ `doc/tui.md`: `/prompts-reload` added to in-session command list (L57) +
+  "Prompt templates" subsection (L85-93) documenting `/prompts`,
+  `/prompts-reload` (worktree + count report, no-restart), and the mutation.
+  Matches `format-prompts-reload`'s actual `worktree`/`count`-only output.
+- ✅ `/help` text (`commands.clj:139`) lists `/prompts-reload` with accurate
+  discovery-path description, consistent with `doc/tui.md`.
+- ✅ Consistency: command name, mutation op-name (`psi.extension/reload-prompts`),
+  discovery paths, and worktree+count output identical across help/tui.md/code.
+- ✅ No stale references; no removed behaviour to clean up. `/reload-models`
+  docs (`doc/custom-providers.md`) untouched and correctly unrelated.
+- ✅ README: documents `psi-tool` mutate capability generally without
+  enumerating individual mutations — no per-mutation update needed.
+
+Considered, NOT actionable:
+- `doc/psi-project-config.md` documents `action: "mutate"` with one example
+  (`psi.extension/close-session`); it is illustrative, not an exhaustive
+  mutation catalog, so the new mutation need not be added there. The mutation
+  is already documented in `doc/tui.md`.
+
+Result: **no new actionable docs feedback.** User docs are accurate, complete,
+and consistent with the implementation. Docs review complete.
