@@ -548,7 +548,7 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
 
 ## Test-review pass 6 follow-ups (review 2026-06-02)
 
-- [ ] T6: Strengthen `resolve-inherited-defaults-snapshot-test`
+- [x] T6: Strengthen `resolve-inherited-defaults-snapshot-test`
       (`inheritance_snapshot_test.clj`) to assert the CAPTURED tools/skills by
       VALUE, not just shape. The test sets model/prompt-mode/thinking/speed/
       effort on the fixture parent and asserts each exactly, but for the two
@@ -566,3 +566,21 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       known skill, and assert the snapshot's `:tool-defs`/`:skills` contain the
       resolved def(s) for those names (matching the value-level rigor the other
       five captured fields already have in the same test).
+      DONE: extended the first `testing` block of
+      `resolve-inherited-defaults-snapshot-test`. It now seeds the fixture
+      parent's REAL capture inputs — sets the agent tool-source via
+      `agent-core/set-tools-in! (ss/agent-ctx-in …)` to a `known-tool`, selects
+      it with `:tool-ids ["known-tool"]`, and registers a `known-skill` through
+      the canonical `:session/register-skill` dispatch (stores the def in
+      root-state + tracks `:skill-ids`). It then asserts the captured snapshot's
+      `:tool-defs`/`:skills` CONTAIN the named def AND carry its value
+      (`:description "a known tool"` / `"a known skill"`), replacing the
+      shape-only `vector?`/`sequential?` checks. A regression dropping
+      `:tool-ids`, reading the wrong session, or returning an empty pool now
+      fails. NOTE: the capture path resolves `:tool-defs` from
+      `agent-tool-source-in` (the agent data-atom `:tools`), NOT session-data
+      `:tool-source`; the test seeds the data-atom accordingly (the
+      hand-built-snapshot isolation test's session-data `:tool-source` mutation
+      is a deliberate distractor on the consumption path, not the capture path).
+      Test-only strengthening (no behaviour/code/doc change). inheritance-snapshot
+      suite green (10 tests, 53 assertions); lint clean.

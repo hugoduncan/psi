@@ -1575,3 +1575,30 @@ pointer wrong) and the dual-shape `(or (get-in config [:model :id]) (:model
 config))` override read are defensive, not signal-eroding.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## T6 follow-up executed (test-review pass 6)
+
+The concurrent uncommitted T6 working-tree change noted in the reconciliation
+above was NOT present at this session's start (tree was clean, HEAD
+`850698f5e`), so T6's capture-path value assertions did not exist in HEAD. ψ
+authored the T6 fix fresh in this pass.
+
+Implemented in `resolve-inherited-defaults-snapshot-test`'s first `testing`
+block (`inheritance_snapshot_test.clj`): seed the fixture parent's REAL capture
+inputs — agent tool-source via `agent-core/set-tools-in! (ss/agent-ctx-in …)`
+(`known-tool`) selected by `:tool-ids`, and a `known-skill` registered through
+the canonical `:session/register-skill` dispatch (root-state def + `:skill-ids`
+tracking). Then assert the captured snapshot's `:tool-defs`/`:skills` CONTAIN
+the named def AND carry its value (`:description`), replacing the shape-only
+`vector?`/`sequential?` checks. The capture half of AC3's tools/skills invariant
+is now value-asserted with the same rigor as the other five captured fields.
+
+Key subtlety: the capture path resolves `:tool-defs` from
+`ss/agent-tool-source-in` (the agent data-atom `:tools`), NOT session-data
+`:tool-source` — so the data-atom must be seeded, not session-data
+`:tool-source`. (The isolation test's session-data `:tool-source` mutation
+targets the consumption path with a hand-built snapshot, a deliberate distractor
+that does not exercise capture.) New requires: `psi.agent-core.core`,
+`psi.agent-session.core`, `psi.session-state.state` — all on the main base test
+classpath. Test-only change (no behaviour/code/doc/changelog delta).
+inheritance-snapshot suite green (10 tests, 53 assertions); lint clean.

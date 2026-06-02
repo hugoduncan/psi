@@ -9,7 +9,10 @@
   (:require
    [clojure.set :as set]
    [clojure.test :refer [deftest is testing]]
+   [psi.agent-core.core :as agent-core]
+   [psi.agent-session.core :as session]
    [psi.session-state.init :as session-init]
+   [psi.session-state.state :as ss]
    [psi.workflow-runtime.core :as workflow-runtime]
    [psi.workflow-runtime.execution-adapter]
    [psi.workflow-runtime.statechart-runtime.delegate :as delegate]
@@ -23,14 +26,37 @@
 
 (deftest resolve-inherited-defaults-snapshot-test
   (testing "captures the resolved inherited defaults from the live parent session,
-            including :speed-mode and :effort-override"
-    (let [[ctx session-id] (support/create-session-context {:persist? false})]
+            including :speed-mode and :effort-override, and the tools/skills
+            POOLS by value (not just shape — T6: the capture path reads
+            :tool-defs from the agent tool-source + :tool-ids and :skills from
+            the registered skill definitions, so a regression dropping :tool-ids,
+            reading the wrong session, or returning an empty pool must fail here)"
+    (let [[ctx session-id] (support/create-session-context {:persist? false})
+          known-tool {:name "known-tool"
+                      :description "a known tool"
+                      :parameters {:type "object"}}
+          known-skill {:name "known-skill"
+                       :description "a known skill"
+                       :file-path "/tmp/known/SKILL.md"
+                       :base-dir "/tmp/known"
+                       :source :project
+                       :disable-model-invocation false}]
+      ;; Seed the agent tool-source (data-atom :tools) and select it via
+      ;; :tool-ids — the resolver resolves :tool-defs from this pool.
+      (agent-core/set-tools-in! (ss/agent-ctx-in ctx session-id) [known-tool])
+      ;; Register the skill through the canonical dispatch so the definition is
+      ;; stored in root-state and :skill-ids tracks it — the resolver reads
+      ;; :skills via skill-storage/all-skills.
+      (session/dispatch-in! ctx :session/register-skill
+                            {:session-id session-id :skill known-skill}
+                            {:origin :core})
       (assoc-session-data! ctx session-id
                            {:model {:provider "anthropic" :id "claude-test"}
                             :prompt-mode :concise
                             :thinking-level :high
                             :speed-mode :fast
-                            :effort-override :xhigh})
+                            :effort-override :xhigh
+                            :tool-ids ["known-tool"]})
       (let [snapshot (workflow-step-session-config/resolve-inherited-defaults-snapshot ctx session-id)]
         (is (= workflow-step-session-config/inherited-defaults-snapshot-keys
                (set (keys snapshot)))
@@ -40,8 +66,18 @@
         (is (= :high (:thinking-level snapshot)))
         (is (= :fast (:speed-mode snapshot)))
         (is (= :xhigh (:effort-override snapshot)))
-        (is (vector? (:tool-defs snapshot)))
-        (is (sequential? (:skills snapshot))))))
+        (let [captured-tool (some #(when (= "known-tool" (:name %)) %)
+                                  (:tool-defs snapshot))]
+          (is (some? captured-tool)
+              "the parent's selected tool is captured in the snapshot pool")
+          (is (= "a known tool" (:description captured-tool))
+              "captured tool def carries the parent tool-source value"))
+        (let [captured-skill (some #(when (= "known-skill" (:name %)) %)
+                                   (:skills snapshot))]
+          (is (some? captured-skill)
+              "the parent's registered skill is captured in the snapshot pool")
+          (is (= "a known skill" (:description captured-skill))
+              "captured skill carries the registered definition value")))))
 
   (testing "thinking-level defaults to :off when the parent has none"
     (let [[ctx session-id] (support/create-session-context {:persist? false})]
