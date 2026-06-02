@@ -171,3 +171,35 @@ is the derived `concat`.
 
 No blocking reasons; B1–B5 fully addressed at design level (projections/`:kinds`
 machinery and help/resolver derivation land in plan/code stages).
+
+### 2026-06-01 — Inconsistency review (review-task-design inconsistency pass), pass 1
+
+Scope: inconsistencies only (¬architecture, ¬correctness, ¬ambiguity). Read
+design.md + design-steps.md (A1, B1–B5 all resolved) and grounded against real
+code: `commands.clj` `exact-command-handlers` (664; includes alias keys `"/?"`→
+`:help` and `"/exit"`→`:quit`), `prefixed-command-prefixes` (682), `format-help`
+(111; current help text **omits** `/?` and `/exit` lines), `prefixed-command`
+(matcher requires `= prefix` or `starts-with (str prefix " ")` — `/jobs`/`/job`
+do **not** collide, so prefixed-vector order is not load-bearing → deriving it in
+help order is safe, no inconsistency), plus TUI `shared.clj/builtin-slash-commands`
+and Emacs `psi-completion.el/psi-emacs-slash-command-specs` (drift claims in the
+"Why" table verified accurate, incl. Emacs listing `/?` and `/exit`).
+
+One new actionable inconsistency:
+
+- C1 — **Aliases-in-table contradicts unchanged-help-output.** The "`/?` and
+  aliases" decision puts `/?` and `/exit` in the spec table "with descriptions so
+  they autocomplete." But "format-help derivation" + AC3 state that *all* routed
+  built-in lines derive from `(seq spec-table)` in table order, with the explicit
+  claim "the help listing is unchanged in order." Since aliases are routed
+  entries they must be table keys (Option B: names exist only as table keys), so
+  help-derives-from-whole-table would now emit `/?` and `/exit` lines — yet the
+  current `format-help` deliberately omits both. The data model gained `:kinds`
+  and `:usage` fields but no help-suppression mechanism, so an aliased routed
+  entry cannot be both in the table (for autocomplete) and absent from help. The
+  three decisions ("`/?` and aliases", "format-help derivation", AC3) are
+  mutually inconsistent as written; design must reconcile (e.g. a `:hide-in-help?`
+  / help-only-filter flag, or explicitly accept that help now lists aliases and
+  drop the "unchanged listing" claim).
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

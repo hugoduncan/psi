@@ -44,3 +44,19 @@ Resolve in design.md before plan stage.
       `:usage` field and whether the resolver exposes it, so AC1's
       `{:name :description}` resolver-output shape and the Option B example spec
       (which shows `:usage`) agree.
+
+## Inconsistency follow-up (2026-06-01)
+
+Resolve in design.md before plan stage.
+
+- [ ] C1 — Reconcile the "`/?` and aliases" decision (aliases `/?`/`/exit` go in
+      the spec table so they autocomplete) with "format-help derivation" + AC3
+      (all routed built-in lines derive from the whole spec table in table order,
+      "listing unchanged"). Current `format-help` omits `/?` and `/exit`; since
+      Option B requires routed names to be table keys, whole-table help
+      derivation would newly emit alias lines, contradicting the unchanged-help
+      claim. The data model has no help-suppression field (`:kinds`/`:usage` only).
+      Decide: add a per-entry help-suppression flag (e.g. `:hide-in-help?`) so
+      aliases autocomplete but stay out of help, or accept aliases now appear in
+      help and drop the "listing unchanged" claim. State it so format-help
+      derivation, the aliases decision, and AC3 agree.
