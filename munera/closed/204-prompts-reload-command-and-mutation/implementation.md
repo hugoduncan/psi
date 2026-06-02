@@ -604,3 +604,59 @@ Considered, NOT actionable (consistent with prior pass):
 Result: **no new actionable test-level feedback.** Tests are well-formed,
 cover every code-testable design AC, and use real infrastructure without
 mocks/stubs. Test review complete.
+
+## Test-shaper review (2026-06-01)
+
+Applied test-shaper (clarity ∧ signal ∧ robustness ∧ economical) to
+`reload_prompts_test.clj` (8 deftests) + `commands_test.clj`
+`prompts-reload-command-test`. Prior passes covered well-formedness, AC
+coverage, ¬mock. This pass targets *shape*: redundancy, white-box coupling,
+ceremony. Distinct from the prior task-test-review findings (T1 closed; cwd-
+divergence + resolver-read already dismissed).
+
+Actionable (shape):
+
+- ❌ TS1 (economical — redundant return-shape assertions). The
+  `{:reloaded? true :count 2 :worktree wt}` triple + `#{"foo" "bar"}` replace
+  is asserted in **three** tests: `…handler-replaces-templates-test`,
+  `…in-core-fn-surfaces-return-test`, and `…end-to-end-edit-add-delete-test`'s
+  initial reload. The three entry points (raw dispatch, core fn, command path)
+  warrant *one* return-shape assertion each, but the full discover→replace
+  proof is re-run redundantly. The end-to-end test's *initial* reload duplicates
+  the handler-replace test; only its edit/add/delete delta (AC1–AC3) is unique.
+  Trim the initial-reload assertions in the e2e test to the minimum needed to
+  establish the pre-edit baseline.
+
+- ❌ TS2 (behavior-focused — white-box handler reach). `…emits-no-effects-test`
+  pulls the raw handler fn via `(kernel/handler-entry :session/reload-prompts)`
+  → `(:fn …)` and asserts on the handler's pure-result map shape
+  (`:effects`/`:root-state-update`/`:return`). This couples the test to the
+  kernel handler-registry internals rather than the dispatch surface every
+  other test uses. The *decision under guard* (no system-prompt refresh) is
+  real and worth a test, but assert it at the observable boundary — e.g.
+  dispatch through `session/dispatch-in!` and assert no system-prompt rebuild
+  observable side effect — or, if the pure-result must be inspected, document
+  why the white-box reach is the only surface that exposes "emitted effects".
+  As written, a refactor of the handler-result key names breaks the test
+  without a behavior change (meaningful-failures violation).
+
+- ❌ TS3 (simple/consistent — duplicated ceremony, no compressing helpers).
+  Three patterns are copy-pasted verbatim across tests with no helper:
+  (a) stale-seed `(ss/update-state-value-in! ctx (ss/session-data-path sid)
+  assoc :prompt-templates [{:name "stale" :content "old"}])` (×3);
+  (b) the null query-fn `(fn [_q] {})` + `make-psi-tool` + `(:execute tool)`
+  `action "mutate"` invocation + `read-string` parse (×2, verbatim);
+  (c) `(set (map :name (:prompt-templates (ss/get-session-data-in …))))` (×3).
+  Add `seed-stale!`, `invoke-reload-mutation` (returns parsed result), and a
+  `template-names` helper (alongside the existing `template-by-name`). These
+  compress ceremony without hiding intent and make the arrange/act/assert
+  structure explicit per the simple(tests) lens.
+
+Considered, NOT actionable:
+- `prompts-reload-command-test` cwd=worktree (no divergence exercise) — already
+  raised and dismissed by the prior pass (handler/e2e cover AC6). No new step.
+- `(fn [_q] {})` null query-fn — a real null dependency, not a mock; correct
+  per ¬mock. The TS3 helper only de-duplicates it, doesn't change its nature.
+
+Result: three shape-level follow-ups (TS1 redundancy, TS2 white-box reach,
+TS3 ceremony helpers). None block correctness; all improve change-confidence.

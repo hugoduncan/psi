@@ -161,3 +161,26 @@ Vertical slices from plan.md. Tick each item with its sha / decision note.
       command + help tests 2/31 green. Well-formed, full code-testable AC
       coverage, ¬mock ¬stub. No new actionable findings (see implementation.md
       "Test review — second pass"). Review complete.
+
+## Test-shaper follow-ups (2026-06-01)
+
+- [ ] TS1: Trim redundant return-shape proofs. The
+      `{:reloaded? true :count 2 :worktree wt}` + `#{"foo" "bar"}` replace is
+      asserted in three tests (`…handler-replaces-templates-test`,
+      `…in-core-fn-surfaces-return-test`, `…end-to-end…` initial reload). Keep
+      one return-shape assertion per entry point (dispatch / core fn / command),
+      and reduce the e2e test's initial-reload assertions to the minimum
+      pre-edit baseline (its unique value is the AC1–AC3 edit/add/delete delta).
+- [ ] TS2: Assert "no system-prompt refresh" at the observable boundary instead
+      of via `(kernel/handler-entry :session/reload-prompts)` → `(:fn …)` raw-
+      handler reach. Either dispatch through `session/dispatch-in!` and assert
+      the absence of the refresh side effect observably, or document why the
+      pure-result white-box inspection is the only surface that exposes emitted
+      effects (meaningful-failures: a handler-result key rename must not break a
+      test with no behavior change).
+- [ ] TS3: Extract compressing helpers for duplicated ceremony:
+      `seed-stale!` (the `ss/update-state-value-in! … assoc :prompt-templates
+      [{:name "stale" …}]` block, ×3), `invoke-reload-mutation` (null query-fn +
+      `make-psi-tool` + `action "mutate"` + `read-string`, ×2 verbatim), and a
+      `template-names` helper (×3). Helpers must compress ceremony without
+      hiding intent (arrange/act/assert stays explicit).
