@@ -720,3 +720,40 @@ assertion count across the deliverable.
   the canonical full `bb test` run (each ns is green standalone). Pre-existing
   cross-namespace test-isolation artifact; not introduced by this step and not
   in scope for a doc-accuracy correction.
+
+## Implementation review — pass 5 (2026-06-01)
+
+Independent verification of the completed deliverable against runtime truth and
+the design/plan acceptance criteria. No new actionable issues found.
+
+- **Tests genuinely green (`runtime ≡ truth`).** Focused kaocha run of all 13
+  scheduler namespaces together (default no-randomize) = **45 tests / 412
+  assertions / 0 failures**; full `--focus unit` kaocha run exits 0 (kaocha
+  returns non-zero on any failure/error) → `bb test` acceptance criterion holds.
+- **clj-kondo clean** (0/0) on all 7 touched test files + `test_support.clj`.
+- **Verification-only scope held.** Changeset = test files under
+  `components/agent-session/test/**` + task dir only; **zero**
+  `components/agent-session/src/**` / `doc/scheduler.md` — invariant gate passes.
+- **Test quality confirmed.** New live-path tests
+  (`scheduler_end_to_end_test`, `scheduler_timer_seam_test`,
+  `scheduler_context_shutdown_test`) drive the real dispatch+effect round trip,
+  cross the time/timer boundary only via the seams, and assert state/outputs
+  (delivered prompt provenance, `:created-session-id`/`:delivery-phase`, handle
+  count, queue) — never handler interactions. The session-kind `with-redefs` is
+  on the turn-runtime boundary (`execute-prepared-request!`), not the scheduler
+  delivery path — consistent with the design's runtime-owned-deliver frontier.
+- **Deliverable counts coherent.** `findings.md` Outcome reads 412; residual
+  `410` strings live only in preserved pass-1 historical notes (carrying
+  forward-pointers to 412) and the pass-4 follow-up's own description — not in
+  the structured deliverable.
+- **Pass-4 cross-ns isolation flag re-assessed and confirmed out of scope.** The
+  canonical runner (kaocha, no randomize) is green for all 13 scheduler ns run
+  together; the "4 ordering-dependent failures in isolation together" is a
+  non-kaocha-runner / cross-ns test-isolation artifact, pre-existing, and the
+  acceptance criterion (`bb test` green) is satisfied. No remediation owed by
+  this verification-only task; if pursued, it belongs in a separate
+  test-isolation task, not 201.
+
+Conclusion: implementation, tests, findings.md, and the structured deliverable
+are accurate, coherent, and green against current behaviour. No follow-up steps
+added (no new actionable issues; prior passes' items all resolved).
