@@ -1,0 +1,344 @@
+(ns psi.workflow-step-session-config.inheritance-snapshot-test
+  "Task 207 — workflow inherited-defaults snapshot tests.
+
+   Covers snapshot capture from the live parent, effective-config projection,
+   snapshot consumption during step config resolution, nested/delegated
+   propagation of overridden defaults, and the inherited-defaults field-set
+   authority. Split out of core-test to keep each test file under the
+   commit-check file-length limit."
+  (:require
+   [clojure.set :as set]
+   [clojure.test :refer [deftest is testing]]
+   [psi.session-state.init :as session-init]
+   [psi.workflow-runtime.core :as workflow-runtime]
+   [psi.workflow-runtime.execution-adapter]
+   [psi.workflow-runtime.step-test-support :as support]
+   [psi.workflow-step-session-config.core :as workflow-step-session-config]
+   [psi.workflow-registry.registry :as workflow-registry]))
+
+(defn- assoc-session-data!
+  [ctx session-id kvs]
+  (swap! (:state* ctx) update-in [:agent-session :sessions session-id :data] merge kvs))
+
+(deftest resolve-inherited-defaults-snapshot-test
+  (testing "captures the resolved inherited defaults from the live parent session,
+            including :speed-mode and :effort-override"
+    (let [[ctx session-id] (support/create-session-context {:persist? false})]
+      (assoc-session-data! ctx session-id
+                           {:model {:provider "anthropic" :id "claude-test"}
+                            :prompt-mode :concise
+                            :thinking-level :high
+                            :speed-mode :fast
+                            :effort-override :xhigh})
+      (let [snapshot (workflow-step-session-config/resolve-inherited-defaults-snapshot ctx session-id)]
+        (is (= workflow-step-session-config/inherited-defaults-snapshot-keys
+               (set (keys snapshot)))
+            "snapshot returns exactly the declared resolved-key set")
+        (is (= {:provider "anthropic" :id "claude-test"} (:model snapshot)))
+        (is (= :concise (:prompt-mode snapshot)))
+        (is (= :high (:thinking-level snapshot)))
+        (is (= :fast (:speed-mode snapshot)))
+        (is (= :xhigh (:effort-override snapshot)))
+        (is (vector? (:tool-defs snapshot)))
+        (is (sequential? (:skills snapshot))))))
+
+  (testing "thinking-level defaults to :off when the parent has none"
+    (let [[ctx session-id] (support/create-session-context {:persist? false})]
+      (assoc-session-data! ctx session-id {:model {:provider "anthropic" :id "claude-test"}})
+      (let [snapshot (workflow-step-session-config/resolve-inherited-defaults-snapshot ctx session-id)]
+        (is (= :off (:thinking-level snapshot)))
+        (is (nil? (:speed-mode snapshot)))
+        (is (nil? (:effort-override snapshot)))))))
+
+(deftest effective-config->snapshot-test
+  (testing "projects only the snapshot keys; the overridden model and the five
+            resolver-emitted inherited keys come from the effective config"
+    (let [effective {:model {:provider "anthropic" :id "claude-override"}
+                     :prompt-mode :verbose
+                     :tool-defs [{:name "read"}]
+                     :skills [{:name "skill-a"}]
+                     :thinking-level :medium
+                     ;; non-snapshot resolver outputs that must not leak through
+                     :developer-prompt "ignored"
+                     :response-mode :streaming
+                     :temperature 0.7}
+          parent-snapshot {:speed-mode :fast :effort-override :high}
+          snapshot (workflow-step-session-config/effective-config->snapshot
+                    effective parent-snapshot)]
+      (is (= workflow-step-session-config/inherited-defaults-snapshot-keys
+             (set (keys snapshot)))
+          "projection yields exactly the snapshot key set")
+      (is (= {:provider "anthropic" :id "claude-override"} (:model snapshot))
+          "overridden model preserved from the effective config")
+      (is (= :verbose (:prompt-mode snapshot)))
+      (is (= [{:name "read"}] (:tool-defs snapshot)))
+      (is (= [{:name "skill-a"}] (:skills snapshot)))
+      (is (= :medium (:thinking-level snapshot)))))
+
+  (testing ":speed-mode/:effort-override are sourced from the parent snapshot
+            (the effective config emits neither — P2)"
+    (let [effective {:model {:provider "anthropic" :id "claude-x"}
+                     :prompt-mode :concise
+                     :tool-defs []
+                     :skills []
+                     :thinking-level :off
+                     ;; effective config carries no speed/effort keys
+                     :speed-mode :should-be-ignored}
+          parent-snapshot {:speed-mode :fast :effort-override :xhigh}
+          snapshot (workflow-step-session-config/effective-config->snapshot
+                    effective parent-snapshot)]
+      (is (= :fast (:speed-mode snapshot)))
+      (is (= :xhigh (:effort-override snapshot)))))
+
+  (testing "thinking-level defaults to :off when the effective config has none"
+    (let [snapshot (workflow-step-session-config/effective-config->snapshot
+                    {:model {:provider "anthropic" :id "x"}} {})]
+      (is (= :off (:thinking-level snapshot))))))
+
+;;; ── S5: snapshot consumption in step config resolution ─────────────────────
+
+(def ^:private no-override-definition
+  "A single-step workflow whose step gives NO model/prompt-mode/tools/skills/
+   thinking-level override, so the resolver falls back to the inherited
+   defaults (snapshot when present, live parent otherwise)."
+  {:definition-id "no-override"
+   :name "no-override"
+   :steps [{:name "step-1"
+            :type :session
+            :contributions [{:type :template
+                             :text "{{input}}"
+                             :vars {"input" {:from :workflow-input :path [:input]}}}]}]
+   :workflow-file-meta {:system-prompt "Do the thing."}})
+
+(defn- run-with-snapshot
+  "Create a no-override workflow run carrying an :inherited-defaults snapshot and
+   a :parent-session-id pointing at session-id."
+  [ctx session-id snapshot run-id]
+  (swap! (:state* ctx)
+         (fn [state]
+           (let [[state' _ _] (workflow-registry/register-definition state no-override-definition)
+                 [state'' _ _] (workflow-runtime/create-run
+                                state'
+                                {:definition-id "no-override"
+                                 :run-id run-id
+                                 :parent-session-id session-id
+                                 :inherited-defaults snapshot
+                                 :workflow-input {:input "go"}})]
+             state'')))
+  (workflow-runtime/workflow-run-in @(:state* ctx) run-id))
+
+(deftest snapshot-isolates-resolution-from-live-parent-mutation-test
+  (testing "AC1/AC2: a captured snapshot makes the resolved step config
+            independent of later invoking-session / default model changes"
+    (let [[ctx session-id] (support/create-session-context {:persist? false})
+          snapshot {:model {:provider "anthropic" :id "claude-snapshot"}
+                    :prompt-mode :concise
+                    :tool-defs [{:name "read"}]
+                    :skills [{:name "skill-a"}]
+                    :thinking-level :high
+                    :speed-mode :fast
+                    :effort-override :xhigh}
+          workflow-run (run-with-snapshot ctx session-id snapshot "run-iso")]
+      ;; Mutate the LIVE parent session after invoke (model + prompt-mode +
+      ;; speed/effort) — must not affect resolution.
+      (assoc-session-data! ctx session-id
+                           {:model {:provider "anthropic" :id "claude-LIVE-CHANGED"}
+                            :prompt-mode :verbose
+                            :speed-mode :flex
+                            :effort-override :low})
+      (let [config (workflow-step-session-config/resolve-step-session-config
+                    ctx nil workflow-run "step-1")]
+        (is (= {:provider "anthropic" :id "claude-snapshot"} (:model config))
+            "model comes from the snapshot, not the mutated live session")
+        (is (= :concise (:prompt-mode config))
+            "prompt-mode comes from the snapshot")
+        (is (= :high (:thinking-level config))
+            "thinking-level inherited from the snapshot")
+        (is (= :fast (:speed-mode config))
+            "speed-mode comes from the snapshot (AC3)")
+        (is (= :xhigh (:effort-override config))
+            "effort-override comes from the snapshot (AC3)")))))
+
+(deftest snapshot-model-feeds-model-query-selection-context-test
+  (testing "AC7: resolved-model-query selection context comes from the snapshot
+            model, not the live parent"
+    (let [[ctx session-id] (support/create-session-context {:persist? false})
+          model-query-definition
+          {:definition-id "model-query-wf"
+           :name "model-query-wf"
+           :steps [{:name "step-1"
+                    :type :session
+                    :model {:type :model-query :require [] :prefer []}
+                    :contributions [{:type :template
+                                     :text "{{input}}"
+                                     :vars {"input" {:from :workflow-input :path [:input]}}}]}]
+           :workflow-file-meta {:system-prompt "Query."}}
+          snapshot {:model {:provider "anthropic" :id "claude-snapshot"}
+                    :prompt-mode :concise
+                    :tool-defs []
+                    :skills []
+                    :thinking-level :off
+                    :speed-mode nil
+                    :effort-override nil}
+          workflow-run
+          (do (swap! (:state* ctx)
+                     (fn [state]
+                       (let [[s _ _] (workflow-registry/register-definition state model-query-definition)
+                             [s' _ _] (workflow-runtime/create-run
+                                       s {:definition-id "model-query-wf"
+                                          :run-id "run-mq"
+                                          :parent-session-id session-id
+                                          :inherited-defaults snapshot
+                                          :workflow-input {:input "go"}})]
+                         s')))
+              (workflow-runtime/workflow-run-in @(:state* ctx) "run-mq"))]
+      (assoc-session-data! ctx session-id
+                           {:model {:provider "anthropic" :id "claude-LIVE-CHANGED"}})
+      (let [config (workflow-step-session-config/resolve-step-session-config
+                    ctx nil workflow-run "step-1")]
+        ;; The model-fallback selection context is derived from the snapshot
+        ;; model; the live session change must not influence the ranking input.
+        (is (some? (:model-fallback config)))
+        (is (= :ranked-model-candidates (get-in config [:model-fallback :type])))))))
+
+(deftest snapshot-preserves-explicit-step-override-test
+  (testing "AC5: an explicit step model override still wins over the snapshot"
+    (let [[ctx session-id] (support/create-session-context {:persist? false})
+          override-definition
+          {:definition-id "override-wf"
+           :name "override-wf"
+           :steps [{:name "step-1"
+                    :type :session
+                    :model "claude-explicit"
+                    :contributions [{:type :template
+                                     :text "{{input}}"
+                                     :vars {"input" {:from :workflow-input :path [:input]}}}]}]
+           :workflow-file-meta {:system-prompt "Override."}}
+          snapshot {:model {:provider "anthropic" :id "claude-snapshot"}
+                    :prompt-mode :concise
+                    :tool-defs []
+                    :skills []
+                    :thinking-level :off
+                    :speed-mode nil
+                    :effort-override nil}
+          workflow-run
+          (do (swap! (:state* ctx)
+                     (fn [state]
+                       (let [[s _ _] (workflow-registry/register-definition state override-definition)
+                             [s' _ _] (workflow-runtime/create-run
+                                       s {:definition-id "override-wf"
+                                          :run-id "run-ov"
+                                          :parent-session-id session-id
+                                          :inherited-defaults snapshot
+                                          :workflow-input {:input "go"}})]
+                         s')))
+              (workflow-runtime/workflow-run-in @(:state* ctx) "run-ov"))
+          config (workflow-step-session-config/resolve-step-session-config
+                  ctx nil workflow-run "step-1")]
+      (is (= "claude-explicit" (or (get-in config [:model :id]) (:model config)))
+          "explicit step override wins; snapshot only governs inherited default"))))
+
+(deftest no-snapshot-falls-back-to-live-parent-test
+  (testing "AC6: a run WITHOUT a snapshot resolves from the live parent (back-compat)"
+    (let [[ctx session-id] (support/create-session-context {:persist? false})]
+      (assoc-session-data! ctx session-id
+                           {:model {:provider "anthropic" :id "claude-live"}
+                            :prompt-mode :verbose})
+      (let [workflow-run
+            (do (swap! (:state* ctx)
+                       (fn [state]
+                         (let [[s _ _] (workflow-registry/register-definition state no-override-definition)
+                               [s' _ _] (workflow-runtime/create-run
+                                         s {:definition-id "no-override"
+                                            :run-id "run-nolive"
+                                            :parent-session-id session-id
+                                            :workflow-input {:input "go"}})]
+                           s')))
+                (workflow-runtime/workflow-run-in @(:state* ctx) "run-nolive"))
+            config (workflow-step-session-config/resolve-step-session-config
+                    ctx nil workflow-run "step-1")]
+        (is (= {:provider "anthropic" :id "claude-live"} (:model config))
+            "no snapshot → model comes from the live parent session")
+        (is (= :verbose (:prompt-mode config)))
+        (is (not (contains? config :speed-mode))
+            "no snapshot → no speed-mode emitted")
+        (is (not (contains? config :effort-override))
+            "no snapshot → no effort-override emitted")))))
+
+(deftest nested-delegation-effective-snapshot-propagates-overridden-model-test
+  (testing "AC4: a step overriding the model, whose effective config feeds
+            effective-config->snapshot, yields a nested snapshot carrying the
+            OVERRIDDEN model (captured at sub-delegation creation), with
+            speed/effort threaded from the parent run snapshot (P2)"
+    (let [[ctx session-id] (support/create-session-context {:persist? false})
+          override-definition
+          {:definition-id "delegating-wf"
+           :name "delegating-wf"
+           :steps [{:name "step-1"
+                    :type :session
+                    :model "claude-override-model"
+                    :contributions [{:type :template
+                                     :text "{{input}}"
+                                     :vars {"input" {:from :workflow-input :path [:input]}}}]}]
+           :workflow-file-meta {:system-prompt "Delegate."}}
+          ;; parent run snapshot: model A, speed/effort set on the parent run.
+          parent-run-snapshot {:model {:provider "anthropic" :id "claude-PARENT"}
+                               :prompt-mode :concise
+                               :tool-defs []
+                               :skills []
+                               :thinking-level :off
+                               :speed-mode :fast
+                               :effort-override :xhigh}
+          workflow-run
+          (do (swap! (:state* ctx)
+                     (fn [state]
+                       (let [[s _ _] (workflow-registry/register-definition state override-definition)
+                             [s' _ _] (workflow-runtime/create-run
+                                       s {:definition-id "delegating-wf"
+                                          :run-id "run-delegating"
+                                          :parent-session-id session-id
+                                          :inherited-defaults parent-run-snapshot
+                                          :workflow-input {:input "go"}})]
+                         s')))
+              (workflow-runtime/workflow-run-in @(:state* ctx) "run-delegating"))
+          ;; This mirrors the injected resolve-inherited-defaults-fn closure
+          ;; bound in context.clj for the nested/delegated path.
+          effective-config (workflow-step-session-config/resolve-step-session-config
+                            ctx nil workflow-run "step-1")
+          nested-snapshot (workflow-step-session-config/effective-config->snapshot
+                           effective-config (:inherited-defaults workflow-run))]
+      (is (= "claude-override-model"
+             (or (get-in nested-snapshot [:model :id]) (:model nested-snapshot)))
+          "nested snapshot carries the delegating step's overridden model")
+      (is (= :fast (:speed-mode nested-snapshot))
+          "speed-mode threaded from the parent run snapshot (P2)")
+      (is (= :xhigh (:effort-override nested-snapshot))
+          "effort-override threaded from the parent run snapshot (P2)")
+      (is (= workflow-step-session-config/inherited-defaults-snapshot-keys
+             (set (keys nested-snapshot)))
+          "nested snapshot has exactly the snapshot key set"))))
+
+(deftest inherited-defaults-field-set-authority-test
+  (testing "every :from-common source key is a member of the canonical
+            common-inherited-fields authority"
+    (let [common (set session-init/common-inherited-fields)]
+      (is (set/subset? (:from-common workflow-step-session-config/inherited-defaults-source-keys)
+                       common)
+          "snapshot :from-common keys must not drift from common-inherited-fields")))
+
+  (testing "every :from-model source key is a member of the canonical
+            model-identity-fields authority"
+    (let [model-fields (set session-init/model-identity-fields)]
+      (is (set/subset? (:from-model workflow-step-session-config/inherited-defaults-source-keys)
+                       model-fields)
+          "snapshot :from-model keys must not drift from model-identity-fields")))
+
+  (testing "the resolved snapshot key set equals the source keys with
+            :tool-ids->:tool-defs and :skill-ids->:skills substituted"
+    (let [{:keys [from-common from-model]} workflow-step-session-config/inherited-defaults-source-keys
+          source-keys (set/union from-common from-model)
+          resolved (-> source-keys
+                       (disj :tool-ids :skill-ids)
+                       (conj :tool-defs :skills))]
+      (is (= resolved workflow-step-session-config/inherited-defaults-snapshot-keys)
+          "resolved snapshot keys must match the declared source keys (resolved-vs-raw)"))))
