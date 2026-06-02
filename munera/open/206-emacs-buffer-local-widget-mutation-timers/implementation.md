@@ -583,3 +583,24 @@ names lstate clearing for the response path explicitly and it lacks a direct
 assertion. Strengthen `…-targets-originating-buffer` to set an in-flight lstate
 on the origin button before dispatch and assert it is cleared on the origin (and
 left untouched on the other buffer), mirroring the timeout test.
+
+## Test review follow-up — T4 resolved (ψ)
+
+Strengthened `pwpt-dispatch-response-targets-originating-buffer`
+(`psi-widget-projection-timers-test.el`) to assert the response callback's
+in-flight **lstate** clearing on the ORIGIN buffer cross-buffer, closing the
+asymmetry vs the timeout test (which already asserted both store + lstate).
+
+- Both origin and other buffers now seed a button spec + `--sync-lstates` +
+  an in-flight lstate (`b1` → t) before dispatch. The response fires while the
+  OTHER buffer is current.
+- Asserts: origin store entry cleared AND origin `--in-flight-p` is nil; other
+  buffer's store (`'sentinel`) AND its in-flight lstate left untouched —
+  mirroring `pwpt-on-mutation-timeout-targets-originating-buffer`.
+- This directly covers design.md Scope (d)/acceptance — the response path
+  clears the originating buffer's "buffer-local timer store **and lstate**" —
+  not only its store-targeting counterpart.
+
+Pure test-coverage addition for already-implemented behaviour; no
+source/design change. `bb emacs:check` green (340/340, byte-compile clean);
+the target test passes (289/340). `.el` reloaded into the running Emacs.

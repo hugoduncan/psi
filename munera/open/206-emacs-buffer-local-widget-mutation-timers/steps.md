@@ -195,7 +195,7 @@
       `run-at-time` fn+args and assert the threaded arg order/values — so the
       design AC "arm captures+threads buffer/state" is asserted directly, not
       only exercised indirectly via dead-buffer/cross-buffer behaviour.
-- [ ] T4 — Assert the response cross-buffer **lstate** clearing. The response
+- [x] T4 — Assert the response cross-buffer **lstate** clearing. The response
       cross-buffer test `pwpt-dispatch-response-targets-originating-buffer`
       (`psi-widget-projection-timers-test.el:206`) asserts only the origin
       *timer store* is cleared (other buffer untouched); it never sets up or
