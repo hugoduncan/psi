@@ -501,3 +501,42 @@ Verified (no actionable findings):
 
 Result: no new actionable implementation-level feedback. Implementation is
 high-quality, design-faithful, architecturally aligned, and well-tested.
+
+## Test review (2026-06-01)
+
+Reviewed `reload_prompts_test.clj` (6 deftests / 22 assertions) + the
+`commands_test.clj` `/prompts-reload` test against the task-test-review
+criteria: well-formedness, behaviour↔test coverage of the design ACs, and
+infra-deps injectable/nullable (¬mock ¬stub). Re-ran focused suite green
+(6 tests / 22 assertions, 0 failures).
+
+Verified (no actionable finding):
+- ✅ Well-formed. Deterministic, temp-dir isolated (`createTempDirectory`),
+  cleaned up via `delete-tree!` in `finally`. No global registry leakage.
+- ✅ ¬mock ¬stub ¬with-redefs in the prompt-reload tests. `(fn [_q] {})` is a
+  real null query-fn for the unused-on-mutate query dependency (the mutate path
+  uses real dispatch), not a mock of the unit under test. Real `discover-templates`
+  IO, real dispatch, real psi-tool `action: "mutate"` resolution.
+- ✅ AC coverage: AC1/AC2/AC3/AC6 (end-to-end edit/add/delete, worktree-rooted),
+  AC4 (command text worktree+count, no diagnostics), AC5 (mutation output keys +
+  psi-tool registered-set visibility + live mutate), AC7 (replace: seeded `stale`
+  gone), AC8-write (state via `:session/reload-prompts` dispatch). No-effects test
+  guards the "no system-prompt refresh" decision (`(nil? (:effects result))`).
+
+Actionable finding:
+- ❌ T1 (boundary coverage gap) — No test covers reload against a worktree with
+  **no / empty `.psi/prompts`** (zero discovered templates). Every test seeds
+  ≥1 `.md`. The implementation review itself cites empty-dir handling as a
+  robustness behaviour (`discover-template-files` returns empty for absent dirs,
+  "no crash"), and the mutation's `(or count 0)` zero-fallback is never
+  exercised. Per the Test formalism (`{nominal, edge, boundary}`) the zero/empty
+  boundary is missing. Add a handler+mutation test: seed a stale template,
+  reload a worktree whose `.psi/prompts` is absent/empty → `reloaded? true`,
+  `count 0`, `:prompt-templates` replaced with `[]` (also proves AC7
+  replace-to-empty and the mutation `count 0` path).
+
+Considered, NOT actionable:
+- AC8 read-via-resolver: tests read `:prompt-templates` via direct
+  `ss/get-session-data-in`, never through a resolver. Low-confidence — resolver
+  reads of `:prompt-templates` are pre-existing (not added by this task), so the
+  read-side of AC8 is out of scope for this task's tests. No step added.

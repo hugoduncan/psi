@@ -138,3 +138,13 @@ Vertical slices from plan.md. Tick each item with its sha / decision note.
       core-fn invocation; mutation passes `agent-session-ctx` as the `ctx` arg
       of `reload-prompts-in! [ctx session-id]`. Plan "Key decisions" records the
       shared-`core.clj`-re-export rationale.
+
+## Test-review follow-ups (2026-06-01)
+
+- [ ] T1: Add an empty/absent-prompts-dir boundary test. Seed a stale template
+      on the session, then reload a worktree whose `.psi/prompts` is absent or
+      empty; assert `:reloaded? true`, `:count 0`, and `:prompt-templates`
+      replaced with `[]` (stale gone). Cover both the `:session/reload-prompts`
+      handler and the `psi.extension/reload-prompts` mutation (the mutation's
+      `(or count 0)` zero path). Closes the `{boundary}` coverage gap the
+      implementation review flagged as a robustness behaviour.
