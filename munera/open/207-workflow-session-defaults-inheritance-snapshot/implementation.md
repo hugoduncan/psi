@@ -1769,3 +1769,48 @@ Scope: README.md, doc/, CHANGELOG.md per review-task-docs checklist.
 - No removed user-facing behaviour (live-read was internal).
 
 No actionable docs findings. Review complete.
+
+## Code-shaper review (ψ, 2026-06-02)
+
+Lens: simplicity ∧ consistency ∧ robustness on the production code
+(`workflow-step-session-config/core.clj` `resolve-step-session-config`,
+the snapshot consumption seam). Prior reviews covered tests/docs/architecture
+but not the resolver's per-field shape. Two consistency findings (CS1, CS2);
+one candidate dismissed.
+
+CS1 — three different idioms express the same "source field from
+snapshot-or-live" operation across the seven inherited defaults:
+  - `(if snapshot? (:X snapshot) (:X parent-session))` — model, prompt-mode,
+    skills, tool-defs (`core.clj:202-212`)
+  - `(when snapshot? (:thinking-level snapshot))` buried inside an `or` chain
+    (`core.clj:243-246`)
+  - `(and snapshot? (some? (:X snapshot))) → assoc` cond-> branches — speed-mode,
+    effort-override (`core.clj:255-261`)
+The snapshot field set is now an explicit named authority
+(`inherited-defaults-snapshot-keys`), yet its consumption is scattered across
+three shapes, so the "seven fields sourced from the snapshot" unit is not
+locally comprehensible as a unit. Consistency smell (¬consistent(idioms)).
+
+CS2 — `:thinking-level` snapshot/inherited precedence is inverted relative to
+`:model`. For `:model` the inherited default (`parent-session-model`) ranks
+ABOVE the base-meta `:model` override (`core.clj:220-235`: step → inherited →
+base-meta). For `:thinking-level` the snapshot/inherited value ranks BELOW the
+base-meta `:thinking-level` (`core.clj:243-246`: step → base-meta → snapshot →
+:off). So a `:workflow-file-meta` thinking-level masks the inherited parent
+value, but a `:workflow-file-meta` model does NOT mask the inherited parent
+model. The two inherited fields disagree on whether base-meta or the inherited
+default wins. Robustness/consistency concern: AC1–3 frame the inherited-default
+invariant uniformly across all seven fields, but base-meta interacts with the
+inherited layer differently per field. Decide the intended ordering and make it
+uniform (or document the per-field difference explicitly with rationale).
+
+Dismissed (NON-actionable): `:prompt-mode` has no step/base-meta override layer
+(`:prompt-mode parent-session-prompt-mode` direct, `core.clj:240`), unlike
+model/thinking-level/tools/skills. This is correct — the workflow grammar
+exposes no `:prompt-mode` override surface in `:session`/`:workflow-file-meta`
+(grep: prompt-mode absent from workflow-step-materialization /
+workflow-registry schemas), so the resolver faithfully mirrors the grammar (no
+override surface → no override layer). Not a finding.
+
+CS1/CS2 are shape/consistency findings, not correctness regressions (no AC test
+fails today); follow-ups added.

@@ -620,3 +620,28 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       set — proving the nested derivation path does not leak a since-mutated live
       parent read (mirrors the direct top-level T2 tools/skills isolation).
       inheritance-snapshot suite green (11 tests, 59 assertions); lint clean.
+
+## Code-shaper review follow-ups (review 2026-06-02)
+
+- [ ] CS1: Unify the three snapshot-consumption idioms in
+      `resolve-step-session-config` (`workflow-step-session-config/core.clj`).
+      The seven inherited defaults are sourced from the snapshot via three
+      different shapes — `(if snapshot? (:X snapshot) (:X parent-session))`
+      (model/prompt-mode/skills/tool-defs, `:202-212`), `(when snapshot?
+      (:thinking-level snapshot))` inside an `or` (`:243-246`), and
+      `(and snapshot? (some? (:X snapshot))) → assoc` cond-> branches
+      (speed-mode/effort-override, `:255-261`). Make the snapshot field set read
+      as a single unit: e.g. a per-field `inherited-default` helper or a
+      snapshot-vs-live source map keyed by `inherited-defaults-snapshot-keys`,
+      so adding/removing an inherited field touches one shape, not three. Keep
+      behaviour identical (existing AC1–8 tests must stay green); shape-only.
+- [ ] CS2: Reconcile the `:thinking-level` vs `:model` inherited-default
+      precedence inversion in `resolve-step-session-config`. `:model` ranks the
+      inherited default ABOVE the base-meta override (`:220-235`), but
+      `:thinking-level` ranks the snapshot/inherited value BELOW base-meta
+      (`:243-246`), so a `:workflow-file-meta` thinking-level masks the inherited
+      parent value while a `:workflow-file-meta` model does not. Decide the
+      intended ordering, make it uniform across the inherited fields (or document
+      the per-field difference + rationale in design.md Decision 1/7 and the
+      resolver). If the behaviour changes, add/adjust a precedence test
+      (base-meta vs inherited default) for the affected field(s).
