@@ -2777,3 +2777,40 @@ Both are test-only additions to
 Mind the `components/` 800-line guard when adding.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK.
+
+## Pass 14 — test-review follow-up execution (TR16, TR17)
+
+Executed both review-pass-14 follow-ups; test-only additions to
+`components/workflow-loader/test/psi/workflow_loader/incidental_complexity_finder_skill_test.clj`
+(no production / EDN / skill change).
+
+### TR16 — max(cc, 1) matched-zero-cc guard (executable lock)
+
+Added sibling deftest `incidental-complexity-finder-recipe-max-cc-guard-test`.
+Feeds a single matched unit (`zero/cc`, lcc 30.0, **cc 0**) and asserts it
+survives the join + qualification filter with `gap` = 30 — `max(0,1)=1` divides
+lcc by 1, not 0. Verified live (`/tmp` recipe run): the cc-0 unit emits
+`gap: 30` and qualifies; dropping `| max` would yield `gap: null` → fails
+`gap >= 2.0` → dropped. jq-absent fallback locks the recipe fragment
+`[$ccmap[.gap_key], 1] | max` (mirrors TR12 fallbacks).
+
+### TR17 — empty-qualification early-stop boundary (executable lock)
+
+Added sibling deftest
+`incidental-complexity-finder-recipe-empty-qualification-test`. Feeds two
+non-qualifying units — a sub-threshold matched unit (`sub/threshold`, lcc 4.0
+< 5.0) and an unmatched `local` row (`unmatched/row`, lcc 30.0, no cc → A1
+drop) — and asserts the recipe emits `[]` (`(= "[]" (str/trim out))` + no
+surviving `"var":`). Verified live: that input yields `[]`. No recipe fragment
+*uniquely* guards the empty case beyond the qualification filter (already
+structurally locked in the filter-and-drop fallback), so this behaviour is
+jq-required; the jq-absent fallback re-asserts the qualification-filter
+fragment so a regress is still caught structurally.
+
+### Verification
+
+- Focused skill-test suite green: 7 tests, 55 assertions, 0 failures
+  (+2 tests / +8 assertions over pass-13's 5/47).
+- `clj-paren-repair` Success; `clj-kondo` 0 findings (errors 0, warnings 0).
+- skill-test file 409 lines (< 800 `components/` guard);
+  `bb commit-check:file-lengths` exit 0.

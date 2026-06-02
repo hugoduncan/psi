@@ -1101,7 +1101,7 @@ with the commit sha / decision when done.
 
 ## Test review follow-ups (review pass 14 — test-shaper)
 
-- [ ] TR16 — Add an executable recipe test for the `max(cc, 1)` matched-zero-cc
+- [x] TR16 — Add an executable recipe test for the `max(cc, 1)` matched-zero-cc
       guard in `incidental_complexity_finder_skill_test.clj`. The recipe's
       `gap: (.["lcc-total"] / ([$ccmap[.gap_key], 1] | max))` is named by SKILL
       §3 as a distinct A1 behaviour ("`max(cc, 1)` guards only the matched
@@ -1115,8 +1115,23 @@ with the commit sha / decision when done.
       fragment, mirroring the existing TR12 fallbacks. Verify focused tests +
       `clj-kondo` + `clj-paren-repair` green and `bb commit-check:file-lengths`
       clean (sibling skill ns headroom).
+      RESOLUTION: added a new sibling deftest
+      `incidental-complexity-finder-recipe-max-cc-guard-test` in the skill-test
+      ns (test-only; no new ns / no production Clojure), reusing `run-jq-recipe`
+      + `named-{local,cc}-unit-json`. Feeds a single matched unit (`zero/cc`,
+      lcc 30.0, **cc 0**) and asserts it survives the join + qualification filter
+      with `gap` = 30 — i.e. `max(0, 1) = 1` divides lcc by 1, not 0. Verified
+      live: with the guard the cc-0 unit emits `gap: 30` and qualifies; were `|
+      max` dropped, `gap` would be `null` and the unit would fail `gap >= 2.0`
+      and drop. jq-absent fallback locks the recipe fragment
+      `[$ccmap[.gap_key], 1] | max` (mirrors the TR12 fallbacks), so the regress
+      fails green whether or not jq is installed. Focused skill-test suite green
+      (7 tests, 55 assertions, 0 failures — +1 test/+4 over pass-13's 5/47, with
+      TR17 below); `clj-kondo` 0 findings; `clj-paren-repair` Success; skill-test
+      file 409 lines (< 800); `bb commit-check:file-lengths` exit 0. (See
+      implementation.md pass-14 test-review TR16 entry.)
 
-- [ ] TR17 — Add an executable recipe test for the empty-qualification (early-
+- [x] TR17 — Add an executable recipe test for the empty-qualification (early-
       stop) boundary in `incidental_complexity_finder_skill_test.clj`. Design
       Locked decision 2 ("A real early-stop exists when nothing qualifies") and
       the recipe's `[]` emission are the machine signal driving the workflow's
@@ -1129,3 +1144,21 @@ with the commit sha / decision when done.
       recipe fragment uniquely guards the empty case; otherwise note jq-required.
       Verify focused tests + `clj-kondo` + `clj-paren-repair` green and
       `bb commit-check:file-lengths` clean.
+      RESOLUTION: added a new sibling deftest
+      `incidental-complexity-finder-recipe-empty-qualification-test` in the
+      skill-test ns (test-only; no new ns / no production Clojure), reusing
+      `run-jq-recipe` + `named-{local,cc}-unit-json`. Feeds two non-qualifying
+      units — a sub-threshold matched unit (`sub/threshold`, lcc 4.0 < 5.0) and
+      an unmatched `local` row (`unmatched/row`, lcc 30.0, no cc → dropped by A1)
+      — and asserts the recipe emits the empty result `[]` (the machine
+      early-stop signal): `(= "[]" (str/trim out))` plus a guard that no
+      `"var":` survives. Verified live: sub-threshold + unmatched input yields
+      `[]`. Per the analysis, no recipe fragment *uniquely* guards the empty case
+      beyond the qualification filter (already structurally locked in the
+      filter-and-drop fallback), so this behaviour is jq-required; the jq-absent
+      fallback re-asserts the qualification-filter fragment
+      (`select(.["lcc-total"] >= 5.0 and .gap >= 2.0)`) so a regress is still
+      caught structurally. Focused skill-test suite green (7 tests, 55
+      assertions, 0 failures); `clj-kondo` 0 findings; `clj-paren-repair`
+      Success; file 409 lines (< 800); `bb commit-check:file-lengths` exit 0.
+      (See implementation.md pass-14 test-review TR17 entry.)

@@ -338,3 +338,72 @@
             "recipe ranks qualifying units gap-descending (sort_by(-.gap), not ascending)")
         (is (.contains recipe ".[0:5]")
             "recipe caps the ranked output at the top 5 units (.[0:5])")))))
+
+(deftest incidental-complexity-finder-recipe-max-cc-guard-test
+  ;; TR16 (test review pass 14): the recipe's `max(cc, 1)` divide-by-zero guard
+  ;; (`gap: (.["lcc-total"] / ([$ccmap[.gap_key], 1] | max))`) is named by SKILL
+  ;; §3 as a distinct A1 behaviour ("`max(cc, 1)` guards only the matched zero-cc
+  ;; case"), but every other executable recipe test feeds cc >= 1, so the guard
+  ;; is never exercised. A regress dropping `| max` (dividing by a bare cc 0)
+  ;; would yield gap = null / a divide error for a matched zero-cc unit, yet pass
+  ;; every existing test green. Feed a single matched unit with lcc above
+  ;; threshold and cc 0 and assert it survives with gap = lcc-total (max(0,1)=1).
+  (let [{:keys [skill]} (incidental-complexity-finder-skill)
+        body (slurp (io/file (:file-path skill)))
+        recipe (extract-jq-recipe body)]
+    (is (some? recipe) "the join/gap jq recipe is extractable from SKILL.md")
+    (if (try (zero? (:exit (shell/sh "jq" "--version"))) (catch Exception _ false))
+      (testing "max(cc, 1) guard — a matched zero-cc unit survives with gap = lcc-total"
+        ;; matched unit: lcc 30.0, cc 0. With the `max(cc, 1)` guard the divisor
+        ;; is 1, so gap = 30.0 (qualifies). Without the guard the divisor is 0,
+        ;; yielding gap = null and failing the `gap >= 2.0` qualification filter,
+        ;; so the unit would be dropped.
+        (let [{:keys [exit out err]}
+              (run-jq-recipe recipe
+                             [(named-local-unit-json "zero" "cc" 10 "30.0")]
+                             [(named-cc-unit-json "zero" "cc" 10 0)])]
+          (is (zero? exit) (str "recipe runs cleanly; stderr: " err))
+          (is (re-find #"\"var\":\s*\"cc\"" out)
+              "the matched zero-cc unit survives the join + qualification filter")
+          (is (re-find #"\"gap\":\s*30\b" out)
+              "gap = lcc-total (30) for the zero-cc unit — max(cc, 1) divides by 1, not 0")))
+      (testing "jq unavailable — max(cc, 1) guard asserted structurally on the recipe"
+        ;; TR16 fallback (mirrors TR12): lock the recipe fragment the zero-cc
+        ;; guard depends on so a regress fails green whether or not jq is present.
+        (is (.contains recipe "[$ccmap[.gap_key], 1] | max")
+            "recipe guards the gap divisor with max(cc, 1) (matched zero-cc case)")))))
+
+(deftest incidental-complexity-finder-recipe-empty-qualification-test
+  ;; TR17 (test review pass 14): Locked decision 2 ("A real early-stop exists when
+  ;; nothing qualifies") and the recipe's `[]` emission are the machine signal
+  ;; driving the workflow's early stop, but this is locked only as SKILL prose
+  ;; (TR3) — no executable test asserts the recipe emits an empty result when the
+  ;; qualification filter removes every candidate (the filter-and-drop test
+  ;; always leaves >= 1 survivor). Feed only sub-threshold / unmatched units and
+  ;; assert the recipe emits an empty result.
+  (let [{:keys [skill]} (incidental-complexity-finder-skill)
+        body (slurp (io/file (:file-path skill)))
+        recipe (extract-jq-recipe body)]
+    (is (some? recipe) "the join/gap jq recipe is extractable from SKILL.md")
+    (if (try (zero? (:exit (shell/sh "jq" "--version"))) (catch Exception _ false))
+      (testing "empty qualification — the recipe emits [] when no unit qualifies (early-stop signal)"
+        ;; sub-threshold matched unit (lcc 4.0 < 5.0) + an unmatched local row
+        ;; (no cc, dropped by A1): nothing qualifies, so the recipe must emit [].
+        (let [{:keys [exit out err]}
+              (run-jq-recipe recipe
+                             [(named-local-unit-json "sub" "threshold" 10 "4.0")
+                              (named-local-unit-json "unmatched" "row" 20 "30.0")]
+                             [(named-cc-unit-json "sub" "threshold" 10 1)])]
+          (is (zero? exit) (str "recipe runs cleanly; stderr: " err))
+          (is (= "[]" (str/trim out))
+              "the recipe emits an empty result when nothing qualifies (early-stop signal)")
+          (is (not (re-find #"\"var\":" out))
+              "no surviving units appear in the empty-qualification output")))
+      (testing "jq unavailable — empty-qualification path covered by the structural filter lock"
+        ;; The empty case is the qualification filter removing every candidate;
+        ;; no recipe fragment uniquely guards the empty result beyond that filter
+        ;; (already structurally locked in the filter-and-drop test's fallback),
+        ;; so this behaviour is jq-required. Assert the filter fragment is present
+        ;; so a regress is still caught structurally.
+        (is (.contains recipe "select(.[\"lcc-total\"] >= 5.0 and .gap >= 2.0)")
+            "recipe carries the qualification filter whose empty result is the early-stop signal")))))
