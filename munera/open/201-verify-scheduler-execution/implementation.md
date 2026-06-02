@@ -2088,3 +2088,25 @@ citation. Findings/test-file-only; no scheduler source/doc change.
 
 Pass outcome: **ACTIONABLE_FEEDBACK** — one citation-coherence fix (follow-up
 recorded in steps.md).
+
+## Test review follow-up — pass 10 executed (2026-06-01)
+
+Executed the pass-10 findings-accuracy follow-up: corrected the inaccurate
+`findings.md` Baseline (L62) covering-test citation.
+
+- **Grounded the flag against source.**
+  `scheduler_effects_test/scheduler-start-and-cancel-timer-effects-test` fires
+  via the **real wall-clock daemon path** — `(.plusMillis now 20)` real delay,
+  `(deref fired 1000 ::timeout)`, `Thread/sleep 10`/`30` polling — and
+  `with-redefs`-stubs `dispatch/dispatch!`. Co-citing it to support the entry's
+  "enable firing **without wall-clock sleeps**" claim is self-contradictory.
+- **Fix applied (findings-only).** Replaced the L62 covering-test cell
+  (`scheduler_timer_seam_test.clj`, `scheduler_effects_test.clj`) with the
+  single authoritative no-wall-clock-firing deftest
+  `scheduler_timer_seam_test.clj/scheduler-start-timer-uses-injected-time-source-and-delay-runner-test`
+  (captures `delay-ms`+callback, invokes `(@callback*)`, asserts `:delivered`,
+  zero wall-clock). No deftest renamed → all other `findings.md` citations
+  unchanged.
+- **Scope held.** `findings.md` (+ `steps.md`/`implementation.md` notes) only —
+  zero `components/agent-session/src/**` or `doc/scheduler.md` change; no test
+  code touched. Verification-only invariant + Slice-10 allowlist held.

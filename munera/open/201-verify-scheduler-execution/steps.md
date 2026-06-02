@@ -1321,7 +1321,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Test review follow-ups — pass 10 (task-test-review, 2026-06-01)
 
-- [ ] Correct the inaccurate `findings.md` L62 (Baseline) citation. The entry
+- [x] Correct the inaccurate `findings.md` L62 (Baseline) citation. The entry
       "Deterministic time/timer seams … enable firing **without wall-clock
       sleeps**" co-cites `scheduler_timer_seam_test.clj` **and**
       `scheduler_effects_test.clj`, but the only *firing* deftest in
@@ -1342,3 +1342,17 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       unchanged; no scheduler source/`doc/scheduler.md` change; verification-only
       invariant + Slice-10 allowlist held). If 201 is treated as closed instead,
       raise as a small standalone findings-accuracy fix.
+      Done: verified the flag against source —
+      `scheduler_effects_test/scheduler-start-and-cancel-timer-effects-test`
+      does fire via the real wall-clock daemon path (`(.plusMillis now 20)`,
+      `(deref fired 1000 ::timeout)`, `Thread/sleep 10`/`30`) and `with-redefs`-
+      stubs `dispatch/dispatch!`, so co-citing it under "firing without
+      wall-clock sleeps" is contradictory. Replaced the L62 covering-test cell
+      (`scheduler_timer_seam_test.clj`, `scheduler_effects_test.clj`) with the
+      single authoritative no-wall-clock-firing deftest
+      `scheduler_timer_seam_test.clj/scheduler-start-timer-uses-injected-time-source-and-delay-runner-test`
+      (captures `delay-ms`+callback, invokes `(@callback*)`, asserts
+      `:delivered`, zero wall-clock). `findings.md`-only edit (no deftest
+      renamed → all other citations unchanged); zero
+      `components/agent-session/src/**` or `doc/scheduler.md` change —
+      verification-only invariant + Slice-10 allowlist held.

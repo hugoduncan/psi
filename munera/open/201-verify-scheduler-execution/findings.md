@@ -59,7 +59,7 @@ deftests: `psi-tool-scheduler-create-list-cancel`,
 | status | summary | covering test | repro / task-ref |
 | ------ | ------- | ------------- | ---------------- |
 | verified-correct | Full scheduler suite present (13 test ns, 35 deftests, 338 assertions) and green against current behaviour. | all `scheduler_*_test.clj` + `psi_tool_scheduler_test.clj` (see inventory below) | — |
-| verified-correct | Deterministic time/timer seams available in `test_support/make-session-ctx` (`:scheduler-run-after-delay-fn`, `:scheduler-cancel-delay-fn`, `:scheduler-timers*`, `:daemon-thread-fn`); enable firing without wall-clock sleeps. | `scheduler_timer_seam_test.clj`, `scheduler_effects_test.clj` | — |
+| verified-correct | Deterministic time/timer seams available in `test_support/make-session-ctx` (`:scheduler-run-after-delay-fn`, `:scheduler-cancel-delay-fn`, `:scheduler-timers*`, `:daemon-thread-fn`); enable firing without wall-clock sleeps. | `scheduler_timer_seam_test.clj/scheduler-start-timer-uses-injected-time-source-and-delay-runner-test` (captures `delay-ms`+callback, invokes `(@callback*)`, asserts `:delivered`, zero wall-clock) | — |
 
 ### Inventory (ns → deftests)
 
