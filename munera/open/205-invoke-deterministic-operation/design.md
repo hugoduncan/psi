@@ -43,9 +43,12 @@ In scope:
 - Routing the invocation through the *existing* runtime boundary
   (`deterministic-operation-runtime/invoke-operation`) and registry
   (`invoke-operation-in`) — no new execution/validation semantics.
-- Constructing the invocation map from the live session: `:operation-id`,
-  `:args`, `:ctx`, `:session-id` (and `:parent-session-id` where available);
-  `:workflow-run-id` / `:step-id` are absent (nil) for direct invocation.
+- Constructing the invocation map from the live session: `:args`, `:ctx`,
+  `:session-id` (and `:parent-session-id` where available); `:workflow-run-id`
+  / `:step-id` are absent (nil) for direct invocation. The `operation-id` is
+  passed **positionally** to `invoke-operation-in` (as the workflow path does),
+  not as an invocation-map key — `runtime/invoke-operation` injects
+  `:operation-id` into the map itself via `assoc`.
 - Result projection: success (`:ok` → `:data`/`:summary`/`:details`) and the
   two failure modes that already exist (tagged `:error` result; thrown →
   canonicalized `:error`; malformed result → ex-info).
@@ -133,9 +136,10 @@ Adjacent / deferred (separate tasks if wanted):
 7. **Result rendering.** Render **all top-level keys** of the tagged result.
    This is the single authoritative projection rule: the displayed key set is
    exactly the keys present on the tagged result, with no enumerated subset.
-   By the result schema, `:ok` results carry `:status :data` plus optional
-   `:summary`/`:details`; `:error` results carry `:status :reason :message`
-   plus optional `:details`. Each top-level **value** is rendered via
+   By the result schema, `:ok` results carry required `:status` and `:data`
+   keys plus optional `:summary`/`:details`; `:error` results carry required
+   `:status`, `:reason`, and `:message` keys plus optional `:details`. Each
+   top-level **value** is rendered via
    `pr-str` and then **per-key truncated** (see decision #9). (This supersedes
    any earlier `:data/:summary/:details`-enumerated phrasing.)
 8. **Listing read path.** Listing reads the deterministic-operation registry
@@ -158,19 +162,26 @@ Adjacent / deferred (separate tasks if wanted):
    `:message` values are subject to the same rule (in practice well under the
    bound).
 
-10. **Direct-invocation invocation-map shape.** A direct call builds:
-    `:operation-id` (the requested id), `:args` (parsed EDN map, default `{}`),
+10. **Direct-invocation invocation-map shape.** The requested `operation-id` is
+    passed **positionally** to `registry/invoke-operation-in` (exactly as the
+    workflow path does); it is **not** a key of the caller-built invocation map.
+    `runtime/invoke-operation` injects `:operation-id` into the map itself via
+    `(assoc invocation :operation-id (:id operation))`, so a caller-supplied
+    `:operation-id` would be redundant and overwritten. The caller-built
+    invocation map therefore contains: `:args` (parsed EDN map, default `{}`),
     `:ctx` (session ctx), and `:session-id` (the invoking session's id).
     `:parent-session-id` is set to the invoking session's parent id only when
     the invoking session is itself a sub-session whose parent is known on ctx;
     otherwise it is `nil`. `:workflow-run-id` and `:step-id` are always `nil`
     for direct invocation. This reconciles with the workflow path
-    (`step_execution`), which passes `:parent-session-id` + `:workflow-run-id`
-    + `:step-id` but no `:session-id`: the two entry points populate the same
-    invocation-map schema with the subset of identity keys meaningful to each.
-    For a direct call the meaningful identity is `:session-id` (who invoked);
-    workflow run/step ids are meaningless and therefore nil. Handlers already
-    tolerate absent keys (documented as "may include" on `invoke-operation`).
+    (`step_execution`), which likewise passes `operation-id` positionally and
+    builds an invocation map with `:parent-session-id` + `:workflow-run-id` +
+    `:step-id` but no `:session-id`: both entry points pass `operation-id`
+    positionally and populate the invocation-map with the subset of identity
+    keys meaningful to each. For a direct call the meaningful identity is
+    `:session-id` (who invoked); workflow run/step ids are meaningless and
+    therefore nil. Handlers already tolerate absent keys (documented as "may
+    include" on `invoke-operation`).
 
 11. **Command arg grammar.** `/operation` is a prefixed command; its tail
     (everything after `/operation `) is split once on the first run of
@@ -206,9 +217,11 @@ Adjacent / deferred (separate tasks if wanted):
   and projects its tagged result (ok / error / malformed) into tool output,
   rendering **all** top-level result keys, each value `pr-str`'d and truncated
   to 2000 chars with a `… (truncated, N chars total)` marker.
-- The direct-invocation invocation map carries `:operation-id`, `:args`,
-  `:ctx`, `:session-id`, optional `:parent-session-id` (nil unless the invoking
-  session has a known parent), and nil `:workflow-run-id`/`:step-id`.
+- The direct-invocation invocation map carries `:args`, `:ctx`, `:session-id`,
+  optional `:parent-session-id` (nil unless the invoking session has a known
+  parent), and nil `:workflow-run-id`/`:step-id`. `operation-id` is passed
+  positionally to `invoke-operation-in` (injected into the map by
+  `runtime/invoke-operation`), not built into the caller's invocation map.
 - `/operations` lists operations (id + description, sorted by id) as a
   `:type :text` result; empty registry → `No deterministic operations
   registered.`

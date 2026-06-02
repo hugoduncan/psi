@@ -145,3 +145,31 @@ schemas). Two actionable inconsistencies:
    as two separate required keys (`[:status [:= :ok]]`, `[:data :any]`). "`:status
    :data`" reads as one key/value pair, contradicting the referenced schema and
    muddying the authoritative projection rule it is meant to ground.
+
+## Resolution of inconsistency follow-ups (ψ)
+
+Resolved both inconsistency follow-ups (design-only). Re-grounded against live
+code:
+- `step_execution.clj`: workflow path calls
+  `(invoke-operation-in registry (:operation invoke-spec) {:ctx :parent-session-id
+  :workflow-run-id :step-id :args} invoke-operation)` — `operation-id` passed
+  **positionally**, NOT a map key.
+- `registry.clj` `invoke-operation-in [reg operation-id invocation invoke-operation]`
+  — `operation-id` is a positional param.
+- `core.clj` `invoke-operation`: `((:handler operation) (assoc invocation
+  :operation-id (:id operation)))` — injects `:operation-id` into the map.
+- `defs.clj` `operation-success-result-schema`: `[:status [:= :ok]]` and
+  `[:data :any]` are two separate required keys.
+
+Changes:
+- #1 (`:operation-id`): dropped `:operation-id` from the caller-built
+  direct-invocation map across Scope, decision #10, and the AC. Now documents
+  passing `operation-id` positionally (mirroring the workflow path) and that
+  `runtime/invoke-operation` injects `:operation-id` via `assoc`. Corrected
+  decision #10's reconciliation claim — both entry points pass `operation-id`
+  positionally; the false "same map carries :operation-id" claim is gone.
+- #2 (#7 schema phrasing): reworded "`:status :data`" → "required `:status`
+  and `:data` keys" for `:ok`, and "`:status :reason :message`" → "required
+  `:status`, `:reason`, and `:message` keys" for `:error`, matching defs.clj.
+
+No code touched (design-only). No blocked steps.
