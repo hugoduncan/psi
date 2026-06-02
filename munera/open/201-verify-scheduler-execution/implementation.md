@@ -1492,3 +1492,57 @@ Conclusion: the verification-only deliverable (green coverage + structured
 `findings.md`) is accurate, coherent, and matches design/architecture. The
 review chain (9 task-test-review + 6 test-shaper passes) has converged; this
 implementation-review pass adds no follow-ups.
+
+## Test review — pass 10 (task-test-review, 2026-06-01) — ACTIONABLE_FEEDBACK
+
+Re-applied `task-test-review` (`well_formed ∧ behaviour-coverage ∧
+infra_deps→injectable ∧ ¬mock ∧ ¬stub`) to the 201 verification deliverables.
+The bulk converged across passes 6–9 + 6 test-shaper passes. One **new,
+previously-unflagged** issue surfaced under the skill's
+"drive the real path via the seam" / "assert state/outputs, not handler
+interactions" clauses (plan sufficient-coverage clauses 2 & 3).
+
+- **Issue E — busy-drain covering test drains via direct handler invocation +
+  asserts on handler-returned effect-data (¬real-path, interaction-assert).**
+  `scheduler_lifecycle_test/busy-session-fire-queues-then-idle-drains-fifo-test`
+  is `findings.md`-cited as a covering test for the **busy queue + drain-on-idle**
+  Live-execution area. Its busy-fire→queue→idle phase drives the **real**
+  `dispatch-in!` pipeline (good), but the drain phase does **not**: it calls
+  the local `invoke-scheduler-handler` helper, which extracts
+  `(kernel/handler-entry :scheduler/drain-queue) :fn` and invokes the handler
+  **directly, bypassing the dispatch pipeline/interceptors**, then manually
+  `apply-root-state-update!`s the result (L140-141, L149-150). The
+  scheduler-time-source FIFO-timestamp behaviour is then asserted via
+  `(-> drain-1 :effects first :event-data :user-msg :timestamp)` (L146, L154) —
+  i.e. on the **shape of the handler-returned effect data** (a produced-effect
+  interaction), not on observable delivered-message state.
+
+  This diverges from the design's resolved "Drain-on-idle trigger" mechanic
+  ("dispatches `:scheduler/drain-queue` **directly** → asserts `drain-one`
+  delivers") and from the plan's sufficient-coverage clause 2 (drive the real
+  path via dispatch for a live area) and clause 3 (assert state/outputs, not
+  handler interactions). The status/queue assertions in the same test *are*
+  state-based and the area is **jointly** cited with
+  `scheduler_dispatch_test/scheduler-drain-queue-delivers-oldest-queued-schedule-test`
+  (which DOES use real `dispatch-in!` + asserts observable state) — so the
+  oldest-by-fire-at drain is cleanly covered via real dispatch. The specific gap
+  is: the **busy→fire→queue→idle→drain full sequence driven end-to-end through
+  real dispatch** (and the time-source-stamped delivered message asserted as
+  observable state rather than handler effect-data) is not demonstrated in a
+  single covering test.
+
+  Recommended fix (test-file-only, Slice-10 allowlist): migrate the drain phase
+  of `busy-session-fire-queues-then-idle-drains-fifo-test` off
+  `invoke-scheduler-handler`/`apply-root-state-update!` onto real
+  `dispatch-in! :scheduler/drain-queue`, and assert the delivered-message
+  timestamp via observable journal/state (e.g. `scheduled-message-by-id` →
+  `:timestamp`) rather than `(-> drain :effects … :event-data …)`. If the
+  time-source-stamp-on-effect assertion has independent value, keep it as a
+  separate, clearly-named handler-unit assertion rather than the *cited live
+  covering test* for the area. If 201 is treated as closed, raise as a small
+  standalone test-hygiene task.
+
+Suite green (`scheduler-lifecycle-test` focused: 3 tests / 26 assertions / 0
+failures). Verification-only invariant intact (no
+`components/agent-session/src/**` or `doc/scheduler.md` touched by this review).
+Follow-up added to steps.md.

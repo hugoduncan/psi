@@ -958,3 +958,30 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       clj-kondo 0/0, cljfmt clean. Test-file-only — zero
       `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist
       held).
+
+## Test review follow-ups — pass 10 (task-test-review, 2026-06-01)
+
+- [ ] Migrate the drain phase of
+      `scheduler_lifecycle_test/busy-session-fire-queues-then-idle-drains-fifo-test`
+      (the `findings.md`-cited busy queue + drain-on-idle covering test) off the
+      local `invoke-scheduler-handler` + `apply-root-state-update!` helpers (which
+      invoke the `:scheduler/drain-queue` handler `:fn` directly, bypassing the
+      dispatch pipeline/interceptors — L140-141, L149-150) onto the **real**
+      `dispatch-in! :scheduler/drain-queue` path, so the busy→fire→queue→idle→drain
+      sequence is driven end-to-end through real dispatch (design "Drain-on-idle
+      trigger" mechanic: "dispatches `:scheduler/drain-queue` **directly**"; plan
+      sufficient-coverage clause 2 — drive the real path for a live area). Then
+      replace the FIFO-timestamp assertions
+      `(-> drain-1 :effects first :event-data :user-msg :timestamp)` /
+      `(-> drain-2 …)` (L146, L154) — which assert on the **shape of
+      handler-returned effect data** (a produced-effect interaction) — with
+      assertions on **observable delivered-message state** (e.g.
+      `test-support/scheduled-message-by-id` → `:timestamp`), per sufficient-coverage
+      clause 3 (assert state/outputs, not handler interactions). If the
+      time-source-stamp-on-effect assertion has independent unit value, keep it as a
+      separate, clearly-named handler-unit assertion rather than as part of the
+      *cited live covering test* for the area. Keep suite green + clj-kondo/cljfmt
+      clean; test-file-only (Slice-10 allowlist — zero
+      `components/agent-session/src/**` / `doc/scheduler.md`); no scheduler-source
+      change. If 201 is treated as closed instead, raise as a small standalone
+      test-hygiene task.
