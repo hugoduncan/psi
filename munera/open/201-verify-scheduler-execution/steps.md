@@ -1356,3 +1356,33 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       renamed → all other citations unchanged); zero
       `components/agent-session/src/**` or `doc/scheduler.md` change —
       verification-only invariant + Slice-10 allowlist held.
+
+## Test-shaper follow-ups — pass 15 (test-shaper, 2026-06-01)
+
+- [ ] Converge the 5 remaining open-coded literal-instant setup sites in
+      `psi_tool_scheduler_test.clj` onto `test-support/instant`
+      (`consistent(idioms)` — finish the convergence commit `5e5fe10af` started
+      across the 201 scheduler test set). Replace
+      `(java.time.Instant/parse "2026-04-21T18:00:00Z")` at L10, L183, L201,
+      L225, L243 with `(test-support/instant "2026-04-21T18:00:00Z")` — the ns
+      already requires `[psi.agent-session.test-support :as test-support]`, so
+      no require change is needed. This is the *literal-setup* idiom that all 5
+      sibling 201 files (`scheduler_test`, `scheduler_end_to_end_test`,
+      `scheduler_timer_seam_test`, `scheduler_resolvers_test`,
+      `scheduler_context_shutdown_test`) already use (0 `Instant/parse` literals
+      each); `psi_tool_scheduler_test.clj` is the lone outlier omitted from
+      `5e5fe10af`. **Do NOT** touch the 5 runtime-output-parse sites
+      (L30, L31, L196, L197, L218 — `(java.time.Instant/parse (:fire-at
+      schedule))` etc.): those deserialize a string from the tool result (a
+      distinct concern), and converging them would mis-use `instant`'s
+      "literal test instant" intent. Behaviour- and assertion-preserving (no
+      deftest renamed → `findings.md` citations unchanged; aggregate stays
+      51 tests / 411 assertions). Keep suite green + clj-kondo/cljfmt clean.
+      Test-only — verify `git diff --name-only` touches only
+      `psi_tool_scheduler_test.clj`; zero `components/agent-session/src/**` or
+      `doc/scheduler.md` (verification-only invariant; Slice-10 allowlist).
+      Note: this corrects test-shaper pass-14's rejection — pass-14's "inline
+      `Instant/parse` is the consistent baseline" premise is factually wrong for
+      the 201 set, where `5e5fe10af` already chose `test-support/instant` as the
+      convergence target. If 201 is treated as closed instead, raise as a small
+      standalone test-hygiene task.

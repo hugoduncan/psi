@@ -2138,3 +2138,38 @@ issue; review chain remains converged.
   (no-duplicate).
 
 No follow-up steps added. Review converged → REVIEW_COMPLETE.
+
+## Test-shaper review — pass 15 (test-shaper, 2026-06-01) — ACTIONABLE_FEEDBACK
+
+Re-applied test-shaper firsthand (clarity ∧ signal ∧ robustness ∧ economy) to
+all 201 new/extended scheduler test nss. Strengths re-confirmed: deterministic
+(fixed `scheduler-time-source` + captured `capturing-delay-fn` seam, zero
+wall-clock sleeps in 201 live tests), behaviour-focused (delivered prompt +
+scheduled provenance, `:status`, `created-session-id`/`:delivery-phase`, queue
+contents — never handler interactions), single-concern deftests with clear AAA,
+good economy (deliberate insertion-order≠fire-at-order `drain-one` case; psi-tool
+megatest split into 6 focused deftests), shared read/write idioms converged
+(`schedule-by-id`/`schedule-status`/`schedule-queue`, `ss/session-update`).
+
+**One actionable `consistent(idioms)` issue found — corrects pass-14's
+rejection (its premise is now factually wrong).** Pass-14 rejected the
+literal-instant convergence claiming inline `java.time.Instant/parse` is "the
+consistent baseline idiom". But commit `5e5fe10af` ("converge literal-instant
+idiom on shared test-support/instant") had **already** adopted
+`test-support/instant` as the convergence target for the 201 file set — it
+replaced 15 literal sites across 5 of the 6 scheduler test files
+(`scheduler_test`, `scheduler_end_to_end_test`, `scheduler_timer_seam_test`,
+`scheduler_resolvers_test`, `scheduler_context_shutdown_test` — now **0**
+`Instant/parse` literals each). `psi_tool_scheduler_test.clj` was **omitted**
+from that commit and is now the lone outlier with **5 open-coded literal-setup
+`(java.time.Instant/parse "2026-04-21T18:00:00Z")` sites** (L10, L183, L201,
+L225, L243) while every sibling 201 file uses `(test-support/instant "…")`. The
+file already requires `test-support`, so the helper is in scope. This is a real
+inconsistency within the converged 201 set, not the surrounding-suite baseline
+pass-14 invoked. (Scope note: the 5 *runtime-output*-parse sites — L30/31/196/
+197/218, `(java.time.Instant/parse (:fire-at schedule))` — parse a string from
+the tool result, a distinct deserialization concern; leave them as inline parses
+and converge only the 5 *literal setup* sites.) Recorded as a follow-up step.
+Verification-only invariant intact (this review touched no
+`components/agent-session/src/**` or `doc/scheduler.md`; the follow-up is
+test-only).
