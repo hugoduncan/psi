@@ -2774,3 +2774,29 @@ the same `meaningful_failures ∧ consistent(naming)` gap pass-20 fixed next doo
 Follow-up filed below. No scheduler-source/doc/behaviour concern; verification-only
 invariant intact (this review touched no `components/agent-session/src/**` or
 `doc/scheduler.md`). **ACTIONABLE_FEEDBACK.**
+
+## Test-shaper follow-up execution — pass 21 (2026-06-02)
+
+Executed the pass-21 FIFO-relabel follow-up. Renamed
+`busy-session-fire-queues-then-idle-drains-fifo-test` →
+`busy-session-fire-queues-then-idle-drains-oldest-by-fire-at-test` in
+`scheduler_lifecycle_test.clj` and fixed the two other "FIFO" sites: block
+comment "FIFO drain order …" → "drain order is oldest by [fire-at created-at
+schedule-id]" (plus a note that insertion order coincides with fire-at order
+here, pointing at `drain-one-orders-by-fire-at-not-queue-insertion-order-test`
+for the discriminating proof), and assertion message "queues both schedules in
+FIFO order" → "queues both schedules in creation order". Updated the sibling
+handler-unit comment reference accordingly. Assertions unchanged → aggregate
+count unchanged.
+
+Coherence: updated the **live** `findings.md` citations (Baseline inventory line
++ Live-execution-path busy-drain covering-test cell) and the canonical Slice-3
+audit pointer in `steps.md` (~L88) to the new deftest name. Historical
+"Done:"/review-note prose in `steps.md`/`implementation.md` that names the old
+deftest is append-only session history and was intentionally left intact.
+
+Verification: `--focus psi.agent-session.scheduler-lifecycle-test` = 4 tests / 26
+assertions / 0 failures; full `bb test` ✅ all green; clj-kondo 0/0;
+`bb fmt:check` "All source files formatted correctly". `git diff --name-only` =
+`scheduler_lifecycle_test.clj` + `findings.md` + `steps.md` — zero
+`components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist held).

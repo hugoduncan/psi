@@ -85,7 +85,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 ## Slice 3 — Busy-session queue + drain-on-idle
 
 - [x] Audit existing busy/queue/drain coverage
-      (`busy-session-fire-queues-then-idle-drains-fifo-test` →
+      (`busy-session-fire-queues-then-idle-drains-oldest-by-fire-at-test` →
       `scheduler_lifecycle_test.clj`;
       `scheduler-drain-queue-delivers-oldest-queued-schedule-test` →
       `scheduler_dispatch_test.clj`).
@@ -1749,7 +1749,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Test-shaper follow-ups — pass 21 (test-shaper, 2026-06-02)
 
-- [ ] Relabel the residual misleading "FIFO" wording in
+- [x] Relabel the residual misleading "FIFO" wording in
       `scheduler_lifecycle_test/busy-session-fire-queues-then-idle-drains-fifo-test`
       (`scheduler_lifecycle_test.clj`). Pass-20 corrected the same smell in the
       sibling `scheduler-test/drain-one-test` but scoped itself to that block
@@ -1774,3 +1774,26 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       Test-file + task-dir only (Slice-10 allowlist — zero
       `components/agent-session/src/**` or `doc/scheduler.md`); keep `bb test`
       green + clj-kondo/cljfmt clean.
+      Done: relabelled all three "FIFO" sites in the lifecycle busy-drain
+      covering test. (1) Renamed the deftest
+      `busy-session-fire-queues-then-idle-drains-fifo-test` →
+      `…-drains-oldest-by-fire-at-test`; (2) reworded the block comment from
+      "FIFO drain order (oldest by [fire-at created-at schedule-id] first)" to
+      "drain order is oldest by [fire-at created-at schedule-id]", adding a note
+      that insertion order here coincides with fire-at order and pointing at the
+      dedicated `drain-one-orders-by-fire-at-not-queue-insertion-order-test`
+      which proves the sort is by fire-at not insertion; (3) changed the
+      assertion message "queues both schedules in FIFO order" →
+      "queues both schedules in creation order". Also updated the sibling
+      handler-unit comment reference (`split out of busy-session-...-drains-fifo`
+      → `…-drains-oldest-by-fire-at`). Assertions unchanged → aggregate count
+      unchanged. Updated the **live** `findings.md` citations (inventory line +
+      Live-execution busy-drain covering-test cell) and the canonical Slice-3
+      audit pointer in steps.md (~L88) to the new deftest name; historical
+      "Done:"/review-note prose in steps.md/implementation.md is append-only and
+      left intact. Verified: focused `scheduler-lifecycle-test` green
+      (4 tests / 26 assertions); full `bb test` ✅ all green; clj-kondo 0/0;
+      `bb fmt:check` "All source files formatted correctly". Test-file +
+      task-dir only — `git diff --name-only` = `scheduler_lifecycle_test.clj`
+      + `findings.md` + `steps.md`; zero `components/agent-session/src/**` or
+      `doc/scheduler.md` (Slice-10 allowlist held).

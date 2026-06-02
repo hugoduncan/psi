@@ -94,14 +94,17 @@
         (is (some #(= :session/prompt-record-response (:event-type %)) entries))
         (is (some #(= :session/prompt-finish (:event-type %)) entries))))))
 
-(deftest busy-session-fire-queues-then-idle-drains-fifo-test
+(deftest busy-session-fire-queues-then-idle-drains-oldest-by-fire-at-test
   ;; Cited busy queue + drain-on-idle covering test. Drives the WHOLE sequence
   ;; (fire-while-busy -> queue -> idle -> drain) through the REAL dispatch
   ;; pipeline (design "Drain-on-idle trigger": dispatch :scheduler/drain-queue
   ;; directly), and asserts OBSERVABLE delivered state — the per-schedule
-  ;; :delivered status, FIFO drain order (oldest by [fire-at created-at
-  ;; schedule-id] first), and the post-drain queue contents — not the shape of
-  ;; the handler-returned effect data. The scheduler-time-source stamping of the
+  ;; :delivered status, drain order is oldest by [fire-at created-at
+  ;; schedule-id], and the post-drain queue contents — not the shape of
+  ;; the handler-returned effect data. (Insertion order here coincides with
+  ;; fire-at order; the dedicated
+  ;; `drain-one-orders-by-fire-at-not-queue-insertion-order-test` proves the sort
+  ;; is by fire-at, not by insertion.) The scheduler-time-source stamping of the
   ;; scheduled user message is asserted separately as a handler unit
   ;; (`drain-one-stamps-scheduled-user-message-from-scheduler-time-source-test`).
   (let [scheduler-clock (test-support/atom-scheduler-time-source
@@ -128,7 +131,7 @@
                             {:origin :core}))
     (is (= ["sch-q-1" "sch-q-2"]
            (test-support/schedule-queue ctx session-id))
-        "fire-while-busy queues both schedules in FIFO order")
+        "fire-while-busy queues both schedules in creation order")
 
     (swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming false))))
     (testing "first idle drain delivers the oldest queued schedule via real dispatch"
@@ -149,7 +152,7 @@
         (is (= :delivered (test-support/schedule-status ctx session-id "sch-q-2")))))))
 
 (deftest drain-one-stamps-scheduled-user-message-from-scheduler-time-source-test
-  ;; Handler-unit assertion (split out of busy-session-...-drains-fifo per
+  ;; Handler-unit assertion (split out of busy-session-...-drains-oldest-by-fire-at per
   ;; sufficient-coverage clause 3: keep the time-source-stamp-on-effect check as
   ;; a clearly-named handler unit, not as part of the cited live covering test).
   ;; Asserts the :scheduler/drain-queue handler stamps the scheduled user message
