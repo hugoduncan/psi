@@ -4,7 +4,10 @@
 (require 'cl-lib)
 
 (add-to-list 'load-path
+             (file-name-directory (or load-file-name buffer-file-name)))
+(add-to-list 'load-path
              (expand-file-name "../" (file-name-directory (or load-file-name buffer-file-name))))
+(require 'psi-test-support)
 (require 'psi)
 (require 'psi-widget-renderer)
 (require 'psi-widget-projection)
@@ -82,10 +85,8 @@
 (ert-deftest pwpt-request-specs-noop-when-no-send-function ()
   (pwpt--with-state
    (let ((psi-emacs--send-request-function nil))
-     ;; Should not error
-     (should-not (condition-case err
-                     (progn (psi-widget-projection-request-specs) nil)
-                   (error err))))))
+     (psi-test--should-not-error
+       (psi-widget-projection-request-specs)))))
 
 ;;; ─── lstate management ───────────────────────────────────────────────────────
 
@@ -475,155 +476,8 @@
                     (psi-widget-projection-render-specs psi-emacs--state))))
        (should (string-match-p "static" result))))))
 
-;;; ─── Mutation timeout ────────────────────────────────────────────────────────
-
-(ert-deftest pwpt-timer-key-formats-correctly ()
-  (should (equal "ext/w1:b1"
-                 (psi-widget-projection--timer-key "ext" "w1" "b1"))))
-
-(ert-deftest pwpt-effective-timeout-uses-mutation-timeout-first ()
-  (let* ((mut    '((:name . ext/do) (:timeout-ms . 1000)))
-         (button '((:type . button) (:timeout-ms . 2000))))
-    (should (= 1000 (psi-widget-projection--effective-timeout-ms button mut)))))
-
-(ert-deftest pwpt-effective-timeout-uses-button-timeout-when-no-mutation-timeout ()
-  (let* ((mut    '((:name . ext/do)))
-         (button '((:type . button) (:timeout-ms . 5000))))
-    (should (= 5000 (psi-widget-projection--effective-timeout-ms button mut)))))
-
-(ert-deftest pwpt-effective-timeout-uses-default-when-neither-set ()
-  (let* ((mut    '((:name . ext/do)))
-         (button '((:type . button))))
-    (should (= psi-widget-projection--default-timeout-ms
-               (psi-widget-projection--effective-timeout-ms button mut)))))
-
-(ert-deftest pwpt-arm-cancel-mutation-timer-roundtrip ()
-  (let ((psi-widget-projection--mutation-timers (make-hash-table :test #'equal)))
-    (cl-letf (((symbol-function 'run-at-time)
-               (lambda (_secs _rep fn &rest args)
-                 ;; Return a fake timer object
-                 (apply #'list fn args))))
-      (psi-widget-projection--arm-mutation-timer "ext" "w1" "b1" 5000)
-      (should (gethash "ext/w1:b1" psi-widget-projection--mutation-timers))
-      (psi-widget-projection--cancel-mutation-timer "ext/w1:b1")
-      (should (null (gethash "ext/w1:b1" psi-widget-projection--mutation-timers))))))
-
-(ert-deftest pwpt-on-mutation-timeout-clears-in-flight ()
-  (pwpt--with-state
-   (let* ((spec   (pwpt--make-button-spec "w1" "b1"))
-          (lstate (psi-widget-renderer-make-lstate))
-          (lstate (psi-widget-renderer-lstate-set-in-flight lstate "b1" t))
-          (psi-widget-projection--mutation-timers (make-hash-table :test #'equal)))
-     (setf (psi-emacs-state-projection-widget-specs psi-emacs--state) (list spec))
-     (psi-widget-projection--sync-lstates (list spec))
-     (psi-widget-projection--set-lstate "ext" "w1" lstate)
-     (cl-letf (((symbol-function 'psi-emacs--upsert-projection-block) #'ignore))
-       (psi-widget-projection--on-mutation-timeout "ext" "w1" "b1" 5000))
-     (should-not (psi-widget-renderer--in-flight-p
-                  (psi-widget-projection--get-lstate "ext" "w1") "b1")))))
-
-(ert-deftest pwpt-on-mutation-timeout-calls-error-handler ()
-  (pwpt--with-state
-   (let* ((spec   (pwpt--make-button-spec "w1" "b1"))
-          (received nil)
-          (psi-widget-projection--mutation-timers (make-hash-table :test #'equal))
-          (psi-widget-projection-error-handler
-           (lambda (ctx) (setq received ctx))))
-     (setf (psi-emacs-state-projection-widget-specs psi-emacs--state) (list spec))
-     (psi-widget-projection--sync-lstates (list spec))
-     (cl-letf (((symbol-function 'psi-emacs--upsert-projection-block) #'ignore))
-       (psi-widget-projection--on-mutation-timeout "ext" "w1" "b1" 5000))
-     (should received)
-     (should (equal "mutation-timeout"
-                    (alist-get :error-code received nil nil #'equal)))
-     (should (equal "w1"
-                    (alist-get :widget-id received nil nil #'equal))))))
-
-(ert-deftest pwpt-on-mutation-timeout-noop-when-no-state ()
-  (let ((psi-emacs--state nil)
-        (psi-widget-projection--mutation-timers (make-hash-table :test #'equal)))
-    (should-not (condition-case err
-                    (progn
-                      (psi-widget-projection--on-mutation-timeout "ext" "w1" "b1" 5000)
-                      nil)
-                  (error err)))))
-
-(ert-deftest pwpt-dispatch-mutation-arms-timer ()
-  (pwpt--with-state
-   (let* ((mutation '((:name . ext/do-thing) (:params . ())))
-          (timer-armed nil)
-          (psi-widget-projection--mutation-timers (make-hash-table :test #'equal)))
-     (cl-letf (((symbol-function 'run-at-time)
-                (lambda (_s _r _fn &rest _a) (setq timer-armed t) 'fake-timer))
-               ((symbol-function 'cancel-timer) #'ignore))
-       (pwpt--capture-query-sends
-        (lambda ()
-          (psi-widget-projection--dispatch-mutation
-           mutation "ext" "w1" "b1" nil))))
-     (should timer-armed))))
-
-(ert-deftest pwpt-dispatch-mutation-cancels-timer-on-response ()
-  (pwpt--with-state
-   (let* ((mutation '((:name . ext/do-thing) (:params . ())))
-          (timer-cancelled nil)
-          (psi-widget-projection--mutation-timers (make-hash-table :test #'equal))
-          (captured-cb nil))
-     (cl-letf (((symbol-function 'run-at-time)
-                (lambda (_s _r _fn &rest _a) 'fake-timer))
-               ((symbol-function 'cancel-timer)
-                (lambda (_t) (setq timer-cancelled t)))
-               ((symbol-function 'timerp) (lambda (x) (eq x 'fake-timer)))
-               ((symbol-value 'psi-emacs--send-request-function)
-                (lambda (_state _op _params &optional cb) (setq captured-cb cb)))
-               ((symbol-function 'psi-emacs--upsert-projection-block) #'ignore))
-       (psi-widget-projection--dispatch-mutation mutation "ext" "w1" "b1" nil)
-       (when captured-cb
-         (funcall captured-cb '((:data . ((:ok . t)))))))
-     (should timer-cancelled))))
-
-;;; ─── Global error handler ────────────────────────────────────────────────────
-
-(ert-deftest pwpt-error-handler-called-when-set ()
-  (let* ((received nil)
-         (psi-widget-projection-error-handler
-          (lambda (ctx) (setq received ctx)))
-         (ctx '((:error-code . "test") (:widget-id . "w1"))))
-    (psi-widget-projection--call-error-handler ctx)
-    (should (equal ctx received))))
-
-(ert-deftest pwpt-error-handler-noop-when-nil ()
-  (let ((psi-widget-projection-error-handler nil))
-    (should-not (condition-case err
-                    (progn
-                      (psi-widget-projection--call-error-handler
-                       '((:error-code . "test")))
-                      nil)
-                  (error err)))))
-
-(ert-deftest pwpt-error-handler-survives-handler-exception ()
-  (let ((psi-widget-projection-error-handler
-         (lambda (_ctx) (error "handler exploded"))))
-    (should-not (condition-case err
-                    (progn
-                      (psi-widget-projection--call-error-handler
-                       '((:error-code . "test")))
-                      nil)
-                  (error err)))))
-
-(ert-deftest pwpt-query-failure-calls-error-handler ()
-  (pwpt--with-state
-   (let* ((received nil)
-          (psi-widget-projection-error-handler
-           (lambda (ctx) (setq received ctx))))
-     (cl-letf (((symbol-function 'psi-emacs--upsert-projection-block) #'ignore))
-       (psi-widget-projection--handle-spec-data-result
-        "ext/w1"
-        '((:error . "resolver failed"))))
-     (should received)
-     (should (equal "query-failed"
-                    (alist-get :error-code received nil nil #'equal))))))
-
 ;;; Event subscription tests moved to psi-widget-projection-events-test.el
+;;; Mutation-timer tests moved to psi-widget-projection-timers-test.el
 
 (provide 'psi-widget-projection-test)
 ;;; psi-widget-projection-test.el ends here

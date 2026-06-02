@@ -2,6 +2,16 @@
 
 (require 'cl-lib)
 
+(defmacro psi-test--should-not-error (&rest body)
+  "Assert that evaluating BODY raises no error (a harmless no-op).
+Compresses the hand-rolled
+`(should-not (condition-case err (progn BODY nil) (error err)))'
+idiom into a single explicit no-op assertion."
+  (declare (indent 0) (debug t))
+  `(should-not (condition-case err
+                   (progn ,@body nil)
+                 (error err))))
+
 (defun psi-test--spawn-long-lived-process (&optional command)
   "Spawn a long-lived process suitable for ownership/lifecycle tests."
   (make-process
