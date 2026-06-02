@@ -51,10 +51,15 @@ Key decisions (all grounded in the current code):
    store resolution. Dead-buffer response is a no-op.
 
 5. **Teardown + transcript reset cancel-all.** Add
-   `psi-widget-projection--clear-mutation-timers (state)` — maphash cancel +
-   clrhash — mirroring `psi-emacs--clear-notification-lifecycle`'s timer loop.
-   Invoke it from `psi-emacs--teardown-buffer` (`psi-lifecycle.el:269`),
-   alongside `psi-emacs--clear-notification-lifecycle`, and from
+   `psi-widget-projection--clear-mutation-timers (state)` — outer `(when state
+   ...)` wrapping a maphash cancel + clrhash — mirroring
+   `psi-emacs--clear-notification-lifecycle` (`psi-projection.el:379`) exactly,
+   including its outer null-`state` guard. The helper owns the null guard, so
+   call sites pass bare `psi-emacs--state` (matching the precedent's
+   `:295`/`:392` call sites) and a nil-state teardown is a harmless no-op rather
+   than erroring on `(psi-emacs-state-projection-mutation-timers nil)`. Invoke
+   it from `psi-emacs--teardown-buffer` (`psi-lifecycle.el:269`), alongside
+   `psi-emacs--clear-notification-lifecycle`, and from
    `psi-emacs--reset-transcript-state` (`psi-lifecycle.el:392`) where
    notification timers are already cleared. Use `declare-function` in
    `psi-lifecycle.el` (mirrors the existing `psi-projection` declares).
@@ -68,7 +73,17 @@ Key decisions (all grounded in the current code):
    explicit-`state` signatures, and add new tests for: killed-buffer cancels
    in-flight timers; two buffers don't share timer state for the same key;
    response/timeout while a *different* buffer is current target the originating
-   buffer; response/timeout for a dead buffer is a no-op.
+   buffer; response/timeout for a dead buffer is a no-op. Two existing tests get
+   specific dispositions:
+   - `pwpt-dispatch-mutation-cancels-timer-on-response` (the sixth
+     global-defvar-binding test) migrates to the buffer-local store via `state`
+     in **Slice 3** (response-callback rework), so no orphaned `let`-bind
+     survives Slice 5's defvar deletion.
+   - `pwpt-on-mutation-timeout-noop-when-no-state` is **repurposed in Slice 2**
+     into the timeout dead-buffer no-op case (its old `psi-emacs--state nil`
+     pivot no longer matches the post-change `(buffer-live-p buffer)` no-op).
+     It becomes the single dead-buffer timeout test — no separate duplicate is
+     added.
 
 ## Risks
 
@@ -78,8 +93,10 @@ Key decisions (all grounded in the current code):
   :303/:356, timeout scheduled at :306) plus tests. Risk is mechanical; mitigated
   by grepping all references before/after and reloading.
 - **Test harness coupling to the global defvar.** Several tests `let`-bind
-  `psi-widget-projection--mutation-timers`. Removing the defvar breaks those
-  binds; they must be rewritten to drive the buffer-local store via state.
+  `psi-widget-projection--mutation-timers` (including the response-cancel test
+  `pwpt-dispatch-mutation-cancels-timer-on-response`, migrated in Slice 3).
+  Removing the defvar breaks those binds; they must be rewritten to drive the
+  buffer-local store via state before Slice 5 deletes the defvar.
 - **`with-current-buffer` re-entrancy in callbacks.** The notification precedent
   already proves this pattern; low risk, but verify the timeout/response bodies
   use the *rebound* buffer-local `psi-emacs--state` (or the captured `state`)

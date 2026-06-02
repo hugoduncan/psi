@@ -229,3 +229,40 @@ Slice-5 step already mandates a pre-delete `git grep`); the helper/field names
 are fixed by the notification mirror (a settled plan decision, not ambiguous);
 the response callback's existing `tkey` capture in the `let*` already coexists
 with the new `buffer`/`state` capture (Slice 3 wording is adequate).
+
+## Plan ambiguity follow-up — P1–P3 resolved (ψ)
+
+Resolved the three plan/steps ambiguities by deciding dispositions and pinning
+them into steps.md slices + plan.md (design-only task; no code yet). All three
+grounded in the notification precedent and the real test file
+(`psi-widget-projection-test.el:500–582`).
+
+- **P1 (sixth test ownership).** Assigned `pwpt-dispatch-mutation-cancels-timer-on-response`
+  (`:565`) to **Slice 3**, which reworks the response callback — the natural
+  home. Slice 3's test list now explicitly migrates it from the global-defvar
+  `let`-bind to driving the buffer-local store via `state`, so Slice 5's defvar
+  deletion + "remove leftover let-binds" finds no orphan. plan.md Decision 7 +
+  the "Test harness coupling" risk updated to name it.
+
+- **P2 (null-`state` guard).** Chose: the **helper internally guards
+  `(when state ...)`**, matching `psi-emacs--clear-notification-lifecycle`
+  (`psi-projection.el:379`) exactly — its whole body is wrapped in
+  `(when state ...)` and its call sites (`psi-lifecycle.el:295/392`) pass bare
+  `psi-emacs--state` (the nearby `(when psi-emacs--state ...)` blocks at
+  `:296/:381` wrap *other* code, not the clear call). So `--clear-mutation-timers`
+  owns the guard and Slice 4 call sites pass bare `psi-emacs--state`; a
+  nil-state teardown is a harmless no-op rather than erroring on
+  `(psi-emacs-state-projection-mutation-timers nil)`. Updated steps Slice 1 +
+  plan.md Decision 5.
+
+- **P3 (`noop-when-no-state` remapping).** Chose: **repurpose** the existing
+  `pwpt-on-mutation-timeout-noop-when-no-state` (`:542`) into the timeout
+  dead-buffer no-op case, and **drop the separately-added duplicate**. Its old
+  pivot (`psi-emacs--state nil` + the `(when psi-emacs--state)` guard) no longer
+  matches the post-change no-op, which turns on `(buffer-live-p buffer)`. Slice 2
+  now renames it (e.g. `…-noop-when-buffer-dead`), drives it via `kill-buffer` +
+  invoke with the dead `buffer` + valid `state`, and is the single dead-buffer
+  timeout test — eliminating the redundant add (`one_way → singular`). Updated
+  steps Slice 2 + plan.md Decision 7.
+
+No code changes (design/plan-only). steps.md P1–P3 checked.

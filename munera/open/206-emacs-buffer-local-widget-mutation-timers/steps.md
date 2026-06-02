@@ -8,9 +8,13 @@
       in `psi-emacs--initialize-state` (`psi-lifecycle.el:57`), beside the
       notification-timers init.
 - [ ] Add `psi-widget-projection--clear-mutation-timers (state)` in
-      `psi-widget-projection.el`: maphash `cancel-timer` over timer values then
-      `clrhash`, guarded on `(hash-table-p timers)` — mirroring the timer loop
-      in `psi-emacs--clear-notification-lifecycle` (`psi-projection.el`).
+      `psi-widget-projection.el`: wrap the whole body in an outer `(when state
+      ...)`, then maphash `cancel-timer` over timer values guarded on
+      `(timerp timer)` then `clrhash`, inner-guarded on `(hash-table-p timers)`
+      — mirroring `psi-emacs--clear-notification-lifecycle`
+      (`psi-projection.el:379`) exactly: outer `(when state ...)` so a nil
+      `state` is a harmless no-op (P2). The helper owns the null guard; call
+      sites pass bare `psi-emacs--state` (Slice 4).
 - [ ] Run `emacs-ui` tests; confirm still green (no behaviour change yet).
 - [ ] `clj-paren-repair`/lint the edited `.el` files; reload per post-commit
       reload guideline.
@@ -39,11 +43,20 @@
 - [ ] Update existing tests `pwpt-arm-cancel-mutation-timer-roundtrip`,
       `pwpt-on-mutation-timeout-clears-in-flight`,
       `pwpt-on-mutation-timeout-calls-error-handler`,
-      `pwpt-on-mutation-timeout-noop-when-no-state`, `pwpt-dispatch-mutation-arms-timer`
+      `pwpt-dispatch-mutation-arms-timer`
       to the new signatures: drive the buffer-local store via state instead of
-      `let`-binding the global defvar; pass `buffer`/`state` to timeout calls.
-- [ ] Add test: timeout callback no-op when its `buffer` is dead
-      (`kill-buffer` then invoke) — store untouched, no error.
+      `let`-binding the global defvar; pass `buffer`/`state` to timeout calls
+      (live buffer + valid `state`, asserting the post-change behaviour holds).
+- [ ] Repurpose existing test `pwpt-on-mutation-timeout-noop-when-no-state`
+      (`psi-widget-projection-test.el:542`) into the dead-buffer no-op case
+      (P3): rename to reflect the new pivot (e.g.
+      `pwpt-on-mutation-timeout-noop-when-buffer-dead`), drive it by
+      `kill-buffer` then invoking `--on-mutation-timeout` with that dead
+      `buffer` + a valid `state`, and assert a harmless no-op (store untouched,
+      no error) — replacing the old `psi-emacs--state nil` pivot since the
+      post-change no-op turns on `(buffer-live-p buffer)`, not dynamic state.
+      This is the single dead-buffer-no-op test for the timeout path; do NOT
+      additionally add a separate dead-buffer test (the repurposed one is it).
 - [ ] Run tests; lint; reload.
 - [ ] Commit: `⚒ 206: resolve mutation-timer store from explicit state + thread buffer into timeout`.
 
@@ -56,6 +69,13 @@
       `(psi-widget-projection--cancel-mutation-timer state tkey)`; clear in-flight
       lstate + `--upsert-projection-block` inside `(with-current-buffer buffer ...)`;
       no read of dynamic `psi-emacs--state` for store resolution.
+- [ ] Update existing test `pwpt-dispatch-mutation-cancels-timer-on-response`
+      (`psi-widget-projection-test.el:565`) to the response-targeting rework
+      (P1): drive the buffer-local store via `state` instead of `let`-binding
+      the global defvar, so it exercises cancel against the originating
+      buffer's store. Slice 3 owns this migration (it reworks the response
+      callback), so Slice 5's defvar deletion + "remove leftover let-binds"
+      finds no remaining `let`-bind here.
 - [ ] Add test: response arriving while a *different* buffer is current
       cancels/clears the originating buffer's store, not the current buffer's.
 - [ ] Add test: response for a dead originating buffer is a no-op (store of a
@@ -94,14 +114,14 @@
 
 ## Plan ambiguity review follow-ups (ψ)
 
-- [ ] P1 — Assign the sixth existing test. `pwpt-dispatch-mutation-cancels-timer-on-response`
+- [x] P1 — Assign the sixth existing test. `pwpt-dispatch-mutation-cancels-timer-on-response`
       (`psi-widget-projection-test.el:565`) `let`-binds the global defvar and
       exercises the response-cancel path, but no slice lists it for update. Decide
       which slice migrates it to drive the buffer-local store via `state` (Slice 3
       is the natural home, since it reworks the response callback) and add it to
       that slice's "update existing tests" set, so Slice 5's defvar deletion +
       "remove leftover let-binds" leaves no broken/orphaned test.
-- [ ] P2 — Specify the `--clear-mutation-timers` null-`state` guard. Steps Slice 1
+- [x] P2 — Specify the `--clear-mutation-timers` null-`state` guard. Steps Slice 1
       pins only `(hash-table-p timers)`; the mirrored
       `psi-emacs--clear-notification-lifecycle` wraps its whole body in
       `(when state ...)`, and Slice 4 calls the helper with bare `psi-emacs--state`
@@ -110,7 +130,7 @@
       the precedent) or whether each call site must wrap with `(when
       psi-emacs--state ...)`, so a nil-state teardown cannot error on
       `(psi-emacs-state-projection-mutation-timers nil)`. Update Slice 1/Slice 4.
-- [ ] P3 — Resolve the `pwpt-on-mutation-timeout-noop-when-no-state` remapping.
+- [x] P3 — Resolve the `pwpt-on-mutation-timeout-noop-when-no-state` remapping.
       Slice 2 lists this test (`:542`, asserts a harmless no-op when
       `psi-emacs--state` is nil, relying on the old `(when psi-emacs--state)`
       guard) for "update to new signatures," but the post-change no-op pivots on
