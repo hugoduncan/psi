@@ -3134,3 +3134,34 @@ it — symmetric to the read-helper convergence of passes 1–3.
   all under `components/agent-session/test/**`; **zero**
   `components/agent-session/src/**` or `doc/scheduler.md` (verification-only
   invariant; Slice-10 allowlist).
+
+---
+
+## code-shaper review — pass 6 (2026-06-01) — REVIEW_COMPLETE
+
+Independent code-shaper pass over the task's verification deliverables
+(`scheduler_test`, `scheduler_end_to_end_test`, `scheduler_timer_seam_test`,
+`scheduler_context_shutdown_test`, `scheduler_resolvers_test`,
+`psi_tool_scheduler_test`, `scheduler_lifecycle_test`,
+`scheduler_background_jobs_test`, `scheduler_cancel_job_test`, `test_support`)
+against `simple ∧ consistent ∧ robust`.
+
+Runtime truth: scheduler subset **34 tests / 257 assertions / 0 failures**;
+clj-kondo **0 errors / 0 warnings** on all 8 touched files.
+
+Findings: **no new actionable shaping issue.** The suite has converged through
+passes 1–5 (read/write helper extraction incl. the pass-5 `set-session-streaming!`
+write-helper, commit 8eb30f7de) + 24 test-shaper passes:
+- single-responsibility deftests (test-shaper megatest splits held);
+- consistent seam idiom across all live tests
+  (`capturing-delay-fn` → `((:f @callback*))`, no wall-clock);
+- consistent `schedule-by-id`/`-status`/`-queue`/`set-session-streaming!`
+  read/write abstraction in `test_support`;
+- assertions on state/outputs, never handler interactions.
+
+Scrutinised the lone residual raw 6-segment internal-state-path `assoc-in`
+`:queued`-seed in `scheduler_background_jobs_test` — already adjudicated by
+pass-4 (atomic-write collapse, a35e338d9) and pass-22 (read-path standardisation,
+ceb10f878), which deliberately retained the test-local `:queued` fabrication
+(write-helper declined as single-callsite over-abstraction). Re-flagging would
+duplicate prior converged decisions. No follow-up steps added.
