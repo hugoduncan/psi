@@ -604,3 +604,40 @@ asymmetry vs the timeout test (which already asserted both store + lstate).
 Pure test-coverage addition for already-implemented behaviour; no
 source/design change. `bb emacs:check` green (340/340, byte-compile clean);
 the target test passes (289/340). `.el` reloaded into the running Emacs.
+
+## Test review pass 3 (ψ)
+
+Independent re-application of task-test-review (well_formed ∧
+∀b∈behaviour(design).∃t.covers ∧ infra_deps injectable/¬mock). Full suite green
+(340/340, byte-compile clean). Grounded on current source
+(`psi-widget-projection.el:310/323/337/361`) and
+`test/psi-widget-projection-timers-test.el`.
+
+Well-formed: each test is isolated (fresh state via `pwpt--with-state` or
+`setq-local`; generated buffers cleaned in `unwind-protect`), names its
+intent, and asserts state — store contents, `in-flight-p` lstate,
+cancel/timerp/armed flags — never interaction sequences.
+
+Behaviour coverage (∀b∈design.∃t) verified complete:
+- Scope (a) teardown cancel — `pwpt-teardown-cancels-in-flight-mutation-timers`.
+- Scope (b) two-buffer independence — `pwpt-two-buffers-do-not-share-mutation-timer-state`.
+- Scope (c) arm/cancel/timeout/response preserved — roundtrip, clears-in-flight,
+  error-handler, dispatch-arms, cancels-on-response.
+- Scope (d) response AND timeout cross-buffer-current targeting (store + lstate)
+  — `pwpt-dispatch-response-targets-originating-buffer` (T4: store + lstate),
+  `pwpt-on-mutation-timeout-targets-originating-buffer` (store + lstate).
+- Scope (e) response/timeout dead-buffer no-op — `…-noop-when-buffer-dead`
+  (both paths).
+- AC arm threads buffer/state — `pwpt-arm-threads-buffer-and-state-into-scheduled-callback` (T1).
+- AC nil-state timeout no-op (R1) — `pwpt-on-mutation-timeout-noop-when-state-nil`.
+- transcript reset — `pwpt-reset-transcript-clears-mutation-timers`.
+- clear helper — cancels+clears + nil-state no-op.
+
+Infra deps: `cl-letf` substitutes only `run-at-time`, `cancel-timer`, `timerp`,
+`send-request-function`, `psi-emacs--upsert-projection-block` — all
+infrastructure/timer/RPC/render primitives (testing-without-mocks
+"infrastructure → controllable"). No domain logic (timer-key, effective-timeout,
+lstate transforms, store resolution, error-handler) is mocked; those run real.
+
+No new actionable test gaps. All prior test follow-ups (T1, T3, T4) confirmed
+resolved in tests. Verdict: REVIEW_COMPLETE.
