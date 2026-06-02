@@ -102,23 +102,10 @@
       (is (re-find #"(?s)any test references the target `var`" body)
           "coverage hint reports whether any test references the target var"))))
 
-(defn- local-unit-json
-  "A synthetic `local`-lens unit JSON object for a null-arity (defmethod-style)
-   var `x/f`, distinguished only by `line`/`lcc-total`."
-  [line lcc-total]
-  (str "{\"ns\":\"x\",\"var\":\"f\",\"arity\":null,\"line\":" line ",\"end-line\":" (+ line 10) ","
-       "\"lcc-total\":" lcc-total ",\"flow-burden\":1,\"state-burden\":1,\"shape-burden\":1,"
-       "\"abstraction-burden\":1,\"dependency-burden\":1,\"working-set\":1,\"file\":\"x.clj\",\"findings\":[]}"))
-
-(defn- cc-unit-json
-  "A synthetic `complexity`-lens unit JSON object for null-arity var `x/f`."
-  [line cc]
-  (str "{\"ns\":\"x\",\"var\":\"f\",\"arity\":null,\"line\":" line ",\"cc\":" cc "}"))
-
 (defn- named-local-unit-json
   "A synthetic `local`-lens unit JSON for a named null-arity var `<ns>/<var>`,
-   distinguished by `line`/`lcc-total`. Used by the filter/drop coverage tests
-   (TR6) to feed identifiable units whose presence/absence is unambiguous."
+   distinguished by `line`/`lcc-total`. Used by the recipe coverage tests to
+   feed identifiable units whose presence/absence is unambiguous."
   [unit-ns unit-var line lcc-total]
   (str "{\"ns\":\"" unit-ns "\",\"var\":\"" unit-var "\",\"arity\":null,\"line\":" line ","
        "\"end-line\":" (+ line 10) ",\"lcc-total\":" lcc-total ",\"flow-burden\":1,"
@@ -163,10 +150,10 @@
         recipe (extract-jq-recipe body)
         ;; two execute-effect!-style null-arity units sharing (ns, var, arity)
         ;; but distinct lines and distinct cc/burden, both above threshold.
-        line-10-local (local-unit-json 10 "30.0")
-        line-40-local (local-unit-json 40 "60.0")
-        line-10-cc (cc-unit-json 10 3)
-        line-40-cc (cc-unit-json 40 4)]
+        line-10-local (named-local-unit-json "x" "f" 10 "30.0")
+        line-40-local (named-local-unit-json "x" "f" 40 "60.0")
+        line-10-cc (named-cc-unit-json "x" "f" 10 3)
+        line-40-cc (named-cc-unit-json "x" "f" 40 4)]
     (is (some? recipe) "the join/gap jq recipe is extractable from SKILL.md")
     (if (try (zero? (:exit (shell/sh "jq" "--version"))) (catch Exception _ false))
       (do

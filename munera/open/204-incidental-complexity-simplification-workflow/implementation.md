@@ -2924,3 +2924,30 @@ single-concern deftests, explicit arrange/act/assert, jq-absent structural
 fallbacks for every executable recipe behaviour (determinism/filter/drop/ranking/
 cap/max-cc/boundary), behaviour-focused prompt/EDN-shape locks for both
 workflows, and the design-acceptance coverage net (TR1–TR19) is comprehensive.
+
+## Test review pass 16 — TR20 resolution (test-shaper follow-up execution)
+
+Executed TR20 (the sole newly added unchecked review-pass-16 follow-up).
+
+- Deleted `local-unit-json` / `cc-unit-json` from
+  `incidental_complexity_finder_skill_test.clj`.
+- Rewrote the four determinism-test call sites (the `line-10`/`line-40`
+  `local`/`cc` fixtures) to the parameterized superset builders
+  `(named-local-unit-json "x" "f" …)` / `(named-cc-unit-json "x" "f" …)`.
+  Byte-identical JSON for `ns "x"`/`var "f"`/`file "x.clj"`, so the determinism
+  test's behaviour and assertions are unchanged — a pure structural collapse.
+- Trimmed the now-obsolete TR6 reference in the `named-local-unit-json` docstring
+  (the builders now serve every recipe test, not just filter/drop).
+
+Verification (test-only; no production/skill/EDN change):
+- focused suite (`incidental-complexity-finder-skill-test` +
+  `task-204-workflow-definitions-test`): 10 tests, 117 assertions, 0 failures —
+  identical to pass-15, confirming the refactor preserved behaviour.
+- `clj-kondo` 0 errors / 0 warnings (no unused-var warning ⇒ both deleted
+  builders confirmed gone, `named-*` still referenced).
+- `clj-paren-repair` Success.
+- skill-test file 429 lines (< 800); `bb commit-check:file-lengths` exit 0.
+
+One fixture-builder pair now serves every recipe test (test-shaper
+`consistent(fixtures)` + `economical`): a future unit-JSON shape change threads
+through one pair; a reader learns one helper.
