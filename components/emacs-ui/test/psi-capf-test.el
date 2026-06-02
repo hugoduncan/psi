@@ -302,6 +302,74 @@ templates) still produces a non-nil token and refreshes (I2/AC5/AC6)."
       (should (equal '("delegate")
                      (psi-emacs-state-extension-command-names psi-emacs--state))))))
 
+(ert-deftest psi-slash-completion-token-constructors-agree-on-padded-edge-data ()
+  "Both slash-completion token constructors normalize equal backend data to
+`equal' tokens (CS4).  The apply-path constructor reads query-frame `:keyword'
+alists; the event-data path reads `psi-emacs--event-data-get' alists.  Seeding
+the same logical built-in specs — with surrounding whitespace and a non-string
+description — through both paths must yield identical tokens, so no spurious
+refresh fires for unchanged data."
+  (let* ((apply-token
+          (psi-emacs--slash-completion-token
+           nil
+           '((( :name . "  reload-models  ")
+              (:description . "  reload custom model definitions  "))
+             (( :name . "speed")
+              (:description . 42)))
+           nil))
+         (event-builtin-specs
+          '((( :name . "  reload-models  ")
+             (:description . "  reload custom model definitions  "))
+            (( :name . "speed")
+             (:description . 42))))
+         (event-token
+          (list :commands nil
+                :builtins (psi-emacs--event-pair-segment event-builtin-specs)
+                :templates (psi-emacs--event-pair-segment nil))))
+    ;; Padded `:name' is trimmed, non-string `:description' is coerced and
+    ;; trimmed identically on both sides.
+    (should (equal '(:commands nil
+                     :builtins (("reload-models" "reload custom model definitions")
+                                ("speed" "42"))
+                     :templates nil)
+                   apply-token))
+    (should (equal apply-token event-token))))
+
+(ert-deftest psi-session-updated-no-false-positive-refresh-on-padded-equal-data ()
+  "An incoming session update whose built-in specs differ only by surrounding
+whitespace / value type from the already-stored token produces NO change (CS4):
+the event-data token must be `equal' to the apply-path token, so the cached
+slash-completion state is left untouched."
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (let ((stored-token
+           (psi-emacs--slash-completion-token
+            nil
+            '((( :name . "reload-models")
+               (:description . "reload custom model definitions")))
+            nil)))
+      (setq-local psi-emacs--state
+                  (make-psi-emacs-state
+                   :session-id "s1"
+                   :prompt-templates nil
+                   :extension-command-names nil
+                   :builtin-command-specs '((( :name . "reload-models")
+                                             (:description . "reload custom model definitions")))
+                   :slash-completion-token stored-token))
+      (psi-emacs--handle-session-updated-event
+       '((:session-id . "s1")
+         (:phase . "idle")
+         (:is-streaming . nil)
+         (:is-compacting . nil)
+         (:pending-message-count . 0)
+         (:retry-attempt . 0)
+         (:interrupt-pending . nil)
+         (:builtin-command-specs . [((:name . "  reload-models  ")
+                                     (:description . "  reload custom model definitions  "))])))
+      ;; Token unchanged → no spurious refresh.
+      (should (equal stored-token
+                     (psi-emacs-state-slash-completion-token psi-emacs--state))))))
+
 (ert-deftest psi-capf-at-reference-context-returns-file-candidates-and-category ()
   (let* ((tmp (make-temp-file "psi-capf-ref-" t))
          (default-directory (file-name-as-directory tmp)))

@@ -77,6 +77,19 @@ payloads can seed state before the first canonical session-targeted update."
     (or (null current-session-id)
         (equal event-session-id current-session-id))))
 
+(defun psi-emacs--event-pair-segment (specs)
+  "Return canonical (NAME DESCRIPTION) token pairs from event-data SPECS.
+
+Each spec is an event-data alist read with `psi-emacs--event-data-get' and
+normalized via the shared `psi-emacs--slash-completion-pair', so this inline
+comparison path yields tokens identical to the apply-path constructor
+(`psi-emacs--slash-completion-token') for equal backend data."
+  (mapcar (lambda (spec)
+            (psi-emacs--slash-completion-pair
+             (psi-emacs--event-data-get spec '(:name name))
+             (psi-emacs--event-data-get spec '(:description description))))
+          (or specs [])))
+
 (defun psi-emacs--slash-completion-data-changed-p (data)
   "Return non-nil when session update DATA carries changed slash completion state."
   (when psi-emacs--state
@@ -102,18 +115,8 @@ payloads can seed state before the first canonical session-targeted update."
                             (list :commands (mapcar (lambda (name)
                                                       (string-trim (format "%s" (or name ""))))
                                                     (or command-names []))
-                                  :builtins (mapcar (lambda (spec)
-                                                      (list (psi-emacs--non-blank-text
-                                                             (psi-emacs--event-data-get spec '(:name name)))
-                                                            (psi-emacs--non-blank-text
-                                                             (psi-emacs--event-data-get spec '(:description description)))))
-                                                    (or builtin-specs []))
-                                  :templates (mapcar (lambda (tpl)
-                                                       (list (psi-emacs--non-blank-text
-                                                              (psi-emacs--event-data-get tpl '(:name name)))
-                                                             (psi-emacs--non-blank-text
-                                                              (psi-emacs--event-data-get tpl '(:description description)))))
-                                                     (or templates [])))))
+                                  :builtins (psi-emacs--event-pair-segment builtin-specs)
+                                  :templates (psi-emacs--event-pair-segment templates))))
            (current-token (psi-emacs-state-slash-completion-token psi-emacs--state)))
       (when next-token
         (unless (equal current-token next-token)

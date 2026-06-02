@@ -1907,3 +1907,49 @@ Remedy: extract one shared token-segment builder (single normalization of a
 sites read different alist shapes (query-frame `:keyword` keys vs event-data
 `(:k k)` key-lists), so the shared helper takes already-extracted pair lists or
 a key-list arg; the normalization itself must be the single shared fn.
+
+## CS4 follow-up executed (code-shaper pass 3)
+
+Unified the two slash-completion token constructors onto a single shared
+normalization, so "equal backend data → `equal` tokens" is structural rather
+than asserted by comment.
+
+- Added two pure helpers to `psi-globals.el` (the base module both call sites
+  already `require`, so no new circular `declare-function`s):
+  - `psi-emacs--slash-completion-normalize-text` — the single canonical scalar
+    normalizer (`(string-trim (format "%s" (or value "")))` → nil-on-blank).
+    This is the trimming/coercing semantics of the former
+    `psi-emacs--trim-optional-input`, chosen as canonical because the stored
+    token (apply path) already used it.
+  - `psi-emacs--slash-completion-pair` — builds a canonical `(name description)`
+    pair from already-extracted raw values, normalizing both through the scalar
+    fn.
+- Apply path (`psi-session-commands.el`): replaced the bespoke
+  `:builtins`/`:templates` mappers with one `psi-emacs--alist-pair-segment`
+  (extracts via `psi-emacs--alist-get-any`, normalizes via the shared pair).
+  `psi-emacs--slash-completion-token` uses it for both `:builtins` and
+  `:templates`. The former `psi-emacs--normalize-builtin-command-specs` had no
+  remaining callers after this and was removed (dead delegate).
+- Event-data path (`psi-events.el`): added `psi-emacs--event-pair-segment`
+  (extracts via `psi-emacs--event-data-get`, normalizes via the shared pair).
+  The inline `next-token` now calls it for `:builtins` and `:templates`; the
+  former `psi-emacs--non-blank-text`-based mappers are gone (the helper remains,
+  still used by assistant/error text paths). Extraction stays per-site (the two
+  alist shapes differ); only the normalization is shared, per the CS4 remedy.
+- The `:commands` segment was already identical on both sides
+  (`(string-trim (format "%s" …))`) so it is left in place.
+
+Tests (`test/psi-capf-test.el`):
+- `psi-slash-completion-token-constructors-agree-on-padded-edge-data` — seeds
+  the same logical built-in specs (padded `:name`, non-string `:description`)
+  through the apply-path constructor and the event-data segment builder and
+  asserts the tokens are `equal` (and trim/coerce to the expected canonical
+  shape). Would have failed pre-CS4: the old event path used the *untrimmed*
+  `non-blank-text` and dropped non-string values.
+- `psi-session-updated-no-false-positive-refresh-on-padded-equal-data` — stores
+  a token, then sends a `session/updated` whose built-in specs differ only by
+  surrounding whitespace; asserts the cached token is untouched (no spurious
+  refresh).
+
+`bb emacs:check` green: 329 tests / 329 expected / 0 unexpected; byte-compile
+clean (0 warnings).

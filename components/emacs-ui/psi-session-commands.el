@@ -302,17 +302,18 @@ the single authoritative source of the built-in command surface (task 205)."
             (string-trim (format "%s" (or name ""))))
           (or names [])))
 
-(defun psi-emacs--normalize-builtin-command-specs (builtin-specs)
-  "Return canonical (NAME DESCRIPTION) pairs from BUILTIN-SPECS.
+(defun psi-emacs--alist-pair-segment (specs)
+  "Return canonical (NAME DESCRIPTION) token pairs from alist SPECS.
 
-Normalized identically to prompt templates so equal backend data yields equal
-token segments (see `psi-emacs--slash-completion-token')."
+Each spec is an alist read with `psi-emacs--alist-get-any' and normalized via
+the shared `psi-emacs--slash-completion-pair', so built-in command specs and
+prompt templates produce identical token segments for equal backend data (see
+`psi-emacs--slash-completion-token')."
   (mapcar (lambda (spec)
-            (list (psi-emacs--trim-optional-input
-                   (psi-emacs--alist-get-any spec '(:name name)))
-                  (psi-emacs--trim-optional-input
-                   (psi-emacs--alist-get-any spec '(:description description)))))
-          (or builtin-specs [])))
+            (psi-emacs--slash-completion-pair
+             (psi-emacs--alist-get-any spec '(:name name))
+             (psi-emacs--alist-get-any spec '(:description description))))
+          (or specs [])))
 
 (defun psi-emacs--slash-completion-token (names builtin-specs templates)
   "Return deterministic token representing slash completion source state.
@@ -320,13 +321,8 @@ Segment order is fixed (:commands :builtins :templates) and identical to the
 inline token in `psi-emacs--slash-completion-data-changed-p' so equal data
 yields equal tokens."
   (list :commands (psi-emacs--normalize-slash-completion-names names)
-        :builtins (psi-emacs--normalize-builtin-command-specs builtin-specs)
-        :templates (mapcar (lambda (tpl)
-                             (list (psi-emacs--trim-optional-input
-                                    (psi-emacs--alist-get-any tpl '(:name name)))
-                                   (psi-emacs--trim-optional-input
-                                    (psi-emacs--alist-get-any tpl '(:description description)))))
-                           (or templates []))))
+        :builtins (psi-emacs--alist-pair-segment builtin-specs)
+        :templates (psi-emacs--alist-pair-segment templates)))
 
 (defun psi-emacs--apply-slash-completion-data (names builtin-specs templates)
   "Store slash completion NAMES, BUILTIN-SPECS, and TEMPLATES on frontend state."

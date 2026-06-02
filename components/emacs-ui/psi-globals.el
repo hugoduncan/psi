@@ -198,6 +198,36 @@ Used to detect stalled streaming runs and transition to deterministic recovery."
 (declare-function markdown-mode "markdown-mode")
 (declare-function markdown-fontify-region "markdown-mode" (begin end))
 
+;; Shared slash-completion token normalization.
+;;
+;; The slash-completion change-detection token is built in two places: the apply
+;; path (`psi-emacs--slash-completion-token' in psi-session-commands.el) and the
+;; inline comparison path (`psi-emacs--slash-completion-data-changed-p' in
+;; psi-events.el). They MUST normalize equal backend data to `equal' tokens, or a
+;; whitespace-padded / non-string `:name'/`:description' yields divergent tokens
+;; → spurious refresh or a missed change. These helpers are the single shared
+;; normalization both call sites use, so "equal data → equal tokens" is
+;; structural rather than asserted by comment.
+
+(defun psi-emacs--slash-completion-normalize-text (value)
+  "Return canonical token text for VALUE, or nil when blank.
+
+Coerces non-string VALUE via `format', trims surrounding whitespace, and
+returns nil for blank results.  This is the single canonical scalar
+normalization shared by both slash-completion token constructors."
+  (let ((text (string-trim (format "%s" (or value "")))))
+    (unless (string-empty-p text)
+      text)))
+
+(defun psi-emacs--slash-completion-pair (name description)
+  "Return canonical (NAME DESCRIPTION) token pair from raw NAME and DESCRIPTION.
+
+Both values are normalized through `psi-emacs--slash-completion-normalize-text'
+so equal backend data provably yields `equal' pairs across both token
+constructors."
+  (list (psi-emacs--slash-completion-normalize-text name)
+        (psi-emacs--slash-completion-normalize-text description)))
+
 (provide 'psi-globals)
 
 ;;; psi-globals.el ends here

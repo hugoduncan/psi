@@ -521,7 +521,7 @@ Tick with sha/decision on completion.
 
 ## Code-shaper review follow-ups (code-shaper pass 3)
 
-- [ ] CS4 — Unify the two slash-completion token constructors so equal backend
+- [x] CS4 — Unify the two slash-completion token constructors so equal backend
       data provably yields equal tokens (`consistent ∧ robust`; closes the
       comment-only "structurally identical" contract P2 relies on). Today
       `psi-emacs--slash-completion-token` (`psi-session-commands.el`, via
