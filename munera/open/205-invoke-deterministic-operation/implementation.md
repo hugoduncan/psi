@@ -471,3 +471,48 @@ The remaining unchecked close-out box (`git mv open/ → closed/` + remove from
 plan.md) is the lifecycle's terminal move; the task stays in `open/` under this
 worktree handoff and the close move is performed by the orchestrating lifecycle,
 not this follow-up pass.
+
+## Test review (ψ, second pass)
+
+Re-applied task-test-review skill (well-formed ∧ behaviour-coverage ∧
+infra-deps real/¬mock). Ran the four task suites focused: 45 tests / 96
+assertions, all green. Grounded against `deterministic_operation_action.clj`,
+`psi_tool_operation.clj`, `commands/operation.clj`, `psi_tool_validate.clj`
+and the four test namespaces.
+
+Confirmed (unchanged from first pass): well-formed, deterministic; real
+registry + real runtime, no mocks/stubs; side-effects via real sinks; AC
+behaviour coverage incl. TR-1 `:details` (now closed across all three surfaces).
+
+Actionable test gap found (1):
+- **Command surface (`/operation`) has no per-key truncation test (decision
+  #9).** Decision #9 is a *surface-independent* rule whose explicit purpose is
+  that the command and psi-tool action "render identically", and the plan's own
+  "Truncation identical across surfaces" risk states: "Test **both surfaces** on
+  an over-2000-char value and assert identical truncated value + marker." Today
+  truncation is exercised at the helper level
+  (`truncate-value-over-limit-marked`, `project-result-truncates-oversized-value`)
+  and on the **psi-tool** surface
+  (`invoke-over-2000-char-value-truncated-identically`), but
+  `operation_command_test.clj` contains **no** over-2000-char case — the
+  `render-operation-result` text path (which calls `project-result` →
+  `truncate-value` and emits a `"<key> <value>"` line) is never asserted to
+  carry the truncation marker. The "identical across surfaces" claim is
+  therefore only half-verified; a regression that broke truncation on the
+  command path (e.g. a future surface re-implementing rendering) would go
+  undetected. This is distinct from TR-1 (which covered `:details` nested-map
+  projection, not value truncation). Add a `/operation` command test invoking
+  an op whose result value `pr-str`s to >2000 chars, asserting the rendered
+  `:type :text` line for that key contains the exact
+  `… (truncated, N chars total)` marker and matches
+  `(op-action/truncate-value (pr-str value))`, closing the
+  decision-#9 surface-parity guarantee on the command surface.
+
+Non-actionable observations (no follow-up):
+- `parse-operation-args-string` hardcodes `:op "invoke"` in its ex-info `:phase
+  :validate` data; it is only ever called from the `invoke` branch, so the
+  constant is correct (not a gap).
+- `validate-psi-tool-request` has no isolated unit test, but its operation
+  branch behaviour (valid op, blank-id reject, invalid-op reject, non-map args
+  reject, default `{}`, list-ignores-args) is fully exercised end-to-end through
+  the `psi_tool_operation_integration_test` `make-psi-tool` path. Adequate.

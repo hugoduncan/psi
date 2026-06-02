@@ -242,6 +242,18 @@
     asserting a `:details {…}` line appears in the `:type :text` output (closes
     the all-keys rule for the nested-map case on both surfaces).
 
+- [ ] (TR-2) Cover per-key truncation on the `/operation` **command** surface
+  (decision #9 surface-parity). Truncation is currently tested only at the
+  helper level and on the psi-tool surface; `operation_command_test.clj` has no
+  over-2000-char case, so the command `render-operation-result` text path is
+  unverified for the truncation marker. Add a `/operation` command test invoking
+  an op whose result value `pr-str`s to >2000 chars, asserting the rendered
+  `:type :text` line for that key contains the exact
+  `… (truncated, N chars total)` marker and equals
+  `(op-action/truncate-value (pr-str value))` — closing the "identical across
+  surfaces" guarantee (plan risk) on the command surface. Distinct from TR-1
+  (nested-map `:details` projection).
+
 ## Close-out
 
 - [x] Re-read design acceptance criteria; confirm each is covered by a test.
