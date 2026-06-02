@@ -1906,3 +1906,26 @@ pre-existing non-cited default-daemon boundary test already scoped out by passes
 7/9/11 (`real_integration_at_boundaries`); not re-filed (no-duplicate). Review
 chain converged → REVIEW_COMPLETE. (Full `bb test` green; clj-kondo 0/0; no
 source/doc touched — verification-only invariant + Slice-10 allowlist held.)
+
+## Code-shaper follow-ups — pass 4 (code-shaper, 2026-06-01)
+
+- [ ] Collapse the two-`swap!` correlated-state seed in
+      `scheduler_background_jobs_test.clj` /
+      `scheduler-background-job-projection-test` (L31–32) into a single atomic
+      write. Currently `:scheduler/create` for `sch-2` is followed by two
+      separate `(swap! (:state* ctx) (ss/session-update session-id (fn [sd]
+      (assoc-in sd …))))` calls — one setting `[:scheduler :schedules "sch-2"
+      :status] :queued`, one setting `[:scheduler :queue] ["sch-2"]`. These are a
+      single invariant (queued status ⇔ queue membership); two swaps create a
+      transient inconsistent intermediate and duplicate the swap/`session-update`
+      wrapper. Replace with one `(swap! (:state* ctx) (ss/session-update
+      session-id (fn [sd] (-> sd (assoc-in [:scheduler :schedules "sch-2" :status]
+      :queued) (assoc-in [:scheduler :queue] ["sch-2"])))))`. `simple`
+      (one write / one responsibility) ∧ `robust` (atomic correlated seed).
+      Behaviour- and assertion-preserving: no deftest renamed → `findings.md`
+      citations unchanged; aggregate count unchanged. Keep `bb test` green +
+      clj-kondo/cljfmt clean. Test-file only (Slice-10 allowlist — zero
+      `components/agent-session/src/**` or `doc/scheduler.md`). NOTE: a write-side
+      helper (`set-schedule-status`/`set-schedule-queue`) is deliberately NOT
+      proposed — single callsite (2 sites, 1 file) → unnecessary abstraction; do
+      not re-file that.

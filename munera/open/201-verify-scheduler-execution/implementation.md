@@ -2997,3 +2997,39 @@ introspection attrs all match verified behaviour.
 No new actionable doc issue; pass-1 follow-ups confirmed complete (both `[x]`).
 Converges with pass 2 → REVIEW_COMPLETE. No new steps added (no actionable
 finding). Verification-only invariant held: no `src`/`doc` change in this review.
+
+## Code-shaper review — pass 4 (code-shaper, 2026-06-01)
+
+Independent re-audit of the 201 test surface (simplicity ∧ consistency ∧
+robustness). Confirmed prior convergences landed and effective: shared
+`stub-execution-result` (pass 1), `test-support/instant` literal helper (pass 2),
+read-path helpers `schedule-by-id`/`schedule-status`/`schedule-queue` (pass 3),
+write idiom `ss/session-update` (test-shaper pass 13), and the inner-`[:scheduler …]`
+read-path isolation. `scheduler-background-jobs-test` re-run green; clj-kondo 0/0
+on the touched file + `test_support`.
+
+One **new actionable** `simple ∧ robust` finding (not raised by passes 1–3 nor
+test-shaper 22): in `scheduler_background_jobs_test` /
+`scheduler-background-job-projection-test` (L31–32), the queued-state seed uses
+**two separate `swap!`/`ss/session-update` calls** to set *correlated* state —
+`[:scheduler :schedules "sch-2" :status] :queued` and `[:scheduler :queue]
+["sch-2"]`. These two facts are a single invariant (a queued schedule's status
+*and* its queue membership); seeding them in two swaps creates a transient
+intermediate where status=:queued but the queue is still empty, and duplicates
+the `swap!`/`session-update` boilerplate. A single `swap!` applying one
+`ss/session-update` that updates both inner paths in one `sd` transform makes
+the correlated seed atomic and removes the duplicated wrapper — `simple`
+(one write, one responsibility) and `robust` (no inconsistent intermediate).
+Behaviour/assertion-preserving (no deftest renamed → `findings.md` citations
+unchanged; aggregate count unchanged). Test-file only (Slice-10 allowlist).
+
+**Declined** (recorded to avoid re-flagging): extracting a write-side helper
+(`set-schedule-status`/`set-schedule-queue`) symmetric to the read helpers.
+There is exactly **one** test with these write sites (2 callsites, 1 file) vs.
+the 41+ read sites that justified the read helpers; a write helper here would be
+an `unnecessary abstraction` for a single callsite (`extract(shape)` gate
+`∃pattern(x,y)` too weak). The inner-path-literal asymmetry (reads isolate it,
+this one write open-codes it) is intentionally tolerated at duplication-count 1.
+
+Verification-only invariant held: no `components/agent-session/src/**` or
+`doc/scheduler.md` change in this review.
