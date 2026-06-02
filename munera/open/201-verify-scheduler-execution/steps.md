@@ -1945,3 +1945,35 @@ source/doc touched — verification-only invariant + Slice-10 allowlist held.)
       `scheduler_background_jobs_test.clj` + task-dir docs; zero
       `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist
       held).
+
+## Code-shaper follow-ups — pass 5 (code-shaper, 2026-06-01)
+
+- [ ] Extract a shared `set-session-streaming!` write-helper into
+      `components/agent-session/test/psi/agent_session/test_support.clj` (beside
+      the existing `schedule-status`/`schedule-queue`/`scheduled-message-by-id`
+      read helpers) and route the duplicated origin-session busy/idle state-write
+      through it (`consistent(idioms)` ∧ DRY ∧ `locally_comprehensible`;
+      symmetric to the read-helper convergence of passes 1–3). The idiom
+      `(swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming true/false))))`
+      repeats **12×**: `scheduler_handlers_test` L69/152/164/191/194/389 (×6),
+      `scheduler_lifecycle_test` L114/136/164/178/201 (×5), and
+      `scheduler_end_to_end_test` L97-98 (×1, `(fn [sd] (assoc sd :is-streaming true))`).
+      Add e.g.
+      `(defn set-session-streaming! [ctx session-id streaming?] (swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming streaming?)))))`
+      and replace all 12 sites with
+      `(test-support/set-session-streaming! ctx session-id true|false)` (the
+      end-to-end site uses `ctx*`). NOT in scope (different idiom — do not
+      touch): the `{:is-streaming … :is-compacting …}` *literal maps* in
+      `scheduler_test.clj` (pure `fire-schedule`/`drain-one` args) and
+      `scheduler_dispatch_test.clj` L66 (dispatch payload) — those are pure-fn
+      args / payloads, not state swaps. After the extraction, the helper may
+      leave a now-unused `ss` require in a file whose only `ss` use was these
+      swaps — drop the require if so (verify with clj-kondo). Behaviour- and
+      assertion-preserving: no deftest renamed, no assertions added/removed →
+      `findings.md` citations + aggregate (50 deftests / 412 assertions)
+      unchanged. Keep `bb test` green + clj-kondo 0/0 + cljfmt clean.
+      Test/`test_support`-only — verify `git diff --name-only` touches only
+      `components/agent-session/test/**` + `test_support.clj`; zero
+      `components/agent-session/src/**` or `doc/scheduler.md` (verification-only
+      invariant; Slice-10 allowlist). If 201 is treated as closed instead, raise
+      as a small standalone test-hygiene task.

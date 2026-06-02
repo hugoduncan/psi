@@ -3058,3 +3058,42 @@ no assertions added/removed → `findings.md` citations + aggregate (50 deftests
 412 assertions) unchanged. Full `bb test` green; clj-kondo 0/0; cljfmt clean.
 Test file only — zero `components/agent-session/src/**` or `doc/scheduler.md`
 (Slice-10 allowlist held). No blocked items.
+
+## Code-shaper review — pass 5 (code-shaper, 2026-06-01)
+
+Fresh code-shaper read of the 201 test surface. The new verification test files
+(`scheduler_test`, `scheduler_end_to_end_test`, `scheduler_timer_seam_test`,
+`scheduler_context_shutdown_test`, `scheduler_resolvers_test`,
+`psi_tool_scheduler_test`, `scheduler_lifecycle_test`) are high-quality:
+single-concern, AAA-explicit, seam-deterministic (captured-callback firing, no
+wall-clock), helper-driven reads (`schedule-status`/`schedule-by-id`/
+`schedule-queue`/`instant`/`stub-execution-result` already consolidated by
+passes 1–3), and state/output assertions (no interaction asserts, no mocks).
+
+Confirmed **not** actionable (consistency with the wider codebase trumps
+task-local DRY — do not re-file):
+- `(:execute tool)` → `read-string (:content result)` psi-tool parse idiom
+  (established convention: `tools_test.clj` ×34). A task-local parse wrapper
+  would diverge from the broader codebase idiom.
+- Direct `(tools/make-psi-tool (fn [_q] {}) {:ctx … :session-id …})` construction
+  (established: `tools_test.clj` ×38). The third-arg variation
+  (`dissoc`/`assoc`/no-session-id) is intentional setup-under-test, not
+  incidental duplication.
+- `scheduler_test` / `scheduler_dispatch_test` `{:is-streaming … :is-compacting …}`
+  literals are a *different* idiom (pure-fn arg / dispatch payload, not a state
+  swap) — out of scope for the busy/idle-state-write finding below.
+
+**One actionable item** (filed as a follow-up step): the origin-session
+busy/idle **state-write** idiom
+`(swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming true/false))))`
+repeats **12×** across three files (`scheduler_handlers_test` ×6,
+`scheduler_lifecycle_test` ×5, `scheduler_end_to_end_test` ×1) to mark the
+origin session busy or idle. `test-support` already hosts the symmetric
+*read* helpers (`schedule-status`/`schedule-queue`/`scheduled-message-by-id`)
+but no write-side `set-session-streaming!`. This is the same idiom-convergence
+passes 1–3 applied to reads, not yet applied to this write. It crosses the
+single-callsite over-abstraction threshold pass-4 cited when declining the
+2-site/1-file `set-schedule-status` write-helper (12 sites / 3 files here), so
+it is **not** a duplicate of that declined item. Test-file/`test_support`-only;
+verification-only invariant + Slice-10 allowlist hold. No `bb test` re-run this
+pass (review-only; the follow-up step runs the suite).
