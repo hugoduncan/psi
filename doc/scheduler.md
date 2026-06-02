@@ -78,7 +78,7 @@ Current supported scheduler `session-config` keys:
 - `:model`
 - `:thinking-level`
 - `:skills`
-- `:tool-defs`
+- `:tool-ids`
 - `:developer-prompt`
 - `:developer-prompt-source`
 - `:preloaded-messages`
