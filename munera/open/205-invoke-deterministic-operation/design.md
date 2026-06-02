@@ -86,8 +86,25 @@ Adjacent / deferred (separate tasks if wanted):
 
 ## Architecture alignment
 
-- Reads go through resolvers; state changes go through dispatch. Operation
-  invocation is execution at the runtime boundary (already the established
+- Canonical domain-state reads go through resolvers; canonical state changes go
+  through dispatch. The deterministic-operation registry is **not** canonical
+  `:state*` domain data — it is a *runtime handle* in the
+  `doc/architecture.md` sense (a `defrecord` owning its own internal `atom`,
+  infrastructure machinery; see the "runtime handles on ctx" table, which lists
+  the workflow registry as the same kind of thing). It has no `:state*`
+  projection and no resolver/EQL surface today.
+- Both **listing** and **invocation** are therefore runtime-boundary reads of a
+  runtime handle, not canonical-state reads. The new surfaces call the same
+  registry functions the established workflow invoke-step path
+  (`step_execution`) already calls — `all-operations-in` for listing,
+  `invoke-operation-in` (via `deterministic-operation-runtime/invoke-operation`)
+  for invocation. This *is* `one_way`: a single read path shared with the
+  existing consumer. Surfacing listing through a new resolver/EQL attribute
+  would instead introduce a *second*, parallel read path over the same runtime
+  handle (violating `one_way`) and would require first projecting the registry
+  into `:state*` — out of scope and unjustified for an infrastructure handle the
+  architecture explicitly classifies as "not queryable domain state".
+- Invocation is execution at the runtime boundary (already the established
   pattern for workflow invoke steps), so the new surfaces call the same
   `deterministic-operation-runtime`/registry functions rather than introducing
   a parallel path (`one_way`).
@@ -115,6 +132,14 @@ Adjacent / deferred (separate tasks if wanted):
 6. **Listing detail.** List returns operation **id + description** per entry.
 7. **Result rendering.** Render **all top-level keys** of the tagged result,
    applying **per-key truncation** to bound oversized values.
+8. **Listing read path.** Listing reads the deterministic-operation registry
+   directly via `all-operations-in`, *not* through a resolver/EQL attribute.
+   Rationale: the registry is a runtime handle (per `doc/architecture.md`), not
+   canonical `:state*` domain data, so "reads go through resolvers" (which
+   governs canonical domain state) does not apply. Listing shares the single
+   existing read path the workflow invoke-step (`step_execution`) already uses
+   over the same handle; adding a resolver would create a parallel path and
+   violate `one_way`. No `:state*` projection is added.
 
 ## Acceptance criteria
 

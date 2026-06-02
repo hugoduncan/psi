@@ -32,3 +32,27 @@ Actionable misfit found (1):
   to reads-through-resolvers (resolver/EQL-backed) or is justified as part of
   the runtime-boundary execution path, and record that decision. (invoke is
   genuinely execution-at-boundary and is fine; only listing is in tension.)
+
+## Resolution of architecture-fit follow-up (ψ)
+
+Resolved with option (b): document the direct registry read as the
+runtime-boundary path. Decision recorded as locked decision #8 and expanded in
+design.md "Architecture alignment".
+
+Verified against live code:
+- `DeterministicOperationRegistry` is a `defrecord` wrapping its own internal
+  `atom` (registry.clj) — infrastructure machinery owning internal mutable
+  lifecycle. By `doc/architecture.md` "State boundary" this is a *runtime
+  handle*, explicitly "not queryable domain state". The architecture table
+  lists the workflow registry as the same kind of handle.
+- It has no `:state*` projection and no resolver/EQL surface today.
+- "Reads go through resolvers" governs canonical `:state*` domain data, not
+  runtime-handle infrastructure → the flagged tension was a misread of scope.
+- The workflow invoke-step path (`step_execution`) already reads this same
+  registry directly. Listing via `all-operations-in` shares that single path
+  → `one_way`. A resolver/EQL listing surface would create a *second* read
+  path over the same handle (violating `one_way`) and would first require
+  projecting an infrastructure handle into `:state*` — out of scope.
+
+Conclusion: no resolver work needed; listing-via-`all-operations-in` is the
+architecturally aligned choice. design.md updated accordingly.

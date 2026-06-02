@@ -2,7 +2,7 @@
 
 ## Architecture-fit follow-ups
 
-- [ ] Resolve the listing read-path tension: operation *listing* is a read but
+- [x] Resolve the listing read-path tension: operation *listing* is a read but
   the design routes it as a direct `registry/all-operations-in` call rather than
   through resolvers/EQL, contradicting the design's own "reads go through
   resolvers" alignment claim and the runtime-handle read model in
