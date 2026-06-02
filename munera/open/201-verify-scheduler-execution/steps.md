@@ -1746,3 +1746,31 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       only `scheduler_lifecycle_test.clj` + task-dir `findings.md`/`steps.md`
       changed; zero `components/agent-session/src/**` or `doc/scheduler.md`
       (Slice-10 allowlist held).
+
+## Test-shaper follow-ups — pass 21 (test-shaper, 2026-06-02)
+
+- [ ] Relabel the residual misleading "FIFO" wording in
+      `scheduler_lifecycle_test/busy-session-fire-queues-then-idle-drains-fifo-test`
+      (`scheduler_lifecycle_test.clj`). Pass-20 corrected the same smell in the
+      sibling `scheduler-test/drain-one-test` but scoped itself to that block
+      only; the lifecycle covering test still asserts "FIFO" in three places:
+      the deftest **name** (`…-drains-fifo-test`), the block comment (L102:
+      "FIFO drain order (oldest by [fire-at created-at schedule-id]…)" — conflates
+      FIFO-by-insertion with the actual `[fire-at created-at schedule-id]` sort),
+      and the assertion message (L131: "queues both schedules in FIFO order").
+      Its setup queues `sch-q-1` (fire-at 18:05:00) then `sch-q-2` (18:05:01), so
+      insertion order coincidentally equals fire-at order and the test cannot
+      distinguish FIFO-by-insertion from fire-at ordering — the same
+      `meaningful_failures ∧ consistent(naming)` gap pass-20 fixed. Reword to
+      "earliest fire-at / oldest-queued" terms (e.g. rename deftest
+      `…-drains-oldest-by-fire-at-test`; comment "drain order is oldest by
+      [fire-at created-at schedule-id]"; assertion "queues both schedules in
+      creation order"), optionally pointing at the dedicated
+      `drain-one-orders-by-fire-at-not-queue-insertion-order-test`. Assertions
+      unchanged. NOTE: renaming the deftest changes the `findings.md` Live-execution
+      citation `busy-session-fire-queues-then-idle-drains-fifo` — update that
+      citation (and any sibling step references) to the new name to keep
+      `findings.md` coherent. test-shaper `meaningful_failures ∧ consistent(naming)`.
+      Test-file + task-dir only (Slice-10 allowlist — zero
+      `components/agent-session/src/**` or `doc/scheduler.md`); keep `bb test`
+      green + clj-kondo/cljfmt clean.

@@ -2742,3 +2742,35 @@ truth, not just the log.
 No new actionable issue; no follow-up steps added. The review chain has
 converged. Verification-only invariant intact (this review touched no
 `components/agent-session/src/**` or `doc/scheduler.md`). **REVIEW_COMPLETE.**
+
+## Test review — pass 21 (test-shaper, 2026-06-02) — ACTIONABLE_FEEDBACK
+
+Re-applied `test-shaper` (`clarity ∧ signal ∧ robustness → shape`) firsthand
+against current HEAD (`6407fbeaa`). Ran full `bb test` (the single failure is
+the documented pre-existing `turn-runtime` retry/streaming order flake — a
+different deftest each run, untouched by this task) and the scheduler subset
+(`12 tests, 52 assertions, 0 failures` for `scheduler-test`); `clj-kondo` 0/0
+across all 7 touched scheduler test files. Read the new/extended covering tests
+firsthand (`scheduler_test`, `scheduler_end_to_end_test`,
+`scheduler_timer_seam_test`, `scheduler_context_shutdown_test`,
+`scheduler_resolvers_test`, `psi_tool_scheduler_test`, `scheduler_lifecycle_test`).
+
+Overall the suite is high-quality: single-concern deftests, seam-driven live
+paths (no wall-clock sleeps on cited paths), state/output assertions (¬interaction),
+named-message bound assertions, fire-at-vs-insertion ordering proven by a
+dedicated test.
+
+**One new actionable issue (non-duplicate of pass-20):** the misleading "FIFO"
+labelling that pass-20 corrected in `scheduler-test/drain-one-test` **survives
+in the sibling `scheduler_lifecycle_test.clj`** — pass-20 explicitly scoped only
+the `drain-one-test` block. In `busy-session-fire-queues-then-idle-drains-fifo-test`
+the deftest **name**, the block comment ("FIFO drain order (oldest by [fire-at
+created-at schedule-id]…)" — which conflates FIFO with fire-at ordering), and
+the assertion message ("queues both schedules in FIFO order") all assert "FIFO".
+The setup queues `sch-q-1` (fire-at 18:05:00) then `sch-q-2` (18:05:01) so
+insertion order coincidentally equals fire-at order, so the test cannot
+distinguish FIFO-by-insertion from `[fire-at created-at schedule-id]` ordering —
+the same `meaningful_failures ∧ consistent(naming)` gap pass-20 fixed next door.
+Follow-up filed below. No scheduler-source/doc/behaviour concern; verification-only
+invariant intact (this review touched no `components/agent-session/src/**` or
+`doc/scheduler.md`). **ACTIONABLE_FEEDBACK.**
