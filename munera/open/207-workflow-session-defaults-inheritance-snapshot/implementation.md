@@ -1746,3 +1746,26 @@ should remain visible at the test site, not hidden behind a helper
 preserving, not incidental ceremony. No follow-up.
 
 No new actionable test-shaper findings. Review complete.
+
+## Docs review (review-task-docs, 2026-06-02)
+
+Scope: README.md, doc/, CHANGELOG.md per review-task-docs checklist.
+
+- doc/workflows.md "Inherited session defaults are snapshotted at invoke time"
+  (`:206-229`): accurate ∧ complete ∧ consistent. Covers invoke-time capture,
+  all 7 inherited fields (model/prompt-mode/tools/skills/thinking-level/
+  speed-mode/effort-override = AC3), no-retroactive-effect (AC1/AC2), nested
+  effective config (AC4), explicit-override precedence (AC5), resume-reuse vs
+  continue-fresh (AC8 / Decision 5a+5b). Field names + resume/continue
+  distinction match design exactly. Prose-only (no drift-prone examples).
+- CHANGELOG.md [Unreleased] → Fixed: present, accurate; user-visible workflow
+  behaviour change correctly logged with the full field list. Matches
+  workflows.md wording. No footer hand-edit.
+- README.md: no inherited-session-default surface to update (no stale refs).
+- doc/workflow-grammar-concepts.md / workflow_statechart_canonical.md: describe
+  authoring grammar / canonical shaping, NOT runtime default-value sourcing
+  (live vs snapshot), so the live→snapshot change introduces no stale refs.
+  Correctly localized to workflows.md (runtime resolution concern).
+- No removed user-facing behaviour (live-read was internal).
+
+No actionable docs findings. Review complete.
