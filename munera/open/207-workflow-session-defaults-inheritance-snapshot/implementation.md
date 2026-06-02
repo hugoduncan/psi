@@ -48,3 +48,31 @@ Actionable architectural-fit gaps (purity/ownership boundaries):
    field lists drift. Design should make the workflow snapshot field set a
    derivation of / explicitly checked against the canonical inheritance set
    rather than a parallel hand-maintained list.
+
+## Architecture-fit follow-up resolution (ψ, 2026-06-02)
+
+All three architecture-fit design-steps resolved into design.md as Decisions
+6–8 (design-only; no code). Grounded against real code first:
+
+- `create-run` (`workflow-runtime/core.clj:110`) takes `state`, not `ctx` →
+  pure. All three call sites already read `@(:state* ctx)` impurely
+  (`psi_tool_workflow.clj:148`, `mutations/canonical_workflows.clj:96`,
+  `statechart_runtime/delegate.clj:44`). → **Decision 6**: snapshot resolved by
+  caller, passed as `:inherited-defaults` data into pure create-run; create-run
+  records verbatim, no ctx reads.
+- `resolve-step-session-config` lives in `workflow-step-session-config/core.clj`
+  (live parent reads at `:163–168`); create-run lives in `workflow-runtime` —
+  distinct components. → **Decision 7**: `workflow-step-session-config` is the
+  single owner of snapshot derivation (new `resolve-inherited-defaults-snapshot`
+  reusing the no-override resolution path); nested/effective snapshot derived
+  from the same component's effective config; `workflow-runtime` never reaches
+  into `workflow-step-session-config` (caller wires both → no layering
+  inversion / no duplicated resolution).
+- `common-inherited-fields` (`session-state/init.clj:30`, private, already
+  includes `:speed-mode`/`:effort-override`) is the canonical inheritance set. →
+  **Decision 8**: promote to public/accessor + test-assert the workflow snapshot
+  field set matches it (modulo resolved-vs-raw `:tool-defs`/`:skills` vs
+  `:tool-ids`/`:skill-ids`) → single source of truth, no drift.
+
+No design-steps blocked; all three completable as design refinements. Code
+implementation remains for the plan phase (steps.md), not this design pass.

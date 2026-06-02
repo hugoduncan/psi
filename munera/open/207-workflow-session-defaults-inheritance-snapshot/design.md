@@ -96,6 +96,56 @@ Out of scope:
    blocked run does not re-capture defaults; it reuses the snapshot taken at
    original invoke time.
 
+6. **Purity boundary — impure resolution outside pure `create-run`.**
+   `workflow-runtime.core/create-run` is the canonical *pure* root-state
+   lifecycle op: it takes `state` (not `ctx`) and must remain free of ctx reads
+   (`get-session-data`, `all-skills`, `agent-tool-source-in`,
+   `list-context-sessions`). The inherited-default snapshot is therefore
+   resolved **impurely by the caller** (the create-run invocation site) and
+   passed as **already-resolved data** into `create-run`, which records it
+   verbatim on the run's canonical state. `create-run` gains an optional
+   `:inherited-defaults` snapshot in `opts`, persisted (like `:parent-session-id`)
+   on the run when present; it performs no resolution. This preserves
+   create-run's pure lifecycle contract and the one-way state boundary
+   (ctx reads → resolved data → pure state transform). All current create-run
+   sites already read `@(:state* ctx)` impurely before calling create-run
+   (`psi_tool_workflow.clj`, `mutations/canonical_workflows.clj`,
+   `statechart_runtime/delegate.clj`), so this places the snapshot resolution
+   alongside the existing impure read at each site.
+
+7. **Single ownership of snapshot derivation.** `workflow-step-session-config`
+   owns the resolution of inherited defaults from a session today; it is the
+   single component that owns deriving the inherited-default snapshot. It
+   exposes one function — `resolve-inherited-defaults-snapshot` (ctx,
+   parent-session-id) → resolved snapshot map — that reuses the same live-read
+   logic `resolve-step-session-config` uses for the no-override path
+   (`get-session-data` → model/prompt-mode, `all-skills`, tool source + tool
+   ids → tool-defs, thinking-level, speed-mode, effort-override). The pure
+   create-run sites call this resolver impurely (with the ctx they already hold)
+   and pass the result into `create-run`. `workflow-runtime` does **not** reach
+   into `workflow-step-session-config`; the dependency direction stays
+   caller → both components, avoiding a layering inversion. For a **nested**
+   delegated run (Decision 3), the delegating step's *effective* config (run
+   snapshot ⊕ step overrides) is the parent: `resolve-step-session-config`
+   already produces that effective config for the step, and the same component
+   derives the child run's snapshot from it (effective config → snapshot map),
+   so effective-snapshot derivation lives in exactly one component with no
+   duplicated resolution logic. `delegate.clj`'s create-run site passes the
+   step's effective snapshot rather than re-reading the invoking session.
+
+8. **Snapshot field-set authority — single source of truth.** The snapshot
+   field set is **not** an independently hand-maintained list. The canonical
+   inheritance field set is `session-state/init.clj`'s `common-inherited-fields`
+   (which already includes `:speed-mode` and `:effort-override`). The workflow
+   snapshot field set is **derived from / validated against** that authority:
+   `common-inherited-fields` is promoted to a public (non-`^:private`) var (or
+   re-exported through a small accessor) so `workflow-step-session-config` can
+   reference it rather than re-enumerate keys, and a test asserts the workflow
+   snapshot's resolved-field set matches the canonical inheritance set (modulo
+   the documented resolved-vs-raw shape difference: the snapshot stores resolved
+   `:tool-defs`/`:skills` where the raw inheritance set stores `:tool-ids`/
+   `:skill-ids`). This keeps the two inheritance field lists from drifting.
+
 ## Acceptance criteria
 
 1. After a workflow is invoked, switching the invoking session's model has **no
