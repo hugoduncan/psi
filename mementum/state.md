@@ -15,6 +15,8 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-06-02: Task 202 (`document-at-bounds-in-scheduler-doc`) post-follow-up docs review found no new actionable documentation issues. Re-read README, doc/scheduler.md, CHANGELOG, scheduler implementation/session-config parsing, and focused `:at` matrix test; scheduler docs now match resolved-millisecond-delay `:at` bounds and `:tool-ids` session-config support. Commit `97c4629cb`.
+
 - 2026-06-02: Task 202 (`document-at-bounds-in-scheduler-doc`) docs-review follow-up completed: fixed `doc/scheduler.md` supported scheduler `session-config` key list from stale `:tool-defs` to implemented `:tool-ids`, matching `parse-session-config!` / `session-config-supported-keys`; checked the follow-up and recorded verification (grep parity + targeted clj-kondo clean).
 
 - 2026-06-02: Task 202 (`document-at-bounds-in-scheduler-doc`) test-shaper review found no new actionable test-shaping issues. The focused `psi-tool-scheduler-at-resolution-matrix-test` is deterministic, behaviour-focused, seam-driven, and covers the documented absolute-`:at` partitions/boundaries. Verification: focused matrix passed (1 test, 21 assertions); targeted clj-kondo clean.
