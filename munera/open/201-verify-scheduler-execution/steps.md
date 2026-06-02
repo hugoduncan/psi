@@ -489,7 +489,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Test review follow-ups — pass 6 (task-test-review, 2026-06-01)
 
-- [ ] Replace the `with-redefs` AI-boundary stub in
+- [x] Replace the `with-redefs` AI-boundary stub in
       `scheduler_end_to_end_test/scheduler-session-kind-fires-via-timer-seam-and-creates-top-level-session-test`
       (line ~109) with the **injectable ctx seam**. The
       `execute-prepared-request!` boundary it stubs is already an injectable ctx
@@ -505,3 +505,18 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       within the Slice-10 allowlist (zero `src/**`/`doc/scheduler.md`); keep the
       suite green + clj-kondo/cljfmt clean. (If the task is treated as closed,
       raise it as a small standalone test-hygiene task instead.)
+      Done: dropped the `with-redefs` of
+      `psi.turn-runtime.core/execute-prepared-request!` and now bind the same
+      shaped stub to a local `execute-prepared-request-fn`, threaded onto the
+      live ctx via the injectable seam alongside the timer seam
+      (`(assoc ctx :scheduler-run-after-delay-fn capture*
+      :execute-prepared-request-fn execute-prepared-request-fn)`). The effect
+      reads the seam from ctx (`dispatch_effects.clj:154`), so the round trip is
+      unchanged: session-kind fires → fresh top-level session created →
+      `:created-session-id`/`:delivery-phase :prompt-submit` recorded. Removed
+      the now-unused `[psi.turn-runtime.core]` require (it existed only as the
+      `with-redefs` target). `scheduler_end_to_end_test` green
+      (3 tests / 20 assertions); related handler/lifecycle/dispatch/shutdown
+      suites green (19 tests / 104 assertions). clj-kondo 0/0, cljfmt clean.
+      Test file only — zero `components/agent-session/src/**` or
+      `doc/scheduler.md` (within the Slice-10 allowlist).

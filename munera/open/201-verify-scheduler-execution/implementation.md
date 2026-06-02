@@ -799,3 +799,24 @@ assert state/outputs, not interactions. One actionable test-quality finding:
   Cross-ns isolation artifact (pass-4/5) confirmed out of scope (canonical
   runner green). All infra time/timer deps are injectable+nullable via ctx
   seams (✓ skill). Behaviour coverage complete (✓ skill).
+
+## Test review follow-up — pass 6 resolved (2026-06-01)
+
+- **`with-redefs` → injectable ctx seam (done).** Replaced the
+  `with-redefs [psi.turn-runtime.core/execute-prepared-request! …]` in
+  `scheduler_end_to_end_test/scheduler-session-kind-fires-via-timer-seam-and-creates-top-level-session-test`
+  with the documented ctx seam: the same shaped stub is bound to a local and
+  threaded onto the live ctx as `:execute-prepared-request-fn` alongside the
+  existing `:scheduler-run-after-delay-fn` timer seam. The effect resolves the
+  fn from ctx (`dispatch_effects.clj:154`), so the round trip is unchanged
+  (session-kind fires → fresh top-level session → `:created-session-id` /
+  `:delivery-phase :prompt-submit`). This realises the pass-5-disagreement axis:
+  injection over redefinition (`infra_deps → injectable ∧ ¬stub`), using the
+  boundary's own ctx seam rather than redefining the turn-runtime var.
+- **Cleanup.** Removed the now-orphan `[psi.turn-runtime.core]` ns require
+  (present only as the `with-redefs` target).
+- **Verification.** `scheduler_end_to_end_test` 3 tests / 20 assertions green;
+  handler/lifecycle/dispatch/shutdown suites 19 tests / 104 assertions green.
+  clj-kondo 0/0, cljfmt clean. Test file only — zero
+  `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist
+  held).
