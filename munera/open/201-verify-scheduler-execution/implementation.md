@@ -1072,3 +1072,30 @@ items, both test-file-only (within the Slice-10 allowlist). Suite green
   explicit `:kind :message` to these create maps for consistent data_shapes and
   locally-comprehensible intent (no behaviour change — the default already
   resolves to `:message`).
+
+## test-shaper follow-up execution (2026-06-01)
+
+Executed the two test-shaper-pass follow-ups (both test-file only, within the
+Slice-10 allowlist — zero `components/agent-session/src/**` or
+`doc/scheduler.md` changes):
+
+1. **fail-schedule shared-setup fix** (`scheduler_test.clj`). Removed the
+   misleading top-level `let` (`s0`/`s1`); scoped each `testing` block to its
+   own minimal setup. The `:queued` fail-detail+dequeue block keeps its
+   self-contained `q0`/`q1`; the terminal fail-guard block now builds `s0`/`s1`
+   locally with a corrected comment noting that pure session-kind
+   `fire-schedule` returns the `:deliver` action and leaves status `:pending`
+   (so the schedule is still cancellable). No dead cross-block binding remains;
+   assertion shape unchanged.
+
+2. **explicit `:kind :message`** (`scheduler_timer_seam_test.clj`). Added
+   `:kind :message` to all three `:scheduler/create` payloads that previously
+   relied on the handler `(or kind :message)` default — both blocks of
+   `scheduler-start-timer-uses-injected-time-source-and-delay-runner-test` and
+   `scheduler-cancelled-default-delay-thread-exits-without-uncaught-interrupted-exception-test`.
+   Data shape now matches every other 201 live create; no behaviour change.
+
+Verification: `scheduler-test` + `scheduler-timer-seam-test` focused run =
+15 tests / 66 assertions / 0 failures; full `bb test` green. clj-kondo 0/0,
+cljfmt clean on both touched files. Aggregate scheduler assertion count is
+unchanged (no asserts added/removed) → still 45 tests / 412 assertions.

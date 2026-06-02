@@ -629,7 +629,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Test review follow-ups — test-shaper pass (2026-06-01)
 
-- [ ] Fix misleading shared setup in
+- [x] Fix misleading shared setup in
       `scheduler-test/fail-schedule-records-failure-detail-and-dequeues-test`.
       The top-level `let` builds `s0` (`:session`-kind) → `s1 = fire-schedule
       (s0, idle)` with comment "session-kind fire delivers (action :deliver)",
@@ -643,8 +643,17 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       block's scope. Test-file only (Slice-10 allowlist); keep suite green +
       clj-kondo/cljfmt clean. If 201 is treated as closed, raise as a small
       standalone test-hygiene task.
+      Done: removed the top-level `let`; each `testing` block now owns its
+      minimal setup. The `:queued`-dequeue block keeps its self-contained
+      `q0`/`q1`; the terminal fail-guard block now builds its own `s0`/`s1`
+      locally with a corrected comment stating that pure session-kind
+      `fire-schedule` returns the `:deliver` action and **leaves status
+      `:pending`** (hence still cancellable). Dead cross-block binding removed.
+      Assertion shape unchanged. `scheduler-test` green; clj-kondo 0/0, cljfmt
+      clean. Test file only — zero `components/agent-session/src/**` or
+      `doc/scheduler.md` (Slice-10 allowlist held).
 
-- [ ] Add explicit `:kind :message` to the three live `:scheduler/create`
+- [x] Add explicit `:kind :message` to the three live `:scheduler/create`
       dispatches that currently omit it and rely on the handler default
       (`dispatch_handlers/scheduler.clj:123` `(or kind :message)`):
       `scheduler-timer-seam-test/scheduler-start-timer-uses-injected-time-source-and-delay-runner-test`
@@ -653,3 +662,13 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       Brings their data shape in line with every other 201 live create and makes
       the kind-under-test local. No behaviour change (default already resolves to
       `:message`). Test-file only; keep suite green + clj-kondo/cljfmt clean.
+      Done: added `:kind :message` (after `:schedule-id`) to all three
+      `:scheduler/create` dispatch payloads in `scheduler_timer_seam_test.clj`
+      — the main + cancel blocks of
+      `scheduler-start-timer-uses-injected-time-source-and-delay-runner-test`
+      and `scheduler-cancelled-default-delay-thread-exits-without-uncaught-interrupted-exception-test`.
+      No behaviour change (default already resolved to `:message`); the
+      kind-under-test is now explicit, matching every other 201 live create.
+      `scheduler-timer-seam-test` green; clj-kondo 0/0, cljfmt clean. Test file
+      only — zero `components/agent-session/src/**` or `doc/scheduler.md`
+      (Slice-10 allowlist held).

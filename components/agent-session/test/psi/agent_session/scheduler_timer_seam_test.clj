@@ -28,6 +28,7 @@
       (session/dispatch-in! ctx* :scheduler/create
                             {:session-id session-id
                              :schedule-id "sch-1"
+                             :kind :message
                              :label "later"
                              :message "later"
                              :created-at now
@@ -51,6 +52,7 @@
       (session/dispatch-in! ctx* :scheduler/create
                             {:session-id session-id
                              :schedule-id "sch-1"
+                             :kind :message
                              :label "later"
                              :message "later"
                              :created-at now
@@ -129,6 +131,7 @@
       (session/dispatch-in! ctx* :scheduler/create
                             {:session-id session-id
                              :schedule-id "sch-1"
+                             :kind :message
                              :label "later"
                              :message "later"
                              :created-at now
