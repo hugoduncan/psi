@@ -3116,3 +3116,44 @@ test, no incidental-variation drift.
 a fresh pass re-derives the same coverage with no uncovered regress remaining.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+---
+
+## Docs review (review-task-docs skill) — pass 1
+
+Scope: user-facing docs only (`README.md`, `doc/`, `CHANGELOG.md`); task
+artifacts/tests/internal excluded per skill scope.
+
+Checklist verdict:
+
+1. **New behaviours reflected** ✅ — `doc/workflows.md` §"Incidental-complexity
+   simplification" (l.599) documents the `reduce-incidental-complexity` workflow:
+   `/delegate` invocation, the `gap = lcc-total / max(cc,1)` selection method,
+   the two-step shape, the `task-lifecycle-in-worktree` wrapper, NO_TARGET
+   early-stop, and the Phase-0/Phase-1 behaviour-preserving contract.
+2. **Removed behaviours** ✅ — none (purely additive task); no stale refs.
+3. **Changelog** ✅ — `[Unreleased] → Added` carries an accurate, user-facing
+   `reduce-incidental-complexity` entry naming the `incidental-complexity-finder`
+   skill, the gap formula, early-stop, and no-push/PR endpoint. Footer
+   `[Unreleased]:` link present (bb-managed).
+4. **Examples accurate** ✅ — `/delegate reduce-incidental-complexity` matches the
+   registered workflow name.
+5. **Consistency** ✅ — names, thresholds, and flags cross-checked against the
+   live implementation:
+   - thresholds `lcc-total ≥ 5.0 ∧ gap ≥ 2.0` ≡ SKILL.md §recipe + outer
+     workflow prompt;
+   - join key `(ns,var,arity,line)` ≡ SKILL jq recipe;
+   - gate flags `--fail-on new-cycles,new-high-findings --max-new-medium-findings 0`
+     ≡ outer-workflow generated-design contract;
+   - NO_TARGET sentinel ≡ wrapper `resolve-worktree`/`summary` steps;
+   - three-step wrapper (`resolve-worktree → task-lifecycle → summary`) ≡
+     `task-lifecycle-in-worktree.edn`.
+   - Wrapper file is `.edn` (not `.md`); docs reference it by name only, no
+     extension claimed → no inconsistency.
+   - No exhaustive workflow enumeration in §"User-facing workflow commands"
+     (examples-only) and no TOC → nothing else to update.
+
+**Finding: no new actionable docs issue.** User docs are accurate, complete, and
+consistent with meta/spec/code. No follow-up steps added.
+
+PASS_STATUS: REVIEW_COMPLETE
