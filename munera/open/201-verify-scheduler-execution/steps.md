@@ -1036,3 +1036,22 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       are pre-existing baseline, non-cited — already evaluated & scoped out in
       passes 7 & 9; not re-filed (no-duplicate). Review chain converged →
       REVIEW_COMPLETE.
+
+## Test-shaper follow-ups — pass 12 (test-shaper, 2026-06-01)
+
+- [ ] Standardise the live-test schedule/queue *state reads* on the existing
+      `ss/get-session-data-in` helper, replacing the repeated raw 6-segment path
+      literal `(get-in @(:state* ctx) [:agent-session :sessions session-id :data
+      :scheduler :schedules id :status])`. Affected: `scheduler_end_to_end_test`
+      (×5 raw + ×2 helper — mixed within one ns), `scheduler_context_shutdown_test`
+      (×2 raw), `scheduler_timer_seam_test` (×5 raw). Rationale (test-shaper
+      consistent(test_abstractions) ∧ locally_comprehensible): the raw literal
+      couples each assertion to internal state nesting (brittle to shape drift)
+      and is noisier than the already-available helper; one ns mixes both idioms.
+      Use `(get-in (ss/get-session-data-in ctx session-id) [:scheduler :schedules
+      id :status])` / `[:scheduler :queue]` consistently. Keep suite green +
+      clj-kondo/cljfmt clean. Test-file-only — zero
+      `components/agent-session/src/**` / `doc/scheduler.md` (verification-only
+      invariant; Slice-10 allowlist). Update `findings.md` only if a covering-test
+      citation’s read form changes (no status changes expected). If 201 is treated
+      as closed instead, raise as a small standalone test-hygiene task.

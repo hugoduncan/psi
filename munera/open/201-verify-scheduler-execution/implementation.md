@@ -1635,3 +1635,29 @@ deliverable (green coverage + structured `findings.md`) is well-formed, fully
 covers the design behaviour, and uses injection over mocking throughout its
 cited/added tests. Verification-only invariant intact (this review touched no
 `components/agent-session/src/**` or `doc/scheduler.md`).
+
+## Test-shaper review — pass 12 (test-shaper, 2026-06-01)
+
+Applied test-shaper (clarity ∧ signal ∧ robustness ∧ economy) to all 201-added/
+extended scheduler test namespaces. Suite green, clj-kondo 0/0 on touched files.
+Strengths confirmed: deterministic (time/timer seams, no wall-clock sleeps),
+behaviour-focused (observable state, not handler interactions), single-concern
+deftests with clear AAA + `testing` labels, good economy (no case-explosion).
+
+**One new actionable issue (consistent(test_abstractions) / locally_comprehensible):**
+the schedule/queue *state read* is expressed two ways across — and within — the
+201 live tests: the raw 6-segment path literal
+`(get-in @(:state* ctx) [:agent-session :sessions session-id :data :scheduler
+:schedules id :status])` (`scheduler_end_to_end_test` ×5, `scheduler_context_shutdown_test`
+×2, `scheduler_timer_seam_test` ×5) vs the existing helper
+`(ss/get-session-data-in ctx session-id)` used elsewhere (`scheduler_end_to_end_test`
+×2, `psi_tool_scheduler_test`, `scheduler_lifecycle_test`, `scheduler_test`-area
+pure reads). `scheduler_end_to_end_test` mixes BOTH idioms in one namespace.
+The raw literal couples each assertion to the internal nesting (brittle to state-
+shape drift) and is noisier than the already-available `ss/get-session-data-in`
+read. Recommend standardising the live-test schedule-status/queue reads on
+`ss/get-session-data-in` (no new abstraction needed; helper already imported in
+the mixed file). Not previously flagged (passes 1–11 covered with-redefs stubs,
+`:kind` data-shape, fixture consolidation, megatest split, drain-via-real-
+dispatch — not this read-idiom inconsistency). Test-only; respects the
+verification-only invariant (no `src/**` or `doc/scheduler.md` change).
