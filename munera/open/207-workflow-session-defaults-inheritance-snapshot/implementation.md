@@ -248,3 +248,89 @@ no code). Grounded against real code first:
 
 No inconsistency design-steps blocked; both completable as design refinements.
 Code implementation remains for the plan phase (steps.md), not this design pass.
+
+## Plan ambiguity review (ψ, 2026-06-02)
+
+Reviewed plan.md + steps.md against code ground truth
+(`workflow-step-session-config/core.clj` `resolve-step-session-config` `:145`,
+output set + `parent-session-model` uses `:164/173/175/183`, model-query
+`model-query->selection-request` `:104` reading `:provider`/`:id`;
+`workflow-runtime/core.clj` `create-run` `:108`; `model.clj`
+`workflow-run-schema` `:179`; `delegate.clj` `delegate-step-runtime-result`
+`:36`, child create-run `:44`, ns deps `:1`; `canonical_workflows.clj`
+`create-workflow-run` `:86`; `psi_tool_workflow.clj` create-run `:148`). Most
+plan mechanics/line refs verified accurate. New actionable plan/steps
+ambiguities (distinct from the resolved design notes):
+
+- **P1 — S6 dependency direction is asserted safe but is actually a cycle.**
+  `workflow-step-session-config` ALREADY requires `workflow-runtime`
+  (`core.clj:16` `execution-adapter`, `:17` `statechart`). So S6 having
+  `delegate.clj` (in `workflow-runtime`) call
+  `resolve-step-session-config`/`effective-config->snapshot` (in
+  `workflow-step-session-config`) is a **require cycle**, not the "caller→both,
+  no inversion" the plan Risks + Decision-7 framing assert. Only the buried S6
+  third bullet admits this conditionally ("If it introduces a cycle … inject
+  the resolver as a ctx op / passed fn"). The plan does not DECIDE the
+  mechanism: the cycle is certain (not conditional), so S6 must commit up front
+  to passing the resolver in as a fn/ctx-op (mirroring delegate's existing
+  `create-workflow-context-fn`/`send-and-drain-fn` injected-fn params) rather
+  than leaving "direct require vs inject" open. Resolve the contradiction
+  between the Risks "must NOT depend" claim and the as-written
+  `resolve-step-session-config`/`effective-config->snapshot` direct calls.
+
+- **P2 — `effective-config->snapshot` cannot recover `:speed-mode`/
+  `:effort-override` by projection.** Plan S2 + steps describe it as a pure
+  `select-keys`/projection of a `resolve-step-session-config` result into the 7
+  snapshot keys. But (per resolved I1) `resolve-step-session-config` outputs
+  NEITHER `:speed-mode` NOR `:effort-override` — its result set is
+  `{:developer-prompt :prompt-mode :response-mode :tool-defs :thinking-level
+  :skills :model :prompt-component-selection}` (+ optional
+  temperature/model-fallback/logprob). So `select-keys` over an effective
+  config yields only 5 of the 7 snapshot keys; the nested path silently drops
+  speed-mode/effort-override (violating AC3/AC4 for those two fields under
+  delegation). The plan must specify where the nested path obtains those two
+  fields (e.g. delegate also threads the parent run's snapshot
+  speed-mode/effort-override, or `resolve-step-session-config` is extended to
+  emit them) — projection alone is insufficient.
+
+- **P3 — snapshot `:model` shape vs `resolved-model-query` selection context
+  unspecified.** Plan AC7/S5 say "feed the snapshot's `:model` into
+  `resolved-model-query` selection context". But `model-query->selection-request`
+  (`core.clj:104`) reads `(:provider parent-session-model)` and
+  `(:id parent-session-model)` — i.e. it expects a `{:provider :id}`-shaped
+  map (the live `(:model parent-session)`). The plan does not state whether the
+  snapshot stores `:model` in that same `{:provider :id}` shape (so it drops in
+  directly) or as a bare resolved id string (which would break the
+  provider/id destructure). Pin the snapshot `:model` shape against what
+  `model-query->selection-request` consumes.
+
+- **P4 — S5 replaces only ONE of four `parent-session-model` consumers.** In
+  `resolve-step-session-config`, `parent-session-model` (`:164`, live
+  `(:model parent-session)`) feeds FOUR sites: `resolved-step-model-config` for
+  the step override (`:173`), for the base-meta override (`:175`), the bare
+  no-override `:model` fallback (`:183/184`), AND (transitively, via those)
+  `resolved-model-query`. Plan S5 only names "feed the snapshot's `:model` into
+  `resolved-model-query`/`resolved-step-model-config`" and "source the
+  no-override `:model` from the snapshot", but does not state that ALL
+  `parent-session-model` uses (including the two override-resolution calls at
+  `:173/:175`) must switch to the snapshot model, or AC1/AC2 leak: a step whose
+  model-query/override resolution still consults the live parent model would
+  observe a mid-run model switch. Specify that snapshot `:model` replaces
+  `parent-session-model` wholesale (single binding), not just the
+  no-override/model-query subset.
+
+- **P5 — S5 snapshot-vs-live is per-field-set, not whole-path; merge with
+  always-live fields unspecified.** The snapshot holds 7 inherited-default
+  fields, but `resolve-step-session-config` also produces fields that are NEVER
+  inherited from the parent and always come from step-def/base-meta
+  (`:developer-prompt`, `:response-mode`, `:prompt-component-selection`,
+  temperature, logprob). Plan S5 says "source the no-override inherited fields
+  from the snapshot … with live-read fallback" but does not state that the
+  snapshot substitution is scoped to ONLY the 7 inherited keys while the
+  always-step-derived fields stay on their current code path. As written it
+  reads as a binary snapshot-vs-live fork; clarify it is a per-field source
+  swap for the seven inherited defaults, leaving non-inherited outputs
+  untouched (and AC6's "no-mutation behaviour unchanged" still holds for
+  those).
+
+PASS_STATUS: ACTIONABLE_FEEDBACK.

@@ -139,3 +139,43 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
 - [ ] Run the full relevant test suite; all green.
 - [ ] Final review: confirm `create-run` purity preserved and no
       `workflow-runtime → workflow-step-session-config` layering inversion.
+
+## Plan-ambiguity follow-ups (review 2026-06-02)
+
+- [ ] P1: Resolve the S6 dependency-direction contradiction. The Risks section
+      claims `workflow-runtime` must NOT depend on `workflow-step-session-config`
+      and "direction stays caller→both", but `workflow-step-session-config`
+      already requires `workflow-runtime` (`core.clj:16/17`), so S6's direct
+      `delegate.clj` → `resolve-step-session-config`/`effective-config->snapshot`
+      calls form a require cycle. Commit S6 (and the plan/Risks text) up front to
+      injecting the snapshot resolver as a passed fn / ctx op (mirroring
+      delegate's existing `create-workflow-context-fn`/`send-and-drain-fn`
+      injected params), not a conditional "if it introduces a cycle" choice.
+- [ ] P2: Specify where the nested (`effective-config->snapshot`) path obtains
+      `:speed-mode`/`:effort-override`. `resolve-step-session-config`'s result
+      set excludes both (resolved I1), so a pure `select-keys` projection yields
+      only 5 of the 7 snapshot keys and silently drops them under delegation
+      (breaks AC3/AC4 for those fields). Decide: thread the parent run's snapshot
+      speed-mode/effort-override into the nested derivation, or extend
+      `resolve-step-session-config` to emit them — projection alone is
+      insufficient.
+- [ ] P3: Pin the snapshot `:model` shape against `resolved-model-query`'s
+      consumer. `model-query->selection-request` (`core.clj:104`) reads
+      `(:provider parent-session-model)`/`(:id parent-session-model)`; state
+      whether the snapshot stores `:model` as that `{:provider :id}` map (drops
+      in directly) or a bare id (would break the destructure).
+- [ ] P4: State that snapshot `:model` replaces `parent-session-model`
+      wholesale. `resolve-step-session-config` feeds `parent-session-model`
+      (`:164`) to four sites — `resolved-step-model-config` for step override
+      (`:173`) and base-meta override (`:175`), the bare no-override fallback
+      (`:183`), and (transitively) `resolved-model-query`. S5 names only the
+      model-query/no-override subset; require ALL `parent-session-model` uses to
+      switch to the snapshot model, or AC1/AC2 leak via override resolution
+      still reading the live parent.
+- [ ] P5: Clarify S5's snapshot substitution is a per-field source swap for the
+      seven inherited keys, not a whole-path binary fork. Fields
+      `resolve-step-session-config` always derives from step-def/base-meta
+      (`:developer-prompt`, `:response-mode`, `:prompt-component-selection`,
+      temperature, logprob) stay on their current code path regardless of
+      snapshot presence; only the 7 inherited defaults are sourced from the
+      snapshot (with live-read fallback when absent).
