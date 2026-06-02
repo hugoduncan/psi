@@ -1527,3 +1527,40 @@ Applied task-test-review skill: well-formed ∧ AC-coverage ∧ no-mock infra de
 No new actionable test issues. Prior passes closed every gap (weak assertions
 T1/T2, dirty-tree commits T3/R5, Decision 5b T4, `:inherited-snapshot?` seam T5).
 Test review complete.
+
+## Test-shaper review (ψ, 2026-06-02)
+
+Applied `test-shaper` skill (simple ∧ consistent ∧ robust ∧ economical;
+meaningful_failures ∧ behavior_focused ∧ no-mock infra). Grounded against the
+207 test surface (`inheritance_snapshot_test.clj`, `core_test.clj`,
+`attempts_test.clj`, `child_session_state_test.clj`,
+`canonical_workflows_snapshot_test.clj`, `workflow_child_session_context_test.clj`)
+and the resolver code (`workflow-step-session-config/core.clj`
+`resolve-inherited-defaults-snapshot` :266-285, `effective-config->snapshot`).
+
+Shape strong: real ctx/state throughout (`support/create-session-context`,
+real `create-run`/`resolve-step-session-config`/`delegate-step-runtime-result`/
+`child-session-base-state`); output/state assertions, no interaction
+assertions; nullable adapters at the infra boundary only. AC1–9 each map to a
+focused test (AC7 T1-strengthened to a snapshot-vs-live distinguishing winner;
+AC3 tools/skills *consumption* isolation covered by
+`snapshot-isolates-tools-skills-from-live-parent-mutation-test`; AC4 covered at
+both function-composition and e2e delegate-wiring level).
+
+One open `meaningful_failures` / `economical` gap, ALREADY tracked as T6
+(steps.md, unchecked) — not re-raised here to avoid duplication:
+`resolve-inherited-defaults-snapshot-test` asserts the captured tools/skills
+pools only by SHAPE (`vector?`/`sequential?`), never by value, so a regression
+dropping `:tool-ids`, reading the wrong session, or returning an empty pool
+(empty `[]` is `vector?`/`sequential?`) would still pass — the CAPTURE half of
+AC3's tools/skills invariant is value-unasserted (the isolation test uses a
+hand-built snapshot, not a captured one, so it does not cover capture either).
+T6 stands as written.
+
+No NEW actionable test-shaper findings beyond the open T6. The other
+candidate-smells reviewed are non-actionable: the AC8 ns-pointer
+misattribution in steps.md S5 (pass-6 noted; coverage correct, only the
+pointer wrong) and the dual-shape `(or (get-in config [:model :id]) (:model
+config))` override read are defensive, not signal-eroding.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
