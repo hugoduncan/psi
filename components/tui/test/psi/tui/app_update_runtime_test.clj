@@ -175,8 +175,11 @@
   ;; Proves explicit runtime-facing events refresh extension command names.
   (testing "window-size refreshes extension command names"
     (let [commands* (atom ["/one"])
+          ;; The command-refresh query widened (task 205) to also request
+          ;; :psi.agent-session/builtin-command-specs; respond to any query that
+          ;; asks for extension command names rather than the exact one-key form.
           query-fn  (fn [query]
-                      (when (= [:psi.extension/command-names] query)
+                      (when (some #{:psi.extension/command-names} query)
                         {:psi.extension/command-names @commands*}))
           update-fn (app/make-update (stub-agent-fn ""))
           state     (assoc (init-state) :query-fn query-fn)

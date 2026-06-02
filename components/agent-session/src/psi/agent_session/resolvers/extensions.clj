@@ -157,11 +157,9 @@
    without an agent-session context being present."
   [_env]
   {::pco/input  []
-   ::pco/output [:psi.agent-session/builtin-command-specs
-                 :psi.agent-session/builtin-command-names]}
+   ::pco/output [:psi.agent-session/builtin-command-specs]}
   (let [specs (builtin-specs/builtin-command-specs-for-resolver)]
-    {:psi.agent-session/builtin-command-specs specs
-     :psi.agent-session/builtin-command-names (mapv :name specs)}))
+    {:psi.agent-session/builtin-command-specs specs}))
 
 (pco/defresolver extension-flags-resolver
   [{:keys [psi/agent-session-ctx]}]

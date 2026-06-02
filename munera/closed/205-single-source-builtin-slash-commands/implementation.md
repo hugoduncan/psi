@@ -1725,3 +1725,66 @@ that same copied shape); CS2 targets the *unused exposed attribute* (no prior
 pass flagged the dead surface — the plan deferred it as an open question).
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+---
+
+## Follow-up execution — code-shaper pass 1 (CS1, CS2)
+
+Executed the two newly-added unchecked code-shaper follow-ups.
+
+### CS1 — single help-line renderer (robustness)
+- `builtin_specs.clj`: extracted public `render-help-line [k spec]` — the sole
+  renderer of `"  /name [usage ]— description"` (usage before the em-dash when
+  present). `builtin-help-block` now maps it over the `:hide-in-help?`-filtered
+  table; output is byte-identical (verified: full unit suites green, no golden
+  drift).
+- Tests: `format-help-block-line-order-test` and
+  `builtin-help-block-hide-in-help-projection-test` now call
+  `bspec/render-help-line` instead of their copied test-local `line-for` fns
+  (the duplicated formula is gone). Added `render-help-line-format-test` with
+  two *independent literal goldens* — `/model` (with-usage) and `/quit`
+  (no-usage) — so a spacing/em-dash/usage-placement regression is caught by a
+  stable anchor, not mirror-confirmed by the shared formula the other two tests
+  re-derive. No behaviour change.
+
+### CS2 — drop unused resolver attribute (simplicity) — option (a)
+- Confirmed `:psi.agent-session/builtin-command-names` (resolver attribute) is
+  consumed by NO UI (TUI `support.clj`/`autocomplete.clj`, Emacs
+  `psi-session-commands.el` query `:builtin-command-specs` only). The
+  `commands.clj:699` `bspec/builtin-command-names` *def* is the unrelated
+  bare-name set used by `all-command-names`, not the resolver attribute.
+- `resolvers/extensions.clj`: dropped `:psi.agent-session/builtin-command-names`
+  from `builtin-commands-resolver`'s `::pco/output` and return map — resolver
+  now exposes `:builtin-command-specs` only.
+- `builtin_commands_resolver_test.clj`: removed the bare-name query/assertions
+  (shape-test query + the redundant "bare-name vector mirrors spec names" block
+  + the graph-discovery resolvability assertion) and reworded the ns docstring
+  (`/ -names` → single attribute). The end-to-end membership lock
+  (`…-exposes-full-spec-table-membership-test`) still derives its name set from
+  `:builtin-command-specs`, so AC6 coverage is preserved.
+- `doc/architecture.md`: trimmed the stale `[:psi.agent-session/builtin-command-names]`
+  "symmetric" mention from the EQL Introspection Tips slash-command bullet.
+
+### Verification
+- `clojure -M:test --focus psi.agent-session.commands-builtin-specs-test
+  --focus psi.agent-session.builtin-commands-resolver-test`: 15 tests, 218
+  assertions, 0 failures.
+- `psi.agent-session.commands-test`: 51 tests, 206 assertions, 0 failures.
+- clj-kondo over the four changed clj files: 0 errors, 0 warnings.
+- clj-paren-repair: no changes needed (well-formed).
+
+Both items checked in steps.md. No remaining unchecked CS items.
+
+### Incidental fix — stale TUI command-refresh stub (Slice-3 regression caught now)
+While running the full unit suite to verify CS1/CS2, found a PRE-EXISTING red
+test (confirmed failing on HEAD with my changes stashed):
+`psi.tui.app-update-runtime-test/explicit-refresh-boundary-refreshes-extension-command-names-test`.
+Its stub `query-fn` guarded `(= [:psi.extension/command-names] query)`, but
+Slice 3 widened `support/command-refresh-query` to
+`[:psi.extension/command-names :psi.agent-session/builtin-command-specs]`, so the
+exact-match guard returned nil and the assertion failed. Slice 3 added a NEW
+refresh test in the autocomplete/selector test file but did not update this older
+runtime test. Minimal fix: relaxed the stub guard to
+`(some #{:psi.extension/command-names} query)` (respond when the widened query
+asks for extension command names). Test-only change; full `bb clojure:test:unit`
+now green.

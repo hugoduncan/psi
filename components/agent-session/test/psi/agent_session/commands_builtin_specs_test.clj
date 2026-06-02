@@ -160,14 +160,30 @@
   ;; no positional assertion; a middle-of-table reorder would pass every other
   ;; test. Assert the rendered block's full line sequence equals the
   ;; spec-table-ordered, `:hide-in-help?`-filtered projection.
-  (let [line-for (fn [k {:keys [description usage]}]
-                   (str "  " k " " (when usage (str usage " ")) "— " description))
-        expected (for [[k spec] bspec/builtin-command-specs
+  (let [expected (for [[k spec] bspec/builtin-command-specs
                        :when (not (:hide-in-help? spec))]
-                   (line-for k spec))]
+                   (bspec/render-help-line k spec))]
     (is (= (vec expected)
            (str/split-lines (bspec/builtin-help-block)))
         "built-in help block lines must equal the spec-table-ordered, hidden-filtered projection")))
+
+(deftest render-help-line-format-test
+  ;; CS1: lock the help-line *format* with stable literal goldens so a
+  ;; spacing/em-dash/usage-placement regression is *caught* rather than
+  ;; mirror-confirmed. `format-help-block-line-order-test` and
+  ;; `builtin-help-block-hide-in-help-projection-test` both call
+  ;; `bspec/render-help-line` to derive their expectations (single renderer),
+  ;; so they cannot detect a change in the shared formula. These goldens are
+  ;; independent literal anchors for the with-usage and no-usage shapes.
+  (testing "with-usage line places usage before the em-dash"
+    (is (= "  /model [provider model-id [session|project|user]] — show current model or set model"
+           (bspec/render-help-line "/model"
+                                   {:description "show current model or set model"
+                                    :usage "[provider model-id [session|project|user]]"}))))
+  (testing "no-usage line has no usage segment"
+    (is (= "  /quit — exit the session"
+           (bspec/render-help-line "/quit"
+                                   {:description "exit the session"})))))
 
 (deftest project-repl-exact-first-precedence-test
   ;; TT6: lock dual-kind `/project-repl` *exact-first* dispatch precedence
@@ -199,18 +215,16 @@
   ;; *built-in-block omission* rather than mere global absence — a substring
   ;; check on the full message would false-fail if a future description carried
   ;; the literal token, and only proves the token appears nowhere at all.
-  (let [block (bspec/builtin-help-block)
-        line-for (fn [k {:keys [description usage]}]
-                   (str "  " k " " (when usage (str usage " ")) "— " description))]
+  (let [block (bspec/builtin-help-block)]
     (testing ":hide-in-help? entries' lines are absent from the block"
       (doseq [[k spec] bspec/builtin-command-specs
               :when (:hide-in-help? spec)]
-        (is (not (str/includes? block (line-for k spec)))
+        (is (not (str/includes? block (bspec/render-help-line k spec)))
             (str k " line must be omitted from the built-in help block"))))
     (testing "shown entries' lines are present in the block"
       (doseq [[k spec] bspec/builtin-command-specs
               :when (not (:hide-in-help? spec))]
-        (is (str/includes? block (line-for k spec))
+        (is (str/includes? block (bspec/render-help-line k spec))
             (str k " line must be present in the built-in help block"))))))
 
 (deftest prefixed-case-branch-coherence-test

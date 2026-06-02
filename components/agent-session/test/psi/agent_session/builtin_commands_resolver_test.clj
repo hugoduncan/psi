@@ -1,8 +1,8 @@
 (ns psi.agent-session.builtin-commands-resolver-test
   "Tests for the built-in slash-command EQL resolver (task 205): the backend is
    the single authoritative source of the built-in command surface, exposed via
-   `:psi.agent-session/builtin-command-specs` / `-names` and consumed by UIs the
-   same way as `:psi.extension/command-names`."
+   `:psi.agent-session/builtin-command-specs` and consumed by UIs the same way
+   as `:psi.extension/command-names`."
   (:require
    [clojure.test :refer [deftest testing is]]
    [psi.agent-session.commands.builtin-specs :as bspec]
@@ -17,10 +17,8 @@
 (deftest builtin-command-specs-resolver-shape-test
   (let [[ctx session-id] (create-session-context)
         result (session/query-in ctx session-id
-                                 [:psi.agent-session/builtin-command-specs
-                                  :psi.agent-session/builtin-command-names])
-        specs  (:psi.agent-session/builtin-command-specs result)
-        names  (:psi.agent-session/builtin-command-names result)]
+                                 [:psi.agent-session/builtin-command-specs])
+        specs  (:psi.agent-session/builtin-command-specs result)]
     (testing "resolver returns a vector of {:name :description} maps"
       (is (vector? specs))
       (is (seq specs))
@@ -58,8 +56,6 @@
       ;; slipped into `builtin-command-specs-for-resolver`, is caught here.
       (is (= (mapv #(bspec/strip-slash (key %)) bspec/builtin-command-specs)
              (mapv :name specs))))
-    (testing "the bare-name vector mirrors the spec names in the same order"
-      (is (= names (mapv :name specs))))
     (testing "each name's description equals the spec-table description (AC1)"
       ;; Lock description *content*, not just non-blankness — a dropped,
       ;; swapped, or zip-misaligned description in
@@ -91,7 +87,5 @@
         (is (contains? syms 'psi.agent-session.resolvers.extensions/builtin-commands-resolver))))
     (testing "the built-in command attrs are resolvable for a session"
       (let [result (session/query-in ctx session-id
-                                     [:psi.agent-session/builtin-command-specs
-                                      :psi.agent-session/builtin-command-names])]
-        (is (seq (:psi.agent-session/builtin-command-specs result)))
-        (is (seq (:psi.agent-session/builtin-command-names result)))))))
+                                     [:psi.agent-session/builtin-command-specs])]
+        (is (seq (:psi.agent-session/builtin-command-specs result)))))))

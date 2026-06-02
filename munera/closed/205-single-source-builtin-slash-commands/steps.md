@@ -456,29 +456,39 @@ Tick with sha/decision on completion.
 
 ## Code-shaper review follow-ups (code-shaper pass 1)
 
-- [ ] CS1 — De-duplicate the help-line render formula (robustness). The single
-      line shape `(str "  " k " " (when usage (str usage " ")) "— " description)`
-      is currently in production (`builtin_specs.clj:110` `builtin-help-block`)
-      and copied verbatim into TWO test-local `line-for` fns
-      (`commands_builtin_specs_test.clj:163-164` and `:203-204`), making
-      `format-help-block-line-order-test` + `builtin-help-block-hide-in-help-projection-test`
-      tautological w.r.t. the line *format* (they re-derive what they assert, so a
-      spacing/em-dash/usage-placement regression changes both block and expectation
-      identically and stays green). Extract a single public renderer in `bspec`
-      (e.g. `(render-help-line k spec)`); have `builtin-help-block` map it over the
-      filtered table; switch the two tests to call that fn (or add a stable literal
-      golden for ≥1 representative line, e.g. `/model` and a no-usage line) so a
-      line-format regression is *caught* rather than mirror-confirmed. No behaviour
-      change.
+- [x] CS1 — De-duplicated the help-line render formula. Extracted a single
+      public `render-help-line` fn in `bspec` (the sole renderer of the
+      `"  /name [usage ]— description"` shape); `builtin-help-block` now maps it
+      over the filtered table. Switched both test-local `line-for` fns
+      (`format-help-block-line-order-test` + `builtin-help-block-hide-in-help-projection-test`)
+      to call `bspec/render-help-line`, AND added `render-help-line-format-test`
+      with stable literal goldens for the with-usage (`/model`) and no-usage
+      (`/quit`) shapes — so a spacing/em-dash/usage-placement regression is now
+      *caught* by an independent anchor rather than mirror-confirmed by the
+      shared formula. No behaviour change; `builtin-help-block` output
+      byte-identical. commands-builtin-specs-test green (+1 test); clj-kondo
+      clean.
 
-- [ ] CS2 — Resolve the unused `:psi.agent-session/builtin-command-names`
-      resolver attribute (simplicity). `builtin-commands-resolver`
-      (extensions.clj:160-164) outputs the bare-name attribute alongside
-      `:builtin-command-specs`, but no UI consumes it (TUI + Emacs read
-      `:builtin-command-specs` only; the bare-name attr is referenced solely by
-      `builtin_commands_resolver_test.clj`). plan.md's carried open question said
-      "drop if unused by either UI after Slices 3–4". Either (a) drop the
-      `:psi.agent-session/builtin-command-names` output from the resolver and its
-      dedicated test assertions (preferred), or (b) if kept for graph symmetry
-      with `:psi.extension/command-names`, record that as a closed decision in
-      plan.md so the "drop if unused" gate is explicitly resolved.
+- [x] CS2 — Resolved the unused `:psi.agent-session/builtin-command-names`
+      resolver attribute via option (a) (preferred: drop). Confirmed no UI reads
+      it (TUI + Emacs consume `:builtin-command-specs` only; the `commands.clj`
+      `bspec/builtin-command-names` *def* at :699 is unrelated to the resolver
+      attribute). Dropped `:psi.agent-session/builtin-command-names` from the
+      `builtin-commands-resolver` `::pco/output` and return map
+      (extensions.clj); removed all resolver-attribute assertions/queries from
+      `builtin_commands_resolver_test.clj` (shape test, the redundant bare-name
+      mirror block, and the graph-discovery resolvability check) and reworded the
+      ns docstring; trimmed the stale `[:psi.agent-session/builtin-command-names]`
+      mention from `doc/architecture.md`'s EQL tips. The end-to-end membership
+      lock (`builtin-commands-resolver-exposes-full-spec-table-membership-test`)
+      still derives the name set from `:builtin-command-specs`, so AC6 coverage
+      is unaffected. builtin-commands-resolver-test green; clj-kondo clean.
+
+- [x] CS-incidental — Fixed a pre-existing Slice-3 regression surfaced by the
+      full-suite verification: `app_update_runtime_test.clj`'s
+      `explicit-refresh-boundary-refreshes-extension-command-names-test` stub
+      `query-fn` guarded the exact one-key `[:psi.extension/command-names]` query,
+      but Slice 3 widened `command-refresh-query` to also request
+      `:psi.agent-session/builtin-command-specs`. Relaxed the guard to
+      `(some #{:psi.extension/command-names} query)`. Test-only; full
+      `bb clojure:test:unit` now green.

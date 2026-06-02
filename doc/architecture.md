@@ -122,8 +122,7 @@ or session navigation domain logic.
   querying the graph — they hold no hardcoded built-in *command* lists:
   - extension commands: `[:psi.extension/command-names]`
   - built-in commands: `[:psi.agent-session/builtin-command-specs]` (a vector of
-    `{:name :description}`, bare names, in table order) and the symmetric
-    `[:psi.agent-session/builtin-command-names]`
+    `{:name :description}`, bare names, in table order)
   - built-in command identity lives in exactly one place — the
     `builtin-command-specs` table in `psi.agent-session.commands.builtin-specs`.
     The routing maps (`exact-command-handlers`, `prefixed-command-prefixes`),

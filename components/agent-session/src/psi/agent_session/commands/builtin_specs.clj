@@ -98,16 +98,25 @@
   "Projection: set of bare built-in command names (no leading slash)."
   (set (map strip-slash (keys builtin-command-specs))))
 
+(defn render-help-line
+  "Render a single built-in command help line:
+   \"  /name [usage ]— description\" (usage inserted before the em-dash when
+   present). The sole renderer of the help-line shape — `builtin-help-block`
+   maps it over the filtered table, and tests assert against it so a
+   spacing/em-dash/usage-placement regression is caught, not mirror-confirmed."
+  [k {:keys [description usage]}]
+  (str "  " k " " (when usage (str usage " ")) "— " description))
+
 (defn builtin-help-block
   "Render the built-in command help lines from the single spec table, in table
-   order, skipping `:hide-in-help?` entries. Each line renders
-   \"  /name [usage ]— description\" (usage inserted before the em-dash when
-   present). Returns a newline-joined string with no trailing newline."
+   order, skipping `:hide-in-help?` entries. Each line is rendered by
+   `render-help-line`. Returns a newline-joined string with no trailing
+   newline."
   []
   (str/join "\n"
-            (for [[k {:keys [description usage hide-in-help?]}] builtin-command-specs
-                  :when (not hide-in-help?)]
-              (str "  " k " " (when usage (str usage " ")) "— " description))))
+            (for [[k spec] builtin-command-specs
+                  :when (not (:hide-in-help? spec))]
+              (render-help-line k spec))))
 
 (defn builtin-command-specs-for-resolver
   "Return built-in command specs as a vector of `{:name :description}` maps
