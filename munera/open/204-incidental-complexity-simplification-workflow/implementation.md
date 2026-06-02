@@ -2552,3 +2552,47 @@ VERIFICATION:
 
 No production code, EDN workflow, skill, meta, spec, or doc change — this is a
 test-file split for CI-boundary relief only. Behaviour and coverage identical.
+
+## 2026-06-01 — Implementation review (independent pass, task-implementation-review skill)
+
+◈ Independent review applying `task-implementation-review`
+(`matches(code,design) ∧ follows(architecture) ∧ ¬redundant-pattern ∧
+¬unnecessary-abstraction ∧ ¬structural-perf-issue`). Verified against live CLI,
+the loadable wrapper precedent, and CI gates — not just artifacts.
+
+Confirmed sound (no new actionable issue):
+- **design↔artifact match.** SKILL.md encodes the `gap = lcc-total / max(cc,1)`
+  method, `(ns,var,arity,line)` inner-join recipe (with the A1 line-uniqueness
+  rationale), `lcc-total ≥ 5.0 ∧ gap ≥ 2.0` filter, top-5 judgment guard,
+  evidence + coverage-hint, single-unit scope. `reduce-incidental-complexity.edn`
+  = two-step select+create / delegate shape with early-stop; the generated-design
+  template embeds the two-phase contract + both baselines + gate flags verbatim.
+- **verified recipes still accurate (R5 re-check).** Live CLI confirms
+  `gordian gate` accepts `--fail-on new-cycles,new-high-findings` and
+  `--max-new-medium-findings`; `gordian local --json` emits `lcc-total` + the six
+  per-dimension burdens. The design/template text matches the live tool — no drift.
+- **pattern reuse, not invention.** `task-lifecycle-in-worktree.edn` is
+  structurally identical to the loadable `review-implementation-in-worktree.edn`
+  (resolve-worktree `:session`+`work-on` → `:delegate` → `summary`), with
+  `task-lifecycle` substituted for `review-task-implementation` and a sound
+  F1 NO_TARGET short-circuit added. No unnecessary abstraction.
+- **handoff wiring is the verified pattern.** The outer `lifecycle-in-worktree`
+  `:delegate` combines `:prompt-string {:input {:from {:step … :yield :text}}}`
+  with a `:context` carrying the step-1 handoff `:yield :text` — exactly the dual
+  wiring `gh-issue-implement.edn`'s delegate steps use (verified live). Not a
+  deviation from `one_way`.
+- **CI green.** Focused suites pass (task-204 + skill-test deftests run within the
+  green full suite); `clj-kondo` 0/0 on both EDN workflows; `commit-check:file-lengths`
+  clean after R6 split (workflow_definitions 593, task_204 277). Docs +
+  `CHANGELOG [Unreleased]` document the workflow + skill coherently with design.
+- **prior actionable items closed.** D1 (.edn over .md — grounded in
+  `parser.clj:162`), F1, TR13/14/15 `:context` locks, and the R6 file-length
+  boundary split (committed `f9f1c5128`, 800→593) are all resolved.
+
+One minor process-hygiene note (non-implementation, recorded not flagged as code
+feedback): the R6 file-length follow-up was executed and committed but tracked
+only as an implementation.md worklog entry, not as an explicit `- [x]` item in
+steps.md's review-follow-ups section. Bookkeeping only — the work is done and
+verified; left as a steps.md follow-up below for completeness.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK.

@@ -1066,3 +1066,17 @@ with the commit sha / decision when done.
       warnings in the trimmed original (every remaining private helper is still
       referenced). `bb commit-check:file-lengths` clean (exit 0; 593 and 277
       both < 800). (See implementation.md R6 entry.)
+
+## Implementation review follow-ups (independent pass — task-implementation-review)
+
+- [ ] IR1 (bookkeeping) — The R6 file-length follow-up (extract task-204
+      workflow-definition deftests into a sibling ns; committed `f9f1c5128`,
+      shared ns 800 → 593) is recorded only as an implementation.md worklog
+      entry, not as a checked `- [x]` item in steps.md. Add an explicit checked
+      steps.md item for the R6 extraction so the steps checklist reflects the
+      committed work. Non-implementation; the code/tests are already done and
+      verified (CI green, file-lengths clean). No further review issues found:
+      design↔artifacts match, recipes re-verified against the live `gordian`
+      CLI, wrapper mirrors the loadable `review-implementation-in-worktree.edn`
+      precedent, handoff wiring matches `gh-issue-implement.edn`, tests/kondo
+      green.
