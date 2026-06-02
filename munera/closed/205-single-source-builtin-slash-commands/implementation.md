@@ -1511,3 +1511,39 @@ state assertions throughout.
   builtin path is incidental robustness already exercised via the ext-cmds path
   and made unreachable from the real backend by TT3 (every entry has a non-blank
   string name) — not a task-contract behaviour warranting a dedicated test.
+
+## Docs review (review-task-docs, pass 1)
+
+Applied `review-task-docs` skill {accuracy ∧ completeness ∧ consistency} over
+`README.md`, `doc/`, `CHANGELOG.md`.
+
+Verified accurate:
+- CHANGELOG `[Unreleased]` ▸ "Changed" entry: correct attribute name
+  (`:psi.agent-session/builtin-command-specs`), correct previously-missing
+  command set, correct `defcustom` repurposing. ✓
+- `doc/architecture.md` EQL tips: attribute names, ns
+  (`psi.agent-session.commands.builtin-specs`), `{:name :description}` shape,
+  and projection list (`exact-command-handlers`, `prefixed-command-prefixes`,
+  `format-help`, `builtin-commands-resolver`) all match source. ✓
+- No stale slash-command surface references in `doc/emacs-ui.md`, `doc/tui.md`,
+  `doc/graph-surface.md`, or `README.md`; the trimmed `defcustom` is not
+  documented in user docs, so trimming needed no user-doc change beyond the
+  (present) CHANGELOG mention. ✓
+- `doc/graph-surface.md` relies on dynamic discovery (`resolver-syms` /
+  attr-index), so it correctly needs no per-attribute enumeration of the two new
+  attrs. ✓
+
+Actionable finding (D1): `doc/architecture.md:121-122` overstates the Emacs side.
+It asserts "Both the TUI and Emacs build their slash autocomplete by querying the
+graph — **they hold no hardcoded command lists**". This is true for the TUI
+(`shared/builtin-slash-commands` deleted) but **inaccurate for Emacs**: the
+`psi-emacs-slash-command-specs` `defcustom` (psi-completion.el:19-20) is
+deliberately retained with a non-empty default
+`(("/skill:" . "Invoke a skill (append skill name)"))` and is merged into the
+completion candidates (`psi-emacs--state-slash-command-specs`, backend-first
+`seq-uniq`). The CHANGELOG already describes this nuance correctly ("`defcustom`
+is now a user override/supplement (default trimmed to the Emacs-only `/skill:`
+affordance)"); architecture.md should be reconciled to match — qualify the claim
+to "no hardcoded built-in *command* lists" and note the Emacs `defcustom`
+survives as a user override/supplement for the Emacs-only `/skill:` affordance,
+so the doc does not contradict the CHANGELOG or the retained defcustom default.
