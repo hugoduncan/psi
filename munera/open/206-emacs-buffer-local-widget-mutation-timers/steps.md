@@ -280,3 +280,31 @@
       `cl-letf`/puthash/assert bodies inline (they are the intent). Deferrable —
       only two callers, coverage/correctness unaffected. Re-run `bb emacs:check`;
       byte-compile clean; reload `.el`.
+
+## Test-shaper review pass 4 follow-ups (ψ)
+
+- [ ] S5 — Factor the repeated DISPATCH/RESPONSE substitution preamble (minor,
+      economy/consistency). The three dispatch/response tests in
+      `test/psi-widget-projection-timers-test.el` —
+      `pwpt-dispatch-mutation-cancels-timer-on-response`,
+      `pwpt-dispatch-response-targets-originating-buffer`,
+      `pwpt-dispatch-response-noop-when-buffer-dead` — each hand-roll the same
+      ~5-line `(let ((captured-cb nil)) …)` + `cl-letf` preamble binding the
+      uniform infrastructure stubs `run-at-time → 'fake-timer`,
+      `timerp → (eq x 'fake-timer)`,
+      `send-request-function → (setq captured-cb cb)`, and
+      `upsert-projection-block → #'ignore` to drive a dispatch and capture its
+      response callback. The only meaningful variation is `cancel-timer`
+      (captured in the first test where cancellation IS the assertion subject;
+      `#'ignore` in the two where store/lstate state is). Add a
+      `pwpt--with-dispatch-stubs (cb-var &rest body)` macro (binding `cb-var`
+      and stubbing `run-at-time`/`timerp`/`send-request-function`/
+      `upsert-projection-block`, leaving the per-test `cancel-timer` binding to
+      the caller's `cl-letf` where it is the assertion subject) and apply it so
+      each dispatch test reads as its distinct arrange/act/assert intent rather
+      than buried under stub boilerplate
+      (`helpers_that_compress(ceremony) ∧ ¬helpers_that_hide(intent)`,
+      `minimal_incidental_variation` ∧ `consistent(fixtures)`). Keep the
+      assertions and the per-test `cancel-timer` binding inline (they are the
+      intent). Deferrable — stubs are uniform/correct, coverage unaffected.
+      Re-run `bb emacs:check`; byte-compile clean; reload `.el`.

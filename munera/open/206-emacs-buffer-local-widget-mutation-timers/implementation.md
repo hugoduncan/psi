@@ -863,3 +863,52 @@ chars and rewrapping the cross-reference). No production code touched — test-o
 economy/consistency refinement.
 
 Verdict: S4 complete. No remaining unchecked follow-up items in steps.md.
+
+## Test-shaper review pass 4 (ψ)
+
+Independent re-application of test-shaper (clarity ∧ signal ∧ robustness ∧
+economy) to `test/psi-widget-projection-timers-test.el` after S1–S4 landed.
+Full suite 340/340 green, byte-compile clean. Determinism
+(`run-at-time`/`cancel-timer`/`timerp`/`send-request-function`/
+`upsert-projection-block` all substituted — infra only), state-based
+(¬interaction) assertions, and complete design behaviour coverage all
+re-confirmed strong; the prior S1/S2/S3/S4 factorings (`pwpt--with-psi-buffer`,
+`pwpt--with-psi-mode-buffer`, `pwpt--seed-button-in-flight`,
+`psi-test--should-not-error`) compress ceremony without hiding intent.
+
+One NEW minor actionable economy/consistency gap (S5): the
+DISPATCH/RESPONSE substitution preamble is hand-rolled 3× across
+`pwpt-dispatch-mutation-cancels-timer-on-response` (`:220`),
+`pwpt-dispatch-response-targets-originating-buffer` (`:248`), and
+`pwpt-dispatch-response-noop-when-buffer-dead` (`:288`). Each binds the same
+uniform infrastructure stubs to drive a dispatch + capture its response
+callback: `run-at-time → 'fake-timer`, `timerp → (eq x 'fake-timer)`,
+`send-request-function → (setq captured-cb cb)`, and
+`upsert-projection-block → #'ignore`, plus a `(let ((captured-cb nil)) …)`
+binding. This is a ~5-line incidental-setup block repeated for the same intent
+(dispatch, then fire the captured response callback), with the only meaningful
+variation being `cancel-timer` (captured in the first test where cancellation
+IS asserted; `#'ignore` in the two cross-buffer/dead-buffer tests where the
+store/lstate state is the assertion subject, not the cancel call). Prior passes
+(S1/S4) factored the buffer scaffold but not this dispatch-stub preamble; the
+non-actionable note about NOT folding the teardown tests' `timerp`/`cancel-timer`
+preamble concerned a different case (there `cancel-timer` capture IS the
+assertion). For the response tests the `run-at-time`/`timerp`/
+`send-request-function`/`upsert` stubs are pure plumbing (the act is firing
+`captured-cb`), so a `pwpt--with-dispatch-stubs (cb-var &rest body)` macro
+(binding `cb-var`, stubbing `run-at-time`/`timerp`/`send-request-function`/
+`upsert-projection-block`, leaving `cancel-timer` to the caller's `cl-letf`
+when it is the assertion subject) would cut the incidental setup so each
+dispatch test reads as its distinct arrange/act/assert intent rather than
+buried under stub boilerplate (`helpers_that_compress(ceremony) ∧
+¬helpers_that_hide(intent)`, `minimal_incidental_variation` ∧
+`consistent(fixtures)`). Keep the assertions and the per-test `cancel-timer`
+binding inline (they are the intent). Minor: coverage/correctness/determinism
+unaffected; the stubs are uniform and correct today — deferrable.
+
+Non-actionable (noted, no follow-up): `pwpt-arm-cancel-mutation-timer-roundtrip`'s
+name still slightly oversells "cancel" (remhash path; `timerp` unstubbed so
+`cancel-timer` never fires on the fake list timer) — already recorded benign in
+prior passes.
+
+Verdict: ACTIONABLE_FEEDBACK (minor economy refinement S5).
