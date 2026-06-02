@@ -2,12 +2,12 @@
 
 ## Slice 1 — State plumbing
 
-- [ ] Add `projection-mutation-timers` field to `cl-defstruct psi-emacs-state`
+- [x] Add `projection-mutation-timers` field to `cl-defstruct psi-emacs-state`
       in `psi-globals.el` (immediately after `projection-notification-timers`).
-- [ ] Initialize `:projection-mutation-timers (make-hash-table :test #'equal)`
+- [x] Initialize `:projection-mutation-timers (make-hash-table :test #'equal)`
       in `psi-emacs--initialize-state` (`psi-lifecycle.el:57`), beside the
       notification-timers init.
-- [ ] Add `psi-widget-projection--clear-mutation-timers (state)` in
+- [x] Add `psi-widget-projection--clear-mutation-timers (state)` in
       `psi-widget-projection.el`: wrap the whole body in an outer `(when state
       ...)`, then maphash `cancel-timer` over timer values guarded on
       `(timerp timer)` then `clrhash`, inner-guarded on `(hash-table-p timers)`
@@ -15,10 +15,10 @@
       (`psi-projection.el:379`) exactly: outer `(when state ...)` so a nil
       `state` is a harmless no-op (P2). The helper owns the null guard; call
       sites pass bare `psi-emacs--state` (Slice 4).
-- [ ] Run `emacs-ui` tests; confirm still green (no behaviour change yet).
-- [ ] `clj-paren-repair`/lint the edited `.el` files; reload per post-commit
+- [x] Run `emacs-ui` tests; confirm still green (no behaviour change yet).
+- [x] `clj-paren-repair`/lint the edited `.el` files; reload per post-commit
       reload guideline.
-- [ ] Commit: `⚒ 206: add buffer-local projection-mutation-timers field + clear helper`.
+- [x] Commit: `⚒ 206: add buffer-local projection-mutation-timers field + clear helper`.
 
 ## Slice 2 — Helper signatures → explicit state
 

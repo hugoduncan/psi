@@ -55,6 +55,7 @@
    :projection-notifications nil
    :projection-notification-seq 0
    :projection-notification-timers (make-hash-table :test #'equal)
+   :projection-mutation-timers (make-hash-table :test #'equal)
    :regions (make-hash-table :test #'equal)
    :region-seq 0
    :active-assistant-id nil

@@ -73,6 +73,19 @@ Inline renderer errors still display.")
 (defvar psi-widget-projection--mutation-timers (make-hash-table :test #'equal)
   "Hash of \"ext/wid:node-key\" → timer for in-flight mutation watchdogs.")
 
+(defun psi-widget-projection--clear-mutation-timers (state)
+  "Cancel and clear all in-flight widget mutation timers in STATE.
+A nil STATE is a harmless no-op, mirroring
+`psi-emacs--clear-notification-lifecycle'."
+  (when state
+    (let ((timers (psi-emacs-state-projection-mutation-timers state)))
+      (when (hash-table-p timers)
+        (maphash (lambda (_tkey timer)
+                   (when (timerp timer)
+                     (cancel-timer timer)))
+                 timers)
+        (clrhash timers)))))
+
 ;;; Query + spec storage
 
 (defun psi-widget-projection-request-specs ()
