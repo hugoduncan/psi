@@ -587,7 +587,7 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
 
 ## Test-review pass 7 follow-ups (review 2026-06-02)
 
-- [ ] T7: Add a direct nested-path isolation test for AC4's
+- [x] T7: Add a direct nested-path isolation test for AC4's
       "not-the-since-mutated-invoking-session" half. The two existing AC4 tests
       (`nested-delegation-effective-snapshot-propagates-overridden-model-test`,
       `delegate-step-runtime-result-persists-child-inherited-defaults-test`,
@@ -604,3 +604,19 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       `:inherited-defaults` reflects the parent-run snapshot (effective config),
       NOT the mutated live parent — mirroring the direct top-level isolation
       coverage T2 added for tools/skills.
+      DONE: added
+      `nested-delegation-isolates-child-snapshot-from-live-parent-mutation-test`
+      to `inheritance_snapshot_test.clj`. It reuses the e2e `delegating-e2e`
+      definitions, creates the delegating run with a `claude-PARENT` parent-run
+      snapshot (speed `:fast`/effort `:xhigh`), then mutates the LIVE parent
+      session to `claude-LIVE-CHANGED` (speed `:flex`/effort `:low`) AFTER invoke
+      BEFORE delegating, drives the REAL `delegate/delegate-step-runtime-result`
+      with the real injected `resolve-inherited-defaults-fn` closure (mirroring
+      `context.clj`: `effective-config->snapshot` ∘ `resolve-step-session-config`)
+      + stub no-op `send-and-drain-fn`/`create-workflow-context-fn`, and asserts
+      the CHILD run's persisted `:inherited-defaults` carries the parent-run
+      snapshot model (`claude-PARENT`, `≠ claude-LIVE-CHANGED`) + parent-snapshot
+      speed/effort (`:fast`/`:xhigh`, not the mutated `:flex`/`:low`) + exact key
+      set — proving the nested derivation path does not leak a since-mutated live
+      parent read (mirrors the direct top-level T2 tools/skills isolation).
+      inheritance-snapshot suite green (11 tests, 59 assertions); lint clean.

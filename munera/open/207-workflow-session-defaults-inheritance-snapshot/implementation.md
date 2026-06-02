@@ -1670,3 +1670,35 @@ guard. A negative schema test would assert malli's own constraint enforcement
 persist → consume → isolate) is fully covered.
 
 No new actionable test-shaper findings. Review complete.
+
+## T7 follow-up executed (ψ, 2026-06-02 — test-review pass 7)
+
+Closed the last AC4 coverage gap: the nested/delegated child snapshot's
+isolation from a since-mutated invoking session had no DIRECT test (only
+transitive via the AC1/AC2/AC3 resolver isolation tests + the snapshot-gated R1
+read). A future change reintroducing a live read on the nested derivation path
+(the injected closure re-reading the live session instead of
+`(:inherited-defaults workflow-run)`) would have passed every prior test.
+
+Added `nested-delegation-isolates-child-snapshot-from-live-parent-mutation-test`
+to `inheritance_snapshot_test.clj`, the nested-path parallel of the direct
+top-level T2 tools/skills isolation test. It:
+
+- creates the delegating run (`delegating-e2e` → `child-wf`) with a
+  `claude-PARENT` parent-run snapshot (speed `:fast`/effort `:xhigh`);
+- mutates the LIVE parent session to `claude-LIVE-CHANGED`
+  (speed `:flex`/effort `:low`) AFTER invoke, BEFORE delegating;
+- drives the REAL `delegate/delegate-step-runtime-result` with the real injected
+  `resolve-inherited-defaults-fn` closure (mirrors `context.clj`:
+  `effective-config->snapshot` ∘ `resolve-step-session-config`) plus stub no-op
+  `send-and-drain-fn`/`create-workflow-context-fn`;
+- asserts the CHILD run's persisted `:inherited-defaults` carries the parent-run
+  snapshot model (`claude-PARENT`, and explicitly `≠ claude-LIVE-CHANGED`) and
+  the parent-snapshot speed/effort (`:fast`/`:xhigh`, not the mutated
+  `:flex`/`:low`), with the exact snapshot key set.
+
+Test-only addition (no behaviour/code/doc change). inheritance-snapshot suite
+green (11 tests, 59 assertions, 0 failures via `clojure -M:test --focus`);
+`clj-kondo` clean (0 errors / 0 warnings) on the touched file. No new actionable
+follow-up items — the T7 gap is the only item this review pass added, and it is
+now closed.

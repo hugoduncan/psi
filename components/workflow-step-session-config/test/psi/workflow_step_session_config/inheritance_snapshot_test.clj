@@ -534,6 +534,79 @@
              (set (keys child-snapshot)))
           "child snapshot has exactly the snapshot key set"))))
 
+(deftest nested-delegation-isolates-child-snapshot-from-live-parent-mutation-test
+  (testing "AC4 (not-the-since-mutated-invoking-session half): after invoke,
+            mutating the LIVE parent session's model/speed-mode/effort-override
+            has NO effect on the CHILD run's persisted :inherited-defaults. The
+            delegating step inherits the parent RUN snapshot (claude-PARENT); a
+            post-invoke live mutation to claude-LIVE-CHANGED must not leak into
+            the nested snapshot. A regression reintroducing a live read on the
+            nested derivation path (the injected closure re-reading the live
+            session instead of (:inherited-defaults workflow-run)) would flip
+            these assertions. Mirrors the direct top-level isolation coverage in
+            snapshot-isolates-tools-skills-from-live-parent-mutation-test (T2)."
+    (let [[ctx session-id] (support/create-session-context {:persist? false})
+          parent-run-snapshot {:model {:provider "anthropic" :id "claude-PARENT"}
+                               :prompt-mode :concise
+                               :tool-defs []
+                               :skills []
+                               :thinking-level :off
+                               :speed-mode :fast
+                               :effort-override :xhigh}
+          workflow-run
+          (do (swap! (:state* ctx)
+                     (fn [state]
+                       (let [[s _ _] (workflow-registry/register-definition state delegate-child-definition)
+                             [s _ _] (workflow-registry/register-definition s delegating-definition)
+                             [s' _ _] (workflow-runtime/create-run
+                                       s {:definition-id "delegating-e2e"
+                                          :run-id "run-delegating-iso"
+                                          :parent-session-id session-id
+                                          :inherited-defaults parent-run-snapshot
+                                          :workflow-input {:input "go"}})]
+                         s')))
+              (workflow-runtime/workflow-run-in @(:state* ctx) "run-delegating-iso"))
+          ;; The real injected closure bound in context.clj for the nested path.
+          resolve-inherited-defaults-fn
+          (fn [ctx* parent-session-id* workflow-run* step-id*]
+            (workflow-step-session-config/effective-config->snapshot
+             (workflow-step-session-config/resolve-step-session-config
+              ctx* parent-session-id* workflow-run* step-id*)
+             (:inherited-defaults workflow-run*)))
+          create-workflow-context-fn (fn [ctx* _psid _run-id] (assoc ctx* :wm nil))
+          send-and-drain-fn (fn [_wf-ctx _wm _event _payload] nil)
+          step-def (get-in workflow-run [:effective-definition :steps "delegate-step"])]
+      ;; Mutate the LIVE parent session AFTER invoke, BEFORE delegating: model +
+      ;; speed/effort all change. The nested derivation must read the parent RUN
+      ;; snapshot, not these live values.
+      (assoc-session-data! ctx session-id
+                           {:model {:provider "anthropic" :id "claude-LIVE-CHANGED"}
+                            :prompt-mode :verbose
+                            :speed-mode :flex
+                            :effort-override :low})
+      (let [result (delegate/delegate-step-runtime-result
+                    create-workflow-context-fn
+                    send-and-drain-fn
+                    resolve-inherited-defaults-fn
+                    ctx session-id "delegate-step" step-def workflow-run)
+            child-run-id (get-in result [:payload :delegate-run-id])
+            child-run (workflow-runtime/workflow-run-in @(:state* ctx) child-run-id)
+            child-snapshot (:inherited-defaults child-run)]
+        (is (some? child-snapshot)
+            "the child run persists an :inherited-defaults snapshot")
+        (is (= {:provider "anthropic" :id "claude-PARENT"} (:model child-snapshot))
+            "child snapshot model comes from the parent RUN snapshot, NOT the
+             post-invoke mutated live parent session")
+        (is (not= {:provider "anthropic" :id "claude-LIVE-CHANGED"} (:model child-snapshot))
+            "the since-mutated live model must not leak into the nested snapshot")
+        (is (= :fast (:speed-mode child-snapshot))
+            "speed-mode comes from the parent run snapshot, not the mutated live :flex")
+        (is (= :xhigh (:effort-override child-snapshot))
+            "effort-override comes from the parent run snapshot, not the mutated live :low")
+        (is (= workflow-step-session-config/inherited-defaults-snapshot-keys
+               (set (keys child-snapshot)))
+            "child snapshot has exactly the snapshot key set")))))
+
 (deftest inherited-defaults-field-set-authority-test
   (testing "every :from-common source key is a member of the canonical
             common-inherited-fields authority"
