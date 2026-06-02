@@ -659,6 +659,35 @@ with the commit sha / decision when done.
       skill-test suite green (4 tests, 40 assertions, 0 failures — +2 over
       pass-4's 38); `clj-kondo` 0 findings; skill-test file 259 lines (< 800).
 
+## Implementation review follow-ups (review pass 6)
+
+- [ ] F6 — `design.md`'s `## Verified facts (grounding)` section (and the
+      Step-1/Step-2 wrapper references at lines 138–139, 144, 168–170, 295, 316,
+      328, 362, 367) still names `implement-task-in-worktree` as the **verified /
+      proven** wrapper precedent the new wrapper is "structurally identical to" —
+      but D1 found, and this review re-confirmed against the live loader, that
+      `implement-task-in-worktree.md` **does not load**: its body begins with an
+      EDN map, which `parse-markdown-workflow-file` rejects (`parser.clj:162`).
+      The actual loadable precedent used was `review-implementation-in-worktree.edn`
+      (recorded in implementation.md/steps.md D1, never propagated to the design
+      spec). Per the coherence invariant (`source_of_truth ≡ … ∪ spec`), the spec
+      asserts a false grounding fact — F4/F5-class stale-claim-in-one-artifact,
+      here a stale *precedent claim*. The chosen mechanism (handoff `worktree_path:`
+      + `resolve-worktree` `:session` re-calling `work-on`) is correct and IS
+      demonstrated by a loadable precedent — but that precedent is
+      `review-implementation-in-worktree.edn`, not `implement-task-in-worktree`.
+      Threshold-harmless (wrapper behaviour is correct + tested) but design↔
+      implementation grounding is internally contradictory. Fix: reconcile
+      `design.md` so the verified/loadable precedent is named as
+      `review-implementation-in-worktree.edn` (the loadable `.edn` 3-step
+      `resolve-worktree → delegate → summary`), demoting `implement-task-in-worktree`
+      to "the *intended* shape, which does not currently load (`.md` body begins
+      with an EDN map — see D1), hence the wrapper is authored as `.edn` mirroring
+      the loadable `review-implementation-in-worktree.edn`." Keep the mechanism
+      prose; only the named verified precedent is wrong. Cross-reference D1.
+      Design prose only; no workflow/skill/test change forced. (See
+      implementation.md pass-6 F6 entry.)
+
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 
 - [ ] Split step-1 selection from task-creation into two `:session` steps,

@@ -1780,3 +1780,65 @@ assertions, 0 failures — +2 over pass-4's 38); `clj-kondo` 0 findings; skill-t
 file 259 lines (< 800).
 
 PASS_STATUS: NO_ACTIONABLE_FEEDBACK (F5 resolved).
+
+---
+
+## Implementation review pass 6 (task-implementation-review skill)
+
+Independent review against design acceptance + architecture. Grounded in
+runtime truth: focused suite green (17 tests, 243 assertions, 0 failures);
+`clj-kondo --lint .psi` 0 findings; both new workflow `.edn` files parse
+clean (`clj-paren-repair` "No changes needed"); all three artifacts
+(`incidental-complexity-finder` skill, `task-lifecycle-in-worktree`,
+`reduce-incidental-complexity`) load with zero errors. Skill scope/guard/keys,
+wrapper positive+NO_TARGET branches, outer early-stop/baselines/gate-flags/
+no-push, and docs (workflows.md + CHANGELOG) all verified coherent. The D1
+deviation (wrapper authored as `.edn`, mirroring `review-implementation-in-worktree.edn`,
+not `.md`) is **independently re-verified correct**: `parse-workflow-file`
+routes `.md` → `parse-markdown-workflow-file` (single-step), which rejects any
+body that begins with an EDN map (`parser.clj:162`), and
+`implement-task-in-worktree.md`'s body *does* begin with `{:terminal-contract …}`.
+
+One new actionable coherence gap (F6) — design(spec)↔implementation, F4/F5-class.
+
+### F6 — design "Verified facts" still names the non-loading `implement-task-in-worktree` as the *verified/proven* wrapper precedent
+
+`design.md` repeatedly grounds the chosen worktree-continuity mechanism on
+`implement-task-in-worktree` as the **"verified"** wrapper the new wrapper is
+**"structurally identical to"** and built on the **"verified wrapper path"** /
+**"proven path"** (lines 138–139, 144, 168–170, 295, 316, 328, 362, 367, and the
+whole `## Verified facts (grounding)` worktree-ownership paragraph at lines
+327–333). But D1 discovered during implementation — and this review
+re-confirmed against the live loader — that `implement-task-in-worktree.md`
+**does not load**: its body begins with an EDN map, which
+`parse-markdown-workflow-file` rejects (`parser.clj:162`). So the artifact the
+design calls "verified" and "proven" is in fact broken; the real loadable
+precedent used was `review-implementation-in-worktree.edn` (recorded only in
+implementation.md / steps.md D1, never propagated back into the design spec).
+
+Per the project coherence invariant (`source_of_truth ≡ … ∪ spec`;
+`¬source_of_truth(code)`), the spec is authoritative and currently asserts a
+false grounding fact — the same stale-claim-in-one-artifact class F4/F5 fixed
+(stale join key) but here a stale *precedent claim*. The chosen **mechanism**
+(handoff-threaded `worktree_path:` + a `resolve-worktree` `:session` step that
+re-calls `work-on` before sub-delegating) is still valid and *is* demonstrated
+by a loadable precedent — but that precedent is `review-implementation-in-worktree.edn`,
+not `implement-task-in-worktree`. Threshold-harmless (behaviour is correct and
+tested), but a future reader trusting the design's "Verified facts" would cite a
+broken file as the proven pattern, and the design↔implementation grounding is
+internally contradictory.
+
+Fix (design prose only; no workflow/skill/test change forced — the wrapper is
+already correct): reconcile `design.md`'s "Verified facts (grounding)" +
+Step-1/Step-2 wrapper references so the **verified/loadable** precedent is named
+as `review-implementation-in-worktree.edn` (the `.edn` 3-step
+`resolve-worktree → delegate → summary` wrapper that actually loads), demoting
+`implement-task-in-worktree` to "the *intended* shape, which does not currently
+load under the loader (`.md` body begins with an EDN map — see D1), hence the
+wrapper is authored as `.edn` mirroring the loadable
+`review-implementation-in-worktree.edn`." Keep the mechanism description (handoff
+field + `work-on` re-call) — only the *named verified precedent* is wrong.
+Cross-reference D1. Optionally lock the design's named precedent for coherence,
+but no test change is forced.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK.
