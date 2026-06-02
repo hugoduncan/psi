@@ -319,6 +319,23 @@ with the commit sha / decision when done.
       (14 tests, 196 assertions, 0 failures); no `.clj` change → no clj-kondo
       delta. (See implementation.md pass-3 F3 resolution entry.)
 
+## Implementation review follow-ups (review pass 4)
+
+- [ ] F4 — `design.md` line 62 (Deliverable 1, **selector** procedure step 2)
+      still describes the selector join as "Join on `(ns, var, arity)`" — the
+      pre-F2 key. F2 changed the implemented `incidental-complexity-finder`
+      SKILL.md recipe to join on `(ns, var, arity, line)` (the `@line` key) for
+      null-arity `defmethod` determinism, and F3 propagated that key into the
+      A5/A2 acceptance prose (design lines 217/232) — but the selector join
+      description at line 62 was left on the old `(ns, var, arity)` key. Residual
+      design(spec)↔SKILL(mechanism) coherence gap; threshold-guarded today (no
+      null-arity unit reaches `lcc-total ≥ 5.0`), so behaviour is unaffected.
+      Fix: update `design.md` step 2 to "Join on `(ns, var, arity, line)`" with a
+      one-clause note that `line` disambiguates same-named null-arity `defmethod`
+      units (mirroring the A5/A2 lines and SKILL §3 rationale). `design.md` prose
+      only; no workflow/skill/test change forced — the recipe is already correct.
+      (See implementation.md pass-4 F4 entry.)
+
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 
 - [ ] Split step-1 selection from task-creation into two `:session` steps,

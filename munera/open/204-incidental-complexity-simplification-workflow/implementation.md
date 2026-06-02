@@ -1075,3 +1075,39 @@ Verification:
 - No `.clj`/`.cljc` source changed (EDN + markdown only), so no clj-kondo delta.
 
 F3 checked in steps.md. PASS_STATUS: REVIEW_COMPLETE.
+
+## Implementation review (pass 4 — task-implementation-review skill)
+
+Reviewed against the `task-implementation-review` skill (design-match,
+architecture-fit, new-vs-reusable patterns, unnecessary abstraction, structural
+issues). Verified live: all three artifacts present and loadable; focused
+definition tests **14 tests / 196 assertions / 0 failures**; `clj-kondo` clean
+on the test ns; the skill's `jq` recipe runs and yields the documented top-5
+(`start-tui-runtime!/5` gap≈7.03 … `start-nrepl!/4` gap≈2.01). Confirmed the F2
+`@line` key is unique on **both** lenses (3520/3526 units, 0 dups) and loses **no**
+local rows in the join (3520/3520 matched on both the `@line` and bare-triple
+keys), so the determinism fix is sound and join-lossless. Confirmed the D1
+deviation is correct: the loader (`parser.clj:162`) rejects `.md` bodies that
+begin with an EDN map, so `implement-task-in-worktree.md` indeed cannot load and
+mirroring the loadable `review-implementation-in-worktree.edn` (3-step
+resolve→delegate→summary) is the right precedent. F3's `(ns, var, arity, line)`
+keying is coherent across the workflow's generated contract (A5/A2) and
+`design.md` lines 217/232. `rg` (skill coverage-hint) is available.
+
+- **F4 (new, actionable — design/skill coherence).** `design.md` line 62
+  (Deliverable 1, **selector** procedure step 2) still describes the selector
+  join as "**Join on `(ns, var, arity)`**" — the pre-F2 key. F2 changed the
+  *implemented* skill recipe to join on `(ns, var, arity, line)` (the `@line`
+  key) specifically to make null-arity `defmethod` units deterministic, and F3
+  propagated that key into the A5/A2 **acceptance** prose (design lines 217/232)
+  — but the **selector join description** at line 62 was not updated to match.
+  This leaves the design's own description of the selector's join key
+  inconsistent with the skill it specifies (SKILL.md §2/§3 join on
+  `(ns, var, arity, line)`). Threshold-guarded today (no null-arity unit reaches
+  `lcc-total ≥ 5.0`), so behaviour is unaffected, but it is a residual
+  source-of-truth coherence gap between `design.md` (spec/intent) and the
+  `incidental-complexity-finder` SKILL.md (mechanism). Fix: update `design.md`
+  step 2 to read "Join on `(ns, var, arity, line)`" (with a one-clause note that
+  `line` disambiguates same-named null-arity `defmethod` units, mirroring the
+  A5/A2 lines and the SKILL §3 rationale). `design.md` prose only; no
+  workflow/skill/test change forced — the skill recipe is already correct.
