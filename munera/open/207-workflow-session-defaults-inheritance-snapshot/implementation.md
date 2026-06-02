@@ -529,3 +529,20 @@ session fields for the live-read resolver test (no mocks — real ctx/state).
 
 Verification: `psi.workflow-step-session-config.core-test` (21 tests, 69
 assertions) green; clj-kondo clean.
+
+## S3 build — persist snapshot on the run (ψ, 2026-06-02)
+
+Added `inherited-defaults-schema` to `workflow-runtime/model.clj` (7 optional/
+nilable fields; `:model` a `{:provider :id}` map per P3) and wired
+`[:inherited-defaults {:optional true} [:maybe inherited-defaults-schema]]` into
+`workflow-run-schema`. Threaded an optional `:inherited-defaults` opt through
+pure `create-run` via a `cond-> (contains? opts :inherited-defaults) (assoc …)`
+branch mirroring `:parent-session-id` — recorded verbatim, no ctx reads, purity
+preserved.
+
+Tests: `create-run-persists-inherited-defaults-snapshot-test` (verbatim persist
++ schema-valid) and `create-run-without-inherited-defaults-omits-key-test`
+(back-compat: key absent, still schema-valid).
+
+Verification: `psi.workflow-runtime.core-test` (9 tests, 34 assertions) green;
+clj-kondo clean.

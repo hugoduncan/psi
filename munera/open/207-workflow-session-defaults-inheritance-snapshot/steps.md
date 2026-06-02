@@ -49,22 +49,20 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
 
 ## S3 — Persist snapshot on the run
 
-- [ ] Add an `inherited-defaults-schema` (optional fields:
+- [x] Added `inherited-defaults-schema` (optional fields:
       `:model :prompt-mode :tool-defs :skills :thinking-level :speed-mode
-      :effort-override`) in `workflow-runtime/src/psi/workflow_runtime/model.clj`.
-      `:model` is a `{:provider :id}`-shaped map (matches live
-      `(:model parent-session)` / `model-query->selection-request` consumer —
-      resolved P3), not a bare id string.
-- [ ] Add `[:inherited-defaults {:optional true} [:maybe inherited-defaults-schema]]`
-      to `workflow-run-schema` (model.clj:179).
-- [ ] In `workflow-runtime/core.clj` `create-run` (line 110): destructure
-      `inherited-defaults` from opts; add a `cond->` branch
+      :effort-override`) in `workflow-runtime/model.clj`. `:model` is a
+      `{:provider :id}`-shaped map (P3), all fields optional/nilable.
+- [x] Added `[:inherited-defaults {:optional true} [:maybe inherited-defaults-schema]]`
+      to `workflow-run-schema`.
+- [x] In `workflow-runtime/core.clj` `create-run`: destructure
+      `inherited-defaults` from opts; `cond->` branch
       `(contains? opts :inherited-defaults) (assoc :inherited-defaults …)`
-      mirroring `:parent-session-id`. No ctx reads added.
-- [ ] Test: `create-run` with `:inherited-defaults` persists it verbatim on the
-      run and the run validates against `workflow-run-schema`.
-- [ ] Test: `create-run` without `:inherited-defaults` omits the key (back-compat).
-- [ ] Lint + repair.
+      mirroring `:parent-session-id`. No ctx reads added (stays pure).
+- [x] Test: `create-run` with `:inherited-defaults` persists it verbatim and the
+      run validates against `workflow-run-schema`.
+- [x] Test: `create-run` without `:inherited-defaults` omits the key (back-compat).
+- [x] Lint clean.
 
 ## S4 — Top-level capture sites
 

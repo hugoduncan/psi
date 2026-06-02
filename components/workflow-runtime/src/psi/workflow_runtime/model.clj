@@ -176,6 +176,25 @@
    [:timestamp inst?]
    [:data {:optional true} [:maybe :map]]])
 
+(def inherited-defaults-schema
+  "Resolved inherited-default session details snapshotted on a workflow run at
+   invoke time (task 207).
+
+   `:model` is the parent's `{:provider :id}`-shaped value (matching the live
+   `(:model parent-session)` consumed by `model-query->selection-request`), not
+   a bare id string. All fields are optional/nilable so partial parent state
+   (e.g. no speed-mode/effort-override set) still validates."
+  [:map
+   [:model {:optional true} [:maybe [:map
+                                     [:provider {:optional true} [:maybe [:or :string :keyword]]]
+                                     [:id {:optional true} [:maybe :string]]]]]
+   [:prompt-mode {:optional true} [:maybe :keyword]]
+   [:tool-defs {:optional true} [:maybe [:sequential :map]]]
+   [:skills {:optional true} [:maybe [:sequential :map]]]
+   [:thinking-level {:optional true} [:maybe :keyword]]
+   [:speed-mode {:optional true} [:maybe :keyword]]
+   [:effort-override {:optional true} [:maybe :keyword]]])
+
 (def workflow-run-schema
   [:map
    [:run-id workflow-run-id-schema]
@@ -183,6 +202,7 @@
    [:effective-definition :map]
    [:source-definition-id {:optional true} [:maybe workflow-definition-id-schema]]
    [:parent-session-id {:optional true} [:maybe :string]]
+   [:inherited-defaults {:optional true} [:maybe inherited-defaults-schema]]
    [:workflow-input {:optional true} :any]
    [:workflow-original {:optional true} :any]
    [:current-step-id {:optional true} [:maybe workflow-step-id-schema]]
