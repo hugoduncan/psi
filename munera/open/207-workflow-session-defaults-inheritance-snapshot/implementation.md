@@ -1458,3 +1458,30 @@ endpoint tests left unguarded.
 
 Both T4 and T5 checked in steps.md; all 207 follow-up steps now checked. No new
 actionable findings; no follow-up items added.
+
+## Test-review pass 6 (review 2026-06-02)
+
+Re-reviewed the full task test surface against task-test-review criteria
+(well-formed ∧ ∀behaviour∃test ∧ infra-deps injectable/nullable/¬mock). All
+AC→test mappings present and green (inheritance-snapshot 10/51, child-session +
+context + core 22/136, canonical-workflows + canonical-workflows-snapshot +
+attempts 20/159). Tree clean at HEAD; `make-test-ctx`/`sample-definition` public
+and shared by the split `canonical_workflows_snapshot_test.clj` (compiles +
+passes). `with-redefs` usages (`valid-session?`, nullable
+`create-child-session!`/`get-session-data` adapters) are infra-boundary
+nullables, not mocks of the unit under test — methodology-conformant.
+
+One actionable gap (T6): the **capture-side** tools/skills value is asserted
+only by shape. `resolve-inherited-defaults-snapshot-test`
+(`inheritance_snapshot_test.clj`) sets model/prompt-mode/thinking/speed/effort
+on the fixture parent and asserts each exactly, but for the two pool fields it
+asserts only `(vector? (:tool-defs snapshot))` / `(sequential? (:skills
+snapshot))` — never that the captured pools reflect the parent's actual
+`tool-source`+`:tool-ids` / `all-skills`. `resolve-inherited-defaults-snapshot`
+(`core.clj:282-285`) reads both from the live parent; a regression that dropped
+`:tool-ids`, read the wrong session, or returned an empty pool would still pass
+(empty `[]` is `vector?`/`sequential?`). The isolation test
+(`snapshot-isolates-tools-skills-…`) uses a HAND-BUILT snapshot, not one
+produced by `resolve-inherited-defaults-snapshot`, so it does not cover the
+capture path's tools/skills value either. AC3 names tools/skills as inherited
+defaults; the capture half of that invariant is value-unasserted. See T6.

@@ -545,3 +545,24 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       (`live-model`/`:prose`/`:flex`/`:low`) through the identical chain,
       proving the distinction is carried by the flag rather than lost on the
       wire. 2 blocks, 39 assertions in the (now 4-test) suite green; lint clean.
+
+## Test-review pass 6 follow-ups (review 2026-06-02)
+
+- [ ] T6: Strengthen `resolve-inherited-defaults-snapshot-test`
+      (`inheritance_snapshot_test.clj`) to assert the CAPTURED tools/skills by
+      VALUE, not just shape. The test sets model/prompt-mode/thinking/speed/
+      effort on the fixture parent and asserts each exactly, but for the two
+      pool fields asserts only `(vector? (:tool-defs snapshot))` /
+      `(sequential? (:skills snapshot))`. `resolve-inherited-defaults-snapshot`
+      (`core.clj:282-285`) reads `:tool-defs` from the parent's `tool-source` +
+      `:tool-ids` and `:skills` from `skill-storage/all-skills`; a regression
+      that dropped `:tool-ids`, read the wrong session, or returned an empty
+      pool would still pass (empty `[]` is `vector?`/`sequential?`). The
+      isolation test (`snapshot-isolates-tools-skills-from-live-parent-mutation-test`)
+      uses a HAND-BUILT snapshot, so it does not cover the capture path's
+      tools/skills value either — leaving the CAPTURE half of AC3's tools/skills
+      invariant value-unasserted while consumption/isolation is covered. Fix:
+      give the fixture parent a known tool (`tool-source` + `:tool-ids`) and a
+      known skill, and assert the snapshot's `:tool-defs`/`:skills` contain the
+      resolved def(s) for those names (matching the value-level rigor the other
+      five captured fields already have in the same test).
