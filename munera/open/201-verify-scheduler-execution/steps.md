@@ -1460,7 +1460,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Test-shaper follow-ups — pass 17 (test-shaper, 2026-06-01)
 
-- [ ] Tighten the two generic-only bound/cap rejection assertions in
+- [x] Tighten the two generic-only bound/cap rejection assertions in
       `psi_tool_scheduler_test.clj/psi-tool-scheduler-bounds-and-cap-test` to
       assert the *named* error message (meaningful_failures ∧
       consistent(assertion_style)), matching the precedent already set for the
@@ -1476,3 +1476,16 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       `components/agent-session/src/**` or `doc/scheduler.md`); deftest name
       unchanged (findings citations stable); clj-kondo 0/0; `bb fmt:check`
       clean; scheduler `bb test` subset green.
+      Done: added both named-message assertions —
+      below-min `delay-ms` block → `"delay-ms is below the minimum bound"`
+      (`scheduler.clj:85`), cap-overflow block → `"scheduler pending cap
+      exceeded"` (`psi_tool_scheduler.clj:149`) — via
+      `(get-in parsed [:psi-tool/error :message])`, matching the `:at` matrix
+      precedent. Existing `:is-error`/`:overall-status` assertions kept; deftest
+      name unchanged → `findings.md` citations stable. The blocks are now
+      assertion-distinguishable. psi-tool deftest 109 → 111 assertions (+2);
+      scheduler-suite total **51 tests / 413 assertions / 0 failures** (was 411).
+      Updated `findings.md` Outcome current-count 411 → 413. clj-kondo 0/0;
+      `bb fmt:check` "All source files formatted correctly"; full `bb test`
+      green. Test/task-doc files only — zero `components/agent-session/src/**`
+      or `doc/scheduler.md` (Slice-10 allowlist held).

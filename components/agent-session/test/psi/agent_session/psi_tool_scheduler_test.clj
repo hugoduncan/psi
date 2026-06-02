@@ -89,7 +89,9 @@
                                    "delay-ms" 10})
           parsed (read-string (:content result))]
       (is (true? (:is-error result)))
-      (is (= :error (:psi-tool/overall-status parsed)))))
+      (is (= :error (:psi-tool/overall-status parsed)))
+      (is (= "delay-ms is below the minimum bound"
+             (get-in parsed [:psi-tool/error :message])))))
 
   (testing "cap rejection blocks the 51st pending schedule"
     (let [[ctx session-id] (test-support/create-test-session)
@@ -108,7 +110,9 @@
                                      "delay-ms" 1000})
             parsed (read-string (:content result))]
         (is (true? (:is-error result)))
-        (is (= :error (:psi-tool/overall-status parsed)))))))
+        (is (= :error (:psi-tool/overall-status parsed)))
+        (is (= "scheduler pending cap exceeded"
+               (get-in parsed [:psi-tool/error :message])))))))
 
 (deftest psi-tool-scheduler-session-id-resolution-test
   (testing "scheduler requires invoking or explicit session-id"

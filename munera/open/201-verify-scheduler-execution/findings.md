@@ -16,14 +16,16 @@ does not document that future absolute `:at` below `min-delay-ms` / above
 Remediation raised as `202-document-at-bounds-in-scheduler-doc` (doc-only fix;
 behaviour proven correct by `psi-tool-scheduler-at-resolution-matrix`). No
 scheduler-behaviour defect found. Scheduler suite grew from baseline **35 tests / 338 assertions** to
-**51 tests / 411 assertions**, all green (the test-shaper-pass-2 split of the
+**51 tests / 413 assertions**, all green (the test-shaper-pass-2 split of the
 psi-tool megatest into 6 focused deftests raised the deftest count 45 → 50;
 assertions unchanged. test-shaper pass 5 then dropped one duplicated
 `:queued`-status assertion in `scheduler-fired-queues-while-session-busy-test`,
 412 → 411. task-test-review pass 10 then split the busy-drain covering test's
 time-source-stamp handler-unit assertion out of the live covering test into a
 dedicated `drain-one-stamps-scheduled-user-message-from-scheduler-time-source`
-deftest, 50 → 51; assertions unchanged). No scheduler source or `doc/scheduler.md` modified
+deftest, 50 → 51; assertions unchanged. test-shaper pass 17 then added the two
+named-message assertions to `psi-tool-scheduler-bounds-and-cap-test`
+(below-min `delay-ms` + pending-cap), 411 → 413). No scheduler source or `doc/scheduler.md` modified
 (coherence gate passes: only test files under
 `components/agent-session/test/**` + this task dir changed).
 

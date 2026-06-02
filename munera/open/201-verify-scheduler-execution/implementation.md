@@ -2260,3 +2260,29 @@ generic). No existing follow-up step targets them.
 Verification-only invariant intact (this review reads only; the follow-up is
 test-only and touches no `components/agent-session/src/**` or `doc/scheduler.md`).
 Recorded as a follow-up step.
+
+## Test-shaper pass-17 follow-up executed (2026-06-01)
+
+Tightened the two generic-only bound/cap rejection assertions in
+`psi_tool_scheduler_test.clj/psi-tool-scheduler-bounds-and-cap-test` to assert
+the *named* error message (meaningful_failures ∧ consistent(assertion_style),
+matching the `:at` matrix + `scheduler_test.clj` `thrown-with-msg?` precedent):
+
+- below-min `:delay-ms` (10ms) block → added
+  `(= "delay-ms is below the minimum bound" (get-in parsed [:psi-tool/error :message]))`
+  (`scheduler.clj:85`).
+- cap-overflow (51st pending) block → added
+  `(= "scheduler pending cap exceeded" (get-in parsed [:psi-tool/error :message]))`
+  (`psi_tool_scheduler.clj:149`).
+
+Existing `:is-error`/`:overall-status` assertions left in place; deftest name
+unchanged (findings citations stable). The blocks are now
+assertion-distinguishable (a swapped/unrelated rejection fails). Verified
+both message literals against source. Aggregate: psi-tool deftest 109 → 111
+assertions (+2); scheduler-suite total **51 tests / 413 assertions / 0
+failures** (was 411). Updated the `findings.md` Outcome current-state count
+411 → 413 (historical per-pass implementation.md notes left intact per the
+pass-4/5 precedent). clj-kondo 0/0; `bb fmt:check` "All source files formatted
+correctly"; full `bb test` green. Test/task-doc files only — zero
+`components/agent-session/src/**` or `doc/scheduler.md` (verification-only
+invariant; Slice-10 allowlist held).
