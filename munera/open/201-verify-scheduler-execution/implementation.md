@@ -1876,3 +1876,34 @@ referenced. No additional doc-gap found; no new actionable issue.
 
 Verification-only invariant held: no `components/agent-session/src/**` or
 `doc/scheduler.md` change in this review.
+
+## Code-shaper review — pass 1 (code-shaper, 2026-06-01)
+
+Applied `code-shaper` (simple ∧ consistent ∧ robust) to the 201 test surface
+(`scheduler_*_test.clj`, `psi_tool_scheduler_test.clj`, `test_support.clj`).
+Most files are well-shaped: the timer-seam live tests, pure-model guard tests,
+and `:at` matrix assert state/outputs (not interactions), inject infra via the
+ctx seams (not stubs), and are time-controlled via
+`fixed-scheduler-time-source` / `capturing-delay-fn`. Prior passes resolved the
+Instant-literal idiom (test-shaper pass-14, deliberately held as baseline),
+journal-scan dedup, the `:kind` data-shape drift, and the in-test wall-clock
+`Instant/now` execution-result timestamps (test-shaper pass-6).
+
+**One actionable consistency/robustness finding** (not previously flagged):
+the execution-result stub *shape* is duplicated rather than shared — once
+inline in `scheduler_end_to_end_test`'s session-kind seam test (deterministic,
+`now`-anchored timestamp) and once in `test_support/make-session-ctx`
+(L246-255, **still wall-clock `(java.time.Instant/now)` at L252**), the shared
+helper that `scheduler_dispatch_test` / `scheduler_handlers_test` depend on.
+Pass-6 de-wall-clocked the in-scope *test-file* copies but left the shared
+`make-session-ctx` stub both duplicated and wall-clock-based — the same
+`control(time(tests))` footgun pass-6 treated as a defect, still latent on the
+helper path. Structural fix (`cause(structural) → redesign > patch`): extract a
+single `stub-execution-result` builder taking/defaulting a fixed instant; have
+both `make-session-ctx` and the inline session-kind test consume it. Removes
+the duplication (consistency) and the wall-clock timestamp (determinism) in one
+move. Test-file/`test_support`-only (Slice-10 allowlist) — zero
+`components/agent-session/src/**` / `doc/scheduler.md`.
+
+Verification-only invariant held: no `components/agent-session/src/**` or
+`doc/scheduler.md` change in this review.

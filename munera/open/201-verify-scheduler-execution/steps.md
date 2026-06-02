@@ -1162,3 +1162,38 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       references `202-document-at-bounds-in-scheduler-doc`. Verification-only
       scope held: only the new task dir + task-local `findings.md` touched — zero
       `doc/scheduler.md` / `src` change.
+
+## Code-shaper follow-ups — pass 1 (code-shaper, 2026-06-01)
+
+- [ ] Extract a shared `stub-execution-result` builder in
+      `components/agent-session/test/psi/agent_session/test_support.clj` and route
+      the duplicated execution-result stub shape through it
+      (`consistent(test_abstractions)` / DRY). Today the
+      `{:execution-result/turn-id … :assistant-message {… :timestamp …} …}` shape
+      is open-coded in two places: `make-session-ctx`'s `:execute-prepared-request-fn`
+      (test_support.clj L246-255) and the inline session-kind seam stub in
+      `scheduler_end_to_end_test/scheduler-session-kind-fires-via-timer-seam-and-creates-top-level-session-test`.
+      Add a helper, e.g. `(stub-execution-result {:keys [sid prepared timestamp]})`,
+      returning the canonical shape; have both callsites consume it. Keep the
+      `now`-anchored deterministic timestamp from the scheduler test as the helper's
+      default discipline (no wall-clock). Test-file/`test_support`-only (Slice-10
+      allowlist — zero `components/agent-session/src/**` / `doc/scheduler.md`); keep
+      suite green + clj-kondo/cljfmt clean; no behaviour/assertion change.
+      `findings.md` citations unchanged. If 201 is closed instead, raise as a small
+      standalone test-hygiene task.
+- [ ] Replace the wall-clock `(java.time.Instant/now)` execution-result-stub
+      timestamp in `test_support/make-session-ctx` (test_support.clj L252) with a
+      fixed instant (`deterministic(tests)` — control(time)). This is the same
+      footgun test-shaper pass-6 removed from the in-scope scheduler *test files*,
+      but it was left in the shared `make-session-ctx` helper that
+      `scheduler_dispatch_test` / `scheduler_handlers_test` depend on transitively —
+      every other instant on those paths is time-controlled, so this lone
+      wall-clock read breaks `control(time(tests))`. Preferably fold this into the
+      `stub-execution-result` extraction above (one structural fix resolves both):
+      have the helper take/default a fixed instant rather than calling
+      `Instant/now`. Leave the `notify-extension-fn` `Instant/now` timestamps
+      (L266/L279) out of scope — notification messages, broader concern, not on
+      the 201 surface. Test-file/`test_support`-only (Slice-10 allowlist); keep
+      suite green + clj-kondo/cljfmt clean; no assertion change (no assertion reads
+      the stub timestamp today, so it is a latent-footgun fix, not a flake fix). If
+      201 is closed instead, raise as a small standalone test-hygiene task.
