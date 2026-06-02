@@ -925,3 +925,38 @@ is out of the test-review remit here; flagged only for future `testing-without-
 mocks` cleanup, not as a 205 follow-up.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Test review follow-up execution (TT1, TT2) — 2026-06-01
+
+Executed the two newly-added test-review follow-ups; both are the only unchecked
+`steps.md` items added by the preceding test-review pass.
+
+- **TT1 — resolver `:description` content locked to the spec table.** Added a
+  `testing` block to `builtin-command-specs-resolver-shape-test`
+  (`builtin_commands_resolver_test.clj`) asserting the resolver-output
+  `{name → description}` map equals the spec-table-derived
+  `(into {} (for [[k s] bspec/builtin-command-specs] [(bspec/strip-slash k)
+  (:description s)]))`. Prior tests only checked descriptions were non-blank and
+  locked the name order, not description *content* — so a dropped, swapped, or
+  zip-misaligned description in `builtin-command-specs-for-resolver` is now
+  caught (AC1). Both maps built via `(juxt :name :description)` / table walk for
+  an order-independent, content-exact comparison.
+
+- **TT2 — `:hide-in-help?` projection locked against the built-in block.**
+  Removed the fragile whole-`/help`-message substring checks
+  (`(not (str/includes? message "/?"/"/exit"/"/project-repl"))`) from
+  `format-help-derived-from-spec-table-test` and added a dedicated
+  `builtin-help-block-hide-in-help-projection-test` that renders
+  `(bspec/builtin-help-block)` and, for every spec entry, asserts the entry's
+  exact rendered line (`"  /name [usage ]— description"`) is absent iff
+  `:hide-in-help?` and present otherwise. This proves built-in-block *omission*
+  of hidden entries (data-driven over the table, so a new hidden/shown entry is
+  covered automatically) rather than a global substring coincidence that would
+  false-fail on a description carrying a hidden token. The `/skill:name`
+  literal-line check stays in the `/help` message test.
+
+Verification: `commands-builtin-specs-test` + `builtin-commands-resolver-test`
+→ 11 tests, 67 assertions, 0 failures (up from 10/43 — TT1 adds 1 assertion in
+the resolver shape test, TT2 adds a new test with the table-driven assertions).
+clj-kondo clean over both changed test files. No production code/docs changed
+(test-only follow-ups). No blocking reasons; both items checked.

@@ -124,12 +124,29 @@
       (is (str/includes? message "  /model [provider model-id [session|project|user]] — show current model or set model"))
       (is (str/includes? message "  /speed [normal|fast [session|project|user]] — show or set speed mode"))
       (is (str/includes? message "  /effort [low|medium|high|xhigh|none [session|project|user]] — show or set effort override")))
-    (testing ":hide-in-help? entries are absent from help (aliases + /project-repl)"
-      (is (not (str/includes? message "/?")))
-      (is (not (str/includes? message "/exit")))
-      (is (not (str/includes? message "/project-repl"))))
     (testing "non-routed /skill:name helper line stays literal"
       (is (str/includes? message "/skill:name — invoke a skill")))))
+
+(deftest builtin-help-block-hide-in-help-projection-test
+  ;; Lock the `:hide-in-help?` projection against the built-in block directly
+  ;; (not the whole `/help` message): hidden entries' lines are absent, shown
+  ;; entries' lines are present. Asserting against `builtin-help-block` proves
+  ;; *built-in-block omission* rather than mere global absence — a substring
+  ;; check on the full message would false-fail if a future description carried
+  ;; the literal token, and only proves the token appears nowhere at all.
+  (let [block (bspec/builtin-help-block)
+        line-for (fn [k {:keys [description usage]}]
+                   (str "  " k " " (when usage (str usage " ")) "— " description))]
+    (testing ":hide-in-help? entries' lines are absent from the block"
+      (doseq [[k spec] bspec/builtin-command-specs
+              :when (:hide-in-help? spec)]
+        (is (not (str/includes? block (line-for k spec)))
+            (str k " line must be omitted from the built-in help block"))))
+    (testing "shown entries' lines are present in the block"
+      (doseq [[k spec] bspec/builtin-command-specs
+              :when (not (:hide-in-help? spec))]
+        (is (str/includes? block (line-for k spec))
+            (str k " line must be present in the built-in help block"))))))
 
 (deftest prefixed-case-branch-coherence-test
   (testing "prefixed spec-table keys equal the live dispatch-prefixed-command case branch keys"

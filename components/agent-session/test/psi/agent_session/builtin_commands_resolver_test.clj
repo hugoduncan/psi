@@ -51,7 +51,14 @@
         (is (< (idx "quit") (idx "status")))
         (is (< (idx "status") (idx "help")))))
     (testing "the bare-name vector mirrors the spec names in the same order"
-      (is (= names (mapv :name specs))))))
+      (is (= names (mapv :name specs))))
+    (testing "each name's description equals the spec-table description (AC1)"
+      ;; Lock description *content*, not just non-blankness — a dropped,
+      ;; swapped, or zip-misaligned description in
+      ;; `builtin-command-specs-for-resolver` is caught here.
+      (is (= (into {} (for [[k s] bspec/builtin-command-specs]
+                        [(bspec/strip-slash k) (:description s)]))
+             (into {} (map (juxt :name :description) specs)))))))
 
 (deftest builtin-commands-resolver-exposes-full-spec-table-membership-test
   ;; AC6 end-to-end lock: the resolver is the single surface both UIs consume.
