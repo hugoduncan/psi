@@ -107,6 +107,21 @@
   [line cc]
   (str "{\"ns\":\"x\",\"var\":\"f\",\"arity\":null,\"line\":" line ",\"cc\":" cc "}"))
 
+(defn- named-local-unit-json
+  "A synthetic `local`-lens unit JSON for a named null-arity var `<ns>/<var>`,
+   distinguished by `line`/`lcc-total`. Used by the filter/drop coverage tests
+   (TR6) to feed identifiable units whose presence/absence is unambiguous."
+  [unit-ns unit-var line lcc-total]
+  (str "{\"ns\":\"" unit-ns "\",\"var\":\"" unit-var "\",\"arity\":null,\"line\":" line ","
+       "\"end-line\":" (+ line 10) ",\"lcc-total\":" lcc-total ",\"flow-burden\":1,"
+       "\"state-burden\":1,\"shape-burden\":1,\"abstraction-burden\":1,\"dependency-burden\":1,"
+       "\"working-set\":1,\"file\":\"" unit-ns ".clj\",\"findings\":[]}"))
+
+(defn- named-cc-unit-json
+  "A synthetic `complexity`-lens unit JSON for named null-arity var `<ns>/<var>`."
+  [unit-ns unit-var line cc]
+  (str "{\"ns\":\"" unit-ns "\",\"var\":\"" unit-var "\",\"arity\":null,\"line\":" line ",\"cc\":" cc "}"))
+
 (defn- run-jq-recipe
   "Run the SKILL.md jq recipe over the given `local`/`cc` unit-JSON sequences,
    returning {:exit :out :err}. Rewrites the recipe's hard-coded /tmp paths to
@@ -184,3 +199,53 @@
         ;; from_entries map cannot collapse same-named null-arity units.
         (is (= 2 (count (re-seq #"\+ \"@\" \+ \(\.line\|tostring\)" recipe)))
             "recipe keys both the cc map and the local gap_key on @line")))))
+
+(deftest incidental-complexity-finder-recipe-filter-and-drop-test
+  ;; TR6 (test review pass 4): the selector recipe's qualification filter
+  ;; (`lcc-total >= 5.0 and gap >= 2.0`) and A1 unmatched-row drop rule were
+  ;; locked only as SKILL.md prose substrings, never exercised. Run the embedded
+  ;; jq recipe over inputs that hit both branches and assert behaviour:
+  ;;   (a) filter — only the above-threshold unit survives;
+  ;;   (b) drop — an unmatched `local` row is absent (dropped), not defaulted to
+  ;;       cc=1 (which A1 explicitly forbids; defaulting would inflate gap into
+  ;;       false qualification).
+  ;; A regress (>= → > threshold typo, or defaulting unmatched rows to cc=1)
+  ;; would pass the prose-only locks above but fail here.
+  (let [{:keys [skill]} (incidental-complexity-finder-skill)
+        body (slurp (io/file (:file-path skill)))
+        recipe (extract-jq-recipe body)]
+    (is (some? recipe) "the join/gap jq recipe is extractable from SKILL.md")
+    (when (try (zero? (:exit (shell/sh "jq" "--version"))) (catch Exception _ false))
+      (testing "qualification filter — only units with lcc-total >= 5.0 and gap >= 2.0 survive"
+        ;; keep/qual:  lcc 30.0, cc 4  -> gap 7.5  -> qualifies
+        ;; drop/lowgap: lcc 30.0, cc 20 -> gap 1.5  -> fails gap >= 2.0
+        ;; drop/lowlcc: lcc 4.0,  cc 1  -> gap 4.0 but lcc < 5.0 -> fails
+        (let [{:keys [exit out err]}
+              (run-jq-recipe recipe
+                             [(named-local-unit-json "keep" "qual" 10 "30.0")
+                              (named-local-unit-json "drop" "lowgap" 20 "30.0")
+                              (named-local-unit-json "drop" "lowlcc" 30 "4.0")]
+                             [(named-cc-unit-json "keep" "qual" 10 4)
+                              (named-cc-unit-json "drop" "lowgap" 20 20)
+                              (named-cc-unit-json "drop" "lowlcc" 30 1)])]
+          (is (zero? exit) (str "recipe runs cleanly; stderr: " err))
+          (is (re-find #"\"var\":\s*\"qual\"" out)
+              "the above-threshold unit (lcc 30, gap 7.5) survives the filter")
+          (is (not (re-find #"\"var\":\s*\"lowgap\"" out))
+              "a unit failing gap >= 2.0 (gap 1.5) is filtered out")
+          (is (not (re-find #"\"var\":\s*\"lowlcc\"" out))
+              "a unit failing lcc-total >= 5.0 (lcc 4.0) is filtered out")))
+      (testing "A1 drop rule — an unmatched `local` row is dropped, never defaulted to cc=1"
+        ;; matched:   lcc 30.0, cc 4  -> gap 7.5  -> qualifies, survives.
+        ;; unmatched: lcc 30.0, no cc row. If A1 were violated (defaulted cc=1),
+        ;;            gap would be 30.0 and it would qualify + survive; A1 drops it.
+        (let [{:keys [exit out err]}
+              (run-jq-recipe recipe
+                             [(named-local-unit-json "matched" "present" 10 "30.0")
+                              (named-local-unit-json "unmatched" "absent" 20 "30.0")]
+                             [(named-cc-unit-json "matched" "present" 10 4)])]
+          (is (zero? exit) (str "recipe runs cleanly; stderr: " err))
+          (is (re-find #"\"var\":\s*\"present\"" out)
+              "a matched qualifying unit survives the inner join")
+          (is (not (re-find #"\"var\":\s*\"absent\"" out))
+              "an unmatched local row is dropped, not defaulted to cc=1 (A1)"))))))

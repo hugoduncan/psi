@@ -509,7 +509,7 @@ with the commit sha / decision when done.
 
 ## Test review follow-ups (review pass 4)
 
-- [ ] TR6 — Add executable coverage for the selector recipe's **qualification
+- [x] TR6 — Add executable coverage for the selector recipe's **qualification
       filter** and **A1 unmatched-row drop rule**, currently locked only as
       SKILL.md prose substrings (lines 52–68 of
       `incidental_complexity_finder_skill_test.clj`) and never exercised. The
@@ -528,6 +528,24 @@ with the commit sha / decision when done.
       Both are named design Deliverable-1 behaviours (the filter also drives the
       workflow early-stop) with no executable cover. Run focused suite +
       `clj-kondo`; keep under the 800-line `components/` file guard.
+      RESOLUTION: added a sibling deftest
+      `incidental-complexity-finder-recipe-filter-and-drop-test` in the same
+      skill-test ns (test-only; no new ns / no production Clojure), plus two
+      parameterized fixture builders (`named-local-unit-json` /
+      `named-cc-unit-json`) so units are individually identifiable in the output.
+      (a) **filter** block feeds three matched units — `keep/qual` (lcc 30, cc 4
+      → gap 7.5, qualifies), `drop/lowgap` (lcc 30, cc 20 → gap 1.5, fails
+      `gap ≥ 2.0`), `drop/lowlcc` (lcc 4.0, cc 1 → fails `lcc-total ≥ 5.0`) — and
+      asserts only `qual` survives; a `>=`→`>` regress flips a boundary unit.
+      (b) **drop** block feeds a matched qualifying unit (`matched/present`) and
+      an unmatched `local` row (`unmatched/absent`, lcc 30, no cc row) — asserting
+      `present` survives and `absent` is absent; were A1 violated (defaulted to
+      cc=1) `absent` would gain gap 30.0 and qualify, so its absence proves the
+      drop. Both blocks gated on jq availability (reuse the existing harness).
+      Verified live the recipe drops the unmatched row (gap-30 candidate excluded).
+      Focused suite green (skill 4 tests/38 assertions, +1 test/+8 over pass-4's
+      3/30; definitions still 13/198 → 17 tests/236 total); `clj-kondo` 0
+      findings; file 251 lines (< 800). (See implementation.md pass-4 TR6 entry.)
 
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 

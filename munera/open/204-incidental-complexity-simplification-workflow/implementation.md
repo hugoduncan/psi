@@ -1498,3 +1498,54 @@ One residual actionable coverage gap (TR6):
   qualification filter (which also *drives the workflow's early-stop*) and the
   A1 inner-join-drop — have no covering executable assertion. The harness makes
   this near-free to close.
+
+---
+
+## Test review pass 4 follow-up — TR6 resolution (executable filter/drop cover)
+
+Closed the one residual coverage gap. Test-only; same skill-test ns
+(`incidental_complexity_finder_skill_test.clj`); no new ns, no production
+Clojure (honours C1).
+
+**What was added.** A sibling deftest
+`incidental-complexity-finder-recipe-filter-and-drop-test` that *executes* the
+SKILL.md-embedded `jq` recipe (reusing the existing `run-jq-recipe` harness and
+the `extract-jq-recipe` extractor) over inputs that hit the two previously
+prose-only branches, plus two parameterized fixture builders
+(`named-local-unit-json` / `named-cc-unit-json`) so each unit is individually
+identifiable in the recipe output (the pre-existing `local-unit-json` /
+`cc-unit-json` are hard-coded to `x/f` and unsuitable for distinguishing
+multiple units).
+
+- **(a) Qualification filter** (`lcc-total ≥ 5.0 ∧ gap ≥ 2.0`). Three matched
+  units fed:
+  - `keep/qual` — lcc 30.0, cc 4 → gap 7.5 → **qualifies** (survives);
+  - `drop/lowgap` — lcc 30.0, cc 20 → gap 1.5 → fails `gap ≥ 2.0` (excluded);
+  - `drop/lowlcc` — lcc 4.0, cc 1 → gap 4.0 but lcc < 5.0 → fails `lcc-total ≥
+    5.0` (excluded).
+  Asserts only `qual` appears in the output. A `>=`→`>` threshold typo or a
+  swapped threshold flips a boundary unit and fails this block. The filter is
+  also the behaviour that **drives the outer workflow's early-stop** (no
+  qualifier → no target), so it is doubly load-bearing.
+
+- **(b) A1 unmatched-row drop rule.** A matched qualifying unit
+  (`matched/present`, lcc 30, cc 4 → gap 7.5) and an unmatched `local` row
+  (`unmatched/absent`, lcc 30, **no cc row**) fed. Asserts `present` survives
+  and `absent` is **absent**. The fixture is chosen so the assertion is sharp:
+  were A1 violated (the unmatched row defaulted to `cc = 1` instead of dropped),
+  `absent` would compute gap = 30.0/1 = 30.0, qualify, and appear — so its
+  absence *proves* the inner-join drop, not merely a coincidental filter-out.
+
+Both blocks are gated on jq availability (mirroring the determinism test); the
+jq-absent path is unchanged (the determinism test already structurally locks the
+`@line` key).
+
+**Verification.**
+- Live spot-check of the recipe over the (b) fixture: output is the single
+  `keep/qual`-style matched unit; the gap-30 unmatched candidate is dropped
+  (confirming the drop is not a default-to-cc=1).
+- `clj-paren-repair` Success.
+- Focused suite green: skill ns 4 tests / 38 assertions (was 3/30 at pass 4),
+  definitions ns 13 tests / 198 assertions → 17 tests / 236 assertions, 0
+  failures.
+- `clj-kondo` 0 findings; file 251 lines (< 800 `components/` guard).
