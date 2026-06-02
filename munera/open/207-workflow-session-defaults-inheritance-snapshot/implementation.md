@@ -120,3 +120,58 @@ resolved architecture-fit notes):
    `ctx`+`parent-session-id`; the mutation holds `agent-session-ctx`+
    `session-id`. Design does not fix whether resolution happens inside the
    mutation or its upstream `mutate!` caller.
+
+
+## Ambiguity follow-up resolution (ψ, 2026-06-02)
+
+All four ambiguity design-steps resolved into design.md as Decisions 5a/5b, 6a,
+7a, 8a (design-only; no code). Grounded against real code first:
+
+- **Field set (8a).** `common-inherited-fields` (`init.clj:30`) has 19 keys and
+  is a child-session-init concern; it excludes `:model`/`:thinking-level`
+  (those are `model-identity-fields`, `init.clj:67`). The workflow snapshot is a
+  narrower resolved-default set: 7 resolved keys
+  `{:model :prompt-mode :tool-defs :skills :thinking-level :speed-mode
+  :effort-override}` sourcing from `common-inherited-fields`
+  (`:prompt-mode :speed-mode :effort-override :tool-ids :skill-ids`, with
+  tool-ids→tool-defs, skill-ids→skills) + `model-identity-fields`
+  (`:model :thinking-level`). The ~12 other `common-inherited-fields` entries
+  are explicitly excluded (not per-step inherited defaults the resolver
+  overrides). Validation: a named source-key constant in
+  `workflow-step-session-config` + a test asserting each source key ∈ its
+  authority and the resolved-key mapping, so neither list can drift.
+
+- **continue vs resume (5a/5b).** Two distinct mechanisms confirmed in
+  `orchestration.clj`: `continue-blocked-run-async!` calls `resume-run` (same
+  run-id, reuses run state → reuses stored snapshot, no re-capture);
+  `continue-terminal-run-async!:201` calls `mutate! 'psi.workflow/create-run`
+  (a NEW run from `source-definition-id`, carrying a fresh user prompt). →
+  resume reuses; continue is an ordinary fresh create-run that captures a fresh
+  snapshot from the live session at continuation time (Decision 6 governs it for
+  free — no special threading, which `continue-terminal-run-async!` could not do
+  anyway, holding only `mutate!`/`run-id`/`session-id`).
+
+- **nested entry point (7a).** `delegate-step-runtime-result` (`delegate.clj:36`)
+  holds `ctx`/`parent-session-id`/`step-id`/`step-def`/`workflow-run` but does
+  not resolve effective config. → delegate first calls
+  `resolve-step-session-config` (`ctx parent-session-id workflow-run step-id`,
+  which already produces effective config = run snapshot ⊕ step overrides), then
+  a new pure `effective-config->snapshot` (effective-config → snapshot, no ctx
+  reads), passing the result as `:inherited-defaults` into create-run at
+  `delegate.clj:44`. delegate does NOT call
+  `resolve-inherited-defaults-snapshot` (would re-read live parent + drop
+  overrides). Two named functions: top-level `(ctx parent-session-id)` impure;
+  nested `(effective-config)` pure projection — shared so paths can't drift.
+
+- **mutation-hop site (6a).** Three direct `workflow-runtime/create-run` sites:
+  `canonical_workflows.clj:96` (the `create-workflow-run` mutation, holds
+  `agent-session-ctx`+`session-id`), `psi_tool_workflow.clj:148` (holds
+  `ctx`+`session-id`), `delegate.clj:44` (nested, Decision 7a). The two
+  `mutate! 'psi.workflow/create-run` upstream callers (`workflow/core.clj:382`,
+  `orchestration.clj:208`) hold no ctx → resolution lives INSIDE the
+  `create-workflow-run` mutation (and the psi-tool op site), leaving both
+  `mutate!` callers untouched. Single mutation-path resolution point also makes
+  Decision 5b (continue) capture-fresh automatic.
+
+No ambiguity design-steps blocked; all four completable as design refinements.
+Code implementation remains for the plan phase (steps.md), not this design pass.

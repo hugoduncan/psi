@@ -96,6 +96,30 @@ Out of scope:
    blocked run does not re-capture defaults; it reuses the snapshot taken at
    original invoke time.
 
+   5a. **`resume-run` (`continue-blocked-run-async!`) — reuse, no
+   re-capture.** `resume-run` (`orchestration.clj` `continue-blocked-run-async!`)
+   targets the **same** `run-id` and re-uses that run's existing canonical
+   state, including its already-stored `:inherited-defaults` snapshot. No new
+   snapshot is resolved; `resume-run` never calls
+   `resolve-inherited-defaults-snapshot`.
+
+   5b. **`continue-terminal-run-async!` — a NEW run captures a FRESH
+   snapshot.** `continue-terminal-run-async!` (`orchestration.clj:201`)
+   creates a **new** run via `mutate! 'psi.workflow/create-run` (a distinct
+   `run-id`, derived `…-continue-<ts>` name) from the original run's
+   `source-definition-id`. Because it is a fresh `create-run`, it follows the
+   ordinary invoke-time capture rule (Decision 6): the `create-workflow-run`
+   mutation resolves a **fresh** snapshot from the continuing `session-id` at
+   continuation time. Continue does **not** reuse the original terminal run's
+   snapshot. Rationale: a continuation is a new top-level invocation from the
+   live session (it carries a fresh user prompt via `continue-workflow-input`),
+   so it should inherit the session's defaults as they stand at continuation —
+   consistent with "top-level steps inherit from the invoking session, captured
+   at invoke time." Reuse of the original snapshot would require threading the
+   prior run's snapshot through `continue-terminal-run-async!`, which holds only
+   `mutate!`/`run-id`/`session-id` and intentionally re-invokes from the
+   definition; that threading is explicitly **not** done.
+
 6. **Purity boundary — impure resolution outside pure `create-run`.**
    `workflow-runtime.core/create-run` is the canonical *pure* root-state
    lifecycle op: it takes `state` (not `ctx`) and must remain free of ctx reads
@@ -112,6 +136,34 @@ Out of scope:
    (`psi_tool_workflow.clj`, `mutations/canonical_workflows.clj`,
    `statechart_runtime/delegate.clj`), so this places the snapshot resolution
    alongside the existing impure read at each site.
+
+   6a. **Resolution site across the mutation hop — inside the mutation, not its
+   `mutate!` callers.** There are exactly three sites that call
+   `workflow-runtime/create-run` directly, and they are the snapshot-resolution
+   sites:
+
+   - `mutations/canonical_workflows.clj:96` — the `create-workflow-run`
+     mutation (`psi.workflow/create-run`). It holds `agent-session-ctx`
+     (`ctx` with `:state*`) and `session-id` (= `:parent-session-id`). The two
+     upstream `mutate! 'psi.workflow/create-run` callers —
+     `workflow/core.clj:382` (psi-tool delegate path) and
+     `orchestration.clj:208` (`continue-terminal-run-async!`) — do **not** hold
+     `ctx` and pass only `:definition-id`/`:workflow-input`/`:run-id`. The
+     resolver (`resolve-inherited-defaults-snapshot ctx parent-session-id`)
+     needs `ctx`+`parent-session-id`, both of which the mutation already has.
+     Therefore the impure resolution for the mutation path lives **inside the
+     `create-workflow-run` mutation** (resolving the snapshot from
+     `agent-session-ctx`+`session-id` and passing it as `:inherited-defaults`
+     into the pure `create-run`), **not** in the upstream `mutate!` callers.
+     This keeps both `mutate!` callers unchanged and gives a single
+     mutation-path resolution point, so the continuation path (Decision 5b)
+     automatically captures a fresh snapshot for free.
+   - `psi_tool_workflow.clj:148` — the psi-tool `create-run` op. It holds `ctx`
+     and `session-id` (= `:parent-session-id`); it resolves the snapshot here
+     and passes `:inherited-defaults` into `create-run`.
+   - `statechart_runtime/delegate.clj:44` — the nested/delegated create-run
+     site, governed by Decision 7 (effective-config → snapshot), not the
+     top-level `resolve-inherited-defaults-snapshot` path.
 
 7. **Single ownership of snapshot derivation.** `workflow-step-session-config`
    owns the resolution of inherited defaults from a session today; it is the
@@ -133,6 +185,35 @@ Out of scope:
    duplicated resolution logic. `delegate.clj`'s create-run site passes the
    step's effective snapshot rather than re-reading the invoking session.
 
+   7a. **Nested-derivation entry point and signatures.**
+   `workflow-step-session-config` exposes **two** snapshot functions, distinct
+   by input:
+
+   - `resolve-inherited-defaults-snapshot` — `(ctx parent-session-id) →
+     snapshot-map`. The **top-level** path (Decisions 6, 6a). Performs the live
+     ctx reads (`get-session-data`, `all-skills`, tool source + tool-ids,
+     thinking-level, speed-mode, effort-override) used by
+     `resolve-step-session-config`'s no-override path and returns the resolved
+     snapshot.
+   - `effective-config->snapshot` — `(effective-config) → snapshot-map`. The
+     **nested** path. Pure projection of an already-resolved effective
+     step-config into the snapshot field set; no ctx reads. It is the single
+     point that maps effective config → snapshot, shared so the two paths
+     cannot drift.
+
+   `delegate.clj`'s `delegate-step-runtime-result` holds `ctx`,
+   `parent-session-id`, `step-id`, `step-def`, and `workflow-run` but does **not**
+   currently resolve the delegating step's effective config. The nested
+   derivation therefore proceeds: `delegate-step-runtime-result` first calls
+   `resolve-step-session-config` (`ctx parent-session-id workflow-run step-id`)
+   — which already produces the step's effective config (run snapshot ⊕ step
+   overrides) — then calls `effective-config->snapshot` on that result, and
+   passes the resulting snapshot as `:inherited-defaults` into the child
+   `create-run` at `delegate.clj:44`. `delegate.clj` does **not** call
+   `resolve-inherited-defaults-snapshot` (that would re-read a live parent
+   session and lose the step overrides); the effective config supplies the
+   parent semantics required by Decision 3.
+
 8. **Snapshot field-set authority — single source of truth.** The snapshot
    field set is **not** an independently hand-maintained list. The canonical
    inheritance field set is `session-state/init.clj`'s `common-inherited-fields`
@@ -145,6 +226,53 @@ Out of scope:
    the documented resolved-vs-raw shape difference: the snapshot stores resolved
    `:tool-defs`/`:skills` where the raw inheritance set stores `:tool-ids`/
    `:skill-ids`). This keeps the two inheritance field lists from drifting.
+
+   8a. **Exact snapshot field set as a named subset, with the
+   model/thinking-level gap made explicit.** `common-inherited-fields`
+   (`init.clj:30`) holds ~20 fields and is a *child-session-init* concern
+   (capability membership, preferences, UI, runtime telemetry). It does **not**
+   include `:model` or `:thinking-level` — those live in the separate
+   `model-identity-fields` constant (`init.clj:67`). The workflow snapshot is a
+   narrower *resolved-default* set: the fields a step inherits when it gives no
+   override of its own. The snapshot is therefore **not** all of
+   `common-inherited-fields`; it is an explicitly named set spanning two
+   authorities:
+
+   - **From `common-inherited-fields`** (a named subset, by their raw keys):
+     `:prompt-mode`, `:speed-mode`, `:effort-override`, plus the
+     resolved-vs-raw pair `:tool-ids` → resolved `:tool-defs` and `:skill-ids`
+     → resolved `:skills`.
+   - **From `model-identity-fields`**: `:model`, `:thinking-level`.
+
+   So the snapshot's seven resolved keys are
+   `{:model :prompt-mode :tool-defs :skills :thinking-level :speed-mode
+   :effort-override}`, mapping to authority keys
+   `{:model :prompt-mode :tool-ids :skill-ids :thinking-level :speed-mode
+   :effort-override}`.
+
+   The dozen other `common-inherited-fields` entries are **deliberately
+   excluded** from the workflow snapshot: capability membership beyond
+   tools/skills (`:prompt-contribution-ids`, `:prompt-templates`, `:extensions`),
+   the remaining preferences (`:auto-retry-enabled`, `:auto-compaction-enabled`,
+   `:nucleus-prelude-override`, `:developer-prompt`,
+   `:developer-prompt-source`, `:cache-breakpoints`, `:scoped-models`,
+   `:tool-output-overrides`), `:ui-type`, and the runtime telemetry fields
+   (`:context-tokens`, `:context-window`). These are not part of the
+   per-step inherited-default that `resolve-step-session-config` overrides
+   today, so they are out of scope for this snapshot (Decision 1 governs only
+   the inherited defaults the resolver reads live).
+
+   **Validation against the authority** (not a hand-maintained parallel list):
+   `common-inherited-fields` (and, if needed, `model-identity-fields`) is
+   promoted to a public var/accessor. A named constant in
+   `workflow-step-session-config` declares the snapshot's source keys
+   (`{:from-common #{:prompt-mode :speed-mode :effort-override :tool-ids
+   :skill-ids} :from-model #{:model :thinking-level}}`), and a test asserts
+   the invariant: every `:from-common` key ∈ `common-inherited-fields`, every
+   `:from-model` key ∈ `model-identity-fields`, and the snapshot's resolved
+   keys equal the declared source keys with `:tool-ids`→`:tool-defs` and
+   `:skill-ids`→`:skills` substituted. Drift (a key disappearing from either
+   authority, or a snapshot key without an authority source) fails the test.
 
 ## Acceptance criteria
 
