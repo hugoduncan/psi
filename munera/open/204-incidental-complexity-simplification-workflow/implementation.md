@@ -113,3 +113,47 @@ architecture-fit handoff follow-up):
 
 Added A1–A5 as unchecked items to design-steps.md. PASS_STATUS:
 ACTIONABLE_FEEDBACK.
+
+## 2026-06-01 — Ambiguity (pass 1) follow-up executed (A1–A5)
+
+Executed the five newly added ambiguity follow-ups (A1–A5) from
+`design-steps.md`, all introduced by the pass-1 ambiguity review (commit
+`4b28328da`). Grounded every change against live gordian output and CLI help.
+
+- **A1 — join unmatched-row rule.** Confirmed both `local` and `complexity`
+  `--json` emit a `units` array carrying `ns`/`var`/`arity` (and `lcc-total` /
+  `cc` respectively). Updated Deliverable 1 step 2 to specify an **inner join
+  keyed on the `local` side**: a `local` unit with no matching `cc` row is
+  **dropped** (never defaulted to `cc=1`, which would inflate `gap`);
+  `complexity`-only units are absent (no `lcc-total`). `max(cc, 1)` now
+  explicitly guards only the *matched zero-cc* case, not the missing-row case.
+
+- **A2 — "touched units" defined.** Defined "touched units" in the Phase 1
+  acceptance as the **metric-derived set** `{u | before(u) ≠ after(u)}` of units
+  whose recomputed `lcc-total` changed (not changed files / changed source),
+  precisely so globally-recomputed `dependency`/`working-set` shifts into
+  untouched callers cannot hide relocated burden. Net check: `Σ after < Σ before`
+  over that set.
+
+- **A3 — gate flags.** Verified via `bb gordian gate --help` that `--fail-on`,
+  `--max-new-medium-findings`, and `--max-new-high-findings` exist, and the
+  gordian SKILL lists gate checks `pc-delta ∧ new-cycles ∧ new-high-findings ∧
+  new-medium-findings`. Updated the Phase 1 acceptance and Locked decision 4 to
+  run `gate --baseline … --fail-on new-cycles,new-high-findings
+  --max-new-medium-findings 0`, since bare `gate --baseline` only *evaluates*
+  checks and does not fail on them — making the "no new cycles/high/medium"
+  claim actually enforced.
+
+- **A4 — baseline path vs cwd.** Specified that Phase 1 runs from the worktree
+  root, so the generated task references baselines by their
+  **worktree-root-relative task-dir path** (`munera/open/NNN-slug/before-*.{edn,json}`,
+  the task dir being inside the worktree) rather than a bare filename, so
+  `gate --baseline` resolves.
+
+- **A5 — comparison source.** Named the stored `before-local.json` (the Step-1
+  baseline) as the single authoritative "before" for every "decreased" check,
+  excluding selector evidence or fresh recompute.
+
+All A1–A5 are checked in `design-steps.md` (unchecked count 0). The earlier
+architecture-fit item predates this pass and remains checked. No `steps.md` /
+`plan.md` touched. PASS_STATUS: REVIEW_COMPLETE.

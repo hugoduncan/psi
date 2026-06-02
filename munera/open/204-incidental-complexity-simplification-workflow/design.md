@@ -60,6 +60,16 @@ narrows and then judges:
 2. Join on `(ns, var, arity)` and compute `gap = lcc-total / max(cc, 1)`. This
    join is a **fixed recipe embedded verbatim in the skill** (a canonical
    snippet the agent runs as-is), not ad-hoc code, so selection is reproducible.
+   **Unmatched-row rule (inner join on the `local` side):** the join is keyed by
+   the `local` lens — only units present in *both* lenses are candidates. A
+   `local` unit with **no matching `cc` row is dropped** (excluded from
+   candidates), never defaulted to `cc=1`; defaulting to `cc=1` would inflate
+   `gap` toward false qualification, so it is explicitly forbidden. `complexity`
+   units with no matching `local` row are irrelevant (they carry no `lcc-total`)
+   and are likewise absent from the candidate set. `max(cc, 1)` therefore guards
+   only the *zero-cc matched* case (a matched unit whose `cc` is reported as 0),
+   not the missing-row case. Both lenses emit `ns`/`var`/`arity` and a `units`
+   array, so the join is total over the shared key space.
 3. **Qualification filter** — a unit qualifies iff:
    `lcc-total ≥ 5.0` **and** `gap ≥ 2.0`. Rank qualifying units by `gap`.
    If no unit qualifies, there is no target (drives the workflow's early stop).
@@ -100,6 +110,15 @@ end. Required behaviour:
   - `before-local.json` — `bb gordian local --json` (per-unit burden baseline),
   - `before-diagnose.edn` — `bb gordian diagnose --edn` (architectural gate
     baseline for `gordian gate --baseline`).
+  - **Path resolution:** these baselines live under the task directory, but
+    Phase 1 runs `gordian gate`/`gordian local` from the **worktree root (cwd)**,
+    where a bare filename does not resolve. The generated `design.md` therefore
+    references each baseline by its **worktree-root-relative task-dir path**
+    — `munera/open/NNN-slug/before-diagnose.edn` and
+    `munera/open/NNN-slug/before-local.json` — (the task dir is inside the
+    worktree, so this path resolves from cwd). Step 1 records the concrete task
+    path in the generated task so Phase 1 commands use the resolvable path
+    rather than a bare filename.
 - Allocate the next task id, create `munera/open/NNN-slug/design.md` for the
   refactor task (see "Generated task design" below).
 - Commit the task creation.
@@ -168,11 +187,33 @@ behaviour change, so refactoring is **gated** on sufficient coverage:
 local, root-cause changes (not superficial extraction).
 
 - **Objective acceptance criteria:**
-  - re-running `bb gordian local --json`, the target unit's `lcc-total`
-    **decreased**, and **net `lcc-total` across all touched units decreased**
-    (guards against relocating burden into a new helper),
-  - `bb gordian gate --baseline before-diagnose.edn` passes (no new cycles, no
-    new high/medium findings),
+  - **Burden reduction (A5 — named comparison source).** Re-run
+    `bb gordian local --json` from the worktree root and compare against the
+    stored `munera/open/NNN-slug/before-local.json` captured in Step 1 — that
+    file is the single authoritative baseline for every "decreased" check (not
+    the selector's emitted evidence, not a fresh pre-refactor recompute). The
+    target unit's `lcc-total` (keyed by `(ns, var, arity)`) **decreased** versus
+    its `before-local.json` value.
+  - **Net burden (A2 — "touched units" defined).** "Touched units" means **every
+    unit whose recomputed `lcc-total` changed** between `before-local.json` and
+    the after-`local` run — i.e. the set is computed from the metric, not from
+    the diff/touched files. This deliberately includes callers whose
+    `dependency`/`working-set` burden shifts even though their source was not
+    edited, because `local` is recomputed globally; scoping to changed *files*
+    or changed *source* would let a refactor hide relocated burden in an
+    untouched caller. The acceptance is: summing `lcc-total` over this
+    metric-derived touched set, the **after total is strictly less than the
+    before total**. The check is objective: `{u | before(u) ≠ after(u)}`, then
+    `Σ after < Σ before`.
+  - **Architectural no-regression (A3 — enforcing gate flags).** Run
+    `bb gordian gate --baseline munera/open/NNN-slug/before-diagnose.edn
+    --fail-on new-cycles,new-high-findings --max-new-medium-findings 0`. The bare
+    `gate --baseline` only *evaluates* checks; the `--fail-on` flag is what makes
+    new cycles and new high findings **fail** (non-zero exit), and
+    `--max-new-medium-findings 0` enforces the "no new medium findings" half of
+    the claim. The gate must **pass** (exit 0) with these flags. (Gate check
+    names confirmed against the live CLI: `new-cycles`, `new-high-findings`,
+    `new-medium-findings`/`--max-new-medium-findings`.)
   - the Phase 0 characterization tests and all existing tests for the affected
     area are **green** (same expectations as before the refactor),
   - the change is minimal, local, and decomplecting.
@@ -199,6 +240,11 @@ inconsistency in place of live user collaboration.
 4. Objective acceptance uses the **`local` lens before/after** for the target +
    net-across-touched-units burden reduction (not `gordian compare`, which is
    architectural), plus `gordian gate` for no-regression and green tests.
+   "Before" is always the stored `before-local.json` baseline; "touched units"
+   is the metric-derived set of units whose `lcc-total` changed. The gate is run
+   with `--fail-on new-cycles,new-high-findings --max-new-medium-findings 0` so
+   the "no new cycles / no new high/medium findings" claim is actually enforced
+   (bare `gate --baseline` only evaluates, it does not fail on these).
 5. v1 scope is function-level incidental complexity only; architectural is a
    later sibling.
 6. Autonomy is acceptable for this task class (objective, narrow design);
