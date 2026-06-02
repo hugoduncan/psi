@@ -4,6 +4,7 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.commands :as commands]
    [psi.agent-session.core :as session]
+   [psi.agent-session.deterministic-operation-action :as op-action]
    [psi.agent-session.test-support :as test-support]
    [psi.deterministic-operation-registry.registry :as registry]))
 
@@ -62,6 +63,18 @@
         (is (= :text (:type result)))
         (is (str/includes? (:message result)
                            (str ":details " (pr-str {:k :v :n 2}))))))))
+
+(deftest operation-invoke-over-2000-char-value-truncated-identically
+  (let [[ctx session-id] (create-session-context)
+        big (apply str (repeat 3000 "z"))]
+    (register-op! ctx {:id "big/op" :description "huge"
+                       :handler (fn [_] {:status :ok :data big})})
+    (testing "command surface per-key truncation matches helper marker (decision #9 surface-parity)"
+      (let [result (dispatch ctx session-id "/operation big/op")
+            expected (op-action/truncate-value (pr-str big))]
+        (is (= :text (:type result)))
+        (is (str/includes? expected "… (truncated, 3002 chars total)"))
+        (is (str/includes? (:message result) (str ":data " expected)))))))
 
 (deftest operation-invoke-default-args
   (let [[ctx session-id] (create-session-context)]

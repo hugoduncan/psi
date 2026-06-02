@@ -516,3 +516,31 @@ Non-actionable observations (no follow-up):
   branch behaviour (valid op, blank-id reject, invalid-op reject, non-map args
   reject, default `{}`, list-ignores-args) is fully exercised end-to-end through
   the `psi_tool_operation_integration_test` `make-psi-tool` path. Adequate.
+
+## Resolution of test-review follow-up TR-2 (ψ)
+
+Closed the one actionable second-pass test-review gap: the `/operation` command
+surface had no per-key truncation test, leaving decision #9's surface-parity
+("render identically") only half-verified (helper + psi-tool covered, command
+uncovered).
+
+Added `operation-invoke-over-2000-char-value-truncated-identically` to
+`operation_command_test.clj`: registers an op returning a 3000-char `:data`
+value, dispatches `/operation big/op`, and asserts the rendered `:type :text`
+output contains the line `":data " + (op-action/truncate-value (pr-str big))`,
+which carries the exact marker `… (truncated, 3002 chars total)` (`pr-str` adds
+the two surrounding quotes → 3002 chars). Required `op-action` in the test ns to
+share the helper's canonical truncation, matching the psi-tool surface test
+(`invoke-over-2000-char-value-truncated-identically`) — so both surfaces assert
+against the same `truncate-value` output, closing the "identical across surfaces"
+guarantee on the command path.
+
+Focused run: `operation-command-test` 13 tests / 27 assertions, all green
+(was 12/25; +1 test, +2 assertions). clj-kondo clean; clj-paren-repair no-op.
+No production code changed — `render-operation-result` already routed values
+through `project-result` → `truncate-value`; this test locks the command-surface
+behaviour against regression. No blocked steps.
+
+The remaining unchecked close-out box (`git mv open/ → closed/` + remove from
+plan.md) is the lifecycle's terminal move, performed by the orchestrating
+lifecycle, not this follow-up pass.

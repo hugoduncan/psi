@@ -242,7 +242,7 @@
     asserting a `:details {…}` line appears in the `:type :text` output (closes
     the all-keys rule for the nested-map case on both surfaces).
 
-- [ ] (TR-2) Cover per-key truncation on the `/operation` **command** surface
+- [x] (TR-2) Cover per-key truncation on the `/operation` **command** surface
   (decision #9 surface-parity). Truncation is currently tested only at the
   helper level and on the psi-tool surface; `operation_command_test.clj` has no
   over-2000-char case, so the command `render-operation-result` text path is
