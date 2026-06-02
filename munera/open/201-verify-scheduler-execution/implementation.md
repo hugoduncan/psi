@@ -2055,3 +2055,36 @@ redundant new step.
 
 Pass outcome: **REVIEW_COMPLETE** — implementation verified, no actionable
 feedback.
+
+## task-test-review — pass 2 (2026-06-01)
+
+Re-audited 201 test deliverables + `findings.md` citations firsthand against the
+task-test-review skill (well-formed ∧ behaviour-coverage ∧ infra-deps
+injectable-not-stubbed). The deftest-level coverage is sound: the 6 acceptance
+gaps cite passing seam-driven tests asserting state/outputs (not interactions);
+pass-9's scoping-out of the two surviving wall-clock/`with-redefs` deftests
+(`scheduler-effects-test/scheduler-start-and-cancel-timer-effects-test`,
+`scheduler-lifecycle-test/scheduled-deliver-runs-canonical-prompt-lifecycle-test`)
+holds at the deftest level — neither is named in a covering-test cell.
+
+One **new actionable** finding pass-9 missed (it checked only deftest-level
+covering cells, not the **file-level** Baseline citation): `findings.md` L62
+co-cites `scheduler_effects_test.clj` as evidence that the seams "enable firing
+**without wall-clock sleeps**" — but that file's only *firing* deftest
+(`scheduler-start-and-cancel-timer-effects-test`) fires through the **real
+wall-clock `Thread/sleep` daemon path** (`(.plusMillis now 20)` real delay,
+`(deref fired 1000 …)`, `Thread/sleep 10/30` polling) and stubs the
+`dispatch/dispatch!` infra boundary via `with-redefs`. The cited file's content
+**contradicts** the very "without wall-clock sleeps" claim it is cited to
+support — an incoherent/inaccurate citation in the structured deliverable. The
+seam-driven claim is already fully and correctly supported by the co-cited
+`scheduler_timer_seam_test.clj`
+(`scheduler-start-timer-uses-injected-time-source-and-delay-runner-test`:
+captures `delay-ms`+callback, invokes `(@callback*)`, asserts `:delivered`, zero
+wall-clock). Minimal fix: drop `scheduler_effects_test.clj` from the L62
+citation (or replace it with the specific seam-using deftest), leaving
+`scheduler_timer_seam_test.clj` as the authoritative no-wall-clock-firing
+citation. Findings/test-file-only; no scheduler source/doc change.
+
+Pass outcome: **ACTIONABLE_FEEDBACK** — one citation-coherence fix (follow-up
+recorded in steps.md).

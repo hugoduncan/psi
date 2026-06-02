@@ -1318,3 +1318,27 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       `components/agent-session/src/**` / `doc/scheduler.md` (invariant held).
       (Marked complete during task-implementation-review pass — item executed but
       left unchecked in the commit.)
+
+## Test review follow-ups — pass 10 (task-test-review, 2026-06-01)
+
+- [ ] Correct the inaccurate `findings.md` L62 (Baseline) citation. The entry
+      "Deterministic time/timer seams … enable firing **without wall-clock
+      sleeps**" co-cites `scheduler_timer_seam_test.clj` **and**
+      `scheduler_effects_test.clj`, but the only *firing* deftest in
+      `scheduler_effects_test.clj`
+      (`scheduler-start-and-cancel-timer-effects-test`) fires via the **real
+      wall-clock `Thread/sleep` daemon path** (`(.plusMillis now 20)` real delay,
+      `(deref fired 1000 …)`, `Thread/sleep 10/30` polling) and `with-redefs`-
+      stubs `dispatch/dispatch!` — directly contradicting the "without wall-clock
+      sleeps" claim it is cited to support. (Pass-9 scoped this deftest out at the
+      *covering-cell* level but missed this *file-level* Baseline citation.) Fix:
+      drop `scheduler_effects_test.clj` from the L62 citation (or replace it with
+      the specific seam-using deftest), leaving
+      `scheduler_timer_seam_test.clj/scheduler-start-timer-uses-injected-time-
+      source-and-delay-runner-test` — which already fully supports the claim
+      (captures `delay-ms`+callback, invokes `(@callback*)`, asserts
+      `:delivered`, zero wall-clock) — as the authoritative no-wall-clock-firing
+      citation. `findings.md`-only edit (no deftest renamed → other citations
+      unchanged; no scheduler source/`doc/scheduler.md` change; verification-only
+      invariant + Slice-10 allowlist held). If 201 is treated as closed instead,
+      raise as a small standalone findings-accuracy fix.
