@@ -487,3 +487,42 @@ were changed. Slices 1–5 and the C-predating items were left untouched.
 C1–C3 checked in steps.md. No code/test/doc outside task artifacts touched
 (slices unbuilt). design.md untouched (design review complete). PASS_STATUS:
 REVIEW_COMPLETE.
+
+## 2026-06-01 — Slice 1 built: incidental-complexity-finder skill
+
+Authored `.psi/skills/incidental-complexity-finder/SKILL.md`. Frontmatter
+(`name`/`description`/`lambda`) mirrors sibling skills; body encodes the full
+selection methodology per design Deliverable 1:
+
+- **Scope**: single executable unit only; explicit false-positive guard ("high
+  cc alone is not a target — essential decision logic").
+- **gap rationale**: `gap = lcc-total / max(cc, 1)` discriminates incidental
+  (high burden / low-moderate cc) from essential (high cc) complexity.
+- **Fixed verbatim join recipe**: a `jq -n --slurpfile loc … --slurpfile cc …`
+  snippet, **developed and tested live against this repo** before embedding.
+  Inner-joins on the `local` side keyed on `(ns,var,arity)`, computes `gap`,
+  applies the `lcc-total ≥ 5.0 ∧ gap ≥ 2.0` filter, ranks by `gap`, prints the
+  top-5 with full per-dimension-burden + `findings` evidence.
+- **A1 unmatched-row rule**: `select($ccmap[.gap_key] != null)` drops local rows
+  with no cc match (never defaults `cc=1`); `max(cc,1)` guards only matched
+  zero-cc. Documented explicitly.
+- **Qualification filter + tunable thresholds** stated explicitly.
+- **Judgment guard** (top-5, incidental categories vs essential algorithm).
+- **Evidence emission** incl. coverage hint (sibling `*_test.clj` + var grep).
+
+Live verification:
+- Recipe run against `bb gordian local --sort total --json` + `bb gordian
+  complexity --json` produced a ranked candidate list — top units e.g.
+  `psi.app-runtime/start-tui-runtime!/5` (lcc≈7.03, cc=1, gap≈7.03),
+  `psi.main/print-help!/0` (gap≈5.86). Selector produces a target.
+- `psi.prompt-assets.skills/load-skills-from-dir ".psi/skills"` returns the skill
+  with **zero diagnostics**; name="incidental-complexity-finder", description
+  (386 chars) + lambda parsed. Skill registers/loads cleanly.
+
+Verified field shapes (P2/A1 grounding, current run): `local` units carry
+`ns`/`var`/`arity`/`lcc-total` + per-dimension burdens (`flow-burden`,
+`state-burden`, `shape-burden`, `abstraction-burden`, `dependency-burden`,
+`working-set`) + `findings`/`file`/`line`/`end-line`; `complexity` units carry
+`cc`. Recipe inputs all present as designed.
+
+No deviations from design. Slices 2–5 remain.
