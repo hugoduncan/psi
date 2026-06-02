@@ -1117,3 +1117,26 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       `findings.md` only if a covering-test citation's form changes (none expected).
       If 201 is treated as closed instead, raise as a small standalone
       test-hygiene task.
+
+## Docs-review follow-ups — pass 1 (review-task-docs, 2026-06-01)
+
+- [ ] Correct the `findings.md` "psi-tool surface" `:at`-asymmetry row to stop
+      claiming the near-future/`>24h` `:at` rejection "matches `doc/scheduler.md`".
+      `doc/scheduler.md` "Create validation rules" documents only *relative*-delay
+      bounds + "past absolute instants fire immediately"; it is **silent** on a
+      future `:at` below `min-delay-ms` (1–999ms ahead) being rejected and on `:at`
+      above `max-delay-ms` (>24h) being rejected. Reword the row to record this as
+      a **doc-gap finding** (doc↔behaviour drift: near-future/`>24h` `:at`
+      rejection is undocumented) rather than `verified-correct`/"matches doc".
+      Grounded in `psi_tool_scheduler/resolve-fire-time!` (`validate-delay-ms!`
+      runs only when `delay` is strictly positive). Verification-only: edit the
+      task-local `findings.md` only — no `doc/scheduler.md`/`src` change here.
+- [ ] Raise a doc-clarification remediation task
+      (`munera/open/NNN-document-at-bounds-in-scheduler-doc` or similar) to extend
+      `doc/scheduler.md` "Create validation rules" with the absolute-`:at` bound
+      behaviour: only past/now `:at` fire immediately (delay 0, no min check);
+      future `:at` below `min-delay-ms` is rejected (below-minimum bound); `:at`
+      above `max-delay-ms` is rejected (exceeds-maximum bound). Reference the new
+      task id from the corrected `findings.md` row. Per design policy this doc fix
+      is out of scope for 201 (verification-only); it is a separate remediation
+      task. If 201 is being closed, this is the deliverable handoff for the doc gap.

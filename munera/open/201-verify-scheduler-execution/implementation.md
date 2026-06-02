@@ -1774,3 +1774,52 @@ passes) has converged: the verification-only deliverable is well-formed, fully
 covers the design behaviour, deterministic, and uses injection over mocking
 throughout its cited/added tests. Verification-only invariant intact (this
 review touched no `components/agent-session/src/**` or `doc/scheduler.md`).
+
+## Docs review — pass 1 (review-task-docs skill, 2026-06-01) — ACTIONABLE_FEEDBACK
+
+Applied review-task-docs (`accuracy ∧ completeness ∧ consistency` of
+user-facing docs against the verified implementation): `README.md`,
+`doc/scheduler.md`, `CHANGELOG.md`.
+
+Scope confirmation: task 201 is verification-only and (correctly) changed only
+test files + task artifacts — zero `README.md`/`doc/`/`CHANGELOG.md` edits. No
+behaviour was added/changed/removed, so the absence of README/doc/CHANGELOG
+changes is correct (no stale removed-behaviour references, no missing changelog
+entry — `user_visible(δ) ≡ ∅` for a verification-only δ).
+
+`README.md` scheduler refs (L118, L123) accurate vs implementation: `scheduler`
+exposes `create|list|cancel`, message + session kinds, points at
+`doc/scheduler.md` — consistent.
+
+**One actionable issue (accuracy ∧ completeness of `doc/scheduler.md`,
+surfaced by this task's own findings):**
+
+`doc/scheduler.md` "Create validation rules" documents bounds only as
+"minimum **relative** delay: 1000ms / maximum relative delay: 24h" and states
+for absolute instants *only* "past absolute instants fire immediately". It does
+**not** document that a *future* `:at` resolving below `min-delay-ms` (1–999ms
+ahead) is **rejected** with the below-minimum bound, nor that `:at` above
+`max-delay-ms` (>24h) is rejected. Runtime truth
+(`psi_tool_scheduler/resolve-fire-time!` L42-65): `delay = max(0, between(now,
+at))`, and `validate-delay-ms!` is invoked **only when `delay` is strictly
+positive** — so past/now `:at` → delay 0 → fires immediately, but near-future
+`:at` is bounds-checked exactly like `:delay-ms`. A doc reader reasonably infers
+absolute `:at` is governed solely by "past fires immediately" (bounds framed as
+*relative*), missing the near-future rejection and the >24h rejection.
+
+The task findings (`findings.md` psi-tool surface §, row "`:at` asymmetry …")
+record this near-future-reject behaviour as `verified-correct` and assert it
+"**matches** `doc/scheduler.md`". That assertion is only partially accurate: the
+doc covers the *past* case but is **silent** on the *near-future* and *>24h*
+`:at` cases. This is a doc completeness/accuracy gap (doc↔behaviour drift), which
+per design policy ("drift found between doc and behaviour is recorded as a
+finding, not corrected here") is a finding — not fixable in this
+verification-only task. Recommended: (a) soften the `findings.md` "matches doc"
+claim to "near-future/>24h `:at` rejection is **not documented** — doc-gap
+finding"; (b) raise a doc-clarification remediation task to add `:at` bounds
+(near-future <min rejected, >max rejected, only past/now fire immediately) to
+`doc/scheduler.md` "Create validation rules".
+
+No other doc accuracy/consistency issues: session-config subset, status model
+(incl. `:failed` + delivery-phase + created-session-id), list/cancel semantics,
+and introspection attrs in `doc/scheduler.md` all match verified behaviour.
