@@ -89,6 +89,25 @@ cross-buffer tests can assert the originating buffer's lstate is cleared."
       (funcall thunk))
     (nreverse calls)))
 
+(defmacro pwpt--with-dispatch-stubs (cb-var &rest body)
+  "Run BODY with CB-VAR bound to the captured dispatch response callback.
+Stubs the uniform dispatch/response infrastructure: `run-at-time' returns the
+`fake-timer' sentinel, `timerp' recognises only that sentinel,
+`send-request-function' captures its callback into CB-VAR, and
+`upsert-projection-block' is a no-op.  Does NOT stub `cancel-timer' — callers
+that assert cancellation bind it in their own inner `cl-letf'; others rely on
+the default (or stub it to `#'ignore').  Compresses the preamble shared by the
+dispatch/response tests so each reads as its arrange/act/assert intent."
+  (declare (indent 1) (debug (symbolp body)))
+  `(let ((,cb-var nil))
+     (cl-letf (((symbol-function 'run-at-time)
+                (lambda (_s _r _fn &rest _a) 'fake-timer))
+               ((symbol-function 'timerp) (lambda (x) (eq x 'fake-timer)))
+               ((symbol-value 'psi-emacs--send-request-function)
+                (lambda (_state _op _params &optional cb) (setq ,cb-var cb)))
+               ((symbol-function 'psi-emacs--upsert-projection-block) #'ignore))
+       ,@body)))
+
 ;;; ─── Mutation timeout ────────────────────────────────────────────────────────
 
 (ert-deftest pwpt-timer-key-formats-correctly ()
@@ -215,28 +234,23 @@ error or mutate anything."
 
 (ert-deftest pwpt-dispatch-mutation-cancels-timer-on-response ()
   (pwpt--with-state
-   (let* ((mutation '((:name . ext/do-thing) (:params . ())))
-          (timer-cancelled nil)
-          (captured-cb nil))
-     (cl-letf (((symbol-function 'run-at-time)
-                (lambda (_s _r _fn &rest _a) 'fake-timer))
-               ((symbol-function 'cancel-timer)
-                (lambda (_t) (setq timer-cancelled t)))
-               ((symbol-function 'timerp) (lambda (x) (eq x 'fake-timer)))
-               ((symbol-value 'psi-emacs--send-request-function)
-                (lambda (_state _op _params &optional cb) (setq captured-cb cb)))
-               ((symbol-function 'psi-emacs--upsert-projection-block) #'ignore))
-       (psi-widget-projection--dispatch-mutation mutation "ext" "w1" "b1" nil)
-       ;; The timer must have been recorded in the buffer-local store.
-       (should (gethash "ext/w1:b1"
-                        (psi-emacs-state-projection-mutation-timers
-                         psi-emacs--state)))
-       (when captured-cb
-         (funcall captured-cb '((:data . ((:ok . t))))))
-       ;; And cleared from that same store once the response cancels it.
-       (should (null (gethash "ext/w1:b1"
-                              (psi-emacs-state-projection-mutation-timers
-                               psi-emacs--state)))))
+   (let ((mutation '((:name . ext/do-thing) (:params . ())))
+         (timer-cancelled nil))
+     (pwpt--with-dispatch-stubs captured-cb
+       ;; `cancel-timer' is the assertion subject here, so bind it inline.
+       (cl-letf (((symbol-function 'cancel-timer)
+                  (lambda (_t) (setq timer-cancelled t))))
+         (psi-widget-projection--dispatch-mutation mutation "ext" "w1" "b1" nil)
+         ;; The timer must have been recorded in the buffer-local store.
+         (should (gethash "ext/w1:b1"
+                          (psi-emacs-state-projection-mutation-timers
+                           psi-emacs--state)))
+         (when captured-cb
+           (funcall captured-cb '((:data . ((:ok . t))))))
+         ;; And cleared from that same store once the response cancels it.
+         (should (null (gethash "ext/w1:b1"
+                                (psi-emacs-state-projection-mutation-timers
+                                 psi-emacs--state))))))
      (should timer-cancelled))))
 
 (ert-deftest pwpt-dispatch-response-targets-originating-buffer ()
@@ -245,16 +259,10 @@ originating buffer's store + in-flight lstate, not the current buffer's.
 Mirrors `pwpt-on-mutation-timeout-targets-originating-buffer' for the response
 path (design.md Scope (d): the response path clears the originating buffer's
 \"buffer-local timer store and lstate\")."
-  (let ((captured-cb nil))
-    (pwpt--with-psi-buffer origin-buffer
-      (pwpt--with-psi-buffer other-buffer
-        (cl-letf (((symbol-function 'run-at-time)
-                   (lambda (_s _r _fn &rest _a) 'fake-timer))
-                  ((symbol-function 'cancel-timer) #'ignore)
-                  ((symbol-function 'timerp) (lambda (x) (eq x 'fake-timer)))
-                  ((symbol-value 'psi-emacs--send-request-function)
-                   (lambda (_state _op _params &optional cb) (setq captured-cb cb)))
-                  ((symbol-function 'psi-emacs--upsert-projection-block) #'ignore))
+  (pwpt--with-dispatch-stubs captured-cb
+    (cl-letf (((symbol-function 'cancel-timer) #'ignore))
+      (pwpt--with-psi-buffer origin-buffer
+        (pwpt--with-psi-buffer other-buffer
           ;; Origin buffer: spec + in-flight lstate, then arm + dispatch.
           (with-current-buffer origin-buffer
             (pwpt--seed-button-in-flight "w1" "b1")
@@ -285,14 +293,8 @@ path (design.md Scope (d): the response path clears the originating buffer's
 
 (ert-deftest pwpt-dispatch-response-noop-when-buffer-dead ()
   "A response for a dead originating buffer is a no-op (no error)."
-  (let ((captured-cb nil))
-    (cl-letf (((symbol-function 'run-at-time)
-               (lambda (_s _r _fn &rest _a) 'fake-timer))
-              ((symbol-function 'cancel-timer) #'ignore)
-              ((symbol-function 'timerp) (lambda (x) (eq x 'fake-timer)))
-              ((symbol-value 'psi-emacs--send-request-function)
-               (lambda (_state _op _params &optional cb) (setq captured-cb cb)))
-              ((symbol-function 'psi-emacs--upsert-projection-block) #'ignore))
+  (pwpt--with-dispatch-stubs captured-cb
+    (cl-letf (((symbol-function 'cancel-timer) #'ignore))
       (let ((origin-buffer (generate-new-buffer " *pwpt-origin*")))
         (with-current-buffer origin-buffer
           (setq-local psi-emacs--state (psi-emacs--initialize-state nil))

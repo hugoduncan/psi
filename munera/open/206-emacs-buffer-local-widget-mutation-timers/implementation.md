@@ -912,3 +912,33 @@ name still slightly oversells "cancel" (remhash path; `timerp` unstubbed so
 prior passes.
 
 Verdict: ACTIONABLE_FEEDBACK (minor economy refinement S5).
+
+## Test-shaper pass-4 follow-up — S5 executed (ψ)
+
+Added `pwpt--with-dispatch-stubs (cb-var &rest body)` macro to
+`test/psi-widget-projection-timers-test.el` (after `pwpt--capture-query-sends`).
+It binds `cb-var` and stubs the uniform dispatch/response infrastructure:
+`run-at-time → 'fake-timer`, `timerp → (eq x 'fake-timer)`,
+`send-request-function → (setq cb-var cb)`, `upsert-projection-block → #'ignore`.
+Deliberately does NOT stub `cancel-timer` — left to each caller's inner `cl-letf`.
+
+Applied to all three dispatch/response tests:
+- `pwpt-dispatch-mutation-cancels-timer-on-response` — `cancel-timer` is the
+  assertion subject, so it stays inline in an inner `cl-letf` capturing
+  `timer-cancelled`; the four plumbing stubs + `captured-cb` now come from the
+  macro. Kept `pwpt--with-state` for the buffer-local store.
+- `pwpt-dispatch-response-targets-originating-buffer` — macro replaces the
+  `(let ((captured-cb nil)) (cl-letf …))` preamble; `cancel-timer #'ignore`
+  retained in a thin inner `cl-letf` (state-targeting is the assertion, not
+  cancellation); the two `pwpt--with-psi-buffer` forms nest inside.
+- `pwpt-dispatch-response-noop-when-buffer-dead` — same macro substitution;
+  `cancel-timer #'ignore` inner `cl-letf`; manual buffer create/kill body
+  preserved (it deliberately kills the origin buffer to drive the dead-buffer
+  no-op).
+
+Per-test variation now reads cleanly: test 1 captures `cancel-timer`; tests 2/3
+use `#'ignore`. Assertions + the per-test `cancel-timer` binding stay inline
+(they are the intent). `bb emacs:check` green (340/340; tests 287–289 are the
+three refactored dispatch tests); byte-compile clean; reloaded `.el`. S5 checked.
+This was the only newly-added unchecked steps.md item (test-shaper pass 4); all
+206 steps now checked.

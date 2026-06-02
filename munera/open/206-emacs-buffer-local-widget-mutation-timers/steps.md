@@ -283,7 +283,7 @@
 
 ## Test-shaper review pass 4 follow-ups (ψ)
 
-- [ ] S5 — Factor the repeated DISPATCH/RESPONSE substitution preamble (minor,
+- [x] S5 — Factor the repeated DISPATCH/RESPONSE substitution preamble (minor,
       economy/consistency). The three dispatch/response tests in
       `test/psi-widget-projection-timers-test.el` —
       `pwpt-dispatch-mutation-cancels-timer-on-response`,
