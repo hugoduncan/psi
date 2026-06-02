@@ -7,6 +7,7 @@ open-task reconciliation audit (completed-task closure, NNN-collision renumber).
 
 Not yet started:
 
+- `munera/open/205-single-source-builtin-slash-commands/` — expose backend built-in command specs (names + descriptions) via an EQL resolver and have TUI + Emacs consume it like `:psi.extension/command-names`, killing the triplicated/drifted hardcoded built-in command lists (root cause of `/reload-models` — and the new `/reload-prompts` — missing from Emacs/TUI autocomplete). Design-only; open questions on table-merge vs coherence-test, description granularity, and Emacs `defcustom` residual role.
 - `munera/open/203-task-lifecycle-chained-workflow/` — renumbered from 198 (NNN collision with closed `198-fix-tool-metrics-empty-tools-map`); new orchestration workflow chaining review-task-design → create-task-plan → review-task-plan → implement-task → review-task-implementation. Design-only; open questions on stage gating and context threading.
 - `munera/open/197-ui-action-invocation/` — renumbered from 191 (NNN collision); side-effecting UI action invocation deferred from closed 190/194 UI work.
 - `munera/open/021-emacs-session-tree-buffer-with-magit-sections/`
