@@ -1447,3 +1447,48 @@ unchanged; no deftest renamed → citations unchanged). Touched paths =
 `scheduler_lifecycle_test.clj`, `test_support.clj` — all under
 `components/agent-session/test/**`; zero `components/agent-session/src/**` or
 `doc/scheduler.md` (Slice-10 allowlist held).
+
+## Implementation review — pass 6 (task-implementation-review skill, 2026-06-01) — REVIEW_COMPLETE
+
+Independent implementation review (matches-design ∧ follows-architecture ∧
+¬unnecessary-abstraction ∧ ¬unflagged-duplication ∧ ¬structural-perf-issue)
+against runtime truth. No new actionable issues.
+
+- **Runtime truth: green.** Focused kaocha run of all 13 scheduler namespaces =
+  **50 tests / 411 assertions / 0 failures** — matches the `findings.md` Outcome
+  figure exactly; full `bb test` green.
+- **Verification-only invariant held.** The genuine 201 commits touch only
+  `components/agent-session/test/**` (12 scheduler test ns + `test_support.clj`)
+  + the task dir — **zero** `components/agent-session/src/**` or
+  `doc/scheduler.md`. (The `CHANGELOG.md` / `version.edn` hits from
+  `git log --grep=201` are unrelated `release:` automation commits matched by
+  digit-coincidence in versions `v0.1.2013`/`v0.1.2017`, not 201 work — verified
+  via `git log --grep` scoped to those paths.)
+- **Matches design.** The new tests implement the design's "Verification
+  mechanics" point-for-point: timer-seam capture-and-invoke (no wall-clock),
+  drain-via-`:scheduler/drain-queue` dispatch, both cancel-races (A: stale
+  callback non-resurrection; B: `:queued`→cancel), the `:at` past-fires /
+  near-future-rejected / above-max-rejected asymmetry, and shutdown handle-count
+  0 + no-fire-after-shutdown.
+- **Follows architecture.** Live tests drive the real dispatch+effect round trip
+  and inject infra only at boundaries via ctx/kernel seams
+  (`:scheduler-run-after-delay-fn`, `:scheduler-cancel-delay-fn`,
+  `:execute-prepared-request-fn`, `kernel/register-handler!`) — not var-stubs of
+  business logic; assertions are on state/outputs (delivered-prompt provenance,
+  `:created-session-id`/`:delivery-phase`, queue, handle count), never handler
+  interactions. Consistent with `testing-without-mocks` + the runtime-owned-
+  deliver frontier.
+- **No unnecessary abstraction / unflagged duplication.** Fixtures consolidated
+  on `test-support/create-test-session`; the journal-scan idiom lifted to
+  `test-support/scheduled-message-by-id`; the psi-tool megatest split into 6
+  focused deftests. The two surviving `with-redefs` sites
+  (`scheduler_effects_test`, `scheduler_lifecycle_test/scheduled-deliver-…`) are
+  pre-existing baseline, non-cited as covering tests — out of 201 scope.
+- **No structural-performance issue.** Pure-model tests are pure; live tests fire
+  by invoking the captured callback (no `Thread/sleep` waiting) except the one
+  intentional default-daemon-thread interrupt test, which bounds its join.
+
+Conclusion: the verification-only deliverable (green coverage + structured
+`findings.md`) is accurate, coherent, and matches design/architecture. The
+review chain (9 task-test-review + 6 test-shaper passes) has converged; this
+implementation-review pass adds no follow-ups.
