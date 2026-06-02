@@ -781,3 +781,29 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       `fire-schedule` returns the action without mutating status. Assertions
       unchanged. clj-kondo 0/0, cljfmt clean; `bb test` green. Test file only —
       zero `components/agent-session/src/**` or `doc/scheduler.md`.
+
+## Test review follow-ups — test-shaper pass 4 (2026-06-01)
+
+- [ ] Complete pass-3's fixture consolidation by migrating the **holdout**
+      `psi_tool_scheduler_test.clj` (L11) off its local `create-session-context`
+      defn onto the shared `test-support/create-test-session`. pass-3
+      consolidated 9 scheduler test ns onto `create-test-session` but did not
+      name `psi_tool_scheduler_test` (itself a 201-touched file — pass-2 split
+      its megatest), leaving the scheduler suite's fixture split across two
+      behaviourally-identical helpers. The local copy is equivalent
+      (`safe-context-opts` already defaults `:persist? false`, so its redundant
+      `(assoc opts :persist? false)` resolves to the same persist-false context).
+      Delete the local `create-session-context` defn; rewrite its call sites
+      (all 6 deftests) to `test-support/create-test-session` (opts pass through
+      unchanged — `{:scheduler-time-source …}` / no-arg). Remove the now-unused
+      `[psi.agent-session.core :as session]` require **only if** `session/` is
+      no longer referenced elsewhere in the file (it is still used for
+      `session/dispatch-in!`/`session/query-in` in this ns, so the require
+      likely stays — verify before removing). No deftest renamed → `findings.md`
+      psi-tool-surface citations unchanged. test-shaper `consistent(fixtures) ∧
+      helpers_that_compress(ceremony)`. Test-file-only (Slice-10 allowlist —
+      zero `components/agent-session/src/**` or `doc/scheduler.md`); keep the
+      suite green + clj-kondo/cljfmt clean. The project-wide
+      `create-session-context` idiom in ~40 non-scheduler ns is out of 201
+      scope. If 201 is treated as closed, raise it as a small standalone
+      test-hygiene task instead.

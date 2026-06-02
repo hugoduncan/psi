@@ -1248,3 +1248,32 @@ Executed all three newly added test-shaper pass-3 follow-ups. Test/`test_support
    Assertions unchanged.
 
 No blockers; all three completed. Suite green via canonical `bb test`.
+
+## Test review follow-ups — test-shaper pass 4 (2026-06-01)
+
+Re-audited the 201 changeset against the test-shaper skill (clarity ∧ signal ∧
+robustness ∧ economical; `consistent(fixtures)`). The 201 verification tests and
+cited covering tests are strong — single-concern, state-based assertions,
+deterministic via the timer/cancel seams (no wall-clock sleeps), descriptive
+testing labels, named-bound `:at` rejection assertions, the megatest split into
+6 focused deftests, and the shared `capturing-delay-fn` seam helper. Runtime
+truth re-confirmed green on the 201-authored namespaces (scheduler-test +
+end-to-end + resolvers + psi-tool = 23 tests / 202 assertions, 0 fail).
+
+One actionable `consistent(fixtures)` finding remains — a holdout from pass-3:
+
+- pass-3 consolidated the **9** scheduler test ns onto
+  `test-support/create-test-session`, but `psi_tool_scheduler_test.clj`
+  (a 201-touched file — pass-2 split its megatest) was **not** in pass-3's named
+  list and still defines its own local `create-session-context` (L11). That
+  local is behaviourally identical to `test-support/create-test-session`
+  (`safe-context-opts` already defaults `:persist? false`, so the local's
+  redundant `(assoc opts :persist? false)` resolves to the same persist-false
+  context, exactly as pass-3 noted for the consolidated 9). Result: the
+  scheduler suite's fixture is now split across two equivalent helpers, with
+  `psi_tool_scheduler_test` the lone holdout — a `consistent(fixtures)` gap
+  *within 201's own changeset*. Migrating it completes pass-3's consolidation
+  and restores one fixture across the whole scheduler suite. Test-file-only
+  (Slice-10 allowlist — zero `components/agent-session/src/**` /
+  `doc/scheduler.md`); the project-wide `create-session-context` idiom in
+  ~40 non-scheduler ns is out of 201 scope. Follow-up added to steps.md.
