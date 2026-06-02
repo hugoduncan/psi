@@ -672,3 +672,26 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       `scheduler-timer-seam-test` green; clj-kondo 0/0, cljfmt clean. Test file
       only — zero `components/agent-session/src/**` or `doc/scheduler.md`
       (Slice-10 allowlist held).
+
+## Test review follow-ups — test-shaper pass 2 (2026-06-01)
+
+- [ ] Split the megatest
+      `psi_tool_scheduler_test/psi-tool-scheduler-create-list-cancel-test`
+      (one deftest, 17 `testing` blocks, 109 assertions) into focused deftests
+      by concern, so each distinct behaviour has its own name + minimal ctx
+      setup and failure localisation is restored. Suggested split:
+      `…-create-list-cancel` (happy path: create pending → list → cancel only),
+      `…-time-source-required` (missing/invalid scheduler-time-source → error),
+      `…-bounds-and-cap` (below-min `delay-ms` rejected + 51st-pending cap),
+      `…-session-id-resolution` (requires invoking/explicit session-id +
+      explicit-session-id report path), `…-kind-validation` (`session` requires
+      session-config / `message` rejects session-config / unsupported
+      session-config keys rejected), and `…-at-resolution-matrix` (past `:at`
+      fires immediately via the seam / near-future `<min` → below-minimum bound
+      / above-max → exceeds-maximum bound + the absolute-instant delay
+      calculation). Keep assertions and their messages intact (aggregate count
+      unchanged); update the `findings.md` psi-tool-surface citations to point at
+      the precise new deftest(s). Test-file-only (Slice-10 allowlist — zero
+      `components/agent-session/src/**` or `doc/scheduler.md`); keep the suite
+      green + clj-kondo/cljfmt clean. If 201 is treated as closed, raise it as a
+      small standalone test-hygiene task instead.

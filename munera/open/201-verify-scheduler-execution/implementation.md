@@ -1099,3 +1099,40 @@ Verification: `scheduler-test` + `scheduler-timer-seam-test` focused run =
 15 tests / 66 assertions / 0 failures; full `bb test` green. clj-kondo 0/0,
 cljfmt clean on both touched files. Aggregate scheduler assertion count is
 unchanged (no asserts added/removed) → still 45 tests / 412 assertions.
+
+## Test review — test-shaper pass 2 (2026-06-01) — ACTIONABLE_FEEDBACK
+
+Re-applied the test-shaper lens (clarity ∧ signal ∧ robustness; single_concern,
+one_test_per_distinct_behavior, meaningful_failures, locally_comprehensible) to
+the full 201 verification-test surface. The prior test-shaper pass (above) closed
+the `fail-schedule` shared-setup and `:kind`-shape items; this pass surfaces one
+new, distinct item not previously recorded. New verification deftests in
+`scheduler_test`, `scheduler_end_to_end_test`, `scheduler_timer_seam_test`,
+`scheduler_context_shutdown_test`, and `scheduler_resolvers_test` are
+well-shaped (single-concern, ctx-seam driven, state/output assertions, no infra
+stubs). Suite green; clj-kondo 0/0; cljfmt clean.
+
+- **Megatest: `psi-tool-scheduler-create-list-cancel-test` bundles ~14 distinct
+  behaviours in one deftest (109 assertions, 17 `testing` blocks).** The single
+  deftest covers create/list/cancel happy path **and** ~11 unrelated concerns:
+  time-source-source validation (missing/invalid), bounds rejection, the 51-cap,
+  session-id requirement, explicit-session-id report path, `message` vs `session`
+  kind validation (3 variants), and the 201-added `:at` matrix (past-fires /
+  near-future-rejected / above-max-rejected). This violates `single_concern` /
+  `one_test_per_distinct_behavior`: a failure in any block reports against the
+  one giant deftest name (`meaningful_failures` degraded — the failing behaviour
+  is not identifiable from the test name), and each fresh `let`-rebound
+  `[ctx session-id]` per block is `minimal_incidental_setup` ceremony repeated
+  17×. The deftest name ("create-list-cancel") also under-describes its true
+  scope (validation + bounds + cap + `:at` matrix). Note: this is *pre-existing*
+  structure that 201 *extended* (the `:at` matrix blocks); the first
+  test-shaper pass did not flag it. Suggest: split into focused deftests by
+  concern — e.g. `…-create-list-cancel` (happy path only),
+  `…-time-source-required`, `…-bounds-and-cap`, `…-session-id-resolution`,
+  `…-kind-validation`, `…-at-resolution-matrix` — each with its own minimal ctx
+  setup; this restores per-behaviour failure localisation and lets the
+  `findings.md` psi-tool-surface citations point at the precise covering
+  deftest. Test-file-only (within the Slice-10 allowlist — zero
+  `components/agent-session/src/**` or `doc/scheduler.md`); keep the suite green
+  + clj-kondo/cljfmt clean and the aggregate assertion count unchanged. If 201
+  is treated as closed, raise it as a small standalone test-hygiene task instead.
