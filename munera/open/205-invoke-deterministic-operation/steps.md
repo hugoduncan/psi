@@ -291,6 +291,33 @@
   *exception* path; this is the *tagged-error* non-exception path). Run the
   integration suite focused; `clj-paren-repair`; `clj-kondo --lint`; commit.
 
+## Test-shaper follow-ups (ψ, sixth pass)
+
+- [ ] (TS-1) Consolidate the duplicated/inconsistent test fixtures across the
+  four task suites. The `make-ctx` (two variants — one takes `sessions`, one
+  hard-codes `{}`), `ok-op` (two variants — whole-invocation echo vs `:args`
+  echo), `create-session-context`, and `register-op!` are independently
+  re-defined per suite with incidental variation and no shared home. Extract a
+  single shared fixture set (e.g. in `test_support.clj` or a small
+  `deterministic-operation-test-support` helper ns) with one canonical
+  `make-ctx`/`ok-op`/`create-session-context`/`register-op!`, and have all four
+  suites use it — `consistent(fixtures) ∧ minimal(incidental_variation) ∧
+  helpers_that_compress(ceremony)`. Keep helpers that compress ceremony, not
+  ones that hide intent. Re-run the four suites; `clj-paren-repair`;
+  `clj-kondo --lint`; commit.
+- [ ] (TS-2) Strengthen `operation-invoke-renders-result` (command) signal.
+  Replace the `str/includes? ":status :ok"` / `":data {:x 1}"` substring
+  assertions with an exact line-set/line-equality assertion (as
+  `operation-invoke-status-line-first` already does), or fold the case into the
+  exact-line test, so a malformed concatenation cannot pass. Avoid leaving two
+  overlapping layout tests where one is weaker-signal. Re-run; commit.
+- [ ] (TS-3) Make `operation-list-ignores-args-and-id` (integration) actually
+  verify the *id*-ignored half. Register an op whose handler writes a sink (or
+  has an observable effect) under the id passed as `operation-id "ignored"`,
+  then assert the sink is **untouched** by the `op list` call (list neither
+  invokes nor errors on the supplied id) — or rename the test to reflect that
+  only the args-ignored half is asserted. Re-run; commit.
+
 ## Close-out
 
 - [x] Re-read design acceptance criteria; confirm each is covered by a test.

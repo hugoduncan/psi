@@ -744,3 +744,38 @@ Non-actionable observations (no follow-up):
   map iteration), so the assertion holds regardless of handler key order. ✓.
 - `format-operations` em-dash separator and list text layout are cosmetic, not
   acceptance criteria; covered incidentally by `operations-lists-sorted`.
+
+## Test review (ψ, sixth pass — test-shaper)
+
+Applied `test-shaper` skill (clarity ∧ signal ∧ robustness ∧ economy) at
+source-of-truth level: read all four task test ns + the shared helper +
+`test_support.clj`; ran the four suites focused (48 tests / 107 assertions,
+0 failures). Prior five passes covered correctness + behaviour-coverage +
+infra-real/¬mock; this pass targets the orthogonal `test-shaper` axes
+(economy, signal, fixture consistency) and found three minor, non-duplicate
+shaping gaps (TS-1..TS-3 below). No coverage or correctness regression; all
+acceptance criteria remain covered.
+
+- **TS-1 (economy / fixture inconsistency).** The fixtures `make-ctx`,
+  `ok-op`, `create-session-context`, `register-op!` are independently
+  re-defined across the four suites with incidental variation: the two unit
+  `make-ctx` differ (one takes a `sessions` arg, one hard-codes `{}`); the two
+  `ok-op` differ (action-test echoes the *whole* invocation, psi-tool-test
+  echoes `:args`); `register-op!` + `create-session-context` are duplicated
+  verbatim across the two integration/command suites. No shared fixture exists
+  in `test_support.clj`. Violates `consistent(fixtures) ∧
+  minimal(incidental_variation) ∧ helpers_that_compress(ceremony)`. Minor —
+  signal is fine; cohesion/maintainability cost only.
+- **TS-2 (signal).** `operation-invoke-renders-result` (command) asserts via
+  `str/includes? ":status :ok"` + `":data {:x 1}"` — weaker signal than the
+  exact-line `operation-invoke-status-line-first`, and a substring match could
+  pass on a malformed concatenation. The exact-line test already proves layout,
+  so the `includes?` test is partially redundant low-signal. Minor.
+- **TS-3 (signal vs name).** `operation-list-ignores-args-and-id` (integration)
+  proves the *args*-ignored half (malformed `args` still lists) but never
+  asserts the *id*-ignored half: `"operation-id" "ignored"` is passed yet the
+  test makes no assertion distinguishing list-ignores-id from list-ignores-
+  nothing. The "and-id" in the name is unverified. Minor.
+
+These are shaping refinements, not coverage/correctness gaps; behaviour and AC
+coverage are intact. Recorded as actionable follow-ups (TS-1..TS-3).
