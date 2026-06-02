@@ -1,0 +1,30 @@
+{:steps
+ [{:name "resolve-worktree",
+   :type :session,
+   :tools ["read" "bash" "work-on"],
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :template,
+     :text
+     "Extract the worktree path and Munera task path from the following handoff data. Call `work-on` with the extracted worktree path to set the session worktree. Then respond with ONLY the Munera task path (e.g. `munera/open/003-foo`) on a single line — nothing else.\n\nHandoff data:\n{{input}}",
+     :vars {"input" {:from :workflow-input, :path [:input]}}}]}
+  {:name "lifecycle",
+   :type :delegate,
+   :target "task-lifecycle",
+   :prompt-string
+   {:type :map,
+    :fields {:input {:from {:step "resolve-worktree", :yield :text}}}},
+   :context [{:type :source, :from :workflow-original}]}
+  {:name "summary",
+   :type :session,
+   :tools ["read" "bash"],
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "lifecycle", :yield :text}}
+    {:type :template,
+     :text
+     "Produce the user-facing final result for the Munera task lifecycle run. Independently inspect that specific task's artifacts, especially design.md, plan.md, steps.md, and implementation.md, and use the prior step outputs as supporting context.\n\nRespond with a concise summary for the user. Include:\n- whether the task-lifecycle run completed cleanly (design → plan → implement → review)\n- the main work completed in this run\n- the task artifact files updated\n- whether the task was closed (moved to munera/closed/) or remains open, with the reason recorded in the task artifacts\n- any remaining notes or risks explicitly recorded in the task artifacts\n- any commit ids created during the run that are evident from the provided step outputs",
+     :vars {}}]}],
+ :name "task-lifecycle-in-worktree",
+ :description
+ "Resolve worktree from a structured handoff, then run a Munera task through its full lifecycle via the task-lifecycle workflow"}
