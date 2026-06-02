@@ -1727,3 +1727,14 @@ Test-only; respects the verification-only invariant (no
 `components/agent-session/src/**` or `doc/scheduler.md` change). `findings.md`
 unchanged unless a covering-test citation's form changes (no status change
 expected).
+
+## Test-shaper pass 13 — execution note (2026-06-01)
+
+Migrated the resolvers-test session-data write to `ss/session-update` as planned
+(behaviour-preserving; same `session-data-path`). One correction to the step's
+stated premise: `ss` was **not** already required in `scheduler_resolvers_test`
+(the ns required only `psi.agent-session.core` + `test-support`), so
+`[psi.session-state.state :as ss]` was added (same require/dep e2e already uses).
+Verified: resolvers test 2 tests / 21 assertions; full `bb test` green;
+clj-kondo 0/0; cljfmt clean; diff scoped to the single test file (Slice-10
+allowlist held; aggregate 412 unchanged).

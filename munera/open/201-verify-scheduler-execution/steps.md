@@ -729,6 +729,27 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       `components/agent-session/src/**` or `doc/scheduler.md`); keep suite green +
       clj-kondo/cljfmt clean. If 201 is closed, raise as a standalone
       test-hygiene task.
+      Done: replaced the raw 6-segment `(swap! (:state* ctx) assoc-in
+      [:agent-session :sessions session-id :data :scheduler] {:schedules …
+      :queue []})` write in
+      `scheduler-resolver-projects-rich-attrs-across-statuses-test` with
+      `(swap! (:state* ctx) (ss/session-update session-id (fn [sd] (assoc sd
+      :scheduler {:schedules schedules :queue []}))))`, matching the
+      `ss/session-update` busy-flag-seed idiom in `scheduler_end_to_end_test`.
+      Behaviour-preserving: `ss/session-update sid f` ≡ `update-in state
+      (session-data-path sid) f` with `session-data-path sid = [:agent-session
+      :sessions sid :data]`, so the targeted path is identical.
+      **Correction to the step's premise:** `ss` was **not** already required in
+      `scheduler_resolvers_test` (the ns required only `session` +
+      `test-support`) — added `[psi.session-state.state :as ss]` (the same
+      require e2e uses; the dep is already on the agent-session test classpath).
+      No deftest renamed → `findings.md` citations unchanged; no assertions
+      added/removed → aggregate stays 412. `scheduler-resolvers-test` green
+      (2 tests / 21 assertions); full `bb test` green; clj-kondo 0/0; cljfmt
+      "All source files formatted correctly". Test file only —
+      `git diff --name-only` = the single `scheduler_resolvers_test.clj` path;
+      zero `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10
+      allowlist held).
       Done: **reused the existing `test-support/create-test-session`** instead of
       adding a new redundant helper (`λbuild: ∃lib → use(lib)`). Discovery: all 9
       local `create-session-context` copies are behaviourally identical to each
@@ -1073,7 +1094,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Test-shaper follow-ups — pass 13 (test-shaper, 2026-06-01)
 
-- [ ] Standardise the 201 session-data *write* idiom (write-side analogue of the
+- [x] Standardise the 201 session-data *write* idiom (write-side analogue of the
       pass-12 read standardisation, not covered by it). Replace the raw 6-segment
       `(swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data
       :scheduler] …)` write in

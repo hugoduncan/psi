@@ -2,7 +2,8 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
-   [psi.agent-session.test-support :as test-support]))
+   [psi.agent-session.test-support :as test-support]
+   [psi.session-state.state :as ss]))
 
 (deftest scheduler-resolver-test
   (testing "scheduler attrs resolve from session root and entity-seeded schedule id"
@@ -76,8 +77,8 @@
                                                                  :skill-count 0
                                                                  :tool-count 0}})}]
       (swap! (:state* ctx)
-             assoc-in [:agent-session :sessions session-id :data :scheduler]
-             {:schedules schedules :queue []})
+             (ss/session-update session-id
+                                (fn [sd] (assoc sd :scheduler {:schedules schedules :queue []}))))
       (doseq [[id expected]
               [["sch-delivered" {:status :delivered :kind :message}]
                ["sch-cancelled" {:status :cancelled :kind :message}]]]
