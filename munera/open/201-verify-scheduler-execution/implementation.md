@@ -3033,3 +3033,28 @@ this one write open-codes it) is intentionally tolerated at duplication-count 1.
 
 Verification-only invariant held: no `components/agent-session/src/**` or
 `doc/scheduler.md` change in this review.
+
+## Code-shaper follow-up execution — pass 4 (2026-06-01)
+
+Executed the pass-4 actionable: collapsed the two-`swap!` correlated-state seed
+in `scheduler_background_jobs_test/scheduler-background-job-projection-test`
+(L31–32) into one atomic `swap!` whose `ss/session-update` fn threads both
+inner writes with `->`:
+
+```
+(swap! (:state* ctx)
+       (ss/session-update session-id
+         (fn [sd] (-> sd
+                      (assoc-in [:scheduler :schedules "sch-2" :status] :queued)
+                      (assoc-in [:scheduler :queue] ["sch-2"])))))
+```
+
+Removes the transient inconsistent intermediate (queued-status ⇔ queue-membership
+now seeded together) and the duplicated swap/`session-update` wrapper —
+`simple` (one write / one responsibility) ∧ `robust` (atomic correlated seed).
+Write-side helper deliberately not introduced (single-callsite over-abstraction,
+per the declined note). Behaviour- and assertion-preserving: no deftest renamed,
+no assertions added/removed → `findings.md` citations + aggregate (50 deftests /
+412 assertions) unchanged. Full `bb test` green; clj-kondo 0/0; cljfmt clean.
+Test file only — zero `components/agent-session/src/**` or `doc/scheduler.md`
+(Slice-10 allowlist held). No blocked items.

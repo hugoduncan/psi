@@ -1909,7 +1909,7 @@ source/doc touched — verification-only invariant + Slice-10 allowlist held.)
 
 ## Code-shaper follow-ups — pass 4 (code-shaper, 2026-06-01)
 
-- [ ] Collapse the two-`swap!` correlated-state seed in
+- [x] Collapse the two-`swap!` correlated-state seed in
       `scheduler_background_jobs_test.clj` /
       `scheduler-background-job-projection-test` (L31–32) into a single atomic
       write. Currently `:scheduler/create` for `sch-2` is followed by two
@@ -1929,3 +1929,19 @@ source/doc touched — verification-only invariant + Slice-10 allowlist held.)
       helper (`set-schedule-status`/`set-schedule-queue`) is deliberately NOT
       proposed — single callsite (2 sites, 1 file) → unnecessary abstraction; do
       not re-file that.
+      Done: collapsed the two separate `(swap! (:state* ctx) (ss/session-update
+      session-id (fn [sd] (assoc-in sd …))))` calls (`[:scheduler :schedules
+      "sch-2" :status] :queued` + `[:scheduler :queue] ["sch-2"]`) into a single
+      atomic `swap!` whose `session-update` fn threads both `assoc-in`s with `->`.
+      Removes the transient inconsistent intermediate (queued-status ⇔
+      queue-membership now seeded in one write) and the duplicate swap/
+      `session-update` wrapper — `simple` (one write / one responsibility) ∧
+      `robust` (atomic correlated seed). No write-side helper introduced (declined
+      per the note: single callsite over-abstraction). Behaviour- and
+      assertion-preserving: no deftest renamed → `findings.md` citations
+      unchanged; aggregate count unchanged (45 → 50 deftests / 412 assertions).
+      Full `bb test` green; clj-kondo 0/0; cljfmt "All source files formatted
+      correctly". Test file only — `git diff --name-only` =
+      `scheduler_background_jobs_test.clj` + task-dir docs; zero
+      `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist
+      held).

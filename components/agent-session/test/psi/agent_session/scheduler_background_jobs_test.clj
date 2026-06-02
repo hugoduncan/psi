@@ -28,8 +28,9 @@
                                                   :created-at (test-support/instant "2099-04-21T18:59:00Z")
                                                   :fire-at (test-support/instant "2099-04-21T19:00:00Z")}
                                                  {:origin :core})
-          _                (swap! (:state* ctx) (ss/session-update session-id (fn [sd] (assoc-in sd [:scheduler :schedules "sch-2" :status] :queued))))
-          _                (swap! (:state* ctx) (ss/session-update session-id (fn [sd] (assoc-in sd [:scheduler :queue] ["sch-2"]))))
+          _                (swap! (:state* ctx) (ss/session-update session-id (fn [sd] (-> sd
+                                                                                           (assoc-in [:scheduler :schedules "sch-2" :status] :queued)
+                                                                                           (assoc-in [:scheduler :queue] ["sch-2"])))))
           jobs             (bg-rt/list-background-jobs-in! ctx session-id [:pending :queued])]
       (is (= 2 (count jobs)))
       (is (= #{{:job-id "schedule/sch-1" :status :running :job-kind :scheduled-prompt :tool-name "check-build"}
