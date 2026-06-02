@@ -1907,3 +1907,31 @@ move. Test-file/`test_support`-only (Slice-10 allowlist) — zero
 
 Verification-only invariant held: no `components/agent-session/src/**` or
 `doc/scheduler.md` change in this review.
+
+## Code-shaper follow-ups executed — pass 1 (2026-06-01)
+
+Executed both code-shaper pass-1 follow-ups (one structural fix resolves both,
+as the second item suggested):
+
+- **Extracted `test-support/stub-execution-result`** — `{:keys [sid prepared
+  timestamp text]}` → the canonical `:execution-result/*` shape
+  (`turn-id`/`session-id`/`assistant-message`/`turn-outcome`/`tool-calls`/
+  `stop-reason`). Routed both open-coded callsites through it: `make-session-ctx`'s
+  `:execute-prepared-request-fn` and the e2e session-kind seam stub in
+  `scheduler-session-kind-fires-via-timer-seam-and-creates-top-level-session-test`
+  (which keeps its `now`-anchored `(.plusMillis now 5000)` deterministic
+  timestamp via the helper's `:timestamp` opt). DRY: one canonical stub shape.
+- **Removed the wall-clock `(java.time.Instant/now)`** from
+  `make-session-ctx`'s execution-result stub by making the shared helper default
+  `:timestamp` to a fixed `default-stub-execution-instant`
+  (`2026-01-01T00:00:00Z`) — `control(time(tests))` restored on the
+  dispatch/handlers paths that depend on `make-session-ctx` transitively. The
+  `notify-extension-fn` `Instant/now` timestamps were left out of scope as
+  specified.
+
+No behaviour/assertion change (the stub shape is identical; no assertion reads
+the assistant timestamp — latent-footgun fix, not a flake fix). `findings.md`
+citations unchanged (no deftest renamed). clj-kondo 0/0; clj-paren-repair clean;
+full `bb test` ✅ green. Test/`test_support`-only — `git diff --name-only` =
+`test_support.clj` + `scheduler_end_to_end_test.clj`; zero
+`components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist held).

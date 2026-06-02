@@ -87,17 +87,12 @@
           ;; shaped execution-result without redefining the boundary var.
           execute-prepared-request-fn
           (fn [_ai-ctx _ctx sid prepared _pq]
-            {:execution-result/turn-id (:prepared-request/id prepared)
-             :execution-result/session-id sid
-             :execution-result/assistant-message {:role "assistant"
-                                                  :content [{:type :text :text "scheduled ack"}]
-                                                  :stop-reason :stop
-                                                  ;; fixed instant (test's fire time) — no wall-clock,
-                                                  ;; matching the surrounding time-control discipline
-                                                  :timestamp (.plusMillis now 5000)}
-             :execution-result/turn-outcome :turn.outcome/stop
-             :execution-result/tool-calls []
-             :execution-result/stop-reason :stop})
+            ;; canonical stub shape via the shared test-support builder; the
+            ;; fixed instant (test's fire time) keeps it wall-clock-free,
+            ;; matching the surrounding time-control discipline.
+            (test-support/stub-execution-result
+             {:sid sid :prepared prepared :text "scheduled ack"
+              :timestamp (.plusMillis now 5000)}))
           ctx*             (assoc ctx
                                   :scheduler-run-after-delay-fn capture*
                                   :execute-prepared-request-fn execute-prepared-request-fn)]

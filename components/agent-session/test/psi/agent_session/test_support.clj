@@ -74,6 +74,33 @@
        {:handle :captured})
      cb*]))
 
+(def ^:private default-stub-execution-instant
+  "Fixed instant for the canonical execution-result stub assistant-message
+  timestamp. Deterministic (no wall-clock) — no test asserts this timestamp
+  today, so the exact value is irrelevant; it only keeps the stub time-controlled
+  (`control(time(tests))`)."
+  (java.time.Instant/parse "2026-01-01T00:00:00Z"))
+
+(defn stub-execution-result
+  "Return the canonical execution-result stub shape used by the
+  `:execute-prepared-request-fn` ctx seam.
+
+  Opts: `:sid` (session-id), `:prepared` (the prepared-request map, supplies the
+  turn-id), `:timestamp` (assistant-message timestamp; defaults to a fixed
+  deterministic instant — never wall-clock), `:text` (assistant text;
+  default \"ok\")."
+  [{:keys [sid prepared timestamp text]
+    :or   {timestamp default-stub-execution-instant text "ok"}}]
+  {:execution-result/turn-id          (:prepared-request/id prepared)
+   :execution-result/session-id       sid
+   :execution-result/assistant-message {:role        "assistant"
+                                        :content     [{:type :text :text text}]
+                                        :stop-reason :stop
+                                        :timestamp   timestamp}
+   :execution-result/turn-outcome     :turn.outcome/stop
+   :execution-result/tool-calls       []
+   :execution-result/stop-reason      :stop})
+
 (defn temp-cwd []
   (let [p (str (java.nio.file.Files/createTempDirectory
                 "psi-agent-session-test-"
@@ -245,15 +272,7 @@
                                                        ([_ctx] (throw (ex-info "refresh-system-prompt-fn requires explicit session-id" {:callback :refresh-system-prompt-fn})))
                                                        ([ctx session-id] (session-core/dispatch-in! ctx :session/refresh-system-prompt {:session-id session-id} {:origin :core})))
                        :execute-prepared-request-fn  (fn [_ai-ctx _ctx sid prepared _progress-queue]
-                                                       {:execution-result/turn-id (:prepared-request/id prepared)
-                                                        :execution-result/session-id sid
-                                                        :execution-result/assistant-message {:role "assistant"
-                                                                                             :content [{:type :text :text "ok"}]
-                                                                                             :stop-reason :stop
-                                                                                             :timestamp (java.time.Instant/now)}
-                                                        :execution-result/turn-outcome :turn.outcome/stop
-                                                        :execution-result/tool-calls []
-                                                        :execution-result/stop-reason :stop})
+                                                       (stub-execution-result {:sid sid :prepared prepared}))
                        :workflow-prompt-execution-result-fn (fn [ctx sid text images opts]
                                                               (cond
                                                                 (some? opts) (psi.agent-session.turn/prompt-execution-result-in! ctx sid text images opts)

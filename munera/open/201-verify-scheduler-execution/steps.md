@@ -1165,7 +1165,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Code-shaper follow-ups — pass 1 (code-shaper, 2026-06-01)
 
-- [ ] Extract a shared `stub-execution-result` builder in
+- [x] Extract a shared `stub-execution-result` builder in
       `components/agent-session/test/psi/agent_session/test_support.clj` and route
       the duplicated execution-result stub shape through it
       (`consistent(test_abstractions)` / DRY). Today the
@@ -1181,7 +1181,24 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       suite green + clj-kondo/cljfmt clean; no behaviour/assertion change.
       `findings.md` citations unchanged. If 201 is closed instead, raise as a small
       standalone test-hygiene task.
-- [ ] Replace the wall-clock `(java.time.Instant/now)` execution-result-stub
+      Done: added `test-support/stub-execution-result`
+      (`{:keys [sid prepared timestamp text]}` → the canonical
+      `:execution-result/*` shape), with a fixed `default-stub-execution-instant`
+      (`2026-01-01T00:00:00Z`) as the `:timestamp` default and `text` default
+      `"ok"`. Routed both callsites through it: `make-session-ctx`'s
+      `:execute-prepared-request-fn` (now
+      `(stub-execution-result {:sid sid :prepared prepared})`) and the e2e
+      session-kind seam stub (now
+      `(stub-execution-result {:sid sid :prepared prepared :text "scheduled ack"
+      :timestamp (.plusMillis now 5000)})`, preserving its `now`-anchored
+      deterministic fire-time timestamp). No behaviour/assertion change — the
+      shape is identical and no assertion reads the assistant timestamp.
+      `findings.md` citations unchanged. clj-kondo 0/0, clj-paren-repair clean;
+      full `bb test` green. Test/`test_support`-only — `git diff --name-only` =
+      `test_support.clj` + `scheduler_end_to_end_test.clj`; zero
+      `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist
+      held).
+- [x] Replace the wall-clock `(java.time.Instant/now)` execution-result-stub
       timestamp in `test_support/make-session-ctx` (test_support.clj L252) with a
       fixed instant (`deterministic(tests)` — control(time)). This is the same
       footgun test-shaper pass-6 removed from the in-scope scheduler *test files*,
@@ -1197,3 +1214,15 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       suite green + clj-kondo/cljfmt clean; no assertion change (no assertion reads
       the stub timestamp today, so it is a latent-footgun fix, not a flake fix). If
       201 is closed instead, raise as a small standalone test-hygiene task.
+      Done: folded into the `stub-execution-result` extraction above (one
+      structural fix resolves both, as suggested). The shared
+      `default-stub-execution-instant` fixed literal is now the helper's
+      `:timestamp` default, so `make-session-ctx`'s `:execute-prepared-request-fn`
+      no longer calls `(java.time.Instant/now)` — it is time-controlled like
+      every other instant on the dispatch/handlers paths. The
+      `notify-extension-fn` `Instant/now` timestamps were left untouched (out of
+      scope as specified). No assertion reads the stub timestamp → latent-footgun
+      fix, no behaviour/assertion change. clj-kondo 0/0, formatted clean; full
+      `bb test` green. Test/`test_support`-only — zero
+      `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist
+      held).
