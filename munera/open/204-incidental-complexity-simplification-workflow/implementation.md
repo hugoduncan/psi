@@ -584,3 +584,39 @@ resolve-worktree tools `["read" "bash" "work-on"]`; no load errors for it.
 Implication for Slice 3: the outer `reduce-incidental-complexity.edn` step-2
 delegate `:target` remains `"task-lifecycle-in-worktree"` (name unchanged); only
 the wrapper's backing file extension changed. No other slice content is affected.
+
+## 2026-06-01 — Slice 3 built: reduce-incidental-complexity outer workflow
+
+Authored `.psi/workflows/reduce-incidental-complexity.edn` — the two-step outer
+orchestration:
+
+- **step-1 `select-and-create` (`:session`)**: tools `["read" "bash" "edit"
+  "write" "work-on"]`, skills `["incidental-complexity-finder" "gordian"
+  "code-shaper"]`, `:thinking-level :high`. Prompt (lifted from design Step 1 +
+  the "Generated task design" section verbatim for the contract): git fetch
+  origin master → apply `incidental-complexity-finder` → early-stop on no target
+  → `work-on` worktree off origin/master → allocate NNN from the WORKTREE's
+  open/closed (P3) → create `munera/open/NNN-slug/design.md` embedding the full
+  two-phase behaviour-preserving contract (Phase 0 char-test gate; Phase 1 A5
+  `before-local.json` lcc decrease, A2 metric-derived touched-set net burden, A3
+  `gordian gate --baseline … --fail-on new-cycles,new-high-findings
+  --max-new-medium-findings 0`, green tests, minimal/local) → capture
+  `before-local.json` (bare `local --json`) + `before-diagnose.edn` into the task
+  dir with worktree-root-relative baseline paths (A4) → commit on the worktree
+  branch (P4) → emit `## Handoff Data` with `worktree_path:` + `munera_task_path:`
+  (gh-issue-implement design-step idiom).
+- **step-2 `lifecycle-in-worktree` (`:delegate`)**: `:target
+  "task-lifecycle-in-worktree"`, `:prompt-string {:type :map :fields {:input
+  {:from {:step "select-and-create" :yield :text}}}}` — routes the whole step-1
+  handoff blob into the wrapper's resolve-worktree, exactly the verified
+  delegate-yield grammar. No push/PR, no workflow-level verification step.
+
+Live verification (`load-workflow-definitions "."`): registers
+`reduce-incidental-complexity`, zero errors; step names/types/tools/skills,
+delegate target, prompt-string wiring, handoff fields, early-stop, gate flags,
+and both baselines all confirmed present (programmatic asserts in
+/tmp/verify_outer.clj).
+
+No deviation in Slice 3 beyond D1 (the delegate target name
+`task-lifecycle-in-worktree` is unchanged; only that wrapper's backing file is
+`.edn`). Slices 4 (definition tests) + 5 (docs) remain.

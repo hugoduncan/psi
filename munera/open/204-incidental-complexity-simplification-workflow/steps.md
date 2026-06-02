@@ -86,26 +86,26 @@ with the commit sha / decision when done.
 
 ## Slice 3 — `reduce-incidental-complexity` outer workflow
 
-- [ ] Create `.psi/workflows/reduce-incidental-complexity.edn` with `:name`
+- [x] Create `.psi/workflows/reduce-incidental-complexity.edn` with `:name`
       `"reduce-incidental-complexity"` and a `:description`.
-- [ ] Author **step-1** (`:type :session`): tools
+- [x] Author **step-1** (`:type :session`): tools
       `["read" "bash" "edit" "write" "work-on"]`, skills
       `["incidental-complexity-finder" "gordian" "code-shaper"]`.
-- [ ] Step-1 prompt: `git fetch origin master`; treat `origin/master` as base.
-- [ ] Step-1 prompt: apply `incidental-complexity-finder` to choose the single
+- [x] Step-1 prompt: `git fetch origin master`; treat `origin/master` as base.
+- [x] Step-1 prompt: apply `incidental-complexity-finder` to choose the single
       highest incidental-complexity unit.
-- [ ] Step-1 prompt: **early stop** — if no qualifying unit exists, stop and
+- [x] Step-1 prompt: **early stop** — if no qualifying unit exists, stop and
       report; do **not** create a worktree or task.
-- [ ] Step-1 prompt: create an isolated worktree via `work-on` based on
+- [x] Step-1 prompt: create an isolated worktree via `work-on` based on
       `origin/master`, described from the target (`simplify <target>`).
-- [ ] Step-1 prompt: capture baselines into the task dir —
+- [x] Step-1 prompt: capture baselines into the task dir —
       `before-local.json` (`bb gordian local --json`, **bare, no `--sort`**) and
       `before-diagnose.edn` (`bb gordian diagnose --edn`). NOTE (P2): this is
       intentionally a different invocation from the `--sort total` selector call
       above; the Phase-1 before/after comparison is keyed by `(ns, var, arity)`,
       so sort order is irrelevant to baseline validity — `--sort total` need not
       match here. (Carries the design inconsistency-review conclusion into steps.)
-- [ ] Step-1 prompt: allocate next task id, create `munera/open/NNN-slug/design.md`
+- [x] Step-1 prompt: allocate next task id, create `munera/open/NNN-slug/design.md`
       for the generated refactor task; record the concrete task path so Phase-1
       commands use the **worktree-root-relative task-dir path** for baselines.
       NOTE (P3): the `work-on` worktree is already active at this point, so NNN is
@@ -114,23 +114,23 @@ with the commit sha / decision when done.
       `alloc → max(NNN over open/ ∪ closed/) + 1` — **not** the outer checkout's
       task set — avoiding collision with the outer checkout's open tasks (e.g. 204
       itself).
-- [ ] Step-1 prompt: embed the **two-phase behaviour-preserving contract** in the
+- [x] Step-1 prompt: embed the **two-phase behaviour-preserving contract** in the
       generated `design.md` instructions, lifted verbatim from `design.md`'s
       "Generated task design" section:
-  - [ ] Phase 0: assess coverage vs `{nominal, edge, boundary}`; add
+  - [x] Phase 0: assess coverage vs `{nominal, edge, boundary}`; add
         characterization tests (state/outputs, no interactions,
         `testing-without-mocks`) if insufficient; tests green against unmodified
         code before refactor; untestable-tangle → seam or close.
-  - [ ] Phase 1 acceptance A5: target `lcc-total` decreased vs stored
+  - [x] Phase 1 acceptance A5: target `lcc-total` decreased vs stored
         `munera/open/NNN-slug/before-local.json` (the single authoritative
         baseline), keyed by `(ns, var, arity)`.
-  - [ ] Phase 1 acceptance A2: net burden over the **metric-derived touched set**
+  - [x] Phase 1 acceptance A2: net burden over the **metric-derived touched set**
         `{u | before(u) ≠ after(u)}` strictly decreases (`Σ after < Σ before`).
-  - [ ] Phase 1 acceptance A3: `bb gordian gate --baseline
+  - [x] Phase 1 acceptance A3: `bb gordian gate --baseline
         munera/open/NNN-slug/before-diagnose.edn --fail-on
         new-cycles,new-high-findings --max-new-medium-findings 0` passes (exit 0).
-  - [ ] Phase 1: Phase-0 + existing tests green; change minimal/local/decomplecting.
-- [ ] Step-1 prompt: commit the task creation **on the `work-on` worktree branch**
+  - [x] Phase 1: Phase-0 + existing tests green; change minimal/local/decomplecting.
+- [x] Step-1 prompt: commit the task creation **on the `work-on` worktree branch**
       (off `origin/master`), so the committed task dir lives on the same branch
       step-2's `resolve-worktree`/`work-on` re-enters (P4). Then emit a
       **structured handoff** block with at minimum `worktree_path:` (absolute) and
@@ -139,14 +139,23 @@ with the commit sha / decision when done.
       lifecycle because the task dir was created **and** committed on the worktree
       branch (not in the outer checkout) — task-id allocation, dir creation, and
       commit all happen inside the worktree.
-- [ ] Author **step-2** (`:type :delegate`): `:target "task-lifecycle-in-worktree"`,
+- [x] Author **step-2** (`:type :delegate`): `:target "task-lifecycle-in-worktree"`,
       `:prompt-string {:type :map :fields {:input {:from {:step "<step-1-name>" :yield :text}}}}`.
-- [ ] Confirm the outer workflow ends with a completed/reviewed task on the local
+- [x] Confirm the outer workflow ends with a completed/reviewed task on the local
       worktree branch — **no push/PR**, no workflow-level verification step.
-- [ ] Run `clj-paren-repair` on the EDN; verify it parses, loads, and that the
+- [x] Run `clj-paren-repair` on the EDN; verify it parses, loads, and that the
       `incidental-complexity-finder` skill + `task-lifecycle-in-worktree` target
-      references resolve.
-- [ ] Commit Slice 3 (`⚒ workflow: add reduce-incidental-complexity`).
+      references resolve. VERIFIED: `clj-paren-repair` Success;
+      `load-workflow-definitions "."` registers `reduce-incidental-complexity`
+      with zero errors — two steps `[select-and-create lifecycle-in-worktree]`,
+      types `[:session :delegate]`; step-1 tools `["read" "bash" "edit" "write"
+      "work-on"]` + skills `["incidental-complexity-finder" "gordian" "code-shaper"]`;
+      step-2 `:target "task-lifecycle-in-worktree"`, prompt-string
+      `{:type :map :fields {:input {:from {:step "select-and-create" :yield :text}}}}`;
+      step-1 prompt emits `worktree_path:`/`munera_task_path:`, early-stop,
+      gate flags `--fail-on new-cycles,new-high-findings --max-new-medium-findings 0`,
+      and both baselines (`before-local.json`/`before-diagnose.edn`).
+- [x] Commit Slice 3 (`⚒ workflow: add reduce-incidental-complexity`).
 
 ## Slice 4 — verification + definition tests
 
