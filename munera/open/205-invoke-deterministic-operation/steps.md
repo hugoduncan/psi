@@ -254,7 +254,7 @@
   surfaces" guarantee (plan risk) on the command surface. Distinct from TR-1
   (nested-map `:details` projection).
 
-- [ ] (TR-3) Cover the unreadable-EDN malformed-args branch on the **psi-tool**
+- [x] (TR-3) Cover the unreadable-EDN malformed-args branch on the **psi-tool**
   `op invoke` surface (decision #11 surface-parity). Today
   `operation-invoke-malformed-args-validate-error` only tests the **non-map**
   case (`"[1 2 3]"` → explicit `:phase :validate` "must be an EDN map" ex-info);

@@ -76,6 +76,18 @@
         (is (= :operation (:psi-tool/action parsed)))
         (is (= :error (:psi-tool/overall-status parsed)))))))
 
+(deftest operation-invoke-unreadable-args-validate-error
+  (let [[ctx session-id] (create-session-context)]
+    (register-op! ctx {:id "alpha/op" :description "a" :handler (fn [_] {:status :ok :data 1})})
+    (let [tool (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
+          result ((:execute tool) {"action" "operation" "op" "invoke"
+                                   "operation-id" "alpha/op" "args" "{:x"})
+          parsed (read-string (:content result))]
+      (testing "unreadable EDN args → structured operation error, not a crash (D11 surface-parity)"
+        (is (true? (:is-error result)))
+        (is (= :operation (:psi-tool/action parsed)))
+        (is (= :error (:psi-tool/overall-status parsed)))))))
+
 (deftest operation-invoke-unknown-id-error
   (let [[ctx session-id] (create-session-context)
         tool (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})

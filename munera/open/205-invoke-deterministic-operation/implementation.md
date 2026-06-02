@@ -595,3 +595,33 @@ Non-actionable observations (no follow-up):
 - `parse-operation-args-string`'s ex-info hardcodes `:op "invoke"`; it is only
   invoked on the `invoke` branch, so the constant is correct (matches prior
   pass's note on the command-side analogue).
+
+## Resolution of test-review follow-up TR-3 (ψ)
+
+Closed the one actionable third-pass test-review gap: the psi-tool `op invoke`
+surface covered only the non-map malformed-args branch, not the unreadable-EDN
+branch (the two take distinct code paths — non-map throws the explicit
+`:phase :validate` "must be an EDN map" ex-info inside `parse-operation-args-string`;
+unreadable EDN throws a raw `RuntimeException` directly out of `parse-edn-string`,
+surfaced via the outer-catch `"operation"` arm). Decision #11 requires both
+sub-cases to surface as a clear non-crashing error on *both* surfaces; the
+command surface (`operation-bad-args-error`) tested both, the psi-tool surface
+tested only non-map.
+
+Added `operation-invoke-unreadable-args-validate-error` to
+`psi_tool_operation_integration_test.clj`: dispatches `op invoke` with an
+unreadable EDN `args` string (`"{:x"`) through the real `make-psi-tool` execute
+path, asserting `:is-error true`, `:psi-tool/action :operation`, and
+`:psi-tool/overall-status :error` — mirroring the non-map test
+(`operation-invoke-malformed-args-validate-error`) and closing the decision-#11
+parse-failure surface-parity guarantee on the psi-tool surface.
+
+Focused run: `psi-tool-operation-integration-test` 9 tests / 22 assertions, all
+green (was 8/20; +1 test, +2 assertions). clj-kondo clean; clj-paren-repair
+success (no structural change). No production code changed — behaviour was
+already correct; this test locks the unreadable-EDN psi-tool path against
+regression. No blocked steps.
+
+The remaining unchecked close-out box (`git mv open/ → closed/` + remove from
+plan.md) is the lifecycle's terminal move, performed by the orchestrating
+lifecycle, not this follow-up pass.
