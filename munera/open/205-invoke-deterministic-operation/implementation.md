@@ -953,3 +953,43 @@ usage/parse-error/unknown-id/malformed-result messages, and the
 CHANGELOG entry is correctly placed under `[Unreleased] > Added` and is
 user-visible. No stale references, no removed-behaviour cleanup needed,
 examples consistent, names/flags/paths correct. No new actionable docs issues.
+
+## Code-shaper review (ψ — production code)
+
+Applied `code-shaper` skill (simple ∧ consistent ∧ robust) to the four touched
+production files: `deterministic_operation_action.clj`,
+`psi_tool_operation.clj`, `commands/operation.clj`, and the `operation` branch
+of `psi_tool_validate.clj`. clj-kondo clean (0/0); full unit suite green.
+
+Assessed:
+- **simple** — each fn single-responsibility: shared helper splits
+  list/build-invocation/invoke/truncate/project cleanly; xor(computation,
+  flow_control) holds (helper = computation; surfaces = flow/render); locally
+  comprehensible. ✓
+- **consistent** — `operation` action mirrors `workflow`/`scheduler`
+  helper-per-ns shape, arg order, `:psi-tool/...` key idiom, duration
+  arithmetic, and outer-catch arm; command follows the prefixed/exact dispatch
+  idiom. ✓
+- **robust** — positional `operation-id` (registry injects), conditional
+  `:parent-session-id`, surface-shared `truncate-value`/`project-result` enforce
+  the single decision-#9 bound; `(:type (ex-data e))` dispatch re-throws
+  non-propagating throwables rather than swallowing. ✓
+
+No new actionable issue. Already-recorded non-actionable observations stand
+(triplicated private `psi-tool-error-summary` is sibling-consistent per-helper
+convention, not introduced here; report fn's own `:phase :validate` guard is an
+intentional tested deviation). Re-confirmed two more potential targets and
+judged them non-actionable:
+- The duration magic-number `1000000` and the `(long (/ (- (System/nanoTime)
+  started-at) …))` form are repeated verbatim across every psi-tool report fn;
+  hoisting only the `operation` copy would worsen consistency — a cross-cutting
+  cleanup, out of scope.
+- Two EDN-map arg parsers exist (command `parse-operation-command-args` →
+  try/catch friendly `{:error msg}`; psi-tool `parse-operation-args-string` →
+  throws, surfaced via outer-catch). The behavioural divergence on the
+  unreadable-EDN sub-case is the *documented* design choice already covered and
+  tested by TR-3 (both surfaces don't crash; non-map case is identical), not a
+  shaping defect.
+
+Conclusion: production code is simple, consistent, and robust against design.
+Code-shaper review complete — no new follow-up items.
