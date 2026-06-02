@@ -453,3 +453,32 @@ Tick with sha/decision on completion.
       `/?`/`/exit`.) Keep the existing prose sections; just complete the
       command-listing block so the TUI user reference matches the single source.
       Pure doc-accuracy fix; no source/test change.
+
+## Code-shaper review follow-ups (code-shaper pass 1)
+
+- [ ] CS1 — De-duplicate the help-line render formula (robustness). The single
+      line shape `(str "  " k " " (when usage (str usage " ")) "— " description)`
+      is currently in production (`builtin_specs.clj:110` `builtin-help-block`)
+      and copied verbatim into TWO test-local `line-for` fns
+      (`commands_builtin_specs_test.clj:163-164` and `:203-204`), making
+      `format-help-block-line-order-test` + `builtin-help-block-hide-in-help-projection-test`
+      tautological w.r.t. the line *format* (they re-derive what they assert, so a
+      spacing/em-dash/usage-placement regression changes both block and expectation
+      identically and stays green). Extract a single public renderer in `bspec`
+      (e.g. `(render-help-line k spec)`); have `builtin-help-block` map it over the
+      filtered table; switch the two tests to call that fn (or add a stable literal
+      golden for ≥1 representative line, e.g. `/model` and a no-usage line) so a
+      line-format regression is *caught* rather than mirror-confirmed. No behaviour
+      change.
+
+- [ ] CS2 — Resolve the unused `:psi.agent-session/builtin-command-names`
+      resolver attribute (simplicity). `builtin-commands-resolver`
+      (extensions.clj:160-164) outputs the bare-name attribute alongside
+      `:builtin-command-specs`, but no UI consumes it (TUI + Emacs read
+      `:builtin-command-specs` only; the bare-name attr is referenced solely by
+      `builtin_commands_resolver_test.clj`). plan.md's carried open question said
+      "drop if unused by either UI after Slices 3–4". Either (a) drop the
+      `:psi.agent-session/builtin-command-names` output from the resolver and its
+      dedicated test assertions (preferred), or (b) if kept for graph symmetry
+      with `:psi.extension/command-names`, record that as a closed decision in
+      plan.md so the "drop if unused" gate is explicitly resolved.

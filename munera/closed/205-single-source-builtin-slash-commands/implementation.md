@@ -1660,3 +1660,68 @@ follow-up steps added (criterion 3: nothing to add without duplicating the prior
 D1/D2 coverage).
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## 2026-06-01 — Code-shaper review (code-shaper), pass 1
+
+λcode. simplicity ∧ consistency ∧ robustness → shape. Scope: the
+single-source surface `commands/builtin_specs.clj` + its projections in
+`commands.clj`, the `builtin-commands-resolver` (resolvers/extensions.clj), TUI
+`autocomplete.clj`, and the spec-table tests (`commands_builtin_specs_test.clj`,
+`builtin_commands_resolver_test.clj`). Verified `bspec` projections, dispatch
+seams (R1/R2 load-time asserts), help-block derivation, and UI consumption.
+
+Strong points (no action): leaf-ns single source is clean; projections are pure
+fns of the keyset (name drift unrepresentable per Option B); the `prefixed-command`
+matcher's trailing-space guard genuinely prevents `/job`↔`/jobs` shadowing, so the
+"order not load-bearing" comment is sound; R1/R2 `assert`s make the hand-wired
+`case`↔spec-table seam drift load-fatal; em-dash rendering is consistent between
+`builtin-help-block` and the literal `/skill:name` line; clj-kondo clean on all
+changed src.
+
+New actionable (code-shaper):
+
+- CS1 (robustness — help-line render formula duplicated 3×, tests are
+  tautological). The line-rendering formula
+  `(str "  " k " " (when usage (str usage " ")) "— " description)` lives in
+  production at `builtin_specs.clj:110` (`builtin-help-block`) AND is copied
+  verbatim as a local `line-for` fn in TWO tests
+  (`commands_builtin_specs_test.clj:163-164` and `:203-204`,
+  `format-help-block-line-order-test` + `builtin-help-block-hide-in-help-projection-test`).
+  Because the tests re-derive the SAME formula they assert against, a regression
+  in the production line format (spacing, em-dash, usage placement) changes both
+  the rendered block and the test's expected string identically → the tests stay
+  green while the user-visible help format silently drifts. This violates
+  `robust ... shaped_by(code, formalisms) → enforceable(invariants)`: the
+  rendering shape has no single enforceable home, and TT5/TT2's "locks the block
+  to the single source" claim only holds for *membership/order*, not the *line
+  shape*. Shape: extract the single-line renderer to one public fn in `bspec`
+  (e.g. `(render-help-line k spec)`), have `builtin-help-block` map it over the
+  filtered table, and have the tests call THAT fn (or assert a stable literal
+  golden for ≥1 representative line) so a format change is caught rather than
+  mirror-confirmed. Pure consolidation; no behaviour change.
+
+- CS2 (simplicity — resolver exposes an unused `builtin-command-names` attribute).
+  `builtin-commands-resolver` outputs both `:psi.agent-session/builtin-command-specs`
+  AND `:psi.agent-session/builtin-command-names` (extensions.clj:160-164), but NO
+  UI consumes the bare-name attribute: TUI `autocomplete.clj` reads
+  `:builtin-command-specs` only, and Emacs (`psi-completion.el`,
+  `psi-session-commands.el:257`) queries/consumes `:builtin-command-specs` only.
+  The bare-name attribute is referenced solely by its own resolver test
+  (`builtin_commands_resolver_test.clj`). plan.md's carried open question
+  explicitly said "drop if unused by either UI after Slices 3–4" — it is unused.
+  This is speculative public surface (`λ extend ... absent(default)`,
+  single-responsibility): a second graph attribute + its derivation + its test
+  exist with no consumer. Shape: either (a) drop
+  `:psi.agent-session/builtin-command-names` from the resolver output and its
+  dedicated test assertions (keep only `builtin-command-specs`), or (b) if
+  retained deliberately for graph symmetry with `:psi.extension/command-names`,
+  record that decision in plan.md's open question so the "drop if unused" gate is
+  closed explicitly rather than left dangling. Prefer (a) unless symmetry is a
+  stated requirement.
+
+No duplication of prior R/TT/D notes: CS1 targets the render-formula *duplication
+across production+tests* (orthogonal to TT2/TT5 which lock membership/order via
+that same copied shape); CS2 targets the *unused exposed attribute* (no prior
+pass flagged the dead surface — the plan deferred it as an open question).
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
