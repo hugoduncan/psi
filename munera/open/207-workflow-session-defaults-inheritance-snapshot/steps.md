@@ -437,7 +437,7 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
 
 ## Test-review pass 3 follow-ups (review 2026-06-02)
 
-- [ ] T3: Commit the uncommitted T2 fix; HEAD still ships the AC3 tools/skills
+- [x] T3: Commit the uncommitted T2 fix; HEAD still ships the AC3 tools/skills
       gap. The T2 test (`snapshot-isolates-tools-skills-from-live-parent-mutation-test`,
       +71 lines in `inheritance_snapshot_test.clj`) exists only in the working
       tree — committed HEAD does NOT contain it (`git show HEAD:…` grep = 0;
@@ -448,3 +448,13 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       `git status --short` is clean and HEAD self-consistent (AC3 tools/skills
       isolation behaviourally covered in HEAD). Do NOT close the task with a
       dirty tree.
+      DONE: HEAD `91d65298d` already contained the T2 test (grep matched
+      line 193), so the original coverage gap was already closed; what remained
+      uncommitted was a small +6/-6 REFINEMENT — moved the step's tool/skill
+      refs from `:session` to top-level `:tools`/`:skills` (added `"read"`
+      alongside `"shared-tool"`), and made the resolved-def lookup
+      order-independent (`(some #(= name (:name %)) pool)` + `(some? …)` guard
+      before the `from-snapshot` description assertion). Focused suite green
+      (10 tests, 51 assertions, 0 failures); `clj-kondo` clean (0/0) on the
+      touched file; committed with `⚒ 207`; `git status --short` clean
+      afterwards. HEAD self-consistent.

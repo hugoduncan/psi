@@ -168,8 +168,8 @@
    :name "tools-skills"
    :steps [{:name "step-1"
             :type :session
-            :session {:tools ["shared-tool"]
-                      :skills ["shared-skill"]}
+            :tools ["read" "shared-tool"]
+            :skills ["shared-skill"]
             :contributions [{:type :template
                              :text "{{input}}"
                              :vars {"input" {:from :workflow-input :path [:input]}}}]}]
@@ -222,12 +222,12 @@
                                       :disable-model-invocation false}]})
       (let [config (workflow-step-session-config/resolve-step-session-config
                     ctx nil workflow-run "step-1")
-            resolved-tool (first (:tool-defs config))
-            resolved-skill (first (:skills config))]
-        (is (= "shared-tool" (:name resolved-tool)))
+            resolved-tool (some #(when (= "shared-tool" (:name %)) %) (:tool-defs config))
+            resolved-skill (some #(when (= "shared-skill" (:name %)) %) (:skills config))]
+        (is (some? resolved-tool) "the named tool resolved from the inherited pool")
         (is (= "from-snapshot" (:description resolved-tool))
             "resolved tool def comes from the snapshot pool, not the mutated live parent")
-        (is (= "shared-skill" (:name resolved-skill)))
+        (is (some? resolved-skill) "the named skill resolved from the inherited pool")
         (is (= "from-snapshot" (:description resolved-skill))
             "resolved skill comes from the snapshot pool, not the mutated live parent")))))
 

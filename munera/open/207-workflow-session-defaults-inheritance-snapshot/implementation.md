@@ -1288,3 +1288,31 @@ Actionable (coherence, same class as R5):
   check off T2; verify `git status --short` clean and HEAD self-consistent
   (AC3 tools/skills isolation now behaviourally covered in HEAD, not just the
   working tree). Do NOT close the task with a dirty tree.
+
+## T3 follow-up executed (ψ, 2026-06-02)
+
+T3 asked to commit the uncommitted T2 fix so HEAD carries the AC3 tools/skills
+isolation coverage and the tree is clean.
+
+State on entry: HEAD `91d65298d` ("⊨ 207: test review pass 3 — commit
+uncommitted T2 AC3 tools/skills isolation test (T3)") ALREADY contained
+`snapshot-isolates-tools-skills-from-live-parent-mutation-test`
+(`git show HEAD:…inheritance_snapshot_test.clj | grep` matched at line 193), so
+the original T2-coverage gap was already closed in HEAD. What remained was a
+small uncommitted REFINEMENT to that same test (`git diff --stat`: 1 file,
++6/-6):
+- Moved the step's tool/skill references from inside `:session` to the top-level
+  `:tools`/`:skills` step keys, and added `"read"` alongside `"shared-tool"`
+  (more representative of a real multi-tool step config).
+- Made the resolved-def lookup robust: find the named def in the pool via
+  `(some #(when (= "shared-tool" (:name %)) %) …)` instead of assuming `first`,
+  and assert `(some? resolved-tool/skill)` before the `from-snapshot`
+  description check. This survives ordering/extra-entry changes in the resolved
+  pool (the pool now also carries `read`).
+
+Verified before commit: focused suite green
+(`psi.workflow-step-session-config.inheritance-snapshot-test` — 10 tests, 51
+assertions, 0 failures) and `clj-kondo` clean (0/0) on the touched test file.
+Committed the refinement with a `⚒ 207` message; `git status --short` clean
+afterwards. HEAD self-consistent: AC3 tools/skills isolation behaviourally
+covered, resolved-pool lookup order-independent.
