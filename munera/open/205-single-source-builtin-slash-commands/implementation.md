@@ -125,3 +125,49 @@ Five new actionable ambiguities (B1–B5 in design-steps.md):
   exposed by the resolver, so AC1's `{:name :description}` is or is not final.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+### 2026-06-01 — Ambiguity follow-up (B1–B5) executed
+
+All five ambiguities resolved at design level. Grounded against `commands.clj`:
+`exact-command-handlers` (664) is a `"/name" → handler-kw` map; `/project-repl`
+is in it (`:project-repl`) AND in `prefixed-command-prefixes` (682);
+`dispatch*` (761) runs exact-first (`case (exact-command-handler trimmed)`) then
+`dispatch-prefixed-command` (697); `format-help` (111) is hand-written prose with
+a `/skill:name` line that is NOT a routing entry; `builtin-command-names` (715)
+is the derived `concat`.
+
+- **B1 (dual-kind).** New "Dispatch-kind representation" decision: each spec
+  entry carries a `:kinds` set `⊆ #{:exact :prefixed}`. Projections filter by
+  membership, so `/project-repl` = `#{:exact :prefixed}` feeds BOTH. Runtime
+  dispatch precedence is unchanged (exact-first then prefixed): bare
+  `/project-repl` hits the exact handler; `/project-repl <args>` falls through
+  to the prefixed `case`. Exact/dual entries must carry `:handler`. Updated
+  Option B example, projection bullets, AC2, open question #1.
+
+- **B2 (key form).** New "Spec-table key form" decision: keys are
+  **leading-slash-prefixed** (`"/help"`), matching `exact-command-handlers` and
+  the routing projections (zero transform); only `builtin-command-names` and the
+  resolver apply one `strip-slash`. Cross-linked from "Slash prefix
+  normalization" (which governs resolver output) to remove the apparent overlap.
+
+- **B3 (format-help).** New "format-help derivation" decision: routed built-in
+  lines derive from `(seq spec-table)` in table order (table authored in current
+  help order); `:usage` renders inline before the em-dash; the `/skill:name`
+  line + trailing prose stay LITERAL (not a routing entry → not in the table);
+  Prompt/Skills/Extension sections unchanged. AC3 reworded to "no hardcoded
+  built-in command name+description literals remain."
+
+- **B4 (ordering).** New "Spec-table ordering" decision: ordered map
+  (`array-map`); emission order authoritative for `format-help`; resolver output
+  preserves table order; autocomplete asserts membership (order-independent), so
+  AC4/AC5/AC6 have a deterministic target without over-constraining UI sort.
+
+- **B5 (`:usage`).** "Description granularity" rewritten: required
+  `:description` + optional `:usage`; `:usage` consumed by `format-help` only,
+  NOT exposed by the resolver. Resolver output stays `{:name :description}`
+  (AC1 made final). Resolves the Option-B-example-vs-AC1 divergence: `:usage`
+  exists in the table purely as a help-rendering detail. Open question #2
+  resolved.
+
+No blocking reasons; B1–B5 fully addressed at design level (projections/`:kinds`
+machinery and help/resolver derivation land in plan/code stages).
