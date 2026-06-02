@@ -39,16 +39,22 @@ until each hardcoded list is manually updated.
   `:name` (without leading slash, or with — pick one and apply uniformly) and
   `:description`. This table becomes the single source from which the existing
   name surfaces are derived.
-- **Derivation, not duplication**:
-  - `builtin-command-names` derives from the spec table (or the spec table and
-    the routing maps share a derivation so names cannot drift).
+- **Derivation, not duplication** (single keyed spec table — see decision
+  "Single spec table is the source of names"):
+  - The spec table is the **sole** place built-in command names exist. Its keys
+    are the names; every other name surface is a pure function of those keys.
+  - `builtin-command-names` derives from `(keys spec-table)` (strip slash, set)
+    — no independent `concat` of routing literals.
+  - `exact-command-handlers` and `prefixed-command-prefixes` become **derived
+    projections** of the spec table (filtered by each entry's dispatch kind),
+    not independent literals, so a routed name cannot diverge from a described
+    name — name drift is unrepresentable, not merely test-rejected.
   - `format-help`'s built-in command lines derive from the spec table rather
     than re-listing prose. (Arg-hint richness decision below.)
-  - Dispatch routing (`exact-command-handlers` value = handler keyword;
-    `prefixed-command-prefixes`) stays the routing authority; the spec table
-    must stay coherent with it (a test asserts the spec-table name set equals
-    the routed name set — no command is routable-but-undescribed or
-    described-but-unroutable).
+  - Residual seam (out of scope here): the prefixed-command *handler* `case` in
+    `dispatch-prefixed-command` stays keyed by prefix string; a narrow coherence
+    test may assert its branch keys match the prefixed spec-table entries. This
+    is handler-wiring, not name drift.
 - **New EQL resolver/attribute** exposing built-in command specs, e.g.
   `:psi.agent-session/builtin-command-specs` (vector of `{:name :description}`)
   and/or `:psi.agent-session/builtin-command-names`. Mirror
@@ -84,16 +90,82 @@ until each hardcoded list is manually updated.
 
 ## Key behaviour / design decisions
 
-### One spec table, two derivations
+### Single spec table is the source of names (unreachable > forbidden)
 
-There are currently two backend authorities: routing (name → handler) and
-description (`format-help` prose). The spec table holds **descriptions** keyed
-by name; routing maps hold **handlers** keyed by name. The invariant to enforce
-by test: `set(spec-table names) == set(routed names)`. Open question for plan:
-whether to physically merge routing+description into one richer table, or keep
-two maps with a coherence test. Design preference: keep routing maps as-is
-(handler values), add a parallel description table, and enforce equality by
-test — minimal blast radius, no routing churn.
+There are currently two backend routing authorities and one description
+authority:
+
+- `exact-command-handlers` — a **map** `name → handler-keyword` (e.g.
+  `"/help" :help`).
+- `prefixed-command-prefixes` — a **vector** of prefix strings (no handler
+  values; prefixed dispatch is a hardcoded `case` in
+  `dispatch-prefixed-command`).
+- `format-help` prose — descriptions, keyed implicitly by name.
+
+`builtin-command-names` is already *derived* (`concat` of the two routing
+collections, strip `/`, `set`). Descriptions are not derived from anything; they
+are independent prose.
+
+**Two structural options, evaluated against `λ shape. unreachable > forbidden`,
+`impossible_invalid_states`, and
+`λ robust ... shaped_by(code, formalisms) → enforceable(invariants(code))`:**
+
+#### Option A — Parallel description table + coherence test (drift *forbidden*)
+
+Keep the routing maps as-is, add a parallel `name → description` table, and
+enforce `set(spec-names) == set(routed-names)` **by test**. A missing or extra
+description is a *representable but invalid* state: the code compiles and runs;
+only a test rejects it. This is `forbidden`, not `unreachable` — it contradicts
+the project ethos (`impossible_invalid_states`). Lower blast radius, but the
+invariant lives outside the type/data shape.
+
+#### Option B — Single keyed spec table is the source of names (drift *unreachable*)
+
+Make **one** ordered map the single source of built-in command identity:
+
+```clojure
+;; name (with leading slash) → spec
+{"/help"  {:handler :help        :description "Show help"}
+ "/model" {:dispatch :prefixed   :description "Set the model" :usage "[provider model-id …]"}
+ ,,,}
+```
+
+Then *derive every other surface from its keys*:
+
+- `builtin-command-names` = `(map strip-slash (keys spec-table))` — no separate
+  `concat`.
+- exact-vs-prefixed routing = a `:dispatch`/`:handler` field per entry; the
+  `exact-command-handlers` map and the `prefixed-command-prefixes` vector are
+  both *projections* of the spec table (`(into {} (for [[n s] table :when (= :exact (kind s))] [n (:handler s)]))` etc.), not independent literals.
+- `format-help` built-in lines = `(map :description (vals spec-table))`.
+- resolver specs = `(for [[n s] table] {:name (strip-slash n) :description (:description s)})`.
+
+Because names exist in exactly **one** place (the keys of the spec table) and
+every other name surface is a pure function of those keys, "a command routable
+but undescribed" or "described but unroutable" is **not representable** — there
+is no second name list to diverge from. Drift is `unreachable`, satisfying
+`single_source_of_truth` structurally rather than by test.
+
+**Residual constraint (honest scoping).** The prefixed-command *behaviour* still
+lives in the `case` of `dispatch-prefixed-command`, keyed by prefix string.
+Option B removes name drift (the `prefixed-command-prefixes` *vector* becomes a
+derived projection, so a prefix can no longer be listed-but-undescribed), but a
+prefix could still be in the table yet missing a `case` branch. That is a
+*handler-wiring* coherence concern, narrower than the name-drift this task
+targets, and the same gap exists today (a prefix in the vector with no `case`
+branch). It is out of scope to fully data-drive the prefixed `case`; if desired,
+a single `count`/membership test (`set(prefixed table entries) == set(case
+keys)`) covers that narrower seam. The *name* invariant — which is what this
+task exists to fix — is made structurally unreachable by Option B regardless.
+
+**Decision: Option B (single keyed spec table) is chosen.** It is selected on
+`unreachable > forbidden` grounds, not blast-radius: a single keyset makes
+built-in command name divergence unrepresentable, which is the architectural
+ethos (`impossible_invalid_states`, `enforceable(invariants)`). The routing maps
+become derived projections of the spec table; the residual prefixed-`case`
+handler-wiring seam (unchanged in scope from today) is the only coherence point
+that remains test-enforced rather than structural, and it is explicitly out of
+this task's name-drift remit.
 
 ### Description granularity
 
@@ -135,9 +207,13 @@ current Emacs behaviour (which lists `/?` and `/exit`).
 
 - AC1: A new EQL attribute exposes built-in command specs (name + description),
   discoverable via the graph, resolvable for a session.
-- AC2: The backend built-in command name set is derived from a single source;
-  a test asserts the spec-table name set equals the routable built-in name set
-  (no drift possible between routing and the exposed spec).
+- AC2: The backend built-in command name set is derived from a **single keyed
+  spec table** whose keys are the only place built-in names exist; routing maps
+  (`exact-command-handlers`, `prefixed-command-prefixes`) and the resolver specs
+  are derived projections of that table, so name divergence between routing and
+  the exposed spec is structurally unrepresentable (`unreachable`, not merely
+  test-forbidden). Any residual handler-wiring coherence (prefixed `case`
+  branches) is a separate, narrower test.
 - AC3: `format-help` built-in command listing derives from the single spec
   source (no independent hardcoded built-in list remains in `format-help`).
 - AC4: TUI slash autocomplete includes `/reload-models` (and other
@@ -162,11 +238,20 @@ current Emacs behaviour (which lists `/?` and `/exit`).
 - No shim/adapter: the UIs gain one more attribute on queries they already make.
 - Kills a triplicated-state coherence violation; aligns with
   `single_source_of_truth` and `λ one_way`.
+- Single keyed spec table makes built-in command name divergence
+  *unrepresentable* rather than test-rejected — satisfies
+  `λ shape. unreachable > forbidden`, `impossible_invalid_states`, and
+  `enforceable(invariants)`.
 
 ## Open questions for plan stage
 
-1. Merge routing + description into one table vs. parallel table + coherence
-   test (design preference: parallel + test).
+1. ~~Merge routing + description into one table vs. parallel table + coherence
+   test.~~ **Resolved (architecture-fit review A1):** single keyed spec table
+   (Option B) on `unreachable > forbidden` grounds — routing maps become derived
+   projections; name drift is unrepresentable. See "Single spec table is the
+   source of names". Remaining sub-question for plan: whether to also data-drive
+   the prefixed `case` (out of this task's scope) or cover it with a narrow
+   branch-coherence test.
 2. Description vs. usage-hint granularity and whether the resolver carries
    `:usage`.
 3. Emacs `defcustom` precedence/residual role and whether built-in entries are

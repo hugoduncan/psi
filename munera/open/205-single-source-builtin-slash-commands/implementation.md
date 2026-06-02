@@ -40,3 +40,35 @@ One actionable architectural-fit misfit (see design-steps.md A1):
   rather than defaulting to the test-enforced variant.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Design-steps follow-up
+
+### 2026-06-01 — A1 (architecture-fit follow-up): single keyed spec table
+
+Completed A1. Grounded the decision in the actual routing shape:
+`exact-command-handlers` is a `name → handler-keyword` **map**;
+`prefixed-command-prefixes` is a prefix **vector** dispatched via a hardcoded
+`case` in `dispatch-prefixed-command`; `builtin-command-names` is already a
+derived `concat`.
+
+design.md changes:
+- Replaced "One spec table, two derivations" decision with "Single spec table is
+  the source of names (unreachable > forbidden)" — evaluates Option A (parallel
+  table + coherence test = drift *forbidden*) vs Option B (single keyed spec
+  table = drift *unreachable*), and **chooses Option B** on `unreachable >
+  forbidden` / `impossible_invalid_states` grounds rather than blast-radius.
+- Routing maps reframed as *derived projections* of the keyed spec table; names
+  exist in exactly one place (the table keys), so name divergence is
+  unrepresentable.
+- Updated Scope "Derivation, not duplication", AC2, "Architectural alignment",
+  and resolved open question #1 to match.
+
+Honest residual scoping recorded in design: prefixed-command *handler* wiring
+still lives in the `dispatch-prefixed-command` `case`. Option B removes name
+drift (prefix vector becomes a projection) but a prefix could be in the table
+yet lack a `case` branch — that is handler-wiring coherence, narrower than the
+name drift this task fixes, unchanged from today, and explicitly out of scope.
+Optionally covered by a narrow branch-coherence test (left to plan).
+
+No blocking reasons; A1 fully addressed at design level (plan/code stages will
+implement the projections).
