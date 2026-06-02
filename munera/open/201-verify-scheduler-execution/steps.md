@@ -626,3 +626,30 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       out of 201's verification-test scope. Suite green (45 tests / 412
       assertions); clj-kondo 0/0; cljfmt clean. Review chain converged →
       REVIEW_COMPLETE.
+
+## Test review follow-ups — test-shaper pass (2026-06-01)
+
+- [ ] Fix misleading shared setup in
+      `scheduler-test/fail-schedule-records-failure-detail-and-dequeues-test`.
+      The top-level `let` builds `s0` (`:session`-kind) → `s1 = fire-schedule
+      (s0, idle)` with comment "session-kind fire delivers (action :deliver)",
+      but the first `testing` block uses fresh `q0`/`q1` and never touches
+      `s0`/`s1`; `s1` is used only by the second (terminal fail-guard) block,
+      relying on the non-obvious fact that pure `fire-schedule` leaves status
+      `:pending` (it returns the `:deliver` *action* without mutating status).
+      Scope each concern to its own minimal setup (or correct the comment to
+      state session-kind `fire-schedule` leaves status `:pending` and move
+      `s0`/`s1` into the guard block), removing the dead binding from the first
+      block's scope. Test-file only (Slice-10 allowlist); keep suite green +
+      clj-kondo/cljfmt clean. If 201 is treated as closed, raise as a small
+      standalone test-hygiene task.
+
+- [ ] Add explicit `:kind :message` to the three live `:scheduler/create`
+      dispatches that currently omit it and rely on the handler default
+      (`dispatch_handlers/scheduler.clj:123` `(or kind :message)`):
+      `scheduler-timer-seam-test/scheduler-start-timer-uses-injected-time-source-and-delay-runner-test`
+      (both the main and the cancel `testing` blocks) and
+      `scheduler-timer-seam-test/scheduler-cancelled-default-delay-thread-exits-without-uncaught-interrupted-exception-test`.
+      Brings their data shape in line with every other 201 live create and makes
+      the kind-under-test local. No behaviour change (default already resolves to
+      `:message`). Test-file only; keep suite green + clj-kondo/cljfmt clean.

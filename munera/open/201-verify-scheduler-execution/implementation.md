@@ -1026,3 +1026,49 @@ infra_deps→injectable ∧ ¬mock ∧ ¬stub`). No new actionable issues.
 Conclusion: the review chain has converged. The verification-test deliverables
 are well-formed, cover the design behaviour, and inject (rather than stub) their
 infra deps. No follow-up steps added.
+
+## Test review — test-shaper pass (2026-06-01) — ACTIONABLE_FEEDBACK
+
+Applied the test-shaper lens (clarity ∧ signal ∧ robustness; single_concern,
+minimal_incidental_setup, locally_comprehensible, consistent data_shapes,
+meaningful_failures) to the 201 verification-test surface. Prior review chain
+(passes 2–9) converged on infra-dep injection (with-redefs→seam) and assertion
+precision; this pass is a distinct clarity/signal lens and surfaces two new
+items, both test-file-only (within the Slice-10 allowlist). Suite green
+(subset 23 tests / 223 assertions), clj-kondo 0/0, cljfmt clean.
+
+- **Misleading shared setup in
+  `scheduler-test/fail-schedule-records-failure-detail-and-dequeues-test`.**
+  The top-level `let` builds `s0` (a `:session`-kind schedule) then
+  `s1 = fire-schedule(s0, idle)`, annotated "session-kind fire delivers
+  (action :deliver), so re-queue manually to test dequeue". But the first
+  `testing` block ("fail-schedule from :queued …") never touches `s0`/`s1` — it
+  builds entirely fresh `q0`/`q1`. `s1` is only used by the *second* block
+  (terminal fail-guard), where it relies on the non-obvious fact that pure
+  `fire-schedule` leaves a session-kind schedule `:pending` (returns the
+  `:deliver` *action* without mutating status), so the subsequent cancel
+  succeeds. The comment describes the *action* return as if it mutated status,
+  which contradicts the code path the test actually depends on, and the
+  disjoint setup couples two unrelated concerns under one deftest. This is a
+  minimal-incidental-setup / locally-comprehensible / single-concern violation,
+  and a meaningful-failures risk (if the guard regressed the failure message
+  would be confusing given the misleading scaffolding). Suggest: scope the fail-
+  detail+dequeue concern and the terminal-guard concern to their own minimal
+  setups (or correct the comment to state that session-kind `fire-schedule`
+  leaves status `:pending` and move `s0`/`s1` into the guard block), removing
+  the dead top-level binding from the first block's view.
+
+- **Inconsistent `:kind` shape across live create dispatches.**
+  `scheduler-timer-seam-test/scheduler-start-timer-uses-injected-time-source-and-delay-runner-test`,
+  its cancel block, and
+  `scheduler-timer-seam-test/scheduler-cancelled-default-delay-thread-exits-without-uncaught-interrupted-exception-test`
+  dispatch `:scheduler/create` **without** `:kind`, relying on the dispatch
+  handler's implicit `(or kind :message)` default (`dispatch_handlers/scheduler.clj:123`),
+  while every other 201 live create (e2e message/session, context-shutdown,
+  cancel-race, resolvers, psi-tool) passes `:kind :message`/`:session`
+  explicitly. The inconsistent data shape makes the intended kind non-local
+  (reader must know the handler default) and silently couples these tests to an
+  implicit default rather than the behaviour under test. Suggest: add the
+  explicit `:kind :message` to these create maps for consistent data_shapes and
+  locally-comprehensible intent (no behaviour change — the default already
+  resolves to `:message`).
