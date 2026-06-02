@@ -40,8 +40,21 @@
       (is (< (.indexOf plain "second") (.indexOf plain "third") (.indexOf plain "fourth")))
       (is (not (str/includes? plain "first"))))))
 
+(def ^:private sample-builtin-command-specs
+  "Representative backend built-in command specs (single-sourced via the
+   :psi.agent-session/builtin-command-specs resolver in production). Seeded
+   through the stub query-fn seam so slash autocomplete has built-in candidates
+   without a live backend. `cancel-job`/`exit` are the two alphabetically-first
+   names, which the selection-movement render test depends on."
+  [{:name "cancel-job" :description "cancel a background job"}
+   {:name "exit" :description "exit the session"}
+   {:name "help" :description "show this help"}
+   {:name "status" :description "show session diagnostics"}])
+
 (defn- init-state []
-  (let [init-fn (app/make-init nil nil nil {:dispatch-fn (constantly nil)})
+  (let [query-fn (fn [_query]
+                   {:psi.agent-session/builtin-command-specs sample-builtin-command-specs})
+        init-fn  (app/make-init query-fn nil nil {:dispatch-fn (constantly nil)})
         [state _] (init-fn)]
     state))
 

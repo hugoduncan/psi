@@ -44,10 +44,9 @@
   ([] (init-state {}))
   ([opts]
    (let [builtin-specs (get opts :builtin-command-specs sample-builtin-command-specs)
-         opts          (dissoc opts :builtin-command-specs)
          ui-atom      (:ui-state* opts)
          ui-read-fn*  (:ui-read-fn opts)
-         opts'        (dissoc opts :ui-state* :ui-read-fn)
+         opts'        (dissoc opts :builtin-command-specs :ui-state* :ui-read-fn)
          ui-read-fn   (or ui-read-fn*
                           (when ui-atom
                             (fn []
@@ -58,10 +57,18 @@
                             :session/ui-set-tools-expanded
                             (ui-state/set-tools-expanded! ui-atom (:expanded? payload))
                             nil)))
-         init-fn      (app/make-init nil ui-read-fn ui-disp-fn
+         ;; Stub query-fn standing in for the backend introspection seam: it
+         ;; populates only :psi.agent-session/builtin-command-specs (build-init
+         ;; defaults the other six query keys). Driving make-init through this
+         ;; seam — instead of a post-hoc (assoc … :builtin-command-specs …) —
+         ;; means the real build-init introspection path produces the slot, so
+         ;; the test asserts only state production can yield.
+         query-fn     (fn [_query]
+                        {:psi.agent-session/builtin-command-specs (vec builtin-specs)})
+         init-fn      (app/make-init query-fn ui-read-fn ui-disp-fn
                                      (merge {:dispatch-fn default-dispatch-fn} opts'))
          [state _cmd] (init-fn)]
-     (assoc state :builtin-command-specs (vec builtin-specs)))))
+     state)))
 
 (defn- type-text
   [update-fn state s]
@@ -185,24 +192,34 @@
 (deftest autocomplete-slash-includes-backend-builtin-commands-test
   (testing "slash autocomplete includes built-in commands sourced from backend specs"
     (let [update-fn (app/make-update (stub-agent-fn ""))
-          ;; /reload-models was previously missing from the hardcoded TUI list.
-          state     (assoc (init-state)
-                           :builtin-command-specs
-                           [{:name "help" :description "show this help"}
-                            {:name "reload-models" :description "reload custom model definitions"}
-                            {:name "speed" :description "show or set speed mode"}])
+          ;; Default fixture (help/status/quit + extras) produced via the stub
+          ;; query-fn seam in init-state, not a post-hoc assoc.
+          state     (init-state)
           [s1 _]    (update-fn state (msg/key-press "/"))
           cand-vals (set (map :value (get-in s1 [:prompt-input-state :autocomplete :candidates])))]
-      (is (contains? cand-vals "/reload-models"))
-      (is (contains? cand-vals "/speed"))
-      (is (contains? cand-vals "/help"))))
+      (is (contains? cand-vals "/help")
+          "with default backend specs /help is offered")
+      (is (contains? cand-vals "/status")
+          "with default backend specs /status is offered")
+      (is (contains? cand-vals "/quit")
+          "with default backend specs /quit is offered")))
   (testing "built-in candidates come from state, not a hardcoded list"
     (let [update-fn (app/make-update (stub-agent-fn ""))
-          state     (assoc (init-state) :builtin-command-specs [])
+          ;; Empty surface fed to the stub query-fn (a map with [] under the
+          ;; builtin key), not a post-hoc (assoc … :builtin-command-specs []).
+          state     (init-state {:builtin-command-specs []})
           [s1 _]    (update-fn state (msg/key-press "/"))
           cand-vals (set (map :value (get-in s1 [:prompt-input-state :autocomplete :candidates])))]
+      ;; A3: an empty backend surface yields *no* built-in candidates. Assert
+      ;; all three default-fixture built-ins are absent (not just /quit), so a
+      ;; partial-leak regression dropping /quit while leaking /help or /status
+      ;; cannot pass vacuously.
+      (is (not (contains? cand-vals "/help"))
+          "with empty backend specs /help is not offered")
+      (is (not (contains? cand-vals "/status"))
+          "with empty backend specs /status is not offered")
       (is (not (contains? cand-vals "/quit"))
-          "with empty backend specs no built-in slash command is offered"))))
+          "with empty backend specs /quit is not offered"))))
 
 (deftest autocomplete-slash-dedupes-builtin-template-collision-test
   ;; TS1: built-in specs are folded into the same candidate set as prompt
@@ -211,8 +228,9 @@
   ;; command) name must yield exactly one candidate, not two.
   (testing "a built-in colliding with a prompt template yields one /resume candidate"
     (let [update-fn (app/make-update (stub-agent-fn ""))
-          state     (assoc (init-state)
-                           :builtin-command-specs [{:name "resume" :description "resume the session"}]
+          ;; Built-in specs via the stub query-fn seam; :prompt-templates is an
+          ;; unrelated slot and may remain a post-hoc assoc.
+          state     (assoc (init-state {:builtin-command-specs [{:name "resume" :description "resume the session"}]})
                            :prompt-templates [{:name "resume"}])
           [s1 _]    (update-fn state (msg/key-press "/"))
           cand-vals (mapv :value (get-in s1 [:prompt-input-state :autocomplete :candidates]))]
@@ -220,8 +238,9 @@
           "built-in/template name collision is deduped to a single candidate")))
   (testing "a built-in colliding with an extension command yields one /resume candidate"
     (let [update-fn (app/make-update (stub-agent-fn ""))
-          state     (assoc (init-state)
-                           :builtin-command-specs [{:name "resume" :description "resume the session"}]
+          ;; Built-in specs via the stub query-fn seam; :extension-command-names
+          ;; is an unrelated slot and may remain a post-hoc assoc.
+          state     (assoc (init-state {:builtin-command-specs [{:name "resume" :description "resume the session"}]})
                            :extension-command-names ["resume"])
           [s1 _]    (update-fn state (msg/key-press "/"))
           cand-vals (mapv :value (get-in s1 [:prompt-input-state :autocomplete :candidates]))]
