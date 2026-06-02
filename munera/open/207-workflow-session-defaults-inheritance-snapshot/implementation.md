@@ -392,3 +392,57 @@ All five plan-ambiguity follow-ups (P1–P5) resolved into plan.md + steps.md
 No plan-ambiguity follow-ups blocked; all five resolved as plan/steps
 refinements. Code implementation remains for the build phase (S1–S7), not this
 plan-review pass.
+
+## Plan inconsistency review (ψ, 2026-06-02)
+
+Reviewed plan.md ↔ steps.md ↔ design.md ↔ implementation.md for cross-file
+inconsistency, grounded against code (`workflow-step-session-config/core.clj`
+`resolve-step-session-config` `:145`, `effective-config->snapshot` consumer
+shape; `delegate.clj` `delegate-step-runtime-result` `:36-37` injected params +
+child create-run `:44`; `create-run` `:110`; `model.clj` schema `:179`). Plan
+and steps are internally consistent with each other (S1–S7 align; AC→slice map
+covers AC1–9; line refs accurate). The P1/P2 plan-phase resolutions, however,
+updated plan.md + steps.md but left design.md's stable Decisions 7/7a stating
+the now-superseded mechanisms — two new design↔plan/steps inconsistencies, not
+captured by any prior note or step:
+
+- **PI1 — `effective-config->snapshot` signature/behaviour: design.md vs
+  plan/steps.** design.md Decision 7a (`:209`) still defines
+  `effective-config->snapshot` as `(effective-config) → snapshot-map`, "pure
+  projection of an already-resolved effective step-config into the snapshot
+  field set", and the nested-derivation prose (`:220-221`) says delegate "calls
+  `effective-config->snapshot` on that result" (single arg, no parent-snapshot).
+  But the P2 resolution changed plan.md (`:26`, `:36`) and steps.md (`:37`,
+  `:136`) to `effective-config->snapshot (effective-config parent-snapshot) →
+  snapshot`, where `:speed-mode`/`:effort-override` come from the parent run's
+  snapshot because the resolver emits neither (resolved I1/P2) — so a single-arg
+  pure projection yields only 5/7 keys. design.md Decision 7a is the exact
+  framing P2 proved insufficient. The P2 follow-up resolution note explicitly
+  lists only "plan S2 + slice-order S6, steps S2 + S6" as updated — design.md
+  was not. Reconcile: update design.md Decision 7a (signature + the "pure
+  projection of effective config into the snapshot field set" description + the
+  `:220-221` nested-flow prose) to the two-arg form sourcing speed/effort from
+  the parent snapshot, matching plan/steps.
+
+- **PI2 — S6 dependency mechanism: design.md vs plan/steps.** design.md
+  Decision 7 (`:188`) asserts "the dependency direction stays caller → both
+  components, avoiding a layering inversion" and the nested-flow prose
+  (`:215-221`) has `delegate.clj` directly calling `resolve-step-session-config`
+  then `effective-config->snapshot`. But P1 established (and plan Risks +
+  steps S6 now commit) that this is a CERTAIN require cycle
+  (`workflow-step-session-config` already requires `workflow-runtime` per
+  `deps.edn`/`core.clj:16-17`), resolved by injecting `resolve-inherited-
+  defaults-fn` into `delegate-step-runtime-result` (mirroring its existing
+  `create-workflow-context-fn`/`send-and-drain-fn`). design.md still describes
+  the direct-call/no-inversion mechanism the plan determined is impossible, and
+  never mentions the injected-fn resolution. The P1 follow-up note lists only
+  plan Risks/slice-order S6 + steps S6 as updated — design.md Decision 7 was
+  not. Reconcile: update design.md Decision 7's "caller → both" / direct-call
+  framing to reflect the injected-fn mechanism (or explicitly note delegate
+  reaches the resolver via an injected fn, not a direct require), matching
+  plan/steps.
+
+Both are design↔plan/steps drift created by resolving plan ambiguities without
+back-propagating to the still-"stable" design.md. Build (S1–S7) not started.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK.

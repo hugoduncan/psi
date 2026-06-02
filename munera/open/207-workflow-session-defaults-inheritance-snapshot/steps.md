@@ -202,3 +202,27 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       temperature, logprob) stay on their current code path regardless of
       snapshot presence; only the 7 inherited defaults are sourced from the
       snapshot (with live-read fallback when absent).
+
+## Plan-inconsistency follow-ups (review 2026-06-02)
+
+- [ ] PI1: Align design.md Decision 7a with the P2-resolved plan/steps.
+      design.md (`:209`) still defines `effective-config->snapshot` as
+      `(effective-config) → snapshot-map` ("pure projection … into the snapshot
+      field set") and the nested-flow prose (`:220-221`) calls it single-arg,
+      but plan.md (`:26/:36`) + steps.md (`:37/:136`) use
+      `effective-config->snapshot (effective-config parent-snapshot)` sourcing
+      `:speed-mode`/`:effort-override` from the parent snapshot (resolver emits
+      neither — P2/I1). Update design.md Decision 7a signature, the
+      "pure projection of effective config" description, and the `:220-221`
+      nested-flow prose to the two-arg form so design no longer contradicts
+      plan/steps.
+- [ ] PI2: Align design.md Decision 7 with the P1-resolved S6 mechanism.
+      design.md (`:188`) asserts "dependency direction stays caller → both
+      components, avoiding a layering inversion" and the nested-flow prose
+      (`:215-221`) has `delegate.clj` directly calling
+      `resolve-step-session-config`/`effective-config->snapshot`, but P1
+      established this is a certain require cycle and plan Risks + steps S6 now
+      commit to injecting `resolve-inherited-defaults-fn` into
+      `delegate-step-runtime-result`. Update design.md Decision 7 to reflect the
+      injected-fn mechanism (delegate reaches the resolver via an injected fn,
+      not a direct require) so design no longer contradicts plan/steps.
