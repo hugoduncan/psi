@@ -1166,3 +1166,48 @@ HIGH-severity coherence finding plus two related drifts:
   must keep live-parent inheritance).
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Implementation review pass 5 (2026-06-02)
+
+Fresh full-implementation review after the R5/R6/R7 follow-up (commit
+`3e9c17a43` / code `d886e1963`). Verified the prior pass-4 coherence hazard
+(uncommitted R4 fix + dangling HEAD schema field) is resolved.
+
+Confirmed HEAD self-consistency of the `:inherited-snapshot?` mechanism:
+- **producer** `attempts.clj:88` sets `:inherited-snapshot? true` on the
+  step-attempt child request only (correctly NOT on the workflow judge path —
+  judge children keep live-parent inheritance per the R5 carve-out);
+- **schema** `child_session_contract.clj:39`
+  `[:inherited-snapshot? {:optional true} [:maybe :boolean]]`;
+- **threading** `context.clj:124/159` destructures + `(some? …) assoc`s it into
+  the `:session/create-child` dispatch; `session_lifecycle.clj:115/141` accepts
+  + forwards it to `child-session-base-state*`;
+- **consumer** `child_session_state.clj:135/153` `(boolean inherited-snapshot?)`
+  → `inherited-default` switches the fallback from live `parent-sd` to the fresh
+  `initial-session` default for `:model`/`:prompt-mode`/`:speed-mode`/
+  `:effort-override`.
+
+Resolver consumption (`workflow-step-session-config/core.clj`) re-verified:
+live parent read gated on `(when-not snapshot? …)` (R1); `parent-session-model`
+replaced wholesale by snapshot `:model` (P4); all 7 inherited fields
+snapshot-sourced; `:thinking-level` child uses `(or thinking-level :off)` (no
+live leak); speed/effort `cond->`-assoc'd from snapshot.
+
+Architecture fit: purity boundary preserved (`create-run` records
+`:inherited-defaults` verbatim, no ctx reads); no `workflow-runtime →
+workflow-step-session-config` layering cycle (nested path via injected
+`resolve-inherited-defaults-fn`); one-way state boundary intact (ctx reads →
+resolved data → pure transform). No unnecessary abstractions, no reusable
+pattern bypassed, no structural performance issue.
+
+Verification: focused suites green
+(`inheritance-snapshot-test` + `child-session-state-test` + `attempts-test` =
+25 tests, 141 assertions, 0 failures); `clj-kondo` 0 errors / 0 warnings on
+touched src; `git status --short` clean; CHANGELOG `[Unreleased]` entry +
+`doc/workflows.md` "Inherited session defaults are snapshotted at invoke time"
+section present and accurate.
+
+No new actionable findings. All design decisions (1–8a) and acceptance criteria
+(1–9) traced to code + tests. Implementation review complete.
+
+PASS_STATUS: REVIEW_COMPLETE

@@ -394,3 +394,14 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       through `context`/`session_lifecycle`/`attempts`, and why `workflow-owned?`
       was insufficient (the workflow judge is workflow-owned but supplies no
       model/prompt-mode and must keep live-parent inheritance).
+
+## Implementation-review pass 5 follow-ups (review 2026-06-02)
+
+- [x] Pass 5: full-implementation re-review after R5/R6/R7. HEAD
+      `:inherited-snapshot?` mechanism self-consistent (producer attempts.clj /
+      schema child_session_contract / threading context+session_lifecycle /
+      consumer child_session_state); resolver snapshot consumption + child-state
+      gate verified; purity boundary + no layering cycle confirmed. Focused
+      suites green (25 tests/141 assertions); lint clean; tree clean; docs +
+      changelog accurate. No new actionable findings — review complete. No
+      follow-up items added.
