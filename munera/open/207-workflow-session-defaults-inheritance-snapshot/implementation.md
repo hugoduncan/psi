@@ -175,3 +175,45 @@ All four ambiguity design-steps resolved into design.md as Decisions 5a/5b, 6a,
 
 No ambiguity design-steps blocked; all four completable as design refinements.
 Code implementation remains for the plan phase (steps.md), not this design pass.
+
+## Inconsistency review (ψ, 2026-06-02)
+
+Reviewed design.md for internal inconsistency and design↔code drift. Grounded
+against `workflow-step-session-config/core.clj` (`resolve-step-session-config`
+`:158`, live reads `:163–168`), `session-state/init.clj`
+(`common-inherited-fields` `:30` = 19 keys; `model-identity-fields` `:67`),
+`workflow-runtime/.../delegate.clj` (`delegate-step-runtime-result` `:36`,
+create-run `:44`), `mutations/canonical_workflows.clj` (`create-workflow-run`,
+create-run `:96`), `psi_tool_workflow.clj` (create-run `:148`),
+`workflow/orchestration.clj` (`continue-terminal-run-async!` defn `:201`,
+`mutate!` `:208`). Most line refs and structural claims verified accurate
+(`:201` defn vs `:208` mutate! is consistent, not a contradiction).
+
+New actionable inconsistencies:
+
+- **I1 (design↔code + internal).** Decisions 7 and 7a state
+  `resolve-inherited-defaults-snapshot` "reuses the same live-read logic
+  `resolve-step-session-config` uses for the no-override path" and lists that
+  path's reads as including **`speed-mode` and `effort-override`**. The actual
+  `resolve-step-session-config` reads neither — it outputs only
+  `:developer-prompt :prompt-mode :response-mode :tool-defs :thinking-level
+  :skills :model` (+ optional temperature/model-fallback/logprob); there is no
+  `:speed-mode`/`:effort-override` read or output anywhere in the resolver
+  (grep-confirmed empty). This also contradicts Decision 1, which correctly
+  frames `speed-mode`/`effort-override` as the *recently introduced* overrides
+  added **on top of** the fields "the resolver inherits live today"
+  (`model prompt-mode skills tools thinking-level`) — i.e. NOT part of the
+  existing no-override logic. So the snapshot resolver must *add* speed-mode/
+  effort-override ctx reads (Decision 1's intent); it cannot "reuse" a
+  no-override path that already reads them. Decisions 7/7a should state these
+  two reads are new (not reused from `resolve-step-session-config`'s current
+  logic), aligning with Decision 1.
+
+- **I2 (internal, minor).** Decision 8a says `common-inherited-fields` holds
+  "~20 fields" and that "the dozen other entries are deliberately excluded",
+  but the vector has 19 keys; with 5 included (`prompt-mode speed-mode
+  effort-override tool-ids skill-ids`) exactly **14** are excluded — and 8a
+  itself enumerates 14. "dozen" (12) understates its own complete list.
+  Reconcile the count ("14", not "dozen"/"~20") with the enumeration.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK.

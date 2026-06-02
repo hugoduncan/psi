@@ -52,3 +52,21 @@
       the upstream caller, given the resolver needs `ctx`+`parent-session-id`.
       → design.md Decision 6a (inside the mutation; upstream `mutate!` callers
       unchanged).
+
+## Inconsistency follow-ups
+
+- [ ] I1: Decisions 7 and 7a claim `resolve-inherited-defaults-snapshot`
+      "reuses the same live-read logic `resolve-step-session-config` uses for
+      the no-override path" and list `speed-mode`/`effort-override` among those
+      reads, but `resolve-step-session-config` reads/outputs neither (it
+      produces `:developer-prompt :prompt-mode :response-mode :tool-defs
+      :thinking-level :skills :model` only) — contradicting both the code and
+      Decision 1 (which frames `speed-mode`/`effort-override` as recently
+      introduced overrides on top of the live-inherited set). State that the
+      snapshot resolver must *add* `speed-mode`/`effort-override` ctx reads
+      rather than reuse a no-override path that already includes them; align
+      Decisions 1, 7, and 7a.
+- [ ] I2 (minor): Decision 8a says `common-inherited-fields` has "~20 fields"
+      and "the dozen other entries are deliberately excluded", but the vector
+      has 19 keys and 14 are excluded (8a itself lists 14). Reconcile the count
+      ("14" excluded, 19 total) with the enumeration.
