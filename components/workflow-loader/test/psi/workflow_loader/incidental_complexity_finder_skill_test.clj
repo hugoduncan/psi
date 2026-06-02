@@ -94,6 +94,40 @@
       (is (re-find #"(?s)any test references the target `var`" body)
           "coverage hint reports whether any test references the target var"))))
 
+(defn- local-unit-json
+  "A synthetic `local`-lens unit JSON object for a null-arity (defmethod-style)
+   var `x/f`, distinguished only by `line`/`lcc-total`."
+  [line lcc-total]
+  (str "{\"ns\":\"x\",\"var\":\"f\",\"arity\":null,\"line\":" line ",\"end-line\":" (+ line 10) ","
+       "\"lcc-total\":" lcc-total ",\"flow-burden\":1,\"state-burden\":1,\"shape-burden\":1,"
+       "\"abstraction-burden\":1,\"dependency-burden\":1,\"working-set\":1,\"file\":\"x.clj\",\"findings\":[]}"))
+
+(defn- cc-unit-json
+  "A synthetic `complexity`-lens unit JSON object for null-arity var `x/f`."
+  [line cc]
+  (str "{\"ns\":\"x\",\"var\":\"f\",\"arity\":null,\"line\":" line ",\"cc\":" cc "}"))
+
+(defn- run-jq-recipe
+  "Run the SKILL.md jq recipe over the given `local`/`cc` unit-JSON sequences,
+   returning {:exit :out :err}. Rewrites the recipe's hard-coded /tmp paths to
+   per-call temp fixtures so emit order is fully controlled by the caller."
+  [recipe local-units cc-units]
+  (let [dir (io/file (System/getProperty "java.io.tmpdir")
+                     (str "icf-recipe-test-" (System/nanoTime)))
+        _ (.mkdirs dir)
+        loc-f (io/file dir "icf-local.json")
+        cc-f (io/file dir "icf-cc.json")
+        recipe' (-> recipe
+                    (str/replace "/tmp/icf-local.json" (.getAbsolutePath loc-f))
+                    (str/replace "/tmp/icf-cc.json" (.getAbsolutePath cc-f)))]
+    (try
+      (spit loc-f (str "{\"units\":[" (str/join "," local-units) "]}"))
+      (spit cc-f (str "{\"units\":[" (str/join "," cc-units) "]}"))
+      (shell/sh "bash" "-c" recipe')
+      (finally
+        (doseq [f (.listFiles dir)] (.delete f))
+        (.delete dir)))))
+
 (deftest incidental-complexity-finder-recipe-determinism-test
   ;; TR1 (executable lock for the F2 determinism fix the prior passes deferred):
   ;; run the SKILL.md's embedded jq recipe over a synthetic input with two
@@ -106,36 +140,18 @@
         recipe (extract-jq-recipe body)
         ;; two execute-effect!-style null-arity units sharing (ns, var, arity)
         ;; but distinct lines and distinct cc/burden, both above threshold.
-        local-json (str "{\"units\":["
-                        "{\"ns\":\"x\",\"var\":\"f\",\"arity\":null,\"line\":10,\"end-line\":20,"
-                        "\"lcc-total\":30.0,\"flow-burden\":1,\"state-burden\":1,\"shape-burden\":1,"
-                        "\"abstraction-burden\":1,\"dependency-burden\":1,\"working-set\":1,\"file\":\"x.clj\",\"findings\":[]},"
-                        "{\"ns\":\"x\",\"var\":\"f\",\"arity\":null,\"line\":40,\"end-line\":50,"
-                        "\"lcc-total\":60.0,\"flow-burden\":1,\"state-burden\":1,\"shape-burden\":1,"
-                        "\"abstraction-burden\":1,\"dependency-burden\":1,\"working-set\":1,\"file\":\"x.clj\",\"findings\":[]}"
-                        "]}")
-        cc-json (str "{\"units\":["
-                     "{\"ns\":\"x\",\"var\":\"f\",\"arity\":null,\"line\":10,\"cc\":3},"
-                     "{\"ns\":\"x\",\"var\":\"f\",\"arity\":null,\"line\":40,\"cc\":4}"
-                     "]}")]
+        line-10-local (local-unit-json 10 "30.0")
+        line-40-local (local-unit-json 40 "60.0")
+        line-10-cc (cc-unit-json 10 3)
+        line-40-cc (cc-unit-json 40 4)]
     (is (some? recipe) "the join/gap jq recipe is extractable from SKILL.md")
     (if (try (zero? (:exit (shell/sh "jq" "--version"))) (catch Exception _ false))
-      (let [dir (io/file (System/getProperty "java.io.tmpdir")
-                         (str "icf-recipe-test-" (System/nanoTime)))
-            _ (.mkdirs dir)
-            loc-f (io/file dir "icf-local.json")
-            cc-f (io/file dir "icf-cc.json")
-            ;; the recipe reads /tmp/icf-local.json + /tmp/icf-cc.json; rewrite
-            ;; those paths to the temp fixture files for the executable check.
-            recipe' (-> recipe
-                        (str/replace "/tmp/icf-local.json" (.getAbsolutePath loc-f))
-                        (str/replace "/tmp/icf-cc.json" (.getAbsolutePath cc-f)))]
-        (try
-          (spit loc-f local-json)
-          (spit cc-f cc-json)
-          (let [{:keys [exit out err]} (shell/sh "bash" "-c" recipe')]
+      (do
+        (testing "the join is lossless — each null-arity unit keeps its own cc"
+          (let [{:keys [exit out err]}
+                (run-jq-recipe recipe [line-10-local line-40-local] [line-10-cc line-40-cc])]
             (is (zero? exit) (str "recipe runs cleanly; stderr: " err))
-            ;; line 10 unit (cc 3) and line 40 unit (cc 6/lcc 60) both survive
+            ;; line 10 unit (cc 3) and line 40 unit (cc 4) both survive
             ;; with their OWN cc — losslessly keyed by (ns, var, arity, line).
             (is (re-find #"\"line\":\s*10" out)
                 "the line-10 null-arity unit survives the join")
@@ -144,10 +160,24 @@
             (is (re-find #"\"cc\":\s*3\b" out)
                 "the line-10 unit keeps its own cc=3 (not collapsed last-wins)")
             (is (re-find #"\"cc\":\s*4\b" out)
-                "the line-40 unit keeps its own cc=4 (not collapsed last-wins)"))
-          (finally
-            (doseq [f (.listFiles dir)] (.delete f))
-            (.delete dir))))
+                "the line-40 unit keeps its own cc=4 (not collapsed last-wins)")))
+        (testing "the join is order-independent — reversing emit order yields identical output (TR4)"
+          ;; The F2/A1 core claim is that the join is deterministic w.r.t. emit
+          ;; order: under the pre-F2 `(ns, var, arity)` key, `from_entries` is
+          ;; last-wins, so swapping the two null-arity units' emit order would
+          ;; swap which cc each inherits. Run the recipe with both inputs'
+          ;; emit order reversed and assert byte-identical output to the forward
+          ;; run — losslessness alone (above) does not prove this.
+          (let [forward (run-jq-recipe recipe
+                                       [line-10-local line-40-local]
+                                       [line-10-cc line-40-cc])
+                reversed (run-jq-recipe recipe
+                                        [line-40-local line-10-local]
+                                        [line-40-cc line-10-cc])]
+            (is (zero? (:exit forward)) "forward-order recipe runs cleanly")
+            (is (zero? (:exit reversed)) "reversed-order recipe runs cleanly")
+            (is (= (:out forward) (:out reversed))
+                "reversing the emit order of both inputs yields identical output"))))
       (testing "jq unavailable — determinism asserted structurally on the recipe key"
         ;; Fallback when jq is absent: lock that the recipe keys on @line (the
         ;; unique key) on BOTH the $ccmap build and the $loc gap_key, so the

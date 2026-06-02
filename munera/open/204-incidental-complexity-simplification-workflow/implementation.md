@@ -1425,3 +1425,46 @@ items:
   `(cc 4)`. Test-only; same ns; no assertion change.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## 2026-06-01 — Test review pass 4 follow-up execution (TR4 + TR5)
+
+Executed the two actionable items added by test-review pass 3. Both are
+test-only and confined to
+`components/workflow-loader/test/psi/workflow_loader/incidental_complexity_finder_skill_test.clj`
+(same ns, no new ns / no production Clojure, per C1).
+
+- **TR4 (order-independence lock).** Refactored the determinism test for
+  caller-controlled emit order: extracted `local-unit-json` / `cc-unit-json`
+  fixture builders and `run-jq-recipe` (rewrites the recipe's hard-coded
+  `/tmp/icf-{local,cc}.json` paths to per-call temp fixtures, returns
+  `{:exit :out :err}`). Split the deftest body into two `testing` blocks:
+  (1) the prior **losslessness** assertions (each null-arity unit keeps its own
+  cc), and (2) a new **order-independence** block that runs the recipe twice —
+  forward `[line-10 line-40]` and with both `local` and `cc` inputs' emit order
+  reversed `[line-40 line-10]` — asserting byte-identical `:out`. This locks the
+  F2/A1 core claim: under the pre-F2 `(ns, var, arity)` key `from_entries` is
+  last-wins, so reversing emit order swaps which cc each unit inherits and the
+  outputs would diverge; the `@line` key makes forward == reversed. The
+  jq-absent structural fallback (`@line` keyed on both `$ccmap` build and `$loc`
+  gap_key) is retained unchanged.
+
+- **TR5 (stale fixture comment).** Corrected the inline comment from
+  `;; line 10 unit (cc 3) and line 40 unit (cc 6/lcc 60) both survive` to
+  `;; line 10 unit (cc 3) and line 40 unit (cc 4) both survive`, matching the
+  fixture JSON (`cc:4`) and the `cc=4` assertion immediately below. Comment-only;
+  no assertion or fixture change.
+
+Verification:
+- `clj-paren-repair` on the test file: Success.
+- Focused suite `--focus psi.workflow-loader.incidental-complexity-finder-skill-test
+  --focus psi.workflow-loader.workflow-definitions-test`: **16 tests, 228
+  assertions, 0 failures** (+3 assertions over pass 3's 225, from the new
+  order-independence block).
+- `clj-kondo --lint` on the test file: 0 errors, 0 warnings.
+- File length: 186 lines (< 800 `components/` guard).
+
+No design/spec/SKILL/workflow/doc change — both items are test-coverage and
+comment fixes; the SKILL recipe and generated-contract keying are already
+correct (F2/F3/F4). Coherence unaffected (test-only).
+
+PASS_STATUS: RESOLVED.

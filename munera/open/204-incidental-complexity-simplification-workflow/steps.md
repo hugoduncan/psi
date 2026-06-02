@@ -467,7 +467,7 @@ with the commit sha / decision when done.
 
 ## Test review follow-ups (review pass 3)
 
-- [ ] TR4 — The determinism test proves losslessness but not the F2 core claim
+- [x] TR4 — The determinism test proves losslessness but not the F2 core claim
       (order-independence). `incidental-complexity-finder-recipe-determinism-test`
       runs the embedded `jq` recipe over a single fixed emit order and asserts
       both null-arity units survive with their own `cc` — a *necessary*
@@ -481,8 +481,21 @@ with the commit sha / decision when done.
       output is identical (each `line` keeps the same `cc`) — locking
       order-independence, not just losslessness. Extend
       `incidental-complexity-finder-recipe-determinism-test` (same ns, test-only).
+      RESOLUTION: extracted the recipe-running into `run-jq-recipe` (+ `local-unit-json`
+      / `cc-unit-json` fixture builders) so emit order is caller-controlled, then
+      split the determinism deftest into two `testing` blocks: (1) the existing
+      **losslessness** lock (each null-arity unit keeps its own cc), and (2) a new
+      **order-independence** lock that runs the recipe twice — forward
+      (`line-10`, `line-40`) and with **both** inputs' emit order reversed
+      (`line-40`, `line-10`) — and asserts byte-identical `:out`. Under the pre-F2
+      `(ns, var, arity)` key, `from_entries` is last-wins, so the reversed run
+      would swap which cc each unit inherits → outputs differ; the `@line` key
+      makes them identical. The jq-absent fallback (structural `@line`-key
+      assertion) is unchanged. Focused suite green (16 tests, 228 assertions, 0
+      failures — +3 over pass 3's 225); clj-kondo 0 findings; file 186 lines
+      (< 800). (See implementation.md pass-4 test-review TR4 entry.)
 
-- [ ] TR5 — Stale/incorrect fixture comment in
+- [x] TR5 — Stale/incorrect fixture comment in
       `incidental-complexity-finder-recipe-determinism-test`. The inline comment
       `;; line 10 unit (cc 3) and line 40 unit (cc 6/lcc 60) both survive`
       mis-states the line-40 fixture: the fixture JSON sets `cc:4` and the
@@ -490,6 +503,9 @@ with the commit sha / decision when done.
       annotation is stale and self-contradictory, hurting the test's
       readability/signal (test-shaper: comments must not mislead). Fix the comment
       to read `(cc 4)`. Test-only; same ns; no assertion change.
+      RESOLUTION: corrected the inline comment to `;; line 10 unit (cc 3) and
+      line 40 unit (cc 4) both survive`, matching the fixture JSON (`cc:4`) and
+      the `cc=4` assertion below it. Comment-only; no assertion change.
 
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 
