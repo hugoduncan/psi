@@ -2039,3 +2039,48 @@ paths end-to-end through the merged-specs builder (`delegate` and
 Verification: `bb emacs:check` green — byte-compile clean (no new warnings on
 `psi-globals.el` / `psi-completion.el`), 330/330 tests pass including the new CS5
 test.
+
+## 2026-06-01 — Code-shaper review (code-shaper), pass 5
+
+REVIEW_COMPLETE — no new actionable shaping finding.
+
+Re-shaped the full 205 surface (`simple ∧ consistent ∧ robust`) after CS1–CS5:
+
+- `builtin_specs.clj`: single keyed source (`builtin-command-specs`); every name
+  surface — `exact-command-handlers`, `prefixed-command-prefixes`,
+  `builtin-command-names`, `builtin-help-block`, resolver specs — is a pure
+  projection of its keys (`unreachable > forbidden`). Per-entry invariant is a
+  load-time malli guard (CS3); the help-line shape has one renderer (CS1,
+  `render-help-line`). Single responsibility per def, consistent
+  `(for [[k spec] …] …)` projection idiom throughout. Clean.
+- `commands.clj`: both exact/prefixed `case` seams carry load-time asserts that
+  prove branch sets coherent with the derived projections (single literal
+  branch-set def each, read by both assert and coherence test — no duplicate
+  literal). Clean.
+- `extensions.clj` `builtin-commands-resolver`: input-free, mirrors
+  `extension-commands-resolver`, deviation documented. Clean.
+- TUI `support.clj`/`autocomplete.clj`: single `command-refresh-query`,
+  consistent `cond-> (vector? x) (assoc …)` slot-fill, `as-slash-command` helper
+  reused for built-ins + ext-cmds. Clean.
+- Emacs `psi-completion.el`/`psi-globals.el`: CS5 `psi-emacs--ensure-slash-prefix`
+  shared by backend-specs + ext-specs blocks; CS4 `slash-completion-pair`
+  normalizer shared by both token constructors. Clean.
+
+Two candidate shapes considered and **deliberately not raised as findings**
+(scope discipline, matching CS5's declined folds):
+
+1. TUI `slash-candidates` still open-codes `(str "/" name)` (templates) and
+   `(str "/skill:" name)` (skills) beside the helper-using `builtins`/`ext-cmds`.
+   These are *unconditional* prefixers on the explicitly out-of-scope
+   skill/template-completion surface (design: "keep the existing Emacs/TUI
+   helpers; only built-in commands are single-sourced"). Folding onto
+   `as-slash-command` would introduce prefix-collapsing semantics — identical to
+   CS5's declined `psi-session-commands.el:363` fold. Not in-scope, not a finding.
+2. The `(string-trim (format "%s" (or x "")))` scalar-coerce idiom recurs in 7+
+   Emacs sites (psi-session-commands.el, psi-events.el, …), most pre-dating 205;
+   `psi-emacs--slash-completion-normalize-text` names it (with nil-on-blank
+   semantics). 205 touched only two of those sites (backend-specs/ext-specs
+   names). A project-wide normalization fold is broad and pre-existing, not a
+   focused 205 duplication — same breadth CS5 declined. Not a 205 finding.
+
+CS1–CS5 hold and are not re-litigated. No new steps added.
