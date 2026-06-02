@@ -1468,3 +1468,33 @@ comment fixes; the SKILL recipe and generated-contract keying are already
 correct (F2/F3/F4). Coherence unaffected (test-only).
 
 PASS_STATUS: RESOLVED.
+
+## Test review (pass 4)
+
+Reviewed test quality per `task-test-review` (well-formedness, behaviour
+coverage of design, no mocks/stubs). Suite re-run green: **16 tests, 228
+assertions, 0 failures**. No mocks/stubs of domain logic — the lone
+`with-redefs` (workflow-loader test fixture) redirects the loader's
+global/project workflow *directories* to a temp dir (infra isolation), and all
+assertions are over loaded-definition state and SKILL.md/prompt text, never
+interactions (`testing-without-mocks` honoured). TR1–TR5 closed the previously
+identified gaps; the content-lock and determinism tests are well-formed and
+high-signal.
+
+One residual actionable coverage gap (TR6):
+
+- **TR6 — The selector recipe's qualification filter (`lcc-total ≥ 5.0 ∧ gap ≥
+  2.0`) and the A1 unmatched-row drop rule (never default `cc = 1`) are locked
+  only as SKILL.md *prose substrings*, never *executed*.** The
+  `incidental-complexity-finder-recipe-determinism-test` already runs the
+  embedded `jq` recipe via the `run-jq-recipe` harness, but both its fixture
+  units qualify and both have matching `cc` rows — so the filter and drop
+  branches of the recipe are never exercised. A regression that broke the
+  filter (e.g. a `>=`→`>` typo, a swapped threshold) or the drop semantics
+  (defaulting an unmatched `local` row to `cc = 1` instead of dropping it —
+  exactly what A1 forbids, because it would inflate `gap` toward false
+  qualification) would pass the suite green. Per the skill criterion `∀b ∈
+  behaviour(design). ∃t. covers(t,b)`, two named Deliverable-1 behaviours — the
+  qualification filter (which also *drives the workflow's early-stop*) and the
+  A1 inner-join-drop — have no covering executable assertion. The harness makes
+  this near-free to close.

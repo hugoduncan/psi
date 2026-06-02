@@ -507,6 +507,28 @@ with the commit sha / decision when done.
       line 40 unit (cc 4) both survive`, matching the fixture JSON (`cc:4`) and
       the `cc=4` assertion below it. Comment-only; no assertion change.
 
+## Test review follow-ups (review pass 4)
+
+- [ ] TR6 — Add executable coverage for the selector recipe's **qualification
+      filter** and **A1 unmatched-row drop rule**, currently locked only as
+      SKILL.md prose substrings (lines 52–68 of
+      `incidental_complexity_finder_skill_test.clj`) and never exercised. The
+      `run-jq-recipe` harness already exists and both determinism fixtures
+      qualify + match a `cc` row, so the filter/drop branches of the embedded
+      `jq` recipe are untested — a regress (e.g. `>=`→`>` threshold typo, or
+      defaulting an unmatched `local` row to `cc = 1` instead of dropping it,
+      which A1 explicitly forbids) passes green. Extend
+      `incidental-complexity-finder-recipe-determinism-test` (or a sibling
+      deftest in the same skill-test ns; test-only, no new ns/production code)
+      with: (a) a **filter** assertion — feed one unit below threshold
+      (`lcc-total < 5.0` or `gap < 2.0`) and one above, assert only the above
+      survives the recipe output; (b) a **drop** assertion — feed a `local`
+      unit with **no matching `cc` row**, assert it is absent from the output
+      (dropped, not defaulted to `cc = 1`/`gap` inflated into qualification).
+      Both are named design Deliverable-1 behaviours (the filter also drives the
+      workflow early-stop) with no executable cover. Run focused suite +
+      `clj-kondo`; keep under the 800-line `components/` file guard.
+
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 
 - [ ] Split step-1 selection from task-creation into two `:session` steps,
