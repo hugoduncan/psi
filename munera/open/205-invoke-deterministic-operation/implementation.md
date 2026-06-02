@@ -544,3 +544,54 @@ behaviour against regression. No blocked steps.
 The remaining unchecked close-out box (`git mv open/ → closed/` + remove from
 plan.md) is the lifecycle's terminal move, performed by the orchestrating
 lifecycle, not this follow-up pass.
+
+## Test review (ψ, third pass)
+
+Re-applied task-test-review skill (well-formed ∧ behaviour-coverage ∧
+infra-deps real/¬mock). Ran the four task suites focused: 46 tests / 99
+assertions, all green. Grounded against `psi_tool_validate.clj`
+(`parse-operation-args-string` → `parse-edn-string`, which does NOT catch read
+errors), the integration suite (`psi_tool_operation_integration_test.clj`), and
+the command suite (`operation_command_test.clj`).
+
+Confirmed (unchanged from prior passes): well-formed, deterministic; real
+registry + real runtime + real `session/create-context`, no mocks/stubs;
+side-effects via real sinks; AC behaviour coverage incl. TR-1 `:details` and
+TR-2 command-surface truncation (both closed).
+
+Actionable test gap found (1):
+- **psi-tool `op invoke` covers only the non-map malformed-args branch, not the
+  unreadable-EDN branch (decision #11 surface-parity).** Decision #11 states
+  the psi-tool `args` param "follows the identical default-`{}` and 'must be an
+  EDN map' validation" as the command, and malformed args must surface as a
+  clear error "naming the parse problem" (not a crash) on *both* surfaces. The
+  **command** surface tests *both* sub-cases — non-map (`[1 2]` → "EDN map") and
+  unreadable EDN (`{:x` → "Could not parse") — in `operation-bad-args-error`.
+  The **psi-tool** surface (`operation-invoke-malformed-args-validate-error`)
+  tests *only* the non-map case (`"[1 2 3]"`). The two sub-cases take **distinct
+  code paths**: non-map throws the explicit `:phase :validate` "must be an EDN
+  map" ex-info inside `parse-operation-args-string`; unreadable EDN throws a raw
+  `RuntimeException` ("EOF while reading", `:phase :operation`, `:data nil`)
+  directly out of `parse-edn-string` (which has no try/catch). Verified live: an
+  `op invoke` with `args "{:x"` yields `:is-error true` + a structured
+  `:psi-tool/action :operation … :overall-status :error` report (surfaced via
+  the outer-catch `"operation"` arm) — correct behaviour, but **unverified by
+  any test**. The slice-2 steps.md checklist item "malformed args (non-map /
+  unreadable EDN) → validate error, not crash" is therefore checked but only
+  half-covered on the psi-tool surface. This is distinct from TR-1 (`:details`
+  projection) and TR-2 (command truncation). Add a `psi_tool_operation_integration_test`
+  case dispatching `op invoke` with an *unreadable* EDN `args` string (e.g.
+  `"{:x"`), asserting `:is-error true`, `:psi-tool/action :operation`, and
+  `:psi-tool/overall-status :error` — closing the decision-#11 surface-parity
+  guarantee for the parse-failure (as opposed to non-map) sub-case on the
+  psi-tool surface.
+
+Non-actionable observations (no follow-up):
+- The unreadable-EDN error message (`"EOF while reading"`) is less descriptive
+  than the command surface's "Could not parse args as EDN: …" wrapping, but
+  decision #11 only requires a clear non-crashing error "naming the parse
+  problem"; the raw reader message names the problem and the surface is
+  structured. Wording parity is not an AC; not actionable here.
+- `parse-operation-args-string`'s ex-info hardcodes `:op "invoke"`; it is only
+  invoked on the `invoke` branch, so the constant is correct (matches prior
+  pass's note on the command-side analogue).

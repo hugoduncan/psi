@@ -254,6 +254,23 @@
   surfaces" guarantee (plan risk) on the command surface. Distinct from TR-1
   (nested-map `:details` projection).
 
+- [ ] (TR-3) Cover the unreadable-EDN malformed-args branch on the **psi-tool**
+  `op invoke` surface (decision #11 surface-parity). Today
+  `operation-invoke-malformed-args-validate-error` only tests the **non-map**
+  case (`"[1 2 3]"` → explicit `:phase :validate` "must be an EDN map" ex-info);
+  the **unreadable-EDN** sub-case takes a different path — a raw
+  `RuntimeException` ("EOF while reading") thrown directly out of
+  `parse-edn-string` (no try/catch), surfaced via the outer-catch `"operation"`
+  arm — and is exercised by no psi-tool test. The command surface
+  (`operation-bad-args-error`) already tests *both* sub-cases. Add a
+  `psi_tool_operation_integration_test` case dispatching `op invoke` with an
+  unreadable EDN `args` string (e.g. `"{:x"`), asserting `:is-error true`,
+  `:psi-tool/action :operation`, and `:psi-tool/overall-status :error` — closing
+  the decision-#11 parse-failure surface-parity guarantee (distinct from the
+  non-map case already covered). This is the gap the checked slice-2 item
+  "malformed args (non-map / unreadable EDN) → validate error, not crash"
+  overstated for the psi-tool surface.
+
 ## Close-out
 
 - [x] Re-read design acceptance criteria; confirm each is covered by a test.
