@@ -85,3 +85,36 @@ step_execution.clj, registry.clj, defs.clj. Five actionable ambiguities:
    rejects/ignores `operation-id`/`args`, the listing order (sorted-by-id vs
    registry order — relevant given the "deterministic" framing), and empty-list
    rendering are unspecified.
+
+## Resolution of ambiguity follow-ups (ψ)
+
+Resolved all five ambiguity follow-ups by adding locked decisions #9–#12 to
+design.md and aligning the acceptance criteria. Grounded against live code:
+`registry.clj` (all-operations-in, get-operation-in), `defs.clj` (result
+schema: ok→:status/:data/+:summary?/:details?; error→:status/:reason/:message
+/+:details?), `core.clj` invoke-operation (invocation "may include" keys →
+absent-key tolerant), `step_execution.clj` (workflow path passes
+:parent-session-id/:workflow-run-id/:step-id, no :session-id), `psi_tool.clj`
++ `psi_tool_workflow.clj` (parse-edn-string + "must be an EDN map" validation,
+op-style actions), `commands.clj` (exact handlers matched before prefixed;
+`/operation` prefix matcher requires `=prefix` or `prefix " "`, so `/operations`
+exact never collides).
+
+Decisions recorded:
+- #9 per-key truncation: pr-str each top-level value, 2000-char bound, marker
+  `… (truncated, N chars total)`; unit = chars (not coll size/depth); single
+  surface-independent rule.
+- #10 direct-invocation map: :operation-id/:args(default {})/:ctx/:session-id;
+  :parent-session-id only when invoking session has a known parent on ctx else
+  nil; :workflow-run-id/:step-id always nil. Reconciled with workflow path:
+  same schema, each entry point fills the meaningful identity subset.
+- #7 (clarified) + AC: render ALL top-level result keys — single authoritative
+  rule, supersedes any :data/:summary/:details enumeration. (Current AC already
+  said "all top-level result keys"; tightened wording, no contradiction left.)
+- #11 command arg grammar: split tail once on first whitespace → <id> + edn;
+  default {}; blank id → usage; malformed/non-map EDN → clear :type :text error;
+  psi-tool `args` identical; /operations exact never collides with /operation.
+- #12 op:list: ignore (not reject) operation-id/args; sort by id (deterministic,
+  stable, both surfaces); empty registry → explicit empty message / :operations [].
+
+No code touched (design-only follow-ups). No blocked steps.

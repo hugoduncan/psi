@@ -130,8 +130,14 @@ Adjacent / deferred (separate tasks if wanted):
    side-effecting ones (e.g. `github/edit-labels`). No new permission/capability
    gating beyond what already governs psi-tool and commands.
 6. **Listing detail.** List returns operation **id + description** per entry.
-7. **Result rendering.** Render **all top-level keys** of the tagged result,
-   applying **per-key truncation** to bound oversized values.
+7. **Result rendering.** Render **all top-level keys** of the tagged result.
+   This is the single authoritative projection rule: the displayed key set is
+   exactly the keys present on the tagged result, with no enumerated subset.
+   By the result schema, `:ok` results carry `:status :data` plus optional
+   `:summary`/`:details`; `:error` results carry `:status :reason :message`
+   plus optional `:details`. Each top-level **value** is rendered via
+   `pr-str` and then **per-key truncated** (see decision #9). (This supersedes
+   any earlier `:data/:summary/:details`-enumerated phrasing.)
 8. **Listing read path.** Listing reads the deterministic-operation registry
    directly via `all-operations-in`, *not* through a resolver/EQL attribute.
    Rationale: the registry is a runtime handle (per `doc/architecture.md`), not
@@ -141,17 +147,75 @@ Adjacent / deferred (separate tasks if wanted):
    over the same handle; adding a resolver would create a parallel path and
    violate `one_way`. No `:state*` projection is added.
 
+9. **Per-key truncation rule.** Each rendered top-level value (after `pr-str`)
+   is truncated to a maximum of **2000 characters**. When the `pr-str` string
+   exceeds the bound, keep the first 2000 characters and append the marker
+   `… (truncated, N chars total)` where `N` is the untruncated character count.
+   The unit is characters of the `pr-str` rendering (not collection size, not
+   tree depth) — a single, surface-independent rule so the command and the
+   psi-tool action render identically. Truncation is per top-level value only;
+   nested structure is not separately bounded. The `:status`, `:reason`, and
+   `:message` values are subject to the same rule (in practice well under the
+   bound).
+
+10. **Direct-invocation invocation-map shape.** A direct call builds:
+    `:operation-id` (the requested id), `:args` (parsed EDN map, default `{}`),
+    `:ctx` (session ctx), and `:session-id` (the invoking session's id).
+    `:parent-session-id` is set to the invoking session's parent id only when
+    the invoking session is itself a sub-session whose parent is known on ctx;
+    otherwise it is `nil`. `:workflow-run-id` and `:step-id` are always `nil`
+    for direct invocation. This reconciles with the workflow path
+    (`step_execution`), which passes `:parent-session-id` + `:workflow-run-id`
+    + `:step-id` but no `:session-id`: the two entry points populate the same
+    invocation-map schema with the subset of identity keys meaningful to each.
+    For a direct call the meaningful identity is `:session-id` (who invoked);
+    workflow run/step ids are meaningless and therefore nil. Handlers already
+    tolerate absent keys (documented as "may include" on `invoke-operation`).
+
+11. **Command arg grammar.** `/operation` is a prefixed command; its tail
+    (everything after `/operation `) is split once on the first run of
+    whitespace into `<id>` and the remaining `{edn-args}` text. `<id>` is the
+    first non-whitespace token. The remaining text is parsed as an EDN map; if
+    it is blank/absent, `args` defaults to `{}`. If `<id>` is blank →
+    `Usage: /operation <id> {edn-args}`. Malformed EDN args (parse failure or
+    non-map) → a `:type :text` error message naming the parse problem
+    (mirrors `psi-tool-workflow`'s "must be an EDN map" validation), not a
+    crash. The psi-tool `args` param follows the identical default-`{}` and
+    "must be an EDN map" validation. `/operations` (list) is a distinct exact
+    command and never collides with the `/operation` prefix (exact handlers are
+    matched before prefixed ones, and the prefix matcher requires exactly
+    `/operation` or a `/operation ` prefix, never `/operations`).
+
+12. **`op: list` behaviour and ordering.** For `op: "list"` (psi-tool) and
+    `/operations` (command), `operation-id` and `args` are **ignored** (not
+    rejected) — list takes no parameters. The listing is returned **sorted by
+    operation id** (ascending, string compare) for deterministic, stable
+    output across both surfaces, consistent with the "deterministic" framing.
+    An empty registry renders an explicit empty-list message
+    (`No deterministic operations registered.` for the command; an empty
+    `:operations []` collection for the psi-tool structured result) rather than
+    blank output.
+
 ## Acceptance criteria
 
 - `action: "operation", op: "list"` returns each available operation's id +
-  description for the invoking session.
-- `action: "operation", op: "invoke"` with `operation-id` + EDN `args` invokes
-  the operation through the existing runtime boundary and projects its tagged
-  result (ok / error / malformed) into tool output, rendering all top-level
-  result keys with per-key truncation.
-- `/operations` lists operations (id + description) as a `:type :text` result.
+  description for the invoking session, **sorted by id**; `operation-id`/`args`
+  are ignored; an empty registry yields an empty `:operations []` result.
+- `action: "operation", op: "invoke"` with `operation-id` + EDN `args` (default
+  `{}` when absent) invokes the operation through the existing runtime boundary
+  and projects its tagged result (ok / error / malformed) into tool output,
+  rendering **all** top-level result keys, each value `pr-str`'d and truncated
+  to 2000 chars with a `… (truncated, N chars total)` marker.
+- The direct-invocation invocation map carries `:operation-id`, `:args`,
+  `:ctx`, `:session-id`, optional `:parent-session-id` (nil unless the invoking
+  session has a known parent), and nil `:workflow-run-id`/`:step-id`.
+- `/operations` lists operations (id + description, sorted by id) as a
+  `:type :text` result; empty registry → `No deterministic operations
+  registered.`
 - `/operation <id> {edn-args}` invokes the operation and returns its result as a
-  `:type :text` result.
+  `:type :text` result. `<id>` is the first whitespace-delimited token; the
+  remainder parses as an EDN map (default `{}`). Blank `<id>` → usage message;
+  malformed/non-map args → a clear `:type :text` error (not a crash).
 - Both surfaces call the same shared invocation/listing helper (verified: no
   duplicate invocation logic).
 - Side-effecting operations are invokable from both surfaces.
