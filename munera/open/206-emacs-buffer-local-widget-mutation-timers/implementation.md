@@ -360,3 +360,39 @@ No code changes (design/plan-only task). steps.md N1 checked.
   achieved.
 - Verification: full `bb emacs:check` (byte-compile + 337 ERT tests) green;
   byte-compile clean; `.el` reloaded into the running Emacs.
+
+## Implementation review (ψ)
+
+Reviewed code+tests against design/plan acceptance criteria, grounded on real
+source (`psi-widget-projection.el:73/299-396`, `psi-globals.el:72-73`,
+`psi-lifecycle.el:28/297-298/395-396`) and the notification precedent
+(`psi-projection.el:368/379/410`). Verdict: implementation is complete,
+high-quality, and faithful to the precedent. All acceptance criteria met;
+module-global defvar gone (`git grep` clean); 316 ERT tests pass, byte-compile
+clean. Tests assert state (store contents, in-flight lstate) and cover all
+required cases (killed-buffer cancel, two-buffer independence, cross-buffer
+response/timeout targeting, dead-buffer no-op, transcript reset). `cl-letf` over
+`run-at-time`/`cancel-timer`/`timerp`/`send-request-function` substitutes
+infrastructure/timer primitives only — consistent with the suite's established
+idiom and the testing-without-mocks "infrastructure → controllable" rule.
+
+Deviations from plan (both documented, both acceptable):
+- Slices 2+3 landed in one commit (the single `--dispatch-mutation` function
+  spans both — splitting would leave a non-compiling intermediate). Same end
+  state.
+- Tests went into a NEW file `test/psi-widget-projection-timers-test.el` rather
+  than editing `psi-widget-projection-test.el` (file-length limit). Steps Slice
+  2/3/5 referenced line numbers in the old file; harmless since the migration
+  achieved the same coverage and no orphaned global `let`-binds remain.
+
+One MINOR actionable consistency gap (R1): `--on-mutation-timeout` guards only
+`(buffer-live-p buffer)`, but the precedent it explicitly mirrors
+(`psi-emacs--schedule-notification-dismiss`'s scheduled lambda,
+`psi-projection.el:415`) guards `(and (buffer-live-p buffer) st)` — i.e. also
+state-non-nil. Benign in practice (the captured `state` is non-nil whenever the
+buffer was live at arm, and the inner `--cancel-mutation-timer`/`--get-lstate`
+paths null-guard), so this is not a correctness defect. But the design/plan
+repeatedly invoke "mirroring `schedule-notification-dismiss`" as the consistency
+rule, and the guard differs from that precedent. Either add the `state` conjunct
+to match, or note the intentional divergence — so the stated "mirror the
+precedent exactly" claim holds.

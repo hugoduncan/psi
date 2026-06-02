@@ -163,3 +163,17 @@
       `with-current-buffer`; response callback originating-buffer targeting +
       dead-buffer no-op; two-buffer independence; transcript-reset clear;
       existing behaviour preserved; tests cover all + existing tests pass.
+
+## Implementation review follow-ups (ψ)
+
+- [ ] R1 — Reconcile `--on-mutation-timeout`'s live-guard with the cited
+      precedent. The callback guards only `(buffer-live-p buffer)`
+      (`psi-widget-projection.el:341`), but the
+      `psi-emacs--schedule-notification-dismiss` lambda it mirrors guards
+      `(and (buffer-live-p buffer) st)` (`psi-projection.el:415`). Either add
+      the `state`-non-nil conjunct so the guard matches the precedent the
+      design repeatedly invokes ("mirror `schedule-notification-dismiss`"), or
+      record the intentional divergence in design.md/implementation.md so the
+      "mirror the precedent" claim is accurate. (Benign in practice — the
+      captured `state` is non-nil when the buffer was live at arm and the inner
+      paths null-guard — so this is a consistency item, not a correctness fix.)
