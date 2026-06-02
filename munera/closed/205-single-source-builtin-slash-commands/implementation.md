@@ -960,3 +960,67 @@ Verification: `commands-builtin-specs-test` + `builtin-commands-resolver-test`
 the resolver shape test, TT2 adds a new test with the table-driven assertions).
 clj-kondo clean over both changed test files. No production code/docs changed
 (test-only follow-ups). No blocking reasons; both items checked.
+
+## 2026-06-01 — Test review (task-test-review), pass 2
+
+Scope: test quality only per skill — well-formedness, behaviour coverage
+(∀ design behaviour ∃ covering test), infra-dep hygiene (injectable ∧ nullable
+∧ ¬mock ∧ ¬stub). Independent re-read of the net-new test surface
+(`commands_builtin_specs_test.clj`, `builtin_commands_resolver_test.clj`, TUI
+`app_input_selector_test.clj`, Emacs `psi-capf-test.el`) against the spec source
+(`commands/builtin_specs.clj`) and the design ACs / "Spec-entry field set"
+decision. Re-ran `commands-builtin-specs-test` + `builtin-commands-resolver-test`
+→ 11 tests, 67 assertions, 0 failures.
+
+Confirmed pass-1 strengths hold and TT1/TT2 follow-ups landed correctly:
+- Infra-dep hygiene clean: no `with-redefs` in any net-new Clojure test; TUI
+  `query-fn`/`stub-agent-fn` are injected REAL boundary fns (state-asserting,
+  not interaction-asserting); resolver tests drive the live Pathom graph via the
+  real session context. Emacs `cl-letf` (psi-capf-test.el:287) is a pre-existing
+  `project-current` stub in an unrelated tree test, outside the 205 surface.
+- TT1 (resolver description content == spec table) and TT2
+  (`builtin-help-block` `:hide-in-help?` projection) verified present and exact.
+- Both `case` seams (R1/R2) live-locked; projection-unchanged snapshots; dual-kind
+  dispatch; resolver shape/order/membership/graph-discovery; TUI + Emacs
+  backend-sourced `/reload-models`, empty-specs→none, two-key fold,
+  backend-desc-wins, built-in-only token refresh (I2). Hidden-entry
+  (`/?`/`/exit`/`/project-repl`) autocomplete presence is covered transitively:
+  the resolver test asserts `?`/`exit` present, and UI candidates derive purely
+  from the resolver surface (empty→none proves it), so no separate UI hidden-entry
+  test is needed.
+
+One new actionable test gap:
+
+- TT3 — **Spec-table per-entry well-formedness invariant is unverified.** The
+  design's "Spec-entry field set" decision (design.md "Description granularity";
+  AC2 "Dispatch-kind representation") mandates a structural invariant on EVERY
+  `builtin-command-specs` entry: `:kinds` is a non-empty subset of
+  `#{:exact :prefixed}`, and `:handler` is **required iff `:exact ∈ :kinds`**.
+  The projections in `builtin_specs.clj` silently *assume* this without
+  enforcement, and no test asserts it. Two representable-but-invalid states slip
+  through every current test:
+  (a) an entry with an EMPTY `:kinds` set is a valid map — it would vanish from
+  BOTH `exact-command-handlers` and `prefixed-command-prefixes` (filtered by
+  `contains? :kinds`), yet still appear in `builtin-command-names`, the resolver,
+  and UI autocomplete: a "named but unroutable" command. That is precisely the
+  class of invalid state Option B claims to make `unreachable`, yet it is
+  representable and untested.
+  (b) an `:exact` entry MISSING `:handler` projects `"/foo" → nil` into
+  `exact-command-handlers`; the `nil` then drifts from `exact-case-branches`
+  (so the R2 load-time assert would catch the handler-keyword mismatch) — but
+  the *table-level* contract ("`:handler` present whenever `:exact`") is not
+  asserted directly, and a stray `:kinds #{:prefixed} :handler …` or
+  unknown-keyword `:kinds` member has no guard at all.
+  The R1/R2 case-coherence tests lock the *projection ↔ dispatch case* seam, and
+  TT1/TT2 lock description/help content, but none of them locks the *spec entry
+  shape itself* — the single source whose well-formedness every projection
+  depends on. Add a `builtin-command-specs-well-formed-test` asserting, for every
+  entry: `(:kinds spec)` is a non-empty subset of `#{:exact :prefixed}`, and
+  `(:exact ∈ :kinds) ⇒ (some? (:handler spec))` (a short malli schema over the
+  entry-value shape, or explicit `doseq`/`every?` assertions). This locks the
+  single-source data shape so a malformed entry is caught as a test failure
+  rather than silently mis-projecting. Non-blocking: the current table is
+  well-formed, so no behaviour is wrong today — this guards future edits to the
+  sole name source.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

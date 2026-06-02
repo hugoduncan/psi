@@ -248,3 +248,18 @@ Tick with sha/decision on completion.
       `:hide-in-help?` projection (built-in-block omission, not mere global
       absence). The `/skill:name` literal-line check stays in the `/help`
       message test.
+
+## Test review follow-ups (review pass 2)
+
+- [ ] TT3 — Lock the `builtin-command-specs` per-entry well-formedness invariant
+      (design "Spec-entry field set" / AC2): add a
+      `builtin-command-specs-well-formed-test` in `commands_builtin_specs_test.clj`
+      asserting, for EVERY entry of `bspec/builtin-command-specs`, that
+      `(:kinds spec)` is a non-empty subset of `#{:exact :prefixed}` and that
+      `(:exact ∈ :kinds) ⇒ (some? (:handler spec))`. Closes the gap that an
+      empty-`:kinds` (named-but-unroutable) or `:exact`-without-`:handler`
+      (projects `→ nil`) entry is currently representable in the single source
+      yet caught by no test — projections silently assume the shape and R1/R2
+      only lock the projection↔case seam, not the entry shape itself. A short
+      malli schema over the entry-value or explicit `doseq`/`every?` assertions
+      both work.
