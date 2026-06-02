@@ -286,6 +286,26 @@ with the commit sha / decision when done.
       updated for coherence. Skill still registers; both workflows still load
       (14 tests, 196 assertions, 0 failures); clj-kondo clean.
 
+## Implementation review follow-ups (review pass 3)
+
+- [ ] F3 — F2's `(ns, var, arity, line)` join-key uniqueness fix did not
+      propagate to the **generated design contract's** acceptance keys. The
+      generated `design.md` template embedded in
+      `.psi/workflows/reduce-incidental-complexity.edn` (and `design.md` line
+      217) still keys Phase-1 **A5** ("target `lcc-total` decreased … keyed by
+      `(ns, var, arity)`") and the **A2** touched-set identity
+      `{u | before(u) != after(u)}` on the **non-unique** `(ns, var, arity)`
+      key — the same null-arity-`defmethod` collision F2 fixed in the selector
+      recipe (all 51 `execute-effect!` defmethods share key
+      `…/execute-effect!/null`). Guarded today only by the tunable threshold
+      (no null-arity unit currently reaches `lcc-total ≥ 5.0`), but a future
+      high-burden defmethod target would be mis-compared. Fix: propagate F2's
+      keying into the A5/A2 wording in `reduce-incidental-complexity.edn` (key
+      on `(ns, var, arity, line)` to match the selector) and the matching
+      `design.md` A5 line — or state explicitly that null-arity units are out of
+      unit-level acceptance scope. Generated-design prose + `design.md` only; no
+      forced test change (optionally assert the key string for coherence).
+
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 
 - [ ] Split step-1 selection from task-creation into two `:session` steps,

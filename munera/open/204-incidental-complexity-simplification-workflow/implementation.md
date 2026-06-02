@@ -978,3 +978,54 @@ loadability. Verified the skill still loads and both workflows still register:
   (SKILL.md / doc/workflows.md are markdown — not cljfmt/clj-kondo-parseable.)
 
 F2 checked in steps.md. PASS_STATUS: REVIEW_COMPLETE.
+
+## 2026-06-01 — Implementation review (pass 3) — task-implementation-review
+
+Reviewed against `design.md`/`plan.md` and the live artifacts
+(`.psi/skills/incidental-complexity-finder/SKILL.md`,
+`.psi/workflows/task-lifecycle-in-worktree.edn`,
+`.psi/workflows/reduce-incidental-complexity.edn`). Verified live:
+- The selector recipe runs end-to-end (`bb gordian local/complexity --json` →
+  `jq`) and emits the documented top-5 (`start-tui-runtime!/5` gap≈7.03,
+  `print-help!/0` gap≈5.86, …); inline `#` comments are valid jq.
+- Both workflows load: `workflow-definitions-test` = 14 tests, 196 assertions,
+  0 failures.
+- F1 (no-target short-circuit) and F2 (selector join re-keyed on
+  `(ns, var, arity, line)`) are both genuinely resolved in the artifacts.
+
+**Matches-design / architecture / abstraction:** good. Outer 2-step + 3-step
+wrapper match the design; `task-lifecycle-in-worktree` reuses the established
+`review-implementation-in-worktree` wrapper pattern (resolve-worktree → delegate
+→ summary) — reuse, not a new abstraction. `:thinking-level :high` is established
+grammar (8 sibling workflows). No atom bypass, no shim/adapter, no unnecessary
+abstraction.
+
+**One actionable coherence gap (F3 — added to steps.md):**
+
+- **F3 — F2's `(ns, var, arity, line)` uniqueness fix did not propagate to the
+  generated design contract's A5/A2 keys.** F2 established (and verified live)
+  that `(ns, var, arity)` is **non-unique** for null-arity `defmethod` units
+  (all 51 `psi.agent-session.dispatch-effects/execute-effect!` defmethods
+  collapse to one key) and re-keyed the **selector** recipe on
+  `(ns, var, arity, line)` to make `from_entries` lossless/deterministic. But
+  the *generated* design contract embedded in
+  `reduce-incidental-complexity.edn` (and mirrored in `design.md` line 217)
+  still describes the Phase-1 **A5** "target `lcc-total` decreased … (keyed by
+  `(ns, var, arity)`)" lookup and the **A2** touched-set identity
+  `{u | before(u) != after(u)}` on the same non-unique `(ns, var, arity)` key.
+  For a null-arity-defmethod target, the A5 before/after lookup and the A2
+  per-unit identity collapse across all 51 defmethods — the exact collision F2
+  fixed upstream, left unfixed in the acceptance contract the selector feeds.
+  Live-guarded today only by the threshold (max null-arity `lcc-total` = 4.89 <
+  5.0, so no null-arity unit currently qualifies), but the threshold is
+  explicitly **tunable** (design) and a future high-burden defmethod would
+  qualify and then be mis-compared. Fix: propagate F2's keying decision into the
+  generated-contract A5/A2 wording in `reduce-incidental-complexity.edn` (and
+  the matching `design.md` A5 line) — either key A5/A2 on
+  `(ns, var, arity, line)` to match the selector, or state explicitly that
+  null-arity units are out of unit-level acceptance scope. Scope is the
+  generated-design prose + `design.md`; the definition tests don't assert the
+  generated-contract key text, so no test change is forced (optionally assert
+  the key string for coherence).
+
+PASS_STATUS: ACTIONABLE_FEEDBACK.
