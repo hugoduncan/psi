@@ -271,6 +271,26 @@
   "malformed args (non-map / unreadable EDN) → validate error, not crash"
   overstated for the psi-tool surface.
 
+- [ ] (TR-4) Cover the end-to-end psi-tool `:is-error` flag for a
+  tagged-`:error` operation result (slice-2 surface-parity). `make-psi-tool`'s
+  `"operation"` arm sets `:is-error (not= :ok (:psi-tool/overall-status
+  safe-report))` (psi_tool.clj ~L693); for `invoke` the overall-status is
+  `(:status tagged)`, so a handler *returning* `{:status :error …}` (a domain
+  error, NOT an exception) drives `:is-error true` via a distinct code path from
+  every currently-tested `:is-error true` integration case (all of which are
+  validation/lookup/parse failures via validate/outer-catch/missing-operation).
+  The tagged-error case is verified only at the report-unit level
+  (`invoke-error-sets-overall-status`, which asserts `:psi-tool/overall-status
+  :error` but not the serialized `:is-error`). Add a
+  `psi_tool_operation_integration_test` case registering an op whose handler
+  returns `{:status :error :reason … :message …}`, dispatching `op invoke`
+  through the real `make-psi-tool`, and asserting `:is-error true`,
+  `:psi-tool/action :operation`, `:psi-tool/overall-status :error`, and the
+  projected `:reason`/`:message` keys on `:psi-tool/result`. Distinct from TR-1
+  (`:details` projection), TR-2 (command truncation), TR-3 (unreadable-EDN
+  *exception* path; this is the *tagged-error* non-exception path). Run the
+  integration suite focused; `clj-paren-repair`; `clj-kondo --lint`; commit.
+
 ## Close-out
 
 - [x] Re-read design acceptance criteria; confirm each is covered by a test.

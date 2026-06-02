@@ -625,3 +625,58 @@ regression. No blocked steps.
 The remaining unchecked close-out box (`git mv open/ → closed/` + remove from
 plan.md) is the lifecycle's terminal move, performed by the orchestrating
 lifecycle, not this follow-up pass.
+
+## Test review (ψ, fourth pass)
+
+Re-applied task-test-review skill (well-formed ∧ behaviour-coverage ∧
+infra-deps real/¬mock). Ran the four task suites focused: 47 tests / 102
+assertions, all green. Grounded against `psi_tool.clj` (the `"operation"` arm
+of `make-psi-tool`'s `case action`, L690–693, where `:is-error` is computed as
+`(not= :ok (:psi-tool/overall-status safe-report))`), `psi_tool_operation.clj`
+(report `:overall-status` ← `(:status tagged)` for the `invoke` branch), and
+the four test namespaces.
+
+Confirmed (unchanged from prior passes): well-formed, deterministic; real
+`registry/create-registry` + real `runtime/invoke-operation` + real
+`session/create-context`; no mocks/stubs; side-effects via real sinks; AC
+behaviour coverage incl. TR-1 `:details`, TR-2 command-surface truncation,
+TR-3 unreadable-EDN psi-tool branch (all closed).
+
+Actionable test gap found (1):
+- **The end-to-end psi-tool `:is-error` flag is never verified for a
+  tagged-`:error` operation result.** The `"operation"` arm of `make-psi-tool`
+  sets `:is-error (not= :ok (:psi-tool/overall-status safe-report))` (psi_tool.clj
+  L693). For the `invoke` branch the report's `:psi-tool/overall-status` is
+  taken directly from `(:status tagged)` — so a handler returning a domain
+  `{:status :error …}` result (NOT an exception) drives `:is-error true` via a
+  **distinct code path** from every currently-tested `:is-error true` case in
+  `psi_tool_operation_integration_test.clj`: those are all
+  *validation/lookup/parse* failures (blank-id, invalid-op, non-map args,
+  unreadable args, unknown-id) routed via `validate-psi-tool-request` /
+  outer-catch / `:missing-deterministic-operation`. None registers an op whose
+  handler *returns* a tagged `:status :error` map and asserts the serialized
+  `:is-error true` survives through `make-psi-tool`. The tagged-error case is
+  covered only at the **report-unit** level (`psi_tool_operation_test/invoke-
+  error-sets-overall-status`, which asserts `:psi-tool/overall-status :error`
+  but not `:is-error`). The slice-2 steps.md item "`op invoke` error-result →
+  `:is-error true`, projected" is therefore checked but only verified at the
+  report level, not end-to-end where `:is-error` is actually applied. A
+  regression in the `:is-error` wiring for the tagged-error (non-exception)
+  result would go undetected. This is distinct from TR-1 (`:details`
+  projection), TR-2 (command truncation), and TR-3 (unreadable-EDN parse
+  branch — an *exception* path, whereas this is the *tagged-error* path). Add a
+  `psi_tool_operation_integration_test` case registering an op whose handler
+  returns `{:status :error :reason … :message …}`, dispatching `op invoke`
+  through the real `make-psi-tool`, and asserting `:is-error true`,
+  `:psi-tool/action :operation`, `:psi-tool/overall-status :error`, and the
+  projected `:reason`/`:message` keys on `:psi-tool/result` — closing the
+  end-to-end `:is-error` guarantee for the tagged-error result path.
+
+Non-actionable observations (no follow-up):
+- The list/invoke-ok `:is-error false` end-to-end cases ARE covered
+  (`operation-list-end-to-end`, `operation-invoke-ok-end-to-end`); only the
+  tagged-error `:is-error true` end-to-end case is missing.
+- The command surface has no analogous `:is-error` concept (commands return
+  `{:type :text}` data maps with no error flag); `operation-malformed-result-
+  distinct` and the error-text tests already cover the command tagged-error
+  rendering. The gap is psi-tool-specific.
