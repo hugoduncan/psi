@@ -106,7 +106,7 @@ override on name collision; extension commands and prompt templates follow."
                                             spec '(:description description))
                                            "")))
                             (when (not (string-empty-p name))
-                              (cons (if (string-prefix-p "/" name) name (concat "/" name))
+                              (cons (psi-emacs--ensure-slash-prefix name)
                                     (format "%s" desc)))))
                         (or builtin-specs []))))
          (base psi-emacs-slash-command-specs)
@@ -115,7 +115,7 @@ override on name collision; extension commands and prompt templates follow."
          (ext-specs
           (mapcar (lambda (name)
                     (let ((cmd (string-trim (format "%s" (or name "")))))
-                      (cons (if (string-prefix-p "/" cmd) cmd (concat "/" cmd))
+                      (cons (psi-emacs--ensure-slash-prefix cmd)
                             "Extension command")))
                   (or ext-names [])))
          (template-specs (delq nil (and (fboundp 'psi-emacs--state-prompt-template-specs)

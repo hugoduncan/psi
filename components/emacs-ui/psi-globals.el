@@ -228,6 +228,14 @@ constructors."
   (list (psi-emacs--slash-completion-normalize-text name)
         (psi-emacs--slash-completion-normalize-text description)))
 
+(defun psi-emacs--ensure-slash-prefix (command)
+  "Return COMMAND guaranteed to start with a leading slash.
+
+Single source of the ensure-leading-slash rule shared by the backend
+built-in and extension slash-command surfaces (parallel to the TUI
+`as-slash-command'), so those surfaces cannot diverge."
+  (if (string-prefix-p "/" command) command (concat "/" command)))
+
 (provide 'psi-globals)
 
 ;;; psi-globals.el ends here

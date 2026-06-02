@@ -547,7 +547,7 @@ Tick with sha/decision on completion.
 
 ## Code-shaper review follow-ups (code-shaper pass 4)
 
-- [ ] CS5 — Extract the open-coded ensure-leading-slash idiom in
+- [x] CS5 — Extract the open-coded ensure-leading-slash idiom in
       `psi-emacs--state-slash-command-specs` (`psi-completion.el`) into one
       shared helper (`consistent ∧ robust`). The form
       `(if (string-prefix-p "/" x) x (concat "/" x))` is repeated twice in that

@@ -504,6 +504,13 @@ slash-completion state is left untouched."
         (delete-directory tmp t)))))
 
 
+(ert-deftest psi-capf-ensure-slash-prefix-is-shared-idempotent-rule ()
+  "CS5: the single shared `psi-emacs--ensure-slash-prefix' helper adds a leading
+slash when missing and preserves an already-prefixed command, so the backend
+built-in and extension slash-command surfaces cannot diverge on the rule."
+  (should (equal "/delegate" (psi-emacs--ensure-slash-prefix "delegate")))
+  (should (equal "/delegate" (psi-emacs--ensure-slash-prefix "/delegate"))))
+
 (provide 'psi-capf-test)
 
 ;;; psi-capf-test.el ends here

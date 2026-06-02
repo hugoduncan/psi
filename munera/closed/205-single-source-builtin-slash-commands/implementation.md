@@ -2001,3 +2001,41 @@ No duplication of prior notes: CS1 = backend help-line render formula; CS2 =
 unused resolver attribute; CS3 = entry-shape load-time guard; CS4 = token-
 constructor normalization. CS5 is a distinct surface (Emacs slash-prefix
 idiom in `psi-completion.el`'s merged-specs builder), untouched by CS1–CS4.
+
+### CS5 execution (code-shaper pass 4 follow-up) — done
+
+Added `psi-emacs--ensure-slash-prefix` to `psi-globals.el` (placed immediately
+after `psi-emacs--slash-completion-pair`, beside
+`psi-emacs--slash-completion-normalize-text`, so existing `(require 'psi-globals)`
+in `psi-completion.el` covers it — no new `declare-function`). The helper is the
+single source of the ensure-leading-slash rule:
+`(if (string-prefix-p "/" command) command (concat "/" command))`, mirroring the
+TUI `as-slash-command`.
+
+Rewired both literal sites in `psi-emacs--state-slash-command-specs`
+(`psi-completion.el`): the `backend-specs` block (was the 205-added
+`:psi.agent-session/builtin-command-specs` consumer) and the pre-existing
+`ext-specs` block now call `(psi-emacs--ensure-slash-prefix …)`. The two
+open-coded `(if (string-prefix-p "/" x) x (concat "/" x))` forms are gone, so the
+backend-command and extension-command surfaces cannot diverge on the prefix rule.
+
+Scope decision — `psi-session-commands.el:363`: left the template-builder
+`(concat "/" name)` as-is. That form is *unconditional* (template names never
+carry a leading `/`, and the surrounding `when name` already guards nil); it is
+not the conditional ensure-leading-slash idiom CS5 targets. Folding it would be a
+behaviour-neutral no-op only if no template name ever starts with `/`, which is an
+assumption the current code does not enforce — so changing it would *introduce*
+the prefix-collapsing semantics rather than preserve them. Kept the change minimal
+and behaviour-preserving (the follow-up explicitly marked this fold "welcome if
+low-risk", i.e. optional).
+
+Test: added `psi-capf-ensure-slash-prefix-is-shared-idempotent-rule` locking both
+the add-when-missing (`"delegate" → "/delegate"`) and preserve-when-present
+(`"/delegate" → "/delegate"`) semantics. Pre-existing
+`psi-capf-slash-includes-extension-commands-from-state` already exercises both
+paths end-to-end through the merged-specs builder (`delegate` and
+`/delegate-reload`), so behaviour parity is regression-covered.
+
+Verification: `bb emacs:check` green — byte-compile clean (no new warnings on
+`psi-globals.el` / `psi-completion.el`), 330/330 tests pass including the new CS5
+test.
