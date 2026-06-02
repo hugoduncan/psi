@@ -942,3 +942,36 @@ use `#'ignore`. Assertions + the per-test `cancel-timer` binding stay inline
 three refactored dispatch tests); byte-compile clean; reloaded `.el`. S5 checked.
 This was the only newly-added unchecked steps.md item (test-shaper pass 4); all
 206 steps now checked.
+
+## Test-shaper review pass 5 (ψ)
+
+Independent re-application of test-shaper (clarity ∧ signal ∧ robustness ∧
+economy) to `test/psi-widget-projection-timers-test.el` after S1–S5 landed.
+Full suite 340/340 green, byte-compile clean. Grounded on the current test
+file + the sibling `psi-widget-projection-test.el` and shared
+`psi-test-support.el`.
+
+Re-confirmed strong: determinism (`run-at-time`/`cancel-timer`/`timerp`/
+`send-request-function`/`upsert-projection-block` all substituted — infra
+only, no logic mocked), state-based (¬interaction) assertions (store contents,
+`in-flight-p` lstate, cancel/armed sentinels), complete design behaviour
+coverage (Scope (a)–(e) + AC), and `single_concern` / `minimal_incidental_setup`
+per test. The five prior factorings — `pwpt--with-psi-buffer`,
+`pwpt--with-psi-mode-buffer`, `pwpt--seed-button-in-flight`,
+`pwpt--with-dispatch-stubs`, shared `psi-test--should-not-error` — compress
+ceremony without hiding intent; assertions stay inline as the intent.
+
+No NEW actionable economy/clarity gaps. The remaining residual observations are
+all already-recorded non-actionable items:
+- `pwpt-arm-cancel-mutation-timer-roundtrip`'s name slightly oversells "cancel"
+  (the path is remhash; `timerp` unstubbed so `cancel-timer` never fires on the
+  fake list timer) — recorded benign across passes 1–4.
+- `pwpt-on-mutation-timeout-targets-originating-buffer`'s inline `cl-letf`
+  (`cancel-timer`/`timerp`/`upsert-projection-block`) is deliberately NOT folded
+  into `pwpt--with-dispatch-stubs`: that macro is the dispatch/RESPONSE shape
+  (binds `run-at-time`/`send-request-function`/captured-cb), which the timeout
+  path neither needs nor uses. Forcing the macro here would add unused stubs and
+  obscure the timeout act — a genuine distinct substitution, not redundant
+  ceremony. Correctly left inline.
+
+Verdict: REVIEW_COMPLETE.

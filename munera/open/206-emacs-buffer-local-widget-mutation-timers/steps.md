@@ -308,3 +308,10 @@
       assertions and the per-test `cancel-timer` binding inline (they are the
       intent). Deferrable — stubs are uniform/correct, coverage unaffected.
       Re-run `bb emacs:check`; byte-compile clean; reload `.el`.
+
+## Test-shaper review pass 5 follow-ups (ψ)
+
+- No new actionable items. Pass 5 re-confirmed clarity ∧ signal ∧ robustness ∧
+  economy after S1–S5 landed; the only residual observations
+  (`…-roundtrip` "cancel" name, the timeout test's distinct inline `cl-letf`)
+  are already-recorded non-actionable. Verdict: REVIEW_COMPLETE.
