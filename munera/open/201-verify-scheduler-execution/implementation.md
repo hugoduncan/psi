@@ -1935,3 +1935,27 @@ citations unchanged (no deftest renamed). clj-kondo 0/0; clj-paren-repair clean;
 full `bb test` ✅ green. Test/`test_support`-only — `git diff --name-only` =
 `test_support.clj` + `scheduler_end_to_end_test.clj`; zero
 `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist held).
+
+## Code-shaper review — pass 2 (code-shaper, 2026-06-01)
+
+Re-audited the 201 test surface firsthand against simplicity ∧ consistency ∧
+robustness. Pass-1 follow-ups (shared `stub-execution-result`, fixed
+execution-stub instant) confirmed landed and effective. The pass-12
+read-idiom convergence (`ss/get-session-data-in`) and pass-13 write-idiom
+convergence (`ss/session-update`) hold; suite green, clj-kondo 0/0 on the new
+files. Deliverable shape (`findings.md` + cited covering tests) sound.
+
+One **new actionable** `consistent(idioms)` finding (test-file-only, not raised
+by any prior pass): the **`java.time.Instant/parse` literal-instant idiom is
+inconsistent across the task's own files**. `scheduler_test.clj` defines a
+private `instant` helper and uses it throughout (~13 sites), while the four new
+integration test files open-code `(java.time.Instant/parse …)`:
+`scheduler_end_to_end_test` (×4), `scheduler_timer_seam_test` (×4),
+`scheduler_resolvers_test` (×4), `scheduler_context_shutdown_test` (×3). Two
+idioms for the same operation (literal → `Instant`) span the task surface, and
+the natural home (`test-support`, parallel to `fixed-scheduler-time-source`) has
+no such helper. Recorded as a follow-up below. (Not flagged: the deeper
+`[:scheduler :schedules id :status]` path literal — pass-12 deliberately
+standardised the *outer* read fn and left that inner path; converging it would
+be a larger cross-cutting change reaching pre-existing baseline files outside
+201's new-test scope, so it is intentionally not raised here.)

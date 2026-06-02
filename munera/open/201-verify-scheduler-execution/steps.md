@@ -1226,3 +1226,28 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       `bb test` green. Test/`test_support`-only — zero
       `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist
       held).
+
+## Code-shaper follow-ups — pass 2 (code-shaper, 2026-06-01)
+
+- [ ] Converge the literal-instant idiom across the 201 test files on a single
+      shared helper. `scheduler_test.clj` defines a private `(defn- instant [s]
+      (java.time.Instant/parse s))` and uses it throughout, but the four new
+      integration test files open-code `(java.time.Instant/parse …)`:
+      `scheduler_end_to_end_test` (×4), `scheduler_timer_seam_test` (×4),
+      `scheduler_resolvers_test` (×4), `scheduler_context_shutdown_test` (×3).
+      Rationale (code-shaper consistent(idioms) ∧ locally_comprehensible): two
+      idioms for the same literal→`Instant` operation span the task's own
+      surface; the verbose fully-qualified static call is noisier than the
+      one-word helper. Promote `instant` to `test-support` (e.g.
+      `(defn instant [s] (java.time.Instant/parse s))`, sitting beside
+      `fixed-scheduler-time-source`), have `scheduler_test.clj` consume the
+      shared helper instead of its private copy, and replace the open-coded
+      `(java.time.Instant/parse …)` literal sites in the four integration test
+      files with `(test-support/instant …)`. Keep the runtime-derived instants
+      (`(.plusMillis now …)` / `(.plusSeconds now …)`) as-is — those are not
+      literal parses. Behaviour-preserving, no assertion change. Keep suite green
+      + clj-kondo/cljfmt clean. Test-file-only — zero
+      `components/agent-session/src/**` / `doc/scheduler.md` (verification-only
+      invariant; Slice-10 allowlist). `findings.md` citations unchanged (no
+      deftest renamed). If 201 is treated as closed instead, raise as a small
+      standalone test-hygiene task.
