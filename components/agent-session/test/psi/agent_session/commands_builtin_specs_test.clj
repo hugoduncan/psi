@@ -152,6 +152,46 @@
     (testing "non-routed /skill:name helper line stays literal"
       (is (str/includes? message "/skill:name — invoke a skill")))))
 
+(deftest format-help-block-line-order-test
+  ;; TT5: lock the *full* built-in help-block line order to the single source
+  ;; (AC3 "unchanged in order"). format-help-derived-from-spec-table-test only
+  ;; asserts the leading (quit < status < help) ordering, leaving the ~18
+  ;; interleaved lines — including every `:usage`-bearing prefixed entry — with
+  ;; no positional assertion; a middle-of-table reorder would pass every other
+  ;; test. Assert the rendered block's full line sequence equals the
+  ;; spec-table-ordered, `:hide-in-help?`-filtered projection.
+  (let [line-for (fn [k {:keys [description usage]}]
+                   (str "  " k " " (when usage (str usage " ")) "— " description))
+        expected (for [[k spec] bspec/builtin-command-specs
+                       :when (not (:hide-in-help? spec))]
+                   (line-for k spec))]
+    (is (= (vec expected)
+           (str/split-lines (bspec/builtin-help-block)))
+        "built-in help block lines must equal the spec-table-ordered, hidden-filtered projection")))
+
+(deftest project-repl-exact-first-precedence-test
+  ;; TT6: lock dual-kind `/project-repl` *exact-first* dispatch precedence
+  ;; (design "Dispatch-kind representation"), not merely behaviour.
+  ;; project-repl-dual-kind-test cannot prove the bare form is served by the
+  ;; exact path because both the exact handler and the prefixed `case` route to
+  ;; the same dispatch-project-nrepl-command — a behaviour assertion is
+  ;; path-blind. Lock the seam instead.
+  ;;
+  ;; NOTE: `commands/prefixed-command` DOES match the bare form
+  ;; (`(= trimmed prefix)` is an explicit branch), so exact-first precedence is
+  ;; NOT decided by the prefixed matcher declining the bare form; it is decided
+  ;; by dispatch*'s `(or (case (exact-command-handler …) …)
+  ;; (dispatch-prefixed-command …))` short-circuiting on the bare form's exact
+  ;; handler. The discriminating seam fact is that the bare form HAS an exact
+  ;; handler (so the `or` serves it via the exact path) while the `<args>` form
+  ;; does NOT (so it is exclusively prefixed-routed).
+  (testing "bare /project-repl has an exact handler (exact path serves it first)"
+    (is (= :project-repl (@#'commands/exact-command-handler "/project-repl"))))
+  (testing "/project-repl <args> has no exact handler (exclusively prefixed-routed)"
+    (is (nil? (@#'commands/exact-command-handler "/project-repl start"))))
+  (testing "the prefixed matcher reaches the /project-repl <args> form"
+    (is (= "/project-repl" (@#'commands/prefixed-command "/project-repl start")))))
+
 (deftest builtin-help-block-hide-in-help-projection-test
   ;; Lock the `:hide-in-help?` projection against the built-in block directly
   ;; (not the whole `/help` message): hidden entries' lines are absent, shown

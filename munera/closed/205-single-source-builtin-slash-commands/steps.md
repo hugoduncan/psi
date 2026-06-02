@@ -293,7 +293,16 @@ Tick with sha/decision on completion.
 
 ## Test review follow-ups (review pass 4)
 
-- [ ] TT5 — Lock the full `format-help` built-in block line *order* to the
+- [x] TT5 — Added `format-help-block-line-order-test`
+      (`commands_builtin_specs_test.clj`): builds the expected line sequence from
+      `bspec/builtin-command-specs` filtered by `:hide-in-help?` in table order
+      (reusing the `line-for` shape) and asserts
+      `(str/split-lines (bspec/builtin-help-block))` equals it exactly — locking
+      the whole ~18-line block, every interleaved `:usage`-bearing prefixed entry
+      included, to the single source (AC3 "unchanged in order"). 11 tests / 192
+      assertions green; clj-kondo clean.
+      Original item text:
+      Lock the full `format-help` built-in block line *order* to the
       single source (AC3 "unchanged in order"). `format-help-derived-from-spec-
       table-test` only asserts `quit < status < help` (the two leading + the
       trailing non-hidden entries), leaving the ~18 interleaved lines —
@@ -305,7 +314,25 @@ Tick with sha/decision on completion.
       `bspec/builtin-command-specs` (reuse the `line-for` shape from
       `builtin-help-block-hide-in-help-projection-test`), locking whole-block
       order — interleaved `:usage` lines included — to the single source.
-- [ ] TT6 — Lock dual-kind `/project-repl` exact-first dispatch *precedence*
+- [x] TT6 — Added `project-repl-exact-first-precedence-test`
+      (`commands_builtin_specs_test.clj`) locking the seam, NOT behaviour:
+      `(@#'commands/exact-command-handler "/project-repl") = :project-repl` (bare
+      form has an exact handler ⇒ dispatch*'s `or` serves it via the exact path
+      first), `(@#'commands/exact-command-handler "/project-repl start") = nil`
+      (args form has no exact handler ⇒ exclusively prefixed-routed), and
+      `(@#'commands/prefixed-command "/project-repl start") = "/project-repl"`
+      (prefixed matcher reaches the args form). Deviation from item text: the
+      proposed "prefixed matcher does **not** match the bare form" assertion is
+      FALSE for the live `commands/prefixed-command` — `(= trimmed prefix)` is an
+      explicit branch, so it matches the bare form too; exact-first precedence is
+      decided by dispatch*'s `(or (case (exact-command-handler …) …)
+      (dispatch-prefixed-command …))` short-circuit, not by the prefixed matcher
+      declining the bare form. The seam assertions above honour TT6's intent
+      ("prove the bare form is genuinely exact-routed") against the real code.
+      See implementation.md "Follow-up execution — review pass 4". 11 tests /
+      192 assertions green; clj-kondo clean.
+      Original item text:
+      Lock dual-kind `/project-repl` exact-first dispatch *precedence*
       (design "Dispatch-kind representation"), not just behaviour.
       `project-repl-dual-kind-test` asserts both projections contain
       `/project-repl` and that bare/`<args>` forms each return `:text`, but

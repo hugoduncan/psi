@@ -1241,3 +1241,49 @@ to the single source / dispatch ordering and harden AC3 + the dual-kind
 precedence contract. Neither indicates a current behaviour defect.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Follow-up execution — review pass 4 (TT5, TT6)
+
+TT5 (whole-block help order) and TT6 (dual-kind exact-first precedence) added as
+`commands-builtin-specs-test` deftests.
+
+### TT5 — full built-in help-block line order locked
+Added `format-help-block-line-order-test`: builds the expected line sequence from
+`bspec/builtin-command-specs` filtered by `:hide-in-help?`, in table order (reusing
+the `line-for` shape from `builtin-help-block-hide-in-help-projection-test`), and
+asserts `(str/split-lines (bspec/builtin-help-block))` equals it exactly. This
+locks the whole ~18-line block — every interleaved `:usage`-bearing prefixed entry
+(`/tree`, `/model`, `/speed`, `/effort`, `/thinking`, `/login`, `/jobs`, …)
+included — to the single source, so a middle-of-table reorder now fails (AC3
+"unchanged in order"), which the leading/trailing-only `<` checks in
+`format-help-derived-from-spec-table-test` did not catch.
+
+### TT6 — exact-first precedence reconciliation
+TT6's proposed second assertion ("the prefixed matcher does **not** match the bare
+form") is **inaccurate against the implementation**: `commands/prefixed-command`
+matches the bare form too — `(= trimmed prefix)` is an explicit branch, so
+`(prefixed-command "/project-repl")` returns `"/project-repl"`. The exact-first
+precedence for the bare form is therefore NOT decided by the prefixed matcher
+declining the bare form; it is decided by `dispatch*`'s `(or (case
+(exact-command-handler …) …) (dispatch-prefixed-command …))` — the exact `case`
+short-circuits the `or` for the bare form because the bare form has an exact
+handler.
+
+Honoured TT6's intent ("prove the bare form is genuinely exact-routed, exact-first")
+with seam assertions that hold against the real code:
+- `(@#'commands/exact-command-handler "/project-repl") = :project-repl` — bare form
+  HAS an exact handler, so the `or`'s exact `case` returns non-nil and
+  short-circuits before `dispatch-prefixed-command`.
+- `(@#'commands/exact-command-handler "/project-repl start") = nil` — the `<args>`
+  form has NO exact handler, so it is exclusively prefixed-routed (proving the two
+  forms take different paths; the prefixed path is reachable only for `<args>`).
+- `(@#'commands/prefixed-command "/project-repl start") = "/project-repl"` — the
+  prefixed matcher reaches the `<args>` form.
+
+Together these lock: bare → exact path (exact-first wins via `or` ordering), args →
+prefixed path. A regression dropping `/project-repl` from the exact projection makes
+assertion 1 fail (`nil`); flipping the `or` order is caught because the bare form
+would then be prefixed-routed while still — but the discriminating lock is assertion
+1 + the design's `or` ordering: with no exact handler the bare form could only be
+prefixed-served. (Did NOT assert "prefixed does not match bare" since that is false
+for the live matcher.)
