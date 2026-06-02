@@ -699,3 +699,45 @@ Two actionable economy findings:
 Both are refactors of test scaffolding for already-correct, fully-covering
 tests; neither changes behaviour, coverage, or source. Verdict:
 ACTIONABLE_FEEDBACK (economy/clarity refinements S1, S2).
+
+## Test-shaper review follow-ups executed (S1, S2) — 2026-06-02
+
+Executed the two newly-added test-shaper review items. Both pure test-scaffold
+refactors of `test/psi-widget-projection-timers-test.el` (+ one site in sibling
+`test/psi-widget-projection-test.el`); no source, no coverage change. Full
+`bb emacs:test` 340/340 before and after; byte-compile clean; reloaded.
+
+- **S2 — shared no-op assertion macro.** Added `psi-test--should-not-error
+  (&rest body)` to the shared `test/psi-test-support.el` (not a per-file copy):
+  the `(should-not (condition-case err (progn … nil) (error err)))` idiom is a
+  generic no-op assertion shared by *both* widget-projection test files, so it
+  belongs in shared support, giving `consistent(assertion_style)` across files.
+  Wired `(require 'psi-test-support)` (+ the `test/` load-path entry) into both
+  `psi-widget-projection-timers-test.el` and `psi-widget-projection-test.el`
+  (mirroring the established pattern in the other emacs-ui test files). Replaced
+  all 5 remaining idiom sites in the timers file (timeout dead-buffer no-op,
+  timeout nil-state no-op, error-handler nil no-op, error-handler-exception
+  no-op, clear-timers nil-state no-op) and the 1 site in the sibling file
+  (`pwpt-request-specs-noop-when-no-send-function`). The response-dead-buffer
+  test also adopted the macro.
+
+- **S1 — buffer ceremony helpers (local to timers file).** Added two helpers
+  local to the timers test (specific to buffer-local widget state, so NOT in
+  shared support):
+  - `pwpt--with-psi-buffer (var &rest body)` — `generate-new-buffer` +
+    `setq-local psi-emacs--state (psi-emacs--initialize-state nil)` +
+    `unwind-protect`/`kill-buffer`. Nestable; used for the two two-buffer tests
+    (`…-dispatch-response-targets-originating-buffer`,
+    `…-on-mutation-timeout-targets-originating-buffer`) and
+    `…-two-buffers-do-not-share-mutation-timer-state`.
+  - `pwpt--seed-button-in-flight (id key)` — registers a single-button spec,
+    syncs lstates, marks the button in-flight in the current buffer; folds the
+    repeated spec+`--sync-lstates`+`--set-lstate` arrange block in the two
+    cross-buffer response/timeout tests.
+
+  Assertions left fully inline (they ARE the intent —
+  `helpers_that_compress(ceremony) ∧ ¬helpers_that_hide(intent)`). Deliberately
+  did NOT convert `…-dispatch-response-noop-when-buffer-dead` to
+  `pwpt--with-psi-buffer`: that test's explicit mid-test `kill-buffer` is the
+  *act*, not teardown, so it keeps an inline `generate-new-buffer`/`kill-buffer`
+  to preserve that intent (the macro's teardown kill would obscure it).

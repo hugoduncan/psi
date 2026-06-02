@@ -4,7 +4,10 @@
 (require 'cl-lib)
 
 (add-to-list 'load-path
+             (file-name-directory (or load-file-name buffer-file-name)))
+(add-to-list 'load-path
              (expand-file-name "../" (file-name-directory (or load-file-name buffer-file-name))))
+(require 'psi-test-support)
 (require 'psi)
 (require 'psi-widget-renderer)
 (require 'psi-widget-projection)
@@ -82,10 +85,8 @@
 (ert-deftest pwpt-request-specs-noop-when-no-send-function ()
   (pwpt--with-state
    (let ((psi-emacs--send-request-function nil))
-     ;; Should not error
-     (should-not (condition-case err
-                     (progn (psi-widget-projection-request-specs) nil)
-                   (error err))))))
+     (psi-test--should-not-error
+       (psi-widget-projection-request-specs)))))
 
 ;;; ─── lstate management ───────────────────────────────────────────────────────
 

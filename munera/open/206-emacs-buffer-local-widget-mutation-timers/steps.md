@@ -215,7 +215,7 @@
 
 ## Test-shaper review follow-ups (ψ)
 
-- [ ] S1 — Compress the unfactored cross-buffer test setup ceremony. The three
+- [x] S1 — Compress the unfactored cross-buffer test setup ceremony. The three
       two-buffer tests (`pwpt-dispatch-response-targets-originating-buffer`,
       `pwpt-on-mutation-timeout-targets-originating-buffer`,
       `pwpt-two-buffers-do-not-share-mutation-timer-state` in
@@ -233,7 +233,7 @@
       compress only the generate/seed/teardown scaffold
       (`helpers_that_compress(ceremony) ∧ ¬helpers_that_hide(intent)`). Re-run
       `bb emacs:check`; byte-compile clean; reload `.el`.
-- [ ] S2 — Factor the repeated no-op idiom (minor). The
+- [x] S2 — Factor the repeated no-op idiom (minor). The
       `(should-not (condition-case err (progn … nil) (error err)))` "harmless
       no-op" idiom is hand-rolled 6× in
       `test/psi-widget-projection-timers-test.el` and again in
