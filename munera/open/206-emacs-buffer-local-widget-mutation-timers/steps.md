@@ -85,34 +85,34 @@
 
 ## Slice 4 — Teardown + transcript reset cancel-all
 
-- [ ] Add `(declare-function psi-widget-projection--clear-mutation-timers "psi-widget-projection" (state))`
+- [x] Add `(declare-function psi-widget-projection--clear-mutation-timers "psi-widget-projection" (state))`
       in `psi-lifecycle.el` (beside existing `psi-projection` declares).
-- [ ] Call `(psi-widget-projection--clear-mutation-timers psi-emacs--state)` in
+- [x] Call `(psi-widget-projection--clear-mutation-timers psi-emacs--state)` in
       `psi-emacs--teardown-buffer` (`psi-lifecycle.el:269`), alongside
       `psi-emacs--clear-notification-lifecycle`.
-- [ ] Call `(psi-widget-projection--clear-mutation-timers psi-emacs--state)` in
+- [x] Call `(psi-widget-projection--clear-mutation-timers psi-emacs--state)` in
       `psi-emacs--reset-transcript-state` (`psi-lifecycle.el:392`), beside the
       existing notification clear.
-- [ ] Add test: killing a psi buffer with an in-flight widget mutation timer
+- [x] Add test: killing a psi buffer with an in-flight widget mutation timer
       cancels and clears that timer (no scheduled watchdog remains).
-- [ ] Add test: transcript reset (`/new`) clears the buffer's widget mutation
+- [x] Add test: transcript reset (`/new`) clears the buffer's widget mutation
       timers.
-- [ ] Add test: two live psi buffers with the same `ext-id/widget-id:node-key`
+- [x] Add test: two live psi buffers with the same `ext-id/widget-id:node-key`
       do not share/interfere with each other's timers (each store independent).
-- [ ] Run tests; lint; reload.
-- [ ] Commit: `⚒ 206: cancel widget mutation timers on teardown and transcript reset`.
+- [x] Run tests; lint; reload.
+- [x] Commit: `⚒ 206: cancel widget mutation timers on teardown and transcript reset`.
 
 ## Slice 5 — Remove module-global defvar
 
-- [ ] `git grep psi-widget-projection--mutation-timers` — confirm only the defvar
+- [x] `git grep psi-widget-projection--mutation-timers` — confirm only the defvar
       (and any remaining test binds) reference it.
-- [ ] Delete `defvar psi-widget-projection--mutation-timers` (`psi-widget-projection.el:73`).
-- [ ] Remove any leftover `let`-binds of the global from tests.
-- [ ] Final `git grep` confirms zero references to the global.
-- [ ] Full `emacs-ui` test sweep green; `.el` lint clean
+- [x] Delete `defvar psi-widget-projection--mutation-timers` (`psi-widget-projection.el:73`).
+- [x] Remove any leftover `let`-binds of the global from tests.
+- [x] Final `git grep` confirms zero references to the global.
+- [x] Full `emacs-ui` test sweep green; `.el` lint clean
       (`clj-paren-repair`/byte-compile, matching Slice 1 — this task edits only
       `.el` files, so the Clojure `clj-kondo` linter does not apply); reload `.el`.
-- [ ] Commit: `⚒ 206: remove module-global widget mutation-timers store`.
+- [x] Commit: `⚒ 206: remove module-global widget mutation-timers store`.
 
 ## Plan ambiguity review follow-ups (ψ)
 
@@ -156,7 +156,7 @@
 
 ## Acceptance verification (final)
 
-- [ ] Confirm against design.md acceptance criteria: buffer-local store; single
+- [x] Confirm against design.md acceptance criteria: buffer-local store; single
       explicit-`state` store-resolution rule (no site reads dynamic
       `psi-emacs--state` for the store); teardown cancels all; arm threads
       `buffer`/`state`; timeout callback leading params + `buffer-live-p` no-op +

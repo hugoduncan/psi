@@ -70,9 +70,6 @@ Inline renderer errors still display.")
 
 ;;; Mutation timeout state
 
-(defvar psi-widget-projection--mutation-timers (make-hash-table :test #'equal)
-  "Hash of \"ext/wid:node-key\" → timer for in-flight mutation watchdogs.")
-
 (defun psi-widget-projection--clear-mutation-timers (state)
   "Cancel and clear all in-flight widget mutation timers in STATE.
 A nil STATE is a harmless no-op, mirroring

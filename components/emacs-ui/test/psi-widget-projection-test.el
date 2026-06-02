@@ -700,6 +700,106 @@ originating buffer's store, not the current buffer's."
      (should (equal "query-failed"
                     (alist-get :error-code received nil nil #'equal))))))
 
+;;; ─── Teardown / transcript-reset / cross-buffer ─────────────────────────────
+
+(ert-deftest pwpt-clear-mutation-timers-cancels-and-clears ()
+  "`--clear-mutation-timers' cancels every timer and empties the store."
+  (pwpt--with-state
+   (let ((timers (psi-emacs-state-projection-mutation-timers psi-emacs--state))
+         (cancelled nil))
+     (cl-letf (((symbol-function 'timerp) (lambda (x) (memq x '(t1 t2))))
+               ((symbol-function 'cancel-timer)
+                (lambda (tm) (push tm cancelled))))
+       (puthash "ext/w1:b1" 't1 timers)
+       (puthash "ext/w2:b2" 't2 timers)
+       (psi-widget-projection--clear-mutation-timers psi-emacs--state)
+       (should (= 0 (hash-table-count timers)))
+       (should (= 2 (length cancelled)))))))
+
+(ert-deftest pwpt-clear-mutation-timers-noop-when-state-nil ()
+  "`--clear-mutation-timers' is a harmless no-op for a nil STATE."
+  (should-not (condition-case err
+                  (progn (psi-widget-projection--clear-mutation-timers nil) nil)
+                (error err))))
+
+(ert-deftest pwpt-teardown-cancels-in-flight-mutation-timers ()
+  "Killing a psi buffer cancels and clears its in-flight widget mutation timers."
+  (let ((buffer (generate-new-buffer " *pwpt-teardown*"))
+        (cancelled nil))
+    (unwind-protect
+        (cl-letf (((symbol-function 'timerp) (lambda (x) (eq x 'live-timer)))
+                  ((symbol-function 'cancel-timer)
+                   (lambda (tm) (push tm cancelled))))
+          (with-current-buffer buffer
+            (psi-emacs-mode)
+            (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+            (let ((timers (psi-emacs-state-projection-mutation-timers
+                           psi-emacs--state)))
+              (puthash "ext/w1:b1" 'live-timer timers)
+              (let ((noninteractive t))
+                (psi-emacs--teardown-buffer))
+              ;; Teardown nils `psi-emacs--state'; assert against the store it
+              ;; cleared (captured before teardown).
+              (should (= 0 (hash-table-count timers)))
+              (should (memq 'live-timer cancelled)))))
+      (when (buffer-live-p buffer) (kill-buffer buffer)))))
+
+(ert-deftest pwpt-reset-transcript-clears-mutation-timers ()
+  "Transcript reset clears the buffer's widget mutation timers."
+  (let ((buffer (generate-new-buffer " *pwpt-reset*"))
+        (cancelled nil))
+    (unwind-protect
+        (cl-letf (((symbol-function 'timerp) (lambda (x) (eq x 'live-timer)))
+                  ((symbol-function 'cancel-timer)
+                   (lambda (tm) (push tm cancelled))))
+          (with-current-buffer buffer
+            (psi-emacs-mode)
+            (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+            (puthash "ext/w1:b1" 'live-timer
+                     (psi-emacs-state-projection-mutation-timers psi-emacs--state))
+            (psi-emacs--reset-transcript-state)
+            (should (= 0 (hash-table-count
+                          (psi-emacs-state-projection-mutation-timers
+                           psi-emacs--state))))
+            (should (memq 'live-timer cancelled))))
+      (when (buffer-live-p buffer) (kill-buffer buffer)))))
+
+(ert-deftest pwpt-two-buffers-do-not-share-mutation-timer-state ()
+  "Two psi buffers with the same key keep independent timer stores."
+  (let ((buffer-a (generate-new-buffer " *pwpt-a*"))
+        (buffer-b (generate-new-buffer " *pwpt-b*")))
+    (unwind-protect
+        (progn
+          (with-current-buffer buffer-a
+            (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+            (puthash "ext/w1:b1" 'timer-a
+                     (psi-emacs-state-projection-mutation-timers psi-emacs--state)))
+          (with-current-buffer buffer-b
+            (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+            (puthash "ext/w1:b1" 'timer-b
+                     (psi-emacs-state-projection-mutation-timers psi-emacs--state)))
+          ;; Distinct stores; same key resolves independently per buffer.
+          (with-current-buffer buffer-a
+            (should (eq 'timer-a
+                        (gethash "ext/w1:b1"
+                                 (psi-emacs-state-projection-mutation-timers
+                                  psi-emacs--state)))))
+          (with-current-buffer buffer-b
+            (should (eq 'timer-b
+                        (gethash "ext/w1:b1"
+                                 (psi-emacs-state-projection-mutation-timers
+                                  psi-emacs--state)))))
+          ;; Clearing buffer-a's store leaves buffer-b's intact.
+          (with-current-buffer buffer-a
+            (psi-widget-projection--clear-mutation-timers psi-emacs--state))
+          (with-current-buffer buffer-b
+            (should (eq 'timer-b
+                        (gethash "ext/w1:b1"
+                                 (psi-emacs-state-projection-mutation-timers
+                                  psi-emacs--state))))))
+      (when (buffer-live-p buffer-a) (kill-buffer buffer-a))
+      (when (buffer-live-p buffer-b) (kill-buffer buffer-b)))))
+
 ;;; Event subscription tests moved to psi-widget-projection-events-test.el
 
 (provide 'psi-widget-projection-test)

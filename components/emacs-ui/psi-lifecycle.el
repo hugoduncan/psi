@@ -25,6 +25,7 @@
 (declare-function psi-emacs--clear-assistant-render-state "psi-assistant-render")
 (declare-function psi-emacs--clear-thinking-render-state "psi-assistant-render" (&optional clear-archived))
 (declare-function psi-emacs--clear-notification-lifecycle "psi-projection" (state))
+(declare-function psi-widget-projection--clear-mutation-timers "psi-widget-projection" (state))
 (declare-function psi-emacs--region-bounds "psi-regions" (kind id))
 (declare-function psi-emacs--region-unregister "psi-regions" (kind id))
 (declare-function psi-emacs--ensure-input-area "psi-compose")
@@ -294,6 +295,7 @@ Returns non-nil when request dispatch was accepted by transport."
     (psi-emacs--clear-assistant-render-state)
     (psi-emacs--clear-thinking-render-state t))
   (psi-emacs--clear-notification-lifecycle psi-emacs--state)
+  (psi-widget-projection--clear-mutation-timers psi-emacs--state)
   (when psi-emacs--state
     (maphash (lambda (_ row)
                (when (markerp (plist-get row :start))
@@ -391,6 +393,7 @@ When PRESERVE-TOOL-OUTPUT-VIEW-MODE is non-nil, keep the current
     (setf (psi-emacs-state-projection-statuses psi-emacs--state) nil)
     (setf (psi-emacs-state-projection-footer psi-emacs--state) nil)
     (psi-emacs--clear-notification-lifecycle psi-emacs--state)
+    (psi-widget-projection--clear-mutation-timers psi-emacs--state)
     (when-let ((projection-id (and psi-emacs--state
                                    (psi-emacs--region-bounds 'projection 'main)
                                    'main)))

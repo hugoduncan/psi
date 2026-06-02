@@ -339,3 +339,24 @@ No code changes (design/plan-only task). steps.md N1 checked.
 - Note: the module-global `psi-widget-projection--mutation-timers` defvar is now
   unreferenced by source (still present; deleted in Slice 5). Tests no longer
   bind it.
+
+## Implementation pass 1 (ψ) — Slices 4–5
+
+- Slice 4: declared `psi-widget-projection--clear-mutation-timers` in
+  `psi-lifecycle.el` and called it (bare `psi-emacs--state`) in
+  `psi-emacs--teardown-buffer` and `psi-emacs--reset-transcript-state`, beside
+  the existing `psi-emacs--clear-notification-lifecycle` calls.
+  - Test note: `psi-emacs--teardown-buffer` nils `psi-emacs--state` at the end,
+    so the teardown test captures the timer-store hash *before* teardown and
+    asserts emptiness against that captured hash (not via the now-nil state).
+  - Added: `pwpt-clear-mutation-timers-cancels-and-clears`,
+    `pwpt-clear-mutation-timers-noop-when-state-nil`,
+    `pwpt-teardown-cancels-in-flight-mutation-timers`,
+    `pwpt-reset-transcript-clears-mutation-timers`,
+    `pwpt-two-buffers-do-not-share-mutation-timer-state`.
+- Slice 5: deleted the module-global `psi-widget-projection--mutation-timers`
+  defvar. `git grep` over `components/` confirms zero source references; tests
+  no longer bind it. `unreachable > forbidden` for orphaned/cross-buffer timers
+  achieved.
+- Verification: full `bb emacs:check` (byte-compile + 337 ERT tests) green;
+  byte-compile clean; `.el` reloaded into the running Emacs.
