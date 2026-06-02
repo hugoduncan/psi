@@ -15,6 +15,8 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-06-02: Task 202 (`document-at-bounds-in-scheduler-doc`) plan/steps ambiguity review found no new actionable ambiguities. Plan and steps are clear for the doc-only slice, resolved-millisecond-delay wording, and optional verification path; appended implementation note and left `steps.md` unchanged.
+
 - 2026-06-02: Task 202 (`document-at-bounds-in-scheduler-doc`) ambiguity follow-up executed: clarified `design.md` and `doc/scheduler.md` so absolute `:at` bounds are described by resolved millisecond delay — delay 0 fires immediately (past/now and sub-millisecond future truncation), positive 1–999ms is below-minimum rejected, and >24h is maximum rejected. Checked the `design-steps.md` item and recorded implementation note.
 
 - 2026-06-02: Task 202 (`document-at-bounds-in-scheduler-doc`) design ambiguity review found one actionable wording ambiguity: design/doc should describe absolute `:at` bounds in terms of positive resolved millisecond delay (1–999ms rejected), because sub-millisecond future instants truncate to delay 0 and fire immediately. Added unchecked `design-steps.md` follow-up and implementation note.
