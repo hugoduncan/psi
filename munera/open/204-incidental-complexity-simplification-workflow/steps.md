@@ -763,6 +763,32 @@ with the commit sha / decision when done.
       pass-6's 40); definitions still 13 tests/203 assertions; `clj-kondo` 0
       findings; file 322 lines (< 800). (See implementation.md pass-7 TR9 entry.)
 
+## Test review follow-ups (review pass 8)
+
+- [ ] TR10 — `task-lifecycle-in-worktree-test`'s `summary`-step coverage locks
+      only the NO_TARGET (negative) branch (prompt `.contains "NO_TARGET"` +
+      sources `resolve-worktree :yield :text`); it never locks the summary's
+      **positive (target-present) terminal contract** — the symmetric gap TR7
+      fixed for `resolve-worktree`. The `summary` template is the workflow's
+      user-facing terminal report: on a real `munera/...` path it must
+      independently inspect the task artifacts and report whether the lifecycle
+      ran cleanly (design → plan → implement → review), the work completed, the
+      artifacts updated, and whether the task was closed/open — and it sources
+      the `lifecycle` step `:yield :text` to report lifecycle outcomes. None of
+      those positive-path strings nor the `lifecycle`-output sourcing is
+      asserted, so a regress dropping the positive-path summary contract (or the
+      `lifecycle` contribution) while keeping the NO_TARGET branch passes every
+      existing test green, gutting the workflow's terminal user-facing report.
+      Per `∀b ∈ behaviour(design). ∃t. covers(t,b)` (design: three-step
+      `… → summary(:session)` adapter producing the terminal user-facing result;
+      Locked decision 7's completed/reviewed-task endpoint is what summary
+      reports), this is an uncovered terminal behaviour. Fix: extend
+      `task-lifecycle-in-worktree-test`'s `summary` coverage (same ns, test-only,
+      no production change) with (a) a substring lock on the positive-path
+      design→plan→implement→review report contract, and (b) an assertion that
+      `summary` sources the `lifecycle` step `:yield :text` contribution. Run
+      focused suite + `clj-kondo`.
+
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 
 - [ ] Split step-1 selection from task-creation into two `:session` steps,

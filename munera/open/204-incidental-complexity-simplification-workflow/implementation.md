@@ -2045,3 +2045,30 @@ determinism/order-independence/filter/drop/ranking/cap, wrapper positive path,
 no-push/PR endpoint). No new follow-ups added.
 
 PASS_STATUS: REVIEW_COMPLETE.
+
+## Test review follow-ups (review pass 8)
+
+- TR10 — `task-lifecycle-in-worktree-test`'s `summary`-step coverage locks only
+  the NO_TARGET (negative) branch: it asserts the prompt `.contains "NO_TARGET"`
+  and that `summary` sources `resolve-worktree :yield :text`. It does NOT lock
+  the summary's **positive (target-present) terminal contract** — the symmetric
+  gap TR7 fixed for `resolve-worktree`. The `summary` template carries the
+  workflow's user-facing terminal behaviour: on a real `munera/...` path it must
+  independently inspect the task's artifacts and report whether the lifecycle
+  ran cleanly (design → plan → implement → review), what work completed, which
+  artifacts updated, and whether the task was closed/open. It also sources the
+  `lifecycle` step's `:yield :text` so it can report lifecycle outcomes. None of
+  these positive-path strings, nor the `lifecycle`-output sourcing, is asserted.
+  A regress dropping the positive-path summary contract (or the `lifecycle`
+  contribution), while keeping the NO_TARGET branch, passes every existing test
+  green — yet the workflow's terminal user-facing report would be gutted. Per
+  `∀b ∈ behaviour(design). ∃t. covers(t,b)` (design acceptance: the wrapper is a
+  three-step `… → summary(:session)` adapter producing the terminal user-facing
+  result; Locked decision 7's "completed, reviewed task" endpoint is what the
+  summary reports), this is an uncovered terminal behaviour. Fix: extend
+  `task-lifecycle-in-worktree-test`'s `summary` coverage (same ns, test-only, no
+  production change) with (a) a substring lock on the positive-path
+  design→plan→implement→review report contract, and (b) an assertion that
+  `summary` sources the `lifecycle` step `:yield :text` contribution. Run
+  focused suite + `clj-kondo`.
+
