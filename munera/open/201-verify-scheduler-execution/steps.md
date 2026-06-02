@@ -569,3 +569,25 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       green. clj-kondo 0/0, cljfmt clean. Test file only — zero
       `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist
       held).
+
+## Test review follow-ups — pass 8 (task-test-review, 2026-06-01)
+
+- [ ] Resolve the infra-boundary `with-redefs` stub in the **cited** busy-drain
+      covering test
+      `scheduler_lifecycle_test/busy-session-fire-queues-then-idle-drains-fifo-test`
+      (L51 & L101: `(with-redefs [psi.turn-runtime.core/execute-prepared-request! …])`).
+      `findings.md` (Live execution path, L87) cites this test as an authoritative
+      covering test for the busy-queue + drain-on-idle acceptance area, but it
+      stubs the AI-execution infra boundary — the same `infra_deps → ¬stub` class
+      pass-6 removed from the e2e session-kind test via the already-wired
+      `:execute-prepared-request-fn` ctx seam. The area is already covered
+      stub-free by `scheduler_dispatch_test` (`scheduler-fired-queues-while-session-busy`
+      + `scheduler-drain-queue-delivers-oldest-queued-schedule`, 0 `with-redefs`).
+      Pick one (test-file/findings-only, within the Slice-10 allowlist — zero
+      `src/**`/`doc/scheduler.md`): (a) migrate
+      `busy-session-fire-queues-then-idle-drains-fifo-test` off `with-redefs`
+      onto `:execute-prepared-request-fn` (mirroring pass-6) and keep the
+      citation; or (b) drop the lifecycle citation from the L87 busy-drain
+      finding and rest the area on the co-cited stub-free `scheduler_dispatch_test`
+      deftests. Keep the suite green + clj-kondo/cljfmt clean. (If the task is
+      treated as closed, raise it as a small standalone test-hygiene task instead.)

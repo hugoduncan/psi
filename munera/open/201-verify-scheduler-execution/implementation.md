@@ -900,3 +900,52 @@ verification-only task:
   (no assertion added/removed — only an asserted value changed). Test file only
   — zero `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10
   allowlist held). All other infra deps remain injectable via ctx/kernel seams.
+
+## Test review — pass 8 (task-test-review, 2026-06-01)
+
+Re-applied `task-test-review` (well_formed ∧ behaviour-coverage ∧
+infra_deps→injectable∧nullable∧¬mock∧¬stub). Suite confirmed green:
+focused scheduler subset 32/274; full scheduler aggregate **45 tests / 412
+assertions / 0 failures** (matches the deliverable). clj-kondo 0/0 on all 8
+touched test files.
+
+Verified good (no new follow-up): the 10 new + 2 extended 201 tests are
+well-formed and behaviour-complete against the acceptance criteria — pure-model
+guards, message/session live round trips (real timer seam, no sleep), cancel
+races, shutdown no-fire, `:at` matrix with named-bound assertions, projection
+rich-attrs. Pass-6 (`:execute-prepared-request-fn` ctx seam in the session-kind
+e2e test) and pass-7 (kernel handler re-registration in the failure-path
+deliverable, no `dispatch/dispatch!` redef) both hold — those two new/extended
+tests are now stub-free.
+
+**One new actionable test-quality issue (not previously flagged):**
+
+- The **busy queue + drain-on-idle** finding (`findings.md` Live execution path,
+  L87) cites `scheduler-lifecycle-test/busy-session-fire-queues-then-idle-drains-fifo`
+  as an authoritative covering test, but that test stubs the AI-execution infra
+  boundary via `(with-redefs [psi.turn-runtime.core/execute-prepared-request! …])`
+  (`scheduler_lifecycle_test.clj` L51 & L101) — the same infra-boundary var-stub
+  class the skill flags (`infra_deps → injectable ∧ ¬stub`) and that pass-6
+  removed from the e2e session-kind test using the *already-wired*
+  `:execute-prepared-request-fn` ctx seam. Passes 6/7 audited the e2e and
+  handlers tests but did not examine this cited pre-existing lifecycle test.
+  The busy-drain acceptance area is **already fully covered stub-free** by
+  `scheduler_dispatch_test.clj` (0 `with-redefs`):
+  `scheduler-fired-queues-while-session-busy` (fire-while-busy → `:queued`) +
+  `scheduler-drain-queue-delivers-oldest-queued-schedule` (real `dispatch-in!
+  :scheduler/drain-queue` → oldest-by-fire-at delivered, queue mutates). So the
+  stubbed lifecycle citation is a redundant-with-stub authority where clean
+  coverage exists. Resolution (test-file/findings-only, within the Slice-10
+  allowlist — zero `src/**`/`doc/scheduler.md`): either (a) migrate
+  `busy-session-fire-queues-then-idle-drains-fifo` off `with-redefs` onto the
+  `:execute-prepared-request-fn` ctx seam (mirroring pass-6), or (b) drop the
+  lifecycle citation from the L87 busy-drain finding and rest the area on the
+  stub-free `scheduler_dispatch_test` deftests already co-cited. (If the task is
+  treated as closed, raise it as a small standalone test-hygiene task.)
+
+Non-issue (no follow-up): `scheduler_lifecycle_test/cancel-pending-and-queued-schedules`
+is cited for the cancel area (L112/L113) but its assertions sit in the
+no-`with-redefs` `cancel-pending-and-queued-schedules-test` deftest (the redef
+sites are only in the two *deliver* deftests above it), so that citation is
+clean. `scheduler_effects_test`'s `with-redefs` of `dispatch/dispatch!` is
+neither modified nor cited by 201 — out of scope.
