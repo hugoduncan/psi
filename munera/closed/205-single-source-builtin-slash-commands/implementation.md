@@ -1355,3 +1355,36 @@ PASS_STATUS: REVIEW_COMPLETE
   in `builtin-commands-resolver-test`, locking the whole resolver name order —
   every interleaved entry — to the single source. See steps.md "Test review
   follow-ups (review pass 6)".
+
+## Follow-up execution — review pass 6 (TT7)
+
+- TT7 (DONE): Added the full resolver name-order lock to
+  `builtin-command-specs-resolver-shape-test`
+  (`components/agent-session/test/psi/agent_session/builtin_commands_resolver_test.clj`),
+  in a new `"the FULL resolver name-order equals the spec-table key order (AC1)"`
+  testing block placed immediately after the existing representative
+  `quit < status < help` triple block:
+
+      (is (= (mapv #(bspec/strip-slash (key %)) bspec/builtin-command-specs)
+             (mapv :name specs)))
+
+  This locks the WHOLE, interleaved resolver output sequence to the single
+  source — symmetric with TT5's whole help-block line-order lock — closing the
+  gap that the leading-triple block and the order-insensitive TT1
+  `{name → description}` map left every middle-of-table reorder (or a
+  `sort`/`set` slipped into `builtin-command-specs-for-resolver`) passing every
+  resolver test while violating AC1's "in spec-table order".
+
+  Note: the pre-existing
+  `"the bare-name vector mirrors the spec names in the same order"` block locks
+  `builtin-command-names` (the resolver's `-names` attr) to the resolver `specs`
+  order, but neither was tied to the *single source* spec-table key order — TT7
+  anchors the `specs` sequence to `bspec/builtin-command-specs` itself, which
+  transitively re-anchors `-names` too.
+
+  Verification: `psi.agent-session.builtin-commands-resolver-test` — 3 tests /
+  26 assertions, 0 failures (was 25; +1 assertion). clj-kondo clean on the
+  changed test file. No source/doc/changelog change needed: TT7 is a pure
+  test-coverage lock over already-correct behaviour (AC1 was already satisfied;
+  the resolver projects in table order via `builtin-command-specs-for-resolver`'s
+  ordered `for` over the `array-map`).

@@ -50,6 +50,14 @@
             idx   (fn [n] (.indexOf ^java.util.List order n))]
         (is (< (idx "quit") (idx "status")))
         (is (< (idx "status") (idx "help")))))
+    (testing "the FULL resolver name-order equals the spec-table key order (AC1)"
+      ;; TT7: lock the whole, interleaved output sequence — not just the leading
+      ;; quit < status < help triple (above) or the order-INSENSITIVE
+      ;; description map (below) — to the single source, symmetric with TT5's
+      ;; help-block-order lock. A middle-of-table reorder, or a `sort`/`set`
+      ;; slipped into `builtin-command-specs-for-resolver`, is caught here.
+      (is (= (mapv #(bspec/strip-slash (key %)) bspec/builtin-command-specs)
+             (mapv :name specs))))
     (testing "the bare-name vector mirrors the spec names in the same order"
       (is (= names (mapv :name specs))))
     (testing "each name's description equals the spec-table description (AC1)"

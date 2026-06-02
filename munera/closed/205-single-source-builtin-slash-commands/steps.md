@@ -348,7 +348,22 @@ Tick with sha/decision on completion.
 
 ## Test review follow-ups (review pass 6)
 
-- [ ] TT7 — Lock the resolver's FULL name-order to the single source (AC1 "in
+- [x] TT7 — Added the full resolver name-order lock to
+      `builtin-command-specs-resolver-shape-test`
+      (`builtin_commands_resolver_test.clj`), in a new
+      `"the FULL resolver name-order equals the spec-table key order (AC1)"`
+      block: asserts `(mapv :name specs)` equals
+      `(mapv #(bspec/strip-slash (key %)) bspec/builtin-command-specs)` — the
+      full, interleaved spec-table key order, stripped. This locks the WHOLE
+      output sequence to the single source, not just the leading
+      `quit < status < help` triple (the pre-existing block) nor the
+      order-insensitive TT1 `{name → description}` map; symmetric with TT5's
+      help-block-order lock. A middle-of-table reorder, or a `sort`/`set`
+      slipped into `builtin-command-specs-for-resolver`, now fails (AC1).
+      `psi.agent-session.builtin-commands-resolver-test`: 3 tests / 26
+      assertions green; clj-kondo clean.
+      Original item text:
+      Lock the resolver's FULL name-order to the single source (AC1 "in
       spec-table order"), symmetric with TT5's help-block-order lock.
       `builtin-command-specs-resolver-shape-test` only asserts the representative
       `quit < status < help` triple, and the TT1 description-content lock
