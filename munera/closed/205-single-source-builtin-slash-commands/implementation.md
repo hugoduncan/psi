@@ -41,6 +41,30 @@ One actionable architectural-fit misfit (see design-steps.md A1):
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
 
+## R1 follow-up resolution (2026-06-01)
+
+Resolved R1 via Option 1 (genuine live-seam lock) rather than a rename, since
+it aligns with the project `unreachable > forbidden` ethos and the existing
+single-source pattern.
+
+- Added private `commands/prefixed-case-branches` — a set holding the `/`-prefixed
+  keys that `dispatch-prefixed-command`'s `case` actually routes. `case` requires
+  compile-time literal keys, so this set is authored adjacent to the `case` as the
+  single literal expression of its branches (the heterogeneous handler arities —
+  `/tree` needs `supports-session-tree?`, `/login` needs `oauth-ctx ai-model` —
+  keep the `case` hand-written and design-scoped out of data-driven dispatch).
+- Added a load-time `(assert (= prefixed-case-branches (set
+  bspec/prefixed-command-prefixes)) …)` directly after the def, so any drift
+  between the spec-table prefixed projection and the real `case` branch set is
+  caught when the namespace loads (not just in a test run).
+- `prefixed-case-branch-coherence-test` now reads `@#'commands/prefixed-case-branches`
+  instead of a second hardcoded literal `case-keys` set, so the test genuinely
+  locks the live seam.
+
+Verification: `commands-builtin-specs-test` 6/18, `commands-test` 51/206, both
+0 failures (the load-time assert holds — namespaces load clean); clj-kondo clean
+on both changed files.
+
 ## Design-steps follow-up
 
 ### 2026-06-01 — A1 (architecture-fit follow-up): single keyed spec table

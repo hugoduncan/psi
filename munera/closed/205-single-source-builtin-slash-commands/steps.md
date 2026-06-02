@@ -194,14 +194,14 @@ Tick with sha/decision on completion.
 
 ## Implementation review follow-ups (review pass 1)
 
-- [ ] R1 — `prefixed-case-branch-coherence-test`
-      (`commands_builtin_specs_test.clj`) compares the prefixed spec-table keys
-      against a hardcoded literal `case-keys` set, not the live
-      `dispatch-prefixed-command` `case` branches, so it does NOT detect drift
-      between the spec table and the real `case` form (its name implies it
-      does). Either derive the `case` branch set from the actual dispatch form
-      (e.g. a small shared data-driven branch table both the `case` and the test
-      read) so the test genuinely locks the seam, or rename/recomment the test
-      to make clear it is a spec-table snapshot lock rather than a live-`case`
-      coherence check. Non-blocking (prefixed-`case` handler-wiring is
-      design-scoped out); test-clarity only.
+- [x] R1 — `prefixed-case-branch-coherence-test` now reads a live branch-key
+      def. Added `commands/prefixed-case-branches` (the single literal source of
+      the `case`'s branch keys, authored adjacent to the `case` since `case`
+      needs compile-time literals; handler-wiring stays hand-written per design)
+      with a load-time `assert` that it equals `(set
+      bspec/prefixed-command-prefixes)` — so spec-table↔`case` drift is caught
+      at namespace load (`unreachable > forbidden`). The coherence test reads
+      `@#'commands/prefixed-case-branches` instead of a second hardcoded literal,
+      so it now genuinely locks the live seam. Targeted suite (6/18 in
+      `commands-builtin-specs-test`, 51/206 in `commands-test`) + clj-kondo
+      green.

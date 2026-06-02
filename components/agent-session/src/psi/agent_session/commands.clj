@@ -652,6 +652,23 @@
             prefix))
         bspec/prefixed-command-prefixes))
 
+(def ^:private prefixed-case-branches
+  "The set of `/`-prefixed command keys that `dispatch-prefixed-command`'s
+   `case` form actually routes (its live branch set).
+
+   `case` requires compile-time literal keys, so this set is authored adjacent
+   to the `case` form as the single literal expression of its branches; the
+   `case` is hand-written (heterogeneous handler arities are design-scoped out
+   of data-driven dispatch). The load-time assertion below proves this branch
+   set stays coherent with the spec-table prefixed projection, and the
+   coherence test reads this same def — so there is no duplicate literal and
+   drift between the spec table and the real `case` is caught at load."
+  #{"/tree" "/jobs" "/job" "/cancel-job" "/remember" "/model" "/thinking"
+    "/speed" "/effort" "/login" "/project-repl"})
+
+(assert (= prefixed-case-branches (set bspec/prefixed-command-prefixes))
+        "dispatch-prefixed-command case branches must match the spec-table prefixed projection")
+
 (defn- dispatch-prefixed-command
   [ctx session-id trimmed {:keys [oauth-ctx ai-model supports-session-tree?]}]
   (case (prefixed-command trimmed)

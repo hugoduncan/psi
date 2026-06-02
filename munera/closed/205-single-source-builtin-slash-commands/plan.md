@@ -46,9 +46,12 @@ literals):
   unchanged.
 
 The prefixed-command **handler** `case` in `dispatch-prefixed-command` stays
-hand-written (handler-wiring residual, design-acknowledged out of scope). A
-narrow coherence test asserts its branch keys match the prefixed spec-table
-entries.
+hand-written (handler-wiring residual, design-acknowledged out of scope). Its
+branch keys are named once in `commands/prefixed-case-branches` (the literal
+`case` needs compile-time keys), with a load-time `assert` that they equal the
+prefixed spec-table projection, so spec-table↔`case` drift is caught at load
+(`unreachable > forbidden`). The narrow coherence test reads that same live def,
+genuinely locking the seam (R1 follow-up).
 
 Concrete spec-table membership (current routing ∪ help, swept complete) —
 exact-only: `/quit /exit(alias) /new /resume /status /history /help /?(alias)

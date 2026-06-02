@@ -128,9 +128,11 @@
       (is (str/includes? message "/skill:name — invoke a skill")))))
 
 (deftest prefixed-case-branch-coherence-test
-  (testing "prefixed spec-table keys equal the dispatch-prefixed-command case branch keys"
+  (testing "prefixed spec-table keys equal the live dispatch-prefixed-command case branch keys"
     (let [prefixed-keys (set bspec/prefixed-command-prefixes)
-          case-keys #{"/tree" "/jobs" "/job" "/cancel-job" "/remember" "/model"
-                      "/thinking" "/speed" "/effort" "/login" "/project-repl"}]
+          ;; Read the live branch set authored adjacent to the `case` form
+          ;; (the single literal source of its branch keys), so this test locks
+          ;; the real seam rather than a second static snapshot.
+          case-keys @#'commands/prefixed-case-branches]
       (is (= prefixed-keys case-keys)
           "every prefixed table entry has a dispatch-prefixed-command case branch"))))
