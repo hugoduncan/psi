@@ -3001,3 +3001,71 @@ No other actionable test-shaper feedback: the suite is otherwise strong —
 single-concern deftests, explicit arrange/act/assert, mock-free, jq-absent
 fallbacks for every recipe branch, behaviour-focused prompt/EDN-shape locks for
 both workflows, and the design-acceptance net (TR1–TR20, F1–F6) is comprehensive.
+
+### TR21 follow-up execution (test review pass 17 — test-shaper) — RESOLVED
+
+Executed the sole newly-added actionable item (the trailing Contingency step-1
+split predates every review pass and is conditional/untriggered). Test-only — no
+production/skill/EDN change; the recipe is correct as-is.
+
+Added `incidental-complexity-finder-recipe-projection-contract-test` to
+`incidental_complexity_finder_skill_test.clj`. Grounded against the live
+SKILL.md projection (`.psi/skills/incidental-complexity-finder/SKILL.md`,
+recipe tail):
+
+```
+| map({ns, var, arity,
+       file, line, end_line: .["end-line"],
+       lcc_total: .["lcc-total"],
+       flow_burden: .["flow-burden"], state_burden: .["state-burden"],
+       shape_burden: .["shape-burden"], abstraction_burden: .["abstraction-burden"],
+       dependency_burden: .["dependency-burden"], working_set: .["working-set"],
+       findings,
+       cc, gap})
+```
+
+**Fixture shape discovery.** The existing `named-local-unit-json` hard-codes
+every burden dimension to `1` and `working-set` to `1`, so a projection test
+reusing it could not distinguish which output key maps to which source
+dimension — a `flow_burden`/`state_burden` swap regress would pass. Added a
+dedicated `evidence-local-unit-json` builder giving the six burden dimensions
+DISTINCT values (`flow-burden` 11 … `working-set` 16) plus two `findings`
+entries, so the dash→underscore rename mapping is pinned per dimension. Kept it
+as a separate, purpose-named builder (not folded onto the `named-*` pair) — the
+TR20 collapse argued one builder per *shape*, and this is the same JSON shape;
+but the distinct-burden values are the test's whole point, so it reads as a
+focused fixture rather than incidental variation. (If a future pass deems it
+collapsible, `evidence-local-unit-json` could take six burden args.)
+
+**jq-present branch:** feed one qualifying matched unit (lcc 30.0, cc 4 → gap
+7.5) and assert every projected key survives with its expected value — identity
+(`ns`=proj, `arity`=null, `file`=proj.clj, `line`=10), the renamed `end_line`=42,
+`lcc_total`=30, `flow_burden`=11 … `working_set`=16, both `findings` entries,
+`cc` present, `gap`=7.5. Verified the live recipe emits exactly this (ran the
+recipe by hand against the distinct-burden fixture before writing the asserts).
+
+**jq-absent fallback** (per the TR12/16/17/18 convention): lock each projected
+key name verbatim — the eight bare-shorthand keys (`ns var arity file line
+findings cc gap`) present in the recipe, and the eight renamed fields as
+`<underscore>: .["<dash>"]` (e.g. `end_line: .["end-line"]`,
+`flow_burden: .["flow-burden"]`). A dropped or mis-renamed field now fails green
+whether or not jq is installed.
+
+**Verification.** Focused ns green: **9 tests, 78 assertions, 0 failures** (+1
+test over pass-16's 8 deftests). Full `bb clojure:test:unit` suite green.
+`clj-kondo` 0 findings. `clj-paren-repair` Success. skill-test file **524 lines**
+(< 800 `components/` guard); `bb commit-check:file-lengths` exit 0.
+
+PASS_STATUS: REVIEW_COMPLETE (TR21 was the sole newly-added actionable item;
+this follow-up closes it).
+
+🔁 PATTERN (continues 204): a recipe's final `map({...})` projection is the
+observable contract output (the evidence the generated task is built from), yet
+the recipe coverage tests asserted only `ns/var/line/cc/gap` survival — the
+rename-and-re-emit projection went uncovered until a pass re-derived
+"∀ acceptance field. ∃ test. asserts it survives". The fixtures *supplied* the
+burden fields, which is exactly what made the gap invisible: data present in
+input ≠ data asserted in output.
+🔁 PATTERN (continues): a projection-rename test needs a fixture with DISTINCT
+per-field values; reusing a fixture that hard-codes a shared sentinel (here all
+burdens = 1) cannot catch a field-swap regress.

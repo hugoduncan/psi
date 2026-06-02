@@ -1262,7 +1262,7 @@ with the commit sha / decision when done.
 
 ## Test review follow-ups (review pass 17 — test-shaper)
 
-- [ ] TR21 — Lock the recipe's emitted-evidence projection (the design's step-5
+- [x] TR21 — Lock the recipe's emitted-evidence projection (the design's step-5
       acceptance). The skill's `gap` recipe ends with a `map({...})` projection
       re-emitting the chosen target's evidence: `ns`, `var`, `arity`, `file`,
       `line`, `end_line`, `lcc_total`, the six per-dimension burdens
@@ -1289,3 +1289,26 @@ with the commit sha / decision when done.
       names verbatim, per the TR12/16/17/18 fallback convention. Verify the
       focused skill-test + task-204 suite green, `clj-kondo` 0, `clj-paren-repair`
       Success, `bb commit-check:file-lengths` clean.
+      RESOLUTION: added `incidental-complexity-finder-recipe-projection-contract-test`
+      to `incidental_complexity_finder_skill_test.clj` (same ns, test-only — no
+      production/skill/EDN change; the recipe is correct). Grounded against the
+      live SKILL.md projection (`map({ns, var, arity, file, line, end_line:
+      .["end-line"], lcc_total: .["lcc-total"], flow_burden: .["flow-burden"],
+      …, working_set: .["working-set"], findings, cc, gap})`). Added a dedicated
+      `evidence-local-unit-json` builder whose six burden dimensions carry
+      DISTINCT values (11..16) + two `findings` entries, so the recipe's
+      dash→underscore rename mapping is verified per dimension (not collapsed
+      onto a shared `1`, as the existing `named-local-unit-json` would). jq-present
+      branch: feed one qualifying matched unit (lcc 30.0, cc 4 → gap 7.5) and
+      assert every projected key survives with its expected value — identity
+      (`ns`/`arity`/`file`/`line`), the renamed `end_line`=42, `lcc_total`=30,
+      the six `*_burden`/`working_set`=11..16, both `findings`, `cc`, and
+      `gap`=7.5. jq-absent fallback (per TR12/16/17/18 convention): lock each
+      projected key name verbatim, asserting the eight bare-shorthand keys are
+      present and the eight renamed fields appear as `<underscore>: .["<dash>"]`,
+      so a dropped/mis-renamed field fails green whether or not jq is installed.
+      Focused ns green: **9 tests, 78 assertions, 0 failures** (+1 test over
+      pass-16's 8); full `bb clojure:test:unit` suite green; `clj-kondo` 0
+      findings; `clj-paren-repair` Success; skill-test file **524 lines** (< 800);
+      `bb commit-check:file-lengths` exit 0. (See implementation.md pass-17
+      test-review TR21 entry.)

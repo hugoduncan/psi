@@ -427,3 +427,98 @@
         ;; filter; a strict `>` regress changes this fragment. Lock it.
         (is (.contains recipe "select(.[\"lcc-total\"] >= 5.0 and .gap >= 2.0)")
             "recipe carries the inclusive (>=) qualification filter at both thresholds")))))
+
+(defn- evidence-local-unit-json
+  "A synthetic `local`-lens unit JSON whose six burden dimensions carry DISTINCT
+   values, so the projection-contract test can verify the recipe's per-dimension
+   dash->underscore rename mapping precisely (e.g. flow-burden -> flow_burden)
+   rather than collapsing every burden onto a shared value. `findings` carries
+   two distinguishable entries so the projection's `findings` survival is real."
+  [unit-ns unit-var line]
+  (str "{\"ns\":\"" unit-ns "\",\"var\":\"" unit-var "\",\"arity\":null,\"line\":" line ","
+       "\"end-line\":" (+ line 32) ",\"lcc-total\":30.0,\"flow-burden\":11,"
+       "\"state-burden\":12,\"shape-burden\":13,\"abstraction-burden\":14,"
+       "\"dependency-burden\":15,\"working-set\":16,\"file\":\"" unit-ns ".clj\","
+       "\"findings\":[\"finding-a\",\"finding-b\"]}"))
+
+(deftest incidental-complexity-finder-recipe-projection-contract-test
+  ;; TR21 (test review pass 17 — test-shaper): the recipe ends with a
+  ;; `map({...})` projection re-emitting the chosen target's evidence — the
+  ;; design's named step-5 acceptance ("emit one chosen target with evidence:
+  ;; … lcc-total with per-dimension burdens, cc, gap, the local findings, …"),
+  ;; consumed verbatim by the workflow step-1 prompt to build the generated
+  ;; task's evidence block. Every other recipe test asserts only
+  ;; ns/var/line/cc/gap survival, so a regress dropping a projected field
+  ;; (end_line, findings, a burden dimension) or mis-renaming one
+  ;; (flow_burden -> flow-burden) passes green while silently degrading the
+  ;; evidence the generated task is built from. Feed one qualifying matched unit
+  ;; whose burden dimensions carry distinct values and assert the surviving
+  ;; object carries every projected evidence key with its expected value.
+  (let [{:keys [skill]} (incidental-complexity-finder-skill)
+        body (slurp (io/file (:file-path skill)))
+        recipe (extract-jq-recipe body)
+        gap-key (fn [out k] (re-find (re-pattern (str "\"" k "\":\\s*[^,}\\]]+")) out))]
+    (is (some? recipe) "the join/gap jq recipe is extractable from SKILL.md")
+    (if (try (zero? (:exit (shell/sh "jq" "--version"))) (catch Exception _ false))
+      (testing "projection emits every evidence key with the recipe's dash->underscore rename"
+        ;; one qualifying matched unit: lcc 30.0, cc 4 -> gap 7.5 (qualifies),
+        ;; distinct burden values 11..16 so the rename mapping is unambiguous.
+        (let [{:keys [exit out err]}
+              (run-jq-recipe recipe
+                             [(evidence-local-unit-json "proj" "target" 10)]
+                             [(named-cc-unit-json "proj" "target" 10 4)])]
+          (is (zero? exit) (str "recipe runs cleanly; stderr: " err))
+          (is (re-find #"\"var\":\s*\"target\"" out)
+              "the qualifying unit survives the recipe")
+          ;; identity + location fields pass through unrenamed.
+          (is (re-find #"\"ns\":\s*\"proj\"" out) "ns survives the projection")
+          (is (re-find #"\"arity\":\s*null" out) "arity survives the projection")
+          (is (re-find #"\"file\":\s*\"proj\.clj\"" out) "file survives the projection")
+          (is (re-find #"\"line\":\s*10\b" out) "line survives the projection")
+          ;; dash-keyed source fields are re-emitted under their underscore names
+          ;; with the exact source value (locks the rename mapping per dimension).
+          (is (re-find #"\"end_line\":\s*42\b" out)
+              "end-line is re-emitted as end_line (= 42)")
+          (is (re-find #"\"lcc_total\":\s*30" out)
+              "lcc-total is re-emitted as lcc_total (= 30)")
+          (is (re-find #"\"flow_burden\":\s*11\b" out)
+              "flow-burden is re-emitted as flow_burden (= 11)")
+          (is (re-find #"\"state_burden\":\s*12\b" out)
+              "state-burden is re-emitted as state_burden (= 12)")
+          (is (re-find #"\"shape_burden\":\s*13\b" out)
+              "shape-burden is re-emitted as shape_burden (= 13)")
+          (is (re-find #"\"abstraction_burden\":\s*14\b" out)
+              "abstraction-burden is re-emitted as abstraction_burden (= 14)")
+          (is (re-find #"\"dependency_burden\":\s*15\b" out)
+              "dependency-burden is re-emitted as dependency_burden (= 15)")
+          (is (re-find #"\"working_set\":\s*16\b" out)
+              "working-set is re-emitted as working_set (= 16)")
+          ;; the local findings survive verbatim, and cc/gap are present.
+          (is (re-find #"finding-a" out) "the local findings survive the projection")
+          (is (re-find #"finding-b" out) "every local finding survives the projection")
+          (is (some? (gap-key out "cc")) "cc is present in the projection")
+          (is (re-find #"\"gap\":\s*7\.5" out) "gap is present in the projection (= 7.5)")))
+      (testing "jq unavailable — projection key names asserted structurally on the recipe"
+        ;; TR21 fallback (mirrors TR12/16/17/18): lock each projected key name
+        ;; verbatim so a dropped/mis-renamed field fails green whether or not jq
+        ;; is installed. Identity/cc/gap pass through as bare jq shorthand; the
+        ;; renamed dash-keyed fields appear as `<underscore>: .["<dash>"]`.
+        (doseq [k ["ns" "var" "arity" "file" "line" "findings" "cc" "gap"]]
+          (is (.contains recipe k)
+              (str "recipe projection emits the " k " field")))
+        (is (.contains recipe "end_line: .[\"end-line\"]")
+            "recipe projects end-line as end_line")
+        (is (.contains recipe "lcc_total: .[\"lcc-total\"]")
+            "recipe projects lcc-total as lcc_total")
+        (is (.contains recipe "flow_burden: .[\"flow-burden\"]")
+            "recipe projects flow-burden as flow_burden")
+        (is (.contains recipe "state_burden: .[\"state-burden\"]")
+            "recipe projects state-burden as state_burden")
+        (is (.contains recipe "shape_burden: .[\"shape-burden\"]")
+            "recipe projects shape-burden as shape_burden")
+        (is (.contains recipe "abstraction_burden: .[\"abstraction-burden\"]")
+            "recipe projects abstraction-burden as abstraction_burden")
+        (is (.contains recipe "dependency_burden: .[\"dependency-burden\"]")
+            "recipe projects dependency-burden as dependency_burden")
+        (is (.contains recipe "working_set: .[\"working-set\"]")
+            "recipe projects working-set as working_set")))))
