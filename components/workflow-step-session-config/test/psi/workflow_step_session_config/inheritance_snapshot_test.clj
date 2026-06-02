@@ -162,19 +162,33 @@
 
 (deftest snapshot-model-feeds-model-query-selection-context-test
   (testing "AC7: resolved-model-query selection context comes from the snapshot
-            model, not the live parent"
-    (let [[ctx session-id] (support/create-session-context {:persist? false})
+            model, not the live parent. Proven via a `:same-model-as-session`
+            preference: the snapshot model and the (post-invoke) live model are
+            two DISTINCT real registered models, so the ranking winner — which
+            the criterion pulls toward whatever `:session-model` fed the
+            selection request — distinguishes snapshot from live. If the
+            resolver leaked the live model into the selection context the winner
+            would flip; the assertion below would fail."
+    (let [;; Two distinct real registered anthropic models. Same provider so a
+          ;; provider-level match cannot disambiguate — only the exact-model
+          ;; context decides the winner.
+          snapshot-model {:provider "anthropic" :id "claude-opus-4-5"}
+          live-model     {:provider "anthropic" :id "claude-haiku-4-5"}
+          [ctx session-id] (support/create-session-context {:persist? false})
           model-query-definition
           {:definition-id "model-query-wf"
            :name "model-query-wf"
            :steps [{:name "step-1"
                     :type :session
-                    :model {:type :model-query :require [] :prefer []}
+                    :model {:type :model-query
+                            :require []
+                            :prefer [{:criterion :same-model-as-session
+                                      :prefer :context-match}]}
                     :contributions [{:type :template
                                      :text "{{input}}"
                                      :vars {"input" {:from :workflow-input :path [:input]}}}]}]
            :workflow-file-meta {:system-prompt "Query."}}
-          snapshot {:model {:provider "anthropic" :id "claude-snapshot"}
+          snapshot {:model snapshot-model
                     :prompt-mode :concise
                     :tool-defs []
                     :skills []
@@ -193,14 +207,21 @@
                                           :workflow-input {:input "go"}})]
                          s')))
               (workflow-runtime/workflow-run-in @(:state* ctx) "run-mq"))]
-      (assoc-session-data! ctx session-id
-                           {:model {:provider "anthropic" :id "claude-LIVE-CHANGED"}})
+      ;; Mutate the live parent AFTER invoke to a different real model.
+      (assoc-session-data! ctx session-id {:model live-model})
       (let [config (workflow-step-session-config/resolve-step-session-config
-                    ctx nil workflow-run "step-1")]
-        ;; The model-fallback selection context is derived from the snapshot
-        ;; model; the live session change must not influence the ranking input.
-        (is (some? (:model-fallback config)))
-        (is (= :ranked-model-candidates (get-in config [:model-fallback :type])))))))
+                    ctx nil workflow-run "step-1")
+            ranked (get-in config [:model-fallback :candidates])]
+        (is (= :ranked-model-candidates (get-in config [:model-fallback :type])))
+        ;; The `:same-model-as-session` preference ranks the candidate matching
+        ;; the selection context's session-model first. The winner reflects the
+        ;; SNAPSHOT model, proving the live mutation did not feed the context.
+        (is (= snapshot-model (:model config))
+            "top-ranked model reflects the snapshot session-model, not the live parent")
+        (is (= snapshot-model (first ranked))
+            "ranked candidates are ordered by the snapshot session-model context")
+        (is (not= live-model (:model config))
+            "the post-invoke live model must not win the selection")))))
 
 (deftest snapshot-preserves-explicit-step-override-test
   (testing "AC5: an explicit step model override still wins over the snapshot"

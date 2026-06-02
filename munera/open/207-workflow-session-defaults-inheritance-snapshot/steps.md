@@ -308,7 +308,7 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
 
 ## Implementation-review pass 3 follow-ups (review 2026-06-02)
 
-- [ ] R4: Close the live-parent leak past the resolver in
+- [x] R4: Close the live-parent leak past the resolver in
       `child-session-base-state*`
       (`agent-session/child_session_state.clj:144-169`). The snapshot isolates
       `resolve-step-session-config`'s OUTPUT (R1), but the workflow child-state
@@ -337,7 +337,7 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
 
 ## Test-review follow-ups (review 2026-06-02)
 
-- [ ] T1: Strengthen the AC7 test
+- [x] T1: Strengthen the AC7 test
       (`snapshot-model-feeds-model-query-selection-context-test`,
       `inheritance_snapshot_test.clj`) so it actually proves the selection
       context comes from the SNAPSHOT model, not the live parent. It currently

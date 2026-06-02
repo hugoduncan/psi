@@ -989,3 +989,84 @@ notes — those discuss the code; this is the test's assertion strength):
   not just the fallback's shape.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## R4 follow-up executed (2026-06-02)
+
+R4 (implementation-review pass 3): closed the live-parent leak past the resolver
+in `child-session-base-state*` (`agent-session/child_session_state.clj`).
+
+Problem: the snapshot isolates `resolve-step-session-config`'s OUTPUT (R1), but
+the resolver `cond->`-omits `:speed-mode`/`:effort-override` when the snapshot
+value is nil-at-invoke, and `child-session-base-state*` then did
+`(or <supplied> (:<field> parent-sd))` where `parent-sd` is the LIVE parent read
+mid-run inside `:session/create-child` (`session_lifecycle.clj`). For
+snapshot-governed fields with a nil-at-invoke value this re-read the live parent,
+leaking a post-invoke mutation — violating Decision 2 / AC3 for those fields
+(`:speed-mode`/`:effort-override`, and the `(or model (:model parent-sd))` /
+`(or prompt-mode (:prompt-mode parent-sd))` fallbacks).
+
+Fix: introduced `workflow-owned?'` + an `inherited-default` helper. For
+workflow-owned children the four snapshot-governed inherited fields
+(`:model :prompt-mode :speed-mode :effort-override`) resolve to the supplied
+(snapshot) value, else the FRESH `initial-session` default — never the live
+`parent-sd`. Non-workflow children keep the existing live `parent-sd` fallback
+(the general fork/spawn path, still covered by
+`child-session-base-state-applies-speed-effort-override-test`). Explicit-override
+precedence is preserved because the resolver feeds the override as the supplied
+value.
+
+Why `initial-session` default rather than bare nil: `:prompt-mode` is
+`{:optional true}` non-nilable in `agent-session-schema` — a nil would fail
+`valid-session?` (the defensive throw in `create-step-attempt-session!`). Falling
+back to the initial-session default (`:lambda` for prompt-mode, nil for
+model/speed/effort) keeps the child schema-valid while still never reading the
+live parent.
+
+Real-flow note: the resolver ALWAYS supplies `:model`/`:prompt-mode` (from the
+snapshot) for workflow children, so the default fallback only ever applies to
+malformed/partial unit inputs; the practical leak vector closed here is the
+resolver's conditional omission of `:speed-mode`/`:effort-override`.
+
+Test: added `child-session-base-state-workflow-owned-isolates-snapshot-fields-test`
+to `child_session_state_test.clj` driving `child-session-base-state` with a LIVE
+parent carrying speed/effort/prompt-mode/model and asserting (a) nil-at-invoke
+snapshot fields resolve to the initial-session default (NOT the live parent),
+(b) supplied snapshot values are authoritative, (c) non-workflow children still
+fall back to the live parent. Updated the pre-existing
+`child-session-base-state-normalizes-and-inherits-test` to supply `:model`
+explicitly (it asserts `:workflow-owned? true` and previously relied on the now-
+removed live-parent model fallback — the real resolver always supplies it).
+Reconciled the `child_session_state.clj` classification comment (model-identity +
+common-inherited buckets) with the new workflow-owned behaviour.
+
+Verification: child-session-state + attempts (workflow-runtime + agent-session) +
+child-session-mutation 28 tests/149 assertions green; workflow delegate-example /
+execution / statechart-runtime / inheritance-snapshot / child-session-context
+30 tests/148 assertions green; clj-kondo clean. R4 checked.
+
+## T1 follow-up executed (2026-06-02)
+
+T1 (test review): strengthened the AC7 test
+(`snapshot-model-feeds-model-query-selection-context-test`,
+`workflow-step-session-config/inheritance_snapshot_test.clj`) so it actually
+proves the model-query selection context comes from the SNAPSHOT model, not the
+live parent. The prior assertion was shape-only (`(some? :model-fallback)` +
+`:type :ranked-model-candidates`), which held regardless of which model fed
+`model-query->selection-request`'s `:session-model` context.
+
+New form: the step's `:model {:type :model-query …}` now carries a
+`:prefer [{:criterion :same-model-as-session :prefer :context-match}]`
+preference; the snapshot model (`claude-opus-4-5`) and the post-invoke live model
+(`claude-haiku-4-5`) are two DISTINCT real registered anthropic models (same
+provider, so only the exact-model context can disambiguate). The
+`:same-model-as-session` criterion ranks the candidate matching the selection
+context's `:session-model` first, so the ranking winner distinguishes
+snapshot-vs-live. Asserts `(= snapshot-model (:model config))`,
+`(= snapshot-model (first ranked))`, and `(not= live-model (:model config))` —
+the test would FLIP/fail if the resolver leaked the live model into the
+selection context. AC7's isolation invariant is now provable, not just the
+fallback's shape.
+
+Verification: `psi.workflow-step-session-config.inheritance-snapshot-test`
+9 tests / 47 assertions green (was 45 — T1 added 2 assertions); clj-kondo clean.
+T1 checked.

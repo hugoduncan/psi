@@ -29,7 +29,14 @@
    [:workflow-run-id {:optional true} [:maybe :string]]
    [:workflow-step-id {:optional true} [:maybe :string]]
    [:workflow-attempt-id {:optional true} [:maybe :string]]
-   [:workflow-owned? {:optional true} [:maybe :boolean]]])
+   [:workflow-owned? {:optional true} [:maybe :boolean]]
+   ;; task 207 (R4): true when the inherited defaults were resolved from the
+   ;; invoke-time snapshot (resolver/attempt path). Snapshot-governed inherited
+   ;; fields (:model :prompt-mode :speed-mode :effort-override) must NOT fall
+   ;; back to the LIVE parent during child-state assembly, else a post-invoke
+   ;; parent mutation leaks in. Workflow-owned children that are NOT
+   ;; snapshot-governed (e.g. the workflow judge) keep parent inheritance.
+   [:inherited-snapshot? {:optional true} [:maybe :boolean]]])
 
 (def result-schema
   [:map {:closed true}

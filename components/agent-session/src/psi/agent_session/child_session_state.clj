@@ -26,9 +26,12 @@
 ;;;     :skill-ids              — derived via derive-child-prompt-state from parent skills
 ;;;     :tool-ids               — derived via derive-child-prompt-state (or explicit child opts)
 ;;;     :prompt-contribution-ids — resolved from parent via prompt-storage/prompt-ids
-;;;     :prompt-mode            — (or prompt-mode (:prompt-mode parent-sd))
-;;;     :speed-mode             — (or speed-mode (:speed-mode parent-sd)) — workflow snapshot (task 207)
-;;;     :effort-override        — (or effort-override (:effort-override parent-sd)) — workflow snapshot (task 207)
+;;;     :prompt-mode            — non-workflow: (or prompt-mode (:prompt-mode parent-sd));
+;;;                               workflow-owned: snapshot value, else initial-session default — no live parent-sd fallback (task 207, R4)
+;;;     :speed-mode             — non-workflow: (or speed-mode (:speed-mode parent-sd));
+;;;                               workflow-owned: snapshot value, else initial-session default (task 207, R4)
+;;;     :effort-override        — non-workflow: (or effort-override (:effort-override parent-sd));
+;;;                               workflow-owned: snapshot value, else initial-session default (task 207, R4)
 ;;;     :developer-prompt       — (or developer-prompt (:developer-prompt parent-sd))
 ;;;     :developer-prompt-source — (or developer-prompt-source (:developer-prompt-source parent-sd))
 ;;;     :cache-breakpoints      — (or cache-breakpoints (:cache-breakpoints parent-sd) default)
@@ -54,7 +57,8 @@
 ;;;     :prompt-component-selection — normalized from child opts via derive-child-prompt-state
 ;;;
 ;;; model-identity-fields (2 keys in init.clj):
-;;;     :model          — (or model (:model parent-sd)) — falls back to parent
+;;;     :model          — non-workflow: (or model (:model parent-sd)) — falls back to parent;
+;;;                       workflow-owned: snapshot value, else initial-session default — no live parent-sd fallback (task 207, R4)
 ;;;     :thinking-level — (or thinking-level :off) — defaults to :off, not direct parent inheritance
 
 (defn- default-child-system-prompt-build-opts
@@ -127,6 +131,27 @@
         normalized-developer-prompt-source (let [source (or developer-prompt-source (:developer-prompt-source parent-sd))]
                                              (when (not= :fallback source)
                                                source))
+        workflow-owned?' (boolean workflow-owned?)
+        ;; Workflow inherited-defaults snapshot isolation (task 207, R4):
+        ;; for workflow-owned children the snapshot-governed inherited fields
+        ;; (:model :prompt-mode :speed-mode :effort-override) come from the
+        ;; resolver's already-snapshotted value and must NOT fall back to the
+        ;; LIVE parent session. parent-sd is read mid-run in :session/create-child
+        ;; (session_lifecycle.clj), so a nil-at-invoke snapshot value falling back
+        ;; to parent-sd would leak a post-invoke live mutation, breaking
+        ;; Decision 2 / AC3. The supplied (snapshot) value is authoritative
+        ;; (explicit override precedence preserved by the resolver); when it is
+        ;; nil the field uses the fresh initial-session default, never the live
+        ;; parent. Non-workflow children keep the live parent-sd fallback.
+        defaults (session-data/initial-session)
+        inherited-default (fn [supplied parent-value default-value]
+                            (if workflow-owned?'
+                              (or supplied default-value)
+                              (or supplied parent-value)))
+        child-model (inherited-default model (:model parent-sd) (:model defaults))
+        child-prompt-mode (inherited-default prompt-mode (:prompt-mode parent-sd) (:prompt-mode defaults))
+        child-speed-mode (inherited-default speed-mode (:speed-mode parent-sd) (:speed-mode defaults))
+        child-effort-override (inherited-default effort-override (:effort-override parent-sd) (:effort-override defaults))
         ts (java.time.Instant/now)
         session-data
         (merge (session-data/initial-session
@@ -138,12 +163,12 @@
                         :workflow-run-id            workflow-run-id
                         :workflow-step-id           workflow-step-id
                         :workflow-attempt-id        workflow-attempt-id
-                        :workflow-owned?            (boolean workflow-owned?)
+                        :workflow-owned?            workflow-owned?'
                         :response-mode              response-mode
                         :logprobs-enabled           (boolean logprobs)
                         :system-prompt              system-prompt
                         :base-system-prompt         base-system-prompt
-                        :prompt-mode                (or prompt-mode (:prompt-mode parent-sd))
+                        :prompt-mode                child-prompt-mode
                         :developer-prompt           (or developer-prompt (:developer-prompt parent-sd))
                         :developer-prompt-source    normalized-developer-prompt-source
                         :thinking-level             (or thinking-level :off)
@@ -155,20 +180,21 @@
                                                         (:cache-breakpoints (session-data/initial-session)))
                         :prompt-component-selection prompt-component-selection
                         :prompt-contribution-ids    (prompt-storage/prompt-ids parent-sd)
-                        :model                      (or model (:model parent-sd))
+                        :model                      child-model
                         :created-at                 ts
                         :updated-at                 ts}
                  (some? top-logprobs)
                  (assoc :top-logprobs top-logprobs)
 
                  ;; Workflow inherited-defaults snapshot (task 207): apply the
-                 ;; resolved speed-mode/effort-override, falling back to the
-                 ;; parent session's value when no override is supplied.
-                 (some? (or speed-mode (:speed-mode parent-sd)))
-                 (assoc :speed-mode (or speed-mode (:speed-mode parent-sd)))
+                 ;; resolved speed-mode/effort-override. Non-workflow children
+                 ;; fall back to the parent session's value when no override is
+                 ;; supplied; workflow children use the snapshot value only (R4).
+                 (some? child-speed-mode)
+                 (assoc :speed-mode child-speed-mode)
 
-                 (some? (or effort-override (:effort-override parent-sd)))
-                 (assoc :effort-override (or effort-override (:effort-override parent-sd)))
+                 (some? child-effort-override)
+                 (assoc :effort-override child-effort-override)
 
                  (some? temperature)
                  (assoc :temperature temperature)))]
