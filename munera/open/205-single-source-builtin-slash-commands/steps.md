@@ -45,20 +45,21 @@ Tick with sha/decision on completion.
 
 ## Slice 2 — Backend resolver + graph discovery
 
-- [ ] Add public `commands/builtin-command-specs-for-resolver` returning a vector
+- [x] Add public `builtin-command-specs-for-resolver` returning a vector
       of `{:name :description}` (bare names, table order, no `:usage`/internal
-      fields).
-- [ ] Add `builtin-commands-resolver` in `resolvers/extensions.clj` mirroring
+      fields). **Lives in the new leaf ns `commands.builtin-specs`** (see
+      deviation) so the resolver can depend on it without a load cycle.
+- [x] Add `builtin-commands-resolver` in `resolvers/extensions.clj` mirroring
       `extension-commands-resolver`; output
       `:psi.agent-session/builtin-command-specs` (+ `:psi.agent-session/builtin-command-names`).
-- [ ] Register `builtin-commands-resolver` in `extensions.clj` `resolvers` vector
+- [x] Register `builtin-commands-resolver` in `extensions.clj` `resolvers` vector
       so it flows into `all-resolvers` / the graph attr-index.
-- [ ] Add test: resolver returns `{:name :description}` vector, bare names, table
+- [x] Add test: resolver returns `{:name :description}` vector, bare names, table
       order; `/reload-models` and `/reload-prompts` present; `:usage`/`:kinds`/
       `:handler`/`:hide-in-help?` absent; aliases `/?`,`/exit` present (bare).
-- [ ] Add graph-discovery test: `:psi.agent-session/builtin-command-specs` is in
-      the resolver/attr index and resolvable for a session.
-- [ ] Targeted clj-kondo over changed agent-session files; green.
+- [x] Add graph-discovery test: `:psi.agent-session/builtin-command-specs` is in
+      the resolver/attr index (`resolver-syms`) and resolvable for a session.
+- [x] Targeted clj-kondo over changed agent-session files; green.
 
 ## Slice 3 — TUI consumption
 

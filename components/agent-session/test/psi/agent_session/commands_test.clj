@@ -8,6 +8,7 @@
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.background-job-runtime :as bg-rt]
    [psi.agent-session.commands :as commands]
+   [psi.agent-session.commands.builtin-specs :as bspec]
    [psi.agent-session.core :as session]
    [psi.session-state.state :as ss]
    [psi.agent-session.mutations :as mutations]
@@ -789,22 +790,22 @@
 (deftest exact-command-handlers-projection-unchanged-test
   (testing "derived exact-command-handlers equals the prior literal map"
     (is (= snapshot-exact-command-handlers
-           @#'commands/exact-command-handlers))))
+           bspec/exact-command-handlers))))
 
 (deftest prefixed-command-prefixes-projection-unchanged-test
   (testing "derived prefixed-command-prefixes equals the prior literal set"
     (is (= snapshot-prefixed-command-prefixes
-           (set @#'commands/prefixed-command-prefixes)))))
+           (set bspec/prefixed-command-prefixes)))))
 
 (deftest builtin-command-names-projection-unchanged-test
   (testing "derived builtin-command-names equals the prior set"
     (is (= snapshot-builtin-command-names
-           @#'commands/builtin-command-names))))
+           bspec/builtin-command-names))))
 
 (deftest project-repl-dual-kind-test
   (testing "/project-repl appears in BOTH derived projections"
-    (is (contains? @#'commands/exact-command-handlers "/project-repl"))
-    (is (contains? (set @#'commands/prefixed-command-prefixes) "/project-repl")))
+    (is (contains? bspec/exact-command-handlers "/project-repl"))
+    (is (contains? (set bspec/prefixed-command-prefixes) "/project-repl")))
   (testing "bare /project-repl dispatches via the exact handler"
     (let [[ctx session-id] (make-test-ctx)
           result (commands/dispatch-in ctx session-id "/project-repl" cmd-opts)]
@@ -836,7 +837,7 @@
 
 (deftest prefixed-case-branch-coherence-test
   (testing "prefixed spec-table keys equal the dispatch-prefixed-command case branch keys"
-    (let [prefixed-keys (set @#'commands/prefixed-command-prefixes)
+    (let [prefixed-keys (set bspec/prefixed-command-prefixes)
           case-keys #{"/tree" "/jobs" "/job" "/cancel-job" "/remember" "/model"
                       "/thinking" "/speed" "/effort" "/login" "/project-repl"}]
       (is (= prefixed-keys case-keys)

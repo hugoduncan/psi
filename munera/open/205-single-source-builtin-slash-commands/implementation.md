@@ -494,3 +494,38 @@ Deviations / notes:
 
 Verification: `clojure -M:test --focus psi.agent-session.commands-test` →
 57 tests, 224 assertions, 0 failures. clj-kondo clean on changed files.
+
+## Slice 2 implementation (2026-06-01)
+
+Added `builtin-commands-resolver` in `resolvers/extensions.clj` (mirrors
+`extension-commands-resolver`), output `:psi.agent-session/builtin-command-specs`
+(vector of `{:name :description}`, bare names, table order) +
+`:psi.agent-session/builtin-command-names` (bare-name vector). Registered in the
+`resolvers` vector. New test ns `builtin-commands-resolver-test` covers resolver
+shape, bare names, internal-field exclusion, previously-missing built-ins
+(`reload-models`/`reload-prompts`/`speed`/`effort`/`project-repl`), aliases
+present, table order, name-vector mirroring, plus a graph-discovery test
+(resolver-syms contains the resolver + attrs resolvable).
+
+### Deviation (significant): leaf ns to break a load cycle
+
+Putting the spec accessor on `commands` and requiring `commands` from the
+resolver introduced a **cyclic load dependency**:
+`core → commands/effort → commands → resolvers/extensions → resolvers →
+psi_tool → … → context → core`. (`commands.effort` requires `core`, which
+transitively pulls in the resolvers.)
+
+Fix: extracted the entire single-source machinery into a new **leaf namespace**
+`psi.agent-session.commands.builtin-specs` (only `clojure.string`):
+`builtin-command-specs` (the table), `strip-slash`, `exact-command-handlers`,
+`prefixed-command-prefixes`, `builtin-command-names`, `builtin-help-block`,
+`builtin-command-specs-for-resolver`. `commands` now `:as bspec` and references
+these; the resolver `:as builtin-specs` references the accessor. No cycle, and
+the single-source-of-names invariant is unchanged (the table is still the sole
+name source). Architecture-fit review's placement-in-agent-session intent is
+preserved (the leaf ns is co-located under `agent-session/commands/`).
+Slice-1 tests updated to reference `bspec/...` (the vars are now public on the
+leaf ns rather than `^:private` on `commands`).
+
+Verification: focused run of `commands-test` + `builtin-commands-resolver-test`
+→ 59 tests, 247 assertions, 0 failures. clj-kondo clean.

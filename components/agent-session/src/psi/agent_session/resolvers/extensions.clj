@@ -3,6 +3,7 @@
   (:require
    [com.wsscode.pathom3.connect.operation :as pco]
    [psi.agent-session.extension-installs :as installs]
+   [psi.agent-session.commands.builtin-specs :as builtin-specs]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.extension-workflow-runtime :as extension-workflow-runtime]
    [psi.agent-session.resolvers.support :as support]
@@ -141,6 +142,19 @@
     {:psi.extension/commands      (mapv #(dissoc % :handler) cmds)
      :psi.extension/command-names (vec (command-registry/command-names-in reg))}))
 
+(pco/defresolver builtin-commands-resolver
+  "Expose the backend's authoritative built-in slash-command surface, derived
+   from the single `builtin-command-specs` table in `commands`. Mirrors
+   `extension-commands-resolver`: bare names (no leading slash, UIs prefix), so
+   TUI + Emacs consume built-ins exactly like `:psi.extension/command-names`."
+  [_env]
+  {::pco/input  []
+   ::pco/output [:psi.agent-session/builtin-command-specs
+                 :psi.agent-session/builtin-command-names]}
+  (let [specs (builtin-specs/builtin-command-specs-for-resolver)]
+    {:psi.agent-session/builtin-command-specs specs
+     :psi.agent-session/builtin-command-names (mapv :name specs)}))
+
 (pco/defresolver extension-flags-resolver
   [{:keys [psi/agent-session-ctx]}]
   {::pco/input  [:psi/agent-session-ctx]
@@ -266,6 +280,7 @@
    extension-handlers-resolver
    extension-tools-resolver
    extension-commands-resolver
+   builtin-commands-resolver
    extension-flags-resolver
    extension-details-resolver
    extension-prompt-contributions-resolver
