@@ -1,13 +1,40 @@
 (ns psi.workflow-step-session-config.core-test
   (:require
+   [clojure.set :as set]
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
    [psi.ai.model-registry :as model-registry]
+   [psi.session-state.init :as session-init]
    [psi.workflow-runtime.core :as workflow-runtime]
    [psi.workflow-runtime.execution-adapter]
    [psi.workflow-runtime.step-test-support :as support]
    [psi.workflow-step-session-config.core :as workflow-step-session-config]
    [psi.workflow-registry.registry :as workflow-registry]))
+
+(deftest inherited-defaults-field-set-authority-test
+  (testing "every :from-common source key is a member of the canonical
+            common-inherited-fields authority"
+    (let [common (set session-init/common-inherited-fields)]
+      (is (set/subset? (:from-common workflow-step-session-config/inherited-defaults-source-keys)
+                       common)
+          "snapshot :from-common keys must not drift from common-inherited-fields")))
+
+  (testing "every :from-model source key is a member of the canonical
+            model-identity-fields authority"
+    (let [model-fields (set session-init/model-identity-fields)]
+      (is (set/subset? (:from-model workflow-step-session-config/inherited-defaults-source-keys)
+                       model-fields)
+          "snapshot :from-model keys must not drift from model-identity-fields")))
+
+  (testing "the resolved snapshot key set equals the source keys with
+            :tool-ids->:tool-defs and :skill-ids->:skills substituted"
+    (let [{:keys [from-common from-model]} workflow-step-session-config/inherited-defaults-source-keys
+          source-keys (set/union from-common from-model)
+          resolved (-> source-keys
+                       (disj :tool-ids :skill-ids)
+                       (conj :tool-defs :skills))]
+      (is (= resolved workflow-step-session-config/inherited-defaults-snapshot-keys)
+          "resolved snapshot keys must match the declared source keys (resolved-vs-raw)"))))
 
 (defn- workflow-run-for
   [ctx definitions run-opts]

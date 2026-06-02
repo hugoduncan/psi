@@ -16,6 +16,32 @@
    [psi.workflow-runtime.execution-adapter :as execution-adapter]
    [psi.workflow-runtime.statechart :as workflow-statechart]))
 
+;;; Inherited-defaults snapshot field-set authority (Decision 8a).
+;;;
+;;; The workflow inherited-defaults snapshot is a narrow resolved-default set:
+;;; the fields a step inherits when it gives no override of its own. Its source
+;;; keys span two `session-state/init` authorities so the snapshot field list is
+;;; validated against (not re-enumerated independently from) the canonical
+;;; child-session inheritance constants.
+
+(def inherited-defaults-source-keys
+  "Authority source keys for the inherited-defaults snapshot (Decision 8a).
+
+   `:from-common` keys must each be members of
+   `session-init/common-inherited-fields`; `:from-model` keys must each be
+   members of `session-init/model-identity-fields`. The resolved snapshot maps
+   the raw `:tool-ids`/`:skill-ids` source keys to resolved `:tool-defs`/
+   `:skills`."
+  {:from-common #{:prompt-mode :speed-mode :effort-override :tool-ids :skill-ids}
+   :from-model #{:model :thinking-level}})
+
+(def inherited-defaults-snapshot-keys
+  "The resolved key set produced by an inherited-defaults snapshot.
+
+   Derived from `inherited-defaults-source-keys` with the resolved-vs-raw
+   substitution `:tool-ids`→`:tool-defs`, `:skill-ids`→`:skills`."
+  #{:model :prompt-mode :tool-defs :skills :thinking-level :speed-mode :effort-override})
+
 (defn- effective-step-def
   [workflow-run step-id]
   (get (workflow-statechart/effective-steps (:effective-definition workflow-run)) step-id))

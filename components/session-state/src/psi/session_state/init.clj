@@ -27,7 +27,7 @@
 ;;; Adding or removing a lifecycle-inherited field requires changing one constant
 ;;; here rather than updating 3 independent vectors.
 
-(def ^:private common-inherited-fields
+(def common-inherited-fields
   "Fields inherited by all lifecycle paths (new, resume, fork).
 
    Authoritative (user/config-set):
@@ -64,7 +64,7 @@
    Fork rebuilds prompt state from the parent through a different path."
   [:base-system-prompt :system-prompt :system-prompt-build-opts :prompt-component-selection])
 
-(def ^:private model-identity-fields
+(def model-identity-fields
   "Model identity — inherited by new and fork, not by resume.
    Resume takes model and thinking-level as explicit parameters."
   [:model :thinking-level])

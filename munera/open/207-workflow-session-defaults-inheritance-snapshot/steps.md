@@ -4,25 +4,25 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
 
 ## S1 — Field-set authority surface
 
-- [ ] Promote `common-inherited-fields` to public (drop `^:private`) in
-      `components/session-state/src/psi/session_state/init.clj:30`.
-- [ ] Promote `model-identity-fields` to public (drop `^:private`) in
-      `init.clj:67`.
-- [ ] Verify in-namespace usages (`initialize-new-session-state`,
-      `initialize-forked-session-state`, `resume-inherited-fields`) still
-      resolve after the visibility change; run that component's tests.
-- [ ] Add a named source-key constant in
-      `components/workflow-step-session-config/src/psi/workflow_step_session_config/core.clj`,
-      e.g. `inherited-defaults-source-keys`
+- [x] Promote `common-inherited-fields` to public (drop `^:private`) in
+      `components/session-state/src/psi/session_state/init.clj`.
+- [x] Promote `model-identity-fields` to public (drop `^:private`) in
+      `init.clj`.
+- [x] Verify in-namespace usages still resolve after the visibility change;
+      `psi.session-state.init-test` green (4 tests, 46 assertions).
+- [x] Add a named source-key constant `inherited-defaults-source-keys`
       `{:from-common #{:prompt-mode :speed-mode :effort-override :tool-ids :skill-ids}
-        :from-model #{:model :thinking-level}}` (Decision 8a).
-- [ ] Add the snapshot resolved-key set constant (or derive it) =
+        :from-model #{:model :thinking-level}}` (Decision 8a) in
+      `workflow-step-session-config/core.clj`.
+- [x] Add the snapshot resolved-key set constant
+      `inherited-defaults-snapshot-keys` =
       `{:model :prompt-mode :tool-defs :skills :thinking-level :speed-mode :effort-override}`.
-- [ ] Add a test asserting the field-set invariant (Decision 8a): every
-      `:from-common` key ∈ `init/common-inherited-fields`, every `:from-model`
-      key ∈ `init/model-identity-fields`, and resolved keys equal source keys
-      with `:tool-ids`→`:tool-defs` and `:skill-ids`→`:skills` substituted.
-- [ ] Run lint (`clj-kondo`) + repair on touched files.
+- [x] Add `inherited-defaults-field-set-authority-test` asserting the invariant
+      (Decision 8a): every `:from-common` key ∈ `init/common-inherited-fields`,
+      every `:from-model` key ∈ `init/model-identity-fields`, resolved keys
+      equal source keys with `:tool-ids`→`:tool-defs`/`:skill-ids`→`:skills`.
+      Added `psi/session-state` direct dep to deps.edn for the test require.
+- [x] Run lint (`clj-kondo`) — clean on touched files.
 
 ## S2 — Snapshot derivation functions
 

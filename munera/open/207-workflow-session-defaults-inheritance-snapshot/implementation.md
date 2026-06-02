@@ -481,3 +481,25 @@ design.md so design no longer contradicts plan/steps:
 
 No plan-inconsistency follow-ups blocked; both resolved as design refinements.
 PI1/PI2 checked in steps.md. Code implementation remains for the build phase.
+
+## S1 build — field-set authority surface (ψ, 2026-06-02)
+
+Promoted `common-inherited-fields` and `model-identity-fields` to public
+(dropped `^:private`) in `session-state/init.clj`. Added two named constants to
+`workflow-step-session-config/core.clj`: `inherited-defaults-source-keys`
+(`:from-common`/`:from-model` authority split) and
+`inherited-defaults-snapshot-keys` (the 7 resolved keys). Added
+`inherited-defaults-field-set-authority-test` proving each source key ∈ its
+authority and the resolved key set = source keys with `:tool-ids`→`:tool-defs`/
+`:skill-ids`→`:skills` substituted, so the two field lists cannot drift.
+
+- Added `psi/session-state` as a direct dep of `workflow-step-session-config`
+  (was transitive via workflow-runtime) for the test's `session-init` require.
+- Kept `session-init` require only in the test (not core.clj) — the snapshot
+  source-key constants are declared explicitly and validated against the
+  authority by the test, so core.clj does not reference init directly (avoids an
+  unused-require lint warning).
+
+Verification: `psi.workflow-step-session-config.core-test` (19 tests, 49
+assertions) and `psi.session-state.init-test` (4 tests, 46 assertions) green;
+clj-kondo clean on touched files.
