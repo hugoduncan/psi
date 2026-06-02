@@ -367,6 +367,93 @@
       (is (= "claude-explicit" (or (get-in config [:model :id]) (:model config)))
           "explicit step override wins; snapshot only governs inherited default"))))
 
+(deftest snapshot-thinking-level-precedence-matches-model-test
+  (testing "CS2: the inherited (snapshot) :thinking-level ranks ABOVE the
+            base-meta :thinking-level, uniform with :model (step → inherited →
+            base-meta → :off). A :workflow-file-meta thinking-level does NOT
+            mask the inherited parent value, exactly as a base-meta model does
+            not mask the inherited model."
+    (let [[ctx session-id] (support/create-session-context {:persist? false})
+          ;; base-meta supplies BOTH a model and a thinking-level; the snapshot
+          ;; supplies the inherited defaults for both. The inherited value must
+          ;; win for each, so the two fields behave consistently.
+          base-meta-definition
+          {:definition-id "base-meta-thinking"
+           :name "base-meta-thinking"
+           :steps [{:name "step-1"
+                    :type :session
+                    :contributions [{:type :template
+                                     :text "{{input}}"
+                                     :vars {"input" {:from :workflow-input :path [:input]}}}]}]
+           :workflow-file-meta {:system-prompt "Base."
+                                :model {:provider :anthropic :id "claude-base-meta"}
+                                :thinking-level :low}}
+          snapshot {:model {:provider "anthropic" :id "claude-snapshot"}
+                    :prompt-mode :concise
+                    :tool-defs []
+                    :skills []
+                    :thinking-level :high
+                    :speed-mode nil
+                    :effort-override nil}
+          workflow-run
+          (do (swap! (:state* ctx)
+                     (fn [state]
+                       (let [[s _ _] (workflow-registry/register-definition state base-meta-definition)
+                             [s' _ _] (workflow-runtime/create-run
+                                       s {:definition-id "base-meta-thinking"
+                                          :run-id "run-bm-thinking"
+                                          :parent-session-id session-id
+                                          :inherited-defaults snapshot
+                                          :workflow-input {:input "go"}})]
+                         s')))
+              (workflow-runtime/workflow-run-in @(:state* ctx) "run-bm-thinking"))
+          config (workflow-step-session-config/resolve-step-session-config
+                  ctx nil workflow-run "step-1")]
+      (is (= :high (:thinking-level config))
+          "inherited snapshot thinking-level (:high) wins over the base-meta
+           thinking-level (:low) — uniform with :model")
+      (is (= {:provider "anthropic" :id "claude-snapshot"} (:model config))
+          "inherited snapshot model wins over the base-meta model — the
+           reference precedence CS2 makes thinking-level match")))
+
+  (testing "CS2: an explicit step :thinking-level still wins over both the
+            inherited snapshot and base-meta"
+    (let [[ctx session-id] (support/create-session-context {:persist? false})
+          step-override-definition
+          {:definition-id "step-thinking-override"
+           :name "step-thinking-override"
+           :steps [{:name "step-1"
+                    :type :session
+                    :thinking-level :medium
+                    :contributions [{:type :template
+                                     :text "{{input}}"
+                                     :vars {"input" {:from :workflow-input :path [:input]}}}]}]
+           :workflow-file-meta {:system-prompt "Base."
+                                :thinking-level :low}}
+          snapshot {:model {:provider "anthropic" :id "claude-snapshot"}
+                    :prompt-mode :concise
+                    :tool-defs []
+                    :skills []
+                    :thinking-level :high
+                    :speed-mode nil
+                    :effort-override nil}
+          workflow-run
+          (do (swap! (:state* ctx)
+                     (fn [state]
+                       (let [[s _ _] (workflow-registry/register-definition state step-override-definition)
+                             [s' _ _] (workflow-runtime/create-run
+                                       s {:definition-id "step-thinking-override"
+                                          :run-id "run-step-thinking"
+                                          :parent-session-id session-id
+                                          :inherited-defaults snapshot
+                                          :workflow-input {:input "go"}})]
+                         s')))
+              (workflow-runtime/workflow-run-in @(:state* ctx) "run-step-thinking"))
+          config (workflow-step-session-config/resolve-step-session-config
+                  ctx nil workflow-run "step-1")]
+      (is (= :medium (:thinking-level config))
+          "explicit step :thinking-level wins over inherited snapshot and base-meta"))))
+
 (deftest no-snapshot-falls-back-to-live-parent-test
   (testing "AC6: a run WITHOUT a snapshot resolves from the live parent (back-compat)"
     (let [[ctx session-id] (support/create-session-context {:persist? false})]

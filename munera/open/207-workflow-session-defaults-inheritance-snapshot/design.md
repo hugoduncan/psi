@@ -73,6 +73,24 @@ Out of scope:
    child-session inheritance set; `speed-mode`/`effort-override` are there as
    inherited-but-transient fields — they must be part of the workflow snapshot.)
 
+   1a. **Inherited-default vs base-meta precedence — uniform.** For the two
+   inherited fields that also have a `:workflow-file-meta`/base-meta override
+   surface (`:model` and `:thinking-level`), the resolution order is uniform:
+   **step `:session` override → inherited default → base-meta → fallback**. The
+   inherited (snapshot, or live for snapshot-less runs) value ranks *above* the
+   static base-meta default, so a `:workflow-file-meta` value acts as a fallback
+   only when neither the step nor the inherited default supplies the field. This
+   matches the pre-task `:model` convention (`resolved-model` cond: step →
+   `parent-session-model` → base-meta) and makes `:thinking-level` consistent
+   with it (CS2 — previously `:thinking-level` ranked base-meta above the
+   inherited value, the lone inversion). `:prompt-mode`/`:speed-mode`/
+   `:effort-override`/`:tools`/`:skills` have no base-meta override surface in
+   the workflow grammar, so the question does not arise for them. (Back-compat
+   for AC6: snapshot-less runs still do not inherit live `:thinking-level`/
+   `:speed-mode`/`:effort-override` — those three are carried only by the
+   snapshot path, so `:thinking-level` for a snapshot-less run still falls back
+   to base-meta/`:off`, consistent with pre-task behaviour.)
+
 2. **Snapshot shape — fully resolved.** Capture a concrete resolved snapshot
    (e.g. `{:model … :prompt-mode … :tool-defs … :skills … :thinking-level …
    :speed-mode … :effort-override …}`), not raw parent fields. Resolved is

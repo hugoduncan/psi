@@ -623,7 +623,7 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
 
 ## Code-shaper review follow-ups (review 2026-06-02)
 
-- [ ] CS1: Unify the three snapshot-consumption idioms in
+- [x] CS1: Unify the three snapshot-consumption idioms in
       `resolve-step-session-config` (`workflow-step-session-config/core.clj`).
       The seven inherited defaults are sourced from the snapshot via three
       different shapes — `(if snapshot? (:X snapshot) (:X parent-session))`
@@ -635,6 +635,48 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       snapshot-vs-live source map keyed by `inherited-defaults-snapshot-keys`,
       so adding/removing an inherited field touches one shape, not three. Keep
       behaviour identical (existing AC1–8 tests must stay green); shape-only.
+      DONE: introduced a single `inherited` map bound once
+      (`core.clj:213-219`): on the snapshot path it is
+      `(select-keys snapshot inherited-defaults-snapshot-keys)`; on the live
+      path it carries only the four fields the pre-task resolver inherited live
+      (`:model :prompt-mode :skills :tool-defs`), deliberately omitting
+      `:thinking-level :speed-mode :effort-override` to preserve AC6 back-compat
+      (snapshot-less runs emit no speed/effort and fall thinking-level back to
+      base-meta/:off). All seven downstream reads now go through `inherited`
+      (`(:prompt-mode inherited)`, `(:tool-defs inherited)`,
+      `(:thinking-level inherited)`, `(:skills inherited)`,
+      `(some? (:speed-mode inherited))`/`(:effort-override inherited)`,
+      `parent-session-model (:model inherited)`), so the
+      `inherited-defaults-snapshot-keys` set is consumed as one unit and the
+      three idioms collapse to one. Behaviour preserved for the four live-path
+      fields; the only behaviour delta is CS2 (thinking-level precedence) below.
+      Full unit suite green; lint clean.
+- [x] CS2: Reconcile the `:thinking-level` vs `:model` inherited-default
+      precedence inversion in `resolve-step-session-config`. `:model` ranks the
+      inherited default ABOVE the base-meta override (`:220-235`), but
+      `:thinking-level` ranks the snapshot/inherited value BELOW base-meta
+      (`:243-246`), so a `:workflow-file-meta` thinking-level masks the inherited
+      parent value while a `:workflow-file-meta` model does not. Decide the
+      intended ordering, make it uniform across the inherited fields (or document
+      the per-field difference + rationale in design.md Decision 1/7 and the
+      resolver). If the behaviour changes, add/adjust a precedence test
+      (base-meta vs inherited default) for the affected field(s).
+      DONE: chose uniformity with the established `:model` convention — the
+      inherited default ranks ABOVE base-meta. `:thinking-level` reordered to
+      `(or (:thinking-level session-spec) (:thinking-level inherited)
+      (:thinking-level base-meta) :off)` so step override → inherited → base-meta
+      → :off, mirroring `resolved-model`'s cond (step → parent-session-model →
+      base-meta). Behaviour change: a `:workflow-file-meta :thinking-level` no
+      longer masks an inherited (snapshot) thinking-level. Documented in
+      design.md Decision 1a (precedence convention + the AC6 back-compat carve-out
+      that snapshot-less runs still don't inherit live thinking-level) and the
+      CHANGELOG Fixed entry. New precedence test
+      `snapshot-thinking-level-precedence-matches-model-test`
+      (`inheritance_snapshot_test.clj`): block 1 asserts inherited snapshot
+      thinking-level (:high) AND model both win over base-meta (:low /
+      claude-base-meta), proving the two fields now agree; block 2 asserts an
+      explicit step :thinking-level (:medium) still wins over both. Full unit
+      suite green; lint clean.
 - [ ] CS2: Reconcile the `:thinking-level` vs `:model` inherited-default
       precedence inversion in `resolve-step-session-config`. `:model` ranks the
       inherited default ABOVE the base-meta override (`:220-235`), but

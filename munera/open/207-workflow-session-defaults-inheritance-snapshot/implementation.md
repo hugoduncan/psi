@@ -1814,3 +1814,40 @@ override surface → no override layer). Not a finding.
 
 CS1/CS2 are shape/consistency findings, not correctness regressions (no AC test
 fails today); follow-ups added.
+
+## Code-shaper follow-ups executed (ψ, 2026-06-02)
+
+CS1 (idiom unification) and CS2 (thinking-level precedence) both executed in
+`workflow-step-session-config/core.clj` `resolve-step-session-config`.
+
+CS1 — collapsed the three snapshot-vs-live consumption shapes into a single
+`inherited` map bound once. Snapshot path:
+`(select-keys snapshot inherited-defaults-snapshot-keys)`. Live path: only the
+four fields the pre-task resolver inherited live (`:model :prompt-mode :skills
+:tool-defs`), with `:thinking-level :speed-mode :effort-override` deliberately
+omitted so the live (snapshot-less, AC6) path keeps emitting no speed/effort and
+falls thinking-level back to base-meta/:off — i.e. no behaviour change for
+snapshot-less runs. All seven downstream reads now source from `inherited`, so
+the `inherited-defaults-snapshot-keys` set is the single edit point and the
+"seven fields from the snapshot" reads as one unit (locally comprehensible).
+`parent-session-model` is now `(:model inherited)`.
+
+CS2 — chose uniformity over per-field documentation. The established `:model`
+convention ranks the inherited default ABOVE base-meta (`resolved-model` cond:
+step → `parent-session-model` → base-meta); `:thinking-level` was the lone
+inversion (step → base-meta → snapshot → :off). Reordered thinking-level to
+`(or (:thinking-level session-spec) (:thinking-level inherited)
+(:thinking-level base-meta) :off)` so a `:workflow-file-meta` thinking-level no
+longer masks an inherited snapshot value, matching the inherited model. This is
+a behaviour change ONLY on the snapshot path with a base-meta thinking-level
+present (no existing snapshot test combined the two, so none regressed); the
+snapshot-less path is unchanged (inherited thinking-level absent ⇒ base-meta
+still wins there, preserving AC6).
+
+Coherence: design.md Decision 1a records the uniform precedence + the AC6
+carve-out; CHANGELOG Fixed entry notes the user-visible thinking-level
+precedence change; new test
+`snapshot-thinking-level-precedence-matches-model-test` pins inherited>base-meta
+for thinking-level (alongside model) and step-override>inherited>base-meta.
+Full `bb clojure:test:unit` green; clj-kondo clean on both touched files; both
+files under the 800-line commit-check limit.

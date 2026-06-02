@@ -197,19 +197,30 @@
         ;; performs no live parent re-read, matching the isolation intent.
         parent-session (when-not snapshot?
                          (execution-adapter/get-session-data ctx authoritative-parent-session-id))
-        ;; parent-session-model is replaced WHOLESALE by the snapshot model
-        ;; (P4): all four consumers (step override, base-meta override,
-        ;; no-override fallback, model-query selection context) see it.
-        parent-session-model (if snapshot? (:model snapshot) (:model parent-session))
-        parent-session-prompt-mode (if snapshot? (:prompt-mode snapshot) (:prompt-mode parent-session))
-        ;; tool-defs/skills snapshots are the resolved name-resolution pools.
-        session-skills (if snapshot?
-                         (:skills snapshot)
-                         (skill-storage/all-skills @(:state* ctx) parent-session))
-        session-tool-defs (if snapshot?
-                            (:tool-defs snapshot)
-                            (let [tool-source (ss/agent-tool-source-in ctx authoritative-parent-session-id)]
-                              (tool-defs/resolve-tool-defs tool-source (:tool-ids parent-session))))
+        ;; Single source for the seven inherited defaults (CS1): each field is
+        ;; resolved once, from the snapshot when present (isolation intent) or
+        ;; the live parent otherwise. Downstream code reads `inherited` rather
+        ;; than re-expressing the snapshot-vs-live choice per field, so the
+        ;; `inherited-defaults-snapshot-keys` set is consumed as one unit and
+        ;; adding/removing an inherited field touches this map alone.
+        ;; `:tool-defs`/`:skills` are the resolved name-resolution POOLS.
+        ;;
+        ;; The live-read branch keeps the pre-task non-inheritance of
+        ;; :thinking-level/:speed-mode/:effort-override (AC6 back-compat:
+        ;; snapshot-less runs emit no speed/effort and fall thinking-level back
+        ;; to base-meta/:off — only the snapshot path carries these three;
+        ;; I1/P2), so it omits those keys (absent ⇒ nil in the consumers).
+        inherited (if snapshot?
+                    (select-keys snapshot inherited-defaults-snapshot-keys)
+                    {:model (:model parent-session)
+                     :prompt-mode (:prompt-mode parent-session)
+                     :skills (skill-storage/all-skills @(:state* ctx) parent-session)
+                     :tool-defs (let [tool-source (ss/agent-tool-source-in ctx authoritative-parent-session-id)]
+                                  (tool-defs/resolve-tool-defs tool-source (:tool-ids parent-session)))})
+        ;; parent-session-model is the inherited model WHOLESALE (P4): all four
+        ;; consumers (step override, base-meta override, no-override fallback,
+        ;; model-query selection context) see it.
+        parent-session-model (:model inherited)
         session-spec (:session step-def)
         developer-prompt (or (:system-prompt session-spec)
                              (:system-prompt base-meta))
@@ -237,25 +248,29 @@
     (cond->
      (merge
       {:developer-prompt (compose-system-prompt developer-prompt framing-prompt)
-       :prompt-mode parent-session-prompt-mode
+       :prompt-mode (:prompt-mode inherited)
        :response-mode (or (:response-mode session-spec) :streaming)
-       :tool-defs (resolve-step-tool-defs session-tool-defs (:tools session-spec))
+       :tool-defs (resolve-step-tool-defs (:tool-defs inherited) (:tools session-spec))
+       ;; thinking-level precedence is uniform with :model (CS2): step override
+       ;; → inherited default → base-meta → fallback, so the inherited parent
+       ;; value dominates a static :workflow-file-meta default exactly as the
+       ;; inherited model does (resolved-model cond), not the inverse.
        :thinking-level (or (:thinking-level session-spec)
+                           (:thinking-level inherited)
                            (:thinking-level base-meta)
-                           (when snapshot? (:thinking-level snapshot))
                            :off)
-       :skills (resolve-step-skills ctx session-skills (:skills session-spec))
+       :skills (resolve-step-skills ctx (:skills inherited) (:skills session-spec))
        :model resolved-model
        :prompt-component-selection (:prompt-component-selection session-spec)}
       (resolved-logprob-config session-spec))
 
-      ;; speed-mode/effort-override flow from the snapshot into the step's
-      ;; resolved config (the resolver emits neither today — I1/P2).
-      (and snapshot? (some? (:speed-mode snapshot)))
-      (assoc :speed-mode (:speed-mode snapshot))
+      ;; speed-mode/effort-override flow from the inherited defaults into the
+      ;; step's resolved config (the resolver emits neither today — I1/P2).
+      (some? (:speed-mode inherited))
+      (assoc :speed-mode (:speed-mode inherited))
 
-      (and snapshot? (some? (:effort-override snapshot)))
-      (assoc :effort-override (:effort-override snapshot))
+      (some? (:effort-override inherited))
+      (assoc :effort-override (:effort-override inherited))
 
       (contains? session-spec :temperature)
       (assoc :temperature (:temperature session-spec))
