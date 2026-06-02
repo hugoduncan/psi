@@ -712,7 +712,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Test review follow-ups — test-shaper pass 3 (2026-06-01)
 
-- [ ] Consolidate the duplicated `create-session-context` test fixture. The
+- [x] Consolidate the duplicated `create-session-context` test fixture. The
       identical (modulo the `:persist? false` lifecycle/effects variant) helper
       is copy-pasted across 9 scheduler test ns
       (`scheduler_end_to_end_test`, `scheduler_timer_seam_test`,
@@ -729,8 +729,28 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       `components/agent-session/src/**` or `doc/scheduler.md`); keep suite green +
       clj-kondo/cljfmt clean. If 201 is closed, raise as a standalone
       test-hygiene task.
+      Done: **reused the existing `test-support/create-test-session`** instead of
+      adding a new redundant helper (`λbuild: ∃lib → use(lib)`). Discovery: all 9
+      local `create-session-context` copies are behaviourally identical to each
+      other **and** to `test-support/create-test-session` — `safe-context-opts`
+      already defaults `:persist? false`, so the 7 "persist" copies, the 2
+      `(assoc opts :persist? false)` lifecycle/effects variants, and
+      `create-test-session` all resolve to the same persist-false context (only
+      the no-arg default differs cosmetically: `create-test-session` → `{:persist?
+      false}`, the locals → `{}`, both persist-false via `safe-context-opts`).
+      Deleted all 9 local defns; rewrote every call site to
+      `test-support/create-test-session` (opts pass through unchanged). Removed
+      the now-unused `[psi.agent-session.core :as session]` require from
+      `scheduler_tools_test` (its only `session/` use was the deleted defn; the
+      other 8 files still use `session/` elsewhere so their requires stay).
+      `findings.md` psi-tool/Live citations unchanged (no deftest renamed).
+      clj-kondo 0/0 across all touched files; cljfmt reformatted the realigned
+      `create-test-session` opts indentation in lifecycle/timer-seam then clean;
+      full `bb test` green; aggregate count unchanged (no assertions added).
+      Test/`test_support`-only — zero `components/agent-session/src/**` or
+      `doc/scheduler.md` (Slice-10 allowlist held).
 
-- [ ] Add explicit `:kind :message` to the `:scheduler/create` dispatch in
+- [x] Add explicit `:kind :message` to the `:scheduler/create` dispatch in
       `scheduler-context-shutdown-test/shutdown-context-clears-scheduler-timers-test`
       (currently omits it and relies on the handler default
       `(or kind :message)`). Brings its data shape in line with every other 201
@@ -739,8 +759,15 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       touched namespace. No behaviour change (default already resolves to
       `:message`). test-shaper `consistent(data_shapes)`. Test-file only
       (Slice-10 allowlist); keep suite green + clj-kondo/cljfmt clean.
+      Done: added `:kind :message` (after `:schedule-id`) to the first
+      `:scheduler/create` dispatch in
+      `shutdown-context-clears-scheduler-timers-test` (the second create in the
+      file already declared it). Data shape now matches every other 201 live
+      create; no behaviour change (default already resolved to `:message`).
+      clj-kondo 0/0, cljfmt clean; `bb test` green. Test file only — zero
+      `components/agent-session/src/**` or `doc/scheduler.md`.
 
-- [ ] Relabel the misleading `testing` block in
+- [x] Relabel the misleading `testing` block in
       `scheduler-test/fire-schedule-test`: "idle session delivers immediately"
       asserts the `:deliver` *action* with status still `:pending` (pure
       `fire-schedule` returns the action without mutating status). Reword to
@@ -749,3 +776,8 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       Assertions unchanged. test-shaper `meaningful_failures` / label accuracy
       (lowest priority — cosmetic). Test-file only (Slice-10 allowlist); keep
       suite green + clj-kondo/cljfmt clean.
+      Done: relabelled the block to "idle session: returns the :deliver action
+      and leaves the schedule :pending" + a one-line comment stating pure
+      `fire-schedule` returns the action without mutating status. Assertions
+      unchanged. clj-kondo 0/0, cljfmt clean; `bb test` green. Test file only —
+      zero `components/agent-session/src/**` or `doc/scheduler.md`.

@@ -1,21 +1,12 @@
 (ns psi.agent-session.scheduler-tools-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [psi.agent-session.core :as session]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.tools :as tools]))
 
-(defn- create-session-context
-  ([]
-   (create-session-context {}))
-  ([opts]
-   (let [ctx (session/create-context (test-support/safe-context-opts opts))
-         sd  (session/new-session-in! ctx nil {})]
-     [ctx (:session-id sd)])))
-
 (deftest make-psi-tool-scheduler-test
   (testing "scheduler create stores a pending schedule"
-    (let [[ctx session-id] (create-session-context {:persist? false})
+    (let [[ctx session-id] (test-support/create-test-session {:persist? false})
           tool             (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
           result           ((:execute tool) {"action" "scheduler"
                                              "op" "create"
@@ -35,7 +26,7 @@
       (is (= :pending (get-in @(:state* ctx) [:agent-session :sessions session-id :data :scheduler :schedules (:schedule-id schedule) :status])))))
 
   (testing "scheduler list returns pending and queued schedules"
-    (let [[ctx session-id] (create-session-context {:persist? false})
+    (let [[ctx session-id] (test-support/create-test-session {:persist? false})
           tool             (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
           create-1         ((:execute tool) {"action" "scheduler"
                                              "op" "create"
@@ -54,7 +45,7 @@
       (is (= :queued (get-in parsed [:psi-tool/scheduler :schedules 0 :status])))))
 
   (testing "scheduler cancel cancels a pending schedule"
-    (let [[ctx session-id] (create-session-context {:persist? false})
+    (let [[ctx session-id] (test-support/create-test-session {:persist? false})
           tool             (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
           create-result    ((:execute tool) {"action" "scheduler"
                                              "op" "create"
@@ -72,7 +63,7 @@
       (is (= :cancelled (get-in @(:state* ctx) [:agent-session :sessions session-id :data :scheduler :schedules schedule-id :status])))))
 
   (testing "scheduler create rejects too-short delay"
-    (let [[ctx session-id] (create-session-context {:persist? false})
+    (let [[ctx session-id] (test-support/create-test-session {:persist? false})
           tool             (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
           result           ((:execute tool) {"action" "scheduler"
                                              "op" "create"
@@ -85,7 +76,7 @@
       (is (= :scheduler (:psi-tool/action parsed)))))
 
   (testing "scheduler create normalizes past absolute instants to immediate fire-at"
-    (let [[ctx session-id] (create-session-context {:persist? false})
+    (let [[ctx session-id] (test-support/create-test-session {:persist? false})
           tool             (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
           result           ((:execute tool) {"action" "scheduler"
                                              "op" "create"
@@ -98,7 +89,7 @@
       (is (string? fire-at))))
 
   (testing "scheduler create rejects the 51st pending schedule"
-    (let [[ctx session-id] (create-session-context {:persist? false})
+    (let [[ctx session-id] (test-support/create-test-session {:persist? false})
           tool             (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})]
       (dotimes [i 50]
         (let [result ((:execute tool) {"action" "scheduler"

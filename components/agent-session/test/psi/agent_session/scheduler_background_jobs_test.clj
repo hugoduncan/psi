@@ -5,17 +5,9 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.test-support :as test-support]))
 
-(defn- create-session-context
-  ([]
-   (create-session-context {}))
-  ([opts]
-   (let [ctx (session/create-context (test-support/safe-context-opts opts))
-         sd  (session/new-session-in! ctx nil {})]
-     [ctx (:session-id sd)])))
-
 (deftest scheduler-background-job-projection-test
   (testing "pending and queued schedules project into background jobs"
-    (let [[ctx session-id] (create-session-context {:persist? false})
+    (let [[ctx session-id] (test-support/create-test-session {:persist? false})
           _                (session/dispatch-in! ctx :scheduler/create
                                                  {:session-id session-id
                                                   :schedule-id "sch-1"
@@ -44,7 +36,7 @@
              (set (map #(select-keys % [:job-id :status :job-kind :tool-name]) jobs))))))
 
   (testing "scheduler-projected background job cancel routes to scheduler cancel"
-    (let [[ctx session-id] (create-session-context {:persist? false})
+    (let [[ctx session-id] (test-support/create-test-session {:persist? false})
           _                (session/dispatch-in! ctx :scheduler/create
                                                  {:session-id session-id
                                                   :schedule-id "sch-1"

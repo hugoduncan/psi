@@ -1207,3 +1207,44 @@ the psi-tool megatest, scoped fail-schedule setup, made `:kind` explicit in
 No defect in verification coverage itself; all are test-hygiene/consistency.
 If 201 is treated as closed, fold these into a small standalone test-hygiene
 task instead of reopening.
+
+## Test review follow-ups executed — test-shaper pass 3 (2026-06-01)
+
+Executed all three newly added test-shaper pass-3 follow-ups. Test/`test_support`
+-only; verification-only scope held (zero `components/agent-session/src/**` or
+`doc/scheduler.md`); `bb test` green, clj-kondo 0/0, cljfmt clean.
+
+1. **`create-session-context` fixture consolidation → reuse existing helper.**
+   Audited the 9 scheduler-test copies and found a stronger fact than the flag
+   assumed: an equivalent shared helper *already exists* —
+   `test-support/create-test-session` returns `[ctx session-id]` from
+   `safe-context-opts` + `new-session-in!`, identical to all 9 locals. Because
+   `safe-context-opts` already defaults `:persist? false`, the 7 "persist"
+   copies, the 2 `(assoc opts :persist? false)` lifecycle/effects variants, and
+   `create-test-session` all resolve to the **same** persist-false context (the
+   no-arg default differs only cosmetically). Per `λbuild: ∃lib → use(lib)` /
+   `λone_way` I reused `create-test-session` rather than adding a second
+   near-identical `make-session-context` helper (which would itself violate the
+   DRY intent of the flag). Deleted all 9 local `create-session-context` defns;
+   rewrote every call site to `test-support/create-test-session` (opts pass
+   through unchanged). Removed the now-orphan `[psi.agent-session.core :as
+   session]` require from `scheduler_tools_test` (its only `session/` use was
+   the deleted defn; the other 8 files still use `session/` for
+   dispatch/shutdown, so their requires stay). No deftest renamed →
+   `findings.md` Live/psi-tool citations unchanged. cljfmt realigned the
+   `create-test-session` opts indentation in lifecycle/timer-seam. Aggregate
+   assertion count unchanged (no assertions touched).
+
+2. **`:kind :message` data-shape alignment.** Added `:kind :message` to the
+   first `:scheduler/create` in
+   `scheduler-context-shutdown-test/shutdown-context-clears-scheduler-timers-test`
+   (the file's second create already had it). Matches every other 201 live
+   create; default already resolved to `:message`, so no behaviour change.
+
+3. **Misleading `fire-schedule-test` label.** Relabelled "idle session delivers
+   immediately" → "idle session: returns the :deliver action and leaves the
+   schedule :pending" + a clarifying comment that pure `fire-schedule` returns
+   the action without mutating status (mirrors pass-1's `fail-schedule` fix).
+   Assertions unchanged.
+
+No blockers; all three completed. Suite green via canonical `bb test`.

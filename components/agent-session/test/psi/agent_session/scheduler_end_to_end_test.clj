@@ -5,17 +5,9 @@
    [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]))
 
-(defn- create-session-context
-  ([]
-   (create-session-context {}))
-  ([opts]
-   (let [ctx (session/create-context (test-support/safe-context-opts opts))
-         sd  (session/new-session-in! ctx nil {})]
-     [ctx (:session-id sd)])))
-
 (deftest scheduler-fired-end-to-end-delivers-when-idle-test
   (testing "create -> fired -> deliver appends scheduled user message and returns to idle"
-    (let [[ctx session-id] (create-session-context {:persist? false})
+    (let [[ctx session-id] (test-support/create-test-session {:persist? false})
           _                (session/dispatch-in! ctx :scheduler/create
                                                  {:session-id session-id
                                                   :schedule-id "sch-1"
@@ -52,7 +44,7 @@
 (deftest scheduler-message-kind-fires-via-timer-seam-and-delivers-to-origin-test
   (testing "create message-kind -> captured timer callback fires -> delivered prompt with scheduled provenance in origin session"
     (let [now              (java.time.Instant/parse "2026-04-21T18:00:00Z")
-          [ctx session-id] (create-session-context
+          [ctx session-id] (test-support/create-test-session
                             {:persist? false
                              :scheduler-time-source (test-support/fixed-scheduler-time-source now)})
           [capture* callback*] (test-support/capturing-delay-fn)
@@ -100,7 +92,7 @@
 (deftest scheduler-session-kind-fires-via-timer-seam-and-creates-top-level-session-test
   (testing "create session-kind -> captured timer callback fires -> fresh top-level session created + prompt submitted; created-session-id/delivery-phase recorded"
     (let [now              (java.time.Instant/parse "2026-04-21T18:00:00Z")
-          [ctx session-id] (create-session-context
+          [ctx session-id] (test-support/create-test-session
                             {:persist? false
                              :scheduler-time-source (test-support/fixed-scheduler-time-source now)})
           [capture* callback*] (test-support/capturing-delay-fn)

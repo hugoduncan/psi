@@ -4,17 +4,9 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.test-support :as test-support]))
 
-(defn- create-session-context
-  ([]
-   (create-session-context {}))
-  ([opts]
-   (let [ctx (session/create-context (test-support/safe-context-opts opts))
-         sd  (session/new-session-in! ctx nil {})]
-     [ctx (:session-id sd)])))
-
 (deftest scheduler-resolver-test
   (testing "scheduler attrs resolve from session root and entity-seeded schedule id"
-    (let [[ctx session-id] (create-session-context {:persist? false})
+    (let [[ctx session-id] (test-support/create-test-session {:persist? false})
           created         (session/dispatch-in! ctx :scheduler/create
                                                 {:session-id session-id
                                                  :schedule-id "sch-1"
@@ -56,7 +48,7 @@
 
 (deftest scheduler-resolver-projects-rich-attrs-across-statuses-test
   (testing "delivered/cancelled/failed schedules project full :psi.scheduler/* attrs coherently"
-    (let [[ctx session-id] (create-session-context {:persist? false})
+    (let [[ctx session-id] (test-support/create-test-session {:persist? false})
           base            {:source :scheduled
                            :message "m"
                            :created-at (java.time.Instant/parse "2099-04-21T17:59:00Z")

@@ -64,7 +64,9 @@
           :created-at (instant "2026-04-21T18:00:00Z")
           :fire-at (instant "2026-04-21T18:05:00Z")
           :session-id "sid-1"})]
-    (testing "idle session delivers immediately"
+    (testing "idle session: returns the :deliver action and leaves the schedule :pending"
+      ;; Pure `fire-schedule` returns the :deliver action without mutating
+      ;; status; the schedule stays :pending until the delivery handler runs.
       (let [{state' :state action :action schedule :schedule}
             (scheduler/fire-schedule state {:is-streaming false :is-compacting false} "sch-1")]
         (is (= :deliver action))

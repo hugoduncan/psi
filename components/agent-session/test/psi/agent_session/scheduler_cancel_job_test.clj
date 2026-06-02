@@ -4,17 +4,9 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.test-support :as test-support]))
 
-(defn- create-session-context
-  ([]
-   (create-session-context {}))
-  ([opts]
-   (let [ctx (session/create-context (test-support/safe-context-opts opts))
-         sd  (session/new-session-in! ctx nil {})]
-     [ctx (:session-id sd)])))
-
 (deftest session-cancel-job-routes-scheduler-projection-to-scheduler-cancel-test
   (testing "session/cancel-job cancels scheduler-projected jobs by schedule id"
-    (let [[ctx session-id] (create-session-context {:persist? false})
+    (let [[ctx session-id] (test-support/create-test-session {:persist? false})
           _                (session/dispatch-in! ctx :scheduler/create
                                                  {:session-id session-id
                                                   :schedule-id "sch-1"

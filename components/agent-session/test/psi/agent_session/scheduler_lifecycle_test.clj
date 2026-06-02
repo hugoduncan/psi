@@ -8,13 +8,6 @@
    [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]))
 
-(defn- create-session-context
-  ([] (create-session-context {}))
-  ([opts]
-   (let [ctx (session/create-context (test-support/safe-context-opts (assoc opts :persist? false)))
-         sd  (session/new-session-in! ctx nil {})]
-     [ctx (:session-id sd)])))
-
 (defn- journal-messages
   [ctx session-id]
   (->> (persist/all-entries-in ctx session-id)
@@ -44,8 +37,8 @@
   ;; Verifies scheduled delivery runs through the canonical prompt lifecycle and
   ;; stamps the scheduled user message from the runtime scheduler time source.
   (let [delivered-at (java.time.Instant/parse "2099-04-21T18:06:00Z")
-        [ctx session-id] (create-session-context {:persist? false
-                                                  :scheduler-time-source (test-support/fixed-scheduler-time-source delivered-at)})]
+        [ctx session-id] (test-support/create-test-session {:persist? false
+                                                            :scheduler-time-source (test-support/fixed-scheduler-time-source delivered-at)})]
     (kernel/clear-event-log!)
     (kernel/clear-dispatch-trace!)
     (with-redefs [psi.turn-runtime.core/execute-prepared-request!
@@ -113,8 +106,8 @@
            :execution-result/turn-outcome :turn.outcome/stop
            :execution-result/tool-calls []
            :execution-result/stop-reason :stop})
-        [ctx session-id] (create-session-context {:persist? false
-                                                  :scheduler-time-source (:time-source scheduler-clock)})
+        [ctx session-id] (test-support/create-test-session {:persist? false
+                                                            :scheduler-time-source (:time-source scheduler-clock)})
         ctx (assoc ctx :execute-prepared-request-fn execute-prepared-request-fn)]
     (swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming true))))
     (doseq [[schedule-id label message created fire]
@@ -155,7 +148,7 @@
       (is (= delivered-at-2 (-> drain-2 :effects first :event-data :user-msg :timestamp))))))
 
 (deftest cancel-pending-and-queued-schedules-test
-  (let [[ctx session-id] (create-session-context {:persist? false})]
+  (let [[ctx session-id] (test-support/create-test-session {:persist? false})]
     (session/dispatch-in! ctx :scheduler/create
                           {:session-id session-id
                            :schedule-id "sch-cancel-pending"
