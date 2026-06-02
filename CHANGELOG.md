@@ -18,6 +18,7 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 - The review workflows (`review-task-design`, `review-task-plan`, and the `review-step` loop behind `review-task-implementation`) now share two profile follow-up steps instead of five near-identical per-aspect follow-up prompts. Follow-up behaviour is unchanged for design and plan reviews; the implementation-review (`review-step`) follow-up now explicitly executes only the items the immediately preceding review pass added, leaving any pre-existing unchecked items untouched across loop iterations.
 
 ### Fixed
+- Killing an Emacs psi buffer while a widget-projection mutation is in flight no longer leaves orphaned, non-deterministically-firing, or cross-buffer-colliding watchdog timers. The mutation watchdog timers are now held in buffer-local `psi-emacs-state` (like the existing notification timers) and are cancelled when the buffer is torn down or its transcript is reset; the mutation timeout and RPC-response callbacks now act on the originating buffer and are no-ops once that buffer is dead.
 - Tool invocations now appear in the `:tools` map in `.psi/metrics.edn`; previously the map was always empty because the `psi/metrics` extension's `on-tool-call`/`on-tool-result` handlers were never fired on the interactive tool execution path.
 
 ## [0.1.2166] - 2026-06-01
