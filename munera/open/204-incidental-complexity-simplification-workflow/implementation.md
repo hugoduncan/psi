@@ -2680,3 +2680,53 @@ task-creation) — never triggered (step-1 is not unwieldy), correctly left
 unchecked; not an outstanding implementation defect.
 
 PASS_STATUS: REVIEW_COMPLETE.
+
+## Test review (task-test-review skill — independent pass)
+
+Applied `task-test-review` (well_formed ∧ ∀b∈design.covers ∧ ¬mock ∧ ¬stub) to
+the three task-204 test nss: `task_204_workflow_definitions_test`,
+`incidental_complexity_finder_skill_test`, and the shared
+`workflow_definitions_test`. Focused run: **7 tests, 102 assertions, 0
+failures** (the two task-204-specific nss).
+
+Confirmed sound (no new actionable test issue):
+
+- **well_formed.** Tests are behavior/state/output-asserting with meaningful
+  failure messages; each lock carries an explicit regression rationale
+  (TR1–TR15, F1–F6) naming the green-passing regress it would catch. No
+  interaction assertions.
+- **behaviour coverage (∀b ∈ design.acceptance).** Every design acceptance
+  criterion has a covering assertion:
+  - Skill (Deliverable 1): registers + content-lock (gap method, thresholds,
+    single-unit scope, A1 drop rule, F2 (ns,var,arity,line) key, top-5 guard,
+    coverage hint) + **executable** recipe (join determinism/losslessness +
+    order-independence, qualification filter, A1 drop, gap-descending ranking,
+    top-5 cap).
+  - Wrapper (`task-lifecycle-in-worktree`): 3-step resolve→lifecycle→summary
+    shape/types, work-on tool + {{input}} wiring, lifecycle :delegate target +
+    :prompt-string + :context (TR14), NO_TARGET short-circuit (F1), positive-
+    path work-on re-call (TR7), summary positive/negative terminal contracts
+    (TR10).
+  - Outer (`reduce-incidental-complexity`): 2-step shape, work-on + skill,
+    bare-:workflow-input wiring (TR15), delegate target/:prompt-string/:context
+    (TR13), handoff fields, early-stop, gate flags + both baselines, worktree-
+    relative baseline paths (TR11), Phase-0 gate, behaviour-identical
+    constraint, A5/A2 (ns,var,arity,line) keys (F3), no-push/PR endpoint (TR8).
+- **¬mock ∧ ¬stub.** No mocking of logic. The sole `with-redefs`
+  (`with-workflow-dir`) injects loader directory **config** (a filesystem path),
+  i.e. infrastructure dependency injection, not a logic mock/stub. Recipe tests
+  run real `jq`/`bash` over synthetic JSON fixtures with graceful jq-absent
+  structural fallbacks; skill tests load the real SKILL.md.
+
+Deliberate (not a gap): the recipe is exercised with **synthetic** unit-JSON
+fixtures rather than a live-repo `bb gordian` run. This is the correct robust
+choice — a live-repo assertion would be non-deterministic and brittle as the
+codebase's complexity profile shifts, and the synthetic fixtures fully exercise
+every recipe behaviour (join/determinism/filter/drop/ranking/cap). The design's
+"produces a target … against this repository" is a one-time authoring
+validation, not a CI regression target.
+
+No new actionable test issues. The only unchecked steps.md item is the
+pre-existing non-planned Contingency (split step-1), correctly left unchecked.
+
+PASS_STATUS: REVIEW_COMPLETE.
