@@ -126,7 +126,7 @@
                                           {:session-id session-id}
                                           {:origin :core})]
         (is (= ["sch-q-2"] (test-support/schedule-queue ctx session-id)))
-        (is (= "sch-q-1" (:schedule-id (or (:return drain-1) drain-1))))
+        (is (= "sch-q-1" (:schedule-id drain-1)))
         (is (= :delivered (test-support/schedule-status ctx session-id "sch-q-1")))
         (is (= :queued (test-support/schedule-status ctx session-id "sch-q-2")))))
 
@@ -135,7 +135,7 @@
                                           {:session-id session-id}
                                           {:origin :core})]
         (is (= [] (test-support/schedule-queue ctx session-id)))
-        (is (= "sch-q-2" (:schedule-id (or (:return drain-2) drain-2))))
+        (is (= "sch-q-2" (:schedule-id drain-2)))
         (is (= :delivered (test-support/schedule-status ctx session-id "sch-q-2")))))))
 
 (deftest drain-one-stamps-scheduled-user-message-from-scheduler-time-source-test

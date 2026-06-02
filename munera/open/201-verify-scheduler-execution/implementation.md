@@ -2332,3 +2332,18 @@ ns-require hedges). Recorded as a follow-up step.
 
 Verification-only invariant intact: this review reads only; the follow-up is
 test-only.
+
+## Test-shaper pass 18 — executed (2026-06-01)
+
+Removed the dead dispatch-return hedge. Contract confirmed at runtime/source:
+kernel sets `:result` ← `(:return pure-result)` (`state_kernel/dispatch.clj:272`),
+`dispatch!` returns `(:result result-ictx)` (`:442`) → test `result`/`drain-*` is
+already the unwrapped handler map; `(:return result)` ≡ `nil` (dead, masked the
+contract). Tightened all 7 sites to assert on the bare map:
+`scheduler_dispatch_test.clj` L33/49/79/98/99 → `(:schedule-id result)` /
+`(:status result)` / `(:drained? result)`; `scheduler_lifecycle_test.clj`
+L129/138 → bare `drain-1`/`drain-2`. Deftest names unchanged (findings citations
+stable); same `is` count → aggregate 50 tests / 412 assertions unchanged.
+clj-kondo 0/0; `bb fmt:check` clean; focused subset = 9 tests / 45 assertions /
+0 failures; full `bb test` green. Test files only — zero
+`components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist held).

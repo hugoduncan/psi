@@ -30,7 +30,7 @@
                                                 :fire-at fire-at}
                                                {:origin :core})
         stored           (test-support/schedule-by-id ctx session-id "sch-1")]
-    (is (= "sch-1" (:schedule-id (:return result result))))
+    (is (= "sch-1" (:schedule-id result)))
     (is (= "check-build" (:label stored)))
     (is (= :pending (:status stored)))
     (is (contains? @(:scheduler-timers* ctx) "sch-1"))))
@@ -46,7 +46,7 @@
                                                 :schedule-id "sch-1"}
                                                {:origin :core})
         stored           (test-support/schedule-by-id ctx session-id "sch-1")]
-    (is (= :cancelled (:status (or (:return result) result))))
+    (is (= :cancelled (:status result)))
     (is (= :cancelled (:status stored)))
     (is (= [] (test-support/schedule-queue ctx session-id)))
     (is (not (contains? @(:scheduler-timers* ctx) "sch-1")))))
@@ -76,7 +76,7 @@
                                                {:origin :core})
         stored           (test-support/schedule-by-id ctx session-id "sch-1")
         scheduled-msg    (test-support/scheduled-message-by-id ctx session-id "sch-1")]
-    (is (= "sch-1" (:schedule-id (or (:return result) result))))
+    (is (= "sch-1" (:schedule-id result)))
     (is (= :delivered (:status stored)))
     (is (= [] (test-support/schedule-queue ctx session-id)))
     (is (some? scheduled-msg))))
@@ -95,8 +95,8 @@
         result (session/dispatch-in! ctx :scheduler/drain-queue
                                      {:session-id session-id}
                                      {:origin :core})]
-    (is (true? (:drained? (or (:return result) result))))
-    (is (= "sch-2" (:schedule-id (or (:return result) result))))
+    (is (true? (:drained? result)))
+    (is (= "sch-2" (:schedule-id result)))
     (is (= :delivered (test-support/schedule-status ctx session-id "sch-2")))
     (is (= ["sch-1" "missing"] (test-support/schedule-queue ctx session-id)))
     (is (nil? (:effects result)))))

@@ -1492,7 +1492,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Test-shaper follow-ups — pass 18 (test-shaper, 2026-06-01)
 
-- [ ] Remove the dead `(or (:return result) result)` / `(:return result result)`
+- [x] Remove the dead `(or (:return result) result)` / `(:return result result)`
       dispatch-return hedge and assert on the bare returned map. `dispatch-in!`
       → `dispatch!` returns `(:result result-ictx)` where the kernel already
       unwraps the handler's pure `:return` (`state_kernel/dispatch.clj:272`
@@ -1516,3 +1516,17 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       `doc/scheduler.md`); clj-kondo 0/0; `bb fmt:check` clean; scheduler
       `bb test` subset green (assertions count unchanged — same number of
       `is` forms, just tightened targets).
+      Done: verified the contract — kernel sets `:result` from `(:return
+      pure-result)` (`state_kernel/dispatch.clj:272`) and `dispatch!` returns
+      `(:result result-ictx)` (`:442`), so the test `result`/`drain-*` is already
+      the unwrapped handler map and `(:return result)` is always `nil`. Removed
+      all 5 dead hedges in `scheduler_dispatch_test.clj`
+      (L33/49/79/98/99 → bare `(:schedule-id result)` / `(:status result)` /
+      `(:drained? result)`) and both in `scheduler_lifecycle_test.clj`
+      (L129/138 → bare `drain-1`/`drain-2`). Deftest names unchanged (findings
+      citations stable); same `is` count → aggregate unchanged. clj-kondo 0/0;
+      `bb fmt:check` "All source files formatted correctly"; focused subset green
+      (`scheduler-dispatch-test` + `scheduler-lifecycle-test` = 9 tests / 45
+      assertions / 0 failures); full `bb test` green. Test files only — zero
+      `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist
+      held).
