@@ -2,7 +2,7 @@
 
 ## Slice 1 — Shared invocation/listing helper
 
-- [ ] Create ns `psi.agent-session.deterministic-operation-action` in
+- [x] Create ns `psi.agent-session.deterministic-operation-action` in
   `components/agent-session/src/psi/agent_session/deterministic_operation_action.clj`,
   requiring `psi.deterministic-operation-registry.registry :as registry`,
   `psi.deterministic-operation-runtime.core :as runtime`, and
@@ -12,68 +12,68 @@
   slice-2 concern in `validate-psi-tool-request` per D1/D5), and unused
   requires fail the slice-1 `clj-kondo --lint` step. Add `clojure.edn` only in
   slice-2 if the EDN parse helper is placed in this shared ns.)
-- [ ] Implement `list-operations [ctx]`: read
+- [x] Implement `list-operations [ctx]`: read
   `(registry/all-operations-in (:deterministic-operation-registry ctx))`,
   map each to `{:id (:id op) :description (:description op)}`, sort ascending by
   `:id` (string compare); return a vector (empty `[]` for empty registry).
-- [ ] Implement `build-invocation [ctx session-id args]`: return
+- [x] Implement `build-invocation [ctx session-id args]`: return
   `{:args (or args {}) :ctx ctx :session-id session-id}`, conditionally
   `assoc :parent-session-id` only when
   `(:parent-session-id (session-state/get-session-data-in ctx session-id))`
   is non-nil. Do **not** include `:operation-id`, `:workflow-run-id`, `:step-id`.
-- [ ] Implement `invoke-operation [ctx session-id operation-id args]`: build the
+- [x] Implement `invoke-operation [ctx session-id operation-id args]`: build the
   invocation map, then call
   `(registry/invoke-operation-in (:deterministic-operation-registry ctx)
      operation-id invocation runtime/invoke-operation)` passing `operation-id`
   positionally; return the tagged result. Let `:missing-deterministic-operation`
   / malformed ex-info propagate.
-- [ ] Implement `truncate-value [s]`: `pr-str`-derived string `s`; when
+- [x] Implement `truncate-value [s]`: `pr-str`-derived string `s`; when
   `(> (count s) 2000)`, return
   `(str (subs s 0 2000) " … (truncated, " (count s) " chars total)")`; else `s`.
-- [ ] Implement `project-result [result]`: for each top-level key, map value →
+- [x] Implement `project-result [result]`: for each top-level key, map value →
   `(truncate-value (pr-str v))`; return a map of `{k truncated-string}`
   preserving all keys present (data-level, surface-independent).
-- [ ] Write tests
+- [x] Write tests
   `components/agent-session/test/psi/agent_session/deterministic_operation_action_test.clj`
   using a real registry (`registry/create-registry`) + real runtime:
-  - [ ] `list-operations` returns id+description sorted by id; empty registry → `[]`.
-  - [ ] register a fake op; `invoke-operation` returns its `:ok` tagged result.
-  - [ ] handler receives `:operation-id` injected by runtime; caller map has no
+  - [x] `list-operations` returns id+description sorted by id; empty registry → `[]`.
+  - [x] register a fake op; `invoke-operation` returns its `:ok` tagged result.
+  - [x] handler receives `:operation-id` injected by runtime; caller map has no
     `:operation-id`, no `:workflow-run-id`, no `:step-id`.
-  - [ ] `:parent-session-id` present only when session-data has a parent.
-  - [ ] error op → `:error` tagged result passes through.
-  - [ ] unknown id → `:missing-deterministic-operation` ex-info thrown.
-  - [ ] `truncate-value` on >2000-char string truncates with exact marker + N.
-  - [ ] `project-result` includes all top-level keys, each `pr-str`'d+truncated.
-- [ ] Run slice-1 tests; `clj-paren-repair` the new files; `clj-kondo --lint`.
-- [ ] Commit: `⚒ 205: shared deterministic-operation invocation/listing helper`.
+  - [x] `:parent-session-id` present only when session-data has a parent.
+  - [x] error op → `:error` tagged result passes through.
+  - [x] unknown id → `:missing-deterministic-operation` ex-info thrown.
+  - [x] `truncate-value` on >2000-char string truncates with exact marker + N.
+  - [x] `project-result` includes all top-level keys, each `pr-str`'d+truncated.
+- [x] Run slice-1 tests; `clj-paren-repair` the new files; `clj-kondo --lint`.
+- [x] Commit: `⚒ 205: shared deterministic-operation invocation/listing helper`.
 
 ## Slice 2 — psi-tool `operation` action
 
-- [ ] Create ns `psi.agent-session.psi-tool-operation` in
+- [x] Create ns `psi.agent-session.psi-tool-operation` in
   `components/agent-session/src/psi/agent_session/psi_tool_operation.clj`,
   requiring the shared helper. Implement
   `execute-psi-tool-operation-report [{:keys [ctx session-id]} {:keys [op operation-id args]}]`:
-  - [ ] guard `ctx` present (mirror `psi-tool-workflow`).
-  - [ ] `op "list"` → call `list-operations`, build
+  - [x] guard `ctx` present (mirror `psi-tool-workflow`).
+  - [x] `op "list"` → call `list-operations`, build
     `{:psi-tool/action :operation :psi-tool/operation-op :list
       :psi-tool/overall-status :ok :psi-tool/operations [...]}` (empty `[]` ok).
-  - [ ] `op "invoke"` → call shared `invoke-operation`, project result via
+  - [x] `op "invoke"` → call shared `invoke-operation`, project result via
     `project-result`, build `{:psi-tool/action :operation
       :psi-tool/operation-op :invoke :psi-tool/overall-status (:status result)
       :psi-tool/result <projected>}`.
-  - [ ] wrap in try/catch dispatching on `(:type (ex-data e))` (D3, not a
+  - [x] wrap in try/catch dispatching on `(:type (ex-data e))` (D3, not a
     blanket catch): `:missing-deterministic-operation` and
     `:malformed-operation-result` each render `:psi-tool/overall-status :error`
     + a distinct `:psi-tool/error` summary; any other throwable is re-thrown
     (runtime already canonicalizes non-propagating throwables to `:error`).
-  - [ ] add `:psi-tool/duration-ms`.
-- [ ] In `psi_tool.clj`: add `"operation"` to `psi-tool-supported-actions`.
-- [ ] In `psi_tool.clj` tool schema: add `"operation"` to
+  - [x] add `:psi-tool/duration-ms`.
+- [x] In `psi_tool.clj`: add `"operation"` to `psi-tool-supported-actions`.
+- [x] In `psi_tool.clj` tool schema: add `"operation"` to
   `:properties :action :enum`; add `:operation-id` property; ensure `:args`
   property exists (add if absent) with EDN-map-string description; extend the
   `:description` text listing the new action.
-- [ ] In `validate-psi-tool-request`: add `operation-id` to the `:strs`
+- [x] In `validate-psi-tool-request`: add `operation-id` to the `:strs`
   destructuring (INC-1: do **not** add `args` to `:strs` — the fn already binds
   the whole request map `:as args`, used by `(psi-tool-action args)` and the
   outer-catch `(get args "op")`; read the `"args"` EDN-map-string param via a
@@ -88,36 +88,36 @@
   :args parsed-args}`. (D4: do **not** add `list`/`invoke` to the schema `:op`
   `:enum` — `op` is validated here only, matching the workflow/scheduler
   convention.)
-- [ ] Add EDN-map parse+validate for `args` (default `{}`, "must be an EDN map"
+- [x] Add EDN-map parse+validate for `args` (default `{}`, "must be an EDN map"
   error) — reuse shared parse helper (place in shared helper ns or mirror
   `parse-workflow-input-string`); call it on the `"invoke"` branch only (D1:
   parse in `validate-psi-tool-request`, outer-try path).
-- [ ] (D1) Add an `"operation"` arm to `make-psi-tool`'s **outer** exception
+- [x] (D1) Add an `"operation"` arm to `make-psi-tool`'s **outer** exception
   `case action` (~L766) rendering `{:psi-tool/action :operation
   :psi-tool/operation-op (some-> (get args "op") keyword) :psi-tool/duration-ms
   0 :psi-tool/overall-status :error :psi-tool/error (psi-tool-error-summary
   :operation e)}` so validate-phase errors (e.g. malformed `args`) render as a
   structured operation error, not the generic fallback.
-- [ ] In `make-psi-tool` `case action`: add `"operation"` arm calling
+- [x] In `make-psi-tool` `case action`: add `"operation"` arm calling
   `execute-psi-tool-operation-report`, `sanitize-psi-tool-data`, `pr-str`,
   `serialize-operation-output`, set `:is-error` on non-`:ok` overall-status.
-- [ ] Add `operation-id`/`args` to `telemetry-args`.
-- [ ] Write tests
+- [x] Add `operation-id`/`args` to `telemetry-args`.
+- [x] Write tests
   `components/agent-session/test/psi/agent_session/psi_tool_operation_test.clj`:
-  - [ ] `op list` returns sorted operations; empty registry → `:operations []`.
-  - [ ] `op list` ignores `operation-id`/`args`.
-  - [ ] (D5) `op list` with malformed `args` string → still lists, not error.
-  - [ ] (D3) `op invoke` malformed-result op → `:malformed-operation-result`
+  - [x] `op list` returns sorted operations; empty registry → `:operations []`.
+  - [x] `op list` ignores `operation-id`/`args`.
+  - [x] (D5) `op list` with malformed `args` string → still lists, not error.
+  - [x] (D3) `op invoke` malformed-result op → `:malformed-operation-result`
     rendered distinctly from unknown-id.
-  - [ ] `op invoke` ok-result projected, all keys present.
-  - [ ] `op invoke` error-result → `:is-error true`, projected.
-  - [ ] unknown id → error report, not crash.
-  - [ ] malformed args (non-map / unreadable EDN) → validate error, not crash.
-  - [ ] side-effecting op invokable (assert observable effect).
-  - [ ] over-2000-char value truncated identically to slice-1 helper.
-  - [ ] `validate-psi-tool-request` accepts `action "operation"`.
-- [ ] Run slice-2 tests; `clj-paren-repair`; `clj-kondo --lint`.
-- [ ] Commit: `⚒ 205: psi-tool operation action (list|invoke)`.
+  - [x] `op invoke` ok-result projected, all keys present.
+  - [x] `op invoke` error-result → `:is-error true`, projected.
+  - [x] unknown id → error report, not crash.
+  - [x] malformed args (non-map / unreadable EDN) → validate error, not crash.
+  - [x] side-effecting op invokable (assert observable effect).
+  - [x] over-2000-char value truncated identically to slice-1 helper.
+  - [x] `validate-psi-tool-request` accepts `action "operation"`.
+- [x] Run slice-2 tests; `clj-paren-repair`; `clj-kondo --lint`.
+- [x] Commit: `⚒ 205: psi-tool operation action (list|invoke)`.
 
 ## Slice 3 — slash commands `/operations` + `/operation`
 
