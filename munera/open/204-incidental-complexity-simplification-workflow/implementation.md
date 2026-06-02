@@ -1842,3 +1842,53 @@ Cross-reference D1. Optionally lock the design's named precedent for coherence,
 but no test change is forced.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK.
+
+---
+
+## Pass 6 — F6 resolution (follow-up execution)
+
+F6 executed (design prose only; no workflow/skill/test change). Reconciled
+`design.md` so the verified/loadable wrapper precedent is named as
+**`review-implementation-in-worktree.edn`**, demoting `implement-task-in-worktree`
+to the *intended shape* that does not currently load.
+
+Live (static) re-confirmation of D1's grounding:
+- `.psi/workflows/implement-task-in-worktree.md` body begins with
+  `{:terminal-contract {:handoff ...} :steps [...]}` — an EDN map — so
+  `parse-markdown-workflow-file` rejects it via `body-starts-with-edn-map?`
+  ("Markdown workflow body must not begin with an EDN workflow definition block",
+  `components/workflow-loader/src/psi/workflow_loader/parser.clj:162`).
+- `.psi/workflows/review-implementation-in-worktree.edn` is a loadable `.edn`
+  3-step wrapper: `resolve-worktree` (`:session`, tools `["read" "bash"
+  "work-on"]`, re-calls `work-on` from a `worktree_path:` handoff) →
+  `review` (`:delegate` `:target "review-task-implementation"`,
+  `:prompt-string {:type :map :fields {:input {:from {:step "resolve-worktree"
+  :yield :text}}}}`) → `summary` (`:session`). This is the mechanism the new
+  wrapper mirrors.
+  (No nREPL is attached in this worktree; confirmation is from the live file
+  bodies + the parser source, which is conclusive for the load-vs-reject claim.)
+
+Edits to `design.md`:
+- Added an **F6/D1 precedent note** at the head of `## Verified facts
+  (grounding)` naming the loadable precedent, citing the parser rejection, and
+  redirecting all later "structurally identical to / verified
+  `implement-task-in-worktree`" phrasing to the loadable
+  `review-implementation-in-worktree.edn`.
+- Reconciled each load-bearing inline reference (Step-1 handoff consumer, Step-2
+  wrapper framing, handoff wiring, worktree-continuity mechanism, the
+  delegate-yield fact, the worktree-ownership fact, Locked decision 11, and both
+  acceptance-criteria mentions) to name `review-implementation-in-worktree.edn`
+  with an "`.edn` realisation of the intended shape; see F6/D1 precedent note"
+  cross-ref. The only bare `implement-task-in-worktree` mentions left are inside
+  the precedent note itself (intentional).
+- Latent coherence fix surfaced by F6: the acceptance criterion described the
+  wrapper as "two-step"; the resolved P1 design makes it three steps
+  (resolve-worktree → lifecycle → summary), matching the loadable 3-step
+  precedent — aligned to "three-step".
+
+Mechanism prose unchanged (handoff `worktree_path:` + `resolve-worktree`
+re-calling `work-on`) — it was already correct and is demonstrated by the
+loadable precedent. `doc/workflows.md`'s single `implement-task-in-worktree.md`
+mention is a plain workflow-listing line (not a 204 precedent claim), so it
+remains coherent; no doc/workflow/skill/test change made. design(spec) ↔
+implementation grounding contradiction closed. `steps.md` F6 item checked.
