@@ -393,3 +393,55 @@ Non-actionable observations (no follow-up):
 
 Conclusion: implementation is simple, consistent, robust, and complete against
 design. No new actionable issues found.
+
+## Test review (ψ)
+
+Applied task-test-review skill: well-formed tests ∧ behaviour coverage of
+design ∧ infra-deps injectable/nullable/¬mock/¬stub. Ran the four task suites
+focused: 42 tests / 89 assertions, all green. Grounded against
+`deterministic_operation_action_test.clj`, `psi_tool_operation_test.clj`,
+`psi_tool_operation_integration_test.clj`, `operation_command_test.clj`, plus
+runtime `core.clj` (malformed canonicalization) and `session_state/state.clj`
+(`get-session-data-in` path `[:agent-session :sessions sid :data]`).
+
+Verified:
+- **Well-formed** — focused, deterministic, no flakiness; all green.
+- **Infra deps real, not mocked** — all four suites use a real
+  `registry/create-registry` + real `runtime/invoke-operation`; unit ctx uses a
+  real `:state*` atom whose shape (`{:agent-session {:sessions {sid {:data …}}}}`)
+  matches production `session-data-path` exactly; integration/command use a real
+  `session/create-context`. No mocks/stubs. Side-effects asserted via real sinks
+  (atoms), outputs asserted via exact keys/text — no interaction assertions. ✓.
+- **Behaviour coverage** — every acceptance criterion has a covering test:
+  list sorted/empty/ignores-args/-id, invoke ok/error/unknown/malformed
+  (distinct), all-top-level-key projection, 2000-char truncation + exact marker
+  identical across surfaces, positional `operation-id` (caller map lacks
+  `:operation-id`/`:workflow-run-id`/`:step-id`), conditional `:parent-session-id`,
+  default `{}`, blank-id usage, non-map/unreadable args, side-effecting op,
+  D2 `:status`-first sorted layout, `/operations` vs `/operation` precedence,
+  end-to-end validate→dispatch→outer-catch. ✓.
+
+Actionable test gap found (1):
+- **Optional `:details` result key is never exercised in projection.** Decision
+  #7 (the single authoritative projection rule) explicitly names `:details` as a
+  top-level key on both `:ok` (optional) and `:error` (optional) results that
+  must be projected ("render ALL top-level keys, each `pr-str`'d + per-key
+  truncated"). No test in any of the four suites registers an operation whose
+  tagged result carries `:details`, so the rendering of a `:details` value
+  (a nested **map** — the non-trivial `pr-str` case the rule governs) is
+  unverified on both surfaces. `:status`/`:data`/`:reason`/`:message`/`:summary`
+  are each covered; only `:details` (the one key whose value is a collection
+  rather than a scalar/atom) is uncovered. Add: (a) a `project-result` unit test
+  with `{:status :ok :data … :details {…}}` asserting `:details` present and
+  `pr-str`'d; (b) a psi-tool `op invoke` test and a `/operation` command test
+  on an op returning `:details`, asserting the `:details` line/key appears in
+  the rendered output of each surface (closes the all-keys rule for the nested-
+  map case across both surfaces).
+
+Non-actionable observations (no follow-up):
+- Truncation `N` count: tested directly on a raw string in `truncate-value`
+  (`2500`/`3000` "x"/"y"/"z" → exact marker `N`) and composed through
+  `project-result`; because `truncate-value` operates on the already-`pr-str`'d
+  string, the char-count semantics are precisely proven. Adequate.
+- The minor `:phase :validate` (missing-ctx) deviation is covered
+  (`missing-ctx-renders-error`).

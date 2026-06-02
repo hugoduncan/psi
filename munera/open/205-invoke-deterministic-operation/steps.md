@@ -225,6 +225,23 @@
   parse helper is placed in the shared ns. Update the slice-1 require step so it
   passes `clj-kondo --lint` (no unused namespace).
 
+## Test-review follow-ups (ψ)
+
+- [ ] (TR-1) Cover the optional `:details` result key in projection (decision
+  #7 names it as a top-level key on both `:ok` and `:error` results; its value
+  is a nested **map** — the non-trivial `pr-str` case — and is currently
+  exercised by no test). Add:
+  - `project-result` unit test
+    (`deterministic_operation_action_test.clj`) on `{:status :ok :data …
+    :details {…}}` asserting `:details` is present in the projected map and
+    rendered via `pr-str`.
+  - a psi-tool `op invoke` test (`psi_tool_operation_test.clj`) on an op
+    returning `:details`, asserting the `:psi-tool/result` carries the
+    `:details` key with its `pr-str`'d value.
+  - a `/operation` command test (`operation_command_test.clj`) on the same op,
+    asserting a `:details {…}` line appears in the `:type :text` output (closes
+    the all-keys rule for the nested-map case on both surfaces).
+
 ## Close-out
 
 - [x] Re-read design acceptance criteria; confirm each is covered by a test.
