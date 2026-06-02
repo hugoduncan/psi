@@ -1623,3 +1623,32 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       `bb test` green; clj-kondo 0/0; `bb fmt:check` "All source files formatted
       correctly". Test file only — zero `components/agent-session/src/**` or
       `doc/scheduler.md` (Slice-10 allowlist held).
+
+- [ ] Fix the flaky cited baseline timer-race in `scheduler_dispatch_test.clj`
+      (implementation-review finding 2026-06-01). Two deftests intermittently
+      fail under the canonical kaocha runner (`46 tests, 2 failures` one run,
+      `0` on re-run) because they use `make-session-ctx`'s **default** real
+      `Thread/sleep`-daemon `:scheduler-run-after-delay-fn` instead of the
+      deterministic `capturing-delay-fn` seam:
+      - `scheduler-create-stores-schedule-and-starts-timer-test` — the 1000ms
+        daemon can fire `:scheduler/fired` → deliver → remove the handle from
+        `:scheduler-timers*` before `(contains? @(:scheduler-timers* ctx) "sch-1")`
+        reads it (observed `actual: (not (contains? {} "sch-1"))`).
+      - `scheduler-cancel-marks-pending-or-queued-schedule-cancelled-test` —
+        `swap!`s `(Thread/currentThread)` into `:scheduler-timers*` then cancels,
+        which `.interrupt`s the **test-runner thread**, setting an interrupt flag
+        that can cross-contaminate other sleeping daemon timers.
+      Fix (test-file-only, Slice-10 allowlist — zero
+      `components/agent-session/src/**` or `doc/scheduler.md`): drive both via
+      `capturing-delay-fn` (`assoc :scheduler-run-after-delay-fn capture*`),
+      assert `:scheduler-timers*` membership **before** firing, fire by invoking
+      the captured callback, and replace the `(Thread/currentThread)` handle with
+      a non-runner handle (or the captured handle) so cancel no longer interrupts
+      the runner. This restores the design's "no wall-clock sleeps / controlled
+      time" discipline (these are the only scheduler sites still on the default
+      delay-fn while asserting timer state — grep-confirmed). Then update
+      `findings.md` Baseline + Cancellation rows to cite them as seam-driven and
+      correct the Outcome's "all green / pre-existing isolation artifact"
+      characterisation (the race is real under the canonical runner). Keep the
+      full `bb test` green (re-run ≥3× to confirm non-flaky) + clj-kondo/cljfmt
+      clean.

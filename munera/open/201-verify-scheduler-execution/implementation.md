@@ -2490,3 +2490,65 @@ insertion≠fire-at proof. Assertions + deftest name unchanged → `findings.md`
 Pure-model citations stable; aggregate assertion count unchanged. `bb test`
 green; clj-kondo 0/0; `bb fmt:check` clean. Test file only — zero
 `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist held).
+
+## Implementation review — task-implementation-review skill (2026-06-01)
+
+Applied `task-implementation-review` (review code vs design, architecture
+conformance, new-pattern/abstraction/structural-perf flags). Re-read
+design/plan/findings/steps + the live-path test sources + `doc/scheduler.md`,
+and **re-ran the suite against runtime truth** rather than trusting the
+"all green" claim.
+
+**Strengths (no action):** new live-path tests
+(`scheduler_end_to_end_test`, `scheduler_timer_seam_test`,
+`scheduler_context_shutdown_test`, `scheduler_resolvers_test`) drive the real
+dispatch+effect round trip, cross the time/timer boundary only via the
+documented ctx seams, and assert state/outputs (delivered-prompt provenance,
+`:created-session-id`/`:delivery-phase`, handle count, queue) — never handler
+interactions. `findings.md` is well-structured (7 fixed sections), the
+`:at`-asymmetry doc-gap finding is accurate (confirmed `doc/scheduler.md:96-99`
+documents only relative bounds + "past absolute instants fire immediately",
+silent on near-future/`>24h` `:at` rejection), and remediation task
+`202-document-at-bounds-in-scheduler-doc` exists.
+
+**One new actionable finding — flaky cited baseline test (wall-clock race),
+contradicts both the "all green" deliverable claim and the design's
+"no wall-clock sleeps" discipline.** Re-running the scheduler namespaces
+together under the **canonical kaocha runner** (`clojure -M:test --focus …`)
+produced `46 tests, 2 failures` on one run and `0 failures` on an immediate
+re-run — i.e. genuinely intermittent under the same runner that backs
+`bb test`, not merely an "isolation-in-isolation artifact" as pass-4/5
+concluded. Failing deftests, both in the **cited baseline**
+`scheduler_dispatch_test.clj`:
+- `scheduler-create-stores-schedule-and-starts-timer-test` — asserts
+  `(contains? @(:scheduler-timers* ctx) "sch-1")`; observed `actual: (not (contains? {} "sch-1"))`.
+- `scheduler-cancel-marks-pending-or-queued-schedule-cancelled-test` — manually
+  `swap!`s `(Thread/currentThread)` into `:scheduler-timers*` then cancels.
+
+Root cause: this file uses `make-session-ctx`'s **default**
+`:scheduler-run-after-delay-fn`, which spawns a **real daemon thread** that
+`(Thread/sleep 1000)`s (the test's `fire-at = created-at + 1000ms`) then fires
+`:scheduler/fired` → deliver → removes the handle from `:scheduler-timers*`
+(`test_support.clj:323-331`). Under suite load the 1000ms daemon can fire and
+empty `:scheduler-timers*` **before the membership assertion reads it**, and the
+sibling test interrupts the *test-runner* thread (`(Thread/currentThread)`),
+setting an interrupt flag that can cross-contaminate other sleeping daemon
+timers. These are the only two scheduler test sites asserting
+`:scheduler-timers*` while NOT overriding the delay-fn with `capturing-delay-fn`
+(grep-confirmed; `session_close_test.clj` is the only other `:scheduler-timers*`
+file, separate suite).
+
+This is in 201's lane: the task verifies the scheduler suite's reliability and
+its own deliverable asserts the suite is "all green" — a flaky cited baseline
+falsifies that and violates the design's controlled-time discipline that the new
+tests otherwise follow. Fix is test-file-only (within the Slice-10 allowlist —
+zero `src/**`/`doc/scheduler.md`): convert the two `scheduler_dispatch_test`
+timer-touching deftests to the deterministic `capturing-delay-fn` seam (capture
+the callback, assert handle membership before firing, invoke the callback to
+fire) and stop interrupting the runner thread — making them deterministic and
+green. Then re-cite them in `findings.md` Baseline / Cancellation as
+seam-driven, and correct the "all green / pre-existing isolation artifact"
+characterisation in the Outcome + prior pass notes (the race is real under the
+canonical runner). Disagreement-with-pass-5 recorded: pass-5's "full `bb test`
+green" held only on lucky runs; the race is non-deterministic, so a single green
+observation does not establish green.
