@@ -483,3 +483,23 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       (continuing-session) model — distinguishable from the original terminal
       run's snapshot. Closes the 5b coverage hole and pins the session-id
       auto-injection contract all top-level capture relies on.
+
+## Test-review pass 5 follow-ups (review 2026-06-02)
+
+- [ ] T5: Add an end-to-end seam test for the `:inherited-snapshot?` contract.
+      The R4/R5 child-state snapshot isolation is gated on a `:inherited-snapshot?`
+      request flag. Its producer (`create-step-attempt-session!` →
+      `:inherited-snapshot? true`) is asserted at `attempts-test:140` and its
+      consumer (`child-session-base-state*` suppressing the live parent-sd
+      fallback) at `child-session-state-test:141`, but the threading hop between
+      them — `context.clj:159` `(assoc :inherited-snapshot? …)` →
+      `create-workflow-child-session!` → `:session/create-child`
+      (`session_lifecycle.clj`) → `child-session-base-state*` — is untested. Both
+      endpoint unit tests stay green even if the flag were dropped on the wire,
+      which is the same incoherence class R5 caught (a contract-schema field with
+      no producer/consumer wiring). Add a test driving the attempt/child-session
+      path through `:session/create-child` (real ctx/state, nullable adapter)
+      that mutates the live parent's model/speed-mode/effort-override AFTER invoke
+      and asserts the created child session's state uses the snapshot /
+      initial-session default and NOT the live parent — proving the flag survives
+      the full `context`/`session_lifecycle` threading, not just the two endpoints.

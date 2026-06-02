@@ -1354,3 +1354,42 @@ test):
   invoke and the continue, then assert the continuation run captured the changed
   model). This closes the 5b coverage hole and pins the session-id auto-injection
   contract that ALL top-level capture depends on.
+
+## Test-review pass 5 (review 2026-06-02)
+
+Re-applied `task-test-review` (well-formedness, ∀-behaviour-coverage,
+injectable/nullable infra). Ran the 207 suites green:
+inheritance-snapshot (10/51), workflow-runtime core + attempts + child-state
+(25/129). 207-introduced tests are well-formed — real ctx/state, output
+assertions, no logic mocks; `execution-adapter/create` nullable injection at the
+infra boundary is acceptable. Pre-existing `with-redefs` on `valid-session?`
+(`attempts-test:88`) and `set-session-model!` (`:204`) predate 207 and stub
+validation/effect infra rather than logic — out of scope, not introduced here.
+
+Confirmed prior T4 (Decision 5b continue-terminal fresh-capture + session-id
+auto-injection) is STILL OPEN (`steps.md` `[ ] T4`) and STILL UNCOVERED — no
+test drives `continue-terminal-run-async!` nor the bootstrap mutate-fn
+session-id injection. T4 stands.
+
+One NEW behaviour-coverage gap (distinct from T4):
+
+- **T5 — `:inherited-snapshot?` contract seam (`context.clj` →
+  `:session/create-child` → `session_lifecycle.clj` → `child-session-base-state*`)
+  is untested end-to-end.** The R4/R5 fix gates child-state snapshot isolation
+  on a `:inherited-snapshot?` request flag. Its PRODUCER (`create-step-attempt-session!`
+  emitting `:inherited-snapshot? true`) is asserted at `attempts-test:140`, and
+  its CONSUMER (`child-session-base-state*` suppressing the live parent-sd
+  fallback when the flag is set) at `child-session-state-test:141`. But the
+  MIDDLE threading hop — `context.clj:159` `(some? inherited-snapshot?) (assoc
+  :inherited-snapshot? …)` into `create-workflow-child-session!` →
+  `:session/create-child` handler (`session_lifecycle.clj`) → the child-state
+  builder — has no test. Both endpoints pass in isolation while the flag could
+  be dropped on the wire between them and every current test stays green. This
+  is precisely the incoherence class R5 caught (a `child-session-contract`
+  schema field with no producer/consumer wiring in HEAD); the producer/consumer
+  unit tests do not guard the seam. Add a test driving the attempt path through
+  `:session/create-child` (real ctx/state, nullable adapter) that mutates the
+  live parent's model/speed-mode/effort-override AFTER invoke and asserts the
+  created child session's state reflects the snapshot/initial-session default,
+  NOT the live parent — proving the `:inherited-snapshot?` flag survives the
+  full `context`/`session_lifecycle` threading, not just the two endpoints.
