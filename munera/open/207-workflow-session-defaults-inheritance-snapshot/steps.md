@@ -334,3 +334,20 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       `child-session-base-state-applies-speed-effort-override-test:121-125`
       currently pins the parent-sd fallback as intended for the general
       non-workflow path — distinguish workflow-owned vs non-workflow behaviour.)
+
+## Test-review follow-ups (review 2026-06-02)
+
+- [ ] T1: Strengthen the AC7 test
+      (`snapshot-model-feeds-model-query-selection-context-test`,
+      `inheritance_snapshot_test.clj`) so it actually proves the selection
+      context comes from the SNAPSHOT model, not the live parent. It currently
+      mutates the live session to `claude-LIVE-CHANGED` after invoke but asserts
+      only `(some? (:model-fallback config))` + `:type :ranked-model-candidates`
+      — both hold regardless of which model fed
+      `model-query->selection-request`'s `:context {:session-model …}`
+      (`core.clj:130-137`). The test would pass even if the resolver read the
+      live model. Assert a snapshot-vs-live-distinguishing value: the selection
+      request/`:model-fallback` `:session-model`/candidate/outcome must reflect
+      `claude-snapshot` and NOT `claude-LIVE-CHANGED` (expose the session-model
+      context if `:model-fallback` surfaces nothing model-dependent), so AC7's
+      isolation invariant is provable rather than just the fallback's shape.

@@ -943,3 +943,49 @@ New actionable finding (not covered by any prior note/step):
   state is unchanged.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Test review (ψ, 2026-06-02)
+
+Reviewed implementation tests with task-test-review skill
+(well-formed ∧ behaviour-coverage ∧ no-mock/no-stub). Grounded against the test
+files (`inheritance_snapshot_test.clj`, `workflow-runtime/core_test.clj`,
+`attempts_test.clj`, `child_session_state_test.clj`, `canonical_workflows_test.clj`,
+`workflow_tools_test.clj`) and the resolver code
+(`workflow-step-session-config/core.clj` `resolve-step-session-config`
+:170-265, `resolved-model-query`/`model-query->selection-request` :130-155).
+
+Strong: tests use real ctx/state (`support/create-session-context`, real
+`create-run`/`resolve-step-session-config`/`delegate-step-runtime-result`) — no
+mocks, no interaction assertions, all state/output assertions. AC1/2/3 isolation,
+AC4 (function-level + e2e delegate-wiring), AC5 override, AC6 no-snapshot
+fallback, AC8 resume-reuse, S3 persist, S4 capture (mutation + psi-tool op),
+field-set authority drift-guard all genuinely covered.
+
+New actionable finding (distinct from open R4 and the P3/P4 implementation
+notes — those discuss the code; this is the test's assertion strength):
+
+- **T1 (AC7 assertion too weak to prove the behaviour).**
+  `snapshot-model-feeds-model-query-selection-context-test`
+  (`inheritance_snapshot_test.clj`) is the only AC7 test. It mutates the live
+  session to `claude-LIVE-CHANGED` after invoke, then asserts ONLY
+  `(some? (:model-fallback config))` and
+  `(= :ranked-model-candidates (get-in config [:model-fallback :type]))`. Both
+  hold regardless of WHICH model fed the selection context: the selection
+  request's `:context {:session-model {:provider … :id …}}`
+  (`model-query->selection-request` :130-137) is built from
+  `parent-session-model`, but the test asserts nothing about the resulting
+  `:session-model`, candidate ranking, or any value that differs between the
+  snapshot model (`claude-snapshot`) and the mutated live model
+  (`claude-LIVE-CHANGED`). The test would pass identically if the resolver read
+  the LIVE model into the selection context — i.e. it does not actually prove
+  AC7's invariant ("selection context comes from the snapshot's effective
+  model", isolated from the live parent). Fix: strengthen the assertion to
+  observe the snapshot-vs-live distinction — e.g. assert the selection request's
+  `:session-model`/`:context` (or a snapshot-model-dependent candidate/outcome
+  in `:model-fallback`) reflects `claude-snapshot` and NOT `claude-LIVE-CHANGED`.
+  If `:model-fallback` does not surface a model-dependent value the test can
+  observe, expose the selection request's session-model context (or assert the
+  ranked-candidate set differs for the two models) so the isolation is provable,
+  not just the fallback's shape.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
