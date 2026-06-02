@@ -1367,3 +1367,48 @@ cljfmt/clj-paren-repair clean on both touched test files. The pre-existing
 cross-ns isolation artifact (scheduler namespaces run in isolation together
 surface ordering-dependent failures absent under canonical full `bb test`) is
 unchanged and out of scope. Review chain converges → no new actionable items.
+
+## Test review — test-shaper pass 6 (2026-06-01)
+
+Re-applied test-shaper across the 201 scheduler test suite (now 50 deftests,
+green; clj-kondo 0/0 on all touched test files). Five prior passes already
+converged the bulk (fixture consolidation, megatest split, `:kind` data-shape
+alignment, with-redefs→ctx-seam migrations, duplicate-assertion removal). Two
+**new, previously-unflagged** issues surfaced; both are test-file-only
+(Slice-10 allowlist — zero `components/agent-session/src/**` / `doc/scheduler.md`):
+
+- **Issue C — journal-scan idiom duplicated (`consistent(test_abstractions)` /
+  `economical / minimal(redundant)`).** The "find the scheduled user message in
+  the journal" idiom
+  `(some->> journal (keep #(get-in % [:data :message])) (some (fn [m] (when (and (= "user" (:role m)) (= :scheduled (:source m)) (= "<id>" (:schedule-id m))) m))))`
+  is repeated verbatim in three places:
+  `scheduler_end_to_end_test` L26 (`scheduler-fired-end-to-end-delivers-when-idle-test`),
+  L70 (`scheduler-message-kind-fires-via-timer-seam-and-delivers-to-origin-test`),
+  and `scheduler_dispatch_test` L85
+  (`scheduler-deliver-submits-canonical-prompt-lifecycle-test`). This is the
+  exact ceremony `scheduler_lifecycle_test` already compresses via its
+  `journal-messages` / `scheduled-user-messages` helpers — so the suite is
+  inconsistent: one ns has the compressing helper, two repeat the raw block.
+  Distinct from pass-3's `create-session-context` fixture consolidation (that
+  was the *context builder*; this is the *journal-scan assertion helper*). Lift
+  a shared `scheduled-message-by-id` (or reuse the lifecycle pattern) into
+  `test-support`, or at least dedupe the two copies within
+  `scheduler_end_to_end_test`. `helpers_that_compress(ceremony) ∧
+  ¬helpers_that_hide(intent)`.
+
+- **Issue D — wall-clock `Instant/now` in execution-result stubs
+  (`deterministic(tests)` — control(time)).** The stubbed assistant-message in
+  `scheduler_end_to_end_test` L111 (session-kind seam) and
+  `scheduler_lifecycle_test` L51 + L106 sets
+  `:timestamp (java.time.Instant/now)` — real wall-clock inside an otherwise
+  fully time-seamed test (every other instant is the injected
+  `fixed-scheduler-time-source`). Not currently flaky (no assertion reads that
+  field), so low-priority; but it violates `control(time(tests))` and is a
+  latent footgun if a future assertion ever touches the assistant timestamp.
+  Replace with a fixed `Instant/parse` literal consistent with the test's
+  `now`, matching the surrounding time-control discipline.
+
+Both are hygiene/consistency follow-ups, not correctness defects — the
+verification deliverable remains green and coherent. Follow-ups added to
+steps.md. If 201 is treated as closed, either may be raised as a small
+standalone test-hygiene task instead.

@@ -884,3 +884,40 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       historical counts). clj-kondo 0/0, cljfmt clean; full `bb test` green.
       Test/task-doc files only — zero `components/agent-session/src/**` or
       `doc/scheduler.md` (Slice-10 allowlist held).
+
+## Test review follow-ups — test-shaper pass 6 (2026-06-01)
+
+- [ ] Dedupe the journal-scan idiom (`consistent(test_abstractions)` /
+      `economical`). The "find the scheduled user message in the journal" block
+      `(some->> journal (keep #(get-in % [:data :message])) (some (fn [m] (when (and (= "user" (:role m)) (= :scheduled (:source m)) (= "<id>" (:schedule-id m))) m))))`
+      is repeated verbatim at `scheduler_end_to_end_test` L26 + L70 and
+      `scheduler_dispatch_test` L85 — the exact ceremony
+      `scheduler_lifecycle_test` already compresses via its `journal-messages` /
+      `scheduled-user-messages` helpers. Lift a shared
+      `scheduled-message-by-id` helper into `test-support` (taking ctx,
+      session-id, schedule-id → the matching scheduled user message), reuse it
+      at all three sites (and from the lifecycle helpers where it fits), so the
+      suite has **one** journal-scan abstraction, not a per-ns mix. At minimum
+      dedupe the two copies inside `scheduler_end_to_end_test`.
+      `helpers_that_compress(ceremony) ∧ ¬helpers_that_hide(intent)`. Distinct
+      from pass-3's `create-session-context` consolidation (context builder vs
+      journal-scan assertion helper). Test-file/`test_support`-only (Slice-10
+      allowlist — zero `components/agent-session/src/**` / `doc/scheduler.md`);
+      keep suite green + clj-kondo/cljfmt clean; no deftest renamed →
+      `findings.md` citations unchanged. If 201 is closed, raise as a standalone
+      test-hygiene task.
+
+- [ ] Replace wall-clock `Instant/now` in execution-result stubs with a fixed
+      instant (`deterministic(tests)` — control(time)). The stubbed
+      assistant-message `:timestamp` is `(java.time.Instant/now)` at
+      `scheduler_end_to_end_test` L111 (session-kind seam) and
+      `scheduler_lifecycle_test` L51 + L106 — real wall-clock inside otherwise
+      fully time-seamed tests (every other instant uses the injected
+      `fixed-scheduler-time-source`). Low-priority (no assertion reads the
+      assistant timestamp today, so not flaky), but it breaks
+      `control(time(tests))` and is a latent footgun. Replace each with a fixed
+      `(java.time.Instant/parse …)` literal consistent with the test's `now`,
+      matching the surrounding time-control discipline. Test-file-only (Slice-10
+      allowlist — zero `components/agent-session/src/**` / `doc/scheduler.md`);
+      keep suite green + clj-kondo/cljfmt clean; no behaviour/assertion change.
+      If 201 is closed, raise as a standalone test-hygiene task.
