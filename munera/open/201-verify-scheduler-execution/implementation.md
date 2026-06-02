@@ -1823,3 +1823,25 @@ finding"; (b) raise a doc-clarification remediation task to add `:at` bounds
 No other doc accuracy/consistency issues: session-config subset, status model
 (incl. `:failed` + delivery-phase + created-session-id), list/cancel semantics,
 and introspection attrs in `doc/scheduler.md` all match verified behaviour.
+
+## Docs-review pass-1 follow-up execution (2026-06-01)
+
+Executed the two pass-1 docs-review follow-ups:
+
+1. Corrected the `findings.md` "psi-tool surface" `:at`-asymmetry row from
+   `verified-correct`/"matches `doc/scheduler.md`" to `defect (doc-gap)`. The
+   behaviour is correct (grounded in `resolve-fire-time!`: `validate-delay-ms!`
+   runs only when the resolved `delay` is strictly positive), but
+   `doc/scheduler.md` "Create validation rules" documents only relative-delay
+   bounds + past-instant immediate-fire — it is silent on future `:at` below
+   `min-delay-ms` (rejected) and `:at` above `max-delay-ms` (rejected). Updated
+   the `findings.md` Outcome accordingly (one doc-gap defect; remediation
+   raised; no scheduler-behaviour defect).
+
+2. Raised remediation task `202-document-at-bounds-in-scheduler-doc` (design.md
+   only; doc-only fix, behaviour out of scope) and referenced it from the
+   corrected `findings.md` row.
+
+Verification-only invariant held: only the new task dir + task-local
+`findings.md`/`steps.md`/`implementation.md` touched — zero
+`components/agent-session/src/**` or `doc/scheduler.md` change.

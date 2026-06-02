@@ -1120,7 +1120,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Docs-review follow-ups — pass 1 (review-task-docs, 2026-06-01)
 
-- [ ] Correct the `findings.md` "psi-tool surface" `:at`-asymmetry row to stop
+- [x] Correct the `findings.md` "psi-tool surface" `:at`-asymmetry row to stop
       claiming the near-future/`>24h` `:at` rejection "matches `doc/scheduler.md`".
       `doc/scheduler.md` "Create validation rules" documents only *relative*-delay
       bounds + "past absolute instants fire immediately"; it is **silent** on a
@@ -1131,7 +1131,18 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       Grounded in `psi_tool_scheduler/resolve-fire-time!` (`validate-delay-ms!`
       runs only when `delay` is strictly positive). Verification-only: edit the
       task-local `findings.md` only — no `doc/scheduler.md`/`src` change here.
-- [ ] Raise a doc-clarification remediation task
+      Done: rewrote the `:at`-asymmetry row from `verified-correct`/"matches doc"
+      to `defect (doc-gap)` — behaviour correct (grounded in `resolve-fire-time!`:
+      `validate-delay-ms!` runs only when resolved `delay` is strictly positive),
+      but `doc/scheduler.md` "Create validation rules" is silent on the
+      near-future-below-min / `>24h` `:at` rejection (doc↔behaviour drift). Added
+      the remediation task-ref `202-document-at-bounds-in-scheduler-doc` to the
+      row's task-ref column. Also corrected the `findings.md` Outcome from "no
+      defects found / no remediation task" to record the one doc-gap defect +
+      raised remediation task 202 (behaviour proven correct; doc-only fix). Verification-only:
+      task-local `findings.md` only — zero `doc/scheduler.md` / `src` change
+      (Slice-10 allowlist held).
+- [x] Raise a doc-clarification remediation task
       (`munera/open/NNN-document-at-bounds-in-scheduler-doc` or similar) to extend
       `doc/scheduler.md` "Create validation rules" with the absolute-`:at` bound
       behaviour: only past/now `:at` fire immediately (delay 0, no min check);
@@ -1140,3 +1151,14 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       task id from the corrected `findings.md` row. Per design policy this doc fix
       is out of scope for 201 (verification-only); it is a separate remediation
       task. If 201 is being closed, this is the deliverable handoff for the doc gap.
+      Done: created remediation task
+      `munera/open/202-document-at-bounds-in-scheduler-doc/` (next free NNN after
+      201) with a `design.md` capturing the doc-gap goal/context/scope/acceptance:
+      extend `doc/scheduler.md` "Create validation rules" with the absolute-`:at`
+      bound behaviour (past/now fire immediately; future-below-min rejected;
+      `>max` rejected), grounded in `resolve-fire-time!` and proven by 201's
+      `psi-tool-scheduler-at-resolution-matrix` tests; doc-only, behaviour
+      out of scope. The corrected `findings.md` `:at`-asymmetry row (item above)
+      references `202-document-at-bounds-in-scheduler-doc`. Verification-only
+      scope held: only the new task dir + task-local `findings.md` touched — zero
+      `doc/scheduler.md` / `src` change.

@@ -9,8 +9,13 @@ raised remediation task ref (`NNN-slug` or `not-yet-raised`).
 
 ## Outcome (2026-06-01)
 
-**All 7 Scope areas verified-correct — no defects found.** No remediation task
-created. Scheduler suite grew from baseline **35 tests / 338 assertions** to
+**All 7 Scope-area behaviours verified-correct.** One **doc-gap defect** found
+(behaviour correct, doc silent): `doc/scheduler.md` "Create validation rules"
+does not document that future absolute `:at` below `min-delay-ms` / above
+`max-delay-ms` is rejected (only past-instant immediate-fire is documented).
+Remediation raised as `202-document-at-bounds-in-scheduler-doc` (doc-only fix;
+behaviour proven correct by `psi-tool-scheduler-at-resolution-matrix`). No
+scheduler-behaviour defect found. Scheduler suite grew from baseline **35 tests / 338 assertions** to
 **51 tests / 411 assertions**, all green (the test-shaper-pass-2 split of the
 psi-tool megatest into 6 focused deftests raised the deftest count 45 → 50;
 assertions unchanged. test-shaper pass 5 then dropped one duplicated
@@ -115,7 +120,7 @@ Baseline `bb test` (scheduler subset, 2026-06-01): `35 tests, 338 assertions, 0 
 | verified-correct | `:at` **past/now** → delay 0, no min-delay check → created **and fires immediately** (delay-0 timer driven via the captured seam, asserts `:delivered`). | `psi-tool-scheduler-test/psi-tool-scheduler-at-resolution-matrix` (`past :at … FIRES immediately via the seam` block) | — |
 | verified-correct | `:at` future **<min-delay-ms** (500ms) → rejected (below-minimum bound). | `psi-tool-scheduler-test/psi-tool-scheduler-at-resolution-matrix` (near-future block) | — |
 | verified-correct | `:at` **>max-delay-ms** (>24h) → rejected (exceeds-maximum bound). | `psi-tool-scheduler-test/psi-tool-scheduler-at-resolution-matrix` (far-future block) | — |
-| verified-correct | `:at` asymmetry (past allowed-and-fires / near-future-rejected): this is **current behaviour and matches** `doc/scheduler.md` ("past absolute instants fire immediately"). Not a doc/behaviour drift — recorded as verified-correct, not a defect. | `psi-tool-scheduler-test/psi-tool-scheduler-at-resolution-matrix` (same `:at` blocks) | — |
+| defect (doc-gap) | `:at` asymmetry: past/now `:at` fires immediately (delay 0, no min check) while future `:at` **below `min-delay-ms`** (1–999ms ahead) and `:at` **above `max-delay-ms`** (>24h) are rejected. The behaviour itself is correct (grounded in `psi_tool_scheduler/resolve-fire-time!`: `validate-delay-ms!` runs only when the resolved `delay` is strictly positive), but `doc/scheduler.md` "Create validation rules" documents only *relative*-delay bounds + "past absolute instants fire immediately" — it is **silent** on the near-future/`>24h` `:at` rejection. This is doc↔behaviour drift (an undocumented doc-gap), **not** verified-correct/"matches doc". | `psi-tool-scheduler-test/psi-tool-scheduler-at-resolution-matrix` (near-future + far-future + past `:at` blocks) | doc-gap; remediation: `202-document-at-bounds-in-scheduler-doc` |
 | verified-correct | kind selection + validation: `message` vs `session`; session-kind requires `:session-config`; message-kind forbids `:session-config`; unsupported session-config keys rejected. | `psi-tool-scheduler-test/psi-tool-scheduler-kind-validation` | — |
 | verified-correct | session-id resolution: explicit-vs-invoking session-id; report path with explicit session-id. | `psi-tool-scheduler-test/psi-tool-scheduler-session-id-resolution` | — |
 | verified-correct | missing/invalid scheduler-time-source fails create (no wall-clock fallback). | `psi-tool-scheduler-test/psi-tool-scheduler-time-source-required` | — |
