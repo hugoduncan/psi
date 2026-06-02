@@ -166,7 +166,7 @@
 
 ## Implementation review follow-ups (ψ)
 
-- [ ] R1 — Reconcile `--on-mutation-timeout`'s live-guard with the cited
+- [x] R1 — Reconcile `--on-mutation-timeout`'s live-guard with the cited
       precedent. The callback guards only `(buffer-live-p buffer)`
       (`psi-widget-projection.el:341`), but the
       `psi-emacs--schedule-notification-dismiss` lambda it mirrors guards

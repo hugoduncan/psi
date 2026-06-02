@@ -396,3 +396,27 @@ repeatedly invoke "mirroring `schedule-notification-dismiss`" as the consistency
 rule, and the guard differs from that precedent. Either add the `state` conjunct
 to match, or note the intentional divergence — so the stated "mirror the
 precedent exactly" claim holds.
+
+## Implementation review follow-up — R1 resolved (ψ)
+
+Chose disposition (a): added the `state`-non-nil conjunct so
+`--on-mutation-timeout`'s guard `(and (buffer-live-p buffer) state)` matches the
+precedent the design repeatedly invokes,
+`psi-emacs--schedule-notification-dismiss`'s scheduled lambda guard
+`(and (buffer-live-p buffer) st)` (`psi-projection.el:415`). Picked match-the-
+precedent over record-divergence because the design/plan name
+`schedule-notification-dismiss` as the *consistency rule* (`one_way` /
+`consistent(code)`) — matching it is the singular obvious path and adds a cheap
+nil-state safety guard; recording a divergence would weaken the "mirror exactly"
+claim it stands on.
+
+- Code: `psi-widget-projection--on-mutation-timeout` guard now
+  `(when (and (buffer-live-p buffer) state) …)`; docstring notes the mirrored
+  guard.
+- Tests: added `pwpt-on-mutation-timeout-noop-when-state-nil`
+  (`psi-widget-projection-timers-test.el`) — live buffer + nil `state` is a
+  harmless no-op (no error, no mutation), covering the new conjunct alongside
+  the existing dead-buffer no-op.
+- Verification: `bb emacs:check` green (338/338, was 337; byte-compile clean);
+  `.el` reloaded. No design.md change (code now matches the precedent the design
+  already specifies).

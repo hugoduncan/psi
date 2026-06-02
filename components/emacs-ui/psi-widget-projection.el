@@ -336,10 +336,11 @@ callback args, mirroring `psi-emacs--schedule-notification-dismiss'."
 
 (defun psi-widget-projection--on-mutation-timeout (buffer state ext-id widget-id node-key timeout-ms)
   "Watchdog callback: mutation for EXT-ID/WIDGET-ID/NODE-KEY timed out.
-No-op unless BUFFER is live; otherwise runs inside BUFFER and cancels/clears
-against STATE's timer store, with no dependence on the incidental current
-buffer."
-  (when (buffer-live-p buffer)
+No-op unless BUFFER is live and STATE is non-nil; otherwise runs inside BUFFER
+and cancels/clears against STATE's timer store, with no dependence on the
+incidental current buffer.  Guard mirrors
+`psi-emacs--schedule-notification-dismiss' (`(and (buffer-live-p buffer) st)')."
+  (when (and (buffer-live-p buffer) state)
     (with-current-buffer buffer
       (let ((tkey (psi-widget-projection--timer-key ext-id widget-id node-key)))
         (psi-widget-projection--cancel-mutation-timer state tkey)

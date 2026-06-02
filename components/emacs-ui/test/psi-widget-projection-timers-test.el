@@ -126,6 +126,20 @@ the post-change no-op pivots on `(buffer-live-p buffer)', not dynamic state."
      ;; A live buffer's store is untouched by a dead-buffer timeout.
      (should (eq 'sentinel (gethash "ext/w1:b1" timers))))))
 
+(ert-deftest pwpt-on-mutation-timeout-noop-when-state-nil ()
+  "Timeout is a harmless no-op when STATE is nil.
+Mirrors the `psi-emacs--schedule-notification-dismiss' guard
+`(and (buffer-live-p buffer) st)': a live BUFFER with a nil STATE must not
+error or mutate anything."
+  (pwpt--with-state
+   (let ((live-buffer (current-buffer)))
+     (should-not (condition-case err
+                     (progn
+                       (psi-widget-projection--on-mutation-timeout
+                        live-buffer nil "ext" "w1" "b1" 5000)
+                       nil)
+                   (error err))))))
+
 (ert-deftest pwpt-dispatch-mutation-arms-timer ()
   (pwpt--with-state
    (let* ((mutation '((:name . ext/do-thing) (:params . ())))
