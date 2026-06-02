@@ -2424,3 +2424,27 @@ duplicated single assertions, the `[:scheduler :schedules <id> …]` read-path).
 Verification-only invariant intact: this review reads only; the follow-up is
 test-only and removes/tightens redundant test coverage without changing
 asserted behaviour of the retained authority.
+
+## Test-shaper pass 19 follow-up execution (2026-06-01)
+
+Executed the pass-19 redundancy follow-up via the **drop-redundant path**.
+Audit confirmed all 6 `testing` blocks of
+`scheduler-tools-test/make-psi-tool-scheduler` are strictly subsumed by the
+authoritative `psi-tool-scheduler-test` (stronger assertions: exact
+created-at/fire-at, named bound messages, delay-0 immediate fire via the seam),
+and the only nuance unique to the file (list surfacing a manually-poked
+`:queued` status) is already covered by the Projections section
+(`scheduler-background-job-projection`). No unique behaviour surfaced, so
+`git rm components/agent-session/test/psi/agent_session/scheduler_tools_test.clj`
+(its sole deftest), eliminating the second expensive `dotimes 50` cap drive and
+leaving `psi-tool-scheduler-test` the single cited psi-tool-surface authority.
+
+`findings.md`: psi-tool-surface create/list/cancel citation reduced to
+`…-create-list-cancel`; baseline inventory line annotated pass-19-removed;
+Outcome counts 51→50 tests / 413→339 assertions.
+
+Verify: full `bb test` green; 12 remaining scheduler ns together =
+50 tests / 339 assertions / 0 failures; clj-kondo 0/0; `bb fmt:check` clean.
+Test/task-doc only — `git rm` of one `test/**` file + task-dir docs; zero
+`components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist
+held; verification-only invariant intact). No blocking reason — step complete.

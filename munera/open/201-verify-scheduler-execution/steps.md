@@ -1533,7 +1533,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Test-shaper follow-ups — pass 19 (test-shaper, 2026-06-01)
 
-- [ ] Collapse the redundant psi-tool-surface overlap between
+- [x] Collapse the redundant psi-tool-surface overlap between
       `scheduler_tools_test/make-psi-tool-scheduler-test` and the authoritative
       `psi_tool_scheduler_test` (economical / minimal(redundant_tests) ∧
       consistent(assertion_style) ∧ meaningful_failures). After 201 built
@@ -1566,3 +1566,28 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       or `doc/scheduler.md`); deftest names of the *retained* authority unchanged
       (findings citations stable for it); clj-kondo 0/0; `bb fmt:check` clean;
       psi-tool + scheduler `bb test` subset green; full `bb test` green.
+      Done: chose the **drop-redundant path** — audited all 6 `testing` blocks of
+      `scheduler-tools-test/make-psi-tool-scheduler` against the authoritative
+      `psi-tool-scheduler-test` and confirmed every one is re-covered with
+      *stronger* assertions: create/list/cancel → `…-create-list-cancel` (+ exact
+      created-at/fire-at + status); below-min (999ms) → `…-bounds-and-cap`
+      below-min (+ named "delay-ms is below the minimum bound"); 51st-pending
+      `dotimes 50` cap → `…-bounds-and-cap` cap (+ named "scheduler pending cap
+      exceeded"); past `:at` `(string? fire-at)` only → `…-at-resolution-matrix`
+      past (delay-0 + immediate seam-driven fire + exact fire-at). The only
+      nuance unique to the dropped file (list surfacing a manually-poked
+      `:queued` status) is covered by the Projections section
+      (`scheduler-background-job-projection` pending+queued). No unique behaviour
+      surfaced → `git rm` the whole `scheduler_tools_test.clj` (its sole deftest),
+      leaving `psi-tool-scheduler-test` the single cited psi-tool-surface
+      authority and removing the second expensive `dotimes 50` cap drive.
+      `findings.md` updated: psi-tool-surface create/list/cancel citation now
+      points only at `…-create-list-cancel`; baseline inventory line annotated as
+      pass-19-removed; Outcome counts 51→50 tests / 413→339 assertions (−1
+      deftest, −74 assertions). Verified: full `bb test` green; the 12 remaining
+      scheduler ns run together = **50 tests / 339 assertions / 0 failures**;
+      `psi-tool-scheduler-test` standalone = 6 tests / 111 assertions; clj-kondo
+      0/0; `bb fmt:check` "All source files formatted correctly". Test/task-doc
+      files only — `git rm` of one `components/agent-session/test/**` file + the
+      task-dir `findings.md`/`steps.md`; zero `components/agent-session/src/**` or
+      `doc/scheduler.md` (verification-only invariant; Slice-10 allowlist held).

@@ -15,8 +15,8 @@ does not document that future absolute `:at` below `min-delay-ms` / above
 `max-delay-ms` is rejected (only past-instant immediate-fire is documented).
 Remediation raised as `202-document-at-bounds-in-scheduler-doc` (doc-only fix;
 behaviour proven correct by `psi-tool-scheduler-at-resolution-matrix`). No
-scheduler-behaviour defect found. Scheduler suite grew from baseline **35 tests / 338 assertions** to
-**51 tests / 413 assertions**, all green (the test-shaper-pass-2 split of the
+scheduler-behaviour defect found. Scheduler suite changed from baseline **35 tests / 338 assertions** to
+**50 tests / 339 assertions**, all green (the test-shaper-pass-2 split of the
 psi-tool megatest into 6 focused deftests raised the deftest count 45 → 50;
 assertions unchanged. test-shaper pass 5 then dropped one duplicated
 `:queued`-status assertion in `scheduler-fired-queues-while-session-busy-test`,
@@ -25,7 +25,12 @@ time-source-stamp handler-unit assertion out of the live covering test into a
 dedicated `drain-one-stamps-scheduled-user-message-from-scheduler-time-source`
 deftest, 50 → 51; assertions unchanged. test-shaper pass 17 then added the two
 named-message assertions to `psi-tool-scheduler-bounds-and-cap-test`
-(below-min `delay-ms` + pending-cap), 411 → 413). No scheduler source or `doc/scheduler.md` modified
+(below-min `delay-ms` + pending-cap), 411 → 413. test-shaper pass 19 then
+**deleted the redundant baseline `scheduler-tools-test/make-psi-tool-scheduler`**
+deftest — every block was re-covered with stronger assertions by the
+authoritative `psi-tool-scheduler-test` (incl. a second expensive `dotimes 50`
+cap drive), so the file was dropped, 51 → 50 tests and 413 → 339 assertions).
+No scheduler source or `doc/scheduler.md` modified
 (coherence gate passes: only test files under
 `components/agent-session/test/**` + this task dir changed).
 
@@ -76,7 +81,9 @@ deftests: `psi-tool-scheduler-create-list-cancel`,
 - `scheduler-background-jobs-test`: scheduler-background-job-projection
 - `scheduler-cancel-job-test`: session-cancel-job-routes-scheduler-projection-to-scheduler-cancel
 - `scheduler-resolvers-test`: scheduler-resolver
-- `scheduler-tools-test`: make-psi-tool-scheduler
+- `scheduler-tools-test`: make-psi-tool-scheduler *(baseline; removed by
+  test-shaper pass 19 as fully redundant with the stronger
+  `psi-tool-scheduler-test` authority — see psi-tool-surface section)*
 - `psi-tool-scheduler-test`: psi-tool-scheduler-create-list-cancel,
   psi-tool-scheduler-time-source-required, psi-tool-scheduler-bounds-and-cap,
   psi-tool-scheduler-session-id-resolution, psi-tool-scheduler-kind-validation,
@@ -116,7 +123,7 @@ Baseline `bb test` (scheduler subset, 2026-06-01): `35 tests, 338 assertions, 0 
 
 | status | summary | covering test | repro / task-ref |
 | ------ | ------- | ------------- | ---------------- |
-| verified-correct | create / list / cancel happy paths; message-kind stored pending; list returns pending+queued; cancel marks cancelled. | `psi-tool-scheduler-test/psi-tool-scheduler-create-list-cancel`, `scheduler-tools-test/make-psi-tool-scheduler` | — |
+| verified-correct | create / list / cancel happy paths; message-kind stored pending; list returns pending; cancel marks cancelled. (`:queued`-status list projection covered by the Projections section.) | `psi-tool-scheduler-test/psi-tool-scheduler-create-list-cancel` (sole psi-tool authority since test-shaper pass 19 dropped the redundant `scheduler-tools-test/make-psi-tool-scheduler`) | — |
 | verified-correct | `:delay-ms` relative path: valid 1000ms accepted; below-min (10ms) rejected as scheduler error; cap (51st pending) rejected. | `psi-tool-scheduler-test/psi-tool-scheduler-bounds-and-cap` (below-min + cap); valid 1000ms exercised in `…/psi-tool-scheduler-create-list-cancel` | — |
 | verified-correct | `:at` future absolute resolves delay from scheduler time source (5000ms → fire-at). | `psi-tool-scheduler-test/psi-tool-scheduler-at-resolution-matrix` (absolute-instant block) | — |
 | verified-correct | `:at` **past/now** → delay 0, no min-delay check → created **and fires immediately** (delay-0 timer driven via the captured seam, asserts `:delivered`). | `psi-tool-scheduler-test/psi-tool-scheduler-at-resolution-matrix` (`past :at … FIRES immediately via the seam` block) | — |
