@@ -298,3 +298,15 @@ to the edited file type. Resolve by replacing Slice 5's `clj-kondo` with the
 Slice 1. Added unchecked follow-up to steps.md.
 
 No code changes (design/plan-only).
+
+## Plan/steps inconsistency follow-up — N1 resolved (ψ)
+
+Resolved the final-sweep lint-tool inconsistency. Slice 5 said "`clj-kondo`/lint
+clean", but `clj-kondo` is the Clojure linter and does not lint Emacs Lisp; this
+task edits only `.el` files (`psi-globals.el`, `psi-lifecycle.el`,
+`psi-widget-projection.el`, `psi-widget-projection-test.el`). Replaced Slice 5's
+`clj-kondo` with the `.el`-appropriate lint (`clj-paren-repair`/byte-compile),
+matching Slice 1's lint step so both slices name the same linter for the same
+files (`consistent(code)` / `one_way`).
+
+No code changes (design/plan-only task). steps.md N1 checked.

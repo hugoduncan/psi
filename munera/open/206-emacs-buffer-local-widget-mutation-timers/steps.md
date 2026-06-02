@@ -109,7 +109,9 @@
 - [ ] Delete `defvar psi-widget-projection--mutation-timers` (`psi-widget-projection.el:73`).
 - [ ] Remove any leftover `let`-binds of the global from tests.
 - [ ] Final `git grep` confirms zero references to the global.
-- [ ] Full `emacs-ui` test sweep green; `clj-kondo`/lint clean; reload `.el`.
+- [ ] Full `emacs-ui` test sweep green; `.el` lint clean
+      (`clj-paren-repair`/byte-compile, matching Slice 1 — this task edits only
+      `.el` files, so the Clojure `clj-kondo` linter does not apply); reload `.el`.
 - [ ] Commit: `⚒ 206: remove module-global widget mutation-timers store`.
 
 ## Plan ambiguity review follow-ups (ψ)
@@ -142,7 +144,7 @@
 
 ## Plan/steps inconsistency review follow-ups (ψ)
 
-- [ ] N1 — Reconcile the final-sweep lint tool with the per-`.el` lint guidance.
+- [x] N1 — Reconcile the final-sweep lint tool with the per-`.el` lint guidance.
       Slice 1 (`steps.md` lint step) lints the edited `.el` files with
       `clj-paren-repair`/lint, but Slice 5 says "`clj-kondo`/lint clean".
       `clj-kondo` is the Clojure linter and does not lint Emacs Lisp `.el`
