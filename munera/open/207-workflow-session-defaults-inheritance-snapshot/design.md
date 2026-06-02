@@ -53,41 +53,48 @@ In scope:
   captured when the child run is created — not re-derived live from the
   original invoking session.
 
-Out of scope (proposed — confirm):
+Out of scope:
 
 - Changing how a step's **explicit** overrides work (`:session` spec /
-  `:workflow-file-meta` model / model-query / tools / skills / thinking-level).
-  Snapshotting governs only the *inherited default* used when a step does not
-  specify its own value.
+  `:workflow-file-meta` model / model-query / tools / skills / thinking-level /
+  etc.). Snapshotting governs only the *inherited default* used when a step does
+  not specify its own value.
 - Changing user/project default-model resolution itself.
 - Retroactively snapshotting already-created runs (forward-looking only).
 
-## Open questions (to refine collaboratively)
+## Resolved decisions
 
-1. **Which details are "default session details"?** Candidates inherited live
-   today: `model`, `prompt-mode`, `skills`, `tools` (tool source + tool-ids),
-   `thinking-level` fallback. Snapshot all of them, or only `model`? The example
-   names model explicitly; a consistent rule probably snapshots the whole
-   inherited-default set, but this needs a decision.
+1. **Which details are "default session details" — ALL of them.** Snapshot the
+   whole inherited-default set, not just `model`. This includes the fields the
+   resolver inherits live today (`model`, `prompt-mode`, `skills`, `tools` =
+   tool source + tool-ids, `thinking-level`) **and** the recently introduced
+   request overrides `:speed-mode` and `:effort-override`. (Note: these mirror
+   `session-state/init.clj`'s `common-inherited-fields`, the canonical
+   child-session inheritance set; `speed-mode`/`effort-override` are there as
+   inherited-but-transient fields — they must be part of the workflow snapshot.)
 
-2. **Snapshot granularity / shape.** A resolved snapshot (e.g. concrete
-   `{:model … :prompt-mode … :tool-defs … :skills … :thinking-level …}`) versus
-   a lighter snapshot of just the parent session's raw default fields. Resolved
-   is more robust against later parent mutation; raw is smaller. Leaning
-   resolved.
+2. **Snapshot shape — fully resolved.** Capture a concrete resolved snapshot
+   (e.g. `{:model … :prompt-mode … :tool-defs … :skills … :thinking-level …
+   :speed-mode … :effort-override …}`), not raw parent fields. Resolved is
+   robust against later parent mutation.
 
-3. **Nested workflow parent semantics.** Confirm a delegated sub-workflow
-   inherits from the *parent workflow run's snapshot* (so the whole tree shares
-   the invoke-time defaults) rather than re-reading the invoking session. Is the
-   parent a workflow-run snapshot, or the parent step's child session?
+3. **Nested workflow parent semantics — inherit the parent's *effective*
+   session config, captured when the sub-delegation is created.** The parent of
+   a delegated sub-workflow is the delegating **step's effective/resolved
+   session config** = (run snapshot ⊕ that step's own overrides). Concretely: if
+   a step overrides the model and then invokes a delegation of its own, that
+   sub-delegation (and its steps) sees the **overridden** model — overrides
+   propagate down the delegation tree as the new inherited default. The whole
+   tree is built from invoke-time-captured snapshots, never a live re-read of the
+   original invoking session.
 
-4. **model-query context.** `resolved-model-query` uses `parent-session-model`
-   as selection context. Should it use the snapshot's model (preferred for
-   determinism) — confirm.
+4. **model-query context — use the snapshot's model.** `resolved-model-query`
+   takes its `parent-session-model` selection context from the snapshot (the
+   parent's effective model), for determinism.
 
-5. **Interaction with continue/resume.** On resume of a blocked run, defaults
-   should still come from the original invoke-time snapshot (not re-captured).
-   Confirm.
+5. **continue/resume — keep the original invoke-time snapshot.** Resuming a
+   blocked run does not re-capture defaults; it reuses the snapshot taken at
+   original invoke time.
 
 ## Acceptance criteria
 
@@ -95,11 +102,21 @@ Out of scope (proposed — confirm):
    effect** on the session details of subsequent steps of that running workflow.
 2. After a workflow is invoked, changing the user/project default model has **no
    effect** on subsequent steps of that running workflow.
-3. A nested/delegated workflow inherits the invoke-time default session details
-   of its parent, not the (possibly-since-mutated) invoking session.
-4. A step that specifies an explicit model/tools/skills/thinking-level override
-   still applies that override (snapshot governs only inherited defaults).
-5. For the no-mutation case, existing single-step and multi-step config
+3. The same invariant holds for **every** inherited default — `prompt-mode`,
+   `tools`, `skills`, `thinking-level`, `speed-mode`, `effort-override` — not
+   just `model`.
+4. A nested/delegated workflow inherits the **effective** session details of its
+   delegating step (run snapshot plus that step's overrides), captured when the
+   sub-delegation is created — not the (possibly-since-mutated) invoking session.
+   A step that overrides the model and then delegates: the sub-delegation sees
+   the overridden model.
+5. A step that specifies an explicit override still applies that override
+   (snapshot governs only inherited defaults).
+6. For the no-mutation case, existing single-step and multi-step config
    resolution behaviour is unchanged.
-6. The captured snapshot is part of the workflow run's state (deterministic /
-   replayable), consistent with the canonical-workflow architecture.
+7. `resolved-model-query` selection context comes from the snapshot's effective
+   model.
+8. Resuming a blocked run reuses the original invoke-time snapshot (no
+   re-capture).
+9. The captured snapshot(s) are part of the workflow run's state (deterministic
+   / replayable), consistent with the canonical-workflow architecture.
