@@ -192,6 +192,28 @@ with the commit sha / decision when done.
       branch. Stated on the Slice-3 commit step (allocation, creation, commit all
       inside the worktree).
 
+## Plan/steps inconsistency follow-ups (review pass 1)
+
+- [ ] C1 — Reconcile plan Approach "**not new test code in `components/`**" with
+      plan R4 + Slice 4 (plan & steps), which add new `components/` test
+      assertions for the two workflows + skill registration. Either soften the
+      Approach line (e.g. no new production Clojure / no new test **namespace** —
+      new assertions extend the existing `workflow_definitions_test.clj` ns) or
+      drop the `components/` test assertions from Slice 4 in favour of pure live
+      loadability. Approach, R4, and Slice 4 (plan + steps) must agree on whether
+      `components/` test code is added.
+- [ ] C2 — Collapse the two duplicate unchecked Slice-2 `summary`-step items
+      (the dedicated "Add `summary` step…" item and the "(Decision — resolved,
+      see P1) **Add** a trailing `summary` step…" item) into a single
+      `summary`-authoring item, keeping the P1 rationale as a sub-note. The
+      checklist must instruct the `summary` step's creation exactly once.
+- [ ] C3 — Add `before-diagnose.edn` to plan.md so its baseline set matches
+      steps.md and the gate acceptance it cites. plan.md currently names only
+      `before-local.json` (lines ~41, ~98) and R3's "reproduce verbatim"
+      contract inventory omits `before-diagnose.edn` — the very baseline
+      `gordian gate --baseline … --fail-on …` consumes. Name both baselines in
+      plan.md's capture description and R3.
+
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 
 - [ ] Split step-1 selection from task-creation into two `:session` steps,
