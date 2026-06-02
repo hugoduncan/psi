@@ -429,3 +429,14 @@ Tick with sha/decision on completion.
       affordance, not a backend routing target), merged after backend specs so
       backend descriptions win on name collision — matching the CHANGELOG
       wording. Pure doc-accuracy fix; no source/test change.
+
+## Docs review follow-ups (review-task-docs pass 2)
+
+- [ ] D2 — `doc/tui.md` "In-session commands" reference list (lines ~57–60) is
+      incomplete relative to the now-authoritative `builtin-command-specs`
+      table. Add the missing user-invokable built-ins this task single-sourced:
+      `/reload-models`, `/reload-extension-installs`, `/jobs [status ...]`,
+      `/job <job-id>`, `/cancel-job <job-id>`. (Skip the help-hidden aliases
+      `/?`/`/exit`.) Keep the existing prose sections; just complete the
+      command-listing block so the TUI user reference matches the single source.
+      Pure doc-accuracy fix; no source/test change.

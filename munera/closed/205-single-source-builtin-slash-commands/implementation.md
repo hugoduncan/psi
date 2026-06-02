@@ -1567,3 +1567,36 @@ This reconciles architecture.md with both the retained `defcustom` default
 trimmed to the Emacs-only `/skill:` affordance ... backend built-in descriptions
 win on any name collision"). Pure doc-accuracy change; no source/test edits, so
 no suite run required.
+
+## Docs review — review-task-docs pass 2
+
+Re-ran the review-task-docs checklist (README ∧ doc/ ∧ CHANGELOG) against the
+implemented single-source command surface.
+
+Verified accurate/complete:
+- CHANGELOG `[Unreleased]` "Changed" entry — attribute name
+  `:psi.agent-session/builtin-command-specs`, the previously-missing command
+  list (`/reload-models /reload-prompts /reload-extension-installs /speed
+  /effort /project-repl`), and the `defcustom` repurposing all match the code
+  (builtin_specs.clj membership, resolver output, psi-completion.el:19-20
+  trimmed default).
+- `doc/architecture.md` "slash-command surface" bullet — ns
+  `psi.agent-session.commands.builtin-specs`, both graph attributes
+  (`builtin-command-specs` / `builtin-command-names`), the projection claim
+  (exact/prefixed/format-help/resolver all derive from the table), and the
+  Emacs `defcustom` override note all verified against source. D1 reconciliation
+  holds.
+- No stale references to the deleted `shared/builtin-slash-commands` or to a
+  hardcoded Emacs built-in list in any user-facing doc.
+
+New actionable finding (→ D2):
+- `doc/tui.md` "In-session commands" reference list (lines 57–60) enumerates
+  built-in commands but is **incomplete** relative to the now-authoritative
+  `builtin-command-specs` table. Missing real, user-invokable built-ins:
+  `/reload-models`, `/reload-extension-installs`, `/jobs [status ...]`,
+  `/job <job-id>`, `/cancel-job <job-id>`. This task swept these commands into
+  the single-sourced surface (they now autocomplete in TUI/Emacs), so the
+  user-facing TUI command reference is stale/incomplete. The prior D1 pass only
+  touched `doc/architecture.md` and did not check `doc/tui.md`'s command
+  reference for completeness. (`/reload-models` is documented in
+  `doc/custom-providers.md`, but absent from the canonical TUI command list.)
