@@ -244,3 +244,80 @@ design.md changes:
 
 No blocking reasons; C1 fully addressed at design level. AC1 resolver shape
 `{:name :description}` unchanged (`:hide-in-help?` not exposed).
+
+### 2026-06-01 — Plan ambiguity review (review-task-plan ambiguity pass), pass 1
+
+Scope: ambiguities in plan.md + steps.md only (¬architecture, ¬correctness,
+¬consistency; design A1/B1–B5/C1 already resolved). Grounded against real code:
+TUI `support.clj` (`command-refresh-query` 188, `refresh-extension-command-names`
+191, `build-init` introspection query 226–230), `autocomplete.clj`
+(`shared/builtin-slash-commands` concat at 59 + many other `shared/` uses),
+`shared.clj` 22; Emacs `psi-completion.el` (`psi-emacs-slash-command-specs`
+defcustom 19, `psi-emacs--state-slash-command-specs` 99–103), `psi-session-commands.el`
+(`psi-emacs--prompt-template-query` 256 — **not** 257; `psi-emacs--apply-slash-completion-data`
+`(names templates)` 302; `psi-emacs--slash-completion-token` ~290), `psi-events.el`
+(`declare-function …apply-slash-completion-data… (names templates)` 28;
+`psi-emacs--slash-completion-data-changed-p` event-data path calls it 109);
+`psi-globals.el` `extension-command-names` slot 100. Backend resolver/registration
+(`extensions.clj` resolvers vector 263–277, `extension-commands-resolver` 134) is
+unambiguous and well-specified — no findings there.
+
+Five new actionable plan/steps ambiguities (P1–P5 in steps.md):
+
+- P1 — **Emacs `apply-slash-completion-data` threading shape unspecified.**
+  Plan ("Extend `psi-emacs--apply-slash-completion-data` to carry built-in specs")
+  + steps ("thread built-in specs through `psi-emacs--apply-slash-completion-data`")
+  don't say whether the fn gains a third positional arg (`(names builtin-specs
+  templates)`) or stores built-in specs via a separate path. The fn's signature
+  is `(names templates)` and is fixed in THREE places that must all change
+  together if the arity changes: the `declare-function` in `psi-events.el:28`,
+  the query-frame call in `psi-session-commands.el:323`, and the event-data call
+  in `psi-events.el:109`. Plan names only the first call site. Pin the
+  signature/threading shape and enumerate every `apply-slash-completion-data`
+  call site + the `declare-function` to update.
+
+- P2 — **Slash-completion change-detection token not addressed.** Refresh only
+  fires when `psi-emacs--slash-completion-token` differs
+  (`psi-emacs--slash-completion-data-changed-p`, `psi-events.el`; token built
+  from names+templates only). If built-in specs become a new completion source
+  but are NOT folded into the token, a built-in-spec-only change won't be
+  detected as "changed" and Emacs autocomplete will go stale — defeating AC5/AC6.
+  Plan/steps are silent on the token. Specify that the token includes built-in
+  specs (in both `psi-emacs--slash-completion-token` and the
+  `…changed-p` event path), or state explicitly why the token need not change.
+
+- P3 — **Built-in specs arrival channel unspecified (query frame vs session
+  event).** Emacs has TWO data-application channels into
+  `apply-slash-completion-data`: the explicit `query_eql` frame
+  (`psi-emacs--prompt-template-query` / `…-from-query-frame`) AND the
+  session-update event-data path (`psi-events.el`
+  `psi-emacs--slash-completion-data-changed-p`, which reads
+  `:extension-command-names`/`:prompt-templates` off pushed events). Plan extends
+  the query string (channel 1) and a frame-extractor, but does not say whether
+  built-in specs also arrive on the session-update event path (channel 2) or only
+  via the query. If only via query, the event path's token/extraction must still
+  not regress; if via both, both extractors are needed. Decide and specify the
+  arrival channel(s) for built-in specs.
+
+- P4 — **TUI refresh fn "(or sibling)" left as a choice.** Steps say
+  "`support.clj` `refresh-extension-command-names` (or sibling): refresh built-in
+  specs." "(or sibling)" defers whether to extend the existing fn (and rename it)
+  or add a new refresh fn — an unresolved implementation fork. Also
+  `command-refresh-query` currently returns only `:psi.extension/command-names`;
+  the fn destructures that one key, so extending it requires a decision on
+  reading the new key too. Pin: extend `refresh-extension-command-names` in place
+  vs add a sibling, and how `command-refresh-query` result feeds both keys.
+
+- P5 — **`shared.clj/builtin-slash-commands` disposal is double-specified and
+  partly incoherent.** Plan offers "remove … (delete, **or** empty + drop the
+  require usage)"; steps pin "delete + drop usages." The two are not reconciled
+  (plan two-option vs steps one-option). Worse, "drop the require usage" is
+  unsound as written: `autocomplete.clj` uses MANY other `shared/` symbols
+  (`shared/input-value`, `shared/input-pos`, `shared/set-input-value`), so the
+  `[… app.shared :as shared]` require must STAY; only the
+  `shared/builtin-slash-commands` reference at line 59 is removed. Pin the exact
+  disposal (delete the `def` only; keep the `shared` require; drop just the
+  `builtin-slash-commands` symbol from the `concat`) so the step is unambiguous
+  and doesn't suggest removing a still-needed require.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

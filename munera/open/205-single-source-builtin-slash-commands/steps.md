@@ -105,3 +105,31 @@ Tick with sha/decision on completion.
       projections), AC3 (help derivation, aliases hidden), AC4/AC5 (TUI/Emacs
       `/reload-models`), AC6 (end-to-end flow), AC7 (one-way), AC8 (changelog +
       docs).
+
+## Plan ambiguity follow-ups (review pass 1)
+
+- [ ] P1 — Pin the Emacs `psi-emacs--apply-slash-completion-data` threading
+      shape in plan.md: state whether it gains a third positional arg
+      (`(names builtin-specs templates)`) or a separate state path, and enumerate
+      ALL sites that must change together — `declare-function` (`psi-events.el:28`),
+      query-frame call (`psi-session-commands.el:323`), event-data call
+      (`psi-events.el:109`).
+- [ ] P2 — Specify in plan.md that the slash-completion change-detection token
+      (`psi-emacs--slash-completion-token` + the `…-changed-p` event path in
+      `psi-events.el`) includes built-in specs, so a built-in-spec-only change is
+      detected and Emacs autocomplete refreshes (AC5/AC6) — or document why the
+      token need not change.
+- [ ] P3 — Decide and specify in plan.md the arrival channel(s) for built-in
+      specs into Emacs: the explicit `query_eql` frame only, or also the
+      session-update event-data path (`psi-events.el`
+      `psi-emacs--slash-completion-data-changed-p`); add the matching
+      extractor(s) accordingly.
+- [ ] P4 — Resolve the TUI refresh "(or sibling)" fork in steps.md/plan.md:
+      extend `refresh-extension-command-names` in place (and how
+      `command-refresh-query`'s result feeds both `:psi.extension/command-names`
+      and the new built-in attribute) vs add a dedicated sibling refresh fn.
+- [ ] P5 — Reconcile the `shared.clj/builtin-slash-commands` disposal: drop the
+      plan's "empty + drop the require usage" alternative; pin one disposal —
+      delete the `def` only, KEEP the `app.shared` require in `autocomplete.clj`
+      (still used for `input-value`/`input-pos`/`set-input-value`), and remove
+      only the `shared/builtin-slash-commands` symbol from the line-59 `concat`.
