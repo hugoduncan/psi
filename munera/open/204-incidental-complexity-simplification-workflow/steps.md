@@ -423,6 +423,32 @@ with the commit sha / decision when done.
       generated contract fails green. Focused suite green (16 tests, 218
       assertions, 0 failures); `clj-kondo` 0 findings.
 
+## Test review follow-ups (review pass 2)
+
+- [ ] TR3 — `incidental-complexity-finder-skill-content-lock-test` (added by TR1)
+      locks the gap method, thresholds, single-unit scope, the high-cc-alone
+      guard string, the A1 drop rule, and the F2 `@line` key — but **omits two
+      named Deliverable-1 behaviours**, so a SKILL.md regress dropping them passes
+      green. (1) The **step-5 judgment guard** — the design's *core* discriminator
+      (Locked decisions 1/2/9; the whole "Why gap" rationale): "read the top 5
+      qualifying units by `gap`", the incidental-burden signal list, the
+      essential-complexity rejection, "choose the first that passes", "if none of
+      the top 5 pass, report no target". The locked high-cc-alone string is the
+      *rationale*, not the top-5 *procedure*; without it the skill degenerates to
+      the `gordian complexity` ranking it exists not to be. (2) The **step-6
+      evidence + coverage-hint emission** — the design's first acceptance is
+      "produces a target **+ evidence**", and step 5/6 names the coverage hint
+      (sibling test ns exists? any test references the target var?) as a required
+      emitted field; no test covers it. Per `∀b ∈ behaviour(design). ∃t.
+      covers(t,b)`, both are uncovered design acceptance behaviours. Fix: extend
+      `incidental-complexity-finder-skill-content-lock-test` (same ns, no new ns,
+      per C1) with substring locks for (a) the top-5 judgment guard ("top 5
+      qualifying units by `gap`", essential-rejection, "Choose the first … that
+      passes", "none of the top 5 pass") and (b) the coverage-hint evidence
+      ("coverage hint", sibling-test-ns / references-the-target-var wording).
+      SKILL.md already carries all these strings (lines 78, 121–139, 152).
+      Test-only change.
+
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 
 - [ ] Split step-1 selection from task-creation into two `:session` steps,

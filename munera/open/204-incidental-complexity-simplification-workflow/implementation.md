@@ -1280,3 +1280,49 @@ Verification: focused `psi.workflow-loader.workflow-definitions-test` green
 (16 tests, 218 assertions, 0 failures); `clj-kondo --lint` on the test file:
 0 errors, 0 warnings. No production/skill/workflow/doc change required — both
 follow-ups were pure coverage additions against existing design behaviours.
+
+## 2026-06-01 — Test review pass 2 (task-test-review)
+
+Re-read design.md (Deliverable-1 acceptance), SKILL.md, both workflow `.edn`s,
+and the full `workflow_definitions_test.clj` (16 tests, 218 assertions — re-run
+green). Criterion: `∀b ∈ behaviour(design). ∃t. covers(t,b)` and
+`¬mock ∧ ¬stub` infra deps.
+
+Infra-dep / well-formedness: clean. Tests are state/content assertions over
+loaded definitions + slurped SKILL.md + a real `jq` subprocess (with a
+structural fallback) — no `with-redefs`, no mocks/stubs, no interaction
+assertions. The determinism test is exemplary (executable lock over a real
+recipe).
+
+One new actionable coverage gap (TR3): TR1's content-lock test deliberately
+enumerated the gap method, thresholds, single-unit scope, the high-cc-alone
+guard string, the A1 drop rule, and the F2 `@line` key — but **omitted two
+named Deliverable-1 behaviours**:
+
+1. **Judgment guard (step 5 — top-5 essential-vs-incidental)** — the design's
+   *core discriminator* (Locked decisions 1/2/9; the entire "Why gap" rationale).
+   No test asserts the SKILL.md encodes "read the top 5 qualifying units by
+   `gap`", the incidental-burden signal list, the essential-complexity rejection,
+   "choose the first that passes", or "if none of the top 5 pass, report no
+   target". A SKILL.md that dropped step 5 entirely (leaving only the mechanical
+   gap/threshold recipe — i.e. degenerating to the `gordian complexity` ranking
+   the skill exists *not* to be) would pass `content-lock` green. The
+   high-cc-alone guard string that *is* locked is the *rationale*, not the
+   *procedure*; the top-5 judgment procedure is the acceptance "false-positive
+   guard" mechanism and is uncovered.
+
+2. **Evidence + coverage-hint emission (step 6)** — the design's first
+   acceptance is "produces a target **+ evidence**", and Deliverable-1 step 5/6
+   names the coverage hint (sibling test ns exists? any test references the
+   target var?) as a required emitted field. No test asserts SKILL.md instructs
+   emitting the per-dimension evidence or the coverage hint. A regress dropping
+   the coverage-hint emission passes green.
+
+Fix: extend `incidental-complexity-finder-skill-content-lock-test` (same ns, no
+new ns, per C1) with substring locks for (a) the top-5 judgment guard ("top 5
+qualifying units by `gap`", the essential-rejection, "Choose the first … that
+passes", "none of the top 5 pass") and (b) the coverage-hint evidence emission
+("coverage hint", sibling-test-ns / references-the-target-var wording). SKILL.md
+already carries all these strings (lines 78, 121–139, 152). Test-only change.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK.
