@@ -27,11 +27,11 @@
 ;;;     :tool-ids               — derived via derive-child-prompt-state (or explicit child opts)
 ;;;     :prompt-contribution-ids — resolved from parent via prompt-storage/prompt-ids
 ;;;     :prompt-mode            — non-workflow: (or prompt-mode (:prompt-mode parent-sd));
-;;;                               workflow-owned: snapshot value, else initial-session default — no live parent-sd fallback (task 207, R4)
+;;;                               snapshot-governed (inherited-snapshot?): snapshot value, else initial-session default — no live parent-sd fallback (task 207, R4)
 ;;;     :speed-mode             — non-workflow: (or speed-mode (:speed-mode parent-sd));
-;;;                               workflow-owned: snapshot value, else initial-session default (task 207, R4)
+;;;                               snapshot-governed (inherited-snapshot?): snapshot value, else initial-session default (task 207, R4)
 ;;;     :effort-override        — non-workflow: (or effort-override (:effort-override parent-sd));
-;;;                               workflow-owned: snapshot value, else initial-session default (task 207, R4)
+;;;                               snapshot-governed (inherited-snapshot?): snapshot value, else initial-session default (task 207, R4)
 ;;;     :developer-prompt       — (or developer-prompt (:developer-prompt parent-sd))
 ;;;     :developer-prompt-source — (or developer-prompt-source (:developer-prompt-source parent-sd))
 ;;;     :cache-breakpoints      — (or cache-breakpoints (:cache-breakpoints parent-sd) default)
@@ -58,7 +58,7 @@
 ;;;
 ;;; model-identity-fields (2 keys in init.clj):
 ;;;     :model          — non-workflow: (or model (:model parent-sd)) — falls back to parent;
-;;;                       workflow-owned: snapshot value, else initial-session default — no live parent-sd fallback (task 207, R4)
+;;;                       snapshot-governed (inherited-snapshot?): snapshot value, else initial-session default — no live parent-sd fallback (task 207, R4)
 ;;;     :thinking-level — (or thinking-level :off) — defaults to :off, not direct parent inheritance
 
 (defn- default-child-system-prompt-build-opts
@@ -125,15 +125,16 @@
      :system-prompt              (or system-prompt resolved-base-prompt (:system-prompt parent-sd))}))
 
 (defn- child-session-base-state*
-  [root-state parent-sd {:keys [child-session-id session-name thinking-level speed-mode effort-override temperature model prompt-mode response-mode logprobs top-logprobs developer-prompt developer-prompt-source cache-breakpoints workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?] :as child-opts}]
+  [root-state parent-sd {:keys [child-session-id session-name thinking-level speed-mode effort-override temperature model prompt-mode response-mode logprobs top-logprobs developer-prompt developer-prompt-source cache-breakpoints workflow-run-id workflow-step-id workflow-attempt-id workflow-owned? inherited-snapshot?] :as child-opts}]
   (let [{:keys [root-state prompt-component-selection tool-ids skill-ids system-prompt-build-opts base-system-prompt system-prompt]}
         (derive-child-prompt-state root-state parent-sd child-opts)
         normalized-developer-prompt-source (let [source (or developer-prompt-source (:developer-prompt-source parent-sd))]
                                              (when (not= :fallback source)
                                                source))
         workflow-owned?' (boolean workflow-owned?)
+        inherited-snapshot?' (boolean inherited-snapshot?)
         ;; Workflow inherited-defaults snapshot isolation (task 207, R4):
-        ;; for workflow-owned children the snapshot-governed inherited fields
+        ;; for SNAPSHOT-GOVERNED children the inherited fields
         ;; (:model :prompt-mode :speed-mode :effort-override) come from the
         ;; resolver's already-snapshotted value and must NOT fall back to the
         ;; LIVE parent session. parent-sd is read mid-run in :session/create-child
@@ -142,10 +143,14 @@
         ;; Decision 2 / AC3. The supplied (snapshot) value is authoritative
         ;; (explicit override precedence preserved by the resolver); when it is
         ;; nil the field uses the fresh initial-session default, never the live
-        ;; parent. Non-workflow children keep the live parent-sd fallback.
+        ;; parent. Gated on inherited-snapshot? (the resolver/step-attempt path),
+        ;; NOT workflow-owned? — workflow-owned children that are NOT
+        ;; snapshot-governed (e.g. the workflow judge, which supplies no model/
+        ;; prompt-mode and relies on live parent inheritance) keep the parent-sd
+        ;; fallback. Non-workflow children also keep the live parent-sd fallback.
         defaults (session-data/initial-session)
         inherited-default (fn [supplied parent-value default-value]
-                            (if workflow-owned?'
+                            (if inherited-snapshot?'
                               (or supplied default-value)
                               (or supplied parent-value)))
         child-model (inherited-default model (:model parent-sd) (:model defaults))

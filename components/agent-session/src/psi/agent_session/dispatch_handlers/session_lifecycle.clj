@@ -112,7 +112,7 @@
 
   (kernel/register-handler!
    :session/create-child
-   (fn [ctx {:keys [session-id child-session-id session-name worktree-path system-prompt prompt-mode response-mode logprobs top-logprobs tool-ids thinking-level speed-mode effort-override model skills developer-prompt developer-prompt-source preloaded-messages cache-breakpoints prompt-component-selection workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?]}]
+   (fn [ctx {:keys [session-id child-session-id session-name worktree-path system-prompt prompt-mode response-mode logprobs top-logprobs tool-ids thinking-level speed-mode effort-override model skills developer-prompt developer-prompt-source preloaded-messages cache-breakpoints prompt-component-selection workflow-run-id workflow-step-id workflow-attempt-id workflow-owned? inherited-snapshot?]}]
      (let [parent-sd (or (session/get-session-data-in ctx session-id)
                          {:worktree-path worktree-path})]
        {:root-state-update #(child-session-state/initialize-child-session-state % parent-sd
@@ -137,7 +137,8 @@
                                                                                  :workflow-run-id        workflow-run-id
                                                                                  :workflow-step-id       workflow-step-id
                                                                                  :workflow-attempt-id    workflow-attempt-id
-                                                                                 :workflow-owned?        workflow-owned?})
+                                                                                 :workflow-owned?        workflow-owned?
+                                                                                 :inherited-snapshot?    inherited-snapshot?})
         :effects [{:effect/type :projection/context-changed
                    :session-id child-session-id
                    :reason :session/create-child}]

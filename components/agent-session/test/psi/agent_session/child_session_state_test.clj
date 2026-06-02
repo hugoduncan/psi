@@ -70,9 +70,8 @@
                    :workflow-step-id "plan"
                    :workflow-attempt-id "attempt-1"
                    :workflow-owned? true
-                   ;; The resolver always supplies the snapshot :model for
-                   ;; workflow children (task 207, R4); workflow-owned children
-                   ;; no longer fall back to the live parent model.
+                   ;; Explicit (resolver-supplied) :model — non-nil supplied
+                   ;; values are authoritative on every path (task 207).
                    :model {:provider "prov" :id "m"}
                    :response-mode :non-streaming
                    :logprobs true
@@ -140,28 +139,36 @@
           (is (nil? (:effort-override child-sd))))))))
 
 (deftest child-session-base-state-workflow-owned-isolates-snapshot-fields-test
-  (testing "task 207 (R4): for workflow-owned children the snapshot-governed
+  (testing "task 207 (R4): for SNAPSHOT-GOVERNED children (`:inherited-snapshot?
+            true`, the resolver/step-attempt path) the snapshot-governed
             inherited fields (:model :prompt-mode :speed-mode :effort-override)
             come from the supplied (snapshot) value only and do NOT fall back to
             the live parent session, so a post-invoke parent mutation cannot leak
-            in. Non-workflow children keep the parent-sd fallback (separate test)."
+            in. The gate is `:inherited-snapshot?`, NOT `:workflow-owned?`:
+            workflow-owned children that are not snapshot-governed (the workflow
+            judge) and non-workflow children both keep the live parent-sd
+            fallback (separate testing blocks below)."
     (let [;; Live parent carries values — these would leak via (or arg parent-sd)
-          ;; if the workflow-owned path did not suppress the fallback.
+          ;; if the snapshot path did not suppress the fallback. :prompt-mode is
+          ;; deliberately NOT the :lambda initial-session default so the
+          ;; default-vs-live-leak distinction is observable.
           live-parent (parent-session-data {:speed-mode :flex
                                             :effort-override :low
-                                            :prompt-mode :lambda
+                                            :prompt-mode :prose
                                             :model {:provider "prov" :id "live-model"}})
           root-state {:agent-session {:sessions {"parent"
                                                  {:data live-parent
                                                   :agent-ctx {:data-atom (atom {:tools parent-tool-defs})}}}}}]
-      (testing "nil-at-invoke snapshot values resolve to nil, NOT the live parent"
+      (testing "nil-at-invoke snapshot values resolve to the initial-session
+                default, NOT the live parent"
         ;; Resolver emits no :speed-mode/:effort-override (nil-at-invoke) and a
         ;; nil :model/:prompt-mode; child-session-base-state* receives them as
-        ;; nil supplied args. workflow-owned? → no parent-sd fallback.
+        ;; nil supplied args. inherited-snapshot? → no parent-sd fallback.
         (let [child-sd (child-session-state/child-session-base-state
                         root-state live-parent
                         {:child-session-id "wf-child-nil"
                          :workflow-owned? true
+                         :inherited-snapshot? true
                          :model nil
                          :prompt-mode nil
                          :speed-mode nil
@@ -169,32 +176,47 @@
           (is (nil? (:model child-sd))
               ":model uses the initial-session default (nil), not the live parent model")
           (is (= :lambda (:prompt-mode child-sd))
-              ":prompt-mode uses the initial-session default (:lambda), not the live parent")
+              ":prompt-mode uses the initial-session default (:lambda), not the live parent (:prose)")
           (is (nil? (:speed-mode child-sd))
               ":speed-mode stays the initial-session nil default, no live parent leak")
           (is (nil? (:effort-override child-sd))
               ":effort-override stays the initial-session nil default, no live parent leak")))
 
-      (testing "supplied snapshot values are authoritative for workflow children"
+      (testing "supplied snapshot values are authoritative for snapshot children"
         (let [child-sd (child-session-state/child-session-base-state
                         root-state live-parent
                         {:child-session-id "wf-child-snap"
                          :workflow-owned? true
+                         :inherited-snapshot? true
                          :model {:provider "prov" :id "snap-model"}
-                         :prompt-mode :prose
+                         :prompt-mode :concise
                          :speed-mode :fast
                          :effort-override :xhigh})]
           (is (= {:provider "prov" :id "snap-model"} (:model child-sd)))
-          (is (= :prose (:prompt-mode child-sd)))
+          (is (= :concise (:prompt-mode child-sd)))
           (is (= :fast (:speed-mode child-sd)))
           (is (= :xhigh (:effort-override child-sd)))))
+
+      (testing "workflow-owned but NOT snapshot-governed (judge) keeps the live
+                parent fallback — supplying no model/prompt-mode inherits the
+                parent, not the default"
+        (let [child-sd (child-session-state/child-session-base-state
+                        root-state live-parent
+                        {:child-session-id "judge-child"
+                         :workflow-owned? true})]
+          (is (= {:provider "prov" :id "live-model"} (:model child-sd))
+              "judge inherits the live parent model (no snapshot suppression)")
+          (is (= :prose (:prompt-mode child-sd))
+              "judge inherits the live parent prompt-mode")
+          (is (= :flex (:speed-mode child-sd)))
+          (is (= :low (:effort-override child-sd)))))
 
       (testing "non-workflow children still fall back to the live parent"
         (let [child-sd (child-session-state/child-session-base-state
                         root-state live-parent
                         {:child-session-id "plain-child"})]
           (is (= {:provider "prov" :id "live-model"} (:model child-sd)))
-          (is (= :lambda (:prompt-mode child-sd)))
+          (is (= :prose (:prompt-mode child-sd)))
           (is (= :flex (:speed-mode child-sd)))
           (is (= :low (:effort-override child-sd))))))))
 

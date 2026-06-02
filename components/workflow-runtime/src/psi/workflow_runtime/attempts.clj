@@ -81,7 +81,11 @@
                            :workflow-run-id            workflow-run-id
                            :workflow-step-id           workflow-step-id
                            :workflow-attempt-id        attempt-id'
-                           :workflow-owned?            true}
+                           :workflow-owned?            true
+                           ;; task 207 (R4): step-attempt children carry the
+                           ;; resolver's snapshot-governed inherited defaults;
+                           ;; they must not fall back to the live parent.
+                           :inherited-snapshot?        true}
                           :psi.workflow-runtime.attempts/create-step-attempt-session!)
         result           (-> (execution-adapter/create-child-session!
                               ctx

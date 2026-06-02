@@ -120,7 +120,8 @@
   (let [{:keys [child-session-id session-name system-prompt prompt-mode response-mode logprobs top-logprobs tool-ids thinking-level speed-mode effort-override temperature model skills
                 developer-prompt developer-prompt-source preloaded-messages
                 cache-breakpoints prompt-component-selection
-                workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?]}
+                workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?
+                inherited-snapshot?]}
         (workflow-child-session-contract/assert-valid-request!
          request
          :psi.agent-session.context/create-workflow-child-session!)]
@@ -154,7 +155,8 @@
                           (some? workflow-run-id) (assoc :workflow-run-id workflow-run-id)
                           (some? workflow-step-id) (assoc :workflow-step-id workflow-step-id)
                           (some? workflow-attempt-id) (assoc :workflow-attempt-id workflow-attempt-id)
-                          (contains? {:workflow-owned? workflow-owned?} :workflow-owned?) (assoc :workflow-owned? workflow-owned?))
+                          (contains? {:workflow-owned? workflow-owned?} :workflow-owned?) (assoc :workflow-owned? workflow-owned?)
+                          (some? inherited-snapshot?) (assoc :inherited-snapshot? inherited-snapshot?))
                         {:origin :mutations})
     (let [child-sd (ss/get-session-data-in ctx child-session-id)
           messages (vec (or preloaded-messages []))

@@ -334,6 +334,20 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       `child-session-base-state-applies-speed-effort-override-test:121-125`
       currently pins the parent-sd fallback as intended for the general
       non-workflow path — distinguish workflow-owned vs non-workflow behaviour.)
+      RECONCILED (R5/R6): the shipped fix gates the snapshot isolation on a NEW
+      `:inherited-snapshot?` request flag, NOT `:workflow-owned?`. The earlier
+      `workflow-owned?'`-gated `inherited-default` helper would have regressed
+      the workflow judge (`workflow_judge.clj:107`), which is workflow-owned but
+      supplies no `:model`/`:prompt-mode` and must keep live-parent inheritance.
+      `child-session-base-state*` now uses `(if inherited-snapshot?' (or supplied
+      default) (or supplied parent-value))`; `:inherited-snapshot? true` is set by
+      `create-step-attempt-session!` (the resolver/step-attempt path), threaded
+      through `context.clj` → `:session/create-child` → `session_lifecycle.clj`,
+      and declared on `child_session_contract/request-schema`. Tests:
+      `child-session-base-state-workflow-owned-isolates-snapshot-fields-test`
+      covers snapshot-governed isolation, the judge carve-out (workflow-owned +
+      no `:inherited-snapshot?` → live fallback), and non-workflow fallback;
+      `attempts-test` forwards `:inherited-snapshot? true` on the request surface.
 
 ## Test-review follow-ups (review 2026-06-02)
 
