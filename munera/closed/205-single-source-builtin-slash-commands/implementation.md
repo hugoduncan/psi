@@ -856,3 +856,72 @@ concern. R1/R2/R3 from prior passes are resolved. Design-fit, architecture-fit,
 and all ACs hold.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## 2026-06-01 — Test review (task-test-review), pass 1
+
+Scope: test quality only per skill — well-formedness, behaviour coverage
+(∀ design behaviour ∃ covering test), and infra-dep hygiene (injectable ∧
+nullable ∧ ¬mock ∧ ¬stub). Read the three net-new test surfaces:
+`commands_builtin_specs_test.clj`, `builtin_commands_resolver_test.clj`, TUI
+`app_input_selector_test.clj`, Emacs `psi-capf-test.el`; cross-checked against
+`builtin_specs.clj` and the design ACs. Re-ran focused suites green:
+`commands-builtin-specs-test` 7/19, `builtin-commands-resolver-test` (with the
+former) 10/43, 0 failures.
+
+Infra-dep hygiene — clean on the net-new surface:
+- No `with-redefs` in any net-new test. The TUI `stub-agent-fn` and `query-fn`
+  are injected REAL functions (queue-pushers / query stubs at the agent/EQL
+  boundary), not interaction-asserting mocks — they verify resulting state, not
+  calls. Aligns with `testing-without-mocks`.
+- Resolver tests drive the REAL session context (`session/create-context` +
+  `new-session-in!` + `query-in`) through the live Pathom graph — no faked
+  resolver. Good.
+
+Coverage strengths: projection-unchanged snapshots (exact/prefixed/names),
+dual-kind `/project-repl` both-projection + bare-vs-args dispatch, both live
+`case`-seam coherence tests (R1/R2), resolver shape/bare-name/internal-field-
+exclusion/order, graph discovery, TUI backend-sourced `/reload-models` +
+empty-specs→none + two-key refresh fold, Emacs backend-sourced `/reload-models`
++ backend-desc-wins + built-in-only token refresh (I2). `/exit`/`/?` routing is
+covered in `commands_test.clj` (hidden-in-help but still routed). AC1–AC8 each
+have at least one covering test.
+
+Two actionable test gaps:
+
+- TT1 — **Resolver `:description` content is never locked to the spec table.**
+  `builtin-command-specs-resolver-shape-test` asserts each spec has keys
+  `#{:name :description}` and that `:description` is *non-blank* (`(seq …)`), but
+  never that the resolver's `:description` for a name **equals** that name's
+  spec-table `:description`. The full-membership lock
+  (`builtin-commands-resolver-exposes-full-spec-table-membership-test`) compares
+  **names only**. So a regression in `builtin-command-specs-for-resolver` that
+  dropped/swapped descriptions (e.g. emitting the name as the description, or
+  off-by-one zipping) would pass every test. AC1 fixes the resolver shape as
+  `{:name :description}` carrying the *short description* — the description
+  *content* is part of that behaviour and is currently unverified. Add an
+  assertion that the resolver `{name → description}` map equals
+  `(into {} (for [[k s] bspec/builtin-command-specs] [(bspec/strip-slash k)
+  (:description s)]))` (or at least spot-check a representative entry's exact
+  description), locking resolver descriptions to the single source.
+
+- TT2 — **`:hide-in-help?` absence assertions are fragile whole-message
+  substring checks.** `format-help-derived-from-spec-table-test` asserts hidden
+  entries are absent via `(not (str/includes? message "/?"))` /
+  `"/exit"` / `"/project-repl"` against the **entire** help message (all
+  sections + description prose), not the built-in block specifically. These pass
+  today only incidentally (no description renders the literal `/exit`/`/?`/
+  `/project-repl` token), but the check is brittle in both directions: a future
+  description containing one of those literal tokens would false-FAIL, and the
+  check does not actually prove the *built-in block* omits the entry (only that
+  the token appears nowhere). Tighten to assert against the built-in block
+  directly — e.g. call `bspec/builtin-help-block` and assert the hidden entries'
+  lines are absent while shown entries' lines are present — so the test locks the
+  `:hide-in-help?` projection rather than a global substring coincidence.
+
+Non-actionable observation (not a 205 net-new test): `commands-test.clj` ~733
+`reload-extension-installs` test uses `with-redefs` on
+`session/reload-extension-installs-in!`. It predates this task's test surface and
+is out of the test-review remit here; flagged only for future `testing-without-
+mocks` cleanup, not as a 205 follow-up.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

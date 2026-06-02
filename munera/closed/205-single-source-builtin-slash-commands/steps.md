@@ -230,3 +230,22 @@ Tick with sha/decision on completion.
       the resolver honest about its (lack of) dependencies and lets it resolve
       without an agent-session context. Also recorded under "Slice-2 deviations"
       in implementation.md so the plan↔code divergence is traceable.
+
+## Test review follow-ups (review pass 1)
+
+- [ ] TT1 — Lock resolver `:description` content to the spec table. In
+      `builtin-commands-resolver-test`, add an assertion that the resolver's
+      `{name → description}` map equals
+      `(into {} (for [[k s] bspec/builtin-command-specs] [(bspec/strip-slash k)
+      (:description s)]))` (or spot-check a representative entry's exact
+      description), so a dropped/swapped/zip-misaligned description in
+      `builtin-command-specs-for-resolver` is caught — current tests only check
+      `:description` is non-blank and lock names, not description content (AC1).
+- [ ] TT2 — Tighten the `:hide-in-help?` absence assertions in
+      `format-help-derived-from-spec-table-test`. Replace the fragile
+      whole-message `(not (str/includes? message "/?" / "/exit" /
+      "/project-repl"))` substring checks (brittle: false-fail if a future
+      description carries the literal token; only prove global absence, not
+      built-in-block omission) with an assertion against the built-in block
+      directly (e.g. `bspec/builtin-help-block`): hidden entries' lines absent,
+      shown entries' lines present — locking the `:hide-in-help?` projection.
