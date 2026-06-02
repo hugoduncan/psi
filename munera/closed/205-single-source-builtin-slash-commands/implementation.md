@@ -1045,3 +1045,61 @@ unrelated TUI `app_projection_test` failure ("moving selection … highlighted
 autocomplete row") is outside this change's scope.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## 2026-06-01 — Test review (task-test-review), pass 3
+
+Scope: test quality only per skill — well-formedness, behaviour coverage
+(∀ design behaviour ∃ covering test), infra-dep hygiene (injectable ∧ nullable
+∧ ¬mock ∧ ¬stub). Independent re-read of the full net-new test surface
+(`commands_builtin_specs_test.clj`, `builtin_commands_resolver_test.clj`, TUI
+`app_input_selector_test.clj`, Emacs `psi-capf-test.el`) against the spec source
+(`commands/builtin_specs.clj`), the trimmed `defcustom`
+(`psi-completion.el:19`), and every AC. Re-ran
+`commands-builtin-specs-test` + `builtin-commands-resolver-test`
+→ 12 tests, 213 assertions, 0 failures.
+
+Confirmed prior strengths + TT1/TT2/TT3 follow-ups all landed and exact:
+- Infra-dep hygiene clean: no `with-redefs` in any net-new Clojure test; TUI
+  `query-fn`/`stub-agent-fn` are injected REAL boundary fns (state-asserting);
+  resolver tests drive the live Pathom graph via the real session context;
+  Emacs tests seed real state structs (no interaction mocking on the 205
+  surface). `cl-letf` at psi-capf-test.el is a pre-existing unrelated tree-test
+  stub.
+- AC1 resolver shape + description content (TT1), AC2 projections/dual-kind/
+  well-formedness (TT3)/both `case` seams (R1/R2), AC3 `:hide-in-help?` block
+  projection + `:usage` inline (TT2), AC4 TUI backend-sourced `/reload-models`
+  + empty-specs→none, AC5 Emacs backend-sourced `/reload-models` + I2
+  built-in-only token refresh, AC6 resolver full-membership lock — all covered.
+
+One new actionable test gap:
+
+- TT4 — **Emacs has no "no-backend ⇒ defcustom supplies no built-ins" guard
+  (asymmetric to the TUI, leaves AC6/AC7's `defcustom`-trimmed claim
+  unverified).** The design's open-question-#3 resolution (and AC7's "no UI-side
+  hardcoded built-in list remains") makes built-ins arrive on the Emacs consumer
+  **solely** from the backend specs; the `defcustom`
+  `psi-emacs-slash-command-specs` default is trimmed to the Emacs-only `/skill:`
+  affordance (psi-completion.el:19–20). The TUI locks the symmetric claim with
+  `autocomplete-slash-includes-backend-builtin-commands-test`'s second block:
+  with `:builtin-command-specs []`, `/quit` is **absent** ("built-in candidates
+  come from state, not a hardcoded list"). The Emacs capf tests have **no
+  equivalent**: every built-in-exercising test
+  (`psi-capf-slash-includes-backend-builtin-commands`,
+  `psi-capf-slash-context-*`) seeds `:builtin-command-specs`, and
+  `psi-capf-slash-backend-builtin-description-wins-over-custom` seeds BOTH a
+  backend `/help` and a stale custom `/help`, so it never isolates the
+  no-backend case. So a regression that re-added built-in commands to the
+  `defcustom` default value (or a future `psi-emacs--state-slash-command-specs`
+  edit that re-introduced a hardcoded built-in list) would pass every Emacs
+  test — the very "no UI-side list" invariant this task exists to enforce is
+  unguarded on the Emacs side. Add a capf test that, with
+  `:builtin-command-specs nil`/`'()` (no backend) and the default trimmed
+  `psi-emacs-slash-command-specs`, slash completion for `/qu` (or `/he`) yields
+  **no** `/quit`/`/help` candidate — only `/skill:`-style affordances and any
+  user-added entries survive — mirroring the TUI empty-specs→none guard so the
+  trimmed-`defcustom` / backend-sole-source claim is locked on both consumers.
+  Non-blocking: the default is correctly trimmed today, so no behaviour is wrong
+  now — this guards future `defcustom`/merge-fn edits to the Emacs built-in
+  source.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

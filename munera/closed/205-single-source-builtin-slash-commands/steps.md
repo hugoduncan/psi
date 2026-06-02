@@ -263,3 +263,21 @@ Tick with sha/decision on completion.
       only lock the projection↔case seam, not the entry shape itself. A short
       malli schema over the entry-value or explicit `doseq`/`every?` assertions
       both work.
+
+## Test review follow-ups (review pass 3)
+
+- [ ] TT4 — Add an Emacs capf test locking the "no-backend ⇒ `defcustom`
+      supplies no built-ins" invariant (symmetric to the TUI empty-specs→none
+      guard; AC6/AC7). With `:builtin-command-specs nil` (or `'()`) in
+      `psi-emacs--state` and the default trimmed `psi-emacs-slash-command-specs`
+      (`/skill:` only), assert slash completion for `/qu` (or `/he`) yields
+      **no** `/quit`/`/help` candidate — only the Emacs-only `/skill:`
+      affordance / any user-added entries survive. Closes the gap that every
+      current built-in Emacs test seeds `:builtin-command-specs` (and the
+      desc-wins test seeds BOTH backend + stale custom `/help`), so a regression
+      re-adding built-ins to the `defcustom` default — or a
+      `psi-emacs--state-slash-command-specs` edit re-introducing a hardcoded
+      built-in list — would pass every Emacs test. Mirrors
+      `autocomplete-slash-includes-backend-builtin-commands-test`'s
+      "built-in candidates come from state, not a hardcoded list" block on the
+      TUI side.
