@@ -321,7 +321,7 @@ with the commit sha / decision when done.
 
 ## Implementation review follow-ups (review pass 4)
 
-- [ ] F4 — `design.md` line 62 (Deliverable 1, **selector** procedure step 2)
+- [x] F4 — `design.md` line 62 (Deliverable 1, **selector** procedure step 2)
       still describes the selector join as "Join on `(ns, var, arity)`" — the
       pre-F2 key. F2 changed the implemented `incidental-complexity-finder`
       SKILL.md recipe to join on `(ns, var, arity, line)` (the `@line` key) for
@@ -335,6 +335,17 @@ with the commit sha / decision when done.
       units (mirroring the A5/A2 lines and SKILL §3 rationale). `design.md` prose
       only; no workflow/skill/test change forced — the recipe is already correct.
       (See implementation.md pass-4 F4 entry.)
+      RESOLUTION: updated `design.md` step 2 (selector procedure) to "Join on
+      `(ns, var, arity, line)`" with a parenthetical note that `line`
+      disambiguates same-named null-arity `defmethod` units sharing
+      `(ns, var, arity)` (the 51 `execute-effect!` defmethods), cross-referencing
+      the A5/A2 acceptance and SKILL.md §2/§3. The selector join (line 62) and the
+      A5/A2 acceptance (lines 220, 235) now share one key string; the remaining
+      bare `(ns, var, arity)` occurrences (lines 64, 222) deliberately denote a
+      unit's *logical identity* (the collision `line` resolves), consistent with
+      the SKILL §3 distinction. `design.md` prose only — no workflow/skill/test
+      change (the SKILL recipe already keys on `@line`); SKILL §2/§3 cross-ref
+      verified accurate. design(spec)↔SKILL(mechanism) coherence gap closed.
 
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 

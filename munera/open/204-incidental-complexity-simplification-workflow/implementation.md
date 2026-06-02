@@ -1111,3 +1111,26 @@ keying is coherent across the workflow's generated contract (A5/A2) and
   `line` disambiguates same-named null-arity `defmethod` units, mirroring the
   A5/A2 lines and the SKILL §3 rationale). `design.md` prose only; no
   workflow/skill/test change forced — the skill recipe is already correct.
+
+### F4 resolution (pass-4 follow-up executed)
+
+Updated `design.md` Deliverable-1 selector procedure **step 2** (line 62) from
+"Join on `(ns, var, arity)`" to "Join on `(ns, var, arity, line)`", with a
+parenthetical noting that `line` disambiguates same-named null-arity `defmethod`
+units sharing `(ns, var, arity)` (the 51 `execute-effect!` defmethods that
+collapse to one key without it), and cross-referencing the A5/A2 acceptance and
+SKILL.md §2/§3. The selector join (line 62) and the A5/A2 acceptance keys
+(lines 220, 235) now share one key string — the design's selector description is
+coherent with the `incidental-complexity-finder` SKILL.md recipe it specifies
+(SKILL §2 `@line` `$ccmap`/join key, §3 uniqueness rationale).
+
+Scope held to `design.md` prose, exactly as F4 specified: no
+workflow/skill/test change (the SKILL recipe already keys on `@line`; F2/F3
+already landed). Verified the SKILL §2/§3 cross-reference is accurate
+(SKILL.md lines 13/44–47/57–60/83 key on `(ns, var, arity, line)` / `@line`).
+The remaining bare `(ns, var, arity)` mentions in `design.md` (lines 64, 222)
+are deliberately retained: they denote a unit's **logical identity** (the
+collision case that `line` resolves), consistent with the pass-2 SKILL §3
+identity-vs-join-key distinction — they are not selector/acceptance keys and
+must not change. design(spec)↔SKILL(mechanism) source-of-truth coherence gap
+closed. No `.clj` touched → no clj-kondo/cljfmt/test delta.

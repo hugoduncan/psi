@@ -59,7 +59,10 @@ narrows and then judges:
 1. Run both lenses in machine form:
    - `bb gordian local --sort total --json` (comprehension burden per unit)
    - `bb gordian complexity --json` (cyclomatic complexity per unit)
-2. Join on `(ns, var, arity)` and compute `gap = lcc-total / max(cc, 1)`. This
+2. Join on `(ns, var, arity, line)` and compute `gap = lcc-total / max(cc, 1)`
+   (`line` disambiguates same-named null-arity `defmethod` units that share
+   `(ns, var, arity)`, e.g. the 51 `execute-effect!` defmethods that collapse to
+   one key without it — see the A5/A2 acceptance and SKILL.md §2/§3). This
    join is a **fixed recipe embedded verbatim in the skill** (a canonical
    snippet the agent runs as-is), not ad-hoc code, so selection is reproducible.
    **Unmatched-row rule (inner join on the `local` side):** the join is keyed by
