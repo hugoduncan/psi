@@ -2969,3 +2969,31 @@ default-path verification. Not re-filed (already-converged, justified analysis).
 Runtime-verified: full `bb test` ✅ green; clj-kondo 0/0 on touched test files.
 No source/doc touched (verification-only invariant + Slice-10 allowlist held).
 **PASS_STATUS: REVIEW_COMPLETE.**
+
+## Docs review — pass 3 (review-task-docs skill, 2026-06-01) — REVIEW_COMPLETE
+
+Independent re-audit (`accuracy ∧ completeness ∧ consistency` of user-facing
+docs vs verified implementation). Scope reconfirmed: branch diff vs `master`
+shows task 201 changed **only** test files + task artifacts + `mementum/state.md`
+— zero `README.md`/`doc/`/`CHANGELOG.md` and zero
+`components/agent-session/src/**` edits. Verification-only invariant holds → no
+behaviour added/changed/removed → no CHANGELOG entry required
+(`user_visible(δ) ≡ ∅`); no stale removed-behaviour refs; absent doc edits are
+correct.
+
+Re-grounded vs source: `resolve-fire-time!`
+(`psi_tool_scheduler.clj:42-67`) confirmed —
+`(when (pos? delay) (validate-delay-ms! (int delay)))` → past/now `:at` skips
+bounds (fires immediately), positive future delays get min/max checked. The one
+doc-gap (`doc/scheduler.md` "Create validation rules" silent on future-`:at`
+<min / >max rejection) is correctly recorded in `findings.md` as
+`defect (doc-gap)` with accurate source grounding, and remediation
+`202-document-at-bounds-in-scheduler-doc` is raised, referenced from the
+findings row, and accurately scoped (doc-only; `202/design.md` claims verified
+against `resolve-fire-time!`). `doc/scheduler.md` status model, delivery-phases,
+session-config subset, list/cancel semantics, and `:psi.scheduler/*`
+introspection attrs all match verified behaviour.
+
+No new actionable doc issue; pass-1 follow-ups confirmed complete (both `[x]`).
+Converges with pass 2 → REVIEW_COMPLETE. No new steps added (no actionable
+finding). Verification-only invariant held: no `src`/`doc` change in this review.
