@@ -1028,3 +1028,18 @@ with the commit sha / decision when done.
       (`bb commit-check:file-lengths` clean). Focused green: 18 tests, **261
       assertions** (+2 over pass-12's 259), 0 failures; `clj-kondo` 0 findings;
       `clj-paren-repair` Success.
+
+## Implementation review follow-ups (independent pass — task-implementation-review)
+
+- [ ] R6 — Relieve the 800-line CI file-length boundary on the shared
+      `components/workflow-loader/test/psi/workflow_loader/workflow_definitions_test.clj`.
+      Task 204's two new workflow-definition `deftest`s
+      (`task-lifecycle-in-worktree-test`, `reduce-incidental-complexity-test`,
+      ≈ lines 595–800, ~206 lines) grew the shared ns to **exactly 800** — the
+      hard limit `bb commit-check:file-lengths` enforces for `components/`.
+      TR15 already had to trim comment prose to fit; the next addition will fail
+      the gate. Extract the 204 workflow-definition `deftest`s into a dedicated
+      sibling ns (a precedent sibling already exists:
+      `incidental_complexity_finder_skill_test.clj`) so each file has headroom
+      and no harness drift. Verify both nss load and run via the focused suite +
+      `clj-kondo`, and `bb commit-check:file-lengths` is clean afterward.
