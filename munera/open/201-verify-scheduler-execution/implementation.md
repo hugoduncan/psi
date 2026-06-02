@@ -2010,3 +2010,48 @@ the `[:scheduler :schedules id …]` shape to a single source of truth. Recorded
 as a follow-up below. Behaviour/assertion-preserving (no deftest renamed →
 `findings.md` citations unchanged); test/`test_support`-only (verification-only
 invariant; Slice-10 allowlist).
+
+## task-implementation-review — pass 1 (2026-06-01)
+
+Reviewed the 201 implementation firsthand against the task-implementation-review
+skill (`matches(design)` ∧ `follows(architecture)` ∧ flag new-pattern /
+unnecessary-abstraction / structural-perf). Verification-only framing honoured.
+
+Evidence checked firsthand:
+- **Suite green**: full `bb test` → "✅ All tests passed".
+- **clj-kondo 0/0** on `test_support.clj` + all 10 scheduler test ns +
+  `psi_tool_scheduler_test`.
+- **Verification-only invariant held**: `git diff --name-only` over the task
+  range = test files + `test_support.clj` + task dirs (201/202) only; zero
+  `components/agent-session/src/**` / `doc/scheduler.md`.
+- **Design ↔ findings coverage**: all 7 Scope-area sections in `findings.md`
+  populated with cited covering tests; the 6 acceptance-required new-coverage
+  gaps (message-kind live, session-kind live, busy-queue+drain, cancel-racing-
+  the-timer, failure recording, context-shutdown timer cleanup) each cite a
+  passing verifying test. The single doc-gap defect (`:at` near-future/>24h
+  bounds undocumented) is correctly recorded and raised as `202-document-at-
+  bounds-in-scheduler-doc` (behaviour proven correct; doc-only remediation).
+- **Architecture / testing-without-mocks**: live tests drive the real
+  dispatch+effect path via the time/timer seams, assert state/outputs (delivered
+  prompt provenance, `created-session-id`/`delivery-phase`, handle-count 0,
+  queue membership) not handler interactions, no wall-clock sleeps.
+- **Idiom convergence**: pass-3 read-path helpers (`schedule-by-id` /
+  `schedule-status` / `schedule-queue`) landed in `test-support`; verified zero
+  `[:scheduler :schedules` / `[:scheduler :queue]` path literals remain in any
+  `*_test.clj`. Instant-literal (`test-support/instant`) and execution-stub
+  (`stub-execution-result`) convergences from passes 1–2 also confirmed landed.
+
+No new actionable implementation issue found — no new pattern duplicating an
+existing reusable one, no unnecessary abstraction, no structural performance
+issue. The deliverable (green verifying coverage + structured `findings.md`)
+matches design and acceptance criteria.
+
+One **bookkeeping drift** (not an implementation defect, no new follow-up
+warranted): the code-shaper pass-3 follow-up in `steps.md` (L1276) was fully
+executed in commit d29cf0407 (helpers present, all 41+14 sites converged) but
+its checklist item was left unchecked and un-annotated. Reconciled in this pass
+by marking it `[x]` with a `Done (commit d29cf0407)` note rather than adding a
+redundant new step.
+
+Pass outcome: **REVIEW_COMPLETE** — implementation verified, no actionable
+feedback.

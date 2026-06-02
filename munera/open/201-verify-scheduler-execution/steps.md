@@ -1273,7 +1273,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Code-shaper follow-ups — pass 3 (code-shaper, 2026-06-01)
 
-- [ ] Converge the duplicated `[:scheduler :schedules <id> …]` read-path idiom
+- [x] Converge the duplicated `[:scheduler :schedules <id> …]` read-path idiom
       across the 201 test files onto shared `test-support` helpers
       (`consistent(idioms)` ∧ DRY ∧ `locally_comprehensible`). The open-coded
       `(get-in (ss/get-session-data-in ctx sid) [:scheduler :schedules <id> …])`
@@ -1308,3 +1308,13 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       `doc/scheduler.md` (verification-only invariant; Slice-10 allowlist). If
       201 is treated as closed instead, raise as a small standalone
       test-hygiene task.
+      Done (commit d29cf0407): extracted `schedule-by-id` / `schedule-status` /
+      `schedule-queue` into `test-support` (L378-393); replaced all 41 open-coded
+      `[:scheduler :schedules id …]` + 14 `[:scheduler :queue]` reads across the
+      8 scheduler test files; dropped now-unused `ss` requires. Verified zero
+      `[:scheduler :schedules` / `[:scheduler :queue]` path literals remain in
+      any `*_test.clj`. clj-kondo 0/0; full `bb test` green. `git diff
+      --name-only` = test files + `test_support.clj` only; zero
+      `components/agent-session/src/**` / `doc/scheduler.md` (invariant held).
+      (Marked complete during task-implementation-review pass — item executed but
+      left unchecked in the commit.)
