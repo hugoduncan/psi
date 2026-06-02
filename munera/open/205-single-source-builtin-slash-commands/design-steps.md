@@ -49,7 +49,7 @@ Resolve in design.md before plan stage.
 
 Resolve in design.md before plan stage.
 
-- [ ] C1 — Reconcile the "`/?` and aliases" decision (aliases `/?`/`/exit` go in
+- [x] C1 — Reconcile the "`/?` and aliases" decision (aliases `/?`/`/exit` go in
       the spec table so they autocomplete) with "format-help derivation" + AC3
       (all routed built-in lines derive from the whole spec table in table order,
       "listing unchanged"). Current `format-help` omits `/?` and `/exit`; since

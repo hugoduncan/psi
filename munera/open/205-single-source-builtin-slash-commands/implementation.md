@@ -203,3 +203,44 @@ One new actionable inconsistency:
   drop the "unchanged listing" claim).
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+### 2026-06-01 — Inconsistency follow-up (C1) executed
+
+C1 resolved at design level. Grounded against `commands.clj`:
+`exact-command-handlers` (664) carries alias keys `"/?" → :help` and
+`"/exit" → :quit`; `format-help` (111–145) deliberately **omits** both `/?` and
+`/exit` lines. Option B (single keyed table = names exist only as keys) forces
+aliases to be table keys (for completeness + autocomplete), so whole-table help
+derivation would newly emit alias lines — contradicting the "listing unchanged"
+claim. The post-B5 data model (`:kinds`, `:usage`) had no help-suppression
+field.
+
+**Decision: add a per-entry `:hide-in-help?` boolean** (help-rendering filter
+only, parallel to help-only `:usage`). `format-help`'s built-in-line derivation
+skips truthy `:hide-in-help?` entries; `/?` and `/exit` carry it. Resolver
+output and UI autocomplete include hidden entries (aliases still autocomplete),
+so `:hide-in-help?` is not resolver-exposed nor UI-consulted. Chosen on
+`unreachable > forbidden` grounds: name drift stays structurally unrepresentable
+(aliases remain keys feeding every name surface + routing projections); help
+suppression becomes an **explicit intentional data field** rather than a hidden
+literal omission, and the "help listing unchanged" claim now holds in order
+*and* membership. Rejected alternative (accept alias lines in help, drop the
+"unchanged listing" claim): changes user-visible help for no benefit, weakens
+AC3.
+
+design.md changes:
+- Rewrote "`/?` and aliases" decision → adds `:hide-in-help?`, states rationale
+  + rejected alternative + scope (help-only).
+- "format-help derivation": built-in lines skip `:hide-in-help?` entries;
+  "unchanged in order *and* membership".
+- Option B example: added `/?` and `/exit` entries with `:hide-in-help? true`
+  and a help-only-filter note; format-help projection bullet now filters hidden
+  entries.
+- AC3: derivation skips `:hide-in-help?` entries (listing unchanged in order +
+  membership; aliases stay out of help but in table for autocomplete).
+- "Description granularity": added a "Spec-entry field set" summary
+  (`:kinds`/`:handler`/`:description`/`:usage`/`:hide-in-help?`; resolver exposes
+  only name+description).
+
+No blocking reasons; C1 fully addressed at design level. AC1 resolver shape
+`{:name :description}` unchanged (`:hide-in-help?` not exposed).
