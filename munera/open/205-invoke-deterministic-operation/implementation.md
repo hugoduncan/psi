@@ -931,3 +931,25 @@ match the code exactly.
 The DR-1 follow-up offered a dedicated page OR a `doc/tui.md` subsection; chose
 the dedicated `doc/operations.md` (sibling parity with `doc/scheduler.md`) and
 added the README "See:" link as the option specified for that choice.
+
+## Docs review (ψ — review-task-docs, re-verification pass)
+
+Independent re-run of `review-task-docs` after DR-1 resolution. Checked
+README.md (`operation` psi-tool bullet + `doc/operations.md` "See:" link),
+`doc/operations.md`, `doc/tui.md` (command list line + Deterministic-operation
+command section), and CHANGELOG.md `[Unreleased] > Added`.
+
+Re-verified every documented behaviour against the live code
+(`psi_tool_operation.clj`, `deterministic_operation_action.clj`,
+`commands/operation.clj`): action `operation`, `op list|invoke`, params
+`operation-id`/`args` (EDN-map, default `{}`), sort-by-id listing, empty
+`:operations []`, all-top-level-key projection, per-value `pr-str` + 2000-char
+`… (truncated, N chars total)` marker, error `:kind` labels
+(`:missing-operation`/`:malformed-result`/`:validate`), tagged-`:error`
+rendering, command text layout (`:status` first then keys sorted by `pr-str`),
+usage/parse-error/unknown-id/malformed-result messages, and the
+`No deterministic operations registered.` empty-command message — all match.
+
+CHANGELOG entry is correctly placed under `[Unreleased] > Added` and is
+user-visible. No stale references, no removed-behaviour cleanup needed,
+examples consistent, names/flags/paths correct. No new actionable docs issues.
