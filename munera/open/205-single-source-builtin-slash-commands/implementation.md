@@ -366,3 +366,54 @@ Slice-3 and Slice-4 steps in steps.md updated in place to reflect the pinned
 decisions (no longer ambiguous). P1–P5 marked done. These are plan/steps-stage
 refinements — no production code/test/doc change yet (Slices 1–5 remain
 unimplemented); plan is now unambiguous enough to execute. No blocking reasons.
+
+### 2026-06-01 — Plan inconsistency review (review-task-plan inconsistency pass), pass 1
+
+Scope: inconsistencies in plan.md + steps.md only (¬architecture, ¬correctness,
+¬ambiguity; design A1/B1–B5/C1 + plan P1–P5 already resolved). Grounded against
+real code: `commands.clj` `exact-command-handlers` (664; alias keys `"/?"`→`:help`,
+`"/exit"`→`:quit`, plus `"/project-repl"`→`:project-repl`), `prefixed-command-prefixes`
+(682; includes `/project-repl`), `format-help` body (111–161), `dispatch-prefixed-command`
+(697); TUI `support.clj` (188/191/204), `autocomplete.clj` (line-59 concat + `shared/`
+usages 14/15/226/245), `shared.clj` (22); Emacs `psi-completion.el` defcustom (19),
+`psi-session-commands.el` (`psi-emacs--prompt-template-query` 255, token 292, apply 302,
+query-frame call 323), `psi-events.el` (`declare-function` 28, `…-changed-p` 80, apply
+call 109). Verified accurate: spec-table membership lists (plan/steps vs routing maps),
+all plan/steps line references, design "Why"-table drift claims (TUI + Emacs).
+
+Two new actionable inconsistencies (I1–I2 in steps.md):
+
+- I1 — **`/project-repl` is routed-but-help-absent yet not flagged `:hide-in-help?`.**
+  The current `format-help` (111–161) omits THREE routed commands: `/?`, `/exit`,
+  AND `/project-repl` (confirmed: no `/project-repl` line in the block). The C1
+  resolution and the plan/steps membership assign `:hide-in-help? true` to ONLY
+  `/?` and `/exit` (both plan "Concrete spec-table membership" and steps Slice-1
+  populate-membership item say "`/?` and `/exit` carry `:hide-in-help? true`").
+  `/project-repl` is a dual-kind real command with no `:hide-in-help?`. Since
+  format-help derives from `(seq table)` skipping only `:hide-in-help?` entries
+  (AC3, plan "format-help derivation"), a `/project-repl` help line would be
+  NEWLY emitted — contradicting AC3 / "format-help derivation" / the plan risk
+  "`format-help` output drift" claim of "help listing unchanged in order *and*
+  membership". The C1 follow-up enumerated only `/?`/`/exit` as help-absent
+  routed entries and missed `/project-repl`. Plan/steps must reconcile: either
+  flag `/project-repl` `:hide-in-help? true` (keeping help membership unchanged),
+  or explicitly accept a new `/project-repl` help line and drop the
+  "unchanged membership" claim + adjust the golden/substring test expectation.
+
+- I2 — **P2 token segment does not make a built-in-spec-only change detectable.**
+  P2 claims "a built-in-spec-only change is detected and Emacs autocomplete
+  refreshes (AC5/AC6)" by adding a `:builtins` token segment to the inline
+  `next-token` in `psi-emacs--slash-completion-data-changed-p`. But that fn
+  (`psi-events.el:80`) computes `next-token` only under
+  `(and (or has-command-names has-templates) …)` and then guards `(when next-token …)`.
+  An event carrying ONLY built-in specs (no `:extension-command-names`, no
+  `:prompt-templates`) leaves `has-command-names`/`has-templates` both nil →
+  `next-token` is nil → no refresh, regardless of the new `:builtins` segment.
+  Plan P2 + Slice-4 steps add only the token SEGMENT and never extend the
+  `(or has-command-names has-templates)` change-detection GUARD (nor add a
+  `has-builtin-specs`). So P2's stated AC5/AC6 outcome is inconsistent with the
+  mechanism it specifies. Plan/steps must extend the guard (add
+  `has-builtin-specs` to the `or`) so a built-in-spec-only event triggers
+  `next-token`, or state why a built-in-spec-only event cannot occur on channel 2.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

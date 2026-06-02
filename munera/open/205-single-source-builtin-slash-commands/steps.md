@@ -150,3 +150,26 @@ Tick with sha/decision on completion.
       `shared` require in `autocomplete.clj`, remove only the
       `shared/builtin-slash-commands` symbol from the line-59 `concat`;
       "empty + drop require" alternative dropped. Slice-3 step updated.
+
+## Plan inconsistency follow-ups (review pass 1)
+
+- [ ] I1 — `/project-repl` is routed but **absent from the current
+      `format-help`** (like `/?` and `/exit`), yet plan/steps assign
+      `:hide-in-help? true` to ONLY `/?` and `/exit`. Deriving help from the
+      whole table (skipping only `:hide-in-help?`) would NEWLY emit a
+      `/project-repl` line, breaking AC3 / "format-help derivation" / the plan
+      risk's "help listing unchanged in order *and* membership". Reconcile in
+      plan + steps: either add `:hide-in-help? true` to `/project-repl` in the
+      Slice-1 populate-membership item AND the plan "Concrete spec-table
+      membership" list (keeping help membership unchanged), or explicitly accept
+      a new `/project-repl` help line, drop the "unchanged membership" claim, and
+      adjust the Slice-1 `format-help` golden/substring test expectation.
+- [ ] I2 — P2's "built-in-spec-only change is detected (AC5/AC6)" is inconsistent
+      with its mechanism: `psi-emacs--slash-completion-data-changed-p`
+      (`psi-events.el:80`) computes `next-token` only under
+      `(and (or has-command-names has-templates) …)`, so an event with only
+      built-in specs leaves `next-token` nil → no refresh, regardless of the new
+      `:builtins` segment. Update plan P2 + the Slice-4 token step to also extend
+      the change-detection guard (add `has-builtin-specs` to the `or`) so a
+      built-in-spec-only event triggers a refresh, or state in plan why a
+      built-in-spec-only event cannot arrive on channel 2.
