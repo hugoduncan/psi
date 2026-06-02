@@ -167,6 +167,7 @@
                 delegate-step?
                 (let [{:keys [pending-kind payload]}
                       (delegate/delegate-step-runtime-result create-workflow-context send-and-drain!
+                                                             (:resolve-inherited-defaults-fn ctx)
                                                              ctx parent-session-id step-id step-def workflow-run)]
                   (swap! working-memory* assoc :pending-actor-result {:kind pending-kind
                                                                       :payload payload

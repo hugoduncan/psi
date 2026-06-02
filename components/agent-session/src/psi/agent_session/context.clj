@@ -224,6 +224,18 @@
                                                   {:skill-ids (mapv :name (or session-skills []))}
                                                   skill-name)))
    :resolve-workflow-step-session-config-fn #'workflow-step-session-config/resolve-step-session-config
+   ;; Nested/delegated inherited-defaults snapshot (task 207, S6). Derives the
+   ;; delegating step's EFFECTIVE config (run snapshot ⊕ step overrides) then
+   ;; projects it into the inherited-defaults snapshot field set, sourcing
+   ;; speed-mode/effort-override from the parent run's snapshot (P2). Injected so
+   ;; delegate.clj (in workflow-runtime) never requires
+   ;; workflow-step-session-config (avoids the certain require cycle, P1).
+   :resolve-inherited-defaults-fn
+   (fn [ctx* parent-session-id* workflow-run* step-id*]
+     (let [effective-config (workflow-step-session-config/resolve-step-session-config
+                             ctx* parent-session-id* workflow-run* step-id*)]
+       (workflow-step-session-config/effective-config->snapshot
+        effective-config (:inherited-defaults workflow-run*))))
    :materialize-workflow-step-session-conversation-fn #'workflow-step-materialization/materialize-step-session-conversation
    :split-workflow-step-session-conversation-fn #'workflow-step-materialization/split-step-session-conversation
    :execute-workflow-judge-fn #'workflow-judge/execute-judge!

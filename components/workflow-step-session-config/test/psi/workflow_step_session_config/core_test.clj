@@ -260,6 +260,59 @@
         (is (not (contains? config :effort-override))
             "no snapshot → no effort-override emitted")))))
 
+(deftest nested-delegation-effective-snapshot-propagates-overridden-model-test
+  (testing "AC4: a step overriding the model, whose effective config feeds
+            effective-config->snapshot, yields a nested snapshot carrying the
+            OVERRIDDEN model (captured at sub-delegation creation), with
+            speed/effort threaded from the parent run snapshot (P2)"
+    (let [[ctx session-id] (support/create-session-context {:persist? false})
+          override-definition
+          {:definition-id "delegating-wf"
+           :name "delegating-wf"
+           :steps [{:name "step-1"
+                    :type :session
+                    :model "claude-override-model"
+                    :contributions [{:type :template
+                                     :text "{{input}}"
+                                     :vars {"input" {:from :workflow-input :path [:input]}}}]}]
+           :workflow-file-meta {:system-prompt "Delegate."}}
+          ;; parent run snapshot: model A, speed/effort set on the parent run.
+          parent-run-snapshot {:model {:provider "anthropic" :id "claude-PARENT"}
+                               :prompt-mode :concise
+                               :tool-defs []
+                               :skills []
+                               :thinking-level :off
+                               :speed-mode :fast
+                               :effort-override :xhigh}
+          workflow-run
+          (do (swap! (:state* ctx)
+                     (fn [state]
+                       (let [[s _ _] (workflow-registry/register-definition state override-definition)
+                             [s' _ _] (workflow-runtime/create-run
+                                       s {:definition-id "delegating-wf"
+                                          :run-id "run-delegating"
+                                          :parent-session-id session-id
+                                          :inherited-defaults parent-run-snapshot
+                                          :workflow-input {:input "go"}})]
+                         s')))
+              (workflow-runtime/workflow-run-in @(:state* ctx) "run-delegating"))
+          ;; This mirrors the injected resolve-inherited-defaults-fn closure
+          ;; bound in context.clj for the nested/delegated path.
+          effective-config (workflow-step-session-config/resolve-step-session-config
+                            ctx nil workflow-run "step-1")
+          nested-snapshot (workflow-step-session-config/effective-config->snapshot
+                           effective-config (:inherited-defaults workflow-run))]
+      (is (= "claude-override-model"
+             (or (get-in nested-snapshot [:model :id]) (:model nested-snapshot)))
+          "nested snapshot carries the delegating step's overridden model")
+      (is (= :fast (:speed-mode nested-snapshot))
+          "speed-mode threaded from the parent run snapshot (P2)")
+      (is (= :xhigh (:effort-override nested-snapshot))
+          "effort-override threaded from the parent run snapshot (P2)")
+      (is (= workflow-step-session-config/inherited-defaults-snapshot-keys
+             (set (keys nested-snapshot)))
+          "nested snapshot has exactly the snapshot key set"))))
+
 (deftest inherited-defaults-field-set-authority-test
   (testing "every :from-common source key is a member of the canonical
             common-inherited-fields authority"

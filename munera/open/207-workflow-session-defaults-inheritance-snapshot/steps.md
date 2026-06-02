@@ -130,27 +130,27 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
 
 ## S6 — Nested/delegated capture
 
-- [ ] Add a new injected fn param (e.g. `resolve-inherited-defaults-fn`) to
-      `delegate-step-runtime-result` (`delegate.clj:36`), alongside the existing
-      `create-workflow-context-fn`/`send-and-drain-fn`. The caller (depends on
-      both components) binds it to a closure that calls
-      `resolve-step-session-config ctx parent-session-id workflow-run step-id`
-      then `effective-config->snapshot effective-config parent-snapshot`
-      (parent-snapshot = `(:inherited-defaults workflow-run)`, supplying
-      `:speed-mode`/`:effort-override` per P2). `delegate.clj` does NOT require
-      `workflow-step-session-config` (the reverse require is a CERTAIN cycle —
-      wssc deps.edn already pulls workflow-runtime; resolved P1).
-- [ ] Pass the injected fn's result as `:inherited-defaults` into the child
-      `create-run` (line ~44).
-- [ ] Wire the injected fn at the delegate caller site(s); update the existing
-      injected-param call signatures accordingly.
-- [ ] Confirm `delegate.clj` does **not** call
-      `resolve-inherited-defaults-snapshot` (would re-read live parent + lose
-      step overrides).
-- [ ] Test AC 4: a step overrides the model then delegates → sub-delegation and
-      its steps see the overridden model, captured at sub-delegation creation,
-      not the (since-mutated) invoking session.
-- [ ] Lint + repair.
+- [x] Added `resolve-inherited-defaults-fn` as a new injected fn param to
+      `delegate-step-runtime-result`, alongside the existing
+      `create-workflow-context-fn`/`send-and-drain-fn`. Bound in `context.clj`
+      to a closure that calls `resolve-step-session-config` then
+      `effective-config->snapshot effective-config (:inherited-defaults
+      workflow-run)` (supplying speed/effort per P2). `delegate.clj` does NOT
+      require `workflow-step-session-config` (reverse require = certain cycle,
+      P1).
+- [x] Pass the injected fn's result as `:inherited-defaults` into the child
+      `create-run` via `cond->`.
+- [x] Wired the injected fn at the delegate caller site
+      (`statechart_runtime.clj` passes `(:resolve-inherited-defaults-fn ctx)`).
+- [x] Confirmed `delegate.clj` does NOT call
+      `resolve-inherited-defaults-snapshot` (it calls only the injected fn,
+      which sources the effective config = run snapshot ⊕ step overrides).
+- [x] Test AC 4: `nested-delegation-effective-snapshot-propagates-overridden-
+      model-test` — a step overriding the model yields a nested snapshot with
+      the overridden model, with speed/effort threaded from the parent run
+      snapshot (P2), exactly the snapshot key set. Real delegation execution
+      tests still green.
+- [x] Lint clean.
 
 ## S7 — Coherence + docs
 

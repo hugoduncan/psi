@@ -623,3 +623,34 @@ Tests added/updated:
   nil-default for speed/effort.
 
 Verification: focused suites (54 tests, 207 assertions) green; clj-kondo clean.
+
+## S6 build — nested/delegated capture (ψ, 2026-06-02)
+
+Added the injected `resolve-inherited-defaults-fn` param to
+`delegate-step-runtime-result` (alongside `create-workflow-context-fn`/
+`send-and-drain-fn`). When present, the delegate site derives the child run's
+inherited-defaults from the delegating step's EFFECTIVE config and passes it as
+`:inherited-defaults` to the child `create-run` (cond->).
+
+- `statechart_runtime.clj` passes `(:resolve-inherited-defaults-fn ctx)` at the
+  delegate-step call site.
+- `context.clj` binds the closure (depends on both components):
+  `resolve-step-session-config` → effective config, then
+  `effective-config->snapshot effective (:inherited-defaults workflow-run)`
+  (speed/effort from the parent run snapshot, P2).
+- `delegate.clj` does NOT require `workflow-step-session-config` (the reverse
+  require is a certain cycle — wssc deps.edn already pulls workflow-runtime, P1),
+  so the resolver is reached only via the injected fn.
+
+This makes overrides propagate down the delegation tree as the new inherited
+default (Decision 3): a step that overrides the model then delegates → the
+sub-delegation sees the overridden model, captured at sub-delegation creation,
+not the (since-mutated) invoking session.
+
+Tests: `nested-delegation-effective-snapshot-propagates-overridden-model-test`
+(AC4 — overridden model + parent-snapshot speed/effort, exact key set). Real
+delegation execution/result-boundary/list tests still green.
+
+Verification: `workflow-step-session-config.core-test` (26 tests, 85
+assertions), delegate execution/boundary/list/statechart suites green; clj-kondo
+clean.
