@@ -46,3 +46,39 @@ Verified against precedent at psi-projection.el:410
 (`psi-emacs--schedule-notification-dismiss`): captures `(current-buffer)` +
 `state`, guards `(buffer-live-p buffer)`, runs in `with-current-buffer`.
 No code changes (design-only task).
+
+## Ambiguity review (ψ)
+
+Grounded design against real code: `psi-widget-projection.el` arm
+(:300), cancel (:310), timeout (:317), dispatch-mutation response (:336/:354);
+struct `psi-globals.el:49`; init `psi-lifecycle.el:32`; teardown `:269`;
+transcript reset `:371`; notification precedent `psi-projection.el:368-423`.
+
+Confirmed (resolves a potential concern, NOT actionable): `psi-emacs--state`
+is `defvar-local` (psi-globals.el:111), so a callback's `with-current-buffer
+buffer` rebinds it and the downstream `--get-lstate` / `--call-error-handler`
+/ `--upsert-projection-block` reads then naturally target the originating
+buffer's state — the design's captured-buffer approach is self-consistent for
+the *post-cancel* body.
+
+One NEW actionable ambiguity (B1, design-steps.md): the design mandates
+captured `buffer`/`state` + `buffer-live-p` for the two **callbacks**, but is
+silent on the helper signatures and the **arm path**. Today
+`--cancel-mutation-timer` takes only `tkey` and reads the global hash, and it
+is called from THREE contexts: (1) inside `--arm-mutation-timer` as
+pre-cancel-before-arm (psi-widget-projection.el:303), (2) the response callback
+(:356), (3) the timeout callback (:321 via `remhash`). Post-change the cancel
+helper must locate a buffer-local store, so its new signature (e.g.
+`(state tkey)` or `(buffer tkey)`) is unspecified. The arm path runs while the
+originating buffer is current (dynamic `psi-emacs--state` is valid), whereas the
+callbacks must use captured state — the design's "neither callback may
+dereference `psi-emacs--state`" rule does NOT say whether `--arm` and its
+inline pre-cancel may use dynamic state or must also thread captured state.
+A shared cancel helper called from both dynamic-current and captured-buffer
+contexts with an unstated store-resolution rule is an actionable mechanism
+ambiguity (`one_way → singular(solution)`).
+
+Not raised (plan-level / non-actionable): exact new struct field name + clear
+helper name (shape fixed by the `projection-notification-timers` mirror;
+naming is a plan concern); whether the widget clear helper also resets widget
+lstates/data (design clearly scopes it to "cancel and clear timers" only).
