@@ -325,7 +325,7 @@
 
 ## Code-shaper review follow-ups (ψ)
 
-- [ ] CS1 — Extract the duplicated clear-in-flight / finalize-watchdog idiom
+- [x] CS1 — Extract the duplicated clear-in-flight / finalize-watchdog idiom
       (`consistent(idioms)` ∧ `simple/single_responsibility`).
       `psi-widget-projection--on-mutation-timeout` (`:346-360`) and the
       `--dispatch-mutation` response lambda (`:386-393`) hand-roll the identical
@@ -339,7 +339,7 @@
       shared finalize lives in one place and each callback body reads as its
       distinct intent. Keep existing tests green (the helpers are pure
       refactors). Re-run `bb emacs:check`; byte-compile clean; reload `.el`.
-- [ ] CS2 — Align the `--dispatch-mutation` response-callback live-guard with
+- [x] CS2 — Align the `--dispatch-mutation` response-callback live-guard with
       the R1-aligned timeout callback and the `schedule-notification-dismiss`
       precedent (`consistent(idioms)`). The response lambda
       (`psi-widget-projection.el:382`) guards only `(when (buffer-live-p buffer)

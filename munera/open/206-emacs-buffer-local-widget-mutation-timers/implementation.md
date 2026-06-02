@@ -1045,3 +1045,55 @@ notification-timer precedent well.
   state)`. (Benign — `state` is captured non-nil at dispatch and the inner
   helpers null-guard — a consistency item, not a correctness fix; mirrors the
   R1 rationale.)
+
+## Code-shaper review follow-up — CS1, CS2 executed (2026-06-02)
+
+Executed the two newly-added code-shaper follow-up items in
+`components/emacs-ui/psi-widget-projection.el`. Pure refactors of already-correct
+finalize logic; behaviour and coverage unchanged. `bb emacs:check` green
+(340/340 before and after); byte-compile clean (no unused-var warnings);
+reloaded `.el`.
+
+- **CS1 — extract the shared finalize idiom (`consistent(idioms)` ∧
+  `single_responsibility`).** Added two helpers after `--cancel-mutation-timer`:
+  - `psi-widget-projection--clear-mutation-in-flight (ext-id widget-id
+    node-key)` — the byte-identical `--get-lstate` → `lstate-set-in-flight nil`
+    → `--set-lstate` block both callbacks hand-rolled. Runs against the
+    buffer-local `psi-emacs--state` (callers are inside `with-current-buffer`).
+  - `psi-widget-projection--finalize-mutation (state ext-id widget-id node-key)`
+    — cancel watchdog (`--cancel-mutation-timer state (--timer-key …)`) +
+    `--clear-mutation-in-flight` + `--upsert-projection-block`. The settled-
+    mutation finalize for the response path.
+  - **Response callback** (`--dispatch-mutation`) now calls
+    `(psi-widget-projection--finalize-mutation state ext-id widget-id node-key)`
+    inside `with-current-buffer buffer` — one call replacing the inline
+    cancel+clear+upsert sequence. The now-unused `tkey` binding in the dispatch
+    `let*` was removed (finalize recomputes the key internally).
+  - **Timeout callback** (`--on-mutation-timeout`) uses `--cancel-mutation-timer`
+    + `--clear-mutation-in-flight` (sharing the clear-in-flight helper) but does
+    NOT use `--finalize-mutation` wholesale, because it interposes
+    `--call-error-handler` between the clear and the upsert. So the byte-
+    identical sub-block (`--clear-mutation-in-flight`) is single-sourced while
+    the timeout's distinct error-handler-then-upsert tail stays inline (its
+    intent). This is the deliberate `--finalize-mutation`-optional shape the CS1
+    item described.
+
+- **CS2 — align the response-callback live-guard.** Changed the response lambda
+  guard from `(when (buffer-live-p buffer) …)` to
+  `(when (and (buffer-live-p buffer) state) …)`, matching the R1-aligned
+  `--on-mutation-timeout` guard and the `psi-emacs--schedule-notification-dismiss`
+  precedent (`(and (buffer-live-p buffer) st)`, `psi-projection.el:415`). Benign
+  (state is captured non-nil at dispatch) — a `consistent(idioms)` item so both
+  sibling store-targeting callbacks use the same guard. Comment updated to name
+  the mirrored precedent.
+
+No new tests needed: the extracted helpers are pure refactors of behaviour the
+existing suite already covers (response/timeout cancel+clear store + in-flight
+lstate, cross-buffer targeting, dead-buffer + nil-state no-ops). The CS2 guard's
+nil-state no-op for the timeout path is already covered by
+`pwpt-on-mutation-timeout-noop-when-state-nil`; the response path's dispatch-time
+`state` is structurally non-nil, so the added conjunct is defensive parity, not a
+new reachable branch.
+
+These were the only two newly-added unchecked steps.md items (code-shaper review
+pass, commit `7055ad055`); both now checked.
