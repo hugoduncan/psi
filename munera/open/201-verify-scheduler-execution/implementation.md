@@ -1738,3 +1738,39 @@ stated premise: `ss` was **not** already required in `scheduler_resolvers_test`
 Verified: resolvers test 2 tests / 21 assertions; full `bb test` green;
 clj-kondo 0/0; cljfmt clean; diff scoped to the single test file (Slice-10
 allowlist held; aggregate 412 unchanged).
+
+## Test-shaper review — pass 14 (test-shaper, 2026-06-01) — REVIEW_COMPLETE
+
+Re-applied test-shaper (clarity ∧ signal ∧ robustness ∧ economy) firsthand to
+all 201 new/extended scheduler test namespaces (`scheduler-test`,
+`scheduler-end-to-end-test`, `scheduler-timer-seam-test`,
+`scheduler-resolvers-test`, `scheduler-context-shutdown-test`,
+`psi-tool-scheduler-test`). Suite green (28 tests / 223 assertions / 0 failures
+across the touched nss); clj-kondo 0/0 on all six files.
+
+Strengths confirmed: deterministic (fixed `scheduler-time-source` + captured
+`capturing-delay-fn` timer seam, no wall-clock sleeps in the 201 live tests),
+behaviour-focused (observable state/outputs — delivered prompt + scheduled
+provenance, `:status`, `created-session-id`/`:delivery-phase`, queue contents —
+never handler interactions), single-concern deftests with clear AAA + `testing`
+labels, good economy (representative cases incl. the deliberate
+insertion-order≠fire-at-order `drain-one` case; psi-tool megatest already split
+into 6 focused deftests). Consistency closed by pass-12 (read idiom →
+`ss/get-session-data-in`) and pass-13 (write idiom → `ss/session-update`).
+
+**One consistency candidate evaluated and rejected (not filed):** inline
+`java.time.Instant/parse` literals (≈61 across the scheduler test set) vs the
+private `instant` helper in `scheduler_test.clj`. Not actionable — fully-qualified
+inline `Instant/parse` is the consistent baseline idiom across the *whole*
+agent-session test suite (not 201-specific), is deterministic, and is
+self-documenting; introducing a shared instant helper would add abstraction the
+skill cautions against (`helpers_that_compress(ceremony) ∧
+¬helpers_that_hide(intent)`) and would diverge from the surrounding codebase
+convention. The wall-clock-`Instant/now`-in-stubs concern was already addressed
+(pass 6). No new follow-up steps added (no actionable issue; no-duplicate).
+
+The review chain (10 task-test-review + 7 test-shaper + 1 implementation-review
+passes) has converged: the verification-only deliverable is well-formed, fully
+covers the design behaviour, deterministic, and uses injection over mocking
+throughout its cited/added tests. Verification-only invariant intact (this
+review touched no `components/agent-session/src/**` or `doc/scheduler.md`).
