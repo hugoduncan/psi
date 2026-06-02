@@ -1977,4 +1977,35 @@ assert the output `gap` values appear in strictly descending order; (b) a
 **top-5 cap** assertion — feed >5 qualifying units and assert exactly 5 survive.
 Keep under the 800-line `components/` file guard.
 
-PASS_STATUS: ACTIONABLE_FEEDBACK.
+#### TR9 resolution
+
+Added a sibling deftest `incidental-complexity-finder-recipe-ranking-and-cap-test`
+in the same skill-test ns (`incidental_complexity_finder_skill_test.clj`;
+test-only, no new ns / no production Clojure), reusing the existing
+`run-jq-recipe` harness and the `named-{local,cc}-unit-json` fixture builders.
+
+- **(a) gap-descending ranking** (`sort_by(-.gap)`): feeds three qualifying
+  units whose input **emit order** (lowmid, top, mid) deliberately differs from
+  their **gap order** — `top` lcc 100/cc 4 → gap 25.0, `mid` lcc 60/cc 4 → gap
+  15.0, `lowmid` lcc 30/cc 4 → gap 7.5. Asserts (1) the serialized output `gap`
+  sequence `[top mid lowmid]` is strictly descending (`= gaps (reverse (sort
+  gaps))`) and (2) the highest-gap unit `top` precedes the lowest `lowmid` in the
+  output string (positional, not just set membership). A regress to
+  `sort_by(.gap)` (ascending) would emit lowmid<mid<top and fail both.
+- **(b) top-5 cap** (`.[0:5]`): feeds 7 qualifying units (all lcc 50/cc 4 → gap
+  12.5, above threshold, distinguished by var/line) and asserts exactly 5 survive
+  (`(count (re-seq #"\"ns\":\s*\"cap\"" out)) = 5`). A regress dropping the slice
+  (or widening to `.[0:10]`) emits all 7 and fails.
+
+Both blocks gated on jq availability (matching the existing
+filter/drop/determinism tests). Verified live the recipe serializes `"gap": 25`
+(integer when whole) / `"var": "top"` (space after colon) — the `gap-of` regex
+and `indexOf` positional check match that exact form.
+
+Focused suite green: skill-test 5 tests / 47 assertions (+7 over pass-6's 40);
+definitions 13 tests / 203 assertions; `clj-kondo` 0 findings; skill-test file
+322 lines (< 800). Test-only change — no production/workflow/skill/doc change
+(the recipe already encodes both behaviours correctly; TR9 only adds the
+executable cover).
+
+PASS_STATUS: RESOLVED.

@@ -726,7 +726,7 @@ with the commit sha / decision when done.
 
 ## Test review follow-ups (review pass 7)
 
-- [ ] TR9 — The selector recipe's **gap-descending ranking** (`sort_by(-.gap)`)
+- [x] TR9 — The selector recipe's **gap-descending ranking** (`sort_by(-.gap)`)
       and **top-5 cap** (`.[0:5]`) are encoded only in the embedded `jq` recipe
       and never exercised: every executable skill test feeds ≤3 units (just enough
       for the join/determinism/filter/drop branches), so neither the ordering nor
@@ -746,6 +746,22 @@ with the commit sha / decision when done.
       descending; (b) a **top-5 cap** assertion — feed >5 qualifying units, assert
       exactly 5 survive. Run focused suite + `clj-kondo`; keep under the 800-line
       `components/` file guard.
+      RESOLUTION: added a sibling deftest
+      `incidental-complexity-finder-recipe-ranking-and-cap-test` in the same
+      skill-test ns (test-only; no new ns / no production Clojure), reusing
+      `run-jq-recipe` + `named-{local,cc}-unit-json`. (a) **ranking** block feeds
+      three qualifying units in non-gap emit order (lowmid gap 7.5, top gap 25.0,
+      mid gap 15.0) and asserts the output `gap` sequence is strictly descending
+      (`= gaps (reverse (sort gaps))`) plus a positional check that `top` precedes
+      `lowmid` in the serialized output — a regress to `sort_by(.gap)` (ascending)
+      emits them lowmid<mid<top and fails. (b) **top-5 cap** block feeds 7
+      qualifying units (all gap 12.5, distinguished by var/line) and asserts
+      exactly 5 survive (`(count (re-seq #"\"ns\":\s*\"cap\"" out)) = 5`) — a
+      regress dropping/widening the `.[0:5]` slice emits all 7 and fails. Both
+      blocks gated on jq availability (reuse the existing harness). Focused
+      skill-test suite green (5 tests, 47 assertions, 0 failures — +7 over
+      pass-6's 40); definitions still 13 tests/203 assertions; `clj-kondo` 0
+      findings; file 322 lines (< 800). (See implementation.md pass-7 TR9 entry.)
 
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 

@@ -257,3 +257,66 @@
               "a matched qualifying unit survives the inner join")
           (is (not (re-find #"\"var\":\s*\"absent\"" out))
               "an unmatched local row is dropped, not defaulted to cc=1 (A1)"))))))
+
+(deftest incidental-complexity-finder-recipe-ranking-and-cap-test
+  ;; TR9 (test review pass 7): the selector recipe's gap-descending ranking
+  ;; (`sort_by(-.gap)`) and top-5 cap (`.[0:5]`) are encoded only in the embedded
+  ;; jq recipe and never exercised — every other skill test feeds <=3 units, just
+  ;; enough for the join/determinism/filter/drop branches. Both are named
+  ;; Deliverable-1 behaviours (design step 4 / Locked decision 2: "Rank
+  ;; qualifying units by `gap`"; the step-5 guard reads "the top 5 qualifying
+  ;; units by `gap`"). A regress to sort_by(.gap) (ascending) or a dropped/widened
+  ;; slice passes every existing test green; the TR3 content-lock asserts only the
+  ;; SKILL prose, which can drift from the executed recipe.
+  (let [{:keys [skill]} (incidental-complexity-finder-skill)
+        body (slurp (io/file (:file-path skill)))
+        recipe (extract-jq-recipe body)
+        gap-of (fn [out var-name]
+                 ;; pull the "gap": <n> following this unit's var in the output.
+                 (some-> (re-find (re-pattern (str "(?s)\"var\":\\s*\"" var-name
+                                                   "\".*?\"gap\":\\s*([0-9.]+)"))
+                                  out)
+                         second
+                         Double/parseDouble))]
+    (is (some? recipe) "the join/gap jq recipe is extractable from SKILL.md")
+    (when (try (zero? (:exit (shell/sh "jq" "--version"))) (catch Exception _ false))
+      (testing "gap-descending ranking — output gap values are strictly descending (sort_by(-.gap))"
+        ;; Feed three qualifying units whose input emit order (lowmid, top, mid)
+        ;; differs from their gap order (top > mid > lowmid). A regress to
+        ;; sort_by(.gap) (ascending) would emit them lowmid < mid < top, failing
+        ;; the strictly-descending assertion below.
+        ;;   top:    lcc 100, cc 4 -> gap 25.0
+        ;;   mid:    lcc 60,  cc 4 -> gap 15.0
+        ;;   lowmid: lcc 30,  cc 4 -> gap 7.5
+        (let [{:keys [exit out err]}
+              (run-jq-recipe recipe
+                             [(named-local-unit-json "rank" "lowmid" 30 "30.0")
+                              (named-local-unit-json "rank" "top" 10 "100.0")
+                              (named-local-unit-json "rank" "mid" 20 "60.0")]
+                             [(named-cc-unit-json "rank" "lowmid" 30 4)
+                              (named-cc-unit-json "rank" "top" 10 4)
+                              (named-cc-unit-json "rank" "mid" 20 4)])
+              gaps [(gap-of out "top") (gap-of out "mid") (gap-of out "lowmid")]]
+          (is (zero? exit) (str "recipe runs cleanly; stderr: " err))
+          (is (every? some? gaps) "all three qualifying units survive with a gap")
+          (is (= gaps (reverse (sort gaps)))
+              "output gap values are in strictly descending order (not ascending)")
+          ;; positional check: the highest-gap unit precedes the lowest in the
+          ;; serialized output (sort order, not just set membership).
+          (is (< (.indexOf out "\"var\": \"top\"")
+                 (.indexOf out "\"var\": \"lowmid\""))
+              "the highest-gap unit appears before the lowest-gap unit in the output")))
+      (testing "top-5 cap — exactly 5 qualifying units survive when more than 5 qualify (.[0:5])"
+        ;; Feed 7 qualifying units (all lcc 50, cc 4 -> gap 12.5, all above
+        ;; threshold) distinguished by var/line. The recipe slices `.[0:5]`, so
+        ;; exactly 5 must survive. A regress dropping the slice (or `.[0:10]`)
+        ;; would emit all 7.
+        (let [local-units (for [i (range 7)]
+                            (named-local-unit-json "cap" (str "u" i) (* 10 (inc i)) "50.0"))
+              cc-units (for [i (range 7)]
+                         (named-cc-unit-json "cap" (str "u" i) (* 10 (inc i)) 4))
+              {:keys [exit out err]} (run-jq-recipe recipe local-units cc-units)
+              survivors (count (re-seq #"\"ns\":\s*\"cap\"" out))]
+          (is (zero? exit) (str "recipe runs cleanly; stderr: " err))
+          (is (= 5 survivors)
+              "exactly 5 of 7 qualifying units survive the top-5 cap (.[0:5])"))))))
