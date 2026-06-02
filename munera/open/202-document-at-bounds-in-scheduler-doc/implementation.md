@@ -11,3 +11,7 @@ Reviewed `design.md` against `resolve-fire-time!`, `millis-until`, `doc/schedule
 ## Design ambiguity follow-up — 2026-06-02
 
 Completed the new ambiguity follow-up. Updated `design.md` so absolute `:at` bounds are described in terms of the resolved millisecond delay: delay 0 fires immediately (past/now and sub-millisecond future truncation), positive 1–999ms delays are rejected by the minimum bound, and positive delays above 24h are rejected by the maximum bound. Updated `doc/scheduler.md` with the same wording and checked the item in `design-steps.md`.
+
+## Design inconsistency review — 2026-06-02
+
+Reviewed `design.md` against `doc/scheduler.md`, `resolve-fire-time!`/`millis-until`, `validate-delay-ms!`, task 201 findings, and `psi-tool-scheduler-at-resolution-matrix-test`. No new actionable inconsistencies found. The design, current scheduler doc, implementation, and verification tests consistently describe absolute `:at` bounds in terms of the resolved millisecond delay: delay 0 fires immediately; positive 1–999ms is rejected by the minimum; positive delay above `max-delay-ms` is rejected by the maximum.
