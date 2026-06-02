@@ -1,23 +1,15 @@
 (ns psi.agent-session.psi-tool-scheduler-test
   (:require
    [clojure.test :refer [deftest is testing]]
-   [psi.agent-session.core :as session]
    [psi.agent-session.psi-tool-scheduler :as psi-tool-scheduler]
    [psi.agent-session.scheduler :as scheduler]
    [psi.session-state.state :as ss]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.tools :as tools]))
 
-(defn- create-session-context
-  ([] (create-session-context {}))
-  ([opts]
-   (let [ctx (session/create-context (test-support/safe-context-opts (assoc opts :persist? false)))
-         sd  (session/new-session-in! ctx nil {})]
-     [ctx (:session-id sd)])))
-
 (deftest psi-tool-scheduler-create-list-cancel-test
   (let [fixed-now (java.time.Instant/parse "2026-04-21T18:00:00Z")
-        [ctx session-id] (create-session-context {:scheduler-time-source (test-support/fixed-scheduler-time-source fixed-now)})
+        [ctx session-id] (test-support/create-test-session {:scheduler-time-source (test-support/fixed-scheduler-time-source fixed-now)})
         tool (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})]
     (testing "create adds a pending schedule"
       (let [result ((:execute tool) {"action" "scheduler"
@@ -60,7 +52,7 @@
 
 (deftest psi-tool-scheduler-time-source-required-test
   (testing "missing scheduler time source fails create instead of falling back to wall-clock"
-    (let [[ctx session-id] (create-session-context)
+    (let [[ctx session-id] (test-support/create-test-session)
           tool (tools/make-psi-tool (fn [_q] {}) {:ctx (dissoc ctx :scheduler-time-source)
                                                   :session-id session-id})
           result ((:execute tool) {"action" "scheduler"
@@ -74,7 +66,7 @@
       (is (= :scheduler-time-source (get-in parsed [:psi-tool/error :data :boundary])))))
 
   (testing "invalid scheduler time source fails create instead of falling back to wall-clock"
-    (let [[ctx session-id] (create-session-context)
+    (let [[ctx session-id] (test-support/create-test-session)
           tool (tools/make-psi-tool (fn [_q] {}) {:ctx (assoc ctx :scheduler-time-source (fn [] "not-an-instant"))
                                                   :session-id session-id})
           result ((:execute tool) {"action" "scheduler"
@@ -89,7 +81,7 @@
 
 (deftest psi-tool-scheduler-bounds-and-cap-test
   (testing "bounds rejection surfaces as scheduler error"
-    (let [[ctx session-id] (create-session-context)
+    (let [[ctx session-id] (test-support/create-test-session)
           tool (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
           result ((:execute tool) {"action" "scheduler"
                                    "op" "create"
@@ -101,7 +93,7 @@
       (is (= :error (:psi-tool/overall-status parsed)))))
 
   (testing "cap rejection blocks the 51st pending schedule"
-    (let [[ctx session-id] (create-session-context)
+    (let [[ctx session-id] (test-support/create-test-session)
           tool (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})]
       (dotimes [i scheduler/default-max-pending-per-session]
         (let [result ((:execute tool) {"action" "scheduler"
@@ -121,7 +113,7 @@
 
 (deftest psi-tool-scheduler-session-id-resolution-test
   (testing "scheduler requires invoking or explicit session-id"
-    (let [[ctx _session-id] (create-session-context)
+    (let [[ctx _session-id] (test-support/create-test-session)
           tool (tools/make-psi-tool (fn [_q] {}) {:ctx ctx})
           result ((:execute tool) {"action" "scheduler"
                                    "op" "list"})
@@ -131,7 +123,7 @@
       (is (= :validate (get-in parsed [:psi-tool/error :phase])))))
 
   (testing "explicit session-id is used when provided directly to scheduler report"
-    (let [[ctx session-id] (create-session-context)
+    (let [[ctx session-id] (test-support/create-test-session)
           report (psi-tool-scheduler/execute-psi-tool-scheduler-report
                   {:ctx ctx :session-id session-id}
                   {:op "create"
@@ -144,7 +136,7 @@
 
 (deftest psi-tool-scheduler-kind-validation-test
   (testing "scheduler create kind :session requires session-config"
-    (let [[ctx session-id] (create-session-context)
+    (let [[ctx session-id] (test-support/create-test-session)
           tool (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
           result ((:execute tool) {"action" "scheduler"
                                    "op" "create"
@@ -157,7 +149,7 @@
       (is (= :validate (get-in parsed [:psi-tool/error :phase])))))
 
   (testing "scheduler create kind :message rejects session-config"
-    (let [[ctx session-id] (create-session-context)
+    (let [[ctx session-id] (test-support/create-test-session)
           tool (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
           result ((:execute tool) {"action" "scheduler"
                                    "op" "create"
@@ -171,7 +163,7 @@
       (is (= :validate (get-in parsed [:psi-tool/error :phase])))))
 
   (testing "scheduler create rejects unsupported session-config keys"
-    (let [[ctx session-id] (create-session-context)
+    (let [[ctx session-id] (test-support/create-test-session)
           tool (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
           result ((:execute tool) {"action" "scheduler"
                                    "op" "create"
@@ -191,7 +183,7 @@
   (testing "absolute instant calculates delay from scheduler time source"
     (let [fixed-now (java.time.Instant/parse "2026-04-21T18:00:00Z")
           fire-at (.plusMillis fixed-now 5000)
-          [ctx session-id] (create-session-context {:scheduler-time-source (test-support/fixed-scheduler-time-source fixed-now)})
+          [ctx session-id] (test-support/create-test-session {:scheduler-time-source (test-support/fixed-scheduler-time-source fixed-now)})
           tool (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
           result ((:execute tool) {"action" "scheduler"
                                    "op" "create"
@@ -209,7 +201,7 @@
   (testing "past :at resolves to delay 0, skips min-delay check, and FIRES immediately via the seam"
     (let [fixed-now        (java.time.Instant/parse "2026-04-21T18:00:00Z")
           past-at          (.minusSeconds fixed-now 60)
-          [ctx session-id] (create-session-context
+          [ctx session-id] (test-support/create-test-session
                             {:scheduler-time-source (test-support/fixed-scheduler-time-source fixed-now)})
           [capture* callback*] (test-support/capturing-delay-fn)
           ctx*             (assoc ctx :scheduler-run-after-delay-fn capture*)
@@ -234,7 +226,7 @@
   (testing "future :at below min-delay-ms (1-999ms) is rejected with the below-minimum bound error"
     (let [fixed-now        (java.time.Instant/parse "2026-04-21T18:00:00Z")
           near-future-at   (.plusMillis fixed-now 500)
-          [ctx session-id] (create-session-context
+          [ctx session-id] (test-support/create-test-session
                             {:scheduler-time-source (test-support/fixed-scheduler-time-source fixed-now)})
           tool             (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
           result           ((:execute tool) {"action" "scheduler"
@@ -252,7 +244,7 @@
   (testing "future :at above max-delay-ms (>24h) is rejected with the exceeds-maximum bound error"
     (let [fixed-now        (java.time.Instant/parse "2026-04-21T18:00:00Z")
           far-future-at    (.plusMillis fixed-now (inc scheduler/max-delay-ms))
-          [ctx session-id] (create-session-context
+          [ctx session-id] (test-support/create-test-session
                             {:scheduler-time-source (test-support/fixed-scheduler-time-source fixed-now)})
           tool             (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
           result           ((:execute tool) {"action" "scheduler"

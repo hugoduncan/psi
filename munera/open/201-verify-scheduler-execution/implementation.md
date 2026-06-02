@@ -1277,3 +1277,26 @@ One actionable `consistent(fixtures)` finding remains — a holdout from pass-3:
   (Slice-10 allowlist — zero `components/agent-session/src/**` /
   `doc/scheduler.md`); the project-wide `create-session-context` idiom in
   ~40 non-scheduler ns is out of 201 scope. Follow-up added to steps.md.
+
+### Execution (test-shaper pass 4 follow-up)
+
+Done. Migrated the holdout `psi_tool_scheduler_test.clj` onto the shared
+`test-support/create-test-session`:
+
+- Deleted the local `create-session-context` defn; rewrote all 13 call sites
+  (across the 6 deftests) to `test-support/create-test-session`, opts unchanged.
+- The require `[psi.agent-session.core :as session]` was used **only** by the
+  deleted defn — the step's hedge about surviving `session/dispatch-in!` /
+  `session/query-in` usage was wrong; this ns has none. The require became
+  unused and was removed (clj-kondo 0/0 confirms — an unused require would warn).
+- Behaviour unchanged: no-arg local `{}` and `create-test-session` no-arg
+  `{:persist? false}` both resolve persist-false via `safe-context-opts`.
+- No deftest renamed → `findings.md` psi-tool citations untouched.
+
+Verified: `--focus psi.agent-session.psi-tool-scheduler-test` = 6 tests / 109
+assertions / 0 failures (aggregate unchanged: 50 tests / 412 assertions); full
+`bb test` green; clj-kondo 0/0; cljfmt clean. `git diff --name-only` = the
+single `psi_tool_scheduler_test.clj` path — zero `components/agent-session/src/**`
+or `doc/scheduler.md` (Slice-10 gate held). Scheduler-suite fixture now fully
+consolidated on `create-test-session`; no `create-session-context` copies remain
+in any scheduler test ns. No blockers.

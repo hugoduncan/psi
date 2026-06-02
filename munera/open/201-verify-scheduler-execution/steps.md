@@ -784,7 +784,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Test review follow-ups — test-shaper pass 4 (2026-06-01)
 
-- [ ] Complete pass-3's fixture consolidation by migrating the **holdout**
+- [x] Complete pass-3's fixture consolidation by migrating the **holdout**
       `psi_tool_scheduler_test.clj` (L11) off its local `create-session-context`
       defn onto the shared `test-support/create-test-session`. pass-3
       consolidated 9 scheduler test ns onto `create-test-session` but did not
@@ -807,3 +807,23 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       `create-session-context` idiom in ~40 non-scheduler ns is out of 201
       scope. If 201 is treated as closed, raise it as a small standalone
       test-hygiene task instead.
+      Done: deleted the local `create-session-context` defn and rewrote all 13
+      call sites (across the 6 deftests) to `test-support/create-test-session`,
+      opts passing through unchanged (`{:scheduler-time-source …}` / no-arg).
+      Correction to the step's hedge: `[psi.agent-session.core :as session]`
+      was used **only** inside the deleted defn (`session/create-context` +
+      `session/new-session-in!`); this ns has **no** `session/dispatch-in!`/
+      `session/query-in` references, so the require became unused and was
+      removed (clj-kondo confirms 0/0 — an unused require would warn). The
+      no-arg `create-session-context` → `{}` and `create-test-session` no-arg →
+      `{:persist? false}` resolve to the same persist-false context via
+      `safe-context-opts`, so behaviour is unchanged. No deftest renamed →
+      `findings.md` psi-tool-surface citations unchanged. Verified:
+      `--focus psi.agent-session.psi-tool-scheduler-test` = **6 tests / 109
+      assertions / 0 failures** (aggregate unchanged at 50 tests / 412
+      assertions); full `bb test` green; clj-kondo 0/0; cljfmt clean. Test file
+      only — `git diff --name-only` = the single
+      `psi_tool_scheduler_test.clj` path; zero `components/agent-session/src/**`
+      or `doc/scheduler.md` (Slice-10 allowlist held). The scheduler suite's
+      fixture is now fully consolidated on `test-support/create-test-session`
+      (no remaining `create-session-context` copies in scheduler test ns).
