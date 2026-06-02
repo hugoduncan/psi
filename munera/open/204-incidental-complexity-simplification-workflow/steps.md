@@ -584,6 +584,31 @@ with the commit sha / decision when done.
       +3 over pass-5's 198); `clj-kondo` 0 findings; `cljfmt` clean; file 734
       lines (< 800). (See implementation.md pass-5 test-review TR7 entry.)
 
+## Test review follow-ups (review pass 6)
+
+- [ ] TR8 — The design's **distinguishing endpoint behaviour — no push/PR — is
+      not locked by any test**. Locked decision 7 ("Endpoint is a completed,
+      reviewed task on a local worktree branch — no push/PR") and Locked
+      decision 8 (the whole reason this is a new workflow vs
+      `complexity-reduction-pr`: "different endpoint: full task lifecycle vs.
+      quick PR") are encoded as an explicit step-1 execution constraint in
+      `reduce-incidental-complexity.edn` — "Do NOT push or open a PR; this
+      workflow ends with a completed, reviewed task on the local worktree branch
+      (the user decides on PR)." — but `reduce-incidental-complexity-test` never
+      asserts it. The test covers handoff fields, early-stop, gate flags,
+      baselines, and the generated two-phase contract, yet a regress adding a
+      push/PR step or instruction to step-1 (silently turning this into a
+      `complexity-reduction-pr` clone and erasing the design's reason for
+      existing) would pass every existing test green. Per
+      `∀b ∈ behaviour(design). ∃t. covers(t,b)`, this is an uncovered design
+      acceptance behaviour ("ends with a completed, reviewed task on the local
+      worktree branch — it does **not** push or open a PR"). Fix: extend
+      `reduce-incidental-complexity-test` (same ns, test-only, no production
+      change) with a prompt-substring lock on the no-push/PR endpoint constraint
+      (the string is already present in step-1's prompt — "Do NOT push or open a
+      PR" / "ends with a completed, reviewed task on the local worktree branch").
+      Run focused suite + `clj-kondo`.
+
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 
 - [ ] Split step-1 selection from task-creation into two `:session` steps,

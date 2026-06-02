@@ -1624,3 +1624,44 @@ design behaviour (the design's central worktree-continuity mechanism) per
 TR7 checked in steps.md. No production/skill/workflow/doc change (the wrapper
 prompt already carries the positive-path instruction; this pass only adds its
 covering assertion). PASS_STATUS: REVIEW_COMPLETE.
+
+## Test review (pass 6)
+
+Applied the `task-test-review` skill criteria
+(`well_formed(tests) ∧ ∀b ∈ behaviour(design). ∃t. covers(t,b) ∧
+∀d ∈ infra_deps. injectable ∧ nullable ∧ ¬mock ∧ ¬stub`) against the live test
+suite (`workflow-definitions-test` + `incidental-complexity-finder-skill-test`,
+17 tests / 239 assertions, all green).
+
+- **Well-formed:** ✅ tests load + run green; one deftest per artifact with
+  named `testing` blocks anchored on prompt/SKILL substrings.
+- **Infra deps:** ✅ the only infra dep is `jq`, used as a **real** dependency
+  via `clojure.java.shell` over real temp-file fixtures (no mock/stub), with a
+  jq-absent structural fallback. No mocks/stubs anywhere. Conforms to the
+  project no-mocks formalism.
+- **Behaviour coverage:** largely complete after TR1–TR7 (gap method,
+  thresholds, single-unit scope, A1 drop, F2 `@line` determinism +
+  order-independence, judgment guard, coverage hint, generated two-phase
+  contract incl. F3 A5/A2 key, wrapper 3-step shape + NO_TARGET + positive-path
+  worktree-continuity, outer 2-step shape + handoff fields + early-stop + gate
+  flags + baselines). **One uncovered named design behaviour found:**
+
+### TR8 — the no-push/PR endpoint is unlocked
+
+The design's *distinguishing* endpoint behaviour — Locked decision 7
+("Endpoint is a completed, reviewed task on a local worktree branch — no
+push/PR") and Locked decision 8 (the whole reason this is a *new* workflow vs
+`complexity-reduction-pr`: "different endpoint: full task lifecycle vs. quick
+PR") — is encoded as an explicit step-1 execution constraint in
+`reduce-incidental-complexity.edn` ("Do NOT push or open a PR; this workflow
+ends with a completed, reviewed task on the local worktree branch …") but is
+**not locked by any test assertion**. `reduce-incidental-complexity-test`
+covers handoff fields, early-stop, gate flags, baselines, and the generated
+two-phase contract, yet a regress adding a push/PR step or instruction to step-1
+(silently turning this into a `complexity-reduction-pr` clone and erasing the
+design's reason for existing) would pass every existing test green. Per
+`∀b ∈ behaviour(design). ∃t. covers(t,b)`, this is an uncovered design
+acceptance behaviour ("ends with a completed, reviewed task on the local
+worktree branch — it does **not** push or open a PR"). The string is already
+present in the prompt, so it is a trivial substring lock — extend
+`reduce-incidental-complexity-test` (same ns, test-only, no production change).
