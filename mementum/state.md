@@ -15,6 +15,8 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-06-02: Task 202 (`document-at-bounds-in-scheduler-doc`) plan inconsistency follow-up completed: reconciled `steps.md` with the already-applied `doc/scheduler.md` absolute-`:at` wording, checked the grounding/docs/verification/task-record items and the review follow-up, and appended implementation evidence. No code/doc changes were needed; existing task 201 `psi-tool-scheduler-at-resolution-matrix-test` proof remains sufficient for this doc-only reconciliation.
+
 - 2026-06-02: Task 202 (`document-at-bounds-in-scheduler-doc`) plan/steps ambiguity review found no new actionable ambiguities. Plan and steps are clear for the doc-only slice, resolved-millisecond-delay wording, and optional verification path; appended implementation note and left `steps.md` unchanged.
 
 - 2026-06-02: Task 202 (`document-at-bounds-in-scheduler-doc`) ambiguity follow-up executed: clarified `design.md` and `doc/scheduler.md` so absolute `:at` bounds are described by resolved millisecond delay — delay 0 fires immediately (past/now and sub-millisecond future truncation), positive 1–999ms is below-minimum rejected, and >24h is maximum rejected. Checked the `design-steps.md` item and recorded implementation note.
