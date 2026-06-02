@@ -17,28 +17,17 @@
   :group 'psi-emacs)
 
 (defcustom psi-emacs-slash-command-specs
-  '(("/quit" . "Exit this psi buffer")
-    ("/exit" . "Exit this psi buffer")
-    ("/resume" . "Resume a prior session")
-    ("/tree" . "Switch between live sessions")
-    ("/new" . "Start a fresh backend session")
-    ("/status" . "Show frontend diagnostics")
-    ("/worktree" . "Show git worktree context")
-    ("/jobs" . "List background jobs")
-    ("/job" . "Inspect a background job")
-    ("/cancel-job" . "Request background job cancellation")
-    ("/model" . "Open model selector or set directly")
-    ("/thinking" . "Open thinking selector or set directly")
-    ("/help" . "Show help")
-    ("/?" . "Show help")
-    ("/history" . "Show message history")
-    ("/prompts" . "List prompt templates")
-    ("/skills" . "List loaded skills")
-    ("/login" . "Login with an OAuth provider")
-    ("/logout" . "Logout from an OAuth provider")
-    ("/remember" . "Capture a memory note for future ψ")
-    ("/skill:" . "Invoke a skill (append skill name)"))
-  "Slash command completion candidates for `psi-emacs-prompt-capf'."
+  '(("/skill:" . "Invoke a skill (append skill name)"))
+  "User override/supplement slash-command completion candidates.
+
+The backend is the single authoritative source of built-in slash commands
+(task 205): built-in command specs travel via the
+`:psi.agent-session/builtin-command-specs' EQL attribute and are merged ahead
+of this list, so the backend wins on any name collision. This list is therefore
+trimmed to Emacs-only affordances (`/skill:', which is not a backend routing
+entry) plus any commands a user wishes to add. Adding a built-in name here will
+not override the backend description; remove an entry only to drop a purely
+Emacs-side affordance."
   :type '(repeat (cons string string))
   :group 'psi-emacs-completion)
 
@@ -95,10 +84,32 @@ A token is delimited by whitespace/newlines."
        (string-prefix-p "@" token)))
 
 (declare-function psi-emacs--state-prompt-template-specs "psi-session-commands")
+(declare-function psi-emacs--alist-get-any "psi-session-commands" (alist keys))
 
 (defun psi-emacs--state-slash-command-specs ()
-  "Return merged built-in + backend extension + prompt-template slash command specs."
-  (let* ((base psi-emacs-slash-command-specs)
+  "Return merged slash command specs.
+
+Backend built-in command specs (from `:psi.agent-session/builtin-command-specs')
+are listed first so they win over the user `psi-emacs-slash-command-specs'
+override on name collision; extension commands and prompt templates follow."
+  (let* ((builtin-specs (and psi-emacs--state
+                             (psi-emacs-state-builtin-command-specs psi-emacs--state)))
+         (backend-specs
+          (delq nil
+                (mapcar (lambda (spec)
+                          (let* ((name (string-trim
+                                        (format "%s"
+                                                (or (psi-emacs--alist-get-any
+                                                     spec '(:name name))
+                                                    ""))))
+                                 (desc (or (psi-emacs--alist-get-any
+                                            spec '(:description description))
+                                           "")))
+                            (when (not (string-empty-p name))
+                              (cons (if (string-prefix-p "/" name) name (concat "/" name))
+                                    (format "%s" desc)))))
+                        (or builtin-specs []))))
+         (base psi-emacs-slash-command-specs)
          (ext-names (and psi-emacs--state
                          (psi-emacs-state-extension-command-names psi-emacs--state)))
          (ext-specs
@@ -109,7 +120,7 @@ A token is delimited by whitespace/newlines."
                   (or ext-names [])))
          (template-specs (delq nil (and (fboundp 'psi-emacs--state-prompt-template-specs)
                                         (psi-emacs--state-prompt-template-specs)))))
-    (seq-uniq (append base ext-specs template-specs)
+    (seq-uniq (append backend-specs base ext-specs template-specs)
               (lambda (a b) (equal (car a) (car b))))))
 
 (defun psi-emacs--slash-annotation (candidate)

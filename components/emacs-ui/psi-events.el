@@ -25,7 +25,7 @@
 (declare-function psi-emacs--dispatch-request "psi-compose" (op params &optional callback))
 (declare-function psi-emacs--append-assistant-message "psi-compose" (text))
 (declare-function psi-emacs--append-user-message-to-transcript "psi-compose" (text))
-(declare-function psi-emacs--apply-slash-completion-data "psi-session-commands" (names templates))
+(declare-function psi-emacs--apply-slash-completion-data "psi-session-commands" (names builtin-specs templates))
 (declare-function psi-emacs--refresh-slash-completion-data "psi-session-commands")
 (declare-function psi-emacs--request-switch-session-by-id "psi-session-commands" (state session-id))
 (declare-function psi-emacs--request-frontend-exit "psi-session-commands")
@@ -81,21 +81,33 @@ payloads can seed state before the first canonical session-targeted update."
   "Return non-nil when session update DATA carries changed slash completion state."
   (when psi-emacs--state
     (let* ((raw-command-names (psi-emacs--event-data-get data '(:extension-command-names extension-command-names)))
+           (raw-builtin-specs (psi-emacs--event-data-get data '(:builtin-command-specs builtin-command-specs)))
            (raw-templates (psi-emacs--event-data-get data '(:prompt-templates prompt-templates)))
            (has-command-names (not (null raw-command-names)))
+           (has-builtin-specs (not (null raw-builtin-specs)))
            (has-templates (not (null raw-templates)))
            (command-names (cond
                            ((vectorp raw-command-names) (append raw-command-names nil))
                            ((listp raw-command-names) raw-command-names)
                            (t nil)))
+           (builtin-specs (cond
+                           ((vectorp raw-builtin-specs) (append raw-builtin-specs nil))
+                           ((listp raw-builtin-specs) raw-builtin-specs)
+                           (t nil)))
            (templates (cond
                        ((vectorp raw-templates) (append raw-templates nil))
                        ((listp raw-templates) raw-templates)
                        (t nil)))
-           (next-token (and (or has-command-names has-templates)
+           (next-token (and (or has-command-names has-builtin-specs has-templates)
                             (list :commands (mapcar (lambda (name)
                                                       (string-trim (format "%s" (or name ""))))
                                                     (or command-names []))
+                                  :builtins (mapcar (lambda (spec)
+                                                      (list (psi-emacs--non-blank-text
+                                                             (psi-emacs--event-data-get spec '(:name name)))
+                                                            (psi-emacs--non-blank-text
+                                                             (psi-emacs--event-data-get spec '(:description description)))))
+                                                    (or builtin-specs []))
                                   :templates (mapcar (lambda (tpl)
                                                        (list (psi-emacs--non-blank-text
                                                               (psi-emacs--event-data-get tpl '(:name name)))
@@ -106,7 +118,7 @@ payloads can seed state before the first canonical session-targeted update."
       (when next-token
         (unless (equal current-token next-token)
           (when (fboundp 'psi-emacs--apply-slash-completion-data)
-            (psi-emacs--apply-slash-completion-data command-names templates))
+            (psi-emacs--apply-slash-completion-data command-names builtin-specs templates))
           t)))))
 
 (defun psi-emacs--handle-session-updated-event (data)

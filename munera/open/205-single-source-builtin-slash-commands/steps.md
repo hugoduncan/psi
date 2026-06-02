@@ -86,39 +86,40 @@ Tick with sha/decision on completion.
 
 ## Slice 4 — Emacs consumption
 
-- [ ] `psi-session-commands.el`: add `:psi.agent-session/builtin-command-specs`
-      to the slash-completion query string (`psi-emacs--prompt-template-query`,
-      line ~256); add `psi-emacs--builtin-command-specs-from-query-frame`
+- [x] `psi-session-commands.el`: add `:psi.agent-session/builtin-command-specs`
+      to the slash-completion query string (`psi-emacs--prompt-template-query`);
+      add `psi-emacs--builtin-command-specs-from-query-frame`
       extractor (P3 channel 1).
-- [ ] `psi-globals.el`: add `builtin-command-specs` state slot (parallel to
-      `extension-command-names`, line 100); seed `nil` in `psi-lifecycle.el`
-      (parallel to `slash-completion-token`, line 85).
-- [ ] `psi-session-commands.el` / `psi-events.el`: thread built-in specs through
+- [x] `psi-globals.el`: add `builtin-command-specs` state slot (parallel to
+      `extension-command-names`); seed `nil` in `psi-lifecycle.el` initial state
+      AND the transcript-reset path (parallel to `extension-command-names`).
+- [x] `psi-session-commands.el` / `psi-events.el`: thread built-in specs through
       `psi-emacs--apply-slash-completion-data` as a third positional arg
-      `(names builtin-specs templates)` — update all 4 sites (P1): defun
-      (`psi-session-commands.el:302`), `declare-function` (`psi-events.el:28`),
-      query-frame call (`psi-session-commands.el:323`), event-data call
-      (`psi-events.el:109`).
-- [ ] Fold built-in specs into the change-detection token (P2): add a `:builtins`
-      segment to `psi-emacs--slash-completion-token`
-      (`psi-session-commands.el:292`) and to the inline `next-token` in
-      `psi-emacs--slash-completion-data-changed-p` (`psi-events.el:80`), kept
-      structurally identical. ALSO extend the change-detection guard (I2): add
-      `has-builtin-specs` (from `raw-builtin-specs`) to the
+      `(names builtin-specs templates)` — updated all 4 sites (P1): defun,
+      `declare-function` (`psi-events.el`), query-frame call, event-data call.
+- [x] Fold built-in specs into the change-detection token (P2): added a
+      `:builtins` segment to `psi-emacs--slash-completion-token` (via new
+      `psi-emacs--normalize-builtin-command-specs`) and to the inline
+      `next-token` in `psi-emacs--slash-completion-data-changed-p`, segment order
+      fixed `:commands :builtins :templates`. ALSO extended the change-detection
+      guard (I2): added `has-builtin-specs` (from `raw-builtin-specs`) to the
       `(or has-command-names has-templates)` condition gating `next-token`, so a
       built-in-spec-only event yields a non-nil token and refreshes (AC5/AC6).
-- [ ] Extract built-in specs on the session-update event-data path (P3 channel 2):
+- [x] Extract built-in specs on the session-update event-data path (P3 channel 2):
       `psi-emacs--slash-completion-data-changed-p` reads
       `(:builtin-command-specs builtin-command-specs)` from event data and passes
       them to `apply-slash-completion-data`.
-- [ ] `psi-completion.el`: `psi-emacs--state-slash-command-specs` merges backend
-      built-in specs first (backend-wins on name collision).
-- [ ] `psi-completion.el`: trim `psi-emacs-slash-command-specs` `defcustom`
-      default to Emacs-only affordances (`/skill:`) + user-addition slot; update
-      docstring (resolves open question #3).
-- [ ] Add Emacs capf test: built-in specs from a queried frame include
-      `/reload-models`; backend descriptions win over stale custom values.
-- [ ] Byte-compile Emacs files clean.
+- [x] `psi-completion.el`: `psi-emacs--state-slash-command-specs` merges backend
+      built-in specs **first** (so `seq-uniq` keeps the backend entry; backend
+      wins on name collision).
+- [x] `psi-completion.el`: trim `psi-emacs-slash-command-specs` `defcustom`
+      default to Emacs-only affordances (`/skill:`); update docstring (resolves
+      open question #3).
+- [x] Add Emacs capf test: built-in specs from state include `/reload-models`;
+      backend descriptions win over stale custom values; built-in-spec-only
+      session event refreshes (I2 lock). Existing capf/tree tests reseeded with
+      backend specs (built-ins no longer come from the defcustom).
+- [x] Byte-compile Emacs files clean; `bb emacs:check` 324/324 green.
 
 ## Slice 5 — Coherence lock + docs/changelog + full verify
 

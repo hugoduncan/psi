@@ -557,3 +557,43 @@ autocomplete test + empty-specs→no-builtins test + a
 
 Verification: `app-input-selector-test` 14 tests, 38 assertions, 0 failures;
 full `clojure -M:test` unit suite exits 0 (no FAIL/ERROR). clj-kondo clean.
+
+## Slice 4 implementation (2026-06-01)
+
+Emacs now consumes the backend built-in command surface on both channels,
+exactly like `extension-command-names`:
+
+- `psi-session-commands.el`: query string gains
+  `:psi.agent-session/builtin-command-specs`; new
+  `psi-emacs--builtin-command-specs-from-query-frame` extractor (channel 1);
+  `psi-emacs--apply-slash-completion-data` gains a 3rd positional arg
+  `(names builtin-specs templates)` and stores the new state slot;
+  `psi-emacs--slash-completion-token` gains a `:builtins` segment (via new
+  `psi-emacs--normalize-builtin-command-specs`), order `:commands :builtins
+  :templates`. Refresh-fn passes built-in specs through.
+- `psi-events.el`: `declare-function` arity updated; the inline `next-token` in
+  `psi-emacs--slash-completion-data-changed-p` extracts `raw-builtin-specs`,
+  adds `has-builtin-specs` to the change-detection guard `or` (I2), emits the
+  matching `:builtins` segment, and passes built-in specs to the apply call
+  (channel 2).
+- `psi-globals.el`: `builtin-command-specs` struct slot.
+  `psi-lifecycle.el`: seed `nil` in initial state + transcript-reset path.
+- `psi-completion.el`: `psi-emacs--state-slash-command-specs` builds
+  `backend-specs` from state and prepends them (backend-wins via `seq-uniq`
+  first-wins); `defcustom` default trimmed to Emacs-only `/skill:` with a
+  rewritten docstring (open question #3 resolved). Added `declare-function` for
+  `psi-emacs--alist-get-any`.
+
+### Deviation: existing capf/tree tests reseeded
+
+Removing the built-in commands from the `defcustom` default meant tests that
+asserted `/resume`, `/jobs`, `/job`, `/remember`, `/history`, `/tree` from the
+defcustom default now have no source. These tests were updated to seed
+`:builtin-command-specs` into `psi-emacs--state` (representing the backend
+resolver output) — they now correctly exercise the backend-sourced path. The
+token-equality regression test gained the `:builtins nil` segment. New tests:
+backend-sourced `/reload-models`, backend-description-wins-over-custom,
+built-in-spec-only session event refresh (I2 lock).
+
+Verification: `bb emacs:byte-compile` clean; `bb emacs:check` 324/324, 0
+unexpected.
