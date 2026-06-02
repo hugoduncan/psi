@@ -465,6 +465,32 @@ with the commit sha / decision when done.
       findings; file-length guard clean. (See implementation.md pass-2 TR3
       resolution entry.)
 
+## Test review follow-ups (review pass 3)
+
+- [ ] TR4 — The determinism test proves losslessness but not the F2 core claim
+      (order-independence). `incidental-complexity-finder-recipe-determinism-test`
+      runs the embedded `jq` recipe over a single fixed emit order and asserts
+      both null-arity units survive with their own `cc` — a *necessary*
+      precondition but not the behaviour the test names ("not collapsed
+      last-wins"), which is inherently order-dependent. A recipe that was
+      order-sensitive yet lossless for this one ordering would still pass green.
+      Per `∀b ∈ behaviour(design). ∃t. covers(t,b)`, the F2/A1 "join is
+      deterministic w.r.t. emit order" behaviour is under-covered. Fix: run the
+      recipe a second time with the two same-`(ns,var,arity)` null-arity units'
+      emit order **reversed** in both the `local` and `cc` inputs, and assert the
+      output is identical (each `line` keeps the same `cc`) — locking
+      order-independence, not just losslessness. Extend
+      `incidental-complexity-finder-recipe-determinism-test` (same ns, test-only).
+
+- [ ] TR5 — Stale/incorrect fixture comment in
+      `incidental-complexity-finder-recipe-determinism-test`. The inline comment
+      `;; line 10 unit (cc 3) and line 40 unit (cc 6/lcc 60) both survive`
+      mis-states the line-40 fixture: the fixture JSON sets `cc:4` and the
+      assertion two lines below correctly checks `cc=4`, not `cc 6`. The "cc 6"
+      annotation is stale and self-contradictory, hurting the test's
+      readability/signal (test-shaper: comments must not mislead). Fix the comment
+      to read `(cc 4)`. Test-only; same ns; no assertion change.
+
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 
 - [ ] Split step-1 selection from task-creation into two `:session` steps,

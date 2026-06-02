@@ -1383,3 +1383,45 @@ step-6 coverage-hint emission. Coherence across design ↔ SKILL ↔ workflows �
 docs unaffected (test-only).
 
 PASS_STATUS: RESOLVED.
+
+## 2026-06-01 — Test review pass 3 (task-test-review)
+
+Reviewed implementation tests against the task-test-review criterion
+`∀b ∈ behaviour(design). ∃t. covers(t,b)` + well-formed + nullable-not-mock.
+Tests are the two workflow-loader namespaces:
+`incidental-complexity-finder-skill-test` (4 tests) and
+`workflow-definitions-test` (`task-lifecycle-in-worktree-test` +
+`reduce-incidental-complexity-test`). Focused suite green:
+16 tests, 225 assertions, 0 failures.
+
+Coverage of the design acceptance criteria is now broad — TR1/TR2/TR3 closed the
+major gaps (gap method, thresholds, single-unit scope, A1 drop rule, F2 `@line`
+key, step-5 judgment guard, step-6 coverage hint, generated two-phase contract,
+F3 A5/A2 key, two/three-step shapes, handoff/early-stop, NO_TARGET
+short-circuit). No mocks/stubs; assertions are on parsed definition state and
+SKILL.md content (state/outputs, not interactions). Two residual actionable
+items:
+
+- **TR4 — determinism test proves losslessness, not order-independence.** The F2
+  fix's *core claim* (and the SKILL/A1 wording it locks) is that the join is
+  **non-deterministic w.r.t. emit order** under the pre-F2 key and deterministic
+  under `(ns, var, arity, line)`. `incidental-complexity-finder-recipe-determinism-test`
+  runs the embedded `jq` recipe over a single fixed emit order and asserts both
+  null-arity units survive with their own `cc` — this proves *losslessness* (a
+  necessary precondition) but **not order-independence**: a recipe that happened
+  to be order-sensitive but lossless for this one ordering would still pass
+  green. The behaviour the test names ("not collapsed last-wins") is precisely
+  the order-dependent one; covering it requires running the recipe a second time
+  with the two units' emit order reversed (in both `local` and `cc` inputs) and
+  asserting identical output (same `cc` per `line`). Test-only; same ns.
+
+- **TR5 — stale/incorrect fixture comment in the determinism test.** The inline
+  comment `;; line 10 unit (cc 3) and line 40 unit (cc 6/lcc 60) both survive`
+  in `incidental-complexity-finder-recipe-determinism-test` mis-states the
+  line-40 fixture: the fixture sets `cc:4` (and the assertion correctly checks
+  `cc=4`), not `cc 6`. The "cc 6" annotation is stale and contradicts both the
+  fixture JSON and the very assertion two lines below it, undermining the test's
+  readability/signal (test-shaper: comments must not mislead). Fix the comment to
+  `(cc 4)`. Test-only; same ns; no assertion change.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
