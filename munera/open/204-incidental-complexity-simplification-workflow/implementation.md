@@ -1549,3 +1549,34 @@ jq-absent path is unchanged (the determinism test already structurally locks the
   definitions ns 13 tests / 198 assertions → 17 tests / 236 assertions, 0
   failures.
 - `clj-kondo` 0 findings; file 251 lines (< 800 `components/` guard).
+
+---
+
+## Test review pass 5 — TR7 (wrapper positive-path worktree-continuity uncovered)
+
+Applied `task-test-review` (`∀b ∈ behaviour(design). ∃t. covers(t,b)`). Tests
+are well-formed; infra deps use real `jq`/real file loaders (no mocks/stubs).
+TR1–TR6 are resolved and the focused suite is green (17 tests, 236 assertions).
+One residual coverage gap remains.
+
+**TR7 — the `task-lifecycle-in-worktree` wrapper's *positive* (target-present)
+path is unlocked.** `task-lifecycle-in-worktree-test` thoroughly locks the
+NO_TARGET (negative) branch — that `work-on` is NOT called and the NO_TARGET
+sentinel is emitted on a no-target handoff (F1) — and locks that the `work-on`
+tool is present and `{{input}}` is wired. But it never asserts the
+target-present branch of the `resolve-worktree` prompt: that on a handoff
+carrying both fields it **calls `work-on` with the extracted worktree path** to
+set the session worktree and then **yields ONLY the bare Munera task path**.
+That instruction *is* the verified worktree-continuity mechanism the design
+chose over bare sibling-step inheritance (Locked decision 11 / Verified Facts:
+"the wrapper's `resolve-worktree` re-calls `work-on` … before sub-delegating").
+A regress that dropped the positive-path "call `work-on` with the extracted
+worktree path, then respond with ONLY the Munera task path" instruction (keeping
+the NO_TARGET branch and the `work-on` tool entry intact) would pass the suite
+green — yet it would silently break the design's central cross-`:delegate`
+continuity claim. Per the test-review criterion, this named design behaviour has
+no covering assertion. Fix: extend `task-lifecycle-in-worktree-test` with
+substring locks on `resolve-step`'s template text for the positive-path
+instruction — that it calls `work-on` with the extracted worktree path and
+responds with only the Munera task path. Test-only; same ns; no production
+change.

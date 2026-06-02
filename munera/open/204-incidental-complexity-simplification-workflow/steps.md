@@ -547,6 +547,28 @@ with the commit sha / decision when done.
       3/30; definitions still 13/198 → 17 tests/236 total); `clj-kondo` 0
       findings; file 251 lines (< 800). (See implementation.md pass-4 TR6 entry.)
 
+## Test review follow-ups (review pass 5)
+
+- [ ] TR7 — `task-lifecycle-in-worktree-test` locks the wrapper's NO_TARGET
+      (negative) branch (work-on NOT called + NO_TARGET sentinel, F1) and that
+      the `work-on` tool is present + `{{input}}` is wired, but never asserts the
+      **positive (target-present) branch** of the `resolve-worktree` prompt: that
+      on a handoff carrying both `worktree_path:`/`munera_task_path:` it **calls
+      `work-on` with the extracted worktree path** to set the session worktree
+      and then **yields ONLY the bare Munera task path**. That instruction is the
+      verified worktree-continuity mechanism the design chose over bare
+      sibling-step inheritance (Locked decision 11 / Verified Facts: the wrapper
+      "re-calls `work-on` … before sub-delegating"). A regress dropping that
+      positive-path instruction (keeping the NO_TARGET branch + the `work-on`
+      tool entry) passes green yet silently breaks the design's central
+      cross-`:delegate` continuity claim — an uncovered design behaviour per
+      `∀b ∈ behaviour(design). ∃t. covers(t,b)`. Fix: extend
+      `task-lifecycle-in-worktree-test` (same ns, test-only, no production
+      change) with substring locks on `resolve-step`'s template text for the
+      positive-path instruction — calls `work-on` with the extracted worktree
+      path, then responds with ONLY the Munera task path on a single line. Run
+      focused suite + `clj-kondo`.
+
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 
 - [ ] Split step-1 selection from task-creation into two `:session` steps,
