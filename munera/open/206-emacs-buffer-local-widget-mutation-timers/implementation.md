@@ -741,3 +741,36 @@ refactors of `test/psi-widget-projection-timers-test.el` (+ one site in sibling
   `pwpt--with-psi-buffer`: that test's explicit mid-test `kill-buffer` is the
   *act*, not teardown, so it keeps an inline `generate-new-buffer`/`kill-buffer`
   to preserve that intent (the macro's teardown kill would obscure it).
+
+## Test-shaper review pass 2 (ψ)
+
+Independent re-application of test-shaper (clarity ∧ signal ∧ robustness ∧
+economy) to `test/psi-widget-projection-timers-test.el` after the S1/S2
+helper-factoring landed. Grounded on the current test file + source
+(`psi-widget-projection.el`). Determinism (`run-at-time`/`cancel-timer`/`timerp`/
+`send-request-function`/`upsert-projection-block` all substituted), state-based
+(¬interaction) assertions, and behaviour coverage all re-confirmed strong; the
+S1 `pwpt--with-psi-buffer` / `pwpt--seed-button-in-flight` and S2
+`psi-test--should-not-error` factorings read cleanly and compress ceremony
+without hiding intent.
+
+One NEW minor actionable economy/consistency gap (S3): `pwpt--seed-button-in-flight`
+(introduced in S1) was applied only to the cross-buffer tests, but the
+single-buffer `pwpt-on-mutation-timeout-clears-in-flight` hand-rolls the exact
+same arrange ceremony it encapsulates — spec via `pwpt--make-button-spec` +
+`setf projection-widget-specs` + `--sync-lstates` + `--set-lstate` with an
+in-flight lstate (`lstate-set-in-flight … key t`). That is precisely the helper
+body, so the helper applies verbatim there. (`pwpt-on-mutation-timeout-calls-error-handler`
+shares the spec+sync prefix but deliberately omits the in-flight `--set-lstate`,
+so the in-flight helper is NOT a clean fit there — leave it or factor only a
+narrower spec+sync helper.) Incidental-variation: the same seed appears in two
+shapes (helper vs inline) for the same intent, costing `minimal_incidental_variation`
+∧ `consistent(fixtures)`. Minor — coverage/correctness unaffected; deferrable.
+
+Non-actionable (noted, no follow-up): `pwpt-arm-cancel-mutation-timer-roundtrip`'s
+name slightly oversells "cancel" (the path is remhash, `timerp` unstubbed so
+`cancel-timer` never fires on the fake list timer) — already recorded in the
+prior test-shaper note as benign. The `'t1`/`'t2`/`'live-timer` quoted-symbol
+fake timers are idiomatic ERT fixtures, not a defect.
+
+Verdict: ACTIONABLE_FEEDBACK (minor economy refinement S3).

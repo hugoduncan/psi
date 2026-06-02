@@ -243,3 +243,20 @@
       `consistent(assertion_style)` across both files. Deferrable — the idiom is
       correct and uniform today. Re-run `bb emacs:check`; byte-compile clean;
       reload `.el`.
+
+## Test-shaper review pass 2 follow-ups (ψ)
+
+- [ ] S3 — Apply `pwpt--seed-button-in-flight` to the single-buffer timeout
+      test (minor, economy/consistency). `pwpt-on-mutation-timeout-clears-in-flight`
+      (`test/psi-widget-projection-timers-test.el`) hand-rolls the exact arrange
+      ceremony the S1 helper `pwpt--seed-button-in-flight` already encapsulates:
+      `pwpt--make-button-spec` + `setf projection-widget-specs` + `--sync-lstates`
+      + `--set-lstate` with an in-flight lstate (`lstate-set-in-flight … "b1" t`).
+      Replace that inline block with `(pwpt--seed-button-in-flight "w1" "b1")` so
+      the seed reads one way file-wide (`minimal_incidental_variation` ∧
+      `consistent(fixtures)`); keep the `cl-letf`/act/assert inline. Do NOT change
+      `pwpt-on-mutation-timeout-calls-error-handler` — it deliberately omits the
+      in-flight `--set-lstate` (spec+sync only), so the in-flight helper is not a
+      clean fit there (leave inline, or factor only a narrower spec+sync helper if
+      a third caller appears). Deferrable. Re-run `bb emacs:check`; byte-compile
+      clean; reload `.el`.
