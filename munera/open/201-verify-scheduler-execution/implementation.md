@@ -1686,3 +1686,44 @@ Verification: affected ns green (8 tests / 41 assertions); full `bb test` green;
 clj-kondo 0/0; `bb fmt:check` clean. `git status` = only the 3 scheduler test
 files; zero `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10
 allowlist held; aggregate assertion count unchanged at 412).
+
+## Test-shaper review — pass 13 (test-shaper, 2026-06-01)
+
+Re-applied test-shaper (clarity ∧ signal ∧ robustness ∧ economy) to the 201
+new/extended scheduler test namespaces, reading each firsthand. Suite green,
+clj-kondo 0/0 on touched files. Confirms prior strengths: deterministic
+(time/timer seams, no wall-clock sleeps in the 201 live tests), behaviour-focused
+(observable state/outputs, no interaction asserts), single-concern deftests with
+clear AAA + `testing` labels, good economy (representative cases, no explosion).
+
+**One new actionable issue (consistent(test_abstractions) / locally_comprehensible)
+— session-data *write* idiom, the write-side analogue of pass-12's read-idiom
+finding, not previously flagged:** pass 12 standardised the schedule/queue
+*state reads* on `ss/get-session-data-in` but explicitly scoped itself to "state
+reads" and left the *write* that seeds session scheduler/busy state inconsistent
+across the 201 deliverables:
+- `scheduler_resolvers_test/scheduler-resolver-projects-rich-attrs-across-statuses-test`
+  (L78-79, 201-new) seeds the whole `:scheduler` map via the **raw 6-segment
+  `(swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data
+  :scheduler] …)`** literal.
+- `scheduler_end_to_end_test/…-session-kind-…-creates-top-level-session-test`
+  (L105-106, 201-new) seeds the busy flag via the **helper
+  `(swap! (:state* ctx*) (ss/session-update session-id (fn [sd] (assoc sd
+  :is-streaming true))))`**.
+
+Two idioms for the same operation (functional session-data seed) across the 201
+test set; the raw `assoc-in` couples the resolvers test to the internal
+`[:agent-session :sessions … :data]` nesting (brittle to state-shape drift) and
+is noisier than the already-used `ss/session-update` helper — precisely the
+coupling pass-12 removed for reads. `ss/session-update sid f` ≡ `update-in state
+(session-data-path sid) f` with `session-data-path sid = [:agent-session
+:sessions sid :data]`, so the resolvers seed is directly expressible as
+`(swap! (:state* ctx) (ss/session-update session-id (fn [sd] (assoc sd :scheduler
+{:schedules … :queue []}))))` — symmetrical with the read helper and the e2e
+write idiom, no new abstraction. Pass-12's own note recorded the e2e write as
+"out of this step's scope"; this follow-up closes the write-side gap.
+
+Test-only; respects the verification-only invariant (no
+`components/agent-session/src/**` or `doc/scheduler.md` change). `findings.md`
+unchanged unless a covering-test citation's form changes (no status change
+expected).

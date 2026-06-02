@@ -1070,3 +1070,29 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       correctly". Test-file-only — `git status` shows only the 3 scheduler test
       files; zero `components/agent-session/src/**` or `doc/scheduler.md`
       (Slice-10 allowlist held; aggregate assertion count unchanged at 412).
+
+## Test-shaper follow-ups — pass 13 (test-shaper, 2026-06-01)
+
+- [ ] Standardise the 201 session-data *write* idiom (write-side analogue of the
+      pass-12 read standardisation, not covered by it). Replace the raw 6-segment
+      `(swap! (:state* ctx) assoc-in [:agent-session :sessions session-id :data
+      :scheduler] …)` write in
+      `scheduler_resolvers_test/scheduler-resolver-projects-rich-attrs-across-statuses-test`
+      (L78-79) with the existing helper form `(swap! (:state* ctx)
+      (ss/session-update session-id (fn [sd] (assoc sd :scheduler {:schedules …
+      :queue []}))))`, matching the `ss/session-update` idiom already used for the
+      busy-flag seed in `scheduler_end_to_end_test` (L105-106). Rationale
+      (test-shaper consistent(test_abstractions) ∧ locally_comprehensible): two
+      idioms seed session-data across the 201 set; the raw `assoc-in` couples the
+      test to internal `[:agent-session :sessions … :data]` nesting (brittle to
+      state-shape drift) and is noisier than the already-available helper —
+      exactly the coupling pass-12 removed for reads. `ss/session-update sid f` ≡
+      `update-in state (session-data-path sid) f`, `session-data-path sid =
+      [:agent-session :sessions sid :data]`, so the rewrite is behaviour-preserving
+      with no new abstraction. `ss` is already required in
+      `scheduler_resolvers_test`. Keep suite green + clj-kondo/cljfmt clean.
+      Test-file-only — zero `components/agent-session/src/**` /
+      `doc/scheduler.md` (verification-only invariant; Slice-10 allowlist). Update
+      `findings.md` only if a covering-test citation's form changes (none expected).
+      If 201 is treated as closed instead, raise as a small standalone
+      test-hygiene task.
