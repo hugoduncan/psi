@@ -1097,3 +1097,28 @@ new reachable branch.
 
 These were the only two newly-added unchecked steps.md items (code-shaper review
 pass, commit `7055ad055`); both now checked.
+
+## Code-shaper review pass 2 (ψ) — 2026-06-02
+
+Re-applied code-shaper (simplicity ∧ consistency ∧ robustness) over the current
+production code (`psi-widget-projection.el` arm/cancel/timeout/dispatch +
+`--clear-mutation-in-flight`/`--finalize-mutation`/`--clear-mutation-timers`)
+after CS1/CS2 landed. No new actionable items.
+
+- simple: each helper single-responsibility; `--clear-mutation-in-flight` +
+  `--finalize-mutation` extractions clean; no computation/flow tangle.
+- consistent: `state`-leading arg order; `equal`-keyed hash store; both
+  store-targeting callbacks guard `(and (buffer-live-p buffer) state)`;
+  `projection-mutation-timers` mirrors `projection-notification-timers`;
+  `--clear-mutation-timers` is the correct narrowed mirror of
+  `psi-emacs--clear-notification-lifecycle` (only omits the two
+  notification-specific field resets, which have no mutation analogue).
+- robust: store resolved solely from explicit `state` (no dynamic
+  `psi-emacs--state` reads for store location); buffer-live + null-state no-ops;
+  no module-global mutable timer state (git grep: zero refs);
+  `unreachable > forbidden` achieved structurally.
+- The timeout callback's deliberate inline cancel+clear (rather than wholesale
+  `--finalize-mutation`) due to the interposed `--call-error-handler` was
+  already evaluated and dispositioned under CS1 — not re-flagged.
+
+`bb emacs:check` green (340/340). Verdict: REVIEW_COMPLETE.

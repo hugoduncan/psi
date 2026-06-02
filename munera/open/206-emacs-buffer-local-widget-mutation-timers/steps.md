@@ -349,3 +349,14 @@
       so both sibling store-targeting callbacks use the same guard. Benign
       (state is captured non-nil at dispatch) — consistency item. Re-run
       `bb emacs:check`; byte-compile clean; reload `.el`.
+
+## Code-shaper review pass 2 follow-ups (ψ)
+
+- No new actionable items. Pass 2 re-confirmed simplicity ∧ consistency ∧
+  robustness after CS1/CS2 landed: single-responsibility helpers, `state`-leading
+  arg order, both callbacks guard `(and (buffer-live-p buffer) state)`,
+  `--clear-mutation-timers` is the correct narrowed mirror of
+  `--clear-notification-lifecycle`, store resolved solely from explicit `state`,
+  no module-global mutable state. The timeout callback's deliberate inline
+  cancel+clear (interposed error-handler) was already dispositioned under CS1.
+  Verdict: REVIEW_COMPLETE.
