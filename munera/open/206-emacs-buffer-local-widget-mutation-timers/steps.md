@@ -212,3 +212,34 @@
       on the other buffer, mirroring the timeout test — so the design-named
       response lstate-targeting behaviour is directly covered, not only its
       store-targeting counterpart.
+
+## Test-shaper review follow-ups (ψ)
+
+- [ ] S1 — Compress the unfactored cross-buffer test setup ceremony. The three
+      two-buffer tests (`pwpt-dispatch-response-targets-originating-buffer`,
+      `pwpt-on-mutation-timeout-targets-originating-buffer`,
+      `pwpt-two-buffers-do-not-share-mutation-timer-state` in
+      `test/psi-widget-projection-timers-test.el`) each repeat ~10–15 lines of
+      `generate-new-buffer` + `setq-local psi-emacs--state
+      (psi-emacs--initialize-state nil)` + (two of them) button-spec +
+      `--sync-lstates` + `--set-lstate` in-flight seed + `unwind-protect`/
+      `kill-buffer` teardown (`setq-local psi-emacs--state` ×9,
+      `generate-new-buffer` ×10 file-wide, no compressing helper). Add a
+      `pwpt--with-psi-buffer (var &rest body)` macro (generate + `psi-emacs-mode`
+      + `setq-local` state + `unwind-protect` kill) and/or a
+      `pwpt--seed-button-in-flight (id key)` helper so each cross-buffer test
+      reads as its distinct arrange/act/assert intent rather than buried under
+      buffer boilerplate. Keep the assertions inline (they are the intent);
+      compress only the generate/seed/teardown scaffold
+      (`helpers_that_compress(ceremony) ∧ ¬helpers_that_hide(intent)`). Re-run
+      `bb emacs:check`; byte-compile clean; reload `.el`.
+- [ ] S2 — Factor the repeated no-op idiom (minor). The
+      `(should-not (condition-case err (progn … nil) (error err)))` "harmless
+      no-op" idiom is hand-rolled 6× in
+      `test/psi-widget-projection-timers-test.el` and again in
+      `psi-widget-projection-test.el:86`. Add a shared
+      `pwpt--should-not-error (&rest body)` (or `pwpt--should-be-noop`) macro and
+      replace the call sites, making the no-op intent explicit and giving
+      `consistent(assertion_style)` across both files. Deferrable — the idiom is
+      correct and uniform today. Re-run `bb emacs:check`; byte-compile clean;
+      reload `.el`.

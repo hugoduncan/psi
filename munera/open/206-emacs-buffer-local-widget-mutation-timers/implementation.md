@@ -641,3 +641,61 @@ lstate transforms, store resolution, error-handler) is mocked; those run real.
 
 No new actionable test gaps. All prior test follow-ups (T1, T3, T4) confirmed
 resolved in tests. Verdict: REVIEW_COMPLETE.
+
+## Test-shaper review (ψ)
+
+Applied the test-shaper skill (clarity ∧ signal ∧ robustness ∧ **economy**) to
+`test/psi-widget-projection-timers-test.el`. This lens is orthogonal to the
+prior task-test-review passes (which proved ∀b∈design.∃t coverage): it weighs
+`minimal_incidental_setup`, `helpers_that_compress(ceremony)`,
+`consistent(fixtures)`, and `minimal(incidental_variation)`. Coverage,
+determinism (`run-at-time`/`cancel-timer`/`timerp`/`send-request-function`
+substituted), and state-based (¬interaction) assertions are all confirmed
+strong; the findings below are economy/clarity refinements, not coverage or
+correctness gaps.
+
+Robustness confirmed: `pwpt-arm-cancel-mutation-timer-roundtrip` stubs
+`run-at-time` to return `(apply #'list fn args)` (a list) and does NOT stub
+`timerp`/`cancel-timer`; `--cancel-mutation-timer` guards `cancel-timer` with
+`(timerp timer)`, so the list is never passed to `cancel-timer` — benign, the
+test exercises puthash/remhash only (not real cancellation). Not a defect; the
+name slightly oversells ("cancel" here = remhash). Non-actionable on its own.
+
+Two actionable economy findings:
+
+- **S1 (actionable, economy / ceremony) — unfactored cross-buffer setup
+  repetition.** The three two-buffer tests
+  (`pwpt-dispatch-response-targets-originating-buffer`,
+  `pwpt-on-mutation-timeout-targets-originating-buffer`,
+  `pwpt-two-buffers-do-not-share-mutation-timer-state`) each repeat the same
+  ~10–15-line ceremony: `generate-new-buffer` → `setq-local psi-emacs--state
+  (psi-emacs--initialize-state nil)` → (for two of them) `pwpt--make-button-spec`
+  + `--sync-lstates` + `--set-lstate` in-flight seed → `unwind-protect` /
+  `kill-buffer` teardown. `setq-local psi-emacs--state …` appears 9×,
+  `generate-new-buffer` 10× across the file, yet no helper compresses it (only
+  `pwpt--with-state` for the single-buffer dynamic-binding case exists). The
+  test-shaper rule `helpers_that_compress(ceremony) ∧ ¬helpers_that_hide(intent)`
+  is unmet: a `pwpt--with-psi-buffer (var &body)` macro (generate + `psi-emacs-mode`
+  + `setq-local` state + `unwind-protect` kill) and/or a
+  `pwpt--seed-button-in-flight (id key)` helper would cut the incidental setup so
+  each cross-buffer test reads as its distinct arrange/act/assert intent
+  (origin-cleared / other-untouched) rather than buried under buffer boilerplate.
+  Keep the assertions inline (they ARE the intent); compress only the
+  generate/seed/teardown scaffold.
+
+- **S2 (minor, economy / consistency) — repeated no-op idiom.** The
+  `(should-not (condition-case err (progn … nil) (error err)))` "is a harmless
+  no-op" idiom is hand-rolled 6× in this file
+  (`…-noop-when-buffer-dead`, `…-noop-when-state-nil`,
+  `…-noop-when-buffer-dead` response, `…-clear-mutation-timers-noop-when-state-nil`,
+  and the two error-handler no-op tests) — and again in the sibling
+  `psi-widget-projection-test.el:86`. A shared `pwpt--should-not-error (&body)`
+  (or `pwpt--should-be-noop`) macro would remove the repeated
+  `condition-case`/`progn … nil`/`(error err)` scaffold, make the no-op intent
+  explicit at each call, and give `consistent(assertion_style)` across both test
+  files. Minor: the idiom is correct and uniform today; this is a clarity/economy
+  compression, deferrable.
+
+Both are refactors of test scaffolding for already-correct, fully-covering
+tests; neither changes behaviour, coverage, or source. Verdict:
+ACTIONABLE_FEEDBACK (economy/clarity refinements S1, S2).
