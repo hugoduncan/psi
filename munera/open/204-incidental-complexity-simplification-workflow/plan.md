@@ -8,8 +8,11 @@ A1–A5 + I1 all resolved REVIEW_COMPLETE; design-steps unchecked count 0).
 Three authoring deliverables, all S1 capability-catalog artifacts (a skill and
 two workflows). No production Clojure changes are required — the workflows are
 data (`.edn`/`.md` definitions) and the skill is markdown. Verification is by the
-existing workflow-loader/parse/definition tests plus live loadability, not new
-test code in `components/`.
+existing workflow-loader/parse/definition tests plus live loadability: **no new
+production Clojure and no new test namespace in `components/`** — the Slice-4
+assertions for the two new workflows + skill registration **extend the existing**
+`workflow_definitions_test.clj` namespace (see R4 + Slice 4), they do not add a
+new ns or any production code.
 
 Build order is **dependency-first**: the inner `task-lifecycle-in-worktree`
 wrapper before the outer `reduce-incidental-complexity` workflow that delegates
@@ -39,7 +42,9 @@ resolve as it is added.
 - **Generated tasks are two-phase behaviour-preserving contracts**: Phase 0
   test-coverage gate (characterization tests + green net before refactor),
   Phase 1 refactor with `local`-lens before/after (`before-local.json`) + net
-  touched-units burden + `gordian gate --fail-on …` + green tests. This contract
+  touched-units burden + `gordian gate --baseline before-diagnose.edn --fail-on …`
+  + green tests (both baselines — `before-local.json` *and* `before-diagnose.edn`
+  — captured in the task dir during step-1). This contract
   lives in the workflow's step-1 prompt (the design-template the workflow
   generates), not in this task's own code.
 - **Endpoint**: completed, reviewed task on a local worktree branch — no push/PR.
@@ -95,8 +100,9 @@ resolve as it is added.
 - **R3 — Generated `design.md` template fidelity.** The two-phase contract,
   baseline path resolution (worktree-root-relative task-dir paths), gate flags
   (`--fail-on new-cycles,new-high-findings --max-new-medium-findings 0`), and the
-  `before-local.json`/touched-units acceptance must be reproduced verbatim in the
-  workflow's generated-design instructions. Mitigation: lift the contract text
+  `before-local.json` (A5 lcc decrease) + `before-diagnose.edn` (A3 `gordian gate
+  --baseline …` source) baselines + touched-units acceptance must be reproduced
+  verbatim in the workflow's generated-design instructions. Mitigation: lift the contract text
   directly from `design.md`'s "Generated task design" section into the step-1
   prompt; do not paraphrase the objective criteria.
 - **R4 — Definition-test coverage location.** Workflow-loader definition tests

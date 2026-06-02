@@ -53,14 +53,12 @@ with the commit sha / decision when done.
       extracted worktree path, then yields **only** the bare task path on one line.
 - [ ] Add `lifecycle` step: `:type :delegate`, `:target "task-lifecycle"`,
       `:prompt-string {:type :map :fields {:input {:from {:step "resolve-worktree" :yield :text}}}}`.
-- [ ] Add `summary` step (`:type :session`, per resolved P1): produce the
-      user-facing terminal summary for the Munera task, mirroring
-      `implement-task-in-worktree.md`'s `summary` step.
-- [ ] (Decision — resolved, see P1) **Add** a trailing `summary` `:session` step
-      mirroring `implement-task-in-worktree.md`. Rationale: outer step-2 (the
-      delegate into this wrapper) is the `reduce-incidental-complexity` workflow's
-      **terminal** step, so the workflow needs a user-facing terminal summary; the
-      wrapper's `summary` step is where that summary is produced (the precedent
+- [ ] Add a trailing `summary` step (`:type :session`, per resolved P1):
+      produce the user-facing terminal summary for the Munera task, mirroring
+      `implement-task-in-worktree.md`'s `summary` step. Rationale (P1): outer
+      step-2 (the delegate into this wrapper) is the `reduce-incidental-complexity`
+      workflow's **terminal** step, so the workflow needs a user-facing terminal
+      summary; the wrapper's `summary` step is where it is produced (the precedent
       keeps it for exactly this reason). The wrapper is therefore a three-step
       adapter (resolve-worktree → lifecycle → summary), structurally identical to
       `implement-task-in-worktree`; the design's "thin two-step adapter" framing is
@@ -194,25 +192,21 @@ with the commit sha / decision when done.
 
 ## Plan/steps inconsistency follow-ups (review pass 1)
 
-- [ ] C1 — Reconcile plan Approach "**not new test code in `components/`**" with
-      plan R4 + Slice 4 (plan & steps), which add new `components/` test
-      assertions for the two workflows + skill registration. Either soften the
-      Approach line (e.g. no new production Clojure / no new test **namespace** —
-      new assertions extend the existing `workflow_definitions_test.clj` ns) or
-      drop the `components/` test assertions from Slice 4 in favour of pure live
-      loadability. Approach, R4, and Slice 4 (plan + steps) must agree on whether
-      `components/` test code is added.
-- [ ] C2 — Collapse the two duplicate unchecked Slice-2 `summary`-step items
-      (the dedicated "Add `summary` step…" item and the "(Decision — resolved,
-      see P1) **Add** a trailing `summary` step…" item) into a single
-      `summary`-authoring item, keeping the P1 rationale as a sub-note. The
-      checklist must instruct the `summary` step's creation exactly once.
-- [ ] C3 — Add `before-diagnose.edn` to plan.md so its baseline set matches
-      steps.md and the gate acceptance it cites. plan.md currently names only
-      `before-local.json` (lines ~41, ~98) and R3's "reproduce verbatim"
-      contract inventory omits `before-diagnose.edn` — the very baseline
-      `gordian gate --baseline … --fail-on …` consumes. Name both baselines in
-      plan.md's capture description and R3.
+- [x] C1 — Resolved by **softening the plan Approach line** (kept the Slice-4
+      `components/` assertions). Approach now reads "no new production Clojure and
+      no new test **namespace** in `components/` — the Slice-4 assertions extend the
+      existing `workflow_definitions_test.clj` ns". Approach, R4, and Slice 4 now
+      agree: assertions are added, but only as extensions of the existing
+      definition-test ns (no new ns, no production code).
+- [x] C2 — Resolved: collapsed the two duplicate Slice-2 `summary`-step items into
+      a single "Add a trailing `summary` step…" item, keeping the P1 rationale as a
+      sub-note. The checklist now instructs the `summary` step's creation exactly
+      once.
+- [x] C3 — Resolved: plan.md now names **both** baselines. Key-decisions capture
+      bullet names `before-local.json` *and* `before-diagnose.edn` (captured in the
+      task dir during step-1); R3's verbatim-reproduction inventory now lists both
+      baselines (`before-local.json` → A5, `before-diagnose.edn` → A3 gate source).
+      plan.md's baseline set matches steps.md and the gate acceptance it cites.
 
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 

@@ -450,3 +450,40 @@ Three new actionable inconsistencies (added to steps.md):
 Added C1–C3 as unchecked follow-up items to steps.md. No plan.md / design.md /
 code / test / doc edits in this pass (review only; resolution deferred to the
 follow-up items). PASS_STATUS: ACTIONABLE_FEEDBACK.
+
+## 2026-06-01 — Plan/steps inconsistency (pass 1) follow-up executed (C1–C3)
+
+Executed the three newly-added unchecked `steps.md` follow-up items (C1–C3) from
+the pass-1 plan/steps inconsistency review. All three are plan/steps
+**specification** reconciliations — the slices they touch are still unbuilt (no
+Slice 1–5 items checked), so no code/test/doc files outside the task artifacts
+were changed. Slices 1–5 and the C-predating items were left untouched.
+
+- **C1 — Approach vs R4/Slice 4 `components/` test-code contradiction.** Resolved
+  by **softening the plan Approach line** (kept the Slice-4 assertions rather than
+  dropping them, since R4 + both Slice-4 listings already plan them and the
+  assertions are the cheapest objective load/shape guard). Approach now states "no
+  new production Clojure and no new test **namespace** in `components/` — the
+  Slice-4 assertions for the two workflows + skill registration **extend the
+  existing** `workflow_definitions_test.clj` ns, they do not add a new ns or any
+  production code." Approach, R4, and Slice 4 (plan + steps) now agree: assertions
+  are added, but only as extensions of the existing definition-test ns.
+
+- **C2 — duplicate Slice-2 `summary`-step checkboxes.** Collapsed the dedicated
+  "Add `summary` step…" item and the "(Decision — resolved, see P1) **Add** a
+  trailing `summary` step…" item into a single "Add a trailing `summary` step…"
+  checkbox, keeping the P1 rationale as a sub-note. The checklist now instructs the
+  `summary` step's creation exactly once.
+
+- **C3 — plan.md omits `before-diagnose.edn`.** Added `before-diagnose.edn` to
+  plan.md in two places: (1) the Key-decisions two-phase-contract bullet now names
+  both baselines (`before-local.json` *and* `before-diagnose.edn`, captured in the
+  task dir during step-1) and references `gordian gate --baseline
+  before-diagnose.edn`; (2) R3's verbatim-reproduction inventory now lists both
+  baselines, tagged by the acceptance each feeds (`before-local.json` → A5 lcc
+  decrease; `before-diagnose.edn` → A3 gate `--baseline` source). plan.md's
+  baseline set now matches steps.md Slice 3 and the gate acceptance it cites.
+
+C1–C3 checked in steps.md. No code/test/doc outside task artifacts touched
+(slices unbuilt). design.md untouched (design review complete). PASS_STATUS:
+REVIEW_COMPLETE.
