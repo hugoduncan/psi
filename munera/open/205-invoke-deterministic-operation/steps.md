@@ -121,16 +121,16 @@
 
 ## Slice 3 — slash commands `/operations` + `/operation`
 
-- [ ] In `commands.clj`: require the shared helper ns.
-- [ ] Add `"/operations" :operations` to `exact-command-handlers`; add
+- [x] In `commands.clj`: require the shared helper ns.
+- [x] Add `"/operations" :operations` to `exact-command-handlers`; add
   `:operations` arm in `dispatch*` exact `case` →
   `{:type :text :message (format-operations ctx)}`.
-- [ ] Implement `format-operations [ctx]`: call `list-operations`; empty →
+- [x] Implement `format-operations [ctx]`: call `list-operations`; empty →
   `"No deterministic operations registered."`; else lines of
   `"<id> — <description>"` (sorted already by helper).
-- [ ] Add `"/operation"` to `prefixed-command-prefixes`; add arm to
+- [x] Add `"/operation"` to `prefixed-command-prefixes`; add arm to
   `dispatch-prefixed-command` → `dispatch-operation-command`.
-- [ ] Implement `dispatch-operation-command [ctx session-id trimmed]` (decision
+- [x] Implement `dispatch-operation-command [ctx session-id trimmed]` (decision
   #11): strip `^/operation\s*`; split tail once on first whitespace run into
   `<id>` + remaining text; blank `<id>` →
   `{:type :text :message "Usage: /operation <id> {edn-args}"}`; blank remaining
@@ -143,23 +143,23 @@
   `:missing-deterministic-operation` → distinct "unknown operation" text;
   `:malformed-operation-result` → distinct "malformed result" text; any other
   throwable re-thrown (not a blanket catch).
-- [ ] Confirm precedence: `/operations` matched as exact before `/operation`
+- [x] Confirm precedence: `/operations` matched as exact before `/operation`
   prefix; add a test asserting `/operations` does not dispatch as `/operation`.
-- [ ] Write tests
+- [x] Write tests
   `components/agent-session/test/psi/agent_session/operation_command_test.clj`:
-  - [ ] `/operations` lists id+description sorted; empty → exact message.
-  - [ ] `/operation <id> {args}` invokes, renders result text (all keys).
-  - [ ] (D2) exact multi-line text for a known result: `:status` line first,
+  - [x] `/operations` lists id+description sorted; empty → exact message.
+  - [x] `/operation <id> {args}` invokes, renders result text (all keys).
+  - [x] (D2) exact multi-line text for a known result: `:status` line first,
     remaining keys sorted ascending by `pr-str`, one `"<key> <value>"` per line.
-  - [ ] (D3) malformed-result op → distinct text from unknown-id text.
-  - [ ] `/operation <id>` (no args) → `args {}` default.
-  - [ ] blank id → usage message.
-  - [ ] malformed/non-map args → clear text error, not crash.
-  - [ ] unknown id → clear text error, not crash.
-  - [ ] side-effecting op invokable.
-  - [ ] `/operations` vs `/operation` precedence (no collision).
-- [ ] Run slice-3 tests; `clj-paren-repair`; `clj-kondo --lint`.
-- [ ] Commit: `⚒ 205: /operations + /operation slash commands`.
+  - [x] (D3) malformed-result op → distinct text from unknown-id text.
+  - [x] `/operation <id>` (no args) → `args {}` default.
+  - [x] blank id → usage message.
+  - [x] malformed/non-map args → clear text error, not crash.
+  - [x] unknown id → clear text error, not crash.
+  - [x] side-effecting op invokable.
+  - [x] `/operations` vs `/operation` precedence (no collision).
+- [x] Run slice-3 tests; `clj-paren-repair`; `clj-kondo --lint`.
+- [x] Commit: `⚒ 205: /operations + /operation slash commands`.
 
 ## Slice 4 — docs + CHANGELOG
 

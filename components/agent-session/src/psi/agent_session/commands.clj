@@ -23,9 +23,11 @@
      :extension-cmd — {:type :extension-cmd :name string :args string :handler fn}
      nil            — not a command (pass through to agent)"
   (:require
+   [clojure.edn :as edn]
    [clojure.string :as str]
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.commands.builtin-specs :as bspec]
+   [psi.agent-session.deterministic-operation-action :as op-action]
    [psi.agent-session.commands.effort :as effort-command]
    [psi.agent-session.commands.speed :as speed-command]
    [psi.agent-session.core :as session]
@@ -630,6 +632,68 @@
                     session-id
                     #(handler args))))}))
 
+(defn format-operations
+  "Render the deterministic-operation listing as text: one
+   `\"<id> — <description>\"` line per operation (sorted by the helper).
+   Empty registry → explicit message."
+  [ctx]
+  (let [operations (op-action/list-operations ctx)]
+    (if (seq operations)
+      (str/join "\n"
+                (map (fn [{:keys [id description]}]
+                       (str id " — " description))
+                     operations))
+      "No deterministic operations registered.")))
+
+(defn- render-operation-result
+  "Render a tagged result as text: `:status` line first, remaining top-level
+   keys sorted ascending by `pr-str`, one `\"<key> <value>\"` line per key (D2)."
+  [result]
+  (let [projected (op-action/project-result result)
+        ordered-keys (cons :status
+                           (sort-by pr-str (remove #{:status} (keys projected))))]
+    (str/join "\n"
+              (map (fn [k] (str (pr-str k) " " (get projected k)))
+                   ordered-keys))))
+
+(defn- parse-operation-command-args
+  "Parse the EDN-map `args` text for the `/operation` command. Blank → `{}`.
+   Returns `{:ok args}` or `{:error message}`."
+  [args-text]
+  (if (str/blank? args-text)
+    {:ok {}}
+    (let [parsed (try
+                   (binding [*read-eval* false]
+                     {:ok (edn/read-string args-text)})
+                   (catch Exception e
+                     {:error (str "Could not parse args as EDN: "
+                                  (or (ex-message e) (str e)))}))]
+      (cond
+        (:error parsed) parsed
+        (map? (:ok parsed)) parsed
+        :else {:error "Operation args must be an EDN map."}))))
+
+(defn- dispatch-operation-command
+  "Dispatch `/operation <id> {edn-args}` (decision #11)."
+  [ctx session-id trimmed]
+  (let [tail (str/replace trimmed #"^/operation\s*" "")
+        [id args-text] (str/split tail #"\s+" 2)]
+    (if (str/blank? id)
+      {:type :text :message "Usage: /operation <id> {edn-args}"}
+      (let [parsed-args (parse-operation-command-args args-text)]
+        (if (:error parsed-args)
+          {:type :text :message (:error parsed-args)}
+          (try
+            (let [result (op-action/invoke-operation ctx session-id id (:ok parsed-args))]
+              {:type :text :message (render-operation-result result)})
+            (catch clojure.lang.ExceptionInfo e
+              (case (:type (ex-data e))
+                :missing-deterministic-operation
+                {:type :text :message (str "Unknown deterministic operation: " id)}
+                :malformed-operation-result
+                {:type :text :message (str "Operation " id " returned a malformed result.")}
+                (throw e)))))))))
+
 (defn- new-session-result
   [ctx session-id on-new-session!]
   (let [rehydrate (if on-new-session!
@@ -664,7 +728,7 @@
    coherence test reads this same def — so there is no duplicate literal and
    drift between the spec table and the real `case` is caught at load."
   #{"/tree" "/jobs" "/job" "/cancel-job" "/remember" "/model" "/thinking"
-    "/speed" "/effort" "/login" "/project-repl"})
+    "/speed" "/effort" "/login" "/operation" "/project-repl"})
 
 (assert (= prefixed-case-branches (set bspec/prefixed-command-prefixes))
         "dispatch-prefixed-command case branches must match the spec-table prefixed projection")
@@ -682,6 +746,7 @@
     "/speed" (speed-command/dispatch-command ctx session-id trimmed)
     "/effort" (effort-command/dispatch-command ctx session-id trimmed)
     "/login" (dispatch-login-command ctx session-id oauth-ctx ai-model trimmed)
+    "/operation" (dispatch-operation-command ctx session-id trimmed)
     "/project-repl" (project-nrepl-commands/dispatch-project-nrepl-command ctx session-id trimmed)
     nil))
 
@@ -741,8 +806,8 @@
    — so an `:exact` spec entry whose `:handler` is absent from the `case` is
    caught at load (`unreachable > forbidden`), symmetric with the prefixed seam."
   #{:quit :new :resume :status :history :help :prompts :skills :worktree
-    :reload-models :reload-prompts :reload-extension-installs :project-repl
-    :logout})
+    :reload-models :reload-prompts :reload-extension-installs :operations
+    :project-repl :logout})
 
 (assert (= exact-case-branches (set (vals bspec/exact-command-handlers)))
         "dispatch* exact-command case branches must match the spec-table exact projection handler values")
@@ -767,6 +832,7 @@
        :reload-models {:type :text :message (format-reload-models ctx session-id)}
        :reload-prompts {:type :text :message (format-reload-prompts ctx session-id)}
        :reload-extension-installs {:type :text :message (format-reload-extension-installs ctx session-id)}
+       :operations {:type :text :message (format-operations ctx)}
        :project-repl (project-nrepl-commands/dispatch-project-nrepl-command ctx session-id trimmed)
        :logout (dispatch-logout-command ctx session-id oauth-ctx)
        nil)
