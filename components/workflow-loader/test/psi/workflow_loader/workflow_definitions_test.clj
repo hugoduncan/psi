@@ -8,6 +8,7 @@
   (:require
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
+   [psi.prompt-assets.skills :as skills]
    [psi.workflow-loader.core :as loader]))
 
 ;;; ---------------------------------------------------------------------------
@@ -590,3 +591,103 @@
        (testing "no step declares :yields or :terminal-contract (terminal relies on propagated session default yield)"
          (is (= (repeat 5 {})
                 (mapv #(select-keys % [:yields :terminal-contract]) steps))))))))
+
+;;; ---------------------------------------------------------------------------
+;;; task-lifecycle-in-worktree (Slice 2 of task 204)
+
+(deftest task-lifecycle-in-worktree-test
+  (load-edn-only
+   "task-lifecycle-in-worktree.edn"
+   (fn [{:keys [definitions errors]}]
+     (testing "loads without error"
+       (is (empty? errors))
+       (is (contains? definitions "task-lifecycle-in-worktree")))
+     (let [steps (get-in definitions ["task-lifecycle-in-worktree" :steps])
+           step-by-name (into {} (map (juxt :name identity) steps))
+           resolve-step (get step-by-name "resolve-worktree")
+           lifecycle-step (get step-by-name "lifecycle")
+           summary-step (get step-by-name "summary")]
+       (testing "is a three-step resolve-worktree -> lifecycle -> summary adapter"
+         (is (= 3 (count steps)))
+         (is (= ["resolve-worktree" "lifecycle" "summary"] (mapv :name steps)))
+         (is (= [:session :delegate :session] (mapv :type steps))))
+       (testing "resolve-worktree :session step includes the work-on tool and {{input}} wiring"
+         (is (some #{"work-on"} (:tools resolve-step))
+             "resolve-worktree tools include work-on")
+         (is (step-has-input-var-wired? resolve-step)
+             "resolve-worktree has {{input}} wired to :workflow-input"))
+       (testing "lifecycle :delegate targets task-lifecycle with :input from resolve-worktree :yield :text"
+         (is (= :delegate (:type lifecycle-step)))
+         (is (= "task-lifecycle" (:target lifecycle-step)))
+         (is (= {:type :map
+                 :fields {:input {:from {:step "resolve-worktree" :yield :text}}}}
+                (:prompt-string lifecycle-step))))
+       (testing "trailing summary :session step is present (terminal user-facing summary)"
+         (is (some? summary-step))
+         (is (= :session (:type summary-step)))
+         (is (seq (:contributions summary-step))))))))
+
+;;; ---------------------------------------------------------------------------
+;;; reduce-incidental-complexity (Slice 3 of task 204)
+
+(deftest reduce-incidental-complexity-test
+  (load-edn-only
+   "reduce-incidental-complexity.edn"
+   (fn [{:keys [definitions errors]}]
+     (testing "loads without error"
+       (is (empty? errors))
+       (is (contains? definitions "reduce-incidental-complexity")))
+     (let [steps (get-in definitions ["reduce-incidental-complexity" :steps])
+           step-by-name (into {} (map (juxt :name identity) steps))
+           select-step (get step-by-name "select-and-create")
+           delegate-step (get step-by-name "lifecycle-in-worktree")
+           select-text (step-template-text select-step)]
+       (testing "is a two-step select-and-create (:session) -> lifecycle-in-worktree (:delegate)"
+         (is (= 2 (count steps)))
+         (is (= ["select-and-create" "lifecycle-in-worktree"] (mapv :name steps)))
+         (is (= [:session :delegate] (mapv :type steps))))
+       (testing "select-and-create :session step carries work-on tool + incidental-complexity-finder skill"
+         (is (some #{"work-on"} (:tools select-step))
+             "select-and-create tools include work-on")
+         (is (some #{"incidental-complexity-finder"} (:skills select-step))
+             "select-and-create skills include incidental-complexity-finder"))
+       (testing "lifecycle-in-worktree :delegate targets the wrapper with :input from select-and-create :yield :text"
+         (is (= :delegate (:type delegate-step)))
+         (is (= "task-lifecycle-in-worktree" (:target delegate-step)))
+         (is (= {:type :map
+                 :fields {:input {:from {:step "select-and-create" :yield :text}}}}
+                (:prompt-string delegate-step))))
+       (testing "select-and-create prompt emits the worktree_path:/munera_task_path: handoff fields"
+         (is (.contains select-text "worktree_path:")
+             "step-1 prompt emits worktree_path: handoff field")
+         (is (.contains select-text "munera_task_path:")
+             "step-1 prompt emits munera_task_path: handoff field"))
+       (testing "select-and-create prompt encodes the early-stop-on-no-target intent"
+         (is (re-find #"(?i)no unit qualif" select-text)
+             "step-1 prompt encodes early-stop when no unit qualifies")
+         (is (.contains select-text "Do NOT create a worktree")
+             "step-1 prompt forbids creating a worktree on early stop"))
+       (testing "select-and-create prompt embeds the enforcing gate flags + both baselines"
+         (is (.contains select-text
+                        "--fail-on new-cycles,new-high-findings --max-new-medium-findings 0")
+             "step-1 prompt embeds the enforcing gate flags")
+         (is (.contains select-text "before-local.json")
+             "step-1 prompt names the before-local.json baseline (A5)")
+         (is (.contains select-text "before-diagnose.edn")
+             "step-1 prompt names the before-diagnose.edn baseline (A3)"))))))
+
+;;; ---------------------------------------------------------------------------
+;;; incidental-complexity-finder skill registration (Slice 1 of task 204)
+
+(deftest incidental-complexity-finder-skill-registers-test
+  (testing "the incidental-complexity-finder skill is discoverable and loads with no diagnostics"
+    (let [skills-dir (str (io/file (System/getProperty "user.dir") ".psi/skills"))
+          {:keys [skills diagnostics]}
+          (skills/load-skills-from-dir skills-dir :project true)
+          skill (first (filter #(= "incidental-complexity-finder" (:name %)) skills))
+          skill-diagnostics (filter #(re-find #"incidental-complexity-finder" (str (:path %)))
+                                    diagnostics)]
+      (is (some? skill) "incidental-complexity-finder skill is discovered")
+      (is (seq (:description skill)) "skill has a description for progressive disclosure")
+      (is (empty? skill-diagnostics)
+          "skill loads without warnings or errors"))))

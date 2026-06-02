@@ -159,26 +159,26 @@ with the commit sha / decision when done.
 
 ## Slice 4 — verification + definition tests
 
-- [ ] Extend `components/workflow-loader/test/.../workflow_definitions_test.clj`:
+- [x] Extend `components/workflow-loader/test/.../workflow_definitions_test.clj`:
       assert `reduce-incidental-complexity` and `task-lifecycle-in-worktree`
       parse/load.
-- [ ] Assert outer two-step shape: step-1 `:session` (with `work-on` tool +
+- [x] Assert outer two-step shape: step-1 `:session` (with `work-on` tool +
       `incidental-complexity-finder` skill), step-2 `:delegate`
       `:target "task-lifecycle-in-worktree"` with the
       `:prompt-string {:type :map :fields {:input {:from {:step … :yield :text}}}}`
       wiring.
-- [ ] Assert wrapper three-step shape (per resolved P1): `resolve-worktree`
+- [x] Assert wrapper three-step shape (per resolved P1): `resolve-worktree`
       `:session` with `work-on` tool; `lifecycle` `:delegate`
       `:target "task-lifecycle"` with `:input` sourced from `resolve-worktree`
       `:yield :text`; trailing `summary` `:session` step present.
-- [ ] Assert (where the test ns convention supports it) the step-1 prompt emits
+- [x] Assert (where the test ns convention supports it) the step-1 prompt emits
       the `worktree_path:` / `munera_task_path:` handoff fields and the early-stop
       intent (R1 lock).
-- [ ] Assert the `incidental-complexity-finder` skill registers / is discoverable.
-- [ ] Run focused workflow tests (workflow-loader + relevant agent-session
+- [x] Assert the `incidental-complexity-finder` skill registers / is discoverable.
+- [x] Run focused workflow tests (workflow-loader + relevant agent-session
       workflow definition tests) green.
-- [ ] Run `clj-kondo --lint` over any changed source/test paths; 0 new findings.
-- [ ] Commit Slice 4 (`⚒ test: lock reduce-incidental-complexity + wrapper definitions`).
+- [x] Run `clj-kondo --lint` over any changed source/test paths; 0 new findings.
+- [x] Commit Slice 4 (`⚒ test: lock reduce-incidental-complexity + wrapper definitions`).
 
 ## Slice 5 — docs + coherence
 

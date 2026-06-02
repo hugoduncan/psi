@@ -620,3 +620,42 @@ and both baselines all confirmed present (programmatic asserts in
 No deviation in Slice 3 beyond D1 (the delegate target name
 `task-lifecycle-in-worktree` is unchanged; only that wrapper's backing file is
 `.edn`). Slices 4 (definition tests) + 5 (docs) remain.
+
+## 2026-06-01 — Slice 4 built: definition tests
+
+Extended `components/workflow-loader/test/psi/workflow_loader/workflow_definitions_test.clj`
+(existing ns, no new ns, no production Clojure — per C1 resolution) with three
+new deftests:
+
+- `task-lifecycle-in-worktree-test` (via `load-edn-only`): asserts the wrapper
+  loads with no errors; three-step `[resolve-worktree lifecycle summary]` shape,
+  types `[:session :delegate :session]`; resolve-worktree includes `work-on` +
+  `{{input}}` wiring; lifecycle `:delegate :target "task-lifecycle"` with
+  `:prompt-string {:type :map :fields {:input {:from {:step "resolve-worktree"
+  :yield :text}}}}`; trailing `summary` `:session` present (per P1).
+- `reduce-incidental-complexity-test` (via `load-edn-only`): asserts the outer
+  workflow loads with no errors; two-step `[select-and-create
+  lifecycle-in-worktree]`, types `[:session :delegate]`; step-1 carries `work-on`
+  tool + `incidental-complexity-finder` skill; step-2 `:delegate :target
+  "task-lifecycle-in-worktree"` with the grammar-conformant `:prompt-string`
+  wiring; step-1 prompt emits `worktree_path:`/`munera_task_path:`, the
+  early-stop intent (+ "Do NOT create a worktree"), the enforcing gate flags
+  `--fail-on new-cycles,new-high-findings --max-new-medium-findings 0`, and both
+  baselines (`before-local.json` A5 / `before-diagnose.edn` A3).
+- `incidental-complexity-finder-skill-registers-test`: asserts
+  `psi.prompt-assets.skills/load-skills-from-dir` discovers the skill (anchored
+  on `user.dir`/`.psi/skills`) with a description and zero diagnostics.
+
+Added `[psi.prompt-assets.skills :as skills]` require (prompt-assets already a
+workflow-loader dep). The two new `.edn` workflows are verified via the
+`load-edn-only` precedent (not `load-edn-with-md-refs`), consistent with D1
+(`.edn` form) and the `review-implementation-in-worktree` / `task-lifecycle`
+test precedents.
+
+Verification:
+- `clojure -M:test --focus psi.workflow-loader.workflow-definitions-test`:
+  **14 tests, 192 assertions, 0 failures**.
+- `clj-kondo --lint` on the test file: 0 errors, 0 warnings.
+- `cljfmt check` on the test file: formatted correctly.
+
+Slice 5 (docs + coherence) remains.
