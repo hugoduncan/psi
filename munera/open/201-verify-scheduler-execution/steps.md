@@ -486,3 +486,22 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       dependent failures that do NOT occur under the canonical full `bb test`
       run (each ns green standalone) — a pre-existing cross-ns test-isolation
       artifact, out of scope for this doc-accuracy step.
+
+## Test review follow-ups — pass 6 (task-test-review, 2026-06-01)
+
+- [ ] Replace the `with-redefs` AI-boundary stub in
+      `scheduler_end_to_end_test/scheduler-session-kind-fires-via-timer-seam-and-creates-top-level-session-test`
+      (line ~109) with the **injectable ctx seam**. The
+      `execute-prepared-request!` boundary it stubs is already an injectable ctx
+      dependency (`dispatch_effects.clj:154` → `(:execute-prepared-request-fn
+      ctx)`), and `test_support/make-session-ctx` (~L246) already provides a
+      default stub via that seam. Per the test-review skill
+      (`infra_deps → injectable ∧ ¬stub`) and the plan's "build live tests on
+      `make-session-ctx`'s already-wired seams" mitigation, pass
+      `:execute-prepared-request-fn` through `safe-context-opts`/the ctx (or
+      build the test on `make-session-ctx`) and drop the `with-redefs`. Keep the
+      same shaped execution-result so the round trip still creates the top-level
+      session + records `:created-session-id`/`:delivery-phase`. Test file only,
+      within the Slice-10 allowlist (zero `src/**`/`doc/scheduler.md`); keep the
+      suite green + clj-kondo/cljfmt clean. (If the task is treated as closed,
+      raise it as a small standalone test-hygiene task instead.)

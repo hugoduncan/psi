@@ -757,3 +757,45 @@ the design/plan acceptance criteria. No new actionable issues found.
 Conclusion: implementation, tests, findings.md, and the structured deliverable
 are accurate, coherent, and green against current behaviour. No follow-up steps
 added (no new actionable issues; prior passes' items all resolved).
+
+## Test review — pass 6 (task-test-review skill, 2026-06-01)
+
+Applied `task-test-review` skill (well_formed ∧ behaviour-coverage ∧
+`∀d ∈ infra_deps. injectable ∧ nullable ∧ ¬mock ∧ ¬stub`). Suite green
+(scheduler-end-to-end focus = 3 tests / 20 assertions / 0 fail). Behaviour
+coverage maps 1:1 to design Scope areas; timer/cancel/drain/shutdown live tests
+correctly drive the real dispatch+effect path via injectable ctx seams and
+assert state/outputs, not interactions. One actionable test-quality finding:
+
+- **`with-redefs` used where an injectable ctx seam exists (skill clause
+  `injectable ∧ ¬stub`).** `scheduler_end_to_end_test/
+  scheduler-session-kind-fires-via-timer-seam-and-creates-top-level-session-test`
+  (line ~109) stubs the AI-execution boundary via
+  `(with-redefs [psi.turn-runtime.core/execute-prepared-request! …] …)` — a
+  global var redef. But that boundary is already an **injectable ctx dependency**:
+  `dispatch_effects.clj:154` calls `(:execute-prepared-request-fn ctx)`, and
+  `test_support/make-session-ctx` (line ~246) already wires a default
+  `:execute-prepared-request-fn` stub via that seam. The skill prefers injection
+  over var-stubbing, and the plan's own mitigation says to "build live tests on
+  `test_support/make-session-ctx`'s already-wired seams." The test instead uses
+  its local `create-session-context` (raw `session/create-context`) + a
+  `with-redefs` reimplementation of the same stub. Fix: pass
+  `:execute-prepared-request-fn` through `safe-context-opts`/ctx (or build on
+  `make-session-ctx`) and drop the `with-redefs`. Test-quality DRY/injection
+  only — no behaviour change; within the Slice-10 allowlist (test file only,
+  zero `src/**`/`doc/scheduler.md`).
+
+- **Disagreement with pass-5 dismissal (recorded for the trail).** Pass 5
+  justified the `with-redefs` as "on the turn-runtime boundary, not the
+  scheduler delivery path — consistent with the runtime-owned-deliver frontier."
+  That defends *what* is stubbed (a genuine infra boundary — correct), but not
+  *how*: the skill clause is about the *mechanism* (`injectable ∧ ¬stub`), and a
+  ctx seam for exactly this boundary exists and is the documented project idiom.
+  So the finding stands on the injection-vs-redef axis, which pass 5 did not
+  address.
+
+- **No other actionable test issues.** capturing-delay-fn DRY (pass-1), `:at`
+  named-bound asserts (pass-2), allowlist (pass-3), counts (pass-4) all resolved.
+  Cross-ns isolation artifact (pass-4/5) confirmed out of scope (canonical
+  runner green). All infra time/timer deps are injectable+nullable via ctx
+  seams (✓ skill). Behaviour coverage complete (✓ skill).
