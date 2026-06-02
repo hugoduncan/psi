@@ -1596,3 +1596,42 @@ time-source-stamp handler-unit assertion out of the cited live covering test.
   --name-only` = the single `scheduler_lifecycle_test.clj` test path; zero
   `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist
   held).
+
+## Test review — pass 11 (task-test-review, 2026-06-01) — REVIEW_COMPLETE
+
+Re-applied `task-test-review` (`well_formed ∧ ∀b∈behaviour. ∃t. covers ∧
+infra_deps→injectable∧nullable∧¬mock∧¬stub`) to all 201 new/extended tests +
+cited covering tests after pass-10's busy-drain migration landed.
+
+- **well_formed.** All scheduler test nss parse, `clj-kondo --lint` 0/0 across
+  the seven touched files, full `bb test` green.
+- **behaviour-coverage.** Every design Scope area (7) + every acceptance
+  criterion maps to a cited covering test in `findings.md`: pure-model
+  guards/ordering (`scheduler-test` new deftests), message- & session-kind live
+  round trips via the ctx timer seam (`scheduler-end-to-end-test`), busy-queue +
+  drain-on-idle through real `dispatch-in! :scheduler/drain-queue`
+  (`scheduler-lifecycle-test/busy-session-…-drains-fifo`, post pass-10), both
+  cancel races (`scheduler-timer-seam-test`, `scheduler-lifecycle-test`,
+  `scheduler-test`), shutdown timer cleanup + no-fire-after
+  (`scheduler-context-shutdown-test`), failure recording
+  (`scheduler-test/fail-schedule-…`, `scheduler-handlers-test/…-prompt-submit-error`),
+  projections across statuses (`scheduler-resolvers-test`).
+- **infra-deps injectable, not stubbed.** All cited covering / 201-added tests
+  drive infra through ctx-injected seams
+  (`:scheduler-run-after-delay-fn`, `:scheduler-cancel-delay-fn`,
+  `:execute-prepared-request-fn`, `:daemon-thread-fn`, `:scheduler-timers*`) and
+  assert observable state/outputs — no mocks, no stubs, no interaction asserts.
+  The two surviving `with-redefs` sites
+  (`scheduler-effects-test/scheduler-start-and-cancel-timer-effects-test` —
+  intentional **default daemon-thread** path with real `Thread/sleep`;
+  `scheduler-lifecycle-test/scheduled-deliver-runs-canonical-prompt-lifecycle-test`)
+  are **pre-existing baseline**, NOT cited as covering tests for any acceptance
+  area — already audited and scoped out in passes 7 & 9. No re-file (would
+  duplicate prior notes).
+
+No new actionable issue. The review chain (10 task-test-review + 6 test-shaper +
+1 implementation-review passes) plus pass 11 has converged: the verification-only
+deliverable (green coverage + structured `findings.md`) is well-formed, fully
+covers the design behaviour, and uses injection over mocking throughout its
+cited/added tests. Verification-only invariant intact (this review touched no
+`components/agent-session/src/**` or `doc/scheduler.md`).

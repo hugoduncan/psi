@@ -1020,3 +1020,19 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       only — `git diff --name-only` = the single
       `scheduler_lifecycle_test.clj` path; zero `components/agent-session/src/**`
       or `doc/scheduler.md` (Slice-10 allowlist held).
+
+## Test review follow-ups — pass 11 (task-test-review, 2026-06-01)
+
+- [x] Re-audit all 201 verification-test deliverables + cited covering tests
+      against the task-test-review skill (well_formed ∧ behaviour-coverage ∧
+      infra_deps→injectable∧nullable∧¬mock∧¬stub), after pass-10's busy-drain
+      migration to real `dispatch-in! :scheduler/drain-queue`. No new actionable
+      issue: well_formed (clj-kondo 0/0, full `bb test` green); every Scope area
+      + acceptance criterion maps to a cited covering test; all cited/201-added
+      tests drive infra via ctx-injected seams and assert observable state (no
+      mocks/stubs/interaction-asserts). The two surviving `with-redefs` sites
+      (`scheduler-effects-test/scheduler-start-and-cancel-timer-effects-test`,
+      `scheduler-lifecycle-test/scheduled-deliver-runs-canonical-prompt-lifecycle-test`)
+      are pre-existing baseline, non-cited — already evaluated & scoped out in
+      passes 7 & 9; not re-filed (no-duplicate). Review chain converged →
+      REVIEW_COMPLETE.
