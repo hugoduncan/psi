@@ -30,3 +30,4 @@
 
 - [x] Reconcile `steps.md` with the already-applied `doc/scheduler.md` absolute-`:at` wording recorded in `implementation.md`: check completed documentation/verification/task-record items or adjust them so the task no longer implies the doc update is still pending.
 - [x] Add or identify executable coverage for the documented sub-millisecond future absolute `:at` case: an `:at` instant less than 1ms ahead truncates to resolved delay `0`, is accepted, and fires immediately rather than being rejected by the minimum bound.
+- [ ] Fix `doc/scheduler.md` supported `session-config` key list: it documents `:tool-defs`, but `parse-session-config!` accepts `:tool-ids` and rejects unsupported keys.
