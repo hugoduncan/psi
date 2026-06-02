@@ -817,3 +817,41 @@ clj-paren-repair no-ops.
 No blocked steps. The remaining unchecked close-out box (`git mv open/ →
 closed/` + remove from plan.md) is the lifecycle's terminal move, performed by
 the orchestrating lifecycle, not this follow-up pass.
+
+## Test review (ψ, seventh pass — test-shaper)
+
+Re-applied `test-shaper` skill (clarity ∧ signal ∧ robustness ∧ economy) at
+source-of-truth level: read all four task test ns + the shared
+`deterministic-operation-action.clj`, `commands/operation.clj`,
+`psi_tool_operation.clj`, and the consolidated `test_support.clj` fixtures
+(`make-op-ctx`/`ok-op`/`create-op-session-context`/`register-op!`). Ran the
+four suites focused: 48 tests / 108 assertions, 0 failures.
+
+Confirmed prior-pass closures hold:
+- TS-1 (fixture economy) — one canonical fixture set in `test_support.clj`;
+  all four suites alias it; no incidental per-suite re-definition remains. ✓.
+- TS-2 (signal) — `operation-invoke-renders-result` asserts exact line-equality
+  (`[":status :ok" ":data {:x 1}"]`), not substring. ✓.
+- TS-3 (signal vs name) — `operation-list-ignores-args-and-id` registers a
+  sink op under a valid id and asserts the sink stays `:untouched`, proving the
+  id-ignored half. ✓.
+
+No new actionable test-shaper issue found. Evaluated the remaining
+`str/includes?` assertions on the command surface and judged each NON-actionable
+(would be churn, not signal):
+- Error-phrase matches (`operation-bad-args-error`, `operation-unknown-id-error`,
+  `operation-malformed-result-distinct`, `operations-vs-operation-precedence`)
+  are *partial-message* assertions; exact-line equality would over-specify error
+  wording that decision #11 / D3 deliberately leave loose ("name the parse
+  problem"), coupling tests to cosmetic phrasing. Substring is the correct shape
+  here.
+- `operation-invoke-default-args` and `operation-invoke-renders-details-nested-map`
+  use `str/includes?` for layout, but the exact multi-line layout (incl. the
+  default-args path `/operation alpha/op`) is already locked by
+  `operation-invoke-status-line-first` and `operation-invoke-renders-result`;
+  these two carry distinct signal (args-defaulting, nested-map `:details`
+  projection) and a malformed-layout regression would still be caught by the
+  exact-line tests. Strengthening them adds redundancy, not coverage.
+
+Tests are well-formed, deterministic, real-infra (no mocks), behaviour-focused,
+economical, and consistent in fixtures (post TS-1). Test review is complete.
