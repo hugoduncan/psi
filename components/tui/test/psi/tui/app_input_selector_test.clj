@@ -7,6 +7,7 @@
    [charm.message :as msg]
    [psi.app-runtime.projections :as projections]
    [psi.tui.app :as app]
+   [psi.tui.app.support :as support]
    [psi.ui.state :as ui-state])
   (:import
    [java.util.concurrent LinkedBlockingQueue]))
@@ -26,10 +27,25 @@
     "/cancel-job"      {:type :text :message "test cancel-job"}
     nil))
 
+(def ^:private sample-builtin-command-specs
+  "Representative backend built-in command specs (single-sourced via the
+   :psi.agent-session/builtin-command-specs resolver in production). Seeded into
+   the test init state so slash autocomplete has built-in candidates without a
+   live backend query."
+  [{:name "quit" :description "exit the session"}
+   {:name "status" :description "show session diagnostics"}
+   {:name "help" :description "show this help"}
+   {:name "reload-models" :description "reload custom model definitions"}
+   {:name "reload-prompts" :description "re-discover prompt templates"}
+   {:name "speed" :description "show or set speed mode"}
+   {:name "effort" :description "show or set effort override"}])
+
 (defn- init-state
   ([] (init-state {}))
   ([opts]
-   (let [ui-atom      (:ui-state* opts)
+   (let [builtin-specs (get opts :builtin-command-specs sample-builtin-command-specs)
+         opts          (dissoc opts :builtin-command-specs)
+         ui-atom      (:ui-state* opts)
          ui-read-fn*  (:ui-read-fn opts)
          opts'        (dissoc opts :ui-state* :ui-read-fn)
          ui-read-fn   (or ui-read-fn*
@@ -45,7 +61,7 @@
          init-fn      (app/make-init nil ui-read-fn ui-disp-fn
                                      (merge {:dispatch-fn default-dispatch-fn} opts'))
          [state _cmd] (init-fn)]
-     state)))
+     (assoc state :builtin-command-specs (vec builtin-specs)))))
 
 (defn- type-text
   [update-fn state s]
@@ -143,6 +159,50 @@
           cand-vals (set (map :value (get-in s1 [:prompt-input-state :autocomplete :candidates])))]
       (is (contains? cand-vals "/chain"))
       (is (contains? cand-vals "/chain-list")))))
+
+(deftest refresh-extension-command-names-folds-builtin-specs-test
+  (testing "one query refreshes both extension command names and built-in specs"
+    (let [builtin [{:name "reload-models" :description "reload models"}]
+          query-fn (fn [_query]
+                     {:psi.extension/command-names ["chain"]
+                      :psi.agent-session/builtin-command-specs builtin})
+          state    {:query-fn query-fn}
+          refreshed (support/refresh-extension-command-names state)]
+      (is (= ["chain"] (:extension-command-names refreshed)))
+      (is (= builtin (:builtin-command-specs refreshed)))))
+  (testing "non-vector values leave the corresponding slot untouched"
+    (let [query-fn (fn [_query]
+                     {:psi.extension/command-names nil
+                      :psi.agent-session/builtin-command-specs nil})
+          state    {:query-fn query-fn
+                    :extension-command-names ["existing"]
+                    :builtin-command-specs [{:name "help" :description "show this help"}]}
+          refreshed (support/refresh-extension-command-names state)]
+      (is (= ["existing"] (:extension-command-names refreshed)))
+      (is (= [{:name "help" :description "show this help"}]
+             (:builtin-command-specs refreshed))))))
+
+(deftest autocomplete-slash-includes-backend-builtin-commands-test
+  (testing "slash autocomplete includes built-in commands sourced from backend specs"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          ;; /reload-models was previously missing from the hardcoded TUI list.
+          state     (assoc (init-state)
+                           :builtin-command-specs
+                           [{:name "help" :description "show this help"}
+                            {:name "reload-models" :description "reload custom model definitions"}
+                            {:name "speed" :description "show or set speed mode"}])
+          [s1 _]    (update-fn state (msg/key-press "/"))
+          cand-vals (set (map :value (get-in s1 [:prompt-input-state :autocomplete :candidates])))]
+      (is (contains? cand-vals "/reload-models"))
+      (is (contains? cand-vals "/speed"))
+      (is (contains? cand-vals "/help"))))
+  (testing "built-in candidates come from state, not a hardcoded list"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (assoc (init-state) :builtin-command-specs [])
+          [s1 _]    (update-fn state (msg/key-press "/"))
+          cand-vals (set (map :value (get-in s1 [:prompt-input-state :autocomplete :candidates])))]
+      (is (not (contains? cand-vals "/quit"))
+          "with empty backend specs no built-in slash command is offered"))))
 
 (deftest autocomplete-accept-on-enter-submits-slash-test
   (testing "enter accepts selected slash suggestion and submits"

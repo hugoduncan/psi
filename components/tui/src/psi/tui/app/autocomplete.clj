@@ -55,8 +55,10 @@
   (let [templates  (mapv (fn [{:keys [name]}] (str "/" name)) (:prompt-templates state))
         skills     (mapv (fn [{:keys [name]}] (str "/skill:" name))
                          (:skills state))
+        builtins   (vec (keep (fn [{:keys [name]}] (as-slash-command name))
+                              (:builtin-command-specs state)))
         ext-cmds   (vec (keep as-slash-command (:extension-command-names state)))
-        all        (->> (concat shared/builtin-slash-commands templates skills ext-cmds)
+        all        (->> (concat builtins templates skills ext-cmds)
                         (remove str/blank?)
                         distinct
                         sort)

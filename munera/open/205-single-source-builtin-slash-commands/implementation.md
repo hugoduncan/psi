@@ -529,3 +529,31 @@ leaf ns rather than `^:private` on `commands`).
 
 Verification: focused run of `commands-test` + `builtin-commands-resolver-test`
 → 59 tests, 247 assertions, 0 failures. clj-kondo clean.
+
+## Slice 3 implementation (2026-06-01)
+
+TUI now consumes the backend built-in command surface via EQL, exactly like
+`:psi.extension/command-names`:
+
+- `support.clj`: `command-refresh-query` + `build-init` introspection query gain
+  `:psi.agent-session/builtin-command-specs`. `refresh-extension-command-names`
+  (extended in place, P4) destructures both keys from the one query result and
+  `cond->` `assoc`es `:extension-command-names` and `:builtin-command-specs`,
+  each vector-guarded. `build-init` seeds `:builtin-command-specs` from the
+  introspection result.
+- `autocomplete.clj`: `slash-candidates` builds built-in candidates from
+  `(:builtin-command-specs state)` (slash-prefixed bare names via
+  `as-slash-command`), replacing `shared/builtin-slash-commands` in the concat.
+- `shared.clj`: deleted the `builtin-slash-commands` `def` (P5). The `shared`
+  require in `autocomplete.clj` stays (still used by
+  `input-value`/`input-pos`/`set-input-value`).
+
+Tests (`app_input_selector_test.clj`): seeded a representative
+`sample-builtin-command-specs` into `init-state` (post-init `assoc`, since
+`build-init` seeds the slot from the query result, nil in tests) so existing
+`/help`-present assertions hold; added `/reload-models` backend-sourced
+autocomplete test + empty-specs→no-builtins test + a
+`refresh-extension-command-names` two-key fold test.
+
+Verification: `app-input-selector-test` 14 tests, 38 assertions, 0 failures;
+full `clojure -M:test` unit suite exits 0 (no FAIL/ERROR). clj-kondo clean.

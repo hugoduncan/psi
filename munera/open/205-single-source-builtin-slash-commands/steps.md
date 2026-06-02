@@ -63,23 +63,26 @@ Tick with sha/decision on completion.
 
 ## Slice 3 — TUI consumption
 
-- [ ] `support.clj`: add `:psi.agent-session/builtin-command-specs` to
+- [x] `support.clj`: add `:psi.agent-session/builtin-command-specs` to
       `command-refresh-query` and the `build-init` introspection query; store
       `:builtin-command-specs` in state.
-- [ ] `support.clj` `refresh-extension-command-names` (extended in place — P4):
+- [x] `support.clj` `refresh-extension-command-names` (extended in place — P4):
       destructure both `:psi.extension/command-names` and
       `:psi.agent-session/builtin-command-specs` from the one query result and
-      `assoc` both state slots (vector-guarded).
-- [ ] `autocomplete.clj`: build built-in slash candidates from
-      `state :builtin-command-specs` (slash-prefix bare names) instead of
-      `shared/builtin-slash-commands`.
-- [ ] `shared.clj`: delete the `builtin-slash-commands` `def` only (P5); KEEP
+      `assoc` both state slots (vector-guarded via `cond->`).
+- [x] `autocomplete.clj`: build built-in slash candidates from
+      `state :builtin-command-specs` (slash-prefix bare names via
+      `as-slash-command`) instead of `shared/builtin-slash-commands`.
+- [x] `shared.clj`: delete the `builtin-slash-commands` `def` only (P5); KEEP
       the `app.shared` require in `autocomplete.clj` (still used for
       `input-value`/`input-pos`/`set-input-value`); remove only the
       `shared/builtin-slash-commands` symbol from the line-59 `concat`.
-- [ ] Add TUI autocomplete test: candidates include `/reload-models` sourced from
-      backend specs (not a hardcoded list); previously-missing built-ins present.
-- [ ] Run TUI tests + targeted clj-kondo; green.
+- [x] Add TUI autocomplete test: candidates include `/reload-models` sourced from
+      backend specs (not a hardcoded list); previously-missing built-ins present;
+      empty backend specs → no built-in candidates. Plus a
+      `refresh-extension-command-names` test folding both keys from one query.
+- [x] Run TUI tests + targeted clj-kondo; green (full `bb`/kaocha unit suite
+      exits clean).
 
 ## Slice 4 — Emacs consumption
 

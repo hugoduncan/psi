@@ -186,17 +186,22 @@
              (some-> (System/getenv "PSI_TUI_DEBUG_KEYS") str/lower-case)))
 
 (def ^:private command-refresh-query
-  [:psi.extension/command-names])
+  [:psi.extension/command-names
+   :psi.agent-session/builtin-command-specs])
 
 (defn refresh-extension-command-names
+  "Refresh the command-completion surface from the backend: both extension
+   command names and the single-sourced built-in command specs (task 205).
+   Each state slot is only `assoc`ed when its queried value is a vector."
   [state]
   (if-let [query-fn (:query-fn state)]
     (try
-      (let [data     (or (query-fn command-refresh-query) {})
-            ext-cmds (:psi.extension/command-names data)]
-        (if (vector? ext-cmds)
-          (assoc state :extension-command-names (vec ext-cmds))
-          state))
+      (let [data          (or (query-fn command-refresh-query) {})
+            ext-cmds      (:psi.extension/command-names data)
+            builtin-specs (:psi.agent-session/builtin-command-specs data)]
+        (cond-> state
+          (vector? ext-cmds)      (assoc :extension-command-names (vec ext-cmds))
+          (vector? builtin-specs) (assoc :builtin-command-specs (vec builtin-specs))))
       (catch Exception _
         state))
     state))
@@ -214,7 +219,8 @@
                                      :psi.agent-session/extension-summary
                                      :psi.agent-session/session-id
                                      :psi.agent-session/session-file
-                                     :psi.extension/command-names]))
+                                     :psi.extension/command-names
+                                     :psi.agent-session/builtin-command-specs]))
            queue        (or (:event-queue opts) (LinkedBlockingQueue.))
            ui-snap      (when ui-read-fn (ui-read-fn))]
        [{:messages                (vec (or (:initial-messages opts) []))
@@ -228,6 +234,7 @@
          :skills                  (or (:psi.agent-session/skills introspected) [])
          :extension-summary       (or (:psi.agent-session/extension-summary introspected) {})
          :extension-command-names (vec (:psi.extension/command-names introspected))
+         :builtin-command-specs   (vec (:psi.agent-session/builtin-command-specs introspected))
          :query-fn                query-fn
          :footer-model-fn         (or (:footer-model-fn opts) (constantly {}))
          :ui-read-fn              ui-read-fn
