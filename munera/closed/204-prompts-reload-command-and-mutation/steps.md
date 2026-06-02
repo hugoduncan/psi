@@ -141,10 +141,16 @@ Vertical slices from plan.md. Tick each item with its sha / decision note.
 
 ## Test-review follow-ups (2026-06-01)
 
-- [ ] T1: Add an empty/absent-prompts-dir boundary test. Seed a stale template
-      on the session, then reload a worktree whose `.psi/prompts` is absent or
-      empty; assert `:reloaded? true`, `:count 0`, and `:prompt-templates`
-      replaced with `[]` (stale gone). Cover both the `:session/reload-prompts`
-      handler and the `psi.extension/reload-prompts` mutation (the mutation's
-      `(or count 0)` zero path). Closes the `{boundary}` coverage gap the
-      implementation review flagged as a robustness behaviour.
+- [x] T1: Added empty/absent-prompts-dir boundary tests in
+      `reload_prompts_test.clj`. New `worktree-without-prompts!` helper (no
+      `.psi/prompts` dir) + reused `worktree-with-prompts! {}` (empty dir).
+      `reload-prompts-handler-empty-dir-replaces-with-empty-test` seeds a stale
+      template, dispatches `:session/reload-prompts`, and asserts
+      `:reloaded? true`, `:count 0`, `:prompt-templates` = `[]` (stale gone)
+      for both the absent and empty cases.
+      `reload-prompts-mutation-empty-dir-count-zero-test` does the same through
+      the live psi-tool `mutate` invocation, asserting the mutation's
+      `(or count 0)` zero path yields `:psi.prompt-template/count 0` and the
+      templates are replaced with `[]`. Focused ns green (8 tests / 36
+      assertions, up from 6/—); `clj-kondo` 0/0. Closes the `{boundary}`
+      coverage gap.

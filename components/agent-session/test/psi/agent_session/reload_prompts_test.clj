@@ -32,6 +32,14 @@
       (spit (io/file prompts (str name ".md")) body))
     wt))
 
+(defn- worktree-without-prompts!
+  "Create a temp worktree dir with no `.psi/prompts` dir at all. Returns the
+   worktree path."
+  []
+  (str (java.nio.file.Files/createTempDirectory
+        "psi-reload-prompts-test-"
+        (make-array java.nio.file.attribute.FileAttribute 0))))
+
 (defn- session-at-worktree
   "Create a [ctx session-id] whose worktree path is `wt`."
   ([wt] (session-at-worktree wt {}))
@@ -111,6 +119,51 @@
           (is (= #{"foo" "bar"}
                  (set (map :name (:prompt-templates (ss/get-session-data-in ctx session-id)))))))
         (finally (delete-tree! wt))))))
+
+(deftest reload-prompts-handler-empty-dir-replaces-with-empty-test
+  (testing "reloading a worktree whose .psi/prompts is absent or empty replaces :prompt-templates with [] (T1 boundary, handler)"
+    (doseq [[label wt] [["absent" (worktree-without-prompts!)]
+                        ["empty"  (worktree-with-prompts! {})]]]
+      (testing label
+        (try
+          (let [[ctx session-id] (session-at-worktree wt)]
+            ;; Seed a stale template that must be cleared by the replace.
+            (ss/update-state-value-in! ctx (ss/session-data-path session-id)
+                                       assoc :prompt-templates
+                                       [{:name "stale" :content "old"}])
+            (let [result    (session/dispatch-in! ctx :session/reload-prompts
+                                                  {:session-id session-id})
+                  templates (:prompt-templates (ss/get-session-data-in ctx session-id))]
+              (is (true? (:reloaded? result)))
+              (is (= 0 (:count result)))
+              ;; Replace, not append — stale template gone, empty vector left.
+              (is (= [] templates))))
+          (finally (delete-tree! wt)))))))
+
+(deftest reload-prompts-mutation-empty-dir-count-zero-test
+  (testing "the reload-prompts mutation surfaces :count 0 for an empty/absent prompts dir and replaces templates with [] (T1 boundary, mutation (or count 0) path)"
+    (doseq [[label wt] [["absent" (worktree-without-prompts!)]
+                        ["empty"  (worktree-with-prompts! {})]]]
+      (testing label
+        (try
+          (let [[ctx session-id] (session-at-worktree wt {:mutations mutations/all-mutations})]
+            ;; Seed a stale template that must be cleared by the replace.
+            (ss/update-state-value-in! ctx (ss/session-data-path session-id)
+                                       assoc :prompt-templates
+                                       [{:name "stale" :content "old"}])
+            (let [tool   (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
+                  result ((:execute tool) {"action" "mutate"
+                                           "mutation" "psi.extension/reload-prompts"
+                                           "params" {"session-id" session-id}})
+                  parsed (read-string (:content result))]
+              (is (false? (:is-error result)))
+              (is (= :ok (:psi-tool/overall-status parsed)))
+              (is (= {:psi.prompt-template/reloaded? true
+                      :psi.prompt-template/count     0}
+                     (:psi-tool/result parsed)))
+              ;; Replace semantics applied through dispatch — stale gone.
+              (is (= [] (:prompt-templates (ss/get-session-data-in ctx session-id))))))
+          (finally (delete-tree! wt)))))))
 
 (defn- template-by-name
   [ctx session-id name]

@@ -540,3 +540,26 @@ Considered, NOT actionable:
   `ss/get-session-data-in`, never through a resolver. Low-confidence — resolver
   reads of `:prompt-templates` are pre-existing (not added by this task), so the
   read-side of AC8 is out of scope for this task's tests. No step added.
+
+## T1 boundary-coverage follow-up executed (2026-06-01)
+
+- ✅ T1 closed. Added two boundary tests to
+  `components/agent-session/test/psi/agent_session/reload_prompts_test.clj`,
+  each parameterised over `["absent" worktree-without-prompts!]` and
+  `["empty"  (worktree-with-prompts! {})]`:
+  - `reload-prompts-handler-empty-dir-replaces-with-empty-test` — seeds a stale
+    `:prompt-templates`, dispatches `:session/reload-prompts`, asserts
+    `:reloaded? true`, `:count 0`, and `:prompt-templates` = `[]` (stale gone;
+    proves AC7 replace-to-empty for the zero-discovery boundary, no crash on
+    absent dir).
+  - `reload-prompts-mutation-empty-dir-count-zero-test` — same scenario through
+    the live psi-tool `mutate` invocation; asserts the mutation `:psi-tool/result`
+    is `{:psi.prompt-template/reloaded? true :psi.prompt-template/count 0}`
+    (exercises the previously-uncovered `(or count 0)` zero fallback) and the
+    session's `:prompt-templates` is replaced with `[]` via dispatch.
+  - New `worktree-without-prompts!` helper creates a temp worktree with **no**
+    `.psi/prompts` dir; the empty case reuses `worktree-with-prompts! {}`.
+  - `clj-kondo --lint` on the test file: 0/0. Focused ns green: 8 tests / 36
+    assertions (was 6). No production code change required — the handler already
+    returns `[]` for absent/empty dirs and the mutation already has the
+    `(or count 0)` guard; this only closes the missing-coverage gap.
