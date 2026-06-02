@@ -11,13 +11,13 @@
    :label nil
    :message (str "message-" schedule-id)
    :source :scheduled
-   :created-at (java.time.Instant/parse "2026-04-21T12:00:00Z")
-   :fire-at (java.time.Instant/parse "2026-04-21T12:01:00Z")
+   :created-at (test-support/instant "2026-04-21T12:00:00Z")
+   :fire-at (test-support/instant "2026-04-21T12:01:00Z")
    :status status
    :session-id session-id})
 
 (deftest scheduler-create-stores-schedule-and-starts-timer-test
-  (let [created-at       (java.time.Instant/parse "2026-04-21T12:00:00Z")
+  (let [created-at       (test-support/instant "2026-04-21T12:00:00Z")
         [ctx session-id] (test-support/make-session-ctx {})
         fire-at          (.plusMillis created-at 1000)
         result           (session/dispatch-in! ctx :scheduler/create
@@ -82,8 +82,8 @@
     (is (some? scheduled-msg))))
 
 (deftest scheduler-drain-queue-delivers-oldest-queued-schedule-test
-  (let [early              (java.time.Instant/parse "2026-04-21T12:00:00Z")
-        later              (java.time.Instant/parse "2026-04-21T12:05:00Z")
+  (let [early              (test-support/instant "2026-04-21T12:00:00Z")
+        later              (test-support/instant "2026-04-21T12:05:00Z")
         initial-schedule-1 (assoc (schedule nil "sid-1" "sch-1" :queued) :fire-at later :created-at later)
         initial-schedule-2 (assoc (schedule nil "sid-1" "sch-2" :queued) :fire-at early :created-at early)
         [ctx session-id]

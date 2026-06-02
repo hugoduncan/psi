@@ -9,7 +9,7 @@
 (deftest scheduler-start-and-cancel-timer-effects-test
   (dispatch-effects/cancel-all-scheduler-timers!)
   (testing "start-timer dispatches scheduler/fired after delay and removes handle"
-    (let [now (java.time.Instant/parse "2026-04-21T18:00:00Z")
+    (let [now (test-support/instant "2026-04-21T18:00:00Z")
           [ctx session-id] (test-support/create-test-session {:scheduler-time-source (test-support/fixed-scheduler-time-source now)})
           fired (promise)]
       (with-redefs [dispatch/dispatch!
@@ -38,7 +38,7 @@
                                                               {:effect/type :scheduler/start-timer
                                                                :session-id session-id
                                                                :schedule-id "sch-missing-time"
-                                                               :fire-at (java.time.Instant/parse "2026-04-21T18:01:00Z")})))))
+                                                               :fire-at (test-support/instant "2026-04-21T18:01:00Z")})))))
 
   (testing "start-timer rejects invalid scheduler time-source return"
     (let [[ctx session-id] (test-support/create-test-session {:scheduler-time-source (fn [] "not-an-instant")})]
@@ -48,10 +48,10 @@
                                                               {:effect/type :scheduler/start-timer
                                                                :session-id session-id
                                                                :schedule-id "sch-invalid-time"
-                                                               :fire-at (java.time.Instant/parse "2026-04-21T18:01:00Z")})))))
+                                                               :fire-at (test-support/instant "2026-04-21T18:01:00Z")})))))
 
   (testing "cancel-timer interrupts and removes handle"
-    (let [now (java.time.Instant/parse "2026-04-21T18:01:00Z")
+    (let [now (test-support/instant "2026-04-21T18:01:00Z")
           [ctx session-id] (test-support/create-test-session {:scheduler-time-source (test-support/fixed-scheduler-time-source now)})]
       (with-redefs [dispatch/dispatch!
                     (fn [_ctx _event-type _event-data _opts]
@@ -75,8 +75,8 @@
                            :schedule-id "sch-3"
                            :kind :message
                            :message "shutdown cleanup"
-                           :created-at (java.time.Instant/parse "2099-04-21T18:00:00Z")
-                           :fire-at (java.time.Instant/parse "2099-04-21T18:05:00Z")
+                           :created-at (test-support/instant "2099-04-21T18:00:00Z")
+                           :fire-at (test-support/instant "2099-04-21T18:05:00Z")
                            :delay-ms 500}
                           {:origin :core})
     (session/dispatch-in! ctx :scheduler/create
@@ -84,8 +84,8 @@
                            :schedule-id "sch-4"
                            :kind :message
                            :message "shutdown cleanup 2"
-                           :created-at (java.time.Instant/parse "2099-04-21T18:00:01Z")
-                           :fire-at (java.time.Instant/parse "2099-04-21T18:05:01Z")
+                           :created-at (test-support/instant "2099-04-21T18:00:01Z")
+                           :fire-at (test-support/instant "2099-04-21T18:05:01Z")
                            :delay-ms 500}
                           {:origin :core})
     (is (= 2 (dispatch-effects/scheduler-timer-handle-count)))

@@ -1406,7 +1406,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Test-shaper follow-ups — pass 16 (test-shaper, 2026-06-01)
 
-- [ ] Finish the literal-instant idiom convergence across the **remaining five**
+- [x] Finish the literal-instant idiom convergence across the **remaining five**
       201-touched scheduler test files (pass-15 only converged
       `psi_tool_scheduler_test.clj`; its "all siblings already at 0
       `Instant/parse`" premise was scoped to the 6 new/core nss and is wrong for
@@ -1431,3 +1431,29 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       `components/agent-session/src/**` or `doc/scheduler.md` (verification-only
       invariant; Slice-10 allowlist). If 201 is treated as closed instead, raise
       as a small standalone test-hygiene task.
+      Done: replaced every open-coded literal-instant *setup*
+      `(java.time.Instant/parse "…")` with `(test-support/instant "…")` across
+      the five remaining 201-touched files — `scheduler_dispatch_test` (5 sites:
+      `schedule` helper L14-15, L20, L85-86), `scheduler_effects_test` (6 sites:
+      L12, L41, L51, L54, L78-79, L87-88), `scheduler_lifecycle_test` (9 sites:
+      L37, L61-62, L98, L111-112 incl. the loop-bound literal `created`/`fire`
+      strings, L147, L158-159, L178-179, L194-195),
+      `scheduler_background_jobs_test` (6 sites: L17-18, L27-28, L46-47), and
+      `scheduler_cancel_job_test` (2 sites: L15-16). All five already required
+      `[psi.agent-session.test-support :as test-support]` → no require change.
+      Runtime/deserialization parses left untouched as specified:
+      `scheduler_handlers_test.clj:27` (private `instant` over a runtime string)
+      and the `psi_tool_scheduler_test` tool-result parses (already excluded from
+      the edit). Verified: zero `Instant/parse` literals remain in the five
+      files; `scheduler_handlers_test:27` unchanged. Behaviour- and
+      assertion-preserving (no deftest renamed → `findings.md` citations
+      unchanged; aggregate stays 51 tests / 411 assertions). clj-kondo 0/0;
+      `bb fmt:check` "All source files formatted correctly"; full `bb test`
+      green (two `turn-runtime`/`prompt-lifecycle` retry-backoff failures
+      observed on one run were a pre-existing non-deterministic test-ordering
+      flake — they touch no file edited here and cleared on re-run with the
+      change in place; the same flake reproduces with the change stashed-then-
+      popped). Test-file-only — `git diff --name-only` = the five
+      `components/agent-session/test/**` scheduler files; zero
+      `components/agent-session/src/**` or `doc/scheduler.md` (verification-only
+      invariant; Slice-10 allowlist held).

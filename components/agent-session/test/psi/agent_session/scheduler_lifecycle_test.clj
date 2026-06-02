@@ -34,7 +34,7 @@
 (deftest scheduled-deliver-runs-canonical-prompt-lifecycle-test
   ;; Verifies scheduled delivery runs through the canonical prompt lifecycle and
   ;; stamps the scheduled user message from the runtime scheduler time source.
-  (let [delivered-at (java.time.Instant/parse "2099-04-21T18:06:00Z")
+  (let [delivered-at (test-support/instant "2099-04-21T18:06:00Z")
         [ctx session-id] (test-support/create-test-session {:persist? false
                                                             :scheduler-time-source (test-support/fixed-scheduler-time-source delivered-at)})]
     (kernel/clear-event-log!)
@@ -58,8 +58,8 @@
                              :kind :message
                              :label "wake-check"
                              :message "check status"
-                             :created-at (java.time.Instant/parse "2099-04-21T18:00:00Z")
-                             :fire-at (java.time.Instant/parse "2099-04-21T18:05:00Z")
+                             :created-at (test-support/instant "2099-04-21T18:00:00Z")
+                             :fire-at (test-support/instant "2099-04-21T18:05:00Z")
                              :delay-ms 1000}
                             {:origin :core})
       (session/dispatch-in! ctx :scheduler/fired
@@ -95,7 +95,7 @@
   ;; scheduled user message is asserted separately as a handler unit
   ;; (`drain-one-stamps-scheduled-user-message-from-scheduler-time-source-test`).
   (let [scheduler-clock (test-support/atom-scheduler-time-source
-                         (java.time.Instant/parse "2099-04-21T18:06:00Z"))
+                         (test-support/instant "2099-04-21T18:06:00Z"))
         [ctx session-id] (test-support/create-test-session {:persist? false
                                                             :scheduler-time-source (:time-source scheduler-clock)})]
     (swap! (:state* ctx) (ss/session-update session-id (fn [session] (assoc session :is-streaming true))))
@@ -108,8 +108,8 @@
                              :kind :message
                              :label label
                              :message message
-                             :created-at (java.time.Instant/parse created)
-                             :fire-at (java.time.Instant/parse fire)
+                             :created-at (test-support/instant created)
+                             :fire-at (test-support/instant fire)
                              :delay-ms 1000}
                             {:origin :core})
       (session/dispatch-in! ctx :scheduler/fired
@@ -144,7 +144,7 @@
   ;; a clearly-named handler unit, not as part of the cited live covering test).
   ;; Asserts the :scheduler/drain-queue handler stamps the scheduled user message
   ;; it emits from the runtime scheduler time source when :delivered-at is omitted.
-  (let [delivered-at (java.time.Instant/parse "2099-04-21T18:06:00Z")
+  (let [delivered-at (test-support/instant "2099-04-21T18:06:00Z")
         scheduler-clock (test-support/atom-scheduler-time-source delivered-at)
         [ctx session-id] (test-support/create-test-session {:persist? false
                                                             :scheduler-time-source (:time-source scheduler-clock)})]
@@ -155,8 +155,8 @@
                            :kind :message
                            :label "first"
                            :message "first wake"
-                           :created-at (java.time.Instant/parse "2099-04-21T18:00:00Z")
-                           :fire-at (java.time.Instant/parse "2099-04-21T18:05:00Z")
+                           :created-at (test-support/instant "2099-04-21T18:00:00Z")
+                           :fire-at (test-support/instant "2099-04-21T18:05:00Z")
                            :delay-ms 1000}
                           {:origin :core})
     (session/dispatch-in! ctx :scheduler/fired
@@ -175,8 +175,8 @@
                            :schedule-id "sch-cancel-pending"
                            :kind :message
                            :message "pending"
-                           :created-at (java.time.Instant/parse "2099-04-21T18:00:00Z")
-                           :fire-at (java.time.Instant/parse "2099-04-21T18:05:00Z")
+                           :created-at (test-support/instant "2099-04-21T18:00:00Z")
+                           :fire-at (test-support/instant "2099-04-21T18:05:00Z")
                            :delay-ms 1000}
                           {:origin :core})
     (session/dispatch-in! ctx :scheduler/cancel
@@ -191,8 +191,8 @@
                            :schedule-id "sch-cancel-queued"
                            :kind :message
                            :message "queued"
-                           :created-at (java.time.Instant/parse "2099-04-21T18:00:01Z")
-                           :fire-at (java.time.Instant/parse "2099-04-21T18:05:01Z")
+                           :created-at (test-support/instant "2099-04-21T18:00:01Z")
+                           :fire-at (test-support/instant "2099-04-21T18:05:01Z")
                            :delay-ms 1000}
                           {:origin :core})
     (session/dispatch-in! ctx :scheduler/fired
