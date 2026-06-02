@@ -368,7 +368,7 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
 
 ## Implementation-review pass 4 follow-ups (review 2026-06-02)
 
-- [ ] R5: Commit (or revert) the uncommitted R4 refinement. The genuine R4 fix
+- [x] R5: Commit (or revert) the uncommitted R4 refinement. The genuine R4 fix
       — re-gating child-state snapshot isolation on `:inherited-snapshot?`
       instead of `:workflow-owned?` — is uncommitted across 5 files
       (`child_session_state.clj`, `context.clj`, `session_lifecycle.clj`,
@@ -382,13 +382,13 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       HEAD is self-consistent (schema field has a producer in `attempts.clj` and
       a consumer in `child_session_state.clj`). Do NOT close the task with a
       dirty tree.
-- [ ] R6: Reconcile steps.md R4's `[x] DONE` note with the actual fix. R4's
+- [x] R6: Reconcile steps.md R4's `[x] DONE` note with the actual fix. R4's
       note documents the `workflow-owned?'`-gated `inherited-default` helper, but
       the real fix re-gates on `:inherited-snapshot?` (to keep live-parent
       inheritance for the workflow judge / non-snapshot workflow children).
       Update R4's steps.md note to describe the `:inherited-snapshot?` mechanism
       after R5 is committed.
-- [ ] R7: Append the `:inherited-snapshot?` refinement to implementation.md's
+- [x] R7: Append the `:inherited-snapshot?` refinement to implementation.md's
       "R4 follow-up executed" section: record the re-gate from `workflow-owned?`
       to `:inherited-snapshot?`, the new contract-schema field, the threading
       through `context`/`session_lifecycle`/`attempts`, and why `workflow-owned?`

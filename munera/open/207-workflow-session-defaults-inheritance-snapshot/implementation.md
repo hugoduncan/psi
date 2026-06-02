@@ -216,7 +216,51 @@ New actionable inconsistencies:
   itself enumerates 14. "dozen" (12) understates its own complete list.
   Reconcile the count ("14", not "dozen"/"~20") with the enumeration.
 
-PASS_STATUS: ACTIONABLE_FEEDBACK.
+PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## R5/R6/R7 follow-up executed (ψ, 2026-06-02)
+
+R4's `:inherited-snapshot?` refinement committed and made coherent end-to-end.
+
+- **Re-gate from `workflow-owned?` to `:inherited-snapshot?`.** The committed R4
+  fix gated child-state snapshot isolation on `workflow-owned?'`, which would
+  regress the workflow judge: `workflow_judge.clj:107` creates a workflow-owned
+  child WITHOUT `:model`/`:prompt-mode` and relies on live-parent inheritance.
+  Under a `workflow-owned?` gate the judge would have received the
+  initial-session default (nil model) instead of the parent model. The fix gates
+  on a new `:inherited-snapshot?` flag instead — true only on the
+  resolver/step-attempt path where the inherited fields are snapshot-governed.
+  `child-session-base-state*` now uses
+  `(if inherited-snapshot?' (or supplied default) (or supplied parent-value))`.
+- **Producer.** `create-step-attempt-session!` (`workflow-runtime/attempts.clj`)
+  sets `:inherited-snapshot? true` in the child-session request (the resolver
+  output is snapshot-governed there).
+- **Threading.** `:inherited-snapshot?` flows
+  `create-workflow-child-session!` (`agent-session/context.clj`) →
+  `:session/create-child` (`dispatch_handlers/session_lifecycle.clj`) →
+  `child-session-base-state*`. Declared on
+  `child_session_contract/request-schema` (committed HEAD already had the schema
+  field; this work adds the missing producer + consumer, closing the dangling
+  field flagged by R5).
+- **Why `workflow-owned?` was insufficient.** Workflow-owned ≠ snapshot-governed.
+  The judge (and any future workflow-owned child created outside the resolver
+  path) is workflow-owned but supplies no inherited defaults and must keep live
+  parent inheritance. Only the resolver/attempt path carries snapshot values, so
+  only it sets `:inherited-snapshot?`.
+- **Tests.**
+  `child-session-base-state-workflow-owned-isolates-snapshot-fields-test`
+  re-gated onto `:inherited-snapshot? true`, strengthened to use a non-`:lambda`
+  live `:prompt-mode` so the default-vs-live-leak distinction is observable, and
+  extended with a "workflow-owned but NOT snapshot-governed (judge)" block
+  asserting live-parent inheritance is preserved.
+  `attempts-test/create-step-attempt-session-forwards-supported-request-surface-test`
+  now asserts `:inherited-snapshot? true` on the forwarded request.
+  Suites green: child-session-state (9 tests, 62 assertions), inheritance-snapshot
+  + workflow-judge (24/130), workflow-execution + attempts + child-session-context
+  (18/113), workflow-judge + statechart-runtime (28/128), workflow-runtime
+  attempts + child-session-contract (12/45). clj-kondo clean on all touched files.
+
+PASS_STATUS: RESOLVED.
 
 ## Inconsistency follow-up resolution (ψ, 2026-06-02)
 
