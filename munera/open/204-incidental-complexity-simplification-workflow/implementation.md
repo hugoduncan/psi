@@ -2814,3 +2814,39 @@ fragment so a regress is still caught structurally.
 - `clj-paren-repair` Success; `clj-kondo` 0 findings (errors 0, warnings 0).
 - skill-test file 409 lines (< 800 `components/` guard);
   `bb commit-check:file-lengths` exit 0.
+
+## Test review pass 15 (test-shaper)
+
+Applied `test-shaper` (cover_by(boundaries) ∧ meaningful_failures ∧
+behavior_focused) to the two task-204 test namespaces
+(`task_204_workflow_definitions_test.clj` + `incidental_complexity_finder_skill_test.clj`).
+Focused suite green: 9 tests, 110 assertions, 0 failures (jq present). Coverage
+after TR1–TR17/F1–F6 is broad and mock-free (executable recipe locks, prompt/
+context handoff locks, NO_TARGET short-circuit, two-phase contract). Two
+remaining gaps where a green-passing regress survives:
+
+### TR18 — qualification filter `>=` boundary is never exercised at the exact threshold
+The recipe's qualification filter `select(.["lcc-total"] >= 5.0 and .gap >= 2.0)`
+is exercised only well above (lcc 30 / gap 7.5) and well below (gap 1.5, lcc 4.0)
+the thresholds (`incidental-complexity-finder-recipe-filter-and-drop-test`). No
+input sits **exactly** at `lcc-total = 5.0` or `gap = 2.0`, so the inclusive
+boundary is unproven: a regress `>=` → `>` (strict, dropping the boundary unit)
+passes every existing test green. Per test-shaper `cover_by(boundaries)`, the
+inclusive `>=` edge is a named, tunable threshold (Locked decision 2) and a
+real, observable boundary — it should be pinned at the exact value.
+
+### TR19 — wrapper `summary` NO_TARGET branch locks only the sentinel, not its substantive contract
+`task-lifecycle-in-worktree-test`'s "summary prompt detects NO_TARGET" asserts
+only `.contains "NO_TARGET"` + that summary sources the `resolve-worktree` yield.
+The prompt's substantive NO_TARGET contract — **ignore the `lifecycle` step
+output entirely**, report that **no worktree was created, no task was created,
+and no lifecycle ran**, and **do not inspect or invent task artifacts** — is
+unlocked. A regress that still detected the sentinel but then inspected/invented
+task artifacts (or reported lifecycle outcomes) on a no-target run would pass
+green. This is the symmetric companion to TR10 (which locks the positive-path
+terminal contract) and TR7's NO_TARGET locks on `resolve-worktree`; the
+no-target *summary* contract has no equivalent lock. Per test-shaper
+`meaningful_failures`, lock the substantive NO_TARGET summary contract substrings.
+
+Both are test-only additions (no production change); the artifacts (skill +
+workflows) are correct as-is — these only strengthen the regression net.

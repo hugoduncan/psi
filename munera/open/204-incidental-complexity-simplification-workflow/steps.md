@@ -1162,3 +1162,36 @@ with the commit sha / decision when done.
       assertions, 0 failures); `clj-kondo` 0 findings; `clj-paren-repair`
       Success; file 409 lines (< 800); `bb commit-check:file-lengths` exit 0.
       (See implementation.md pass-14 test-review TR17 entry.)
+
+## Test review follow-ups (review pass 15 — test-shaper)
+
+- [ ] TR18 — Pin the qualification filter's inclusive `>=` boundary at the exact
+      threshold in `incidental_complexity_finder_skill_test.clj`. The recipe
+      filter `select(.["lcc-total"] >= 5.0 and .gap >= 2.0)` is exercised only
+      well above (lcc 30 / gap 7.5) and well below (gap 1.5, lcc 4.0) the
+      thresholds, so the inclusive boundary is unproven — a regress `>=` → `>`
+      (strict) passes every existing test green. Add an executable recipe case
+      (extend `incidental-complexity-finder-recipe-filter-and-drop-test` or a new
+      sibling deftest reusing `run-jq-recipe` + `named-{local,cc}-unit-json`)
+      feeding a unit that sits **exactly** on the boundary — e.g. `lcc 10.0,
+      cc 5 → gap 2.0` (gap exactly 2.0) and/or `lcc 5.0, cc 1 → gap 5.0` (lcc
+      exactly 5.0) — and assert it **survives** the filter (inclusive `>=`,
+      not strict `>`). Keep the jq-absent structural fallback already present
+      (the filter fragment is locked there). Verify focused skill-test suite +
+      `clj-kondo` + `clj-paren-repair` green and `bb commit-check:file-lengths`
+      clean.
+
+- [ ] TR19 — Lock the wrapper `summary` step's substantive NO_TARGET contract in
+      `task_204_workflow_definitions_test.clj`
+      (`task-lifecycle-in-worktree-test`). The existing "summary prompt detects
+      NO_TARGET" assertion locks only `.contains "NO_TARGET"` + the
+      resolve-worktree-yield source; the prompt's substantive no-target contract
+      is unlocked, so a regress that detects the sentinel but still inspects/
+      invents task artifacts (or reports lifecycle outcomes) on a no-target run
+      passes green. Add assertions on `summary-text` for the substantive NO_TARGET
+      contract substrings present in the prompt: `ignore the `lifecycle` step
+      output entirely`, `no worktree was created, no task was created, and no
+      lifecycle ran`, and `Do not inspect or invent task artifacts`. This is the
+      symmetric companion to TR10 (positive-path terminal contract). Verify
+      focused task-204 workflow-definition suite + `clj-kondo` + `clj-paren-repair`
+      green and `bb commit-check:file-lengths` clean.
