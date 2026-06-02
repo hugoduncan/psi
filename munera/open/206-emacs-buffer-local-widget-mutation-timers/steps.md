@@ -92,6 +92,34 @@
 - [ ] Full `emacs-ui` test sweep green; `clj-kondo`/lint clean; reload `.el`.
 - [ ] Commit: `⚒ 206: remove module-global widget mutation-timers store`.
 
+## Plan ambiguity review follow-ups (ψ)
+
+- [ ] P1 — Assign the sixth existing test. `pwpt-dispatch-mutation-cancels-timer-on-response`
+      (`psi-widget-projection-test.el:565`) `let`-binds the global defvar and
+      exercises the response-cancel path, but no slice lists it for update. Decide
+      which slice migrates it to drive the buffer-local store via `state` (Slice 3
+      is the natural home, since it reworks the response callback) and add it to
+      that slice's "update existing tests" set, so Slice 5's defvar deletion +
+      "remove leftover let-binds" leaves no broken/orphaned test.
+- [ ] P2 — Specify the `--clear-mutation-timers` null-`state` guard. Steps Slice 1
+      pins only `(hash-table-p timers)`; the mirrored
+      `psi-emacs--clear-notification-lifecycle` wraps its whole body in
+      `(when state ...)`, and Slice 4 calls the helper with bare `psi-emacs--state`
+      (no `(when psi-emacs--state)` wrapper, unlike sibling teardown calls). Decide
+      and pin whether the helper must internally guard `(when state ...)` (matching
+      the precedent) or whether each call site must wrap with `(when
+      psi-emacs--state ...)`, so a nil-state teardown cannot error on
+      `(psi-emacs-state-projection-mutation-timers nil)`. Update Slice 1/Slice 4.
+- [ ] P3 — Resolve the `pwpt-on-mutation-timeout-noop-when-no-state` remapping.
+      Slice 2 lists this test (`:542`, asserts a harmless no-op when
+      `psi-emacs--state` is nil, relying on the old `(when psi-emacs--state)`
+      guard) for "update to new signatures," but the post-change no-op pivots on
+      `(buffer-live-p buffer)` not dynamic state, and Slice 2 separately ADDS a
+      dead-buffer no-op test. Specify the disposition: repurpose this one into the
+      dead-buffer case (and drop the separately-added duplicate), retain it as a
+      distinct nil/`state` guard with explicit `buffer`/`state` args + assertion,
+      or delete it. Update Slice 2's test list to one unambiguous outcome.
+
 ## Acceptance verification (final)
 
 - [ ] Confirm against design.md acceptance criteria: buffer-local store; single

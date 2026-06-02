@@ -178,3 +178,54 @@ This makes the "capture originating buffer/state at arm time + dead-buffer
 no-op" requirement satisfiable for the timeout path (previously unsatisfiable:
 no `buffer` was threaded into the scheduled callback). Arm signature unchanged;
 inconsistency removed. No code changes (design-only task).
+
+## Plan ambiguity review (ψ)
+
+Grounded plan.md/steps.md against real `emacs-ui` code: arm (`psi-widget-projection.el:300`),
+inline pre-cancel call (`:303`), cancel def (`:310`), timeout def (`:317`),
+dispatch-mutation (`:336`), arm call site (`:349`), response callback
+(`:353`–`:362`); struct (`psi-globals.el:49`, field `projection-notification-timers`
+present, `defvar-local psi-emacs--state` `:111`); init (`psi-lifecycle.el:32`,
+notification-timers init `:57`); teardown (`:269`, notif clear `:295`); transcript
+reset (`:371`, notif clear `:392`); defvar (`:73`); notification precedent
+`psi-emacs--clear-notification-lifecycle` (`psi-projection.el:379`, outer
+`(when state ...)` + inner `(when (hash-table-p timers) ...)`); existing mutation
+tests `psi-widget-projection-test.el:500/511/525/542/551/565`.
+
+Most plan/steps mechanics are accurate and slice ordering is sound. Three NEW
+actionable plan/steps ambiguities (P1–P3 in steps.md):
+
+- **P1 — Sixth existing test is unassigned.** Slice 2's "update existing tests"
+  set names five tests but omits `pwpt-dispatch-mutation-cancels-timer-on-response`
+  (`:565`), which `let`-binds the global defvar and exercises the response-cancel
+  path. Slice 5 deletes the defvar and says "remove leftover let-binds", so this
+  test MUST be migrated to drive the buffer-local store via state — but no slice
+  owns its rewrite (Slice 2 signature change? Slice 3 response targeting? Slice 5
+  cleanup?). Unassigned migration → ambiguous ownership.
+
+- **P2 — `--clear-mutation-timers` null-`state` guard unspecified.** Steps Slice 1
+  pins the guard as only `(hash-table-p timers)`, omitting the precedent's outer
+  `(when state ...)`. Slice 4 calls `(psi-widget-projection--clear-mutation-timers
+  psi-emacs--state)` directly with NO `(when psi-emacs--state)` wrapper, unlike
+  sibling teardown calls — and `(psi-emacs-state-projection-mutation-timers nil)`
+  errors. The mirrored `clear-notification-lifecycle` wraps its whole body in
+  `(when state ...)`. Whether the new helper must null-guard `state` is
+  unspecified → potential teardown error on a nil-state buffer.
+
+- **P3 — `pwpt-on-mutation-timeout-noop-when-no-state` intent remapping
+  unspecified.** This existing test sets `psi-emacs--state nil` and asserts the
+  timeout is a harmless no-op, relying on the *current* `(when psi-emacs--state)`
+  guard. Post-change the timeout no-ops on `(buffer-live-p buffer)`, NOT on
+  dynamic `psi-emacs--state`. Slice 2 lists this test for "update to new
+  signatures" but does not say what `buffer`/`state` it should pass nor what it
+  asserts — and Slice 2 also separately ADDS a dead-buffer no-op test, so it is
+  unspecified whether this test is repurposed (making the new one redundant),
+  retained as a distinct nil-state guard, or deleted.
+
+Not raised (non-actionable / design-resolved): stale-vs-actual line numbers in
+plan Risks ("cancels at :303/:356, timeout scheduled at :306") are close enough
+to navigate and the def/call-site distinction is recoverable by grep (plan
+Slice-5 step already mandates a pre-delete `git grep`); the helper/field names
+are fixed by the notification mirror (a settled plan decision, not ambiguous);
+the response callback's existing `tkey` capture in the `let*` already coexists
+with the new `buffer`/`state` capture (Slice 3 wording is adequate).
