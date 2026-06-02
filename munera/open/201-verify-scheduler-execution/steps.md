@@ -1403,3 +1403,31 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       `git status --short` = the single `psi_tool_scheduler_test.clj` path; zero
       `components/agent-session/src/**` or `doc/scheduler.md` (verification-only
       invariant; Slice-10 allowlist held).
+
+## Test-shaper follow-ups — pass 16 (test-shaper, 2026-06-01)
+
+- [ ] Finish the literal-instant idiom convergence across the **remaining five**
+      201-touched scheduler test files (pass-15 only converged
+      `psi_tool_scheduler_test.clj`; its "all siblings already at 0
+      `Instant/parse`" premise was scoped to the 6 new/core nss and is wrong for
+      the full 14-file 201-touched set). Replace open-coded literal-instant
+      *setup* `(java.time.Instant/parse "…")` with `(test-support/instant "…")`
+      in: `scheduler_dispatch_test.clj` (`schedule` helper L14-15; L20, L85-86),
+      `scheduler_effects_test.clj` (L12, L41, L51, L54, L78-79, L87-88),
+      `scheduler_lifecycle_test.clj` (L37, L61-62, L98, L111-112, L147, L158-159,
+      L178-179, L194-195 — incl. the loop-bound *literal* `created`/`fire` strings
+      at L111-112), `scheduler_background_jobs_test.clj` (L17-18, L27-28, L46-47),
+      and `scheduler_cancel_job_test.clj` (L15-16). All five already require
+      `[psi.agent-session.test-support :as test-support]`, so no require change
+      is needed. **Do NOT** convert runtime-output/deserialization parses:
+      `scheduler_handlers_test.clj:27` (`(Instant/parse s)` over a runtime
+      string) and `psi_tool_scheduler_test.clj` L30/31/196/197/218 (tool-result
+      strings) — those are a distinct concern, not the literal-test-instant
+      idiom. Behaviour- and assertion-preserving (no deftest renamed →
+      `findings.md` citations unchanged; aggregate stays 51 tests / 411
+      assertions). Keep suite green + clj-kondo/cljfmt clean. Test-only — verify
+      `git diff --name-only` touches only the five
+      `components/agent-session/test/**` files; zero
+      `components/agent-session/src/**` or `doc/scheduler.md` (verification-only
+      invariant; Slice-10 allowlist). If 201 is treated as closed instead, raise
+      as a small standalone test-hygiene task.

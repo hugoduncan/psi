@@ -2173,3 +2173,50 @@ and converge only the 5 *literal setup* sites.) Recorded as a follow-up step.
 Verification-only invariant intact (this review touched no
 `components/agent-session/src/**` or `doc/scheduler.md`; the follow-up is
 test-only).
+
+## Test-shaper review — pass 16 (test-shaper, 2026-06-01) — ACTIONABLE_FEEDBACK
+
+Re-applied test-shaper firsthand (clarity ∧ signal ∧ robustness ∧ economy) to
+the full 201-touched scheduler test set (14 files). Runtime-verified the cited
+slice green (`bb test --focus` over the 6 new/core nss → "All tests passed")
+and clj-kondo 0/0 across the new files. Strengths re-confirmed: deterministic
+timer/time seams (zero wall-clock sleeps in 201 live tests), behaviour-focused
+assertions (delivered prompt + scheduled provenance, `:status`,
+`created-session-id`/`:delivery-phase`, queue contents — never handler
+interactions), single-concern deftests with clear AAA, good economy
+(insertion-order≠fire-at `drain-one` case; psi-tool megatest split into 6
+focused deftests), and converged read/write idioms
+(`schedule-by-id`/`schedule-status`/`schedule-queue`).
+
+**One actionable `consistent(idioms)` issue — the literal-instant convergence is
+incomplete across the broader 201-touched set (pass-15's "lone outlier" premise
+was scoped too narrowly).** Pass 15 converged `psi_tool_scheduler_test.clj` onto
+`test-support/instant`, asserting "all 5 sibling 201 files have 0 `Instant/parse`
+literals." That claim covered only the **6 new/core** scheduler nss. The actual
+201-touched set is **14 files**, and **five** still open-code
+`java.time.Instant/parse` for literal-instant *setup*:
+- `scheduler_dispatch_test.clj` — `schedule` helper L14-15 + L20, L85-86 (5 sites)
+- `scheduler_effects_test.clj` — L12, L41, L51, L54, L78-79, L87-88 (8 sites)
+- `scheduler_lifecycle_test.clj` — L37, L61-62, L98, L111-112, L147, L158-159,
+  L178-179, L194-195 (~11 sites; L111-112 are loop-bound *literal* strings, so
+  they convert too)
+- `scheduler_background_jobs_test.clj` — L17-18, L27-28, L46-47 (6 sites)
+- `scheduler_cancel_job_test.clj` — L15-16 (2 sites)
+All five already `(:require [… test-support :as test-support])`, so
+`test-support/instant` is in scope — convergence is trivial, behaviour- and
+assertion-preserving, and test-only. This is a real inconsistency *within the
+converged 201 set*, not the surrounding-suite baseline (matching pass-14/15's
+distinction). Non-duplicate: pass 15 explicitly scoped its fix to
+`psi_tool_scheduler_test.clj` only and (incorrectly) claimed the siblings were
+already converged.
+
+**Scope boundary (carried from pass 15):** converge only literal-instant
+*setup* sites. Leave runtime-output/deserialization parses untouched —
+`scheduler_handlers_test.clj:27` (`(Instant/parse s)` over a runtime string),
+`psi_tool_scheduler_test.clj` L30/31/196/197/218 (tool-result strings). The
+loop-bound literals in `scheduler_lifecycle_test.clj` L111-112 ARE literals
+(parsing a `created`/`fire` string constant one binding-hop removed) → converge.
+
+Verification-only invariant intact (this review touched no
+`components/agent-session/src/**` or `doc/scheduler.md`; the follow-up is
+test-only). Recorded as a follow-up step.
