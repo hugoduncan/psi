@@ -15,6 +15,8 @@ Bootstrapped on 2026-04-02.
 
 ## Current work state
 
+- 2026-06-02: Task 202 (`document-at-bounds-in-scheduler-doc`) test-review follow-up completed: expanded `psi-tool-scheduler-at-resolution-matrix-test` with executable coverage for sub-millisecond future absolute `:at` (`fixed-now + 500000ns`) truncating to resolved delay `0`, accepted, timer seam delay `0`, and delivered when driven. Marked the review follow-up checked and recorded implementation evidence. Verification: focused matrix passed (1 test, 21 assertions); targeted clj-kondo clean.
+
 - 2026-06-02: Task 202 (`document-at-bounds-in-scheduler-doc`) test review found one actionable coverage gap: current focused matrix proves past delay-0, 500ms rejection, 5000ms acceptance, and >24h rejection, but not the documented sub-millisecond future `:at` truncation-to-delay-0 immediate-fire case. Added unchecked review follow-up; focused matrix still passes (1 test, 16 assertions).
 
 - 2026-06-02: Task 202 (`document-at-bounds-in-scheduler-doc`) independent implementation verification found no remaining concrete implementation work: all task/design steps already checked, `doc/scheduler.md` matches resolved-millisecond-delay absolute-`:at` acceptance criteria, and focused `psi-tool-scheduler-at-resolution-matrix-test` passed (1 test, 16 assertions). Implementation is complete pending closure.

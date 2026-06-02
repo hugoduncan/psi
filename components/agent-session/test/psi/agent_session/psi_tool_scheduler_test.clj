@@ -179,8 +179,8 @@
       (is (= :error (:psi-tool/overall-status parsed)))
       (is (= :validate (get-in parsed [:psi-tool/error :phase]))))))
 
-;; --- 201 verification: :at resolution matrix
-;;     (absolute-instant delay calc / past fires / near-future rejected / above-max rejected) ---
+;; --- 201/202 verification: :at resolution matrix
+;;     (absolute-instant delay calc / delay-0 fire / near-future rejected / above-max rejected) ---
 
 (deftest psi-tool-scheduler-at-resolution-matrix-test
   (testing "absolute instant calculates delay from scheduler time source"
@@ -224,6 +224,29 @@
       ((:f @callback*))
       (is (= :delivered (test-support/schedule-status ctx* session-id (:schedule-id schedule)))
           "delay-0 schedule fires and delivers")))
+
+  (testing "sub-millisecond future :at truncates to delay 0 and fires immediately"
+    (let [fixed-now        (test-support/instant "2026-04-21T18:00:00Z")
+          sub-ms-future-at (.plusNanos fixed-now 500000)
+          [ctx session-id] (test-support/create-test-session
+                            {:scheduler-time-source (test-support/fixed-scheduler-time-source fixed-now)})
+          [capture* callback*] (test-support/capturing-delay-fn)
+          ctx*             (assoc ctx :scheduler-run-after-delay-fn capture*)
+          tool             (tools/make-psi-tool (fn [_q] {}) {:ctx ctx* :session-id session-id})
+          result           ((:execute tool) {"action" "scheduler"
+                                             "op" "create"
+                                             "kind" "message"
+                                             "message" "fire now"
+                                             "at" (str sub-ms-future-at)})
+          parsed           (read-string (:content result))
+          schedule         (get-in parsed [:psi-tool/scheduler :schedule])]
+      (is (false? (:is-error result)) "sub-millisecond future :at is accepted")
+      (is (= :ok (:psi-tool/overall-status parsed)))
+      (is (= 0 (:delay-ms @callback*)) "timer scheduled with truncated delay 0")
+      (is (= sub-ms-future-at (java.time.Instant/parse (:fire-at schedule))))
+      ((:f @callback*))
+      (is (= :delivered (test-support/schedule-status ctx* session-id (:schedule-id schedule)))
+          "truncated delay-0 schedule fires and delivers")))
 
   (testing "future :at below min-delay-ms (1-999ms) is rejected with the below-minimum bound error"
     (let [fixed-now        (test-support/instant "2026-04-21T18:00:00Z")
