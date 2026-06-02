@@ -122,6 +122,7 @@ See:
 - [`doc/psi-project-config.md`](doc/psi-project-config.md) for query/mutate/reload examples and worktree-authoritative reload targeting rules, including the recommended self-reload loop
 - [`doc/graph-surface.md`](doc/graph-surface.md) for graph discovery, root-queryable attrs, and session inventory discovery surfaces
 - [`doc/scheduler.md`](doc/scheduler.md) for scheduler kinds, session-config support, status semantics, and introspection attrs
+- [`doc/operations.md`](doc/operations.md) for the deterministic-operation `list`/`invoke` request shapes, params, all-key + 2000-char truncation rendering, and error surfacing (both the psi-tool action and the `/operations` / `/operation` commands)
 
 ### Workflows
 

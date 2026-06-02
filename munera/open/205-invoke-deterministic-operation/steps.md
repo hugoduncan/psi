@@ -331,7 +331,7 @@
 
 ## Docs-review follow-ups (ψ)
 
-- [ ] (DR-1) Bring the psi-tool `operation` **action** surface to documentation
+- [x] (DR-1) Bring the psi-tool `operation` **action** surface to documentation
   parity with its sibling federated actions (`scheduler` has a dedicated
   `doc/scheduler.md` + README "See:" link; `operation` has only a one-line
   README bullet and a passing mention in `doc/tui.md`, which documents the

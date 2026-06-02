@@ -901,3 +901,33 @@ Actionable docs gap found (1):
   behaviour, OR an "psi-tool `operation` action" subsection inside `doc/tui.md`
   alongside the command section), and add a README "See:" link to it — bringing
   the action surface to parity with `scheduler`/`project-repl` documentation.
+
+## Docs-review follow-up resolution (ψ — DR-1)
+
+Resolved DR-1 by adding a dedicated `doc/operations.md` (mirrors
+`doc/scheduler.md`'s shape) and a README "See:" link.
+
+`doc/operations.md` covers, for the psi-tool `operation` action:
+- `{:action "operation" :op "list"|"invoke"}` request shape + a worked example
+  each (`list` with no params; `invoke` with `:operation-id` + EDN-string
+  `:args`).
+- params: `operation-id` (string) and `args` (EDN-map string, default `{}`).
+- `list` ignores `operation-id`/`args`, sorts by id, empty → `:operations []`.
+- invoke: all-top-level-key rendering, per-value `pr-str` + 2000-char truncation
+  with the `… (truncated, N chars total)` marker.
+- error surfacing dispatched on ex-info `:type`
+  (`:missing-deterministic-operation` / `:malformed-operation-result` /
+  validate-phase `must be an EDN map` / unreadable-EDN), `:psi-tool/error`
+  `:kind`, and `:is-error true`; plus the tagged-`:error` (non-exception) path.
+- structured `:psi-tool/...` result shapes for both ops.
+It also restates the command surface for completeness and links to `doc/tui.md`.
+
+Verified against `psi_tool_operation.clj`, `deterministic_operation_action.clj`,
+`psi_tool_validate.clj`, and `commands/operation.clj`: action discriminator,
+op set `list|invoke`, param names, default `{}`, sort-by-id, empty `:operations
+[]`, 2000-char marker text, error `:kind` labels, and `:psi-tool/...` keys all
+match the code exactly.
+
+The DR-1 follow-up offered a dedicated page OR a `doc/tui.md` subsection; chose
+the dedicated `doc/operations.md` (sibling parity with `doc/scheduler.md`) and
+added the README "See:" link as the option specified for that choice.
