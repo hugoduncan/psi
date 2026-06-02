@@ -33,3 +33,31 @@ One actionable architectural-fit gap (added to design-steps.md):
   with the `one_way` principle and the design's own elevation of this contract
   to "Verified facts". The design should state that step-2 sources `:input`
   from the step-1 yielded text via the established delegate-yield grammar.
+
+## 2026-06-01 — Architecture-fit follow-up executed (step-1 → step-2 handoff)
+
+Resolved the one architecture-fit design-step. Verified the grammar precedent
+directly in `.psi/workflows/gh-issue-implement.edn` (its `implement` and
+`review` `:delegate` steps wire `:input` via
+`:prompt-string {:type :map :fields {:input {:from {:step "<name>" :yield :text}}}}`)
+and `.psi/workflows/task-lifecycle.edn` (first sub-workflow reads
+`:input {:from :workflow-input :path [:input]}`, confirming the `{:input "…"}`
+map shape). Updated `design.md` in three places:
+
+- **Step 2** now names the grammar-conformant wiring explicitly: step-2 sources
+  `:input` from step-1's `:yield :text` via the `:map`/`:fields` form. Because
+  step-1 emits only the bare task-path line, its text yield *is* the path
+  string, so the delegate receives `{:input "munera/open/NNN-slug"}`. Tied to
+  the `gh-issue-implement.edn` precedent and the `one_way` principle.
+- **Verified facts** gained a "Step→step delegate-yield handoff" entry citing the
+  precedent, and the lifecycle-input-contract entry now cites the
+  `task-lifecycle.edn` first sub-workflow read site.
+- **Acceptance criteria** task-path-handoff bullet now spells out the concrete
+  `:prompt-string` wiring rather than referring abstractly to "the verified
+  contract".
+
+Subtlety recorded: the precedent's prior step yields a structured Markdown
+report and the consumer takes that whole text as `:input`; here step-1 is
+constrained to emit *only* the path line, so the same `:yield :text` mechanism
+yields exactly the bare path with no extraction step — grammar-identical, just a
+narrower payload. No grammar extension needed. design-step checked.

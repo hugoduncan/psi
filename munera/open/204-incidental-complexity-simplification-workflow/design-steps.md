@@ -2,7 +2,7 @@
 
 ## Architecture fit
 
-- [ ] Specify the step-1 → step-2 handoff using the verified workflow-grammar
+- [x] Specify the step-1 → step-2 handoff using the verified workflow-grammar
       delegate-yield mechanism. The design must state that step-2 sources its
       `task-lifecycle` `:input` from step-1's yielded text via
       `:prompt-string {:type :map :fields {:input {:from {:step "<select-step-name>" :yield :text}}}}`,
