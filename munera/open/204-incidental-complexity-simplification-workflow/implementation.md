@@ -1684,3 +1684,72 @@ Verification: `clj-paren-repair` Success; `clj-kondo` 0 findings; focused
 definitions suite green — 13 tests, 203 assertions, 0 failures (+2 assertions
 over pass-5's 201, matching the two new asserts); file 746 lines (< 800-line
 `components/` guard).
+
+## 2026-06-02 — Implementation review (pass 5) — task-implementation-review
+
+Reviewed the implemented artifacts against `design.md`/`plan.md` and the
+architecture (`review_task_implementation`: code↔design match, architecture fit,
+unnecessary-abstraction / new-vs-existing-pattern / structural-performance
+flags). Re-read the live `.psi/skills/incidental-complexity-finder/SKILL.md`,
+`.psi/workflows/task-lifecycle-in-worktree.edn`,
+`.psi/workflows/reduce-incidental-complexity.edn`, both workflow-definition test
+files, and `doc/workflows.md`.
+
+**Largely sound.** The two workflows + skill match the design after the F1–F4 /
+TR1–TR8 chain: outer 2-step (select-and-create `:session` + lifecycle-in-worktree
+`:delegate`), wrapper 3-step (resolve-worktree + lifecycle + summary), F1
+NO_TARGET short-circuit on both wrapper branches, the F2 `@line` join-key fixed
+recipe, the F3/F4 `(ns, var, arity, line)` acceptance + selector-procedure keys,
+the two-phase generated contract verbatim from design, and the no-push/PR
+endpoint. Focused suite green (17 tests, 241 assertions, 0 failures). No new
+unnecessary abstraction, no new-vs-existing-pattern divergence (mirrors the
+loadable `review-implementation-in-worktree.edn` precedent), no structural
+performance concern.
+
+### F5 — SKILL.md frontmatter lambda still states the pre-F2 join key
+
+One residual design(spec)↔SKILL(mechanism) coherence gap remains — the **same
+class** F4 closed at `design.md` line 62, left un-propagated to the skill's own
+frontmatter. SKILL.md line 4:
+
+```
+lambda: "λcode. … → join(ns,var,arity) → gap=burden/cc → …"
+```
+
+The `join(ns,var,arity)` token describes the **join operation** in the skill's
+pipeline lambda — exactly the operation F2 re-keyed onto `(ns, var, arity, line)`
+(the `@line` recipe) and F3/F4 propagated through the A5/A2 acceptance and the
+design selector-procedure step 2. The skill **body** §2/§3 (lines 47, 83–96) and
+the `jq` recipe correctly key on `(ns, var, arity, line)`; the doc and design
+selector-join wording were corrected (F4); only the frontmatter lambda — the
+skill's one-line behavioural summary, the first thing a reader/loader sees — was
+left on the stale key.
+
+F2's resolution note (implementation.md ~line 963) deliberately left this,
+classifying lambda line 4's `join(ns,var,arity)` as the **unit's logical
+identity** (alongside the Scope "a `(ns, var, arity)`" mention). That
+classification is wrong for the lambda specifically: the Scope sentence *does*
+denote logical identity (a unit *is* a `(ns, var, arity)`), but the lambda token
+is `join(...)` — a description of the **join step**, not the unit's identity. F4
+applied exactly this distinction when it fixed `design.md` line 62 ("Join on
+`(ns, var, arity, line)`") while deliberately leaving the bare `(ns, var, arity)`
+identity mentions at design lines 64/222. By F4's own rule, the lambda's
+`join(...)` is a join-key statement and should read `join(ns,var,arity,line)`.
+
+Impact: threshold-guarded today (no null-arity unit reaches `lcc-total ≥ 5.0`),
+so behaviour is unaffected — but the design's first acceptance criterion is that
+the skill "documents the `gap` method" correctly, and the lambda is the skill's
+canonical mechanism summary; a reader trusting the lambda would believe the join
+is non-deterministic over null-arity `defmethod` units (the precise bug F2
+fixed). No test locks the lambda (the content-lock test asserts body strings
+only), so it can drift unnoticed.
+
+Fix (frontmatter-only, no behaviour change): update SKILL.md line 4
+`join(ns,var,arity)` → `join(ns,var,arity,line)` to match the body recipe and the
+F4-corrected design selector procedure. Leave the Scope "a `(ns, var, arity)`"
+mention intact (it denotes logical identity, the same call F4 made at design
+lines 64/222). Optionally extend the content-lock test with the lambda join-key
+substring so it cannot regress. Skill markdown only; no workflow/test change
+forced.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK.

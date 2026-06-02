@@ -621,6 +621,30 @@ with the commit sha / decision when done.
       pass-5's 201); `clj-kondo` 0 findings; `clj-paren-repair` Success; file 746
       lines (< 800).
 
+## Implementation review follow-ups (review pass 5)
+
+- [ ] F5 — SKILL.md frontmatter `lambda` (line 4) still states the **pre-F2**
+      join key: `… → join(ns,var,arity) → gap=burden/cc → …`. The
+      `join(ns,var,arity)` token describes the skill pipeline's **join
+      operation** — exactly the operation F2 re-keyed onto `(ns, var, arity,
+      line)` (the `@line` recipe) and F3/F4 propagated through the A5/A2
+      acceptance and `design.md`'s selector-procedure step 2. The skill body
+      §2/§3 + the `jq` recipe + docs + the design selector join all correctly key
+      on `(ns, var, arity, line)`; only the frontmatter lambda — the skill's
+      one-line behavioural summary — was left stale. F2 deliberately left it,
+      classifying it as the unit's "logical identity," but that is wrong for the
+      lambda specifically: the token is `join(...)` (a join-key statement), not a
+      unit-identity statement — the same distinction F4 used when it fixed
+      `design.md` line 62's "Join on `(ns, var, arity, line)`" while leaving the
+      bare-identity mentions at lines 64/222. Residual design(spec)↔SKILL
+      coherence gap (F4-class); threshold-guarded today, never locked by a test
+      (the content-lock test asserts body strings only). Fix: SKILL.md line 4
+      `join(ns,var,arity)` → `join(ns,var,arity,line)`; leave the Scope
+      "a `(ns, var, arity)`" mention intact (logical identity). Optionally extend
+      `incidental-complexity-finder-skill-content-lock-test` with the lambda
+      join-key substring so it cannot regress. Skill markdown only; no
+      workflow/test change forced.
+
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 
 - [ ] Split step-1 selection from task-creation into two `:session` steps,
