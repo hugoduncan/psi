@@ -421,14 +421,11 @@ Tick with sha/decision on completion.
 
 ## Docs review follow-ups (review-task-docs pass 1)
 
-- [ ] D1 — Reconcile `doc/architecture.md:120-122` with the retained Emacs
-      `defcustom`. The doc claims "Both the TUI and Emacs ... hold no hardcoded
-      command lists", but Emacs keeps `psi-emacs-slash-command-specs`
-      (psi-completion.el:19-20) with a non-empty default
-      `(("/skill:" . …))` merged into completion candidates — so the blanket
-      "no hardcoded command lists" is inaccurate for Emacs (and contradicts the
-      CHANGELOG's "`defcustom` ... default trimmed to the Emacs-only `/skill:`
-      affordance"). Qualify to "no hardcoded built-in *command* lists" and note
-      the Emacs `defcustom` survives as a user override/supplement for the
-      Emacs-only `/skill:` affordance (backend wins on name collision), matching
-      the CHANGELOG wording. Pure doc-accuracy fix; no source/test change.
+- [x] D1 — Reconciled `doc/architecture.md` "slash-command surface" bullet with
+      the retained Emacs `defcustom`. Qualified the blanket "no hardcoded command
+      lists" to "no hardcoded built-in *command* lists", and added a sub-bullet
+      noting the Emacs `psi-emacs-slash-command-specs` `defcustom` survives as a
+      user override/supplement (default trimmed to the Emacs-only `/skill:`
+      affordance, not a backend routing target), merged after backend specs so
+      backend descriptions win on name collision — matching the CHANGELOG
+      wording. Pure doc-accuracy fix; no source/test change.

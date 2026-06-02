@@ -1547,3 +1547,23 @@ affordance)"); architecture.md should be reconciled to match — qualify the cla
 to "no hardcoded built-in *command* lists" and note the Emacs `defcustom`
 survives as a user override/supplement for the Emacs-only `/skill:` affordance,
 so the doc does not contradict the CHANGELOG or the retained defcustom default.
+
+## Follow-up execution — docs review pass 1 (D1)
+
+Resolved D1. Edited the `doc/architecture.md` "slash-command surface offered to
+UIs" bullet:
+- Qualified the blanket "they hold no hardcoded command lists" → "they hold no
+  hardcoded built-in *command* lists" (true for both UIs; the TUI deleted
+  `shared/builtin-slash-commands`, and neither UI hardcodes the built-in command
+  set any longer).
+- Added a sub-bullet recording that the Emacs `psi-emacs-slash-command-specs`
+  `defcustom` survives as a user override/supplement (default trimmed to the
+  Emacs-only `/skill:` affordance, which is not a backend routing target),
+  merged after the backend specs so backend built-in descriptions win on any
+  name collision.
+
+This reconciles architecture.md with both the retained `defcustom` default
+(psi-completion.el:19-20) and the CHANGELOG wording ("`defcustom` ... default
+trimmed to the Emacs-only `/skill:` affordance ... backend built-in descriptions
+win on any name collision"). Pure doc-accuracy change; no source/test edits, so
+no suite run required.
