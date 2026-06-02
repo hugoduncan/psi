@@ -1546,3 +1546,53 @@ Suite green (`scheduler-lifecycle-test` focused: 3 tests / 26 assertions / 0
 failures). Verification-only invariant intact (no
 `components/agent-session/src/**` or `doc/scheduler.md` touched by this review).
 Follow-up added to steps.md.
+
+## Test review follow-up — pass 10 executed (2026-06-01)
+
+Executed the pass-10 follow-up: migrated the busy-drain covering test off the
+pure-handler-invocation helpers onto real dispatch, and split the
+time-source-stamp handler-unit assertion out of the cited live covering test.
+
+- **Live covering test now drives real dispatch.**
+  `scheduler-lifecycle-test/busy-session-fire-queues-then-idle-drains-fifo-test`
+  now runs both drain phases via `dispatch-in! :scheduler/drain-queue` (the
+  design "dispatch the event directly" drain mechanic; same stub-free path
+  `scheduler_dispatch_test` uses). It asserts observable delivered state only —
+  per-schedule `:delivered`/`:queued` status, FIFO drain order (oldest by
+  `[fire-at created-at schedule-id]` via the `:return` schedule-id), and the
+  post-drain queue contents. The handler-returned effect-shape assertions
+  (`(-> drain-1 :effects first :event-data :user-msg :timestamp)`) are gone from
+  this test.
+- **Discovery — drain delivery is not observable in the test ctx.** The
+  `:scheduler/drain-queue` handler emits a
+  `:runtime/dispatch-event-with-effect-result` effect that re-dispatches
+  `:session/submit-synthetic-user-prompt`. In the test ctx this re-dispatch does
+  **not** append the scheduled user message to the journal (verified via probes
+  on both `create-test-session` and `make-session-ctx`: drain sets `:delivered`
+  through `drain-one`'s root-state-update, but `scheduled-message-by-id` /
+  `persist/all-entries-in` show no delivered message, and the event log records
+  only `:scheduler/drain-queue`). This is the runtime-owned-deliver frontier —
+  and explains why the original test (and the cited `scheduler_dispatch_test`
+  drain test) asserted the timestamp on the *handler-returned effect* rather
+  than on a delivered message. `scheduled-message-by-id` is therefore NOT a
+  viable observable for the drain path, so the plan's preferred
+  delivered-message-timestamp assertion is not achievable end-to-end here.
+- **Time-source stamp kept as a separate handler unit.** Per the step's
+  explicit branch ("if the time-source-stamp-on-effect assertion has
+  independent unit value, keep it as a separate, clearly-named handler-unit
+  assertion"), added
+  `drain-one-stamps-scheduled-user-message-from-scheduler-time-source-test`,
+  which invokes the handler `:fn` directly (via the retained, now-documented
+  `invoke-scheduler-handler` helper) and asserts the emitted `:user-msg`
+  `:timestamp` is stamped from the scheduler time source. Explicitly NOT part of
+  the cited live covering test.
+- **Cleanup.** Deleted the now-unused `apply-root-state-update!` helper; kept +
+  documented `invoke-scheduler-handler` (used only by the split-out handler-unit
+  test). `kernel` require still used (event-log clears + handler-entry).
+- **Counts.** Split raised deftests 50 → 51; assertions unchanged at 411.
+  Updated `findings.md` Outcome + `scheduler-lifecycle-test` inventory line.
+- **Verification.** `scheduler-lifecycle-test` 4 tests / 26 assertions / 0
+  failures; full `bb test` green; clj-kondo 0/0; cljfmt clean. `git diff
+  --name-only` = the single `scheduler_lifecycle_test.clj` test path; zero
+  `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist
+  held).

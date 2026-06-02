@@ -961,7 +961,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
 
 ## Test review follow-ups — pass 10 (task-test-review, 2026-06-01)
 
-- [ ] Migrate the drain phase of
+- [x] Migrate the drain phase of
       `scheduler_lifecycle_test/busy-session-fire-queues-then-idle-drains-fifo-test`
       (the `findings.md`-cited busy queue + drain-on-idle covering test) off the
       local `invoke-scheduler-handler` + `apply-root-state-update!` helpers (which
@@ -985,3 +985,38 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       `components/agent-session/src/**` / `doc/scheduler.md`); no scheduler-source
       change. If 201 is treated as closed instead, raise as a small standalone
       test-hygiene task.
+      Done: migrated `busy-session-fire-queues-then-idle-drains-fifo-test` off
+      the local `invoke-scheduler-handler` + `apply-root-state-update!` helpers
+      onto the **real** `dispatch-in! :scheduler/drain-queue` path — both drain
+      phases now drive the full fire-while-busy → queue → idle → drain sequence
+      through the real dispatch pipeline (matching the design "dispatch the event
+      directly" mechanic and the stub-free `scheduler_dispatch_test` drain
+      pattern). The cited live covering test now asserts only **observable
+      delivered state**: per-schedule `:delivered`/`:queued` status, FIFO drain
+      order (oldest by `[fire-at created-at schedule-id]` delivered first via the
+      `:return` schedule-id), and post-drain queue contents — no handler-returned
+      effect-shape assertions. **Discovery (grounds the keep-as-separate-unit
+      branch):** the `:scheduler/drain-queue` deliver effect
+      (`:runtime/dispatch-event-with-effect-result` → `:session/submit-synthetic-user-prompt`)
+      does **not** land the scheduled user message observably in the test ctx
+      journal (runtime-owned-deliver frontier — verified: drain sets `:delivered`
+      via `drain-one`'s root-state-update, but the synthetic-prompt re-dispatch
+      does not append to the state/persistence journal under either
+      `create-test-session` or `make-session-ctx`; this is why the original test
+      — and the cited `scheduler_dispatch_test` drain test — asserted the
+      timestamp on the *handler-returned effect* rather than the delivered
+      message). So `scheduled-message-by-id` is **not** observable here for drain.
+      The time-source-stamp-on-effect check therefore retains independent unit
+      value and was split into a new, clearly-named handler-unit deftest
+      `drain-one-stamps-scheduled-user-message-from-scheduler-time-source-test`
+      (invokes the handler `:fn` directly via the retained, now-documented
+      `invoke-scheduler-handler` helper and asserts the emitted
+      `:user-msg :timestamp` is stamped from the scheduler time source) —
+      explicitly NOT part of the cited live covering test. `apply-root-state-update!`
+      helper deleted (no longer used). Verified: `scheduler-lifecycle-test`
+      4 tests / 26 assertions green; full `bb test` green; clj-kondo 0/0; cljfmt
+      clean. Aggregate: deftests 50 → **51** (split added one), assertions stay
+      **411** (`findings.md` Outcome + lifecycle inventory updated). Test file
+      only — `git diff --name-only` = the single
+      `scheduler_lifecycle_test.clj` path; zero `components/agent-session/src/**`
+      or `doc/scheduler.md` (Slice-10 allowlist held).

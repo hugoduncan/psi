@@ -11,11 +11,14 @@ raised remediation task ref (`NNN-slug` or `not-yet-raised`).
 
 **All 7 Scope areas verified-correct — no defects found.** No remediation task
 created. Scheduler suite grew from baseline **35 tests / 338 assertions** to
-**50 tests / 411 assertions**, all green (the test-shaper-pass-2 split of the
+**51 tests / 411 assertions**, all green (the test-shaper-pass-2 split of the
 psi-tool megatest into 6 focused deftests raised the deftest count 45 → 50;
 assertions unchanged. test-shaper pass 5 then dropped one duplicated
 `:queued`-status assertion in `scheduler-fired-queues-while-session-busy-test`,
-412 → 411). No scheduler source or `doc/scheduler.md` modified
+412 → 411. task-test-review pass 10 then split the busy-drain covering test's
+time-source-stamp handler-unit assertion out of the live covering test into a
+dedicated `drain-one-stamps-scheduled-user-message-from-scheduler-time-source`
+deftest, 50 → 51; assertions unchanged). No scheduler source or `doc/scheduler.md` modified
 (coherence gate passes: only test files under
 `components/agent-session/test/**` + this task dir changed).
 
@@ -58,7 +61,7 @@ deftests: `psi-tool-scheduler-create-list-cancel`,
 - `scheduler-test`: empty-state, create-and-list-schedule, create-schedule-requires-explicit-kind, validate-delay-ms, fire-schedule, deliver-and-cancel, drain-one
 - `scheduler-dispatch-test`: scheduler-create-stores-schedule-and-starts-timer, scheduler-cancel-marks-pending-or-queued-schedule-cancelled, scheduler-fired-queues-while-session-busy, scheduler-deliver-submits-canonical-prompt-lifecycle, scheduler-drain-queue-delivers-oldest-queued-schedule
 - `scheduler-handlers-test`: scheduler-create-cancel-fire-deliver-handlers, scheduler-deliver-and-drain-use-time-source-when-delivered-at-omitted, scheduler-deliver-and-drain-require-time-source-when-delivered-at-omitted, scheduler-session-deliver-requires-time-source-without-marking-failed, scheduler-deliver-checks-schedule-before-time-source, scheduler-session-kind-fires-without-origin-idle, scheduler-session-deliver-creates-top-level-session-without-switching, scheduler-session-deliver-records-failed-status-on-prompt-submit-error, scheduler-drain-and-statechart-idle-hooks
-- `scheduler-lifecycle-test`: scheduled-deliver-runs-canonical-prompt-lifecycle, busy-session-fire-queues-then-idle-drains-fifo, cancel-pending-and-queued-schedules
+- `scheduler-lifecycle-test`: scheduled-deliver-runs-canonical-prompt-lifecycle, busy-session-fire-queues-then-idle-drains-fifo, drain-one-stamps-scheduled-user-message-from-scheduler-time-source, cancel-pending-and-queued-schedules
 - `scheduler-end-to-end-test`: scheduler-fired-end-to-end-delivers-when-idle
 - `scheduler-effects-test`: scheduler-start-and-cancel-timer-effects, shutdown-context-cancels-scheduler-timers
 - `scheduler-timer-seam-test`: scheduler-start-timer-uses-injected-time-source-and-delay-runner, scheduler-cancelled-default-delay-thread-exits-without-uncaught-interrupted-exception
