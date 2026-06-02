@@ -1287,3 +1287,52 @@ would then be prefixed-routed while still — but the discriminating lock is ass
 1 + the design's `or` ordering: with no exact handler the bare form could only be
 prefixed-served. (Did NOT assert "prefixed does not match bare" since that is false
 for the live matcher.)
+
+## 2026-06-01 — Test review (task-test-review), pass 5
+
+Scope per skill: well-formedness, behaviour coverage (∀ design behaviour ∃
+covering test), infra-dep hygiene (injectable ∧ nullable ∧ ¬mock ∧ ¬stub).
+Independent re-read of the full net-new test surface
+(`commands_builtin_specs_test.clj` 14t/217a, `builtin_commands_resolver_test.clj`,
+TUI `app_input_selector_test.clj`, Emacs `psi-capf-test.el`) against
+`commands/builtin_specs.clj`, `commands.clj` `dispatch*`/`format-help`,
+`resolvers/extensions.clj`, TUI `autocomplete.clj`/`support.clj`, and every AC.
+Ran the two backend suites (14 tests / 217 assertions / 0 failures) and
+`bb emacs:test` (325/325) — green.
+
+Confirmed strengths (all prior follow-ups R1–R3, TT1–TT6 landed and exact):
+- Infra-dep hygiene clean: no `with-redefs`/mock/stub in any net-new Clojure
+  test. TUI `query-fn`/`stub-agent-fn` are injected REAL boundary fns
+  (state-asserting, nullable seam per `λ one_way`); resolver tests drive the
+  live Pathom graph via real session contexts; Emacs tests seed real
+  `psi-emacs-state` structs and exercise the real event handler. The
+  `psi-capf-test.el` `cl-letf` is a pre-existing unrelated tree-test stub.
+- Spec-entry well-formedness (TT3), resolver shape/order/membership/graph +
+  description content (TT1), `:builtin-command-names` ↔ specs symmetry
+  (`names == (mapv :name specs)`) and spec-name-set == `builtin-command-names`
+  (full membership lock), `:hide-in-help?` block projection (TT2), both `case`
+  seams via live branch defs (R1/R2), projection-unchanged snapshots, whole
+  help-block line order (TT5), dual-kind `/project-repl` exact-first seam (TT6),
+  TUI backend-sourced `/reload-models` + `as-slash-command` bare→`/name`
+  prefixing + empty-specs→none + folds-both-keys refresh guard, Emacs
+  backend-sourced + desc-wins + no-backend⇒no-builtins (TT4) + builtin-spec-only
+  event refresh through the real session-update handler (I2) — all present.
+
+Independent checks of areas not explicitly flagged by prior passes — all found
+already covered:
+- `:psi.agent-session/builtin-command-names` symmetry attribute: content locked
+  transitively (`names == (mapv :name specs)` + spec-name-set ==
+  `builtin-command-names`); no separate divergence path.
+- TUI `as-slash-command` bare→`/name` prefixing: exercised end-to-end by the
+  backend-sourced `/reload-models` autocomplete test (seeds bare names).
+- TUI non-vector refresh guard: symmetric for both slots
+  (`refresh-extension-command-names-folds-builtin-specs-test`).
+- I2 change-detection guard (built-in-spec-only event): locked through the real
+  `psi-emacs--handle-session-updated-event` path with token-segment assertion.
+
+No new actionable issues. Behaviour coverage is complete across the design ACs
+(AC1–AC8); infra-dep hygiene is clean; tests are well-formed and lock to the
+single source rather than spot-checks. No follow-up steps added (criterion 3:
+nothing to add without duplicating existing TT1–TT6 coverage).
+
+PASS_STATUS: REVIEW_COMPLETE
