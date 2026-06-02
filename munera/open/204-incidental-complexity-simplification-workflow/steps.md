@@ -855,6 +855,30 @@ with the commit sha / decision when done.
       test file 787 lines (< 800). (See implementation.md pass-9 test-review TR11
       entry.)
 
+- [ ] TR12 — Two of the three executable recipe tests in
+      `incidental_complexity_finder_skill_test.clj`
+      (`incidental-complexity-finder-recipe-filter-and-drop-test` and
+      `incidental-complexity-finder-recipe-ranking-and-cap-test`) gate their
+      entire behavioural body on a bare `(when jq-available …)` with **no else
+      branch**, so when `jq` is absent each `deftest` runs only its single
+      pre-`when` `(is (some? recipe) …)` floor assertion and reports green while
+      asserting **none** of the behaviours it exists to lock (filter `>= 5.0` /
+      `>= 2.0`, the A1 unmatched-row drop, `sort_by(-.gap)` ranking, `.[0:5]`
+      cap). Only `incidental-complexity-finder-recipe-determinism-test` degrades
+      gracefully — it has a jq-absent **structural fallback** asserting the
+      recipe keys on `@line`. Per test-shaper `meaningful_failures` (a recipe
+      regress would pass green in any jq-less environment) + `deterministic`
+      (coverage must not silently vary with the environment) + `economical`
+      (named Deliverable-1 behaviours must stay covered), this asymmetry is a
+      robustness defect. Fix: give both `when`-gated recipe tests a jq-absent
+      fallback mirroring the determinism test — structurally lock the recipe
+      fragment each behaviour depends on (the `>= 5.0`/`>= 2.0` filter predicate
+      + inner-join/drop shape for filter-and-drop; the `sort_by(-.gap)` +
+      `.[0:5]` fragments for ranking-and-cap) — so a regress fails green whether
+      or not jq is installed. Test-only, no production/skill/EDN change; skill
+      test file is 322 lines (well under the 800 `components/` guard). Run
+      focused suite + `clj-kondo`.
+
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 
 - [ ] Split step-1 selection from task-creation into two `:session` steps,

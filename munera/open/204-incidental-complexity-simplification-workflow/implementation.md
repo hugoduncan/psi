@@ -2152,3 +2152,47 @@ Verification: `bb clojure:test:unit` → ✅ All tests passed (full unit suite g
 including the extended `reduce-incidental-complexity-test`). `clj-kondo --lint`
 on the test file → 0 errors, 0 warnings. File length 787 lines (< 800
 `components/` guard). Marked TR11 `[x]` in steps.md with resolution note.
+
+## Pass 10 — test-shaper review (independent)
+
+Applied `test-shaper` (robustness ∧ meaningful_failures ∧ deterministic ∧
+economical) to the 204 tests (`workflow_definitions_test.clj` +
+`incidental_complexity_finder_skill_test.clj`). Focused suite green: 18 tests,
+257 assertions, 0 failures (jq present). TR1–TR11 coverage is strong, sociable,
+state/output-asserting, no mocks. One actionable gap.
+
+### TR12 — two recipe tests silently pass with zero behavioural assertions when jq is absent
+
+The three executable recipe tests gate on `jq` availability, but only the
+*determinism* test (`incidental-complexity-finder-recipe-determinism-test`)
+degrades gracefully: its `if/do/else` has a jq-absent **structural fallback**
+(`testing "jq unavailable — determinism asserted structurally on the recipe
+key"`) that asserts the recipe keys on `@line` on both the `$ccmap` build and the
+`$loc` gap_key — a real assertion in the jq-absent environment.
+
+The other two recipe tests use a bare `(when jq-available …)` with **no else
+branch**:
+- `incidental-complexity-finder-recipe-filter-and-drop-test`
+- `incidental-complexity-finder-recipe-ranking-and-cap-test`
+
+When `jq` is absent (e.g. a CI runner without jq), the entire `when` body is
+skipped and each `deftest` runs only its single pre-`when` `(is (some? recipe) …)`
+floor assertion — the filter/drop and ranking/cap **behaviours are not asserted
+at all**, yet both tests report green. This violates `meaningful_failures`
+(a regress to the recipe's `>= → >` threshold, the A1 unmatched-row drop, the
+`sort_by(-.gap)` ranking, or the `.[0:5]` cap would pass green in any
+jq-less environment) and `deterministic` (coverage silently varies with the
+environment). The determinism test already shows the correct shape; the
+asymmetry is the defect.
+
+Minimal fix (mirror the determinism test): give each of the two `when`-gated
+recipe tests a jq-absent fallback that either (a) structurally locks the recipe
+fragment the behaviour depends on (the `>= 5.0`/`>= 2.0` filter predicate and the
+A1 drop = inner-join shape for filter-and-drop; the `sort_by(-.gap)` +
+`.[0:5]` fragments for ranking-and-cap), or (b) explicitly fails/marks the test
+inconclusive rather than passing vacuously. Prefer (a) for parity with the
+determinism test's structural fallback. No production/skill/EDN change — this is
+test robustness only, and the skill-test file is 322 lines (well under the 800
+`components/` guard), so the fallbacks fit without a split.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK.
