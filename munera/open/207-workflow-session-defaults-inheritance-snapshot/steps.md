@@ -234,3 +234,22 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       `delegate-step-runtime-result`. Update design.md Decision 7 to reflect the
       injected-fn mechanism (delegate reaches the resolver via an injected fn,
       not a direct require) so design no longer contradicts plan/steps.
+
+## Implementation-review follow-ups (review 2026-06-02)
+
+- [ ] R1: In `resolve-step-session-config`
+      (`workflow-step-session-config/core.clj:195`) make the live
+      `parent-session` (`execution-adapter/get-session-data`) read snapshot-gated
+      / lazy so it is NOT performed when `(:inherited-defaults workflow-run)` is
+      present. Currently the live read is unconditional but unused on the
+      snapshot path (only the else-branches consume `parent-session`), a dead
+      read that partially defeats the "no live parent re-read" snapshot intent.
+- [ ] R2: Add an end-to-end AC4 test driving `delegate-step-runtime-result` with
+      the injected `resolve-inherited-defaults-fn` (or a full delegation through
+      the bound closure) that asserts the CHILD run's persisted
+      `:inherited-defaults` equals the delegating step's effective snapshot
+      (overridden model + parent-snapshot speed/effort). Current AC4 coverage
+      tests only `resolve-step-session-config` + `effective-config->snapshot`
+      directly, leaving the `delegate.clj:54-60` wiring
+      (`when resolve-inherited-defaults-fn` → `assoc :inherited-defaults` into
+      child `create-run`) unasserted.

@@ -675,3 +675,52 @@ clean.
 
 All slices S1–S7 implemented and checked. Implementation complete pending
 review/closure.
+
+## Implementation review (ψ, 2026-06-02)
+
+Reviewed code ↔ design/plan/steps with task-implementation-review skill.
+Grounded against source + ran focused suites (all green): wssc core (18/46) +
+inheritance-snapshot (8/39), workflow-runtime core (9/35), attempts (7/32),
+agent-session child-session-state (8/46), canonical-workflows (12/123),
+workflow-tools (1/54). clj-kondo clean on touched src.
+
+Strong fit: create-run stays pure (takes `state`, records `:inherited-defaults`
+verbatim via cond->); no require cycle (`delegate.clj` does not require
+`workflow-step-session-config`; nested path reached via injected
+`resolve-inherited-defaults-fn`); snapshot tests are real (no mocks, real
+ctx/state); schema/capture-sites/consumption all match Decisions 6/6a/7/7a/8a/5.
+The S5 speed/effort end-to-end threading deviation is clean and AC3-necessary.
+
+New actionable findings:
+
+- **R1 (simple/locally-comprehensible — minor).**
+  `resolve-step-session-config` (`core.clj:195`) unconditionally binds
+  `parent-session (execution-adapter/get-session-data ctx
+  authoritative-parent-session-id)`, but when `snapshot?` is true that value is
+  used in NONE of the three `(if snapshot? …)` forms (model, prompt-mode,
+  skills, tool-defs all take the snapshot branch; `:tool-ids parent-session` /
+  `all-skills … parent-session` only appear in the live-read else-branches). So
+  with a snapshot present the live `get-session-data` read is performed and
+  discarded — a dead read that partially defeats the snapshot's "no live parent
+  re-read" intent (AC1/AC2 still hold because the value is unused, but the read
+  still happens). Make the live `parent-session` read lazy / snapshot-gated
+  (e.g. `(when-not snapshot? (get-session-data …))` or a `delay`) so the
+  snapshot path performs no live parent read, matching the design intent that
+  resolution is isolated from the live parent.
+
+- **R2 (test coverage — AC4 end-to-end gap).** AC4 is asserted only at the
+  function-composition level
+  (`nested-delegation-effective-snapshot-propagates-overridden-model-test`
+  calls `resolve-step-session-config` + `effective-config->snapshot` directly,
+  mirroring the closure). No test exercises `delegate-step-runtime-result` with
+  the injected `resolve-inherited-defaults-fn` to assert the *child run's
+  persisted* `:inherited-defaults` (the `when resolve-inherited-defaults-fn`
+  branch + `cond-> … (assoc :inherited-defaults …)` into the child `create-run`
+  at `delegate.clj:54-60`). The existing delegate-execution tests run through
+  the bound closure but assert none of the child run's snapshot. Add a test that
+  drives `delegate-step-runtime-result` (or a full delegation) and asserts the
+  child run's stored `:inherited-defaults` equals the delegating step's
+  effective snapshot (overridden model + parent-snapshot speed/effort) — so the
+  delegate wiring, not just the two helper fns, is covered.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
