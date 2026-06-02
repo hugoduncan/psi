@@ -271,7 +271,7 @@
   "malformed args (non-map / unreadable EDN) → validate error, not crash"
   overstated for the psi-tool surface.
 
-- [ ] (TR-4) Cover the end-to-end psi-tool `:is-error` flag for a
+- [x] (TR-4) Cover the end-to-end psi-tool `:is-error` flag for a
   tagged-`:error` operation result (slice-2 surface-parity). `make-psi-tool`'s
   `"operation"` arm sets `:is-error (not= :ok (:psi-tool/overall-status
   safe-report))` (psi_tool.clj ~L693); for `invoke` the overall-status is

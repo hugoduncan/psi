@@ -680,3 +680,23 @@ Non-actionable observations (no follow-up):
   `{:type :text}` data maps with no error flag); `operation-malformed-result-
   distinct` and the error-text tests already cover the command tagged-error
   rendering. The gap is psi-tool-specific.
+
+## TR-4 follow-up (ψ) — end-to-end tagged-error :is-error coverage
+
+Added `operation-invoke-tagged-error-sets-is-error-end-to-end` to
+`psi_tool_operation_integration_test.clj`. Registers a handler returning a
+domain `{:status :error :reason :boom :message "no"}` (NOT an exception),
+dispatches `op invoke` through the real `make-psi-tool`, and asserts the
+serialized `:is-error true`, `:psi-tool/action :operation`,
+`:psi-tool/overall-status :error`, and the projected (`pr-str`'d) `:reason`
+/`:message` keys on `:psi-tool/result`. This exercises the
+`(not= :ok (:psi-tool/overall-status safe-report))` wiring (psi_tool.clj
+~L693) via the tagged-error code path — distinct from all prior `:is-error`
+integration cases (validation/lookup/parse failures via validate /
+outer-catch / missing-operation) and from the report-unit-only
+`invoke-error-sets-overall-status`.
+
+Verified: `clj-paren-repair` (success), `clj-kondo --lint` (0/0), focused
+integration suite green (10 tests / 27 assertions, 0 failures). No blocked
+steps. The remaining unchecked close-out box (`git mv open/ → closed/` +
+remove from plan.md) is the lifecycle's terminal move, not this follow-up pass.
