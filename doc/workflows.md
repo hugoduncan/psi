@@ -203,6 +203,31 @@ For the formal grammar, see [`doc/workflow-grammar.md`](workflow-grammar.md).
 For the conceptual explanation, see
 [`doc/workflow-grammar-concepts.md`](workflow-grammar-concepts.md).
 
+## Inherited session defaults are snapshotted at invoke time
+
+When a step does not specify its own override, it inherits its default session
+details — model, prompt-mode, tools, skills, thinking-level, speed-mode, and
+effort-override — from the session that invoked the workflow. These inherited
+defaults are captured as a **snapshot when the workflow run is created**, and
+that snapshot becomes part of the run's replayable canonical state.
+
+Consequences:
+
+- Changing the invoking session's model (or the user/project default model)
+  *after* a workflow has started has **no effect** on the still-running
+  workflow's later steps — they continue to use the model that was in effect
+  when the workflow was invoked.
+- A nested/delegated sub-workflow inherits the delegating step's **effective**
+  config: the run snapshot combined with that step's own overrides, captured
+  when the sub-delegation is created. So a step that overrides the model and
+  then delegates passes the overridden model down to the sub-delegation.
+- A step that specifies an explicit override (`:model`, `:tools`, `:skills`,
+  `:thinking-level`, etc.) still applies that override — the snapshot governs
+  only the inherited default used when a step gives no value of its own.
+- Resuming a blocked run reuses the original invoke-time snapshot;
+  *continuing* a terminal run is a fresh top-level invocation that captures a
+  new snapshot from the live session at continuation time.
+
 ## Example 1: compact inline session workflow
 
 `plan-build` is the smallest authoritative example of the preferred inline

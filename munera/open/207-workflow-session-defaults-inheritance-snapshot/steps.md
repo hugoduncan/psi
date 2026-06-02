@@ -154,16 +154,22 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
 
 ## S7 — Coherence + docs
 
-- [ ] Re-read all touched files (sync after tooling edits).
-- [ ] Verify coherence across meta/spec/tests/code/docs for the snapshot model.
-- [ ] Update user-facing docs (`doc/workflows.md` and/or `doc/architecture.md`)
-      describing invoke-time inheritance snapshot semantics, if user-visible.
-- [ ] Add changelog entry under `[Unreleased]` if behaviour is user-visible
-      (workflow inheritance now snapshotted at invoke time).
-- [ ] Run full lint (`clj-kondo --lint src` across touched components).
-- [ ] Run the full relevant test suite; all green.
-- [ ] Final review: confirm `create-run` purity preserved and no
-      `workflow-runtime → workflow-step-session-config` layering inversion.
+- [x] Re-read all touched files (sync after tooling edits); resolver snapshot
+      bindings + delegate injected-fn signature confirmed coherent.
+- [x] Verified coherence across spec/tests/code/docs for the snapshot model.
+- [x] Updated `doc/workflows.md` with an "Inherited session defaults are
+      snapshotted at invoke time" section (invoke-time capture, nested effective
+      config, explicit-override precedence, resume-reuse vs continue-fresh).
+- [x] Added `[Unreleased]` → Fixed changelog entry describing the snapshot
+      behaviour (model/prompt-mode/tools/skills/thinking-level/speed/effort, no
+      retroactive mid-run leakage, nested delegation, replayable canonical state).
+- [x] Ran `clj-kondo --lint` across all touched component src files — clean.
+- [x] Ran the relevant focused test suite across all touched areas — 84 tests,
+      490 assertions + workflow-execution/statechart-runtime + child-session
+      mutation/judge suites all green.
+- [x] Final review: `create-run` purity preserved (records `:inherited-defaults`
+      verbatim, no ctx reads); no `workflow-runtime → workflow-step-session-config`
+      layering inversion (nested path uses the injected fn).
 
 ## Plan-ambiguity follow-ups (review 2026-06-02)
 

@@ -654,3 +654,24 @@ delegation execution/result-boundary/list tests still green.
 Verification: `workflow-step-session-config.core-test` (26 tests, 85
 assertions), delegate execution/boundary/list/statechart suites green; clj-kondo
 clean.
+
+## S7 build — coherence + docs (ψ, 2026-06-02)
+
+- Re-read touched source; confirmed resolver per-field source swap, the delegate
+  injected-fn signature, and create-run purity are coherent.
+- `doc/workflows.md`: added "Inherited session defaults are snapshotted at invoke
+  time" section (invoke-time capture; nested effective-config inheritance;
+  explicit-override precedence; resume-reuse vs continue-fresh).
+- `CHANGELOG.md` `[Unreleased]` → Fixed: documents the snapshot behaviour and
+  mid-run-leakage fix for all seven inherited fields, nested delegation, and the
+  replayable canonical-state property.
+- Lint clean across all touched component src files.
+- Tests: 84-test focused cross-component pass (490 assertions) +
+  workflow-execution/statechart-runtime (12/61) + child-session
+  mutation/judge (24/121) all green.
+- Final review: create-run stays pure (verbatim record, no ctx reads); no
+  workflow-runtime → workflow-step-session-config layering inversion (the nested
+  path is reached only through the injected `resolve-inherited-defaults-fn`).
+
+All slices S1–S7 implemented and checked. Implementation complete pending
+review/closure.
