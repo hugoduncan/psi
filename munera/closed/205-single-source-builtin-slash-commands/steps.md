@@ -191,3 +191,17 @@ Tick with sha/decision on completion.
       the change-detection guard (add `has-builtin-specs` to the `or`) so a
       built-in-spec-only event triggers a refresh, or state in plan why a
       built-in-spec-only event cannot arrive on channel 2.
+
+## Implementation review follow-ups (review pass 1)
+
+- [ ] R1 — `prefixed-case-branch-coherence-test`
+      (`commands_builtin_specs_test.clj`) compares the prefixed spec-table keys
+      against a hardcoded literal `case-keys` set, not the live
+      `dispatch-prefixed-command` `case` branches, so it does NOT detect drift
+      between the spec table and the real `case` form (its name implies it
+      does). Either derive the `case` branch set from the actual dispatch form
+      (e.g. a small shared data-driven branch table both the `case` and the test
+      read) so the test genuinely locks the seam, or rename/recomment the test
+      to make clear it is a spec-table snapshot lock rather than a live-`case`
+      coherence check. Non-blocking (prefixed-`case` handler-wiring is
+      design-scoped out); test-clarity only.

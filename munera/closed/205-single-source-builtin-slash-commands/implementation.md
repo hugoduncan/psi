@@ -640,3 +640,44 @@ Coherence lock, changelog, docs, full verify.
 
 Verification: full `clojure -M:test` exits 0; `bb lint` 0 errors/0 warnings;
 `bb emacs:check` 324/324; `bb fmt:check` clean.
+
+## 2026-06-01 — Implementation review (task-implementation-review), pass 1
+
+Scope: implementation quality (design-fit, architecture-fit, new-vs-existing
+pattern, unnecessary abstraction, structural perf). Read all task artifacts +
+the landed code/tests/docs. Verified projections at runtime against the prior
+literals (`exact-command-handlers`, `prefixed-command-prefixes`,
+`builtin-command-names`, handler keywords) — **byte-identical**, no command
+dropped/added. `format-help` order + membership + descriptions reproduce the
+pre-task help exactly (only column padding dropped, as noted). Ran focused
+suites green: `commands-test` (51/206), `commands-builtin-specs-test` (via
+suite), `builtin-commands-resolver-test` (3/24), TUI `app-input-selector-test`
+(14/38), `bb emacs:check` 324/324; `bb fmt:check` + clj-kondo clean.
+
+Strong fit: single keyed `builtin-command-specs` table is the sole name source;
+every other surface is a pure projection (`unreachable > forbidden` satisfied
+structurally). Resolver mirrors `extension-commands-resolver`; UIs consume via
+EQL (one-way). Leaf-ns extraction (`commands.builtin-specs`) cleanly breaks the
+documented load cycle without weakening the invariant. Emacs merge prepends
+backend specs so `seq-uniq` first-wins gives backend precedence — correct. No
+unnecessary abstraction; reuses the existing extension-command-names pattern; no
+structural perf concern.
+
+One minor (non-blocking, design-sanctioned) observation:
+
+- R1 — `prefixed-case-branch-coherence-test` compares the prefixed spec-table
+  keys against a **second hardcoded literal** `case-keys` set, not against the
+  live `dispatch-prefixed-command` `case` branch keys. It therefore locks the
+  spec table against a static snapshot and does **not** detect drift between the
+  table and the real `case` form (the seam its name implies it guards). The
+  design explicitly scoped the prefixed-`case` handler-wiring out (hand-written,
+  residual), so this is not a defect — but the test gives less protection than
+  its name suggests. Consider either deriving `case-keys` from the actual `case`
+  form (e.g. a small data-driven branch table the `case` and the test both read)
+  or renaming/recommenting the test to reflect that it is a spec-table snapshot
+  lock, not a live-`case` coherence check.
+
+No correctness, design-fit, or architecture-fit defects found. R1 is a
+test-clarity nicety, not a blocker.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
