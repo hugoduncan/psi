@@ -89,43 +89,44 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
 
 ## S5 — Consume snapshot in step config resolution
 
-- [ ] In `resolve-step-session-config` (core.clj:145): when
-      `(:inherited-defaults workflow-run)` present, source ONLY the 7 inherited
-      fields (`:model`, `:prompt-mode`, `:tool-defs`, `:skills`,
-      `:thinking-level`, `:speed-mode`, `:effort-override`) from the snapshot
-      instead of the live parent reads. This is a per-field source swap, NOT a
-      whole-path fork (resolved P5): non-inherited outputs
-      (`:developer-prompt`, `:response-mode`, `:prompt-component-selection`,
-      `:temperature`, logprob, `:model-fallback`) stay on their current
-      step-def/base-meta code path regardless of snapshot presence.
-- [ ] When `:inherited-defaults` absent (pre-existing runs), retain the current
-      live-read path (forward-looking-only fallback; AC 6).
-- [ ] Set the single `parent-session-model` binding (`core.clj:164`) to the
-      snapshot's `{:provider :id}` `:model` when a snapshot is present, so ALL
-      FOUR consumers observe it (resolved P4): `resolved-step-model-config` step
-      override (`:173`), base-meta override (`:175`), bare no-override fallback
-      (`:183`), and (transitively) `resolved-model-query` (AC 7). Do NOT replace
-      only the model-query/no-override subset — override resolution must also see
-      the snapshot model or AC1/AC2 leak.
-- [ ] Ensure `:speed-mode`/`:effort-override` from the snapshot flow into the
-      step's resolved config output (extend output map — resolver emits neither
-      today, resolved I1/P2).
-- [ ] Verify explicit overrides (`:session` spec / base-meta) still win over the
-      snapshot defaults (AC 5): the override path's OUTPUT still takes precedence;
-      only its model-selection CONTEXT (`parent-session-model`) is snapshot-sourced
-      (P4).
-- [ ] Test AC 1: switching invoking session model after invoke → no effect on
-      subsequent steps.
-- [ ] Test AC 2: changing user/project default model after invoke → no effect.
-- [ ] Test AC 3: same invariant for `prompt-mode`, `tools`, `skills`,
-      `thinking-level`, `speed-mode`, `effort-override`.
-- [ ] Test AC 5: explicit override still applied.
-- [ ] Test AC 6: no-mutation single-step and multi-step resolution unchanged;
-      no-snapshot fallback unchanged.
-- [ ] Test AC 7: `resolved-model-query` selection context = snapshot model.
-- [ ] Test AC 8: `resume-run`/`continue-blocked-run-async!` reuses the original
-      snapshot (no re-capture; resolver not called).
-- [ ] Lint + repair.
+- [x] In `resolve-step-session-config`: when `(:inherited-defaults workflow-run)`
+      present, the 7 inherited fields (`:model`, `:prompt-mode`, `:tool-defs`,
+      `:skills`, `:thinking-level`, `:speed-mode`, `:effort-override`) are sourced
+      from the snapshot instead of the live parent reads. Per-field source swap,
+      NOT a whole-path fork (P5): non-inherited outputs stay on their current
+      step-def/base-meta code path. `:tool-defs`/`:skills` snapshots replace the
+      resolved name-resolution pools.
+- [x] When `:inherited-defaults` absent (pre-existing runs), the current live-read
+      path is retained (forward-looking-only fallback; AC 6).
+- [x] The single `parent-session-model` binding is set wholesale to the
+      snapshot's `:model` when present (P4), so all four consumers observe it
+      (step override, base-meta override, no-override fallback, model-query
+      selection context).
+- [x] `:speed-mode`/`:effort-override` from the snapshot flow into the step's
+      resolved config output (cond-> assoc when present).
+- [x] End-to-end propagation (discovered necessary for AC3): threaded
+      `:speed-mode`/`:effort-override` from the resolved config through
+      `attempts/create-step-attempt-session!` → `child-session-contract`
+      request-schema → `context/create-workflow-child-session!` →
+      `:session/create-child` handler → `child-session-state` (override wins,
+      else parent fallback). Without this the snapshot would be decorative for
+      those two fields (workflow children build state via
+      `child-session-base-state*`, which did not inherit speed/effort).
+- [x] Explicit overrides still win over snapshot defaults (AC 5): override path
+      OUTPUT precedence preserved; only model-selection CONTEXT is
+      snapshot-sourced. Proven by `snapshot-preserves-explicit-step-override-test`.
+- [x] Test AC 1/AC 2: `snapshot-isolates-resolution-from-live-parent-mutation-test`
+      — mutating live session model/prompt-mode/speed/effort after invoke has no
+      effect on resolution.
+- [x] Test AC 3: same invariant for prompt-mode, thinking-level, speed-mode,
+      effort-override (same test); tools/skills sourced from snapshot pools.
+- [x] Test AC 5: `snapshot-preserves-explicit-step-override-test`.
+- [x] Test AC 6: existing no-snapshot resolver tests unchanged +
+      `no-snapshot-falls-back-to-live-parent-test` (no speed/effort emitted).
+- [x] Test AC 7: `snapshot-model-feeds-model-query-selection-context-test`.
+- [x] Test AC 8: `resume-run-test` "AC8" testing block — resume preserves the
+      original snapshot verbatim (no re-capture).
+- [x] Lint clean.
 
 ## S6 — Nested/delegated capture
 

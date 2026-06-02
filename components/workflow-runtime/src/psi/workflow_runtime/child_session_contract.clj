@@ -14,6 +14,8 @@
    [:response-mode {:optional true} [:maybe keyword?]]
    [:tool-ids {:optional true} [:maybe [:vector :string]]]
    [:thinking-level {:optional true} [:maybe keyword?]]
+   [:speed-mode {:optional true} [:maybe keyword?]]
+   [:effort-override {:optional true} [:maybe keyword?]]
    [:temperature {:optional true} [:maybe number?]]
    [:model {:optional true} [:maybe :map]]
    [:skills {:optional true} [:maybe [:vector :map]]]

@@ -119,7 +119,7 @@
      :system-prompt              (or system-prompt resolved-base-prompt (:system-prompt parent-sd))}))
 
 (defn- child-session-base-state*
-  [root-state parent-sd {:keys [child-session-id session-name thinking-level temperature model prompt-mode response-mode logprobs top-logprobs developer-prompt developer-prompt-source cache-breakpoints workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?] :as child-opts}]
+  [root-state parent-sd {:keys [child-session-id session-name thinking-level speed-mode effort-override temperature model prompt-mode response-mode logprobs top-logprobs developer-prompt developer-prompt-source cache-breakpoints workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?] :as child-opts}]
   (let [{:keys [root-state prompt-component-selection tool-ids skill-ids system-prompt-build-opts base-system-prompt system-prompt]}
         (derive-child-prompt-state root-state parent-sd child-opts)
         normalized-developer-prompt-source (let [source (or developer-prompt-source (:developer-prompt-source parent-sd))]
@@ -158,6 +158,15 @@
                         :updated-at                 ts}
                  (some? top-logprobs)
                  (assoc :top-logprobs top-logprobs)
+
+                 ;; Workflow inherited-defaults snapshot (task 207): apply the
+                 ;; resolved speed-mode/effort-override, falling back to the
+                 ;; parent session's value when no override is supplied.
+                 (some? (or speed-mode (:speed-mode parent-sd)))
+                 (assoc :speed-mode (or speed-mode (:speed-mode parent-sd)))
+
+                 (some? (or effort-override (:effort-override parent-sd)))
+                 (assoc :effort-override (or effort-override (:effort-override parent-sd)))
 
                  (some? temperature)
                  (assoc :temperature temperature)))]

@@ -100,6 +100,41 @@
       (is (not (contains? child-sd :tool-defs)))
       (is (not (contains? child-sd :active-tools))))))
 
+(deftest child-session-base-state-applies-speed-effort-override-test
+  (testing "task 207: explicit speed-mode/effort-override (from the inherited
+            snapshot) win over the parent session; absence falls back to parent"
+    (let [root-state {:agent-session {:sessions {"parent"
+                                                 {:data (parent-session-data {:speed-mode :flex
+                                                                              :effort-override :low})
+                                                  :agent-ctx {:data-atom (atom {:tools parent-tool-defs})}}}}}
+          parent-sd (parent-session-data {:speed-mode :flex :effort-override :low})]
+      (testing "override supplied → override wins"
+        (let [child-sd (child-session-state/child-session-base-state
+                        root-state parent-sd
+                        {:child-session-id "child-speed"
+                         :speed-mode :fast
+                         :effort-override :xhigh})]
+          (is (= :fast (:speed-mode child-sd)))
+          (is (= :xhigh (:effort-override child-sd)))))
+
+      (testing "no override → falls back to the parent session's values"
+        (let [child-sd (child-session-state/child-session-base-state
+                        root-state parent-sd
+                        {:child-session-id "child-speed-fallback"})]
+          (is (= :flex (:speed-mode child-sd)))
+          (is (= :low (:effort-override child-sd)))))
+
+      (testing "neither override nor parent value → nil (initial-session default)"
+        (let [bare-parent (parent-session-data)
+              bare-root {:agent-session {:sessions {"parent"
+                                                    {:data bare-parent
+                                                     :agent-ctx {:data-atom (atom {:tools parent-tool-defs})}}}}}
+              child-sd (child-session-state/child-session-base-state
+                        bare-root bare-parent
+                        {:child-session-id "child-speed-none"})]
+          (is (nil? (:speed-mode child-sd)))
+          (is (nil? (:effort-override child-sd))))))))
+
 (deftest child-session-base-state-fallback-precedence-test
   (testing "explicit system prompt wins and becomes base prompt"
     (let [parent-sd (parent-session-data {:base-system-prompt "parent-base"

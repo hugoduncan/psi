@@ -101,6 +101,8 @@
                 :top-logprobs 2
                 :tool-defs [{:name "read"}]
                 :thinking-level :off
+                :speed-mode :fast
+                :effort-override :xhigh
                 :model {:provider "openai" :id "gpt-5"}
                 :skills [{:name "skill-a"}]
                 :developer-prompt "dev"
@@ -120,6 +122,8 @@
                   :top-logprobs 2
                   :tool-ids ["read"]
                   :thinking-level :off
+                  :speed-mode :fast
+                  :effort-override :xhigh
                   :model {:provider "openai" :id "gpt-5"}
                   :skills [{:name "skill-a"}]
                   :developer-prompt "dev"

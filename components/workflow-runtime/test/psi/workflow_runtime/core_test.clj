@@ -152,7 +152,27 @@
       (is (= :running (:status resumed-run)))
       (is (nil? (:blocked resumed-run)))
       (is (= resumed-run (workflow-runtime/workflow-run-in state4 run-id)))
-      (is (= :workflow/resume (-> resumed-run :history last :event))))))
+      (is (= :workflow/resume (-> resumed-run :history last :event)))))
+
+  (testing "AC8: resume reuses the original invoke-time inherited-defaults
+            snapshot (no re-capture)"
+    (let [[state1 definition-id _]
+          (workflow-registry/register-definition {:workflows (workflow-model/initial-workflow-state)}
+                                                 registered-definition)
+          snapshot {:model {:provider "anthropic" :id "claude-snapshot"}
+                    :prompt-mode :concise
+                    :speed-mode :fast
+                    :effort-override :xhigh}
+          [state2 run-id _]
+          (workflow-runtime/create-run state1 {:definition-id definition-id
+                                               :run-id "run-resume-snap"
+                                               :inherited-defaults snapshot
+                                               :workflow-input {:input "x"}})
+          state3 (assoc-in state2 [:workflows :runs run-id :status] :blocked)
+          [_ resumed-run]
+          (workflow-runtime/resume-run state3 run-id)]
+      (is (= snapshot (:inherited-defaults resumed-run))
+          "resume preserves the original snapshot verbatim"))))
 
 (deftest cancel-run-test
   (testing "cancel-run marks a run cancelled and records terminal outcome/history"

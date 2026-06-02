@@ -575,3 +575,51 @@ empty session data and produces a nilable snapshot (schema-valid).
 
 Verification: `workflow-tools-test` + `canonical-workflows-test` (13 tests, 177
 assertions) green; clj-kondo clean.
+
+## S5 build — consume snapshot in step config resolution (ψ, 2026-06-02)
+
+`resolve-step-session-config` now does a per-field source swap (P5): when
+`(:inherited-defaults workflow-run)` is present the 7 inherited defaults come
+from the snapshot, else the live-read path is retained (AC6). Key points:
+
+- `parent-session-model` is set WHOLESALE to the snapshot `:model` (P4) — all
+  four consumers (step override, base-meta override, no-override fallback,
+  model-query selection context) see it, so AC1/AC2 cannot leak through override
+  resolution, and AC7's model-query selection context is snapshot-sourced.
+- `:tool-defs`/`:skills` snapshots replace the resolved name-resolution pools;
+  `:prompt-mode` and the `:thinking-level` inherited fallback come from the
+  snapshot.
+- `:speed-mode`/`:effort-override` are emitted into the resolved config via
+  cond-> when the snapshot supplies them (the resolver emits neither today —
+  I1/P2).
+
+### Deviation / discovery — end-to-end speed/effort propagation
+
+AC3 requires the invariant for speed-mode/effort-override too. The resolved
+config carrying them is necessary but not sufficient: workflow child sessions
+build their state via `child-session-state/child-session-base-state*`, which
+(unlike init.clj's lifecycle paths using `common-inherited-fields`) did NOT
+inherit or apply speed/effort. So a mid-run parent change would still leak into
+later steps' children. Threaded them through the full child-creation path:
+
+- `child-session-contract/request-schema` — added optional
+  `:speed-mode`/`:effort-override` (closed schema).
+- `attempts/create-step-attempt-session!` — destructure + forward.
+- `context/create-workflow-child-session!` — destructure + dispatch keys.
+- `dispatch_handlers/session_lifecycle.clj` `:session/create-child` — forward to
+  `initialize-child-session-state`.
+- `child-session-state/child-session-base-state*` — apply override (else parent
+  fallback) via cond->.
+
+Not in the original steps list; recorded here as a design deviation. It is a
+clean threading of two already-modelled session fields and is required for AC3.
+
+Tests added/updated:
+- `workflow-step-session-config.core-test`: AC1/2/3 isolation, AC5 override,
+  AC6 no-snapshot fallback, AC7 model-query selection context (25 tests total).
+- `workflow-runtime.core-test`: AC8 resume reuse.
+- `workflow-runtime.attempts-test`: request-surface forwards speed/effort.
+- `agent-session.child-session-state-test`: override-wins / parent-fallback /
+  nil-default for speed/effort.
+
+Verification: focused suites (54 tests, 207 assertions) green; clj-kondo clean.

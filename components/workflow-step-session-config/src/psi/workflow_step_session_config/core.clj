@@ -186,12 +186,26 @@
         authoritative-parent-session-id (or parent-session-id
                                             (:parent-session-id workflow-run)
                                             (some->> (execution-adapter/list-context-sessions ctx) first :session-id))
+        ;; Inherited-defaults snapshot, captured at invoke time (task 207).
+        ;; When present, the seven inherited defaults are sourced from the
+        ;; snapshot instead of live parent reads (per-field source swap, P5);
+        ;; when absent (pre-existing runs) the live-read path is retained (AC 6).
+        snapshot (:inherited-defaults workflow-run)
+        snapshot? (some? snapshot)
         parent-session (execution-adapter/get-session-data ctx authoritative-parent-session-id)
-        parent-session-model (:model parent-session)
-        parent-session-prompt-mode (:prompt-mode parent-session)
-        session-skills (skill-storage/all-skills @(:state* ctx) parent-session)
-        tool-source (ss/agent-tool-source-in ctx authoritative-parent-session-id)
-        session-tool-defs (tool-defs/resolve-tool-defs tool-source (:tool-ids parent-session))
+        ;; parent-session-model is replaced WHOLESALE by the snapshot model
+        ;; (P4): all four consumers (step override, base-meta override,
+        ;; no-override fallback, model-query selection context) see it.
+        parent-session-model (if snapshot? (:model snapshot) (:model parent-session))
+        parent-session-prompt-mode (if snapshot? (:prompt-mode snapshot) (:prompt-mode parent-session))
+        ;; tool-defs/skills snapshots are the resolved name-resolution pools.
+        session-skills (if snapshot?
+                         (:skills snapshot)
+                         (skill-storage/all-skills @(:state* ctx) parent-session))
+        session-tool-defs (if snapshot?
+                            (:tool-defs snapshot)
+                            (let [tool-source (ss/agent-tool-source-in ctx authoritative-parent-session-id)]
+                              (tool-defs/resolve-tool-defs tool-source (:tool-ids parent-session))))
         session-spec (:session step-def)
         developer-prompt (or (:system-prompt session-spec)
                              (:system-prompt base-meta))
@@ -224,11 +238,20 @@
        :tool-defs (resolve-step-tool-defs session-tool-defs (:tools session-spec))
        :thinking-level (or (:thinking-level session-spec)
                            (:thinking-level base-meta)
+                           (when snapshot? (:thinking-level snapshot))
                            :off)
        :skills (resolve-step-skills ctx session-skills (:skills session-spec))
        :model resolved-model
        :prompt-component-selection (:prompt-component-selection session-spec)}
       (resolved-logprob-config session-spec))
+
+      ;; speed-mode/effort-override flow from the snapshot into the step's
+      ;; resolved config (the resolver emits neither today — I1/P2).
+      (and snapshot? (some? (:speed-mode snapshot)))
+      (assoc :speed-mode (:speed-mode snapshot))
+
+      (and snapshot? (some? (:effort-override snapshot)))
+      (assoc :effort-override (:effort-override snapshot))
 
       (contains? session-spec :temperature)
       (assoc :temperature (:temperature session-spec))
