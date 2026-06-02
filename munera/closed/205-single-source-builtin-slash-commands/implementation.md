@@ -806,3 +806,53 @@ PASS_STATUS: ACTIONABLE_FEEDBACK
   divergence is now traceable at the most local point (the resolver itself) and
   here. Existing graph-discovery + resolver-shape tests already cover its
   behaviour (unchanged).
+
+## 2026-06-01 — Implementation review (task-implementation-review), pass 3
+
+Scope: implementation quality (design-fit, architecture-fit, new-vs-existing
+pattern, unnecessary abstraction, structural perf). Independent re-read of all
+task artifacts + the landed code across all three layers + tests + docs:
+`commands/builtin_specs.clj`, `commands.clj` (both `case` seams),
+`resolvers/extensions.clj`, `commands_builtin_specs_test.clj`,
+`builtin_commands_resolver_test.clj`, TUI `autocomplete.clj`/`support.clj`/
+`shared.clj`, Emacs `psi-completion.el`/`psi-session-commands.el`/`psi-events.el`/
+`psi-globals.el`/`psi-lifecycle.el`, CHANGELOG, `doc/architecture.md`.
+
+Verified prior findings landed and correct:
+- R1 (prefixed-case seam) — live `commands/prefixed-case-branches` def +
+  load-time `assert` + `prefixed-case-branch-coherence-test` reads
+  `@#'commands/prefixed-case-branches`. ✓
+- R2 (exact-case seam) — symmetric live `commands/exact-case-branches` def +
+  load-time `assert (= … (set (vals bspec/exact-command-handlers)))` +
+  `exact-case-branch-coherence-test`; `exact-command-handlers-projection-
+  unchanged-test` recommented as a static snapshot lock (not live-`case`). ✓
+- R3 (resolver input-free deviation) — `builtin-commands-resolver` docstring
+  documents the `::pco/input []`/`_env` choice (static specs ⇒ no session ctx)
+  and the plan↔code divergence is recorded here. ✓
+
+Fresh independent checks (no prior pass covered these in depth):
+- TUI `autocomplete.clj` builds built-in candidates purely from
+  `(:builtin-command-specs state)` via `as-slash-command`; `shared/
+  builtin-slash-commands` is gone; `shared` require retained (P5). The `nil`
+  built-in `:description` in `slash-candidates` matches the pre-existing
+  candidate shape (extension/template candidates are also `:description nil`
+  there) — no regression. ✓
+- Emacs `psi-emacs--state-slash-command-specs` prepends `backend-specs` then
+  `seq-uniq` first-wins → backend descriptions win on collision (AC, design). ✓
+  `defcustom` default correctly trimmed to `/skill:`; docstring accurate.
+- No hardcoded built-in command list remains in any TUI/Emacs source
+  (grep over `components/tui/src` + `components/emacs-ui/*.el`). ✓
+- CHANGELOG `[Unreleased]` + `doc/architecture.md` EQL tips accurately describe
+  the single-source spec-table → resolver → UI-projection surfacing. ✓
+- Resolver tests cover shape/bare-names/internal-field-exclusion,
+  full-membership coherence (resolver bare-name set == `builtin-command-names`,
+  AC6), and graph discovery.
+
+No new actionable findings. Single keyed table is the sole name source; every
+surface (routing maps, names set, help block, resolver, both UIs) is a pure
+projection; both `case` seams are live-locked; no unnecessary abstraction; the
+extension-command-names pattern is reused, not reinvented; no structural perf
+concern. R1/R2/R3 from prior passes are resolved. Design-fit, architecture-fit,
+and all ACs hold.
+
+PASS_STATUS: REVIEW_COMPLETE
