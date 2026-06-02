@@ -22,7 +22,10 @@ watchdog. Those timers live in a module-global hash table:
   single `defvar` hash keyed by the string `"ext-id/widget-id:node-key"`.
 - Armed by `psi-widget-projection--arm-mutation-timer` when a widget mutation is
   dispatched; cancelled by `psi-widget-projection--cancel-mutation-timer` only on
-  RPC response or when the watchdog fires.
+  RPC response (`--dispatch-mutation` response callback) or when the watchdog
+  fires. Both the response callback and the timeout callback read the dynamic
+  `psi-emacs--state` to locate the store and lstate they mutate, so both inherit
+  the same buffer-targeting hazard once the store moves buffer-local.
 
 This produces three problems when a buffer is killed mid-mutation:
 
@@ -55,12 +58,27 @@ In scope:
   write that buffer-local store instead of the module-global `defvar`.
 - Cancel and clear all widget mutation timers in `psi-emacs--teardown-buffer`,
   alongside the existing timer-cancellation calls.
-- Decide and apply the timeout-callback's buffer-targeting so the watchdog
-  resolves the correct buffer/state explicitly (as notification timers do via a
-  captured `buffer`/`state`) rather than relying on incidental current buffer.
+- Decide and apply explicit buffer-targeting for **both** callbacks that touch
+  the buffer-local timer store, rather than relying on the incidental current
+  buffer:
+  - The timeout watchdog callback
+    (`psi-widget-projection--on-mutation-timeout`).
+  - The `--dispatch-mutation` RPC **response** callback
+    (`psi-widget-projection.el:354`), which currently reads the dynamic
+    `psi-emacs--state` and calls `--cancel-mutation-timer` against the global
+    hash. Post-change it must cancel/clear against the *originating* buffer's
+    buffer-local timer store and lstate.
+  Both callbacks must capture the originating `buffer`/`state` at arm/dispatch
+  time and guard with `buffer-live-p` before mutating that buffer's store
+  (mirroring `psi-emacs--schedule-notification-dismiss`), so a callback that
+  arrives while another buffer is current cannot mutate the wrong buffer's
+  store, and is a no-op when the originating buffer is dead.
 - Tests proving: (a) a killed buffer cancels its in-flight widget timers; (b) two
   buffers no longer share timer state for the same key; (c) the existing
-  arm/cancel-on-response and timeout behaviours still hold.
+  arm/cancel-on-response and timeout behaviours still hold; (d) a response (and a
+  timeout) arriving while a *different* buffer is current cancels/clears the
+  originating buffer's store, not the current buffer's; (e) a response/timeout
+  for a dead buffer is a no-op.
 
 Out of scope:
 
@@ -77,6 +95,12 @@ Out of scope:
 - Follow the existing `projection-notification-timers` shape and lifecycle as the
   consistency reference (creation in `initialize-state`, cancel-all in a
   `clear-*` helper, invoked from teardown and transcript reset).
+- Both timer-store mutators — the timeout watchdog and the RPC response callback
+  — follow the `psi-emacs--schedule-notification-dismiss` precedent: capture the
+  originating `buffer`/`state` at arm/dispatch time, guard with `buffer-live-p`,
+  and operate inside `with-current-buffer buffer` (or against the captured
+  `state` directly) rather than the dynamic `psi-emacs--state`. Neither callback
+  may dereference `psi-emacs--state` to locate the store it cancels/clears.
 - Per `psi-emacs--reset-transcript-state` semantics, also clear widget mutation
   timers on transcript reset (`/new`, reconnect) where notification timers are
   already cleared, since the widgets they watch are discarded there too.
@@ -98,6 +122,12 @@ Out of scope:
 - The watchdog timeout callback resolves its target buffer/state explicitly and
   is a no-op when that buffer is dead, with no dependence on the incidental
   current buffer.
+- The `--dispatch-mutation` RPC response callback likewise cancels/clears
+  against the *originating* buffer's buffer-local timer store and lstate
+  (captured `buffer`/`state` + `buffer-live-p` guard), with no dependence on the
+  incidental current buffer; a response arriving while another buffer is current
+  does not mutate that other buffer's store, and a response for a dead buffer is
+  a no-op.
 - Two live psi buffers with mutations sharing the same
   `ext-id/widget-id:node-key` do not interfere with each other's timers.
 - Transcript reset (`/new`, reconnect) clears the buffer's widget mutation

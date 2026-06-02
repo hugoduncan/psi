@@ -2,7 +2,7 @@
 
 ## Architecture-fit review (ψ)
 
-- [ ] Extend the "resolve target buffer/state explicitly" requirement to cover
+- [x] Extend the "resolve target buffer/state explicitly" requirement to cover
       the `--dispatch-mutation` RPC **response** callback
       (psi-widget-projection.el:354), not just the timeout callback. The
       response path must cancel/clear against the originating buffer's

@@ -26,3 +26,23 @@ Actionable misfit (1):
   notification precedent's captured `buffer`/`state` + `buffer-live-p` guard
   (psi-projection.el:415). Otherwise consistency/orthogonality goals are only
   partially met and a stale-buffer response could touch the wrong store.
+
+## Architecture-fit follow-up — resolved (ψ)
+
+Applied the response-callback buffer-targeting requirement into design.md:
+- Scope: explicit buffer-targeting now required for **both** callbacks (timeout
+  watchdog + `--dispatch-mutation` response), each capturing originating
+  `buffer`/`state` + `buffer-live-p` guard, mirroring
+  `psi-emacs--schedule-notification-dismiss`.
+- Constraints: neither callback may dereference dynamic `psi-emacs--state` to
+  locate the store; both operate against the captured buffer/state.
+- Acceptance: added a criterion for the response callback targeting the
+  originating buffer (no cross-buffer mutation, dead-buffer no-op).
+- Scope/Tests: added (d) cross-buffer-current and (e) dead-buffer no-op cases for
+  both response and timeout paths.
+- Why: noted both callbacks share the same buffer-targeting hazard.
+
+Verified against precedent at psi-projection.el:410
+(`psi-emacs--schedule-notification-dismiss`): captures `(current-buffer)` +
+`state`, guards `(buffer-live-p buffer)`, runs in `with-current-buffer`.
+No code changes (design-only task).
