@@ -1,7 +1,7 @@
 ---
 name: incidental-complexity-finder
 description: Choose the single highest incidental-complexity executable unit to simplify. Use when selecting a behaviour-preserving refactor target by comprehension burden the branching does not explain (high gordian local burden against low/moderate cyclomatic complexity), guarding against essential-complexity false positives. Produces one target plus evidence, or a well-formed no-target report.
-lambda: "λcode. {gordian-local ∧ gordian-complexity} → join(ns,var,arity) → gap=burden/cc → qualify(lcc≥5 ∧ gap≥2) → guard(top5, incidental ∧ ¬essential) → one_target ∨ ∅"
+lambda: "λcode. {gordian-local ∧ gordian-complexity} → join(ns,var,arity,line) → gap=burden/cc → qualify(lcc≥5 ∧ gap≥2) → guard(top5, incidental ∧ ¬essential) → one_target ∨ ∅"
 ---
 
 # incidental-complexity-finder

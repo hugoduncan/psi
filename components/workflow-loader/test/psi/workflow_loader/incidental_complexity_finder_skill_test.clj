@@ -71,6 +71,14 @@
           "documents the (ns, var, arity, line) join key (F2)")
       (is (.contains body "@line")
           "documents the @line key suffix that makes the join key unique"))
+    (testing "frontmatter lambda join key matches the F2 (ns, var, arity, line) key (F5)"
+      ;; F5: the one-line behavioural summary in the frontmatter lambda is a
+      ;; join-key statement; it must track the F2/F3/F4 (ns, var, arity, line)
+      ;; key, not regress to the pre-F2 join(ns,var,arity).
+      (is (.contains body "join(ns,var,arity,line)")
+          "frontmatter lambda joins on (ns, var, arity, line)")
+      (is (not (re-find #"join\(ns,var,arity\)" body))
+          "frontmatter lambda does not regress to the pre-F2 join(ns,var,arity) key"))
     (testing "encodes the step-5 top-5 essential-vs-incidental judgment guard (TR3)"
       ;; The design's core discriminator (Locked decisions 1/2/9). Without the
       ;; top-5 judgment procedure the skill degenerates to the `gordian

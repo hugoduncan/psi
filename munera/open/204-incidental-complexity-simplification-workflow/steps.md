@@ -623,7 +623,7 @@ with the commit sha / decision when done.
 
 ## Implementation review follow-ups (review pass 5)
 
-- [ ] F5 — SKILL.md frontmatter `lambda` (line 4) still states the **pre-F2**
+- [x] F5 — SKILL.md frontmatter `lambda` (line 4) still states the **pre-F2**
       join key: `… → join(ns,var,arity) → gap=burden/cc → …`. The
       `join(ns,var,arity)` token describes the skill pipeline's **join
       operation** — exactly the operation F2 re-keyed onto `(ns, var, arity,
@@ -644,6 +644,20 @@ with the commit sha / decision when done.
       `incidental-complexity-finder-skill-content-lock-test` with the lambda
       join-key substring so it cannot regress. Skill markdown only; no
       workflow/test change forced.
+      RESOLUTION: updated SKILL.md line 4 frontmatter `lambda`
+      `join(ns,var,arity)` → `join(ns,var,arity,line)`, matching the body
+      §2/§3 + `jq` recipe, the F3 A5/A2 acceptance keys, and the F4-corrected
+      `design.md` selector procedure (line 62). Applied F4's distinction: the
+      lambda token is a **join-key statement** so it tracks the unique key; the
+      Scope "a `(ns, var, arity)`" mention (logical identity) is left intact (as
+      F4 left design lines 64/222). Took the optional test lock: extended
+      `incidental-complexity-finder-skill-content-lock-test` (same ns, test-only,
+      no production change) with an F5 block asserting the body **contains**
+      `join(ns,var,arity,line)` and does **not** contain the pre-F2
+      `join(ns,var,arity)`, so the lambda cannot silently regress. Frontmatter
+      prose only — behaviour unchanged (recipe already keyed on `@line`). Focused
+      skill-test suite green (4 tests, 40 assertions, 0 failures — +2 over
+      pass-4's 38); `clj-kondo` 0 findings; skill-test file 259 lines (< 800).
 
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 

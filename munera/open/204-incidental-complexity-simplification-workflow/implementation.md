@@ -1753,3 +1753,30 @@ substring so it cannot regress. Skill markdown only; no workflow/test change
 forced.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK.
+
+---
+
+## Implementation review pass 5 — F5 resolution (frontmatter lambda join-key)
+
+RESOLVED. Updated SKILL.md line 4: the frontmatter `lambda`'s join token
+`join(ns,var,arity)` → `join(ns,var,arity,line)`, matching the body §2/§3 + `jq`
+recipe, the F3 A5/A2 acceptance keys, and the F4-corrected `design.md` selector
+procedure (line 62). Applied F4's distinction: the lambda token is a **join-key
+statement** (`join(...)`), so it tracks the unique key; the Scope "a
+`(ns, var, arity)`" sentence (logical identity) is left intact, as F4 left the
+bare-identity mentions at design lines 64/222.
+
+Also added the optional regression lock noted in F5: extended
+`incidental-complexity-finder-skill-content-lock-test` (same skill-test ns,
+test-only, no production change) with a new `testing` block
+"frontmatter lambda join key matches the F2 (ns, var, arity, line) key (F5)" —
+(1) asserts the body contains `join(ns,var,arity,line)`, and (2) asserts the
+body does **not** contain `join(ns,var,arity)` (the pre-F2 token), so a regress
+of the lambda back to the stale key fails green.
+
+Behaviour unchanged (frontmatter prose only; recipe already keyed on `@line`).
+Focused suite green (incidental-complexity-finder-skill-test: 4 tests, 40
+assertions, 0 failures — +2 over pass-4's 38); `clj-kondo` 0 findings; skill-test
+file 259 lines (< 800).
+
+PASS_STATUS: NO_ACTIONABLE_FEEDBACK (F5 resolved).
