@@ -2278,3 +2278,39 @@ the handoff context source fails green. Test-only, no production/EDN change;
 small added block fits; verify the file stays under 800 after editing.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK.
+
+## 2026-06-02 — Test review (pass 11) follow-up executed (TR13)
+
+Executed the single newly-added unchecked `steps.md` item (TR13) from the
+pass-11 test-shaper review. (The trailing Contingency item predates this pass
+and is conditional — "only if Slice 3 step-1 proves unwieldy", which it did not
+— so it was left untouched.)
+
+**Grounding before locking.** Read the live
+`.psi/workflows/reduce-incidental-complexity.edn` `lifecycle-in-worktree`
+delegate step and confirmed its `:context` is exactly
+`[{:type :source :from :workflow-original}
+  {:type :source :from {:step "select-and-create" :yield :text}}]`.
+
+**Fix (test-only; same ns, no production/EDN change).** Added a `testing` block
+to `reduce-incidental-complexity-test` immediately after the existing
+`:type`/`:target`/`:prompt-string` delegate assertions — "lifecycle-in-worktree
+:delegate :context propagates workflow-original + the select-and-create handoff
+yield (TR13)" — asserting `(:context delegate-step)` equals the full two-source
+vector, mirroring `task-lifecycle-test`'s `:context` lock. A regress dropping the
+`{:step "select-and-create" :yield :text}` source — stripping the step-1
+structured handoff from the delegated wrapper's context (the companion to the
+`:prompt-string` `:input` wiring, part of the verified cross-`:delegate`
+worktree-continuity mechanism, Locked decision 11) — now fails green.
+
+**File-length guard.** The added assertion + comment initially pushed
+`workflow_definitions_test.clj` to 802 lines (over the 800 `components/` guard);
+trimmed the TR13 explanatory comment to land at **799 lines** (< 800).
+
+**Verification:**
+- `clj-paren-repair workflow_definitions_test.clj`: Success(1)/Failed(0).
+- `clojure -M:test --focus psi.workflow-loader.workflow-definitions-test`:
+  **13 tests, 211 assertions, 0 failures** (+3 over pass-9's 208).
+- `clj-kondo --lint` on the test file: 0 errors, 0 warnings.
+
+TR13 checked in steps.md. PASS_STATUS: REVIEW_COMPLETE.

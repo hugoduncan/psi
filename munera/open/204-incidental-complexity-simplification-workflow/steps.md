@@ -901,7 +901,7 @@ with the commit sha / decision when done.
 
 ## Test review follow-ups (review pass 11 — test-shaper)
 
-- [ ] TR13 — `reduce-incidental-complexity-test` does not lock the
+- [x] TR13 — `reduce-incidental-complexity-test` does not lock the
       `lifecycle-in-worktree` `:delegate` step's `:context`. That step carries
       `[{:type :source :from :workflow-original}
         {:type :source :from {:step "select-and-create" :yield :text}}]`; the
@@ -926,3 +926,18 @@ with the commit sha / decision when done.
       production/EDN change; `workflow_definitions_test.clj` is 787 lines — keep
       the edit under the 800 `components/` guard. Run focused suite +
       `clj-kondo`. (See implementation.md pass-11 test-shaper TR13 entry.)
+      RESOLUTION: added a `testing` block to `reduce-incidental-complexity-test`
+      (same ns, test-only, no production/EDN change) —
+      "lifecycle-in-worktree :delegate :context propagates workflow-original +
+      the select-and-create handoff yield (TR13)" — asserting the delegate's
+      `:context` equals
+      `[{:type :source :from :workflow-original}
+        {:type :source :from {:step "select-and-create" :yield :text}}]`,
+      mirroring `task-lifecycle-test`'s `:context` lock. Verified the EDN's
+      `lifecycle-in-worktree` step carries exactly that `:context` before
+      locking. A regress dropping the `{:step "select-and-create" :yield :text}`
+      source — stripping the step-1 handoff from the delegated run's context —
+      now fails green. Focused suite green (13 tests, 211 assertions, 0 failures
+      — +3 over pass-9's 208); `clj-kondo` 0 findings; `clj-paren-repair`
+      Success; test file trimmed to 799 lines (< 800 `components/` guard — the
+      verbose TR13 comment was shortened to stay under).

@@ -716,6 +716,18 @@
          (is (= {:type :map
                  :fields {:input {:from {:step "select-and-create" :yield :text}}}}
                 (:prompt-string delegate-step))))
+       ;; TR13 (test review pass 11, test-shaper): the delegate's :context — not
+       ;; just its :prompt-string :input — propagates the step-1 structured
+       ;; handoff blob into the delegated wrapper's context (the second source is
+       ;; the companion to the :input wiring, part of the verified cross-:delegate
+       ;; worktree-continuity mechanism — Locked decision 11). Previously the
+       ;; delegate was asserted only on :type/:target/:prompt-string, so a regress
+       ;; dropping the {:step ... :yield :text} context source passed green. Lock
+       ;; it, mirroring task-lifecycle-test's :context lock.
+       (testing "lifecycle-in-worktree :delegate :context propagates workflow-original + the select-and-create handoff yield (TR13)"
+         (is (= [{:type :source :from :workflow-original}
+                 {:type :source :from {:step "select-and-create" :yield :text}}]
+                (:context delegate-step))))
        (testing "select-and-create prompt emits the worktree_path:/munera_task_path: handoff fields"
          (is (.contains select-text "worktree_path:")
              "step-1 prompt emits worktree_path: handoff field")
