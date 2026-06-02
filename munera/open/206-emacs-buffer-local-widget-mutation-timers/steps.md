@@ -263,7 +263,7 @@
 
 ## Test-shaper review pass 3 follow-ups (ψ)
 
-- [ ] S4 — Factor the repeated MODE-BEARING buffer ceremony (minor,
+- [x] S4 — Factor the repeated MODE-BEARING buffer ceremony (minor,
       economy/consistency). `pwpt-teardown-cancels-in-flight-mutation-timers`
       and `pwpt-reset-transcript-clears-mutation-timers` in
       `test/psi-widget-projection-timers-test.el` each hand-roll the same

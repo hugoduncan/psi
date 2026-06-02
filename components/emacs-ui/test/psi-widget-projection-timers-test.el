@@ -41,6 +41,22 @@ Compresses the
          (progn ,@body)
        (when (buffer-live-p ,var) (kill-buffer ,var)))))
 
+(defmacro pwpt--with-psi-mode-buffer (var &rest body)
+  "Bind VAR to a fresh `psi-emacs-mode' buffer with a buffer-local state.
+Like `pwpt--with-psi-buffer' but enables `psi-emacs-mode' before seeding
+`psi-emacs--state', and runs BODY inside that buffer (current).  Required by
+tests exercising `psi-emacs--teardown-buffer' /
+`psi-emacs--reset-transcript-state', which touch mode-bound machinery.
+Kills the buffer in an `unwind-protect'."
+  (declare (indent 1) (debug (symbolp body)))
+  `(let ((,var (generate-new-buffer " *pwpt*")))
+     (unwind-protect
+         (with-current-buffer ,var
+           (psi-emacs-mode)
+           (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+           ,@body)
+       (when (buffer-live-p ,var) (kill-buffer ,var)))))
+
 (defun pwpt--make-button-spec (id key)
   "Build a spec with a single button node."
   `((:id . ,id)
@@ -385,45 +401,35 @@ path (design.md Scope (d): \"a response (and a timeout)\")."
 
 (ert-deftest pwpt-teardown-cancels-in-flight-mutation-timers ()
   "Killing a psi buffer cancels and clears its in-flight widget mutation timers."
-  (let ((buffer (generate-new-buffer " *pwpt-teardown*"))
-        (cancelled nil))
-    (unwind-protect
-        (cl-letf (((symbol-function 'timerp) (lambda (x) (eq x 'live-timer)))
-                  ((symbol-function 'cancel-timer)
-                   (lambda (tm) (push tm cancelled))))
-          (with-current-buffer buffer
-            (psi-emacs-mode)
-            (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
-            (let ((timers (psi-emacs-state-projection-mutation-timers
-                           psi-emacs--state)))
-              (puthash "ext/w1:b1" 'live-timer timers)
-              (let ((noninteractive t))
-                (psi-emacs--teardown-buffer))
-              ;; Teardown nils `psi-emacs--state'; assert against the store it
-              ;; cleared (captured before teardown).
-              (should (= 0 (hash-table-count timers)))
-              (should (memq 'live-timer cancelled)))))
-      (when (buffer-live-p buffer) (kill-buffer buffer)))))
+  (let ((cancelled nil))
+    (cl-letf (((symbol-function 'timerp) (lambda (x) (eq x 'live-timer)))
+              ((symbol-function 'cancel-timer)
+               (lambda (tm) (push tm cancelled))))
+      (pwpt--with-psi-mode-buffer buffer
+        (let ((timers (psi-emacs-state-projection-mutation-timers
+                       psi-emacs--state)))
+          (puthash "ext/w1:b1" 'live-timer timers)
+          (let ((noninteractive t))
+            (psi-emacs--teardown-buffer))
+          ;; Teardown nils `psi-emacs--state'; assert against the store it
+          ;; cleared (captured before teardown).
+          (should (= 0 (hash-table-count timers)))
+          (should (memq 'live-timer cancelled)))))))
 
 (ert-deftest pwpt-reset-transcript-clears-mutation-timers ()
   "Transcript reset clears the buffer's widget mutation timers."
-  (let ((buffer (generate-new-buffer " *pwpt-reset*"))
-        (cancelled nil))
-    (unwind-protect
-        (cl-letf (((symbol-function 'timerp) (lambda (x) (eq x 'live-timer)))
-                  ((symbol-function 'cancel-timer)
-                   (lambda (tm) (push tm cancelled))))
-          (with-current-buffer buffer
-            (psi-emacs-mode)
-            (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
-            (puthash "ext/w1:b1" 'live-timer
-                     (psi-emacs-state-projection-mutation-timers psi-emacs--state))
-            (psi-emacs--reset-transcript-state)
-            (should (= 0 (hash-table-count
-                          (psi-emacs-state-projection-mutation-timers
-                           psi-emacs--state))))
-            (should (memq 'live-timer cancelled))))
-      (when (buffer-live-p buffer) (kill-buffer buffer)))))
+  (let ((cancelled nil))
+    (cl-letf (((symbol-function 'timerp) (lambda (x) (eq x 'live-timer)))
+              ((symbol-function 'cancel-timer)
+               (lambda (tm) (push tm cancelled))))
+      (pwpt--with-psi-mode-buffer buffer
+        (puthash "ext/w1:b1" 'live-timer
+                 (psi-emacs-state-projection-mutation-timers psi-emacs--state))
+        (psi-emacs--reset-transcript-state)
+        (should (= 0 (hash-table-count
+                      (psi-emacs-state-projection-mutation-timers
+                       psi-emacs--state))))
+        (should (memq 'live-timer cancelled))))))
 
 (ert-deftest pwpt-two-buffers-do-not-share-mutation-timer-state ()
   "Two psi buffers with the same key keep independent timer stores."

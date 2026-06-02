@@ -833,3 +833,33 @@ name still slightly oversells "cancel" (remhash path) — already recorded benig
 in the prior pass.
 
 Verdict: ACTIONABLE_FEEDBACK (minor economy refinement S4).
+
+## S4 — Mode-bearing buffer ceremony factored (2026-06-02)
+
+Added `pwpt--with-psi-mode-buffer (var &rest body)` to
+`test/psi-widget-projection-timers-test.el`, mirroring the S1
+`pwpt--with-psi-buffer` macro but enabling `(psi-emacs-mode)` before seeding the
+buffer-local `psi-emacs--state` and running BODY inside the buffer (current).
+Applied it to the two mode-bearing tests that hand-rolled the
+`generate-new-buffer` + `with-current-buffer` + `(psi-emacs-mode)` +
+`setq-local psi-emacs--state` + `unwind-protect`/`kill-buffer` scaffold:
+`pwpt-teardown-cancels-in-flight-mutation-timers` and
+`pwpt-reset-transcript-clears-mutation-timers`. Each now reads as its distinct
+arrange/act/assert intent (puthash live-timer → run teardown/reset → assert
+store empty + timer cancelled); the `cl-letf` `timerp`/`cancel-timer` capture
+preamble stays inline per the prior pass's non-actionable note (folding it would
+couple the helper to the capture-list shape and hide the substitution intent).
+
+Macro design note: unlike `pwpt--with-psi-buffer` (which seeds state in a
+separate `with-current-buffer` then wraps BODY in `unwind-protect`/`progn`),
+the mode variant runs BODY *inside* the seeding `with-current-buffer` so callers
+needn't re-enter the buffer — these two tests act on the current buffer
+throughout. The genuine `kill-buffer` teardown is preserved in `unwind-protect`
+(it is real cleanup here, not the act under test).
+
+Verification: `bb emacs:check` 340/340 green; byte-compile clean (fixed a
+docstring-width warning on the new macro's first line by shortening it to ≤80
+chars and rewrapping the cross-reference). No production code touched — test-only
+economy/consistency refinement.
+
+Verdict: S4 complete. No remaining unchecked follow-up items in steps.md.
