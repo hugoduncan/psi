@@ -3,10 +3,14 @@
 ## Intent
 
 Make registered deterministic operations directly invokable outside a workflow
-run, via two new surfaces:
+run, via two new surfaces that **share one underlying mechanism**:
 
 1. a **slash command** (user-facing, in `agent-session/commands.clj`), and
 2. a **psi-tool capability** (agent-facing, a new `action` in `psi-tool`).
+
+Both surfaces are thin adapters over a single shared invocation/listing helper;
+they differ only in input parsing and output rendering, never in the invocation
+mechanism (`one_way`).
 
 Today a deterministic operation can only be executed as a side effect of a
 workflow IR `invoke` step (`workflow-runtime .../step_execution.clj` →
@@ -51,8 +55,8 @@ Out of scope:
 
 - Changing the operation contract, registry storage, or runtime boundary.
 - Registering any new deterministic operations.
-- Permission/capability gating beyond what already governs psi-tool and
-  commands (unless an open question below resolves to add it).
+- New permission/capability gating: none. Side-effecting operations are
+  invokable; only the existing psi-tool/command governance applies.
 - Workflow IR invoke-step behaviour (unchanged).
 
 Adjacent / deferred (separate tasks if wanted):
@@ -67,11 +71,18 @@ Adjacent / deferred (separate tasks if wanted):
   :source?}`, id matching `^ns/name$` kebab-case.
 - **Invocation map**: keys consumed by handlers; here built from session ctx.
 - **Tagged result**: `{:status :ok …}` | `{:status :error …}`.
+- **Shared invocation helper** (the "underlying mechanism"): one function pair —
+  *list* (operation id + description) and *invoke* (operation-id + args → tagged
+  result) — that builds the invocation map from session ctx and routes through
+  the existing registry + runtime boundary. Both the command and the psi-tool
+  action call this; it owns no rendering.
 - **psi-tool action**: discriminator string + parameter set, dispatched in
   `psi_tool.clj` (mirrors the existing `workflow`/`scheduler` actions, each in
-  its own helper namespace).
+  its own helper namespace) — parses input, calls the shared helper, renders the
+  structured `:psi-tool/...` result map.
 - **Slash command**: `commands.clj` dispatch entry returning a data map
-  (`:type :text`), rendered by TUI/RPC.
+  (`:type :text`), rendered by TUI/RPC — parses input, calls the shared helper,
+  renders text.
 
 ## Architecture alignment
 
@@ -86,39 +97,41 @@ Adjacent / deferred (separate tasks if wanted):
 - Commands return pure data maps; the new command follows the existing
   prefixed-command pattern (`/job`, `/remember`, …).
 
-## Open questions (to resolve collaboratively before plan.md)
+## Locked decisions
 
-1. **Primary driver / priority**: is the main consumer the *agent* (psi-tool),
-   the *user* (command), or equally both? This shapes where effort/detail goes.
-2. **psi-tool action name + ops**: proposal — `action: "operation"` with
-   `op` values `list | invoke` (mirrors `workflow`'s op style), params
-   `operation-id` (string) and `args` (EDN map string). Alternative:
-   a bare action `"invoke-operation"` + separate `"list-operations"`. Prefer?
-3. **Command surface**: proposal — `/operations` (list) and
-   `/operation <id> {edn-args}` (invoke). Alternative single prefixed
-   `/operation` with an `list` subcommand. Naming/shape preference?
-4. **Args format**: EDN map string (consistent with `workflow-input`,
-   `session-config`)? Confirm.
-5. **Side-effecting operations from a command**: `github/edit-labels` mutates
-   GitHub. Is direct user/agent invocation of side-effecting operations in
-   scope now, or should the first cut be invocation-of-any with a clear result,
-   deferring any gating? (Current lean: invoke any; no new gating — but flag.)
-6. **Listing detail**: list just ids, or ids + `:description`/`:source`/
-   `:ext-path` for discoverability? (Lean: ids + description + source.)
-7. **Result rendering**: how much of `:data` to surface in the command’s text
-   result vs. psi-tool’s structured `:psi-tool/...` map? Truncation policy?
+1. **Both surfaces, one mechanism.** Command and psi-tool action are equal
+   first-class consumers; both delegate to the single shared invocation/listing
+   helper. No parallel invocation path.
+2. **psi-tool action.** `action: "operation"` with `op` values `list | invoke`
+   (mirrors the `workflow` action's op style). Params: `operation-id` (string)
+   and `args` (EDN map string).
+3. **Command surface.** `/operations` (list) and `/operation <id> {edn-args}`
+   (invoke).
+4. **Args format.** EDN map string, consistent with `workflow-input` /
+   `session-config`.
+5. **Side effects allowed.** Any registered operation may be invoked, including
+   side-effecting ones (e.g. `github/edit-labels`). No new permission/capability
+   gating beyond what already governs psi-tool and commands.
+6. **Listing detail.** List returns operation **id + description** per entry.
+7. **Result rendering.** Render **all top-level keys** of the tagged result,
+   applying **per-key truncation** to bound oversized values.
 
-## Acceptance criteria (draft — finalised after open questions)
+## Acceptance criteria
 
-- A psi-tool request can list the deterministic operation ids available to the
-  invoking session.
-- A psi-tool request can invoke a named operation with args and receive its
-  tagged result (ok/error/malformed) projected into tool output, going through
-  the existing runtime boundary.
-- A slash command can list operations and invoke one, returning a `:type :text`
-  data map.
-- Unknown operation id → the existing `:missing-deterministic-operation`
-  error is surfaced clearly (not a crash).
+- `action: "operation", op: "list"` returns each available operation's id +
+  description for the invoking session.
+- `action: "operation", op: "invoke"` with `operation-id` + EDN `args` invokes
+  the operation through the existing runtime boundary and projects its tagged
+  result (ok / error / malformed) into tool output, rendering all top-level
+  result keys with per-key truncation.
+- `/operations` lists operations (id + description) as a `:type :text` result.
+- `/operation <id> {edn-args}` invokes the operation and returns its result as a
+  `:type :text` result.
+- Both surfaces call the same shared invocation/listing helper (verified: no
+  duplicate invocation logic).
+- Side-effecting operations are invokable from both surfaces.
+- Unknown operation id → the existing `:missing-deterministic-operation` error
+  is surfaced clearly (not a crash) on both surfaces.
 - No change to operation contract, registry, runtime boundary, or workflow
   invoke-step behaviour.
 - README/`doc/` + CHANGELOG updated for the new user-visible surfaces.
