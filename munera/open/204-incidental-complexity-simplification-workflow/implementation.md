@@ -3069,3 +3069,50 @@ input ≠ data asserted in output.
 🔁 PATTERN (continues): a projection-rename test needs a fixture with DISTINCT
 per-field values; reusing a fixture that hard-codes a shared sentinel (here all
 burdens = 1) cannot catch a field-swap regress.
+
+## 2026-06-01 — Test review pass 18 (test-shaper, independent)
+
+Applied `test-shaper` fresh to the full task-204 test surface:
+`task_204_workflow_definitions_test.clj` (292 lines, 2 deftests) and
+`incidental_complexity_finder_skill_test.clj` (524 lines, 9 deftests). Re-ran
+both ns + full suite: green. `clj-kondo --lint` both files: 0 errors, 0 warnings.
+File-length guard: 292 / 524 (< 800).
+
+Criteria assessed — `simple ∧ consistent ∧ robust ∧ economical`:
+
+- **simple** ✓ — single-concern `testing` blocks; explicit arrange/act/assert;
+  minimal incidental setup via the shared `named-*-unit-json` / `run-jq-recipe`
+  helpers (compress ceremony, do not hide intent).
+- **consistent** ✓ — uniform TRn naming, jq-availability guard + structural
+  fallback pattern repeated identically (TR12/16/17/18/21), consistent
+  state/output assertion style. TR20 already collapsed the redundant
+  fixture-builder pair.
+- **robust** ✓ — deterministic: IO controlled via per-call temp fixtures with a
+  `jq --version` guard and structural fallback when jq is absent
+  (`control(io) ∧ ¬flaky`). Behavior-focused: every assertion is over slurped
+  SKILL.md content, loaded workflow definitions, or recipe `:out`/`:exit` — no
+  `with-redefs`, no mocks/stubs, no interaction assertions
+  (`testing-without-mocks` honoured). Failure messages explain the contract
+  violated.
+- **economical** ✓ — each TR closes a distinct regress that previously passed
+  green (documented per pass); boundary inclusivity (TR18), order-independence
+  (TR4), empty-qualification early-stop (TR17), zero-cc guard (TR16), top-5 cap
+  (TR9), projection rename (TR21) are all covered by representative cases, not a
+  case explosion.
+
+Behaviour↔acceptance audit (`∀b ∈ design-acceptance. ∃t. covers(t,b)`): every
+named Deliverable-1/2 behaviour is bound to either an executable recipe test or
+a content/definition content-lock. The only design behaviour that is
+deliberately prose-only is the **step-6 coverage hint** (a manual `rg -l
+'deftest|<var>'` judgment step, not part of the deterministic jq recipe, so it
+cannot be locked against the recipe) and the **step-5 top-5 essential-vs-
+incidental judgment guard** (judgment-bearing prose, not executable) — both are
+correctly TR3 content-locked rather than over-specified with a brittle
+executable assertion. No new mock/stub/interaction smell, no redundant or flaky
+test, no incidental-variation drift.
+
+**Finding: no new actionable test-shaping issue.** Seventeen prior passes
+(TR1–TR21) have driven the surface to high quality across all four dimensions;
+a fresh pass re-derives the same coverage with no uncovered regress remaining.
+
+PASS_STATUS: REVIEW_COMPLETE
