@@ -1103,3 +1103,26 @@ One new actionable test gap:
   source.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Test review follow-up execution (TT4) — 2026-06-01
+
+- **TT4 — Emacs "no-backend ⇒ defcustom supplies no built-ins" guard added.**
+  New ert test `psi-capf-slash-no-backend-yields-no-builtins`
+  (`components/emacs-ui/test/psi-capf-test.el`), symmetric to the TUI
+  empty-specs→none block in
+  `autocomplete-slash-includes-backend-builtin-commands-test`. The test:
+  - First asserts the shipped `(default-value 'psi-emacs-slash-command-specs)`
+    is exactly the trimmed `(("/skill:" . …))` — so a regression re-adding
+    built-ins to the defcustom default fails here directly.
+  - Then, with `:builtin-command-specs nil` (no backend) and **without**
+    `let`-binding the defcustom (exercises the real shipped default), asserts
+    slash completion for `/qu` yields no `/quit` candidate and `/he` yields no
+    `/help` candidate. Only the Emacs-only `/skill:` affordance / user-added
+    entries survive. A future `psi-emacs--state-slash-command-specs` edit
+    re-introducing a hardcoded built-in list would also fail this.
+  - `bb emacs:check` green: 325/325 (was 324; +1 new test);
+    `psi-capf-slash-no-backend-yields-no-builtins` passes. Byte-compile clean.
+  This locks the backend-sole-source / trimmed-defcustom invariant (AC6/AC7) on
+  both consumers — the asymmetry TT4 flagged is closed.
+
+PASS_STATUS: NO_ACTIONABLE_FEEDBACK

@@ -109,6 +109,38 @@ custom value on name collision."
       (should (equal "show this help"
                      (cdr (assoc "/help" (psi-emacs--state-slash-command-specs))))))))
 
+(ert-deftest psi-capf-slash-no-backend-yields-no-builtins ()
+  "With no backend built-in specs the trimmed default
+`psi-emacs-slash-command-specs' (`/skill:' only) supplies no built-in slash
+commands (task 205 TT4; symmetric to the TUI empty-specs guard). A regression
+re-adding built-ins to the defcustom default — or a
+`psi-emacs--state-slash-command-specs' edit re-introducing a hardcoded built-in
+list — would make this fail. Only the Emacs-only `/skill:' affordance survives."
+  ;; Intentionally does NOT bind `psi-emacs-slash-command-specs': it exercises
+  ;; the shipped trimmed default value.
+  (should (equal '(("/skill:" . "Invoke a skill (append skill name)"))
+                 (default-value 'psi-emacs-slash-command-specs)))
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state
+                (make-psi-emacs-state :builtin-command-specs nil))
+    (insert "/qu")
+    (let* ((capf (psi-emacs-prompt-capf))
+           (table (nth 2 capf))
+           (cands (all-completions "/qu" table)))
+      (should capf)
+      (should-not (member "/quit" cands))))
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state
+                (make-psi-emacs-state :builtin-command-specs nil))
+    (insert "/he")
+    (let* ((capf (psi-emacs-prompt-capf))
+           (table (nth 2 capf))
+           (cands (all-completions "/he" table)))
+      (should capf)
+      (should-not (member "/help" cands)))))
+
 (ert-deftest psi-capf-slash-includes-extension-commands-from-state ()
   (with-temp-buffer
     (psi-emacs-mode)

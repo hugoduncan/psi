@@ -266,7 +266,16 @@ Tick with sha/decision on completion.
 
 ## Test review follow-ups (review pass 3)
 
-- [ ] TT4 — Add an Emacs capf test locking the "no-backend ⇒ `defcustom`
+- [x] TT4 — Added Emacs capf test `psi-capf-slash-no-backend-yields-no-builtins`
+      (psi-capf-test.el), symmetric to the TUI empty-specs→none guard: asserts
+      the shipped `(default-value 'psi-emacs-slash-command-specs)` is the trimmed
+      `(("/skill:" . …))`, then with `:builtin-command-specs nil` (no backend)
+      and the real default defcustom, `/qu`→no `/quit` and `/he`→no `/help`. So a
+      regression re-adding built-ins to the defcustom default OR a
+      `psi-emacs--state-slash-command-specs` edit re-introducing a hardcoded
+      built-in list now fails (AC6/AC7). `bb emacs:check` 325/325 green (+1).
+      Original item text:
+      Add an Emacs capf test locking the "no-backend ⇒ `defcustom`
       supplies no built-ins" invariant (symmetric to the TUI empty-specs→none
       guard; AC6/AC7). With `:builtin-command-specs nil` (or `'()`) in
       `psi-emacs--state` and the default trimmed `psi-emacs-slash-command-specs`
