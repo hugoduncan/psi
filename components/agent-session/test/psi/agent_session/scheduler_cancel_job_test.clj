@@ -10,6 +10,7 @@
           _                (session/dispatch-in! ctx :scheduler/create
                                                  {:session-id session-id
                                                   :schedule-id "sch-1"
+                                                  :kind :message
                                                   :label "check-build"
                                                   :message "check build"
                                                   :created-at (test-support/instant "2099-04-21T17:59:00Z")

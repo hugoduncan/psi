@@ -2905,3 +2905,27 @@ ceremony) ∧ ¬helpers_that_hide(intent)`); the background-jobs `:queued` seed
 via a raw `[:scheduler …]` path inside `ss/session-update` is acceptable (no
 write helper exists; pass-22 already standardised the wrapper). No further
 actionable shaping found.
+
+## Test-shaper follow-up — pass 23 executed (2026-06-01)
+
+Executed the single pass-23 follow-up: added explicit `:kind :message` (after
+`:schedule-id`) to the `:scheduler/create` dispatch payload in
+`scheduler_cancel_job_test.clj`
+(`session-cancel-job-routes-scheduler-projection-to-scheduler-cancel-test`,
+~L15) — the **last** `:kind`-omitting scheduler test (of 12 files). It now aligns
+with every other 201 live create, making the message-kind-under-test local
+rather than depending on the dispatch handler's `(or kind :message)` default
+(`dispatch_handlers/scheduler.clj:123`).
+
+- **No behaviour change** — the default already resolves `:message`; the
+  cancel-routing round trip (create message schedule → `cancel-job-in!` →
+  `:cancelled`) is unchanged.
+- **No assertions added/removed** → `findings.md` citations + aggregate count
+  unchanged (still 50 tests / 412 assertions for the scheduler suite).
+- **Verification:** `clojure -M:test --focus
+  psi.agent-session.scheduler-cancel-job-test` → 1 test / 2 assertions / 0
+  failures. clj-kondo 0/0; `bb fmt:check` "All source files formatted correctly".
+- **Scope held:** test file only — `git diff --name-only` =
+  `scheduler_cancel_job_test.clj` + task-dir docs; zero
+  `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist
+  held; verification-only invariant intact).
