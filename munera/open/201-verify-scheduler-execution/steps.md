@@ -709,3 +709,43 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       assertions / 0 failures; full `bb test` green; clj-kondo 0/0, cljfmt clean.
       Test file + task-dir docs only — zero `components/agent-session/src/**` or
       `doc/scheduler.md` (Slice-10 allowlist held).
+
+## Test review follow-ups — test-shaper pass 3 (2026-06-01)
+
+- [ ] Consolidate the duplicated `create-session-context` test fixture. The
+      identical (modulo the `:persist? false` lifecycle/effects variant) helper
+      is copy-pasted across 9 scheduler test ns
+      (`scheduler_end_to_end_test`, `scheduler_timer_seam_test`,
+      `scheduler_context_shutdown_test`, `scheduler_resolvers_test`,
+      `scheduler_lifecycle_test`, `scheduler_effects_test`,
+      `scheduler_background_jobs_test`, `scheduler_cancel_job_test`,
+      `scheduler_tools_test`). Extract one shared helper into
+      `psi.agent-session.test-support` (e.g. `make-session-context` taking opts,
+      with the two callers that want `:persist? false` passing it explicitly or
+      via a thin convenience), then delete the 9 local copies and update call
+      sites. test-shaper `consistent(fixtures) ∧ helpers_that_compress(ceremony)`;
+      precedent already set by the `capturing-delay-fn` extraction (steps.md
+      pass-2 line ~377). Test-file/`test_support`-only (Slice-10 allowlist — zero
+      `components/agent-session/src/**` or `doc/scheduler.md`); keep suite green +
+      clj-kondo/cljfmt clean. If 201 is closed, raise as a standalone
+      test-hygiene task.
+
+- [ ] Add explicit `:kind :message` to the `:scheduler/create` dispatch in
+      `scheduler-context-shutdown-test/shutdown-context-clears-scheduler-timers-test`
+      (currently omits it and relies on the handler default
+      `(or kind :message)`). Brings its data shape in line with every other 201
+      live create — the same alignment pass-1 applied to
+      `scheduler_timer_seam_test` but which missed this pre-existing deftest in a
+      touched namespace. No behaviour change (default already resolves to
+      `:message`). test-shaper `consistent(data_shapes)`. Test-file only
+      (Slice-10 allowlist); keep suite green + clj-kondo/cljfmt clean.
+
+- [ ] Relabel the misleading `testing` block in
+      `scheduler-test/fire-schedule-test`: "idle session delivers immediately"
+      asserts the `:deliver` *action* with status still `:pending` (pure
+      `fire-schedule` returns the action without mutating status). Reword to
+      state it returns the `:deliver` action and leaves the schedule `:pending`
+      (same `:pending`-after-fire confusion pass-1 corrected for `fail-schedule`).
+      Assertions unchanged. test-shaper `meaningful_failures` / label accuracy
+      (lowest priority — cosmetic). Test-file only (Slice-10 allowlist); keep
+      suite green + clj-kondo/cljfmt clean.

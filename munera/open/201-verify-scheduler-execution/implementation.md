@@ -1171,3 +1171,39 @@ Verification: `clojure -M:test --focus psi.agent-session.psi-tool-scheduler-test
 = **6 tests / 109 assertions / 0 failures**; full `bb test` green; clj-kondo 0/0,
 cljfmt clean on the touched test file. Test file + task-dir docs only — zero
 `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist held).
+
+## ◈ test-shaper review — pass 3 (2026-06-01)
+
+Applied `test-shaper` to the 201 scheduler test surface (new + touched ns).
+Suite well-shaped overall (prior passes removed `with-redefs` infra-stubs, split
+the psi-tool megatest, scoped fail-schedule setup, made `:kind` explicit in
+`scheduler_timer_seam_test`). Three remaining actionable items
+(`consistent(fixtures)` / `consistent(data_shapes)` / clarity-of-failure):
+
+1. **Duplicated fixture ceremony** — `create-session-context` is copy-pasted
+   across **9** scheduler test ns (7 byte-identical;
+   `scheduler_lifecycle_test` + `scheduler_effects_test` are a `:persist? false`
+   variant). test-shaper `consistent(fixtures) ∧ helpers_that_compress(ceremony)`
+   wants this single shared helper in `test-support` (this task already set the
+   precedent by extracting the duplicated `capturing-delay-fn` timer-seam idiom
+   there — steps.md line 377). Test-file/`test_support`-only (Slice-10 allowlist).
+
+2. **`:kind` data-shape drift in a touched ns** — `scheduler-context-shutdown-
+   test/shutdown-context-clears-scheduler-timers-test` omits `:kind :message` on
+   its `:scheduler/create` and leans on the handler default, while every other
+   201 live create is explicit. The pass-1 follow-up aligned this exact shape in
+   `scheduler_timer_seam_test` "to bring data shape in line with every other 201
+   live create" but missed this pre-existing deftest in a namespace this task
+   touched. `consistent(data_shapes)`.
+
+3. **Misleading `testing` label** — `scheduler-test/fire-schedule-test` block
+   "idle session delivers immediately" asserts the `:deliver` *action* with
+   status still `:pending` (pure `fire-schedule` returns the action without
+   mutating status). Reads as if delivery occurred — the same `:pending`-after-
+   fire confusion pass-1 corrected in `fail-schedule`. Relabel to state it
+   returns the `:deliver` action and leaves status `:pending`. `meaningful_
+   failures` / label accuracy. Lowest priority (cosmetic).
+
+No defect in verification coverage itself; all are test-hygiene/consistency.
+If 201 is treated as closed, fold these into a small standalone test-hygiene
+task instead of reopening.
