@@ -59,13 +59,17 @@ resolve as it is added.
 
 - `task-lifecycle.edn`: 5 sub-workflows, each `:delegate`, each reading
   `:input {:from :workflow-input :path [:input]}` (map `{:input "munera/open/NNN-slug"}`).
-- `implement-task-in-worktree.md`: two-step wrapper —
+- `implement-task-in-worktree.md`: three-step wrapper —
   `resolve-worktree` (`:session`, tools `["read" "bash" "work-on"]`, extracts
   `worktree_path:`, calls `work-on`, yields bare task path) →
   `implement` (`:delegate :target "implement-task"`,
-  `:prompt-string {:type :map :fields {:input {:from {:step "resolve-worktree" :yield :text}}}}`).
-  (It also has a third `summary` `:session` step; the 204 wrapper may stay at the
-  minimal two steps per design's "thin two-step adapter" framing.)
+  `:prompt-string {:type :map :fields {:input {:from {:step "resolve-worktree" :yield :text}}}}`)
+  → `summary` (`:session`, user-facing terminal summary).
+  (Per plan/steps ambiguity
+  resolution **P1**, the 204 wrapper **mirrors this and keeps the `summary`
+  step** — three steps — because outer step-2 is the terminal step of
+  `reduce-incidental-complexity`, so the workflow needs a user-facing terminal
+  summary. The design's "thin two-step adapter" framing is superseded by P1.)
 - `complexity-reduction-pr.edn`: single fat `:session` step doing
   select+worktree+refactor+push — precedent for the step-1 select+worktree+task
   shape (minus task-creation/handoff), and for the `git fetch origin master` /
@@ -118,8 +122,8 @@ Vertical, dependency-first. Each slice ends loadable/verifiable.
    discoverable/registers and produces a target when run against this repo.
 2. **Slice 2 — `task-lifecycle-in-worktree` wrapper workflow.** Author the
    `.md`-with-EDN wrapper (resolve-worktree `:session`+`work-on` → lifecycle
-   `:delegate :target "task-lifecycle"`), mirroring `implement-task-in-worktree`.
-   Verify it parses, loads, and is registered.
+   `:delegate :target "task-lifecycle"` → `summary` `:session`, per P1), mirroring
+   `implement-task-in-worktree`. Verify it parses, loads, and is registered.
 3. **Slice 3 — `reduce-incidental-complexity` outer workflow.** Author the
    two-step `.edn` (step-1 `:session` select+worktree+baselines+task+handoff with
    early-stop; step-2 `:delegate :target "task-lifecycle-in-worktree"` with the
@@ -128,8 +132,9 @@ Vertical, dependency-first. Each slice ends loadable/verifiable.
 4. **Slice 4 — verification + definition tests.** Add/extend workflow definition
    tests asserting: both workflows parse/load; the outer two-step shape +
    early-stop intent + handoff field emission + `:delegate` target +
-   `:prompt-string` wiring; the wrapper two-step shape + `work-on` tool +
-   `task-lifecycle` target; skill registration. Run focused workflow tests +
+   `:prompt-string` wiring; the wrapper three-step shape (resolve-worktree +
+   lifecycle + summary, per P1) + `work-on` tool + `task-lifecycle` target;
+   skill registration. Run focused workflow tests +
    `clj-kondo`.
 5. **Slice 5 — docs + coherence.** Update user-facing docs where the capability
    is user-visible (`doc/workflows.md` and/or CHANGELOG `[Unreleased] → Added`):

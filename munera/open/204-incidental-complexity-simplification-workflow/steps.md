@@ -8,7 +8,10 @@ with the commit sha / decision when done.
 - [ ] Re-verify live CLI shape: run `bb gordian local --sort total --json` and
       `bb gordian complexity --json`; confirm each emits a `units` array with
       `ns`/`var`/`arity`, `local` carrying `lcc-total` (+ per-dimension burdens),
-      `complexity` carrying `cc`.
+      `complexity` carrying `cc`. NOTE (P2): `--sort total` here is a
+      **selector-only** convenience for ranking display during selection; it is a
+      distinct invocation from the `before-local.json` capture below and does not
+      affect baseline validity (see P2 reconciliation).
 - [ ] Create `.psi/skills/incidental-complexity-finder/SKILL.md` with frontmatter
       (`name`, `description`, `lambda`) consistent with sibling skills
       (`refactoring`, `gordian`, `code-shaper`).
@@ -50,9 +53,18 @@ with the commit sha / decision when done.
       extracted worktree path, then yields **only** the bare task path on one line.
 - [ ] Add `lifecycle` step: `:type :delegate`, `:target "task-lifecycle"`,
       `:prompt-string {:type :map :fields {:input {:from {:step "resolve-worktree" :yield :text}}}}`.
-- [ ] (Decision) Keep the wrapper minimal at two steps per design's "thin
-      two-step adapter"; record whether a trailing `summary` `:session` step is
-      added (mirroring `implement-task-in-worktree`) or deliberately omitted.
+- [ ] Add `summary` step (`:type :session`, per resolved P1): produce the
+      user-facing terminal summary for the Munera task, mirroring
+      `implement-task-in-worktree.md`'s `summary` step.
+- [ ] (Decision — resolved, see P1) **Add** a trailing `summary` `:session` step
+      mirroring `implement-task-in-worktree.md`. Rationale: outer step-2 (the
+      delegate into this wrapper) is the `reduce-incidental-complexity` workflow's
+      **terminal** step, so the workflow needs a user-facing terminal summary; the
+      wrapper's `summary` step is where that summary is produced (the precedent
+      keeps it for exactly this reason). The wrapper is therefore a three-step
+      adapter (resolve-worktree → lifecycle → summary), structurally identical to
+      `implement-task-in-worktree`; the design's "thin two-step adapter" framing is
+      superseded by this resolution.
 - [ ] Run `clj-paren-repair` on the EDN body if needed; verify the workflow
       parses, loads, and is registered.
 - [ ] Commit Slice 2 (`⚒ workflow: add task-lifecycle-in-worktree wrapper`).
@@ -72,11 +84,21 @@ with the commit sha / decision when done.
 - [ ] Step-1 prompt: create an isolated worktree via `work-on` based on
       `origin/master`, described from the target (`simplify <target>`).
 - [ ] Step-1 prompt: capture baselines into the task dir —
-      `before-local.json` (`bb gordian local --json`) and
-      `before-diagnose.edn` (`bb gordian diagnose --edn`).
+      `before-local.json` (`bb gordian local --json`, **bare, no `--sort`**) and
+      `before-diagnose.edn` (`bb gordian diagnose --edn`). NOTE (P2): this is
+      intentionally a different invocation from the `--sort total` selector call
+      above; the Phase-1 before/after comparison is keyed by `(ns, var, arity)`,
+      so sort order is irrelevant to baseline validity — `--sort total` need not
+      match here. (Carries the design inconsistency-review conclusion into steps.)
 - [ ] Step-1 prompt: allocate next task id, create `munera/open/NNN-slug/design.md`
       for the generated refactor task; record the concrete task path so Phase-1
       commands use the **worktree-root-relative task-dir path** for baselines.
+      NOTE (P3): the `work-on` worktree is already active at this point, so NNN is
+      allocated by scanning the **worktree's** `munera/open/ ∪ munera/closed/`
+      (the `origin/master`-based checkout where the task is created), per Munera
+      `alloc → max(NNN over open/ ∪ closed/) + 1` — **not** the outer checkout's
+      task set — avoiding collision with the outer checkout's open tasks (e.g. 204
+      itself).
 - [ ] Step-1 prompt: embed the **two-phase behaviour-preserving contract** in the
       generated `design.md` instructions, lifted verbatim from `design.md`'s
       "Generated task design" section:
@@ -93,9 +115,15 @@ with the commit sha / decision when done.
         munera/open/NNN-slug/before-diagnose.edn --fail-on
         new-cycles,new-high-findings --max-new-medium-findings 0` passes (exit 0).
   - [ ] Phase 1: Phase-0 + existing tests green; change minimal/local/decomplecting.
-- [ ] Step-1 prompt: commit the task creation; emit a **structured handoff**
-      block with at minimum `worktree_path:` (absolute) and `munera_task_path:`
-      lines (mirroring `gh-issue-implement.edn`'s `design`-step handoff).
+- [ ] Step-1 prompt: commit the task creation **on the `work-on` worktree branch**
+      (off `origin/master`), so the committed task dir lives on the same branch
+      step-2's `resolve-worktree`/`work-on` re-enters (P4). Then emit a
+      **structured handoff** block with at minimum `worktree_path:` (absolute) and
+      `munera_task_path:` lines (mirroring `gh-issue-implement.edn`'s `design`-step
+      handoff). NOTE (P3+P4): `munera_task_path:` only resolves for the delegated
+      lifecycle because the task dir was created **and** committed on the worktree
+      branch (not in the outer checkout) — task-id allocation, dir creation, and
+      commit all happen inside the worktree.
 - [ ] Author **step-2** (`:type :delegate`): `:target "task-lifecycle-in-worktree"`,
       `:prompt-string {:type :map :fields {:input {:from {:step "<step-1-name>" :yield :text}}}}`.
 - [ ] Confirm the outer workflow ends with a completed/reviewed task on the local
@@ -115,9 +143,10 @@ with the commit sha / decision when done.
       `:target "task-lifecycle-in-worktree"` with the
       `:prompt-string {:type :map :fields {:input {:from {:step … :yield :text}}}}`
       wiring.
-- [ ] Assert wrapper two-step shape: `resolve-worktree` `:session` with `work-on`
-      tool; `lifecycle` `:delegate` `:target "task-lifecycle"` with `:input`
-      sourced from `resolve-worktree` `:yield :text`.
+- [ ] Assert wrapper three-step shape (per resolved P1): `resolve-worktree`
+      `:session` with `work-on` tool; `lifecycle` `:delegate`
+      `:target "task-lifecycle"` with `:input` sourced from `resolve-worktree`
+      `:yield :text`; trailing `summary` `:session` step present.
 - [ ] Assert (where the test ns convention supports it) the step-1 prompt emits
       the `worktree_path:` / `munera_task_path:` handoff fields and the early-stop
       intent (R1 lock).
@@ -141,24 +170,27 @@ with the commit sha / decision when done.
 
 ## Plan/steps ambiguity follow-ups (review pass 1)
 
-- [ ] P1 — State the criterion for the Slice-2 wrapper `summary` step: decide
-      add-vs-omit by whether the outer workflow needs a user-facing *terminal*
-      summary (outer step-2 is terminal; `implement-task-in-worktree` keeps the
-      summary step). Resolve the choice in plan.md/steps.md, don't leave it open.
-- [ ] P2 — Reconcile the two `local` invocations in steps.md: explicitly note
-      that `before-local.json` is captured with `bb gordian local --json` (no
-      `--sort`) and that `--sort total` (selector-only, line 8) is irrelevant to
-      the `(ns,var,arity)`-keyed before/after comparison, so the baseline is
-      valid regardless of sort. Carry the design's inconsistency-review
-      conclusion into the steps.
-- [ ] P3 — Define the task-id allocation scan root: state that NNN is allocated
-      by scanning `open/ ∪ closed/` in the `origin/master`-based **worktree**
-      (where the task is created), per Munera `alloc → max(NNN)+1`, to avoid
-      collision with the outer checkout's open tasks.
-- [ ] P4 — Make the task-creation commit location explicit in Slice 3: the task
-      dir is created **and committed on the `work-on` worktree branch** (off
-      `origin/master`), so the handoff's `munera_task_path:` resolves for
-      step-2's `resolve-worktree`/`work-on` before the delegated lifecycle runs.
+- [x] P1 — Resolved: **add** the wrapper `summary` step. Deciding criterion =
+      outer step-2 (delegate into the wrapper) is the `reduce-incidental-complexity`
+      terminal step, so a user-facing terminal summary is needed; the wrapper's
+      `summary` step provides it (mirroring `implement-task-in-worktree`). Wrapper
+      is now three steps. Propagated to Slice 2 + Slice 4 wrapper-shape items and
+      plan.md. (steps.md updated; no code yet — Slice 2 unbuilt.)
+- [x] P2 — Resolved: annotated both `local` invocation sites in steps.md.
+      `before-local.json` uses bare `bb gordian local --json` (no `--sort`);
+      `--sort total` (selector-only) is irrelevant to the `(ns,var,arity)`-keyed
+      before/after, so the baseline is valid regardless of sort. Design
+      inconsistency-review conclusion now carried into steps.
+- [x] P3 — Resolved: NNN is allocated by scanning the **worktree's**
+      `munera/open/ ∪ munera/closed/` (the `origin/master`-based checkout where
+      `work-on` is already active), per Munera `alloc → max(NNN)+1` — not the
+      outer checkout — avoiding collision with outer open tasks (e.g. 204). Stated
+      on the Slice-3 task-id-allocation step.
+- [x] P4 — Resolved: the task dir is created **and committed on the `work-on`
+      worktree branch** (off `origin/master`); `munera_task_path:` resolves for
+      step-2's `resolve-worktree`/`work-on` only because the commit is on that
+      branch. Stated on the Slice-3 commit step (allocation, creation, commit all
+      inside the worktree).
 
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 
