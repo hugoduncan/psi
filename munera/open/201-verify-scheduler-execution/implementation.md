@@ -2347,3 +2347,80 @@ stable); same `is` count → aggregate 50 tests / 412 assertions unchanged.
 clj-kondo 0/0; `bb fmt:check` clean; focused subset = 9 tests / 45 assertions /
 0 failures; full `bb test` green. Test files only — zero
 `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist held).
+
+## Test-shaper review pass-19 (test-shaper, 2026-06-01)
+
+Reviewed the converged 201 scheduler verification suite with the test-shaper
+lens (clarity ∧ signal ∧ robustness ∧ **economical**). After 18 passes the
+per-test shaping is high quality; one genuine, grounded, non-duplicate
+**`economical` (minimal redundant_tests) ∧ `consistent(test_abstractions)`**
+signal remains at the *suite* level.
+
+**Finding — `scheduler_tools_test/make-psi-tool-scheduler-test` is a weaker,
+redundant near-duplicate of `psi_tool_scheduler_test`.** Both drive the *same*
+psi-tool scheduler surface (`(:execute tool) {"action" "scheduler" …}`) and
+overlap deftest-for-deftest:
+- "create stores a pending schedule" ≈ `psi-tool-scheduler-create-list-cancel-test`
+  create block.
+- "list returns pending and queued" ≈ create-list-cancel list block.
+- "cancel cancels a pending schedule" ≈ create-list-cancel cancel block.
+- "rejects too-short delay" (999ms) ≈ `psi-tool-scheduler-bounds-and-cap-test`
+  below-min block — but *weaker*: asserts only `:is-error`/`:overall-status`
+  (the very generic-only idiom pass-17 fixed in the bounds-and-cap test), no
+  named bound message.
+- "normalizes past absolute instants to immediate fire-at" ≈
+  `psi-tool-scheduler-at-resolution-matrix-test` past-`:at` block — but
+  *strictly weaker*: asserts only `(string? fire-at)`, where the matrix asserts
+  delay 0, immediate fire via the seam, and exact `fire-at`.
+- "rejects the 51st pending schedule" ≈ `psi-tool-scheduler-bounds-and-cap-test`
+  cap block — and this duplicates the **expensive `dotimes 50` cap-overflow
+  drive**, so the suite pays the 51-create cost *twice*.
+
+Grounded: both files are pre-existing (`86c6d0954` / `b7aa30d41`), but 201 built
+`psi_tool_scheduler_test` into the **authoritative, stronger** psi-tool-surface
+coverage (split into 6 focused deftests in pass-2, named-message bounds in
+pass-17, the full `:at` matrix). The Slice-5 audit
+(`steps.md` "Slice 5 — psi-tool surface") explicitly noted create/list/cancel +
+below-min + cap were "already covered" across *both* files yet kept both and
+cites both in `findings.md` — the duplication was acknowledged but never
+reconciled. So after 201's build-up, `make-psi-tool-scheduler-test` no longer
+adds distinct behavioural coverage; it re-asserts the same surface with weaker
+assertions and a duplicated cap drive.
+
+Why this is a test-shaper signal (not cosmetic):
+- economical / minimal(redundant_tests): two deftests cover one surface; the
+  duplicated 51-create cap drive is the single most expensive scheduler test,
+  run twice (fast_feedback cost with no extra signal).
+- consistent(assertion_style): the `tools-test` below-min/cap/`:at`-past blocks
+  use the *generic-only* idiom (`:is-error`/`:overall-status`) that pass-17 and
+  the `:at` matrix already replaced with named-bound assertions in the
+  authoritative file — an inconsistency within the converged 201 set against the
+  precedent the task itself established.
+- meaningful_failures: the weaker assertions (`(string? fire-at)`,
+  generic `:is-error`) would pass for an unrelated/swapped error or a wrong
+  fire-at, so the redundant copy gives weaker regression-pinning than the
+  authoritative one it shadows.
+
+Resolution is **test-only and verification-only-safe** (touches no
+`components/agent-session/src/**` or `doc/scheduler.md`): collapse the redundant
+overlap by reducing `scheduler_tools_test/make-psi-tool-scheduler-test` to only
+the coverage *not* already authoritatively held by `psi_tool_scheduler_test`
+(if any remains, none is apparent), preferring to drop the duplicated
+create/list/cancel/below-min/cap/`:at`-past blocks (and especially the second
+`dotimes 50` cap drive) and let `psi_tool_scheduler_test` be the sole cited
+psi-tool-surface authority — OR, if any `scheduler_tools_test`-only nuance is
+worth keeping, tighten its assertions to the named-message/exact-fire-at
+precedent so the two files stop diverging in rigour. Either way update the
+`findings.md` psi-tool-surface citations to the single retained authority and
+the deftest/assertion counts. Pick the drop-redundant path unless a unique
+behaviour surfaces during execution.
+
+Non-duplicate check: no existing follow-up step or `findings.md` entry targets
+the cross-namespace `scheduler_tools_test` ↔ `psi_tool_scheduler_test`
+whole-surface overlap or the duplicated cap drive (prior redundancy follow-ups
+were intra-file: `create-session-context` fixture, `capturing-delay-fn`,
+duplicated single assertions, the `[:scheduler :schedules <id> …]` read-path).
+
+Verification-only invariant intact: this review reads only; the follow-up is
+test-only and removes/tightens redundant test coverage without changing
+asserted behaviour of the retained authority.

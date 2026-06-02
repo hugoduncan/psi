@@ -1530,3 +1530,39 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       assertions / 0 failures); full `bb test` green. Test files only — zero
       `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist
       held).
+
+## Test-shaper follow-ups — pass 19 (test-shaper, 2026-06-01)
+
+- [ ] Collapse the redundant psi-tool-surface overlap between
+      `scheduler_tools_test/make-psi-tool-scheduler-test` and the authoritative
+      `psi_tool_scheduler_test` (economical / minimal(redundant_tests) ∧
+      consistent(assertion_style) ∧ meaningful_failures). After 201 built
+      `psi_tool_scheduler_test` into the stronger psi-tool authority (6 focused
+      deftests, named-bound messages pass-17, full `:at` matrix), the pre-existing
+      `make-psi-tool-scheduler-test` re-covers the same surface with weaker
+      assertions, and duplicates the expensive `dotimes 50` cap-overflow drive
+      (the single most expensive scheduler test, now run twice). Overlapping
+      blocks:
+      - "create stores a pending schedule" ≈ `psi-tool-scheduler-create-list-cancel-test` create.
+      - "list returns pending and queued" ≈ create-list-cancel list.
+      - "cancel cancels a pending schedule" ≈ create-list-cancel cancel.
+      - "rejects too-short delay" (999ms) ≈ `psi-tool-scheduler-bounds-and-cap-test`
+        below-min — weaker (generic `:is-error`/`:overall-status` only, no named bound).
+      - "normalizes past absolute instants" ≈ `psi-tool-scheduler-at-resolution-matrix-test`
+        past-`:at` — strictly weaker (`(string? fire-at)` only vs delay-0 + immediate
+        fire + exact fire-at).
+      - "rejects the 51st pending schedule" ≈ `psi-tool-scheduler-bounds-and-cap-test`
+        cap — duplicates the `dotimes 50` cap drive.
+      Action: drop the redundant create/list/cancel/below-min/cap/`:at`-past blocks
+      from `make-psi-tool-scheduler-test` (especially the second `dotimes 50` cap
+      drive), letting `psi_tool_scheduler_test` be the sole cited psi-tool-surface
+      authority; OR if any `scheduler_tools_test`-only nuance survives audit, keep
+      it but tighten its assertions to the named-message / exact-fire-at precedent
+      so the two files stop diverging in rigour. Update `findings.md`
+      psi-tool-surface citations to the single retained authority + the deftest/
+      assertion counts. Prefer the drop-redundant path unless a unique behaviour
+      surfaces during execution.
+      Verify: test-only edit (Slice-10 allowlist; no `components/agent-session/src/**`
+      or `doc/scheduler.md`); deftest names of the *retained* authority unchanged
+      (findings citations stable for it); clj-kondo 0/0; `bb fmt:check` clean;
+      psi-tool + scheduler `bb test` subset green; full `bb test` green.
