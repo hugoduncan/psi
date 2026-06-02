@@ -1,0 +1,141 @@
+# 207 — Steps
+
+Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
+
+## S1 — Field-set authority surface
+
+- [ ] Promote `common-inherited-fields` to public (drop `^:private`) in
+      `components/session-state/src/psi/session_state/init.clj:30`.
+- [ ] Promote `model-identity-fields` to public (drop `^:private`) in
+      `init.clj:67`.
+- [ ] Verify in-namespace usages (`initialize-new-session-state`,
+      `initialize-forked-session-state`, `resume-inherited-fields`) still
+      resolve after the visibility change; run that component's tests.
+- [ ] Add a named source-key constant in
+      `components/workflow-step-session-config/src/psi/workflow_step_session_config/core.clj`,
+      e.g. `inherited-defaults-source-keys`
+      `{:from-common #{:prompt-mode :speed-mode :effort-override :tool-ids :skill-ids}
+        :from-model #{:model :thinking-level}}` (Decision 8a).
+- [ ] Add the snapshot resolved-key set constant (or derive it) =
+      `{:model :prompt-mode :tool-defs :skills :thinking-level :speed-mode :effort-override}`.
+- [ ] Add a test asserting the field-set invariant (Decision 8a): every
+      `:from-common` key ∈ `init/common-inherited-fields`, every `:from-model`
+      key ∈ `init/model-identity-fields`, and resolved keys equal source keys
+      with `:tool-ids`→`:tool-defs` and `:skill-ids`→`:skills` substituted.
+- [ ] Run lint (`clj-kondo`) + repair on touched files.
+
+## S2 — Snapshot derivation functions
+
+- [ ] Add `resolve-inherited-defaults-snapshot (ctx parent-session-id) → snapshot`
+      to `workflow-step-session-config/core.clj`: read parent via
+      `execution-adapter/get-session-data` → `:model`, `:prompt-mode`,
+      `:speed-mode`, `:effort-override`; `skill-storage/all-skills` → `:skills`;
+      `ss/agent-tool-source-in` + `:tool-ids` via `tool-defs/resolve-tool-defs`
+      → `:tool-defs`; `:thinking-level` (default `:off`).
+- [ ] Confirm `resolve-inherited-defaults-snapshot` returns exactly the snapshot
+      resolved-key set (S1 constant); no extra keys.
+- [ ] Add `effective-config->snapshot (effective-config) → snapshot` — pure
+      `select-keys`/projection of an effective `resolve-step-session-config`
+      result into the snapshot field set; no ctx reads.
+- [ ] Unit-test `resolve-inherited-defaults-snapshot` against a fixture
+      parent session (asserts `:speed-mode`/`:effort-override` captured).
+- [ ] Unit-test `effective-config->snapshot` projects only snapshot keys from
+      an effective config (and that an overridden model is preserved).
+- [ ] Lint + repair.
+
+## S3 — Persist snapshot on the run
+
+- [ ] Add an `inherited-defaults-schema` (optional fields:
+      `:model :prompt-mode :tool-defs :skills :thinking-level :speed-mode
+      :effort-override`) in `workflow-runtime/src/psi/workflow_runtime/model.clj`.
+- [ ] Add `[:inherited-defaults {:optional true} [:maybe inherited-defaults-schema]]`
+      to `workflow-run-schema` (model.clj:179).
+- [ ] In `workflow-runtime/core.clj` `create-run` (line 110): destructure
+      `inherited-defaults` from opts; add a `cond->` branch
+      `(contains? opts :inherited-defaults) (assoc :inherited-defaults …)`
+      mirroring `:parent-session-id`. No ctx reads added.
+- [ ] Test: `create-run` with `:inherited-defaults` persists it verbatim on the
+      run and the run validates against `workflow-run-schema`.
+- [ ] Test: `create-run` without `:inherited-defaults` omits the key (back-compat).
+- [ ] Lint + repair.
+
+## S4 — Top-level capture sites
+
+- [ ] In `agent_session/mutations/canonical_workflows.clj` `create-workflow-run`
+      (line ~96): when `session-id` present, call
+      `resolve-inherited-defaults-snapshot agent-session-ctx session-id` and
+      add `:inherited-defaults` to the `create-run` opts.
+- [ ] Add the `workflow-step-session-config` require to canonical_workflows.clj
+      (verify no dependency cycle; agent-session already depends on it).
+- [ ] In `agent_session/psi_tool_workflow.clj` `create-run` op (line ~143):
+      when `session-id` present, resolve via
+      `resolve-inherited-defaults-snapshot ctx session-id` and add
+      `:inherited-defaults` to `create-opts`.
+- [ ] Confirm the two upstream `mutate! 'psi.workflow/create-run` callers
+      (`workflow/core.clj:382`, `orchestration.clj:208`) are left **unchanged**.
+- [ ] Test: invoking a workflow captures the snapshot on the run at invoke time
+      (top-level path).
+- [ ] Test (Decision 5b): `continue-terminal-run-async!` produces a new run with
+      a **fresh** snapshot resolved from the continuing session.
+- [ ] Lint + repair.
+
+## S5 — Consume snapshot in step config resolution
+
+- [ ] In `resolve-step-session-config` (core.clj:145): when
+      `(:inherited-defaults workflow-run)` present, source the no-override
+      inherited fields (`:model`, `:prompt-mode`, `:tool-defs`, `:skills`,
+      `:thinking-level`, `:speed-mode`, `:effort-override`) from the snapshot
+      instead of the live parent reads.
+- [ ] When `:inherited-defaults` absent (pre-existing runs), retain the current
+      live-read path (forward-looking-only fallback; AC 6).
+- [ ] Feed the snapshot's `:model` as `parent-session-model` into
+      `resolved-model-query`/`resolved-step-model-config` (AC 7).
+- [ ] Ensure `:speed-mode`/`:effort-override` from the snapshot flow into the
+      step's resolved config output (extend output map if currently absent).
+- [ ] Verify explicit overrides (`:session` spec / base-meta) still win over the
+      snapshot defaults (AC 5).
+- [ ] Test AC 1: switching invoking session model after invoke → no effect on
+      subsequent steps.
+- [ ] Test AC 2: changing user/project default model after invoke → no effect.
+- [ ] Test AC 3: same invariant for `prompt-mode`, `tools`, `skills`,
+      `thinking-level`, `speed-mode`, `effort-override`.
+- [ ] Test AC 5: explicit override still applied.
+- [ ] Test AC 6: no-mutation single-step and multi-step resolution unchanged;
+      no-snapshot fallback unchanged.
+- [ ] Test AC 7: `resolved-model-query` selection context = snapshot model.
+- [ ] Test AC 8: `resume-run`/`continue-blocked-run-async!` reuses the original
+      snapshot (no re-capture; resolver not called).
+- [ ] Lint + repair.
+
+## S6 — Nested/delegated capture
+
+- [ ] In `workflow-runtime/statechart_runtime/delegate.clj`
+      `delegate-step-runtime-result` (line ~37): call
+      `resolve-step-session-config ctx parent-session-id workflow-run step-id`
+      to obtain the delegating step's effective config.
+- [ ] Project it via `effective-config->snapshot` and pass the result as
+      `:inherited-defaults` into the child `create-run` (line ~44).
+- [ ] Resolve the dependency: `delegate.clj` (workflow-runtime) calling into
+      `workflow-step-session-config` — confirm direction. If it introduces a
+      cycle (workflow-step-session-config already requires workflow-runtime),
+      inject the resolver as a ctx op / passed fn instead of a direct require
+      (record the decision in implementation.md).
+- [ ] Confirm `delegate.clj` does **not** call
+      `resolve-inherited-defaults-snapshot` (would lose step overrides).
+- [ ] Test AC 4: a step overrides the model then delegates → sub-delegation and
+      its steps see the overridden model, captured at sub-delegation creation,
+      not the (since-mutated) invoking session.
+- [ ] Lint + repair.
+
+## S7 — Coherence + docs
+
+- [ ] Re-read all touched files (sync after tooling edits).
+- [ ] Verify coherence across meta/spec/tests/code/docs for the snapshot model.
+- [ ] Update user-facing docs (`doc/workflows.md` and/or `doc/architecture.md`)
+      describing invoke-time inheritance snapshot semantics, if user-visible.
+- [ ] Add changelog entry under `[Unreleased]` if behaviour is user-visible
+      (workflow inheritance now snapshotted at invoke time).
+- [ ] Run full lint (`clj-kondo --lint src` across touched components).
+- [ ] Run the full relevant test suite; all green.
+- [ ] Final review: confirm `create-run` purity preserved and no
+      `workflow-runtime → workflow-step-session-config` layering inversion.
