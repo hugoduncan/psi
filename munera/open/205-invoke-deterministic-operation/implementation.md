@@ -700,3 +700,47 @@ Verified: `clj-paren-repair` (success), `clj-kondo --lint` (0/0), focused
 integration suite green (10 tests / 27 assertions, 0 failures). No blocked
 steps. The remaining unchecked close-out box (`git mv open/ → closed/` +
 remove from plan.md) is the lifecycle's terminal move, not this follow-up pass.
+
+## Test review (ψ, fifth pass)
+
+Re-applied task-test-review skill (well-formed ∧ behaviour-coverage ∧
+infra-deps real/¬mock) with independent verification at source-of-truth level
+(ran suites, read all four test ns + all production ns + the protected-component
+diff), not trusting the prior-pass narrative. Ran the four task suites focused:
+48 tests / 107 assertions, all green.
+
+Verified independently:
+- **Well-formed** — focused, deterministic, no flakiness; all green.
+- **Infra deps real, ¬mock** — all four suites use real
+  `registry/create-registry` + real `runtime/invoke-operation`; integration +
+  command use real `session/create-context`; unit ctx uses a real `:state*`
+  atom whose `{:agent-session {:sessions {sid {:data …}}}}` shape matches
+  production. Side-effects asserted via real sink atoms; outputs asserted via
+  exact keys/text; no interaction assertions. Conforms to the `λtest` rule. ✓.
+- **Behaviour coverage** — mapped each acceptance criterion to ≥1 covering
+  test: list sorted/empty/ignores-args+id; invoke ok/error/unknown/malformed
+  (distinct), all-top-level-key projection incl. `:details` nested map (TR-1),
+  2000-char truncation + exact marker identical across helper/psi-tool/command
+  (TR-2); positional `operation-id` (caller map lacks `:operation-id`/
+  `:workflow-run-id`/`:step-id`); conditional `:parent-session-id`; default
+  `{}`; blank-id usage; non-map AND unreadable-EDN args on both surfaces (TR-3);
+  side-effecting op (real sink); D2 `:status`-first sorted layout; `/operations`
+  vs `/operation` precedence; end-to-end validate→dispatch→outer-catch incl.
+  tagged-error `:is-error true` (TR-4), invalid-op and blank-id rejection. ✓.
+- **AC #9 (no change to contract/registry/runtime/workflow)** — verified by
+  scoping the git diff to all task-205 commits over
+  `deterministic-operation-registry` + `deterministic-operation-runtime` +
+  `workflow-runtime`: **empty**. The new surfaces are pure additive entry
+  points. ✓.
+
+No new actionable test gap found. The four prior-pass gaps (TR-1 `:details`,
+TR-2 command truncation, TR-3 unreadable-EDN psi-tool branch, TR-4 end-to-end
+tagged-error `:is-error`) are all closed and corroborated by this independent
+sweep. Test review is complete.
+
+Non-actionable observations (no follow-up):
+- `operation-invoke-status-line-first` asserts the explicit `cons :status` +
+  sort-by-`pr-str` ordering; the render code orders explicitly (not relying on
+  map iteration), so the assertion holds regardless of handler key order. ✓.
+- `format-operations` em-dash separator and list text layout are cosmetic, not
+  acceptance criteria; covered incidentally by `operations-lists-sorted`.
