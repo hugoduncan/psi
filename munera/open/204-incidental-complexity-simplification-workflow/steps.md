@@ -1259,3 +1259,33 @@ with the commit sha / decision when done.
       0 findings (no unused-var warning → both deleted builders confirmed gone,
       `named-*` still referenced); `clj-paren-repair` Success; skill-test file
       429 lines (< 800); `bb commit-check:file-lengths` exit 0.
+
+## Test review follow-ups (review pass 17 — test-shaper)
+
+- [ ] TR21 — Lock the recipe's emitted-evidence projection (the design's step-5
+      acceptance). The skill's `gap` recipe ends with a `map({...})` projection
+      re-emitting the chosen target's evidence: `ns`, `var`, `arity`, `file`,
+      `line`, `end_line`, `lcc_total`, the six per-dimension burdens
+      (`flow_burden`, `state_burden`, `shape_burden`, `abstraction_burden`,
+      `dependency_burden`, `working_set`), `findings`, `cc`, `gap`. This is the
+      design's named step-5 acceptance ("emit one chosen target with evidence:
+      … `lcc-total` with per-dimension burdens, `cc`, `gap`, the `local`
+      findings, …"), consumed verbatim by the workflow step-1 prompt to build
+      the generated task's evidence block. No test exercises it: every recipe
+      test asserts only `ns`/`var`/`line`/`cc`/`gap` survival (the synthetic
+      fixtures supply the burden fields but nothing asserts they reappear), and
+      there is no structural fallback on the projection map. A regress dropping a
+      projected field (`end_line`, `findings`, a burden dimension) or mis-renaming
+      one (`flow_burden` → `flow-burden`) passes every existing test green,
+      silently degrading the evidence the generated task is built from
+      (test-shaper `cover_by(invariants)` + `behavior_focused`). Fix (test-only,
+      no production/skill/EDN change — recipe is correct): add a
+      projection-contract test to `incidental_complexity_finder_skill_test.clj`
+      reusing the `run-jq-recipe` + `named-*-unit-json` harness — feed one
+      qualifying matched unit and assert the surviving object carries every
+      projected evidence key with its expected value (`end_line`, `lcc_total`,
+      the six `*_burden`/`working_set` dimensions, `findings`, `cc`, `gap`); add
+      the mirroring jq-absent structural fallback locking the projection-map key
+      names verbatim, per the TR12/16/17/18 fallback convention. Verify the
+      focused skill-test + task-204 suite green, `clj-kondo` 0, `clj-paren-repair`
+      Success, `bb commit-check:file-lengths` clean.

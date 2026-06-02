@@ -2951,3 +2951,53 @@ Verification (test-only; no production/skill/EDN change):
 One fixture-builder pair now serves every recipe test (test-shaper
 `consistent(fixtures)` + `economical`): a future unit-JSON shape change threads
 through one pair; a reader learns one helper.
+
+## Test review (pass 17 — test-shaper)
+
+Re-applied `test-shaper` to the two task-204 test namespaces after the pass-16
+TR20 collapse. Focused suite green: 10 tests, 117 assertions, 0 failures (jq
+present). The coverage net is broad and mock-free — executable recipe locks
+(join losslessness, order-independence, filter, A1 drop, ranking, top-5 cap,
+max(cc,1) zero-cc guard, empty-qualification, `>=` boundary inclusivity), each
+with a jq-absent structural fallback; prompt/`:context` handoff locks and the
+NO_TARGET / two-phase / no-push contracts for both workflows. One genuine
+`cover_by(invariants)` gap remains:
+
+### TR21 — the recipe's emitted-evidence projection is entirely unlocked
+The skill's `gap` recipe ends with a final `map({...})` projection (SKILL.md
+§ join recipe, the last map) that re-emits the chosen target's evidence:
+`ns`, `var`, `arity`, `file`, `line`, `end_line`, `lcc_total`, the six
+per-dimension burdens (`flow_burden`, `state_burden`, `shape_burden`,
+`abstraction_burden`, `dependency_burden`, `working_set`), `findings`, `cc`,
+and `gap`. This projection **is** the design's named step-5 acceptance ("emit
+one chosen target with evidence: `ns`, `var`, `arity`, file, line range,
+`lcc-total` with per-dimension burdens, `cc`, `gap`, the `local` findings, and
+a coverage hint") — the workflow's step-1 prompt consumes exactly these fields
+to build the generated task's incidental-complexity evidence block.
+
+No test exercises this projection. Every executable recipe test asserts only
+`ns`/`var`/`line`/`cc`/`gap` survival (and the synthetic `named-*-unit-json`
+fixtures *supply* the burden fields but nothing asserts they reappear in
+output); there is no structural (jq-absent) lock on the projection map either.
+A regress that drops a projected field (e.g. omits `end_line`, `findings`, or a
+burden dimension) or mis-renames one (`flow_burden` → `flow-burden`, a key the
+prompt would not read) passes every existing test green, silently degrading the
+evidence the generated task is built from. Per test-shaper
+`cover_by(invariants)` + `behavior_focused` (the projection is the observable
+contract output, not an implementation detail), the emitted-evidence shape
+should be pinned.
+
+Fix (test-only, no production/skill/EDN change — the recipe is correct as-is):
+add a projection-contract test to `incidental_complexity_finder_skill_test.clj`
+reusing the existing `run-jq-recipe` + `named-*-unit-json` harness. Feed one
+qualifying matched unit and assert the surviving object carries every projected
+evidence key with its expected value (`end_line`, `lcc_total`, the six
+`*_burden`/`working_set` dimensions, `findings`, `cc`, `gap`). Add the
+mirroring jq-absent structural fallback locking the projection-map key names
+(`flow_burden:`, `state_burden:`, …, `end_line:`, `lcc_total:`) verbatim in the
+recipe, matching the established TR12/16/17/18 fallback convention.
+
+No other actionable test-shaper feedback: the suite is otherwise strong —
+single-concern deftests, explicit arrange/act/assert, mock-free, jq-absent
+fallbacks for every recipe branch, behaviour-focused prompt/EDN-shape locks for
+both workflows, and the design-acceptance net (TR1–TR20, F1–F6) is comprehensive.
