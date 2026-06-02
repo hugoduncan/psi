@@ -5,42 +5,49 @@ with the commit sha / decision when done.
 
 ## Slice 1 — `incidental-complexity-finder` skill
 
-- [ ] Re-verify live CLI shape: run `bb gordian local --sort total --json` and
+- [x] Re-verify live CLI shape: run `bb gordian local --sort total --json` and
       `bb gordian complexity --json`; confirm each emits a `units` array with
       `ns`/`var`/`arity`, `local` carrying `lcc-total` (+ per-dimension burdens),
       `complexity` carrying `cc`. NOTE (P2): `--sort total` here is a
       **selector-only** convenience for ranking display during selection; it is a
       distinct invocation from the `before-local.json` capture below and does not
-      affect baseline validity (see P2 reconciliation).
-- [ ] Create `.psi/skills/incidental-complexity-finder/SKILL.md` with frontmatter
+      affect baseline validity (see P2 reconciliation). VERIFIED: `local` units
+      carry `ns`/`var`/`arity`/`lcc-total`/`flow-burden`/`state-burden`/
+      `shape-burden`/`abstraction-burden`/`dependency-burden`/`working-set`/
+      `findings`/`file`/`line`/`end-line`; `complexity` units carry `cc`.
+- [x] Create `.psi/skills/incidental-complexity-finder/SKILL.md` with frontmatter
       (`name`, `description`, `lambda`) consistent with sibling skills
       (`refactoring`, `gordian`, `code-shaper`).
-- [ ] In SKILL.md, state the scope explicitly: **a single executable unit**;
+- [x] In SKILL.md, state the scope explicitly: **a single executable unit**;
       encode the false-positive guard (high CC alone is not a target).
-- [ ] Embed the **fixed verbatim join recipe**: run both lenses in machine form,
+- [x] Embed the **fixed verbatim join recipe**: run both lenses in machine form,
       join on `(ns, var, arity)`, compute `gap = lcc-total / max(cc, 1)`.
-- [ ] Encode the **unmatched-row rule** (A1): inner join keyed on the `local`
+      (Implemented as a verbatim `jq` recipe; tested live against this repo.)
+- [x] Encode the **unmatched-row rule** (A1): inner join keyed on the `local`
       side — a `local` unit with no matching `cc` row is **dropped**, never
       defaulted to `cc=1`; `complexity`-only units are absent; `max(cc,1)` guards
       only the matched zero-cc case.
-- [ ] Encode the **qualification filter**: a unit qualifies iff
+- [x] Encode the **qualification filter**: a unit qualifies iff
       `lcc-total ≥ 5.0 ∧ gap ≥ 2.0`; rank qualifying units by `gap`; if none
       qualify there is no target (drives early stop).
-- [ ] Encode the **judgment guard**: read the top 5 qualifying units by `gap`,
+- [x] Encode the **judgment guard**: read the top 5 qualifying units by `gap`,
       confirm burden is incidental (braiding / state threading / abstraction
       oscillation / helper-chasing / working-set overload on low/moderate CC) and
       not an essential irreducible algorithm; choose the first that passes;
       report no target if none of the top 5 pass.
-- [ ] Encode the **evidence emission**: chosen target emits `ns`, `var`, `arity`,
+- [x] Encode the **evidence emission**: chosen target emits `ns`, `var`, `arity`,
       file, line range, `lcc-total` with per-dimension burdens, `cc`, `gap`, the
       `local` findings, and a **coverage hint** (sibling test ns exists? any test
       references the target var?).
-- [ ] State thresholds (`lcc-total ≥ 5.0`, `gap ≥ 2.0`, top-5 guard depth) are
+- [x] State thresholds (`lcc-total ≥ 5.0`, `gap ≥ 2.0`, top-5 guard depth) are
       explicit and tunable.
-- [ ] Verify the skill registers/loads (discoverable in skills registry) and,
+- [x] Verify the skill registers/loads (discoverable in skills registry) and,
       run interactively against this repo, produces a target + evidence (or a
-      well-formed no-target report).
-- [ ] Commit Slice 1 (`⚒ skill: add incidental-complexity-finder`).
+      well-formed no-target report). VERIFIED: `load-skills-from-dir` returns the
+      skill with zero diagnostics (name/desc/lambda parsed); the join recipe run
+      live yields a ranked top-5 candidate list (e.g. `start-tui-runtime!/5`
+      gap≈7.03, `print-help!/0` gap≈5.86) — selection produces a target.
+- [x] Commit Slice 1 (`⚒ skill: add incidental-complexity-finder`).
 
 ## Slice 2 — `task-lifecycle-in-worktree` wrapper workflow
 
