@@ -107,7 +107,24 @@ end. Required behaviour:
   line as the step output.
 
 **Step 2 — run the lifecycle (`:delegate`)**
-- Delegate to `task-lifecycle` with `{:input <task-path-from-step-1>}`.
+- Delegate to `task-lifecycle` (`:target "task-lifecycle"`).
+- **Handoff wiring (grammar-conformant):** step-2 sources its `:input` from
+  step-1's yielded text via the verified delegate-yield grammar:
+  ```
+  :prompt-string {:type :map
+                  :fields {:input {:from {:step "<step-1-name>" :yield :text}}}}
+  ```
+  Because step-1 emits **only** the Munera task path on a single line as its
+  step output (see Step 1), step-1's `:yield :text` *is* the bare task-path
+  string. This routes `{:input "munera/open/NNN-slug"}` into the delegate — the
+  exact map shape every `task-lifecycle` sub-workflow reads via
+  `{:from :workflow-input :path [:input]}`. This mirrors the verified
+  `gh-issue-implement.edn` precedent, whose `implement`/`review` `:delegate`
+  steps wire `:input` from a prior step's `:yield :text` with this identical
+  `:prompt-string {:type :map :fields {:input {:from {:step … :yield :text}}}}`
+  form. Naming this mechanism keeps the handoff on the one verified data-flow
+  path (the `one_way` principle) rather than an implicit, non-grammatical
+  contract.
 - The delegate **inherits the worktree** established in step 1 (verified
   behaviour; see Verified Facts).
 
@@ -198,7 +215,17 @@ inconsistency in place of live user collaboration.
 ## Verified facts (grounding)
 
 - **Lifecycle input contract:** every `task-lifecycle` sub-workflow takes
-  `{:input "munera/open/NNN-slug"}` — a bare Munera task path string.
+  `{:input "munera/open/NNN-slug"}` — a bare Munera task path string. Confirmed
+  in `task-lifecycle.edn`: the first sub-workflow reads
+  `:input {:from :workflow-input :path [:input]}`.
+- **Step→step delegate-yield handoff:** a `:delegate` step sources a
+  `:prompt-string` `:map` field from a prior step's text output via
+  `:fields {:input {:from {:step "<name>" :yield :text}}}`. Verified precedent:
+  `gh-issue-implement.edn`'s `implement` and `review` `:delegate` steps wire
+  `:input` from a prior step's `:yield :text` with exactly this form. Since
+  step-1 here emits only the task-path line, its `:yield :text` is the bare path
+  string, producing the `{:input "munera/open/NNN-slug"}` map `task-lifecycle`
+  expects.
 - **Worktree ownership:** neither `task-lifecycle` nor `implement-task` creates
   a worktree; the caller establishes it, and a `:delegate` step inherits the
   worktree set by a prior `:session` step's `work-on` call (precedent:
@@ -213,7 +240,11 @@ inconsistency in place of live user collaboration.
   the verified grammar (`:session` + `:delegate`), and matches the two-step
   shape above including the early-stop-on-no-target behaviour.
 - The workflow's step-1 output and step-2 input wiring conform to the verified
-  task-path handoff contract.
+  task-path handoff contract: step-1 yields only the bare task-path line, and
+  step-2's `:delegate` sources `:input` via
+  `:prompt-string {:type :map :fields {:input {:from {:step "<step-1-name>" :yield :text}}}}`,
+  producing the `{:input "munera/open/NNN-slug"}` map every `task-lifecycle`
+  sub-workflow reads.
 - Generated tasks carry the two-phase behaviour-preserving contract: a Phase 0
   test-coverage gate (characterization tests + green net before refactoring) and
   Phase 1 refactor with the `local`-lens + `gate` + green-tests acceptance.
