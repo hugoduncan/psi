@@ -205,7 +205,7 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
 
 ## Plan-inconsistency follow-ups (review 2026-06-02)
 
-- [ ] PI1: Align design.md Decision 7a with the P2-resolved plan/steps.
+- [x] PI1: Align design.md Decision 7a with the P2-resolved plan/steps.
       design.md (`:209`) still defines `effective-config->snapshot` as
       `(effective-config) → snapshot-map` ("pure projection … into the snapshot
       field set") and the nested-flow prose (`:220-221`) calls it single-arg,
@@ -216,7 +216,7 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       "pure projection of effective config" description, and the `:220-221`
       nested-flow prose to the two-arg form so design no longer contradicts
       plan/steps.
-- [ ] PI2: Align design.md Decision 7 with the P1-resolved S6 mechanism.
+- [x] PI2: Align design.md Decision 7 with the P1-resolved S6 mechanism.
       design.md (`:188`) asserts "dependency direction stays caller → both
       components, avoiding a layering inversion" and the nested-flow prose
       (`:215-221`) has `delegate.clj` directly calling

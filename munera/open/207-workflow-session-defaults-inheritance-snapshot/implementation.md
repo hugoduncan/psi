@@ -446,3 +446,38 @@ Both are design↔plan/steps drift created by resolving plan ambiguities without
 back-propagating to the still-"stable" design.md. Build (S1–S7) not started.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK.
+
+## Plan-inconsistency follow-up resolution (ψ, 2026-06-02)
+
+Both plan-inconsistency follow-ups (PI1, PI2) from the preceding review pass
+resolved into design.md (design-only; no code; build S1–S7 not started). These
+back-propagate the P1/P2 plan/steps resolutions into the previously-"stable"
+design.md so design no longer contradicts plan/steps:
+
+- **PI1.** Updated Decision 7a's `effective-config->snapshot` signature from
+  single-arg `(effective-config) → snapshot-map` "pure projection of an
+  already-resolved effective step-config into the snapshot field set" to the
+  two-arg `(effective-config parent-snapshot) → snapshot-map`: the five
+  resolver-emitted inherited keys (`:model :prompt-mode :tool-defs :skills
+  :thinking-level`) come from the effective config, while
+  `:speed-mode`/`:effort-override` come from `parent-snapshot`
+  (`(:inherited-defaults workflow-run)`), because `resolve-step-session-config`
+  emits neither (resolved I1) — a single-arg projection would yield only 5/7
+  keys and drop speed/effort under delegation. Also updated the nested-flow
+  prose to call `effective-config->snapshot` on the effective config **plus the
+  parent snapshot**. Now matches plan.md (`:26/:36`) + steps.md (`:37/:136`).
+
+- **PI2.** Updated Decision 7's "dependency direction stays caller → both
+  components, avoiding a layering inversion" + direct-call framing to the
+  P1-resolved injected-fn mechanism: `workflow-step-session-config` already
+  requires `workflow-runtime` (deps.edn + core.clj:16/17), so a reverse require
+  from `delegate.clj` is a certain cycle. Decision 7 now states the nested path
+  reaches the resolver via an injected `resolve-inherited-defaults-fn` passed
+  into `delegate-step-runtime-result` (mirroring its existing
+  `create-workflow-context-fn`/`send-and-drain-fn`), bound by the caller (which
+  depends on both components); `delegate.clj` does not require
+  `workflow-step-session-config`. Updated the nested-flow prose accordingly.
+  Now matches plan Risks + steps S6.
+
+No plan-inconsistency follow-ups blocked; both resolved as design refinements.
+PI1/PI2 checked in steps.md. Code implementation remains for the build phase.

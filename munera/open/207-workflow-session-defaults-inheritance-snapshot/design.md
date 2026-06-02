@@ -183,16 +183,27 @@ Out of scope:
    reads; it does not reuse a no-override path that already includes them
    (there is none). The pure
    create-run sites call this resolver impurely (with the ctx they already hold)
-   and pass the result into `create-run`. `workflow-runtime` does **not** reach
-   into `workflow-step-session-config`; the dependency direction stays
-   caller → both components, avoiding a layering inversion. For a **nested**
-   delegated run (Decision 3), the delegating step's *effective* config (run
-   snapshot ⊕ step overrides) is the parent: `resolve-step-session-config`
+   and pass the result into `create-run`. `workflow-runtime` does **not**
+   `require` `workflow-step-session-config`: that reverse require is a **certain
+   cycle**, because `workflow-step-session-config` already requires
+   `workflow-runtime` (`deps.edn` declares `psi/workflow-runtime`; `core.clj:16/17`
+   require `execution-adapter`/`statechart`). For the top-level capture sites the
+   caller already lives in a component that depends on both, so it calls the
+   resolver directly. For the **nested** delegated path, where the caller is
+   `workflow-runtime`'s own `delegate.clj`, the snapshot resolver is reached via
+   an **injected fn** (`resolve-inherited-defaults-fn`) passed into
+   `delegate-step-runtime-result`, mirroring its existing injected
+   `create-workflow-context-fn`/`send-and-drain-fn` params — `delegate.clj` does
+   not require `workflow-step-session-config`, so no layering inversion / cycle.
+   For a **nested** delegated run (Decision 3), the delegating step's *effective*
+   config (run snapshot ⊕ step overrides) is the parent: `resolve-step-session-config`
    already produces that effective config for the step, and the same component
-   derives the child run's snapshot from it (effective config → snapshot map),
-   so effective-snapshot derivation lives in exactly one component with no
-   duplicated resolution logic. `delegate.clj`'s create-run site passes the
-   step's effective snapshot rather than re-reading the invoking session.
+   derives the child run's snapshot from it (effective config + parent snapshot →
+   snapshot map), so effective-snapshot derivation lives in exactly one component
+   with no duplicated resolution logic. The injected fn (bound by the caller, which
+   depends on both components) calls `resolve-step-session-config` then
+   `effective-config->snapshot`; `delegate.clj`'s child create-run site passes the
+   resulting effective snapshot rather than re-reading the invoking session.
 
    7a. **Nested-derivation entry point and signatures.**
    `workflow-step-session-config` exposes **two** snapshot functions, distinct
@@ -206,21 +217,32 @@ Out of scope:
      have today — `:speed-mode` and `:effort-override` from the parent session
      — which this resolver adds (Decision 7 / Decision 1; the current resolver
      reads neither). Returns the resolved snapshot.
-   - `effective-config->snapshot` — `(effective-config) → snapshot-map`. The
-     **nested** path. Pure projection of an already-resolved effective
-     step-config into the snapshot field set; no ctx reads. It is the single
-     point that maps effective config → snapshot, shared so the two paths
-     cannot drift.
+   - `effective-config->snapshot` — `(effective-config parent-snapshot) →
+     snapshot-map`. The **nested** path. Pure projection; no ctx reads. The five
+     resolver-emitted inherited keys (`:model :prompt-mode :tool-defs :skills
+     :thinking-level`) come from the already-resolved effective step-config; the
+     remaining two snapshot keys (`:speed-mode`/`:effort-override`) come from
+     `parent-snapshot` (the parent run's `:inherited-defaults`), because
+     `resolve-step-session-config` emits neither (resolved I1) — a single-arg
+     projection would silently yield only 5 of the 7 snapshot keys and drop
+     speed/effort under delegation. It is the single point that maps effective
+     config + parent snapshot → snapshot, shared so the two paths cannot drift.
 
    `delegate.clj`'s `delegate-step-runtime-result` holds `ctx`,
    `parent-session-id`, `step-id`, `step-def`, and `workflow-run` but does **not**
-   currently resolve the delegating step's effective config. The nested
-   derivation therefore proceeds: `delegate-step-runtime-result` first calls
-   `resolve-step-session-config` (`ctx parent-session-id workflow-run step-id`)
-   — which already produces the step's effective config (run snapshot ⊕ step
-   overrides) — then calls `effective-config->snapshot` on that result, and
-   passes the resulting snapshot as `:inherited-defaults` into the child
-   `create-run` at `delegate.clj:44`. `delegate.clj` does **not** call
+   currently resolve the delegating step's effective config, and (per Decision 7)
+   must not `require` `workflow-step-session-config`. The nested derivation
+   therefore goes through an **injected fn** (`resolve-inherited-defaults-fn`)
+   added to `delegate-step-runtime-result`'s param list alongside its existing
+   injected `create-workflow-context-fn`/`send-and-drain-fn`. The caller — which
+   depends on both components — binds it to a closure that first calls
+   `resolve-step-session-config` (`ctx parent-session-id workflow-run step-id`),
+   producing the step's effective config (run snapshot ⊕ step overrides), then
+   calls `effective-config->snapshot` on that result **plus the parent snapshot**
+   (`(:inherited-defaults workflow-run)`, supplying `:speed-mode`/
+   `:effort-override`). `delegate-step-runtime-result` passes that injected fn's
+   result as `:inherited-defaults` into the child `create-run` at
+   `delegate.clj:44`. The injected fn does **not** call
    `resolve-inherited-defaults-snapshot` (that would re-read a live parent
    session and lose the step overrides); the effective config supplies the
    parent semantics required by Decision 3.
