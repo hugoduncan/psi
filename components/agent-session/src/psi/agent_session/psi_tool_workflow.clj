@@ -4,7 +4,8 @@
    [clojure.edn :as edn]
    [psi.workflow-runtime.core :as workflow-runtime]
    [psi.workflow-runtime.execution-adapter :as workflow-execution-adapter]
-   [psi.workflow-registry.registry :as workflow-registry]))
+   [psi.workflow-registry.registry :as workflow-registry]
+   [psi.workflow-step-session-config.core :as workflow-step-session-config]))
 
 ;; ── Helpers (local copies of private psi_tool utilities) ────────────────────
 
@@ -140,7 +141,10 @@
                                                                    definitions)}})
 
               "create-run"
-              (let [create-opts (cond-> {:parent-session-id session-id}
+              (let [inherited-defaults (workflow-step-session-config/resolve-inherited-defaults-snapshot
+                                        ctx session-id)
+                    create-opts (cond-> {:parent-session-id session-id
+                                         :inherited-defaults inherited-defaults}
                                   definition-id (assoc :definition-id definition-id)
                                   definition    (assoc :definition (parse-workflow-definition-string definition))
                                   true          (assoc :workflow-input (or (parse-workflow-input-string workflow-input) {})))

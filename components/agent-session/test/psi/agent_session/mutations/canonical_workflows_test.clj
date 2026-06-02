@@ -101,7 +101,41 @@
                                                         :definition-id "nonexistent"
                                                         :workflow-input {}})]
       (is (nil? (:psi.workflow/run-id result)))
-      (is (string? (:psi.workflow/error result))))))
+      (is (string? (:psi.workflow/error result)))))
+
+  (testing "captures the inherited-defaults snapshot from the invoking session
+            at invoke time (task 207 S4)"
+    (let [ctx (make-test-ctx)
+          sd (session/new-session-in! ctx nil {:session-name "delegator"})
+          session-id (:session-id sd)
+          _ (swap! (:state* ctx) update-in [:agent-session :sessions session-id :data]
+                   merge {:model {:provider "anthropic" :id "claude-test"}
+                          :prompt-mode :concise
+                          :speed-mode :fast
+                          :effort-override :xhigh})
+          _ (cwf-mutations/register-workflow-definition {} {:psi/agent-session-ctx ctx
+                                                            :definition sample-definition})
+          _ (cwf-mutations/create-workflow-run {} {:psi/agent-session-ctx ctx
+                                                   :session-id session-id
+                                                   :definition-id "test-workflow"
+                                                   :workflow-input {:input "go"}
+                                                   :run-id "run-snap"})
+          snapshot (get-in @(:state* ctx) [:workflows :runs "run-snap" :inherited-defaults])]
+      (is (= {:provider "anthropic" :id "claude-test"} (:model snapshot)))
+      (is (= :concise (:prompt-mode snapshot)))
+      (is (= :fast (:speed-mode snapshot)))
+      (is (= :xhigh (:effort-override snapshot)))))
+
+  (testing "no session-id → no inherited-defaults snapshot captured"
+    (let [ctx (make-test-ctx)
+          _ (cwf-mutations/register-workflow-definition {} {:psi/agent-session-ctx ctx
+                                                            :definition sample-definition})
+          _ (cwf-mutations/create-workflow-run {} {:psi/agent-session-ctx ctx
+                                                   :definition-id "test-workflow"
+                                                   :workflow-input {:input "go"}
+                                                   :run-id "run-no-snap"})]
+      (is (not (contains? (get-in @(:state* ctx) [:workflows :runs "run-no-snap"])
+                          :inherited-defaults))))))
 
 (deftest execute-workflow-run-test
   (testing "executes a pending run to completion"

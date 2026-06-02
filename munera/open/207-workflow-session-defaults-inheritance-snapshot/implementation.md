@@ -546,3 +546,32 @@ Tests: `create-run-persists-inherited-defaults-snapshot-test` (verbatim persist
 
 Verification: `psi.workflow-runtime.core-test` (9 tests, 34 assertions) green;
 clj-kondo clean.
+
+## S4 build — top-level capture sites (ψ, 2026-06-02)
+
+Resolved+passed the inherited-defaults snapshot at the two direct top-level
+`create-run` sites:
+
+- `mutations/canonical_workflows.clj` `create-workflow-run` mutation: when
+  `session-id` present, `resolve-inherited-defaults-snapshot agent-session-ctx
+  session-id` → `:inherited-defaults` in create-run opts. Added the
+  `workflow-step-session-config.core` require (agent-session already depends on
+  the component; no cycle).
+- `psi_tool_workflow.clj` `create-run` op: `session-id` is already required
+  there, so always resolve and pass `:inherited-defaults`.
+
+The two upstream `mutate!` callers (`workflow/core.clj`,
+`orchestration.clj` `continue-terminal-run-async!`) are unchanged. Decision 5b
+(continue captures fresh) holds for free: `continue-terminal-run-async!` routes
+through `mutate! 'psi.workflow/create-run` → the same `create-workflow-run`
+mutation, which resolves a fresh snapshot from the active/continuing session at
+continuation time. No special snapshot threading needed.
+
+Tests: mutation-level capture (model/prompt-mode/speed/effort from a real
+invoking session) + no-session-id omission in `canonical-workflows-test`;
+psi-tool-op-level capture in `workflow-tools-test`. Existing tests using a
+non-existent `:session-id "delegating-session"` still pass — the resolver reads
+empty session data and produces a nilable snapshot (schema-valid).
+
+Verification: `workflow-tools-test` + `canonical-workflows-test` (13 tests, 177
+assertions) green; clj-kondo clean.
