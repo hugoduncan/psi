@@ -249,6 +249,31 @@ with the commit sha / decision when done.
       failures); `clj-kondo`/`cljfmt` clean; `doc/workflows.md` updated for
       coherence. (See implementation.md F1 entry.)
 
+## Implementation review follow-ups (review pass 2)
+
+- [ ] F2 — The skill's fixed `jq` join recipe keys `$ccmap`/the join on
+      `(ns + "/" + var + "/" + (arity|tostring))`, but that key is **non-unique**
+      when `arity` is `null`: every `defmethod`-style unit emits `arity: null`,
+      so all 51 `psi.agent-session.dispatch-effects/execute-effect!` defmethods
+      collapse to one key `…/execute-effect!/null` on **both** the `local` and
+      `complexity` sides (verified live). `from_entries` then keeps only the
+      **last** of the 51 distinct cc values (jq last-wins) — making `cc`/`gap`
+      for any null-arity unit **non-deterministic w.r.t. emit order**, which
+      contradicts the SKILL's "fixed recipe … so selection is reproducible" claim
+      and the A1 "join is total over the shared key space" wording. Currently no
+      null-arity unit qualifies (`lcc-total ≥ 5.0 ∧ gap ≥ 2.0`), so the live
+      top-5 is unaffected — but a future high-burden null-arity defmethod would
+      be mis-ranked / falsely (dis)qualified. Fix the recipe in
+      `.psi/skills/incidental-complexity-finder/SKILL.md` to stop relying on
+      last-wins `from_entries` over a non-unique key — e.g. (a) exclude
+      `null`-arity units explicitly (`select(.arity != null)`, documenting
+      arity-aggregated defmethods as out of unit-level scope), or (b) group cc by
+      key and reduce (order-independent), or (c) re-key on something unique — and
+      correct the A1 "total over the shared key space" prose to acknowledge the
+      null-arity collision. Confined to the skill recipe + its A1/A4 prose; no
+      workflow/test change forced (optionally assert recipe determinism). (See
+      implementation.md pass-2 entry.)
+
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 
 - [ ] Split step-1 selection from task-creation into two `:session` steps,

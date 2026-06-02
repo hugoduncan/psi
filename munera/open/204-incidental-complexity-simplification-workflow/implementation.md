@@ -822,3 +822,82 @@ for coherence with the workflow.
   formatted correctly.
 
 F1 checked in steps.md. PASS_STATUS: REVIEW_COMPLETE.
+
+## 2026-06-01 — Implementation review (task-implementation-review, pass 2)
+
+Second implementation-review pass over the now-complete artifacts (Slices 1–5 +
+F1 resolved). Re-grounded against live runtime: focused definition tests
+(**14 tests, 196 assertions, 0 failures**), `load-workflow-definitions`
+(both workflows register cleanly), the skill `jq` join recipe run end-to-end
+against live `bb gordian local --sort total --json` + `bb gordian complexity
+--json`, and the verified precedents (`review-implementation-in-worktree.edn`,
+`gh-issue-implement.edn`).
+
+Re-confirmed sound (no new findings):
+- **Wrapper + outer wiring faithful to precedent.** `task-lifecycle-in-worktree.edn`
+  is structurally identical to `review-implementation-in-worktree.edn`
+  (resolve-worktree `:session`+`work-on` → `lifecycle` `:delegate
+  :target "task-lifecycle"` → `summary` `:session`), and the outer step-2
+  `:delegate :target "task-lifecycle-in-worktree"` + `:prompt-string {:type :map
+  :fields {:input {:from {:step "select-and-create" :yield :text}}}}` is
+  grammar-identical to `gh-issue-implement.edn`'s `implement` delegate into
+  `implement-task-in-worktree`. The wrapper's `resolve-worktree` template reads
+  `{:from :workflow-input :path [:input]}` — the map shape the outer delegate
+  supplies. F1's `NO_TARGET` short-circuit is present in both `resolve-worktree`
+  and `summary`.
+- **Skill recipe runs live** and produces a ranked top-5 (e.g.
+  `psi.app-runtime/start-tui-runtime!/5` gap≈7.03). A1 unmatched-row rule,
+  qualification filter, and `max(cc,1)` zero-cc guard are faithfully encoded.
+
+One new actionable finding (added to steps.md):
+
+- **F2 — Join key `(ns, var, arity)` is non-unique when `arity` is `null`,
+  silently corrupting the cc/gap for those units and breaking the recipe's
+  "reproducible, embedded verbatim" guarantee.** The skill's fixed `jq` recipe
+  builds `$ccmap` via `from_entries` keyed on
+  `(.ns + "/" + .var + "/" + (.arity|tostring))`. Live data shows this key is
+  **not unique**: every `defmethod`-style unit is emitted with `arity: null`, so
+  e.g. all **51** `psi.agent-session.dispatch-effects/execute-effect!`
+  defmethods collapse to the single key
+  `psi.agent-session.dispatch-effects/execute-effect!/null` — on **both** the
+  `local` and `complexity` sides (verified: 51 null-arity units each side,
+  collapsing to 1 distinct key). Consequences:
+  - `from_entries` over the cc units keeps only the **last** of the 51 distinct
+    cc values for that key (jq last-wins), discarding the other 50. **Which** cc
+    survives depends on cc-unit emission order — so `cc`, and therefore `gap`,
+    for a null-arity unit is **non-deterministic with respect to source/emit
+    order**, directly contradicting the skill's "fixed recipe … so selection is
+    reproducible" claim and the A1 grounding ("the join is total over the shared
+    key space").
+  - Every one of the 51 local `execute-effect!/null` rows then joins to that one
+    arbitrary surviving cc, so all share an identical (and likely wrong) `gap`.
+  - **Not currently latent-only by luck:** today no null-arity unit qualifies
+    (`lcc-total ≥ 5.0 ∧ gap ≥ 2.0`) — verified the qualifying set contains no
+    `arity == null` unit — so the live top-5 is unaffected. But the recipe is the
+    skill's central reproducibility artifact and the workflow runs it on every
+    invocation against evolving code; a future high-burden null-arity defmethod
+    would be mis-ranked or falsely qualified/disqualified with a non-reproducible
+    `gap`.
+  - Mitigation options for the skill recipe: (a) **exclude `null`-arity units**
+    from candidacy explicitly (`select(.arity != null)`), documenting that
+    arity-aggregated defmethod units are out of scope for unit-level selection
+    (consistent with the single-`(ns,var,arity)`-unit scope); or (b) **group cc
+    by key and reduce** (e.g. `max`/`sum` cc per key) so the join is total and
+    order-independent rather than last-wins; or (c) re-key on something unique
+    (e.g. include `line`) if per-method granularity is wanted. Whichever is
+    chosen, the recipe must stop relying on last-wins `from_entries` over a
+    non-unique key, and the A1 "total over the shared key space" wording should
+    be corrected to acknowledge null-arity key collisions. The fix is confined to
+    the skill's recipe + its A1/A4 prose; no workflow/test change is forced
+    beyond optionally asserting the recipe is deterministic.
+
+Non-actionable observations (no follow-up):
+- D1 (the `.md`→`.edn` wrapper-form deviation) remains correct and
+  runtime-justified; `implement-task-in-worktree.md` is still a live load error
+  but is a pre-existing repo bug, correctly scoped out of 204.
+- F1's documented residual (the inner `lifecycle` `:delegate` still fires on a
+  `NO_TARGET` input because the grammar has no skip) is engine-bounded and
+  correctly mitigated at the authoritative terminal `summary` step; no new
+  action.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK.
