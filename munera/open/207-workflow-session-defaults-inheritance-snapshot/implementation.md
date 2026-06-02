@@ -1702,3 +1702,47 @@ green (11 tests, 59 assertions, 0 failures via `clojure -M:test --focus`);
 `clj-kondo` clean (0 errors / 0 warnings) on the touched file. No new actionable
 follow-up items — the T7 gap is the only item this review pass added, and it is
 now closed.
+
+## Test-shaper review (ψ, 2026-06-02 — post-T7, pass 8)
+
+Re-applied `test-shaper` after T7 committed (`69fe49ec0`). Tree clean. Re-read
+the full 207 test surface (`inheritance_snapshot_test.clj`,
+`workflow_runtime/core_test.clj`, `canonical_workflows_snapshot_test.clj`,
+`workflow_child_session_context_test.clj`). Focused suites green: 16 tests,
+102 assertions, 0 failures.
+
+Quality: HIGH. simple ∧ consistent ∧ robust ∧ economical ∧ deterministic all
+hold. Real ctx/state throughout; nullable adapters at infra boundary only
+(no-mock). State/behavior assertions only, no interaction assertions. Every
+`is` carries a meaningful failure message. Distinguishing-value assertions
+(snapshot-vs-live for model/prompt/speed/effort/tools/skills, and model-query
+selection winner) prove the actual isolation contract, not shape. Positive +
+negative controls for both the `:inherited-snapshot?` flag (child-session) and
+the no-snapshot live-parent fallback. AC1–9 each map to a focused test, now
+including the direct nested-path isolation test T7 added.
+
+AC coverage confirmed: AC1/AC2 (snapshot-isolates-resolution-…), AC3 model
+(same test) + tools/skills (snapshot-isolates-tools-skills-…), AC4 propagation
+(nested-delegation-effective-…, delegate-step-runtime-result-persists-…) +
+isolation (nested-delegation-isolates-child-snapshot-…, T7), AC5
+(snapshot-preserves-explicit-step-override-…), AC6 (no-snapshot-falls-back-…),
+AC7 (snapshot-model-feeds-model-query-…), AC8 (core_test resume-run-test
+"AC8" block — reuses original snapshot verbatim), AC9 (create-run-persists-…
++ schema validation). Field-set authority drift guarded by
+inherited-defaults-field-set-authority-test against common-inherited-fields /
+model-identity-fields. Decision 5b fresh-snapshot capture covered by
+continue-terminal-run-captures-fresh-snapshot-test with a production-like
+session-id-injecting mutate!.
+
+One candidate smell considered and judged NON-actionable: the injected
+`resolve-inherited-defaults-fn` closure (the `effective-config->snapshot ∘
+resolve-step-session-config` mirror of `context.clj`) is defined verbatim in
+two nested e2e tests (delegate-…-persists-… and nested-delegation-isolates-…).
+Extracting it to a shared helper would WEAKEN the isolation test — that test's
+proof is precisely that this closure structure reads
+`(:inherited-defaults workflow-run*)` and not the live session, so the closure
+should remain visible at the test site, not hidden behind a helper
+(`¬helpers_that_hide(intent)`). The duplication is local-comprehensibility-
+preserving, not incidental ceremony. No follow-up.
+
+No new actionable test-shaper findings. Review complete.
