@@ -333,3 +333,50 @@ summary), `task-lifecycle.edn` (5 sub-workflows, each reads
 
 Added P1–P4 as unchecked follow-up items to steps.md. PASS_STATUS:
 ACTIONABLE_FEEDBACK.
+
+## 2026-06-01 — Plan/steps ambiguity (pass 1) follow-up executed (P1–P4)
+
+Executed the four newly-added unchecked `steps.md` follow-up items (P1–P4) from
+the pass-1 plan/steps ambiguity review. All four are plan/steps **specification**
+resolutions — the slices they touch are not yet built (no Slice 1–5 items
+checked), so no code/test/doc files outside the task artifacts were changed.
+Slices 1–5 themselves predate this review pass and were left untouched.
+
+- **P1 — wrapper `summary` step.** Resolved **add** (three-step wrapper). Deciding
+  criterion = outer step-2 (the delegate into `task-lifecycle-in-worktree`) is the
+  `reduce-incidental-complexity` workflow's **terminal** step, so the workflow
+  needs a user-facing terminal summary; the wrapper's `summary` step is where it
+  is produced — exactly why `implement-task-in-worktree.md` keeps its third step.
+  Verified `implement-task-in-worktree.md` is in fact a **three-step** wrapper
+  (resolve-worktree → implement → summary), and corrected plan.md's grammar-anchor
+  bullet which had mischaracterized it as "two-step". Propagated: steps.md Slice-2
+  creation item (+ explicit `summary` step item), Slice-4 wrapper-shape assertion
+  (two-step → three-step), plan.md Slice 2 + Slice 4 descriptions + the
+  grammar-anchor note. The design's "thin two-step adapter" framing is recorded as
+  superseded by P1 (design.md left untouched — design review already
+  REVIEW_COMPLETE; superseding note lives in plan/steps).
+
+- **P2 — two `local` invocations.** Resolved by annotating both sites in steps.md:
+  the `--sort total` call (line ~8) is selector-only ranking display; the
+  `before-local.json` capture uses **bare** `bb gordian local --json` (no
+  `--sort`). Because the Phase-1 before/after comparison is keyed by
+  `(ns, var, arity)`, sort order is irrelevant to baseline validity — the two
+  invocations are intentionally different and the baseline is valid regardless of
+  sort. Carries the design inconsistency-review conclusion into steps.
+
+- **P3 — task-id allocation scan root.** Resolved on the Slice-3
+  task-id-allocation step: NNN is allocated by scanning the **worktree's**
+  `munera/open/ ∪ munera/closed/` (the `origin/master`-based checkout where
+  `work-on` is already active), per Munera `alloc → max(NNN over open/ ∪ closed/)
+  + 1` — **not** the outer checkout — avoiding collision with the outer checkout's
+  open tasks (e.g. 204 itself).
+
+- **P4 — task-creation commit location.** Resolved on the Slice-3 commit step: the
+  task dir is created **and committed on the `work-on` worktree branch** (off
+  `origin/master`). `munera_task_path:` resolves for step-2's
+  `resolve-worktree`/`work-on` only because allocation, dir creation, and commit
+  all happen inside the worktree branch (not the outer checkout).
+
+P1–P4 checked in steps.md. PASS_STATUS: REVIEW_COMPLETE. No code/test/doc outside
+task artifacts touched (slices unbuilt). design.md untouched (design review
+complete; supersession recorded in plan/steps).
