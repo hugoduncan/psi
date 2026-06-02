@@ -2623,3 +2623,60 @@ items that predate the preceding review pass" instruction.
 
 Pure steps.md/implementation.md bookkeeping; no code, test, EDN, or doc change.
 PASS_STATUS: REVIEW_COMPLETE.
+
+## 2026-06-01 — Implementation review (independent confirming pass, task-implementation-review skill)
+
+◈ Independent re-review applying `task-implementation-review` (matches(code,design)
+∧ follows(architecture) ∧ ¬redundant-pattern ∧ ¬unnecessary-abstraction
+∧ ¬structural-perf-issue). Verified live against artifacts, tests, lint, and
+file-length gate — not the worklog alone.
+
+Confirmed sound (no new actionable issue):
+- **design↔artifact match.** SKILL.md encodes the `gap = lcc-total / max(cc,1)`
+  method, the `(ns,var,arity,line)` `@line` inner-join recipe (A1 determinism
+  rationale), `lcc-total ≥ 5.0 ∧ gap ≥ 2.0` filter, `sort_by(-.gap)` + `.[0:5]`
+  top-5 guard, evidence + coverage-hint, single-unit scope. The frontmatter
+  lambda keys on `join(ns,var,arity,line)` (F5). `reduce-incidental-complexity.edn`
+  = two-step select+create / delegate with early-stop; the generated-design
+  template embeds the two-phase contract, both baselines, the worktree-relative
+  gate `--baseline` path, and the `--fail-on …` flags verbatim; A5/A2 key on
+  `(ns,var,arity,line)` (F3). `design.md` selector step 2 keys on the same (F4);
+  Verified-facts names `review-implementation-in-worktree.edn` as the loadable
+  precedent (F6).
+- **data-flow shapes consistent.** Outer step-2 `:prompt-string {:type :map
+  :fields {:input {:from {:step "select-and-create" :yield :text}}}}` → `{:input
+  "<handoff>"}`; wrapper `resolve-worktree` reads `{:from :workflow-input :path
+  [:input]}` to extract it. Outer `:delegate :context` carries workflow-original
+  + select-and-create yield; wrapper `lifecycle :context` is workflow-original
+  only (TR13/TR14). Wiring is the verified pattern; no `one_way` violation.
+- **pattern reuse, not invention.** Wrapper is structurally identical to the
+  loadable `review-implementation-in-worktree.edn` (resolve-worktree
+  `:session`+`work-on` → `:delegate` → `summary`), with `task-lifecycle`
+  substituted and a sound F1 NO_TARGET short-circuit. No unnecessary abstraction;
+  no structural performance issue (data-only artifacts).
+- **early-stop is sound.** Grammar has no conditional/skip; step-2 always runs.
+  Step-1 early-stop emits a free-form no-target report (no `worktree_path:`/
+  `munera_task_path:` lines), so the wrapper's `resolve-worktree` NO_TARGET branch
+  (no `work-on`) and `summary` NO_TARGET branch (no task inspection) both engage
+  correctly (F1).
+- **CI green (live).** Focused suite — `task-204-workflow-definitions-test` +
+  `incidental-complexity-finder-skill-test` + `workflow-definitions-test` —
+  **18 tests, 261 assertions, 0 failures**. `clj-kondo --lint` on both EDN
+  workflows + all three task-204 test nss: **0 errors, 0 warnings**.
+  `bb commit-check:file-lengths` clean (workflow_definitions 593,
+  task_204 277, skill-test 340 — all < 800).
+- **docs coherent.** `doc/workflows.md` (§Incidental-complexity simplification)
+  and `CHANGELOG [Unreleased] → Added` describe the two-step workflow, the
+  three-step wrapper, the `(ns,var,arity,line)` join, thresholds, baselines,
+  the no-push/PR endpoint, and the NO_TARGET prompt-level handling — all matching
+  the live artifacts.
+- **prior actionable items all closed.** F1–F6, TR1–TR15, R6 (file-length split,
+  `f9f1c5128`), and IR1 (steps.md bookkeeping) are resolved and verified; the
+  preceding independent pass already reached REVIEW_COMPLETE after IR1.
+
+No new actionable implementation issues found. The only unchecked steps.md item
+is the pre-existing non-planned Contingency (split step-1 selection from
+task-creation) — never triggered (step-1 is not unwieldy), correctly left
+unchecked; not an outstanding implementation defect.
+
+PASS_STATUS: REVIEW_COMPLETE.
