@@ -465,3 +465,39 @@ All five slices implemented; all `steps.md` items checked. Surfaces:
 - CHANGELOG + `doc/tui.md` updates.
 Tests: `reload_prompts_test.clj` (6 tests / 22 assertions) + command/help tests
 in `commands_test.clj`. Full `bb test` green. AC1–AC9 all satisfied.
+
+## Implementation review (2026-06-01)
+
+Reviewed the built code (not design/plan — already reviewed) against design.md
+and architecture: design-fit, one-way/architecture, new-vs-reusable patterns,
+unnecessary abstraction, structural perf. Sources: AGENTS.md (VSM, dispatch
+sequencing, one-way), design.md, and the live tree.
+
+Verified (no actionable findings):
+- ✅ Design-fit. Handler (`session_mutations.clj:289-301`), mutation
+  (`mutations/prompts.clj:34-45` + `all-mutations`), command
+  (`commands.clj:268-276`, `exact-command-handlers`, `case`, `/help`), core
+  re-export (`core.clj:187-192`), settings fn (`session_settings.clj:157-162`)
+  all match design exactly. Discovery opts identical to the design's pinned map
+  (`:global-prompts-dir` explicit from `default-config`,
+  `:project-prompts-dir` = `<worktree>/.psi/prompts`, no `:extra-paths`/`:disabled`).
+- ✅ Architecture. Writes via `:session/reload-prompts` dispatch; pure handler
+  with in-handler discovery IO returning a single `:root-state-update` wholesale
+  replace (mirrors `set-skills`/`set-active-tools`); no effects (templates are
+  `/name`-invoked, not system-prompt-enumerated); reuses `discover-templates`
+  (no new shim/adapter). Command/mutation share one `core/reload-prompts-in!`
+  re-export, mirroring the `reload-models` surface pair.
+- ✅ No reinvented pattern, no unnecessary abstraction — the thin settings-fn +
+  core re-export is the established reload idiom, not gratuitous.
+- ✅ Robustness. `discover-template-files` returns empty for absent dirs
+  (`(.exists d)` guard) — reload of a worktree with no `.psi/prompts` yields an
+  empty set, no crash.
+- ✅ Perf. Synchronous disk IO on the dispatch thread is manual/infrequent and
+  mirrors `/reload-models`; acknowledged in plan risks. Not a structural issue.
+- ✅ Tests. `reload_prompts_test.clj` (6 deftests) covers AC1–AC9 incl. the live
+  psi-tool `action: "mutate"` resolution path (AC5) and worktree-rooted
+  edit/add/delete (AC1–AC3, AC6). `clj-kondo` 0/0 over changed files;
+  `bb test` green (re-run).
+
+Result: no new actionable implementation-level feedback. Implementation is
+high-quality, design-faithful, architecturally aligned, and well-tested.
