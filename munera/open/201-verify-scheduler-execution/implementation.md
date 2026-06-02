@@ -720,6 +720,13 @@ assertion count across the deliverable.
   the canonical full `bb test` run (each ns is green standalone). Pre-existing
   cross-namespace test-isolation artifact; not introduced by this step and not
   in scope for a doc-accuracy correction.
+  **[Superseded — see "Flaky-baseline timer-race fix" below.]** The
+  implementation-review pass re-classified this as a **real wall-clock timer
+  race** (not a benign cross-ns artifact): two `scheduler_dispatch_test` deftests
+  used the default `Thread/sleep`-daemon delay-fn while asserting `:scheduler-
+  timers*` state, and one interrupted the test-runner thread. The race was fixed
+  by migrating both to the deterministic `capturing-delay-fn` seam; the 13
+  scheduler ns now run together in isolation at 0 failures.
 
 ## Implementation review — pass 5 (2026-06-01)
 
@@ -2552,3 +2559,50 @@ characterisation in the Outcome + prior pass notes (the race is real under the
 canonical runner). Disagreement-with-pass-5 recorded: pass-5's "full `bb test`
 green" held only on lucky runs; the race is non-deterministic, so a single green
 observation does not establish green.
+
+## Flaky-baseline timer-race fix (implementation-review follow-up, 2026-06-01)
+
+Fixed the flaky cited baseline timer-race in `scheduler_dispatch_test.clj`
+flagged by the implementation-review pass. Both deftests now use the
+deterministic `capturing-delay-fn` seam instead of `make-session-ctx`'s default
+real `Thread/sleep`-daemon delay-fn:
+
+- `scheduler-create-stores-schedule-and-starts-timer-test` — now threads
+  `(assoc ctx :scheduler-run-after-delay-fn capture*)` (from
+  `test-support/capturing-delay-fn`), so the 1000ms timer is captured (not run
+  on a real daemon) and cannot fire → deliver → remove the handle before the
+  `(contains? @(:scheduler-timers* ctx) "sch-1")` membership assertion reads it.
+  Assertions unchanged (4 `is`).
+- `scheduler-cancel-marks-pending-or-queued-schedule-cancelled-test` — replaced
+  the `(swap! (:scheduler-timers* ctx) assoc "sch-1" (Thread/currentThread))`
+  handle seed with a non-Thread `{:handle :captured}` sentinel. `:scheduler/
+  cancel-timer` only `.interrupt`s a handle when `(instance? Thread handle)`
+  (`dispatch_effects.clj:244`); the sentinel hits the `:else nil` branch, so
+  cancel no longer interrupts the **test-runner thread** (which the prior
+  `(Thread/currentThread)` handle did, setting an interrupt flag that could
+  cross-contaminate sibling sleeping daemon timers). Assertions unchanged
+  (4 `is`).
+
+Verification: `scheduler-dispatch-test` green 3× in a row (5 tests / 19
+assertions / 0 failures). All 13 scheduler namespaces run **together in
+isolation** (`clojure -M:test --focus …` ×13) now report **50 tests / 339
+assertions / 0 failures**, stable across 2 runs — the prior "4 ordering-
+dependent failures in isolation" / "2 intermittent failures under the canonical
+kaocha runner" race is **gone**. Full `bb test` green. clj-kondo 0/0, cljfmt
+"All source files formatted correctly".
+
+**Correction to the pass-4 / pass-5 "pre-existing cross-ns isolation artifact"
+characterisation.** Those passes concluded the in-isolation-together failures
+were a benign non-kaocha test-isolation artifact out of 201's scope. The
+implementation-review pass correctly re-classified them as a **real wall-clock
+timer race** under the canonical runner (the two dispatch tests on the default
+`Thread/sleep` daemon while asserting timer state). With the seam migration the
+race is eliminated at its root — it was never a cross-ns ordering artifact but a
+single-test daemon/assertion race plus a runner-thread interrupt. The "all
+green" deliverable now holds deterministically (no lucky-run dependence).
+
+Assertion-count note: this fix added/removed **zero** assertions (both tests keep
+4 `is` each), so the aggregate scheduler-suite count is unchanged at
+**50 tests / 339 assertions** (`findings.md` Outcome figure stands). Test file +
+task-dir docs only — zero `components/agent-session/src/**` or
+`doc/scheduler.md` (Slice-10 allowlist held).

@@ -1624,7 +1624,7 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       correctly". Test file only — zero `components/agent-session/src/**` or
       `doc/scheduler.md` (Slice-10 allowlist held).
 
-- [ ] Fix the flaky cited baseline timer-race in `scheduler_dispatch_test.clj`
+- [x] Fix the flaky cited baseline timer-race in `scheduler_dispatch_test.clj`
       (implementation-review finding 2026-06-01). Two deftests intermittently
       fail under the canonical kaocha runner (`46 tests, 2 failures` one run,
       `0` on re-run) because they use `make-session-ctx`'s **default** real
@@ -1652,3 +1652,28 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       characterisation (the race is real under the canonical runner). Keep the
       full `bb test` green (re-run ≥3× to confirm non-flaky) + clj-kondo/cljfmt
       clean.
+      Done: migrated both deftests off the default `Thread/sleep`-daemon
+      delay-fn onto the deterministic `capturing-delay-fn` seam.
+      `scheduler-create-stores-schedule-and-starts-timer-test` now threads
+      `(assoc ctx :scheduler-run-after-delay-fn capture*)`, so the 1000ms timer
+      is captured (never run on a real daemon) → the schedule cannot fire →
+      deliver → remove the handle before the `:scheduler-timers*` membership
+      assertion reads it.
+      `scheduler-cancel-marks-pending-or-queued-schedule-cancelled-test`
+      replaced the `(Thread/currentThread)` handle seed with a non-Thread
+      `{:handle :captured}` sentinel — `:scheduler/cancel-timer` only
+      `.interrupt`s a `(instance? Thread handle)` (`dispatch_effects.clj:244`),
+      so the sentinel hits `:else nil` and cancel no longer interrupts the
+      test-runner thread (no cross-contamination of sibling daemon timers).
+      Assertions unchanged (4 `is` each) → aggregate stays **50 tests / 339
+      assertions**. Verified: `scheduler-dispatch-test` green 3× (5 tests / 19
+      assertions); all 13 scheduler ns run **together in isolation** now report
+      **50 tests / 339 assertions / 0 failures**, stable across 2 runs — the
+      prior in-isolation / intermittent-under-canonical-runner race is **gone**.
+      Full `bb test` green; clj-kondo 0/0; cljfmt "All source files formatted
+      correctly". Updated `findings.md` (Baseline seam row now cites both
+      dispatch tests as seam-driven) and corrected the pass-4/5
+      "pre-existing isolation artifact" characterisation in `implementation.md`
+      (the race was real, now fixed at its root). Test files + task-dir docs
+      only — zero `components/agent-session/src/**` or `doc/scheduler.md`
+      (Slice-10 allowlist held).

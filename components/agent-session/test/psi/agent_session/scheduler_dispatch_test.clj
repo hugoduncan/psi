@@ -18,7 +18,12 @@
 
 (deftest scheduler-create-stores-schedule-and-starts-timer-test
   (let [created-at       (test-support/instant "2026-04-21T12:00:00Z")
-        [ctx session-id] (test-support/make-session-ctx {})
+        [capture* _cb*]  (test-support/capturing-delay-fn)
+        [ctx0 session-id] (test-support/make-session-ctx {})
+        ;; Drive the timer via the deterministic capturing seam (no real
+        ;; Thread/sleep daemon) so the 1000ms timer cannot fire → deliver →
+        ;; remove the handle before we assert `:scheduler-timers*` membership.
+        ctx              (assoc ctx0 :scheduler-run-after-delay-fn capture*)
         fire-at          (.plusMillis created-at 1000)
         result           (session/dispatch-in! ctx :scheduler/create
                                                {:session-id session-id
@@ -40,7 +45,11 @@
         [ctx session-id] (test-support/make-session-ctx {:session-data {:session-id "sid-1"
                                                                         :scheduler {:schedules {"sch-1" initial-schedule}
                                                                                     :queue ["sch-1"]}}})
-        _                (swap! (:scheduler-timers* ctx) assoc "sch-1" (Thread/currentThread))
+        ;; Use a non-Thread sentinel handle (matching the capturing seam's
+        ;; `{:handle :captured}`) so cancel's `:scheduler/cancel-timer` does NOT
+        ;; `.interrupt` the test-runner thread (which a `(Thread/currentThread)`
+        ;; handle would, cross-contaminating sibling timer tests).
+        _                (swap! (:scheduler-timers* ctx) assoc "sch-1" {:handle :captured})
         result           (session/dispatch-in! ctx :scheduler/cancel
                                                {:session-id session-id
                                                 :schedule-id "sch-1"}

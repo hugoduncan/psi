@@ -67,6 +67,7 @@ deftests: `psi-tool-scheduler-create-list-cancel`,
 | ------ | ------- | ------------- | ---------------- |
 | verified-correct | Full scheduler suite present (13 test ns, 35 deftests, 338 assertions) and green against current behaviour. | all `scheduler_*_test.clj` + `psi_tool_scheduler_test.clj` (see inventory below) | — |
 | verified-correct | Deterministic time/timer seams available in `test_support/make-session-ctx` (`:scheduler-run-after-delay-fn`, `:scheduler-cancel-delay-fn`, `:scheduler-timers*`, `:daemon-thread-fn`); enable firing without wall-clock sleeps. | `scheduler_timer_seam_test.clj/scheduler-start-timer-uses-injected-time-source-and-delay-runner-test` (captures `delay-ms`+callback, invokes `(@callback*)`, asserts `:delivered`, zero wall-clock) | — |
+| verified-correct | `scheduler-dispatch-test` timer-state assertions are seam-driven (no real `Thread/sleep` daemon): `scheduler-create-stores-schedule-and-starts-timer` drives the timer via `capturing-delay-fn` and asserts `:scheduler-timers*` membership before any fire; `scheduler-cancel-marks-pending-or-queued-schedule-cancelled` uses a non-Thread `{:handle :captured}` sentinel so cancel cannot `.interrupt` the test-runner thread. Restores the design's controlled-time discipline (fixes the prior canonical-runner timer race). | `scheduler-dispatch-test/scheduler-create-stores-schedule-and-starts-timer`, `scheduler-dispatch-test/scheduler-cancel-marks-pending-or-queued-schedule-cancelled` | — |
 
 ### Inventory (ns → deftests)
 
