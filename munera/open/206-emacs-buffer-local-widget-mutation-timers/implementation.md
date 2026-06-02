@@ -420,3 +420,53 @@ claim it stands on.
 - Verification: `bb emacs:check` green (338/338, was 337; byte-compile clean);
   `.el` reloaded. No design.md change (code now matches the precedent the design
   already specifies).
+
+## Implementation review pass 2 (ψ)
+
+Independent re-review against the task-implementation-review skill
+(code↔design fit, architecture fit, new-pattern/abstraction/perf flags),
+grounded on current source and a full test run.
+
+Verified:
+- All design.md acceptance criteria met. Module-global
+  `psi-widget-projection--mutation-timers` gone (`git grep` clean, source +
+  tests). Struct field + init present (`psi-globals.el:73`,
+  `psi-lifecycle.el:59`).
+- Single explicit-`state` store-resolution rule holds: `--cancel-mutation-timer
+  (state tkey)` / `--arm-mutation-timer (state …)` resolve the store solely
+  from the passed `state`; the only `psi-emacs--state` token in lines 310–335
+  is a docstring reference, not a read. Arm captures `(current-buffer)` +
+  threads `buffer`/`state` into the `run-at-time` args
+  (`psi-widget-projection.el:330-335`).
+- `--on-mutation-timeout (buffer state …)` guard `(and (buffer-live-p buffer)
+  state)` matches the cited precedent
+  `psi-emacs--schedule-notification-dismiss` (`psi-projection.el:415`); R1 is
+  correctly resolved.
+- Response callback closes over dispatch-time `buffer`/`state`, guards
+  `buffer-live-p`, cancels/clears inside `with-current-buffer`
+  (`psi-widget-projection.el:380-389`). Confirmed the post-cancel lstate path
+  (`--get-lstate`/`--set-lstate`, which read dynamic `psi-emacs--state`,
+  `:138/:147`) is correct because `defvar-local psi-emacs--state` is rebound by
+  `with-current-buffer buffer` — exactly the ambiguity-review insight.
+- `--clear-mutation-timers (state)` mirrors `--clear-notification-lifecycle`
+  (`psi-projection.el:379`): outer `(when state)`, inner `(hash-table-p …)`,
+  maphash `cancel-timer`, `clrhash`. Correctly omits the notification-only
+  state resets (scoped to timers per design). Wired into teardown
+  (`psi-lifecycle.el:298`) and transcript reset (`:396`) with bare
+  `psi-emacs--state`, declared at `:28`.
+- Tests assert state (store contents, in-flight lstate, cancel calls) and cover
+  every required case: arm/cancel roundtrip, timeout clears-in-flight +
+  error-handler, dispatch arms, response cancels, cross-buffer-current response
+  targeting, dead-buffer + nil-state no-ops, teardown cancel, transcript-reset
+  clear, two-buffer independence. `cl-letf` substitutes only timer/RPC
+  infrastructure primitives — consistent with the suite idiom and
+  testing-without-mocks "infrastructure → controllable".
+- Changelog entry present and user-facing (`CHANGELOG.md:21`). File lengths
+  under limit (`psi-widget-projection.el` 529; timers-test 385).
+- `bb emacs:check`: 338/338 ERT pass, byte-compile clean.
+
+No new patterns warranting reuse-flags, no unnecessary abstractions, no
+structural/performance concerns. No new actionable issues. All prior
+follow-ups (B1, I1, P1–P3, N1, R1) confirmed resolved in code+tests.
+
+Verdict: REVIEW_COMPLETE.
