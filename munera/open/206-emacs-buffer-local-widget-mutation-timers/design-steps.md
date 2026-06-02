@@ -13,7 +13,7 @@
 
 ## Ambiguity review (ψ)
 
-- [ ] B1 — Specify the helper signatures and arm-path store-resolution rule.
+- [x] B1 — Specify the helper signatures and arm-path store-resolution rule.
       Post-change, `--cancel-mutation-timer` (today `(tkey)` against the global
       hash) must locate a buffer-local store and is called from three contexts:
       the inline pre-cancel inside `--arm-mutation-timer` (psi-widget-projection.el:303),

@@ -82,3 +82,36 @@ Not raised (plan-level / non-actionable): exact new struct field name + clear
 helper name (shape fixed by the `projection-notification-timers` mirror;
 naming is a plan concern); whether the widget clear helper also resets widget
 lstates/data (design clearly scopes it to "cancel and clear timers" only).
+
+## Ambiguity follow-up — B1 resolved (ψ)
+
+Resolved the helper-signature / arm-path store-resolution ambiguity by adopting
+the notification precedent's explicit-`state` pattern. Grounded in
+`psi-emacs--cancel-notification-timer (state notification-id)`
+(psi-projection.el:368), which resolves the store from the *passed* `state`,
+never from dynamic `psi-emacs--state`.
+
+Single store-resolution rule applied across all three cancel/arm call sites:
+the store is always resolved from an explicitly passed `state` argument; the
+helpers never dereference dynamic `psi-emacs--state`. Sites differ only in which
+`state` they pass:
+- arm + inline pre-cancel (psi-widget-projection.el:300/303): pass the
+  then-current dynamic `psi-emacs--state` (captured at the synchronous call
+  boundary while the originating buffer is current).
+- response callback (:354) and timeout callback (:317): pass the captured
+  originating `state` after a `buffer-live-p` guard, per
+  `psi-emacs--schedule-notification-dismiss`.
+
+design.md updates:
+- Scope: pinned helper signatures `--cancel-mutation-timer (state tkey)` and
+  `--arm-mutation-timer (state ext-id widget-id node-key timeout-ms)`.
+- Constraints: replaced the callback-only "neither callback may dereference
+  `psi-emacs--state`" rule with a single store-resolution rule covering all
+  three sites (arm, inline pre-cancel, both callbacks).
+- Acceptance: added a criterion that the helpers resolve the store solely from
+  the passed `state` and no site reads dynamic `psi-emacs--state` for store
+  resolution.
+
+This makes the cancel helper safely shared between dynamic-current and
+captured-buffer contexts (`one_way → singular(solution)`). No code changes
+(design-only task).

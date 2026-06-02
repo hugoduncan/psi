@@ -55,7 +55,16 @@ In scope:
   `projection-notification-timers` field: a hash table created in
   `psi-emacs--initialize-state`).
 - Rework `psi-widget-projection.el` timer arming/cancelling/timeout to read and
-  write that buffer-local store instead of the module-global `defvar`.
+  write that buffer-local store instead of the module-global `defvar`. The
+  cancel and arm helpers take the target `state` explicitly (mirroring
+  `psi-emacs--cancel-notification-timer (state notification-id)`):
+  - `psi-widget-projection--cancel-mutation-timer (state tkey)` — resolves the
+    timer store from the *passed* `state`, never from the dynamic
+    `psi-emacs--state`. This single signature serves all three call sites; only
+    the `state` argument differs per site.
+  - `psi-widget-projection--arm-mutation-timer (state ext-id widget-id node-key
+    timeout-ms)` — arms against the passed `state`'s store and performs its
+    inline pre-cancel via `--cancel-mutation-timer` with that same `state`.
 - Cancel and clear all widget mutation timers in `psi-emacs--teardown-buffer`,
   alongside the existing timer-cancellation calls.
 - Decide and apply explicit buffer-targeting for **both** callbacks that touch
@@ -95,12 +104,24 @@ Out of scope:
 - Follow the existing `projection-notification-timers` shape and lifecycle as the
   consistency reference (creation in `initialize-state`, cancel-all in a
   `clear-*` helper, invoked from teardown and transcript reset).
-- Both timer-store mutators — the timeout watchdog and the RPC response callback
-  — follow the `psi-emacs--schedule-notification-dismiss` precedent: capture the
-  originating `buffer`/`state` at arm/dispatch time, guard with `buffer-live-p`,
-  and operate inside `with-current-buffer buffer` (or against the captured
-  `state` directly) rather than the dynamic `psi-emacs--state`. Neither callback
-  may dereference `psi-emacs--state` to locate the store it cancels/clears.
+- Single store-resolution rule for all three cancel/arm call sites: the store is
+  always resolved from an **explicitly passed `state`** argument, never read from
+  the dynamic `psi-emacs--state` inside the helper. The three sites differ only
+  in *which* `state` they pass:
+  - The inline pre-cancel inside `--arm-mutation-timer` and the arm itself run
+    synchronously while the originating buffer is current, so they pass the
+    then-current dynamic `psi-emacs--state` as the `state` argument (captured at
+    the call boundary). The helpers themselves remain dynamic-state-free.
+  - The `--dispatch-mutation` RPC **response** callback and the timeout watchdog
+    callback both follow the `psi-emacs--schedule-notification-dismiss`
+    precedent: capture the originating `buffer`/`state` at arm/dispatch time,
+    guard with `buffer-live-p`, and pass that captured `state` to
+    `--cancel-mutation-timer`/the clear path — operating inside
+    `with-current-buffer buffer` (or against the captured `state` directly).
+  Because the cancel/arm helpers resolve the store solely from their `state`
+  argument, no call site (arm, inline pre-cancel, response callback, or timeout
+  callback) ever dereferences the dynamic `psi-emacs--state` to locate the store
+  it touches.
 - Per `psi-emacs--reset-transcript-state` semantics, also clear widget mutation
   timers on transcript reset (`/new`, reconnect) where notification timers are
   already cleared, since the widgets they watch are discarded there too.
@@ -116,6 +137,10 @@ Out of scope:
 
 - `psi-widget-projection--mutation-timers` is no longer a module-global mutable
   store; widget mutation timers are held in buffer-local `psi-emacs-state`.
+- The cancel/arm helpers resolve the timer store solely from an explicitly
+  passed `state` argument; no helper or call site (arm, inline pre-cancel,
+  response callback, timeout callback) reads the dynamic `psi-emacs--state` to
+  locate the store it cancels/arms/clears.
 - `psi-emacs--teardown-buffer` cancels and clears all widget mutation timers for
   the buffer being killed; after kill, none of that buffer's widget watchdogs
   remain scheduled.
