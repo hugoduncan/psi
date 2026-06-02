@@ -128,6 +128,21 @@
                                 (:from %))
                             (:contributions summary-step)))
                "summary sources the resolve-worktree :yield :text so it can detect NO_TARGET")))
+       ;; TR19 (pass 15 — test-shaper): lock the summary's *substantive* NO_TARGET
+       ;; contract (symmetric to TR10's positive-path lock). The .contains
+       ;; "NO_TARGET" assertion above proves only that the sentinel is mentioned;
+       ;; a regress that detects the sentinel but still inspects/invents task
+       ;; artifacts (or reports lifecycle outcomes) on a no-target run passes
+       ;; green. Lock the no-target behavioural contract substrings.
+       (testing "summary prompt reports the substantive NO_TARGET contract (TR19)"
+         (let [summary-text (step-template-text summary-step)]
+           (is (.contains summary-text "ignore the `lifecycle` step output entirely")
+               "summary ignores the lifecycle output entirely on a no-target run")
+           (is (.contains summary-text
+                          "no worktree was created, no task was created, and no lifecycle ran")
+               "summary reports that no worktree/task/lifecycle occurred on a no-target run")
+           (is (.contains summary-text "Do not inspect or invent task artifacts")
+               "summary does not inspect or invent task artifacts on a no-target run")))
        ;; TR10 (pass 8): lock the summary's positive-path terminal contract
        ;; (symmetric to TR7). On a real munera/... path summary inspects the task
        ;; artifacts and reports the design → plan → implement → review run, the

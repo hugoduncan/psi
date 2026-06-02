@@ -2850,3 +2850,40 @@ no-target *summary* contract has no equivalent lock. Per test-shaper
 
 Both are test-only additions (no production change); the artifacts (skill +
 workflows) are correct as-is — these only strengthen the regression net.
+
+## Pass-15 test-review resolutions (TR18 / TR19)
+
+### TR18 — inclusive `>=` boundary lock (RESOLVED)
+Added `incidental-complexity-finder-recipe-boundary-inclusivity-test` to
+`incidental_complexity_finder_skill_test.clj` (test-only; same ns, no new ns /
+no production Clojure). Feeds two units on the exact thresholds via the existing
+`run-jq-recipe` + `named-{local,cc}-unit-json` harness:
+- `edge/gapedge` — lcc 10.0, cc 5 → gap **exactly 2.0** (gap boundary)
+- `edge/lccedge` — lcc 5.0, cc 1 → lcc **exactly 5.0**, gap 5.0 (lcc boundary)
+Both must survive the qualification filter; a `>=`→`>` (strict) regress drops
+either boundary unit. jq-absent fallback re-asserts the
+`select(.["lcc-total"] >= 5.0 and .gap >= 2.0)` fragment (mirrors TR12/16/17),
+so the regress fails green whether or not jq is installed. Skill-test file 442
+lines (< 800).
+
+### TR19 — substantive NO_TARGET summary contract lock (RESOLVED)
+Added a "summary prompt reports the substantive NO_TARGET contract (TR19)"
+`testing` block to `task-lifecycle-in-worktree-test` in
+`task_204_workflow_definitions_test.clj` (test-only; same ns, no production/EDN
+change). Asserts three `summary-text` substrings already present verbatim in the
+EDN summary template: `ignore the \`lifecycle\` step output entirely`,
+`no worktree was created, no task was created, and no lifecycle ran`, and
+`Do not inspect or invent task artifacts`. Symmetric companion to TR10's
+positive-path terminal contract lock. task-204 definitions file 292 lines
+(< 800).
+
+### Verification (pass-15)
+Focused suite (both task-204 test nss):
+`clojure -M:test --config-file tests.edn --focus
+psi.workflow-loader.incidental-complexity-finder-skill-test --focus
+psi.workflow-loader.task-204-workflow-definitions-test` → **10 tests, 117
+assertions, 0 failures**. `clj-kondo` 0 findings on both files;
+`clj-paren-repair` Success on both; `bb commit-check:file-lengths` exit 0
+(442 + 292 both < 800). Both additions are test-only — the skill recipe and
+wrapper EDN are unchanged (already correct); these strengthen the regression net
+only.

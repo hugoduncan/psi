@@ -407,3 +407,36 @@
         ;; so a regress is still caught structurally.
         (is (.contains recipe "select(.[\"lcc-total\"] >= 5.0 and .gap >= 2.0)")
             "recipe carries the qualification filter whose empty result is the early-stop signal")))))
+
+(deftest incidental-complexity-finder-recipe-boundary-inclusivity-test
+  ;; TR18 (test review pass 15 — test-shaper): the qualification filter
+  ;; `select(.["lcc-total"] >= 5.0 and .gap >= 2.0)` is exercised only well above
+  ;; (lcc 30 / gap 7.5) and well below (gap 1.5, lcc 4.0) the thresholds, so the
+  ;; inclusive `>=` boundary is unproven — a regress `>=` -> `>` (strict) passes
+  ;; every existing test green. Feed units that sit EXACTLY on each boundary and
+  ;; assert they survive the filter (inclusive `>=`, not strict `>`).
+  (let [{:keys [skill]} (incidental-complexity-finder-skill)
+        body (slurp (io/file (:file-path skill)))
+        recipe (extract-jq-recipe body)]
+    (is (some? recipe) "the join/gap jq recipe is extractable from SKILL.md")
+    (if (try (zero? (:exit (shell/sh "jq" "--version"))) (catch Exception _ false))
+      (testing "qualification filter is inclusive at the exact thresholds (>=, not >)"
+        ;; gapedge:  lcc 10.0, cc 5 -> gap exactly 2.0 (gap == 2.0 boundary)
+        ;; lccedge:  lcc 5.0,  cc 1 -> lcc exactly 5.0, gap 5.0 (lcc == 5.0 boundary)
+        ;; A strict `>` regress drops either boundary unit.
+        (let [{:keys [exit out err]}
+              (run-jq-recipe recipe
+                             [(named-local-unit-json "edge" "gapedge" 10 "10.0")
+                              (named-local-unit-json "edge" "lccedge" 20 "5.0")]
+                             [(named-cc-unit-json "edge" "gapedge" 10 5)
+                              (named-cc-unit-json "edge" "lccedge" 20 1)])]
+          (is (zero? exit) (str "recipe runs cleanly; stderr: " err))
+          (is (re-find #"\"var\":\s*\"gapedge\"" out)
+              "a unit with gap exactly 2.0 survives the inclusive gap >= 2.0 filter")
+          (is (re-find #"\"var\":\s*\"lccedge\"" out)
+              "a unit with lcc-total exactly 5.0 survives the inclusive lcc-total >= 5.0 filter")))
+      (testing "jq unavailable — inclusive boundary asserted structurally on the recipe"
+        ;; The inclusive boundary is the `>=` operators in the qualification
+        ;; filter; a strict `>` regress changes this fragment. Lock it.
+        (is (.contains recipe "select(.[\"lcc-total\"] >= 5.0 and .gap >= 2.0)")
+            "recipe carries the inclusive (>=) qualification filter at both thresholds")))))

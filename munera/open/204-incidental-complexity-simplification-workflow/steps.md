@@ -1165,7 +1165,7 @@ with the commit sha / decision when done.
 
 ## Test review follow-ups (review pass 15 — test-shaper)
 
-- [ ] TR18 — Pin the qualification filter's inclusive `>=` boundary at the exact
+- [x] TR18 — Pin the qualification filter's inclusive `>=` boundary at the exact
       threshold in `incidental_complexity_finder_skill_test.clj`. The recipe
       filter `select(.["lcc-total"] >= 5.0 and .gap >= 2.0)` is exercised only
       well above (lcc 30 / gap 7.5) and well below (gap 1.5, lcc 4.0) the
@@ -1180,8 +1180,23 @@ with the commit sha / decision when done.
       (the filter fragment is locked there). Verify focused skill-test suite +
       `clj-kondo` + `clj-paren-repair` green and `bb commit-check:file-lengths`
       clean.
+      RESOLUTION: added a new sibling deftest
+      `incidental-complexity-finder-recipe-boundary-inclusivity-test` in the
+      skill-test ns (test-only; no new ns / no production Clojure), reusing
+      `run-jq-recipe` + `named-{local,cc}-unit-json`. Feeds two units sitting
+      **exactly** on each boundary — `gapedge` (lcc 10.0, cc 5 → gap exactly
+      2.0) and `lccedge` (lcc 5.0, cc 1 → lcc exactly 5.0, gap 5.0) — and asserts
+      both **survive** the qualification filter, proving the `>=` is inclusive
+      (a strict `>` regress drops either boundary unit). jq-absent fallback
+      re-asserts the `select(.["lcc-total"] >= 5.0 and .gap >= 2.0)` fragment
+      (mirrors TR12/TR16/TR17), so the `>=`→`>` regress fails green whether or
+      not jq is installed. Focused suite green (skill-test +
+      task-204 definitions: 10 tests, 117 assertions, 0 failures); `clj-kondo` 0
+      findings; `clj-paren-repair` Success; skill-test file 442 lines (< 800);
+      `bb commit-check:file-lengths` exit 0. (See implementation.md pass-15
+      test-review TR18 entry.)
 
-- [ ] TR19 — Lock the wrapper `summary` step's substantive NO_TARGET contract in
+- [x] TR19 — Lock the wrapper `summary` step's substantive NO_TARGET contract in
       `task_204_workflow_definitions_test.clj`
       (`task-lifecycle-in-worktree-test`). The existing "summary prompt detects
       NO_TARGET" assertion locks only `.contains "NO_TARGET"` + the
@@ -1195,3 +1210,18 @@ with the commit sha / decision when done.
       symmetric companion to TR10 (positive-path terminal contract). Verify
       focused task-204 workflow-definition suite + `clj-kondo` + `clj-paren-repair`
       green and `bb commit-check:file-lengths` clean.
+      RESOLUTION: added a new `testing` block to `task-lifecycle-in-worktree-test`
+      (same ns, test-only, no production/EDN change) — "summary prompt reports the
+      substantive NO_TARGET contract (TR19)" — asserting three `summary-text`
+      substrings present verbatim in the EDN summary template: "ignore the
+      \`lifecycle\` step output entirely" (the lifecycle output is discarded on a
+      no-target run), "no worktree was created, no task was created, and no
+      lifecycle ran" (the substantive no-target report), and "Do not inspect or
+      invent task artifacts" (the no-fabrication guard). Symmetric companion to
+      TR10's positive-path terminal contract lock — a regress that detects the
+      sentinel but still inspects/invents artifacts or reports lifecycle outcomes
+      on a no-target run now fails green. Focused suite green (skill-test +
+      task-204 definitions: 10 tests, 117 assertions, 0 failures); `clj-kondo` 0
+      findings; `clj-paren-repair` Success; task-204 definitions file 292 lines
+      (< 800); `bb commit-check:file-lengths` exit 0. (See implementation.md
+      pass-15 test-review TR19 entry.)
