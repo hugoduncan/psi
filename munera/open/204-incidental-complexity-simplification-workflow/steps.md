@@ -984,3 +984,47 @@ with the commit sha / decision when done.
       (+1 over pass-11's 25); full definitions ns 13 tests, 212 assertions, 0
       failures (+1 over pass-11's 211); `clj-kondo` 0 findings; `clj-paren-repair`
       Success; `bb commit-check:file-lengths` clean (797 < 800).
+
+## Test review follow-ups (review pass 13 — test-shaper)
+
+- [x] TR15 — `reduce-incidental-complexity-test` never locks the
+      `select-and-create` `:session` step's `{{input}}` → `:workflow-input`
+      wiring. Step 1 carries `:vars {"input" {:from :workflow-input}}` and the
+      prompt ends `Input:\n{{input}}` — this is the workflow's entry-point
+      data-flow contract (top-level workflow input reaches the selection step's
+      prompt). Its sibling tests already lock the analogous wiring:
+      `task-lifecycle-in-worktree-test` asserts
+      `(step-has-input-var-wired? resolve-step)` for the wrapper's first step,
+      and the design's handoff chain depends on the outer step receiving its
+      input. But the outer `select-and-create` step's input wiring is uncovered:
+      a regress dropping `:vars`/the `{{input}}` template (or mis-wiring `input`
+      to a non-`:workflow-input` source) passes every existing
+      `reduce-incidental-complexity-test` assertion green. Per test-shaper
+      `behavior_focused` (entry-point input flow is observable and
+      design-significant) + `meaningful_failures` (the regress fails silently) +
+      `consistent` (the sibling wrapper test already locks the analogous wiring
+      via `step-has-input-var-wired?`), this is a coverage gap. Fix: add an
+      assertion (or `testing` block) to `reduce-incidental-complexity-test`
+      asserting `(step-has-input-var-wired? select-step)`, mirroring the
+      wrapper test's `resolve-step` lock. Test-only, no production/EDN change;
+      `workflow_definitions_test.clj` is 797 lines — keep the edit under the
+      800 `components/` guard. Run focused suite + `clj-kondo`.
+      RESOLUTION: added a `testing` block to `reduce-incidental-complexity-test`
+      (same ns, test-only, no production/EDN change) — "select-and-create wires
+      {{input}} to the bare :workflow-input (TR15)" — asserting (a) the step's
+      template references `{{input}}` and (b) its `:vars["input"]` equals
+      `{:from :workflow-input}`. **Discovery:** the outer step wires `input` to
+      the **bare** top-level `:workflow-input` (no `:path`), distinct from the
+      wrapper steps' `{:from :workflow-input :path [:input]}` (which select the
+      `:input` field of a delegated `:map`). So `step-has-input-var-wired?`
+      (which requires the `:path [:input]` shape) could NOT be reused — it
+      returned false for this step (verified by a failing first attempt);
+      asserted the actual shape directly instead. A regress dropping `:vars`/the
+      `{{input}}` template, or mis-wiring to a non-`:workflow-input` source, now
+      fails green. File-length guard: the new block + comment pushed
+      `workflow_definitions_test.clj` from 797 to 814 lines (> 800 `components/`
+      guard); trimmed verbose prose headroom in the TR7/TR8/TR10/TR11/TR13/TR14/
+      TR2 comment blocks (assertions untouched) → file now exactly **800** lines
+      (`bb commit-check:file-lengths` clean). Focused green: 18 tests, **261
+      assertions** (+2 over pass-12's 259), 0 failures; `clj-kondo` 0 findings;
+      `clj-paren-repair` Success.

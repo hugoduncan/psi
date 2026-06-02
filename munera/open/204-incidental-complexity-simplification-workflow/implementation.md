@@ -2377,3 +2377,64 @@ Verification:
 - `bb commit-check:file-lengths`: clean (797 < 800).
 
 TR14 checked in steps.md. PASS_STATUS: REVIEW_COMPLETE.
+
+## Test review pass 13 (test-shaper)
+
+TR15 — `reduce-incidental-complexity-test` never locked the `select-and-create`
+`:session` step's `{{input}}` → `:workflow-input` wiring. Step 1 carries
+`:vars {"input" {:from :workflow-input}}` and the prompt ends `Input:\n{{input}}`
+— the workflow's entry-point data-flow contract (top-level workflow input
+reaches the selection step's prompt). The sibling `task-lifecycle-in-worktree-test`
+already locks the analogous wiring for the wrapper's first step via
+`(step-has-input-var-wired? resolve-step)`, but the outer step's input wiring
+was uncovered: a regress dropping `:vars`/the `{{input}}` template (or mis-wiring
+`input` to a non-`:workflow-input` source) passed every existing
+`reduce-incidental-complexity-test` assertion green. Per test-shaper
+`behavior_focused` (entry-point input flow is observable and design-significant)
++ `meaningful_failures` (the regress fails silently) + `consistent` (the sibling
+wrapper test already locks the analogous wiring), this is a coverage gap. See
+steps.md "Test review follow-ups (review pass 13 — test-shaper)".
+
+### TR15 resolution
+
+Added a `testing` block to `reduce-incidental-complexity-test` (same ns,
+test-only, no production/EDN change):
+
+```clojure
+(testing "select-and-create wires {{input}} to the bare :workflow-input (TR15)"
+  (let [tmpl (first (filter #(= :template (:type %))
+                            (:contributions select-step)))]
+    (is (.contains (:text tmpl) "{{input}}")
+        "select-and-create prompt references the {{input}} template var")
+    (is (= {:from :workflow-input}
+           (get-in tmpl [:vars "input"]))
+        "select-and-create wires input to the bare top-level :workflow-input (no :path)")))
+```
+
+**Discovery (shape asymmetry).** The outer `select-and-create` step wires
+`input` to the **bare** top-level `:workflow-input` — `{:from :workflow-input}`,
+**no** `:path`. This is deliberately distinct from the wrapper steps
+(`resolve-worktree`, and the inner `lifecycle` `:prompt-string`), which use
+`{:from :workflow-input :path [:input]}` to select the `:input` **field** of a
+delegated `:map` input. Because of this, the shared `step-has-input-var-wired?`
+helper (which requires the `:path [:input]` field-selecting shape) could NOT be
+reused — a first attempt using it failed (`(not (step-has-input-var-wired? …))`),
+confirming the asymmetry. The block therefore asserts the actual bare shape
+directly. A regress dropping `:vars`/the `{{input}}` template, or mis-wiring to a
+non-`:workflow-input` source, now fails green.
+
+File-length guard: the new block + comment pushed `workflow_definitions_test.clj`
+from 797 to 814 lines (over the 800 `components/` guard). Trimmed verbose prose
+headroom in the TR7, TR8, TR10, TR11, TR13, TR14, and TR2 explanatory comment
+blocks (no assertion changes) → file now exactly **800 lines**
+(`bb commit-check:file-lengths` clean).
+
+Verification:
+- `psi.workflow-loader.workflow-definitions-test` +
+  `psi.workflow-loader.incidental-complexity-finder-skill-test` (focused):
+  **18 tests, 261 assertions, 0 failures** (+2 over pass-12's 259).
+- `clj-kondo --lint` on the test file: 0 errors, 0 warnings.
+- `clj-paren-repair` on the test file: Success.
+- `bb commit-check:file-lengths`: clean (800, not > 800).
+
+TR15 checked in steps.md. PASS_STATUS: ACTIONABLE_FEEDBACK.

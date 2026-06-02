@@ -621,14 +621,12 @@
          (is (= {:type :map
                  :fields {:input {:from {:step "resolve-worktree" :yield :text}}}}
                 (:prompt-string lifecycle-step))))
-       ;; TR14 (test review pass 12, test-shaper): lock the wrapper lifecycle
-       ;; delegate's :context — deliberately ONLY :workflow-original, NOT the
-       ;; resolve-worktree handoff yield (inner task-lifecycle reads the task
-       ;; path solely via :prompt-string :input; re-injecting the handoff blob
-       ;; would pollute the lifecycle context). Mirrors task-lifecycle-test's
-       ;; :context lock and TR13's outer-delegate lock. A regress adding
-       ;; {:step "resolve-worktree" :yield :text} or dropping :workflow-original
-       ;; previously passed green.
+       ;; TR14 (pass 12, test-shaper): lock the wrapper lifecycle delegate's
+       ;; :context — deliberately ONLY :workflow-original, NOT the resolve-worktree
+       ;; yield (inner task-lifecycle reads the path via :prompt-string :input;
+       ;; re-injecting the handoff would pollute the context). Mirrors
+       ;; task-lifecycle-test + TR13. A regress adding {:step "resolve-worktree"
+       ;; :yield :text} or dropping :workflow-original previously passed green.
        (testing "lifecycle :delegate :context is only :workflow-original (no prior-step yield) (TR14)"
          (is (= [{:type :source :from :workflow-original}]
                 (:context lifecycle-step))))
@@ -653,11 +651,10 @@
                                 (:from %))
                             (:contributions summary-step)))
                "summary sources the resolve-worktree :yield :text so it can detect NO_TARGET")))
-       ;; TR10 (test review pass 8): lock the summary's positive-path terminal
-       ;; contract (symmetric to TR7 for resolve-worktree). On a real munera/...
-       ;; path summary must inspect the task artifacts and report the design →
-       ;; plan → implement → review run, the artifacts updated, and the
-       ;; closed/open outcome, sourcing the lifecycle step :yield :text.
+       ;; TR10 (pass 8): lock the summary's positive-path terminal contract
+       ;; (symmetric to TR7). On a real munera/... path summary inspects the task
+       ;; artifacts and reports the design → plan → implement → review run, the
+       ;; artifacts updated, and the closed/open outcome, sourcing lifecycle yield.
        (testing "summary prompt reports the positive-path lifecycle terminal contract (TR10)"
          (let [summary-text (step-template-text summary-step)]
            (is (re-find #"(?i)independently inspect that specific task" summary-text)
@@ -673,10 +670,10 @@
                               (:from %))
                           (:contributions summary-step)))
              "summary sources the lifecycle :yield :text so it can report the lifecycle run outcomes"))
-       ;; TR7 (test review): lock the positive (target-present) branch — the
-       ;; verified cross-:delegate worktree-continuity mechanism (Locked
-       ;; decision 11): the wrapper re-calls work-on before sub-delegating. The
-       ;; NO_TARGET-only locks above let a regress dropping this pass green.
+       ;; TR7: lock the positive (target-present) branch — the cross-:delegate
+       ;; worktree-continuity mechanism (Locked decision 11): the wrapper
+       ;; re-calls work-on before sub-delegating. The NO_TARGET-only locks above
+       ;; let a regress dropping this pass green.
        (testing "resolve-worktree prompt re-calls work-on and yields only the task path on a target-present handoff (TR7)"
          (let [resolve-text (step-template-text resolve-step)]
            (is (re-find #"(?i)call `?work-on`? with the extracted worktree path"
@@ -711,17 +708,30 @@
              "select-and-create tools include work-on")
          (is (some #{"incidental-complexity-finder"} (:skills select-step))
              "select-and-create skills include incidental-complexity-finder"))
+       ;; TR15 (test review pass 13, test-shaper): lock the entry-point input
+       ;; flow — step 1 wires "input" to the bare top-level :workflow-input (NO
+       ;; :path, distinct from the wrapper steps' {:path [:input]} :map-field
+       ;; selector). Previously uncovered: a regress dropping :vars/{{input}} or
+       ;; mis-wiring passed green. (step-has-input-var-wired? can't be reused —
+       ;; it requires the :path [:input] shape.)
+       (testing "select-and-create wires {{input}} to the bare :workflow-input (TR15)"
+         (let [tmpl (first (filter #(= :template (:type %))
+                                   (:contributions select-step)))]
+           (is (.contains (:text tmpl) "{{input}}")
+               "select-and-create prompt references the {{input}} template var")
+           (is (= {:from :workflow-input}
+                  (get-in tmpl [:vars "input"]))
+               "select-and-create wires input to the bare top-level :workflow-input (no :path)")))
        (testing "lifecycle-in-worktree :delegate targets the wrapper with :input from select-and-create :yield :text"
          (is (= :delegate (:type delegate-step)))
          (is (= "task-lifecycle-in-worktree" (:target delegate-step)))
          (is (= {:type :map
                  :fields {:input {:from {:step "select-and-create" :yield :text}}}}
                 (:prompt-string delegate-step))))
-       ;; TR13 (test review pass 11, test-shaper): lock the delegate's :context —
-       ;; the second source propagates the step-1 handoff blob into the delegated
-       ;; wrapper (companion to the :input wiring, Locked decision 11). The
-       ;; :type/:target/:prompt-string-only locks let a regress dropping the
-       ;; {:step ... :yield :text} source pass green.
+       ;; TR13 (pass 11, test-shaper): lock the delegate's :context — the second
+       ;; source propagates the step-1 handoff into the delegated wrapper
+       ;; (companion to :input, Locked decision 11). The prior :type/:target/
+       ;; :prompt-string-only locks let a regress dropping it pass green.
        (testing "lifecycle-in-worktree :delegate :context propagates workflow-original + the select-and-create handoff yield (TR13)"
          (is (= [{:type :source :from :workflow-original}
                  {:type :source :from {:step "select-and-create" :yield :text}}]
@@ -744,14 +754,11 @@
              "step-1 prompt names the before-local.json baseline (A5)")
          (is (.contains select-text "before-diagnose.edn")
              "step-1 prompt names the before-diagnose.edn baseline (A3)"))
-       ;; TR11 (test review pass 9, test-shaper): the A3 baseline-path-resolution
-       ;; behaviour is named in the design (Phase-1 A3 + R3) with an explicit
-       ;; failure mode — the gate `--baseline` and the A5 `before-local.json`
-       ;; read must reference the WORKTREE-ROOT-RELATIVE task-dir path
-       ;; (`munera/open/NNN-slug/...`), NOT a bare filename, which "does not
-       ;; resolve" from the worktree-root cwd where Phase 1 runs `gordian gate`.
-       ;; The bare-filename locks above do not anchor this path, so the exact
-       ;; R3-warned regress (`--baseline before-diagnose.edn`) would pass green.
+       ;; TR11 (pass 9, test-shaper): A3 baseline paths must be WORKTREE-ROOT-
+       ;; RELATIVE (`munera/open/NNN-slug/...`), NOT a bare filename (which does
+       ;; not resolve from the worktree-root cwd where Phase 1 runs gate). The
+       ;; bare-filename locks above don't anchor this, so the R3-warned regress
+       ;; (`--baseline before-diagnose.edn`) would pass green.
        (testing "select-and-create prompt resolves A3/A5 baselines by worktree-relative path (TR11)"
          (is (.contains select-text
                         "--baseline munera/open/NNN-slug/before-diagnose.edn")
@@ -759,12 +766,10 @@
          (is (.contains select-text
                         "the stored `munera/open/NNN-slug/before-local.json`")
              "step-1 prompt names the worktree-relative A5 before-local.json comparison path (not a bare filename)"))
-       ;; TR2 (test review): the generated two-phase behaviour-preserving
-       ;; contract embedded in step-7 is the design's substantive acceptance,
-       ;; not just the gate flags/baseline filenames already locked above. Lock
-       ;; the contract's shape so a paraphrase/regress of the Phase-0 gate, the
-       ;; behaviour-identical constraint, or the F3-re-keyed A5/A2 acceptance key
-       ;; cannot pass green.
+       ;; TR2: the step-7 two-phase behaviour-preserving contract is the design's
+       ;; substantive acceptance, not just the gate flags/filenames locked above.
+       ;; Lock its shape so a paraphrase/regress of the Phase-0 gate, the
+       ;; behaviour-identical constraint, or the F3 A5/A2 key can't pass green.
        (testing "select-and-create prompt embeds the Phase-0 characterization-test gate"
          (is (.contains select-text
                         "These tests must be GREEN against the unmodified code before any refactoring begins")
@@ -783,12 +788,10 @@
              "step-1 prompt keys the A5 burden-reduction acceptance on (ns, var, arity, line)")
          (is (.contains select-text "identified by `(ns, var, arity, line)`")
              "step-1 prompt keys the A2 touched-set identity on (ns, var, arity, line)"))
-       ;; TR8 (test review pass 6): the design's distinguishing endpoint
-       ;; behaviour — no push/PR (Locked decisions 7 & 8: full task lifecycle on
-       ;; a local worktree branch, NOT a complexity-reduction-pr clone) — is an
-       ;; explicit step-1 execution constraint but was previously unlocked. A
-       ;; regress adding a push/PR step (erasing this workflow's reason to exist
-       ;; vs complexity-reduction-pr) must not pass green.
+       ;; TR8 (pass 6): the distinguishing endpoint — no push/PR (Locked
+       ;; decisions 7 & 8: full lifecycle on a local worktree branch, not a
+       ;; complexity-reduction-pr clone) — was unlocked. A regress adding a
+       ;; push/PR step must not pass green.
        (testing "select-and-create prompt locks the no-push/PR endpoint constraint (TR8)"
          (is (.contains select-text "Do NOT push or open a PR")
              "step-1 prompt forbids pushing or opening a PR")
