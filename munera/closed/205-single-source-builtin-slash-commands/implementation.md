@@ -772,3 +772,37 @@ traceability/documentation gap. Routing, help, resolver, and UI behaviour are
 correct and verified.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Review pass 2 follow-up execution (R2, R3)
+
+- **R2 — exact-`case` seam locked symmetrically with R1 (option (a) + (b) clarity
+  remedy).** Added `commands/exact-case-branches` — a private set of the
+  `:handler` keywords that the exact-command `case` in `dispatch*` actually
+  routes, authored adjacent to the `case` (which needs compile-time literal
+  keys) as the single literal source of its branch set. A load-time
+  `(assert (= exact-case-branches (set (vals bspec/exact-command-handlers))) …)`
+  proves the live `case` stays coherent with the spec-table exact projection's
+  handler values, so an `:exact` spec entry whose `:handler` is absent from the
+  `case` is caught at namespace load (`unreachable > forbidden`), exactly
+  mirroring `prefixed-case-branches`. Added
+  `exact-case-branch-coherence-test` (reads `@#'commands/exact-case-branches`,
+  parallels `prefixed-case-branch-coherence-test`) and recommented
+  `exact-command-handlers-projection-unchanged-test` to state plainly it is a
+  static snapshot lock, NOT a live-`case` coherence check. Both gaps R2 named
+  (missing live guard + misleading snapshot-test framing) are closed.
+  Verification: `commands-builtin-specs-test` + `builtin-commands-resolver-test`
+  10 tests/43 assertions green; `commands-test` 51/206 green; clj-kondo clean
+  over the changed files. The load-time assert also fires on every test load —
+  another live proof the seam matches.
+
+- **R3 — resolver input-free shape recorded as a deliberate Slice-2 deviation.**
+  Extended the `builtin-commands-resolver` docstring to explain why it is written
+  `[_env]` / `::pco/input []` rather than mirroring
+  `extension-commands-resolver`'s `:psi/agent-session-ctx` input (and the plan's
+  "reads agent-session-ctx"): the built-in spec table is a compile-time constant
+  — session-independent — so an agent-session-ctx input would be inert ceremony.
+  The input-free form keeps the resolver honest about its (lack of) dependencies
+  and lets it resolve without an agent-session context present. The plan↔code
+  divergence is now traceable at the most local point (the resolver itself) and
+  here. Existing graph-discovery + resolver-shape tests already cover its
+  behaviour (unchanged).

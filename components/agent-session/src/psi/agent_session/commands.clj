@@ -728,6 +728,25 @@
              {:kind :template :template-match template-match}
              {:kind :unknown})))))))
 
+(def ^:private exact-case-branches
+  "The set of `:handler` keywords that `dispatch*`'s exact-command `case` form
+   actually routes (its live branch set).
+
+   Like `prefixed-case-branches`, `case` requires compile-time literal keys, so
+   this set is authored adjacent to the `case` form as the single literal
+   expression of its branches; the `case` is hand-written (heterogeneous handler
+   bodies are design-scoped out of data-driven dispatch). The load-time
+   assertion below proves this branch set stays coherent with the spec-table
+   exact projection's handler values, and the coherence test reads this same def
+   — so an `:exact` spec entry whose `:handler` is absent from the `case` is
+   caught at load (`unreachable > forbidden`), symmetric with the prefixed seam."
+  #{:quit :new :resume :status :history :help :prompts :skills :worktree
+    :reload-models :reload-prompts :reload-extension-installs :project-repl
+    :logout})
+
+(assert (= exact-case-branches (set (vals bspec/exact-command-handlers)))
+        "dispatch* exact-command case branches must match the spec-table exact projection handler values")
+
 (defn- dispatch*
   "Single command dispatch pipeline.
 

@@ -80,6 +80,10 @@
     "remember" "model" "thinking" "speed" "effort" "login"})
 
 (deftest exact-command-handlers-projection-unchanged-test
+  ;; Static snapshot lock: proves the *derived* exact-command-handlers map
+  ;; matches the pre-task literal. This is NOT a live-`case` coherence check —
+  ;; the dispatch* exact-command `case` seam is locked separately by
+  ;; exact-case-branch-coherence-test (reading the live exact-case-branches def).
   (testing "derived exact-command-handlers equals the prior literal map"
     (is (= snapshot-exact-command-handlers
            bspec/exact-command-handlers))))
@@ -136,3 +140,14 @@
           case-keys @#'commands/prefixed-case-branches]
       (is (= prefixed-keys case-keys)
           "every prefixed table entry has a dispatch-prefixed-command case branch"))))
+
+(deftest exact-case-branch-coherence-test
+  (testing "exact spec-table handler values equal the live dispatch* case branch keys"
+    (let [handler-values (set (vals bspec/exact-command-handlers))
+          ;; Read the live branch set authored adjacent to the exact-command
+          ;; `case` in dispatch* (the single literal source of its branch keys),
+          ;; so this test locks the real seam rather than a static snapshot —
+          ;; symmetric with prefixed-case-branch-coherence-test.
+          case-keys @#'commands/exact-case-branches]
+      (is (= handler-values case-keys)
+          "every exact table entry's :handler has a dispatch* case branch"))))

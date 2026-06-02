@@ -208,25 +208,25 @@ Tick with sha/decision on completion.
 
 ## Implementation review follow-ups (review pass 2)
 
-- [ ] R2 — Exact-handler `case` seam in `dispatch*` (commands.clj ~744–757) has
-      no live coherence guard, asymmetric to the R1 prefixed-`case` lock. It is a
-      hand-written `case` keyed by the `:exact` entries' `:handler` keywords, but
-      only `exact-command-handlers-projection-unchanged-test` (a static snapshot
-      lock) protects it — the same weakness R1 fixed for the prefixed side. An
-      `:exact` spec entry whose `:handler` is absent from the `case` falls
-      silently to `nil`. The design's handler-wiring out-of-scope note covers
-      ONLY the prefixed `case`, not the exact one. Either (a) lock it
-      symmetrically — add a live `exact-case-branches` / `exact-handler-keywords`
-      def + load-time `assert` (`= (set (vals bspec/exact-command-handlers))`) +
-      a coherence test reading that def — or (b) explicitly extend the design's
-      handler-wiring out-of-scope note to the exact `case` AND rename/recomment
-      `exact-command-handlers-projection-unchanged-test` to reflect it is a
-      snapshot lock, not a live-`case` coherence check (the R1 clarity remedy).
-- [ ] R3 — `builtin-commands-resolver` (resolvers/extensions.clj:150) is written
-      `[_env]` with `::pco/input []` — no `:psi/agent-session-ctx` — diverging
-      from both the `extension-commands-resolver` it "mirrors" and the plan's
-      "reads `agent-session-ctx`" (plan.md:70). The deviation is sound (specs are
-      static, session-independent) but undocumented. Record it as a deliberate
-      Slice-2 deviation (static specs ⇒ input-free resolver) in implementation.md,
-      or note why the empty-input form is preferred over the mirrored
-      `:psi/agent-session-ctx` input, so the plan↔code divergence is traceable.
+- [x] R2 — Locked the exact-handler `case` seam symmetrically with R1 (option
+      (a) + the (b) clarity remedy). Added a live `commands/exact-case-branches`
+      def (the single literal source of the exact `case`'s `:handler` branch
+      keys, authored adjacent to the `case` in `dispatch*`) with a load-time
+      `assert` `(= exact-case-branches (set (vals bspec/exact-command-handlers)))`
+      — so an `:exact` spec entry whose `:handler` is absent from the `case` is
+      caught at namespace load (`unreachable > forbidden`). Added
+      `exact-case-branch-coherence-test` reading `@#'commands/exact-case-branches`
+      (mirrors `prefixed-case-branch-coherence-test`), and recommented
+      `exact-command-handlers-projection-unchanged-test` to state it is a static
+      snapshot lock, NOT a live-`case` coherence check. Targeted suites green
+      (commands-builtin-specs + builtin-commands-resolver 10/43; commands-test
+      51/206); clj-kondo clean.
+- [x] R3 — Documented the deliberate Slice-2 deviation (static specs ⇒
+      input-free resolver). Extended the `builtin-commands-resolver` docstring
+      (resolvers/extensions.clj) to state why the `::pco/input []` / `_env` form
+      is preferred over the mirrored `:psi/agent-session-ctx` input: the built-in
+      spec table is a compile-time constant (session-independent), so an
+      agent-session-ctx input would be inert ceremony; the input-free form keeps
+      the resolver honest about its (lack of) dependencies and lets it resolve
+      without an agent-session context. Also recorded under "Slice-2 deviations"
+      in implementation.md so the plan↔code divergence is traceable.
