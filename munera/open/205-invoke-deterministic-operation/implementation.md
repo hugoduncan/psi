@@ -855,3 +855,49 @@ No new actionable test-shaper issue found. Evaluated the remaining
 
 Tests are well-formed, deterministic, real-infra (no mocks), behaviour-focused,
 economical, and consistent in fixtures (post TS-1). Test review is complete.
+
+## Docs review (ψ — review-task-docs)
+
+Applied `review-task-docs` skill (README ∧ doc/ ∧ CHANGELOG; accuracy ∧
+completeness ∧ consistency). Reviewed the slice-4 commit (8729d065f) against the
+live code (`commands/operation.clj`, `psi_tool_operation.clj`, README psi-tool
+action list, `doc/tui.md`).
+
+Verified accurate ∧ consistent:
+- **CHANGELOG** `[Unreleased] > Added` — user-facing, names both surfaces, op
+  values, sorted-by-id listing, default `{}` args, all-key/2000-char rendering,
+  side-effects, error surfacing. Accurate against code. ✓.
+- **README** `operation` psi-tool action bullet — matches `list|invoke`
+  behaviour, sort, `args` default, projection/truncation, side-effects. ✓.
+- **doc/tui.md** — command list line + "Deterministic operation commands"
+  section: `/operations` empty message, `<id>` token split, default `{}`,
+  `:status`-first sorted layout, per-key `pr-str`+2000-char truncation marker,
+  blank-id usage, malformed/non-map args, unknown-id/malformed-result distinct
+  messages — all match `commands/operation.clj` exactly. ✓.
+- No stale references introduced; workflow-ir.md / workflows.md invoke-step
+  docs remain accurate (workflow invoke-step behaviour unchanged). ✓.
+
+Actionable docs gap found (1):
+- **psi-tool `operation` action lacks dedicated reference docs, unlike its
+  sibling federated actions.** Decision #1 makes the psi-tool action an *equal
+  first-class surface* ("both surfaces, one mechanism"). The most analogous new
+  federated action, `scheduler`, ships a dedicated `doc/scheduler.md` (179 lines:
+  `{:action "scheduler" :op …}` request examples, per-op params, behaviour) plus
+  a README "See:" link. The `operation` action receives only a one-line README
+  bullet and a *passing* mention in `doc/tui.md` (which documents the **command**
+  surface in detail but the **action** surface only as "this command and the
+  psi-tool `operation` action share one mechanism"). Consequences:
+  - No `{:action "operation" :op "list"|"invoke"}` request example exists in any
+    doc (review-task-docs item 4 — examples).
+  - The action params (`operation-id`, `args` EDN-map-string) and the
+    list-ignores-params / `op`-not-in-`:op`-enum behaviour are documented only in
+    the tool schema, not in user-facing docs (item 1 — new behaviour reflected
+    in README ∧ doc/; item 5 — consistency with sibling actions).
+  This is a completeness/consistency gap against the established per-action doc
+  pattern, not an inaccuracy. Add a short psi-tool `operation` action reference
+  (either a dedicated `doc/operations.md` mirroring `doc/scheduler.md`'s shape
+  with `{:action :op :operation-id :args}` examples for both `list` and
+  `invoke`, plus the empty-list / unknown-id / malformed-result / truncation
+  behaviour, OR an "psi-tool `operation` action" subsection inside `doc/tui.md`
+  alongside the command section), and add a README "See:" link to it — bringing
+  the action surface to parity with `scheduler`/`project-repl` documentation.

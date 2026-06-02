@@ -329,6 +329,25 @@
   (Used a schema-valid `ns/name` id; the literal `"ignored"` fails the
   `^ns/name$` operation-id schema at registration.)
 
+## Docs-review follow-ups (ψ)
+
+- [ ] (DR-1) Bring the psi-tool `operation` **action** surface to documentation
+  parity with its sibling federated actions (`scheduler` has a dedicated
+  `doc/scheduler.md` + README "See:" link; `operation` has only a one-line
+  README bullet and a passing mention in `doc/tui.md`, which documents the
+  *command* surface only). Decision #1 makes the action an equal first-class
+  surface, so it warrants equivalent reference docs. Add either a dedicated
+  `doc/operations.md` (mirroring `doc/scheduler.md`'s shape) or a "psi-tool
+  `operation` action" subsection in `doc/tui.md`, covering: the
+  `{:action "operation" :op "list"|"invoke"}` request shape with a worked
+  example for each op; the `operation-id` and `args` (EDN-map-string, default
+  `{}`) params; that `list` ignores `operation-id`/`args` and sorts by id;
+  empty-list `:operations []`; all-top-level-key + 2000-char-per-value
+  truncation rendering; and unknown-id / malformed-result / malformed-args
+  error surfacing. If a dedicated page is added, also add a README "See:" link
+  to it. Verify the new doc matches `psi_tool_operation.clj` /
+  `psi_tool_validate.clj` exactly; re-check coherence design ↔ code ↔ docs.
+
 ## Close-out
 
 - [x] Re-read design acceptance criteria; confirm each is covered by a test.
