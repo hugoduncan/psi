@@ -492,3 +492,29 @@ Tick with sha/decision on completion.
       `:psi.agent-session/builtin-command-specs`. Relaxed the guard to
       `(some #{:psi.extension/command-names} query)`. Test-only; full
       `bb clojure:test:unit` now green.
+
+## Code-shaper review follow-ups (code-shaper pass 2)
+
+- [ ] CS3 — Tighten the `builtin-command-specs` per-entry-shape invariant from
+      *forbidden* (runtime test TT3) to *unreachable* (load-time), matching the
+      `unreachable > forbidden` ethos AND the sibling idiom already used in this
+      ns cluster (`commands.clj` guards both `case` seams with load-time
+      `assert`s). The table's per-entry shape — `:kinds` non-empty
+      `⊆ #{:exact :prefixed}`; `:exact ∈ :kinds ⇒ (some? :handler)`;
+      `:description` non-blank string; optional `:usage` string;
+      optional `:hide-in-help?` boolean — is the *primary* invariant of the
+      single source that every projection silently assumes, yet it is currently
+      enforced only by `builtin-command-specs-well-formed-test` (TT3), so a
+      malformed entry (empty `:kinds` → named-but-unroutable; `:exact` without
+      `:handler` → projects `"/name" → nil`) loads clean and is caught only when
+      that test runs. Add a malli entry schema in `builtin_specs.clj` (malli is
+      the project validation lib, already used in
+      `psi.agent-session.dispatch-schema`) and a **load-time guard** over
+      `builtin-command-specs` (e.g.
+      `(assert (every? #(m/validate entry-schema (val %)) builtin-command-specs) …)`
+      or `m/coerce`/`m/explain`-based), so a malformed entry fails at namespace
+      load. Then shrink TT3 to assert the schema *rejects* representative
+      malformations (empty `:kinds`, `:exact`-without-`:handler`), or retire it.
+      Keep the existing two `case`-seam asserts unchanged. Verify the namespace
+      still loads clean (the well-formed shipped table must pass) and re-run the
+      commands-builtin-specs suite + targeted clj-kondo.

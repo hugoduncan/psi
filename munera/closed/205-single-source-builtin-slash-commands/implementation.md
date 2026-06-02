@@ -1788,3 +1788,53 @@ runtime test. Minimal fix: relaxed the stub guard to
 `(some #{:psi.extension/command-names} query)` (respond when the widened query
 asks for extension command names). Test-only change; full `bb clojure:test:unit`
 now green.
+
+## Reviews
+
+### 2026-06-01 — Code-shaper review (code-shaper), pass 2
+
+Scope: simplicity ∧ consistency ∧ robustness of the shipped code (`builtin_specs.clj`,
+`commands.clj` dispatch/case seams, `resolvers/extensions.clj` resolver, TUI
+`autocomplete.clj`/`support.clj`, Emacs `psi-completion.el`). Suite + lint
+re-verified green at review time (commands-builtin-specs + builtin-commands-resolver
++ commands-test: 66 tests / 424 assertions / 0 failures; clj-kondo: 0/0 over the
+four changed clj files).
+
+Overall the implementation is well-shaped: the single keyed `builtin-command-specs`
+table is a genuine leaf ns (only `clojure.string`), every name surface is a pure
+projection of its keys, CS1 already collapsed the help-line formula into one
+`render-help-line`, and CS2 dropped the unused `:builtin-command-names` resolver
+attribute. The two `case` seams (`prefixed-case-branches`, `exact-case-branches`)
+are correctly locked by **load-time asserts** in `commands.clj`, honouring
+`unreachable > forbidden` for the handler-wiring residual.
+
+Actionable (1):
+
+- CS3 (robustness, `unreachable > forbidden` consistency) — the spec table's own
+  **per-entry shape** (`:kinds` non-empty ⊆ #{:exact :prefixed}; `:exact ⇒ :handler`;
+  `:description` non-blank) — which is the *primary* invariant of the single source
+  the projections silently assume — is enforced **only by runtime test TT3**
+  (`builtin-command-specs-well-formed-test`), i.e. `forbidden`, not `unreachable`.
+  This is inconsistent with (a) the project ethos (`impossible_invalid_states`,
+  `shaped_by(code, formalisms) → enforceable(invariants)`), and (b) the sibling
+  idiom already in this very namespace cluster: `commands.clj` guards both `case`
+  seams with **load-time `assert`s** so drift is caught at namespace load. The
+  weaker invariant (case↔table seam) is structurally guarded; the stronger one
+  (the table entries themselves) is not. TT3's own note records that "a short
+  malli schema over the entry-value or explicit doseq/every? assertions both
+  work" and chose the test. Tighten to load-time: add a malli entry schema in
+  `builtin_specs.clj` (malli is the project validation lib, already used in
+  `dispatch_schema.clj`) and a load-time `(assert (m/validate ...))` /
+  `(m/coerce ...)` over `builtin-command-specs`, so a malformed entry fails at
+  load (`unreachable`) rather than only when a test runs. TT3 can then shrink to
+  asserting the schema rejects representative malformations, or be retired.
+
+Non-actionable observations (recorded, no follow-up):
+
+- `strip-slash` uses `(str/replace s #"^/" "")` — a regex for a single-leading-char
+  strip where `(cond-> s (str/starts-with? s "/") (subs 1))` is cheaper/plainer.
+  Micro; correct and locally clear; not worth the churn. Noted only.
+- TUI `slash-candidates` derives `builtins`/`ext-cmds` via `as-slash-command`
+  (tolerant of bare-or-`/`-prefixed) but `templates`/`skills` via raw `(str "/" name)`.
+  The new built-in code is *consistent with* its nearest neighbour (`ext-cmds`);
+  the templates/skills idiom predates this task and is out of its remit.
