@@ -25,3 +25,7 @@
 
 - [ ] Append an implementation note summarizing the documentation update and verification evidence.
 - [ ] Check off completed `steps.md` items after executing the corresponding actions.
+
+## Review follow-ups
+
+- [ ] Reconcile `steps.md` with the already-applied `doc/scheduler.md` absolute-`:at` wording recorded in `implementation.md`: check completed documentation/verification/task-record items or adjust them so the task no longer implies the doc update is still pending.

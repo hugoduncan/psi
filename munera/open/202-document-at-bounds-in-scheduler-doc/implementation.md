@@ -19,3 +19,7 @@ Reviewed `design.md` against `doc/scheduler.md`, `resolve-fire-time!`/`millis-un
 ## Plan ambiguity review — 2026-06-02
 
 Reviewed `plan.md` and `steps.md` against `design.md`, `doc/scheduler.md`, `resolve-fire-time!`/`millis-until`, `validate-delay-ms!`, and `psi-tool-scheduler-at-resolution-matrix-test`. No new actionable plan/steps ambiguities found. The plan and steps clearly describe a documentation-only slice, the absolute-`:at` bounds in terms of resolved millisecond delay, and the optional verification choice to either run the focused matrix test or record reliance on task 201 proof.
+
+## Plan inconsistency review — 2026-06-02
+
+Reviewed `plan.md` and `steps.md` against `implementation.md`, `design.md`, updated `doc/scheduler.md`, `resolve-fire-time!`/`millis-until`, and `psi-tool-scheduler-at-resolution-matrix-test`. Found one new actionable inconsistency: `implementation.md` records that the design ambiguity follow-up already updated `doc/scheduler.md`, and the doc now contains the required absolute-`:at` bounds wording, but `steps.md` still leaves the Slice 2 documentation-update items and related verification/task-record items unchecked as if the doc update has not happened. Reconcile the task steps with the already-applied doc update/evidence before doing further execution so the task record does not imply duplicate pending documentation work.
