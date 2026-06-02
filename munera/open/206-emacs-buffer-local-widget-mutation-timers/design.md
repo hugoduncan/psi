@@ -65,6 +65,18 @@ In scope:
   - `psi-widget-projection--arm-mutation-timer (state ext-id widget-id node-key
     timeout-ms)` — arms against the passed `state`'s store and performs its
     inline pre-cancel via `--cancel-mutation-timer` with that same `state`.
+    Arm is the sole scheduler of `--on-mutation-timeout`; mirroring
+    `psi-emacs--schedule-notification-dismiss`, it captures the originating
+    `buffer` (`(current-buffer)`) and `state` at arm time and threads **both**
+    into the scheduled `run-at-time` callback args, so the deferred timeout
+    callback can guard `buffer-live-p` and operate against the originating
+    buffer rather than the incidental current one.
+  - `psi-widget-projection--on-mutation-timeout (buffer state ext-id widget-id
+    node-key timeout-ms)` — gains leading `buffer`/`state` params (threaded in
+    by arm). It is a no-op unless `(buffer-live-p buffer)`, then runs inside
+    `with-current-buffer buffer`, cancels/clears against the passed `state`'s
+    store (via `--cancel-mutation-timer state tkey`), and invokes the
+    error-handler / `--upsert-projection-block` against that buffer's state.
 - Cancel and clear all widget mutation timers in `psi-emacs--teardown-buffer`,
   alongside the existing timer-cancellation calls.
 - Decide and apply explicit buffer-targeting for **both** callbacks that touch
@@ -118,6 +130,15 @@ Out of scope:
     guard with `buffer-live-p`, and pass that captured `state` to
     `--cancel-mutation-timer`/the clear path — operating inside
     `with-current-buffer buffer` (or against the captured `state` directly).
+    Concretely, the originating `buffer`/`state` reach the *timeout* callback
+    by `--arm-mutation-timer` capturing `(current-buffer)` + `state` and
+    threading both into the scheduled `run-at-time` callback args (the
+    precedent threads `(current-buffer)`, `state`, `notification-id`); the
+    timeout callback's signature therefore leads with `buffer`/`state`
+    (`--on-mutation-timeout (buffer state ext-id widget-id node-key
+    timeout-ms)`). The response callback is a synchronous closure over the
+    dispatch site, so it closes over the dispatch-time `buffer`/`state`
+    directly.
   Because the cancel/arm helpers resolve the store solely from their `state`
   argument, no call site (arm, inline pre-cancel, response callback, or timeout
   callback) ever dereferences the dynamic `psi-emacs--state` to locate the store
@@ -144,9 +165,16 @@ Out of scope:
 - `psi-emacs--teardown-buffer` cancels and clears all widget mutation timers for
   the buffer being killed; after kill, none of that buffer's widget watchdogs
   remain scheduled.
-- The watchdog timeout callback resolves its target buffer/state explicitly and
-  is a no-op when that buffer is dead, with no dependence on the incidental
-  current buffer.
+- `psi-widget-projection--arm-mutation-timer` captures the originating `buffer`
+  (`(current-buffer)`) and `state` at arm time and threads both into the
+  scheduled `run-at-time` callback args, mirroring
+  `psi-emacs--schedule-notification-dismiss`.
+- The watchdog timeout callback
+  (`psi-widget-projection--on-mutation-timeout (buffer state ext-id widget-id
+  node-key timeout-ms)`) receives its target `buffer`/`state` as leading
+  params, is a no-op unless `(buffer-live-p buffer)`, otherwise runs inside
+  `with-current-buffer buffer` and cancels/clears against the passed `state`'s
+  store — with no dependence on the incidental current buffer.
 - The `--dispatch-mutation` RPC response callback likewise cancels/clears
   against the *originating* buffer's buffer-local timer store and lstate
   (captured `buffer`/`state` + `buffer-live-p` guard), with no dependence on the

@@ -28,7 +28,7 @@
 
 ## Inconsistency review (ψ)
 
-- [ ] I1 — Reconcile the pinned arm signature with the timeout-callback
+- [x] I1 — Reconcile the pinned arm signature with the timeout-callback
       buffer-capture requirement. `--arm-mutation-timer (state ext-id widget-id
       node-key timeout-ms)` (Scope/Constraints) takes `state` but no `buffer`,
       yet Scope/Constraints/AC require the timeout callback to capture the

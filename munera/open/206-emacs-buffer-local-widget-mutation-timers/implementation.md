@@ -145,3 +145,36 @@ only; the deferred-callback buffer-capture/threading gap is distinct and
 unresolved.) Resolve by extending the arm signature/scheduling to capture and
 thread the originating `buffer` (mirroring the precedent's `(current-buffer)` +
 `state` capture) and specifying `--on-mutation-timeout`'s post-change params.
+
+## Inconsistency follow-up — I1 resolved (ψ)
+
+Resolved the pinned-arm-signature ↔ timeout-callback-buffer-capture
+inconsistency by threading the originating `buffer` (alongside `state`) into the
+scheduled callback at arm time, exactly mirroring
+`psi-emacs--schedule-notification-dismiss` (psi-projection.el:410), which
+captures `(current-buffer)` + `state` and threads both into the `run-at-time`
+lambda args, then guards `(buffer-live-p buffer)` inside `with-current-buffer`.
+
+Key insight: arm needs no extra `buffer` *parameter* — it captures
+`(current-buffer)` locally at the (synchronous, originating-buffer-current) arm
+call site, just like the precedent. The pinned `--arm-mutation-timer (state
+ext-id widget-id node-key timeout-ms)` signature is preserved; only the
+scheduled-callback args grow to carry `buffer`/`state`.
+
+design.md updates:
+- Scope: arm now documented as capturing `(current-buffer)` + `state` and
+  threading both into the `run-at-time` callback args; added the post-change
+  timeout-callback signature `--on-mutation-timeout (buffer state ext-id
+  widget-id node-key timeout-ms)` with its `buffer-live-p`/`with-current-buffer`
+  body.
+- Constraints: made the buffer/state→timeout-callback threading mechanism
+  explicit (arm threads them via `run-at-time` args; response callback closes
+  over dispatch-time `buffer`/`state` synchronously).
+- Acceptance: added a criterion that arm captures+threads `buffer`/`state`, and
+  sharpened the timeout-callback criterion to name the leading `buffer`/`state`
+  params, the `buffer-live-p` no-op, and the `with-current-buffer` body.
+
+This makes the "capture originating buffer/state at arm time + dead-buffer
+no-op" requirement satisfiable for the timeout path (previously unsatisfiable:
+no `buffer` was threaded into the scheduled callback). Arm signature unchanged;
+inconsistency removed. No code changes (design-only task).
