@@ -42,3 +42,22 @@
       without naming the baseline it compares against (stored `before-local.json`,
       selector evidence, or fresh recompute). State the comparison source so the
       objective check is well-defined.
+
+## Inconsistency (pass 1)
+
+- [ ] I1 — Reconcile the worktree-inheritance claim with its cited precedent.
+      "Verified facts" claims a `:delegate` step inherits the worktree set by a
+      prior `:session` `work-on` call, citing `implement-task-in-worktree.md`,
+      and Step 2 calls the `task-lifecycle` delegate's inheritance "verified
+      behaviour." But that precedent shows inheritance happening INSIDE a
+      worktree-resolving wrapper (`resolve-worktree` `:session` re-calls
+      `work-on` from a `worktree_path:` handoff field) before it delegates to
+      `implement-task` — not from a sibling step in the outer workflow. Task 204
+      delegates DIRECTLY to `task-lifecycle` (no `resolve-worktree`/`work-on`
+      sub-step; sub-workflows read only `{:input <task-path>}`) and step-1 emits
+      ONLY the bare task path (no `worktree_path:` threaded). Resolve by one of:
+      (a) delegate to a worktree-resolving wrapper and thread `worktree_path:`
+      through step-1 output (reconciling with the "emit only the task path"
+      constraint); (b) cite the actual mechanism that lets a fresh `:delegate`
+      to `task-lifecycle` execute in step-1's worktree; or (c) weaken the
+      "verified behaviour" claim to a stated open risk.
