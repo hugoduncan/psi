@@ -31,3 +31,18 @@
 - [x] Specify `op: list` behaviour: whether `operation-id`/`args` are
   rejected or ignored, the listing order (define deterministic ordering, e.g.
   sorted by id), and empty-list rendering.
+
+## Inconsistency follow-ups
+
+- [ ] Reconcile `:operation-id` in the invocation map (Scope / decision #10 /
+  AC) with the actual mechanism: `registry/invoke-operation-in` takes
+  `operation-id` as a positional arg and `runtime/invoke-operation` injects it
+  via `assoc`; the existing workflow path (step_execution.clj) does NOT put
+  `:operation-id` in its invocation map. Either drop `:operation-id` from the
+  documented direct-invocation map (pass it positionally like the workflow
+  path) or correct decision #10's "same invocation-map schema" reconciliation
+  claim, which is false for `:operation-id`.
+- [ ] Fix decision #7's `:ok` schema phrasing "`:status :data`": the
+  success-result schema (defs.clj) has `:status` and `:data` as two separate
+  required keys, not a `:status :data` pair. Reword so the authoritative
+  projection rule matches the referenced schema.

@@ -118,3 +118,30 @@ Decisions recorded:
   stable, both surfaces); empty registry → explicit empty message / :operations [].
 
 No code touched (design-only follow-ups). No blocked steps.
+
+## Inconsistency review (ψ)
+
+Reviewed design.md for internal inconsistency and design-vs-artifact
+inconsistency; grounded against step_execution.clj, core.clj
+(invoke-operation), registry.clj (invoke-operation-in), defs.clj (result
+schemas). Two actionable inconsistencies:
+
+1. **`:operation-id` placed in the invocation map vs. positional arg in the
+   referenced mechanism.** Scope, decision #10, and AC all state the
+   *direct-invocation invocation map* carries `:operation-id`. But the
+   referenced boundary `registry/invoke-operation-in` takes `operation-id` as a
+   separate positional arg, and `runtime/invoke-operation` injects it via
+   `(assoc invocation :operation-id (:id operation))`. The existing workflow
+   path (step_execution.clj) does NOT put `:operation-id` in its invocation map.
+   So decision #10's reconciliation claim — "the two entry points populate the
+   same invocation-map schema with the subset of identity keys" — is false for
+   `:operation-id`: the workflow entry point populates it nowhere, relying on
+   injection. Including `:operation-id` in the caller-built map is redundant
+   (overwritten by assoc) and inconsistent with the established mechanism.
+
+2. **Decision #7 mis-phrases the `:ok` result schema.** Decision #7 says "`:ok`
+   results carry `:status :data` plus optional `:summary`/`:details`". The
+   actual `operation-success-result-schema` (defs.clj) has `:status` and `:data`
+   as two separate required keys (`[:status [:= :ok]]`, `[:data :any]`). "`:status
+   :data`" reads as one key/value pair, contradicting the referenced schema and
+   muddying the authoritative projection rule it is meant to ground.
