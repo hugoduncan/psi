@@ -217,3 +217,34 @@ New actionable inconsistencies:
   Reconcile the count ("14", not "dozen"/"~20") with the enumeration.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK.
+
+## Inconsistency follow-up resolution (ψ, 2026-06-02)
+
+Both inconsistency design-steps (I1, I2) resolved into design.md (design-only;
+no code). Grounded against real code first:
+
+- **I1.** `resolve-step-session-config`
+  (`workflow-step-session-config/core.clj:145`) reads/outputs neither
+  `:speed-mode` nor `:effort-override` (grep-confirmed: only `:model`
+  `:prompt-mode` `:thinking-level` `:model-fallback` appear; no speed/effort
+  read anywhere in the resolver). Decisions 7 and 7a previously claimed the
+  snapshot resolver "reuses" the no-override path *including* speed-mode/
+  effort-override — false, and contradicted Decision 1 (which frames those two
+  as recently introduced overrides layered on top of the live-inherited set).
+  Fixed both: Decision 7 now states the resolver is built on
+  `resolve-step-session-config`'s actual no-override reads (model/prompt-mode/
+  skills/tool-defs/thinking-level) and **adds** the two new `:speed-mode`/
+  `:effort-override` ctx reads (citing the resolver's real output set and the
+  fact it reads neither today). Decision 7a's
+  `resolve-inherited-defaults-snapshot` bullet now distinguishes the reused
+  reads from the two newly-added reads. Now aligned with Decision 1.
+
+- **I2.** `common-inherited-fields` (`init.clj:30`) vector has **19** keys, not
+  "~20". Included raw keys = 5 (`:prompt-mode :speed-mode :effort-override
+  :tool-ids :skill-ids`) → **14** excluded (the enumeration in 8a lists exactly
+  14: 3 capability + 8 preferences + 1 ui-type + 2 telemetry). Fixed Decision
+  8a: "19 fields" (not "~20") and "remaining 14 … entries (19 total minus the 5
+  included raw keys)" (not "dozen"). Count now matches its own enumeration.
+
+No inconsistency design-steps blocked; both completable as design refinements.
+Code implementation remains for the plan phase (steps.md), not this design pass.

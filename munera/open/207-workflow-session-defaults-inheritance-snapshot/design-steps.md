@@ -55,7 +55,7 @@
 
 ## Inconsistency follow-ups
 
-- [ ] I1: Decisions 7 and 7a claim `resolve-inherited-defaults-snapshot`
+- [x] I1: Decisions 7 and 7a claim `resolve-inherited-defaults-snapshot`
       "reuses the same live-read logic `resolve-step-session-config` uses for
       the no-override path" and list `speed-mode`/`effort-override` among those
       reads, but `resolve-step-session-config` reads/outputs neither (it
@@ -66,7 +66,7 @@
       snapshot resolver must *add* `speed-mode`/`effort-override` ctx reads
       rather than reuse a no-override path that already includes them; align
       Decisions 1, 7, and 7a.
-- [ ] I2 (minor): Decision 8a says `common-inherited-fields` has "~20 fields"
+- [x] I2 (minor): Decision 8a says `common-inherited-fields` has "~20 fields"
       and "the dozen other entries are deliberately excluded", but the vector
       has 19 keys and 14 are excluded (8a itself lists 14). Reconcile the count
       ("14" excluded, 19 total) with the enumeration.

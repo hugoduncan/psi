@@ -169,10 +169,19 @@ Out of scope:
    owns the resolution of inherited defaults from a session today; it is the
    single component that owns deriving the inherited-default snapshot. It
    exposes one function — `resolve-inherited-defaults-snapshot` (ctx,
-   parent-session-id) → resolved snapshot map — that reuses the same live-read
-   logic `resolve-step-session-config` uses for the no-override path
+   parent-session-id) → resolved snapshot map — built on the live-read logic
+   `resolve-step-session-config` already uses for its no-override path
    (`get-session-data` → model/prompt-mode, `all-skills`, tool source + tool
-   ids → tool-defs, thinking-level, speed-mode, effort-override). The pure
+   ids → tool-defs, thinking-level). It additionally reads `:speed-mode` and
+   `:effort-override` from the parent session: those two are **not** part of
+   `resolve-step-session-config`'s current reads or output (the resolver today
+   emits only `:developer-prompt :prompt-mode :response-mode :tool-defs
+   :thinking-level :skills :model`, plus optional temperature/model-fallback/
+   logprob — it reads neither field). Consistent with Decision 1, which frames
+   `:speed-mode`/`:effort-override` as recently introduced overrides layered on
+   top of the live-inherited set, the snapshot resolver **adds** these two ctx
+   reads; it does not reuse a no-override path that already includes them
+   (there is none). The pure
    create-run sites call this resolver impurely (with the ctx they already hold)
    and pass the result into `create-run`. `workflow-runtime` does **not** reach
    into `workflow-step-session-config`; the dependency direction stays
@@ -191,10 +200,12 @@ Out of scope:
 
    - `resolve-inherited-defaults-snapshot` — `(ctx parent-session-id) →
      snapshot-map`. The **top-level** path (Decisions 6, 6a). Performs the live
-     ctx reads (`get-session-data`, `all-skills`, tool source + tool-ids,
-     thinking-level, speed-mode, effort-override) used by
-     `resolve-step-session-config`'s no-override path and returns the resolved
-     snapshot.
+     ctx reads `resolve-step-session-config`'s no-override path already uses
+     (`get-session-data` → model/prompt-mode, `all-skills`, tool source +
+     tool-ids → tool-defs, thinking-level) **and** two reads that path does not
+     have today — `:speed-mode` and `:effort-override` from the parent session
+     — which this resolver adds (Decision 7 / Decision 1; the current resolver
+     reads neither). Returns the resolved snapshot.
    - `effective-config->snapshot` — `(effective-config) → snapshot-map`. The
      **nested** path. Pure projection of an already-resolved effective
      step-config into the snapshot field set; no ctx reads. It is the single
@@ -229,7 +240,7 @@ Out of scope:
 
    8a. **Exact snapshot field set as a named subset, with the
    model/thinking-level gap made explicit.** `common-inherited-fields`
-   (`init.clj:30`) holds ~20 fields and is a *child-session-init* concern
+   (`init.clj:30`) holds 19 fields and is a *child-session-init* concern
    (capability membership, preferences, UI, runtime telemetry). It does **not**
    include `:model` or `:thinking-level` — those live in the separate
    `model-identity-fields` constant (`init.clj:67`). The workflow snapshot is a
@@ -250,8 +261,10 @@ Out of scope:
    `{:model :prompt-mode :tool-ids :skill-ids :thinking-level :speed-mode
    :effort-override}`.
 
-   The dozen other `common-inherited-fields` entries are **deliberately
-   excluded** from the workflow snapshot: capability membership beyond
+   The remaining 14 `common-inherited-fields` entries (19 total minus the 5
+   included raw keys `:prompt-mode :speed-mode :effort-override :tool-ids
+   :skill-ids`) are **deliberately excluded** from the workflow snapshot:
+   capability membership beyond
    tools/skills (`:prompt-contribution-ids`, `:prompt-templates`, `:extensions`),
    the remaining preferences (`:auto-retry-enabled`, `:auto-compaction-enabled`,
    `:nucleus-prelude-override`, `:developer-prompt`,
