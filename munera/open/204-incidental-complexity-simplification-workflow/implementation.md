@@ -2438,3 +2438,33 @@ Verification:
 - `bb commit-check:file-lengths`: clean (800, not > 800).
 
 TR15 checked in steps.md. PASS_STATUS: ACTIONABLE_FEEDBACK.
+
+---
+
+## Follow-up execution pass after test-shaper review pass 13 (TR15)
+
+Scanned `steps.md` for newly added actionable unchecked items added by the
+preceding review pass (test-shaper pass 13 — TR15, committed `b489b3a2c`).
+
+**Determination: no actionable follow-up items to execute.**
+
+- TR15 (the only item the preceding review pass added) is already fully resolved
+  and committed (`b489b3a2c`) — its checkbox is `[x]` with a complete RESOLUTION
+  note. No new unchecked items were added after it.
+- The single remaining unchecked `- [ ]` in `steps.md` (the "Split step-1
+  selection from task-creation into two `:session` steps" item) lives under
+  **`## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)`**. It
+  is **out of scope** for this pass because it is:
+  - explicitly **non-planned** (section header) and **conditional** — gated on
+    "only if Slice 3 step-1 proves unwieldy"; that trigger has not fired
+    (Slice 3 step-1 was built as a single `:session` step, loads clean, and is
+    locked by tests — never proved unwieldy), and
+  - **predates the preceding review pass** (it is original-design contingency
+    text, not a review-pass-added item), so per the execution rule "do not
+    execute items that predate the preceding review pass" it must not be run.
+
+Working tree clean before this pass (branch `simplifier`); no code/test/doc
+change required. Focused suite state unchanged from TR15: 18 tests, 261
+assertions, 0 failures; `clj-kondo` 0 findings; file-length guard clean (800).
+
+PASS_STATUS: NO_ACTIONABLE_FOLLOW_UPS.
