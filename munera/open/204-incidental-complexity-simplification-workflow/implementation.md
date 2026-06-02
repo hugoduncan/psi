@@ -380,3 +380,73 @@ Slices 1–5 themselves predate this review pass and were left untouched.
 P1–P4 checked in steps.md. PASS_STATUS: REVIEW_COMPLETE. No code/test/doc outside
 task artifacts touched (slices unbuilt). design.md untouched (design review
 complete; supersession recorded in plan/steps).
+
+## 2026-06-01 — Plan/steps inconsistency review (pass 1)
+
+Reviewed `plan.md` and `steps.md` for inconsistencies **across the task files**
+only (not the already-locked design, not architecture/ambiguity/correctness).
+Grounded against `implement-task-in-worktree.md` (confirmed live: three-step
+wrapper resolve-worktree → implement → summary, `summary` tools `["read" "bash"]`),
+`components/workflow-loader/test/psi/workflow_loader/workflow_definitions_test.clj`
+(exists), and `doc/workflows.md` + `CHANGELOG.md` (both exist). No prior
+plan/steps **inconsistency** pass exists (prior plan/steps pass was ambiguity
+P1–P4), so these are net-new.
+
+Verified consistent (no findings):
+- Wrapper = three-step, outer = two-step: agreed across plan + steps (no
+  two/three-step drift between the files).
+- Slice order (skill → wrapper → outer → tests → docs) and dependency-first
+  build order: identical in plan Approach/Slice-order and steps headings.
+- Step-1 tools `["read" "bash" "edit" "write" "work-on"]` + skills
+  `["incidental-complexity-finder" "gordian" "code-shaper"]`, resolve-worktree
+  tools `["read" "bash" "work-on"]`, delegate-yield wiring form, gate flags
+  (`--fail-on new-cycles,new-high-findings --max-new-medium-findings 0`),
+  handoff fields (`worktree_path:` + `munera_task_path:`), wrapper `.md` / outer
+  `.edn` file forms, SKILL frontmatter (`name`/`description`/`lambda`): all
+  consistent plan↔steps and against design.
+
+Three new actionable inconsistencies (added to steps.md):
+
+- **C1 — Plan Approach "not new test code in `components/`" contradicts plan R4
+  + Slice 4 (plan & steps), which add new `components/` test assertions.**
+  Plan Approach (line ~9–11): *"Verification is by the existing
+  workflow-loader/parse/definition tests plus live loadability, **not new test
+  code in `components/`**."* But plan R4 (line ~103) plans *"New assertions for
+  the two workflows + skill registration ... slot into the existing test ns"*,
+  and **both** plan Slice 4 and steps.md Slice 4 instruct *Extend
+  `…/workflow_definitions_test.clj`: assert `reduce-incidental-complexity` and
+  `task-lifecycle-in-worktree` parse/load … assert outer two-step shape …
+  assert wrapper three-step shape … assert skill registration*. New assertions
+  about the two new artifacts **are** new test code in `components/`. A builder
+  cannot tell whether Slice 4 should add `components/` test assertions or rely
+  only on existing tests + live loadability. Reconcile: either soften the
+  Approach line (e.g. "no new production Clojure / no new test **namespace** in
+  `components/` — new assertions extend the existing definition-test ns") or
+  drop the `components/` test assertions from Slice 4 in favour of pure live
+  loadability. The Approach statement and Slice 4 / R4 must agree.
+
+- **C2 — steps.md Slice 2 has two unchecked items both instructing "Add the
+  `summary` step".** Slice 2 contains a dedicated *"Add `summary` step (`:type
+  :session`, per resolved P1)…"* item **and** a separate *"(Decision —
+  resolved, see P1) **Add** a trailing `summary` `:session` step …"* item — two
+  unchecked checklist boxes for the same single build action. Post-P1, the
+  decision-placeholder item should have become rationale prose (or be merged
+  into the dedicated `summary` item), not remain a duplicate actionable
+  checkbox. Collapse the two into one `summary`-authoring item (keep the P1
+  rationale as a sub-note), so the checklist instructs the step's creation once.
+
+- **C3 — plan.md never names `before-diagnose.edn`; its R3 "reproduce verbatim"
+  inventory omits it while the gate it references requires it.** steps.md
+  Slice 3 captures **both** baselines (`before-local.json` *and*
+  `before-diagnose.edn`) and the Phase-1 gate command depends on
+  `before-diagnose.edn`. plan.md mentions only `before-local.json` (lines ~41,
+  ~98); R3's list of contract elements to "reproduce verbatim in the … generated
+  instructions" names baseline-path resolution, gate flags, and
+  `before-local.json`/touched-units — but omits `before-diagnose.edn`, the very
+  baseline the gate flags consume. Add `before-diagnose.edn` to plan.md (its
+  capture + R3's verbatim-reproduction inventory) so the plan's baseline set
+  matches steps.md and the gate acceptance it cites.
+
+Added C1–C3 as unchecked follow-up items to steps.md. No plan.md / design.md /
+code / test / doc edits in this pass (review only; resolution deferred to the
+follow-up items). PASS_STATUS: ACTIONABLE_FEEDBACK.
