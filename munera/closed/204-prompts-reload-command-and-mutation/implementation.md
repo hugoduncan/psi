@@ -751,3 +751,27 @@ Considered, NOT actionable (re-confirmed):
 
 Result: one new low-confidence shape follow-up (TS4 positive control for the
 absence assertion). Does not block correctness.
+
+## TS4 positive-control follow-up executed (2026-06-01)
+
+- ✅ TS4 closed. Added a real positive control to
+  `reload-prompts-does-not-refresh-system-prompt-test`. Before the absence
+  assertion, the test dispatches `:session/set-prompt-component-selection`
+  `{:session-id … :selection {}}` in the same ctx and asserts the recorder
+  flips to `true`. Chose `set-prompt-component-selection` over the
+  TS4-suggested `:session/set-skills` / `:session/set-active-tools`: it emits
+  **exactly one** `:runtime/refresh-system-prompt` effect (session_mutations
+  L327) with no co-emitted effect — `set-active-tools` also emits
+  `:runtime/agent-set-tools` (extra effect handler) and `set-skills` needs
+  skill storage setup. Minimal incidental setup, single refresh effect ⇒
+  cleanest control. The test then `(reset! refreshed? false)` and asserts
+  reload leaves it `false`.
+- Effect path confirmed: `execute-effect! :runtime/refresh-system-prompt`
+  (`dispatch_effects.clj:199-201`) calls `(:refresh-system-prompt-fn ctx)`, so
+  the rebound recorder is exactly where the side effect surfaces. The positive
+  control proves liveness in-test (no longer code-reading only): a wrong rebind
+  key or inert effect path fails the positive-control `is`, so the absence
+  assertion can no longer pass vacuously.
+- Verify: `clj-kondo` 0/0; focused ns 8 tests / 35 assertions / 0 failures
+  (+1 vs prior 34). No production code change — this only strengthens the
+  existing no-refresh test's signal. Test review arc complete.

@@ -111,12 +111,22 @@
               ;; lets us assert the absence of the refresh observably, without
               ;; reaching into the handler-registry pure-result internals.
               ctx        (assoc ctx0 :refresh-system-prompt-fn
-                                (fn [& _] (reset! refreshed? true)))
-              result     (session/dispatch-in! ctx :session/reload-prompts
-                                               {:session-id session-id})]
-          (is (true? (:reloaded? result)))
-          ;; No system-prompt refresh side effect crossed the boundary.
-          (is (false? @refreshed?)))
+                                (fn [& _] (reset! refreshed? true)))]
+          ;; Positive control: an event known to emit
+          ;; :runtime/refresh-system-prompt must flip the recorder, proving the
+          ;; rebound callback is live in this ctx and the effect path runs — so
+          ;; the absence assertion below cannot pass vacuously.
+          (session/dispatch-in! ctx :session/set-prompt-component-selection
+                                {:session-id session-id :selection {}})
+          (is (true? @refreshed?)
+              "recorder fires when a refresh-emitting event is dispatched")
+          ;; Reset and assert reload leaves the recorder untouched.
+          (reset! refreshed? false)
+          (let [result (session/dispatch-in! ctx :session/reload-prompts
+                                             {:session-id session-id})]
+            (is (true? (:reloaded? result)))
+            ;; No system-prompt refresh side effect crossed the boundary.
+            (is (false? @refreshed?))))
         (finally (delete-tree! wt))))))
 
 (deftest reload-prompts-in-core-fn-surfaces-return-test

@@ -214,17 +214,15 @@ Done (2026-06-01, this pass):
 
 ## Test-shaper second-pass follow-ups (2026-06-01)
 
-- [ ] TS4: Add a positive control to
-      `reload-prompts-does-not-refresh-system-prompt-test`. The test asserts
-      `(false? @refreshed?)` (absence) but never proves the rebound
-      `:refresh-system-prompt-fn` recorder would fire if a
-      `:runtime/refresh-system-prompt` effect were emitted — so it can pass
-      vacuously. In the same ctx, dispatch an event known to emit the refresh
-      effect (e.g. `:session/set-skills` / `:session/set-active-tools`) and
-      assert the recorder flips to `true`, **then** reset and assert reload
-      leaves it `false`. Keep `single_concern` in mind — if the positive
-      control dilutes focus more than it adds signal, instead document (in a
-      test comment) the verified code path (`dispatch_effects.clj:199` →
-      `:refresh-system-prompt-fn`; `context.clj:193-194` wires the real
-      `:execute-effect-fn`) that establishes the recorder is live; prefer the
-      real positive-control assertion.
+- [x] TS4: Added the real positive control to
+      `reload-prompts-does-not-refresh-system-prompt-test`. In the same ctx, the
+      test first dispatches `:session/set-prompt-component-selection` (a handler
+      that emits exactly one `:runtime/refresh-system-prompt` effect — chosen
+      over `:session/set-active-tools`, which also emits
+      `:runtime/agent-set-tools`, and `:session/set-skills`, which needs skill
+      setup) and asserts the recorder flips to `true` (proving the rebound
+      `:refresh-system-prompt-fn` is live and the effect path runs in the test
+      ctx). It then resets the recorder and asserts reload leaves it `false`.
+      The absence assertion can no longer pass vacuously: a wrong rebind key or
+      inert effect path now fails the positive-control `is`. Focused ns green
+      (8 tests / 35 assertions, +1); `clj-kondo` 0/0.
