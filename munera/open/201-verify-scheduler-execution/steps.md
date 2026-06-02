@@ -1591,3 +1591,24 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       files only — `git rm` of one `components/agent-session/test/**` file + the
       task-dir `findings.md`/`steps.md`; zero `components/agent-session/src/**` or
       `doc/scheduler.md` (verification-only invariant; Slice-10 allowlist held).
+
+## Test-shaper follow-ups — pass 20 (test-shaper, 2026-06-01)
+
+- [ ] Relabel the misleading `testing` block in
+      `scheduler-test/drain-one-test` (L119): "drain-one is FIFO by queue order
+      when session is idle". `drain-one` sorts by `[fire-at created-at
+      schedule-id]` (`scheduler.clj:262-264`), not FIFO-by-insertion; the block's
+      setup queues sch-a (fire-at 18:05:00) then sch-b (18:05:01) so insertion
+      order coincidentally equals fire-at order, making the docstring assert a
+      non-existent contract and the test unable to catch a FIFO-insertion
+      regression (`meaningful_failures` gap). It also contradicts the sibling
+      `drain-one-orders-by-fire-at-not-queue-insertion-order-test` in the same
+      file. Reword to "drain-one delivers the earliest fire-at when session is
+      idle" (sch-a is both first-inserted and earliest fire-at here, so the
+      assertions stand). Optionally add a one-line comment that the dedicated
+      ordering test proves the sort when insertion ≠ fire-at order. test-shaper
+      `behavior_focused ∧ meaningful_failures ∧ consistent(naming)`.
+      Assertions unchanged; deftest name unchanged → `findings.md` Pure-model
+      citations stable. Test-file-only (Slice-10 allowlist — zero
+      `components/agent-session/src/**` or `doc/scheduler.md`); keep the suite
+      green + clj-kondo/cljfmt clean.

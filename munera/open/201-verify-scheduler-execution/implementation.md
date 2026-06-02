@@ -2448,3 +2448,33 @@ Verify: full `bb test` green; 12 remaining scheduler ns together =
 Test/task-doc only — `git rm` of one `test/**` file + task-dir docs; zero
 `components/agent-session/src/**` or `doc/scheduler.md` (Slice-10 allowlist
 held; verification-only invariant intact). No blocking reason — step complete.
+
+## Test-shaper review — pass 20 (test-shaper, 2026-06-01)
+
+Re-audit of the 201 new/extended scheduler tests against `behavior_focused ∧
+meaningful_failures ∧ consistent(naming)`. The new pure-model / live-round-trip
+/ seam / shutdown / resolver / psi-tool tests are well-shaped (deterministic via
+the time/timer seams, state-based assertions, named-message failure assertions,
+no fire-by-sleep). The baseline
+`scheduler-timer-seam-test/scheduler-cancelled-default-delay-thread-...` is a
+legitimate real-concurrency boundary test (interrupts the *default* daemon path;
+its `Thread/sleep 10` is a bounded join-poll, not a fire-delay) — not a
+no-wall-clock-firing violation; left as-is.
+
+One actionable finding (`behavior_focused` / `meaningful_failures` /
+`consistent(naming)`): `scheduler-test/drain-one-test` line 119 carries the
+docstring **"drain-one is FIFO by queue order when session is idle"**. This is
+the wrong invariant — `drain-one` sorts by `[fire-at created-at schedule-id]`
+(`scheduler.clj:262-264`), never FIFO-by-insertion. The test's setup queues
+sch-a (fire-at 18:05:00) then sch-b (18:05:01), so insertion order *happens to
+equal* fire-at order and the test passes either way — it cannot distinguish the
+real fire-at sort from a buggy FIFO-insertion drain (so it would stay green
+under that regression: a meaningless-failure gap). Worse, it directly
+contradicts the sibling
+`drain-one-orders-by-fire-at-not-queue-insertion-order-test` in the same file,
+which proves the fire-at sort. The implementation log (Slice-1) already noted
+this old test "can't distinguish sort-by-fire-at from FIFO-by-insertion" but the
+misleading docstring was never corrected. Relabel the block to state it drains
+the earliest fire-at (= sch-a here), removing the false FIFO-by-insertion claim
+and the cross-test contradiction. Cosmetic/label-only (assertions unchanged,
+deftest name unchanged → `findings.md` citations stable).
