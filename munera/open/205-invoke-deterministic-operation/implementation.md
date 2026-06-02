@@ -256,3 +256,35 @@ Decisions:
 
 No code touched (plan/steps-review resolution only — implementation slices not
 yet started). No blocked steps.
+
+## Plan/steps inconsistency review (ψ)
+
+Reviewed plan.md + steps.md for internal/cross-file inconsistency; grounded
+against psi_tool.clj (validate-psi-tool-request `:as args` binding L105–106,
+outer-catch `case action` L765 reads `(get args "op")`, schema `:op` enum L52),
+psi_tool_workflow.clj (parse-workflow-input-string), step_execution.clj
+(workflow invoke-spec positional operation-id), defs.clj (result schemas).
+Two actionable inconsistencies:
+
+1. **`args` destructuring collides with `:as args` request-map binding.** Slice-2
+   steps say "add `operation-id`/`args` to destructuring" in
+   `validate-psi-tool-request`, but that fn binds the *whole request map* `:as
+   args` (used at L106 `(psi-tool-action args)` and by the outer catch L765
+   `(get args "op")`). Adding a `:strs` entry `args` (the `"args"` EDN-map-string
+   param) shadows/conflicts with the `:as args` binding → breaks
+   `psi-tool-action` dispatch. The steps must read the EDN-map param via a
+   distinct binding (e.g. `(get args "args")` or destructure under a different
+   symbol like `operation-args`), not add `args` to `:strs`.
+
+2. **Slice-1 declares `clojure.edn` + `clojure.string` requires no slice-1
+   function uses.** Slice-1's five functions (`list-operations`,
+   `build-invocation`, `invoke-operation`, `truncate-value`, `project-result`)
+   use only core fns — `truncate-value` is `subs`/`str`/`count`, not
+   `clojure.string`; EDN `args` parsing is a slice-2 concern living in
+   `validate-psi-tool-request` (D1/D5), not slice-1. Requiring `clojure.edn`/
+   `clojure.string` in slice-1 contradicts the same slice's `clj-kondo --lint`
+   step (unused-namespace warning). Drop both requires from slice-1; add
+   `clojure.edn` only in slice-2 if the parse helper is placed in the shared ns.
+
+No code touched (plan/steps inconsistency review only — implementation slices
+not yet started). No blocked steps.

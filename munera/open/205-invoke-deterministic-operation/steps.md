@@ -198,6 +198,22 @@
   → **D5** (plan.md): `args` parsed only on the `"invoke"` branch; `list` skips
   it. Slice-2 step + test updated.
 
+## Plan/steps inconsistency follow-ups (ψ)
+
+- [ ] (INC-1) Fix the `args` binding collision in `validate-psi-tool-request`:
+  do **not** add `args` to the fn's `:strs` destructuring (it already binds the
+  whole request map `:as args`, used by `(psi-tool-action args)` and the
+  outer-catch `(get args "op")`). Read the `"args"` EDN-map-string param via a
+  distinct binding (`(get args "args")` or a separate symbol e.g.
+  `operation-args`). Update the slice-2 "add `operation-id`/`args` to
+  destructuring" item accordingly.
+- [ ] (INC-2) Remove `clojure.edn` and `clojure.string` from the slice-1
+  `deterministic-operation-action` ns requires — no slice-1 function uses them
+  (`truncate-value` uses core `subs`/`str`/`count`; `args` EDN parsing is a
+  slice-2 concern per D1/D5). Add `clojure.edn` only in slice-2 if the EDN
+  parse helper is placed in the shared ns. Update the slice-1 require step so it
+  passes `clj-kondo --lint` (no unused namespace).
+
 ## Close-out
 
 - [ ] Re-read design acceptance criteria; confirm each is covered by a test.
