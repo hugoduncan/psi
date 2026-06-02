@@ -1126,3 +1126,44 @@ PASS_STATUS: ACTIONABLE_FEEDBACK
   both consumers — the asymmetry TT4 flagged is closed.
 
 PASS_STATUS: NO_ACTIONABLE_FEEDBACK
+
+## 2026-06-01 — Implementation review (task-implementation-review), pass 4
+
+Scope: implementation quality (design-fit, architecture-fit, new-vs-existing
+pattern, unnecessary abstraction, structural perf). Independent re-read of the
+landed code across all three layers + tests + docs, and **independent
+verification** (not trusting prior notes):
+- `commands/builtin_specs.clj`: single ordered `builtin-command-specs` table is
+  the sole name source; `exact-command-handlers`/`prefixed-command-prefixes`/
+  `builtin-command-names`/`builtin-help-block`/`builtin-command-specs-for-resolver`
+  are all pure projections. Leaf ns (only `clojure.string`) → no load cycle. ✓
+- `commands.clj`: both `case` seams live-locked — `prefixed-case-branches` (R1)
+  and `exact-case-branches` (R2) each with a load-time `assert` against the
+  spec-table projection; `format-help` consumes `bspec/builtin-help-block`. ✓
+- `resolvers/extensions.clj`: `builtin-commands-resolver` mirrors
+  `extension-commands-resolver`; input-free `::pco/input []` deviation documented
+  in its docstring (R3, static specs ⇒ no session ctx). Registered in the
+  `resolvers` vector. ✓
+- TUI `autocomplete.clj` sources built-ins purely from `(:builtin-command-specs
+  state)`; `shared.clj/builtin-slash-commands` gone (grep confirms no
+  `builtin-slash-commands` reference remains in `components/tui`). ✓
+- Emacs `psi-completion.el` defcustom trimmed to `/skill:`; backend specs
+  prepended (first-wins). ✓
+- CHANGELOG `[Unreleased]` + `doc/architecture.md` accurately describe the
+  single-source spec-table → resolver → UI-projection surfacing. ✓
+
+Independently re-ran the suites green:
+- `commands-builtin-specs-test` + `builtin-commands-resolver-test` → 12 tests,
+  213 assertions, 0 failures.
+- TUI `app-input-selector-test` → 14 tests, 38 assertions, 0 failures.
+- `bb emacs:check` → 325/325, 0 unexpected.
+- clj-kondo over the 3 changed src files → 0 errors, 0 warnings.
+
+No new actionable findings. Single keyed table is the sole name source; every
+surface is a pure projection; both `case` seams are live-locked; resolver reuses
+the extension-command-names pattern (no new pattern, no unnecessary abstraction);
+no structural perf concern (compile-time constant table). R1/R2/R3 and TT1–TT4
+from prior passes are verified resolved. Design-fit, architecture-fit, and all
+ACs (AC1–AC8) hold.
+
+PASS_STATUS: REVIEW_COMPLETE
