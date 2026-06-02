@@ -920,3 +920,35 @@ Executed CS1 + CS2 together as a single naming rename (no behaviour change).
 - Verification: `clj-kondo` 0/0 over `commands.clj` + `commands_test.clj`;
   full `bb test` green (✅ All tests passed). No mutation/handler/core surface
   touched — those symbols were already verb-first.
+
+## Code-shaper review — second pass (2026-06-01)
+
+Re-ran code-shaper (simplicity ∧ consistency ∧ robustness) over the production
+surfaces after the CS1/CS2 rename: handler
+(`session_mutations.clj:290-302`), settings fn (`session_settings.clj:157-162`),
+core re-export (`core.clj:187-192`), mutation (`mutations/prompts.clj:34-45`),
+command (`commands.clj:268-276` + `/help:139` + `exact-command-handlers:678` +
+case `779`), and `discover-templates` (`prompt_templates.clj:301-331`).
+
+Verified high-quality (no new finding):
+- ✅ simple — handler is the single IO+replace point; settings/core/mutation/
+  command are thin single-responsibility pass-throughs; no
+  computation/flow-control mixing; locally comprehensible.
+- ✅ consistent — naming now uniformly verb-first across **all** surfaces
+  (CS1/CS2 fixed: `/reload-prompts`, `:reload-prompts`, `format-reload-prompts`
+  match `/reload-models` family); `{:reloaded? :count :worktree}` return shape,
+  `[ctx session-id]` arg order, and docstrings mirror the reload family;
+  `format-reload-prompts` banner/label style matches `format-reload-models`;
+  mutation `(boolean …)`/`(or count 0)` mirrors `add-prompt-template`.
+- ✅ robust — `discover-template-files` `(.exists d)` guard ⇒ absent/empty dir
+  yields `[]` (T1 boundary tested); pure handler, single `:root-state-update`,
+  no orthogonality violation.
+
+Pre-existing, already-resolved (not re-raised):
+- In-handler file IO and the mutation's `core/reload-prompts-in!` (vs
+  `add-prompt-template`'s `dispatch/dispatch!`) idiom split are the documented,
+  deliberately-resolved decisions (design Architectural alignment + steps I2);
+  no shape defect.
+
+Result: no new actionable code-shape findings. CS1/CS2 from the first pass are
+executed and verified. Code is simple, consistent, and robust.

@@ -254,3 +254,13 @@ Done (2026-06-01, this pass):
       `format-reload-prompts` (defn + its case-arm call site in `commands.clj`),
       matching `format-reload-models` / `format-reload-extension-installs` and
       the renamed command. `clj-kondo` 0/0; full `bb test` green.
+
+## Code-shaper second-pass follow-ups (2026-06-01)
+
+- [x] Re-ran code-shaper independently over the production surfaces post-CS1/CS2
+      rename (handler / settings / core / mutation / command / discover). All
+      simple ∧ consistent ∧ robust; naming now uniformly verb-first. The
+      in-handler IO and `core/`-vs-`dispatch/` mutation idiom split are the
+      documented, already-resolved decisions (design Architectural alignment +
+      I2). No new actionable findings (see implementation.md "Code-shaper
+      review — second pass"). Review complete.
