@@ -1388,3 +1388,57 @@ PASS_STATUS: REVIEW_COMPLETE
   test-coverage lock over already-correct behaviour (AC1 was already satisfied;
   the resolver projects in table order via `builtin-command-specs-for-resolver`'s
   ordered `for` over the `array-map`).
+
+## 2026-06-01 — Test review (test-shaper), pass 7
+
+Independent test-shaper re-read of the full net-new test surface
+(`commands_builtin_specs_test.clj` 11t/192a, `builtin_commands_resolver_test.clj`
+3t/26a, TUI `app_input_selector_test.clj` 14t/38a, Emacs `psi-capf-test.el`)
+against the source seams (`commands/builtin_specs.clj`, `commands.clj`
+`dispatch*`/`format-help`, `resolvers/extensions.clj`, TUI
+`autocomplete.clj` `slash-candidates`, Emacs
+`psi-completion.el`/`psi-events.el`). All four suites run green (backend 11+3,
+TUI 14, Emacs 325/325 reported).
+
+Confirmed strengths (R1–R3, TT1–TT7 all landed): infra-dep hygiene clean (no
+mocks/stubs; injected real boundary fns + live Pathom graph + real
+`psi-emacs-state` structs); single-source locks (well-formedness TT3, resolver
+shape/full-order TT7 + description content TT1, help-block full line order TT5,
+`:hide-in-help?` block projection TT2, both `case` seams R1/R2, dual-kind
+exact-first seam TT6, empty-specs→none on both UIs TT4); behaviour-focused
+state assertions throughout.
+
+### New actionable (TS1)
+
+- TS1 — **built-in ↔ template/extension name-collision dedup is untested on
+  both UIs.** Task 205 newly folds `builtin-command-specs` into the TUI
+  `slash-candidates` `(concat builtins templates skills ext-cmds)` →
+  `distinct` (autocomplete.clj:61-63) and into the Emacs
+  `psi-emacs--state-slash-command-specs` merge (`seq-uniq`, backend-first). A
+  built-in name that also appears as a prompt-template or extension command is
+  therefore deduped to a single candidate — new behaviour introduced by this
+  task. But no test exercises a built-in colliding with a template/extension:
+  - TUI: `autocomplete-slash-includes-backend-builtin-commands-test` seeds only
+    built-ins; the dedup path (`distinct`) is never driven with a built-in name
+    equal to a template/ext-cmd, so a regression dropping `distinct` (or merging
+    in an order that emits two `/resume` entries) passes every TUI test.
+  - Emacs: `psi-capf-slash-dedupes-command-template-collision-by-command-name`
+    seeds a `resume` *template* but NO `:builtin-command-specs`, and the trimmed
+    defcustom default has no `/resume`, so it does not actually exercise a
+    built-in↔template collision either; the backend-first `seq-uniq` merge is
+    only proven for the desc-wins case (`/help` backend vs stale custom), not for
+    a built-in vs a *template/extension* of the same name.
+
+  This is symmetric to the existing desc-wins (TT-era) and empty-specs (TT4)
+  locks but covers the *dedup* contract of the newly added source. Add narrow
+  collision tests:
+  - TUI: seed `:builtin-command-specs [{:name "resume" …}]` AND
+    `:prompt-templates [{:name "resume" …}]` (or `:extension-command-names
+    ["resume"]`), open `/re`, assert exactly one `/resume` candidate.
+  - Emacs: seed `:builtin-command-specs '((( :name . "resume") …))` AND a
+    `resume` `:prompt-templates`/`:extension-command-names`, `/re`, assert
+    `(= 1 (length (seq-filter (lambda (c) (equal c "/resume")) cands)))`.
+
+  Pure test-coverage locks over already-correct behaviour (both UIs already
+  dedup); no source change expected. See steps.md "Test review follow-ups
+  (review pass 7)".

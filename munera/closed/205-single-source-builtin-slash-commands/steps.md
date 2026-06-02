@@ -375,3 +375,27 @@ Tick with sha/decision on completion.
       `(mapv #(bspec/strip-slash (key %)) bspec/builtin-command-specs)`
       (the full, interleaved spec-table key order, stripped), locking the whole
       output sequence — not just the leading triple — to the single source.
+
+## Test review follow-ups (review pass 7)
+
+- [ ] TS1 — Lock the built-in ↔ template/extension name-collision *dedup*
+      contract newly introduced by folding `builtin-command-specs` into both UIs'
+      candidate sources (TUI `slash-candidates` `(concat builtins templates
+      skills ext-cmds)` → `distinct`, autocomplete.clj:61-63; Emacs
+      `psi-emacs--state-slash-command-specs` backend-first `seq-uniq` merge). No
+      current test drives a built-in name equal to a template/extension name, so
+      a regression dropping `distinct`/`seq-uniq` (or merging so two same-named
+      candidates survive) passes every UI test —
+      `autocomplete-slash-includes-backend-builtin-commands-test` seeds only
+      built-ins, and `psi-capf-slash-dedupes-command-template-collision-by-command-name`
+      seeds a `resume` template with NO `:builtin-command-specs` (and the trimmed
+      defcustom has no `/resume`), so neither exercises a built-in↔template/ext
+      collision. Add:
+      - TUI: seed both `:builtin-command-specs [{:name "resume" ...}]` and
+        `:prompt-templates [{:name "resume" ...}]` (or `:extension-command-names
+        ["resume"]`), open `/re`, assert exactly one `/resume` candidate.
+      - Emacs: seed both `:builtin-command-specs '((( :name . "resume") ...))`
+        and a `resume` `:prompt-templates`/`:extension-command-names`, `/re`,
+        assert `(= 1 (length (seq-filter (lambda (c) (equal c "/resume")) cands)))`.
+      Pure test-coverage locks over already-correct dedup behaviour; no source
+      change expected.
