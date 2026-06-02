@@ -378,7 +378,26 @@ Tick with sha/decision on completion.
 
 ## Test review follow-ups (review pass 7)
 
-- [ ] TS1 — Lock the built-in ↔ template/extension name-collision *dedup*
+- [x] TS1 — Locked the built-in ↔ template/extension name-collision *dedup*
+      contract on both UIs (pure test-coverage; no source change). TUI: added
+      `autocomplete-slash-dedupes-builtin-template-collision-test`
+      (`app_input_selector_test.clj`) — seeds `:builtin-command-specs
+      [{:name "resume" …}]` plus `:prompt-templates [{:name "resume"}]` (and a
+      second arm with `:extension-command-names ["resume"]`), opens `/`, asserts
+      exactly one `/resume` candidate — driving the `slash-candidates`
+      `(concat builtins templates skills ext-cmds)` → `distinct` seam with a
+      genuine built-in↔template/ext collision (15t/40a, was 14t/38a). Emacs:
+      added `psi-capf-slash-dedupes-builtin-template-collision-by-command-name`
+      and `…-builtin-extension-collision-by-command-name` (`psi-capf-test.el`) —
+      seed `:builtin-command-specs '(((:name . "resume")(:description . "resume
+      the session")))` plus a `resume` template / `:extension-command-names`,
+      `/re`, assert exactly one `/resume` candidate; the template arm also asserts
+      backend-wins (`"resume the session"` description survives the
+      `seq-uniq`). So a regression dropping `distinct`/`seq-uniq` — or merging so
+      two same-named candidates survive — now fails (AC6/AC7). `bb emacs:check`
+      327/327 green (+2); TUI suite green; clj-kondo clean.
+      Original item text:
+      Lock the built-in ↔ template/extension name-collision *dedup*
       contract newly introduced by folding `builtin-command-specs` into both UIs'
       candidate sources (TUI `slash-candidates` `(concat builtins templates
       skills ext-cmds)` → `distinct`, autocomplete.clj:61-63; Emacs

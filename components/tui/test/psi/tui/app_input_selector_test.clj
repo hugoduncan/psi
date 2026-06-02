@@ -204,6 +204,30 @@
       (is (not (contains? cand-vals "/quit"))
           "with empty backend specs no built-in slash command is offered"))))
 
+(deftest autocomplete-slash-dedupes-builtin-template-collision-test
+  ;; TS1: built-in specs are folded into the same candidate set as prompt
+  ;; templates / extension commands and deduped via `distinct` in
+  ;; slash-candidates. A built-in name colliding with a template (or extension
+  ;; command) name must yield exactly one candidate, not two.
+  (testing "a built-in colliding with a prompt template yields one /resume candidate"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (assoc (init-state)
+                           :builtin-command-specs [{:name "resume" :description "resume the session"}]
+                           :prompt-templates [{:name "resume"}])
+          [s1 _]    (update-fn state (msg/key-press "/"))
+          cand-vals (mapv :value (get-in s1 [:prompt-input-state :autocomplete :candidates]))]
+      (is (= 1 (count (filter #{"/resume"} cand-vals)))
+          "built-in/template name collision is deduped to a single candidate")))
+  (testing "a built-in colliding with an extension command yields one /resume candidate"
+    (let [update-fn (app/make-update (stub-agent-fn ""))
+          state     (assoc (init-state)
+                           :builtin-command-specs [{:name "resume" :description "resume the session"}]
+                           :extension-command-names ["resume"])
+          [s1 _]    (update-fn state (msg/key-press "/"))
+          cand-vals (mapv :value (get-in s1 [:prompt-input-state :autocomplete :candidates]))]
+      (is (= 1 (count (filter #{"/resume"} cand-vals)))
+          "built-in/extension name collision is deduped to a single candidate"))))
+
 (deftest autocomplete-accept-on-enter-submits-slash-test
   (testing "enter accepts selected slash suggestion and submits"
     (let [submitted (atom nil)

@@ -182,6 +182,48 @@ list — would make this fail. Only the Emacs-only `/skill:' affordance survives
       (should capf)
       (should (= 1 (length (seq-filter (lambda (cand) (equal cand "/resume")) cands)))))))
 
+(ert-deftest psi-capf-slash-dedupes-builtin-template-collision-by-command-name ()
+  "TS1: a backend built-in command colliding by name with a prompt template is
+deduped to a single candidate by the backend-first `seq-uniq' merge in
+`psi-emacs--state-slash-command-specs'. A regression dropping `seq-uniq' (or
+merging so two same-named candidates survive) would fail. Symmetric to the TUI
+built-in/template dedup lock."
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state
+                (make-psi-emacs-state
+                 :builtin-command-specs '((( :name . "resume")
+                                           (:description . "resume the session")))
+                 :prompt-templates '((( :name . "resume")
+                                      (:description . "Shadow resume template")))))
+    (insert "/re")
+    (let* ((capf (psi-emacs-prompt-capf))
+           (table (nth 2 capf))
+           (cands (all-completions "/re" table)))
+      (should capf)
+      (should (= 1 (length (seq-filter (lambda (cand) (equal cand "/resume")) cands))))
+      ;; Backend wins on collision: the built-in description survives.
+      (should (equal "resume the session"
+                     (cdr (assoc "/resume" (psi-emacs--state-slash-command-specs))))))))
+
+(ert-deftest psi-capf-slash-dedupes-builtin-extension-collision-by-command-name ()
+  "TS1: a backend built-in command colliding by name with an extension command
+is deduped to a single candidate. A regression dropping the backend-first
+`seq-uniq' merge would fail."
+  (with-temp-buffer
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state
+                (make-psi-emacs-state
+                 :builtin-command-specs '((( :name . "resume")
+                                           (:description . "resume the session")))
+                 :extension-command-names '("resume")))
+    (insert "/re")
+    (let* ((capf (psi-emacs-prompt-capf))
+           (table (nth 2 capf))
+           (cands (all-completions "/re" table)))
+      (should capf)
+      (should (= 1 (length (seq-filter (lambda (cand) (equal cand "/resume")) cands)))))))
+
 (ert-deftest psi-session-updated-applies-inline-slash-completion-state-when-changed ()
   (with-temp-buffer
     (psi-emacs-mode)

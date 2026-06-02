@@ -1442,3 +1442,46 @@ state assertions throughout.
   Pure test-coverage locks over already-correct behaviour (both UIs already
   dedup); no source change expected. See steps.md "Test review follow-ups
   (review pass 7)".
+
+## Follow-up execution — review pass 7 (TS1)
+
+- TS1 (DONE): Locked the built-in ↔ template/extension name-collision *dedup*
+  contract that task 205 newly introduced by folding `builtin-command-specs`
+  into both UIs' candidate sources. Pure test-coverage; both UIs already dedup
+  correctly, so no source change was made.
+
+  - TUI: added `autocomplete-slash-dedupes-builtin-template-collision-test`
+    (`components/tui/test/psi/tui/app_input_selector_test.clj`) with two arms —
+    `:builtin-command-specs [{:name "resume" …}]` colliding with (a) a
+    `:prompt-templates [{:name "resume"}]` entry and (b) an
+    `:extension-command-names ["resume"]` entry. Opens `/`, asserts exactly one
+    `/resume` candidate via `(filter #{"/resume"} cand-vals)`. This is the first
+    test to drive `slash-candidates`'s `(concat builtins templates skills
+    ext-cmds)` → `distinct` (autocomplete.clj:61-63) with a built-in name equal
+    to a template/ext-cmd name; the existing
+    `autocomplete-slash-includes-backend-builtin-commands-test` seeds only
+    built-ins. A regression dropping `distinct` (or merging two `/resume`
+    entries) now fails. Suite: 15t/40a (was 14t/38a).
+
+  - Emacs: added `psi-capf-slash-dedupes-builtin-template-collision-by-command-name`
+    and `psi-capf-slash-dedupes-builtin-extension-collision-by-command-name`
+    (`components/emacs-ui/test/psi-capf-test.el`). Each seeds
+    `:builtin-command-specs '(((:name . "resume")(:description . "resume the
+    session")))` plus a colliding `resume` `:prompt-templates` /
+    `:extension-command-names`, completes `/re`, and asserts exactly one
+    `/resume` candidate (`seq-filter` length 1) — driving the backend-first
+    `seq-uniq` merge in `psi-emacs--state-slash-command-specs` against a genuine
+    built-in↔template/ext collision (the pre-existing
+    `psi-capf-slash-dedupes-command-template-collision-by-command-name` seeds a
+    template with NO built-in specs, and the desc-wins test seeds backend vs a
+    stale *custom* `/help`, not a *template/extension* of the same name). The
+    template arm additionally asserts backend-wins on collision (the built-in
+    `"resume the session"` description survives). `bb emacs:check` 327/327 green
+    (+2 deftests; was 325).
+
+  Verification: TUI `psi.tui.app-input-selector-test` 15t/40a 0 failures;
+  `bb emacs:check` 327/327; clj-kondo clean on the changed Clojure test file. No
+  source/doc/changelog change: TS1 is a pure dedup-coverage lock over
+  already-correct behaviour (AC6/AC7 were already satisfied — both UIs dedup via
+  `distinct`/`seq-uniq`). Closes the pass-7 test-shaper finding that no test
+  exercised a built-in name colliding with a template/extension on either UI.
