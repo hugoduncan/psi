@@ -2110,3 +2110,31 @@ Executed the pass-10 findings-accuracy follow-up: corrected the inaccurate
 - **Scope held.** `findings.md` (+ `steps.md`/`implementation.md` notes) only —
   zero `components/agent-session/src/**` or `doc/scheduler.md` change; no test
   code touched. Verification-only invariant + Slice-10 allowlist held.
+
+## Test review — pass 14 (task-test-review, 2026-06-01) — REVIEW_COMPLETE
+
+Re-applied the task-test-review skill (well_formed ∧ behaviour-coverage ∧
+infra_deps→injectable∧nullable∧¬mock∧¬stub) fresh against the current state
+(HEAD `949bc032b`, after pass-10's findings L62 citation fix). No new actionable
+issue; review chain remains converged.
+
+- **well_formed** ✓ — verified at runtime (not just from log): `clj-kondo`
+  0/0 across all 8 in-scope scheduler test files; full `bb test` "✅ All tests
+  passed".
+- **behaviour-coverage** ✓ — all 7 design Scope areas + every acceptance
+  criterion (message/session live round trip via timer seam, busy-queue+drain,
+  both cancel races, failure recording, shutdown timer cleanup, `:at` matrix,
+  projection rich-attrs) map to a cited covering deftest in `findings.md`.
+- **infra_deps → injectable ∧ ¬stub** ✓ — every 201-added/cited covering test
+  drives infra via ctx-injected seams (`:scheduler-run-after-delay-fn`,
+  `:execute-prepared-request-fn`, `kernel/register-handler!`) and asserts
+  observable state, not interactions. The two surviving `with-redefs` sites
+  (`scheduler_effects_test/scheduler-start-and-cancel-timer-effects-test`,
+  `scheduler_lifecycle_test/scheduled-deliver-runs-canonical-prompt-lifecycle-test`)
+  are pre-existing baseline, **non-cited** — re-confirmed
+  `scheduled-deliver-runs-canonical-prompt-lifecycle` appears only in the
+  Baseline inventory (`findings.md` L69), not as a covering test for any
+  acceptance area. Already evaluated & scoped out in passes 6–11; not re-filed
+  (no-duplicate).
+
+No follow-up steps added. Review converged → REVIEW_COMPLETE.
