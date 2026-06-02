@@ -1892,3 +1892,38 @@ loadable precedent. `doc/workflows.md`'s single `implement-task-in-worktree.md`
 mention is a plain workflow-listing line (not a 204 precedent claim), so it
 remains coherent; no doc/workflow/skill/test change made. design(spec) ↔
 implementation grounding contradiction closed. `steps.md` F6 item checked.
+
+## Implementation review — pass 7 (task-implementation-review skill)
+
+◈ Independent review pass applying `task-implementation-review`
+(`matches(code,design) ∧ follows(code,architecture) ∧ ¬redundant-pattern ∧
+¬unnecessary-abstraction ∧ ¬structural-perf-issue`). Verified against live
+runtime + code, not just artifacts:
+
+- **Loadability + tests:** both workflows load; focused suite green
+  (17 tests, 243 assertions, 0 failures); `clj-kondo` 0 findings on the two
+  changed test nss.
+- **design↔code match:** SKILL.md encodes the `gap` method, `lcc-total ≥ 5.0 ∧
+  gap ≥ 2.0` filter, top-5 guard, evidence + coverage-hint, and the
+  `(ns, var, arity, line)` join (F2–F5 all landed). `reduce-incidental-complexity.edn`
+  matches the two-step shape; `task-lifecycle-in-worktree.edn` matches the
+  three-step P1 wrapper shape; generated two-phase contract is verbatim.
+- **Live grounding re-confirmed:** `bb gordian gate --help` shows `--fail-on`,
+  `--max-new-medium-findings`, `--max-new-high-findings` (A3 flags real);
+  `bb gordian local --json` units carry `lcc-total`/`findings`/`line`/`end-line`
+  (skill recipe field references real).
+- **Architecture fit (worktree continuity):** confirmed at code level —
+  `child_session_state.clj` copies `(:worktree-path parent-sd)` into the child
+  session, so the wrapper's `resolve-worktree` `:session` `work-on` call sets the
+  wrapper-session worktree which the inner `lifecycle` `:delegate` child inherits.
+  The verified wrapper pattern (re-call `work-on`, not bare sibling inheritance)
+  is sound and honours `one_way`.
+- **Coherence:** `doc/workflows.md` + `CHANGELOG.md [Unreleased]` document the
+  workflow + skill; join key, thresholds, gate flags, handoff fields, no-push/PR
+  endpoint all consistent across design/skill/workflows/docs.
+
+Found **no new actionable issues**. The only unchecked steps.md item is the
+explicitly-non-planned step-1-split contingency (gated on "only if step-1 proves
+unwieldy" — it did not). The six implementation + eight test review follow-ups
+(F1–F6, TR1–TR8) are all resolved. Implementation quality: simple, consistent,
+robust; behaviour-preserving contract objective and enforced. REVIEW_COMPLETE.
