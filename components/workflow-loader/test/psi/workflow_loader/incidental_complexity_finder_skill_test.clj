@@ -70,7 +70,29 @@
       (is (.contains body "(ns, var, arity, line)")
           "documents the (ns, var, arity, line) join key (F2)")
       (is (.contains body "@line")
-          "documents the @line key suffix that makes the join key unique"))))
+          "documents the @line key suffix that makes the join key unique"))
+    (testing "encodes the step-5 top-5 essential-vs-incidental judgment guard (TR3)"
+      ;; The design's core discriminator (Locked decisions 1/2/9). Without the
+      ;; top-5 judgment procedure the skill degenerates to the `gordian
+      ;; complexity` ranking it exists *not* to be — the locked high-cc-alone
+      ;; string above is the rationale, not this procedure.
+      (is (.contains body "top 5 qualifying units by `gap`")
+          "instructs reading the top 5 qualifying units by gap")
+      (is (.contains body "Reject as **essential**")
+          "encodes the essential-complexity rejection (false positives)")
+      (is (.contains body "Choose the first unit (highest `gap`) that passes the guard")
+          "chooses the first guard-passing unit by gap")
+      (is (.contains body "If none of the top 5 pass")
+          "reports no target when none of the top 5 pass the guard"))
+    (testing "encodes the step-6 evidence + coverage-hint emission (TR3)"
+      ;; The design's first acceptance is "produces a target + evidence", and
+      ;; the coverage hint is a named required emitted field.
+      (is (.contains body "coverage hint")
+          "emits a coverage hint with the chosen target")
+      (is (re-find #"(?s)sibling test namespace exists for the target" body)
+          "coverage hint reports whether a sibling test namespace exists")
+      (is (re-find #"(?s)any test references the target `var`" body)
+          "coverage hint reports whether any test references the target var"))))
 
 (deftest incidental-complexity-finder-recipe-determinism-test
   ;; TR1 (executable lock for the F2 determinism fix the prior passes deferred):

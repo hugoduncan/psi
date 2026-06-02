@@ -425,7 +425,7 @@ with the commit sha / decision when done.
 
 ## Test review follow-ups (review pass 2)
 
-- [ ] TR3 — `incidental-complexity-finder-skill-content-lock-test` (added by TR1)
+- [x] TR3 — `incidental-complexity-finder-skill-content-lock-test` (added by TR1)
       locks the gap method, thresholds, single-unit scope, the high-cc-alone
       guard string, the A1 drop rule, and the F2 `@line` key — but **omits two
       named Deliverable-1 behaviours**, so a SKILL.md regress dropping them passes
@@ -448,6 +448,22 @@ with the commit sha / decision when done.
       ("coverage hint", sibling-test-ns / references-the-target-var wording).
       SKILL.md already carries all these strings (lines 78, 121–139, 152).
       Test-only change.
+      RESOLUTION: extended `incidental-complexity-finder-skill-content-lock-test`
+      with two new `testing` blocks (test-only; same skill-test ns — the
+      content-lock test now lives in `incidental_complexity_finder_skill_test.clj`,
+      split out of `workflow_definitions_test.clj` to stay under the 800-line
+      `components/` file-length guard; no new production Clojure). (a) step-5
+      judgment guard: locks "top 5 qualifying units by `gap`", "Reject as
+      **essential**", "Choose the first unit (highest `gap`) that passes the
+      guard", and "If none of the top 5 pass" — so a SKILL.md that dropped step 5
+      (degenerating to the `gordian complexity` ranking the skill exists *not* to
+      be) fails green. (b) step-6 evidence + coverage hint: locks "coverage hint",
+      "sibling test namespace exists for the target", and "any test references the
+      target `var`" — so a regress dropping the coverage-hint emission fails
+      green. Focused suite green: skill-test 3 tests/27 assertions + definitions
+      13 tests/198 assertions = 16 tests/225 assertions, 0 failures; clj-kondo 0
+      findings; file-length guard clean. (See implementation.md pass-2 TR3
+      resolution entry.)
 
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 

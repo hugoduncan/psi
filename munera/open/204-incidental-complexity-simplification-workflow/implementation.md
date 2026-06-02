@@ -1326,3 +1326,60 @@ passes", "none of the top 5 pass") and (b) the coverage-hint evidence emission
 already carries all these strings (lines 78, 121–139, 152). Test-only change.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK.
+
+## 2026-06-02 — Test review pass 2 follow-up executed (TR3)
+
+Executed the single newly-added unchecked `steps.md` item (TR3) from the pass-2
+test review. Test-only change; no production Clojure, no workflow/skill/design
+change (SKILL.md already carries every locked string).
+
+NS note (deviation from the original "same ns, no new ns per C1" framing): the
+`incidental-complexity-finder` content-lock + determinism tests had already been
+**split** out of `workflow_definitions_test.clj` into
+`components/workflow-loader/test/psi/workflow_loader/incidental_complexity_finder_skill_test.clj`
+(an in-flight uncommitted change preceding this follow-up). The combined file was
+~873 lines — over the 800-line `components/` file-length guard
+(`bb commit-check:file-lengths`). The split is the mechanically-forced way to
+keep both test clusters; C1's intent (no **production** Clojure, extend the
+existing definition-test surface rather than introduce new behaviour) is
+preserved. I added TR3's assertions to the content-lock test in its new home.
+
+Added two `testing` blocks to `incidental-complexity-finder-skill-content-lock-test`:
+
+1. **step-5 top-5 judgment guard** — substring locks on:
+   - "top 5 qualifying units by `gap`" (read the top 5),
+   - "Reject as **essential**" (essential-complexity rejection),
+   - "Choose the first unit (highest `gap`) that passes the guard",
+   - "If none of the top 5 pass" (no-target when all top-5 are essential).
+   A SKILL.md dropping step 5 — degenerating to the `gordian complexity` ranking
+   the skill exists *not* to be — now fails green. The previously-locked
+   high-cc-alone string is the *rationale*; this locks the *procedure*.
+
+2. **step-6 evidence + coverage-hint emission** — substring locks on:
+   - "coverage hint",
+   - "sibling test namespace exists for the target" (sibling-ns hint),
+   - "any test references the target `var`" (var-reference hint).
+   A regress dropping the coverage-hint emission (the design's "produces a target
+   + evidence" acceptance, with coverage hint a named emitted field) now fails
+   green.
+
+Verification (focused):
+- skill-test ns: `clojure -M:test:dev --focus
+  psi.workflow-loader.incidental-complexity-finder-skill-test` →
+  3 tests, 27 assertions, 0 failures (content-lock now reports the two new
+  `testing` blocks: step-5 guard + step-6 coverage hint).
+- definitions ns: `--focus psi.workflow-loader.workflow-definitions-test` →
+  13 tests, 198 assertions, 0 failures (split intact).
+- combined: 16 tests, 225 assertions, 0 failures.
+- `clj-kondo --lint` over both test files: 0 errors, 0 warnings.
+- `bb commit-check:file-lengths`: clean (both files under 800 lines —
+  skill-test 156, definitions 717).
+- `clj-paren-repair` on the skill-test file: Success.
+
+No design/spec/SKILL/workflow change needed — the design Deliverable-1
+behaviours TR3 covers were already encoded in SKILL.md; this closes the
+`∀b ∈ behaviour(design). ∃t. covers(t,b)` gap for the step-5 judgment guard and
+step-6 coverage-hint emission. Coherence across design ↔ SKILL ↔ workflows ↔
+docs unaffected (test-only).
+
+PASS_STATUS: RESOLVED.
