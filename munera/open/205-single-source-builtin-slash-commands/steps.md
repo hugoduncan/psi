@@ -62,13 +62,17 @@ Tick with sha/decision on completion.
 - [ ] `support.clj`: add `:psi.agent-session/builtin-command-specs` to
       `command-refresh-query` and the `build-init` introspection query; store
       `:builtin-command-specs` in state.
-- [ ] `support.clj` `refresh-extension-command-names` (or sibling): refresh
-      built-in specs from query result into state.
+- [ ] `support.clj` `refresh-extension-command-names` (extended in place — P4):
+      destructure both `:psi.extension/command-names` and
+      `:psi.agent-session/builtin-command-specs` from the one query result and
+      `assoc` both state slots (vector-guarded).
 - [ ] `autocomplete.clj`: build built-in slash candidates from
       `state :builtin-command-specs` (slash-prefix bare names) instead of
       `shared/builtin-slash-commands`.
-- [ ] `shared.clj`: remove `builtin-slash-commands` source-of-truth (delete +
-      drop usages).
+- [ ] `shared.clj`: delete the `builtin-slash-commands` `def` only (P5); KEEP
+      the `app.shared` require in `autocomplete.clj` (still used for
+      `input-value`/`input-pos`/`set-input-value`); remove only the
+      `shared/builtin-slash-commands` symbol from the line-59 `concat`.
 - [ ] Add TUI autocomplete test: candidates include `/reload-models` sourced from
       backend specs (not a hardcoded list); previously-missing built-ins present.
 - [ ] Run TUI tests + targeted clj-kondo; green.
@@ -76,12 +80,27 @@ Tick with sha/decision on completion.
 ## Slice 4 — Emacs consumption
 
 - [ ] `psi-session-commands.el`: add `:psi.agent-session/builtin-command-specs`
-      to the slash-completion query string (line ~257); add frame-extractor for
-      built-in specs.
-- [ ] `psi-globals.el`: add state slot for backend built-in command specs
-      (parallel to `extension-command-names`).
+      to the slash-completion query string (`psi-emacs--prompt-template-query`,
+      line ~256); add `psi-emacs--builtin-command-specs-from-query-frame`
+      extractor (P3 channel 1).
+- [ ] `psi-globals.el`: add `builtin-command-specs` state slot (parallel to
+      `extension-command-names`, line 100); seed `nil` in `psi-lifecycle.el`
+      (parallel to `slash-completion-token`, line 85).
 - [ ] `psi-session-commands.el` / `psi-events.el`: thread built-in specs through
-      `psi-emacs--apply-slash-completion-data` and the event data path.
+      `psi-emacs--apply-slash-completion-data` as a third positional arg
+      `(names builtin-specs templates)` — update all 4 sites (P1): defun
+      (`psi-session-commands.el:302`), `declare-function` (`psi-events.el:28`),
+      query-frame call (`psi-session-commands.el:323`), event-data call
+      (`psi-events.el:109`).
+- [ ] Fold built-in specs into the change-detection token (P2): add a `:builtins`
+      segment to `psi-emacs--slash-completion-token`
+      (`psi-session-commands.el:292`) and to the inline `next-token` in
+      `psi-emacs--slash-completion-data-changed-p` (`psi-events.el:80`), kept
+      structurally identical.
+- [ ] Extract built-in specs on the session-update event-data path (P3 channel 2):
+      `psi-emacs--slash-completion-data-changed-p` reads
+      `(:builtin-command-specs builtin-command-specs)` from event data and passes
+      them to `apply-slash-completion-data`.
 - [ ] `psi-completion.el`: `psi-emacs--state-slash-command-specs` merges backend
       built-in specs first (backend-wins on name collision).
 - [ ] `psi-completion.el`: trim `psi-emacs-slash-command-specs` `defcustom`
@@ -108,28 +127,26 @@ Tick with sha/decision on completion.
 
 ## Plan ambiguity follow-ups (review pass 1)
 
-- [ ] P1 — Pin the Emacs `psi-emacs--apply-slash-completion-data` threading
-      shape in plan.md: state whether it gains a third positional arg
-      (`(names builtin-specs templates)`) or a separate state path, and enumerate
-      ALL sites that must change together — `declare-function` (`psi-events.el:28`),
-      query-frame call (`psi-session-commands.el:323`), event-data call
-      (`psi-events.el:109`).
-- [ ] P2 — Specify in plan.md that the slash-completion change-detection token
-      (`psi-emacs--slash-completion-token` + the `…-changed-p` event path in
-      `psi-events.el`) includes built-in specs, so a built-in-spec-only change is
-      detected and Emacs autocomplete refreshes (AC5/AC6) — or document why the
-      token need not change.
-- [ ] P3 — Decide and specify in plan.md the arrival channel(s) for built-in
-      specs into Emacs: the explicit `query_eql` frame only, or also the
-      session-update event-data path (`psi-events.el`
-      `psi-emacs--slash-completion-data-changed-p`); add the matching
-      extractor(s) accordingly.
-- [ ] P4 — Resolve the TUI refresh "(or sibling)" fork in steps.md/plan.md:
-      extend `refresh-extension-command-names` in place (and how
-      `command-refresh-query`'s result feeds both `:psi.extension/command-names`
-      and the new built-in attribute) vs add a dedicated sibling refresh fn.
-- [ ] P5 — Reconcile the `shared.clj/builtin-slash-commands` disposal: drop the
-      plan's "empty + drop the require usage" alternative; pin one disposal —
-      delete the `def` only, KEEP the `app.shared` require in `autocomplete.clj`
-      (still used for `input-value`/`input-pos`/`set-input-value`), and remove
-      only the `shared/builtin-slash-commands` symbol from the line-59 `concat`.
+- [x] P1 — Resolved in plan.md "P1 — `apply-slash-completion-data` threading
+      shape + all call sites": third positional arg
+      `(names builtin-specs templates)`; all 4 sites enumerated (defun 302,
+      `declare-function` `psi-events.el:28`, query-frame call 323, event-data
+      call `psi-events.el:109`) + new globals slot. Slice-4 steps updated.
+- [x] P2 — Resolved in plan.md "P2 — change-detection token includes built-in
+      specs": `:builtins` segment added to both `psi-emacs--slash-completion-token`
+      (292) and the inline `next-token` in `…-changed-p` (`psi-events.el:80`),
+      structurally identical; built-in-spec-only change triggers refresh
+      (AC5/AC6). Slice-4 step added.
+- [x] P3 — Resolved in plan.md "P3 — arrival channel(s): BOTH query frame and
+      event path": channel 1 frame-extractor + channel 2 event-data extraction,
+      both feeding the same arity/token, mirroring `extension-command-names`.
+      Slice-4 steps updated.
+- [x] P4 — Resolved in plan.md "P4 — TUI refresh fn: extend in place": extend
+      `refresh-extension-command-names` (no sibling/rename);
+      `command-refresh-query` gains the new attr; one fn destructures + `assoc`es
+      both keys (vector-guarded). Slice-3 step updated.
+- [x] P5 — Resolved in plan.md "P5 — `shared.clj/builtin-slash-commands`
+      disposal": single pinned disposal — delete the `def` only, KEEP the
+      `shared` require in `autocomplete.clj`, remove only the
+      `shared/builtin-slash-commands` symbol from the line-59 `concat`;
+      "empty + drop require" alternative dropped. Slice-3 step updated.

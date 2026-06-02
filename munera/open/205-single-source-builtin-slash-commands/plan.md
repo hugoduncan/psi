@@ -71,29 +71,138 @@ must equal (architecture-fit review confirmed this placement).
 
 ### TUI consumption
 
-- `support.clj`: extend `command-refresh-query` and `build-init`'s introspection
-  query with `:psi.agent-session/builtin-command-specs`; store
-  `:builtin-command-specs` in state (parallel to `:extension-command-names`).
+- `support.clj`: extend `command-refresh-query` (currently
+  `[:psi.extension/command-names]`, support.clj:188) and `build-init`'s
+  introspection query (support.clj:226–230) with
+  `:psi.agent-session/builtin-command-specs`; store `:builtin-command-specs` in
+  state (parallel to `:extension-command-names`).
 - `autocomplete.clj`: build built-in candidates from
   `state :builtin-command-specs` (slash-prefix the bare names) instead of
-  `shared/builtin-slash-commands`.
-- `shared.clj`: remove `builtin-slash-commands` as a source of truth (delete, or
-  empty + drop the require usage).
+  `shared/builtin-slash-commands` at the line-59 `concat`.
+- `shared.clj`: remove `builtin-slash-commands` as a source of truth.
+
+#### P4 — TUI refresh fn: extend in place, no sibling (resolves steps "(or sibling)")
+
+**Decision.** Extend `refresh-extension-command-names` **in place** (no new
+sibling fn, no rename). Today it issues `command-refresh-query`, destructures
+`:psi.extension/command-names` from the result, and `assoc`es
+`:extension-command-names`. The change:
+
+- `command-refresh-query` becomes
+  `[:psi.extension/command-names :psi.agent-session/builtin-command-specs]`.
+- The single `refresh-extension-command-names` body destructures **both** keys
+  from the one query result and `assoc`es **both** state slots
+  (`:extension-command-names` from `:psi.extension/command-names`,
+  `:builtin-command-specs` from `:psi.agent-session/builtin-command-specs`),
+  guarded the same way (only `assoc` a slot when its value is a vector).
+
+Rationale: one query already round-trips; folding the new attribute into the
+existing query + existing refresh fn avoids a second query/refresh and keeps a
+single command-refresh code path. The fn name stays
+`refresh-extension-command-names` (it already refreshes the command-completion
+surface; broadening it to built-ins is in-charter and a rename would churn its
+call sites for no benefit). `build-init`'s introspection query is extended in
+parallel and seeds `:builtin-command-specs` directly into initial state.
+
+#### P5 — `shared.clj/builtin-slash-commands` disposal (resolves the double-spec)
+
+**Decision (single, pinned).** Delete **only** the `builtin-slash-commands`
+`def` from `shared.clj`, and remove **only** the `shared/builtin-slash-commands`
+symbol from the `autocomplete.clj` line-59 `concat`. The
+`[… psi.tui.app.shared :as shared]` require in `autocomplete.clj` **stays** — it
+is still used by `shared/input-value` (14, 226), `shared/input-pos` (15), and
+`shared/set-input-value` (245). The earlier plan/steps "empty + drop the require
+usage" alternative is dropped: dropping the `shared` require would break those
+remaining usages. No other `shared.clj` symbol is touched.
 
 ### Emacs consumption
 
-- `psi-session-commands.el`: extend the slash-completion query string (line 257)
-  with `:psi.agent-session/builtin-command-specs`; add a frame-extractor and
-  store backend built-in specs into state (new globals slot, parallel to
-  `extension-command-names`). Extend `psi-emacs--apply-slash-completion-data` to
-  carry built-in specs.
+- `psi-session-commands.el`: extend the slash-completion query string
+  (`psi-emacs--prompt-template-query`, line 256 — **not** 257) with
+  `:psi.agent-session/builtin-command-specs`; add a frame-extractor
+  (`psi-emacs--builtin-command-specs-from-query-frame`, parallel to
+  `…-extension-command-names-from-query-frame`) and store backend built-in specs
+  into state (new globals slot, parallel to `extension-command-names`). Extend
+  `psi-emacs--apply-slash-completion-data` to carry built-in specs (see P1).
 - `psi-completion.el`: `psi-emacs--state-slash-command-specs` merges
   backend built-in specs first; `psi-emacs-slash-command-specs` `defcustom`
   becomes a **user override/supplement** — default trimmed to Emacs-only
   affordances (`/skill:`) plus a documented user-addition slot; backend wins on
   name collision (resolves open question #3).
 - `psi-events.el`: thread built-in specs through the same data-application path
-  that already handles `extension-command-names` / templates.
+  that already handles `extension-command-names` / templates (see P3).
+
+#### P1 — `apply-slash-completion-data` threading shape + all call sites
+
+**Decision: gain a third positional arg.**
+`psi-emacs--apply-slash-completion-data` changes arity from
+`(names templates)` to `(names builtin-specs templates)` (built-in specs in the
+middle, names first to preserve the existing leading arg). `builtin-specs` is a
+list of `(:name … :description …)` alists, stored on the new globals slot. ALL
+sites change together:
+
+1. **Definition** — `psi-session-commands.el:302`
+   `(defun psi-emacs--apply-slash-completion-data (names builtin-specs templates) …)`;
+   body `setf`s the new globals slot from `builtin-specs` and folds built-in
+   specs into the token (see P2).
+2. **`declare-function`** — `psi-events.el:28`
+   `(declare-function psi-emacs--apply-slash-completion-data "psi-session-commands" (names builtin-specs templates))`.
+3. **Query-frame call** — `psi-session-commands.el:323` inside
+   `psi-emacs--refresh-slash-completion-data`: extract built-in specs from the
+   frame (`psi-emacs--builtin-command-specs-from-query-frame`) and pass them as
+   the middle arg.
+4. **Event-data call** — `psi-events.el:109` inside
+   `psi-emacs--slash-completion-data-changed-p`: pass the event-extracted
+   built-in specs (see P3) as the middle arg.
+
+A new globals slot `builtin-command-specs` is added to the state struct
+(`psi-globals.el`, parallel to `extension-command-names` at line 100) and
+seeded `nil` in `psi-lifecycle.el` (parallel to `slash-completion-token` at
+line 85).
+
+#### P2 — Slash-completion change-detection token includes built-in specs
+
+**Decision.** Built-in specs **are folded into the change-detection token** so a
+built-in-spec-only change is detected and Emacs autocomplete refreshes (AC5/AC6).
+Two token constructors must both gain a built-in-specs component, kept structurally
+identical so equal data yields equal tokens:
+
+- `psi-emacs--slash-completion-token` (`psi-session-commands.el:292`) gains a
+  `builtin-specs` parameter and emits a `:builtins` token segment (list of
+  `(name description)` pairs, normalized the same way templates are).
+- The inline `next-token` in `psi-emacs--slash-completion-data-changed-p`
+  (`psi-events.el:80`) gains the matching `:builtins` segment built from the
+  event-extracted built-in specs.
+
+`psi-emacs--apply-slash-completion-data` recomputes the token via the updated
+`psi-emacs--slash-completion-token` call (now passing built-in specs). Token
+segment order is fixed (`:commands … :builtins … :templates …`) and identical in
+both constructors so the change-detection compares like-for-like.
+
+#### P3 — Built-in specs arrival channel(s): BOTH query frame and event path
+
+**Decision.** Built-in specs arrive on **both** existing channels, matching how
+`extension-command-names` already travels:
+
+- **Channel 1 — `query_eql` frame** (`psi-emacs--refresh-slash-completion-data`,
+  via the extended `psi-emacs--prompt-template-query` string): add
+  `psi-emacs--builtin-command-specs-from-query-frame` to extract
+  `:psi.agent-session/builtin-command-specs` from the query result, passed to
+  `apply-slash-completion-data` (P1 site 3).
+- **Channel 2 — session-update event-data path**
+  (`psi-emacs--slash-completion-data-changed-p`, `psi-events.el:80`): extract
+  built-in specs from the pushed event data (via
+  `psi-emacs--event-data-get` with `(:builtin-command-specs builtin-command-specs)`
+  keys, parallel to the existing `:extension-command-names` extraction), fold
+  them into `next-token` (P2), and pass them to `apply-slash-completion-data`
+  (P1 site 4).
+
+Both channels feed the same `apply-slash-completion-data` arity and the same
+token shape, so neither path can regress the other (a built-in-spec change on
+either channel updates the token and triggers a refresh; a names/templates-only
+change still detects via its own token segment). This mirrors the existing
+two-channel handling of `extension-command-names`/`prompt-templates` exactly — no
+new pattern.
 
 ### Resolver-output / key-form invariants (from design)
 

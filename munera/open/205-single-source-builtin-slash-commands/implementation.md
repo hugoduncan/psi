@@ -321,3 +321,48 @@ Five new actionable plan/steps ambiguities (P1–P5 in steps.md):
   and doesn't suggest removing a still-needed require.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+### 2026-06-01 — Plan ambiguity follow-up (P1–P5) executed
+
+All five plan/steps ambiguities resolved in plan.md, grounded against real code.
+
+- **P1 (Emacs apply threading).** `psi-emacs--apply-slash-completion-data` gains
+  a third positional arg → `(names builtin-specs templates)`. Enumerated all 4
+  co-changing sites: defun (`psi-session-commands.el:302`), `declare-function`
+  (`psi-events.el:28`), query-frame call (`psi-session-commands.el:323`),
+  event-data call (`psi-events.el:109`); plus a new `builtin-command-specs`
+  globals slot (`psi-globals.el` parallel to line 100) seeded nil in
+  `psi-lifecycle.el` (parallel to line 85). Plan section "P1 …" added.
+
+- **P2 (change-detection token).** Built-in specs folded into the token so a
+  built-in-spec-only change refreshes Emacs autocomplete (AC5/AC6). `:builtins`
+  segment added to BOTH `psi-emacs--slash-completion-token` (292) and the inline
+  `next-token` in `psi-emacs--slash-completion-data-changed-p` (`psi-events.el:80`),
+  kept structurally identical; fixed segment order `:commands :builtins
+  :templates`. Plan section "P2 …" added.
+
+- **P3 (arrival channels).** BOTH channels carry built-in specs, mirroring
+  `extension-command-names`: channel 1 `query_eql` frame
+  (`psi-emacs--builtin-command-specs-from-query-frame` extractor +
+  `psi-emacs--prompt-template-query` line 256 — corrected from steps' "257");
+  channel 2 session-update event path (extract via `psi-emacs--event-data-get`
+  `(:builtin-command-specs builtin-command-specs)`). Both feed the same arity +
+  token, no cross-regression. Plan section "P3 …" added.
+
+- **P4 (TUI refresh fork).** Pinned: extend `refresh-extension-command-names`
+  **in place** (no sibling, no rename). `command-refresh-query` (support.clj:188)
+  gains `:psi.agent-session/builtin-command-specs`; the one fn destructures both
+  keys and `assoc`es both state slots (vector-guarded); `build-init` query
+  (226–230) extended in parallel. Plan section "P4 …" added.
+
+- **P5 (shared.clj disposal).** Pinned single disposal: delete the
+  `builtin-slash-commands` `def` only; KEEP the `app.shared` require in
+  `autocomplete.clj` (still used by `input-value`/`input-pos`/`set-input-value`
+  at 14/15/226/245); remove only the `shared/builtin-slash-commands` symbol from
+  the line-59 `concat`. "empty + drop require" alternative dropped (would break
+  remaining `shared/` usages). Plan section "P5 …" added.
+
+Slice-3 and Slice-4 steps in steps.md updated in place to reflect the pinned
+decisions (no longer ambiguous). P1–P5 marked done. These are plan/steps-stage
+refinements — no production code/test/doc change yet (Slices 1–5 remain
+unimplemented); plan is now unambiguous enough to execute. No blocking reasons.
