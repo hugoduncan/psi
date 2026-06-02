@@ -279,3 +279,20 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       function-composition level by
       `nested-delegation-effective-snapshot-propagates-overridden-model-test`.)
       inheritance-snapshot suite green (9 tests, 45 assertions); lint clean.
+
+## Implementation-review pass 2 follow-ups (review 2026-06-02)
+
+- [ ] R3: Update the `child_session_state.clj` header classification comment
+      (`:14-50`) so it stops drifting from `common-inherited-fields` after S5
+      added speed/effort inheritance to `child-session-base-state*`
+      (`:166-169`, `(or speed-mode (:speed-mode parent-sd))` /
+      `(or effort-override (:effort-override parent-sd))`). (a) Fix the stale
+      count: the comment says "common-inherited-fields (17 keys)" / "Inherited
+      (7 of 17)" / "Not inherited (10 of 17)" but the constant now holds 19 keys
+      (init.clj docstring + Decision 8a). (b) Add `:speed-mode` and
+      `:effort-override` to the "Inherited" enumeration with their
+      `(or … (:… parent-sd))` derivation note — they are currently absent from
+      BOTH buckets despite the code inheriting them. This is the same drift
+      Decision 8's authority test guards on the workflow-snapshot side; the
+      hand-maintained child-session classification mirror has no such guard and
+      has drifted. At minimum reconcile the comment with the code + authority.

@@ -779,3 +779,54 @@ Verification: `psi.workflow-step-session-config.inheritance-snapshot-test`
 core-test + terminal-contract-execution-test 28 tests / 86 assertions green;
 clj-kondo clean on both touched files. Both R1 and R2 checked in steps.md; all
 207 steps now checked.
+
+## Implementation review pass 2 (ψ, 2026-06-02)
+
+Re-reviewed code ↔ design/plan/steps with task-implementation-review skill
+after R1/R2 follow-ups. Grounded against source: `core.clj`
+`resolve-step-session-config` (snapshot-gated `parent-session` :194,
+wholesale `parent-session-model` :199, per-field swaps), `resolve-inherited-
+defaults-snapshot`, `effective-config->snapshot`; `model.clj`
+`inherited-defaults-schema` :179; `delegate.clj` injected-fn :128; `context.clj`
+`:resolve-inherited-defaults-fn` :233; `child_session_state.clj`
+`child-session-base-state*` :158-169; `child_session_contract.clj` closed
+request-schema :8-18; capture sites (`canonical_workflows.clj` :96,
+`psi_tool_workflow.clj` :144). Lint clean (0/0). 207-specific suites green
+(inheritance-snapshot, wssc core, workflow-runtime core/attempts, child-session-
+state, canonical-workflows, workflow-tools). One unit failure
+(`psi.tui.app-projection-test/autocomplete-selection-movement-updates-rendered-
+highlight-test`) is UNRELATED and pre-existing — task 207 touched no TUI/app-
+projection files (`git diff --name-only a683959c8~1 HEAD` excludes them).
+
+Strong fit confirmed: create-run pure (records verbatim, no ctx reads); R1
+dead-read gate present and correct; no require cycle (delegate reaches resolver
+only via injected fn); schema/capture/consumption match Decisions 5/6/6a/7/7a/8a;
+explicit-override precedence preserved (AC5); resume reuse (AC8).
+
+New actionable finding (not covered by any prior note/step):
+
+- **R3 (doc↔code coherence drift — `child_session_state.clj` classification
+  comment).** S5's necessary end-to-end deviation added speed/effort inheritance
+  to `child-session-base-state*` via `(or speed-mode (:speed-mode parent-sd))`
+  / `(or effort-override (:effort-override parent-sd))` (`:166-169`). This is
+  the general child-session path (not workflow-only) and is the path's first
+  inheritance of these two fields — a legitimate alignment with
+  `common-inherited-fields` (which lists both). But the file's header
+  classification comment (`:14-50`), which hand-mirrors `common-inherited-fields`
+  into "Inherited (N of M)" / "Not inherited (N of M)" buckets, was NOT updated:
+  (a) it still says "common-inherited-fields (17 keys)" / "7 of 17" / "10 of 17"
+  while the constant now holds 19 keys (init.clj docstring + this task's own
+  Decision 8a both say 19); (b) `:speed-mode`/`:effort-override` appear in
+  NEITHER the Inherited nor the Not-inherited enumeration — they are simply
+  absent, despite the code now inheriting them. This is exactly the
+  "two independent inheritance field lists drift" failure Decision 8 set out to
+  prevent; the workflow-snapshot side got a drift-guard test
+  (`inherited-defaults-field-set-authority-test`), but this hand-maintained
+  classification mirror did not, and has now drifted. Fix: update the
+  classification comment — correct the count (17→19), and add
+  `:speed-mode`/`:effort-override` to the "Inherited" bucket with their
+  `(or … (:…  parent-sd))` derivation note. (Optionally consider a lighter-weight
+  guard than a prose comment, but at minimum the comment must stop contradicting
+  the code and the authority.)
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
