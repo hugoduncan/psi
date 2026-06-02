@@ -11,8 +11,7 @@
    [psi.agent-session.mutations :as mutations]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.tools :as tools]
-   [psi.session-state.state :as ss]
-   [psi.state-kernel.dispatch :as kernel]))
+   [psi.session-state.state :as ss]))
 
 (defn- delete-tree! [path]
   (when path
@@ -51,6 +50,37 @@
          sd  (session/new-session-in! ctx nil {:worktree-path wt})]
      [ctx (:session-id sd)])))
 
+(defn- seed-stale!
+  "Seed a single stale template so a subsequent reload's replace semantics
+   (not append) are observable."
+  [ctx session-id]
+  (ss/update-state-value-in! ctx (ss/session-data-path session-id)
+                             assoc :prompt-templates
+                             [{:name "stale" :content "old"}]))
+
+(defn- template-names
+  "Set of :name values of the session's current :prompt-templates."
+  [ctx session-id]
+  (set (map :name (:prompt-templates (ss/get-session-data-in ctx session-id)))))
+
+(defn- template-by-name
+  [ctx session-id name]
+  (->> (ss/get-session-data-in ctx session-id)
+       :prompt-templates
+       (filter #(= name (:name %)))
+       first))
+
+(defn- invoke-reload-mutation
+  "Invoke the psi.extension/reload-prompts mutation through a live psi-tool
+   `mutate` action and return the parsed psi-tool result map."
+  [ctx session-id]
+  (let [tool   (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
+        result ((:execute tool) {"action" "mutate"
+                                 "mutation" "psi.extension/reload-prompts"
+                                 "params" {"session-id" session-id}})]
+    {:result result
+     :parsed (read-string (:content result))}))
+
 (deftest reload-prompts-handler-replaces-templates-test
   (testing "dispatch :session/reload-prompts replaces :prompt-templates with the freshly discovered set"
     (let [wt (worktree-with-prompts! {"foo" "foo body v1"
@@ -58,33 +88,35 @@
       (try
         (let [[ctx session-id] (session-at-worktree wt)]
           ;; Seed a stale template that should be replaced (not appended to).
-          (ss/update-state-value-in! ctx (ss/session-data-path session-id)
-                                     assoc :prompt-templates
-                                     [{:name "stale" :content "old"}])
+          (seed-stale! ctx session-id)
           (let [result (session/dispatch-in! ctx :session/reload-prompts
-                                             {:session-id session-id})
-                templates (:prompt-templates (ss/get-session-data-in ctx session-id))
-                names (set (map :name templates))]
+                                             {:session-id session-id})]
             ;; AC7: replace, not append — "stale" is gone, discovered set present.
-            (is (= #{"foo" "bar"} names))
-            (is (= "foo body v1" (:content (first (filter #(= "foo" (:name %)) templates)))))
+            (is (= #{"foo" "bar"} (template-names ctx session-id)))
+            (is (= "foo body v1" (:content (template-by-name ctx session-id "foo"))))
             ;; Return shape carries :reloaded?/:count/:worktree.
             (is (true? (:reloaded? result)))
             (is (= 2 (:count result)))
             (is (= wt (:worktree result)))))
         (finally (delete-tree! wt))))))
 
-(deftest reload-prompts-handler-emits-no-effects-test
-  (testing "the :session/reload-prompts handler returns a pure result with no effects"
+(deftest reload-prompts-does-not-refresh-system-prompt-test
+  (testing "dispatching :session/reload-prompts never triggers a system-prompt refresh (observable: the refresh callback is the boundary a :runtime/refresh-system-prompt effect would cross)"
     (let [wt (worktree-with-prompts! {"foo" "foo body"})]
       (try
-        (let [[ctx session-id] (session-at-worktree wt)
-              handler (:fn (kernel/handler-entry :session/reload-prompts))
-              result  (handler ctx {:session-id session-id})]
-          ;; No :runtime/refresh-system-prompt (or any) effect.
-          (is (nil? (:effects result)))
-          (is (some? (:root-state-update result)))
-          (is (true? (:reloaded? (:return result)))))
+        (let [refreshed? (atom false)
+              [ctx0 session-id] (session-at-worktree wt)
+              ;; The :runtime/refresh-system-prompt effect is executed through
+              ;; ctx's :refresh-system-prompt-fn. Rebinding it to a recorder
+              ;; lets us assert the absence of the refresh observably, without
+              ;; reaching into the handler-registry pure-result internals.
+              ctx        (assoc ctx0 :refresh-system-prompt-fn
+                                (fn [& _] (reset! refreshed? true)))
+              result     (session/dispatch-in! ctx :session/reload-prompts
+                                               {:session-id session-id})]
+          (is (true? (:reloaded? result)))
+          ;; No system-prompt refresh side effect crossed the boundary.
+          (is (false? @refreshed?)))
         (finally (delete-tree! wt))))))
 
 (deftest reload-prompts-in-core-fn-surfaces-return-test
@@ -103,11 +135,7 @@
     (let [wt (worktree-with-prompts! {"foo" "foo body" "bar" "bar body"})]
       (try
         (let [[ctx session-id] (session-at-worktree wt {:mutations mutations/all-mutations})
-              tool   (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
-              result ((:execute tool) {"action" "mutate"
-                                       "mutation" "psi.extension/reload-prompts"
-                                       "params" {"session-id" session-id}})
-              parsed (read-string (:content result))]
+              {:keys [result parsed]} (invoke-reload-mutation ctx session-id)]
           (is (false? (:is-error result)))
           (is (= :ok (:psi-tool/overall-status parsed)))
           (is (= {:psi.prompt-template/reloaded? true
@@ -116,8 +144,7 @@
           ;; :worktree is NOT surfaced by the mutation.
           (is (not (contains? (:psi-tool/result parsed) :worktree)))
           ;; Replace semantics applied through dispatch.
-          (is (= #{"foo" "bar"}
-                 (set (map :name (:prompt-templates (ss/get-session-data-in ctx session-id)))))))
+          (is (= #{"foo" "bar"} (template-names ctx session-id))))
         (finally (delete-tree! wt))))))
 
 (deftest reload-prompts-handler-empty-dir-replaces-with-empty-test
@@ -128,9 +155,7 @@
         (try
           (let [[ctx session-id] (session-at-worktree wt)]
             ;; Seed a stale template that must be cleared by the replace.
-            (ss/update-state-value-in! ctx (ss/session-data-path session-id)
-                                       assoc :prompt-templates
-                                       [{:name "stale" :content "old"}])
+            (seed-stale! ctx session-id)
             (let [result    (session/dispatch-in! ctx :session/reload-prompts
                                                   {:session-id session-id})
                   templates (:prompt-templates (ss/get-session-data-in ctx session-id))]
@@ -148,14 +173,8 @@
         (try
           (let [[ctx session-id] (session-at-worktree wt {:mutations mutations/all-mutations})]
             ;; Seed a stale template that must be cleared by the replace.
-            (ss/update-state-value-in! ctx (ss/session-data-path session-id)
-                                       assoc :prompt-templates
-                                       [{:name "stale" :content "old"}])
-            (let [tool   (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
-                  result ((:execute tool) {"action" "mutate"
-                                           "mutation" "psi.extension/reload-prompts"
-                                           "params" {"session-id" session-id}})
-                  parsed (read-string (:content result))]
+            (seed-stale! ctx session-id)
+            (let [{:keys [result parsed]} (invoke-reload-mutation ctx session-id)]
               (is (false? (:is-error result)))
               (is (= :ok (:psi-tool/overall-status parsed)))
               (is (= {:psi.prompt-template/reloaded? true
@@ -165,13 +184,6 @@
               (is (= [] (:prompt-templates (ss/get-session-data-in ctx session-id))))))
           (finally (delete-tree! wt)))))))
 
-(defn- template-by-name
-  [ctx session-id name]
-  (->> (ss/get-session-data-in ctx session-id)
-       :prompt-templates
-       (filter #(= name (:name %)))
-       first))
-
 (deftest reload-prompts-end-to-end-edit-add-delete-test
   (testing "edit/add/delete .md against the worktree, then reload reflects each change (AC1-AC3, AC6)"
     (let [wt (worktree-with-prompts! {"foo" "foo body v1"
@@ -179,10 +191,11 @@
           prompts (io/file wt ".psi/prompts")]
       (try
         (let [[ctx session-id] (session-at-worktree wt)]
-          ;; Initial reload picks up foo + baz from the worktree.
+          ;; Initial reload establishes the pre-edit baseline. (Full
+          ;; discover→replace + return-shape proofs live in the handler/core-fn
+          ;; tests; here we only need a baseline to delta against.)
           (session/reload-prompts-in! ctx session-id)
-          (is (= "foo body v1" (:content (template-by-name ctx session-id "foo"))))
-          (is (some? (template-by-name ctx session-id "baz")))
+          (is (= #{"foo" "baz"} (template-names ctx session-id)))
           ;; AC1: edit foo body, AC2: add bar, AC3: delete baz.
           (spit (io/file prompts "foo.md") "foo body v2")
           (spit (io/file prompts "bar.md") "bar body")

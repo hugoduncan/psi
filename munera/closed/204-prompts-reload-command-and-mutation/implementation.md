@@ -660,3 +660,45 @@ Considered, NOT actionable:
 
 Result: three shape-level follow-ups (TS1 redundancy, TS2 white-box reach,
 TS3 ceremony helpers). None block correctness; all improve change-confidence.
+
+## Test-shaper follow-ups executed (2026-06-01)
+
+Applied TS1–TS3 from the test-shaper review pass to
+`reload_prompts_test.clj`.
+
+- **TS1 (redundancy)** — The e2e `…edit-add-delete-test` initial reload no
+  longer re-proves discover→replace + return shape (covered once each by the
+  dispatch and core-fn tests); it now asserts only the
+  `#{"foo" "baz"}` pre-edit baseline it needs to delta the AC1–AC3 changes
+  against. Net: 36 → 34 assertions, no coverage loss.
+
+- **TS2 (white-box reach → observable boundary)** — `…emits-no-effects-test`
+  reached the raw handler via `kernel/handler-entry` → `:fn` and asserted on
+  the pure-result map keys (`:effects`/`:root-state-update`/`:return`),
+  coupling the test to handler-registry internals. Replaced with
+  `…does-not-refresh-system-prompt-test`, which rebinds ctx's
+  `:refresh-system-prompt-fn` to a recording atom and dispatches through
+  `session/dispatch-in!`. Rationale for this being *the* observable boundary:
+  a `:runtime/refresh-system-prompt` effect, if emitted, is executed by the
+  dispatch effect-interceptor (`state-kernel/dispatch.clj` `effect-interceptor`)
+  via `:execute-effect-fn` → `dispatch-effects/execute-effect!`
+  (`:runtime/refresh-system-prompt` defmethod) → `(:refresh-system-prompt-fn
+  ctx)`. So the recorder is exactly where the side effect would surface. The
+  guarded decision (reload must not rebuild the system prompt) now fails only
+  on a real behavior change, not a handler-result key rename. Dropped the
+  unused `psi.state-kernel.dispatch` require.
+
+- **TS3 (ceremony helpers)** — Added `seed-stale!` (stale-template seed, ×3),
+  `template-names` (name-set read, ×3), and `invoke-reload-mutation`
+  (null query-fn + `make-psi-tool` + `mutate` action + `read-string`,
+  returns `{:result :parsed}`, ×2 verbatim before). Hoisted `template-by-name`
+  into the helper block and removed its duplicate mid-file defn. The
+  null query-fn `(fn [_q] {})` stays a real null dependency (¬mock) — the
+  helper only de-duplicates it. Arrange/act/assert remains explicit at every
+  call site.
+
+Verify: `clj-kondo` 0/0; `clojure -M:test --focus
+psi.agent-session.reload-prompts-test` → 8 tests / 34 assertions / 0 failures;
+`--focus psi.agent-session.commands-test` → 51 / 206 / 0 (shared-helper
+regression guard, no shared code touched there). All three shape follow-ups
+closed; no behavior change to the production reload path.
