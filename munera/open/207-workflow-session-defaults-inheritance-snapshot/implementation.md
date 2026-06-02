@@ -851,3 +851,62 @@ PASS_STATUS: ACTIONABLE_FEEDBACK
   possible future hardening but is out of scope for this follow-up.
 
 PASS_STATUS: COMPLETE
+
+## Implementation review pass 3 (ψ, 2026-06-02)
+
+Re-reviewed code ↔ design/AC with task-implementation-review skill after the
+R1/R2/R3 follow-ups. Grounded against source and ran focused suites green:
+inheritance-snapshot (9/45), wssc core + workflow-runtime core + child-session-
+state (35/127). clj-kondo clean on `core.clj`/`delegate.clj`/`model.clj`/
+`context.clj`. Confirmed: create-run pure; no require cycle (delegate→resolver
+only via injected fn at `context.clj:233`, wired `statechart_runtime.clj:170`);
+schema/capture/consumption match Decisions 5/6/6a/7/7a/8a; R1 dead-read gate
+present (`core.clj` `parent-session` = `(when-not snapshot? …)`); R2 e2e
+delegate-wiring test present; R3 comment reconciled.
+
+New actionable finding (not covered by any prior note/step):
+
+- **R4 (correctness — live-parent leak past the resolver in
+  `child-session-base-state*`; AC1/AC2/AC3 for nil-at-invoke fields).** The
+  snapshot correctly isolates `resolve-step-session-config`'s OUTPUT from the
+  live parent (R1), but the final workflow child-state assembly re-reads the
+  LIVE parent for any snapshot-governed field whose snapshot value was nil at
+  invoke. `child-session-base-state*`
+  (`agent-session/child_session_state.clj:144-169`) builds the child via
+  `(or <arg> (:<field> parent-sd))`, where `parent-sd =
+  (session/get-session-data-in ctx session-id)` — the live parent session
+  resolved mid-run at child-creation time (`dispatch_handlers/
+  session_lifecycle.clj:115`, `:session/create-child`). For the
+  snapshot-governed inherited defaults this is a live re-read whenever the
+  resolver did not supply a non-nil value:
+  - `:speed-mode`/`:effort-override` — emitted by the resolver ONLY via
+    `cond-> (some? (:speed-mode snapshot)) …` (`core.clj:243-249`), so when the
+    parent had none at invoke the arg is nil and
+    `(or speed-mode (:speed-mode parent-sd))` (`child_session_state.clj:166-169`)
+    picks up a LIVE speed/effort set AFTER invoke — the exact AC3 leak for the
+    two most-transient fields. The unit test
+    `child-session-base-state-applies-speed-effort-override-test`
+    (`child_session_state_test.clj:121-125`) pins this parent-sd fallback as
+    intended behaviour, but at workflow runtime parent-sd is live, not the
+    snapshot.
+  - `:model`/`:prompt-mode` — same `(or model (:model parent-sd))` /
+    `(or prompt-mode (:prompt-mode parent-sd))` fallback; reachable when the
+    snapshot value is nil (e.g. parent had no model/prompt-mode at invoke).
+  Existing isolation coverage
+  (`snapshot-isolates-resolution-from-live-parent-mutation-test`) stops at the
+  resolver's output map and never drives `child-session-base-state*`/
+  `:session/create-child`, so this leak past the resolver is untested. This
+  contradicts Decision 2 ("resolved snapshot … robust against later parent
+  mutation") and AC3 ("invariant holds for EVERY inherited default … not just
+  model"). Fix: for workflow-owned children the snapshot-governed inherited
+  fields must NOT fall back to live `parent-sd` — either thread the full
+  snapshot through `:session/create-child` and make the workflow child path use
+  snapshot values (with explicit-override precedence preserved) rather than
+  `(or … (:… parent-sd))`, or have the resolver always emit the snapshot's
+  value (including nil) so the child path cannot reach the live fallback. Add a
+  test driving child-state assembly (resolver → `:session/create-child` →
+  `child-session-base-state*`) that mutates the live parent's
+  speed-mode/effort-override/model AFTER invoke and asserts the workflow child
+  state is unchanged.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

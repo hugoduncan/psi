@@ -305,3 +305,32 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       classified as not-carried). 9 + 10 = 19 reconciles with the constant.
       Comment-only change (no behaviour/code path touched), so no test/doc
       delta; lint clean on the touched file.
+
+## Implementation-review pass 3 follow-ups (review 2026-06-02)
+
+- [ ] R4: Close the live-parent leak past the resolver in
+      `child-session-base-state*`
+      (`agent-session/child_session_state.clj:144-169`). The snapshot isolates
+      `resolve-step-session-config`'s OUTPUT (R1), but the workflow child-state
+      assembly re-reads the LIVE parent via `(or <arg> (:<field> parent-sd))`
+      where `parent-sd = (session/get-session-data-in ctx session-id)` (live,
+      mid-run; `session_lifecycle.clj:115` `:session/create-child`). For
+      snapshot-governed fields with a nil snapshot value at invoke this leaks a
+      post-invoke live mutation: `:speed-mode`/`:effort-override` (resolver emits
+      them only via `cond-> (some? (:speed-mode snapshot)) …`, `core.clj:243-249`
+      — nil-at-invoke → `(or speed-mode (:speed-mode parent-sd))` reads live,
+      `child_session_state.clj:166-169`) and `:model`/`:prompt-mode` (same
+      `(or … (:… parent-sd))` fallback). Contradicts Decision 2 (resolved
+      snapshot robust against later parent mutation) and AC3 (invariant holds for
+      EVERY inherited default). Fix: for workflow-owned children the
+      snapshot-governed inherited fields must not fall back to live `parent-sd`
+      — thread the full snapshot through `:session/create-child` so the workflow
+      child path uses snapshot values (explicit-override precedence preserved),
+      or have the resolver always emit the snapshot value (incl. nil) so the
+      child path cannot reach the live fallback. Add a test driving child-state
+      assembly (resolver → `:session/create-child` → `child-session-base-state*`)
+      that mutates the live parent's speed-mode/effort-override/model AFTER
+      invoke and asserts the workflow child state is unchanged. (Note:
+      `child-session-base-state-applies-speed-effort-override-test:121-125`
+      currently pins the parent-sd fallback as intended for the general
+      non-workflow path — distinguish workflow-owned vs non-workflow behaviour.)
