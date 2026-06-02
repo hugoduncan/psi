@@ -2887,3 +2887,40 @@ assertions, 0 failures**. `clj-kondo` 0 findings on both files;
 (442 + 292 both < 800). Both additions are test-only — the skill recipe and
 wrapper EDN are unchanged (already correct); these strengthen the regression net
 only.
+
+## Test review (pass 16 — test-shaper)
+
+### TR20 — redundant fixture-builder pair in the skill-test ns (ACTIONABLE)
+test-shaper `consistent(fixtures)` + `economical(minimal redundant)`:
+`incidental_complexity_finder_skill_test.clj` carries **two** fixture-builder
+abstractions for the *same* unit-JSON shape:
+
+- `local-unit-json [line lcc-total]` / `cc-unit-json [line cc]` — hard-code
+  `ns "x"` / `var "f"` / `file "x.clj"`; used **only** by the determinism test
+  (lines 166–169).
+- `named-local-unit-json [unit-ns unit-var line lcc-total]` /
+  `named-cc-unit-json [unit-ns unit-var line cc]` — parameterize `ns`/`var`
+  (file = `<ns>.clj`); used by every other recipe test (filter/drop, ranking/cap,
+  max-cc, empty-qualification, boundary).
+
+The `named-*` builders are a **strict superset**: the plain builders are exactly
+`(named-local-unit-json "x" "f" line lcc-total)` / `(named-cc-unit-json "x" "f"
+line cc)` (for `ns "x"`, `file "x.clj"` is identical). Maintaining two builders
+for one shape is incidental variation — a future change to the unit JSON shape
+must be threaded through both, and a reader must learn two near-identical
+helpers. Per test-shaper `helpers_that_compress(ceremony) ∧ ¬helpers_that_hide`,
+collapse to the parameterized pair.
+
+Fix (test-only, no production/skill/EDN change): delete `local-unit-json` /
+`cc-unit-json` and rewrite the four determinism-test call sites (lines 166–169)
+to the `named-*` builders with `"x" "f"` — e.g.
+`(named-local-unit-json "x" "f" 10 "30.0")`. The determinism test's behaviour is
+unchanged (same JSON for `ns "x"`). Verify the focused skill-test +
+task-204 suite green, `clj-kondo` 0, `clj-paren-repair` Success,
+`bb commit-check:file-lengths` clean.
+
+No other actionable test-shaper feedback: the suite is otherwise strong —
+single-concern deftests, explicit arrange/act/assert, jq-absent structural
+fallbacks for every executable recipe behaviour (determinism/filter/drop/ranking/
+cap/max-cc/boundary), behaviour-focused prompt/EDN-shape locks for both
+workflows, and the design-acceptance coverage net (TR1–TR19) is comprehensive.

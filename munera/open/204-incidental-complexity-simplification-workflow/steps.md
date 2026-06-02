@@ -1225,3 +1225,23 @@ with the commit sha / decision when done.
       findings; `clj-paren-repair` Success; task-204 definitions file 292 lines
       (< 800); `bb commit-check:file-lengths` exit 0. (See implementation.md
       pass-15 test-review TR19 entry.)
+
+## Test review follow-ups (review pass 16 — test-shaper)
+
+- [ ] TR20 — Collapse the redundant fixture-builder pair in
+      `incidental_complexity_finder_skill_test.clj`. The ns carries two
+      fixture-builder abstractions for the same unit-JSON shape:
+      `local-unit-json`/`cc-unit-json` (hard-code `ns "x"`/`var "f"`/`file
+      "x.clj"`; used only by the determinism test at lines 166–169) and the
+      `named-local-unit-json`/`named-cc-unit-json` parameterized pair (used by
+      every other recipe test). The `named-*` builders are a strict superset —
+      the plain builders are exactly `(named-local-unit-json "x" "f" …)` /
+      `(named-cc-unit-json "x" "f" …)`. Two builders for one shape is incidental
+      variation (test-shaper `consistent(fixtures)` + `economical`): a future
+      unit-JSON shape change must be threaded through both, and a reader learns
+      two near-identical helpers. Fix (test-only, no production/skill/EDN
+      change): delete `local-unit-json`/`cc-unit-json` and rewrite the four
+      determinism-test call sites (lines 166–169) to the `named-*` builders with
+      `"x" "f"`; behaviour is unchanged (identical JSON for `ns "x"`). Verify the
+      focused skill-test + task-204 suite green, `clj-kondo` 0, `clj-paren-repair`
+      Success, `bb commit-check:file-lengths` clean.
