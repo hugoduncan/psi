@@ -2606,3 +2606,58 @@ Assertion-count note: this fix added/removed **zero** assertions (both tests kee
 **50 tests / 339 assertions** (`findings.md` Outcome figure stands). Test file +
 task-dir docs only — zero `components/agent-session/src/**` or
 `doc/scheduler.md` (Slice-10 allowlist held).
+
+## Implementation-review pass (2026-06-02) — ACTIONABLE_FEEDBACK
+
+Re-ran the scheduler suite against runtime truth under the canonical kaocha
+runner (all 13 scheduler ns focused together), repeatedly, instead of trusting
+the deliverable's "all green deterministically (no lucky-run dependence)" claim
+from the prior flaky-baseline fix. **The suite is still flaky: 4 failures on
+one run, 0 on others (observed ~1 failing run in 8–10 full-suite runs).**
+
+Root cause — a **different** test than the two the prior pass fixed: the cited
+`scheduler-lifecycle-test/scheduled-deliver-runs-canonical-prompt-lifecycle-test`
+dispatches `:scheduler/fired` synchronously, then immediately reads
+`kernel/event-log-entries` and asserts presence of
+`:session/prompt-record-response` and `:session/prompt-finish`. Those two
+events are emitted by the **canonical prompt lifecycle / turn execution, which
+completes asynchronously** (on a separate thread) after `:session/prompt-submit`
+returns. The test reads the shared event log before those late lifecycle events
+land, so the two `(some #(= :session/prompt-record-response …) entries)` and
+`…prompt-finish…` assertions intermittently see `(not (some … entries))`
+(observed actuals captured: both missing; schedule already `:delivered`,
+`:scheduler/fired`/`:scheduler/deliver`/`:session/prompt-submit` present but the
+record-response/finish lifecycle tail absent).
+
+Notably the test passes **8/8 in isolation** (`--focus
+psi.agent-session.scheduler-lifecycle-test` alone) but fails ~1-in-8 when the
+**full scheduler suite** runs together — confirming the race is the
+async-lifecycle-completion-vs-synchronous-event-log-read on the shared
+`kernel` event log, surfaced by cross-ns thread-scheduling pressure, not a
+single-ns ordering bug.
+
+Disagreement-with-prior-pass recorded: the 2026-06-01 flaky-baseline fix
+correctly identified a *real* wall-clock timer race in the two
+`scheduler_dispatch_test` deftests and fixed those at their root, but its
+closing claim — "the prior … race is **gone** … the 'all green' deliverable
+now holds deterministically (no lucky-run dependence)" — is **falsified by
+runtime truth**: there is a *second, distinct* async-lifecycle race in
+`scheduler_lifecycle_test` that still produces intermittent 4-failure runs.
+A single green observation (even 5× in a row) does not establish green for a
+~1-in-8 flake. The deliverable's "all green / `bb test` green" claim and the
+findings.md Baseline/Outcome ("all 7 areas verified-correct", "all green") are
+not yet true under the canonical runner.
+
+Fix direction (test-file-only, within the Slice-10 allowlist — zero
+`components/agent-session/src/**` or `doc/scheduler.md`): make the
+lifecycle-completion assertions deterministic rather than reading the shared
+event log immediately after `dispatch-in!`. Options, in order of preference:
+(1) replace the real async turn execution with a *synchronous* seam (the
+end-to-end test already uses `:execute-prepared-request-fn` on `ctx` instead of
+`with-redefs`-stubbing `execute-prepared-request!`; align the lifecycle test so
+delivery completes synchronously before the event-log read), or (2) if the
+lifecycle test must drive the genuinely-async path, await a settle condition
+(poll the event log for `:session/prompt-finish` up to a bounded deadline with
+no `Thread/sleep`-based fixed wait) before asserting. Then re-verify ≥10× full
+scheduler-suite runs green and correct findings.md Outcome/Baseline to reflect
+the actual (now genuinely deterministic) state.

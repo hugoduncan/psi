@@ -1677,3 +1677,35 @@ state/outputs, (2) drives the real path via the timer seam for *live* areas, and
       (the race was real, now fixed at its root). Test files + task-dir docs
       only — zero `components/agent-session/src/**` or `doc/scheduler.md`
       (Slice-10 allowlist held).
+
+- [ ] Fix the still-flaky cited lifecycle test
+      `scheduler_lifecycle_test/scheduled-deliver-runs-canonical-prompt-lifecycle-test`
+      (implementation-review finding 2026-06-02). The full scheduler suite still
+      fails intermittently under the canonical kaocha runner (**4 failures one
+      run, 0 on others; ~1-in-8 full-suite runs**), falsifying the prior
+      flaky-baseline fix's "race is gone / all green deterministically (no
+      lucky-run dependence)" claim. The two failing assertions are
+      `(is (some #(= :session/prompt-record-response (:event-type %)) entries))`
+      and `(is (some #(= :session/prompt-finish (:event-type %)) entries))`
+      (`scheduler_lifecycle_test.clj:84-85`): the test dispatches
+      `:scheduler/fired` synchronously then immediately reads
+      `kernel/event-log-entries`, but `:session/prompt-record-response` /
+      `:session/prompt-finish` are emitted by the **canonical prompt lifecycle /
+      turn execution that completes asynchronously** after
+      `:session/prompt-submit` returns — so the event-log read races the late
+      lifecycle tail. (Passes 8/8 in isolation; fails ~1-in-8 only when the full
+      13-ns scheduler suite runs together — cross-ns thread-scheduling pressure
+      surfaces the async-completion-vs-synchronous-read race on the shared
+      `kernel` event log.)
+      Fix (test-file-only — Slice-10 allowlist, zero
+      `components/agent-session/src/**` or `doc/scheduler.md`): preferred —
+      replace the `with-redefs` stub of `psi.turn-runtime.core/execute-prepared-request!`
+      with the synchronous `:execute-prepared-request-fn` `ctx` seam already used
+      by `scheduler_end_to_end_test.clj` so delivery completes synchronously
+      before the event-log read; alternative — await a bounded settle condition
+      (poll the event log for `:session/prompt-finish` to a deadline, no
+      `Thread/sleep` fixed wait) before asserting. Then re-verify the full
+      scheduler suite ≥10× green under the canonical runner, and correct
+      `findings.md` Outcome/Baseline (and any "all green" wording) to reflect the
+      now-genuinely-deterministic state. Keep clj-kondo 0/0 and `bb fmt:check`
+      clean.
