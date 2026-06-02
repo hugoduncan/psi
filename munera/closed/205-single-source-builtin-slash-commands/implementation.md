@@ -705,3 +705,70 @@ No correctness, design-fit, or architecture-fit defects found. R1 is a
 test-clarity nicety, not a blocker.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## 2026-06-01 — Implementation review (task-implementation-review), pass 2
+
+Scope: implementation quality (design-fit, architecture-fit, new-vs-existing
+pattern, unnecessary abstraction, structural perf). Read all task artifacts +
+the landed code (`commands/builtin_specs.clj`, `commands.clj`,
+`resolvers/extensions.clj`), tests
+(`commands_builtin_specs_test.clj`, `builtin_commands_resolver_test.clj`),
+CHANGELOG, `doc/architecture.md`. R1 follow-up (66e5d7b49) confirmed landed: the
+live `commands/prefixed-case-branches` def + load-time `assert` + the test
+reading `@#'commands/prefixed-case-branches` genuinely lock the prefixed seam.
+Re-ran focused suites green: `builtin-commands-resolver-test` 3/24,
+`commands-builtin-specs-test` 6/18, 0 failures; clj-kondo clean on the three
+changed src files.
+
+Strong fit confirmed: single keyed table is the sole name source; projections
+byte-identical to prior literals (snapshot tests pass); resolver mirrors the
+extension surface; UIs read via EQL; leaf-ns extraction breaks the load cycle
+cleanly; docs+changelog accurate.
+
+Two new actionable findings:
+
+- R2 — **Exact-handler `case` seam has no live coherence guard (asymmetric to
+  R1).** R1 locked the *prefixed* `case` (`dispatch-prefixed-command`) with a
+  live `prefixed-case-branches` def + load-time `assert` + a test reading that
+  def. The *exact* dispatch `case` in `dispatch*` (commands.clj ~744–757) is
+  structurally identical — a hand-written `case` keyed by the `:handler`
+  keywords the spec table's `:exact` entries carry (`:quit :new :resume :status
+  :history :help :prompts :skills :worktree :reload-models :reload-prompts
+  :reload-extension-installs :project-repl :logout`) — yet has **no** equivalent
+  live guard. Its only protection is `exact-command-handlers-projection-unchanged
+  -test`, a **static snapshot** lock (compare to a hardcoded snapshot map), i.e.
+  exactly the weakness R1 was raised to fix, left in place on the exact side. An
+  `:exact` spec entry whose `:handler` is missing from the `dispatch*` `case`
+  falls silently to `nil` (no exact dispatch), then to the prefixed/extension
+  fallthrough — a handler-wiring drift identical in class to the prefixed seam
+  R1 closed. The design's "residual constraint" / "handler-wiring residual"
+  scoping (design.md:55–57,170–190,217–220; plan.md:48–50,291) names **only** the
+  prefixed `case`; it never mentions the exact `case`, so this seam is neither
+  closed nor explicitly scoped out. Either (a) lock it symmetrically — a live
+  `exact-case-branches` (or `exact-handler-keywords`) def + load-time `assert`
+  that it equals `(set (vals bspec/exact-command-handlers))` plus a coherence
+  test reading that def — or (b) explicitly extend the design's handler-wiring
+  out-of-scope note to cover the exact `case` and rename/recomment
+  `exact-command-handlers-projection-unchanged-test` to reflect it is a
+  snapshot lock, not a live-`case` coherence check (the same R1 clarity remedy).
+
+- R3 — **Undocumented resolver-input deviation from plan.**
+  `builtin-commands-resolver` (resolvers/extensions.clj:150) is written
+  `[_env]` with `::pco/input []` — it takes **no** `:psi/agent-session-ctx`,
+  unlike `extension-commands-resolver` (which it claims to "mirror") and unlike
+  the plan's explicit statement that the resolver "reads `agent-session-ctx`"
+  (plan.md:70). The deviation is sound and arguably better (built-in specs are
+  static, session-independent, so an input-free resolver is correct and still
+  resolves for a session — graph-discovery test passes), but it is a real
+  divergence from the plan that is **not recorded** in implementation.md's
+  Slice-2 notes (which only document the leaf-ns load-cycle deviation). Record
+  the input-free shape as a deliberate deviation (static specs ⇒ no session
+  context needed) so the plan↔code divergence is traceable, or note why the
+  empty-input form is preferred over the mirrored `:psi/agent-session-ctx` input.
+
+Both are non-blocking: no correctness, behaviour, or AC defect. R2 is a
+seam-symmetry/test-protection gap of the same kind R1 addressed; R3 is a
+traceability/documentation gap. Routing, help, resolver, and UI behaviour are
+correct and verified.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
