@@ -1665,3 +1665,22 @@ acceptance behaviour ("ends with a completed, reviewed task on the local
 worktree branch — it does **not** push or open a PR"). The string is already
 present in the prompt, so it is a trivial substring lock — extend
 `reduce-incidental-complexity-test` (same ns, test-only, no production change).
+
+### TR8 resolution (review pass 6 follow-up)
+
+Added a new `testing` block to `reduce-incidental-complexity-test`
+("select-and-create prompt locks the no-push/PR endpoint constraint (TR8)") in
+`components/workflow-loader/test/psi/workflow_loader/workflow_definitions_test.clj`
+(same ns, test-only, no production change). Two prompt-substring asserts on
+step-1's template text: (1) `"Do NOT push or open a PR"` — the explicit
+execution constraint; (2) `"ends with a completed, reviewed task on the local
+worktree branch"` — the local-worktree-branch endpoint (Locked decisions 7 &
+8). A regress adding a push/PR step to step-1 — turning this into a
+`complexity-reduction-pr` clone and erasing the workflow's distinguishing
+endpoint — now fails green. Both strings were already present verbatim in
+step-1's prompt, so no production change was needed.
+
+Verification: `clj-paren-repair` Success; `clj-kondo` 0 findings; focused
+definitions suite green — 13 tests, 203 assertions, 0 failures (+2 assertions
+over pass-5's 201, matching the two new asserts); file 746 lines (< 800-line
+`components/` guard).

@@ -586,7 +586,7 @@ with the commit sha / decision when done.
 
 ## Test review follow-ups (review pass 6)
 
-- [ ] TR8 — The design's **distinguishing endpoint behaviour — no push/PR — is
+- [x] TR8 — The design's **distinguishing endpoint behaviour — no push/PR — is
       not locked by any test**. Locked decision 7 ("Endpoint is a completed,
       reviewed task on a local worktree branch — no push/PR") and Locked
       decision 8 (the whole reason this is a new workflow vs
@@ -608,6 +608,18 @@ with the commit sha / decision when done.
       (the string is already present in step-1's prompt — "Do NOT push or open a
       PR" / "ends with a completed, reviewed task on the local worktree branch").
       Run focused suite + `clj-kondo`.
+      RESOLUTION: added a new `testing` block to `reduce-incidental-complexity-test`
+      (same ns, test-only, no production change) — "select-and-create prompt locks
+      the no-push/PR endpoint constraint (TR8)" — asserting two step-1 prompt
+      substrings: "Do NOT push or open a PR" (the explicit constraint) and
+      "ends with a completed, reviewed task on the local worktree branch" (the
+      local-worktree-branch endpoint, Locked decisions 7 & 8). A regress adding a
+      push/PR step — silently turning this into a `complexity-reduction-pr` clone
+      and erasing the workflow's reason to exist — now fails green. Both strings
+      already present in step-1's prompt; no production change. Focused
+      definitions suite green (13 tests, 203 assertions, 0 failures — +2 over
+      pass-5's 201); `clj-kondo` 0 findings; `clj-paren-repair` Success; file 746
+      lines (< 800).
 
 ## Contingency (non-planned; only if Slice 3 step-1 proves unwieldy)
 

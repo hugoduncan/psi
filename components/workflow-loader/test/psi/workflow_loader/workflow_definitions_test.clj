@@ -731,4 +731,16 @@
          (is (.contains select-text "keyed by `(ns, var, arity, line)`")
              "step-1 prompt keys the A5 burden-reduction acceptance on (ns, var, arity, line)")
          (is (.contains select-text "identified by `(ns, var, arity, line)`")
-             "step-1 prompt keys the A2 touched-set identity on (ns, var, arity, line)"))))))
+             "step-1 prompt keys the A2 touched-set identity on (ns, var, arity, line)"))
+       ;; TR8 (test review pass 6): the design's distinguishing endpoint
+       ;; behaviour — no push/PR (Locked decisions 7 & 8: full task lifecycle on
+       ;; a local worktree branch, NOT a complexity-reduction-pr clone) — is an
+       ;; explicit step-1 execution constraint but was previously unlocked. A
+       ;; regress adding a push/PR step (erasing this workflow's reason to exist
+       ;; vs complexity-reduction-pr) must not pass green.
+       (testing "select-and-create prompt locks the no-push/PR endpoint constraint (TR8)"
+         (is (.contains select-text "Do NOT push or open a PR")
+             "step-1 prompt forbids pushing or opening a PR")
+         (is (.contains select-text
+                        "ends with a completed, reviewed task on the local worktree branch")
+             "step-1 prompt states the local-worktree-branch endpoint (no push/PR)"))))))
