@@ -54,7 +54,7 @@ repo-local startup.
 
 ## In-session commands
 
-`/status` `/history` `/new` `/resume` `/tree [session-id]` `/worktree` `/help` `/quit` `/skills` `/prompts` `/prompts-reload` `/remember [text]`
+`/status` `/history` `/new` `/resume` `/tree [session-id]` `/worktree` `/help` `/quit` `/skills` `/prompts` `/reload-prompts` `/remember [text]`
 `/model <provider> <model-id>` `/thinking <off|minimal|low|medium|high|xhigh>` `/speed [normal|fast [session|project|user]]` `/effort [low|medium|high|xhigh|none [session|project|user]]`
 `/project-repl` `/project-repl start` `/project-repl attach` `/project-repl stop` `/project-repl eval <code>` `/project-repl interrupt`
 `/skill:<name>` plus any extension commands such as `/work-on`, `/work-done`, `/work-rebase`, `/work-status`
@@ -85,7 +85,7 @@ only applies to newly created root sessions.
 - `/prompts` lists the prompt templates discovered for the session (from
   `~/.psi/agent/prompts/*.md` and `<worktree>/.psi/prompts/*.md`), each
   invokable as `/<name>`.
-- `/prompts-reload` re-discovers the prompt templates from disk for the
+- `/reload-prompts` re-discovers the prompt templates from disk for the
   session's worktree and replaces the session's registered templates, so
   editing, adding, or deleting a prompt `.md` takes effect without restarting
   the session. It reports the worktree path and the resulting template count.

@@ -239,20 +239,18 @@ Done (2026-06-01, this pass):
 
 ## Code-shaper follow-ups (2026-06-01)
 
-- [ ] CS1: Resolve the command-name word-order inconsistency. The reload family
-      is verb-first (`/reload-models`, `/reload-extension-installs`) and every
-      internal symbol is verb-first `reload-prompts` (handler
-      `:session/reload-prompts`, mutation `psi.extension/reload-prompts`,
-      `reload-prompts-in!`); only the command string `"/prompts-reload"` and
-      case key `:prompts-reload` are noun-first. Either rename the command to
-      `/reload-prompts` (command string + `:reload-prompts` case key +
-      `exact-command-handlers` entry + `/help` line + `doc/tui.md` references +
-      CHANGELOG entry + `prompts-reload-command-test` / `format-help-includes-
-      all-commands-test`), OR add an explicit one-line rationale in design.md
-      for the deliberate noun-first divergence.
-- [ ] CS2: Align the private formatter name with the chosen command word order.
-      Siblings are `format-reload-models` / `format-reload-extension-installs`;
-      this task added `format-prompts-reload`. Rename to `format-reload-prompts`
-      (defn + its call site at `commands.clj:779`) if CS1 renames the command;
-      otherwise match the formatter name to the documented command word order
-      for local consistency.
+- [x] CS1: Resolved by **renaming the command to `/reload-prompts`** (the
+      verb-first, sibling-consistent choice — `λone_way` / `λconsistent`, not a
+      design.md rationale carve-out). Changed: command string `"/reload-prompts"`
+      + `:reload-prompts` case key + `exact-command-handlers` entry + `/help`
+      line (`commands.clj`); `doc/tui.md` command list + Prompt-templates
+      subsection; `CHANGELOG.md` `[Unreleased]` entry; `commands_test.clj`
+      (`reload-prompts-command-test`, dispatch path, and the
+      `format-help-includes-all-commands-test` enumeration). Every internal
+      symbol (`:session/reload-prompts`, `psi.extension/reload-prompts`,
+      `reload-prompts-in!`) was already verb-first, so only the command
+      surface needed alignment.
+- [x] CS2: Renamed the private formatter `format-prompts-reload` →
+      `format-reload-prompts` (defn + its case-arm call site in `commands.clj`),
+      matching `format-reload-models` / `format-reload-extension-installs` and
+      the renamed command. `clj-kondo` 0/0; full `bb test` green.

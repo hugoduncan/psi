@@ -892,3 +892,31 @@ Actionable (consistency — naming):
 Result: two consistency (naming) follow-ups (CS1 command word order, CS2
 formatter name). Both are pure naming/shape — no behaviour change. Code is
 otherwise simple, consistent, and robust.
+
+## Code-shaper follow-up execution (2026-06-01)
+
+Executed CS1 + CS2 together as a single naming rename (no behaviour change).
+
+- 🎯 CS1 decision: chose **rename `/prompts-reload` → `/reload-prompts`** over
+  the design.md-rationale alternative. Rationale: the reload family is
+  uniformly verb-first (`/reload-models`, `/reload-extension-installs`) and
+  every internal symbol was already verb-first (`:session/reload-prompts`,
+  `psi.extension/reload-prompts`, `reload-prompts-in!`). Renaming the lone
+  noun-first command string + case key is the `λone_way` / `λconsistent`
+  resolution; documenting a divergence would preserve a gratuitous
+  inconsistency for no benefit.
+- CS1 surfaces changed: `commands.clj` command string `"/reload-prompts"`,
+  `:reload-prompts` case key, `exact-command-handlers` entry, `/help` line;
+  `doc/tui.md` (in-session command list + Prompt-templates subsection);
+  `CHANGELOG.md` `[Unreleased]` entry; `commands_test.clj`
+  (`reload-prompts-command-test` rename, dispatch arg, and the
+  `format-help-includes-all-commands-test` enumeration).
+- CS2: renamed `format-prompts-reload` → `format-reload-prompts` (defn + its
+  case-arm call site), matching `format-reload-models` /
+  `format-reload-extension-installs`.
+- Also corrected stale `/prompts-reload` / `format-prompts-reload` references
+  in working-memory artifacts (`munera/plan.md` task-curation line,
+  `mementum/state.md` task-204 summary) for coherence.
+- Verification: `clj-kondo` 0/0 over `commands.clj` + `commands_test.clj`;
+  full `bb test` green (✅ All tests passed). No mutation/handler/core surface
+  touched — those symbols were already verb-first.

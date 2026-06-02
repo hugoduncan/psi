@@ -7,7 +7,7 @@ Version scheme: `MAJOR.MINOR.PATCH` where PATCH = `git rev-list HEAD --count` at
 ## [Unreleased]
 
 ### Added
-- New `/prompts-reload` command and `psi.extension/reload-prompts` mutation (visible to `psi-tool` via `action: "mutate"`) re-discover prompt templates from disk for the session's worktree (`~/.psi/agent/prompts` and `<worktree>/.psi/prompts`) and replace the session's registered templates, so editing, adding, or deleting a prompt `.md` takes effect without restarting the session.
+- New `/reload-prompts` command and `psi.extension/reload-prompts` mutation (visible to `psi-tool` via `action: "mutate"`) re-discover prompt templates from disk for the session's worktree (`~/.psi/agent/prompts` and `<worktree>/.psi/prompts`) and replace the session's registered templates, so editing, adding, or deleting a prompt `.md` takes effect without restarting the session.
 - New `task-lifecycle` workflow: runs a Munera task through its full design → plan → implement → review lifecycle by chaining `review-task-design`, `create-task-plan`, `review-task-plan`, `implement-task`, and `review-task-implementation` in order. Invokable via `/delegate task-lifecycle`.
 - `review-task-design` (invokable via `/delegate review-task-design`) now includes an architectural-fit review aspect that runs first, before the ambiguity and inconsistency aspects. It checks the task design's fit with the current architecture (consulting the in-context architecture sources) and loops on actionable feedback like the other aspects.
 

@@ -644,7 +644,7 @@
         s          (commands/format-help ctx session-id)]
     (doseq [cmd ["/quit" "/status" "/history" "/new" "/resume" "/tree"
                  "/login" "/logout" "/remember" "/worktree"
-                 "/reload-models" "/prompts-reload"
+                 "/reload-models" "/reload-prompts"
                  "/jobs" "/job" "/cancel-job"
                  "/help" "/prompts" "/skills"]]
       (is (str/includes? s cmd) (str "help should mention " cmd)))
@@ -707,10 +707,10 @@
       (model-registry/init! {:user-models-path    nil
                              :project-models-path nil}))))
 
-;; ── /prompts-reload ─────────────────────────────────────────
+;; ── /reload-prompts ─────────────────────────────────────────
 
-(deftest prompts-reload-command-test
-  (testing "/prompts-reload returns :text result with worktree + count"
+(deftest reload-prompts-command-test
+  (testing "/reload-prompts returns :text result with worktree + count"
     (let [cwd (test-support/temp-cwd)
           _   (.mkdirs (java.io.File. (str cwd "/.psi/prompts")))
           _   (spit (str cwd "/.psi/prompts/foo.md") "foo body")
@@ -719,7 +719,7 @@
                             {:session-defaults {:worktree-path cwd}
                              :cwd cwd
                              :persist? false})
-          result (commands/dispatch-in ctx session-id "/prompts-reload" cmd-opts)]
+          result (commands/dispatch-in ctx session-id "/reload-prompts" cmd-opts)]
       (is (= :text (:type result)))
       (is (str/includes? (:message result) "Prompts reloaded"))
       (is (str/includes? (:message result) cwd))
