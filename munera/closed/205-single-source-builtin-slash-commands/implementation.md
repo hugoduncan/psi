@@ -1024,3 +1024,24 @@ One new actionable test gap:
   sole name source.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Test review follow-up TT3 — done
+
+Added `builtin-command-specs-well-formed-test` in
+`components/agent-session/test/psi/agent_session/commands_builtin_specs_test.clj`.
+Explicit `doseq`/`every?` assertions (no malli dep added) over every
+`bspec/builtin-command-specs` entry:
+- `:kinds` is a set, non-empty, and `⊆ #{:exact :prefixed}` (rejects
+  empty-`:kinds` "named-but-unroutable" entries and unknown `:kinds` members);
+- `:exact ∈ :kinds ⇒ (some? (:handler spec))` (rejects the `"/foo" → nil`
+  exact-projection mis-shape, table-level — complementing R2's load-time
+  case-keyword assert);
+- `:description` is a non-blank string on every entry (locks the resolver/help
+  text source shape).
+Locks the single-source entry shape itself (the gap R1/R2 — projection↔case
+seam — and TT1/TT2 — content — did not cover). Targeted namespace green:
+9 tests, 188 assertions, 0 failures; clj-kondo + cljfmt clean. Pre-existing
+unrelated TUI `app_projection_test` failure ("moving selection … highlighted
+autocomplete row") is outside this change's scope.
+
+PASS_STATUS: REVIEW_COMPLETE

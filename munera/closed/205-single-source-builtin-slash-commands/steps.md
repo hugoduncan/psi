@@ -251,7 +251,7 @@ Tick with sha/decision on completion.
 
 ## Test review follow-ups (review pass 2)
 
-- [ ] TT3 — Lock the `builtin-command-specs` per-entry well-formedness invariant
+- [x] TT3 — Lock the `builtin-command-specs` per-entry well-formedness invariant
       (design "Spec-entry field set" / AC2): add a
       `builtin-command-specs-well-formed-test` in `commands_builtin_specs_test.clj`
       asserting, for EVERY entry of `bspec/builtin-command-specs`, that

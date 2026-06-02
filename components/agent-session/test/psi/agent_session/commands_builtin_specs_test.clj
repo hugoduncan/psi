@@ -79,6 +79,31 @@
     "reload-extension-installs" "project-repl" "tree" "jobs" "job" "cancel-job"
     "remember" "model" "thinking" "speed" "effort" "login"})
 
+(deftest builtin-command-specs-well-formed-test
+  ;; TT3: lock the per-entry well-formedness invariant of the single source
+  ;; (design "Spec-entry field set" / AC2). The projections silently assume
+  ;; the entry shape: an empty-`:kinds` entry is named-but-unroutable, and an
+  ;; `:exact`-without-`:handler` entry projects into exact-command-handlers as
+  ;; `"/name" → nil`. R1/R2 only lock the projection↔`case` seam, not the entry
+  ;; shape itself, so both malformations are currently representable in the
+  ;; single source yet caught by no test. Assert directly on every entry.
+  (testing ":kinds is a non-empty subset of #{:exact :prefixed}"
+    (doseq [[k spec] bspec/builtin-command-specs]
+      (is (set? (:kinds spec)) (str k " :kinds must be a set"))
+      (is (seq (:kinds spec)) (str k " :kinds must be non-empty"))
+      (is (every? #{:exact :prefixed} (:kinds spec))
+          (str k " :kinds must be ⊆ #{:exact :prefixed}"))))
+  (testing ":exact ∈ :kinds ⇒ :handler is present"
+    (doseq [[k spec] bspec/builtin-command-specs
+            :when (contains? (:kinds spec) :exact)]
+      (is (some? (:handler spec))
+          (str k " is :exact and must carry a :handler"))))
+  (testing ":description is a non-blank string on every entry"
+    (doseq [[k spec] bspec/builtin-command-specs]
+      (is (string? (:description spec)) (str k " :description must be a string"))
+      (is (not (str/blank? (:description spec)))
+          (str k " :description must be non-blank")))))
+
 (deftest exact-command-handlers-projection-unchanged-test
   ;; Static snapshot lock: proves the *derived* exact-command-handlers map
   ;; matches the pre-task literal. This is NOT a live-`case` coherence check —
