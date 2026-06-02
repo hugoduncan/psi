@@ -157,3 +157,60 @@ Executed the five newly added ambiguity follow-ups (A1–A5) from
 All A1–A5 are checked in `design-steps.md` (unchecked count 0). The earlier
 architecture-fit item predates this pass and remains checked. No `steps.md` /
 `plan.md` touched. PASS_STATUS: REVIEW_COMPLETE.
+
+## 2026-06-01 — Design inconsistency review (pass 1)
+
+Reviewed `design.md` for inconsistencies only (not ambiguity/architecture/
+correctness). Grounded against live `bb gordian local/complexity/diagnose/gate
+--json/--edn/--help`, `.psi/workflows/task-lifecycle.edn`,
+`.psi/workflows/gh-issue-implement.edn`, and
+`.psi/workflows/implement-task-in-worktree.md`.
+
+Verified consistent (no findings):
+- Selector recipe field claims: `local --json` units carry `lcc-total`/`ns`/
+  `var`/`arity`/`line`/`end-line`/per-dimension burdens; `complexity --json`
+  units carry `cc`/`ns`/`var`/`arity`; both expose a `units` array — join key
+  and `gap` inputs all exist as stated.
+- `diagnose --edn` → `gate --baseline … --fail-on new-cycles,new-high-findings
+  --max-new-medium-findings 0` round-trips and PASSes (exit 0) with the exact
+  flags in Phase-1 acceptance + Locked decision 4. Gate check names match.
+- Step-1→step-2 delegate-yield handoff: `gh-issue-implement.edn` `:delegate`
+  steps and `task-lifecycle.edn` first sub-workflow read site confirm the
+  `:prompt-string {:type :map :fields {:input {:from {:step … :yield :text}}}}`
+  → `{:from :workflow-input :path [:input]}` chain as described.
+- `--sort total` on the selector's `local` call vs bare `local --json` for
+  `before-local.json`: NOT an inconsistency — Phase-1 comparison is keyed by
+  `(ns, var, arity)`, so sort order is irrelevant to the keyed before/after.
+- Naming (`incidental-complexity-finder`, `reduce-incidental-complexity`) is
+  consistent across Scope/Deliverables/Locked decisions/Acceptance.
+
+One new actionable inconsistency (added to design-steps.md):
+
+- **I1 — Worktree-inheritance claim contradicts its own cited precedent and
+  step-1 handoff.** "Verified facts" states *"a `:delegate` step inherits the
+  worktree set by a prior `:session` step's `work-on` call (precedent:
+  `implement-task-in-worktree.md`)"* and Step 2 asserts the `task-lifecycle`
+  delegate "inherits the worktree established in step 1 (verified behaviour)."
+  But the cited precedent shows the OPPOSITE mechanism: `implement-task-in-
+  worktree.md` is a *wrapper* whose own `resolve-worktree` `:session` step
+  re-extracts a `worktree_path:` field from a structured handoff blob and
+  re-calls `work-on` BEFORE delegating to `implement-task` — inheritance happens
+  inside the delegated wrapper, driven by an explicit handoff field, not from a
+  sibling step in the outer workflow. In `gh-issue-implement.edn` the outer
+  workflow reaches that wrapper by passing the `design` step's text yield, which
+  carries a `worktree_path:` field. Task 204 instead (a) delegates DIRECTLY to
+  `task-lifecycle` (not a worktree-resolving wrapper; its sub-workflows have no
+  `resolve-worktree`/`work-on` step and read only `{:input <task-path>}`), and
+  (b) constrains step-1 to emit ONLY the bare task path (no `worktree_path:`
+  field threaded). So the precedent demonstrates inheritance requires either a
+  worktree-resolving wrapper or a `worktree_path:` in the handoff — and the
+  design does neither while claiming the inheritance is "verified." The design
+  must resolve this: either delegate to a worktree-resolving wrapper (and thread
+  `worktree_path:` through step-1's output, contradicting the "emit only the
+  task path" constraint), or cite the actual mechanism that makes a fresh
+  `:delegate` to `task-lifecycle` run inside step-1's worktree, or weaken the
+  "verified behaviour" claim to an open risk. (Note: the prior architecture-fit
+  note accepted this as "verified precedent"; this finding corrects that.)
+
+Added I1 as an unchecked item to design-steps.md. PASS_STATUS:
+ACTIONABLE_FEEDBACK.
