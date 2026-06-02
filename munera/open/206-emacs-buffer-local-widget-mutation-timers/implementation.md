@@ -115,3 +115,33 @@ design.md updates:
 This makes the cancel helper safely shared between dynamic-current and
 captured-buffer contexts (`one_way → singular(solution)`). No code changes
 (design-only task).
+
+## Inconsistency review (ψ)
+
+Re-read design.md against real code: arm/cancel/timeout/dispatch-mutation
+(`psi-widget-projection.el:300/303/310/317/336/349/351-357`), struct
+(`psi-globals.el:49-72`), `defvar-local psi-emacs--state` (`:111`), init
+(`psi-lifecycle.el:32-57`), teardown (`:269`), reset-transcript (`:371`),
+notification precedent (`psi-projection.el:368/379/410`). Line refs, the
+global-hash claim, the cleared-on-teardown/reset notification precedent, and the
+`projection-notification-timers` shape all verified accurate.
+
+One NEW actionable inconsistency (I1, design-steps.md): the **pinned arm
+signature** `--arm-mutation-timer (state ext-id widget-id node-key timeout-ms)`
+(Scope/Constraints) takes `state` but **no `buffer`**, yet Scope/Constraints/AC
+require the *timeout* callback to "capture the originating `buffer`/`state` at
+arm time," be a no-op for a dead buffer via `buffer-live-p`, and (per the cited
+`psi-emacs--schedule-notification-dismiss` precedent) run inside
+`with-current-buffer buffer`. Arm is the only site that schedules
+`--on-mutation-timeout` via `run-at-time`, but the pinned signature provides no
+`buffer` to thread, and the design never says (a) that arm threads captured
+`buffer` (and `state`) into the scheduled callback's args, nor (b) that
+`--on-mutation-timeout` gains `buffer`/`state` params. The notification
+precedent it mirrors captures BOTH `(current-buffer)` and `state` into the
+scheduled lambda; the design captures only `state` for arm. As written the
+"captured buffer/state at arm time" + dead-buffer-no-op requirement is
+unsatisfiable for the timeout path. (B1 resolved synchronous store-resolution
+only; the deferred-callback buffer-capture/threading gap is distinct and
+unresolved.) Resolve by extending the arm signature/scheduling to capture and
+thread the originating `buffer` (mirroring the precedent's `(current-buffer)` +
+`state` capture) and specifying `--on-mutation-timeout`'s post-change params.

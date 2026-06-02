@@ -25,3 +25,22 @@
       `psi-emacs--state`" constraint does not cover `--arm` or the shared cancel
       helper's arm-path use. Resolve so a single, unambiguous store-resolution
       rule governs all three call sites. Update Scope/Constraints/Acceptance.
+
+## Inconsistency review (ψ)
+
+- [ ] I1 — Reconcile the pinned arm signature with the timeout-callback
+      buffer-capture requirement. `--arm-mutation-timer (state ext-id widget-id
+      node-key timeout-ms)` (Scope/Constraints) takes `state` but no `buffer`,
+      yet Scope/Constraints/AC require the timeout callback to capture the
+      originating `buffer`/`state` at arm time, guard `buffer-live-p`
+      (dead-buffer no-op), and — per the cited
+      `psi-emacs--schedule-notification-dismiss` precedent — run inside
+      `with-current-buffer buffer`. Arm is the sole scheduler of
+      `--on-mutation-timeout`, so without a captured `buffer` threaded into the
+      `run-at-time` callback args the requirement is unsatisfiable. The
+      precedent captures BOTH `(current-buffer)` and `state`; the design
+      captures only `state`. Specify (a) that arm captures and threads the
+      originating `buffer` (and `state`) into the scheduled callback, and (b)
+      `--on-mutation-timeout`'s post-change signature (the `buffer`/`state`
+      params it receives). Update Scope/Constraints/Acceptance. (Distinct from
+      B1, which resolved only the synchronous store-resolution rule.)
