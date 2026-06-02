@@ -659,3 +659,42 @@ Verification:
 - `cljfmt check` on the test file: formatted correctly.
 
 Slice 5 (docs + coherence) remains.
+
+## 2026-06-01 — Slice 5 built: docs + coherence
+
+User-facing docs updated for the new capability:
+
+- `doc/workflows.md`: added an "Incidental-complexity simplification" section
+  describing `reduce-incidental-complexity` (the `gap` selection method, the
+  `incidental-complexity-finder` skill, the two-step select-and-create →
+  lifecycle-in-worktree shape via the `task-lifecycle-in-worktree` wrapper, the
+  two-phase behaviour-preserving generated-task contract, the gate flags, and
+  the no-push/PR endpoint). `/delegate reduce-incidental-complexity` invocation
+  documented.
+- `CHANGELOG.md` `[Unreleased] → Added`: entry for the new workflow + skill.
+
+Coherence verified across artifacts:
+- Names consistent: `incidental-complexity-finder`, `reduce-incidental-complexity`,
+  `task-lifecycle-in-worktree` agree across design.md, SKILL.md, both workflow
+  .edn files, doc/workflows.md, and CHANGELOG.
+- Thresholds (`lcc-total ≥ 5.0`, `gap ≥ 2.0`) consistent between SKILL.md and
+  the workflow step-1 prompt.
+- Gate flags (`--fail-on new-cycles,new-high-findings --max-new-medium-findings 0`)
+  identical in design.md, reduce-incidental-complexity.edn, and doc/workflows.md.
+- Baselines (`before-local.json` / `before-diagnose.edn`) named consistently.
+
+D1 vindicated by docs: `doc/workflows.md` ("Where workflows live") explicitly
+lists `implement-task-in-worktree.md` among the deferred-migration `.md`
+wrappers that "still begin with legacy EDN workflow maps and are intentionally
+tracked … as outstanding migration blockers, not as valid single-step markdown
+examples", and states "New authoring should treat `.md` as single-step and
+`.edn` as multi-step." Authoring the wrapper as `.edn` is the documented
+correct path.
+
+Final verification:
+- `clojure -M:test --focus psi.workflow-loader.workflow-definitions-test`:
+  **14 tests, 192 assertions, 0 failures**.
+- `clj-kondo` / `cljfmt`: clean on the changed Clojure test file (docs are
+  markdown — not cljfmt-parseable, expected).
+
+All five slices (1–5) complete. Task implementation done.

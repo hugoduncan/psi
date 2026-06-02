@@ -182,15 +182,15 @@ with the commit sha / decision when done.
 
 ## Slice 5 — docs + coherence
 
-- [ ] Update `doc/workflows.md` (and/or the workflow listing it curates) to
+- [x] Update `doc/workflows.md` (and/or the workflow listing it curates) to
       document `reduce-incidental-complexity` and `incidental-complexity-finder`.
-- [ ] Add a CHANGELOG `[Unreleased] → Added` entry for the new user-visible
+- [x] Add a CHANGELOG `[Unreleased] → Added` entry for the new user-visible
       workflow + skill.
-- [ ] Verify coherence across `design.md` ↔ SKILL.md ↔ both workflow `.edn/.md`
+- [x] Verify coherence across `design.md` ↔ SKILL.md ↔ both workflow `.edn/.md`
       ↔ docs (names, thresholds, gate flags, handoff fields all consistent).
-- [ ] Run final focused workflow tests + `clj-kondo`; record results in
+- [x] Run final focused workflow tests + `clj-kondo`; record results in
       `implementation.md`.
-- [ ] Commit Slice 5 (`⚒ doc: document reduce-incidental-complexity workflow`).
+- [x] Commit Slice 5 (`⚒ doc: document reduce-incidental-complexity workflow`).
 
 ## Plan/steps ambiguity follow-ups (review pass 1)
 

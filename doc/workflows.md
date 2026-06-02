@@ -621,6 +621,58 @@ loops back to its review step (`REPEAT → review`, bounded by
 `:max-iterations`). Only the follow-up step *body* is shared; the
 judge/`:on` wiring around each follow-up stays with its host.
 
+## Incidental-complexity simplification
+
+`reduce-incidental-complexity` is an autonomous workflow that simplifies **one
+aspect of the system per run** by targeting *incidental* complexity — the
+comprehension burden that comes from how code is built, not from the problem it
+solves. Running it repeatedly walks the codebase down its incidental-complexity
+gradient, one isolated, reviewable change at a time.
+
+```text
+/delegate reduce-incidental-complexity
+```
+
+How it selects a target: raw cyclomatic complexity (`gordian complexity`)
+surfaces *essential* complexity (flat dispatch/registration tables are
+irreducible decision logic — false positives for simplification). The
+discriminator for *incidental* complexity is **comprehension burden the
+branching does not explain**: high `gordian local` burden against low/moderate
+cyclomatic complexity. The `incidental-complexity-finder` skill encodes this as
+`gap = lcc-total / max(cc, 1)`, joins the two `gordian` lenses on
+`(ns, var, arity)`, qualifies units with `lcc-total ≥ 5.0 ∧ gap ≥ 2.0`, ranks by
+`gap`, and applies an essential-vs-incidental judgment guard over the top 5 to
+discard false positives. It selects exactly one unit, or reports that none
+qualifies.
+
+The workflow has two steps:
+
+1. **select-and-create** (`:session`) — fetches `origin/master`, applies the
+   `incidental-complexity-finder` skill, and **stops early** with no worktree or
+   task if nothing qualifies. Otherwise it creates an isolated worktree via
+   `work-on` off `origin/master`, captures `before-local.json` (per-unit burden
+   baseline) and `before-diagnose.edn` (architectural gate baseline) into the
+   generated task directory, allocates the next Munera task id, writes a
+   **two-phase behaviour-preserving refactor** `design.md`, commits it on the
+   worktree branch, and emits a structured `worktree_path:` / `munera_task_path:`
+   handoff.
+2. **lifecycle-in-worktree** (`:delegate`) — routes that handoff into the
+   `task-lifecycle-in-worktree` wrapper (a three-step
+   `resolve-worktree` → `task-lifecycle` → `summary` adapter, structurally like
+   `review-implementation-in-worktree`), which re-establishes the worktree and
+   drives the generated task through the full design → plan → implement → review
+   lifecycle.
+
+Each generated task is a behaviour-preserving refactor: **Phase 0** establishes
+a green characterization-test safety net (gating all refactoring), and
+**Phase 1** decomplects the target under objective acceptance — the target's
+`lcc-total` decreases versus `before-local.json`, net burden across the
+metric-derived touched set strictly decreases, `gordian gate --baseline
+before-diagnose.edn --fail-on new-cycles,new-high-findings
+--max-new-medium-findings 0` passes, and all tests stay green. The workflow ends
+with a completed, reviewed task on the local worktree branch; it does **not**
+push or open a PR — that decision is left to the user.
+
 ## Related docs
 
 - [`doc/workflow-grammar.md`](workflow-grammar.md) — workflow grammar
