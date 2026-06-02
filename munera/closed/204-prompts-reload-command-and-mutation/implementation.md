@@ -839,3 +839,56 @@ Considered, NOT actionable:
 
 Result: **no new actionable docs feedback.** User docs are accurate, complete,
 and consistent with the implementation. Docs review complete.
+
+## Code-shaper review (2026-06-01)
+
+Applied code-shaper (simplicity ∧ consistency ∧ robustness) to the production
+reload surfaces (handler `session_mutations.clj:290-302`, settings fn
+`session_settings.clj:157-162`, core re-export `core.clj:187-192`, mutation
+`mutations/prompts.clj:34-45`, command `commands.clj:268-276` + `/help` +
+`exact-command-handlers`). Distinct from prior arch/ambiguity/inconsistency/
+impl/test/docs passes — this targets **code shape** (single-responsibility,
+data-shape/idiom/naming consistency, robustness), not claims or AC coverage.
+
+Verified high-quality (no finding):
+- ✅ simple — each fn single-responsibility; handler is the one IO+replace
+  point, settings/core/mutation/command are thin pass-throughs. No
+  computation/flow-control mixing. Locally comprehensible.
+- ✅ consistent (data shapes / arg order / idioms) — `{:reloaded? :count
+  :worktree}` return shape uniform; `[ctx session-id]` arg order matches the
+  reload family; mutation `(boolean …)`/`(or count 0)` mirrors
+  `add-prompt-template`; settings-fn + core re-export pair mirrors
+  `reload-models`. Discovery opts match the design's pinned map.
+- ✅ robust — `discover-template-files` `(.exists d)` guard ⇒ absent/empty dir
+  yields `[]`, no crash (T1 boundary tested). Pure handler, single
+  `:root-state-update`, no orthogonality violations.
+
+Actionable (consistency — naming):
+- ❌ CS1 — User-facing command name **inverts the established word order**.
+  The reload family is verb-first: `/reload-models`,
+  `/reload-extension-installs` (and `:session/reload-prompts`,
+  `psi.extension/reload-prompts`, `reload-prompts-in!` are all verb-first
+  `reload-prompts`). Only the command string `"/prompts-reload"` and its
+  case key `:prompts-reload` are noun-first — inconsistent **within this very
+  task** (everything is `reload-prompts` except the command surface) and with
+  the sibling `/reload-*` commands. This breaks `consistent(naming(code))`:
+  a user with `/reload-<thing>` muscle memory will mistype. No task artifact
+  justifies the inversion (the design fixed `/prompts-reload` from the title
+  onward without addressing word order; OQ#3's `/reload` umbrella is a
+  separate deferral). Resolve: rename to `/reload-prompts` (command string +
+  `:reload-prompts` case key + `exact-command-handlers` + `/help` line +
+  `doc/tui.md` + CHANGELOG + the command/help tests), OR add an explicit
+  one-line rationale in design.md for the deliberate noun-first divergence.
+
+- ❌ CS2 — Private formatter name diverges from siblings. Siblings are
+  `format-reload-models` / `format-reload-extension-installs` (verb-first,
+  mirroring their command); the new one is `format-prompts-reload`
+  (noun-first). Same root inconsistency as CS1, surfacing in the fn name.
+  Resolve together with CS1 — rename to `format-reload-prompts` (and its one
+  call site at `commands.clj:779`) when the command is renamed; if CS1 is
+  instead resolved by documenting the divergence, rename the formatter to
+  match the chosen command word order for at least local consistency.
+
+Result: two consistency (naming) follow-ups (CS1 command word order, CS2
+formatter name). Both are pure naming/shape — no behaviour change. Code is
+otherwise simple, consistent, and robust.
