@@ -546,3 +546,40 @@ was 338) and byte-compile clean.
 
 No source/design changes — both are pure test-coverage additions for already
 -implemented behaviour. `.el` reloaded into the running Emacs.
+
+## Test review pass 2 (ψ)
+
+Independent re-application of task-test-review (well_formed ∧ ∀b∈behaviour(design).
+∃t.covers ∧ infra_deps injectable/¬mock). 340/340 ERT green, byte-compile clean.
+Grounded on `psi-widget-projection.el:310/323/338/375` and the test file.
+
+Confirmed strong: tests assert state (store contents, in-flight lstate,
+cancel/timerp calls), not interactions; `cl-letf` substitutes only timer/RPC/
+render infrastructure primitives (`run-at-time`, `cancel-timer`, `timerp`,
+`send-request-function`, `upsert-projection-block`) — testing-without-mocks
+"infrastructure → controllable", no logic mocked. Behaviour coverage verified for
+design Scope (a)–(e) + acceptance: teardown cancel (a), two-buffer independence
+(b), arm/cancel/response/timeout preserved (c), response+timeout cross-buffer
+targeting (d), response+timeout dead-buffer no-op (e), transcript-reset clear,
+arm buffer/state threading (T1), nil-state timeout no-op (R1).
+
+One NEW minor actionable coverage asymmetry (T4): the response cross-buffer test
+`pwpt-dispatch-response-targets-originating-buffer` (`:206`) asserts only the
+origin *timer store* is cleared (and the other buffer's untouched); it neither
+sets up nor asserts the response callback's **in-flight lstate** clearing on the
+ORIGIN buffer. The response callback (`psi-widget-projection.el:380-389`) clears
+both the timer store AND the in-flight lstate inside `with-current-buffer buffer`,
+and design.md Scope (d)/acceptance name the response path clearing the originating
+buffer's "buffer-local timer store **and lstate**". The symmetric *timeout*
+cross-buffer test (`pwpt-on-mutation-timeout-targets-originating-buffer`, `:266`)
+DOES assert both store + `in-flight-p` lstate on the origin (`:302-308`); the
+response path asserts only the store. So the response callback's lstate-targeting
+— a named cross-buffer hazard (a response while another buffer is current must
+not clear the wrong buffer's lstate) — is unasserted, while its store-targeting
+counterpart and the timeout path's lstate-targeting are both covered. Minor:
+the underlying mechanism (`with-current-buffer buffer` rebinding `defvar-local
+psi-emacs--state`) is shared and exercised by the timeout test, but the design
+names lstate clearing for the response path explicitly and it lacks a direct
+assertion. Strengthen `…-targets-originating-buffer` to set an in-flight lstate
+on the origin button before dispatch and assert it is cleared on the origin (and
+left untouched on the other buffer), mirroring the timeout test.

@@ -195,3 +195,20 @@
       `run-at-time` fn+args and assert the threaded arg order/values — so the
       design AC "arm captures+threads buffer/state" is asserted directly, not
       only exercised indirectly via dead-buffer/cross-buffer behaviour.
+- [ ] T4 — Assert the response cross-buffer **lstate** clearing. The response
+      cross-buffer test `pwpt-dispatch-response-targets-originating-buffer`
+      (`psi-widget-projection-timers-test.el:206`) asserts only the origin
+      *timer store* is cleared (other buffer untouched); it never sets up or
+      asserts the response callback's in-flight **lstate** clearing on the
+      ORIGIN buffer. The callback (`psi-widget-projection.el:380-389`) clears
+      both store AND lstate inside `with-current-buffer buffer`, and design.md
+      Scope (d)/acceptance name the response path clearing the originating
+      buffer's "buffer-local timer store **and lstate**". The symmetric timeout
+      cross-buffer test (`…-targets-originating-buffer`, `:266`) asserts both
+      store + `in-flight-p` lstate; the response path asserts only the store.
+      Strengthen `…-dispatch-response-targets-originating-buffer` to set an
+      in-flight lstate on the origin button (via the spec + `--set-lstate`)
+      before dispatch and assert it is cleared on the origin and left untouched
+      on the other buffer, mirroring the timeout test — so the design-named
+      response lstate-targeting behaviour is directly covered, not only its
+      store-targeting counterpart.
