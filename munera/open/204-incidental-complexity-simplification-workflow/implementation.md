@@ -4274,3 +4274,60 @@ TT-F command-name lock) so the structural `.units`-shape assumption stays guarde
 in the fast suite once the slow real-lens execution moves to `:integration`.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## task-implementation-review (independent pass, 2026-06-03, post-TR22)
+
+Re-applied `task-implementation-review` (matches-design ∧ follows-architecture ∧
+flag new-pattern-where-reusable ∧ flag unnecessary-abstraction ∧ flag
+structural-perf) to the three shipped artifacts and their docs, after the
+TR22 (test-shaper) follow-up entered flight.
+
+**Verdict: REVIEW_COMPLETE — no new actionable implementation issues.**
+
+- **Code↔design — matches.** Read all three artifacts fresh.
+  `reduce-incidental-complexity.edn` is the verified two-step shape:
+  `select-and-create` (`:session`; tools `read/bash/edit/write/work-on`; skills
+  `incidental-complexity-finder`/`gordian`/`code-shaper`; `:thinking-level
+  :high`) carrying the full 9-point procedure — `git fetch origin master` base
+  refresh, skill-driven selection, early-stop, worktree-scoped NNN allocation,
+  two `before` baselines with worktree-root-relative task-dir paths, the verbatim
+  two-phase generated-design contract (A5/A2/A3 + gate flags
+  `--fail-on new-cycles,new-high-findings --max-new-medium-findings 0`), commit
+  on worktree branch, and the `worktree_path:`/`munera_task_path:` handoff — then
+  `lifecycle-in-worktree` (`:delegate` → `task-lifecycle-in-worktree`) with the
+  grammar-conformant `:prompt-string {:input {:from {:step "select-and-create"
+  :yield :text}}}`. Wrapper is the three-step `resolve-worktree`(`:session`,
+  tools incl. `work-on`) → `lifecycle`(`:delegate :target "task-lifecycle"`) →
+  `summary`(`:session`) adapter, structurally identical to the loadable
+  `review-implementation-in-worktree.edn` (verified by side-by-side read), with
+  only the documented, intentional deltas: the F1 `NO_TARGET` short-circuit in
+  both session steps and the `summary` step additionally sourcing the
+  `resolve-worktree` yield (needed to detect NO_TARGET). Skill encodes the
+  `gap = lcc-total / max(cc,1)` recipe, `(ns,var,arity,line)` determinism key,
+  inner-join-on-local-side drop rule, `lcc-total ≥ 5.0 ∧ gap ≥ 2.0` filter, and
+  the top-5 essential-vs-incidental guard.
+- **Architecture — follows.** Pure S1 capability-catalog artifacts (one skill +
+  two `.edn` workflows); no production Clojure. Reuses the verified
+  worktree-resolving-wrapper pattern — no invented pattern, no unnecessary
+  abstraction, no structural-perf concern.
+- **Known limitation — accepted, not new.** F1 (step-2 `:delegate` fires
+  unconditionally on a no-target handoff; grammar has no conditional/skip),
+  mitigated by the prompt-level NO_TARGET short-circuit — engine-bounded, not an
+  actionable code defect.
+- **Tests — green.** Focused `task-204-workflow-definitions-test` +
+  `incidental-complexity-finder-skill-test` via the real loader →
+  13 tests, 182 assertions, 0 failures (includes the in-flight TR22 fast-suite
+  `.units`-shape lock).
+- **Docs — accurate.** `doc/workflows.md` §"Incidental-complexity simplification"
+  + CHANGELOG `[Unreleased] → Added` faithfully describe the two-step workflow,
+  three-step `.edn` wrapper, NO_TARGET early-stop, join key, thresholds, and the
+  two-phase contract.
+- **In-flight observation (not a new follow-up).** The working tree carries an
+  uncommitted TR22 edit to `incidental_complexity_finder_skill_test.clj`
+  (test-shaper track: tag the slow real-lens test `^:integration`, hoist the
+  fast-suite `.units`-shape lock). Already tracked as the open TR22 steps.md
+  item under the test-review track — not re-added here (would duplicate).
+
+No follow-up items added.
+
+PASS_STATUS: REVIEW_COMPLETE
