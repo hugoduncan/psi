@@ -1764,3 +1764,36 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
       design-named tools…" and added a TT-J comment. Focused task-204 ns green
       (2 tests, 80 assertions, 0 failures); `clj-kondo` 0; `clj-paren-repair`
       Success; `bb commit-check:file-lengths` clean (400 lines < 800).
+
+## Test review follow-ups (review pass 26 — task-test-review)
+
+- [ ] TT-K — Prove the task-204 delegate **reference chain resolves**, not just
+      the target strings, in `task_204_workflow_definitions_test.clj`. Both
+      isolated tests use `load-edn-only` and assert only target *string equality*:
+      `reduce-incidental-complexity-test` asserts
+      `(= "task-lifecycle-in-worktree" (:target delegate-step))` but loads only
+      `reduce-incidental-complexity.edn` (the target is not in its `definitions`);
+      `task-lifecycle-in-worktree-test` asserts `(= "task-lifecycle" (:target
+      lifecycle-step))` but loads only the wrapper (the target is not in its
+      `definitions`). The loader does NOT validate delegate targets at load time
+      (no resolution check in `compiler.clj`/`core.clj`; isolated `(empty?
+      errors)` passes with dangling targets), so the string asserts give no
+      resolution guarantee. Design acceptance requires the workflows "parse and
+      load … **references resolve**" — the references-resolve half is uncovered: a
+      regress renaming the wrapper file/`:name` while the outer keeps the old
+      `:target` string would break the live chain yet pass every existing test
+      green. Established same-component precedent:
+      `review-workflow-set-loads-together-test`
+      (`components/workflow-loader/test/psi/workflow_loader/workflow_definitions_test.clj`)
+      co-loads the `review-*` delegate set and asserts each registers. Fix
+      (test-only; no production/skill/EDN change): add a
+      `task-204-workflow-set-loads-together-test` mirroring that precedent — load
+      `reduce-incidental-complexity.edn`, `task-lifecycle-in-worktree.edn`, and
+      `task-lifecycle.edn` together (via `with-workflow-dir` + `slurp-workflow-file`,
+      both already in the ns), assert `(empty? errors)`, assert all three
+      register, and assert each task-204 delegate `:target`
+      (`task-lifecycle-in-worktree` from the outer, `task-lifecycle` from the
+      wrapper) is a key in the combined `definitions` — the references-resolve
+      check the isolated string-equality asserts cannot give. Verify the focused
+      task-204 ns green, `clj-kondo` 0, `clj-paren-repair` Success, and
+      `bb commit-check:file-lengths` clean (< 800).

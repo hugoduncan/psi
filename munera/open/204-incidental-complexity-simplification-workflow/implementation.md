@@ -3935,3 +3935,41 @@ documenting the symmetric-with-TT-A rationale. No production/skill/EDN change.
 - `bb commit-check:file-lengths`: clean (file 400 lines < 800).
 
 TT-J checked in steps.md.
+
+## Test review pass 26 (task-test-review) — TT-K
+
+**Finding (ACTIONABLE):** the task-204 delegate **reference chain is never
+proven to resolve** — only the target *strings* are asserted. Both isolated
+tests use `load-edn-only` (one EDN into an empty temp dir):
+
+- `reduce-incidental-complexity-test` asserts
+  `(= "task-lifecycle-in-worktree" (:target delegate-step))` (string equality)
+  but loads only `reduce-incidental-complexity.edn`, so its delegate target
+  `task-lifecycle-in-worktree` is **not** in that run's `definitions`.
+- `task-lifecycle-in-worktree-test` asserts
+  `(= "task-lifecycle" (:target lifecycle-step))` but loads only the wrapper,
+  so `task-lifecycle` is **not** in its `definitions`.
+
+The loader does not validate delegate targets at load time (confirmed: no
+target-resolution check in `compiler.clj`/`core.clj`; the isolated
+`(empty? errors)` assertions pass with dangling targets), so the string-equality
+asserts give no resolution guarantee. The design acceptance explicitly requires
+the outer workflow "parses and loads, follows the verified grammar … **references
+resolve**" and the wrapper "exists, parses and loads"; the *references-resolve*
+half is uncovered. A regress renaming the wrapper file/`:name` (e.g.
+`task-lifecycle-in-worktree` → a typo) while the outer keeps the old `:target`
+string would break the live delegate chain yet pass every existing test green.
+
+There is an established same-component precedent for closing exactly this gap:
+`review-workflow-set-loads-together-test` (`workflow_definitions_test.clj`)
+co-loads the whole `review-*` delegate set and asserts each member registers.
+The task-204 chain (`reduce-incidental-complexity` → `task-lifecycle-in-worktree`
+→ `task-lifecycle`) has no analogous co-load test, and none of the isolated
+tests asserts target ∈ `definitions`.
+
+**Recorded as steps.md TT-K (unchecked).** Test-only; add a co-load test (mirror
+`review-workflow-set-loads-together-test`) that loads the three task-204 chain
+EDNs together, asserts `(empty? errors)` + all register, and asserts each
+task-204 delegate `:target` is a key in the combined `definitions` (the
+references-resolve check the isolated string-equality asserts cannot provide).
+No production/skill/EDN change anticipated.
