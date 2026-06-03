@@ -4445,3 +4445,29 @@ No new actionable test gaps. Saturation confirmed (cf. pass-29 saturation check,
 TR22/TT-N). No follow-up steps added.
 
 PASS_STATUS: REVIEW_COMPLETE.
+
+## 2026-06-03 — Test review (test-shaper, pass 33) — ACTIONABLE
+
+Fresh test-shaper pass over `incidental_complexity_finder_skill_test.clj` and
+`task_204_workflow_definitions_test.clj`. Re-read the design acceptance, both
+test namespaces, and the prior CS1/CS2 (code-shaper) + TR/TT follow-ups. Suite
+is behaviourally saturated (every named design behaviour is covered and the
+fast/integration split is clean). One **economy/consistency** defect found —
+incidental harness duplication that post-dates the CS1/CS2 shaping pass:
+
+- **TR23 — `run-recipe-over-lens-output` duplicates `run-jq-recipe`'s temp-file
+  ceremony verbatim.** The two recipe-running helpers
+  (`incidental_complexity_finder_skill_test.clj:164` and `:185`) share a
+  byte-identical body — temp-dir creation (`icf-*-test-<nanoTime>`), the
+  `icf-local.json`/`icf-cc.json` file names, the `/tmp/icf-*.json` → temp-path
+  `str/replace` recipe rewrite, the `bash -c` shell call, and the `finally`
+  cleanup. They differ in exactly one line each: the `spit` payload
+  (`run-jq-recipe` wraps synthetic units in `{"units":[…]}`; the lens helper
+  feeds the JSON verbatim). This is the same `consistent(idioms)` +
+  `economical`/`minimal(incidental_variation)` defect CS1/CS2 closed for the
+  `jq-available?` guard and recipe preamble — but `run-recipe-over-lens-output`
+  was added later (TT-L, after CS1/CS2 ran), so the duplication was never
+  shaped. A change to the temp-file/cleanup ceremony must now thread through two
+  near-identical copies. Logged as a follow-up (test-shaper pass 33).
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

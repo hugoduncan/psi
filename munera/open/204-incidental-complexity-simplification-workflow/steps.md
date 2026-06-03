@@ -2017,3 +2017,37 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
       `reduce-incidental-complexity-test` emit lock. Place it alongside the
       F1/TR7 resolve-worktree blocks. Run focused task-204 ns + `clj-kondo` +
       `clj-paren-repair`; keep under the 800-line `components/` guard.
+
+## Test review follow-ups (review pass 33 — test-shaper)
+
+Source: test-shaper review of the task test suite (skill content-lock +
+executable recipe tests; the two workflow-definition deftests + delegate-set
+resolution test). Behaviourally saturated; one incidental harness-duplication
+defect that post-dates the CS1/CS2 code-shaper pass. Test-only — no
+production/skill/EDN change, all assertions identical.
+
+- [ ] TR23 — Collapse the duplicated temp-file ceremony shared by
+      `run-recipe-over-lens-output` and `run-jq-recipe` in
+      `components/workflow-loader/test/psi/workflow_loader/incidental_complexity_finder_skill_test.clj`
+      (defns at lines ~164 and ~185). Their bodies are byte-identical — temp-dir
+      creation (`icf-*-test-<nanoTime>`), the `icf-local.json`/`icf-cc.json`
+      names, the `/tmp/icf-*.json` → temp-path `str/replace` recipe rewrite, the
+      `(shell/sh "bash" "-c" recipe')` call, and the `finally` cleanup — diverging
+      only in the `spit` payload: `run-jq-recipe` wraps synthetic units in
+      `{"units":[…]}` while `run-recipe-over-lens-output` feeds the lens JSON
+      verbatim. This is the same `consistent(idioms)` + `economical` /
+      `minimal(incidental_variation)` defect CS1/CS2 closed for the
+      `jq-available?` guard and the recipe preamble, but `run-recipe-over-lens-output`
+      was introduced by TT-L *after* CS1/CS2 ran, so the harness duplication was
+      never shaped — a change to the temp-file/cleanup ceremony must now thread
+      through two copies. Fix (test-only; behaviour-identical; assertions
+      untouched): keep `run-recipe-over-lens-output` as the single ceremony-owning
+      helper (it already feeds JSON verbatim) and re-express `run-jq-recipe` as a
+      thin wrapper that pre-wraps its synthetic units and delegates —
+      `(run-recipe-over-lens-output recipe (str "{\"units\":[" (str/join "," local-units) "]}") (str "{\"units\":[" (str/join "," cc-units) "]}"))`
+      — so the temp-dir/path-rewrite/cleanup ceremony lives in exactly one place
+      (`helpers_that_compress(ceremony)`). Run focused
+      `incidental-complexity-finder-skill-test` (jq-present + integration paths) +
+      `clj-kondo` + `clj-paren-repair` + `bb commit-check:file-lengths`; confirm
+      identical assertion counts (pure refactor) and the file stays under the
+      800-line `components/` guard.
