@@ -1883,7 +1883,7 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
 
 ## Test review follow-ups (review pass 28 — task-test-review)
 
-- [ ] TT-M — Lock the generated-design contract's **first clause** (the target
+- [x] TT-M — Lock the generated-design contract's **first clause** (the target
       unit + captured incidental-complexity evidence) and the step-1
       **evidence-capture instruction** (incl. the coverage hint) in
       `reduce-incidental-complexity-test`. The design's "Generated task design"
@@ -1924,3 +1924,25 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
       capture instruction). Place it alongside the TT-I/TR2 contract cluster. Run
       focused task-204 ns + `clj-kondo` + `clj-paren-repair`; keep under the
       800-line `components/` guard.
+      RESOLUTION: added a "select-and-create prompt locks the generated-design
+      evidence clause + capture instruction (TT-M)" `testing` block to the
+      TT-I/TR2 contract cluster in `reduce-incidental-complexity-test`
+      (`task_204_workflow_definitions_test.clj`, same task-204 ns, test-only — no
+      production/skill/EDN change) asserting three `select-text` substrings, each
+      verified present verbatim in the shipped `reduce-incidental-complexity.edn`
+      step-1 prompt before locking: (1) "The target unit and the captured
+      incidental-complexity evidence" — the generated design.md contract's FIRST
+      stated requirement (step-7); (2) "Capture the chosen target's evidence" —
+      the upstream step-2 evidence-capture instruction; and (3) "and the coverage
+      hint" — the coverage-hint clause of that capture (the generated task's
+      test-net signal, per the design's Phase-0 coverage gate). Closes the same
+      sub-clause-lock symmetry gap TT-I/TR2/TT-D/TT-G closed for the *other*
+      clauses of the same generated-design contract: a regress emitting a refactor
+      task with no evidence block (defeating the design's "produces a target +
+      evidence" purpose) or dropping the coverage hint (so the generated task
+      can't see its test net) now fails green. The SKILL.md side of the coverage
+      hint was already locked (TR3) — this locks the *workflow* step-1 prompt's
+      capture/emit instruction, the missing half. Focused task-204 ns green
+      (3 tests, 91 assertions, 0 failures — +3 over pass-26/27's 88); `clj-kondo`
+      0 findings; `clj-paren-repair` Success; file 459 lines (< 800);
+      `bb commit-check:file-lengths` exit 0.

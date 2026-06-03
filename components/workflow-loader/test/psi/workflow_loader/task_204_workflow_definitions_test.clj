@@ -322,6 +322,20 @@
              "step-1 prompt closes an uncharacterizable unit per Munera scope-drift")
          (is (.contains select-text "No refactor proceeds without a green net")
              "step-1 prompt hard-gates the refactor on a green characterization net"))
+       ;; TT-M (test review pass 28, task-test-review): TT-I/TR2/TT-D locked
+       ;; sibling clauses of the generated-design contract, but its FIRST stated
+       ;; requirement (target unit + captured evidence) and the upstream step-1
+       ;; evidence-capture instruction incl. the coverage hint were unlocked. A
+       ;; regress emitting a refactor task with no evidence block, or dropping the
+       ;; coverage hint (so the generated task can't see its test net), must fail.
+       (testing "select-and-create prompt locks the generated-design evidence clause + capture instruction (TT-M)"
+         (is (.contains select-text
+                        "The target unit and the captured incidental-complexity evidence")
+             "step-1 prompt's generated design.md contract opens with the target unit + captured evidence")
+         (is (.contains select-text "Capture the chosen target's evidence")
+             "step-1 prompt instructs capturing the chosen target's evidence")
+         (is (.contains select-text "and the coverage hint")
+             "step-1 evidence capture includes the coverage hint (the generated task's test-net signal)"))
        ;; TR8 (pass 6): the distinguishing endpoint — no push/PR (Locked
        ;; decisions 7 & 8: full lifecycle on a local worktree branch, not a
        ;; complexity-reduction-pr clone) — was unlocked. A regress adding a

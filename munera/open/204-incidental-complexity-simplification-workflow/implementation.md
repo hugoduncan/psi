@@ -4141,3 +4141,37 @@ the step-1 capture instruction ("Capture the chosen target's evidence" + "the
 coverage hint"), placed alongside the TT-I/TR2 contract cluster.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## 2026-06-03 — Test review pass 28 follow-up TT-M executed
+
+Executed the sole newly-added actionable item (TT-M). The trailing Contingency
+step-1 split predates every pass and is conditional/untriggered, so excluded.
+
+Added a "select-and-create prompt locks the generated-design evidence clause +
+capture instruction (TT-M)" `testing` block to the TT-I/TR2 contract cluster in
+`reduce-incidental-complexity-test`
+(`components/workflow-loader/test/psi/workflow_loader/task_204_workflow_definitions_test.clj`),
+asserting three `select-text` substrings — each verified present verbatim in the
+shipped `.psi/workflows/reduce-incidental-complexity.edn` step-1 prompt before
+locking, so each is a regression guard:
+
+1. "The target unit and the captured incidental-complexity evidence" — the
+   generated `design.md` contract's FIRST stated requirement (step-7).
+2. "Capture the chosen target's evidence" — the upstream step-2 evidence-capture
+   instruction.
+3. "and the coverage hint" — the coverage-hint clause of that capture (the
+   generated task's test-net signal feeding the Phase-0 coverage gate).
+
+Closes the same sub-clause-lock symmetry gap TT-I/TR2/TT-D/TT-G closed for the
+other clauses of the same generated-design contract: a regress emitting a
+refactor task with no evidence block (defeating the design's "produces a target +
+evidence" purpose), or dropping the coverage hint (so the generated task can't
+see its test net), now fails green. The SKILL.md side of the coverage hint was
+already locked (TR3); this locks the missing *workflow* step-1 prompt half.
+
+Test-only — no production/skill/EDN change; assertions added only. Focused
+task-204 ns green (3 tests, 91 assertions, 0 failures — +3 over pass-26/27's 88);
+`clj-kondo` 0 findings; `clj-paren-repair` Success; file 459 lines (< 800);
+`bb commit-check:file-lengths` exit 0.
+
+PASS_STATUS: REVIEW_COMPLETE
