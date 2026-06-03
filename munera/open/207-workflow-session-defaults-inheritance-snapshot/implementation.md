@@ -1899,3 +1899,33 @@ test gap — left for a steps/plan-hygiene pass, not raised as a test follow-up.
 Conclusion: test suite is well-formed, mock-free, and provides discriminating
 coverage of every acceptance criterion and resolved decision. Review complete;
 no new actionable test follow-up items added.
+
+## Test-shaper review pass 9 (review 2026-06-02)
+
+Re-ran the inheritance-snapshot suite (12 tests, 62 assertions, green) and
+audited the new continue-terminal T4 test against test-shaper. Coverage and
+discrimination remain strong (state-based, mock-free, distinguishing values).
+Two NEW `meaningful_failures`/clarity defects in the T4 test seam (not
+previously recorded; prior passes' DUPLICATE-CS2 note is a separate
+steps-hygiene item):
+
+- **T8 — contradictory contract comment.**
+  `canonical_workflows_snapshot_test.clj:44` calls `psi.workflow/create-run`
+  "non-session-scoped", directly contradicting the SAME file's docstring
+  (`:19-20`: "`psi.workflow/create-run` is in that session-scoped set") and
+  production (`runtime_eql.clj:17-49`: it IS a member of
+  `session-scoped-extension-mutation-ops`). The whole point of this test is to
+  pin the session-id auto-injection contract; a comment that misstates the
+  contract direction misleads a future reader debugging the seam and weakens
+  the test's self-documenting `meaningful_failures` value. Actionable: a
+  test-comment correctness fix.
+
+- **T9 — steps.md T4 note cites the wrong file.** The T4 follow-up's DONE note
+  says the test was added "in `canonical_workflows_test.clj`", but it actually
+  lives in the sibling `canonical_workflows_snapshot_test.clj` (split out for
+  the 800-line file-length limit). Minor doc-vs-artifact drift in the task
+  record; correct the cited filename so the test trail is accurate.
+
+Everything else (AC1–9 discriminating coverage, field-set authority guard,
+purity-by-signature, R1 snapshot-gated read, R4/R5 `:inherited-snapshot?`
+threading with judge carve-out) remains well-shaped. No other new test gaps.

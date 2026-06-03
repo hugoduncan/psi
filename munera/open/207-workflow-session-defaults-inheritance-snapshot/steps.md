@@ -687,3 +687,23 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       the per-field difference + rationale in design.md Decision 1/7 and the
       resolver). If the behaviour changes, add/adjust a precedence test
       (base-meta vs inherited default) for the affected field(s).
+
+## Test-review pass 9 follow-ups (review 2026-06-02)
+
+- [ ] T8: Fix the contradictory contract comment in
+      `canonical_workflows_snapshot_test.clj:44`. The inline comment calls
+      `psi.workflow/create-run` "non-session-scoped", but the SAME file's
+      docstring (`:19-20`) and production (`runtime_eql.clj:17-49`,
+      `session-scoped-extension-mutation-ops`) state it IS session-scoped — the
+      whole reason the session-id is auto-injected. The test's purpose is to pin
+      that auto-injection contract, so a comment misstating the contract
+      direction misleads a future reader debugging the seam and weakens the
+      test's self-documenting `meaningful_failures` value. Correct the comment to
+      say session-scoped (or drop the (non-)scoped qualifier and just reference
+      the injection-when-absent behaviour). Comment-only; behaviour unchanged.
+- [ ] T9: Correct steps.md T4's DONE note filename. The note says the
+      `continue-terminal-run-captures-fresh-snapshot-test` was added "in
+      `canonical_workflows_test.clj`", but it actually lives in the sibling
+      `canonical_workflows_snapshot_test.clj` (split out for the 800-line
+      file-length limit). Update the cited filename so the task's test trail is
+      accurate.
