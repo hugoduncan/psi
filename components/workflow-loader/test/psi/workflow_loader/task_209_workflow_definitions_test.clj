@@ -1,5 +1,5 @@
-(ns psi.workflow-loader.task-204-workflow-definitions-test
-  "Loader/compiler tests for the task-204 incidental-complexity workflows
+(ns psi.workflow-loader.task-209-workflow-definitions-test
+  "Loader/compiler tests for the task-209 incidental-complexity workflows
    (task-lifecycle-in-worktree and reduce-incidental-complexity).
 
    Split out of workflow-definitions-test (R6) to keep that shared ns under the
@@ -22,7 +22,7 @@
             with-workflow-dir]]))
 
 ;;; ---------------------------------------------------------------------------
-;;; task-lifecycle-in-worktree (Slice 2 of task 204)
+;;; task-lifecycle-in-worktree (Slice 2 of task 209)
 
 (deftest task-lifecycle-in-worktree-test
   (load-edn-only
@@ -148,7 +148,7 @@
                "resolve-worktree references the literal munera_task_path: handoff field token")))))))
 
 ;;; ---------------------------------------------------------------------------
-;;; reduce-incidental-complexity (Slice 3 of task 204)
+;;; reduce-incidental-complexity (Slice 3 of task 209)
 
 (deftest reduce-incidental-complexity-test
   (load-edn-only
@@ -390,14 +390,14 @@
 ;; TT-K (test review pass 26, task-test-review): the isolated tests above assert
 ;; only delegate :target *string equality* while loading a single EDN — the
 ;; loader does NOT validate delegate targets at load time, so those asserts give
-;; no resolution guarantee. Co-load the task-204 delegate set
+;; no resolution guarantee. Co-load the task-209 delegate set
 ;; (reduce-incidental-complexity -> task-lifecycle-in-worktree -> task-lifecycle)
 ;; and assert each delegate :target is a key in the combined definitions — the
 ;; references-resolve half of the design acceptance the string-equality asserts
 ;; cannot give. Mirrors review-workflow-set-loads-together-test. A regress
 ;; renaming the wrapper file/:name while an upstream :target string stays stale
 ;; would break the live chain yet pass the isolated tests; this fails green.
-(deftest task-204-workflow-set-loads-together-test
+(deftest task-209-workflow-set-loads-together-test
   (with-workflow-dir
     {"reduce-incidental-complexity.edn"
      (slurp-workflow-file "reduce-incidental-complexity.edn")
@@ -406,12 +406,12 @@
      "task-lifecycle.edn"
      (slurp-workflow-file "task-lifecycle.edn")}
     (fn [{:keys [definitions errors]}]
-      (testing "the task-204 delegate set loads together without compilation errors"
+      (testing "the task-209 delegate set loads together without compilation errors"
         (is (empty? errors))
         (is (contains? definitions "reduce-incidental-complexity"))
         (is (contains? definitions "task-lifecycle-in-worktree"))
         (is (contains? definitions "task-lifecycle")))
-      (testing "each task-204 delegate :target resolves to a registered workflow"
+      (testing "each task-209 delegate :target resolves to a registered workflow"
         (let [outer-target (->> (get-in definitions
                                         ["reduce-incidental-complexity" :steps])
                                 (some #(when (= "lifecycle-in-worktree" (:name %))

@@ -1,4 +1,4 @@
-# 204 — Plan
+# 209 — Plan
 
 Derived from the stable `design.md` (design review complete: architecture-fit +
 A1–A5 + I1 all resolved REVIEW_COMPLETE; design-steps unchecked count 0).

@@ -4752,3 +4752,9 @@ verified precedents; test code is simple, single-sourced, consistent, lint-clean
 and under the 800-line length guard. No follow-up steps added.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+---
+
+## Renumber 204 → 209 (rebase on origin/master)
+
+Rebased the branch onto `origin/master`. Number 204 is already taken on master by two tasks (`closed/204-prompts-reload-command-and-mutation` — the legitimate owner — and a stale leaked snapshot of this very task under `open/204-incidental-complexity-simplification-workflow`, accidentally committed via PR #150 / commit `46883f403`). Renumbered this task **204 → 209** (next free; max was 208) to avoid the collision: `git mv` of the task dir and the test file `task_204_workflow_definitions_test.clj` → `task_209_...`, ns/deftest/comments updated to `task-209-*`, living-doc headers updated to `# 209`. Historical "204" references in this append-only log, in `steps.md`, and in `mementum/state.md` are left intact as timestamped history (they predate the renumber and refer to the old id/test-filename).

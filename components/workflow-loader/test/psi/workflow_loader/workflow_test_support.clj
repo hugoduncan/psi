@@ -5,7 +5,7 @@
    `loader/global-workflow-dirs`/`loader/project-workflow-dir` redefs),
    the real-`.psi/workflows` slurp + single-edn loader, and the step/var
    inspection helpers so the seam is defined once and cannot drift between
-   `workflow-definitions-test` and `task-204-workflow-definitions-test`."
+   `workflow-definitions-test` and `task-209-workflow-definitions-test`."
   (:require
    [clojure.java.io :as io]
    [psi.workflow-loader.core :as loader]))

@@ -1,6 +1,6 @@
 (ns psi.workflow-loader.incidental-complexity-finder-skill-test
   "Content-lock + executable-determinism tests for the incidental-complexity-finder
-   skill (task 204, Deliverable 1). Split out of workflow-definitions-test to keep
+   skill (task 209, Deliverable 1). Split out of workflow-definitions-test to keep
    that file under the length limit; these tests are skill-focused and share no
    workflow-loader fixtures."
   (:require
