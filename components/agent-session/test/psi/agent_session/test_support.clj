@@ -39,6 +39,11 @@
     :tool-output-stats :tool-call-attempts :tool-lifecycle-events
     :provider-requests :provider-replies :provider-events})
 
+(defn instant
+  "Parse an ISO-8601 string into a `java.time.Instant`."
+  [s]
+  (java.time.Instant/parse s))
+
 (defn fixed-scheduler-time-source
   "Return a scheduler test time source fixed at `instant`."
   [instant]
@@ -58,6 +63,48 @@
 (defn advance-scheduler-instant!
   [instant* millis]
   (swap! instant* #(.plusMillis ^java.time.Instant % millis)))
+
+(defn capturing-delay-fn
+  "Return `[override-fn cb*]` for the scheduler timer seam.
+
+  `override-fn` is suitable as a `:scheduler-run-after-delay-fn` override: it
+  captures the requested delay and fire callback into `cb*` (an atom holding
+  `{:delay-ms delay-ms :f f}`) instead of scheduling on a real timer, and
+  returns a sentinel `{:handle :captured}`. Tests then invoke the captured
+  callback directly (no wall-clock sleep), e.g. `((:f @cb*))`."
+  []
+  (let [cb* (atom nil)]
+    [(fn [_ctx delay-ms f]
+       (reset! cb* {:delay-ms delay-ms :f f})
+       {:handle :captured})
+     cb*]))
+
+(def ^:private default-stub-execution-instant
+  "Fixed instant for the canonical execution-result stub assistant-message
+  timestamp. Deterministic (no wall-clock) — no test asserts this timestamp
+  today, so the exact value is irrelevant; it only keeps the stub time-controlled
+  (`control(time(tests))`)."
+  (java.time.Instant/parse "2026-01-01T00:00:00Z"))
+
+(defn stub-execution-result
+  "Return the canonical execution-result stub shape used by the
+  `:execute-prepared-request-fn` ctx seam.
+
+  Opts: `:sid` (session-id), `:prepared` (the prepared-request map, supplies the
+  turn-id), `:timestamp` (assistant-message timestamp; defaults to a fixed
+  deterministic instant — never wall-clock), `:text` (assistant text;
+  default \"ok\")."
+  [{:keys [sid prepared timestamp text]
+    :or   {timestamp default-stub-execution-instant text "ok"}}]
+  {:execution-result/turn-id          (:prepared-request/id prepared)
+   :execution-result/session-id       sid
+   :execution-result/assistant-message {:role        "assistant"
+                                        :content     [{:type :text :text text}]
+                                        :stop-reason :stop
+                                        :timestamp   timestamp}
+   :execution-result/turn-outcome     :turn.outcome/stop
+   :execution-result/tool-calls       []
+   :execution-result/stop-reason      :stop})
 
 (defn temp-cwd []
   (let [p (str (java.nio.file.Files/createTempDirectory
@@ -230,15 +277,7 @@
                                                        ([_ctx] (throw (ex-info "refresh-system-prompt-fn requires explicit session-id" {:callback :refresh-system-prompt-fn})))
                                                        ([ctx session-id] (session-core/dispatch-in! ctx :session/refresh-system-prompt {:session-id session-id} {:origin :core})))
                        :execute-prepared-request-fn  (fn [_ai-ctx _ctx sid prepared _progress-queue]
-                                                       {:execution-result/turn-id (:prepared-request/id prepared)
-                                                        :execution-result/session-id sid
-                                                        :execution-result/assistant-message {:role "assistant"
-                                                                                             :content [{:type :text :text "ok"}]
-                                                                                             :stop-reason :stop
-                                                                                             :timestamp (java.time.Instant/now)}
-                                                        :execution-result/turn-outcome :turn.outcome/stop
-                                                        :execution-result/tool-calls []
-                                                        :execution-result/stop-reason :stop})
+                                                       (stub-execution-result {:sid sid :prepared prepared}))
                        :workflow-prompt-execution-result-fn (fn [ctx sid text images opts]
                                                               (cond
                                                                 (some? opts) (psi.agent-session.turn/prompt-execution-result-in! ctx sid text images opts)
@@ -356,3 +395,47 @@
   "Register a deterministic operation on `ctx`'s registry."
   [ctx op]
   (op-registry/register-operation-in! (:deterministic-operation-registry ctx) op))
+(defn scheduled-message-by-id
+  "Return the scheduled user message delivered into `session-id`'s journal for
+  `schedule-id`, or nil.
+
+  Scans the session journal for a `\"user\"`-role message carrying scheduled
+  provenance (`:source :scheduled` + matching `:schedule-id`). One shared
+  journal-scan abstraction for the scheduler verification tests."
+  [ctx session-id schedule-id]
+  (->> (ss/get-state-value-in ctx (ss/state-path :journal session-id))
+       (keep #(get-in % [:data :message]))
+       (some (fn [message]
+               (when (and (= "user" (:role message))
+                          (= :scheduled (:source message))
+                          (= schedule-id (:schedule-id message)))
+                 message)))))
+
+(defn schedule-by-id
+  "Return the full schedule map for `schedule-id` in `session-id`'s scheduler
+  state, or nil. One shared schedule-read abstraction for the scheduler
+  verification tests."
+  [ctx session-id schedule-id]
+  (get-in (ss/get-session-data-in ctx session-id)
+          [:scheduler :schedules schedule-id]))
+
+(defn schedule-status
+  "Return the `:status` of `schedule-id` in `session-id`'s scheduler state."
+  [ctx session-id schedule-id]
+  (:status (schedule-by-id ctx session-id schedule-id)))
+
+(defn schedule-queue
+  "Return the scheduler `:queue` vector for `session-id`."
+  [ctx session-id]
+  (get-in (ss/get-session-data-in ctx session-id) [:scheduler :queue]))
+
+(defn set-session-streaming!
+  "Set `session-id`'s `:is-streaming` flag to `streaming?` in `ctx`'s state.
+
+  Symmetric write-helper to the `schedule-status`/`schedule-queue` read helpers
+  for driving the origin-session busy/idle state in the scheduler verification
+  tests (busy = `:is-streaming true`)."
+  [ctx session-id streaming?]
+  (swap! (:state* ctx)
+         (ss/session-update session-id
+                            (fn [session] (assoc session :is-streaming streaming?)))))

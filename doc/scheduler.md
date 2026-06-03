@@ -78,7 +78,7 @@ Current supported scheduler `session-config` keys:
 - `:model`
 - `:thinking-level`
 - `:skills`
-- `:tool-defs`
+- `:tool-ids`
 - `:developer-prompt`
 - `:developer-prompt-source`
 - `:preloaded-messages`
@@ -96,7 +96,12 @@ Exactly one of these delay forms is required:
 Bounds:
 - minimum relative delay: `1000ms`
 - maximum relative delay: `24h`
-- past absolute instants fire immediately
+- absolute `:at` values are first resolved to a millisecond delay
+- `:at` values resolving to delay `0` fire immediately (past/now, plus any
+  sub-millisecond future instant that truncates to `0ms`)
+- future `:at` values resolving to a positive delay below `1000ms` (`1–999ms`)
+  are rejected by the minimum bound
+- future `:at` values resolving beyond `24h` are rejected by the maximum bound
 
 Kind-specific rules:
 - `kind: "message"` requires `:message` and forbids `:session-config`

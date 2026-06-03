@@ -4,19 +4,11 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.test-support :as test-support]))
 
-(defn- create-session-context
-  ([]
-   (create-session-context {}))
-  ([opts]
-   (let [ctx (session/create-context (test-support/safe-context-opts opts))
-         sd  (session/new-session-in! ctx nil {})]
-     [ctx (:session-id sd)])))
-
 (deftest scheduler-start-timer-uses-injected-time-source-and-delay-runner-test
   (testing "scheduler timer computes delay from injected scheduler time source and dispatches via injected runner"
-    (let [now              (java.time.Instant/parse "2026-04-21T17:00:00Z")
-          [ctx session-id] (create-session-context {:persist? false
-                                                    :scheduler-time-source (test-support/fixed-scheduler-time-source now)})
+    (let [now              (test-support/instant "2026-04-21T17:00:00Z")
+          [ctx session-id] (test-support/create-test-session {:persist? false
+                                                              :scheduler-time-source (test-support/fixed-scheduler-time-source now)})
           fire-at          (.plusMillis now 5000)
           observed-delay*  (atom nil)
           callback*        (atom nil)
@@ -28,6 +20,7 @@
       (session/dispatch-in! ctx* :scheduler/create
                             {:session-id session-id
                              :schedule-id "sch-1"
+                             :kind :message
                              :label "later"
                              :message "later"
                              :created-at now
@@ -36,12 +29,12 @@
       (is (= 5000 @observed-delay*))
       (is (= {:handle :fake} (get @(:scheduler-timers* ctx*) "sch-1")))
       (@callback*)
-      (is (= :delivered (get-in @(:state* ctx*) [:agent-session :sessions session-id :data :scheduler :schedules "sch-1" :status])))))
+      (is (= :delivered (test-support/schedule-status ctx* session-id "sch-1")))))
 
   (testing "scheduler cancel uses injected cancel fn for non-thread handles"
-    (let [now              (java.time.Instant/parse "2026-04-21T17:10:00Z")
-          [ctx session-id] (create-session-context {:persist? false
-                                                    :scheduler-time-source (test-support/fixed-scheduler-time-source now)})
+    (let [now              (test-support/instant "2026-04-21T17:10:00Z")
+          [ctx session-id] (test-support/create-test-session {:persist? false
+                                                              :scheduler-time-source (test-support/fixed-scheduler-time-source now)})
           cancelled*       (atom nil)
           ctx*             (assoc ctx
                                   :scheduler-run-after-delay-fn (fn [_ctx _delay-ms _f]
@@ -51,6 +44,7 @@
       (session/dispatch-in! ctx* :scheduler/create
                             {:session-id session-id
                              :schedule-id "sch-1"
+                             :kind :message
                              :label "later"
                              :message "later"
                              :created-at now
@@ -61,13 +55,52 @@
                              :schedule-id "sch-1"}
                             {:origin :core})
       (is (= {:handle :fake} @cancelled*))
-      (is (= :cancelled (get-in @(:state* ctx*) [:agent-session :sessions session-id :data :scheduler :schedules "sch-1" :status]))))))
+      (is (= :cancelled (test-support/schedule-status ctx* session-id "sch-1"))))))
+
+;; --- 201 verification: cancel racing the timer (Race A — cancel before the
+;; captured callback dispatches :scheduler/fired). Cancel wins; invoking the
+;; stale callback must NOT resurrect the schedule (fire-schedule hits the
+;; non-:pending guard "only pending schedules can fire").
+
+(deftest scheduler-cancel-before-stale-timer-callback-does-not-resurrect-test
+  (testing "cancel runs before the captured callback; invoking the stale callback leaves the schedule :cancelled"
+    (let [now              (test-support/instant "2026-04-21T17:30:00Z")
+          [ctx session-id] (test-support/create-test-session
+                            {:persist? false
+                             :scheduler-time-source (test-support/fixed-scheduler-time-source now)})
+          [capture* callback*] (test-support/capturing-delay-fn)
+          ctx*             (assoc ctx
+                                  :scheduler-run-after-delay-fn capture*
+                                  ;; non-Thread handle → cancel uses the cancel-delay-fn path
+                                  :scheduler-cancel-delay-fn (fn [_ctx _handle] nil))]
+      (session/dispatch-in! ctx* :scheduler/create
+                            {:session-id session-id
+                             :schedule-id "sch-race"
+                             :kind :message
+                             :label "race"
+                             :message "race"
+                             :created-at now
+                             :fire-at (.plusMillis now 5000)}
+                            {:origin :core})
+      (is (some? @callback*) "timer callback captured")
+      ;; cancel BEFORE the captured callback fires
+      (session/dispatch-in! ctx* :scheduler/cancel
+                            {:session-id session-id
+                             :schedule-id "sch-race"}
+                            {:origin :core})
+      (is (= :cancelled (test-support/schedule-status ctx* session-id "sch-race")))
+      (is (nil? (get @(:scheduler-timers* ctx*) "sch-race"))
+          "cancel removed the timer handle")
+      ;; now invoke the stale callback — must not resurrect the schedule
+      ((:f @callback*))
+      (is (= :cancelled (test-support/schedule-status ctx* session-id "sch-race"))
+          "stale callback did not resurrect the cancelled schedule"))))
 
 (deftest scheduler-cancelled-default-delay-thread-exits-without-uncaught-interrupted-exception-test
   (testing "cancelling the default delayed scheduler thread interrupts sleep without leaking an uncaught exception"
-    (let [now              (java.time.Instant/parse "2026-04-21T17:20:00Z")
-          [ctx session-id] (create-session-context {:persist? false
-                                                    :scheduler-time-source (test-support/fixed-scheduler-time-source now)})
+    (let [now              (test-support/instant "2026-04-21T17:20:00Z")
+          [ctx session-id] (test-support/create-test-session {:persist? false
+                                                              :scheduler-time-source (test-support/fixed-scheduler-time-source now)})
           started-thread*  (atom nil)
           uncaught*        (atom nil)
           ctx*             (assoc ctx
@@ -86,6 +119,7 @@
       (session/dispatch-in! ctx* :scheduler/create
                             {:session-id session-id
                              :schedule-id "sch-1"
+                             :kind :message
                              :label "later"
                              :message "later"
                              :created-at now
@@ -103,4 +137,4 @@
       (is (false? (.isAlive ^Thread @started-thread*)))
       (is (nil? @uncaught*))
       (is (nil? (get @(:scheduler-timers* ctx*) "sch-1")))
-      (is (= :cancelled (get-in @(:state* ctx*) [:agent-session :sessions session-id :data :scheduler :schedules "sch-1" :status]))))))
+      (is (= :cancelled (test-support/schedule-status ctx* session-id "sch-1"))))))
