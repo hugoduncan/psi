@@ -3567,3 +3567,46 @@ Verification:
 
 PASS_STATUS: NO_ACTIONABLE_FEEDBACK (TT-E was the only newly added unchecked item;
 the Contingency item predates and is non-planned/out of scope.)
+
+## 2026-06-03 — Test review pass 21 (task-test-review, independent)
+
+Applied `task-test-review` (`well_formed ∧ ∀b∈behaviour(design).∃t.covers(t,b) ∧
+infra_deps injectable/nullable/¬mock`) fresh to the two task-204 test namespaces.
+Tests are well-formed and green (11 tests, 146 assertions, 0 failures across
+`task-204-workflow-definitions-test` + `incidental-complexity-finder-skill-test`).
+Infra deps clean — real `workflow-loader`/`skills` loaders over temp dirs, real
+`jq` with an availability guard + structural fallback; `with-redefs` only
+redirects workflow-dir config to a real temp dir, not behaviour; no mocks/stubs.
+Coverage is otherwise strong after passes 1–20.
+
+One **named Deliverable-1 behaviour is NOT locked** (`∃b∈behaviour(design).
+¬∃t.covers(t,b)`):
+
+- **TT-F — the selector's two-lens invocation commands are unlocked.** Design
+  Deliverable 1, step 1 ("Run both lenses in machine form") names the two data
+  source commands: `bb gordian local --sort total --json` and
+  `bb gordian complexity --json`. SKILL.md §1 ("Run both lenses in machine form")
+  emits both verbatim — they produce the `/tmp/icf-local.json` /
+  `/tmp/icf-cc.json` inputs the embedded jq recipe consumes. The
+  `incidental-complexity-finder-skill-content-lock-test` locks the gap method,
+  thresholds, scope, the `(ns, var, arity, line)`/`@line` join key, the top-5
+  guard, and evidence/coverage-hint emission — but NOT these two lens commands.
+  The recipe-execution tests rewrite those temp paths, so they never exercise the
+  producing commands either. A regress (wrong subcommand, dropped `--json`,
+  `complexity` → `complexity --sort`, or losing the selector-vs-baseline
+  `--sort total`/bare distinction the design draws in A5/A2) passes every
+  existing test green while breaking the recipe's inputs. This is the exact
+  symmetry the workflow test's TT-C already enforces for the *baseline* capture
+  commands (`bb gordian local --json` / `bb gordian diagnose --edn`); the
+  *selector* lens commands deserve the same lock. The only current mention of
+  `local --sort total` in the tests is a TT-C *comment* explaining the forbidden
+  baseline, not an assertion. Fix: extend
+  `incidental-complexity-finder-skill-content-lock-test` with a `testing` block
+  asserting `body` contains `bb gordian local --sort total --json` and
+  `bb gordian complexity --json`. Test-only substring lock on the shipped
+  SKILL.md; no production/skill/EDN change; skill test ns is well under the
+  `components/` length guard.
+
+Added TT-F as an unchecked follow-up in steps.md.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

@@ -1557,3 +1557,27 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
       0 failures — +1 over pass-19's 67); `clj-kondo` 0 findings;
       `clj-paren-repair` Success; file 339 lines (< 800);
       `bb commit-check:file-lengths` exit 0.
+
+## Test review follow-ups (review pass 21 — task-test-review)
+
+- [ ] TT-F — Lock the selector's two-lens invocation commands in
+      `incidental-complexity-finder-skill-content-lock-test`. Design Deliverable 1,
+      step 1 ("Run both lenses in machine form") names the two data-source
+      commands: `bb gordian local --sort total --json` and
+      `bb gordian complexity --json`. SKILL.md §1 emits both verbatim — they
+      produce the `/tmp/icf-local.json` / `/tmp/icf-cc.json` inputs the embedded
+      jq recipe consumes. The content-lock test locks the gap method, thresholds,
+      scope, the `(ns, var, arity, line)`/`@line` join key, the top-5 guard, and
+      evidence/coverage-hint emission — but NOT these two lens commands; the
+      recipe-execution tests rewrite the temp paths and never exercise the
+      producing commands either. A regress (wrong subcommand, dropped `--json`,
+      or losing the selector-vs-baseline `--sort total`/bare distinction the
+      design draws in A5/A2) passes green while breaking the recipe's inputs. This
+      is the same symmetry the workflow test's TT-C already enforces for the
+      *baseline* capture commands; the only current mention of `local --sort
+      total` in tests is a TT-C comment, not an assertion. Fix: extend
+      `incidental-complexity-finder-skill-content-lock-test` with a `testing`
+      block asserting `body` contains `bb gordian local --sort total --json` and
+      `bb gordian complexity --json`. Test-only substring lock on the shipped
+      SKILL.md; no production/skill/EDN change. Run focused
+      `incidental-complexity-finder-skill-test` + `clj-kondo`.
