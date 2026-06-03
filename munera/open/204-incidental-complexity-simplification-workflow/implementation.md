@@ -3236,3 +3236,45 @@ confirming a pure refactor); `clj-kondo` 0 findings; `clj-paren-repair` Success;
 `bb commit-check:file-lengths` exit 0; file 524 lines (< 800).
 
 PASS_STATUS: FOLLOW_UPS_EXECUTED
+
+---
+
+## task-implementation-review (independent pass, 2026-06-03)
+
+Applied `task-implementation-review` (matches-design ∧ follows-architecture ∧
+flag new-pattern-where-reusable ∧ flag unnecessary-abstraction ∧ flag
+structural-perf) to the three shipped artifacts (`incidental-complexity-finder`
+SKILL.md, `task-lifecycle-in-worktree.edn`, `reduce-incidental-complexity.edn`)
++ the two task-204 test namespaces + docs.
+
+**Verdict: clean on code/architecture, one coherence defect in a task artifact.**
+
+- **Code↔design — matches.** The `.edn` wrapper mirrors the loadable
+  `review-implementation-in-worktree.edn` precedent (D1-corrected design);
+  outer step-1 tools/skills/handoff fields and step-2 `:delegate`/`:prompt-string`
+  wiring conform to the design's verified contract; skill encodes the
+  `gap`/qualification/top-5-guard/(ns,var,arity,line) recipe. No invented
+  pattern (reuses the verified wrapper shape), no unnecessary abstraction, no
+  structural-perf concern (workflow-as-data; no production Clojure).
+- **Tests — green.** Focused `task-204-workflow-definitions-test` +
+  `incidental-complexity-finder-skill-test`: 11 tests, 136 assertions, 0
+  failures.
+- **Docs — accurate.** `doc/workflows.md` §"Incidental-complexity
+  simplification" + CHANGELOG `[Unreleased]` describe the shipped two-step
+  workflow, `.edn` three-step wrapper, NO_TARGET short-circuit, and two-phase
+  contract faithfully.
+
+**IR-A (actionable, minor) — plan.md stale on the wrapper file-form.** D1
+forced the wrapper from the planned `.md`-with-EDN-body to `.edn` (the `.md`
+form does not load; documented in implementation.md and corrected in design.md's
+F6/D1 note). design.md and the shipped artifact agree on `.edn`, but **plan.md
+was never updated**: "Artifact locations" still reads
+`.psi/workflows/task-lifecycle-in-worktree.md` … `.md`-with-EDN-body form,
+mirroring it` (lines ~63–64), and the "Verified grammar anchors" / "Approach"
+still cite `implement-task-in-worktree.md` as the loadable precedent without the
+D1 correction (lines ~40,46,72,140). Per Munera (`plan.md changes ↔ approach
+changes`) the approach changed; plan.md should reflect the `.edn` wrapper +
+`review-implementation-in-worktree.edn` precedent so a future reader is not
+misled into the non-loadable form. Low-cost doc fix; no code change.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

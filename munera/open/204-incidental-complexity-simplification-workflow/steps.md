@@ -1368,3 +1368,18 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
       `clj-paren-repair` Success; `bb commit-check:file-lengths` exit 0; file
       524 lines (< 800 — the net line delta is ~0: the two extracted helpers
       offset the collapsed preambles).
+
+## Implementation review follow-ups (independent pass — task-implementation-review)
+
+- [ ] IR-A — Bring plan.md into coherence with the shipped `.edn` wrapper (D1).
+      plan.md still describes the wrapper as `.psi/workflows/task-lifecycle-in-worktree.md`
+      in `.md`-with-EDN-body form "mirroring `implement-task-in-worktree.md`"
+      (Artifact locations, lines ~63–64), and the Approach / Verified-grammar-anchors
+      sections cite `implement-task-in-worktree.md` as the loadable precedent
+      without the D1 correction (lines ~40,46,72,140). This contradicts the
+      shipped artifact (`task-lifecycle-in-worktree.edn`), design.md's F6/D1 note,
+      and implementation.md's documented D1 deviation. Per Munera (`plan.md
+      changes ↔ approach changes`): update plan.md's wrapper file path/form to
+      `.edn` and re-anchor the precedent on the loadable
+      `review-implementation-in-worktree.edn` (note the D1 reason). Doc-only; no
+      code change. Verify coherence across design/plan/impl after the edit.
