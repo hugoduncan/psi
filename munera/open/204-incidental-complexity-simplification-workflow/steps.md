@@ -1814,3 +1814,40 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
       assertions, 0 failures — +1 test/+8 over pass-25's 2/80); `clj-kondo` 0
       findings; `clj-paren-repair` Success; file 445 lines (< 800);
       `bb commit-check:file-lengths` exit 0.
+
+## Test review follow-ups (review pass 27 — task-test-review)
+
+- [ ] TT-L — The design's **first acceptance criterion** (the
+      `incidental-complexity-finder` skill "produces a target + evidence **when
+      run against this repository**"; Deliverable 1 step 5 / Locked decision 1)
+      has **no executable test**. Every recipe test in
+      `incidental_complexity_finder_skill_test.clj` runs the embedded jq recipe
+      over **synthetic** `{"units":[…]}` inputs (`run-jq-recipe`), and TT-F locks
+      only that SKILL.md §1 *names* the two lens commands as prose substrings —
+      the TT-F step records the residual gap verbatim ("the recipe-execution
+      tests rewrite the temp paths and never exercise the producing commands").
+      So nothing proves the recipe consumes the *real* lens output shape: the
+      recipe assumes each lens emits a top-level `.units` array with the
+      ns/var/arity/line/lcc-total/burdens/findings (local) and ns/var/arity/line/cc
+      (complexity) fields. Verified to hold against the live CLI today (recipe
+      ranks the real top-5, e.g. `psi.app-runtime/start-tui-runtime!` gap ≈ 7.03),
+      but that grounding lives only in design prose + a manual check; a future
+      `gordian` JSON reshape (wrapped `units`, renamed burden, changed
+      `findings`/`line`) would keep every synthetic test green while the shipped
+      skill silently breaks. Per testing-without-mocks this is the **Narrow
+      Integration Test** gap (the recipe wraps the external `bb gordian` system,
+      untested against the real system). Fix (test-only; no production/skill/EDN
+      change): add a focused narrow integration test that runs the real
+      `bb gordian local --sort total --json` + `bb gordian complexity --json`
+      against this repo, pipes their actual output through the SKILL.md recipe
+      (reuse `skill-recipe` + `run-jq-recipe`'s temp-path rewrite, sourcing the
+      two real lens outputs instead of synthetic units), and asserts the recipe
+      (a) runs cleanly (exit 0) and (b) emits a structurally-valid result — a JSON
+      array (possibly `[]`), each element carrying the projected evidence keys
+      (ns/var/gap/cc/lcc_total/findings). Assert **structure, not a specific
+      target** (the live target drifts, so a specific-unit assertion would be
+      flaky). Gate on `bb`/`jq` availability (mirror the existing `jq-available?`
+      fallback) and isolate from the fast path if slow. Closes the real-lens-shape
+      assumption the synthetic tests build on and the design's first acceptance.
+      Run focused `incidental-complexity-finder-skill-test` + `clj-kondo` +
+      `clj-paren-repair` + `bb commit-check:file-lengths`.

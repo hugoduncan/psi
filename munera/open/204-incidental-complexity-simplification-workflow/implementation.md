@@ -4004,3 +4004,51 @@ psi.workflow-loader.task-204-workflow-definitions-test` → 3 tests, 88
 assertions, 0 failures (+1 test/+8 assertions over pass-25's 2/80);
 `clj-kondo --lint` 0 findings (errors 0, warnings 0); `clj-paren-repair` Success;
 `bb commit-check:file-lengths` exit 0; test file 445 lines (< 800).
+
+## Test review pass 27 (task-test-review) — TT-L
+
+**Finding (ACTIONABLE):** the design's **first acceptance criterion** — the
+`incidental-complexity-finder` skill "produces a target + evidence **when run
+against this repository**" (also Deliverable 1 step 5 + Locked decision 1) — has
+**no executable test**. Every recipe test in
+`incidental_complexity_finder_skill_test.clj` runs the embedded jq recipe over
+**synthetic** `{"units":[…]}` inputs (`run-jq-recipe` spits hand-built JSON), and
+TT-F locks only that SKILL.md §1 *names* `bb gordian local --sort total --json` /
+`bb gordian complexity --json` as **prose substrings**. The TT-F step itself
+records the residual gap verbatim: "the recipe-execution tests rewrite the temp
+paths and **never exercise the producing commands**." So nothing proves the
+recipe consumes the *real* lens output shape.
+
+The recipe assumes each lens emits a top-level `.units` array whose elements
+carry `ns`/`var`/`arity`/`line`/`lcc-total`/per-dimension-burdens/`findings`
+(local) and `ns`/`var`/`arity`/`line`/`cc` (complexity). I verified this holds
+against the live CLI today — `bb gordian local --json` and
+`bb gordian complexity --json` both expose `.units`, and the end-to-end recipe
+ranks the live top-5 (e.g. `psi.app-runtime/start-tui-runtime!` gap ≈ 7.03 down
+to `…/start-nrepl!` gap ≈ 2.01). But that grounding lives only in design prose
+(Verified facts: "Both lenses emit … a units array") and a one-off manual check;
+**no test guards it**. If a future `gordian` change reshaped the JSON (wrapped
+`units`, renamed a burden field, changed the `findings`/`line` shape), every
+synthetic recipe test would stay green while the shipped skill silently produced
+nothing or a malformed target in production. Per testing-without-mocks this is
+the classic **Narrow Integration Test** gap: the recipe is a wrapper over the
+external `bb gordian` system, and no focused test exercises it against the real
+system. Per the task-test-review criterion `∀b∈behaviour(design).∃t.covers(t,b)`,
+this named acceptance behaviour is uncovered.
+
+**Recorded as steps.md TT-L (unchecked).** Test-only (no production/skill/EDN
+change): add a focused narrow integration test that runs the real
+`bb gordian local --sort total --json` + `bb gordian complexity --json` against
+this repo, pipes their actual output through the SKILL.md recipe (reuse
+`skill-recipe` + the temp-path rewrite in `run-jq-recipe`, sourcing the two real
+lens outputs instead of synthetic units), and asserts the recipe (a) runs cleanly
+(exit 0) and (b) emits a structurally-valid result — a JSON array (possibly `[]`),
+each element carrying the projected evidence keys (`ns`/`var`/`gap`/`cc`/
+`lcc_total`/`findings`). Assert **structure, not a specific target** (the live
+target drifts as code changes, so a specific-unit assertion would be flaky).
+Gate on `bb`/`jq` availability (mirror the existing `jq-available?` fallback) and
+keep it isolated from the fast path if it proves slow. This closes the
+real-lens-shape assumption the synthetic tests build on and the design's first
+acceptance criterion.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
