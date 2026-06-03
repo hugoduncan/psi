@@ -3278,3 +3278,45 @@ changes`) the approach changed; plan.md should reflect the `.edn` wrapper +
 misled into the non-loadable form. Low-cost doc fix; no code change.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## 2026-06-03 — Implementation review (independent pass) follow-up executed (IR-A)
+
+Executed the single newly-added unchecked `steps.md` item (IR-A) from the
+independent task-implementation-review pass. (The trailing Contingency step-1
+split predates every pass and is conditional/untriggered — left unchecked.)
+
+IR-A = plan(spec)↔shipped-artifact coherence gap: plan.md still described the
+`task-lifecycle-in-worktree` wrapper as a `.md`-with-EDN-body file
+"mirroring `implement-task-in-worktree.md`", contradicting the shipped
+`.psi/workflows/task-lifecycle-in-worktree.edn` (D1 deviation — the live
+`workflow-loader` parser rejects any `.md` body that begins with an EDN map
+[`parser.clj:162`, `body-starts-with-edn-map?`]; `implement-task-in-worktree.md`
+itself does not load; the loadable precedent is
+`review-implementation-in-worktree.edn`). design.md (F6/D1 note) and this
+implementation.md (Slice-2 D1 entry) already carried the correction; only plan.md
+was stale (per Munera `plan.md changes ↔ approach changes`).
+
+Reconciled plan.md in five places (plan-only; no code/test/EDN change):
+
+1. **Artifact locations** — wrapper path `.md` → `.edn` (multi-step `.edn` map,
+   sibling to the loadable `review-implementation-in-worktree.edn`), with an
+   explicit D1 deviation note citing the live rejection.
+2. **Key decisions → Worktree continuity** — "structurally identical to the
+   verified `implement-task-in-worktree`" → "structurally identical to the
+   loadable `review-implementation-in-worktree.edn` (the `.edn` realisation of the
+   intended `implement-task-in-worktree` shape — see D1)".
+3. **Grammar-conformant handoff wiring** precedent — `implement-task-in-worktree.md`
+   → loadable `review-implementation-in-worktree.edn`.
+4. **Verified grammar anchors** — replaced the `implement-task-in-worktree.md`
+   anchor block with a `review-implementation-in-worktree.edn` block noting the
+   `.md` form does not load.
+5. **Slice 2** — `.md`-with-EDN wrapper → `.edn` wrapper mirroring the loadable
+   `review-implementation-in-worktree.edn`.
+
+All remaining `implement-task-in-worktree` mentions in plan.md are now inside
+D1-correction context (named as the intended-but-non-loadable shape). Verified
+the shipped artifact is `.psi/workflows/task-lifecycle-in-worktree.edn`.
+design ↔ plan ↔ implementation now coherent on the wrapper file form.
+
+Doc-only (plan.md) — no code/test/skill/EDN change. IR-A checked in steps.md.
+PASS_STATUS: REVIEW_COMPLETE.

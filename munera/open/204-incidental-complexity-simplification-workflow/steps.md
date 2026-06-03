@@ -1371,7 +1371,7 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
 
 ## Implementation review follow-ups (independent pass — task-implementation-review)
 
-- [ ] IR-A — Bring plan.md into coherence with the shipped `.edn` wrapper (D1).
+- [x] IR-A — Bring plan.md into coherence with the shipped `.edn` wrapper (D1).
       plan.md still describes the wrapper as `.psi/workflows/task-lifecycle-in-worktree.md`
       in `.md`-with-EDN-body form "mirroring `implement-task-in-worktree.md`"
       (Artifact locations, lines ~63–64), and the Approach / Verified-grammar-anchors
@@ -1383,3 +1383,27 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
       `.edn` and re-anchor the precedent on the loadable
       `review-implementation-in-worktree.edn` (note the D1 reason). Doc-only; no
       code change. Verify coherence across design/plan/impl after the edit.
+      RESOLUTION: reconciled plan.md to the shipped `.edn` wrapper in five places
+      (plan-only; no code/test/EDN change). (1) **Artifact locations**: wrapper
+      path → `.psi/workflows/task-lifecycle-in-worktree.edn` (multi-step `.edn`
+      map, sibling to the loadable `review-implementation-in-worktree.edn`), with
+      an explicit **D1 deviation** note citing the live rejection
+      (`parser.clj:162`, `body-starts-with-edn-map?`) and that
+      `implement-task-in-worktree.md` itself does not load. (2) **Key decisions →
+      Worktree continuity**: "structurally identical to the verified
+      `implement-task-in-worktree`" → "structurally identical to the loadable
+      `review-implementation-in-worktree.edn` (the `.edn` realisation of the
+      intended `implement-task-in-worktree` shape — see D1)". (3) **Grammar-
+      conformant handoff wiring** precedent: `implement-task-in-worktree.md` →
+      the loadable `review-implementation-in-worktree.edn`. (4) **Verified grammar
+      anchors**: replaced the `implement-task-in-worktree.md` anchor block with a
+      `review-implementation-in-worktree.edn` block, noting the `.md` form does
+      not load. (5) **Slice 2**: "Author the `.md`-with-EDN wrapper … mirroring
+      `implement-task-in-worktree`" → "Author the `.edn` wrapper … mirroring the
+      loadable `review-implementation-in-worktree.edn`". All remaining
+      `implement-task-in-worktree` mentions in plan.md are now inside D1-correction
+      context (naming it as the intended-but-non-loadable shape), matching
+      design.md's F6/D1 note and implementation.md's D1 deviation. Verified the
+      shipped artifact is `.psi/workflows/task-lifecycle-in-worktree.edn` (not
+      `.md`). design ↔ plan ↔ implementation now coherent on the wrapper file
+      form. Doc-only — no code/test change.
