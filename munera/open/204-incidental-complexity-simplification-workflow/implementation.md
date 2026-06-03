@@ -3640,3 +3640,31 @@ findings; `clj-paren-repair` Success; file 537 lines (< 800);
 `bb commit-check:file-lengths` exit 0. steps.md TT-F ticked.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Test review pass 22 (task-test-review)
+
+Reviewed all task-204 test namespaces against design behaviour
+(`task_204_workflow_definitions_test.clj`,
+`incidental_complexity_finder_skill_test.clj`). Tests are well-formed,
+state/output-asserting, dependency-free (no mocks/stubs; jq gated with a
+structural fallback). Coverage is dense (TR1–TR21, TT-A–TT-F). One new
+actionable gap found.
+
+- **TT-G (actionable, minor) — A2 "touched units = metric-derived set" is
+  unlocked.** Locked decision 4 and the design's "Net burden (A2)" paragraph
+  make the *defining* A2 discriminator that "touched units" is the
+  **metric-derived** set (every unit whose recomputed `lcc-total` changed),
+  **not** the diff/touched-files set — with an explicit rationale ("scoping to
+  changed files or changed source would let a refactor hide relocated burden in
+  an untouched caller"). The shipped step-1 prompt carries this verbatim
+  (`the set is computed from the metric, not from the diff/touched files`), but
+  the only A2 locks are F3 (`identified by (ns, var, arity, line)` key) and TT-D
+  (direction: `after total is strictly less than the before total`). Neither
+  anchors the metric-vs-file derivation. A paraphrase weakening the touched-set
+  to "units whose source/files changed" — which defeats the whole point of the
+  global-recompute net check — passes every existing test green. Companion to
+  TT-D (direction) the same way TT-C/TT-F lock the surrounding A2/A5 plumbing.
+
+Added TT-G as an unchecked follow-up in steps.md.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

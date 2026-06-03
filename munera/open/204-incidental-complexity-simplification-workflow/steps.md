@@ -1596,3 +1596,26 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
       0 failures — +2 over pass-17's 78); `clj-kondo` 0 findings;
       `clj-paren-repair` Success; file 537 lines (< 800);
       `bb commit-check:file-lengths` exit 0.
+
+## Test review follow-ups (review pass 22 — task-test-review)
+
+- [ ] TT-G — Lock the A2 "touched units = metric-derived set" discriminator in
+      `reduce-incidental-complexity-test`. Locked decision 4 and the design's
+      "Net burden (A2)" paragraph define "touched units" as the metric-derived
+      set (every unit whose recomputed `lcc-total` changed between
+      `before-local.json` and the after-`local` run), explicitly NOT the
+      diff/touched-files set — the rationale being that file-scoping would let a
+      refactor hide relocated burden in an untouched caller. The shipped step-1
+      prompt carries this verbatim. Current A2 locks are only F3 (the
+      `(ns, var, arity, line)` key) and TT-D (the strictly-less direction);
+      neither anchors the metric-vs-file derivation, so a paraphrase to "units
+      whose source/files changed" passes green while defeating the global-
+      recompute net check. Fix: extend the F3 / TT-D `testing` cluster in
+      `reduce-incidental-complexity-test`
+      (`components/workflow-loader/test/psi/workflow_loader/task_204_workflow_definitions_test.clj`)
+      with an assertion that `select-text` contains
+      `the set is computed from the metric, not from the diff/touched files`
+      (verified present verbatim in the shipped EDN). Test-only substring lock;
+      no production/skill/EDN change; task-204 test ns is well under the
+      `components/` 800-line length guard. Run focused
+      `task-204-workflow-definitions-test` + `clj-kondo`.
