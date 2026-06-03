@@ -1410,7 +1410,7 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
 
 ## Test review follow-ups (review pass 18 — task-test-review)
 
-- [ ] TT-A — Lock all three design-named step-1 `:skills` in
+- [x] TT-A — Lock all three design-named step-1 `:skills` in
       `reduce-incidental-complexity-test`. The design (Deliverable 2, Step 1)
       requires step-1 to carry the `incidental-complexity-finder`, `gordian`, and
       `code-shaper` skills, and the shipped
@@ -1428,3 +1428,16 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
       `incidental-complexity-finder` lock. Test-only; no production/skill/EDN
       change. Verify the focused task-204 ns green, `clj-kondo` 0,
       `clj-paren-repair` Success, `bb commit-check:file-lengths` clean.
+      RESOLUTION: extended the existing "select-and-create … carries work-on
+      tool" `testing` block (renamed to "… + all three design-named skills") in
+      `task_204_workflow_definitions_test.clj`'s `reduce-incidental-complexity-test`
+      (same ns, test-only — no production/skill/EDN change) with two assertions:
+      `(some #{"gordian"} (:skills select-step))` (selection methodology) and
+      `(some #{"code-shaper"} (:skills select-step))` (refactor shaping),
+      alongside the existing `incidental-complexity-finder` lock. Verified the
+      shipped EDN's step-1 declares
+      `:skills ["incidental-complexity-finder" "gordian" "code-shaper"]` before
+      locking; a regress dropping `gordian` or `code-shaper` now fails green.
+      Focused task-204 ns green (2 tests, 60 assertions, 0 failures — +2 over
+      pass-17's 58); `clj-kondo` 0 findings; `clj-paren-repair` Success; task-204
+      definitions file 301 lines (< 800); `bb commit-check:file-lengths` exit 0.

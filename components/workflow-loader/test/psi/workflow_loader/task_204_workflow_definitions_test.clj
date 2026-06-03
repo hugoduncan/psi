@@ -195,11 +195,20 @@
          (is (= 2 (count steps)))
          (is (= ["select-and-create" "lifecycle-in-worktree"] (mapv :name steps)))
          (is (= [:session :delegate] (mapv :type steps))))
-       (testing "select-and-create :session step carries work-on tool + incidental-complexity-finder skill"
+       (testing "select-and-create :session step carries work-on tool + all three design-named skills"
          (is (some #{"work-on"} (:tools select-step))
              "select-and-create tools include work-on")
+         ;; TT-A (test review pass 18, task-test-review): the design (Deliverable
+         ;; 2, Step 1) names three step-1 skills — incidental-complexity-finder
+         ;; (selection recipe), gordian (selection methodology), code-shaper
+         ;; (refactor shaping). Lock all three; a regress dropping gordian or
+         ;; code-shaper previously passed green.
          (is (some #{"incidental-complexity-finder"} (:skills select-step))
-             "select-and-create skills include incidental-complexity-finder"))
+             "select-and-create skills include incidental-complexity-finder")
+         (is (some #{"gordian"} (:skills select-step))
+             "select-and-create skills include gordian")
+         (is (some #{"code-shaper"} (:skills select-step))
+             "select-and-create skills include code-shaper"))
        ;; TR15 (test review pass 13, test-shaper): lock the entry-point input
        ;; flow — step 1 wires "input" to the bare top-level :workflow-input (NO
        ;; :path, distinct from the wrapper steps' {:path [:input]} :map-field

@@ -3408,3 +3408,25 @@ methodology and refactor-shaping framing — passes the suite green. Per
 three; no regression test anchors them.)
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+---
+
+### TT-A resolution (test-review pass 18 follow-up — task-test-review)
+
+Executed TT-A. Extended the existing `select-and-create` skill assertion in
+`task_204_workflow_definitions_test.clj`'s `reduce-incidental-complexity-test`
+(`testing` block renamed "… + all three design-named skills") with two new
+assertions — `(some #{"gordian"} (:skills select-step))` and
+`(some #{"code-shaper"} (:skills select-step))` — alongside the existing
+`incidental-complexity-finder` lock. Grounded against the shipped EDN, which
+declares `:skills ["incidental-complexity-finder" "gordian" "code-shaper"]`.
+
+Test-only — no production/skill/EDN change. A regress dropping `gordian` or
+`code-shaper` from step-1's `:skills` now fails green.
+
+Verification: focused `psi.workflow-loader.task-204-workflow-definitions-test`
+green (2 tests, 60 assertions, 0 failures — +2 over the prior 58); `clj-kondo`
+0 findings; `clj-paren-repair` Success; task-204 definitions file 301 lines
+(< 800); `bb commit-check:file-lengths` exit 0.
+
+PASS_STATUS: REVIEW_COMPLETE
