@@ -1,4 +1,4 @@
-# 204 — Incidental-Complexity Simplification Workflow
+# 209 — Incidental-Complexity Simplification Workflow
 
 ## Intent
 
@@ -59,7 +59,10 @@ narrows and then judges:
 1. Run both lenses in machine form:
    - `bb gordian local --sort total --json` (comprehension burden per unit)
    - `bb gordian complexity --json` (cyclomatic complexity per unit)
-2. Join on `(ns, var, arity)` and compute `gap = lcc-total / max(cc, 1)`. This
+2. Join on `(ns, var, arity, line)` and compute `gap = lcc-total / max(cc, 1)`
+   (`line` disambiguates same-named null-arity `defmethod` units that share
+   `(ns, var, arity)`, e.g. the 51 `execute-effect!` defmethods that collapse to
+   one key without it — see the A5/A2 acceptance and SKILL.md §2/§3). This
    join is a **fixed recipe embedded verbatim in the skill** (a canonical
    snippet the agent runs as-is), not ad-hoc code, so selection is reproducible.
    **Unmatched-row rule (inner join on the `local` side):** the join is keyed by
@@ -129,8 +132,10 @@ end. Required behaviour:
   - `worktree_path:` — the absolute path of the worktree created via `work-on`,
   - `munera_task_path:` — the `munera/open/NNN-slug` task path.
   This mirrors the `worktree_path:`/`munera_task_path:` handoff blob that
-  `gh-issue-implement.edn`'s `design` step emits and that
-  `implement-task-in-worktree`'s `resolve-worktree` step consumes. Emitting the
+  `gh-issue-implement.edn`'s `design` step emits and that the loadable
+  `review-implementation-in-worktree.edn`'s `resolve-worktree` step consumes (the
+  `.edn` realisation of the `implement-task-in-worktree` intended shape; see the
+  F6/D1 precedent note under Verified Facts). Emitting the
   worktree path explicitly (rather than only the bare task path) is what makes
   cross-`:delegate` worktree continuity work on the **verified** wrapper path
   (see Verified Facts) instead of an unverified silent-inheritance assumption.
@@ -138,8 +143,11 @@ end. Required behaviour:
 **Step 2 — run the lifecycle in the worktree (`:delegate`)**
 - Delegate to a thin **worktree-resolving wrapper** around `task-lifecycle`
   (`:target "task-lifecycle-in-worktree"`), structurally identical to the
-  verified `implement-task-in-worktree` wrapper but sub-delegating to
-  `task-lifecycle` instead of `implement-task`. The wrapper:
+  loadable `review-implementation-in-worktree.edn` wrapper (the `.edn`
+  realisation of the `implement-task-in-worktree` intended shape, which does not
+  itself load — see the F6/D1 precedent note under Verified Facts) but
+  sub-delegating to `task-lifecycle` instead of `review-task-implementation`.
+  The wrapper:
   1. `resolve-worktree` (`:session`, tools include `work-on`): extract
      `worktree_path:` and `munera_task_path:` from the step-1 handoff, call
      `work-on` with the extracted worktree path to set the delegated run's
@@ -156,22 +164,31 @@ end. Required behaviour:
   ```
   This routes the whole structured handoff blob into the wrapper's
   `resolve-worktree` step (which reads `{{input}}` and re-establishes the
-  worktree), exactly as `gh-issue-implement.edn`'s `implement` delegate routes
-  its `design`-step handoff into `implement-task-in-worktree`. Keeping the
-  handoff on this one verified data-flow path honours the `one_way` principle.
+  worktree), exactly as `gh-issue-implement.edn`'s `review` delegate routes
+  its `design`-step handoff into the loadable
+  `review-implementation-in-worktree.edn` (the `.edn` realisation of the
+  `implement-task-in-worktree` intended shape; see the F6/D1 precedent note under
+  Verified Facts). Keeping the handoff on this one verified data-flow path
+  honours the `one_way` principle.
 - **Worktree continuity is established, not assumed:** the wrapper's
   `resolve-worktree` `:session` step **re-calls `work-on`** from the threaded
   `worktree_path:` field before sub-delegating, so the lifecycle runs in
-  step-1's worktree by the same proven mechanism as `implement-task-in-worktree`
-  — not by relying on a fresh `:delegate` silently inheriting an outer sibling
-  step's worktree (see Verified Facts).
+  step-1's worktree by the same proven mechanism as the loadable
+  `review-implementation-in-worktree.edn` (the `.edn` realisation of the
+  `implement-task-in-worktree` intended shape; see the F6/D1 precedent note under
+  Verified Facts) — not by relying on a fresh `:delegate` silently inheriting an
+  outer sibling step's worktree (see Verified Facts).
 
 The outer workflow stays at two steps (select+create, then delegate to the
 worktree-resolving lifecycle wrapper) and ends with a completed, reviewed task
 on the local worktree branch — it does **not** push or open a PR (the user
-decides on PR). The `task-lifecycle-in-worktree` wrapper is a thin two-step
-adapter (resolve-worktree + lifecycle delegate), not additional orchestration
-logic. No workflow-level verification step is added: the generated task's
+decides on PR). The `task-lifecycle-in-worktree` wrapper is a thin three-step
+adapter (resolve-worktree → lifecycle delegate → summary; per resolved P1,
+superseding the original "two-step adapter" framing), not additional
+orchestration logic — structurally the loadable
+`review-implementation-in-worktree.edn` shape (see the F6/D1 precedent note under
+Verified Facts). No workflow-level verification step is added: the generated
+task's
 acceptance criteria carry the objective checks, and the lifecycle's own
 implement/review steps enforce them.
 
@@ -214,8 +231,11 @@ local, root-cause changes (not superficial extraction).
     stored `munera/open/NNN-slug/before-local.json` captured in Step 1 — that
     file is the single authoritative baseline for every "decreased" check (not
     the selector's emitted evidence, not a fresh pre-refactor recompute). The
-    target unit's `lcc-total` (keyed by `(ns, var, arity)`) **decreased** versus
-    its `before-local.json` value.
+    target unit's `lcc-total` (keyed by `(ns, var, arity, line)` — the same
+    unique key the selector's join uses; `line` disambiguates same-named
+    null-arity `defmethod` units that share `(ns, var, arity)`, e.g. the 51
+    `execute-effect!` defmethods that collapse to one key without it)
+    **decreased** versus its `before-local.json` value.
   - **Net burden (A2 — "touched units" defined).** "Touched units" means **every
     unit whose recomputed `lcc-total` changed** between `before-local.json` and
     the after-`local` run — i.e. the set is computed from the metric, not from
@@ -225,8 +245,10 @@ local, root-cause changes (not superficial extraction).
     or changed *source* would let a refactor hide relocated burden in an
     untouched caller. The acceptance is: summing `lcc-total` over this
     metric-derived touched set, the **after total is strictly less than the
-    before total**. The check is objective: `{u | before(u) ≠ after(u)}`, then
-    `Σ after < Σ before`.
+    before total**. The check is objective, with each unit `u` identified by
+    `(ns, var, arity, line)` (the selector's unique join key, so null-arity
+    `defmethod` units do not collapse together): `{u | before(u) ≠ after(u)}`,
+    then `Σ after < Σ before`.
   - **Architectural no-regression (A3 — enforcing gate flags).** Run
     `bb gordian gate --baseline munera/open/NNN-slug/before-diagnose.edn
     --fail-on new-cycles,new-high-findings --max-new-medium-findings 0`. The bare
@@ -284,13 +306,33 @@ inconsistency in place of live user collaboration.
     Step-1 emits a structured handoff carrying `worktree_path:` +
     `munera_task_path:`; step-2 delegates to a thin `task-lifecycle-in-worktree`
     wrapper (resolve-worktree `:session` re-calls `work-on`, then sub-delegates
-    to `task-lifecycle`), structurally identical to `implement-task-in-worktree`.
+    to `task-lifecycle`), structurally identical to the loadable
+    `review-implementation-in-worktree.edn` (the `.edn` realisation of the
+    `implement-task-in-worktree` intended shape, which does not itself load — see
+    the F6/D1 precedent note under Verified Facts).
     Chosen over a direct `task-lifecycle` delegate relying on session
     `:worktree-path` inheritance, which — though the runtime copies the parent
     worktree into child sessions — has no workflow precedent for a *direct*
     delegate and would be an unverified assumption. (Resolves design-review I1.)
 
 ## Verified facts (grounding)
+
+> **Precedent note (F6 / D1):** The verified, *loadable* wrapper precedent for
+> the worktree-resolving-wrapper pattern below is
+> **`review-implementation-in-worktree.edn`** — a 3-step `resolve-worktree`
+> (`:session`, `work-on`) → `review` (`:delegate`) → `summary` `.edn` that loads
+> under the live `workflow-loader`. `implement-task-in-worktree` is the
+> **intended shape** for this pattern, but it **does not currently load**: its
+> `.md` body begins with an EDN map, which `parse-markdown-workflow-file` rejects
+> ("Markdown workflow body must not begin with an EDN workflow definition block",
+> `parser.clj:162`; see D1 in implementation.md/steps.md). Where the text below
+> says "structurally identical to `implement-task-in-worktree`" or "verified
+> `implement-task-in-worktree`," read it as: *mirrors the loadable
+> `review-implementation-in-worktree.edn`, which is the `.edn` realisation of the
+> `implement-task-in-worktree` intended shape.* The mechanism itself (handoff
+> `worktree_path:` + a `resolve-worktree` `:session` step re-calling `work-on`
+> before sub-delegating) is correct and demonstrated by the loadable
+> `review-implementation-in-worktree.edn`.
 
 - **Lifecycle input contract:** every `task-lifecycle` sub-workflow takes
   `{:input "munera/open/NNN-slug"}` — a bare Munera task path string. Confirmed
@@ -305,9 +347,11 @@ inconsistency in place of live user collaboration.
   `task-lifecycle-in-worktree` wrapper; the wrapper's `resolve-worktree`
   `:session` step extracts the bare task path and re-yields it, and the
   wrapper's inner `lifecycle` delegate wires that bare path into `{:input "…"}`
-  for `task-lifecycle` — identical to how `implement-task-in-worktree`'s
-  `resolve-worktree` → `implement` delegate produces `{:input <task-path>}` for
-  `implement-task`.
+  for `task-lifecycle` — identical to how the loadable
+  `review-implementation-in-worktree.edn`'s `resolve-worktree` → `review`
+  delegate produces `{:input <task-path>}` for `review-task-implementation`
+  (the `.edn` realisation of the `implement-task-in-worktree` intended shape; see
+  the F6/D1 precedent note above).
 - **Worktree ownership (and the verified handoff mechanism):** neither
   `task-lifecycle` nor any of its sub-workflows (`review-task-design`,
   `create-task-plan`, `review-task-plan`, `implement-task`,
@@ -315,12 +359,16 @@ inconsistency in place of live user collaboration.
   step; each sub-workflow reads only `{:input <task-path>}`. So a `:delegate`
   step that targets `task-lifecycle` **directly** has no mechanism to establish
   step-1's worktree. The verified precedent for crossing a `:delegate` boundary
-  into a prior step's worktree is **not** bare sibling-step inheritance: in
-  `gh-issue-implement.edn` the outer `implement` step delegates to the
-  **`implement-task-in-worktree` wrapper**, whose own first `:session` step
-  (`resolve-worktree`, tools include `work-on`) re-extracts a `worktree_path:`
-  field from a structured handoff blob and **re-calls `work-on`** to set the
-  delegated run's session worktree *before* it sub-delegates to `implement-task`.
+  into a prior step's worktree is **not** bare sibling-step inheritance: the
+  loadable **`review-implementation-in-worktree.edn` wrapper** (the `.edn`
+  realisation of the `implement-task-in-worktree` intended shape — which does not
+  itself load, see the F6/D1 precedent note above) has a first `:session` step
+  (`resolve-worktree`, tools include `work-on`) that re-extracts a
+  `worktree_path:` field from a structured handoff blob and **re-calls
+  `work-on`** to set the delegated run's session worktree *before* it
+  sub-delegates (to `review-task-implementation`). `gh-issue-implement.edn`
+  likewise delegates its outer `implement` step into a worktree-resolving
+  wrapper rather than relying on sibling-step inheritance.
   Worktree continuity is therefore carried by (1) an explicit `worktree_path:`
   field threaded through the handoff text and (2) a worktree-resolving wrapper
   that re-calls `work-on` — not by a fresh `:delegate` silently inheriting an
@@ -350,13 +398,17 @@ inconsistency in place of live user collaboration.
   the wrapper's `resolve-worktree` `:session` step re-calls `work-on` from the
   threaded `worktree_path:` and emits the bare task path, and the wrapper's inner
   `lifecycle` delegate routes `{:input "munera/open/NNN-slug"}` into
-  `task-lifecycle` — the map shape every sub-workflow reads. (This mirrors
-  `implement-task-in-worktree` exactly, with `task-lifecycle` substituted for
-  `implement-task`.)
+  `task-lifecycle` — the map shape every sub-workflow reads. (This mirrors the
+  loadable `review-implementation-in-worktree.edn` exactly, with `task-lifecycle`
+  substituted for `review-task-implementation` — the `.edn` realisation of the
+  `implement-task-in-worktree` intended shape; see the F6/D1 precedent note under
+  Verified Facts.)
 - The `task-lifecycle-in-worktree` wrapper workflow exists, parses and loads, and
-  is structurally a two-step `resolve-worktree`(`:session`,+`work-on`) →
-  `lifecycle`(`:delegate` `:target "task-lifecycle"`) adapter — verified against
-  the workflow definition/parse tests, mirroring `implement-task-in-worktree`.
+  is structurally a three-step `resolve-worktree`(`:session`,+`work-on`) →
+  `lifecycle`(`:delegate` `:target "task-lifecycle"`) → `summary`(`:session`)
+  adapter — verified against the workflow definition/parse tests, mirroring the
+  loadable `review-implementation-in-worktree.edn` (the `.edn` realisation of the
+  `implement-task-in-worktree` intended shape; see the F6/D1 precedent note).
 - Generated tasks carry the two-phase behaviour-preserving contract: a Phase 0
   test-coverage gate (characterization tests + green net before refactoring) and
   Phase 1 refactor with the `local`-lens + `gate` + green-tests acceptance.

@@ -1,7 +1,7 @@
 ---
 name: incidental-complexity-finder
 description: Choose the single highest incidental-complexity executable unit to simplify. Use when selecting a behaviour-preserving refactor target by comprehension burden the branching does not explain (high gordian local burden against low/moderate cyclomatic complexity), guarding against essential-complexity false positives. Produces one target plus evidence, or a well-formed no-target report.
-lambda: "λcode. {gordian-local ∧ gordian-complexity} → join(ns,var,arity) → gap=burden/cc → qualify(lcc≥5 ∧ gap≥2) → guard(top5, incidental ∧ ¬essential) → one_target ∨ ∅"
+lambda: "λcode. {gordian-local ∧ gordian-complexity} → join(ns,var,arity,line) → gap=burden/cc → qualify(lcc≥5 ∧ gap≥2) → guard(top5, incidental ∧ ¬essential) → one_target ∨ ∅"
 ---
 
 # incidental-complexity-finder
@@ -41,9 +41,10 @@ bb gordian complexity --json           > /tmp/icf-cc.json
 Both emit a `units` array; each unit carries `ns`/`var`/`arity`. `local` units
 carry `lcc-total` plus per-dimension burdens (`flow-burden`, `state-burden`,
 `shape-burden`, `abstraction-burden`, `dependency-burden`, `working-set`) and a
-`findings` array; `complexity` units carry `cc`. The `--sort total` on the
-`local` call is **selector-only ranking display** — it has no effect on the
-`(ns, var, arity)`-keyed join below.
+`findings` array; `complexity` units carry `cc`. Both also carry `line` (the
+unit's start line), used to make the join key unique (see step 3). The
+`--sort total` on the `local` call is **selector-only ranking display** — it has
+no effect on the `(ns, var, arity, line)`-keyed join below.
 
 ### 2. Join and compute gap — fixed verbatim recipe
 
@@ -53,10 +54,10 @@ selection is reproducible):
 ```
 jq -n --slurpfile loc /tmp/icf-local.json --slurpfile cc /tmp/icf-cc.json '
   ($cc[0].units
-   | map({key: (.ns + "/" + .var + "/" + (.arity|tostring)), value: .cc})
-   | from_entries) as $ccmap
+   | map({key: (.ns + "/" + .var + "/" + (.arity|tostring) + "@" + (.line|tostring)), value: .cc})
+   | from_entries) as $ccmap                                    # key includes line: unique even for null-arity defmethods
   | $loc[0].units
-  | map(. + {gap_key: (.ns + "/" + .var + "/" + (.arity|tostring))})
+  | map(. + {gap_key: (.ns + "/" + .var + "/" + (.arity|tostring) + "@" + (.line|tostring))})
   | map(select($ccmap[.gap_key] != null))                       # inner join on the local side: drop unmatched local rows
   | map(. + {cc: $ccmap[.gap_key],
              gap: (.["lcc-total"] / ([$ccmap[.gap_key], 1] | max))})
@@ -78,8 +79,21 @@ This prints the **top 5 qualifying units by `gap`**, each with its evidence.
 
 ### 3. Unmatched-row rule (A1 — embedded in the recipe)
 
-The join is an **inner join keyed on the `local` side**: only units present in
-**both** lenses are candidates.
+The join is an **inner join keyed on the `local` side**, keyed on
+`(ns, var, arity, line)`: only units present in **both** lenses are candidates.
+
+**Why `line` is part of the key (A1 determinism).** `(ns, var, arity)` alone is
+**not unique**: every `defmethod`-style unit emits `arity: null`, so all the
+`defmethod` bodies for one multimethod (e.g. the 51
+`psi.agent-session.dispatch-effects/execute-effect!` defmethods) collapse onto a
+single key `…/execute-effect!/null` on **both** lenses. Building `$ccmap` with
+`from_entries` over a non-unique key is **last-wins**, so every null-arity unit
+would inherit the `cc` of whichever defmethod jq emitted last — a value that is
+**non-deterministic w.r.t. emit order**, breaking the "fixed recipe …
+reproducible" guarantee. Adding `@line` makes the key unique (each `defmethod`
+has a distinct start line), so `from_entries` is lossless and every unit gets its
+own `cc` regardless of emit order. The join is therefore total and deterministic
+over the `(ns, var, arity, line)` key space.
 
 - A `local` unit with **no matching `cc` row is dropped** — excluded from
   candidates. It is **never** defaulted to `cc = 1`; defaulting would inflate
