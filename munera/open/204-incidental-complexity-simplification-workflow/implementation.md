@@ -4491,3 +4491,41 @@ pure-refactor invariant); `clj-paren-repair` Success; `clj-kondo` 0 findings;
 `bb commit-check:file-lengths` clean (file 638 lines, < 800).
 
 PASS_STATUS: RESOLVED
+
+## 2026-06-03 — Test review (test-shaper, pass 34) — ACTIONABLE
+
+Fresh test-shaper pass over `incidental_complexity_finder_skill_test.clj` and
+`task_204_workflow_definitions_test.clj`, re-reading the design acceptance and
+the prior CS1/CS2 + TR/TT follow-ups (TR23 resolved). Suite remains behaviourally
+saturated. One **meaningful-failures** defect found — a tautological assertion
+that advertises sort-order coverage it cannot actually provide:
+
+- **TR24 — `incidental-complexity-finder-recipe-ranking-and-cap-test`'s
+  gap-descending assertion is tautological (false-confidence signal).** In the
+  jq-present "gap-descending ranking" branch
+  (`incidental_complexity_finder_skill_test.clj:349-353`), `gaps` is built by
+  name-keyed lookup in a hand-fixed vector order
+  `[(gap-of out "top") (gap-of out "mid") (gap-of out "lowmid")]`, so it is
+  *always* `[25.0 15.0 7.5]` (each unit's gap is determined by its synthetic
+  input lcc/cc, and `gap-of` extracts by var-name regardless of output
+  position). Therefore `(= gaps (reverse (sort gaps)))` is `(= [25 15 7.5]
+  [25 15 7.5])` — it can never fail, including under a `sort_by(.gap)` ascending
+  regress. Its message ("output gap values are in strictly descending order")
+  is false advertising: it pins *input* gap values in a hand-coded order, not
+  *output* order. The branch's only genuine sort-order coverage is the single
+  positional `.indexOf` pair (`top` before `lowmid`, lines 356-358), which does
+  catch the ascending regress but leaves the middle element (`mid`) unpinned —
+  a regress that emitted `top, lowmid, mid` (top still first) would pass both
+  the tautology and the positional check. Per test-shaper `meaningful_failures`
+  (a failing test must explain a contract violation; this one cannot fail on the
+  contract it names) + `economical`/`behavior_focused`. Fix (test-only,
+  assertion-strengthening): derive the descending check from the *output* order
+  — extract each surviving unit's gap **in serialized output order** (e.g. via
+  jq `[.[].gap]` over the recipe output, or by `re-seq` over `out` collecting
+  gaps in appearance order) and assert that sequence equals its own descending
+  sort; and/or pin all three positions (`top` before `mid` before `lowmid`) so
+  the middle element's rank is covered. Then a `sort_by(.gap)` regress fails on
+  the order-derived assertion, not only the partial positional pair. Logged as a
+  follow-up (test-shaper pass 34).
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

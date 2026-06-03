@@ -2062,3 +2062,34 @@ production/skill/EDN change, all assertions identical.
       green (10 tests, 91 assertions, 0 failures — identical assertion count);
       `clj-paren-repair` Success; `clj-kondo` 0 findings; `bb commit-check:
       file-lengths` clean (file 638 lines, < 800).
+
+## Test review follow-ups (review pass 34 — test-shaper)
+
+- [ ] TR24 — `incidental-complexity-finder-recipe-ranking-and-cap-test`'s
+      jq-present "gap-descending ranking" branch carries a **tautological**
+      assertion that advertises sort-order coverage it cannot provide. `gaps`
+      (`incidental_complexity_finder_skill_test.clj:349`) is built by name-keyed
+      lookup in a hand-fixed vector order
+      `[(gap-of out "top") (gap-of out "mid") (gap-of out "lowmid")]`, so it is
+      *always* `[25.0 15.0 7.5]` (each unit's gap is fixed by its synthetic
+      lcc/cc, and `gap-of` extracts by var-name regardless of output position).
+      Thus `(= gaps (reverse (sort gaps)))` (line 352) is `(= [25 15 7.5]
+      [25 15 7.5])` — it can never fail, including under a `sort_by(.gap)`
+      ascending regress, yet its message claims "output gap values are in
+      strictly descending order". The branch's only genuine sort-order coverage
+      is the positional `.indexOf` pair (`top` before `lowmid`, lines 356-358),
+      which catches the ascending regress but leaves the middle element (`mid`)
+      unpinned (a `top, lowmid, mid` output would pass both checks). Per
+      test-shaper `meaningful_failures` (a failing test must explain the contract
+      it names) + `behavior_focused`. Fix (test-only, assertion-strengthening;
+      no skill/EDN/production change): derive the descending check from the
+      *output* order — extract each surviving unit's gap **in serialized output
+      order** (jq `[.[].gap]` over the recipe output, or `re-seq` collecting
+      gaps in appearance order) and assert that sequence equals its own
+      descending sort; and/or pin all three positions (`top` before `mid` before
+      `lowmid`). Then a `sort_by(.gap)` regress fails on the order-derived
+      assertion, not only the partial positional pair. Run focused
+      `incidental-complexity-finder-skill-test` (jq-present path) + `clj-kondo` +
+      `clj-paren-repair` + `bb commit-check:file-lengths`; confirm the strengthened
+      assertion still passes green against the correct `sort_by(-.gap)` recipe and
+      the file stays under the 800-line guard.
