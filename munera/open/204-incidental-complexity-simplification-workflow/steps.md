@@ -1767,7 +1767,7 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
 
 ## Test review follow-ups (review pass 26 — task-test-review)
 
-- [ ] TT-K — Prove the task-204 delegate **reference chain resolves**, not just
+- [x] TT-K — Prove the task-204 delegate **reference chain resolves**, not just
       the target strings, in `task_204_workflow_definitions_test.clj`. Both
       isolated tests use `load-edn-only` and assert only target *string equality*:
       `reduce-incidental-complexity-test` asserts
@@ -1797,3 +1797,20 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
       check the isolated string-equality asserts cannot give. Verify the focused
       task-204 ns green, `clj-kondo` 0, `clj-paren-repair` Success, and
       `bb commit-check:file-lengths` clean (< 800).
+      RESOLUTION: added `task-204-workflow-set-loads-together-test` to
+      `task_204_workflow_definitions_test.clj` (same ns, test-only — no
+      production/skill/EDN change), mirroring
+      `review-workflow-set-loads-together-test`. Co-loads the task-204 delegate
+      set — `reduce-incidental-complexity.edn`, `task-lifecycle-in-worktree.edn`,
+      and `task-lifecycle.edn` — via `with-workflow-dir` + `slurp-workflow-file`
+      (both already in the ns), asserts `(empty? errors)` and that all three
+      register, then asserts each task-204 delegate `:target` is a key in the
+      combined `definitions`: the outer `lifecycle-in-worktree` step resolves to
+      `task-lifecycle-in-worktree`, and the wrapper `lifecycle` step resolves to
+      `task-lifecycle`. The loader does not validate delegate targets at load
+      time, so the isolated string-equality asserts gave no resolution guarantee;
+      a regress renaming the wrapper file/`:name` while an upstream `:target`
+      stays stale now fails green. Focused task-204 ns green (3 tests, 88
+      assertions, 0 failures — +1 test/+8 over pass-25's 2/80); `clj-kondo` 0
+      findings; `clj-paren-repair` Success; file 445 lines (< 800);
+      `bb commit-check:file-lengths` exit 0.

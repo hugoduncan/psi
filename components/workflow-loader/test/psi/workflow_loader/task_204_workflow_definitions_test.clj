@@ -398,3 +398,48 @@
              "step-1 prompt states worktree-scoped allocation avoids outer-checkout collision (P3)")
          (is (.contains select-text "Commit the task creation ON THE WORKTREE BRANCH")
              "step-1 prompt commits the task creation on the worktree branch so munera_task_path: resolves"))))))
+
+;;; ---------------------------------------------------------------------------
+;;; Reference-chain resolution (TT-K)
+
+;; TT-K (test review pass 26, task-test-review): the isolated tests above assert
+;; only delegate :target *string equality* while loading a single EDN — the
+;; loader does NOT validate delegate targets at load time, so those asserts give
+;; no resolution guarantee. Co-load the task-204 delegate set
+;; (reduce-incidental-complexity -> task-lifecycle-in-worktree -> task-lifecycle)
+;; and assert each delegate :target is a key in the combined definitions — the
+;; references-resolve half of the design acceptance the string-equality asserts
+;; cannot give. Mirrors review-workflow-set-loads-together-test. A regress
+;; renaming the wrapper file/:name while an upstream :target string stays stale
+;; would break the live chain yet pass the isolated tests; this fails green.
+(deftest task-204-workflow-set-loads-together-test
+  (with-workflow-dir
+    {"reduce-incidental-complexity.edn"
+     (slurp-workflow-file "reduce-incidental-complexity.edn")
+     "task-lifecycle-in-worktree.edn"
+     (slurp-workflow-file "task-lifecycle-in-worktree.edn")
+     "task-lifecycle.edn"
+     (slurp-workflow-file "task-lifecycle.edn")}
+    (fn [{:keys [definitions errors]}]
+      (testing "the task-204 delegate set loads together without compilation errors"
+        (is (empty? errors))
+        (is (contains? definitions "reduce-incidental-complexity"))
+        (is (contains? definitions "task-lifecycle-in-worktree"))
+        (is (contains? definitions "task-lifecycle")))
+      (testing "each task-204 delegate :target resolves to a registered workflow"
+        (let [outer-target (->> (get-in definitions
+                                        ["reduce-incidental-complexity" :steps])
+                                (some #(when (= "lifecycle-in-worktree" (:name %))
+                                         (:target %))))
+              wrapper-target (->> (get-in definitions
+                                          ["task-lifecycle-in-worktree" :steps])
+                                  (some #(when (= "lifecycle" (:name %))
+                                           (:target %))))]
+          (is (= "task-lifecycle-in-worktree" outer-target)
+              "reduce-incidental-complexity delegates to task-lifecycle-in-worktree")
+          (is (contains? definitions outer-target)
+              "the outer delegate :target resolves to a registered workflow")
+          (is (= "task-lifecycle" wrapper-target)
+              "task-lifecycle-in-worktree delegates to task-lifecycle")
+          (is (contains? definitions wrapper-target)
+              "the wrapper delegate :target resolves to a registered workflow"))))))

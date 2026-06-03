@@ -3973,3 +3973,34 @@ EDNs together, asserts `(empty? errors)` + all register, and asserts each
 task-204 delegate `:target` is a key in the combined `definitions` (the
 references-resolve check the isolated string-equality asserts cannot provide).
 No production/skill/EDN change anticipated.
+
+### Pass 26 (test review — task-test-review) — TT-K RESOLVED
+
+Added `task-204-workflow-set-loads-together-test` to
+`task_204_workflow_definitions_test.clj` (same ns, test-only — no
+production/skill/EDN change), mirroring `review-workflow-set-loads-together-test`.
+
+The test co-loads the task-204 delegate set via `with-workflow-dir` +
+`slurp-workflow-file` —
+`reduce-incidental-complexity.edn`, `task-lifecycle-in-worktree.edn`, and
+`task-lifecycle.edn` — asserts `(empty? errors)` and that all three register,
+then walks each task-204 delegate step and asserts its `:target` is a key in the
+combined `definitions`:
+
+- outer `reduce-incidental-complexity` step `lifecycle-in-worktree` →
+  `task-lifecycle-in-worktree` (∈ definitions);
+- wrapper `task-lifecycle-in-worktree` step `lifecycle` → `task-lifecycle`
+  (∈ definitions).
+
+The loader does not validate delegate targets at load time (no resolution check
+in `compiler.clj`/`core.clj`), so the isolated string-equality asserts gave no
+resolution guarantee. The references-resolve half of the design acceptance
+("parse and load … references resolve") is now covered: a regress renaming the
+wrapper file/`:name` while an upstream `:target` string stays stale breaks the
+live chain and now fails green.
+
+Verification: `clojure -M:test --focus
+psi.workflow-loader.task-204-workflow-definitions-test` → 3 tests, 88
+assertions, 0 failures (+1 test/+8 assertions over pass-25's 2/80);
+`clj-kondo --lint` 0 findings (errors 0, warnings 0); `clj-paren-repair` Success;
+`bb commit-check:file-lengths` exit 0; test file 445 lines (< 800).
