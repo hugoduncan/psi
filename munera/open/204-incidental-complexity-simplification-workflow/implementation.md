@@ -4643,3 +4643,43 @@ and consistent with meta/spec/code. No follow-up steps added (pass-1 verdict
 re-confirmed independently).
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## code-shaper review (pass 2, 2026-06-03 — independent)
+
+Fresh code-shaper pass (`simple ∧ consistent ∧ robust → shape`) over the shipped
+artifacts: SKILL.md `gap` recipe, both EDN workflows, and both task-204 test
+namespaces. Re-read the pass-1 CS1/CS2 resolutions and the TR23/TR24 follow-ups.
+
+**Production deliverables — clean (re-confirmed).** The jq recipe is one
+canonical single-responsibility artifact; the two EDN workflows mirror their
+verified precedents (`gh-issue-implement.edn`,
+`review-implementation-in-worktree.edn`) with consistent step/handoff/`:context`
+idioms. The giant `:text` prompt is data lifted verbatim from design — not a
+code-shape target. No production/skill/EDN issue.
+
+**CS3 (actionable, test-only) — six loader fixtures duplicated verbatim across
+the two sibling test namespaces.** `task_204_workflow_definitions_test.clj`
+(introduced by this task's R6 split) and the pre-existing
+`workflow_definitions_test.clj` each define byte-identical copies of
+`slurp-workflow-file`, `with-workflow-dir`, `load-edn-only`, `input-var-wired?`,
+`step-has-input-var-wired?`, and `step-template-text` (~50 lines). The 204 ns
+docstring acknowledges the copy ("loader fixtures … duplicated here") but no
+follow-up factors it. This is the **same `consistent(idioms)` + non-orthogonality
+defect class CS1/CS2 closed, now at namespace granularity**: a change to the
+loader test seam (the `with-redefs [loader/global-workflow-dirs …
+loader/project-workflow-dir …]` shape, the temp-dir cleanup, or any helper
+signature) must be made twice and can drift silently between the two suites —
+`robust` requires `orthogonal(code, y)`. The R6 split correctly moved the
+*deftests* out to keep the shared ns under the 800-line guard, but copied the
+fixtures rather than single-sourcing them. Fix (test-only, behaviour-identical,
+assertions untouched): extract the six shared loader fixtures into a small
+test-support ns (e.g. `psi.workflow-loader.workflow-test-support`) and `:require`
+it from both `workflow_definitions_test.clj` and
+`task_204_workflow_definitions_test.clj`, deleting both local copies. This
+single-sources the seam (a future loader-fixture change threads through one
+place) and keeps both files under the length guard. Verify both definition test
+nss green (identical assertion counts — pure refactor), `clj-kondo` 0,
+`clj-paren-repair` Success, `bb commit-check:file-lengths` clean for all three
+files. Logged as a follow-up (code-shaper pass 2).
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

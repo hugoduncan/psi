@@ -2112,3 +2112,32 @@ production/skill/EDN change, all assertions identical.
       +1 split positional, +1 output-derived descending); `clj-paren-repair`
       Success; `clj-kondo` 0 findings; `bb commit-check:file-lengths` clean (file
       652 lines, < 800).
+
+## Code-shaper review follow-ups (review pass 2 — code-shaper)
+
+Source: independent code-shaper pass over the shipped artifacts (SKILL.md recipe,
+both EDN workflows, both task-204 test namespaces). Production deliverables
+re-confirmed clean; one new cross-namespace test-harness duplication that
+post-dates the within-file CS1/CS2 shaping. Test-only — no production/skill/EDN
+change, all assertions identical.
+
+- [ ] CS3 — Single-source the six loader fixtures duplicated verbatim across the
+      two sibling definition-test namespaces. `task_204_workflow_definitions_test.clj`
+      (created by this task's R6 split) and the pre-existing
+      `workflow_definitions_test.clj` each define byte-identical copies of
+      `slurp-workflow-file`, `with-workflow-dir`, `load-edn-only`,
+      `input-var-wired?`, `step-has-input-var-wired?`, and `step-template-text`
+      (~50 lines). Same `consistent(idioms)` + non-orthogonality defect class as
+      CS1/CS2, now at namespace granularity: a change to the loader test seam
+      (`with-redefs [loader/global-workflow-dirs … loader/project-workflow-dir …]`,
+      temp-dir cleanup, or a helper signature) must be made twice and can drift
+      silently between the two suites (`robust` requires `orthogonal(code, y)`).
+      The R6 split correctly extracted the *deftests* to stay under the 800-line
+      guard but copied the fixtures rather than single-sourcing them. Fix
+      (test-only, behaviour-identical, assertions untouched): extract the six
+      shared fixtures into a small test-support ns (e.g.
+      `psi.workflow-loader.workflow-test-support`) and `:require` it from both
+      definition-test namespaces, deleting both local copies. Verify both
+      definition test nss green (identical assertion counts — pure refactor),
+      `clj-kondo` 0, `clj-paren-repair` Success, and
+      `bb commit-check:file-lengths` clean for all three files.
