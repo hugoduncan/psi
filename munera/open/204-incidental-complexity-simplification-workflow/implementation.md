@@ -4471,3 +4471,23 @@ incidental harness duplication that post-dates the CS1/CS2 shaping pass:
   near-identical copies. Logged as a follow-up (test-shaper pass 33).
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## 2026-06-03 — TR23 execution (test-shaper follow-up) — RESOLVED
+
+Collapsed the duplicated temp-file ceremony in
+`incidental_complexity_finder_skill_test.clj`. Reordered so
+`run-recipe-over-lens-output` is defined first and is the single ceremony-owner:
+it holds the per-call temp dir (`icf-recipe-test-<nanoTime>`), the
+`/tmp/icf-*.json` → temp-path recipe rewrite, the `(shell/sh "bash" "-c" recipe')`
+call, and the `finally` cleanup. `run-jq-recipe` is now a thin wrapper that wraps
+its synthetic `local`/`cc` unit seqs in the `{"units":[…]}` envelope and delegates
+to `run-recipe-over-lens-output`. Docstrings updated to reflect the ownership
+split.
+
+Pure test-only refactor — no assertion, skill, EDN, or production change.
+Verification: focused `incidental-complexity-finder-skill-test` green
+(10 tests, 91 assertions, 0 failures — assertion count unchanged, confirming the
+pure-refactor invariant); `clj-paren-repair` Success; `clj-kondo` 0 findings;
+`bb commit-check:file-lengths` clean (file 638 lines, < 800).
+
+PASS_STATUS: RESOLVED

@@ -161,36 +161,17 @@
   [unit-ns unit-var line cc]
   (str "{\"ns\":\"" unit-ns "\",\"var\":\"" unit-var "\",\"arity\":null,\"line\":" line ",\"cc\":" cc "}"))
 
-(defn- run-jq-recipe
-  "Run the SKILL.md jq recipe over the given `local`/`cc` unit-JSON sequences,
-   returning {:exit :out :err}. Rewrites the recipe's hard-coded /tmp paths to
-   per-call temp fixtures so emit order is fully controlled by the caller."
-  [recipe local-units cc-units]
-  (let [dir (io/file (System/getProperty "java.io.tmpdir")
-                     (str "icf-recipe-test-" (System/nanoTime)))
-        _ (.mkdirs dir)
-        loc-f (io/file dir "icf-local.json")
-        cc-f (io/file dir "icf-cc.json")
-        recipe' (-> recipe
-                    (str/replace "/tmp/icf-local.json" (.getAbsolutePath loc-f))
-                    (str/replace "/tmp/icf-cc.json" (.getAbsolutePath cc-f)))]
-    (try
-      (spit loc-f (str "{\"units\":[" (str/join "," local-units) "]}"))
-      (spit cc-f (str "{\"units\":[" (str/join "," cc-units) "]}"))
-      (shell/sh "bash" "-c" recipe')
-      (finally
-        (doseq [f (.listFiles dir)] (.delete f))
-        (.delete dir)))))
-
 (defn- run-recipe-over-lens-output
-  "Write the two real lens JSON payloads to the recipe's temp-file paths and run
-   the rewritten recipe over them, returning {:exit :out :err}. Unlike
-   `run-jq-recipe` (which wraps synthetic units in `{\"units\":[…]}`), this feeds
-   the lens output verbatim — the real `bb gordian` payload already carries the
-   top-level `.units` array the recipe reads."
+  "Write the two lens JSON payloads to the recipe's temp-file paths and run the
+   rewritten recipe over them, returning {:exit :out :err}. Owns the temp-file
+   ceremony (per-call temp dir, the recipe's hard-coded /tmp path rewrite, and
+   cleanup) so emit order is fully controlled by the caller. Feeds the lens
+   output verbatim — the real `bb gordian` payload already carries the top-level
+   `.units` array the recipe reads; `run-jq-recipe` wraps synthetic units before
+   delegating here."
   [recipe local-json cc-json]
   (let [dir (io/file (System/getProperty "java.io.tmpdir")
-                     (str "icf-real-lens-test-" (System/nanoTime)))
+                     (str "icf-recipe-test-" (System/nanoTime)))
         _ (.mkdirs dir)
         loc-f (io/file dir "icf-local.json")
         cc-f (io/file dir "icf-cc.json")
@@ -204,6 +185,17 @@
       (finally
         (doseq [f (.listFiles dir)] (.delete f))
         (.delete dir)))))
+
+(defn- run-jq-recipe
+  "Run the SKILL.md jq recipe over the given `local`/`cc` unit-JSON sequences,
+   returning {:exit :out :err}. Wraps the synthetic units in the top-level
+   `{\"units\":[…]}` envelope the recipe reads, then delegates the temp-file
+   ceremony to `run-recipe-over-lens-output`."
+  [recipe local-units cc-units]
+  (run-recipe-over-lens-output
+   recipe
+   (str "{\"units\":[" (str/join "," local-units) "]}")
+   (str "{\"units\":[" (str/join "," cc-units) "]}")))
 
 (deftest incidental-complexity-finder-recipe-determinism-test
   ;; TR1 (executable lock for the F2 determinism fix the prior passes deferred):

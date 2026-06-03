@@ -2026,7 +2026,7 @@ resolution test). Behaviourally saturated; one incidental harness-duplication
 defect that post-dates the CS1/CS2 code-shaper pass. Test-only — no
 production/skill/EDN change, all assertions identical.
 
-- [ ] TR23 — Collapse the duplicated temp-file ceremony shared by
+- [x] TR23 — Collapse the duplicated temp-file ceremony shared by
       `run-recipe-over-lens-output` and `run-jq-recipe` in
       `components/workflow-loader/test/psi/workflow_loader/incidental_complexity_finder_skill_test.clj`
       (defns at lines ~164 and ~185). Their bodies are byte-identical — temp-dir
@@ -2051,3 +2051,14 @@ production/skill/EDN change, all assertions identical.
       `clj-kondo` + `clj-paren-repair` + `bb commit-check:file-lengths`; confirm
       identical assertion counts (pure refactor) and the file stays under the
       800-line `components/` guard.
+      RESOLUTION: reordered the two helpers so `run-recipe-over-lens-output` is
+      defined first and **owns** the temp-file ceremony (per-call temp dir,
+      `/tmp/icf-*.json` → temp-path recipe rewrite, `(shell/sh "bash" "-c" …)`,
+      and the `finally` cleanup); re-expressed `run-jq-recipe` as a thin wrapper
+      that wraps its synthetic `local`/`cc` unit seqs in the `{"units":[…]}`
+      envelope and delegates to `run-recipe-over-lens-output` — the ceremony now
+      lives in exactly one place. Pure test-only refactor: no assertion, skill,
+      EDN, or production change. Focused `incidental-complexity-finder-skill-test`
+      green (10 tests, 91 assertions, 0 failures — identical assertion count);
+      `clj-paren-repair` Success; `clj-kondo` 0 findings; `bb commit-check:
+      file-lengths` clean (file 638 lines, < 800).
