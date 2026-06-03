@@ -63,6 +63,7 @@
    "/reload-models" :reload-models
    "/reload-prompts" :reload-prompts
    "/reload-extension-installs" :reload-extension-installs
+   "/operations" :operations
    "/project-repl" :project-repl})
 
 (def ^:private snapshot-prefixed-command-prefixes
@@ -71,13 +72,14 @@
    another under the dispatch matcher), so the regression lock compares as a
    set."
   #{"/tree" "/jobs" "/job" "/cancel-job" "/remember" "/model" "/thinking"
-    "/speed" "/effort" "/login" "/project-repl"})
+    "/speed" "/effort" "/login" "/operation" "/project-repl"})
 
 (def ^:private snapshot-builtin-command-names
   "Snapshot of the derived built-in command name set (bare names)."
   #{"quit" "exit" "new" "resume" "status" "history" "help" "?" "prompts"
     "skills" "worktree" "logout" "reload-models" "reload-prompts"
-    "reload-extension-installs" "project-repl" "tree" "jobs" "job" "cancel-job"
+    "reload-extension-installs" "operations" "operation" "project-repl"
+    "tree" "jobs" "job" "cancel-job"
     "remember" "model" "thinking" "speed" "effort" "login"})
 
 (deftest builtin-command-specs-entry-schema-rejects-malformations-test

@@ -85,6 +85,11 @@
                       :description "re-discover prompt templates from ~/.psi/agent/prompts and <worktree>/.psi/prompts"}
    "/reload-extension-installs" {:kinds #{:exact} :handler :reload-extension-installs
                                  :description "reload/apply extension installs from extensions.edn"}
+   "/operations" {:kinds #{:exact} :handler :operations
+                  :description "list deterministic operations available in this session"}
+   "/operation" {:kinds #{:prefixed}
+                 :description "invoke a deterministic operation by id"
+                 :usage "<id> {edn-args}"}
    "/jobs"    {:kinds #{:prefixed} :description "list background jobs (default: running,pending-cancel)"
                :usage "[status ...]"}
    "/job"     {:kinds #{:prefixed} :description "inspect a background job"

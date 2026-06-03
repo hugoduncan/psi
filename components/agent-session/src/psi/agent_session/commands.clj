@@ -26,6 +26,7 @@
    [clojure.string :as str]
    [psi.agent-session.background-jobs :as bg-jobs]
    [psi.agent-session.commands.builtin-specs :as bspec]
+   [psi.agent-session.commands.operation :as operation-command]
    [psi.agent-session.commands.effort :as effort-command]
    [psi.agent-session.commands.speed :as speed-command]
    [psi.agent-session.core :as session]
@@ -664,7 +665,7 @@
    coherence test reads this same def — so there is no duplicate literal and
    drift between the spec table and the real `case` is caught at load."
   #{"/tree" "/jobs" "/job" "/cancel-job" "/remember" "/model" "/thinking"
-    "/speed" "/effort" "/login" "/project-repl"})
+    "/speed" "/effort" "/login" "/operation" "/project-repl"})
 
 (assert (= prefixed-case-branches (set bspec/prefixed-command-prefixes))
         "dispatch-prefixed-command case branches must match the spec-table prefixed projection")
@@ -682,6 +683,7 @@
     "/speed" (speed-command/dispatch-command ctx session-id trimmed)
     "/effort" (effort-command/dispatch-command ctx session-id trimmed)
     "/login" (dispatch-login-command ctx session-id oauth-ctx ai-model trimmed)
+    "/operation" (operation-command/dispatch-command ctx session-id trimmed)
     "/project-repl" (project-nrepl-commands/dispatch-project-nrepl-command ctx session-id trimmed)
     nil))
 
@@ -741,8 +743,8 @@
    — so an `:exact` spec entry whose `:handler` is absent from the `case` is
    caught at load (`unreachable > forbidden`), symmetric with the prefixed seam."
   #{:quit :new :resume :status :history :help :prompts :skills :worktree
-    :reload-models :reload-prompts :reload-extension-installs :project-repl
-    :logout})
+    :reload-models :reload-prompts :reload-extension-installs :operations
+    :project-repl :logout})
 
 (assert (= exact-case-branches (set (vals bspec/exact-command-handlers)))
         "dispatch* exact-command case branches must match the spec-table exact projection handler values")
@@ -767,6 +769,7 @@
        :reload-models {:type :text :message (format-reload-models ctx session-id)}
        :reload-prompts {:type :text :message (format-reload-prompts ctx session-id)}
        :reload-extension-installs {:type :text :message (format-reload-extension-installs ctx session-id)}
+       :operations {:type :text :message (operation-command/format-operations ctx)}
        :project-repl (project-nrepl-commands/dispatch-project-nrepl-command ctx session-id trimmed)
        :logout (dispatch-logout-command ctx session-id oauth-ctx)
        nil)
