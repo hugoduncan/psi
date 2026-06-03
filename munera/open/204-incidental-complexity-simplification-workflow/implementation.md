@@ -4716,3 +4716,39 @@ Verification (behaviour-identical, assertions untouched):
 - `clj-paren-repair`: Success (no changes needed) on all three files.
 - `bb commit-check:file-lengths`: rc=0; support 63, task-204 430, definitions
   551 lines (all < 800).
+
+## code-shaper review (pass 3, 2026-06-03 — independent)
+
+Fresh independent code-shaper pass (`simple ∧ consistent ∧ robust → shape`) over
+the live shipped artifacts: SKILL.md `gap` recipe, both EDN workflows, and the
+three test namespaces (`workflow_test_support`,
+`task_204_workflow_definitions_test`, `incidental_complexity_finder_skill_test`).
+Re-derived each verdict against source rather than trusting passes 1–2.
+
+**Production deliverables (skill + EDN) — clean (re-confirmed).** The jq recipe
+is one canonical single-responsibility artifact. Both EDN workflows mirror their
+verified precedents (`gh-issue-implement.edn`,
+`review-implementation-in-worktree.edn`) with consistent step/handoff/`:context`
+idioms; the giant step-1 `:text` is design-lifted data (R3), not a code-shape
+target. No skill/EDN issue.
+
+**Test code — clean (CS1/CS2/CS3 verified resolved).** The loader seam is
+single-sourced in `workflow_test_support` (63 lines) and `:refer`-ed from both
+definition-test nss with no residual verbatim duplication (CS3 closed); each ns
+keeps only its ns-unique helpers. The synthetic-JSON builders
+(`named-local-unit-json`/`named-cc-unit-json`/`evidence-local-unit-json`) use
+string concatenation deliberately — emit-order control is the determinism test's
+whole point, so a `data.json` rewrite would *lose* the property under test (not a
+defect). `clj-kondo` 0 findings across all four files.
+
+**Re-examined, declined (not new):** the repeated
+`(if (jq-available?) … structural-fallback)` idiom across the six recipe deftests
+is a *consistent* idiom guarding six distinct behaviours' jq-absent fallbacks;
+consolidating would couple unrelated tests — already declined as low-value churn
+in passes 29/32 against the simplicity/robustness ethos. No re-raise.
+
+**Finding: no new actionable code-shape issue.** Production artifacts mirror
+verified precedents; test code is simple, single-sourced, consistent, lint-clean,
+and under the 800-line length guard. No follow-up steps added.
+
+PASS_STATUS: REVIEW_COMPLETE
