@@ -1994,3 +1994,33 @@ constraint. Re-removing or re-flagging it would contradict that recorded
 decision and duplicate an existing note, so no new step is added.
 
 Conclusion: test suite is well-shaped; review complete, no actionable feedback.
+
+## Docs review pass 2 (review-task-docs, ψ, 2026-06-02)
+
+Independent re-review after the CS2 commit (`6cad7a672`) landed *after* the
+original docs review (`66a26a176`). Re-checked README.md, doc/, CHANGELOG.md.
+
+- CHANGELOG [Unreleased] → Fixed: accurate ∧ complete. Field list
+  (model/prompt-mode/tools/skills/thinking-level/speed-mode/effort-override)
+  matches the shipped snapshot keys; nested-effective-config, explicit-override,
+  replayable-canonical-state claims all match implementation. The CS2
+  thinking-level precedence change (inherited ranks above the workflow-file
+  default; step → inherited → file → off) is correctly recorded here as a
+  user-visible behaviour change.
+- doc/workflows.md "Inherited session defaults are snapshotted at invoke time"
+  (`:206-229`): still accurate ∧ consistent for the snapshot/inheritance model
+  (invoke-time capture, all 7 fields, no-retroactive-effect, nested effective
+  config, explicit-override precedence, resume-reuse vs continue-fresh). The
+  CS2 precedence nuance (inherited thinking-level vs a *workflow-file* default)
+  is not reflected here — judged NON-actionable: workflows.md is a conceptual
+  guide that does not document a workflow-file-level `:model`/`:thinking-level`
+  default surface, so the inherited-vs-file precedence has no natural home at
+  this abstraction level, and the user-visible record (CHANGELOG) already
+  captures it accurately.
+- README.md: no inherited-session-default surface; no stale refs.
+- No stale references to the old live-read behaviour anywhere in doc/ or
+  README.md (grep clean; the lone `rpc-edn-op-mapping-contract.md` hit is
+  unrelated).
+- No removed user-facing behaviour to clean up.
+
+No actionable docs findings. Review complete.
