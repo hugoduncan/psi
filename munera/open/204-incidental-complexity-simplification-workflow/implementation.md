@@ -3724,3 +3724,32 @@ TT-class symmetry gap as TT-B/TT-G (a prompt-encoded, design-resolved correctnes
 behaviour left unlocked). Follow-up added to steps.md.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+---
+
+## Test review pass 23 follow-up — TT-H resolution (worktree-scoped task creation lock)
+
+Executed the single newly-added actionable follow-up (TT-H) from review pass 23.
+
+Test-only change: extended `reduce-incidental-complexity-test` in
+`components/workflow-loader/test/psi/workflow_loader/task_204_workflow_definitions_test.clj`
+with a "select-and-create prompt locks the worktree-scoped task creation (TT-H)"
+`testing` block appended to the TT-G/TT-D/F3 cluster (same task-204 ns; no
+production/skill/EDN change). Three `is` substring asserts on `select-text`
+(step-1 prompt), each verified present verbatim in the shipped
+`.psi/workflows/reduce-incidental-complexity.edn` before locking:
+
+1. `scanning the WORKTREE's` — step-5 worktree-scoped NNN allocation (P3).
+2. `so the id does not collide with the outer checkout's open tasks` — the P3
+   collision-avoidance rationale.
+3. `Commit the task creation ON THE WORKTREE BRANCH` — step-8 commit-on-branch
+   so the emitted `munera_task_path:` resolves under the delegated `work-on`.
+
+A regress to outer-checkout-scoped id allocation (reintroducing P3) or committing
+on the wrong branch now fails green — closing the same TT-class symmetry gap as
+TT-B/TT-G (a prompt-encoded, design-resolved correctness behaviour left unlocked).
+
+Verification: `clj-paren-repair` Success; `clj-kondo` 0 findings; focused
+`clojure -M:test --focus psi.workflow-loader.task-204-workflow-definitions-test`
+green (2 tests, 72 assertions, 0 failures — +3 over pass-22's 69); test ns 369
+lines (< 800 `components/` guard).

@@ -1637,7 +1637,7 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
 
 ## Test review follow-ups (review pass 23 — task-test-review)
 
-- [ ] TT-H — Lock the step-1 **worktree-scoped task creation** behaviour (the P3
+- [x] TT-H — Lock the step-1 **worktree-scoped task creation** behaviour (the P3
       resolution) in `reduce-incidental-complexity-test`. Design Deliverable 2,
       Step 1 ("Allocate the next task id, create munera/open/NNN-slug/…",
       "Commit the task creation") plus the resolved P3 (implementation.md: NNN is
@@ -1662,3 +1662,19 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
       production/skill/EDN change; task-204 test ns is well under the 800-line
       `components/` length guard. Run focused `task-204-workflow-definitions-test`
       + `clj-kondo`.
+      RESOLUTION: added a "select-and-create prompt locks the worktree-scoped
+      task creation (TT-H)" `testing` block to the TT-G/TT-D/F3 cluster in
+      `reduce-incidental-complexity-test` (same task-204 ns, test-only — no
+      production/skill/EDN change) asserting `select-text` contains all three
+      P3-resolution strings, each verified present verbatim in the shipped
+      `reduce-incidental-complexity.edn` step-1 prompt before locking:
+      (1) `scanning the WORKTREE's` (step-5 worktree-scoped NNN allocation),
+      (2) `so the id does not collide with the outer checkout's open tasks`
+      (the P3 collision-avoidance rationale), and (3)
+      `Commit the task creation ON THE WORKTREE BRANCH` (step-8 commit-on-branch
+      so the emitted `munera_task_path:` resolves under the delegated `work-on`).
+      Closes the same TT-class symmetry gap as TT-B/TT-G: a regress to
+      outer-checkout-scoped id allocation (reintroducing P3) or committing on the
+      wrong branch now fails green. Focused task-204 ns green (2 tests, 72
+      assertions, 0 failures — +3 over pass-22's 69); `clj-kondo` 0 findings;
+      `clj-paren-repair` Success; file 369 lines (< 800).

@@ -348,4 +348,22 @@
        (testing "select-and-create prompt locks the metric-derived touched-set discriminator (TT-G)"
          (is (.contains select-text
                         "the set is computed from the metric, not from the diff/touched files")
-             "step-1 prompt derives the A2 touched set from the metric, not the diff/touched files"))))))
+             "step-1 prompt derives the A2 touched set from the metric, not the diff/touched files"))
+       ;; TT-H (test review pass 23, task-test-review): lock the step-1
+       ;; worktree-scoped task creation behaviour (the P3 resolution). Design
+       ;; Deliverable 2 Step 1 + resolved P3: NNN is allocated by scanning the
+       ;; WORKTREE's open/ ∪ closed/ (not the outer checkout's, so the id does
+       ;; not collide), and the create + commit happen on the worktree branch so
+       ;; the emitted munera_task_path: resolves for the delegated lifecycle.
+       ;; No existing test anchors it: a regress to outer-checkout-scoped id
+       ;; allocation (reintroducing P3) or committing on the wrong branch (so
+       ;; munera_task_path: does not resolve under the delegated work-on) passed
+       ;; green. Same TT-class symmetry gap as TT-B/TT-G.
+       (testing "select-and-create prompt locks the worktree-scoped task creation (TT-H)"
+         (is (.contains select-text "scanning the WORKTREE's")
+             "step-1 prompt allocates NNN by scanning the worktree's task set")
+         (is (.contains select-text
+                        "so the id does not collide with the outer checkout's open tasks")
+             "step-1 prompt states worktree-scoped allocation avoids outer-checkout collision (P3)")
+         (is (.contains select-text "Commit the task creation ON THE WORKTREE BRANCH")
+             "step-1 prompt commits the task creation on the worktree branch so munera_task_path: resolves"))))))
