@@ -2121,7 +2121,7 @@ re-confirmed clean; one new cross-namespace test-harness duplication that
 post-dates the within-file CS1/CS2 shaping. Test-only — no production/skill/EDN
 change, all assertions identical.
 
-- [ ] CS3 — Single-source the six loader fixtures duplicated verbatim across the
+- [x] CS3 — Single-source the six loader fixtures duplicated verbatim across the
       two sibling definition-test namespaces. `task_204_workflow_definitions_test.clj`
       (created by this task's R6 split) and the pre-existing
       `workflow_definitions_test.clj` each define byte-identical copies of
@@ -2141,3 +2141,24 @@ change, all assertions identical.
       definition test nss green (identical assertion counts — pure refactor),
       `clj-kondo` 0, `clj-paren-repair` Success, and
       `bb commit-check:file-lengths` clean for all three files.
+      RESOLUTION: extracted the six shared loader fixtures
+      (`slurp-workflow-file`, `with-workflow-dir`, `load-edn-only`,
+      `input-var-wired?`, `step-has-input-var-wired?`, `step-template-text`)
+      into a new test-support ns
+      `psi.workflow-loader.workflow-test-support`
+      (`components/workflow-loader/test/.../workflow_test_support.clj`, 63 lines)
+      and `:refer`-ed them into both `workflow_definitions_test.clj` and
+      `task_204_workflow_definitions_test.clj`, deleting both verbatim local
+      copies (call sites unchanged — pure single-sourcing). `input-var-wired?`
+      is used only inside `step-has-input-var-wired?` (now in the support ns), so
+      it is not `:refer`-ed by either consumer (no dangling unused-refer). The
+      ns-unique helpers stay local: `load-edn-with-md-refs`,
+      `pass-status-judge-from-step`, `constant-routing-judge` in
+      `workflow_definitions_test`. Behaviour-identical, assertions untouched:
+      focused suite green (14 tests, 252 assertions, 0 failures — same as
+      pre-refactor); `clj-kondo` 0 findings; `clj-paren-repair` Success; all
+      three files clean under the 800-line `components/` guard (support 63,
+      task-204 430, definitions 551). The loader test seam
+      (`with-redefs [loader/global-workflow-dirs … loader/project-workflow-dir …]`,
+      temp-dir cleanup) is now defined once and cannot drift between the two
+      suites. (See implementation.md pass-2 code-shaper CS3 entry.)

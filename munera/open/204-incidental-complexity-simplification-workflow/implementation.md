@@ -4683,3 +4683,36 @@ nss green (identical assertion counts — pure refactor), `clj-kondo` 0,
 files. Logged as a follow-up (code-shaper pass 2).
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Code-shaper review pass 2 — CS3 resolution (follow-up execution)
+
+Executed the CS3 follow-up. Created test-support ns
+`psi.workflow-loader.workflow-test-support`
+(`components/workflow-loader/test/psi/workflow_loader/workflow_test_support.clj`,
+63 lines) holding the six shared loader fixtures (`slurp-workflow-file`,
+`with-workflow-dir`, `load-edn-only`, `input-var-wired?`,
+`step-has-input-var-wired?`, `step-template-text`) as public defns, and
+`:refer`-ed them into both `workflow_definitions_test.clj` and
+`task_204_workflow_definitions_test.clj`, deleting both verbatim local copies.
+Call sites are unchanged (the `:refer` keeps the bare symbol names), so this is
+a pure single-sourcing refactor.
+
+`input-var-wired?` is only consumed inside `step-has-input-var-wired?` (now in
+the support ns), so neither consumer `:refer`s it — avoids a dangling
+unused-refer (clj-kondo confirmed). The ns-unique helpers stay local in
+`workflow_definitions_test`: `load-edn-with-md-refs`,
+`pass-status-judge-from-step`, `constant-routing-judge` (the first reuses the
+referred `with-workflow-dir`/`slurp-workflow-file`).
+
+The loader test seam (`with-redefs [loader/global-workflow-dirs …
+loader/project-workflow-dir …]` + temp-dir cleanup) is now defined once and
+cannot drift between the two suites (closes the CS1/CS2-class
+non-orthogonality at namespace granularity).
+
+Verification (behaviour-identical, assertions untouched):
+- focused suite green: 14 tests, 252 assertions, 0 failures (same totals as
+  before the refactor — pure single-sourcing).
+- `clj-kondo --lint` over all three files: 0 findings.
+- `clj-paren-repair`: Success (no changes needed) on all three files.
+- `bb commit-check:file-lengths`: rc=0; support 63, task-204 430, definitions
+  551 lines (all < 800).

@@ -7,66 +7,19 @@
    fixtures (load-edn-only + step helpers) duplicated here; they assert no load
    errors, step counts/names/types, :vars wiring, :prompt-string/:context
    handoff plumbing, and the prompt-level behavioural contracts (NO_TARGET
-   short-circuit, two-phase refactor gate, no-push/PR endpoint)."
+   short-circuit, two-phase refactor gate, no-push/PR endpoint).
+
+   The shared loader fixtures (load-edn-only + step helpers) live in
+   psi.workflow-loader.workflow-test-support, single-sourced with
+   workflow-definitions-test (CS3)."
   (:require
-   [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
-   [psi.workflow-loader.core :as loader]))
-
-;;; ---------------------------------------------------------------------------
-;;; Fixtures (mirror workflow-definitions-test; the subset these tests use)
-
-(defn- slurp-workflow-file
-  [filename]
-  (slurp (io/file (System/getProperty "user.dir")
-                  ".psi/workflows"
-                  filename)))
-
-(defn- with-workflow-dir
-  "Write files to a temp dir and call f with the loader result.
-   files is a map of filename -> content string."
-  [files f]
-  (let [dir (io/file (System/getProperty "java.io.tmpdir")
-                     (str "wf-def-test-" (System/nanoTime)))]
-    (.mkdirs dir)
-    (try
-      (doseq [[filename content] files]
-        (spit (io/file dir filename) content))
-      (with-redefs [loader/global-workflow-dirs (constantly [])
-                    loader/project-workflow-dir (constantly (.getAbsolutePath dir))]
-        (f (loader/load-workflow-definitions (.getAbsolutePath dir))))
-      (finally
-        (doseq [f (.listFiles dir)] (.delete f))
-        (.delete dir)))))
-
-(defn- load-edn-only
-  "Load a single edn workflow (no .md refs) from the real .psi/workflows dir."
-  [edn-filename f]
-  (with-workflow-dir
-    {edn-filename (slurp-workflow-file edn-filename)}
-    f))
-
-(defn- input-var-wired?
-  "True if the contribution has :vars with 'input' wired to :workflow-input."
-  [contribution]
-  (= {:from :workflow-input :path [:input]}
-     (get-in contribution [:vars "input"])))
-
-(defn- step-has-input-var-wired?
-  "True if any template contribution in step has 'input' wired to :workflow-input."
-  [step]
-  (some (fn [c]
-          (and (= :template (:type c))
-               (input-var-wired? c)))
-        (:contributions step)))
-
-(defn- step-template-text
-  "Concatenated text of all template contributions in step."
-  [step]
-  (->> (:contributions step)
-       (filter #(= :template (:type %)))
-       (map :text)
-       (apply str)))
+   [psi.workflow-loader.workflow-test-support
+    :refer [load-edn-only
+            slurp-workflow-file
+            step-has-input-var-wired?
+            step-template-text
+            with-workflow-dir]]))
 
 ;;; ---------------------------------------------------------------------------
 ;;; task-lifecycle-in-worktree (Slice 2 of task 204)

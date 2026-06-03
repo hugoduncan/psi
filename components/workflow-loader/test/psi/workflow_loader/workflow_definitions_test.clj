@@ -6,42 +6,22 @@
    types, :vars wired to :workflow-input for {{input}}-bearing steps, and for
    judge steps: expected :on routing keys and :outputs presence."
   (:require
-   [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
-   [psi.workflow-loader.core :as loader]))
+   [psi.workflow-loader.workflow-test-support
+    :refer [load-edn-only
+            slurp-workflow-file
+            step-has-input-var-wired?
+            step-template-text
+            with-workflow-dir]]))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Fixtures
-
-(defn- slurp-workflow-file
-  [filename]
-  (slurp (io/file (System/getProperty "user.dir")
-                  ".psi/workflows"
-                  filename)))
-
-(defn- with-workflow-dir
-  "Write files to a temp dir and call f with the loader result.
-   files is a map of filename -> content string."
-  [files f]
-  (let [dir (io/file (System/getProperty "java.io.tmpdir")
-                     (str "wf-def-test-" (System/nanoTime)))]
-    (.mkdirs dir)
-    (try
-      (doseq [[filename content] files]
-        (spit (io/file dir filename) content))
-      (with-redefs [loader/global-workflow-dirs (constantly [])
-                    loader/project-workflow-dir (constantly (.getAbsolutePath dir))]
-        (f (loader/load-workflow-definitions (.getAbsolutePath dir))))
-      (finally
-        (doseq [f (.listFiles dir)] (.delete f))
-        (.delete dir)))))
-
-(defn- load-edn-only
-  "Load a single edn workflow (no .md refs) from the real .psi/workflows dir."
-  [edn-filename f]
-  (with-workflow-dir
-    {edn-filename (slurp-workflow-file edn-filename)}
-    f))
+;;;
+;;; The shared loader seam (slurp-workflow-file, with-workflow-dir,
+;;; load-edn-only, input-var-wired?, step-has-input-var-wired?,
+;;; step-template-text) is single-sourced in
+;;; psi.workflow-loader.workflow-test-support (CS3) and :refer-ed above.
+;;; Only the helpers unique to this ns are defined locally.
 
 (defn- load-edn-with-md-refs
   "Load an edn workflow and its referenced .md files from the real .psi/workflows dir."
@@ -50,28 +30,6 @@
     (into {edn-filename (slurp-workflow-file edn-filename)}
           (map (fn [md] [md (slurp-workflow-file md)]) md-filenames))
     f))
-
-(defn- input-var-wired?
-  "True if the contribution has :vars with 'input' wired to :workflow-input."
-  [contribution]
-  (= {:from :workflow-input :path [:input]}
-     (get-in contribution [:vars "input"])))
-
-(defn- step-has-input-var-wired?
-  "True if any template contribution in step has 'input' wired to :workflow-input."
-  [step]
-  (some (fn [c]
-          (and (= :template (:type c))
-               (input-var-wired? c)))
-        (:contributions step)))
-
-(defn- step-template-text
-  "Concatenated text of all template contributions in step."
-  [step]
-  (->> (:contributions step)
-       (filter #(= :template (:type %)))
-       (map :text)
-       (apply str)))
 
 (defn- pass-status-judge-from-step
   ([step-name]
