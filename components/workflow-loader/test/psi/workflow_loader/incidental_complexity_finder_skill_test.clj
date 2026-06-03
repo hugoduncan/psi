@@ -133,7 +133,18 @@
       (is (.contains body "bb gordian local --sort total --json")
           "emits the selector `local` lens command with --sort total --json")
       (is (.contains body "bb gordian complexity --json")
-          "emits the `complexity` lens command with --json"))))
+          "emits the `complexity` lens command with --json"))
+    (testing "recipe reads each lens's top-level `.units` array (TR22 fast-suite real-shape lock)"
+      ;; TR22: the recipe's real-lens `.units`-shape assumption was guarded only
+      ;; inside the slow `incidental-complexity-finder-real-lens-integration-test`
+      ;; jq/bb-absent fallback; once that deftest is `^:integration`-tagged it no
+      ;; longer runs in the fast `:unit` suite. Hoist the structural lock here so
+      ;; a gordian JSON reshape (wrapping/renaming the top-level units array)
+      ;; still fails the fast suite green.
+      (is (.contains body "$cc[0].units")
+          "recipe reads the complexity lens top-level units array")
+      (is (.contains body "$loc[0].units")
+          "recipe reads the local lens top-level units array"))))
 
 (defn- named-local-unit-json
   "A synthetic `local`-lens unit JSON for a named null-arity var `<ns>/<var>`,
@@ -565,7 +576,16 @@
         (is (.contains recipe "working_set: .[\"working-set\"]")
             "recipe projects working-set as working_set")))))
 
-(deftest incidental-complexity-finder-real-lens-integration-test
+(deftest ^:integration incidental-complexity-finder-real-lens-integration-test
+  ;; TR22 (test review pass 30 — test-shaper): tagged `^:integration` so this
+  ;; slow real-lens test (it spawns the real `bb gordian local`/`complexity`
+  ;; subprocesses against this repo, ~1.1s/1.3s per lens) moves to the
+  ;; `:integration` suite and is skipped from the fast `:unit` suite
+  ;; (`:skip-meta [:integration]`), mirroring every other slow real-system
+  ;; boundary test. The fast-suite guard of the recipe's `.units`-shape
+  ;; assumption is hoisted into `incidental-complexity-finder-skill-content-lock-test`
+  ;; (the jq/bb-absent fallback below no longer runs in the fast suite).
+  ;;
   ;; TT-L (test review pass 27 — task-test-review / testing-without-mocks
   ;; Narrow Integration Test). Every other recipe test runs the embedded jq
   ;; recipe over SYNTHETIC {"units":[…]} inputs, and TT-F locks only that

@@ -1949,7 +1949,7 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
 
 ## Test review follow-ups (review pass 30 — test-shaper)
 
-- [ ] TR22 — Isolate the slow real-lens narrow integration test from the fast
+- [x] TR22 — Isolate the slow real-lens narrow integration test from the fast
       `:unit` suite. `incidental-complexity-finder-real-lens-integration-test`
       (TT-L) spawns the real `bb gordian local --sort total --json` +
       `bb gordian complexity --json` subprocesses against this repo (~1.1s/1.3s
@@ -1982,7 +1982,7 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
 
 ## Test review follow-ups (review pass 31 — task-test-review)
 
-- [ ] TT-N — Lock the wrapper's **consumer-side** handoff field-name extraction
+- [x] TT-N — Lock the wrapper's **consumer-side** handoff field-name extraction
       in `task-lifecycle-in-worktree-test`. The
       `worktree_path:`/`munera_task_path:` handoff is a producer/consumer pair
       keyed on literal field-name tokens: the outer `reduce-incidental-complexity`

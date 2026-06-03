@@ -4365,3 +4365,38 @@ TR22 (test-shaper) follow-up entered flight.
 No follow-up items added.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Review follow-up execution — TR22 + TT-N (steps profile)
+
+- **TR22 (review pass 30 — test-shaper) — DONE.** Isolated the slow real-lens
+  narrow integration test from the fast `:unit` suite. (1) Tagged
+  `incidental-complexity-finder-real-lens-integration-test` `^:integration` in
+  `incidental_complexity_finder_skill_test.clj` so it joins the `:integration`
+  suite and is skipped by the `:unit` suite (`tests.edn` `:skip-meta
+  [:integration]`), mirroring every other slow real-system boundary test. (2)
+  Preserved the fast-suite real-shape lock: hoisted a `$cc[0].units` /
+  `$loc[0].units` structural assertion into a `testing` block in
+  `incidental-complexity-finder-skill-content-lock-test` (beside the TT-F
+  command-name lock) so the recipe's top-level-`.units` assumption stays guarded
+  in the fast suite once the integration test no longer runs there. (The edit was
+  already staged in the working tree from the review pass; verified + completed
+  here.) Verify: focused `:unit` run no longer spawns `bb gordian` (12 tests, 175
+  assertions, 0 failures, fast); the real-lens test still runs under
+  `clojure:test:integration` (1 test, 9 assertions, 0 failures); `clj-kondo` 0
+  findings; `clj-paren-repair` Success; `bb commit-check:file-lengths` exit 0
+  (skill test 646 lines).
+
+- **TT-N (review pass 31 — task-test-review) — DONE.** Locked the wrapper's
+  CONSUMER side of the `worktree_path:`/`munera_task_path:` handoff field-name
+  contract. Added a `testing` block to `task-lifecycle-in-worktree-test` (task-204
+  ns) asserting `resolve-text` (the already-bound `resolve-worktree` step
+  template) contains both literal `"worktree_path:"` and `"munera_task_path:"`
+  tokens — the extract-side companion to the producer-side `select-text` emit lock
+  in `reduce-incidental-complexity-test`. A regress renaming the extracted tokens
+  now breaks the live cross-`:delegate` worktree handoff (Locked decision 11) AND
+  fails the fast suite. Placed alongside the F1/TR7 resolve-worktree blocks
+  (test-only — no production/skill/EDN change; the shipped
+  `task-lifecycle-in-worktree.edn` `resolve-worktree` prompt already references
+  both tokens verbatim). Verify: focused `:unit` run green (12 tests, 175
+  assertions, 0 failures); `clj-kondo` 0 findings; `clj-paren-repair` Success;
+  `task_204_workflow_definitions_test.clj` 477 lines (< 800).

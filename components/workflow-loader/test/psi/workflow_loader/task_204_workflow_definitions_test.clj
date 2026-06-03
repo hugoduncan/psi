@@ -174,7 +174,25 @@
            (is (re-find #"(?i)respond with ONLY the Munera task path" resolve-text)
                "resolve-worktree yields only the bare Munera task path on the positive path")
            (is (re-find #"(?i)on a single line" resolve-text)
-               "resolve-worktree constrains the positive-path yield to a single line")))))))
+               "resolve-worktree constrains the positive-path yield to a single line")))
+       ;; TT-N (test review pass 31 — task-test-review): lock the wrapper's
+       ;; CONSUMER side of the worktree handoff field-name contract. The
+       ;; `reduce-incidental-complexity` step-1 EMITS `worktree_path:` +
+       ;; `munera_task_path:` (locked in `reduce-incidental-complexity-test`) and
+       ;; this `resolve-worktree` step EXTRACTS them (calls work-on from the
+       ;; threaded `worktree_path:`, yields the `munera_task_path:` value). Only
+       ;; the emit side was locked; F1/TR7 assert generic prose on `resolve-text`
+       ;; but never the literal field tokens. A regress renaming the extracted
+       ;; tokens (`worktree_path:` -> `worktree:`, `munera_task_path:` ->
+       ;; `task_path:`) breaks the live cross-:delegate worktree handoff (Locked
+       ;; decision 11) yet passes every existing wrapper test green. Symmetric to
+       ;; the producer-side `select-text` lock in reduce-incidental-complexity-test.
+       (testing "resolve-worktree prompt extracts the literal handoff field tokens (TT-N consumer side)"
+         (let [resolve-text (step-template-text resolve-step)]
+           (is (.contains resolve-text "worktree_path:")
+               "resolve-worktree references the literal worktree_path: handoff field token")
+           (is (.contains resolve-text "munera_task_path:")
+               "resolve-worktree references the literal munera_task_path: handoff field token")))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; reduce-incidental-complexity (Slice 3 of task 204)
