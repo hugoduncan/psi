@@ -1681,7 +1681,7 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
 
 ## Test review follow-ups (review pass 24 — task-test-review)
 
-- [ ] TT-I — Lock the generated-design contract's **Blast radius** constraint and
+- [x] TT-I — Lock the generated-design contract's **Blast radius** constraint and
       **Phase-0 hard gate / untestable-tangle handling** in
       `reduce-incidental-complexity-test`. The step-7 generated `design.md`
       contract in `reduce-incidental-complexity.edn` is a named design behaviour
@@ -1711,3 +1711,22 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
       cleanup", "No refactor proceeds without a green net", "cannot be
       characterized safely", and "scope drift -> close per Munera". Run focused
       task-204 ns + `clj-kondo`; keep under the 800-line `components/` guard.
+      RESOLUTION: extended the TR2 contract `testing` cluster in
+      `reduce-incidental-complexity-test` (same task-204 ns, test-only — no
+      production/skill/EDN change) with two new `testing` blocks immediately after
+      the F3 A5/A2 key lock: (1) "select-and-create prompt locks the Blast-radius
+      scope fence (TT-I)" asserting `select-text` contains "Blast radius: the
+      target unit PLUS the minimal surrounding helpers required to decomplect it;
+      no unrelated cleanup"; and (2) "select-and-create prompt locks the Phase-0
+      hard gate + untestable-tangle handling (TT-I)" asserting three substrings —
+      "cannot be characterized safely" (the untestable-tangle case), "scope drift
+      -> close per Munera" (the close-on-uncharacterizable escape hatch), and "No
+      refactor proceeds without a green net" (the Phase-0 hard gate). All four
+      strings verified present verbatim in the shipped
+      `reduce-incidental-complexity.edn` step-1 prompt before locking; a regress
+      dropping the blast-radius fence (admitting unrelated cleanup) or the
+      untestable-tangle/green-net hard gate now fails green — closing the
+      sub-clause-lock symmetry gap (TR2/TT-D/TT-G locked sibling clauses).
+      Focused task-204 ns green (2 tests, 76 assertions, 0 failures — +4 over
+      pass-23's 72); `clj-kondo` 0 findings; `clj-paren-repair` Success; file 386
+      lines (< 800); `bb commit-check:file-lengths` exit 0.

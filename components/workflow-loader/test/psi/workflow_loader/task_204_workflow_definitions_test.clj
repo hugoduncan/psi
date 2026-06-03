@@ -291,6 +291,23 @@
              "step-1 prompt keys the A5 burden-reduction acceptance on (ns, var, arity, line)")
          (is (.contains select-text "identified by `(ns, var, arity, line)`")
              "step-1 prompt keys the A2 touched-set identity on (ns, var, arity, line)"))
+       ;; TT-I (test review pass 24, task-test-review): TR2 locked the Phase-0
+       ;; gate + behaviour-identical constraint; two further clauses of the same
+       ;; generated-design contract were unlocked — (1) the Blast-radius scope
+       ;; fence and (2) the Phase-0 hard gate + untestable-tangle escape hatch.
+       ;; A regress admitting unrelated cleanup, or letting a refactor proceed on
+       ;; an uncharacterized unit without a green net, must not pass green.
+       (testing "select-and-create prompt locks the Blast-radius scope fence (TT-I)"
+         (is (.contains select-text
+                        "Blast radius: the target unit PLUS the minimal surrounding helpers required to decomplect it; no unrelated cleanup")
+             "step-1 prompt fences the refactor scope to the target unit + minimal helpers (no unrelated cleanup)"))
+       (testing "select-and-create prompt locks the Phase-0 hard gate + untestable-tangle handling (TT-I)"
+         (is (.contains select-text "cannot be characterized safely")
+             "step-1 prompt handles the untestable-tangle case (cannot be characterized safely)")
+         (is (.contains select-text "scope drift -> close per Munera")
+             "step-1 prompt closes an uncharacterizable unit per Munera scope-drift")
+         (is (.contains select-text "No refactor proceeds without a green net")
+             "step-1 prompt hard-gates the refactor on a green characterization net"))
        ;; TR8 (pass 6): the distinguishing endpoint — no push/PR (Locked
        ;; decisions 7 & 8: full lifecycle on a local worktree branch, not a
        ;; complexity-reduction-pr clone) — was unlocked. A regress adding a

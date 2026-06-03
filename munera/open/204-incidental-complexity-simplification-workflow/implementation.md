@@ -3856,3 +3856,42 @@ One new actionable gap (added to steps.md):
   focused task-204 ns + `clj-kondo`; keep under the 800-line `components/` guard.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK.
+
+## 2026-06-03 — Test review (pass 24) follow-up executed (TT-I)
+
+Executed the single newly-added unchecked `steps.md` item (TT-I) from the pass-24
+task-test-review. (The line-898 "Contingency" item predates this pass — a
+non-planned design-stated fallback, not a review follow-up — and was left
+untouched; no other unchecked items exist.)
+
+**Grounding before editing:** verified all four target substrings are present
+verbatim in the shipped `.psi/workflows/reduce-incidental-complexity.edn` step-1
+prompt (`grep -c` → 1 each): the Blast-radius scope fence, "No refactor proceeds
+without a green net", "cannot be characterized safely", and "scope drift -> close
+per Munera". Confirmed they were absent from the test ns before this change.
+
+**Fix (test-only; no production/skill/EDN change), in
+`components/workflow-loader/test/psi/workflow_loader/task_204_workflow_definitions_test.clj`:**
+Extended `reduce-incidental-complexity-test`'s TR2 contract cluster with two new
+`testing` blocks immediately after the F3 A5/A2 key lock —
+(1) "select-and-create prompt locks the Blast-radius scope fence (TT-I)": one
+`select-text` substring lock on the full blast-radius clause ("the target unit
+PLUS the minimal surrounding helpers required to decomplect it; no unrelated
+cleanup"); (2) "select-and-create prompt locks the Phase-0 hard gate +
+untestable-tangle handling (TT-I)": three substring locks — "cannot be
+characterized safely", "scope drift -> close per Munera", "No refactor proceeds
+without a green net". This applies the same sub-clause-lock standard TR2 (Phase-0
+gate + behaviour-identical) / TT-D (A5/A2 direction) / TT-G (metric-derived
+touched set) already use for sibling clauses of the same generated-design
+contract. A regress admitting unrelated cleanup (dropping the blast-radius fence)
+or letting a refactor proceed on an uncharacterized unit without a green net (the
+untestable-tangle/hard-gate escape hatch) now fails green.
+
+**Verification:**
+- `clj-paren-repair` on the test file: Success(1)/Failed(0).
+- `clojure -M:test --focus psi.workflow-loader.task-204-workflow-definitions-test`:
+  **2 tests, 76 assertions, 0 failures** (+4 over pass-23's 72).
+- `clj-kondo --lint` on the test file: errors 0, warnings 0.
+- `bb commit-check:file-lengths`: exit 0 (file 386 lines < 800).
+
+TT-I checked in steps.md. PASS_STATUS: REVIEW_COMPLETE.
