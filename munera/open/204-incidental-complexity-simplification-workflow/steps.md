@@ -2065,7 +2065,7 @@ production/skill/EDN change, all assertions identical.
 
 ## Test review follow-ups (review pass 34 — test-shaper)
 
-- [ ] TR24 — `incidental-complexity-finder-recipe-ranking-and-cap-test`'s
+- [x] TR24 — `incidental-complexity-finder-recipe-ranking-and-cap-test`'s
       jq-present "gap-descending ranking" branch carries a **tautological**
       assertion that advertises sort-order coverage it cannot provide. `gaps`
       (`incidental_complexity_finder_skill_test.clj:349`) is built by name-keyed
@@ -2093,3 +2093,22 @@ production/skill/EDN change, all assertions identical.
       `clj-paren-repair` + `bb commit-check:file-lengths`; confirm the strengthened
       assertion still passes green against the correct `sort_by(-.gap)` recipe and
       the file stays under the 800-line guard.
+      RESOLUTION: replaced the tautological `(= gaps (reverse (sort gaps)))`
+      assertion. The old `gaps` was a name-keyed lookup vector
+      `[(gap-of out "top") (gap-of out "mid") (gap-of out "lowmid")]` — always
+      `[25.0 15.0 7.5]` regardless of output order, so comparing it to its own
+      descending sort could never fail. Now derive the descending check from the
+      *output* order: `output-gaps` collects every `gap` value in serialized
+      appearance order via `(re-seq #"\"gap\":\s*([0-9.]+)" out)` and asserts
+      `(= output-gaps (reverse (sort output-gaps)))` — under a `sort_by(.gap)`
+      ascending regress the output is `[7.5 15.0 25.0]` ≠ `[25.0 15.0 7.5]`, so it
+      fails. Renamed the lookup vector to `name-keyed-gaps` (still used for the
+      `every? some?` survival check) and added `(= 3 (count output-gaps))`. Also
+      pinned all three positions: split the single `top < lowmid` `.indexOf` pair
+      into `top < mid` and `mid < lowmid`, so a `top, lowmid, mid` misorder now
+      fails too. Pure test-only assertion-strengthening: no skill/EDN/production
+      change. Focused `incidental-complexity-finder-skill-test` green (10 tests,
+      93 assertions, 0 failures — was 91; net +2: −1 tautology, +1 output-count,
+      +1 split positional, +1 output-derived descending); `clj-paren-repair`
+      Success; `clj-kondo` 0 findings; `bb commit-check:file-lengths` clean (file
+      652 lines, < 800).

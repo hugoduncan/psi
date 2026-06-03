@@ -346,16 +346,30 @@
                                [(named-cc-unit-json "rank" "lowmid" 30 4)
                                 (named-cc-unit-json "rank" "top" 10 4)
                                 (named-cc-unit-json "rank" "mid" 20 4)])
-                gaps [(gap-of out "top") (gap-of out "mid") (gap-of out "lowmid")]]
+                ;; TR24: the descending check must be derived from the *output*
+                ;; order, not a name-keyed lookup. `name-keyed-gaps` looks up each
+                ;; unit's gap by var, so it is always [25.0 15.0 7.5] regardless of
+                ;; serialized order — comparing it to its own descending sort can
+                ;; never fail (tautology). `output-gaps` collects the `gap` values
+                ;; in serialized appearance order, so a regress to sort_by(.gap)
+                ;; yields [7.5 15.0 25.0] and fails the descending assertion below.
+                name-keyed-gaps [(gap-of out "top") (gap-of out "mid") (gap-of out "lowmid")]
+                output-gaps (mapv (comp Double/parseDouble second)
+                                  (re-seq #"\"gap\":\s*([0-9.]+)" out))]
             (is (zero? exit) (str "recipe runs cleanly; stderr: " err))
-            (is (every? some? gaps) "all three qualifying units survive with a gap")
-            (is (= gaps (reverse (sort gaps)))
-                "output gap values are in strictly descending order (not ascending)")
-          ;; positional check: the highest-gap unit precedes the lowest in the
-          ;; serialized output (sort order, not just set membership).
+            (is (every? some? name-keyed-gaps) "all three qualifying units survive with a gap")
+            (is (= 3 (count output-gaps)) "all three qualifying units appear in the output")
+            (is (= output-gaps (reverse (sort output-gaps)))
+                "output gap values are in strictly descending order (sort_by(-.gap), not ascending)")
+          ;; positional check: pin all three positions (top before mid before
+          ;; lowmid), so a `top, lowmid, mid` misorder fails too — not just the
+          ;; top/lowmid pair, which left the middle element unconstrained.
             (is (< (.indexOf out "\"var\": \"top\"")
+                   (.indexOf out "\"var\": \"mid\""))
+                "the highest-gap unit appears before the middle-gap unit in the output")
+            (is (< (.indexOf out "\"var\": \"mid\"")
                    (.indexOf out "\"var\": \"lowmid\""))
-                "the highest-gap unit appears before the lowest-gap unit in the output")))
+                "the middle-gap unit appears before the lowest-gap unit in the output")))
         (testing "top-5 cap — exactly 5 qualifying units survive when more than 5 qualify (.[0:5])"
         ;; Feed 7 qualifying units (all lcc 50, cc 4 -> gap 12.5, all above
         ;; threshold) distinguished by var/line. The recipe slices `.[0:5]`, so

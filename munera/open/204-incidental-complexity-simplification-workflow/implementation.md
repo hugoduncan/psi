@@ -4529,3 +4529,33 @@ that advertises sort-order coverage it cannot actually provide:
   follow-up (test-shaper pass 34).
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Test review follow-up execution — TR24 (review pass 34 — test-shaper)
+
+Executed the TR24 follow-up. Replaced the tautological gap-descending assertion
+in `incidental-complexity-finder-recipe-ranking-and-cap-test`
+(`incidental_complexity_finder_skill_test.clj`):
+
+- Removed `(= gaps (reverse (sort gaps)))` where `gaps` was the name-keyed
+  lookup vector `[(gap-of out "top") (gap-of out "mid") (gap-of out "lowmid")]`
+  (always `[25.0 15.0 7.5]` regardless of output order → could never fail).
+- Renamed that lookup vector to `name-keyed-gaps` (kept for the `every? some?`
+  survival check) and added `output-gaps`, collecting the `gap` values in
+  serialized output appearance order via `(re-seq #"\"gap\":\s*([0-9.]+)" out)`.
+  The final recipe projection emits `gap` once per surviving unit and uses
+  `gap_key`/`lcc_total` (underscored) for other fields, so the regex matches
+  exactly the per-unit `gap` values.
+- Asserted `(= output-gaps (reverse (sort output-gaps)))`: under a
+  `sort_by(.gap)` ascending regress the output order is `[7.5 15.0 25.0]` ≠
+  `[25.0 15.0 7.5]`, so the assertion fails on the contract it names.
+- Added `(= 3 (count output-gaps))` and pinned all three positions by splitting
+  the single `top < lowmid` `.indexOf` pair into `top < mid` and `mid < lowmid`,
+  closing the unpinned-middle gap (a `top, lowmid, mid` misorder now fails).
+
+Pure test-only assertion-strengthening — no skill SKILL.md, recipe EDN, or
+production change. Verification: focused `incidental-complexity-finder-skill-test`
+green (10 tests, 93 assertions, 0 failures — was 91; net +2); `clj-paren-repair`
+Success; `clj-kondo` 0 findings; `bb commit-check:file-lengths` clean (file 652
+lines, < 800).
+
+PASS_STATUS: FOLLOW_UP_EXECUTED
