@@ -1851,3 +1851,51 @@ precedence change; new test
 for thinking-level (alongside model) and step-override>inherited>base-meta.
 Full `bb clojure:test:unit` green; clj-kondo clean on both touched files; both
 files under the 800-line commit-check limit.
+
+## Test-review pass 8 (review 2026-06-02)
+
+ψ test-review (task-test-review skill: well-formed ∧ AC-coverage ∧
+no-mocks/nullable-infra). Ran the touched suites:
+inheritance-snapshot (12 tests/62 assertions),
+workflow-runtime core-test + child-session-state + workflow-child-session-context
++ canonical-workflows-snapshot + attempts (30 tests/172 assertions) — all green.
+
+Findings — NONE actionable. Assessment:
+
+- **Well-formed / no-mocks**: task-207 tests use real ctx/state, output+state
+  assertions, and injected seams (`resolve-inherited-defaults-fn`,
+  `send-and-drain-fn`, `create-workflow-context-fn`, `production-like-mutate!`)
+  that are real closures / no-op boundary stubs at the same injection points
+  production uses — not `with-redefs`/mocks of logic. The one `with-redefs`
+  (`child_session_state_test.clj:239`, `system-prompt/build-system-prompt`) is
+  pre-existing and outside task scope.
+- **AC coverage** (1–9) is complete and *discriminating*, not shape-only:
+  - AC7 uses two REAL registered models (`claude-opus-4-5`/`claude-haiku-4-5`)
+    + the REAL `:same-model-as-session`/`:context-match` criterion, so a leaked
+    live model would flip the ranking winner (closes the original T1 weakness).
+  - AC3 covers model/prompt-mode/thinking/speed/effort isolation AND the
+    tools/skills isolation (T2) by name against distinct snapshot-vs-live defs.
+  - AC4 covers function-level propagation, e2e `delegate-step-runtime-result`
+    child-run persistence (R2), AND since-mutated-live-parent isolation (T7).
+  - AC8 (resume reuse) + Decision 5b (continue-terminal fresh capture via the
+    real `continue-terminal-run-async!` + session-id auto-injection contract, T4).
+  - Field-set drift is guarded by `inherited-defaults-field-set-authority-test`.
+- **create-run purity** is structurally enforced by signature (`state`-in, no
+  `ctx` param); the persistence test asserts "verbatim, no resolution". A
+  dedicated purity test would be redundant (`unreachable > forbidden`).
+- **Decision 5a residual asymmetry (considered, NOT flagged)**: the AC8 "no
+  re-capture on resume" is proven at the pure `resume-run` level, not at the
+  `continue-blocked-run-async!` async level. Unlike the terminal path (which
+  calls `create-run` and needed T4), the blocked-resume path routes ONLY through
+  `mutate! 'psi.workflow/resume-run` and reaches NO capture site, so "no
+  re-capture" is architecturally guaranteed; an async-level test would be a
+  near-duplicate of `resume-run-test` with no discriminating power. No follow-up.
+
+Coherence note (non-test, NOT a test follow-up): steps.md ends with a stray
+DUPLICATE CS2 item left UNCHECKED (`- [ ] CS2`) below the completed `[x] CS2`;
+the work is done (committed `6cad7a672`). A leftover-checklist artifact, not a
+test gap — left for a steps/plan-hygiene pass, not raised as a test follow-up.
+
+Conclusion: test suite is well-formed, mock-free, and provides discriminating
+coverage of every acceptance criterion and resolved decision. Review complete;
+no new actionable test follow-up items added.
