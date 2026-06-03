@@ -493,7 +493,9 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       (`workflow/core.clj`) rely on (both call `mutate! 'psi.workflow/create-run`
       with no explicit `:session-id`). Behavioural coverage:
       `continue-terminal-run-captures-fresh-snapshot-test` in
-      `canonical_workflows_test.clj` drives the REAL
+      `canonical_workflows_snapshot_test.clj` (split out of
+      `canonical_workflows_test.clj` for the 800-line file-length limit) drives
+      the REAL
       `orchestration/continue-terminal-run-async!` with a production-like
       `mutate!` that reproduces the runtime-fns/session-scoped contract (inject
       from `*active-workflow-session-id*` when `:session-id` absent) routing to
@@ -690,7 +692,7 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
 
 ## Test-review pass 9 follow-ups (review 2026-06-02)
 
-- [ ] T8: Fix the contradictory contract comment in
+- [x] T8: Fix the contradictory contract comment in
       `canonical_workflows_snapshot_test.clj:44`. The inline comment calls
       `psi.workflow/create-run` "non-session-scoped", but the SAME file's
       docstring (`:19-20`) and production (`runtime_eql.clj:17-49`,
@@ -701,9 +703,21 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       test's self-documenting `meaningful_failures` value. Correct the comment to
       say session-scoped (or drop the (non-)scoped qualifier and just reference
       the injection-when-absent behaviour). Comment-only; behaviour unchanged.
-- [ ] T9: Correct steps.md T4's DONE note filename. The note says the
+      DONE: rewrote the line-44 deltest comment from "matching the runtime-fns
+      wrapper for the non-session-scoped `psi.workflow/create-run`" to "matching
+      the runtime-fns wrapper that injects the active session for the
+      session-scoped `psi.workflow/create-run`", reconciling it with the file
+      docstring (`:17-22`) and production (`runtime_eql.clj`
+      `session-scoped-extension-mutation-ops`). Comment-only; lint clean
+      (0 errors / 0 warnings) on the touched file; behaviour unchanged.
+- [x] T9: Correct steps.md T4's DONE note filename. The note says the
       `continue-terminal-run-captures-fresh-snapshot-test` was added "in
       `canonical_workflows_test.clj`", but it actually lives in the sibling
       `canonical_workflows_snapshot_test.clj` (split out for the 800-line
       file-length limit). Update the cited filename so the task's test trail is
       accurate.
+      DONE: updated steps.md T4's DONE note (the `:496` citation) from
+      "in `canonical_workflows_test.clj`" to
+      "in `canonical_workflows_snapshot_test.clj` (split out of
+      `canonical_workflows_test.clj` for the 800-line file-length limit)", so the
+      task's test trail now names the file the test actually lives in. Docs-only.

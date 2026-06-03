@@ -1929,3 +1929,30 @@ steps-hygiene item):
 Everything else (AC1–9 discriminating coverage, field-set authority guard,
 purity-by-signature, R1 snapshot-gated read, R4/R5 `:inherited-snapshot?`
 threading with judge carve-out) remains well-shaped. No other new test gaps.
+
+## Test-review pass 9 follow-up execution (2026-06-02)
+
+Executed the two newly added pass-9 follow-ups (T8, T9); both are
+documentation/comment-only with no behaviour change.
+
+- **T8 (done).** Rewrote the `continue-terminal-run-captures-fresh-snapshot-test`
+  deftest comment in `canonical_workflows_snapshot_test.clj` (the `:44`
+  citation): "matching the runtime-fns wrapper for the **non**-session-scoped
+  `psi.workflow/create-run`" → "matching the runtime-fns wrapper that injects
+  the active session for the **session-scoped** `psi.workflow/create-run`". Now
+  consistent with the file docstring (`:17-22`) and production
+  (`runtime_eql.clj` `session-scoped-extension-mutation-ops`). `clj-kondo` clean
+  (0 errors / 0 warnings) on the touched file; comment-only, so existing test
+  behaviour is unaffected.
+
+- **T9 (done).** Corrected steps.md T4's DONE note (`:496`) to cite
+  `canonical_workflows_snapshot_test.clj` (split out of
+  `canonical_workflows_test.clj` for the 800-line file-length limit) instead of
+  `canonical_workflows_test.clj`, matching where
+  `continue-terminal-run-captures-fresh-snapshot-test` actually lives. Docs-only.
+
+Out of scope (predates pass 9): the unchecked duplicate `CS2` entry between the
+code-shaper section and the pass-9 header was introduced by the earlier
+code-shaper review (`65af82156`), not pass 9; CS2's work is already implemented
+and recorded under the checked CS2 above. Left untouched per the "do not execute
+items that predate the preceding review pass" constraint.

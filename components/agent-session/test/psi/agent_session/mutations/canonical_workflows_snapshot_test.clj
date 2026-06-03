@@ -41,7 +41,8 @@
   ;; continuing session — distinguishable from the original terminal run's
   ;; snapshot. This drives the real `continue-terminal-run-async!` path with a
   ;; production-like `mutate!` (no explicit `:session-id`, matching the
-  ;; runtime-fns wrapper for the non-session-scoped `psi.workflow/create-run`),
+  ;; runtime-fns wrapper that injects the active session for the
+  ;; session-scoped `psi.workflow/create-run`),
   ;; so it pins the session-id contract all top-level capture relies on rather
   ;; than the S4 tests that call the mutation directly with an explicit
   ;; `:session-id`.
