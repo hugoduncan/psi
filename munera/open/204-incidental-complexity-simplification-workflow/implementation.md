@@ -3539,3 +3539,31 @@ One **named design early-stop behaviour embedded verbatim in the shipped
 Added TT-E as an unchecked follow-up in steps.md.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+---
+
+## Review pass 20 follow-up — TT-E resolution (task-test-review)
+
+TT-E (early-stop task half) RESOLVED. Extended the existing
+"select-and-create prompt encodes the early-stop-on-no-target intent" `testing`
+block in `reduce-incidental-complexity-test`
+(`components/workflow-loader/test/psi/workflow_loader/task_204_workflow_definitions_test.clj`,
+same ns — test-only, no production/skill/EDN change) with one assertion:
+`(is (.contains select-text "Do NOT create a task") …)`.
+
+- Design Deliverable 2 Step 1 Early stop: "do not create a worktree **or task**".
+- Shipped `reduce-incidental-complexity.edn` step-3 emits BOTH
+  `Do NOT create a worktree.` and `Do NOT create a task.` — the test previously
+  locked only the worktree half, leaving the task half uncovered (a regress
+  dropping `Do NOT create a task.` → orphan task dir on a no-target run would
+  pass green). TR13/TR14-class symmetry gap (one half of a two-part contract
+  locked, sibling half left) closed.
+
+Verification:
+- `clojure -M:test --focus psi.workflow-loader.task-204-workflow-definitions-test`
+  → 2 tests, 68 assertions, 0 failures (+1 over pass-19's 67).
+- `clj-kondo` 0 findings; `clj-paren-repair` Success.
+- `bb commit-check:file-lengths` exit 0 (file 339 lines < 800).
+
+PASS_STATUS: NO_ACTIONABLE_FEEDBACK (TT-E was the only newly added unchecked item;
+the Contingency item predates and is non-planned/out of scope.)

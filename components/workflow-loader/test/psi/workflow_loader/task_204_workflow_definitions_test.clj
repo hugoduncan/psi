@@ -246,7 +246,9 @@
          (is (re-find #"(?i)no unit qualif" select-text)
              "step-1 prompt encodes early-stop when no unit qualifies")
          (is (.contains select-text "Do NOT create a worktree")
-             "step-1 prompt forbids creating a worktree on early stop"))
+             "step-1 prompt forbids creating a worktree on early stop")
+         (is (.contains select-text "Do NOT create a task")
+             "step-1 prompt forbids creating a task on early stop"))
        (testing "select-and-create prompt embeds the enforcing gate flags + both baselines"
          (is (.contains select-text
                         "--fail-on new-cycles,new-high-findings --max-new-medium-findings 0")
