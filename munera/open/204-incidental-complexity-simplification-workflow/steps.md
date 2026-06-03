@@ -1441,3 +1441,53 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
       Focused task-204 ns green (2 tests, 60 assertions, 0 failures — +2 over
       pass-17's 58); `clj-kondo` 0 findings; `clj-paren-repair` Success; task-204
       definitions file 301 lines (< 800); `bb commit-check:file-lengths` exit 0.
+
+## Test review follow-ups (review pass 19 — task-test-review)
+
+- [ ] TT-B — Lock the step-1 base-refresh behaviour in
+      `reduce-incidental-complexity-test`. Design Deliverable 2, Step 1 first
+      bullet requires "Refresh base: `git fetch origin master`; treat
+      `origin/master` as the authoritative base" and "Base the worktree on
+      `origin/master`"; the shipped `.psi/workflows/reduce-incidental-complexity.edn`
+      step-1 prompt emits all three (`git fetch origin master`, "Treat
+      `origin/master` as the authoritative base", "Base the worktree on
+      `origin/master`"). The test
+      (`components/workflow-loader/test/psi/workflow_loader/task_204_workflow_definitions_test.clj`,
+      `reduce-incidental-complexity-test`) never asserts these, so a regress
+      dropping the base-refresh or rebasing the worktree off stale local `master`
+      passes green. Per `∀b∈behaviour(design).∃t.covers(t,b)`, add `select-text`
+      substring assertions for `git fetch origin master` and the
+      authoritative-`origin/master`-base claim. Test-only; no production/skill/EDN
+      change. Verify the focused task-204 ns green, `clj-kondo` 0,
+      `clj-paren-repair` Success, `bb commit-check:file-lengths` clean.
+
+- [ ] TT-C — Lock the baseline *capture commands* (not just the filenames) in
+      `reduce-incidental-complexity-test`. Design Step 1 names the baseline
+      capture invocations — `before-local.json` ← `bb gordian local --json`
+      (bare, NO `--sort`) and `before-diagnose.edn` ← `bb gordian diagnose --edn`
+      — and the shipped EDN emits both. The test
+      ("select-and-create prompt embeds the enforcing gate flags + both
+      baselines") asserts only the output *filenames* (`before-local.json` /
+      `before-diagnose.edn`), leaving the generating commands unlocked: a regress
+      to `bb gordian local --sort total --json` (the selector ranking call, which
+      the EDN explicitly forbids as a baseline — "bare, NO `--sort`") or a wrong
+      `diagnose` flag passes green. Add `select-text` substring assertions for
+      `bb gordian local --json` and `bb gordian diagnose --edn`. Test-only; no
+      production/skill/EDN change. Verify the focused task-204 ns green,
+      `clj-kondo` 0, `clj-paren-repair` Success, `bb commit-check:file-lengths`
+      clean.
+
+- [ ] TT-D — Lock the A5/A2 direction-of-change in
+      `reduce-incidental-complexity-test`. The Phase-1 acceptance is directional:
+      A5 — the target unit's `lcc-total` "decreased versus its `before-local.json`
+      value"; A2 — "the after total is strictly less than the before total". The
+      existing `F3 lock` test ("keys A5/A2 acceptance on (ns, var, arity, line)")
+      locks only the join *key*, not the direction, so a paraphrase/regress
+      weakening "decreased" → "changed" or "strictly less" → "not greater"
+      passes green while gutting the acceptance. Both substrings are present
+      verbatim in the shipped EDN. Add `select-text` substring assertions for
+      `decreased versus its \`before-local.json\` value` (A5) and
+      `after total is strictly less than the before total` (A2), companion to the
+      existing key lock. Test-only; no production/skill/EDN change. Verify the
+      focused task-204 ns green, `clj-kondo` 0, `clj-paren-repair` Success,
+      `bb commit-check:file-lengths` clean.

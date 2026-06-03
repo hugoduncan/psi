@@ -3430,3 +3430,46 @@ green (2 tests, 60 assertions, 0 failures — +2 over the prior 58); `clj-kondo`
 (< 800); `bb commit-check:file-lengths` exit 0.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+---
+
+## 2026-06-03 — Test review pass 19 (task-test-review, independent)
+
+Applied `task-test-review` (`well_formed ∧ ∀b∈behaviour(design).∃t.covers(t,b) ∧
+infra_deps injectable/nullable/¬mock`). Tests are well-formed; infra deps are
+clean — real loader/skill-loader over temp dirs, real `jq` with a jq-availability
+guard + structural fallback, no mocks/stubs (`with-redefs` only redirects the
+workflow-dir config to a real temp dir, not behaviour). Coverage is otherwise
+strong after passes 1–18.
+
+Three **named design Step-1 / Phase-1 behaviours embedded verbatim in the
+shipped `reduce-incidental-complexity.edn` step-1 prompt are NOT locked by any
+test** (`∃b∈behaviour(design). ¬∃t.covers(t,b)`); each is a substring lock of
+the same kind the existing tests already use for the gate flags / baselines:
+
+- **TT-B — base-refresh.** Design Step 1 first bullet: "Refresh base:
+  `git fetch origin master`; treat `origin/master` as the authoritative base"
+  (+ "Base the worktree on `origin/master`"). The EDN emits all three, but
+  `reduce-incidental-complexity-test` asserts no `git fetch origin master` /
+  `origin/master` substring. A regress dropping the base-refresh or rebasing the
+  worktree off stale local `master` passes green.
+- **TT-C — baseline *capture commands*.** Design Step 1 names the capture
+  invocations `bb gordian local --json` (before-local.json) and
+  `bb gordian diagnose --edn` (before-diagnose.edn). The test asserts only the
+  output *filenames* (`before-local.json` / `before-diagnose.edn`); the
+  generating commands are unlocked. A regress to e.g.
+  `bb gordian local --sort total --json` (the selector call, NOT a valid baseline
+  per the EDN's own "bare, NO `--sort`" note) or a wrong diagnose flag passes
+  green.
+- **TT-D — A5/A2 direction-of-change.** The substantive Phase-1 acceptance is
+  *directional*: A5 "the target unit's `lcc-total` … **decreased** versus its
+  `before-local.json` value" and A2 "the **after total is strictly less than the
+  before total**". The test (`F3 lock`) locks only the `(ns, var, arity, line)`
+  *key*, not the direction. A paraphrase/regress weakening "decreased" →
+  "changed" or "strictly less" → "not greater" passes green while gutting the
+  acceptance.
+
+Added TT-B/TT-C/TT-D as unchecked follow-ups in steps.md. All test-only
+substring locks on the shipped EDN; no production/skill/EDN change.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
