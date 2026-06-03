@@ -3753,3 +3753,53 @@ Verification: `clj-paren-repair` Success; `clj-kondo` 0 findings; focused
 `clojure -M:test --focus psi.workflow-loader.task-204-workflow-definitions-test`
 green (2 tests, 72 assertions, 0 failures — +3 over pass-22's 69); test ns 369
 lines (< 800 `components/` guard).
+
+## task-implementation-review (independent pass, 2026-06-03, post-TT-H)
+
+Re-applied `task-implementation-review` (matches-design ∧ follows-architecture ∧
+flag new-pattern-where-reusable ∧ flag unnecessary-abstraction ∧ flag
+structural-perf) to the three shipped artifacts (`incidental-complexity-finder/
+SKILL.md`, `task-lifecycle-in-worktree.edn`, `reduce-incidental-complexity.edn`)
++ the two task-204 test namespaces + docs, after the TT-F/TT-G/TT-H test-review
+passes (all test-only) landed.
+
+**Verdict: REVIEW_COMPLETE — no new actionable implementation issues.**
+
+- **Code↔design — matches.** Outer workflow is the verified two-step shape
+  (`select-and-create` `:session`, skills `incidental-complexity-finder`/
+  `gordian`/`code-shaper`, `git fetch origin master` base refresh, early-stop,
+  worktree-scoped NNN allocation + commit-on-branch, two `before` baselines,
+  two-phase generated-design contract, `worktree_path:`/`munera_task_path:`
+  handoff; `lifecycle-in-worktree` `:delegate` → `task-lifecycle-in-worktree`
+  with grammar-conformant `:prompt-string` `{:input {:from {:step
+  "select-and-create" :yield :text}}}`). Wrapper is the three-step
+  `resolve-worktree`(`:session`,+`work-on`) → `lifecycle`(`:delegate`
+  `:target "task-lifecycle"`) → `summary`(`:session`) adapter mirroring the
+  loadable `review-implementation-in-worktree.edn`, with the F1 `NO_TARGET`
+  short-circuit in both session steps. Skill encodes the `gap = lcc-total /
+  max(cc,1)` recipe, inner-join-on-local-side drop rule, `(ns,var,arity,line)`
+  determinism key, `lcc-total ≥ 5.0 ∧ gap ≥ 2.0` filter, and the top-5 guard.
+- **Architecture — follows.** Pure capability-catalog (S1) artifacts (skill +
+  `.edn` workflows); no production Clojure; reuses the verified wrapper pattern
+  — no invented pattern, no unnecessary abstraction, no structural-perf concern.
+- **Known limitation — accepted, not new.** F1 (step-2 `:delegate` fires
+  unconditionally on a no-target handoff because the grammar has no
+  conditional/skip) is documented, mitigated by the prompt-level `NO_TARGET`
+  short-circuit (resolve-worktree skips `work-on`, summary overrides), and
+  engine-bounded — not an actionable code defect.
+- **Tests — green** via the real loader (`load-workflow-definitions` over the
+  live `.psi/workflows`): focused `task-204-workflow-definitions-test` +
+  `incidental-complexity-finder-skill-test` → 11 tests, 152 assertions, 0
+  failures. `clj-kondo` 0 findings on both `.edn` workflows.
+- **Docs — accurate.** `doc/workflows.md` §"Incidental-complexity
+  simplification" + CHANGELOG `[Unreleased] → Added` describe the two-step
+  workflow, three-step `.edn` wrapper, NO_TARGET early-stop, and two-phase
+  contract faithfully.
+- **Coherence — clean.** design ↔ plan ↔ implementation ↔ artifact agree
+  (IR-A plan.md `.edn`-wrapper reconciliation holds). Only unchecked steps.md
+  item is the pre-existing, untriggered Contingency (split step-1) — conditional,
+  not actionable.
+
+No follow-up items added.
+
+PASS_STATUS: REVIEW_COMPLETE
