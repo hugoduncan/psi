@@ -3473,3 +3473,30 @@ Added TT-B/TT-C/TT-D as unchecked follow-ups in steps.md. All test-only
 substring locks on the shipped EDN; no production/skill/EDN change.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## 2026-06-03 — Test review pass 19 follow-up executed (TT-B / TT-C / TT-D)
+
+Executed the three newly-added unchecked follow-ups from review pass 19. All
+test-only substring locks on the shipped `reduce-incidental-complexity.edn`
+step-1 prompt — no production/skill/EDN change. Each verified present in the EDN
+before locking, so all three are regression guards (not behaviour changes).
+
+Added to `reduce-incidental-complexity-test`
+(`components/workflow-loader/test/psi/workflow_loader/task_204_workflow_definitions_test.clj`):
+
+- **TT-B** — "locks the origin/master base-refresh" block: `git fetch origin
+  master`, "Treat `origin/master` as the authoritative base", "Base the worktree
+  on `origin/master`" (3 asserts).
+- **TT-C** — "locks the baseline capture commands" block: `bb gordian local
+  --json` and `bb gordian diagnose --edn` (the generating commands, distinct from
+  the already-locked output filenames) (2 asserts).
+- **TT-D** — "locks the A5/A2 direction-of-change" block: "decreased versus its
+  `before-local.json` value" (A5) and "after total is strictly less than the
+  before total" (A2), companion to the existing F3 key lock (2 asserts).
+
+Verification: focused task-204 ns green (2 tests, 67 assertions, 0 failures —
++7 over pass-18's 60); `clj-kondo` 0 findings; `clj-paren-repair` Success; file
+337 lines (< 800); `bb commit-check:file-lengths` exit 0. steps.md TT-B/TT-C/TT-D
+ticked.
+
+PASS_STATUS: REVIEW_COMPLETE

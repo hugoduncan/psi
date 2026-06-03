@@ -1444,7 +1444,7 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
 
 ## Test review follow-ups (review pass 19 — task-test-review)
 
-- [ ] TT-B — Lock the step-1 base-refresh behaviour in
+- [x] TT-B — Lock the step-1 base-refresh behaviour in
       `reduce-incidental-complexity-test`. Design Deliverable 2, Step 1 first
       bullet requires "Refresh base: `git fetch origin master`; treat
       `origin/master` as the authoritative base" and "Base the worktree on
@@ -1460,8 +1460,19 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
       authoritative-`origin/master`-base claim. Test-only; no production/skill/EDN
       change. Verify the focused task-204 ns green, `clj-kondo` 0,
       `clj-paren-repair` Success, `bb commit-check:file-lengths` clean.
+      RESOLUTION: added a "select-and-create prompt locks the origin/master
+      base-refresh (TT-B)" `testing` block to `reduce-incidental-complexity-test`
+      (same ns, test-only — no production/skill/EDN change) asserting three
+      `select-text` substrings: `git fetch origin master` (the base refresh),
+      "Treat `origin/master` as the authoritative base" (the authoritative-base
+      claim), and "Base the worktree on `origin/master`" (the worktree base). All
+      three present verbatim in the shipped EDN step-1 prompt; a regress dropping
+      the fetch or rebasing off stale local `master` now fails green. Focused
+      task-204 ns green (2 tests, 67 assertions, 0 failures — +7 over pass-18's
+      60, shared with TT-C/TT-D); `clj-kondo` 0 findings; `clj-paren-repair`
+      Success; file 337 lines (< 800); `bb commit-check:file-lengths` exit 0.
 
-- [ ] TT-C — Lock the baseline *capture commands* (not just the filenames) in
+- [x] TT-C — Lock the baseline *capture commands* (not just the filenames) in
       `reduce-incidental-complexity-test`. Design Step 1 names the baseline
       capture invocations — `before-local.json` ← `bb gordian local --json`
       (bare, NO `--sort`) and `before-diagnose.edn` ← `bb gordian diagnose --edn`
@@ -1476,8 +1487,19 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
       production/skill/EDN change. Verify the focused task-204 ns green,
       `clj-kondo` 0, `clj-paren-repair` Success, `bb commit-check:file-lengths`
       clean.
+      RESOLUTION: added a "select-and-create prompt locks the baseline capture
+      commands (TT-C)" `testing` block (same ns, test-only) asserting two
+      `select-text` substrings: `bb gordian local --json` (the bare before-local
+      capture) and `bb gordian diagnose --edn` (the before-diagnose capture) —
+      the generating *commands*, distinct from the output filenames already
+      locked. A regress to the forbidden selector call
+      `bb gordian local --sort total --json` (the EDN's own "bare, NO `--sort`"
+      baseline rule) or a wrong diagnose flag now fails green. Both substrings
+      present in the shipped EDN. Verified green with TT-B/TT-D (2 tests, 67
+      assertions, 0 failures); `clj-kondo` 0; `clj-paren-repair` Success; file
+      337 lines (< 800); `bb commit-check:file-lengths` exit 0.
 
-- [ ] TT-D — Lock the A5/A2 direction-of-change in
+- [x] TT-D — Lock the A5/A2 direction-of-change in
       `reduce-incidental-complexity-test`. The Phase-1 acceptance is directional:
       A5 — the target unit's `lcc-total` "decreased versus its `before-local.json`
       value"; A2 — "the after total is strictly less than the before total". The
@@ -1491,3 +1513,14 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
       existing key lock. Test-only; no production/skill/EDN change. Verify the
       focused task-204 ns green, `clj-kondo` 0, `clj-paren-repair` Success,
       `bb commit-check:file-lengths` clean.
+      RESOLUTION: added a "select-and-create prompt locks the A5/A2
+      direction-of-change (TT-D)" `testing` block (same ns, test-only) asserting
+      two `select-text` substrings companion to the existing F3 key lock:
+      "decreased versus its `before-local.json` value" (A5 directional reduction)
+      and "after total is strictly less than the before total" (A2 strict net
+      decrease). The F3 lock covers only the `(ns, var, arity, line)` key; these
+      lock the *direction*, so a paraphrase weakening "decreased" → "changed" or
+      "strictly less" → "not greater" now fails green. Both substrings present
+      verbatim in the shipped EDN. Verified green with TT-B/TT-C (2 tests, 67
+      assertions, 0 failures); `clj-kondo` 0; `clj-paren-repair` Success; file
+      337 lines (< 800); `bb commit-check:file-lengths` exit 0.

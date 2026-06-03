@@ -298,4 +298,40 @@
              "step-1 prompt forbids pushing or opening a PR")
          (is (.contains select-text
                         "ends with a completed, reviewed task on the local worktree branch")
-             "step-1 prompt states the local-worktree-branch endpoint (no push/PR)"))))))
+             "step-1 prompt states the local-worktree-branch endpoint (no push/PR)"))
+       ;; TT-B (test review pass 19, task-test-review): lock the step-1
+       ;; base-refresh behaviour (design Deliverable 2, Step 1 first bullet) —
+       ;; `git fetch origin master` + treat origin/master as the authoritative
+       ;; base + base the worktree on origin/master. Previously unlocked: a
+       ;; regress dropping the fetch or rebasing off stale local master passed
+       ;; green.
+       (testing "select-and-create prompt locks the origin/master base-refresh (TT-B)"
+         (is (.contains select-text "git fetch origin master")
+             "step-1 prompt refreshes the base with git fetch origin master")
+         (is (.contains select-text
+                        "Treat `origin/master` as the authoritative base")
+             "step-1 prompt treats origin/master as the authoritative base")
+         (is (.contains select-text "Base the worktree on `origin/master`")
+             "step-1 prompt bases the worktree on origin/master"))
+       ;; TT-C (test review pass 19, task-test-review): lock the baseline
+       ;; *capture commands*, not just the output filenames — before-local.json
+       ;; <- `bb gordian local --json` (bare) and before-diagnose.edn <-
+       ;; `bb gordian diagnose --edn`. A regress to the selector's
+       ;; `local --sort total --json` (forbidden as a baseline) or a wrong
+       ;; diagnose flag previously passed green.
+       (testing "select-and-create prompt locks the baseline capture commands (TT-C)"
+         (is (.contains select-text "bb gordian local --json")
+             "step-1 prompt captures before-local.json via bare bb gordian local --json")
+         (is (.contains select-text "bb gordian diagnose --edn")
+             "step-1 prompt captures before-diagnose.edn via bb gordian diagnose --edn"))
+       ;; TT-D (test review pass 19, task-test-review): lock the A5/A2
+       ;; direction-of-change. The F3 lock asserts only the join key, not the
+       ;; directional acceptance; a paraphrase weakening "decreased" -> "changed"
+       ;; or "strictly less" -> "not greater" previously passed green.
+       (testing "select-and-create prompt locks the A5/A2 direction-of-change (TT-D)"
+         (is (.contains select-text
+                        "decreased versus its `before-local.json` value")
+             "step-1 prompt states A5: target lcc-total decreased versus before-local.json")
+         (is (.contains select-text
+                        "after total is strictly less than the before total")
+             "step-1 prompt states A2: after total strictly less than before total"))))))
