@@ -3320,3 +3320,50 @@ design ↔ plan ↔ implementation now coherent on the wrapper file form.
 
 Doc-only (plan.md) — no code/test/skill/EDN change. IR-A checked in steps.md.
 PASS_STATUS: REVIEW_COMPLETE.
+
+## task-implementation-review (independent pass, 2026-06-03, confirming)
+
+Re-applied `task-implementation-review` to the three shipped artifacts
+(`incidental-complexity-finder/SKILL.md`, `task-lifecycle-in-worktree.edn`,
+`reduce-incidental-complexity.edn`) + the two task-204 test namespaces + docs,
+after the IR-A plan.md reconciliation.
+
+**Verdict: REVIEW_COMPLETE — no new actionable issues.**
+
+- **Code↔design — matches.** Outer workflow is the verified two-step shape
+  (`select-and-create` `:session` with `incidental-complexity-finder`/`gordian`/
+  `code-shaper` skills + early-stop + two-phase generated-design contract +
+  `worktree_path:`/`munera_task_path:` handoff; `lifecycle-in-worktree`
+  `:delegate` → `task-lifecycle-in-worktree` with the grammar-conformant
+  `:prompt-string {:type :map :fields {:input {:from {:step "select-and-create"
+  :yield :text}}}}` and the `[workflow-original + select-and-create yield]`
+  `:context`). Wrapper is the three-step `resolve-worktree`(`:session`,+work-on)
+  → `lifecycle`(`:delegate` `:target "task-lifecycle"`) → `summary`(`:session`)
+  adapter mirroring the loadable `review-implementation-in-worktree.edn`, plus
+  the NO_TARGET short-circuit for the early-stop handoff. Skill encodes the
+  `gap = lcc-total / max(cc,1)` recipe, the inner-join-on-local-side drop rule,
+  the `(ns,var,arity,line)` determinism key, the `lcc-total ≥ 5.0 ∧ gap ≥ 2.0`
+  filter, and the top-5 essential-vs-incidental guard.
+- **Architecture — follows.** Pure capability-catalog artifacts (skill +
+  `.edn` workflows); no production Clojure; reuses the verified wrapper pattern
+  (no invented pattern, no unnecessary abstraction, no structural-perf concern).
+- **Grounding — live.** `bb gordian` confirms `local`/`complexity`/`gate`/
+  `diagnose` subcommands + `--json`/`--edn` exist, so the embedded verbatim
+  recipes/commands resolve.
+- **Tests — green** via the real loader (`load-workflow-definitions` over the
+  live `.psi/workflows` files): 11 tests, 136 assertions, 0 failures. Both
+  task-204 test files < 800 (`292`, `524`).
+- **Docs — accurate.** `doc/workflows.md` §"Incidental-complexity
+  simplification" + CHANGELOG `[Unreleased]` describe the two-step workflow,
+  three-step `.edn` wrapper, NO_TARGET behaviour, and two-phase contract
+  faithfully.
+- **Coherence — clean.** plan.md's IR-A reconciliation holds: the only remaining
+  `implement-task-in-worktree.md` mention (Artifact locations) is inside an
+  explicit **D1 deviation** note; design/plan/implementation/artifact all agree
+  on the `.edn` wrapper form.
+
+Only unchecked steps.md item is the pre-existing, untriggered Contingency
+(split step-1 selection from task-creation) — conditional, not actionable. No
+follow-up items added.
+
+PASS_STATUS: REVIEW_COMPLETE
