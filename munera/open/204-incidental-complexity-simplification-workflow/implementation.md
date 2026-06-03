@@ -4225,3 +4225,52 @@ warranted; adding the marginal candidates above would be low-value churn against
 the simplicity/robustness ethos.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Test review pass 30 (test-shaper) — TR22
+
+**Finding (ACTIONABLE):** `incidental-complexity-finder-real-lens-integration-test`
+(the TT-L narrow integration test) executes the real `bb gordian local --sort
+total --json` + `bb gordian complexity --json` subprocesses against this repo,
+yet it runs in the default **`:unit`** suite without the repo's established
+`^:integration` metadata tag. The `:unit` suite declares `:skip-meta
+[:integration]` (tests.edn), and every other slow real-system boundary test in
+the repo uses `^:integration` to isolate itself —
+`tui/tmux_integration_harness_test` (7 deftests),
+`gordian_launcher_manifest_runtime_boundary_test`,
+`workflow_reload_runtime_test`. This one does not, so every fast-feedback run
+pays its cost whenever bb+jq are present (the normal dev environment): the test
+author measured both lenses at ~1.1s/1.3s, and a focused run takes ~11s wall.
+This violates test-shaper's `fast_feedback`/`test_suite` layering law
+("slow_tests = explicit_and_separate", "isolate(slower_boundary_tests)"). The
+TT-L resolution note itself flagged the contingency ("keep it isolated from the
+fast path if it proves slow") but the implementation gated only on bb/jq
+*availability*, not on suite membership — so the slow path still runs in the fast
+suite.
+
+**Coupling to preserve:** the only fast-suite lock of the recipe's real-shape
+assumption (`$cc[0].units` / `$loc[0].units`) currently lives **inside this same
+deftest's jq/bb-absent else-branch** (skill_test.clj:623–625). In a normal dev
+environment the if-branch runs (real lenses) and that structural fallback never
+executes; it is the unit-suite substitute only when the CLIs are missing.
+Tagging the whole deftest `^:integration` would remove that structural shape lock
+from the fast suite entirely (the deftest is then skipped under `:skip-meta
+[:integration]`), regressing fast-suite coverage of the `.units`-shape
+assumption.
+
+(No-mocks / determinism check, per the skill: the synthetic recipe tests and the
+content-lock test are state/output-asserting over real `jq` with structural
+fallbacks — no interaction asserts, no stubs; the only seam is the loader-dir
+`with-redefs` in the workflow test. No finding there. The real-lens test itself
+is correctly a sociable/narrow integration test — the issue is purely its suite
+placement, not its design.)
+
+**Recorded as steps.md TR22 (unchecked).** Test-only (no production/skill/EDN
+change): (1) tag `incidental-complexity-finder-real-lens-integration-test` with
+`^:integration` so it joins the `:integration` suite and is skipped from the fast
+`:unit` suite, matching the repo convention; and (2) hoist the `$cc[0].units` /
+`$loc[0].units` real-shape recipe lock into a fast-suite test (e.g. a `testing`
+block in `incidental-complexity-finder-skill-content-lock-test`, alongside the
+TT-F command-name lock) so the structural `.units`-shape assumption stays guarded
+in the fast suite once the slow real-lens execution moves to `:integration`.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

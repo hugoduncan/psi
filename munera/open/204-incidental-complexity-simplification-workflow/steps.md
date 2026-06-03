@@ -1946,3 +1946,36 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
       (3 tests, 91 assertions, 0 failures — +3 over pass-26/27's 88); `clj-kondo`
       0 findings; `clj-paren-repair` Success; file 459 lines (< 800);
       `bb commit-check:file-lengths` exit 0.
+
+## Test review follow-ups (review pass 30 — test-shaper)
+
+- [ ] TR22 — Isolate the slow real-lens narrow integration test from the fast
+      `:unit` suite. `incidental-complexity-finder-real-lens-integration-test`
+      (TT-L) spawns the real `bb gordian local --sort total --json` +
+      `bb gordian complexity --json` subprocesses against this repo (~1.1s/1.3s
+      per lens; ~11s focused wall) but runs in the default `:unit` suite WITHOUT
+      the repo's `^:integration` tag. The `:unit` suite declares `:skip-meta
+      [:integration]` (tests.edn), and every other slow real-system boundary test
+      (`tui/tmux_integration_harness_test`,
+      `gordian_launcher_manifest_runtime_boundary_test`,
+      `workflow_reload_runtime_test`) uses `^:integration` to isolate itself.
+      Violates test-shaper `fast_feedback`/`test_suite` layering
+      (slow_tests = explicit_and_separate). The TT-L note flagged "keep it
+      isolated from the fast path if it proves slow" but gated only on bb/jq
+      *availability*, not suite membership.
+      Fix (test-only — no production/skill/EDN change):
+      (1) Tag `incidental-complexity-finder-real-lens-integration-test` with
+          `^:integration` (in `incidental_complexity_finder_skill_test.clj`) so it
+          moves to the `:integration` suite and is skipped from fast `:unit`.
+      (2) Preserve the fast-suite real-shape lock: the only unit-suite guard of
+          the recipe's `$cc[0].units` / `$loc[0].units` assumption currently lives
+          inside that deftest's jq/bb-absent else-branch (skill_test.clj:623–625),
+          which won't run once the deftest is integration-tagged. Hoist a
+          `$cc[0].units` / `$loc[0].units` structural assertion into a fast-suite
+          test (e.g. a `testing` block in
+          `incidental-complexity-finder-skill-content-lock-test`, beside the TT-F
+          command-name lock) so the `.units`-shape assumption stays guarded in the
+          fast suite.
+      Verify: `:unit` focused run no longer spawns `bb gordian`; the real-lens
+      test still runs under `clojure:test:integration`; `clj-kondo` 0 findings;
+      `clj-paren-repair` Success; `bb commit-check:file-lengths` exit 0.
