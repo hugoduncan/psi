@@ -114,7 +114,20 @@
       (is (re-find #"(?s)sibling test namespace exists for the target" body)
           "coverage hint reports whether a sibling test namespace exists")
       (is (re-find #"(?s)any test references the target `var`" body)
-          "coverage hint reports whether any test references the target var"))))
+          "coverage hint reports whether any test references the target var"))
+    (testing "encodes the step-1 two-lens invocation commands (TT-F)"
+      ;; The design's Deliverable-1 step 1 ("Run both lenses in machine form")
+      ;; names the two data-source commands that produce the jq recipe's inputs.
+      ;; The recipe-execution tests rewrite the temp paths and never exercise
+      ;; the producing commands; a regress (wrong subcommand, dropped `--json`,
+      ;; or losing the selector-vs-baseline `--sort total`/bare distinction A5/A2
+      ;; draws) would pass green while breaking the recipe inputs. TT-C already
+      ;; enforces the symmetric lock for the *baseline* capture commands in the
+      ;; workflow test.
+      (is (.contains body "bb gordian local --sort total --json")
+          "emits the selector `local` lens command with --sort total --json")
+      (is (.contains body "bb gordian complexity --json")
+          "emits the `complexity` lens command with --json"))))
 
 (defn- named-local-unit-json
   "A synthetic `local`-lens unit JSON for a named null-arity var `<ns>/<var>`,

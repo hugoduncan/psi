@@ -1560,7 +1560,7 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
 
 ## Test review follow-ups (review pass 21 — task-test-review)
 
-- [ ] TT-F — Lock the selector's two-lens invocation commands in
+- [x] TT-F — Lock the selector's two-lens invocation commands in
       `incidental-complexity-finder-skill-content-lock-test`. Design Deliverable 1,
       step 1 ("Run both lenses in machine form") names the two data-source
       commands: `bb gordian local --sort total --json` and
@@ -1581,3 +1581,18 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
       `bb gordian complexity --json`. Test-only substring lock on the shipped
       SKILL.md; no production/skill/EDN change. Run focused
       `incidental-complexity-finder-skill-test` + `clj-kondo`.
+      RESOLUTION: extended `incidental-complexity-finder-skill-content-lock-test`
+      (same ns, test-only — no production/skill/EDN change) with a new `testing`
+      block "encodes the step-1 two-lens invocation commands (TT-F)" asserting
+      `body` contains `bb gordian local --sort total --json` (selector lens,
+      with `--sort total --json`) and `bb gordian complexity --json` (cc lens).
+      Both strings verified present verbatim in the shipped SKILL.md §1 before
+      locking, so each is a regression guard. Companion to the workflow test's
+      TT-C *baseline* capture-command lock; closes the symmetry where only a
+      TT-C comment mentioned `local --sort total`. A regress (wrong subcommand,
+      dropped `--json`, or losing the `--sort total`/bare selector-vs-baseline
+      distinction A5/A2 draws) now fails green. Focused
+      `incidental-complexity-finder-skill-test` green (9 tests, 80 assertions,
+      0 failures — +2 over pass-17's 78); `clj-kondo` 0 findings;
+      `clj-paren-repair` Success; file 537 lines (< 800);
+      `bb commit-check:file-lengths` exit 0.

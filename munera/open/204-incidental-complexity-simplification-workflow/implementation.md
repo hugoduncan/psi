@@ -3610,3 +3610,33 @@ One **named Deliverable-1 behaviour is NOT locked** (`∃b∈behaviour(design).
 Added TT-F as an unchecked follow-up in steps.md.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Review pass 21 follow-up — TT-F resolution (task-test-review)
+
+TT-F was the only newly-added actionable item from pass 21 (the trailing
+Contingency step-1 split predates every pass and is conditional/untriggered, so
+it is excluded). Test-only — no production/skill/EDN change; SKILL.md §1 already
+emits both lens commands verbatim.
+
+Extended `incidental-complexity-finder-skill-content-lock-test`
+(`components/workflow-loader/test/psi/workflow_loader/incidental_complexity_finder_skill_test.clj`)
+with a new `testing` block "encodes the step-1 two-lens invocation commands
+(TT-F)" asserting `body` contains:
+- `bb gordian local --sort total --json` — the selector lens command, including
+  the `--sort total` display flag and `--json`
+- `bb gordian complexity --json` — the cc lens command
+
+Both strings grounded against the shipped SKILL.md before locking, so each is a
+regression guard. Companion to the workflow test's TT-C *baseline*
+capture-command lock — this closes the symmetry where the recipe-execution tests
+rewrite temp paths and never exercise the producing commands, leaving the two
+input-producing lens commands uncovered. A regress (wrong subcommand, dropped
+`--json`, or losing the `--sort total`/bare selector-vs-baseline distinction the
+design draws in A5/A2) now fails green.
+
+Verification: focused `incidental-complexity-finder-skill-test` green
+(9 tests, 80 assertions, 0 failures — +2 over pass-17's 78); `clj-kondo` 0
+findings; `clj-paren-repair` Success; file 537 lines (< 800);
+`bb commit-check:file-lengths` exit 0. steps.md TT-F ticked.
+
+PASS_STATUS: REVIEW_COMPLETE
