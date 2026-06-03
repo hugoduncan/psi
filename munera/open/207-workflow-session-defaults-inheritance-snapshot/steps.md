@@ -679,16 +679,6 @@ Checklist grouped by slice (see plan.md). Tick items with sha/decision notes.
       claude-base-meta), proving the two fields now agree; block 2 asserts an
       explicit step :thinking-level (:medium) still wins over both. Full unit
       suite green; lint clean.
-- [ ] CS2: Reconcile the `:thinking-level` vs `:model` inherited-default
-      precedence inversion in `resolve-step-session-config`. `:model` ranks the
-      inherited default ABOVE the base-meta override (`:220-235`), but
-      `:thinking-level` ranks the snapshot/inherited value BELOW base-meta
-      (`:243-246`), so a `:workflow-file-meta` thinking-level masks the inherited
-      parent value while a `:workflow-file-meta` model does not. Decide the
-      intended ordering, make it uniform across the inherited fields (or document
-      the per-field difference + rationale in design.md Decision 1/7 and the
-      resolver). If the behaviour changes, add/adjust a precedence test
-      (base-meta vs inherited default) for the affected field(s).
 
 ## Test-review pass 9 follow-ups (review 2026-06-02)
 
