@@ -611,7 +611,15 @@
     (if (and (bb-available?) (jq-available?))
       (let [repo-dir (System/getProperty "user.dir")
             local (shell/sh "bb" "gordian" "local" "--sort" "total" "--json" :dir repo-dir)
-            cc (shell/sh "bb" "gordian" "complexity" "--json" :dir repo-dir)]
+            cc (shell/sh "bb" "gordian" "complexity" "--json" :dir repo-dir)
+            ;; CI hardening: a `bb` invocation can prepend a non-JSON preamble
+            ;; line (e.g. a timbre log line) to stdout before the JSON, which
+            ;; breaks jq's whole-file `--slurpfile`. This test validates the
+            ;; recipe consumes the real `.units` SHAPE, not babashka's stdout
+            ;; hygiene, so slice each lens payload from its first `{`.
+            from-first-brace (fn [s] (if-let [i (str/index-of s "{")] (subs s i) s))
+            local-json (from-first-brace (:out local))
+            cc-json (from-first-brace (:out cc))]
         (testing "the real lenses emit the top-level `.units` shape the recipe reads"
           (is (zero? (:exit local))
               (str "bb gordian local --sort total --json runs; stderr: " (:err local)))
@@ -622,7 +630,7 @@
           (is (.contains (:out cc) "\"units\"")
               "the complexity lens emits a top-level units array"))
         (testing "the recipe consumes the real lens output and emits a structurally-valid result"
-          (let [{:keys [exit out err]} (run-recipe-over-lens-output recipe (:out local) (:out cc))
+          (let [{:keys [exit out err]} (run-recipe-over-lens-output recipe local-json cc-json)
                 trimmed (str/trim out)]
             (is (zero? exit)
                 (str "recipe runs cleanly over the real lens output; stderr: " err))
