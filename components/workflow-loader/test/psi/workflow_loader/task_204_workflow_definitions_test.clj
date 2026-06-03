@@ -336,4 +336,16 @@
              "step-1 prompt states A5: target lcc-total decreased versus before-local.json")
          (is (.contains select-text
                         "after total is strictly less than the before total")
-             "step-1 prompt states A2: after total strictly less than before total"))))))
+             "step-1 prompt states A2: after total strictly less than before total"))
+       ;; TT-G (test review pass 22, task-test-review): lock the A2 "touched
+       ;; units = metric-derived set" discriminator (Locked decision 4 / the
+       ;; design's "Net burden (A2)" paragraph). F3 locks only the
+       ;; (ns, var, arity, line) key and TT-D only the strictly-less direction;
+       ;; neither anchors the metric-vs-file derivation. A paraphrase to "units
+       ;; whose source/files changed" previously passed green while defeating
+       ;; the global-recompute net check (a refactor could hide relocated
+       ;; burden in an unedited caller).
+       (testing "select-and-create prompt locks the metric-derived touched-set discriminator (TT-G)"
+         (is (.contains select-text
+                        "the set is computed from the metric, not from the diff/touched files")
+             "step-1 prompt derives the A2 touched set from the metric, not the diff/touched files"))))))

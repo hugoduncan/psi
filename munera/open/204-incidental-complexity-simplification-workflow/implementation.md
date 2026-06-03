@@ -3668,3 +3668,32 @@ actionable gap found.
 Added TT-G as an unchecked follow-up in steps.md.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## 2026-06-03 — Test review pass 22 follow-up TT-G executed
+
+Executed the sole newly-added actionable item from review pass 22 (the trailing
+Contingency step-1 split predates every pass and is conditional/untriggered).
+
+TT-G — Locked the A2 "touched units = metric-derived set" discriminator. Added a
+"select-and-create prompt locks the metric-derived touched-set discriminator
+(TT-G)" `testing` block to the F3/TT-D cluster in
+`reduce-incidental-complexity-test`
+(`components/workflow-loader/test/psi/workflow_loader/task_204_workflow_definitions_test.clj`),
+asserting `select-text` contains
+`the set is computed from the metric, not from the diff/touched files`. Verified
+the substring present verbatim in the shipped
+`.psi/workflows/reduce-incidental-complexity.edn` step-1 prompt before locking,
+so this is a regression guard. F3 locks only the `(ns, var, arity, line)` join
+key and TT-D only the strictly-less direction; TT-G anchors the metric-vs-file
+*derivation* (Locked decision 4 / the design's "Net burden (A2)" paragraph), so
+a paraphrase to "units whose source/files changed" — which would defeat the
+global-recompute net check by letting a refactor hide relocated burden in an
+unedited caller — now fails green. Companion to TT-D (direction) and TT-C/TT-F
+(surrounding A2/A5 plumbing).
+
+Test-only — no production/skill/EDN change; assertions otherwise untouched.
+Focused task-204 ns green (2 tests, 69 assertions, 0 failures — +1 over
+pass-21's 68); `clj-kondo` 0 findings; `clj-paren-repair` Success; file 351
+lines (< 800); `bb commit-check:file-lengths` exit 0. steps.md TT-G ticked.
+
+PASS_STATUS: REVIEW_COMPLETE
