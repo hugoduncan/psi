@@ -43,6 +43,12 @@
   []
   (try (zero? (:exit (shell/sh "jq" "--version"))) (catch Exception _ false)))
 
+(defn- bb-available?
+  "Is the `bb` (babashka) CLI available on this machine? Gates the narrow
+   integration test that runs the real `bb gordian` lenses against this repo."
+  []
+  (try (zero? (:exit (shell/sh "bb" "--version"))) (catch Exception _ false)))
+
 (defn- skill-recipe
   "Slurp the loaded SKILL.md and extract its embedded join/gap jq recipe. Single
    helper for every executable recipe test (their shared body-slurp + recipe-
@@ -160,6 +166,29 @@
     (try
       (spit loc-f (str "{\"units\":[" (str/join "," local-units) "]}"))
       (spit cc-f (str "{\"units\":[" (str/join "," cc-units) "]}"))
+      (shell/sh "bash" "-c" recipe')
+      (finally
+        (doseq [f (.listFiles dir)] (.delete f))
+        (.delete dir)))))
+
+(defn- run-recipe-over-lens-output
+  "Write the two real lens JSON payloads to the recipe's temp-file paths and run
+   the rewritten recipe over them, returning {:exit :out :err}. Unlike
+   `run-jq-recipe` (which wraps synthetic units in `{\"units\":[…]}`), this feeds
+   the lens output verbatim — the real `bb gordian` payload already carries the
+   top-level `.units` array the recipe reads."
+  [recipe local-json cc-json]
+  (let [dir (io/file (System/getProperty "java.io.tmpdir")
+                     (str "icf-real-lens-test-" (System/nanoTime)))
+        _ (.mkdirs dir)
+        loc-f (io/file dir "icf-local.json")
+        cc-f (io/file dir "icf-cc.json")
+        recipe' (-> recipe
+                    (str/replace "/tmp/icf-local.json" (.getAbsolutePath loc-f))
+                    (str/replace "/tmp/icf-cc.json" (.getAbsolutePath cc-f)))]
+    (try
+      (spit loc-f local-json)
+      (spit cc-f cc-json)
       (shell/sh "bash" "-c" recipe')
       (finally
         (doseq [f (.listFiles dir)] (.delete f))
@@ -535,3 +564,63 @@
             "recipe projects dependency-burden as dependency_burden")
         (is (.contains recipe "working_set: .[\"working-set\"]")
             "recipe projects working-set as working_set")))))
+
+(deftest incidental-complexity-finder-real-lens-integration-test
+  ;; TT-L (test review pass 27 — task-test-review / testing-without-mocks
+  ;; Narrow Integration Test). Every other recipe test runs the embedded jq
+  ;; recipe over SYNTHETIC {"units":[…]} inputs, and TT-F locks only that
+  ;; SKILL.md §1 NAMES the two lens commands as prose substrings — nothing
+  ;; proves the recipe consumes the REAL `bb gordian` output shape (each lens's
+  ;; top-level `.units` array carrying ns/var/arity/line/lcc-total/burdens/
+  ;; findings for `local` and ns/var/arity/line/cc for `complexity`). A future
+  ;; gordian JSON reshape (wrapped units, renamed burden, changed findings/line)
+  ;; would keep every synthetic test green while the shipped skill silently
+  ;; broke. This is the design's FIRST acceptance criterion ("produces a target
+  ;; + evidence when run against this repository"; Deliverable 1 step 5 / Locked
+  ;; decision 1): exercise the recipe against the real lenses and assert
+  ;; STRUCTURE, not a specific target — the live top-5 drifts as code changes,
+  ;; so a unit-specific assertion would be flaky.
+  (let [recipe (skill-recipe)]
+    (is (some? recipe) "the join/gap jq recipe is extractable from SKILL.md")
+    (if (and (bb-available?) (jq-available?))
+      (let [repo-dir (System/getProperty "user.dir")
+            local (shell/sh "bb" "gordian" "local" "--sort" "total" "--json" :dir repo-dir)
+            cc (shell/sh "bb" "gordian" "complexity" "--json" :dir repo-dir)]
+        (testing "the real lenses emit the top-level `.units` shape the recipe reads"
+          (is (zero? (:exit local))
+              (str "bb gordian local --sort total --json runs; stderr: " (:err local)))
+          (is (zero? (:exit cc))
+              (str "bb gordian complexity --json runs; stderr: " (:err cc)))
+          (is (.contains (:out local) "\"units\"")
+              "the local lens emits a top-level units array")
+          (is (.contains (:out cc) "\"units\"")
+              "the complexity lens emits a top-level units array"))
+        (testing "the recipe consumes the real lens output and emits a structurally-valid result"
+          (let [{:keys [exit out err]} (run-recipe-over-lens-output recipe (:out local) (:out cc))
+                trimmed (str/trim out)]
+            (is (zero? exit)
+                (str "recipe runs cleanly over the real lens output; stderr: " err))
+            ;; a JSON array (possibly `[]` — a vacuously-valid no-target result).
+            (is (str/starts-with? trimmed "[") "recipe emits a JSON array")
+            (is (str/ends-with? trimmed "]") "recipe emits a JSON array")
+            ;; structure not target: validate via jq that every result element
+            ;; carries the projected evidence keys (robust to multi-element
+            ;; output and the live top-5 drifting; `[]` passes vacuously).
+            (let [{vexit :exit vout :out}
+                  (shell/sh "jq" "-e"
+                            (str "type == \"array\" and all(.[]; "
+                                 "has(\"ns\") and has(\"var\") and has(\"gap\") and "
+                                 "has(\"cc\") and has(\"lcc_total\") and has(\"findings\"))")
+                            :in out)]
+              (is (zero? vexit)
+                  (str "each result element carries the projected evidence keys; "
+                       "jq said: " (str/trim vout)))))))
+      (testing "bb or jq unavailable — recipe structurally reads each lens's top-level `.units`"
+        ;; Fallback when the real lenses can't run (mirrors the jq-absent
+        ;; fallbacks elsewhere): lock that the recipe reads each lens's top-level
+        ;; `.units` array — the real-shape assumption this integration test
+        ;; proves when bb/jq are present.
+        (is (.contains recipe "$cc[0].units")
+            "recipe reads the complexity lens top-level units array")
+        (is (.contains recipe "$loc[0].units")
+            "recipe reads the local lens top-level units array")))))

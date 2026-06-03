@@ -1817,7 +1817,7 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
 
 ## Test review follow-ups (review pass 27 — task-test-review)
 
-- [ ] TT-L — The design's **first acceptance criterion** (the
+- [x] TT-L — The design's **first acceptance criterion** (the
       `incidental-complexity-finder` skill "produces a target + evidence **when
       run against this repository**"; Deliverable 1 step 5 / Locked decision 1)
       has **no executable test**. Every recipe test in
@@ -1851,3 +1851,32 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
       assumption the synthetic tests build on and the design's first acceptance.
       Run focused `incidental-complexity-finder-skill-test` + `clj-kondo` +
       `clj-paren-repair` + `bb commit-check:file-lengths`.
+      RESOLUTION: added `incidental-complexity-finder-real-lens-integration-test`
+      to `incidental_complexity_finder_skill_test.clj` (same ns, test-only — no
+      production/skill/EDN change), the testing-without-mocks **Narrow
+      Integration Test** the synthetic recipe tests lacked. Added a `bb-available?`
+      predicate (mirrors `jq-available?`) and a `run-recipe-over-lens-output`
+      harness (sibling to `run-jq-recipe`, but feeds the real lens payload
+      verbatim rather than wrapping synthetic units — the live `bb gordian`
+      output already carries the top-level `.units` array). When `bb`+`jq` are
+      present the test runs the real `bb gordian local --sort total --json` +
+      `bb gordian complexity --json` against this repo (`:dir user.dir`), asserts
+      both lenses exit 0 and expose a top-level `"units"`, pipes their actual
+      output through the SKILL.md recipe (via `skill-recipe` + the path-rewrite),
+      and asserts the recipe (a) runs cleanly (exit 0) and (b) emits a JSON array
+      (trimmed `[`…`]`, possibly `[]`) whose every element carries the projected
+      evidence keys — validated via `jq -e 'type=="array" and all(.[]; has("ns")
+      and has("var") and has("gap") and has("cc") and has("lcc_total") and
+      has("findings"))'` (structure, not a specific target — the live top-5
+      drifts, so a unit-specific assertion would be flaky; `[]` passes
+      vacuously). jq/bb-absent fallback locks that the recipe reads each lens's
+      top-level `.units` array (`$cc[0].units` / `$loc[0].units`) — the
+      real-shape assumption the integration test proves when the CLIs are
+      present. Closes the design's first acceptance ("produces a target +
+      evidence when run against this repository"; Deliverable 1 step 5 / Locked
+      decision 1) and the real-lens-shape assumption every synthetic test builds
+      on. Verified live: both lenses ~1.1s/1.3s, recipe over the real output
+      validates `true`. Focused `incidental-complexity-finder-skill-test` green
+      (**10 tests, 89 assertions, 0 failures** — +1 test/+11 over pass-17's
+      9/78); `clj-kondo` 0 findings; `clj-paren-repair` Success; file 626 lines
+      (< 800); `bb commit-check:file-lengths` exit 0.

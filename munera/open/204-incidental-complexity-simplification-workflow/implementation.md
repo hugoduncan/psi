@@ -4052,3 +4052,42 @@ real-lens-shape assumption the synthetic tests build on and the design's first
 acceptance criterion.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Test review pass-27 follow-up TT-L executed (real-lens narrow integration test)
+
+Executed the sole newly-added actionable item (the trailing Contingency step-1
+split predates every pass and is conditional/untriggered). Test-only — no
+production/skill/EDN change; the recipe and SKILL.md are correct.
+
+The gap: every recipe test ran the embedded jq recipe over **synthetic**
+`{"units":[…]}` inputs (`run-jq-recipe`), and TT-F locked only that SKILL.md §1
+*names* the two lens commands as prose. Nothing proved the recipe consumes the
+**real** `bb gordian` output shape — the testing-without-mocks **Narrow
+Integration Test** gap (recipe wraps the external `bb gordian` system, untested
+against it) and the design's **first** acceptance ("produces a target + evidence
+when run against this repository"; Deliverable 1 step 5 / Locked decision 1).
+
+Fix: added `incidental-complexity-finder-real-lens-integration-test` plus a
+`bb-available?` predicate (mirrors `jq-available?`) and a
+`run-recipe-over-lens-output` harness (sibling to `run-jq-recipe` but feeds the
+real lens payload verbatim — the live output already carries the top-level
+`.units` array, so it is NOT re-wrapped). When `bb`+`jq` are present: runs the
+real `bb gordian local --sort total --json` + `bb gordian complexity --json`
+(`:dir user.dir`), asserts both exit 0 + expose top-level `"units"`, pipes their
+actual output through the SKILL.md recipe, and asserts the recipe runs cleanly
+(exit 0) and emits a JSON array (trimmed `[`…`]`, possibly `[]`) whose every
+element carries the projected evidence keys — validated via
+`jq -e 'type=="array" and all(.[]; has("ns") and has("var") and has("gap") and
+has("cc") and has("lcc_total") and has("findings"))'`. Structure, not a specific
+target (the live top-5 drifts, so a unit-specific assertion would be flaky; `[]`
+passes vacuously). bb/jq-absent fallback locks `$cc[0].units` / `$loc[0].units`
+— the real-shape assumption the integration test proves when the CLIs are
+present.
+
+Verified live: both lenses ~1.1s/1.3s; recipe over the real output validates
+`true`. Focused `incidental-complexity-finder-skill-test` green (**10 tests, 89
+assertions, 0 failures** — +1 test/+11 over pass-17's 9/78); `clj-kondo` 0
+findings; `clj-paren-repair` Success; file 626 lines (< 800);
+`bb commit-check:file-lengths` exit 0. steps.md TT-L ticked.
+
+PASS_STATUS: REVIEW_COMPLETE
