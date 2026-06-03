@@ -38,7 +38,15 @@
     'psi.extension/append-message
     'psi.extension/inject-mid-system-message
     'psi.extension/send-prompt
-    'psi.extension/schedule-event})
+    'psi.extension/schedule-event
+    ;; Workflow run creation: the invoking session must be injected as
+    ;; `:session-id` so `create-workflow-run` can snapshot the invoking
+    ;; session's inherited defaults at invoke time (task 207). The top-level
+    ;; invoke (`workflow/core.clj`) and terminal-run continuation
+    ;; (`continue-terminal-run-async!`) call `mutate! 'psi.workflow/create-run`
+    ;; with no explicit `:session-id`, relying on this injection (Decision 5b /
+    ;; 6a). Without it the snapshot is never captured on those paths.
+    'psi.workflow/create-run})
 
 (def ^:private lifecycle-extension-mutation-param-builders
   {'psi.extension/create-session

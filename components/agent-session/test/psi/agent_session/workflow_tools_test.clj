@@ -142,6 +142,28 @@
       (is (= session-id (get-in parsed [:psi-tool/workflow :run :parent-session-id])))
       (is (= run-id (get-in @(:state* ctx) [:workflows :run-order 0])))))
 
+  (testing "workflow create-run captures the inherited-defaults snapshot from the
+            invoking session (task 207 S4)"
+    (let [[ctx session-id] (create-session-context {:persist? false})
+          _ (swap! (:state* ctx) update-in [:agent-session :sessions session-id :data]
+                   merge {:model {:provider "anthropic" :id "claude-test"}
+                          :prompt-mode :concise
+                          :speed-mode :fast
+                          :effort-override :xhigh})
+          tool   (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
+          result ((:execute tool) {"action" "workflow"
+                                   "op" "create-run"
+                                   "definition" inline-single-step-definition-edn
+                                   "workflow-input" "{:task \"ship it\"}"})
+          parsed (read-string (:content result))
+          run-id (get-in parsed [:psi-tool/workflow :run-id])
+          snapshot (get-in @(:state* ctx) [:workflows :runs run-id :inherited-defaults])]
+      (is (false? (:is-error result)))
+      (is (= {:provider "anthropic" :id "claude-test"} (:model snapshot)))
+      (is (= :concise (:prompt-mode snapshot)))
+      (is (= :fast (:speed-mode snapshot)))
+      (is (= :xhigh (:effort-override snapshot)))))
+
   (testing "workflow create-run plus execute-run completes an ad-hoc inline workflow"
     (let [[ctx session-id] (create-session-context {:persist? false})
           tool          (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})

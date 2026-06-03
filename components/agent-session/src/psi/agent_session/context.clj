@@ -117,10 +117,11 @@
 
 (defn- create-workflow-child-session!
   [ctx parent-session-id request]
-  (let [{:keys [child-session-id session-name system-prompt prompt-mode response-mode logprobs top-logprobs tool-ids thinking-level temperature model skills
+  (let [{:keys [child-session-id session-name system-prompt prompt-mode response-mode logprobs top-logprobs tool-ids thinking-level speed-mode effort-override temperature model skills
                 developer-prompt developer-prompt-source preloaded-messages
                 cache-breakpoints prompt-component-selection
-                workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?]}
+                workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?
+                inherited-snapshot?]}
         (workflow-child-session-contract/assert-valid-request!
          request
          :psi.agent-session.context/create-workflow-child-session!)]
@@ -138,6 +139,8 @@
                                  :thinking-level thinking-level
                                  :skills skills}
                           (some? prompt-mode) (assoc :prompt-mode prompt-mode)
+                          (some? speed-mode) (assoc :speed-mode speed-mode)
+                          (some? effort-override) (assoc :effort-override effort-override)
                           (some? response-mode) (assoc :response-mode response-mode)
                           (contains? {:logprobs logprobs} :logprobs) (assoc :logprobs logprobs)
                           (some? top-logprobs) (assoc :top-logprobs top-logprobs)
@@ -152,7 +155,8 @@
                           (some? workflow-run-id) (assoc :workflow-run-id workflow-run-id)
                           (some? workflow-step-id) (assoc :workflow-step-id workflow-step-id)
                           (some? workflow-attempt-id) (assoc :workflow-attempt-id workflow-attempt-id)
-                          (contains? {:workflow-owned? workflow-owned?} :workflow-owned?) (assoc :workflow-owned? workflow-owned?))
+                          (contains? {:workflow-owned? workflow-owned?} :workflow-owned?) (assoc :workflow-owned? workflow-owned?)
+                          (some? inherited-snapshot?) (assoc :inherited-snapshot? inherited-snapshot?))
                         {:origin :mutations})
     (let [child-sd (ss/get-session-data-in ctx child-session-id)
           messages (vec (or preloaded-messages []))
@@ -222,6 +226,18 @@
                                                   {:skill-ids (mapv :name (or session-skills []))}
                                                   skill-name)))
    :resolve-workflow-step-session-config-fn #'workflow-step-session-config/resolve-step-session-config
+   ;; Nested/delegated inherited-defaults snapshot (task 207, S6). Derives the
+   ;; delegating step's EFFECTIVE config (run snapshot ⊕ step overrides) then
+   ;; projects it into the inherited-defaults snapshot field set, sourcing
+   ;; speed-mode/effort-override from the parent run's snapshot (P2). Injected so
+   ;; delegate.clj (in workflow-runtime) never requires
+   ;; workflow-step-session-config (avoids the certain require cycle, P1).
+   :resolve-inherited-defaults-fn
+   (fn [ctx* parent-session-id* workflow-run* step-id*]
+     (let [effective-config (workflow-step-session-config/resolve-step-session-config
+                             ctx* parent-session-id* workflow-run* step-id*)]
+       (workflow-step-session-config/effective-config->snapshot
+        effective-config (:inherited-defaults workflow-run*))))
    :materialize-workflow-step-session-conversation-fn #'workflow-step-materialization/materialize-step-session-conversation
    :split-workflow-step-session-conversation-fn #'workflow-step-materialization/split-step-session-conversation
    :execute-workflow-judge-fn #'workflow-judge/execute-judge!

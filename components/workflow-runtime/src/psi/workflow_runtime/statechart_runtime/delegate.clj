@@ -34,18 +34,32 @@
   (workflow-terminal-contract/terminal-result-envelope workflow-run))
 
 (defn delegate-step-runtime-result
-  [create-workflow-context-fn send-and-drain-fn ctx parent-session-id step-id step-def workflow-run]
+  "Resolve a delegate step by creating + driving a child workflow run.
+
+   `resolve-inherited-defaults-fn` is an injected closure
+   `(ctx parent-session-id workflow-run step-id) → snapshot` (mirroring the
+   existing injected `create-workflow-context-fn`/`send-and-drain-fn` params).
+   It derives the delegating step's effective-config inherited-defaults snapshot
+   (run snapshot ⊕ step overrides), captured at sub-delegation creation
+   (task 207, Decision 3/7a). `delegate.clj` does NOT require
+   `workflow-step-session-config` — that reverse require is a certain cycle
+   (P1) — so the resolver is reached via this injected fn, bound by the caller
+   (which depends on both components)."
+  [create-workflow-context-fn send-and-drain-fn resolve-inherited-defaults-fn ctx parent-session-id step-id step-def workflow-run]
   (let [delegate-spec (:delegate step-def)
         target (:target delegate-spec)
         {:keys [target-name]} (resolve-delegate-target-definition ctx workflow-run target)
         prompt-string (workflow-source-resolution/render-delegate-prompt-string workflow-run (:prompt-string delegate-spec))
         context (workflow-source-resolution/resolve-delegate-context workflow-run (:context delegate-spec))
+        inherited-defaults (when resolve-inherited-defaults-fn
+                             (resolve-inherited-defaults-fn ctx parent-session-id workflow-run step-id))
         [state' delegate-run-id _]
         (workflow-runtime/create-run @(:state* ctx)
-                                     {:definition-id target-name
-                                      :parent-session-id parent-session-id
-                                      :workflow-input prompt-string
-                                      :workflow-original context})
+                                     (cond-> {:definition-id target-name
+                                              :parent-session-id parent-session-id
+                                              :workflow-input prompt-string
+                                              :workflow-original context}
+                                       inherited-defaults (assoc :inherited-defaults inherited-defaults)))
         _ (reset! (:state* ctx) state')
         delegate-wf-ctx (create-workflow-context-fn ctx parent-session-id delegate-run-id)
         _ (send-and-drain-fn delegate-wf-ctx (:wm delegate-wf-ctx) :workflow/start nil)

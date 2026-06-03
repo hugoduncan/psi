@@ -84,6 +84,42 @@
       (is (= "session-delegator"
              (get-in run [:history 0 :data :parent-session-id]))))))
 
+(deftest create-run-persists-inherited-defaults-snapshot-test
+  (testing "create-run records the inherited-defaults snapshot verbatim and the
+            run validates against workflow-run-schema (task 207)"
+    (let [[state1 definition-id _]
+          (workflow-registry/register-definition {:workflows (workflow-model/initial-workflow-state)}
+                                                 registered-definition)
+          snapshot {:model {:provider "anthropic" :id "claude-test"}
+                    :prompt-mode :concise
+                    :tool-defs [{:name "read"}]
+                    :skills [{:name "skill-a"}]
+                    :thinking-level :high
+                    :speed-mode :fast
+                    :effort-override :xhigh}
+          [_ _ run]
+          (workflow-runtime/create-run state1 {:definition-id definition-id
+                                               :run-id "run-with-snapshot"
+                                               :parent-session-id "session-delegator"
+                                               :inherited-defaults snapshot
+                                               :workflow-input {:task "ship it"}})]
+      (is (= snapshot (:inherited-defaults run))
+          "snapshot persisted verbatim, no resolution")
+      (is (workflow-model/valid-workflow-run? run)
+          "run with inherited-defaults validates against the schema"))))
+
+(deftest create-run-without-inherited-defaults-omits-key-test
+  (testing "create-run without :inherited-defaults omits the key (back-compat)"
+    (let [[state1 definition-id _]
+          (workflow-registry/register-definition {:workflows (workflow-model/initial-workflow-state)}
+                                                 registered-definition)
+          [_ _ run]
+          (workflow-runtime/create-run state1 {:definition-id definition-id
+                                               :run-id "run-no-snapshot"
+                                               :workflow-input {:task "ship it"}})]
+      (is (not (contains? run :inherited-defaults)))
+      (is (workflow-model/valid-workflow-run? run)))))
+
 (deftest update-run-workflow-input-test
   (testing "update-run-workflow-input replaces workflow input and records history"
     (let [[state1 definition-id _]
@@ -116,7 +152,27 @@
       (is (= :running (:status resumed-run)))
       (is (nil? (:blocked resumed-run)))
       (is (= resumed-run (workflow-runtime/workflow-run-in state4 run-id)))
-      (is (= :workflow/resume (-> resumed-run :history last :event))))))
+      (is (= :workflow/resume (-> resumed-run :history last :event)))))
+
+  (testing "AC8: resume reuses the original invoke-time inherited-defaults
+            snapshot (no re-capture)"
+    (let [[state1 definition-id _]
+          (workflow-registry/register-definition {:workflows (workflow-model/initial-workflow-state)}
+                                                 registered-definition)
+          snapshot {:model {:provider "anthropic" :id "claude-snapshot"}
+                    :prompt-mode :concise
+                    :speed-mode :fast
+                    :effort-override :xhigh}
+          [state2 run-id _]
+          (workflow-runtime/create-run state1 {:definition-id definition-id
+                                               :run-id "run-resume-snap"
+                                               :inherited-defaults snapshot
+                                               :workflow-input {:input "x"}})
+          state3 (assoc-in state2 [:workflows :runs run-id :status] :blocked)
+          [_ resumed-run]
+          (workflow-runtime/resume-run state3 run-id)]
+      (is (= snapshot (:inherited-defaults resumed-run))
+          "resume preserves the original snapshot verbatim"))))
 
 (deftest cancel-run-test
   (testing "cancel-run marks a run cancelled and records terminal outcome/history"

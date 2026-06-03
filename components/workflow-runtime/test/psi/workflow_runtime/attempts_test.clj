@@ -101,6 +101,8 @@
                 :top-logprobs 2
                 :tool-defs [{:name "read"}]
                 :thinking-level :off
+                :speed-mode :fast
+                :effort-override :xhigh
                 :model {:provider "openai" :id "gpt-5"}
                 :skills [{:name "skill-a"}]
                 :developer-prompt "dev"
@@ -120,6 +122,8 @@
                   :top-logprobs 2
                   :tool-ids ["read"]
                   :thinking-level :off
+                  :speed-mode :fast
+                  :effort-override :xhigh
                   :model {:provider "openai" :id "gpt-5"}
                   :skills [{:name "skill-a"}]
                   :developer-prompt "dev"
@@ -130,7 +134,10 @@
                   :workflow-run-id "run-1"
                   :workflow-step-id "plan"
                   :workflow-attempt-id "attempt-1"
-                  :workflow-owned? true}
+                  :workflow-owned? true
+                  ;; task 207 (R4): step-attempt children are snapshot-governed,
+                  ;; so the inherited fields must not fall back to the live parent.
+                  :inherited-snapshot? true}
                  (first @create-calls*)))
           (is (= {:type :ranked-model-candidates
                   :candidates [{:provider "x" :id "y"}]}

@@ -10,7 +10,8 @@
    [psi.agent-session.workflow-run-retention :as workflow-run-retention]
    [psi.workflow-runtime.ir :as workflow-ir]
    [psi.workflow-runtime.core :as workflow-runtime]
-   [psi.workflow-registry.registry :as workflow-registry]))
+   [psi.workflow-registry.registry :as workflow-registry]
+   [psi.workflow-step-session-config.core :as workflow-step-session-config]))
 
 (defn- terminal-outcome-error-message
   "Extract a human-readable error message from a workflow run's terminal-outcome."
@@ -92,10 +93,14 @@
                   :psi.workflow/status
                   :psi.workflow/error]}
   (try
-    (let [[new-state created-run-id workflow-run]
+    (let [inherited-defaults (when session-id
+                               (workflow-step-session-config/resolve-inherited-defaults-snapshot
+                                agent-session-ctx session-id))
+          [new-state created-run-id workflow-run]
           (workflow-runtime/create-run @(:state* agent-session-ctx)
                                        (cond-> {:definition-id definition-id}
                                          session-id (assoc :parent-session-id session-id)
+                                         inherited-defaults (assoc :inherited-defaults inherited-defaults)
                                          workflow-input (assoc :workflow-input workflow-input)
                                          run-id (assoc :run-id run-id)))]
       (reset! (:state* agent-session-ctx) new-state)

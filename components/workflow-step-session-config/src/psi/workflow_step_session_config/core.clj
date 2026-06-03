@@ -16,6 +16,32 @@
    [psi.workflow-runtime.execution-adapter :as execution-adapter]
    [psi.workflow-runtime.statechart :as workflow-statechart]))
 
+;;; Inherited-defaults snapshot field-set authority (Decision 8a).
+;;;
+;;; The workflow inherited-defaults snapshot is a narrow resolved-default set:
+;;; the fields a step inherits when it gives no override of its own. Its source
+;;; keys span two `session-state/init` authorities so the snapshot field list is
+;;; validated against (not re-enumerated independently from) the canonical
+;;; child-session inheritance constants.
+
+(def inherited-defaults-source-keys
+  "Authority source keys for the inherited-defaults snapshot (Decision 8a).
+
+   `:from-common` keys must each be members of
+   `session-init/common-inherited-fields`; `:from-model` keys must each be
+   members of `session-init/model-identity-fields`. The resolved snapshot maps
+   the raw `:tool-ids`/`:skill-ids` source keys to resolved `:tool-defs`/
+   `:skills`."
+  {:from-common #{:prompt-mode :speed-mode :effort-override :tool-ids :skill-ids}
+   :from-model #{:model :thinking-level}})
+
+(def inherited-defaults-snapshot-keys
+  "The resolved key set produced by an inherited-defaults snapshot.
+
+   Derived from `inherited-defaults-source-keys` with the resolved-vs-raw
+   substitution `:tool-ids`→`:tool-defs`, `:skill-ids`→`:skills`."
+  #{:model :prompt-mode :tool-defs :skills :thinking-level :speed-mode :effort-override})
+
 (defn- effective-step-def
   [workflow-run step-id]
   (get (workflow-statechart/effective-steps (:effective-definition workflow-run)) step-id))
@@ -160,12 +186,41 @@
         authoritative-parent-session-id (or parent-session-id
                                             (:parent-session-id workflow-run)
                                             (some->> (execution-adapter/list-context-sessions ctx) first :session-id))
-        parent-session (execution-adapter/get-session-data ctx authoritative-parent-session-id)
-        parent-session-model (:model parent-session)
-        parent-session-prompt-mode (:prompt-mode parent-session)
-        session-skills (skill-storage/all-skills @(:state* ctx) parent-session)
-        tool-source (ss/agent-tool-source-in ctx authoritative-parent-session-id)
-        session-tool-defs (tool-defs/resolve-tool-defs tool-source (:tool-ids parent-session))
+        ;; Inherited-defaults snapshot, captured at invoke time (task 207).
+        ;; When present, the seven inherited defaults are sourced from the
+        ;; snapshot instead of live parent reads (per-field source swap, P5);
+        ;; when absent (pre-existing runs) the live-read path is retained (AC 6).
+        snapshot (:inherited-defaults workflow-run)
+        snapshot? (some? snapshot)
+        ;; The live parent read is only consumed by the no-snapshot
+        ;; else-branches (R1); gate it on snapshot? so the snapshot path
+        ;; performs no live parent re-read, matching the isolation intent.
+        parent-session (when-not snapshot?
+                         (execution-adapter/get-session-data ctx authoritative-parent-session-id))
+        ;; Single source for the seven inherited defaults (CS1): each field is
+        ;; resolved once, from the snapshot when present (isolation intent) or
+        ;; the live parent otherwise. Downstream code reads `inherited` rather
+        ;; than re-expressing the snapshot-vs-live choice per field, so the
+        ;; `inherited-defaults-snapshot-keys` set is consumed as one unit and
+        ;; adding/removing an inherited field touches this map alone.
+        ;; `:tool-defs`/`:skills` are the resolved name-resolution POOLS.
+        ;;
+        ;; The live-read branch keeps the pre-task non-inheritance of
+        ;; :thinking-level/:speed-mode/:effort-override (AC6 back-compat:
+        ;; snapshot-less runs emit no speed/effort and fall thinking-level back
+        ;; to base-meta/:off — only the snapshot path carries these three;
+        ;; I1/P2), so it omits those keys (absent ⇒ nil in the consumers).
+        inherited (if snapshot?
+                    (select-keys snapshot inherited-defaults-snapshot-keys)
+                    {:model (:model parent-session)
+                     :prompt-mode (:prompt-mode parent-session)
+                     :skills (skill-storage/all-skills @(:state* ctx) parent-session)
+                     :tool-defs (let [tool-source (ss/agent-tool-source-in ctx authoritative-parent-session-id)]
+                                  (tool-defs/resolve-tool-defs tool-source (:tool-ids parent-session)))})
+        ;; parent-session-model is the inherited model WHOLESALE (P4): all four
+        ;; consumers (step override, base-meta override, no-override fallback,
+        ;; model-query selection context) see it.
+        parent-session-model (:model inherited)
         session-spec (:session step-def)
         developer-prompt (or (:system-prompt session-spec)
                              (:system-prompt base-meta))
@@ -193,19 +248,84 @@
     (cond->
      (merge
       {:developer-prompt (compose-system-prompt developer-prompt framing-prompt)
-       :prompt-mode parent-session-prompt-mode
+       :prompt-mode (:prompt-mode inherited)
        :response-mode (or (:response-mode session-spec) :streaming)
-       :tool-defs (resolve-step-tool-defs session-tool-defs (:tools session-spec))
+       :tool-defs (resolve-step-tool-defs (:tool-defs inherited) (:tools session-spec))
+       ;; thinking-level precedence is uniform with :model (CS2): step override
+       ;; → inherited default → base-meta → fallback, so the inherited parent
+       ;; value dominates a static :workflow-file-meta default exactly as the
+       ;; inherited model does (resolved-model cond), not the inverse.
        :thinking-level (or (:thinking-level session-spec)
+                           (:thinking-level inherited)
                            (:thinking-level base-meta)
                            :off)
-       :skills (resolve-step-skills ctx session-skills (:skills session-spec))
+       :skills (resolve-step-skills ctx (:skills inherited) (:skills session-spec))
        :model resolved-model
        :prompt-component-selection (:prompt-component-selection session-spec)}
       (resolved-logprob-config session-spec))
+
+      ;; speed-mode/effort-override flow from the inherited defaults into the
+      ;; step's resolved config (the resolver emits neither today — I1/P2).
+      (some? (:speed-mode inherited))
+      (assoc :speed-mode (:speed-mode inherited))
+
+      (some? (:effort-override inherited))
+      (assoc :effort-override (:effort-override inherited))
 
       (contains? session-spec :temperature)
       (assoc :temperature (:temperature session-spec))
 
       model-fallback
       (assoc :model-fallback model-fallback))))
+
+(defn resolve-inherited-defaults-snapshot
+  "Top-level inherited-defaults snapshot resolver (Decisions 6a, 7a).
+
+   Resolves the inheritable default session details from the live parent
+   session at workflow-invoke time, producing the resolved snapshot map captured
+   on the run's canonical state. Impure: performs ctx reads
+   (`get-session-data`, `all-skills`, tool source resolution).
+
+   The five model/prompt/tools/skills/thinking-level reads mirror
+   `resolve-step-session-config`'s no-override path. It additionally reads
+   `:speed-mode` and `:effort-override` from the parent session — two reads the
+   resolver does not have today (Decision 1 / I1).
+
+   Returns exactly `inherited-defaults-snapshot-keys`. `:model` is the parent's
+   `{:provider :id}`-shaped value, copied verbatim (resolved P3)."
+  [ctx parent-session-id]
+  (let [parent-session (execution-adapter/get-session-data ctx parent-session-id)
+        session-skills (skill-storage/all-skills @(:state* ctx) parent-session)
+        tool-source (ss/agent-tool-source-in ctx parent-session-id)
+        session-tool-defs (tool-defs/resolve-tool-defs tool-source (:tool-ids parent-session))]
+    {:model (:model parent-session)
+     :prompt-mode (:prompt-mode parent-session)
+     :tool-defs session-tool-defs
+     :skills session-skills
+     :thinking-level (or (:thinking-level parent-session) :off)
+     :speed-mode (:speed-mode parent-session)
+     :effort-override (:effort-override parent-session)}))
+
+(defn effective-config->snapshot
+  "Nested inherited-defaults snapshot projection (Decisions 3, 7a).
+
+   Pure projection: maps a delegating step's already-resolved effective config
+   (run snapshot ⊕ step overrides, as produced by `resolve-step-session-config`)
+   plus the parent run's snapshot into the inherited-defaults snapshot field set.
+   No ctx reads.
+
+   The five resolver-emitted inherited keys (`:model :prompt-mode :tool-defs
+   :skills :thinking-level`) come from the effective config. `:speed-mode` and
+   `:effort-override` come from `parent-snapshot` because
+   `resolve-step-session-config` emits neither (resolved I1/P2) — a projection
+   over the effective config alone would silently drop them under delegation.
+   `:model` is the effective config's already `{:provider :id}`-shaped value
+   (resolved P3)."
+  [effective-config parent-snapshot]
+  {:model (:model effective-config)
+   :prompt-mode (:prompt-mode effective-config)
+   :tool-defs (:tool-defs effective-config)
+   :skills (:skills effective-config)
+   :thinking-level (or (:thinking-level effective-config) :off)
+   :speed-mode (:speed-mode parent-snapshot)
+   :effort-override (:effort-override parent-snapshot)})
