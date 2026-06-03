@@ -1524,3 +1524,23 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
       verbatim in the shipped EDN. Verified green with TT-B/TT-C (2 tests, 67
       assertions, 0 failures); `clj-kondo` 0; `clj-paren-repair` Success; file
       337 lines (< 800); `bb commit-check:file-lengths` exit 0.
+
+## Test review follow-ups (review pass 20 — task-test-review)
+
+- [ ] TT-E — `reduce-incidental-complexity-test`'s early-stop block locks only
+      the worktree half of the design's two-part early stop. Design Deliverable 2,
+      Step 1 **Early stop** bullet: "if no qualifying unit exists, stop and
+      report — do not create a worktree **or task**". The EDN step-3 emits BOTH
+      `Do NOT create a worktree` and `Do NOT create a task`, but the test's
+      "select-and-create prompt encodes the early-stop-on-no-target intent" block
+      asserts only `.contains "Do NOT create a worktree"` (+ the `no unit qualif`
+      sentinel). The task half is uncovered: a regress dropping
+      `Do NOT create a task.` — letting a no-target run create an orphan task dir
+      while still skipping the worktree — passes every existing test green. Same
+      TR13/TR14-class symmetry gap (one half of a two-part contract locked, the
+      sibling half left uncovered) and the same substring-lock kind TT-B/C/D use.
+      Fix: extend the existing early-stop `testing` block in
+      `reduce-incidental-complexity-test` with an assert that `select-text`
+      contains `Do NOT create a task`. Test-only substring lock on the shipped
+      `reduce-incidental-complexity.edn`; no production/skill/EDN change; file is
+      337 lines (< 800 `components/` guard). Run focused task-204 ns + `clj-kondo`.

@@ -3500,3 +3500,42 @@ Verification: focused task-204 ns green (2 tests, 67 assertions, 0 failures —
 ticked.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## 2026-06-03 — Test review pass 20 (task-test-review, independent)
+
+Applied `task-test-review` (`well_formed ∧ ∀b∈behaviour(design).∃t.covers(t,b) ∧
+infra_deps injectable/nullable/¬mock`) fresh to the two task-204 test namespaces.
+Tests are well-formed and green (11 tests, 145 assertions, 0 failures across
+`task-204-workflow-definitions-test` + `incidental-complexity-finder-skill-test`).
+Infra deps are clean — real `workflow-loader`/`skills` loaders over temp dirs,
+real `jq` with an availability guard + structural fallback, no mocks/stubs
+(`with-redefs` only redirects the workflow-dir config to a real temp dir, not
+behaviour). Coverage is otherwise strong after passes 1–19 (gate flags,
+baselines + capture commands, worktree-relative paths, A5/A2 key + direction,
+two-phase contract, no-push/PR, base-refresh, the full skill recipe surface, the
+wrapper `:context` locks).
+
+One **named design early-stop behaviour embedded verbatim in the shipped
+`reduce-incidental-complexity.edn` step-1 prompt is NOT fully locked**
+(`∃b∈behaviour(design). ¬∃t.covers(t,b)`):
+
+- **TT-E — early-stop "no task" half.** Design Deliverable 2, Step 1
+  **Early stop** bullet: "if no qualifying unit exists, stop and report — do not
+  create a worktree **or task**". The early stop has TWO suppressed effects: no
+  worktree AND no task. The EDN step-3 emits both `Do NOT create a worktree` and
+  `Do NOT create a task`, but `reduce-incidental-complexity-test`'s early-stop
+  block asserts only `.contains "Do NOT create a worktree"` (plus the
+  `no unit qualif` sentinel). The task half is unlocked: a regress dropping
+  `Do NOT create a task.` — letting the workflow create an orphan task dir on a
+  no-target run while still skipping the worktree — passes every existing test
+  green. This is the same TR13/TR14-class symmetry gap (one half of a two-part
+  contract locked, the sibling half left uncovered) and the same substring-lock
+  kind TT-B/C/D already use. Fix: extend the existing
+  "select-and-create prompt encodes the early-stop-on-no-target intent" block
+  with an assert that `select-text` contains `Do NOT create a task`. Test-only
+  substring lock on the shipped EDN; no production/skill/EDN change; file is 337
+  lines (< 800 `components/` guard).
+
+Added TT-E as an unchecked follow-up in steps.md.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
