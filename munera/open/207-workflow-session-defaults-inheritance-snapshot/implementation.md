@@ -1956,3 +1956,41 @@ code-shaper section and the pass-9 header was introduced by the earlier
 code-shaper review (`65af82156`), not pass 9; CS2's work is already implemented
 and recorded under the checked CS2 above. Left untouched per the "do not execute
 items that predate the preceding review pass" constraint.
+
+## Test-review pass 10 (test-shaper, ψ, 2026-06-02)
+
+Applied test-shaper (clarity ∧ signal ∧ robustness ∧ economical) across all
+touched test files: `inheritance_snapshot_test.clj` (12 tests / 62 assertions),
+`workflow_runtime/core_test.clj` snapshot+resume blocks, `canonical_workflows_test.clj`
+S4 capture, `canonical_workflows_snapshot_test.clj` (Decision 5b), and
+`workflow_tools_test.clj`. Focused runs green and deterministic: snapshot ns
+12/62, the four agent-session/workflow-runtime ns 23 tests / 216 assertions, 0
+failures.
+
+Assessment — no new actionable test-quality findings:
+- Mock-free (zero `with-redefs`); seams are real (dispatch register-skill,
+  agent tool-source, real registered models for AC7) — testing-without-mocks
+  satisfied.
+- Behavior-focused: assertions read resolved config outputs (`:model`,
+  `:prompt-mode`, `:tool-defs`, `:skills`, `:thinking-level`, `:speed-mode`,
+  `:effort-override`, model-fallback ranking), not internals.
+- Discriminating signal: snapshot-vs-live use DISTINCT values for the same key
+  (claude-snapshot vs claude-LIVE-CHANGED; from-snapshot vs from-live tool/skill
+  descriptions; two distinct real models for AC7), so a regression re-reading
+  the live parent flips the assertion rather than passing silently.
+- Meaningful failures: every `is` carries a contract-stating message.
+- Economical AC coverage: AC1/2/3 (iso + tools/skills iso), AC4 (projection +
+  e2e delegate + nested live-mutation isolation), AC5, AC6, AC7, AC8 (resume),
+  Decision 5b (fresh continue), field-set authority drift guard.
+- Determinism: no time/random/IO; fixed run-ids and seeded session data.
+
+Known inconsistency, NOT re-flagged: the unchecked duplicate `CS2` item in
+steps.md (between the code-shaper section and the pass-9 header) is a verbatim
+copy of the already-`[x]` CS2; its requested test
+(`snapshot-thinking-level-precedence-matches-model-test`) exists and passes.
+Pass 9 already documented this as a pre-pass-9 leftover (`65af82156`) left
+untouched per the "do not execute items predating the preceding pass"
+constraint. Re-removing or re-flagging it would contradict that recorded
+decision and duplicate an existing note, so no new step is added.
+
+Conclusion: test suite is well-shaped; review complete, no actionable feedback.
