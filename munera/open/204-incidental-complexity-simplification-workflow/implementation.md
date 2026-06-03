@@ -3804,6 +3804,40 @@ No follow-up items added.
 
 PASS_STATUS: REVIEW_COMPLETE
 
+## Test review (review pass 31 — task-test-review)
+
+One new actionable coverage gap (TT-N). The `worktree_path:`/`munera_task_path:`
+handoff is a producer/consumer pair keyed on literal field-name tokens: the
+outer `reduce-incidental-complexity` step-1 **emits** them and the wrapper
+`task-lifecycle-in-worktree` `resolve-worktree` step **extracts** them (calls
+`work-on` from `worktree_path:`, yields the `munera_task_path:` value). The
+**producer/emit** side is locked (`reduce-incidental-complexity-test`
+"select-and-create prompt emits the worktree_path:/munera_task_path: handoff
+fields", asserting both tokens in `select-text`), but the **consumer/extract**
+side is **not**: `task-lifecycle-in-worktree-test`'s F1/TR7 blocks assert only
+generic prose on `resolve-text` ("call `work-on` with the extracted worktree
+path", "respond with ONLY the Munera task path") and the `NO_TARGET` sentinel —
+never the literal `worktree_path:`/`munera_task_path:` field tokens the wrapper
+must read. `grep` confirms both tokens appear in the task-204 test only against
+`select-text` (lines 254–258), never `resolve-text`. The shipped
+`task-lifecycle-in-worktree.edn` `resolve-worktree` prompt does reference both
+tokens verbatim (the no-target check keys on "BOTH a `worktree_path:` line AND a
+`munera_task_path:` line"). A regress renaming the tokens the wrapper extracts
+(e.g. `worktree_path:` → `worktree:`, `munera_task_path:` → `task_path:`) would
+break the live handoff — the wrapper would fail to find the worktree path and
+never call `work-on`, defeating Locked-decision-11 cross-`:delegate` worktree
+continuity — yet pass every existing wrapper test green. This is the same
+producer/consumer field-name symmetry gap the TT class has been closing
+(TT-J tools, TT-A skills, TT-B base-refresh): the emit side is locked, the
+read side is not. Per `∀b∈behaviour(design).∃t.covers(t,b)` (design acceptance:
+"the wrapper's `resolve-worktree` `:session` step re-calls `work-on` from the
+**threaded `worktree_path:`**" and Step 2 wrapper #1: "extract `worktree_path:`
+and `munera_task_path:` from the step-1 handoff"). Follow-up TT-N added.
+Test-only — no production/skill/EDN change. Tests green this pass (13 tests,
+182 assertions, 0 failures).
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
+
 ## 2026-06-03 — Test review (task-test-review, pass 24)
 
 Re-reviewed the task's tests against `∀b ∈ behaviour(design). ∃t. covers(t,b)`,

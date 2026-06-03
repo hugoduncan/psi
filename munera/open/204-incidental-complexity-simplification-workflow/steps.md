@@ -1979,3 +1979,41 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
       Verify: `:unit` focused run no longer spawns `bb gordian`; the real-lens
       test still runs under `clojure:test:integration`; `clj-kondo` 0 findings;
       `clj-paren-repair` Success; `bb commit-check:file-lengths` exit 0.
+
+## Test review follow-ups (review pass 31 — task-test-review)
+
+- [ ] TT-N — Lock the wrapper's **consumer-side** handoff field-name extraction
+      in `task-lifecycle-in-worktree-test`. The
+      `worktree_path:`/`munera_task_path:` handoff is a producer/consumer pair
+      keyed on literal field-name tokens: the outer `reduce-incidental-complexity`
+      step-1 **emits** them (locked in `reduce-incidental-complexity-test`:
+      `select-text` contains `worktree_path:` + `munera_task_path:`, lines
+      254–258) and the wrapper `resolve-worktree` step **extracts** them (calls
+      `work-on` from `worktree_path:`, yields the `munera_task_path:` value). The
+      emit side is locked; the extract side is **not** — F1/TR7 assert only
+      generic prose on `resolve-text` ("call `work-on` with the extracted
+      worktree path", "respond with ONLY the Munera task path") + the `NO_TARGET`
+      sentinel, never the literal field tokens. `grep` confirms both tokens
+      appear in `task_204_workflow_definitions_test.clj` only against
+      `select-text`, never `resolve-text`. The shipped
+      `task-lifecycle-in-worktree.edn` `resolve-worktree` prompt references both
+      tokens verbatim (no-target check keys on "BOTH a `worktree_path:` line AND
+      a `munera_task_path:` line"). A regress renaming the tokens the wrapper
+      extracts (`worktree_path:` → `worktree:`, `munera_task_path:` →
+      `task_path:`) breaks the live handoff (wrapper never finds the worktree
+      path, never calls `work-on`, defeating Locked-decision-11 cross-`:delegate`
+      worktree continuity) yet passes every existing wrapper test green. Same
+      producer/consumer field-name symmetry gap TT-J (tools)/TT-A (skills)/TT-B
+      (base-refresh) closed for the emit side. Design acceptance names the
+      tokens: "the wrapper's `resolve-worktree` `:session` step re-calls
+      `work-on` from the **threaded `worktree_path:`**" and Step 2 wrapper #1
+      ("extract `worktree_path:` and `munera_task_path:` from the step-1
+      handoff").
+      Fix (test-only — no production/skill/EDN change): add a `testing` block to
+      `task-lifecycle-in-worktree-test` (same task-204 ns) asserting
+      `resolve-text` (already bound via `step-template-text resolve-step`)
+      contains both `"worktree_path:"` and `"munera_task_path:"` — the consumer
+      half of the handoff contract, symmetric to the
+      `reduce-incidental-complexity-test` emit lock. Place it alongside the
+      F1/TR7 resolve-worktree blocks. Run focused task-204 ns + `clj-kondo` +
+      `clj-paren-repair`; keep under the 800-line `components/` guard.
