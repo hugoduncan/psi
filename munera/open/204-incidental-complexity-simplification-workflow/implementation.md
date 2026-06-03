@@ -4175,3 +4175,53 @@ task-204 ns green (3 tests, 91 assertions, 0 failures — +3 over pass-26/27's 8
 `bb commit-check:file-lengths` exit 0.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Test review pass 29 (task-test-review) — saturation check
+
+**Finding: no new actionable issue.** Re-ran the full task-test-review criterion
+(`well_formed(tests) ∧ ∀b∈behaviour(design).∃t.covers(t,b) ∧ infra_deps
+injectable/nullable ∧ ¬mock ∧ ¬stub`) against both task-204 test namespaces.
+
+- **Well-formed / green:** focused run of
+  `task-204-workflow-definitions-test` + `incidental-complexity-finder-skill-test`
+  = **13 tests, 180 assertions, 0 failures**. Tests are clear, each `testing`
+  block carries a rationale comment + a regress-it-would-catch note; every
+  executable recipe test has a jq/bb-absent structural fallback so the lock holds
+  whether or not the CLIs are installed.
+- **No mocks/stubs:** the only seam is `with-redefs` on
+  `global-workflow-dirs`/`project-workflow-dir` pointing the *real* loader at a
+  real temp dir (established `workflow_definitions_test.clj` convention) — a
+  test-config injection over real I/O, not a logic stub. The real-lens
+  integration test (TT-L) and recipe tests run the actual `bb gordian` / `jq`
+  CLIs. No interaction assertions; all asserts are on state/output.
+- **Behaviour coverage:** all substantive design-acceptance behaviours are
+  covered — skill recipe (determinism/losslessness TR1+TR4, filter+A1-drop TR6,
+  ranking+cap TR9, max-cc guard TR16, empty-qualification TR17, boundary TR18,
+  projection contract TR21, real-lens integration TT-L, content-lock TR1/TR3/F5/
+  TT-F); wrapper (3-step shape, work-on tool, delegate target/prompt-string/
+  context TR14, NO_TARGET short-circuit F1+TR19, positive-path TR7/TR10); outer
+  (2-step shape, 5 tools TT-J + 3 skills TT-A, input wiring TR15, delegate
+  target/prompt-string/context TR13, handoff fields, early-stop, gate flags +
+  both baselines, worktree-relative paths TR11, generated-design contract
+  TR2/TT-I/TT-M, A5/A2 keys+direction F3/TT-D, metric-derived touched-set TT-G,
+  base-refresh TT-B, baseline-capture commands TT-C, worktree-scoped task
+  creation TT-H, no-push endpoint TR8); reference-chain co-load TT-K.
+
+**Candidates considered and judged below the behaviour-coverage threshold (no
+follow-up):**
+- Worktree description derived from target (`simplify <ns>/<var>`, step-1 prompt
+  §4) — cosmetic branch-naming; a regress to a generic description breaks no
+  data-flow or downstream resolution. Lower value than the locked
+  correctness-affecting clauses (TT-B/TT-C/TT-H).
+- `git fetch` / `work-on`-unavailable stop guards (prompt §1/§4) — prompt-level
+  robustness, not a named design behaviour.
+- The three structured-handoff headings (`## Selection Outcome` /
+  `## Munera Task` / `## Handoff Data`) — implementation detail; the design
+  contracts only the `worktree_path:`/`munera_task_path:` *fields*, which are
+  already locked.
+
+The design-named behaviours are saturated by the existing suite. No new test is
+warranted; adding the marginal candidates above would be low-value churn against
+the simplicity/robustness ethos.
+
+PASS_STATUS: REVIEW_COMPLETE
