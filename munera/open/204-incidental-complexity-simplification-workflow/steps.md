@@ -1733,7 +1733,7 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
 
 ## Test review follow-ups (review pass 25 — task-test-review)
 
-- [ ] TT-J — Lock all five design-named step-1 `:tools` in
+- [x] TT-J — Lock all five design-named step-1 `:tools` in
       `reduce-incidental-complexity-test`. Design Deliverable 2, Step 1 first
       bullet names the step-1 tools verbatim: "Tools include `read`, `bash`,
       `edit`, `write`, `work-on`", and the shipped
@@ -1752,3 +1752,15 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
       existing `"work-on"` lock. Test-only; no production/skill/EDN change.
       Verify the focused task-204 ns green, `clj-kondo` 0, `clj-paren-repair`
       Success, `bb commit-check:file-lengths` clean.
+      RESOLUTION: extended `reduce-incidental-complexity-test`'s
+      select-and-create tools/skills `testing` block (same task-204 ns,
+      test-only, no production/skill/EDN change) with `:tools` membership
+      asserts for `"read"`, `"bash"`, `"edit"`, and `"write"` alongside the
+      pre-existing `"work-on"` lock — closing the symmetric gap TT-A fixed for
+      the skills half of the same Deliverable-2 Step-1 bullet (was 1-of-5 tools
+      locked → now 5-of-5). A regress dropping `bash` (git fetch + bb gordian
+      selection + baseline capture), `edit`/`write` (generated design.md task
+      creation), or `read` now fails green. Renamed the block "…all five
+      design-named tools…" and added a TT-J comment. Focused task-204 ns green
+      (2 tests, 80 assertions, 0 failures); `clj-kondo` 0; `clj-paren-repair`
+      Success; `bb commit-check:file-lengths` clean (400 lines < 800).

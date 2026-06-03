@@ -3915,3 +3915,23 @@ the step-1 tool set is a named design behaviour and is under-covered.
 
 **Recorded as steps.md TT-J (unchecked).** Test-only substring/membership lock;
 no production/skill/EDN change anticipated.
+
+## Test review pass 25 follow-up execution — TT-J resolved
+
+**Change (test-only):** Extended `reduce-incidental-complexity-test`'s
+select-and-create `testing` block in
+`components/workflow-loader/test/psi/workflow_loader/task_204_workflow_definitions_test.clj`
+with `:tools` membership asserts for `"read"`, `"bash"`, `"edit"`, and
+`"write"` alongside the pre-existing `"work-on"` lock — locking all five
+design-named step-1 tools (Deliverable 2, Step 1 first bullet) instead of one.
+Renamed the block to "…all five design-named tools…" and added a TT-J comment
+documenting the symmetric-with-TT-A rationale. No production/skill/EDN change.
+
+**Verification:**
+- `clj-paren-repair` on the test file: Success(1)/Failed(0).
+- `clojure -M:test:kaocha --focus psi.workflow-loader.task-204-workflow-definitions-test`:
+  **2 tests, 80 assertions, 0 failures** (+4 over pass-24's 76).
+- `clj-kondo --lint` on the test file: errors 0, warnings 0.
+- `bb commit-check:file-lengths`: clean (file 400 lines < 800).
+
+TT-J checked in steps.md.

@@ -195,7 +195,21 @@
          (is (= 2 (count steps)))
          (is (= ["select-and-create" "lifecycle-in-worktree"] (mapv :name steps)))
          (is (= [:session :delegate] (mapv :type steps))))
-       (testing "select-and-create :session step carries work-on tool + all three design-named skills"
+       (testing "select-and-create :session step carries all five design-named tools + all three design-named skills"
+         ;; TT-J (test review pass 25, task-test-review): the design (Deliverable
+         ;; 2, Step 1, first bullet) names all five step-1 tools verbatim —
+         ;; read, bash (git fetch + bb gordian selection + baseline capture),
+         ;; edit, write (generated design.md task creation), work-on. Lock all
+         ;; five; a regress dropping read/bash/edit/write previously passed green
+         ;; (only work-on was asserted) — the symmetric gap TT-A closed for skills.
+         (is (some #{"read"} (:tools select-step))
+             "select-and-create tools include read")
+         (is (some #{"bash"} (:tools select-step))
+             "select-and-create tools include bash")
+         (is (some #{"edit"} (:tools select-step))
+             "select-and-create tools include edit")
+         (is (some #{"write"} (:tools select-step))
+             "select-and-create tools include write")
          (is (some #{"work-on"} (:tools select-step))
              "select-and-create tools include work-on")
          ;; TT-A (test review pass 18, task-test-review): the design (Deliverable
