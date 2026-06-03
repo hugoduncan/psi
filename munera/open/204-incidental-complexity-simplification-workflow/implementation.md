@@ -4400,3 +4400,48 @@ PASS_STATUS: REVIEW_COMPLETE
   both tokens verbatim). Verify: focused `:unit` run green (12 tests, 175
   assertions, 0 failures); `clj-kondo` 0 findings; `clj-paren-repair` Success;
   `task_204_workflow_definitions_test.clj` 477 lines (< 800).
+
+## 2026-06-03 — Test review (task-test-review, pass 32) — REVIEW_COMPLETE
+
+Fresh task-test-review pass over the now-saturated test suite (skill content-lock
++ executable recipe tests in `incidental_complexity_finder_skill_test.clj`; the
+`^:integration` real-lens narrow integration test; the two workflow-definition
+deftests + the delegate-set resolution test in
+`task_204_workflow_definitions_test.clj`). Re-ran the focused `:unit` suite green
+(**13 tests, 184 assertions, 0 failures**).
+
+Applied the three task-test-review criteria:
+
+- **well_formed(tests):** ✓ All tests load and pass; fixtures are shared and
+  legible (CS1/CS2 de-duplicated the jq-guard + recipe preamble; TR20 collapsed
+  the redundant builder pair); the slow real-lens test is `^:integration`-tagged
+  (TR22) so the fast suite stays fast and deterministic.
+
+- **∀b ∈ behaviour(design). ∃t. covers(t,b):** ✓ Every named design behaviour is
+  covered. Deliverable 1 (gap method, thresholds, single-unit scope + high-cc
+  guard, A1 drop rule, `(ns,var,arity,line)`/@line join key incl. frontmatter
+  lambda, top-5 judgment guard, evidence + coverage-hint emission, two-lens
+  commands) — locked by the content-lock test + executable recipe tests
+  (determinism/order-independence, filter+drop, ranking+top-5 cap, max(cc,1)
+  guard, empty-qualification early-stop, boundary inclusivity, projection
+  contract) + the real-lens narrow integration test (TT-L). Deliverable 2 (two-
+  step outer shape, five tools + three skills, `{{input}}` entry wiring, early-
+  stop both halves, base-refresh, baseline capture commands + worktree-relative
+  paths, the full two-phase generated contract incl. blast-radius/Phase-0 hard
+  gate/A5+A2 direction+metric-derived touched set/evidence clause, no-push/PR
+  endpoint, worktree-scoped task creation, handoff field-name emit+extract,
+  delegate `:context`, three-step wrapper, NO_TARGET + positive-path summary
+  contract, delegate reference-chain resolution). No uncovered design acceptance
+  behaviour found.
+
+- **infra deps injectable ∧ nullable ∧ ¬mock ∧ ¬stub:** ✓ No mocks/stubs. The
+  recipe/integration tests exec the **real** `jq` and `bb gordian` subprocesses
+  (gated on availability with structural fallbacks, not mocked); the loader tests
+  drive the **real** loader, injecting a temp workflow dir via `with-redefs` on
+  the `global-workflow-dirs`/`project-workflow-dir` config seams (a directory
+  injection, not a behaviour stub).
+
+No new actionable test gaps. Saturation confirmed (cf. pass-29 saturation check,
+TR22/TT-N). No follow-up steps added.
+
+PASS_STATUS: REVIEW_COMPLETE.
