@@ -1,3 +1,4 @@
+- 2026-06-03: Task 204 test-review pass-26 follow-up TT-K complete: added `task-204-workflow-set-loads-together-test` co-loading the three task-204 delegate-chain EDNs (`reduce-incidental-complexity` → `task-lifecycle-in-worktree` → `task-lifecycle`), asserting empty errors, all three register, and each delegate `:target` ∈ combined definitions — the references-resolve check the isolated string-equality asserts couldn't give (loader does not validate targets at load time). Mirrors `review-workflow-set-loads-together-test`. Test-only; 3 tests/88 assertions green, clj-kondo 0, file-lengths clean (445<800). Commit 861e4ccd5.
 # Mementum State
 
 Bootstrapped on 2026-04-02.
