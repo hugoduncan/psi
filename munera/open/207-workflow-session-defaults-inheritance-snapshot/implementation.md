@@ -2024,3 +2024,49 @@ original docs review (`66a26a176`). Re-checked README.md, doc/, CHANGELOG.md.
 - No removed user-facing behaviour to clean up.
 
 No actionable docs findings. Review complete.
+
+## Code-shaper review pass 2 (post-CS1/CS2) (ψ, 2026-06-02)
+
+Independent re-shape after CS1/CS2 landed (`6cad7a672`). Re-read the shipped
+production surface: `workflow-step-session-config/core.clj`
+(`resolve-step-session-config`, `resolve-inherited-defaults-snapshot`,
+`effective-config->snapshot`, field-set constants),
+`workflow-runtime/model.clj` (`inherited-defaults-schema`),
+`workflow-runtime/core.clj` (`create-run`), the two top-level capture sites
+(`mutations/canonical_workflows.clj`, `psi_tool_workflow.clj`), and the nested
+path (`delegate.clj` + `context.clj` injected `resolve-inherited-defaults-fn`).
+
+Assessment — no new actionable code-shaping findings:
+- **Simple**: post-CS1 the seven inherited defaults flow through one `inherited`
+  map; consumers read `inherited` rather than re-expressing snapshot-vs-live per
+  field. Helpers are single-responsibility; the two snapshot producers each have
+  one purpose.
+- **Consistent**: field set is one named authority
+  (`inherited-defaults-snapshot-keys`/`-source-keys`); naming and arg order are
+  uniform; the new injected `resolve-inherited-defaults-fn` matches the
+  established `create-workflow-context-fn`/`send-and-drain-fn` injected-fn idiom.
+- **Robust**: field set validated against `common-inherited-fields`/
+  `model-identity-fields` by a drift test; both producers assert their output
+  keys equal the constant; schema-validated on the run; live-read fallback
+  preserves AC6 back-compat.
+
+Considered but NON-actionable (consistency-with-local-idiom):
+- The two top-level capture sites differ — `canonical_workflows.clj` guards
+  resolution with `(when session-id …)` and conditionally assocs, while
+  `psi_tool_workflow.clj` resolves unconditionally and assocs in the base map.
+  Justified by a real precondition delta: psi-tool calls
+  `(require-session-id! session-id op)` (throws when absent), so its session-id
+  is always present; the mutation tolerates a nil session-id. Divergence is
+  warranted, not drift.
+- `delegate-step-runtime-result` now takes 8 positional params (three injected
+  fns). The design (Decision 7a) deliberately added `resolve-inherited-defaults-fn`
+  *alongside* the two pre-existing injected fns to match the local idiom;
+  converting to an options map would make it inconsistent with the surrounding
+  two params and is out of scope. Matching the established convention is the
+  shaped choice.
+
+Verification: clj-kondo clean (0/0) on the touched namespaces; focused
+`inheritance-snapshot-test` 12 tests / 62 assertions, 0 failures.
+
+Conclusion: production code is well-shaped; review complete, no actionable
+feedback.
