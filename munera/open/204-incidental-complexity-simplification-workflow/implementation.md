@@ -4091,3 +4091,53 @@ findings; `clj-paren-repair` Success; file 626 lines (< 800);
 `bb commit-check:file-lengths` exit 0. steps.md TT-L ticked.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Test review pass 28 (task-test-review) — TT-M
+
+**Finding (ACTIONABLE):** the generated-design contract's **first stated clause**
+— design.md must state "The target unit and the captured incidental-complexity
+evidence" ("Generated task design" section) — and the upstream step-1
+**evidence-capture instruction** (Deliverable 2 Step 1 / Deliverable 1 step 5:
+"emit one chosen target with evidence: ns, var, arity, file, line range,
+lcc-total with per-dimension burdens, cc, gap, the local findings, and a coverage
+hint") have **no test coverage**. Both are present verbatim in the shipped
+`reduce-incidental-complexity.edn` step-1 prompt (step-7 "The target unit and the
+captured incidental-complexity evidence", `grep` 1; step-2 "Capture the chosen
+target's evidence (… the coverage hint)", `grep` 1) but are **absent** from
+`task_204_workflow_definitions_test.clj` (`grep` 0 each).
+
+This is the exact sub-clause-lock symmetry gap the prior passes closed for the
+*sibling* clauses of the **same** generated-design contract: TT-I locked the
+Blast-radius scope fence + Phase-0 hard gate / untestable-tangle handling, TR2
+the Phase-0 characterization-test gate + the behaviour-identical constraint, TT-D
+the A5/A2 direction-of-change, TT-G the metric-derived touched-set. The
+contract's **first** requirement (target unit + captured evidence) and the
+upstream evidence-capture + coverage-hint instruction were left unlocked while
+every neighbouring clause was anchored.
+
+A regress dropping the "captured incidental-complexity evidence" requirement from
+the generated design (the workflow would emit a refactor task with no evidence
+block, defeating the design's stated purpose "produces a target + evidence") or
+dropping the coverage-hint from the step-1 capture (so the generated task does
+not know what test net it faces — directly feeding the Phase-0 coverage gate)
+passes every existing test green. Note the SKILL.md side of the coverage hint IS
+locked (TR3 in `incidental_complexity_finder_skill_test.clj`), but that proves
+only the *skill* documents it, not that the *workflow* step-1 prompt instructs
+capturing/emitting it. Per the task-test-review criterion
+`∀b∈behaviour(design).∃t.covers(t,b)`, these named acceptance behaviours are
+uncovered.
+
+(Reviewed the no-mocks criterion too: the `with-redefs` in the shared loader
+fixtures points `global-workflow-dirs`/`project-workflow-dir` at a temp dir — a
+test-config seam over a real loader run against a real temp directory, mirroring
+the established `workflow_definitions_test.clj` convention; not a logic stub. No
+finding.)
+
+**Recorded as steps.md TT-M (unchecked).** Test-only (no production/skill/EDN
+change): add a `testing` block to `reduce-incidental-complexity-test` (same
+task-204 ns) asserting `select-text` contains both the generated-design first
+clause ("The target unit and the captured incidental-complexity evidence") and
+the step-1 capture instruction ("Capture the chosen target's evidence" + "the
+coverage hint"), placed alongside the TT-I/TR2 contract cluster.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
