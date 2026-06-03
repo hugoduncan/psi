@@ -3697,3 +3697,30 @@ pass-21's 68); `clj-kondo` 0 findings; `clj-paren-repair` Success; file 351
 lines (< 800); `bb commit-check:file-lengths` exit 0. steps.md TT-G ticked.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Test review (pass 23 — task-test-review)
+
+Reviewed task-204 test coverage against design behaviour. Baseline green: 11
+tests, 149 assertions, 0 failures (`task-204-workflow-definitions-test` +
+`incidental-complexity-finder-skill-test`). Infra deps are real, not mocked —
+the skill recipe tests exercise the live `jq` CLI via `clojure.java.shell` over
+temp-file fixtures (jq-absent structural fallback), and the loader/skill tests
+use the real `load-workflow-definitions` / `load-skills-from-dir`. No
+mock/stub/interaction assertions; all assertions are state/output. Skill
+Deliverable-1 behaviours are exhaustively locked (gap method, thresholds, A1
+drop, @line determinism+order-independence, filter/drop, ranking/cap, max(cc,1),
+empty-qualification, boundary inclusivity, projection contract, two-lens
+commands). Workflow/wrapper grammar + prompt contracts are densely locked
+(TT-A..G, TR2/7/8/10/11/13/14/15/19, F1/F3).
+
+ONE new actionable gap found (TT-H, below): the step-1 prompt's **worktree-scoped
+task creation** — the explicit P3 resolution (allocate the task id by scanning
+the WORKTREE's `open/ ∪ closed/`, "not the outer checkout's", so ids do not
+collide; and commit the created task ON THE WORKTREE BRANCH) — is a substantive
+correctness behaviour encoded verbatim in the shipped EDN but anchored by no
+test. A regress reverting to outer-checkout-scoped allocation (reintroducing P3)
+or committing on the wrong branch passes every existing test green. Same
+TT-class symmetry gap as TT-B/TT-G (a prompt-encoded, design-resolved correctness
+behaviour left unlocked). Follow-up added to steps.md.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

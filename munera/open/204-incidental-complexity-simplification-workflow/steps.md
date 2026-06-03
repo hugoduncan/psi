@@ -1634,3 +1634,31 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
       assertions, 0 failures — +1 over pass-21's 68); `clj-kondo` 0 findings;
       `clj-paren-repair` Success; file 351 lines (< 800);
       `bb commit-check:file-lengths` exit 0.
+
+## Test review follow-ups (review pass 23 — task-test-review)
+
+- [ ] TT-H — Lock the step-1 **worktree-scoped task creation** behaviour (the P3
+      resolution) in `reduce-incidental-complexity-test`. Design Deliverable 2,
+      Step 1 ("Allocate the next task id, create munera/open/NNN-slug/…",
+      "Commit the task creation") plus the resolved P3 (implementation.md: NNN is
+      allocated by scanning the WORKTREE's `open/ ∪ closed/`, not the outer
+      checkout's, so the id does not collide; the create + commit happen on the
+      worktree branch so the emitted `munera_task_path:` resolves for the
+      delegated lifecycle). The shipped EDN step-1 prompt encodes this verbatim
+      (step 5: "scanning the WORKTREE's `munera/open/` and `munera/closed/`" +
+      "so the id does not collide with the outer checkout's open tasks"; step 8:
+      "Commit the task creation ON THE WORKTREE BRANCH"). No test anchors it: a
+      regress reverting to outer-checkout-scoped id allocation (reintroducing P3 —
+      colliding with the outer checkout's open tasks) or committing on the wrong
+      branch (so the emitted `munera_task_path:` does not resolve under the
+      delegated `work-on`) passes every existing test green. Same TT-class
+      symmetry gap as TT-B/TT-G: a design-resolved, prompt-encoded correctness
+      behaviour left unlocked. Fix: extend `reduce-incidental-complexity-test`
+      (`components/workflow-loader/test/psi/workflow_loader/task_204_workflow_definitions_test.clj`)
+      with a `testing` block asserting `select-text` contains
+      `scanning the WORKTREE's`, `so the id does not collide with the outer checkout's open tasks`,
+      and `Commit the task creation ON THE WORKTREE BRANCH` (all verified present
+      verbatim in the shipped EDN). Test-only substring lock; no
+      production/skill/EDN change; task-204 test ns is well under the 800-line
+      `components/` length guard. Run focused `task-204-workflow-definitions-test`
+      + `clj-kondo`.
