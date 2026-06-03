@@ -3895,3 +3895,23 @@ untestable-tangle/hard-gate escape hatch) now fails green.
 - `bb commit-check:file-lengths`: exit 0 (file 386 lines < 800).
 
 TT-I checked in steps.md. PASS_STATUS: REVIEW_COMPLETE.
+
+## Test review pass 25 (task-test-review) — TT-J
+
+**Finding (ACTIONABLE):** `reduce-incidental-complexity-test` under-covers the
+step-1 **tool set**. Design Deliverable 2, Step 1 first bullet names five step-1
+tools verbatim: "Tools include `read`, `bash`, `edit`, `write`, `work-on`". The
+shipped `.psi/workflows/reduce-incidental-complexity.edn` step-1 declares all
+five (`:tools ["read" "bash" "edit" "write" "work-on"]`), but the test asserts
+only `(some #{"work-on"} (:tools select-step))`. The other four are uncovered:
+a regress dropping `bash` (which runs `git fetch` + `bb gordian
+local/complexity` selection + baseline capture), `edit`/`write` (the generated
+`design.md` task creation), or `read` passes every existing test green while
+breaking step-1. This is the exact symmetric gap TT-A closed for the *skills*
+half of the same bullet (TT-A locked all three named skills after the test
+locked only one) — the *tools* half of the same enumeration was left at one of
+five. Per the task-test-review criterion `∀b∈behaviour(design).∃t.covers(t,b)`,
+the step-1 tool set is a named design behaviour and is under-covered.
+
+**Recorded as steps.md TT-J (unchecked).** Test-only substring/membership lock;
+no production/skill/EDN change anticipated.

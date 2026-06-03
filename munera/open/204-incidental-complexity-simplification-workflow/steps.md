@@ -1730,3 +1730,25 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
       Focused task-204 ns green (2 tests, 76 assertions, 0 failures — +4 over
       pass-23's 72); `clj-kondo` 0 findings; `clj-paren-repair` Success; file 386
       lines (< 800); `bb commit-check:file-lengths` exit 0.
+
+## Test review follow-ups (review pass 25 — task-test-review)
+
+- [ ] TT-J — Lock all five design-named step-1 `:tools` in
+      `reduce-incidental-complexity-test`. Design Deliverable 2, Step 1 first
+      bullet names the step-1 tools verbatim: "Tools include `read`, `bash`,
+      `edit`, `write`, `work-on`", and the shipped
+      `.psi/workflows/reduce-incidental-complexity.edn` step-1 declares all five
+      (`:tools ["read" "bash" "edit" "write" "work-on"]`). The test
+      (`components/workflow-loader/test/psi/workflow_loader/task_204_workflow_definitions_test.clj`,
+      `reduce-incidental-complexity-test`, "select-and-create … carries work-on
+      tool + all three design-named skills") asserts only
+      `(some #{"work-on"} (:tools select-step))`, so a regress dropping `bash`
+      (runs `git fetch` + `bb gordian local/complexity` selection + baseline
+      capture), `edit`/`write` (the generated `design.md` task creation), or
+      `read` passes green. This is the exact symmetric gap TT-A closed for the
+      *skills* half of the same bullet — the *tools* half was left at one of
+      five. Per `∀b∈behaviour(design).∃t.covers(t,b)`, add `:tools` membership
+      assertions for `"read"`, `"bash"`, `"edit"`, and `"write"` alongside the
+      existing `"work-on"` lock. Test-only; no production/skill/EDN change.
+      Verify the focused task-204 ns green, `clj-kondo` 0, `clj-paren-repair`
+      Success, `bb commit-check:file-lengths` clean.
