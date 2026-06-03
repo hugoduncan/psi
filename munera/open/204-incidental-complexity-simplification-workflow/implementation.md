@@ -4605,3 +4605,41 @@ Both candidates are the low-value churn passes 29/32 already declined against th
 simplicity/robustness ethos. No new test is warranted. Saturation reconfirmed.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Docs review (review-task-docs skill) — pass 2 (2026-06-03, independent confirm)
+
+Fresh independent pass over user-facing docs only (`README.md`, `doc/`,
+`CHANGELOG.md`); task artifacts/tests/internal excluded per skill scope.
+Re-derived each checklist verdict against the live shipped artifacts rather than
+trusting pass-1.
+
+Checklist:
+1. **New behaviours reflected** ✅ — `doc/workflows.md` l.599 §"Incidental-complexity
+   simplification" documents `reduce-incidental-complexity`: `/delegate`
+   invocation, `gap = lcc-total / max(cc,1)` selection, the two-step
+   (`select-and-create`/`lifecycle-in-worktree`) shape, the
+   `task-lifecycle-in-worktree` wrapper, the NO_TARGET early-stop, and the
+   Phase-0/Phase-1 behaviour-preserving contract.
+2. **Removed behaviours** ✅ — purely additive; no stale references.
+3. **Changelog** ✅ — `[Unreleased] → Added` entry is accurate and user-facing
+   (names the `incidental-complexity-finder` skill, gap formula, early-stop,
+   no-push/PR endpoint).
+4. **Examples accurate** ✅ — `/delegate reduce-incidental-complexity` matches the
+   registered workflow `:name`.
+5. **Consistency** ✅ — cross-checked vs live impl this pass:
+   - thresholds `lcc-total ≥ 5.0 ∧ gap ≥ 2.0` ≡ SKILL.md §4 recipe + outer-workflow prompt;
+   - join key `(ns,var,arity,line)` ≡ SKILL.md jq recipe;
+   - gate flags `--fail-on new-cycles,new-high-findings --max-new-medium-findings 0`
+     ≡ generated-design contract **and** verified against live `bb gordian gate --help`
+     (all three flag names exist);
+   - NO_TARGET sentinel ≡ wrapper `resolve-worktree`/`summary` steps;
+   - three-step wrapper (`resolve-worktree → lifecycle[:target task-lifecycle] → summary`)
+     ≡ `task-lifecycle-in-worktree.edn` (doc names the middle step by its target
+     `task-lifecycle`, which is accurate-by-target, not a defect).
+   - No exhaustive workflow enumeration/TOC to keep in sync.
+
+**Finding: no new actionable docs issue.** User docs remain accurate, complete,
+and consistent with meta/spec/code. No follow-up steps added (pass-1 verdict
+re-confirmed independently).
+
+PASS_STATUS: REVIEW_COMPLETE
