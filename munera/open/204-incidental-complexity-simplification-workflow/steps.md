@@ -1407,3 +1407,24 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
       shipped artifact is `.psi/workflows/task-lifecycle-in-worktree.edn` (not
       `.md`). design ↔ plan ↔ implementation now coherent on the wrapper file
       form. Doc-only — no code/test change.
+
+## Test review follow-ups (review pass 18 — task-test-review)
+
+- [ ] TT-A — Lock all three design-named step-1 `:skills` in
+      `reduce-incidental-complexity-test`. The design (Deliverable 2, Step 1)
+      requires step-1 to carry the `incidental-complexity-finder`, `gordian`, and
+      `code-shaper` skills, and the shipped
+      `.psi/workflows/reduce-incidental-complexity.edn` declares all three
+      (`:skills ["incidental-complexity-finder" "gordian" "code-shaper"]`). The
+      test
+      (`components/workflow-loader/test/psi/workflow_loader/task_204_workflow_definitions_test.clj`,
+      `reduce-incidental-complexity-test`, "select-and-create … carries work-on
+      tool + incidental-complexity-finder skill") asserts only
+      `(some #{"incidental-complexity-finder"} (:skills select-step))`, so a
+      regress dropping `gordian` or `code-shaper` passes green. Per the
+      task-test-review criterion `∀b ∈ behaviour(design). ∃t. covers(t,b)`, add
+      assertions that `:skills` contains `"gordian"` and `"code-shaper"` (the
+      selection-methodology + refactor-shaping skills) alongside the existing
+      `incidental-complexity-finder` lock. Test-only; no production/skill/EDN
+      change. Verify the focused task-204 ns green, `clj-kondo` 0,
+      `clj-paren-repair` Success, `bb commit-check:file-lengths` clean.

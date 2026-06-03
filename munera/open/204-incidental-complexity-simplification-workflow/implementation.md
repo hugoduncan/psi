@@ -3367,3 +3367,44 @@ Only unchecked steps.md item is the pre-existing, untriggered Contingency
 follow-up items added.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## task-test-review (independent pass, 2026-06-03)
+
+Applied `task-test-review` to the two task-204 test namespaces
+(`task_204_workflow_definitions_test.clj`,
+`incidental_complexity_finder_skill_test.clj`) against the design behaviours.
+
+**Verdict: ACTIONABLE_FEEDBACK — one minor coverage gap.**
+
+- **Green.** Focused run: 11 tests, 136 assertions, 0 failures.
+- **Well-formed.** Tests assert state/outputs (loader-definition shapes, recipe
+  JSON outputs, prompt substrings), not interactions. The recipe tests drive the
+  *real* embedded `jq` recipe over synthetic fixtures (no mocks/stubs of logic);
+  the jq-absent fallback degrades to structural recipe-fragment locks. The only
+  redefinition is the inherited loader fixture's `with-redefs` of
+  `loader/global-workflow-dirs`/`project-workflow-dir` to point at a temp dir —
+  configuration injection (nulling the global/project dir scan), not logic
+  mocking; consistent with the sibling `workflow-definitions-test` fixture. No
+  change warranted.
+- **Coverage — broad and deep.** TR1–TR21 lock the skill recipe (gap method,
+  qualification filter + inclusive boundary, A1 drop, `(ns,var,arity,line)`
+  determinism, ranking, top-5 cap, max(cc,1) guard, empty-qualification early
+  stop, evidence projection) and both workflows (two/three-step shapes,
+  `:delegate` targets, `:prompt-string`/`:context` wiring, handoff fields,
+  early-stop, gate flags + worktree-relative baselines, two-phase contract,
+  no-push/PR endpoint).
+
+**TT-A (actionable, minor) — step-1 `:skills` membership only partly locked.**
+The design (Deliverable 2, Step 1) names **three** required step-1 skills:
+`incidental-complexity-finder`, `gordian`, and `code-shaper`. The shipped
+`reduce-incidental-complexity.edn` declares all three
+(`:skills ["incidental-complexity-finder" "gordian" "code-shaper"]`), but
+`reduce-incidental-complexity-test` asserts only
+`(some #{"incidental-complexity-finder"} (:skills select-step))`. A regress
+dropping `gordian` or `code-shaper` — the skills that back the selection
+methodology and refactor-shaping framing — passes the suite green. Per
+`∀b ∈ behaviour(design). ∃t. covers(t,b)`, lock all three named skills.
+(Only the build-time manual verification at steps.md line ~152 mentions all
+three; no regression test anchors them.)
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
