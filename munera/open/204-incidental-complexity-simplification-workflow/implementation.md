@@ -4559,3 +4559,49 @@ Success; `clj-kondo` 0 findings; `bb commit-check:file-lengths` clean (file 652
 lines, < 800).
 
 PASS_STATUS: FOLLOW_UP_EXECUTED
+
+## 2026-06-03 — Test review (test-shaper, pass 35) — REVIEW_COMPLETE
+
+Fresh test-shaper pass over `incidental_complexity_finder_skill_test.clj` and
+`task_204_workflow_definitions_test.clj`, re-reading the design acceptance, both
+shipped `.edn` workflows + SKILL.md, and the prior TR/TT/CS follow-ups (TR22/23/24
+resolved). Focused suite green: **13 tests, 186 assertions, 0 failures**.
+
+Applied the test-shaper laws (simple ∧ consistent ∧ robust ∧ economical;
+deterministic ∧ behavior_focused ∧ meaningful_failures ∧ fast_feedback):
+
+- **economical/behaviour coverage — saturated.** Every named design behaviour is
+  covered (cf. pass-32 coverage map): skill recipe determinism/order-independence,
+  filter+A1-drop, ranking+top-5 cap (now output-order-derived, TR24), max(cc,1)
+  guard, empty-qualification early-stop, boundary inclusivity, full
+  projection-rename contract, real-lens narrow integration (TT-L), and the
+  content-lock; both workflows' shapes, tool/skill sets, input wiring, NO_TARGET
+  short-circuit (emit+extract field tokens TT-N), gate flags + both baselines,
+  worktree-relative paths, the full two-phase generated contract, no-push
+  endpoint, and the co-load reference-chain resolution (TT-K).
+- **fast_feedback — clean.** The slow real-lens test is `^:integration`-tagged
+  (TR22); the fast `:unit` suite spawns no `bb gordian`; the `.units`-shape
+  assumption is hoisted into the fast content-lock test.
+- **deterministic / ¬mocks — clean.** No mocks/stubs; recipe/integration tests
+  exec real `jq`/`bb gordian` (availability-gated with structural fallbacks);
+  loader tests drive the real loader via a temp-dir `with-redefs` config seam.
+  Temp dirs are nanoTime-isolated; no time/random/concurrency hazards.
+
+**Candidates considered, judged below the actionable threshold (no follow-up):**
+- The determinism test's per-unit `cc=3`/`cc=4` presence asserts globally rather
+  than tying each `cc` to its own `line` object; the messages ("the line-10 unit
+  keeps its own cc=3") slightly overstate. But unlike TR24 (a true tautology),
+  these assertions DO fail on their named primary contract (last-wins collapse
+  drops one `cc` value), and the reversal/order-independence test adds further
+  guard. Only a contrived deterministic line→cc key-inversion regress would slip
+  through — not a plausible recipe regress. Strengthening to per-object pairing
+  is message-precision polish, not a coverage gap.
+- The qualification-filter substring (`select(.["lcc-total"] >= 5.0 and
+  .gap >= 2.0)`) appears in three jq-absent fallbacks (filter-drop,
+  empty-qualification, boundary). Each guards a distinct behaviour's fallback;
+  consolidating would couple unrelated tests. Acceptable per single-concern.
+
+Both candidates are the low-value churn passes 29/32 already declined against the
+simplicity/robustness ethos. No new test is warranted. Saturation reconfirmed.
+
+PASS_STATUS: REVIEW_COMPLETE
