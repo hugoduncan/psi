@@ -1678,3 +1678,36 @@ Both are test-only — no production/skill/EDN change, all assertions identical.
       wrong branch now fails green. Focused task-204 ns green (2 tests, 72
       assertions, 0 failures — +3 over pass-22's 69); `clj-kondo` 0 findings;
       `clj-paren-repair` Success; file 369 lines (< 800).
+
+## Test review follow-ups (review pass 24 — task-test-review)
+
+- [ ] TT-I — Lock the generated-design contract's **Blast radius** constraint and
+      **Phase-0 hard gate / untestable-tangle handling** in
+      `reduce-incidental-complexity-test`. The step-7 generated `design.md`
+      contract in `reduce-incidental-complexity.edn` is a named design behaviour
+      ("Generated tasks carry the two-phase behaviour-preserving contract"). TR2
+      locked the Phase-0 characterization-test gate + the behaviour-identical
+      constraint, and F3 the A5/A2 key — but two further named clauses of that
+      same contract carry no assertion: (1) the **Blast radius** scope fence
+      ("the target unit PLUS the minimal surrounding helpers required to
+      decomplect it; no unrelated cleanup"), and (2) the Phase-0 **hard gate +
+      untestable-tangle escape hatch** ("If the unit cannot be characterized
+      safely … a minimal seam … or (b) is closed with the finding (scope drift
+      -> close per Munera). No refactor proceeds without a green net."). Both
+      strings are present verbatim in the shipped EDN (`grep` 1 each) and absent
+      from `task_204_workflow_definitions_test.clj` (`grep` 0 each). A regress
+      dropping the blast-radius fence (admitting unrelated cleanup that inflates
+      the diff while still passing the net-burden check via relocation) or the
+      untestable-tangle/green-net hard gate (letting a refactor proceed on an
+      uncharacterized unit without the prescribed seam-or-close decision) passes
+      every existing test green — the same sub-clause-lock standard
+      TR2/TT-D/TT-G applied to the other contract clauses, left unapplied here.
+      Fix: extend the TR2 contract `testing` cluster in
+      `reduce-incidental-complexity-test`
+      (`components/workflow-loader/test/psi/workflow_loader/task_204_workflow_definitions_test.clj`,
+      same task-204 ns, test-only — no production/skill/EDN change) with
+      `select-text` substring locks for "Blast radius: the target unit PLUS the
+      minimal surrounding helpers required to decomplect it; no unrelated
+      cleanup", "No refactor proceeds without a green net", "cannot be
+      characterized safely", and "scope drift -> close per Munera". Run focused
+      task-204 ns + `clj-kondo`; keep under the 800-line `components/` guard.

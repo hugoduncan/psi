@@ -3803,3 +3803,56 @@ passes (all test-only) landed.
 No follow-up items added.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## 2026-06-03 — Test review (task-test-review, pass 24)
+
+Re-reviewed the task's tests against `∀b ∈ behaviour(design). ∃t. covers(t,b)`,
+well-formedness, and the no-mocks/nullable-infra criterion. Tests run green via
+the real loader + real `jq` (synthetic fixtures, graceful jq-absent structural
+fallback): focused `task-204-workflow-definitions-test` +
+`incidental-complexity-finder-skill-test` → 11 tests, 152 assertions, 0 failures.
+
+Infra-deps clean: the loader is exercised through `load-workflow-definitions`
+over temp/real `.psi/workflows` (test-config injection via `with-redefs` on the
+dir-resolvers — not behavioural mocking); recipe tests shell out to real `jq`
+and assert state/outputs, never interactions. No mocks/stubs. Well-formed.
+
+Coverage is exhaustive for the workflow shapes, handoff wiring, NO_TARGET
+short-circuit, recipe determinism/filter/drop/ranking/cap/max-guard/empty/
+boundary/projection, base-refresh (TT-B), baseline commands (TT-C), A5/A2
+direction (TT-D)/key (F3)/metric-set (TT-G), worktree-scoped creation (TT-H),
+no-push/PR (TR8), skills (TT-A), and the Phase-0 char-test gate (TR2).
+
+One new actionable gap (added to steps.md):
+
+- **TT-I — the generated-design contract's "Blast radius" constraint and
+  Phase-0 hard gate are unlocked.** The step-7 generated `design.md` contract in
+  `reduce-incidental-complexity.edn` is a named design behaviour ("Generated
+  tasks carry the two-phase behaviour-preserving contract"). TR2 locked the
+  Phase-0 characterization-test gate, the behaviour-identical constraint, and
+  (with F3) the A5/A2 key — but **two further named clauses of that same
+  contract carry no assertion**: (1) the **Blast radius** constraint ("the
+  target unit PLUS the minimal surrounding helpers required to decomplect it;
+  no unrelated cleanup" — the scope fence keeping the refactor honest against
+  the net-burden acceptance), and (2) the Phase-0 **hard gate + untestable-tangle
+  escape hatch** ("If the unit cannot be characterized safely … (a) … a minimal
+  seam … or (b) is closed with the finding (scope drift → close per Munera). No
+  refactor proceeds without a green net."). Both strings are present verbatim in
+  the shipped EDN (`grep` confirms 1 each) and absent from
+  `task_204_workflow_definitions_test.clj` (`grep` confirms 0 each). A regress
+  dropping the blast-radius fence (admitting unrelated cleanup that inflates the
+  diff while still passing the net-burden check via relocation) or the
+  untestable-tangle/green-net hard gate (letting a refactor proceed on an
+  uncharacterized unit without the prescribed seam-or-close decision) passes
+  every existing test green — the same sub-clause-lock standard TR2/TT-D/TT-G
+  applied to the other contract clauses, left unapplied here. Per
+  `∀b∈behaviour(design).∃t.covers(t,b)`, these are uncovered named contract
+  behaviours. Fix: extend `reduce-incidental-complexity-test`'s TR2 contract
+  cluster (same task-204 ns, test-only — no production/skill/EDN change) with
+  `select-text` substring locks for "Blast radius: the target unit PLUS the
+  minimal surrounding helpers required to decomplect it; no unrelated cleanup",
+  "No refactor proceeds without a green net", and the untestable-tangle handling
+  ("cannot be characterized safely" + "scope drift -> close per Munera"). Run
+  focused task-204 ns + `clj-kondo`; keep under the 800-line `components/` guard.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK.
