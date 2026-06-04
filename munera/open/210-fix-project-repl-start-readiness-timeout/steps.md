@@ -238,3 +238,19 @@
       → `start-instance-in!` path. No mocks (real `live-fake-process` proxy +
       `fake-connector` seam, file-backed `.nrepl-port`). Coverage-only; no
       production change.
+- [ ] TR4: Pin the A1 "attach/shared-discovery accepts a stale port" semantics.
+      The A1 acceptance criterion keeps the shared `config/read-dot-nrepl-port`
+      primitive and `attach/resolve-attach-endpoint` *unchanged* — they must
+      accept whatever `.nrepl-port` is present, with **no** mtime/launch gate
+      (the gate lives only in `started.clj`). But every current attach/discovery
+      test (`attach_test.clj` `resolve-attach-endpoint-test` fallback;
+      `config_test.clj` `read-dot-nrepl-port-test`) writes a *freshly-spit* port
+      and accepts it — none ages the file. A regression leaking an mtime gate
+      into the shared primitive or attach-mode would still pass every test
+      (fixtures only present fresh ports). Add a case (in `attach_test.clj` for
+      `resolve-attach-endpoint`'s `.nrepl-port` fallback, and/or `config_test.clj`
+      for `read-dot-nrepl-port`) that writes `.nrepl-port`, `setLastModified` to
+      well before now (mirroring the started-mode `(- now 60000)` stale fixture),
+      and asserts the endpoint is **still resolved** — symmetric to the
+      started-mode stale-rejection tests, pinning the A1 separation against a
+      future gate leak. Coverage-only (production verified by inspection).

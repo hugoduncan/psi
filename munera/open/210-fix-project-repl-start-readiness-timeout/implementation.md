@@ -692,3 +692,45 @@ design/plan/doc/CHANGELOG change (coverage-only; no user-visible surface
 change).
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Test review — implementation tests (ψ, 2026-06-03, pass 3)
+
+Independent re-review against the design acceptance criteria after TR1/TR2/TR3
+landed. Skill: task-test-review — `well_formed(tests)` ∧
+`∀b∈behaviour(design).∃t.covers(t,b)` ∧ `∀d∈infra_deps. injectable ∧ nullable ∧
+¬mock ∧ ¬stub`. Read: `started_test.clj`, `config_test.clj`, `ops_test.clj`,
+`attach_test.clj`, `test_support.clj`, `started.clj`, `config.clj`, `ops.clj`.
+Ran `bb clojure:test:unit` — all green. Verified prior gaps closed (TR1
+no-opts-default 120000; TR2 ops-level `:readiness-timeout-ms` projection; TR3
+config→ops→opts threading). No-mocks compliance holds: real `fake-process`/
+`live-fake-process` proxies, `fake-connector` fn, file-backed `.nrepl-port`,
+`setLastModified` mtime — state/return assertions, no interaction assertions.
+
+New actionable coverage gap (not a duplicate of IR1/TR1/TR2/TR3 or the
+with-redefs note):
+
+- TR4 (A1 attach/shared-discovery "accepts stale port" semantics unproven).
+  The A1 acceptance criterion is that the stale-port gate lives *only* in
+  `started.clj`, "leaving the shared `config/read-dot-nrepl-port` discovery
+  primitive and attach-mode discovery unchanged" — i.e. attach-mode and the
+  shared primitive must keep accepting *whatever `.nrepl-port` is present, by
+  design*, with **no** mtime gate. But every existing attach/discovery test
+  (`attach_test.clj` `resolve-attach-endpoint-test` fallback case;
+  `config_test.clj` `read-dot-nrepl-port-test`) writes a **freshly-`spit`** port
+  and accepts it — none ever calls `setLastModified` to age the file. So a
+  regression that accidentally introduced an mtime/launch gate into the *shared*
+  `read-dot-nrepl-port` or into `attach/resolve-attach-endpoint` would still pass
+  every current test, because the fixtures only present *fresh* ports. The
+  differentiating A1 behaviour — that an **old (stale-mtime) `.nrepl-port` is
+  still accepted** by attach-mode / shared discovery (the exact opposite of the
+  started-mode gate) — has no covering test. Add a case (in `attach_test.clj`
+  for `resolve-attach-endpoint`'s fallback, and/or `config_test.clj` for
+  `read-dot-nrepl-port`) that writes a `.nrepl-port`, `setLastModified` to well
+  before now (mirroring the started-mode `(- now 60000)` stale fixture), and
+  asserts the endpoint is **still resolved** — pinning that no stale gate leaked
+  into the shared/attach path (the A1 separation), symmetric to the started-mode
+  stale-rejection tests. Coverage-only (production verified by inspection: the
+  gate lives only in `started/wait-for-started-endpoint!`); hardens the headline
+  A1 "attach unchanged" criterion against a future gate leak.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
