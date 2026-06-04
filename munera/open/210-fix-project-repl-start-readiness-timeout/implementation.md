@@ -1246,3 +1246,38 @@ Every rewired file shrank (started 273→234, config 276→247, ops 134→125, a
 design/plan/doc/CHANGELOG change (shape-only; no user-visible surface change).
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Test-shaper review (pass 5)
+
+Read: `started_test.clj`, `ops_test.clj`, `config_test.clj`, `attach_test.clj`,
+`commands_test.clj`, `test_support.clj`. Applied `λtests. clarity ∧ signal ∧
+robustness → shape`.
+
+Passes TS1–TS7 are landed and effective: the suite is single-concern, no-mock,
+behaviour-focused, deterministic (mtime fixtures explicit by construction), and
+the `Process` proxy / stale-fresh mtime / happy launcher / temp-dir ceremony are
+single-sourced. `clojure -M:test --focus unit` exit 0.
+
+Two new actionable `consistent(fixtures)` / `minimal_incidental_setup` shape
+findings remain, both untouched by prior passes (grep-confirmed absent from
+steps/implementation):
+
+- **TS8 — divergent `write-project-config!` across files.** `ops_test` and
+  `config_test` each define a private `write-project-config!` with **different
+  semantics**: `ops_test`'s wraps its arg in `{:agent-session {:project-nrepl …}}`
+  (takes the inner map), `config_test`'s spits the arg verbatim (caller wraps).
+  `config_test` also has a third sibling `write-user-config!`. Two same-named
+  private helpers with different wrapping is exactly the `consistent(fixtures)`
+  drift `test_support` exists to prevent — a reader moving between files mis-reads
+  the contract. The `test_support` docstring already claims to single-source the
+  shared config-write shape, yet these on-disk config writers are not there.
+
+- **TS9 — `read-project-preferences-test` open-coded shared/local pair (×3).**
+  Its three cases each open-code the same `shared-f`/`local-f` + `.mkdirs` +
+  `spit` arrange for the `.psi/project.edn` (shared) + `.psi/project.local.edn`
+  (local) file pair — `minimal_incidental_setup` repetition with no helper, even
+  though single-file writers live in the same file. A pair-writer helper would
+  compress the ceremony so each case asserts only its distinct merge/fallback
+  contract.
+
+Both are shape-only / behaviour-preserving (no assertion change).

@@ -449,3 +449,31 @@
       unit` green; `bb commit-check:file-lengths` exit 0 (all files shrank:
       started 273→234, config 276→247, ops 134→125, attach 77→71, commands
       79→76, test_support 185→209). PASS_STATUS REVIEW_COMPLETE.
+
+## Test-shaper review follow-ups (shape, pass 5)
+
+- [ ] TS8: Single-source the divergent config-file writers
+      (`consistent(fixtures)`). `ops_test` and `config_test` each define a
+      private `write-project-config!` with **different** wrapping semantics
+      (`ops_test` wraps its arg in `{:agent-session {:project-nrepl …}}`;
+      `config_test` spits the arg verbatim), and `config_test` has a sibling
+      `write-user-config!`. Lift one canonical config-write helper set into
+      `test_support` (e.g. `write-project-config!` / `write-user-config!` /
+      `write-local-config!` with one explicit wrapping convention) and rewire
+      both files onto it, so a reader moving between files sees one contract.
+      Pick a single wrapping convention (caller passes the full
+      `{:agent-session …}` map, or the inner project-nrepl map — state which) and
+      apply it consistently; update both call sites' literals accordingly.
+      Shape-only; behaviour-preserving (no assertion change). Re-run
+      started/ops/config/attach/commands + clj-kondo after.
+
+- [ ] TS9: Compress the `read-project-preferences-test` shared/local arrange
+      (`minimal_incidental_setup`). Its three cases each open-code the same
+      `shared-f` (`.psi/project.edn`) + `local-f` (`.psi/project.local.edn`) +
+      `.mkdirs` + `spit` frame. Add a pair-writer helper (e.g.
+      `write-project-prefs!` taking a dir + `:shared`/`:local` content, in
+      `config_test` or `test_support` per the TS8 decision) so each case writes
+      its two files in one call and asserts only its distinct merge/fallback/
+      malformed contract. Keep the asserted content visible at the call site
+      (`helpers_that_compress(ceremony) ∧ ¬helpers_that_hide(intent)`).
+      Shape-only; behaviour-preserving. Re-run config + clj-kondo after.
