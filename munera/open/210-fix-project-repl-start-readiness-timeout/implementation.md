@@ -1156,3 +1156,39 @@ references another `defn` (`fake-process`) must be ordered *after* it or
 clj-kondo flags an unresolved-symbol forward reference.
 
 PASS_STATUS REVIEW_COMPLETE.
+
+## Test review — test-shaper pass 4 (ψ)
+
+Fresh `test-shaper` read of the whole project-nrepl test suite (started/ops/
+config/attach/test_support) after passes 1–3. Passes 1–3 single-sourced the
+`Process` proxy (TS1), the stale/fresh mtime fixtures (TS2/TS3), strengthened
+`:started-at` provenance (TS4/TS5), and single-sourced the happy started-launcher
+arrange (TS6). The seam helpers, fixtures, and assertions are now consistent and
+behaviour-focused. One new actionable item remains.
+
+- TS7 (temp-dir lifecycle ceremony — `minimal_incidental_setup` ∧
+  `helpers_that_compress(ceremony)` ∧ `consistent(structure)`). The
+  `(temp-dir …)` + `(try … (finally (delete-tree! dir)))` cleanup ceremony recurs
+  ~37 times across the suite (started ×13, config ×12, ops ×4, attach ×3,
+  commands ×2): every case that needs a real temp directory open-codes the same
+  acquire/try/finally/delete frame, which is incidental to each case's actual
+  concern (readiness gate, config resolution, ops threading…) and structurally
+  identical at every site. No `with-temp-dir` helper exists. Add a
+  `test_support` `with-temp-dir` macro (bind a freshly-created temp dir to a
+  caller-named symbol over a body, guaranteeing `delete-tree!` in a `finally`),
+  e.g. `(with-temp-dir [dir "psi-project-nrepl-started-"] …)`, and rewire the
+  ~37 try/finally sites onto it. This compresses the dominant remaining
+  incidental ceremony without *hiding* intent — the directory binding stays
+  visible at the call site; only the acquire/cleanup frame is removed
+  (`helpers_that_compress(ceremony) ∧ ¬helpers_that_hide(intent)`). Multi-dir
+  cases (config_test's `home`+`worktree`) can nest the macro or it can accept
+  multiple bindings. Shape-only; behaviour-preserving (no assertion change).
+  Re-run started/ops/config/attach/commands + clj-kondo after.
+
+Considered-and-rejected (no step added): the two file-private
+`write-project-config!` helpers (ops_test wraps `{:agent-session {:project-nrepl
+…}}`; config_test takes the already-wrapped `content`) share a name but are
+*different* abstractions by design — config_test exercises the full nesting/merge
+precedence, ops_test only the project-nrepl slice. Consolidating would force one
+shape onto both and hide that intent; the local divergence is the clearer choice
+(`¬helpers_that_hide(intent)`). No action.

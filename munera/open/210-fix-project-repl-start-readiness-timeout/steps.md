@@ -405,3 +405,24 @@
   their bespoke launchers. Shape-only/behaviour-preserving: started/ops/config/
   attach 17 tests/115 assertions green (unchanged); clj-kondo 0/0;
   clj-paren-repair Success; files 185/273/134 (< 800); file-lengths exit 0.
+
+## Test-shaper review follow-ups (shape, pass 4)
+
+- [ ] TS7: Single-source the temp-dir lifecycle ceremony
+      (`minimal_incidental_setup` ∧ `helpers_that_compress(ceremony)` ∧
+      `consistent(structure)`). The `(temp-dir …)` + `(try … (finally
+      (delete-tree! dir)))` acquire/cleanup frame recurs ~37 times across the
+      suite (started ×13, config ×12, ops ×4, attach ×3, commands ×2); every
+      case needing a real temp directory open-codes the same structurally
+      identical frame, incidental to its actual concern. No `with-temp-dir`
+      helper exists. Add a `test_support` `with-temp-dir` macro that binds a
+      freshly-created temp dir to a caller-named symbol over a body and
+      guarantees `delete-tree!` in a `finally`, e.g.
+      `(with-temp-dir [dir "psi-project-nrepl-started-"] …)`, and rewire the
+      ~37 try/finally sites onto it (multi-dir cases like config_test's
+      `home`+`worktree` nest the macro or it accepts multiple bindings). The
+      directory binding stays visible at each call site — only the
+      acquire/cleanup frame is removed
+      (`helpers_that_compress(ceremony) ∧ ¬helpers_that_hide(intent)`).
+      Shape-only; behaviour-preserving (no assertion change). Re-run
+      started/ops/config/attach/commands + clj-kondo after.
