@@ -1901,3 +1901,60 @@ full `bb clojure:test:unit` green (consuming suites unaffected); file lengths
 change).
 
 PASS_STATUS: REVIEW_COMPLETE
+
+---
+
+## Test-shaper review (pass 8) — 刀-requested
+
+Skill: test-shaper (`λtests. clarity ∧ signal ∧ robustness → shape`). Fresh read
+of the full project-nrepl test surface — the task's own tests (`started_test`,
+`ops_test`, `config_test`, `attach_test` + `test_support`) and the adjacent
+`eval_test`/`commands_test`/`runtime_test`/`client_test` — after passes TS1–TS12.
+Suite green (`started/ops/config/attach` 19 tests/137 assertions, 0 failures).
+
+The task's tests are now well-shaped across all four `high_quality(tests)`
+axes — no new actionable issue within this task's surface:
+- `simple` / `single_concern`: every behaviour is its own named `testing` block
+  citing its criterion (TRn/PA4/IR1/IR2/TS4); arrange is minimal.
+- `consistent`: the `Process` proxy (TS1), stale/fresh mtime fixtures (TS2/TS3),
+  happy launcher (TS6), temp-dir lifecycle (TS7), config writers (TS8/TS9), and
+  thrown-`ExceptionInfo` capture (TS11/TS12) are all single-sourced in
+  `test_support`; naming/structure/assertion-style consistent.
+- `robust` / `behavior_focused` / `deterministic`: real nullable seams only
+  (`fake-process` `Process` proxy, `fake-connector`, file-backed `.nrepl-port`,
+  explicit `setLastModified` mtime via `age-file-back!`/`touch-fresh!`); no
+  mocks/stubs/`with-redefs` anywhere in `components/project-nrepl/test`;
+  state/return assertions, no interaction assertions; the TR7 poll-continuation
+  case joins its background `future` in a `finally`.
+- `meaningful_failures`: A2 stale-port diagnostics assert the instant trio
+  (`:port-mtime-ms`/`:min-mtime-ms`/`:launched-at`, `min ≥ port`) on every
+  `:started-stale-port` path (TS10); `:started-at` provenance asserts an
+  ordering relation, not a bare `instance?` type check (TS4).
+- `economical`: helpers compress ceremony without hiding intent — asserted port
+  values / on-disk config shapes / instants stay visible at each call site.
+
+Considered-and-not-actionable (recorded so a later pass need not re-derive):
+- The `:active-op` interrupt-precondition seed
+  (`update-instance-in! … assoc-in [:runtime-handle :active-op] {:op-id …
+  :started-at (now)}`) is open-coded 4× across `eval_test` (×2) and
+  `commands_test` (×2). It is a candidate for a `test_support` seed helper, but
+  (a) both files are **pre-existing** (last touched by task 108, untouched by
+  this task — `git log` confirms) and sit **outside** this task's test surface
+  (the readiness-timeout/stale-port change set is started/ops/config/attach), so
+  consolidating it is scope-creep beyond this task; (b) the duplication is local
+  to two files, not the cross-file `consistent(fixtures)` drift `test_support`
+  exists to prevent. No step.
+- `config_test`'s file-private `with-temp-home` (rebind `user.home`, used 3×) is
+  file-local to the one namespace that needs `resolve-config` home resolution;
+  not duplicated across files, so lifting it to `test_support` would not improve
+  cross-file consistency. No step.
+- The TR4 stale-acceptance cases in `config_test`/`attach_test` keep an explicit
+  `(spit port-file …)` + `(age-file-back! port-file)` (3 lines) rather than the
+  `spit-stale-port!` one-liner — a deliberate TS2 decision to keep the asserted
+  port literal visible at the call site. Unchanged.
+
+No new actionable shape issue. The prior twelve shape passes (TS1–TS12) closed
+every economy/consistency/robustness gap in the task's tests; the surface is
+behaviour-focused, no-mock, deterministic, and single-sourced.
+
+PASS_STATUS: REVIEW_COMPLETE
