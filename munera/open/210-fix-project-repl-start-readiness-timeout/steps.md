@@ -161,3 +161,16 @@
       `project-nrepl/test` is in the Kaocha `:unit` suite (`tests.edn`); no
       component-isolated `clojure -X:test` path exists. Task-artifact-only fix
       (steps.md); no code/test/doc change.
+
+## Implementation review follow-ups (quality)
+
+- [ ] IR1: Make the stale-port diagnostic deterministic on the
+      exit-with-stale-port path. In `wait-for-started-endpoint!`, the
+      `process-exited?` branch is checked before the deadline branch and throws
+      `:phase :started-readiness` ignoring the present-but-too-old `.nrepl-port`,
+      so a process that writes only a stale port then exits loses A2's
+      `:phase :started-stale-port` distinction. Either fold the stale-only
+      condition into the exit-path `ex-data` (e.g. emit `:started-stale-port`
+      when `(and endpoint (not fresh?))` on exit) or explicitly decide which
+      diagnostic wins and document it. Add a `wait-for-started-endpoint!`
+      unit test for exit-with-stale-port asserting the chosen `:phase`.

@@ -407,3 +407,42 @@ directly per the slice order.
   preserved; no-mocks tests; docs.
 
 PASS_STATUS: IMPLEMENTATION_COMPLETE
+
+## Implementation review — quality (ψ, 2026-06-03)
+
+Scope: implementation vs design/plan/architecture. Verified locally: lint 0/0
+(`clj-kondo` src+test); `started-test` 3/22 green; combined
+`config/ops/attach/started + consuming extension-install` 16 tests/101 assertions
+green; `started.clj` 185 / `started_test.clj` 206 lines (< 800). Matches design
+(config key, raised 120000 default, pre-launch removal + mtime gate,
+`:phase :started-stale-port`, `:readiness-timeout-ms` projection, `[1000 600000]`
+validation) and architecture (guard in started-mode layer only; shared
+`read-dot-nrepl-port` + attach untouched; runtime-handle ownership respected).
+Strong traceability (INC1/INC2/AMB3/AMB4/PA1–PA4 ↔ code).
+
+New actionable issue:
+
+- IR1 (stale-port diagnostic lost on exit-with-stale-port path). In
+  `wait-for-started-endpoint!` the `process-exited?` branch is checked *before*
+  the deadline branch and unconditionally throws `:phase :started-readiness`
+  (`:command-exited? true`), ignoring the already-computed `endpoint`/`fresh?`.
+  If the launched process writes only a too-old `.nrepl-port` and then exits —
+  the exact stale-port scenario A2's `:started-stale-port` diagnostic exists to
+  surface — the wait reports `:started-readiness`, not `:started-stale-port`, so
+  the A2 stale-port distinction is silently lost on this path. Not a correctness
+  bug (a failure is still reported, and pre-launch removal still prevents wrong-
+  endpoint connection), but the observable diagnostic does not match A2's intent
+  when exit and a stale-only port coincide. Consider folding the stale-only
+  condition into the exit-path payload (or asserting which diagnostic wins on
+  exit-with-stale-port) so the projected `:phase` is deterministic. No test
+  covers exit-with-stale-port today.
+
+Non-blocking observation (already documented, no new step):
+
+- The slices-2/3 deviation widened a `with-redefs` stub arity in
+  `project_nrepl_extension_install_test.clj` (a mock, counter to the no-mocks
+  standard). implementation.md already records this as a pre-existing consuming-
+  test idiom outside this task's no-mocks scope and only the arity was touched —
+  acceptable; recorded here only for completeness, no follow-up step.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
