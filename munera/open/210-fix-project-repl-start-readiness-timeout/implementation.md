@@ -847,3 +847,53 @@ Verified: clj-paren-repair Success; clj-kondo 0/0
 (coverage-only; no user-visible surface change).
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Test review — implementation tests (ψ, 2026-06-03, pass 5)
+
+Independent re-review against the design acceptance criteria after TR1–TR5
+landed. Skill: task-test-review — `well_formed(tests)` ∧
+`∀b∈behaviour(design).∃t.covers(t,b)` ∧ `∀d∈infra_deps. injectable ∧ nullable ∧
+¬mock ∧ ¬stub`. Read: `started_test.clj`, `config_test.clj`, `ops_test.clj`,
+`attach_test.clj`, `test_support.clj`, `started.clj`, `config.clj`, `ops.clj`.
+Ran `started/config/ops/attach` focused suite — 17 tests/113 assertions green.
+
+Verified well-formed: deterministic, `testing` blocks, file-backed real
+`.nrepl-port`, real-file `setLastModified` mtime (no time mocking), temp dirs
+cleaned in `finally`. No-mocks: the component's tests inject only real nullable
+seams (`fake-process`/`live-fake-process` real `Process` proxies,
+`fake-connector` fn, `process-launcher`/`nrepl-connector`) and assert
+state/return, never interactions. The single `with-redefs` lives in the
+consuming `agent-session` `project_nrepl_extension_install_test.clj` (arity-only
+touch) — already documented as a pre-existing out-of-scope idiom; confirmed no
+other `with-redefs`/mock/stub in `components/project-nrepl/test`.
+
+Acceptance-criterion → test mapping, all covered:
+- raised 120000 default → `started_test` TR1 (no-opts → `:readiness-timeout-ms
+  120000`).
+- timeout configurability: config validation → `config_test`
+  `resolved-start-readiness-timeout-ms-test`; end-to-end config→ops→opts → TR3
+  `start-config-timeout-threading-test`; wait honours a passed `:timeout-ms` in
+  its deadline/error payload → TR5 (asserts thrown `:timeout-ms 100`).
+- stale-port gate reject/accept → `wait-for-started-endpoint-stale-port-gate-test`;
+  exit-with-stale → IR1; pre-launch removal + fresh acceptance →
+  `start-instance-in-test`.
+- deadline diagnostics: `:started-stale-port` → gate test; plain
+  `:started-readiness` (the reproduction's mode) → TR5.
+- A2 projection `:readiness-timeout-ms`: happy/ops level → `ops_test` TR2;
+  failure-path `status` read + stale-port on `:last-error → :data` → `started_test`
+  PA4.
+- A1 attach/shared-discovery unchanged (accepts stale port) → `attach_test` /
+  `config_test` TR4.
+- behaviour-preserving happy path / attach-mode → `start-instance-in-test`,
+  `attach-instance-in-test`.
+
+No new actionable test-coverage gap. Every design behaviour maps to a real,
+no-mock, state/return-asserting test; the prior five passes (TR1–TR5, IR1, PA4)
+closed each acceptance-criterion gap. One residual coupling — the recorded
+`:readiness-timeout-ms` and the wait's deadline are two independent
+`(or (:timeout-ms opts) default)` reads of the same `opts` — is within design
+tolerance (same expression, design states it is verified by inspection; TR5 pins
+the wait's use of a passed `:timeout-ms`, TR1/TR3 pin the recorded value);
+recorded for completeness, not actionable.
+
+PASS_STATUS: REVIEW_COMPLETE
