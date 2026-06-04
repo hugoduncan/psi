@@ -345,7 +345,7 @@
 
 ## Test-shaper review follow-ups (shape, pass 2)
 
-- [ ] TS4: Strengthen the under-asserted `:started-at` launch-instant contract
+- [x] TS4: Strengthen the under-asserted `:started-at` launch-instant contract
       in `started_test`'s "records the effective :readiness-timeout-ms and
       launch-instant :started-at" case. Today it asserts only
       `(instance? java.time.Instant (get-in instance [:runtime-handle
@@ -358,9 +358,14 @@
       precedes connect completion. Pins "started-at = launch instant, not connect
       instant" (PA2/INC1) so a regression fails green. Coverage/assertion-only;
       production verified by inspection.
-- [ ] TS5 (judgement, optional): Split the bundled "records the effective
+- [x] TS5 (judgement, optional): Split the bundled "records the effective
       :readiness-timeout-ms and launch-instant :started-at" case into two named
       `testing` blocks (effective-timeout recording vs `:started-at` launch-instant
       provenance) so a failure names which contract broke (`single_concern` ∧
       `meaningful_failures`). Fold into TS4 if convenient. Shape-only;
       behaviour-preserving.
+      → Resolved (folded with TS4): split the bundled case into two named
+      `testing` blocks — "records the effective :readiness-timeout-ms" (asserts
+      `:readiness-timeout-ms 90000`) and "records :started-at = launch instant,
+      not connect instant (TS4/PA2)" (the strengthened provenance check). A
+      failure now names which contract broke.

@@ -1040,3 +1040,46 @@ Suite green (17 tests/113 assertions). Two new actionable items.
   the `:started-at` assertion, split the launch-instant provenance into its own
   named `testing` so a failure names which contract broke (`single_concern` ∧
   `meaningful_failures`). Low severity; fold into TS4 if convenient.
+
+### Test-shaper pass-2 follow-up execution (TS4 + TS5)
+
+PASS_STATUS: REVIEW_COMPLETE.
+
+Sole newly-added actionable items (TS4 + TS5, added by test-shaper review
+`bafed7ecd`); all prior TR/TS1–3/IR/PA/PSI items already checked. Test-only,
+shape-and-assertion-only — no production / doc / CHANGELOG change; suite
+behaviour preserved.
+
+- **TS5** (split): split the bundled `started_test` case "records the effective
+  :readiness-timeout-ms and launch-instant :started-at" into two named
+  `testing` blocks — "records the effective :readiness-timeout-ms" (the
+  `:readiness-timeout-ms 90000` assertion) and "records :started-at = launch
+  instant, not connect instant (TS4/PA2)" (the strengthened provenance check).
+  A failure now names which contract broke.
+
+- **TS4** (provenance, folded into the new split block): replaced the bare
+  `(instance? java.time.Instant …)` type check with a launch-instant provenance
+  assertion. The launcher seam now captures the instant it is invoked into a
+  `launcher-at` atom (the true launch site — the launcher runs *after*
+  `launched-at (now)` is captured pre-wait, and *before* the gate poll +
+  connect). Assertions: `:started-at` is an `Instant`, is **not after**
+  `@launcher-at` (`(not (.isAfter started-at @launcher-at))`), and is **not
+  before** a pre-call `before` wall-clock. A PA2 regression re-adding the
+  removed post-wait connect-time `:started-at (now)` write would record an
+  instant strictly after the launcher fired (poll + connect happen after
+  launch), so `started-at` would exceed `@launcher-at` and the `.isAfter` guard
+  fails green. The kept `Instant` type check + lower `before` bound keep the
+  assertion well-formed.
+
+started-test 3 tests / **33 assertions** green (+8 over pass-1's 25);
+ops/config/attach unchanged (4/23, 8/41, 2/18); clj-kondo 0/0; clj-paren-repair
+Success; file 284 < 800; `bb commit-check:file-lengths` exit 0.
+
+🔁 PATTERN: a bare `(instance? Instant x)` type check cannot pin *which* instant
+was recorded — a PA2-style regression that swaps a launch-instant source for a
+connect-instant source still yields *an* Instant and passes green. Pin
+provenance by having the seam (here the launcher) capture its own invocation
+instant and asserting an ordering relation (`recorded ≤ seam-observed`) that
+only the correct source satisfies. Bundling two contracts (timeout recording +
+:started-at provenance) under one `testing` block also hides which broke — the
+TS5 split makes failures self-naming.

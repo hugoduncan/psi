@@ -207,7 +207,7 @@
         (finally
           (delete-tree! worktree)))))
 
-  (testing "records the effective :readiness-timeout-ms and launch-instant :started-at"
+  (testing "records the effective :readiness-timeout-ms"
     (let [ctx       (make-ctx)
           worktree  (temp-dir "psi-project-nrepl-started-")
           fake-proc (fake-process {:alive? true :exit-code 0 :pid 4321})
@@ -221,8 +221,41 @@
                         {:timeout-ms 90000
                          :runtime-handle {:process-launcher launcher
                                           :nrepl-connector connector}})]
-          (is (= 90000 (:readiness-timeout-ms instance)))
-          (is (instance? java.time.Instant (get-in instance [:runtime-handle :started-at]))))
+          (is (= 90000 (:readiness-timeout-ms instance))))
+        (finally
+          (delete-tree! worktree)))))
+
+  (testing "records :started-at = launch instant, not connect instant (TS4/PA2)"
+    ;; Provenance, not a bare type check: capture the instant the launcher seam
+    ;; is invoked (the true launch site, before wait/connect run) and assert the
+    ;; recorded :started-at is <= that instant. A PA2 regression re-adding the
+    ;; removed post-wait connect-time `:started-at (now)` write would record an
+    ;; instant strictly after the launcher fired (the gate poll + connect happen
+    ;; after launch), so :started-at would exceed `launcher-at` and fail green.
+    (let [ctx          (make-ctx)
+          worktree     (temp-dir "psi-project-nrepl-started-")
+          fake-proc    (fake-process {:alive? true :exit-code 0 :pid 4321})
+          launcher-at  (atom nil)
+          launcher     (fn [_worktree _command]
+                         (reset! launcher-at (java.time.Instant/now))
+                         (spit (io/file worktree ".nrepl-port") "7777\n")
+                         fake-proc)
+          connector    (fake-connector "nrepl-session-1")
+          before       (java.time.Instant/now)]
+      (try
+        (let [instance   (project-nrepl-started/start-instance-in!
+                          ctx worktree ["bb" "nrepl-server"]
+                          {:timeout-ms 90000
+                           :runtime-handle {:process-launcher launcher
+                                            :nrepl-connector connector}})
+              started-at (get-in instance [:runtime-handle :started-at])]
+          (is (instance? java.time.Instant started-at))
+          ;; launch instant precedes/equals the launcher invocation it triggers,
+          ;; and is not earlier than the test's pre-call wall clock.
+          (is (not (.isAfter ^java.time.Instant started-at ^java.time.Instant @launcher-at))
+              "started-at must not be after the launcher-observed launch instant")
+          (is (not (.isBefore ^java.time.Instant started-at ^java.time.Instant before))
+              "started-at must not precede the pre-call wall clock"))
         (finally
           (delete-tree! worktree)))))
 
