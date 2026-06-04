@@ -97,6 +97,51 @@ Out of scope:
   is in scope (it materially aids diagnosing real start-command failures) or
   deferred.
 
+## Architectural-fit decisions (from design review)
+
+- **A1 — Stale-port guard placement (started-mode only).**
+  The stale-`.nrepl-port` correctness guard lives entirely in the **started-mode
+  acquisition layer** (`started.clj`), not in the shared discovery primitive
+  `config/read-dot-nrepl-port` (used by both started and attach modes). Concretely:
+  - `read-dot-nrepl-port` stays a pure, mode-agnostic "read+validate the current
+    `.nrepl-port`" primitive (single responsibility) — unchanged. Attach-mode's
+    documented `.nrepl-port` fallback (`attach/resolve-attach-endpoint`) keeps its
+    current semantics: it accepts whatever `.nrepl-port` is present, by design,
+    because an attach target is an externally-owned, already-running REPL.
+  - The launch-time/mtime acceptance gate is implemented in
+    `started/wait-for-started-endpoint!` (and its caller
+    `start-instance-in!`), which records the launch instant and only accepts a
+    `.nrepl-port` whose last-modified ≥ launch instant. The polling loop already
+    owns the started-process lifecycle (`process-exited?`, deadline), so the gate
+    is co-located with the only context that knows "this launch's" instant.
+  - This keeps the started-mode acquisition *policy* (Q2 stale-port strategy) out
+    of the orthogonal discovery *mechanism*, satisfying single-responsibility and
+    leaving attach-mode untouched.
+
+- **A2 — Observable status projection through the registry instance.**
+  New observable started-mode outcomes are projected as canonical instance
+  status on the runtime-owned project-nrepl **registry instance**, consistently
+  with the existing `:readiness` / `:last-error` projection, rather than as
+  ad-hoc op-return-only data. Specifically:
+  - The project-nrepl registry is a runtime handle (subprocess launch + `.nrepl-port`
+    polling are documented runtime-owned I/O per the Layer Map / Frontier; they do
+    not move under dispatch effects). The instance map in `runtime.clj` is the
+    canonical status surface; `ops/instance-payload` is its read projection.
+  - **Stale-port rejection** is recorded on the instance via the existing
+    `:last-error` field on the failure path (`start-instance-in!`'s `catch`
+    already writes `:lifecycle-state :failed` + `:last-error {:message :data :at}`);
+    the rejection's `ex-data` carries a distinct `:phase :started-stale-port`
+    (vs `:started-readiness`) plus the rejected/launch instants, so the
+    diagnostic is observable from the instance, not only the op return.
+  - **Effective configured timeout** is recorded on the instance as a new
+    `:readiness-timeout-ms` status field set when the launch begins (alongside
+    the existing instance status fields), and is surfaced through
+    `instance-payload` so the resolved timeout is observable as instance status
+    rather than inferred from config or returned only ad hoc.
+  - `ops/start`'s return shape continues to project from `instance-payload`, so
+    the op return is a derived view of the canonical instance status (no new
+    op-only status channel).
+
 ## Acceptance criteria
 
 - `psi-tool {action: project-repl, op: start}` against a real, slow-booting
@@ -105,7 +150,15 @@ Out of scope:
   default and/or configured timeout.
 - A pre-existing stale `.nrepl-port` does not cause start to report success
   against the wrong endpoint; start connects only to the port written by the
-  process it launched (or fails diagnosably).
+  process it launched (or fails diagnosably). The stale-port acceptance gate is
+  implemented in the started-mode layer (`started.clj`), leaving the shared
+  `config/read-dot-nrepl-port` discovery primitive and attach-mode discovery
+  unchanged (A1).
+- Started-mode observable outcomes (stale-port rejection diagnostic, effective
+  configured timeout) are projected as canonical status on the project-nrepl
+  registry instance and surfaced through `instance-payload`, consistently with
+  the existing `:readiness` / `:last-error` projection — not as op-return-only
+  data (A2).
 - The readiness timeout is controllable through the confirmed Q1 surface, with
   validation consistent with existing `project-nrepl` config validation.
 - Behaviour-preserving for the existing fast happy path and for attach-mode.

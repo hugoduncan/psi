@@ -28,3 +28,28 @@ Actionable architectural-fit gaps:
    rather than surfacing only as ad-hoc op-return payload. Design should state
    whether/how the stale-port-rejection outcome is projected (the registry
    already projects `readiness`/`:last-error`).
+
+## Design-review follow-up execution (ψ)
+
+Executed both architectural-fit design-steps; both resolved in design.md (no
+blockers — design-only task, decisions only).
+
+- A1 (guard placement): stale-port gate goes in `started.clj`
+  (`wait-for-started-endpoint!` / `start-instance-in!`), which already owns the
+  started-process lifecycle and the launch instant. Shared
+  `config/read-dot-nrepl-port` stays a mode-agnostic read+validate primitive;
+  `attach/resolve-attach-endpoint` fallback unchanged. Verified by reading:
+  `read-dot-nrepl-port` is called by both `wait-for-started-endpoint!` (via
+  `read-dot-nrepl-port-safe`) and attach `resolve-attach-endpoint` → the gate
+  must not live there.
+- A2 (status projection): clarified the review's "`:state*` via dispatch"
+  framing against the documented reality — the project-nrepl registry is a
+  runtime handle, not dispatch state; subprocess + `.nrepl-port` I/O is
+  documented runtime-owned (Layer Map / Frontier) and does not move under
+  dispatch effects (consistent with the earlier design-review note in this file).
+  Canonical status surface = the registry instance map (`runtime.clj`), read via
+  `ops/instance-payload`. Decision: stale-port rejection → existing `:last-error`
+  failure-path projection with distinct `:phase :started-stale-port`; effective
+  timeout → new instance `:readiness-timeout-ms` status field surfaced through
+  `instance-payload`; `ops/start` keeps projecting from `instance-payload` (no
+  op-only status channel). Acceptance criteria updated to match.
