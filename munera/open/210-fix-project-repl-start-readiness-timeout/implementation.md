@@ -1574,3 +1574,43 @@ A1 attach/shared-discovery stale-acceptance (TR4), startup-failure projection.
 No mocks/stubs; infra deps fully nullable.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+---
+
+## TR6 follow-up — invalid configured timeout `:phase :validate` through `ops/start` (2026-06-04)
+
+Sole newly-added actionable item (added by test-review pass `cc71e3e2b`; all
+prior TR1–TR5/IR1/IR2/PA1–PA4/PSI1/TS1–TS10 already checked).
+
+Added `ops_test.clj` `start-invalid-config-timeout-test` — the negative-path
+sibling of `start-config-timeout-threading-test` (TR3) at the same `ops/start`
+boundary. `ops/start` calls `(resolved-start-readiness-timeout-ms cfg)`
+**unguarded** (no try/catch) before launch, so an out-of-range / non-integer
+configured `:start-readiness-timeout-ms` throws `:phase :validate` straight out
+of the op. The test writes a project `.psi/project.edn` with a valid
+`:start-command` plus an invalid timeout in two `testing` blocks:
+
+- out-of-range (`999`): asserts `thrown-with-msg?` on `#"range 1000-600000"`
+  **and** `(:phase (ex-data …)) = :validate`;
+- non-integer (`"120000"`): asserts `(:phase (ex-data …)) = :validate`.
+
+No launcher/connector seam is seeded — the validation throw precedes launch.
+Coverage-only; production verified by inspection (no production/doc/CHANGELOG
+change). A regression swallowing/wrapping the throw, mis-reading the config key,
+or silently coercing the value would otherwise pass `config_test` (exercises the
+fn directly), TR3 (valid value), and `start-test` (missing-start-command).
+
+Verified: ops-test 5 tests/26 assertions green (+1 test/+3 assertions over the
+prior 4/23); `clojure -M:test --focus unit` RC=0; clj-kondo 0/0;
+clj-paren-repair Success; `bb commit-check:file-lengths` exit 0; ops_test 158
+lines (< 800).
+
+🔁 PATTERN: a happy-path threading test (TR3) at a config→op boundary leaves the
+*negative* validation path (invalid configured value) uncovered when the op
+calls the validating resolver unguarded — the throw fires at the op boundary,
+not just the resolver unit (`config_test`), so a wrap/swallow/coerce regression
+escapes both the unit test and the valid-value threading test. Pin both the
+valid threading and the invalid-validation surfacing at the boundary that owns
+the user-misconfiguration error.
+
+PASS_STATUS: REVIEW_COMPLETE

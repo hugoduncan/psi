@@ -297,7 +297,7 @@
       `(and endpoint (not fresh?))` guard fails green. Coverage-only; no
       production/doc/CHANGELOG change.
 
-- [ ] TR6: Cover the invalid-configured-timeout `:phase :validate` path through
+- [x] TR6: Cover the invalid-configured-timeout `:phase :validate` path through
       `ops/start` — the negative-path sibling of TR3 at the same boundary. The Q1
       acceptance criterion includes "out-of-range or non-integer values throw a
       `:phase :validate` `ex-info`". Today that throw is tested only at the
@@ -318,6 +318,19 @@
       that config validation surfaces at the op boundary. Coverage-only
       (production verified by inspection); no mocks (real config file + ctx).
       Re-run config/ops + clj-kondo after.
+      → Resolved: added `ops_test.clj` `start-invalid-config-timeout-test` with
+      two `testing` blocks. Both write a project `.psi/project.edn` with a valid
+      `:start-command ["bb" "nrepl-server"]` plus an invalid
+      `:start-readiness-timeout-ms` (out-of-range `999`; non-integer `"120000"`),
+      drive `ops/start`, and assert it throws — out-of-range via
+      `thrown-with-msg?` on `#"range 1000-600000"` **and** `(:phase (ex-data …))
+      = :validate`; non-integer via the `:phase :validate` ex-data check. No
+      launcher/connector seam seeded (the throw in `ops/start`'s unguarded
+      `(resolved-start-readiness-timeout-ms cfg)` precedes launch). Pins config
+      validation surfacing at the op boundary — the negative-path sibling of TR3.
+      Coverage-only; no production change. ops-test 5 tests/26 assertions green
+      (+1/+3); `--focus unit` RC=0; clj-kondo 0/0; clj-paren-repair Success;
+      file-lengths exit 0; ops_test 158 lines (< 800).
 
 ## Test-shaper review follow-ups (shape)
 

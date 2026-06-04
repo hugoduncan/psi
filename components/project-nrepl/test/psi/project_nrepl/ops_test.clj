@@ -79,6 +79,45 @@
         (let [status (project-nrepl-ops/status ctx worktree)]
           (is (= 90000 (get-in status [:instance :readiness-timeout-ms]))))))))
 
+(deftest start-invalid-config-timeout-test
+  (testing "ops/start surfaces an invalid configured :start-readiness-timeout-ms as a :phase :validate ex-info (TR6/Q1)"
+    ;; Negative-path sibling of start-config-timeout-threading-test (TR3) at the
+    ;; same boundary. ops/start calls (resolved-start-readiness-timeout-ms cfg)
+    ;; unguarded before launch, so an out-of-range / non-integer configured value
+    ;; throws :phase :validate straight out of the op — the user-misconfiguration
+    ;; surface where validation actually fires. A regression swallowing/wrapping
+    ;; the throw, mis-reading the config key, or silently coercing the value would
+    ;; pass config_test (exercises the fn directly), the TR3 threading test (valid
+    ;; value), and start-test (missing-start-command). No launcher/connector seam
+    ;; is seeded — the throw precedes launch.
+    (with-temp-dir [worktree "psi-project-nrepl-ops-"]
+      (let [ctx     (make-ctx)
+            command ["bb" "nrepl-server"]]
+        (testing "out-of-range value"
+          (write-project-config!
+           worktree
+           {:agent-session {:project-nrepl {:start-command command
+                                            :start-readiness-timeout-ms 999}}})
+          (is (thrown-with-msg?
+               clojure.lang.ExceptionInfo
+               #"range 1000-600000"
+               (project-nrepl-ops/start ctx worktree)))
+          (is (= :validate
+                 (:phase (ex-data
+                          (try
+                            (project-nrepl-ops/start ctx worktree)
+                            (catch clojure.lang.ExceptionInfo e e)))))))
+        (testing "non-integer value"
+          (write-project-config!
+           worktree
+           {:agent-session {:project-nrepl {:start-command command
+                                            :start-readiness-timeout-ms "120000"}}})
+          (is (= :validate
+                 (:phase (ex-data
+                          (try
+                            (project-nrepl-ops/start ctx worktree)
+                            (catch clojure.lang.ExceptionInfo e e)))))))))))
+
 (deftest eval-op-test
   (testing "eval-op preserves the public success contract through real eval-instance-in!"
     (let [ctx            (make-ctx)
