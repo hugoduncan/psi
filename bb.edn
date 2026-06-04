@@ -144,7 +144,32 @@
           (defn print-top-files [fmt rows]
             (run! (fn [[path value]]
                     (println (format fmt value path)))
-                  rows)))
+                  rows))
+
+          (defn scry-runner-error? [result]
+            (and (pos? (:exit result))
+                 (str/includes? (or (:err result) "") "scry CLI error:")))
+
+          (defn run-scry-kaocha-suite!
+            "Run a Kaocha suite through Scry first, falling back to the existing
+             Kaocha wrapper only when the Scry runner itself cannot execute. Test
+             failures stay as Scry failures so the structured .scry-results data
+             remains the default diagnostic path."
+            [suite kaocha-args]
+            (let [result (shell {:continue true :out :string :err :string}
+                                "clojure" "-X:test" "scry.cli/run"
+                                ":runner" ":kaocha" ":suite" (str ":" suite))]
+              (print (:out result))
+              (when (seq (:err result))
+                (binding [*out* *err*]
+                  (print (:err result))))
+              (flush)
+              (if (scry-runner-error? result)
+                (do
+                  (binding [*out* *err*]
+                    (println "Scry runner unavailable; falling back to Kaocha."))
+                  (bb.kaocha-runner/run! kaocha-args))
+                (:exit result)))))
 
   fmt:check
   {:doc  "Check Clojure and EDN formatting with cljfmt CLI."
@@ -189,26 +214,24 @@
    :task (System/exit (bb.dispatch-architecture-check/run! *command-line-args*))}
 
   clojure:test:unit
-  {:doc  "Run Clojure unit tests (Kaocha :unit suite).
-         Uses documentation reporter so errors are named, not buried in dots.
-         Scans output for ERROR/FAIL markers — exits non-zero even when
-         StackOverflowError corrupts Kaocha's result tree."
-   :task (System/exit (bb.kaocha-runner/run! ["--focus" "unit"]))}
+  {:doc  "Run Clojure unit tests through Scry's structured runner; fall back to raw Kaocha only if Scry cannot execute."
+   :task (System/exit (run-scry-kaocha-suite! "unit" ["--focus" "unit"]))}
 
   clojure:test:extensions
-  {:doc  "Run Clojure extension tests (Kaocha :extensions suite).
-         Uses documentation reporter so errors are named, not buried in dots.
-         Scans output for ERROR/FAIL markers — exits non-zero even when
-         StackOverflowError corrupts Kaocha's result tree."
-   :task (System/exit (bb.kaocha-runner/run! ["--focus" "extensions"]))}
+  {:doc  "Run Clojure extension tests through Scry's structured runner; fall back to raw Kaocha only if Scry cannot execute."
+   :task (System/exit (run-scry-kaocha-suite! "extensions" ["--focus" "extensions"]))}
 
   clojure:test:integration
-  {:doc  "Run Clojure integration tests (slow, requires tmux etc)."
-   :task (shell "clojure -M:test --focus integration")}
+  {:doc  "Run Clojure integration tests through Scry's structured runner; fall back to raw Kaocha only if Scry cannot execute."
+   :task (System/exit (run-scry-kaocha-suite! "integration" ["--focus" "integration"]))}
+
+  clojure:test:scry
+  {:doc  "Run focused clojure.test tests with Scry structured results. Pass scry CLI options, e.g. --namespace psi.session-state.state-test."
+   :task (apply shell "clojure" "-M:test-paths" "-m" "scry.cli" *command-line-args*)}
 
   smoke:test
   {:doc  "Smoke-test the live runtime: RPC handshake subprocess test + TUI tmux startup scenario."
-   :task (shell "clojure -M:test --focus integration")}
+   :task (System/exit (run-scry-kaocha-suite! "integration" ["--focus" "integration"]))}
 
   tui:delegate:e2e
   {:doc  "Run the live TUI tmux /delegate scenario against the current worktree."

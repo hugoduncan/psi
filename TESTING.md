@@ -32,6 +32,39 @@ bb clojure:test:integration
 bb test
 ```
 
+## Structured Scry Runs
+
+Psi includes `org.hugoduncan/scry` and `org.hugoduncan/scry-kaocha` on the test
+classpath. The default `bb clojure:test:*` tasks run the configured Kaocha suites
+through Scry first, preserving suite semantics while making structured failure
+artifacts the default diagnostic path. They fall back to the previous raw Kaocha
+runner only if the Scry runner itself cannot execute.
+
+Use focused Scry CLI or REPL runs when you need machine-readable assertion data
+instead of scraping terminal output:
+
+```bash
+# Focus one namespace with CLI exit semantics
+bb clojure:test:scry --namespace psi.session-state.state-test
+
+# Equivalent direct CLI invocation
+clojure -M:test-paths -m scry.cli --namespace psi.session-state.state-test
+```
+
+From a warm project REPL started with the default project nREPL command:
+
+```clojure
+(require '[scry.core :as scry])
+
+(scry/run {:namespaces ['psi.session-state.state-test]})
+(:pass? (scry/last-result))
+(scry/failures)
+```
+
+Use `bb clojure:test:*` for Scry-first CI-style suite verification; use
+`bb clojure:test:scry` or the REPL API for targeted structured inspection and
+iteration.
+
 ## Performance Notes
 
 The startup cost is incurred once per JVM instance. Using a warm REPL or nREPL connection can amortize this cost across multiple test runs.

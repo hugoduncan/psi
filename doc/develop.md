@@ -300,6 +300,9 @@ bb clojure:test:unit
 # Clojure extension tests only
 bb clojure:test:extensions
 
+# Focused structured clojure.test inspection with Scry
+bb clojure:test:scry --namespace psi.session-state.state-test
+
 # Emacs frontend tests
 bb emacs:check
 ```
