@@ -477,3 +477,45 @@ change — the new `:phase` was already a documented A2 outcome; this only makes
 fire on one more code path).
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Implementation review — quality (ψ, 2026-06-03, pass 2)
+
+Independent re-review against design/plan/architecture after IR1 resolution.
+Verified locally: clj-kondo 0/0 (`components/project-nrepl/{src,test}`);
+`started/config/ops` focused suite 13 tests/82 assertions green; consuming
+`project-nrepl-extension-install-test` widened-arity stub correct (`& _opts`).
+
+Traceability confirmed end-to-end:
+- Q1 config: `resolved-start-readiness-timeout-ms` mirrors the
+  `resolved-attach-endpoint` `cond` range idiom (`[1000 600000]`,
+  `:phase :validate`); `nil` unset → started.clj default fallback.
+- Raised default `120000` in `started.clj`; threaded via `ops/start`
+  (`cond-> {} (some? timeout-ms) (assoc :timeout-ms …)`), preserving the
+  missing-start-command path.
+- Stale-port guard wholly in `started.clj` (A1): pre-launch
+  `dot-nrepl-port-file .delete`; single `launched-at (now)` at launch site →
+  both runtime-handle `:started-at` and `opts :launched-at`; post-wait
+  `:started-at` write removed (PA2); mtime gate `floored-to-whole-seconds`
+  (AMB4); `:phase :started-stale-port` on deadline and (IR1) on
+  exit-with-stale-port. Shared `read-dot-nrepl-port` + attach untouched.
+- A2 projection: `:readiness-timeout-ms` written by the pre-wait launch-site
+  `update-instance-in!` (survives the throwing failure path) and added to
+  `instance-payload`'s key list (AMB3); stale-port rides `:last-error → :data`.
+- Tests no-mocks via `process-launcher`/`nrepl-connector` seams; PA3 split
+  (unit-level gate rejection vs `start-instance-in!`-level pre-launch removal)
+  honoured; PA4 `status`-read failure-path test present.
+
+Non-blocking observation (no new step — within design tolerance):
+- The freshness gate is fail-open on a TOCTOU stat miss: `mtime-ms` is a second
+  independent `port-file-mtime-ms` stat after `read-dot-nrepl-port-safe`, and
+  `fresh?` short-circuits to `true` when `(nil? mtime-ms)`. If the port file
+  vanishes between read and stat, a just-read port is accepted without the gate.
+  This is consistent with the design's explicit framing that pre-launch removal
+  "guarantees correctness even when the gate is lenient" (Q2/A1 defence-in-depth)
+  — the gate is intentionally lenient and correctness does not depend on it.
+  Recorded for completeness; not actionable.
+
+No new actionable issues. Implementation matches design + architecture; no
+unjustified new pattern, abstraction, or structural performance concern.
+
+PASS_STATUS: REVIEW_COMPLETE
