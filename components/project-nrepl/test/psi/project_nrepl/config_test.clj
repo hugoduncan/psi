@@ -3,23 +3,15 @@
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
    [psi.project-nrepl.config :as project-nrepl-config]
-   [psi.project-nrepl.test-support :refer [age-file-back! with-temp-dir]]))
+   [psi.project-nrepl.test-support
+    :refer [age-file-back! with-temp-dir write-local-config!
+            write-project-config! write-user-config!]]))
 
 (defn- capture-stderr [f]
   (let [w (java.io.StringWriter.)]
     (binding [*err* w]
       (f))
     (str w)))
-
-(defn- write-user-config! [home-dir content]
-  (let [f (io/file home-dir ".psi" "agent" "config.edn")]
-    (.mkdirs (.getParentFile f))
-    (spit f (pr-str content))))
-
-(defn- write-project-config! [worktree content]
-  (let [f (io/file worktree ".psi" "project.edn")]
-    (.mkdirs (.getParentFile f))
-    (spit f (pr-str content))))
 
 (defn- with-temp-home
   "Run `f` with `user.home` rebound to `home-dir`, restoring the original after."
@@ -57,44 +49,35 @@
 (deftest read-project-preferences-test
   (testing "deep-merges shared then local with local precedence"
     (with-temp-dir [dir "psi-project-nrepl-pref-"]
-      (let [shared-f (io/file dir ".psi" "project.edn")
-            local-f  (io/file dir ".psi" "project.local.edn")]
-        (.mkdirs (.getParentFile shared-f))
-        (spit shared-f (pr-str {:agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]
-                                                                :attach {:host "localhost" :port 7888}}}}))
-        (spit local-f (pr-str {:agent-session {:project-nrepl {:attach {:port 9999}}}}))
-        (is (= {:version 1
-                :agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]
-                                                :attach {:host "localhost" :port 9999}}}}
-               (project-nrepl-config/read-project-preferences dir))))))
+      (write-project-config! dir {:agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]
+                                                                  :attach {:host "localhost" :port 7888}}}})
+      (write-local-config! dir {:agent-session {:project-nrepl {:attach {:port 9999}}}})
+      (is (= {:version 1
+              :agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]
+                                              :attach {:host "localhost" :port 9999}}}}
+             (project-nrepl-config/read-project-preferences dir)))))
 
   (testing "malformed local warns and falls back to shared"
     (with-temp-dir [dir "psi-project-nrepl-pref-"]
-      (let [shared-f (io/file dir ".psi" "project.edn")
-            local-f  (io/file dir ".psi" "project.local.edn")]
-        (.mkdirs (.getParentFile shared-f))
-        (spit shared-f (pr-str {:agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]}}}))
-        (spit local-f "not valid edn")
-        (let [err (capture-stderr
-                   #(is (= {:version 1
-                            :agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]}}}
-                           (project-nrepl-config/read-project-preferences dir))))]
-          (is (.contains err "WARNING: ignoring malformed project preferences file"))
-          (is (.contains err "project.local.edn"))))))
+      (write-project-config! dir {:agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]}}})
+      (spit (io/file dir ".psi" "project.local.edn") "not valid edn")
+      (let [err (capture-stderr
+                 #(is (= {:version 1
+                          :agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]}}}
+                         (project-nrepl-config/read-project-preferences dir))))]
+        (is (.contains err "WARNING: ignoring malformed project preferences file"))
+        (is (.contains err "project.local.edn")))))
 
   (testing "malformed shared warns and falls back to local"
     (with-temp-dir [dir "psi-project-nrepl-pref-"]
-      (let [shared-f (io/file dir ".psi" "project.edn")
-            local-f  (io/file dir ".psi" "project.local.edn")]
-        (.mkdirs (.getParentFile shared-f))
-        (spit shared-f "not valid edn")
-        (spit local-f (pr-str {:agent-session {:project-nrepl {:attach {:port 7888}}}}))
-        (let [err (capture-stderr
-                   #(is (= {:version 1
-                            :agent-session {:project-nrepl {:attach {:port 7888}}}}
-                           (project-nrepl-config/read-project-preferences dir))))]
-          (is (.contains err "WARNING: ignoring malformed project preferences file"))
-          (is (.contains err "project.edn")))))))
+      (write-local-config! dir {:agent-session {:project-nrepl {:attach {:port 7888}}}})
+      (spit (io/file dir ".psi" "project.edn") "not valid edn")
+      (let [err (capture-stderr
+                 #(is (= {:version 1
+                          :agent-session {:project-nrepl {:attach {:port 7888}}}}
+                         (project-nrepl-config/read-project-preferences dir))))]
+        (is (.contains err "WARNING: ignoring malformed project preferences file"))
+        (is (.contains err "project.edn"))))))
 
 (deftest resolve-target-worktree-test
   (testing "explicit target wins over session worktree"

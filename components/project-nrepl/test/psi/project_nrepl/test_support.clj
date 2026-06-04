@@ -101,6 +101,39 @@
          (finally
            ~@(map (fn [sym] `(delete-tree! ~sym)) (reverse syms)))))))
 
+(defn write-user-config!
+  "Write `content` (verbatim EDN) to `<home-dir>/.psi/agent/config.edn`, the
+   canonical user-config path read by `resolve-config` when `user.home` is bound
+   to `home-dir`. Caller passes the full on-disk map (e.g.
+   `{:agent-session {:project-nrepl …}}`); the helper only writes it to the
+   canonical path (`¬helpers_that_hide(intent)`). Single-sources the user-config
+   writer across the config tests."
+  [home-dir content]
+  (let [f (io/file home-dir ".psi" "agent" "config.edn")]
+    (.mkdirs (.getParentFile f))
+    (spit f (pr-str content))))
+
+(defn write-project-config!
+  "Write `content` (verbatim EDN) to `<worktree>/.psi/project.edn`, the canonical
+   shared project-config path. Caller passes the full on-disk map (e.g.
+   `{:agent-session {:project-nrepl …}}`); the helper only writes it to the
+   canonical path. Single-sources the shared-config writer across the config/ops
+   tests with one explicit wrapping convention."
+  [worktree content]
+  (let [f (io/file worktree ".psi" "project.edn")]
+    (.mkdirs (.getParentFile f))
+    (spit f (pr-str content))))
+
+(defn write-local-config!
+  "Write `content` (verbatim EDN) to `<worktree>/.psi/project.local.edn`, the
+   canonical local project-override path. Caller passes the full on-disk map;
+   the helper only writes it to the canonical path. Single-sources the
+   local-override writer across the config tests."
+  [worktree content]
+  (let [f (io/file worktree ".psi" "project.local.edn")]
+    (.mkdirs (.getParentFile f))
+    (spit f (pr-str content))))
+
 (defn session-fn-with-id
   "A fake nREPL session fn carrying the `:nrepl.core/taking-until {:session id}`
    metadata used to derive the managed session-id."

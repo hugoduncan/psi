@@ -1281,3 +1281,50 @@ steps/implementation):
   contract.
 
 Both are shape-only / behaviour-preserving (no assertion change).
+
+## Test-shaper review (pass 5) follow-up execution — TS8/TS9
+
+Executed the two pass-5 follow-ups (the only newly-added unchecked items;
+TS1–TS7 + all TR/IR/PA/PSI items already done). Shape-only / behaviour-
+preserving — test files + task artifacts only; no production/doc/CHANGELOG;
+suite behaviour and assertions unchanged.
+
+**TS8 — single-source the divergent config-file writers.** Lifted three writers
+into `test_support`: `write-user-config!` (`~/.psi/agent/config.edn`),
+`write-project-config!` (`<worktree>/.psi/project.edn`), and new
+`write-local-config!` (`<worktree>/.psi/project.local.edn`). **Decision — one
+wrapping convention: caller passes the full on-disk map verbatim**; the helper
+only writes EDN to the canonical path. Chosen because it keeps the asserted
+on-disk shape (`{:agent-session {:project-nrepl …}}`) visible at every call site
+(`¬helpers_that_hide(intent)`) and matches `config_test`'s prior verbatim
+semantics — so only `ops_test`'s call site changed (it previously passed the
+inner `:project-nrepl` map and let its private writer wrap; it now passes the
+full map). `config_test` deleted its two private writers, `ops_test` deleted its
+one (and its now-unused `clojure.java.io` require); both `:refer` the shared set.
+
+**TS9 — compress the `read-project-preferences-test` shared/local arrange.**
+Rewired all three cases onto the TS8 single-file writers, removing the open-coded
+`shared-f`/`local-f` `let` + `.mkdirs` + `spit` frame. **Decision — reused the
+TS8 single-file writers, not a new `write-project-prefs!` pair-writer**, because
+the two malformed cases write ONE valid file via the writer and the OTHER as raw
+invalid EDN (`spit "not valid edn"` to the canonical path); a pair-writer taking
+two valid maps could not express the malformed half. The writer's `.mkdirs` also
+creates the `.psi` dir for the sibling malformed `spit`.
+
+Verified: clj-paren-repair Success (3 files); clj-kondo 0 errors/0 warnings over
+`components/project-nrepl/test`; focused green (config 8/41, ops 4/23, started
+3/33, attach 2/18); full `clojure -M:test --focus unit` exit 0;
+`bb commit-check:file-lengths` exit 0 (config 230, ops 119, test_support 242 —
+all < 800; config/ops shrank, test_support grew by the three writers).
+
+🔁 PATTERN: two same-named private helpers in sibling test files with DIFFERENT
+wrapping semantics (`ops_test` wraps the inner map; `config_test` spits verbatim)
+is the exact `consistent(fixtures)` drift `test_support` exists to prevent —
+unify on the *verbatim full-map* convention so the asserted on-disk shape stays
+at the call site, then only the wrapping site changes.
+🔁 PATTERN: a pair-writer helper that takes two *valid* maps cannot serve the
+malformed-fallback cases (which need one valid file + one raw-invalid-EDN spit);
+prefer per-file writers whose `.mkdirs` still provisions the shared dir for the
+sibling raw spit.
+
+PASS_STATUS: REVIEW_COMPLETE

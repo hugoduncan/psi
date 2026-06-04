@@ -452,7 +452,7 @@
 
 ## Test-shaper review follow-ups (shape, pass 5)
 
-- [ ] TS8: Single-source the divergent config-file writers
+- [x] TS8: Single-source the divergent config-file writers
       (`consistent(fixtures)`). `ops_test` and `config_test` each define a
       private `write-project-config!` with **different** wrapping semantics
       (`ops_test` wraps its arg in `{:agent-session {:project-nrepl …}}`;
@@ -466,8 +466,21 @@
       apply it consistently; update both call sites' literals accordingly.
       Shape-only; behaviour-preserving (no assertion change). Re-run
       started/ops/config/attach/commands + clj-kondo after.
+      → Resolved: lifted `write-user-config!`, `write-project-config!`, and new
+      `write-local-config!` into `test_support`, all with ONE explicit wrapping
+      convention — **caller passes the full on-disk map verbatim**; the helper
+      only writes EDN to the canonical path (`~/.psi/agent/config.edn`,
+      `<worktree>/.psi/project.edn`, `<worktree>/.psi/project.local.edn`). This
+      keeps the asserted on-disk shape visible at every call site
+      (`¬helpers_that_hide(intent)`) and matches `config_test`'s prior verbatim
+      semantics. `config_test` deleted its two private writers and `:refer`s the
+      shared ones unchanged. `ops_test` deleted its inner-map-wrapping writer,
+      `:refer`s the shared `write-project-config!`, and its one call site now
+      passes the full `{:agent-session {:project-nrepl {…}}}` map; dropped the
+      now-unused `clojure.java.io` require. config 8/41, ops 4/23, started 3/33,
+      attach 2/18 green; clj-kondo 0/0; full `--focus unit` exit 0.
 
-- [ ] TS9: Compress the `read-project-preferences-test` shared/local arrange
+- [x] TS9: Compress the `read-project-preferences-test` shared/local arrange
       (`minimal_incidental_setup`). Its three cases each open-code the same
       `shared-f` (`.psi/project.edn`) + `local-f` (`.psi/project.local.edn`) +
       `.mkdirs` + `spit` frame. Add a pair-writer helper (e.g.
@@ -477,3 +490,16 @@
       malformed contract. Keep the asserted content visible at the call site
       (`helpers_that_compress(ceremony) ∧ ¬helpers_that_hide(intent)`).
       Shape-only; behaviour-preserving. Re-run config + clj-kondo after.
+      → Resolved: rewired all three `read-project-preferences-test` cases onto
+      the TS8 single-file writers `write-project-config!` (shared `.psi/project.edn`)
+      and `write-local-config!` (local `.psi/project.local.edn`), removing the
+      open-coded `shared-f`/`local-f` `let` + `.mkdirs` + `spit` frame. Chose the
+      TS8 single-file writers over a new `write-project-prefs!` pair-writer
+      because the two malformed cases must write ONE valid file via the writer
+      and the OTHER as raw invalid EDN (a verbatim `spit` of `"not valid edn"`
+      to the canonical path) — a pair-writer taking two valid maps could not
+      express the malformed half. Each case now writes its valid file via the
+      named writer (whose `.mkdirs` also creates the `.psi` dir for the sibling
+      malformed `spit`) and asserts only its distinct merge/fallback/malformed
+      contract; the asserted EDN content stays visible at the call site. config
+      8 tests/41 assertions green; clj-kondo 0/0.

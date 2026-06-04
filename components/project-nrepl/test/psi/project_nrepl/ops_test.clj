@@ -1,21 +1,13 @@
 (ns psi.project-nrepl.ops-test
   (:require
-   [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
    [psi.project-nrepl.config]
    [psi.project-nrepl.ops :as project-nrepl-ops]
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
    [psi.project-nrepl.test-support
     :refer [fake-connector install-instance!
-            make-ctx started-launcher! with-temp-dir]]))
-
-(defn- write-project-config!
-  "Write `<worktree>/.psi/project.edn` with the given agent-session project-nrepl map."
-  [worktree project-nrepl-map]
-  (let [psi-dir (io/file worktree ".psi")]
-    (.mkdirs psi-dir)
-    (spit (io/file psi-dir "project.edn")
-          (pr-str {:agent-session {:project-nrepl project-nrepl-map}}))))
+            make-ctx started-launcher! with-temp-dir
+            write-project-config!]]))
 
 (deftest start-test
   (testing "start returns structured missing-start-command result with actionable guidance"
@@ -66,8 +58,10 @@
             command   ["bb" "nrepl-server"]
             launcher  (started-launcher!)
             connector (fake-connector "nrepl-session-1")]
-        (write-project-config! worktree {:start-command command
-                                         :start-readiness-timeout-ms 90000})
+        (write-project-config!
+         worktree
+         {:agent-session {:project-nrepl {:start-command command
+                                          :start-readiness-timeout-ms 90000}}})
         ;; Pre-seed the runtime-handle launcher/connector seam. The acquisition
         ;; mode/command/endpoint match start-instance-in!'s ensure request, so it
         ;; returns this slot (no conflict) and keeps the seeded runtime-handle.
