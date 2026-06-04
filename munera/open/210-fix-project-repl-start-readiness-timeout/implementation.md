@@ -1734,3 +1734,49 @@ regression collapse it to one mechanism while the suite stays green, re-opening
 the exact leak the fix closed for the deferred path.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Test-review follow-up execution — TR8 (ψ, 2026-06-04)
+
+Executed the sole newly-added actionable item (TR8, added by task-test-review
+pass 8). Coverage-only (production already correct: the pre-wait `:process`/`:pid`
+record onto the runtime-handle and `stop-started-instance-in!`'s reaping branch
+both exist and are verified by inspection); no production/doc/CHANGELOG change.
+
+TR8 pins the **second half** of the IR2 process-reaping contract, which the
+existing IR2 case left uncovered. Implemented *both* design options:
+
+- (a) Extended the IR2 `start-instance-in-test` case ("reaps the alive launched
+  process on the readiness-failure path (IR2)") to also read the failure-path
+  instance via `instance-in` and assert `(get-in instance [:runtime-handle
+  :process])` is present (non-nil) and `:pid` = 4321. This pins the **pre-wait**
+  `:process`/`:pid` record: a regression reverting to the post-wait
+  success-only update would keep `@destroyed*` green (the `catch` still reaps via
+  the outer `launched-process` volatile) yet re-orphan any process that survives
+  the catch, because `stop-started-instance-in!` reads `:process` from the
+  runtime-handle and would find it absent on a failure-path instance.
+
+- (b) Added `stop-started-instance-in-test` "reaps the alive recorded process and
+  removes the instance (TR8)" — the previously-**untested**
+  `stop-started-instance-in!` reaping branch
+  (`(when (and process (.isAlive process)) (.destroy process))`). Seeds a
+  `:started` instance (`ensure-instance-in!`) whose runtime-handle carries an
+  alive `fake-process` (a `:destroyed*` atom) + `:pid 4321`, calls
+  `stop-started-instance-in!`, and asserts `@destroyed*` is true (the process was
+  reaped) and `instance-in` returns nil (the instance was removed). No mocks:
+  real `Process` proxy seam; `disconnect-instance-in!` is a no-op without a
+  seeded transport.
+
+Verified: clj-paren-repair Success; clj-kondo 0/0
+(`components/project-nrepl/test/psi/project_nrepl/started_test.clj`); `started-test`
+**4 tests/52 assertions** green (+1 deftest, +5 assertions over pass-3's 47);
+full `clojure -M:test --focus unit` green; `bb commit-check:file-lengths` RC=0.
+
+🔁 PATTERN: a fix with two stated mechanisms (immediate `catch` reap via an outer
+volatile + a recorded durable handle for deferred reap by `stop`) needs both
+pinned — testing only the immediate path lets a regression collapse it to one
+mechanism while the suite stays green, re-opening the exact leak the fix closed
+for the deferred path. Cover both the producing record (pre-wait `:process`
+present on the failure instance) and the consuming reaper
+(`stop-started-instance-in!` destroys + removes).
+
+PASS_STATUS: REVIEW_COMPLETE

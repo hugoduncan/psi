@@ -302,4 +302,42 @@
               {:timeout-ms 100 :poll-interval-ms 10
                :runtime-handle {:process-launcher launcher}})))
         (is (true? @destroyed*)
-            "the alive launched process must be destroyed on the readiness-failure path")))))
+            "the alive launched process must be destroyed on the readiness-failure path")
+        ;; Second half of the IR2 contract (TR8): the process is recorded on the
+        ;; runtime-handle *pre-wait*, so it survives onto the failure-path
+        ;; instance. A regression reverting to the post-wait success-only record
+        ;; keeps @destroyed* green (the catch reaps via the outer volatile) yet
+        ;; re-orphans any process that survives the catch, because
+        ;; stop-started-instance-in! reads :process from the runtime-handle and
+        ;; would find it absent on a failure-path instance.
+        (let [instance (project-nrepl-runtime/instance-in ctx worktree)]
+          (is (some? (get-in instance [:runtime-handle :process]))
+              "the launched process must be recorded on the failure-path instance")
+          (is (= 4321 (get-in instance [:runtime-handle :pid]))
+              "the launched pid must be recorded on the failure-path instance"))))))
+
+(deftest stop-started-instance-in-test
+  (testing "reaps the alive recorded process and removes the instance (TR8)"
+    ;; Directly exercises stop-started-instance-in!'s reaping branch
+    ;; (`(when (and process (.isAlive process)) (.destroy process))`), which had
+    ;; no test: seed a runtime-handle carrying an alive fake-process with a
+    ;; :destroyed* flag, call stop, assert the process is destroyed and the
+    ;; instance removed.
+    (with-temp-dir [worktree "psi-project-nrepl-started-"]
+      (let [ctx        (make-ctx)
+            destroyed* (atom false)
+            fake-proc  (fake-process {:alive? true :exit-code 0 :pid 4321
+                                      :destroyed* destroyed*})]
+        (project-nrepl-runtime/ensure-instance-in!
+         ctx
+         {:worktree-path worktree
+          :acquisition-mode :started
+          :command-vector ["bb" "nrepl-server"]})
+        (project-nrepl-runtime/update-instance-in!
+         ctx worktree
+         #(update % :runtime-handle merge {:process fake-proc :pid 4321}))
+        (project-nrepl-started/stop-started-instance-in! ctx worktree)
+        (is (true? @destroyed*)
+            "the alive recorded process must be destroyed on stop")
+        (is (nil? (project-nrepl-runtime/instance-in ctx worktree))
+            "the instance must be removed after stop")))))

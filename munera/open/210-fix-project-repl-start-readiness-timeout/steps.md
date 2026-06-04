@@ -669,7 +669,7 @@
 
 ## Test review follow-ups (task-test-review, pass 8)
 
-- [ ] TR8: Pin the second half of the IR2 process-reaping contract — the
+- [x] TR8: Pin the second half of the IR2 process-reaping contract — the
       pre-wait `:process`/`:pid` record onto the runtime-handle and the
       `stop-started-instance-in!` reap. The current IR2 case asserts only
       `@destroyed*` (the failure-path `catch` reap via the outer
@@ -688,3 +688,19 @@
       `fake-process` carrying a `:destroyed*` atom, call
       `stop-started-instance-in!`, assert `@destroyed*` is true and the instance
       is removed. No production/doc/CHANGELOG change.
+      → Resolved (both (a) and (b)): (a) extended the IR2 `started_test` case to
+      also assert `(get-in instance [:runtime-handle :process])` is present
+      (non-nil) and `:pid` = 4321 on the failure-path instance after the throw
+      (read via `instance-in`), pinning the *pre-wait* `:process`/`:pid` record
+      — a regression reverting to the post-wait success-only record keeps
+      `@destroyed*` green yet re-orphans any process that survives the catch.
+      (b) added `stop-started-instance-in-test` "reaps the alive recorded
+      process and removes the instance (TR8)": seeds a `:started` instance whose
+      runtime-handle carries an alive `fake-process` (`:destroyed*` atom) +
+      `:pid`, calls `stop-started-instance-in!`, asserts `@destroyed*` true (the
+      previously-untested `(when (and process (.isAlive process)) (.destroy
+      process))` reaping branch) and the instance is removed
+      (`instance-in` → nil). No-mocks (real `Process` proxy seam). Coverage-only;
+      no production/doc/CHANGELOG change. started-test 4 tests/52 assertions
+      green (+1 deftest, +5 assertions over pass-3's 47); full `--focus unit`
+      green; clj-kondo 0/0; clj-paren-repair Success; file-lengths RC=0.
