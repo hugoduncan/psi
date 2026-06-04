@@ -52,6 +52,58 @@ untouched.
   `ex-data` carries `:phase :started-stale-port` + rejected/launch instants,
   landing under `:last-error → :data` (INC2). No new projected key for it.
 
+### Plan/steps review resolutions (PA1–PA4)
+
+Grounded against `started.clj`, `runtime.clj`, `ops.clj`, `started_test.clj`.
+The unifying mechanism is a **single new launch-site `update-instance-in!`** in
+`start-instance-in!`, placed *after* `ensure-instance-in!` and *immediately
+before* `(launcher …)` / `wait-for-started-endpoint!`, that writes the
+launch-time status fields so they survive the throwing failure path.
+
+- **PA1 — `:readiness-timeout-ms` write site.** The effective resolved timeout
+  is written by the new launch-site `update-instance-in!` (a top-level instance
+  status key), **before** `wait-for-started-endpoint!` runs. It is *not* seeded
+  via `ensure-instance-in!` (whose match-key set is fixed and matters for
+  conflict detection) and *not* deferred to the post-wait success
+  `update-instance-in!`. Because it is written pre-wait, it is present on the
+  instance even when the wait throws (timeout / stale-port), so the diagnostic
+  timeout is observable on a *failure* via a `status` read (see PA4). The
+  effective resolved timeout = `(:timeout-ms opts)` when present, else
+  `default-readiness-timeout-ms` — the same fallback `wait-for-started-endpoint!`
+  applies — so the recorded value matches the wait's actual deadline basis.
+
+- **PA2 — `:started-at` move mechanism.** The same launch-site
+  `update-instance-in!` captures one `launched-at (now)` local and writes it as
+  the runtime-handle `:started-at` (`update :runtime-handle merge {:started-at
+  launched-at}`). The existing **post-wait** success-path `:started-at (now)`
+  write is **removed**, so `:started-at` is the launch instant (not the connect
+  instant) and survives the failure path. `build-instance`'s top-level
+  `:started-at (now)` (the slot-creation timestamp, a distinct field from the
+  runtime-handle `:started-at`) is left unchanged — only the runtime-handle
+  capture moves. `launched-at` is also threaded into `wait-for-started-endpoint!`
+  via `opts {:launched-at …}` as the mtime-gate reference, giving one
+  launch-instant source (INC1).
+
+- **PA3 — gate-rejection test level.** Pre-launch `.nrepl-port` removal in
+  `start-instance-in!` deletes any pre-existing port before `(launcher …)`, so
+  through `start-instance-in!` the gate only ever sees fresh launcher-written
+  ports. The **mtime-gate rejection case is therefore exercised at the
+  `wait-for-started-endpoint!` unit level** with an injected `:launched-at` and a
+  pre-written too-old `.nrepl-port` (bypassing removal). The
+  `start-instance-in!`-level test asserts only that **pre-launch removal occurs**
+  (a pre-seeded port is gone before the launcher writes the fresh one) and the
+  fresh post-launch port is accepted — it does *not* attempt to assert
+  gate-rejection through `start-instance-in!`.
+
+- **PA4 — failure-path diagnostic surface.** On the stale-port/timeout failure
+  path `start-instance-in!` *throws*, so the `start` op return never reaches
+  `instance-payload`. The launch-time diagnostics (`:readiness-timeout-ms`;
+  stale-port rejection under `:last-error → :data` with
+  `:phase :started-stale-port`) are observable via a separate **`status` (op)
+  read** of the instance, not via the `start` op return. A `status`-read
+  acceptance test confirms the failure-path instance carries
+  `:readiness-timeout-ms` and the stale-port `:last-error` phase.
+
 ### Tests (no mocks; existing `process-launcher`/`nrepl-connector` seams)
 
 - timeout configurability (config resolution + range validation + opts threading)
@@ -72,8 +124,9 @@ untouched.
   that dies returns immediately rather than waiting out the timeout.
 - **Mtime granularity / clock skew.** Mitigated by the whole-second floor
   (AMB4) plus pre-launch removal making correctness independent of the gate.
-- **`:started-at` capture move.** Moving `:started-at` from post-wait to the
-  launch site is a semantic shift (now = launch instant, not connect instant);
+- **`:started-at` capture move.** Moving the runtime-handle `:started-at` from
+  the post-wait success update to the new launch-site `update-instance-in!`
+  (PA2) is a semantic shift (now = launch instant, not connect instant);
   confirm no consumer depends on the post-wait timing. Grep before changing.
 - **Config resolution placement in `ops/start`.** `ops/start` currently calls
   `start-instance-in!` with no `opts`; ensure the resolved timeout is threaded
@@ -87,11 +140,17 @@ Vertical, smallest-first; each slice keeps the suite green.
    in `config.clj`, with tests. (No behaviour change to start yet.)
 2. **Timeout threading + raised default** — raise `default-readiness-timeout-ms`;
    thread resolved timeout through `ops/start` → `start-instance-in!` → opts;
-   record `:readiness-timeout-ms` on the instance; extend `instance-payload`.
-   Tests for configurability + payload projection + happy path.
-3. **Stale-port guard** — launch-instant ownership move (`:started-at` →
-   launch site), pre-launch `.nrepl-port` removal, threaded `:launched-at`,
-   mtime gate, `:phase :started-stale-port` deadline rejection. Tests for
-   stale rejection + fresh acceptance; assert attach-mode unchanged.
+   record `:readiness-timeout-ms` on the instance via a new pre-wait launch-site
+   `update-instance-in!` (PA1); extend `instance-payload`. Tests for
+   configurability + payload projection + happy path + a `status`-read of the
+   failure-path instance carrying `:readiness-timeout-ms` (PA4).
+3. **Stale-port guard** — launch-instant ownership move: the runtime-handle
+   `:started-at` is written at the new launch-site `update-instance-in!` from a
+   `launched-at` local (post-wait `:started-at` removed, PA2); pre-launch
+   `.nrepl-port` removal; threaded `:launched-at`; mtime gate;
+   `:phase :started-stale-port` deadline rejection. Tests: unit-level gate
+   rejection in `wait-for-started-endpoint!` with injected `:launched-at` (PA3);
+   `start-instance-in!`-level pre-launch removal + fresh acceptance; attach-mode
+   unchanged.
 4. **Docs + CHANGELOG** — `doc/project-nrepl.md` + `[Unreleased]` entries.
 5. **Coherence pass** — full suite + clj-kondo; verify acceptance criteria.

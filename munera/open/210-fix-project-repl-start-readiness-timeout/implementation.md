@@ -247,3 +247,47 @@ ambiguities a builder would otherwise guess at:
   Resolve (or confirm a `status`-read acceptance test covers it).
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Plan/steps ambiguity follow-up execution (ψ)
+
+Executed all four newly-added plan/steps ambiguity follow-ups (PA1–PA4); all
+resolved into plan.md + steps.md, no blockers (still design/plan stage — no
+production code exists yet; resolutions are decisions grounded by reading
+`started.clj`, `runtime.clj`, `ops.clj`, `started_test.clj`).
+
+Unifying mechanism: a **single new launch-site `update-instance-in!`** in
+`start-instance-in!`, placed after `ensure-instance-in!` and immediately before
+`(launcher …)` / `wait-for-started-endpoint!`, writing the launch-time status
+fields so they survive the throwing failure path.
+
+- PA1 (`:readiness-timeout-ms` write site): written by the new pre-wait
+  launch-site `update-instance-in!` as a top-level key (effective timeout =
+  `(:timeout-ms opts)` else `default-readiness-timeout-ms`). Not seeded via
+  `ensure-instance-in!` (its match-key set drives conflict detection), not
+  deferred to the post-wait success update — so it is present on a timeout/
+  stale-port *failure*. Plan "PA1" bullet + slice-2 step updated.
+- PA2 (`:started-at` move): the same launch-site update writes runtime-handle
+  `:started-at = launched-at` (one captured `(now)` local); the post-wait
+  success-path `:started-at (now)` write is removed; `build-instance`'s
+  top-level slot-creation `:started-at` (distinct field) is unchanged.
+  `launched-at` also threads into `wait-for-started-endpoint!` via
+  `opts {:launched-at …}` (one launch-instant source, INC1). Plan "PA2" +
+  slice-3 steps updated.
+- PA3 (gate-rejection test level): pre-launch removal in `start-instance-in!`
+  means the gate only sees fresh ports there, so the mtime-gate *rejection* case
+  is tested at the `wait-for-started-endpoint!` unit level with injected
+  `:launched-at` + a pre-written too-old port; the `start-instance-in!`-level
+  test asserts only pre-launch removal + fresh acceptance. Plan "PA3" + slice-3
+  test step updated.
+- PA4 (failure-path diagnostic surface): on the failure path
+  `start-instance-in!` throws, so the `start` op return never projects via
+  `instance-payload`; diagnostics (`:readiness-timeout-ms`; stale-port under
+  `:last-error → :data` with `:phase :started-stale-port`) are observable via a
+  separate `status` (op) read. Added a `status`-read acceptance test to slice-2.
+  Plan "PA4" updated.
+
+No blocked items. plan.md ↔ steps.md ↔ design.md verified coherent (launch-site
+`update-instance-in!` ↔ PA1/PA2; gate-rejection unit-test level ↔ PA3; `status`
+read surface ↔ PA4/A2).
+
+PASS_STATUS: REVIEW_COMPLETE

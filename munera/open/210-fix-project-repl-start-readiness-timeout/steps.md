@@ -20,15 +20,22 @@
       `resolved-start-readiness-timeout-ms` from the already-resolved `cfg`, and
       pass `start-instance-in!` an `opts` map carrying `:timeout-ms` (only when
       non-nil; nil falls back to the started.clj default).
-- [ ] In `start-instance-in!`, set instance status field
-      `:readiness-timeout-ms` (the effective resolved timeout, defaulted to
-      `default-readiness-timeout-ms` when `opts` omits it) when the launch
-      begins, alongside the existing status fields.
+- [ ] In `start-instance-in!`, add a **new launch-site `update-instance-in!`**
+      (after `ensure-instance-in!`, immediately before `(launcher …)` /
+      `wait-for-started-endpoint!`) that writes the top-level status field
+      `:readiness-timeout-ms` = effective resolved timeout (`(:timeout-ms opts)`
+      else `default-readiness-timeout-ms`, matching the wait's fallback) (PA1).
+      It is written *pre-wait* so it survives the throwing failure path; it is
+      *not* seeded via `ensure-instance-in!` and *not* deferred to the post-wait
+      success update.
 - [ ] Extend `ops/instance-payload`'s fixed key list with
       `:readiness-timeout-ms` (AMB3).
 - [ ] Add tests: configured timeout flows into `wait-for-started-endpoint!`'s
       effective deadline (via the seam); `instance-payload` includes
-      `:readiness-timeout-ms`; fast happy path still reaches `:started`.
+      `:readiness-timeout-ms`; fast happy path still reaches `:started`; a
+      `status` (op) read of the *failure-path* instance carries
+      `:readiness-timeout-ms` (PA4 — observable via `status`, not the throwing
+      `start` return).
 - [ ] Run tests + lint; commit slice 2.
 
 ## Slice 3 — Stale-port ownership guard
@@ -37,8 +44,12 @@
       depend on its current post-wait (connect-time) capture before moving it.
 - [ ] In `start-instance-in!`, capture a single `launched-at (now)` binding at
       the launch site (immediately before `(launcher …)`).
-- [ ] Use `launched-at` for the runtime-handle `:started-at` (remove the
-      post-wait `:started-at (now)`), so there is one launch-instant source.
+- [ ] Write the runtime-handle `:started-at` = `launched-at` in the new
+      launch-site `update-instance-in!` (the same pre-wait update that writes
+      `:readiness-timeout-ms`, PA1), and **remove** the post-wait success-path
+      `:started-at (now)` write, so there is one launch-instant source that
+      survives the failure path (PA2). Leave `build-instance`'s top-level
+      slot-creation `:started-at` unchanged (distinct field).
 - [ ] In `start-instance-in!`, delete any existing
       `<worktree>/.nrepl-port` immediately before launching.
 - [ ] Thread `launched-at` into `wait-for-started-endpoint!` via
@@ -51,9 +62,17 @@
       `ex-info` `:phase :started-stale-port` carrying rejected mtime +
       `launched-at` (so it lands on `:last-error → :data` via the existing
       `catch`), distinct from `:started-readiness`.
-- [ ] Add tests: pre-existing too-old `.nrepl-port` is rejected (stale-port
-      phase on deadline / continues polling); a fresh port written after launch
-      is accepted; pre-launch removal occurs.
+- [ ] Add tests (PA3 — exercise the gate at the right level):
+      - At the `wait-for-started-endpoint!` *unit* level (injected
+        `:launched-at`, pre-written too-old `.nrepl-port`, bypassing removal):
+        a too-old port is rejected — continues polling, then
+        `:phase :started-stale-port` on deadline; a fresh port (mtime ≥
+        launched-at floor) is accepted.
+      - At the `start-instance-in!` level: assert **pre-launch removal occurs**
+        (a pre-seeded `.nrepl-port` is gone before the launcher writes the fresh
+        one) and the fresh post-launch port is accepted. Do *not* assert
+        gate-rejection through `start-instance-in!` (removal makes the gate see
+        only fresh ports there).
 - [ ] Add/confirm a test asserting attach-mode discovery and
       `config/read-dot-nrepl-port` are behaviour-preserved (no stale gate).
 - [ ] Run tests + lint; commit slice 3.
@@ -79,22 +98,36 @@
 
 ## Plan/steps review follow-ups (ambiguity)
 
-- [ ] PA1: Resolve `:readiness-timeout-ms` write-site ordering. Name the exact
+- [x] PA1: Resolve `:readiness-timeout-ms` write-site ordering. Name the exact
       `update-instance-in!` (or `ensure-instance-in!` seed) that writes
       `:readiness-timeout-ms`, and ensure it is written *before*
       `wait-for-started-endpoint!` so the effective timeout is observable on a
       timeout *failure*, not only the success path. Update slice-2 steps + plan.
-- [ ] PA2: Specify the `:started-at` launch-site move mechanism. State whether a
+      → Resolved: new pre-wait launch-site `update-instance-in!` writes
+      `:readiness-timeout-ms` (top-level), not `ensure-instance-in!` seed nor
+      post-wait update. Plan "PA1" + slice-2 step updated.
+- [x] PA2: Specify the `:started-at` launch-site move mechanism. State whether a
       new launch-site `update-instance-in!` writes `:started-at launched-at`
       (so it survives the failure path) or it is only written at the existing
       post-wait update; reconcile with the `:runtime-handle` nesting. Update
       slice-3 steps + plan.
-- [ ] PA3: Reconcile the stale-port rejection test with pre-launch removal.
+      → Resolved: the same new launch-site `update-instance-in!` writes
+      runtime-handle `:started-at = launched-at`; post-wait `:started-at` write
+      removed; `build-instance` top-level `:started-at` untouched. Plan "PA2" +
+      slice-3 steps updated.
+- [x] PA3: Reconcile the stale-port rejection test with pre-launch removal.
       Specify that the mtime-gate rejection case is exercised at the
       `wait-for-started-endpoint!` unit level with an injected `:launched-at`
       (since `start-instance-in!`'s pre-launch removal deletes any pre-existing
       port before the gate runs). Update slice-3 test steps.
-- [ ] PA4: Disambiguate the failure-path diagnostic surface. State that the
+      → Resolved: gate-rejection at `wait-for-started-endpoint!` unit level
+      (injected `:launched-at`); `start-instance-in!`-level test asserts only
+      pre-launch removal + fresh acceptance. Plan "PA3" + slice-3 test step
+      updated.
+- [x] PA4: Disambiguate the failure-path diagnostic surface. State that the
       stale-port/timeout diagnostics on `instance-payload` are observable via a
       `status` (op) read of the instance, not via the throwing `start` op return;
       add/confirm a `status`-read acceptance test. Update slice-2/slice-5 steps.
+      → Resolved: failure-path diagnostics observable via `status` op read (not
+      the throwing `start` return); `status`-read test added to slice-2. Plan
+      "PA4" updated.
