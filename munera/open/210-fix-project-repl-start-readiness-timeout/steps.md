@@ -204,7 +204,7 @@
       120000 via `update-instance-in!`, asserts `status` projects `:present`,
       `:readiness true`, and `:readiness-timeout-ms 120000` through
       `instance-payload`.
-- [ ] TR3: Cover the `ops/start` config→opts threading end-to-end. The Q1
+- [x] TR3: Cover the `ops/start` config→opts threading end-to-end. The Q1
       acceptance criterion — the timeout is *controllable through the
       `[:agent-session :project-nrepl :start-readiness-timeout-ms]` config key* —
       has no test that drives a *configured* timeout from project config through
@@ -224,3 +224,17 @@
       config-key → ops → opts → `start-instance-in!` resolution path. (Resolve the
       runtime-handle pre-seed vs `ensure-instance-in!` conflict-detection seam in
       the builder; the threading is the assertion target.)
+      → Resolved: added `ops_test.clj` `start-config-timeout-threading-test`.
+      Writes `<worktree>/.psi/project.edn`
+      `{:agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]
+      :start-readiness-timeout-ms 90000}}}`, pre-seeds the runtime-handle
+      launcher/connector seam via `ensure-instance-in!` (matching
+      `:started`/`:command-vector`/nil-`:endpoint`, `:lifecycle-state :starting`
+      so `start-instance-in!`'s `ensure-instance-in!` matches the slot and keeps
+      the seam — and `ops/start` does not short-circuit on `:readiness`), drives
+      `ops/start`, and asserts both the `start` return and a follow-up `status`
+      read project `:readiness-timeout-ms 90000`. Pins the config-key →
+      `resolve-config` → `resolved-start-readiness-timeout-ms` → `cond-> opts`
+      → `start-instance-in!` path. No mocks (real `live-fake-process` proxy +
+      `fake-connector` seam, file-backed `.nrepl-port`). Coverage-only; no
+      production change.

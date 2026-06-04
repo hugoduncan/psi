@@ -1,11 +1,20 @@
 (ns psi.project-nrepl.ops-test
   (:require
+   [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
    [psi.project-nrepl.config]
    [psi.project-nrepl.ops :as project-nrepl-ops]
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
    [psi.project-nrepl.test-support
-    :refer [delete-tree! install-instance! make-ctx temp-dir]]))
+    :refer [delete-tree! fake-connector install-instance! make-ctx temp-dir]]))
+
+(defn- write-project-config!
+  "Write `<worktree>/.psi/project.edn` with the given agent-session project-nrepl map."
+  [worktree project-nrepl-map]
+  (let [psi-dir (io/file worktree ".psi")]
+    (.mkdirs psi-dir)
+    (spit (io/file psi-dir "project.edn")
+          (pr-str {:agent-session {:project-nrepl project-nrepl-map}}))))
 
 (deftest start-test
   (testing "start returns structured missing-start-command result with actionable guidance"
@@ -44,6 +53,63 @@
           (is (= :present (:status result)))
           (is (= true (get-in result [:instance :readiness])))
           (is (= 120000 (get-in result [:instance :readiness-timeout-ms]))))
+        (finally
+          (delete-tree! worktree))))))
+
+(defn- live-fake-process
+  "A minimal live `java.lang.Process` proxy for the launcher seam (alive, exit 0)."
+  []
+  (proxy [Process] []
+    (isAlive [] true)
+    (waitFor ([] 0) ([_timeout _unit] true))
+    (exitValue [] 0)
+    (destroy [] nil)
+    (destroyForcibly [] this)
+    (pid [] 4321)
+    (toHandle [] nil)
+    (info [] nil)
+    (children [] nil)
+    (descendants [] nil)
+    (getInputStream [] nil)
+    (getErrorStream [] nil)
+    (getOutputStream [] nil)))
+
+(deftest start-config-timeout-threading-test
+  (testing "ops/start threads a configured :start-readiness-timeout-ms from project config into the instance (TR3/Q1)"
+    ;; Pins the central Q1 configurability path end-to-end: a project
+    ;; .psi/project.edn configured :start-readiness-timeout-ms must flow through
+    ;; ops/start's resolve-config → resolved-start-readiness-timeout-ms →
+    ;; cond-> opts → start-instance-in! onto the instance's :readiness-timeout-ms.
+    ;; A regression in the ops glue (dropped assoc, wrong key, not reading cfg)
+    ;; would otherwise pass every other test. The launcher/connector seam is
+    ;; pre-seeded via ensure-instance-in! (matching :started/command/endpoint)
+    ;; so start-instance-in!'s ensure matches and preserves the runtime-handle.
+    (let [ctx       (make-ctx)
+          worktree  (temp-dir "psi-project-nrepl-ops-")
+          command   ["bb" "nrepl-server"]
+          launcher  (fn [_worktree _command]
+                      (spit (io/file worktree ".nrepl-port") "7777\n")
+                      (live-fake-process))
+          connector (fake-connector "nrepl-session-1")]
+      (try
+        (write-project-config! worktree {:start-command command
+                                         :start-readiness-timeout-ms 90000})
+        ;; Pre-seed the runtime-handle launcher/connector seam. The acquisition
+        ;; mode/command/endpoint match start-instance-in!'s ensure request, so it
+        ;; returns this slot (no conflict) and keeps the seeded runtime-handle.
+        (project-nrepl-runtime/ensure-instance-in!
+         ctx
+         {:worktree-path worktree
+          :acquisition-mode :started
+          :lifecycle-state :starting
+          :command-vector command
+          :runtime-handle {:process-launcher launcher
+                           :nrepl-connector connector}})
+        (let [result (project-nrepl-ops/start ctx worktree)]
+          (is (= :started (:status result)))
+          (is (= 90000 (get-in result [:instance :readiness-timeout-ms]))))
+        (let [status (project-nrepl-ops/status ctx worktree)]
+          (is (= 90000 (get-in status [:instance :readiness-timeout-ms]))))
         (finally
           (delete-tree! worktree))))))
 

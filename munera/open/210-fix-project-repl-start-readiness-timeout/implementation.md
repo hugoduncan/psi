@@ -645,3 +645,50 @@ with-redefs note):
   hardens regression detection for the headline configurability criterion.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Test-review follow-up execution — TR3 (ψ, 2026-06-03)
+
+Executed the single newly-added test-coverage follow-up (TR3) from the preceding
+test review pass 2. Coverage-only (production already correct and verified by
+inspection: `ops.clj` reads `(resolved-start-readiness-timeout-ms cfg)` and
+threads it via `cond-> {} (some? timeout-ms) (assoc :timeout-ms …)`); no
+production change.
+
+- TR3 (`ops/start` config→opts threading end-to-end). Added `ops_test.clj`
+  `start-config-timeout-threading-test`. Writes a project
+  `<worktree>/.psi/project.edn`
+  (`{:agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]
+  :start-readiness-timeout-ms 90000}}}`) via a new `write-project-config!`
+  helper, then drives `ops/start` over a real launcher/connector seam and
+  asserts both the `start` return *and* a follow-up `status` read project
+  `:readiness-timeout-ms 90000`. This pins the central Q1 configurability path
+  config-key → `resolve-config` → `resolved-start-readiness-timeout-ms` →
+  `ops/start`'s `cond-> opts` → `start-instance-in!`, so a regression in the
+  ops glue (dropped `assoc`, wrong config key, not reading from `cfg`) is caught
+  — distinct from `config_test` (value/validation only), `started_test` TR1
+  (no-opts default) / directly-passed `:timeout-ms` (90000), and TR2
+  (`update-instance-in!`-set, bypassing config).
+
+- Runtime-handle seam resolution (the note's "resolve the pre-seed vs
+  `ensure-instance-in!` conflict-detection seam"). `ops/start` calls
+  `start-instance-in!` with only `{:timeout-ms …}` (no `:runtime-handle`), so the
+  launcher would default to `real-process-launcher` and spawn a real process.
+  Resolved by **pre-seeding** the slot via `ensure-instance-in!`
+  (`:acquisition-mode :started`, `:command-vector` = same command, nil
+  `:endpoint`, `:lifecycle-state :starting`, `:runtime-handle {:process-launcher
+  … :nrepl-connector …}`). `start-instance-in!`'s own `ensure-instance-in!`
+  request matches that active slot on `(acquisition-mode, endpoint,
+  command-vector)`, so it returns the existing instance (no conflict) and the
+  seeded `:runtime-handle` survives — the seam launcher is used. `:starting`
+  (not `:ready`) is chosen so `ops/start` does not short-circuit on
+  `(:readiness existing)` before launching. No mocks: real `live-fake-process`
+  proxy + the shared `fake-connector` seam + file-backed `.nrepl-port`.
+
+Verified: clj-paren-repair Success; clj-kondo 0/0
+(`components/project-nrepl/{src,test}`); `ops-test` 4 tests/23 assertions green
+(new test included); `started/config/attach` 13 tests/83 assertions green;
+`bb commit-check:file-lengths` exit 0 (`ops_test.clj` 153 lines < 800). No
+design/plan/doc/CHANGELOG change (coverage-only; no user-visible surface
+change).
+
+PASS_STATUS: REVIEW_COMPLETE
