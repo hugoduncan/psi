@@ -160,3 +160,26 @@
     (getInputStream [] nil)
     (getErrorStream [] nil)
     (getOutputStream [] nil)))
+
+(defn started-launcher!
+  "The canonical happy started-mode `:process-launcher` seam: a launcher fn of
+   `[worktree command]` that synchronously writes a fresh `<worktree>/.nrepl-port`
+   (so `wait-for-started-endpoint!`'s first poll finds it) and returns a happy
+   `fake-process` (alive, exit 0). Single-sources the repeated happy launcher
+   arrange (default port `7777` pid `4321`) across the `start-instance-in!` happy
+   cases and the `ops/start` threading test.
+
+   `opts`:
+     :port      → port written into `.nrepl-port` (default `7777`)
+     :pid       → returned process pid (default `4321`)
+     :on-launch → optional 0-arg hook run *before* the port is written (the true
+                  launch site); lets a caller capture the launch instant
+                  (`helpers_that_compress(ceremony) ∧ ¬helpers_that_hide(intent)`).
+
+   Returns the launcher fn; pair with `(fake-connector)` for the connector seam."
+  ([] (started-launcher! nil))
+  ([{:keys [port pid on-launch] :or {port 7777 pid 4321}}]
+   (fn [worktree _command]
+     (when on-launch (on-launch))
+     (spit (io/file worktree ".nrepl-port") (str port "\n"))
+     (fake-process {:alive? true :exit-code 0 :pid pid}))))

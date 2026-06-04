@@ -372,7 +372,7 @@
 
 ## Test-shaper review follow-ups (shape, pass 3)
 
-- [ ] TS6: Single-source the duplicated happy started-launcher arrange. Four
+- [x] TS6: Single-source the duplicated happy started-launcher arrange. Four
       `start-instance-in-test` cases ("launches command…", "no :timeout-ms opts…
       120000 default (TR1)", "records the effective :readiness-timeout-ms",
       "records :started-at = launch instant (TS4/PA2)") plus `ops_test`'s
@@ -389,3 +389,19 @@
       (`helpers_that_compress(ceremony) ∧ ¬helpers_that_hide(intent)`).
       Shape-only; behaviour-preserving (no assertion change). Re-run
       started/ops/config/attach + clj-kondo after.
+  → Resolved: added `test_support/started-launcher!` — the canonical happy
+  started-mode `:process-launcher` (writes a fresh `<worktree>/.nrepl-port`
+  default port `7777`, returns a happy `fake-process` default pid `4321`), with
+  an `:on-launch` pre-write hook so the TS4 provenance case composes its
+  `launcher-at` capture without re-open-coding the launcher
+  (`helpers_that_compress(ceremony) ∧ ¬helpers_that_hide(intent)`). Rewired the
+  four `start-instance-in-test` happy cases ("launches command…", TR1 no-opts
+  120000 default, "records the effective :readiness-timeout-ms", TS4 "records
+  :started-at = launch instant") + `ops_test`'s
+  `start-config-timeout-threading-test` onto the helper; dropped each site's
+  open-coded launcher and the now-unused `fake-process` binding/refer in
+  `ops_test`. The `"7777"`/`:pid 4321` literals are now single-sourced. The
+  stale/exit/deadline cases (which need non-happy or stale-port launchers) keep
+  their bespoke launchers. Shape-only/behaviour-preserving: started/ops/config/
+  attach 17 tests/115 assertions green (unchanged); clj-kondo 0/0;
+  clj-paren-repair Success; files 185/273/134 (< 800); file-lengths exit 0.

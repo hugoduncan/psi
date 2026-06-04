@@ -6,8 +6,8 @@
    [psi.project-nrepl.ops :as project-nrepl-ops]
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
    [psi.project-nrepl.test-support
-    :refer [delete-tree! fake-connector fake-process install-instance!
-            make-ctx temp-dir]]))
+    :refer [delete-tree! fake-connector install-instance!
+            make-ctx started-launcher! temp-dir]]))
 
 (defn- write-project-config!
   "Write `<worktree>/.psi/project.edn` with the given agent-session project-nrepl map."
@@ -70,9 +70,7 @@
     (let [ctx       (make-ctx)
           worktree  (temp-dir "psi-project-nrepl-ops-")
           command   ["bb" "nrepl-server"]
-          launcher  (fn [_worktree _command]
-                      (spit (io/file worktree ".nrepl-port") "7777\n")
-                      (fake-process {:alive? true :exit-code 0 :pid 4321}))
+          launcher  (started-launcher!)
           connector (fake-connector "nrepl-session-1")]
       (try
         (write-project-config! worktree {:start-command command

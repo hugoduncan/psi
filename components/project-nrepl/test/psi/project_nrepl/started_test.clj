@@ -7,7 +7,7 @@
    [psi.project-nrepl.started :as project-nrepl-started]
    [psi.project-nrepl.test-support
     :refer [age-file-back! delete-tree! fake-connector fake-process make-ctx
-            spit-stale-port! temp-dir touch-fresh!]]))
+            spit-stale-port! started-launcher! temp-dir touch-fresh!]]))
 
 (deftest wait-for-started-endpoint-test
   (testing "reads discovered endpoint once .nrepl-port appears"
@@ -120,14 +120,9 @@
   (testing "started-mode acquisition launches command, discovers endpoint, and marks ready"
     (let [ctx          (make-ctx)
           worktree     (temp-dir "psi-project-nrepl-started-")
-          fake-proc    (fake-process {:alive? true :exit-code 0 :pid 4321})
-          launcher     (fn [_worktree _command]
-                         ;; file-backed readiness: write a real .nrepl-port in the
-                         ;; temp worktree synchronously before returning the
-                         ;; process; the launcher runs before
-                         ;; wait-for-started-endpoint!, so the first poll finds it.
-                         (spit (io/file worktree ".nrepl-port") "7777\n")
-                         fake-proc)
+          ;; the shared happy launcher writes a fresh .nrepl-port synchronously
+          ;; before returning the process, so the first poll finds it.
+          launcher     (started-launcher!)
           connector    (fake-connector "nrepl-session-1")]
       (try
         (let [instance (project-nrepl-started/start-instance-in!
@@ -193,10 +188,7 @@
     ;; recorded on the instance must be the 120000 ms default.
     (let [ctx       (make-ctx)
           worktree  (temp-dir "psi-project-nrepl-started-")
-          fake-proc (fake-process {:alive? true :exit-code 0 :pid 4321})
-          launcher  (fn [_worktree _command]
-                      (spit (io/file worktree ".nrepl-port") "7777\n")
-                      fake-proc)
+          launcher  (started-launcher!)
           connector (fake-connector "nrepl-session-1")]
       (try
         (let [instance (project-nrepl-started/start-instance-in!
@@ -210,10 +202,7 @@
   (testing "records the effective :readiness-timeout-ms"
     (let [ctx       (make-ctx)
           worktree  (temp-dir "psi-project-nrepl-started-")
-          fake-proc (fake-process {:alive? true :exit-code 0 :pid 4321})
-          launcher  (fn [_worktree _command]
-                      (spit (io/file worktree ".nrepl-port") "7777\n")
-                      fake-proc)
+          launcher  (started-launcher!)
           connector (fake-connector "nrepl-session-1")]
       (try
         (let [instance (project-nrepl-started/start-instance-in!
@@ -234,12 +223,12 @@
     ;; after launch), so :started-at would exceed `launcher-at` and fail green.
     (let [ctx          (make-ctx)
           worktree     (temp-dir "psi-project-nrepl-started-")
-          fake-proc    (fake-process {:alive? true :exit-code 0 :pid 4321})
           launcher-at  (atom nil)
-          launcher     (fn [_worktree _command]
-                         (reset! launcher-at (java.time.Instant/now))
-                         (spit (io/file worktree ".nrepl-port") "7777\n")
-                         fake-proc)
+          ;; the shared launcher composes with an :on-launch pre-write hook (the
+          ;; true launch site) so this case can capture the launch instant
+          ;; without re-open-coding the happy launcher.
+          launcher     (started-launcher!
+                        {:on-launch #(reset! launcher-at (java.time.Instant/now))})
           connector    (fake-connector "nrepl-session-1")
           before       (java.time.Instant/now)]
       (try

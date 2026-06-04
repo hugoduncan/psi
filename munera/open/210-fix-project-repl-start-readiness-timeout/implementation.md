@@ -1115,3 +1115,44 @@ stale/fresh mtime fixtures (TS2/TS3), strengthened `:started-at` provenance
   launcher for the caller to wrap — `helpers_that_compress(ceremony) ∧
   ¬helpers_that_hide(intent)`. Shape-only; behaviour-preserving (no assertion
   change). Re-run started/ops/config/attach + clj-kondo after.
+
+## Test-shaper pass 3 follow-up — TS6 (ψ)
+
+TS6 (sole newly-added actionable item; commit `54266be36`) executed.
+Single-sourced the duplicated happy started-launcher arrange into a new
+`test_support/started-launcher!` (default port `7777` pid `4321`): a launcher fn
+of `[worktree command]` that synchronously writes a fresh `.nrepl-port` and
+returns a happy `fake-process`. It composes — rather than hides — the launch
+site via an optional `:on-launch` 0-arg pre-write hook, so the TS4 provenance
+case still captures its `launcher-at` instant without re-open-coding the
+launcher (`helpers_that_compress(ceremony) ∧ ¬helpers_that_hide(intent)`).
+
+Rewired the four `start-instance-in-test` happy cases ("launches command…", TR1
+no-opts 120000 default, "records the effective :readiness-timeout-ms", TS4
+"records :started-at = launch instant") and `ops_test`'s
+`start-config-timeout-threading-test` onto the helper. Removed the duplicated
+`(spit … ".nrepl-port" "7777\n")` + `(fake-process {:alive? true :exit-code 0
+:pid 4321})` launcher at ≥5 sites and the now-unused `fake-process`
+binding/`:refer` in `ops_test`. The stale/exit/plain-deadline cases keep their
+bespoke (non-happy / stale-port) launchers — the helper only single-sources the
+*happy* arrange.
+
+**Ordering discovery:** `started-launcher!` calls `fake-process`, so clj-kondo
+flagged an unresolved-symbol forward reference when the helper was placed before
+`fake-process`'s `defn`. Moved `started-launcher!` to the end of `test_support`,
+after `fake-process`.
+
+Shape-only / behaviour-preserving — test files + task artifacts only; no
+production/doc/CHANGELOG change. started/ops/config/attach 17 tests / 115
+assertions green (count unchanged); clj-kondo 0/0; clj-paren-repair Success;
+files 185/273/134 (< 800); `bb commit-check:file-lengths` exit 0.
+
+🔁 PATTERN: a test-shaper pass after the suite has accreted ≥5 near-identical
+happy-arrange blocks (the same launcher writing `"7777"` + `fake-process pid
+4321`) single-sources them into one named helper; the helper must *compose* with
+the one case that needs a launch-site hook (TS4's `launcher-at` capture) via an
+injected `:on-launch` callback rather than hiding it — and a helper that
+references another `defn` (`fake-process`) must be ordered *after* it or
+clj-kondo flags an unresolved-symbol forward reference.
+
+PASS_STATUS REVIEW_COMPLETE.
