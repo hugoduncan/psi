@@ -319,3 +319,25 @@ PA2's move is safe. New actionable inconsistency:
   tests").
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Follow-up execution — PSI1 resolved (2026-06-03)
+
+Executed the single new actionable follow-up item (PSI1) from the preceding
+plan/steps inconsistency review.
+
+- Fixed slice-1 test-runner wording in steps.md: replaced the invalid
+  `clojure -X:test` (project-nrepl) form with the repo's actual Kaocha command
+  `clojure -M:test --focus unit` (namespace-focused variant
+  `clojure -M:test --focus project-nrepl.config-test`; `bb clojure:test:unit`
+  equivalently).
+- Verification grounding: `project-nrepl/test` is a member of the `:unit`
+  Kaocha suite in `tests.edn`; bb.edn `clojure:test:unit` runs
+  `bb.kaocha-runner/run! ["--focus" "unit"]`; the root `:test` alias is a
+  Kaocha `-M` runner with no `:exec-fn`, confirming `clojure -X:test` is
+  invalid. No `clojure -X:test` reference exists outside steps.md slice 1
+  (design.md's `clojure -M …` mentions are the slow-boot start command being
+  timed, not a test runner). Slices 2/3/5 already use generic "Run tests" /
+  "full project-nrepl test suite" wording, so no further edits needed for
+  consistency.
+- Scope: task-artifact-only (steps.md). PSI1 references no code/test/doc, so
+  none were touched. Marked PSI1 `[x]` with an inline `→ Resolved` note.

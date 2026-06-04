@@ -10,8 +10,10 @@
 - [ ] Add `config_test.clj` cases: unset → `nil`; valid in-range → value;
       below 1000 → throws `:phase :validate`; above 600000 → throws; non-integer
       → throws.
-- [ ] Run `clojure -X:test` (project-nrepl) + `clj-kondo --lint` on changed
-      files; commit slice 1.
+- [ ] Run the unit suite (`clojure -M:test --focus unit`, or the
+      namespace-focused `clojure -M:test --focus
+      project-nrepl.config-test`; `bb clojure:test:unit` equivalently) +
+      `clj-kondo --lint` on changed files; commit slice 1.
 
 ## Slice 2 — Timeout threading + raised default + payload projection
 
@@ -134,7 +136,7 @@
 
 ## Plan/steps review follow-ups (inconsistency)
 
-- [ ] PSI1: Fix the test-runner invocation in slice 1. steps.md says
+- [x] PSI1: Fix the test-runner invocation in slice 1. steps.md said
       "Run `clojure -X:test` (project-nrepl)", but the repo `:test` alias
       (`deps.edn`) is a Kaocha `-M` runner (`:main-opts ["-m" "kaocha.runner"]`,
       no `:exec-fn`), so `clojure -X:test` is invalid. Replace with the project's
@@ -142,3 +144,9 @@
       bb.edn `clojure:test:unit` + AGENTS.md), consistent with the "full
       project-nrepl test suite" wording in slice 5 and the "Run tests" steps in
       slices 2–3.
+      → Resolved: slice-1 step now reads "Run the unit suite (`clojure -M:test
+      --focus unit`, or namespace-focused `clojure -M:test --focus
+      project-nrepl.config-test`; `bb clojure:test:unit` equivalently)".
+      `project-nrepl/test` is in the Kaocha `:unit` suite (`tests.edn`); no
+      component-isolated `clojure -X:test` path exists. Task-artifact-only fix
+      (steps.md); no code/test/doc change.
