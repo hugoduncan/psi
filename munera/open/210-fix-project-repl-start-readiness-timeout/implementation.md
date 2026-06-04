@@ -1372,3 +1372,20 @@ Secondary (judgement, optional — noted, not blocking):
   `(.getMessage ex)` inspection frame. A `thrown-ex-data` helper would compress
   the catch-and-inspect ceremony (`consistent(assertion_style)` ∧
   `minimal_incidental_setup`). Shape-only.
+
+## TS10 — assert stale-port diagnostic instants (A2 observability)
+
+Test-shaper pass-6 follow-up. The `:started-stale-port` ex-data carries
+`:port-mtime-ms`/`:min-mtime-ms`/`:launched-at` (deadline + IR1 exit branch in
+`started.clj`), but no test asserted those keys — A2's "observable from the
+instance" rationale was uncovered. Tightened three assertion sites
+(coverage-only, no production change):
+
+- PA4 `status`-read test (owning surface): `[:instance :last-error :data]` now
+  asserts `:port-mtime-ms`/`:min-mtime-ms` non-nil, `:launched-at` is an
+  `Instant`, and `:min-mtime-ms ≥ :port-mtime-ms`, alongside `:phase`.
+- `wait-for-started-endpoint!` deadline reject case + IR1 exit-with-stale case:
+  each now asserts the same instant trio, with `:launched-at` = the injected
+  launch instant.
+
+started-test 3/45 (was 3/25), ops-test 4/23, clj-kondo 0/0, paren-repair OK.

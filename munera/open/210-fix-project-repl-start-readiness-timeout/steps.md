@@ -506,7 +506,7 @@
 
 ## Test-shaper review follow-ups (shape, pass 6)
 
-- [ ] TS10: Assert the stale-port diagnostic *instants* — the A2 observability
+- [x] TS10: Assert the stale-port diagnostic *instants* — the A2 observability
       payload. The A2 acceptance criterion is that the stale-port rejection's
       `ex-data` carries the rejected/launch instants so the diagnostic is
       **observable from the instance** via `:last-error → :data`. The production
@@ -526,3 +526,18 @@
       `wait-for-started-endpoint!` reject + IR1 cases. Coverage-only;
       behaviour-preserving (production already carries the keys). Re-run
       started/ops + clj-kondo after.
+      → Resolved (both surfaces): tightened the PA4 status-read test (the
+      contract's owning surface) — `[:instance :last-error :data]` now asserts
+      `:port-mtime-ms`/`:min-mtime-ms` present (non-nil), `:launched-at` an
+      `Instant`, and `min-mtime-ms ≥ port-mtime-ms` (rejected port below the
+      launch floor), in addition to `:phase`. Also strengthened both
+      `wait-for-started-endpoint!` unit cases that yield `:started-stale-port`
+      — the deadline reject case and the IR1 exit-with-stale-port case — to
+      assert the same instant trio (`:port-mtime-ms`/`:min-mtime-ms` present,
+      `:launched-at` = the injected launch instant, `min ≥ port`). A regression
+      dropping the rejected/launch instants from any `:started-stale-port`
+      diagnostic (gutting A2's observability) now fails green on both the
+      deadline and exit branches and at the instance-observable `status` surface.
+      Coverage-only (production already carries the keys). started-test 3
+      tests/45 assertions green (was 25); ops-test 4/23 green; clj-kondo 0/0;
+      clj-paren-repair Success; started_test 257 lines (< 800).

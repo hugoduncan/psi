@@ -63,7 +63,13 @@
                     {:timeout-ms 100 :poll-interval-ms 10 :launched-at launched-at})
                    (catch clojure.lang.ExceptionInfo e e))]
           (is (= :started-stale-port (:phase (ex-data ex))))
-          (is (re-find #"only a stale port was present" (.getMessage ex)))))))
+          (is (re-find #"only a stale port was present" (.getMessage ex)))
+          ;; A2: the rejected/launch instants are carried on the diagnostic.
+          (let [data (ex-data ex)]
+            (is (some? (:port-mtime-ms data)))
+            (is (some? (:min-mtime-ms data)))
+            (is (= launched-at (:launched-at data)))
+            (is (>= (:min-mtime-ms data) (:port-mtime-ms data))))))))
 
   (testing "exit leaving only a stale port reports :started-stale-port (IR1)"
     ;; When the launched process writes only a too-old .nrepl-port and then
@@ -80,7 +86,13 @@
                    (catch clojure.lang.ExceptionInfo e e))]
           (is (= :started-stale-port (:phase (ex-data ex))))
           (is (true? (:command-exited? (ex-data ex))))
-          (is (re-find #"exited leaving only a stale" (.getMessage ex)))))))
+          (is (re-find #"exited leaving only a stale" (.getMessage ex)))
+          ;; A2: the exit-branch diagnostic also carries the instants.
+          (let [data (ex-data ex)]
+            (is (some? (:port-mtime-ms data)))
+            (is (some? (:min-mtime-ms data)))
+            (is (= launched-at (:launched-at data)))
+            (is (>= (:min-mtime-ms data) (:port-mtime-ms data))))))))
 
   (testing "accepts a fresh .nrepl-port (mtime >= launch floor) with :launched-at gate"
     (with-temp-dir [dir "psi-project-nrepl-started-"]
@@ -228,7 +240,18 @@
               ctx worktree ["bb" "nrepl-server"]
               {:timeout-ms 1000 :poll-interval-ms 10
                :runtime-handle {:process-launcher launcher}})))
-        (let [status (project-nrepl-ops/status ctx worktree)]
+        (let [status (project-nrepl-ops/status ctx worktree)
+              data   (get-in status [:instance :last-error :data])]
           (is (= 1000 (get-in status [:instance :readiness-timeout-ms])))
-          (is (= :started-stale-port
-                 (get-in status [:instance :last-error :data :phase]))))))))
+          (is (= :started-stale-port (:phase data)))
+          ;; A2 observability: the rejected/launch instants are carried on the
+          ;; diagnostic ex-data, observable from the instance via
+          ;; :last-error → :data — a regression dropping them passes :phase-only.
+          (is (some? (:port-mtime-ms data))
+              "stale-port diagnostic must carry the rejected port mtime")
+          (is (some? (:min-mtime-ms data))
+              "stale-port diagnostic must carry the launch-floor min mtime")
+          (is (instance? java.time.Instant (:launched-at data))
+              "stale-port diagnostic must carry the launch instant")
+          (is (>= (:min-mtime-ms data) (:port-mtime-ms data))
+              "rejected port mtime is below the launch floor"))))))
