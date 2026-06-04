@@ -14,3 +14,32 @@
       runtime-owned registry instance — the canonical status surface here —
       not dispatch `:state*`, since subprocess/port I/O is documented
       runtime-owned and does not move under dispatch effects).
+
+## Design follow-up — ambiguity
+
+- [ ] AMB1: Resolve Q1–Q4 in design.md before plan. Acceptance criteria already
+      reference "the confirmed Q1 surface" and "a reasonable default and/or
+      configured timeout", so each open question needs a decision: Q1 config key
+      name + default value + validation bounds; Q2 stale-port strategy (a/b/c);
+      Q3 the empirically-confirmed cause(s); Q4 in-scope-vs-deferred for
+      process-exit (stdout/stderr tail) diagnostics.
+- [ ] AMB2: Reconcile A1 vs Q2. A1 commits to the launch-time/mtime gate as the
+      stale-port mechanism, but Q2 still presents it as one open option of three
+      and asks to "confirm which". Make A1 the resolution of Q2 (or fold Q2 into
+      A1) so the stale-port strategy is stated once, unambiguously.
+- [ ] AMB3: State explicitly whether `instance-payload` (`ops.clj`) is extended.
+      A2 names a new `:readiness-timeout-ms` instance status field "surfaced
+      through instance-payload", but instance-payload's fixed projected key list
+      lacks it (and any stale-port diagnostic beyond `:last-error`). Specify the
+      key(s) added to the projection so "surfaced through instance-payload" has a
+      single interpretation.
+- [ ] AMB4: Specify the mtime-gate comparison semantics. Define the
+      precision/tolerance of "last-modified ≥ launch instant" given coarse
+      filesystem mtime vs. ms launch instant, and state whether Q2(a) pre-launch
+      `.nrepl-port` removal supplements the gate (Q2c combination) to close the
+      same-second / clock-skew race.
+- [ ] AMB5: Clarify which fixes are required relative to Q3. Acceptance mandates
+      both the timeout raise and the stale-port gate while the design warns
+      "avoid speculative changes" and Q3 (cause) is unconfirmed. State whether
+      both fixes are required regardless of Q3's empirical finding, or whether a
+      single-cause finding scopes one of them out.

@@ -53,3 +53,38 @@ blockers — design-only task, decisions only).
   timeout → new instance `:readiness-timeout-ms` status field surfaced through
   `instance-payload`; `ops/start` keeps projecting from `instance-payload` (no
   op-only status channel). Acceptance criteria updated to match.
+
+## Design review — ambiguity (ψ)
+
+Scope: design.md only (not plan/steps). Architectural-fit (A1/A2) already
+resolved. New actionable ambiguities, all single-interpretation gaps a builder
+would otherwise guess at:
+
+- AMB1: Q1–Q4 are still "open … resolve collaboratively before plan", yet
+  acceptance criteria assert "the confirmed Q1 surface" and "a reasonable
+  default and/or configured timeout". Each open question (Q1 key name/default/
+  bounds; Q2 strategy a/b/c; Q3 confirmed cause; Q4 process-exit diagnostics
+  scope) must be resolved in design.md before plan, or the criteria reference
+  decisions that do not exist.
+- AMB2: A1 commits to a launch-time/mtime acceptance gate (last-modified ≥
+  launch instant) as the stale-port mechanism, but Q2 still lists that gate as
+  only one of three open options (a/b/c) and asks to "confirm which". Design
+  simultaneously decides and leaves-open the Q2 strategy — which governs?
+- AMB3: A2 names a new `:readiness-timeout-ms` instance status field "surfaced
+  through `instance-payload`", but `instance-payload` (`ops.clj:22`) has an
+  explicit fixed key list that today lacks it (and lacks any stale-port
+  diagnostic key beyond `:last-error`). Design does not state that
+  `instance-payload`'s projected key set is extended, so "surfaced through
+  instance-payload" is ambiguous about whether the projection itself changes.
+- AMB4: The mtime gate "last-modified ≥ launch instant" has unspecified
+  precision/tolerance. Filesystem mtime is often coarse (1s) vs. a ms launch
+  instant; a stale port touched in the same second as launch could pass, a fresh
+  port could be rejected under clock/mtime skew. Design does not specify the
+  comparison tolerance nor whether Q2(a) pre-launch removal supplements the gate
+  (Q2c "combination").
+- AMB5: Acceptance mandates BOTH the timeout raise and the stale-port gate, but
+  Q3 (confirmed cause) is unresolved and the design warns "avoid speculative
+  changes". If Q3 empirically shows a single cause, the criteria are ambiguous
+  about whether the other fix is still required.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
