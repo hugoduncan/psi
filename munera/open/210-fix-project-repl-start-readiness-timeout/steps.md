@@ -544,7 +544,7 @@
 
 ## Implementation review follow-ups (quality, pass 3)
 
-- [ ] IR2: Reap the launched child process on the readiness-failure path. In
+- [x] IR2: Reap the launched child process on the readiness-failure path. In
       `start-instance-in!` the launched `process` is bound in the inner `let`
       and only stored onto the runtime-handle (`:process`) *after*
       `wait-for-started-endpoint!` returns; when the wait throws (timeout /
@@ -565,3 +565,25 @@
       `:timeout-ms`) asserting the launched process is destroyed (e.g.
       `(.isAlive process)` false / a `:destroyed*` flag set) after the
       readiness timeout throws.
+      → Resolved: in `start-instance-in!` the launched process is now held in an
+      outer-scope `volatile!` (`launched-process`) visible to the `catch`, and it
+      is recorded onto the runtime-handle (`:process`/`:pid`) **pre-wait** (moved
+      off the post-wait success update) via a third launch-site
+      `update-instance-in!`, so both the readiness-failure `catch` and a later
+      `stop-started-instance-in!` can reap it. The `catch Throwable` now
+      `.destroy`s the launched process when `(.isAlive process)` before recording
+      `:last-error` and rethrowing (no-op on an already-exited process — the
+      `process-exited?` self-exit short-circuit path is unaffected). The happy
+      path is unchanged (`:pid 4321` still recorded; pre-wait now instead of
+      post-wait). Added the no-mocks `started_test` case "reaps the alive
+      launched process on the readiness-failure path (IR2)": an alive
+      `fake-process` (`:destroyed*` atom) whose launcher writes **no**
+      `.nrepl-port`, a short `:timeout-ms 100`, asserting the readiness timeout
+      throws (`:phase :started-readiness`) **and** `@destroyed*` is `true` — a
+      regression that stops reaping the process passes `:phase`-only and fails on
+      the destroy assertion. CHANGELOG `Fixed` entry + `doc/project-nrepl.md`
+      note added (user-observable: no orphaned JVMs on failed starts). started
+      3 tests/47 assertions green (+2 over pass-6's 45); ops/config/attach/
+      commands unchanged; consuming `project-nrepl-extension-install-test` 1/5
+      green; clj-kondo 0/0; clj-paren-repair Success; `bb commit-check:file-lengths`
+      exit 0; `--focus unit` exit 0.

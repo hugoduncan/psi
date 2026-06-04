@@ -1433,3 +1433,58 @@ New actionable issue (not previously flagged; amplified by this task):
   resource-leak regression-in-impact this task's timeout raise directly enlarges.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Implementation review — quality (ψ, 2026-06-04, pass 3 follow-up IR2)
+
+Executed the sole newly-added actionable item from impl-review pass 3 (commit
+`66383ab59`) — IR2 (launched child process leaked on the readiness-failure path).
+All prior items (5 slices + PA1–4 + PSI1 + IR1 + TR1–5 + TS1–10) already checked.
+
+**Production (`started.clj`, `start-instance-in!`):**
+- Hold the launched process in an outer-scope `launched-process (volatile! nil)`
+  bound in the top-level `let` (merged there rather than a nested `let` to avoid a
+  clj-kondo redundant-let warning), so the `catch` can reach it.
+- Record `:process`/`:pid` onto the runtime-handle **pre-wait** via a third
+  launch-site `update-instance-in!` (immediately after `(launcher …)`), and
+  `vreset!` the volatile — moved off the post-wait success update so
+  `stop-started-instance-in!` (reads runtime-handle `:process`) can also reap a
+  hung process. The post-wait success update now only adds `:launch-id`.
+- `catch Throwable`: when `@launched-process` is non-nil and `(.isAlive process)`,
+  `.destroy` it before recording `:last-error` + rethrowing. `.destroy` is a no-op
+  on an already-exited process, so the `process-exited?` self-exit short-circuit
+  path (which never enters the catch with an alive process) is unaffected.
+
+**Decision — pre-wait runtime-handle record (vs catch-only outer bind):** the
+design offered two options. Chose **both**: outer-scope volatile (so the `catch`
+reaps immediately) AND pre-wait runtime-handle `:process` record (so a later
+`stop-started-instance-in!` can reap a process that somehow survives the catch).
+This mirrors the existing pre-wait `:readiness-timeout-ms`/`:started-at`
+launch-site update — the runtime-handle is the single durable place the process
+must live for the stop path, and the volatile is the in-flight handle the catch
+reaches without re-reading the instance.
+
+**Test (no-mocks, `started_test`):** "reaps the alive launched process on the
+readiness-failure path (IR2)" — alive `fake-process` with a `:destroyed*` atom,
+launcher writes no `.nrepl-port`, `:timeout-ms 100`; asserts the readiness
+timeout throws (`:phase :started-readiness`) AND `@destroyed*` is `true`. The
+`fake-process` proxy's `destroy` already sets `:destroyed*` (TS-era helper), so
+no test-support change. A regression dropping the reap passes `:phase`-only and
+fails the destroy assertion.
+
+**Docs:** CHANGELOG `Fixed` entry (no orphaned JVMs on failed starts; window
+widened by the 120 s raise) + `doc/project-nrepl.md` readiness-failure note.
+
+**Verify:** started 3/47 green (+2 over 45); ops/config/attach/commands 19/148
+green (unchanged); consuming `project-nrepl-extension-install-test` 1/5 green
+(the `with-redefs` stub is unaffected by the internal change); `--focus unit`
+exit 0; clj-kondo 0/0 (`components/project-nrepl/{src,test}`); clj-paren-repair
+Success; `bb commit-check:file-lengths` exit 0.
+
+🔁 PATTERN: a resource bound in an inner `let` and only stored on the durable
+handle *after* the success call is unreachable from the `catch` of an enclosing
+`try` — to reap it on the failure path, bind it in a scope the `catch` can reach
+(outer volatile) AND record it on the durable handle *before* the throwing call
+(pre-wait), mirroring how the pre-wait status-field update was already structured
+so the diagnostic survives the failure path.
+
+PASS_STATUS: REVIEW_COMPLETE

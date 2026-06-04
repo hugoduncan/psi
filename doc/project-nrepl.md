@@ -69,6 +69,10 @@ reached while only a too-old port is present is reported distinctly
 (`:phase :started-stale-port`) from a plain readiness timeout
 (`:phase :started-readiness`).
 
+If the launched process is still alive when a readiness failure (timeout or
+stale-port) fires, psi destroys it so a hung or slow-booting command is not left
+running as an orphaned child process.
+
 ### Attach mode
 
 Psi connects to an already-running nREPL endpoint.

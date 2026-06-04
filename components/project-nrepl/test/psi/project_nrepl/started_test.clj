@@ -254,4 +254,26 @@
           (is (instance? java.time.Instant (:launched-at data))
               "stale-port diagnostic must carry the launch instant")
           (is (>= (:min-mtime-ms data) (:port-mtime-ms data))
-              "rejected port mtime is below the launch floor"))))))
+              "rejected port mtime is below the launch floor")))))
+
+  (testing "reaps the alive launched process on the readiness-failure path (IR2)"
+    ;; A hung/slow-boot child that stays alive but never writes a usable
+    ;; .nrepl-port (the headline scenario the 120000 ms default enlarges) must
+    ;; be destroyed when the readiness wait times out, not orphaned.
+    (with-temp-dir [worktree "psi-project-nrepl-started-"]
+      (let [ctx        (make-ctx)
+            destroyed* (atom false)
+            ;; alive process, no .nrepl-port ever written → the deadline branch
+            ;; fires :phase :started-readiness while the process is still alive.
+            fake-proc  (fake-process {:alive? true :exit-code 0 :pid 4321
+                                      :destroyed* destroyed*})
+            launcher   (fn [_worktree _command] fake-proc)]
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Timed out waiting for started project nREPL"
+             (project-nrepl-started/start-instance-in!
+              ctx worktree ["bb" "nrepl-server"]
+              {:timeout-ms 100 :poll-interval-ms 10
+               :runtime-handle {:process-launcher launcher}})))
+        (is (true? @destroyed*)
+            "the alive launched process must be destroyed on the readiness-failure path")))))

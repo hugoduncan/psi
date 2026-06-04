@@ -136,7 +136,11 @@
                              {:worktree-path effective-worktree
                               :acquisition-mode :started
                               :command-vector validated-command
-                              :runtime-handle (:runtime-handle opts)})]
+                              :runtime-handle (:runtime-handle opts)})
+         ;; Hold the launched process in a scope visible to the catch so an
+         ;; alive-but-port-less hang (the headline slow-boot scenario) is reaped
+         ;; on the readiness-failure path rather than orphaned (IR2).
+         launched-process   (volatile! nil)]
      (try
        (let [instance (project-nrepl-runtime/instance-in ctx effective-worktree)
              launcher (or (get-in instance [:runtime-handle :process-launcher])
@@ -157,6 +161,14 @@
                (assoc :readiness-timeout-ms effective-timeout-ms)
                (update :runtime-handle merge {:started-at launched-at})))
          (let [process  (launcher effective-worktree validated-command)
+               ;; Record the process onto the runtime-handle pre-wait (and the
+               ;; outer volatile) so the readiness-failure catch and a later
+               ;; stop-started-instance-in! can reap it (IR2).
+               _        (vreset! launched-process process)
+               _        (project-nrepl-runtime/update-instance-in!
+                         ctx effective-worktree
+                         #(update % :runtime-handle merge
+                                  {:process process :pid (.pid process)}))
                endpoint (wait-for-started-endpoint!
                          effective-worktree process
                          (assoc opts :launched-at launched-at))]
@@ -167,11 +179,15 @@
                         :readiness false
                         :endpoint endpoint
                         :last-error nil)
-                 (update :runtime-handle merge {:process process
-                                                :pid (.pid process)
-                                                :launch-id (str (UUID/randomUUID))})))
+                 (update :runtime-handle merge {:launch-id (str (UUID/randomUUID))})))
            (project-nrepl-client/connect-instance-in! ctx effective-worktree)))
        (catch Throwable t
+         ;; Reap an alive launched process on the readiness-failure path so a
+         ;; hung/slow-boot child JVM is not orphaned (IR2). destroy is a no-op
+         ;; on an already-exited process.
+         (when-let [^Process process @launched-process]
+           (when (.isAlive process)
+             (.destroy process)))
          (project-nrepl-runtime/update-instance-in!
           ctx effective-worktree
           #(assoc %
