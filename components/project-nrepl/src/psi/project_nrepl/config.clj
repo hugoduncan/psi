@@ -84,6 +84,24 @@
 
       :else start-command)))
 
+(defn resolved-start-readiness-timeout-ms
+  "Return the validated started-mode readiness-timeout in ms or nil when unset.
+
+   Read from [:project-nrepl :start-readiness-timeout-ms]. When set it must be an
+   integer in the range [1000 600000] (1 s–10 min). nil when unset so callers fall
+   back to the started.clj default. Out-of-range / non-integer throws
+   `ex-info` `{:phase :validate}`, mirroring `resolved-attach-endpoint`'s port-range
+   idiom."
+  [cfg]
+  (let [timeout-ms (get-in cfg [:project-nrepl :start-readiness-timeout-ms])]
+    (cond
+      (nil? timeout-ms) nil
+      (not (and (integer? timeout-ms) (<= 1000 timeout-ms 600000)))
+      (throw (ex-info "project nREPL start-readiness-timeout-ms must be an integer in the range 1000-600000 when provided"
+                      {:phase :validate :start-readiness-timeout-ms timeout-ms}))
+
+      :else timeout-ms)))
+
 (defn resolved-attach-endpoint
   "Return the validated attach endpoint map or nil when unset.
 

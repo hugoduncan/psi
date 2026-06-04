@@ -60,7 +60,11 @@
   potemkin/extend-protocol+            clojure.core/extend-protocol
   potemkin/reify-map-type              clojure.core/reify
   potemkin/def-derived-map             clj-kondo.lint-as/def-catch-all
-  potemkin/def-map-type                clj-kondo.lint-as/def-catch-all}
+  potemkin/def-map-type                clj-kondo.lint-as/def-catch-all
+
+  ;; project-nrepl test-support: temp-dir lifecycle macro binds `sym prefix`
+  ;; pairs over a body (let-style binding semantics).
+  psi.project-nrepl.test-support/with-temp-dir clojure.core/let}
 
  :linters
  {;; Malli

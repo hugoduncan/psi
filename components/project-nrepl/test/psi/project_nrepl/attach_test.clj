@@ -5,7 +5,7 @@
    [psi.project-nrepl.attach :as project-nrepl-attach]
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
    [psi.project-nrepl.test-support
-    :refer [delete-tree! fake-connector make-ctx temp-dir]]))
+    :refer [age-file-back! fake-connector make-ctx with-temp-dir]]))
 
 (deftest resolve-attach-endpoint-test
   (testing "explicit port wins and host defaults when omitted"
@@ -16,15 +16,25 @@
              (project-nrepl-attach/resolve-attach-endpoint worktree {:host "localhost" :port 7888})))))
 
   (testing "falls back to worktree-local .nrepl-port when explicit port absent"
-    (let [dir (temp-dir "psi-project-nrepl-attach-")]
-      (try
-        (spit (io/file dir ".nrepl-port") "7999\n")
-        (is (= {:host "127.0.0.1" :port 7999 :port-source :dot-nrepl-port}
-               (project-nrepl-attach/resolve-attach-endpoint dir {})))
-        (is (= {:host "localhost" :port 7999 :port-source :dot-nrepl-port}
-               (project-nrepl-attach/resolve-attach-endpoint dir {:host "localhost"})))
-        (finally
-          (delete-tree! dir))))))
+    (with-temp-dir [dir "psi-project-nrepl-attach-"]
+      (spit (io/file dir ".nrepl-port") "7999\n")
+      (is (= {:host "127.0.0.1" :port 7999 :port-source :dot-nrepl-port}
+             (project-nrepl-attach/resolve-attach-endpoint dir {})))
+      (is (= {:host "localhost" :port 7999 :port-source :dot-nrepl-port}
+             (project-nrepl-attach/resolve-attach-endpoint dir {:host "localhost"})))))
+
+  ;; TR4: the started-mode launch-instant mtime gate lives ONLY in started.clj.
+  ;; Attach-mode discovery must accept whatever .nrepl-port is present, by design
+  ;; — even a stale (old-mtime) one — i.e. the exact opposite of the started gate.
+  ;; Aging the file mirrors the started-mode stale fixture (- now 60000); a future
+  ;; gate leak into the shared/attach path would fail this assertion.
+  (testing "accepts a stale (old-mtime) .nrepl-port — no started-mode gate in attach"
+    (with-temp-dir [dir "psi-project-nrepl-attach-"]
+      (let [port-file (io/file dir ".nrepl-port")]
+        (spit port-file "7999\n")
+        (age-file-back! port-file))
+      (is (= {:host "127.0.0.1" :port 7999 :port-source :dot-nrepl-port}
+             (project-nrepl-attach/resolve-attach-endpoint dir {}))))))
 
 (deftest attach-instance-in-test
   (testing "attach establishes attached instance and managed client session"

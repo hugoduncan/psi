@@ -3,28 +3,114 @@
    [clojure.test :refer [deftest is testing]]
    [psi.project-nrepl.config]
    [psi.project-nrepl.ops :as project-nrepl-ops]
+   [psi.project-nrepl.runtime :as project-nrepl-runtime]
    [psi.project-nrepl.test-support
-    :refer [delete-tree! install-instance! make-ctx temp-dir]]))
+    :refer [fake-connector install-instance!
+            make-ctx started-launcher! thrown-ex thrown-ex-data
+            with-temp-dir write-project-config!]]))
 
 (deftest start-test
   (testing "start returns structured missing-start-command result with actionable guidance"
-    (let [ctx      (make-ctx)
-          worktree (temp-dir "psi-project-nrepl-ops-")]
-      (try
+    (with-temp-dir [worktree "psi-project-nrepl-ops-"]
+      (let [ctx    (make-ctx)
+            result (project-nrepl-ops/start ctx worktree)]
+        (is (= :missing-start-command (:status result)))
+        (is (= worktree (:worktree-path result)))
+        (is (= :config (:phase result)))
+        (is (= ["~/.psi/agent/config.edn"
+                (str worktree "/.psi/project.edn")
+                (str worktree "/.psi/project.local.edn")]
+               (:config-paths result)))
+        (is (re-find #"requires a configured start-command" (:message result)))
+        (is (re-find #":agent-session :project-nrepl :start-command" (:message result)))
+        (is (= {:agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]}}}
+               (:example-config result)))))))
+
+(deftest status-readiness-timeout-projection-test
+  (testing "status/instance-payload projects :readiness-timeout-ms on a ready instance (TR2/AMB3)"
+    ;; Pins the instance-payload key-list extension at the ops layer: a normal
+    ;; present/ready instance's status must surface :readiness-timeout-ms, so a
+    ;; future instance-payload edit dropping it is caught independently of the
+    ;; started-mode failure-path status read.
+    (with-temp-dir [worktree "psi-project-nrepl-ops-"]
+      (let [ctx (make-ctx)]
+        (install-instance! ctx worktree (fn [_] nil))
+        (project-nrepl-runtime/update-instance-in!
+         ctx worktree
+         #(assoc % :readiness-timeout-ms 120000))
+        (let [result (project-nrepl-ops/status ctx worktree)]
+          (is (= :present (:status result)))
+          (is (= true (get-in result [:instance :readiness])))
+          (is (= 120000 (get-in result [:instance :readiness-timeout-ms]))))))))
+
+(deftest start-config-timeout-threading-test
+  (testing "ops/start threads a configured :start-readiness-timeout-ms from project config into the instance (TR3/Q1)"
+    ;; Pins the central Q1 configurability path end-to-end: a project
+    ;; .psi/project.edn configured :start-readiness-timeout-ms must flow through
+    ;; ops/start's resolve-config → resolved-start-readiness-timeout-ms →
+    ;; cond-> opts → start-instance-in! onto the instance's :readiness-timeout-ms.
+    ;; A regression in the ops glue (dropped assoc, wrong key, not reading cfg)
+    ;; would otherwise pass every other test. The launcher/connector seam is
+    ;; pre-seeded via ensure-instance-in! (matching :started/command/endpoint)
+    ;; so start-instance-in!'s ensure matches and preserves the runtime-handle.
+    (with-temp-dir [worktree "psi-project-nrepl-ops-"]
+      (let [ctx       (make-ctx)
+            command   ["bb" "nrepl-server"]
+            launcher  (started-launcher!)
+            connector (fake-connector "nrepl-session-1")]
+        (write-project-config!
+         worktree
+         {:agent-session {:project-nrepl {:start-command command
+                                          :start-readiness-timeout-ms 90000}}})
+        ;; Pre-seed the runtime-handle launcher/connector seam. The acquisition
+        ;; mode/command/endpoint match start-instance-in!'s ensure request, so it
+        ;; returns this slot (no conflict) and keeps the seeded runtime-handle.
+        (project-nrepl-runtime/ensure-instance-in!
+         ctx
+         {:worktree-path worktree
+          :acquisition-mode :started
+          :lifecycle-state :starting
+          :command-vector command
+          :runtime-handle {:process-launcher launcher
+                           :nrepl-connector connector}})
         (let [result (project-nrepl-ops/start ctx worktree)]
-          (is (= :missing-start-command (:status result)))
-          (is (= worktree (:worktree-path result)))
-          (is (= :config (:phase result)))
-          (is (= ["~/.psi/agent/config.edn"
-                  (str worktree "/.psi/project.edn")
-                  (str worktree "/.psi/project.local.edn")]
-                 (:config-paths result)))
-          (is (re-find #"requires a configured start-command" (:message result)))
-          (is (re-find #":agent-session :project-nrepl :start-command" (:message result)))
-          (is (= {:agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]}}}
-                 (:example-config result))))
-        (finally
-          (delete-tree! worktree))))))
+          (is (= :started (:status result)))
+          (is (= 90000 (get-in result [:instance :readiness-timeout-ms]))))
+        (let [status (project-nrepl-ops/status ctx worktree)]
+          (is (= 90000 (get-in status [:instance :readiness-timeout-ms]))))))))
+
+(deftest start-invalid-config-timeout-test
+  (testing "ops/start surfaces an invalid configured :start-readiness-timeout-ms as a :phase :validate ex-info (TR6/Q1)"
+    ;; Negative-path sibling of start-config-timeout-threading-test (TR3) at the
+    ;; same boundary. ops/start calls (resolved-start-readiness-timeout-ms cfg)
+    ;; unguarded before launch, so an out-of-range / non-integer configured value
+    ;; throws :phase :validate straight out of the op — the user-misconfiguration
+    ;; surface where validation actually fires. A regression swallowing/wrapping
+    ;; the throw, mis-reading the config key, or silently coercing the value would
+    ;; pass config_test (exercises the fn directly), the TR3 threading test (valid
+    ;; value), and start-test (missing-start-command). No launcher/connector seam
+    ;; is seeded — the throw precedes launch.
+    (with-temp-dir [worktree "psi-project-nrepl-ops-"]
+      (let [ctx     (make-ctx)
+            command ["bb" "nrepl-server"]]
+        (testing "out-of-range value"
+          (write-project-config!
+           worktree
+           {:agent-session {:project-nrepl {:start-command command
+                                            :start-readiness-timeout-ms 999}}})
+          ;; Capture the single throw once (TS12): assert both the range message
+          ;; and :phase :validate against the one captured ex.
+          (let [ex (thrown-ex #(project-nrepl-ops/start ctx worktree))]
+            (is (re-find #"range 1000-600000" (.getMessage ex)))
+            (is (= :validate (:phase (ex-data ex))))))
+        (testing "non-integer value"
+          (write-project-config!
+           worktree
+           {:agent-session {:project-nrepl {:start-command command
+                                            :start-readiness-timeout-ms "120000"}}})
+          (is (= :validate
+                 (:phase (thrown-ex-data
+                          #(project-nrepl-ops/start ctx worktree))))))))))
 
 (deftest eval-op-test
   (testing "eval-op preserves the public success contract through real eval-instance-in!"

@@ -41,7 +41,7 @@
                     psi.project-nrepl.config/resolve-config (fn [_]
                                                               {:project-nrepl {:start-command ["bb" "nrepl-server"]}})
                     psi.project-nrepl.started/start-instance-in!
-                    (fn [ctx worktree-path command-vector]
+                    (fn [ctx worktree-path command-vector & _opts]
                       (require 'psi.project-nrepl.runtime)
                       (let [ensure-instance! (resolve 'psi.project-nrepl.runtime/ensure-instance-in!)
                             update-instance! (resolve 'psi.project-nrepl.runtime/update-instance-in!)

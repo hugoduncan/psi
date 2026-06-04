@@ -29,7 +29,8 @@ Canonical shape:
 ```clojure
 {:agent-session
  {:project-nrepl
-  {:start-command ["bb" "nrepl-server"]}}}
+  {:start-command ["bb" "nrepl-server"]
+   :start-readiness-timeout-ms 120000}}}
 ```
 
 If both project files exist, psi deep-merges shared then local, so local values
@@ -43,6 +44,34 @@ Rules:
 - psi starts the process in the effective target worktree
 - psi discovers the endpoint from `<worktree>/.nrepl-port`
 - the older nested `:started :command-vector` shape is no longer the canonical or supported config surface
+
+#### `:start-readiness-timeout-ms`
+
+How long psi waits for the launched process to write a fresh
+`<worktree>/.nrepl-port` before reporting a readiness failure.
+
+- optional integer milliseconds; default `120000` (120 s) so a cold
+  `clojure -M …` JVM + classpath build + nREPL/cider middleware load succeeds
+  out of the box
+- must be in the range `[1000 600000]` (1 s–10 min); out-of-range or
+  non-integer values are rejected at config validation
+- follows the same `system < user < project` precedence as the rest of the
+  project nREPL config
+- the effective resolved timeout is observable as the instance status field
+  `:readiness-timeout-ms` (via `/project-repl status`), even on a readiness
+  failure
+
+Started mode also guards against a **stale `.nrepl-port`**: psi deletes any
+pre-existing `<worktree>/.nrepl-port` immediately before launching and only
+accepts a port file written at or after the launch instant, so start connects
+to the process it launched rather than latching onto a leftover port. A timeout
+reached while only a too-old port is present is reported distinctly
+(`:phase :started-stale-port`) from a plain readiness timeout
+(`:phase :started-readiness`).
+
+If the launched process is still alive when a readiness failure (timeout or
+stale-port) fires, psi destroys it so a hung or slow-booting command is not left
+running as an orphaned child process.
 
 ### Attach mode
 
