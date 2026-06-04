@@ -88,12 +88,12 @@
 
 ## Slice 4 — Docs + CHANGELOG
 
-- [ ] `doc/project-nrepl.md`: document `:start-readiness-timeout-ms` in the
+- [x] `doc/project-nrepl.md`: document `:start-readiness-timeout-ms` in the
       started-mode config section (default 120000 ms, range [1000 600000],
       precedence system < user < project).
-- [ ] `CHANGELOG.md` `[Unreleased]`: `Added` the config key;
+- [x] `CHANGELOG.md` `[Unreleased]`: `Added` the config key;
       `Fixed` the slow-boot timeout + stale-`.nrepl-port` wrong-endpoint bugs.
-- [ ] Commit slice 4.
+- [x] Commit slice 4.
 
 ## Slice 5 — Coherence pass
 
