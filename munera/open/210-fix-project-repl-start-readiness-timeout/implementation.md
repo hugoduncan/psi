@@ -1816,3 +1816,44 @@ extension (pre-wait `:process`/`:pid` on the failure instance) and the new
 branch. Tests are well-formed and behaviour-complete.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+---
+
+## Test-shaper review (pass 7) — 刀-requested
+
+Skill: test-shaper (`consistent(assertion_style)` ∧
+`helpers_that_compress(ceremony)` ∧ `economical`). Re-read started/ops/config/
+attach/commands tests + test_support after passes TS1–TS10.
+
+Tests are behaviour-complete, no-mocks, deterministic, and well-partitioned;
+TS1–TS10 already single-sourced the launcher / temp-dir / stale-port / config-
+writer ceremonies. Two residual shape findings, both new (no prior TS/TR step
+covers them):
+
+- **TS11 (consistency/ceremony).** The thrown-`ExceptionInfo` *capture* ceremony
+  `(try … (catch clojure.lang.ExceptionInfo e e))` recurs six times — three as
+  the `(:phase (ex-data (try … (catch … e e))))` ex-data-extraction idiom
+  (`ops_test` ×2 in `start-invalid-config-timeout-test`, `config_test` ×1 in
+  `resolved-start-readiness-timeout-ms-test`) and three as the
+  `(let [ex (try … (catch … e e)) data (ex-data ex)] …)` form (`started_test`
+  ×3). No `test_support` helper names this; readers see bare catch-the-ex
+  arithmetic, not intent, and the assertion style is inconsistent across files
+  (some assert `:phase` via the nested form, some bind `ex`/`data`). A single
+  `thrown-ex-data` (return the `ex-data` of the `ExceptionInfo` thrown by a
+  thunk, else fail) compresses the ceremony and single-sources the convention
+  (`consistent(assertion_style)` ∧ `helpers_that_compress(ceremony) ∧
+  ¬helpers_that_hide(intent)`).
+
+- **TS12 (economical/redundancy).** `start-invalid-config-timeout-test`'s
+  "out-of-range value" block invokes `(project-nrepl-ops/start ctx worktree)`
+  **twice** — once inside `thrown-with-msg?` (message) and again inside the
+  `try/catch` (`:phase`) — exercising the same op against the same on-disk
+  config twice to assert two facets of one throw. `minimal(redundant_tests)` /
+  `single_concern`: capture the throw once (via the TS11 helper or one
+  `try/catch` bind) and assert both message-match and `:phase` against the one
+  captured ex. Folds naturally into TS11.
+
+No correctness or coverage gaps; these are shape-only, behaviour-preserving
+follow-ups.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

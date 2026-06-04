@@ -704,3 +704,33 @@
       no production/doc/CHANGELOG change. started-test 4 tests/52 assertions
       green (+1 deftest, +5 assertions over pass-3's 47); full `--focus unit`
       green; clj-kondo 0/0; clj-paren-repair Success; file-lengths RC=0.
+
+## Test-shaper review follow-ups (shape, pass 7)
+
+- [ ] TS11: Single-source the thrown-`ExceptionInfo` capture ceremony
+      (`consistent(assertion_style)` ∧ `helpers_that_compress(ceremony)`). The
+      `(try … (catch clojure.lang.ExceptionInfo e e))` capture recurs six times:
+      three as `(:phase (ex-data (try … (catch … e e))))` (`ops_test` ×2 in
+      `start-invalid-config-timeout-test`; `config_test` ×1 in
+      `resolved-start-readiness-timeout-ms-test`) and three as
+      `(let [ex (try … (catch … e e)) data (ex-data ex)] …)` (`started_test`
+      ×3, the wait-for-started-endpoint! deadline/exit/plain-timeout cases). No
+      `test_support` helper names it; the bare catch arithmetic obscures intent
+      and the assertion style is inconsistent across files. Add a `test_support`
+      helper (e.g. `thrown-ex-data` returning the `ex-data` of the
+      `ExceptionInfo` thrown by a 0-arg thunk, failing if none is thrown) and
+      rewire the six sites to assert against its result (`:phase`, message via
+      the captured ex, the instant trio). Keep the asserted keys visible at each
+      call site (`¬helpers_that_hide(intent)`). Shape-only; behaviour-preserving
+      (no assertion change). Re-run started/ops/config + clj-kondo after.
+
+- [ ] TS12: Remove the redundant double op-invocation in
+      `start-invalid-config-timeout-test`'s "out-of-range value" block
+      (`minimal(redundant_tests)` ∧ `single_concern`). It invokes
+      `(project-nrepl-ops/start ctx worktree)` twice against the same on-disk
+      config — once in `thrown-with-msg?` (message), once in the `try/catch`
+      (`:phase`) — to assert two facets of one throw. Capture the throw once
+      (via the TS11 `thrown-ex-data` helper, or one `try/catch` bind) and assert
+      both the `#"range 1000-600000"` message and `:phase :validate` against the
+      single captured ex. Folds into TS11. Shape-only; behaviour-preserving.
+      Re-run ops + clj-kondo after.
