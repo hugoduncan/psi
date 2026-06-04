@@ -1993,3 +1993,47 @@ whole-second-floor internal tolerance would reduce user-facing clarity, not
 improve accuracy.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+---
+
+## code-shaper review (pass 1)
+
+Production-code shaping review (`simplicity ∧ consistency ∧ robustness`) of the
+started-mode change set (`started.clj`, `config.clj`, `ops.clj`). Prior passes
+covered tests (test-shaper TS1–TS12), behaviour coverage (TR/IR), and docs — no
+prior pass shaped the production code. Suite green at review time (HEAD clean).
+
+One actionable finding (CS1): the effective-timeout fallback expression
+`(long (or (:timeout-ms opts) default-readiness-timeout-ms))` is duplicated in
+`started.clj` at two sites — `wait-for-started-endpoint!` (line 72, the wait's
+actual deadline basis) and `start-instance-in!` (line 148, the value recorded as
+the instance `:readiness-timeout-ms` pre-wait). The plan (PA1) makes the
+invariant *recorded `:readiness-timeout-ms` = the wait's actual deadline basis*
+an explicit requirement ("matching the wait's fallback"), but that invariant is
+enforced only by convention — both call sites independently re-derive the same
+formula. A change to the fallback (e.g. raising/lowering the default, or adding
+a clamp) in one site silently drifts the recorded diagnostic from the real
+deadline. `robust(code)`: an invariant the design states should be
+*structurally* enforced (one source), not duplicated. Extract a private
+`effective-readiness-timeout-ms` helper (`(long (or (:timeout-ms opts)
+default-readiness-timeout-ms))`) and call it from both sites so the recorded
+value and the wait's deadline cannot diverge.
+
+Considered but NOT actionable:
+- The four `throw (ex-info …)` sites in `wait-for-started-endpoint!`
+  (exit/deadline × stale/plain) share map structure, but each carries a
+  *distinct* key set (exit adds `:command-exited?`/`:exit-code`; stale adds the
+  instant trio) and a distinct message; the divergence is the diagnostic intent,
+  not incidental repetition. Factoring a shared map builder would couple four
+  independent failure contracts and obscure which keys each phase carries
+  (`¬helpers_that_hide(intent)`). Leave as-is.
+- `instance-payload`'s fixed projected key list (`ops.clj`) is a deliberate
+  explicit projection (A2/AMB3) — its verbosity is the contract surface, not
+  incidental. Leave as-is.
+- The three pre-wait `update-instance-in!` calls in `start-instance-in!`
+  (timeout/`:started-at`; `:process`/`:pid`; success) are each at a distinct
+  lifecycle point with distinct survive-the-throw rationale (PA1/PA2/IR2);
+  merging them would re-entangle the launch-instant, process-record, and
+  success writes that the design deliberately separates. Leave as-is.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

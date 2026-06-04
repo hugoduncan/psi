@@ -757,3 +757,22 @@
       `(= :validate (:phase (ex-data ex)))` against that one ex — `start` is
       invoked once, not twice. ops-test 4 tests/23 assertions green; clj-kondo
       0/0.
+
+## Code-shaper review follow-ups (shape)
+
+- [ ] CS1: Single-source the effective-timeout fallback in `started.clj`
+      (`robust(code)`: structurally enforce the PA1 invariant *recorded
+      `:readiness-timeout-ms` = the wait's actual deadline basis*). The
+      expression `(long (or (:timeout-ms opts) default-readiness-timeout-ms))`
+      is duplicated at two sites — `wait-for-started-endpoint!` (the wait's
+      deadline basis) and `start-instance-in!` (the value written as the
+      instance `:readiness-timeout-ms` pre-wait). The match is enforced only by
+      convention today; a change to the fallback (default raise/lower, a clamp)
+      in one site silently drifts the recorded diagnostic from the real
+      deadline. Extract a private `effective-readiness-timeout-ms` helper
+      (`[opts]` → `(long (or (:timeout-ms opts) default-readiness-timeout-ms))`)
+      and call it from both sites so the recorded value and the wait's deadline
+      cannot diverge. Behaviour-preserving (same value computed); the TR1
+      no-opts-`120000` and the configured-`90000`/threading tests already pin
+      the values — they must stay green. Re-run started/ops + clj-kondo +
+      clj-paren-repair after.
