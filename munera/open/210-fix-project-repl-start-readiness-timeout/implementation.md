@@ -341,3 +341,69 @@ plan/steps inconsistency review.
   consistency.
 - Scope: task-artifact-only (steps.md). PSI1 references no code/test/doc, so
   none were touched. Marked PSI1 `[x]` with an inline `→ Resolved` note.
+
+## Implementation execution (ψ, 2026-06-03)
+
+All five slices executed; `steps.md` fully checked. Plan/design/plan-review
+were all REVIEW_COMPLETE, so the plan gate was satisfied; production code added
+directly per the slice order.
+
+- **Slice 1 — config surface.** Added `resolved-start-readiness-timeout-ms` to
+  `config.clj` (reads `[:project-nrepl :start-readiness-timeout-ms]`; `nil`
+  unset; `cond` range `[1000 600000]` integer; `{:phase :validate}` throw —
+  exact `resolved-attach-endpoint` idiom). 5 `config_test.clj` cases (unset /
+  in-range×3 / below / above / non-integer / `:phase :validate`). Commit, lint
+  0/0, 8 tests/40 assertions green.
+
+- **Slices 2+3 — committed together** because they share the single new
+  pre-wait launch-site `update-instance-in!` (PA1/PA2 unifying mechanism), so
+  splitting the commit would leave a half-written launch-site update.
+  - Slice 2: `default-readiness-timeout-ms 5000→120000`; `ops/start` resolves
+    the config timeout and threads `{:timeout-ms …}` (only when non-nil) as the
+    4th `opts` arg to `start-instance-in!`; new pre-wait launch-site
+    `update-instance-in!` writes top-level `:readiness-timeout-ms` (effective =
+    `(:timeout-ms opts)` else default, matching the wait's fallback);
+    `instance-payload` projects `:readiness-timeout-ms` (AMB3).
+  - Slice 3: one `launched-at (now)` captured at the launch site → both
+    runtime-handle `:started-at` (post-wait `:started-at` write removed, PA2)
+    and the gate reference threaded via `opts :launched-at` (INC1); pre-launch
+    `.nrepl-port` deletion (`dot-nrepl-port-file` `.delete`); `wait-for-
+    started-endpoint!` mtime gate (`floored-to-whole-seconds`, AMB4) accepting
+    only `mtime ≥ floor`, continuing to poll a too-old port, throwing
+    `:phase :started-stale-port` on a deadline reached with only a stale port.
+  - Tests: unit-level gate reject (`:started-stale-port`) + accept (injected
+    `:launched-at`, `setLastModified` to force mtime); `start-instance-in!`
+    pre-launch removal + fresh acceptance; `:readiness-timeout-ms` + launch-
+    instant `:started-at` recording; `status`-read of the failure-path instance
+    (PA4 — `:readiness-timeout-ms` + `:last-error :data :phase
+    :started-stale-port`). No mocks; existing `process-launcher`/`nrepl-
+    connector` seams. Full project-nrepl suite green (28 tests/169 assertions).
+
+- **Deviation — consuming-test arity (not in the original steps).** Adding the
+  4th `opts` arg to the `ops/start` → `start-instance-in!` call broke the
+  agent-session consuming test `project-nrepl-extension-install-test`, whose
+  `with-redefs` stub of `start-instance-in!` was a fixed 3-arg fn →
+  `ArityException (4)`. Widened the stub to `(fn [ctx worktree-path
+  command-vector & _opts] …)` (matching the real fn's optional `opts` arity).
+  Separate commit. (`with-redefs` here is a pre-existing consuming-test idiom
+  outside this task's no-mocks scope; only the arity was touched.) Full unit
+  suite (`bb clojure:test:unit`) green.
+
+- **Slice 4 — docs + CHANGELOG.** `doc/project-nrepl.md` documents
+  `:start-readiness-timeout-ms` (default 120000, range, precedence, status
+  observability) + the stale-port ownership guard. `CHANGELOG.md [Unreleased]`:
+  Added config key; Fixed slow-boot timeout + stale-port wrong-endpoint bugs.
+
+- **Slice 5 — coherence.** `clj-kondo --lint` 0/0 over
+  `components/project-nrepl/{src,test}`; full `bb clojure:test:unit` green;
+  `bb commit-check:file-lengths` exit 0 (started.clj 185, started_test.clj 206
+  — both < 800). All design acceptance criteria verified satisfied:
+  raised-120000-default slow boot (no per-call config); stale-port wrong-
+  endpoint prevented (pre-launch removal + mtime gate in started.clj only,
+  shared discovery + attach untouched); A2 status projection
+  (`:readiness-timeout-ms` field + `instance-payload`; `:phase
+  :started-stale-port` on `:last-error → :data`); Q1 config +
+  `[1000 600000]` validation; both fixes unconditional (Q3); attach/happy-path
+  preserved; no-mocks tests; docs.
+
+PASS_STATUS: IMPLEMENTATION_COMPLETE

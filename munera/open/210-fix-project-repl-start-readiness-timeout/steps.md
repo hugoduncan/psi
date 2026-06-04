@@ -97,13 +97,17 @@
 
 ## Slice 5 — Coherence pass
 
-- [ ] Run the full project-nrepl test suite green; `clj-kondo --lint` clean.
-- [ ] Verify each acceptance criterion in `design.md` is satisfied:
+- [x] Run the full project-nrepl test suite green; `clj-kondo --lint` clean.
+      → `bb clojure:test:unit` green; project-nrepl suite 28 tests/169
+      assertions; lint 0/0; file-lengths exit 0.
+- [x] Verify each acceptance criterion in `design.md` is satisfied:
       raised-default slow boot; stale-port wrong-endpoint prevented; A2 status
       projection (`:readiness-timeout-ms` + `:phase :started-stale-port` on
       `:last-error → :data`); Q1 config + `[1000 600000]` validation; both fixes
       unconditional (Q3); attach/happy-path preserved; no-mocks tests; docs.
-- [ ] Update `mementum/state.md` if a reusable insight emerged; commit.
+      → all verified (see implementation.md "Implementation execution").
+- [x] Update `mementum/state.md` if a reusable insight emerged; commit.
+      → state.md updated with the consuming-test-arity-break insight.
 
 ## Plan/steps review follow-ups (ambiguity)
 
