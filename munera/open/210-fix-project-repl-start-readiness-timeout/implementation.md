@@ -1488,3 +1488,51 @@ handle *after* the success call is unreachable from the `catch` of an enclosing
 so the diagnostic survives the failure path.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Implementation review — quality (ψ, 2026-06-04, pass 4)
+
+Skill: task-implementation-review (`review(code) ∧ matches(design) ∧
+follows(architecture) ∧ flag(new_pattern ∨ unnecessary_abstraction ∨
+structural_performance)`). Independent re-read of `started.clj`, `config.clj`,
+`ops.clj`, `client.clj`, `runtime.clj`, `doc/project-nrepl.md`, `CHANGELOG.md`,
+and the project-nrepl test suite after the IR2 follow-up landed. State: clean
+tree; `clojure -M:test --focus unit` exit 0; clj-kondo 0/0
+(`components/project-nrepl/{src,test}`); steps.md 47/47 checked.
+
+Confirms all prior conclusions — no regressions, no newly-surfaced gaps:
+- Design match: config key + `[1000 600000]` validation (`resolved-attach-endpoint`
+  idiom), raised 120000 default, pre-launch removal + `floored-to-whole-seconds`
+  mtime gate, `:phase :started-stale-port` on both deadline and IR1 exit paths,
+  `:readiness-timeout-ms` projection (AMB3), launch-site `:started-at`/INC1, IR2
+  failure-path reap.
+- Architecture fit: stale-port gate confined to `started.clj` (A1); shared
+  `read-dot-nrepl-port` + `attach/resolve-attach-endpoint` untouched; runtime-
+  handle ownership of subprocess + `.nrepl-port` I/O respected (no move under
+  dispatch effects); `ops/start` keeps projecting from `instance-payload` (no
+  op-only status channel, A2).
+- No unjustified new pattern, no unnecessary abstraction.
+
+Reviewed-and-not-actionable observations (recorded for completeness):
+- `start-instance-in!` now performs three sequential `update-instance-in!` swaps
+  on the success path (pre-wait launch-site status; post-launch `:process`/`:pid`
+  record; post-wait `:launch-id`/`:endpoint`). Each has a distinct survival
+  purpose the design mandates (status/`:started-at` and `:process` must be
+  recorded *before* the throwing wait so the failure-path `catch` and a later
+  `stop-started-instance-in!` can observe/reap them). The registry is a single
+  in-memory handle and `start` is an infrequent op, so the extra functional
+  swaps are not a structural performance concern. Within design tolerance.
+- The IR2 failure path leaves the `:failed` instance with a (now-destroyed)
+  `:process` on its runtime-handle and does not `remove-instance-in!` it. A
+  subsequent `stop` would `.destroy` an already-dead process (guarded by
+  `.isAlive`, no-op) — benign. Failed-instance cleanup/removal is pre-existing
+  behaviour and out of this task's scope.
+- The freshness gate remains intentionally fail-open on a TOCTOU stat miss
+  (`fresh?` short-circuits when `(nil? mtime-ms)`), consistent with the design's
+  "pre-launch removal guarantees correctness even when the gate is lenient"
+  (Q2/A1 defence-in-depth). Already recorded in pass 2; unchanged.
+
+No new actionable issue. Implementation is correct, matches design + architecture,
+and is fully covered by no-mock state/return tests. All prior review threads
+(IR1, IR2, TR1–5, TS1–10, PA1–4, PSI1) are resolved and checked.
+
+PASS_STATUS: REVIEW_COMPLETE
