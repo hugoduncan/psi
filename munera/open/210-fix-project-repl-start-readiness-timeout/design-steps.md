@@ -58,3 +58,24 @@
       → Resolved: Q3 states both fixes ship unconditionally (each an independent
       inspection-proven defect), no single-cause finding scopes either out;
       acceptance criteria add an explicit Q3 line.
+
+## Design follow-up — inconsistency
+
+- [ ] INC1: Resolve the launch-instant ownership contradiction. Q2/A1 launch the
+      process inside `start-instance-in!` (pre-launch `.nrepl-port` removal
+      "immediately before launching") yet also say `wait-for-started-endpoint!`
+      "records the launch instant" — but that function runs after the launch and
+      cannot capture the true launch instant. Pick one owner: capture the launch
+      instant in `start-instance-in!` (reusing/reconciling the existing
+      `:started-at` runtime-handle value) and thread it into
+      `wait-for-started-endpoint!` (e.g. via `opts`), OR explicitly accept a
+      self-timed gate in `wait-for-started-endpoint!`. State the threading and
+      reconcile with `:started-at` so the mtime-gate reference instant has a
+      single, code-consistent source.
+- [ ] INC2: Align the acceptance-criterion wording for the stale-port `:phase`.
+      The A2 body places `:phase :started-stale-port` inside `ex-data`, surfaced
+      via `:last-error`'s `:data` field ({:message :data :at}); the acceptance
+      criterion's "via `:last-error` with `:phase :started-stale-port`" shorthand
+      reads as a direct `:last-error` key. Reword the criterion to match the A2
+      body (phase nested in `:last-error` → `:data`/ex-data) so the projected
+      shape is unambiguous.

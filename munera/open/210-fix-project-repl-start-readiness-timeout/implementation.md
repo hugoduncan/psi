@@ -120,3 +120,43 @@ started/ops/config/runtime source).
 
 No blocked design-steps. design.md verified internally coherent (Q1–Q4 ↔ A1/A2
 ↔ acceptance criteria align).
+
+## Design review — inconsistency (ψ)
+
+Scope: design.md only (not plan/steps). Cross-checked Q2/A1/A2 + acceptance vs
+`started.clj`, `ops.clj`, `runtime.clj`, `config.clj`, `client.clj`,
+`doc/project-nrepl.md`. Most claims verified consistent (Q1 precedence ↔ doc;
+attach-port range idiom ↔ config.clj; `instance-payload` fixed key list ↔
+ops.clj:22; `instance-payload`←`update-instance-in!` return chain ↔
+runtime.clj/client.clj). New actionable inconsistencies:
+
+- INC1 (launch-instant ownership contradiction). Q2/A1 split the launch-instant
+  capture across two functions: pre-launch `.nrepl-port` removal happens in
+  `start-instance-in!` "immediately before launching the process" (design 94,
+  149) — i.e. the process is launched *inside* `start-instance-in!` (code:
+  `(launcher effective-worktree validated-command)` then `(wait-for-started-
+  endpoint! …)`). Yet A1/Q2 also assert `wait-for-started-endpoint!` "records the
+  launch instant" (design 99, 151). By the time `wait-for-started-endpoint!`
+  runs, the launch already happened in its caller, so it cannot record the true
+  launch instant — it can only record its own entry time. The function that owns
+  the real launch instant is `start-instance-in!`, which **already** records
+  `:started-at (now)` into the runtime-handle on the success path
+  (`started.clj`). Design contradicts itself on which function captures the gate
+  reference instant and never reconciles the gate with the existing `:started-at`
+  value. A builder must guess whether to (a) capture in `start-instance-in!` and
+  thread the instant into `wait-for-started-endpoint!` (via `opts`), or (b) let
+  `wait-for-started-endpoint!` self-time (looser gate). Resolve to one owner and
+  state the threading.
+
+- INC2 (`:last-error` `:phase` shape mismatch). A2 body is precise: stale-port
+  rejection rides the existing `:last-error {:message :data :at}` projection and
+  the `:phase :started-stale-port` lives inside `ex-data` (design 173–174,
+  190–191) — matching `start-instance-in!`'s catch, which writes
+  `:last-error {:message … :data (ex-data t) :at …}` (so `:phase` is nested under
+  `:last-error → :data`). The acceptance criterion shorthand says "via
+  `:last-error` with `:phase :started-stale-port`" (design 210), which reads as
+  `:phase` being a direct key of `:last-error`. Minor but actionable: align the
+  acceptance wording with the A2 body (phase is in `:last-error`'s `:data`/
+  ex-data), so the projected shape has one interpretation.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
