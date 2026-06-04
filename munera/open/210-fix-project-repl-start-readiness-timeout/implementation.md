@@ -897,3 +897,69 @@ the wait's use of a passed `:timeout-ms`, TR1/TR3 pin the recorded value);
 recorded for completeness, not actionable.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Test-shaper review — test quality/shape (ψ, 2026-06-03)
+
+Skill: test-shaper — `clarity ∧ signal ∧ robustness ∧ economical`, distinct from
+the prior five task-test-review *coverage* passes (TR1–TR5: behaviour↔test
+mapping). This pass evaluates the *shape* of the now-complete tests: simple,
+consistent, robust, economical. Read: `started_test.clj`, `ops_test.clj`,
+`config_test.clj`, `attach_test.clj`, `test_support.clj`, `started.clj`. Ran the
+focused `started/ops/config/attach` suite — green.
+
+Strengths: deterministic file-backed `.nrepl-port` readiness (no time mocking on
+the happy path); state/return assertions, no interaction assertions; the shared
+`test_support.clj` already single-sources `make-ctx`/`temp-dir`/`delete-tree!`/
+`fake-connector`/`install-instance!`; every temp dir is cleaned in `finally`;
+`testing` strings name the behaviour and cite the criterion (TRn/PA4/IR1).
+
+New actionable shape issues (economy + consistency — not coverage gaps, so
+distinct from TR1–TR5/IR1):
+
+- TS1 (duplicated `Process` proxy — `consistent(fixtures)` ∧
+  `helpers_that_compress(ceremony)`). The 16-method `java.lang.Process` proxy is
+  written twice: `started_test/fake-process` (parameterised on
+  `{:alive? :exit-code :pid :destroyed*}`) and `ops_test/live-fake-process`
+  (hardcoded alive / exit 0 / pid 4321). `live-fake-process` is a strict special
+  case of `fake-process` (verified: the 9 boilerplate stub methods —
+  `toHandle`/`info`/`children`/`descendants`/`get*Stream` — are byte-identical;
+  the only difference is the parameterised vs hardcoded alive/exit/pid). The big
+  proxy ceremony is incidental setup duplicated across two files. Lift one
+  `fake-process` into `test_support.clj` (the existing component-local
+  test-helper home, whose docstring already enumerates the shared seams) and have
+  `ops_test` call it with `{:alive? true :exit-code 0 :pid 4321}`, deleting
+  `live-fake-process`. Compresses ceremony, single-sources the `Process` seam
+  shape, and keeps the two files consistent. Shape-only; behaviour-preserving.
+
+- TS2 (duplicated stale-mtime fixture — `consistent(test_abstractions)` ∧
+  economy). The launch-instant stale fixture
+  `(.setLastModified port-file (- (System/currentTimeMillis) 60000))` is
+  open-coded **six times** across `started_test` (×4), `config_test`, and
+  `attach_test`, always with the same magic `60000` offset that encodes "well
+  before the launch floor". The intent (age a port file so it is stale vs the
+  mtime gate) is an abstraction worth naming. Add a `test_support.clj` helper
+  (e.g. `(spit-stale-port! dir port)` or `(age-file-back! file ms)` defaulting to
+  the 60000 offset) and call it from all six sites, so the staleness convention
+  is single-sourced and a reader sees intent rather than a bare arithmetic
+  `setLastModified`. Shape-only; behaviour-preserving.
+
+- TS3 (`robust`/`deterministic` — wall-clock-coupled "fresh accept" assertion;
+  judgement, lower priority). `wait-for-started-endpoint-stale-port-gate-test`'s
+  "accepts a fresh .nrepl-port" case captures `launched-at (now)` then `spit`s
+  the port **without** `setLastModified`, relying on the real filesystem mtime
+  landing `≥ (launched-at floored to whole seconds)`. The whole-second floor
+  (AMB4) makes this safe in practice (the spit happens microseconds after the
+  capture, same second), so it is not flaky today — but the freshness is implicit
+  in wall-clock timing rather than asserted by construction. The symmetric reject
+  cases explicitly `setLastModified` to force the relation; the accept case could
+  do the same (`setLastModified` to `(+ launched-floor 1000)` or to "now") to
+  make the mtime≥floor relation explicit and remove the residual same-second
+  wall-clock dependency. Optional hardening — record as a judgement item, not a
+  correctness defect; consider alongside TS2's helper (an `age-file!` helper that
+  can also set a *fresh* mtime would serve both).
+
+All three are shape-only and behaviour-preserving (no production change, no new
+behaviour assertion); they reduce incidental duplication and one residual timing
+coupling in the otherwise-complete test set.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

@@ -296,3 +296,30 @@
       to `:started-stale-port`, dropping `:timeout-ms`, or inverting the
       `(and endpoint (not fresh?))` guard fails green. Coverage-only; no
       production/doc/CHANGELOG change.
+
+## Test-shaper review follow-ups (shape)
+
+- [ ] TS1: Lift one parameterised `fake-process` `java.lang.Process` proxy into
+      `test_support.clj` and delete `ops_test/live-fake-process` (a strict
+      special case: alive / exit 0 / pid 4321). Have `ops_test` call the shared
+      helper with `{:alive? true :exit-code 0 :pid 4321}`. Single-sources the
+      16-method proxy ceremony and keeps the two files consistent
+      (`consistent(fixtures)` ∧ `helpers_that_compress(ceremony)`). Shape-only;
+      behaviour-preserving (no assertion change). Re-run the
+      `started/ops/config/attach` suite + clj-kondo after.
+- [ ] TS2: Add a `test_support.clj` helper naming the stale-port fixture
+      (e.g. `spit-stale-port!`/`age-file-back!`, defaulting to the `60000` ms
+      offset) and replace the six open-coded
+      `(.setLastModified port-file (- (System/currentTimeMillis) 60000))` sites
+      in `started_test` (×4), `config_test`, and `attach_test`. Single-sources
+      the staleness convention so readers see intent, not bare arithmetic
+      (`consistent(test_abstractions)` ∧ economy). Shape-only;
+      behaviour-preserving.
+- [ ] TS3 (judgement, optional hardening): Make the
+      `wait-for-started-endpoint-stale-port-gate-test` "accepts a fresh
+      .nrepl-port" case assert the mtime≥floor relation by construction
+      (`setLastModified` to a known-fresh instant) rather than relying on the
+      real-FS same-second wall-clock landing after `spit`. Removes the residual
+      timing coupling; the whole-second floor (AMB4) means it is not flaky today,
+      so treat as optional robustness hardening — consider alongside a TS2 helper
+      that can also set a fresh mtime. Shape-only; behaviour-preserving.
