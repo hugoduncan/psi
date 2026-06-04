@@ -85,11 +85,24 @@
            (assoc endpoint :host "127.0.0.1")
            (do
              (when (process-exited? process)
-               (throw (ex-info "Started project nREPL process exited before .nrepl-port became ready"
-                               {:phase :started-readiness
-                                :worktree-path effective-worktree
-                                :command-exited? true
-                                :exit-code (.exitValue process)})))
+               ;; A2/IR1: when the exited process left only a too-old port, the
+               ;; stale-port diagnostic wins so the :started-stale-port
+               ;; distinction is not lost on the exit-with-stale-port path.
+               (if (and endpoint (not fresh?))
+                 (throw (ex-info "Started project nREPL process exited leaving only a stale .nrepl-port"
+                                 {:phase :started-stale-port
+                                  :worktree-path effective-worktree
+                                  :command-exited? true
+                                  :exit-code (.exitValue process)
+                                  :path (.getAbsolutePath (io/file effective-worktree ".nrepl-port"))
+                                  :port-mtime-ms mtime-ms
+                                  :min-mtime-ms min-mtime-ms
+                                  :launched-at launched-at}))
+                 (throw (ex-info "Started project nREPL process exited before .nrepl-port became ready"
+                                 {:phase :started-readiness
+                                  :worktree-path effective-worktree
+                                  :command-exited? true
+                                  :exit-code (.exitValue process)}))))
              (when (>= (System/currentTimeMillis) deadline)
                (if (and endpoint (not fresh?))
                  (throw (ex-info "Timed out waiting for a fresh started project nREPL .nrepl-port (only a stale port was present)"

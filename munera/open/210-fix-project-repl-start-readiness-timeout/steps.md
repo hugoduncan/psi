@@ -164,13 +164,20 @@
 
 ## Implementation review follow-ups (quality)
 
-- [ ] IR1: Make the stale-port diagnostic deterministic on the
+- [x] IR1: Make the stale-port diagnostic deterministic on the
       exit-with-stale-port path. In `wait-for-started-endpoint!`, the
-      `process-exited?` branch is checked before the deadline branch and throws
+      `process-exited?` branch is checked before the deadline branch and threw
       `:phase :started-readiness` ignoring the present-but-too-old `.nrepl-port`,
-      so a process that writes only a stale port then exits loses A2's
-      `:phase :started-stale-port` distinction. Either fold the stale-only
-      condition into the exit-path `ex-data` (e.g. emit `:started-stale-port`
-      when `(and endpoint (not fresh?))` on exit) or explicitly decide which
-      diagnostic wins and document it. Add a `wait-for-started-endpoint!`
-      unit test for exit-with-stale-port asserting the chosen `:phase`.
+      so a process that writes only a stale port then exits lost A2's
+      `:phase :started-stale-port` distinction.
+      → Resolved: the exit branch now folds in the stale-only condition —
+      when `(and endpoint (not fresh?))` on exit it throws
+      `:phase :started-stale-port` (keeping `:command-exited? true` +
+      `:exit-code`, plus the rejected `:port-mtime-ms`/`:min-mtime-ms`/
+      `:launched-at`); otherwise it stays `:phase :started-readiness`. The
+      stale-port diagnostic wins on exit-with-stale-port, so A2's distinction is
+      preserved on every path. Added a `wait-for-started-endpoint!` unit test
+      (`exit leaving only a stale port reports :started-stale-port (IR1)`,
+      `alive? false`) asserting the chosen `:phase`/`:command-exited?`/message.
+      started-test 3 tests/25 assertions green (+3 over pass-1's 22);
+      lint 0/0; clj-paren-repair Success; files 198/228 (< 800).

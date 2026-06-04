@@ -446,3 +446,34 @@ Non-blocking observation (already documented, no new step):
   acceptable; recorded here only for completeness, no follow-up step.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Implementation review — quality follow-up IR1 executed (ψ, 2026-06-03)
+
+IR1 (stale-port diagnostic lost on exit-with-stale-port path) resolved.
+`wait-for-started-endpoint!`'s `process-exited?` branch now folds in the
+stale-only condition: when `(and endpoint (not fresh?))` at exit it throws
+`:phase :started-stale-port` (retaining `:command-exited? true` + `:exit-code`,
+and carrying `:path`/`:port-mtime-ms`/`:min-mtime-ms`/`:launched-at`); otherwise
+it keeps `:phase :started-readiness`. Decision: the **stale-port diagnostic wins**
+on exit-with-stale-port, so A2's `:started-stale-port` distinction is preserved
+on the exit path as well as the deadline path — the projected `:phase` is now
+deterministic and matches A2's intent whenever a stale-only port and process exit
+coincide. Pre-launch removal already guards correctness; this change is
+diagnostic-only (no correctness/behaviour change for the non-stale exit path).
+
+Added unit test `exit leaving only a stale port reports :started-stale-port
+(IR1)` in `wait-for-started-endpoint-stale-port-gate-test` (`alive? false`,
+too-old port, injected `:launched-at`): asserts `:phase :started-stale-port`,
+`:command-exited? true`, and the "exited leaving only a stale" message. The
+pre-existing "exits before port discovery" test (no stale port) still asserts
+`:started-readiness`, pinning the non-stale exit path.
+
+Verified: clj-kondo 0/0 (src+test); `started-test` 3 tests/25 assertions green
+(+3 over the prior 22); `started/ops/config/attach` combined 15 tests/99
+assertions green; consuming `project-nrepl-extension-install-test` 1 test/5
+assertions green; clj-paren-repair Success; `started.clj` 198 / `started_test.clj`
+228 lines (< 800). No design/doc/CHANGELOG change (no user-visible surface
+change — the new `:phase` was already a documented A2 outcome; this only makes it
+fire on one more code path).
+
+PASS_STATUS: REVIEW_COMPLETE

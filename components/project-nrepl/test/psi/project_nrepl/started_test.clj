@@ -74,6 +74,28 @@
         (finally
           (delete-tree! dir)))))
 
+  (testing "exit leaving only a stale port reports :started-stale-port (IR1)"
+    ;; When the launched process writes only a too-old .nrepl-port and then
+    ;; exits, the exit branch must preserve the A2 stale-port distinction
+    ;; rather than degrade to a plain :started-readiness diagnostic.
+    (let [dir       (temp-dir "psi-project-nrepl-started-")
+          process   (fake-process {:alive? false :exit-code 42 :pid 1234})
+          port-file (io/file dir ".nrepl-port")]
+      (try
+        (spit port-file "7888\n")
+        (.setLastModified port-file (- (System/currentTimeMillis) 60000))
+        (let [launched-at (java.time.Instant/now)
+              ex (try
+                   (project-nrepl-started/wait-for-started-endpoint!
+                    dir process
+                    {:timeout-ms 100 :poll-interval-ms 10 :launched-at launched-at})
+                   (catch clojure.lang.ExceptionInfo e e))]
+          (is (= :started-stale-port (:phase (ex-data ex))))
+          (is (true? (:command-exited? (ex-data ex))))
+          (is (re-find #"exited leaving only a stale" (.getMessage ex))))
+        (finally
+          (delete-tree! dir)))))
+
   (testing "accepts a fresh .nrepl-port (mtime >= launch floor) with :launched-at gate"
     (let [dir       (temp-dir "psi-project-nrepl-started-")
           process   (fake-process {:alive? true :exit-code 0 :pid 1234})
