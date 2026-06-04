@@ -342,3 +342,25 @@
       .nrepl-port" case after `spit`, so the mtime≥floor accept relation is
       explicit by construction — symmetric to the reject cases' aging — instead
       of relying on the same-second wall-clock landing.
+
+## Test-shaper review follow-ups (shape, pass 2)
+
+- [ ] TS4: Strengthen the under-asserted `:started-at` launch-instant contract
+      in `started_test`'s "records the effective :readiness-timeout-ms and
+      launch-instant :started-at" case. Today it asserts only
+      `(instance? java.time.Instant (get-in instance [:runtime-handle
+      :started-at]))` — a bare type check that a PA2 regression (re-adding the
+      removed post-wait `:started-at (now)` connect-time write) would still pass.
+      Assert the *provenance*: have the launcher seam capture the instant it is
+      invoked (the true launch site) and assert the instance's `:started-at`
+      equals (or is `≤`) that launcher-observed instant, and/or bracket the call
+      with `before`/`after` wall-clock and assert `:started-at` falls within and
+      precedes connect completion. Pins "started-at = launch instant, not connect
+      instant" (PA2/INC1) so a regression fails green. Coverage/assertion-only;
+      production verified by inspection.
+- [ ] TS5 (judgement, optional): Split the bundled "records the effective
+      :readiness-timeout-ms and launch-instant :started-at" case into two named
+      `testing` blocks (effective-timeout recording vs `:started-at` launch-instant
+      provenance) so a failure names which contract broke (`single_concern` ∧
+      `meaningful_failures`). Fold into TS4 if convenient. Shape-only;
+      behaviour-preserving.

@@ -1009,3 +1009,34 @@ File lengths: `test_support.clj` 162, `started_test.clj` 251, `ops_test.clj`
 design/plan/doc/CHANGELOG change (shape-only; no user-visible surface change).
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Test review — test-shaper pass 2 (ψ)
+
+Fresh `test-shaper` read of the project-nrepl test suite (started/ops/config/
+attach + test_support). Pass 1 (TS1–TS3) addressed fixture/ceremony economy; this
+pass focuses on `behavior_focused` / `meaningful_failures` / `single_concern`.
+Suite green (17 tests/113 assertions). Two new actionable items.
+
+- TS4 (under-asserted `:started-at` launch-instant contract). The PA2 contract
+  is that the runtime-handle `:started-at` is the *launch* instant captured
+  pre-wait (a single launch-instant source, INC1), explicitly *not* the
+  post-wait/connect instant — the post-wait `:started-at (now)` write was
+  removed. But `started_test`'s "records the effective :readiness-timeout-ms and
+  launch-instant :started-at" case asserts only
+  `(instance? java.time.Instant (get-in instance [:runtime-handle :started-at]))`
+  — a bare type check. A regression reverting PA2 (re-adding `:started-at (now)`
+  on the post-wait success path) still yields *an* Instant and passes green, so
+  the named launch-instant provenance is untested. Strengthen it to assert the
+  *provenance*: have the launcher seam record the instant at which it is invoked
+  (the true launch site) and assert the instance's `:started-at` equals (or is
+  `≤`) that launcher-observed instant — and/or bracket the call with
+  `before`/`after` wall-clock and assert `:started-at` falls within and precedes
+  the connect completion. Pins "started-at = launch instant, not connect
+  instant" so a PA2 regression fails.
+
+- TS5 (single-concern split — judgement/optional). The same case bundles two
+  distinct contracts (effective `:readiness-timeout-ms` recording + `:started-at`
+  launch-instant provenance) under one `testing` block. With TS4 strengthening
+  the `:started-at` assertion, split the launch-instant provenance into its own
+  named `testing` so a failure names which contract broke (`single_concern` ∧
+  `meaningful_failures`). Low severity; fold into TS4 if convenient.
