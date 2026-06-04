@@ -1693,3 +1693,44 @@ clj-kondo 0 errors/0 warnings on `started_test.clj`; clj-paren-repair Success;
 No production / doc / CHANGELOG change (coverage-only).
 
 PASS_STATUS: FOLLOW_UP_COMPLETE
+
+---
+
+## Test review (task-test-review) — pass 8
+
+Reviewed tests against `λ review_tests`: well-formedness, behaviour coverage of
+design acceptance criteria, no-mocks infra injection. Re-verified pass-7/TR7
+claims hold and the full focused suite is green (started/ops/config/attach:
+18 tests, 133 assertions, 0 failures). Well-formed/no-mocks confirmed (grep
+clean: no `with-redefs`/mock/stub/spy). Production strings + gate logic in
+`started.clj` match the pinned diagnostics.
+
+❌ TR8 (new actionable gap): the IR2 process-reaping fix has **two** distinct
+mechanisms by design — (a) the failure-path `catch` reaps the alive process via
+the outer `launched-process` volatile, and (b) the launched `:process`/`:pid`
+is recorded onto the runtime-handle **pre-wait** (moved off the post-wait
+success update) "so both the readiness-failure `catch` and a later
+`stop-started-instance-in!` can reap it" (design IR2 / impl L1447-1460). Only
+mechanism (a) is tested: the IR2 case asserts `@destroyed*` only, which the
+`catch` sets directly. A regression that drops the **pre-wait `:process` record**
+(reverting it to the post-wait success path) while keeping the volatile-based
+catch reap would pass `@destroyed*` and every current test, yet would silently
+re-orphan any process that survives the catch — because `stop-started-instance-in!`
+reads `:process` from the runtime-handle and would find it absent on a
+failure-path instance. Compounding this, `stop-started-instance-in!`'s own
+reaping branch (`(when (and process (.isAlive process)) (.destroy process))`)
+has **no test at all**. Modest scope, coverage-only (production already correct):
+either extend the IR2 case to also assert `(get-in instance [:runtime-handle
+:process])` (and/or `:pid`) is present on the failed instance after the throw
+(observed via a `status`/`instance-in` read of the failure-path instance), or
+add a `stop-started-instance-in!` no-mocks case (alive `fake-process` with a
+`:destroyed*` atom seeded on the runtime-handle `:process`) asserting stop
+`.destroy`s it and removes the instance — pinning the second half of the IR2
+contract the design mandates.
+
+🔁 PATTERN: a fix with two stated mechanisms (immediate reap + recorded handle
+for deferred reap) needs both pinned — testing only the immediate path lets a
+regression collapse it to one mechanism while the suite stays green, re-opening
+the exact leak the fix closed for the deferred path.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

@@ -666,3 +666,25 @@
       commands unchanged; consuming `project-nrepl-extension-install-test` 1/5
       green; clj-kondo 0/0; clj-paren-repair Success; `bb commit-check:file-lengths`
       exit 0; `--focus unit` exit 0.
+
+## Test review follow-ups (task-test-review, pass 8)
+
+- [ ] TR8: Pin the second half of the IR2 process-reaping contract — the
+      pre-wait `:process`/`:pid` record onto the runtime-handle and the
+      `stop-started-instance-in!` reap. The current IR2 case asserts only
+      `@destroyed*` (the failure-path `catch` reap via the outer
+      `launched-process` volatile); a regression dropping the **pre-wait
+      `:process` record** (reverting to the post-wait success update) keeps
+      `@destroyed*` green yet re-orphans any process that survives the catch,
+      because `stop-started-instance-in!` reads `:process` from the
+      runtime-handle and would find it absent on a failure-path instance.
+      `stop-started-instance-in!`'s own reaping branch
+      (`(when (and process (.isAlive process)) (.destroy process))`) has no
+      test. Coverage-only (production already correct). Either: (a) extend the
+      IR2 `started_test` case to also assert `(get-in instance [:runtime-handle
+      :process])` / `:pid` is present on the failed instance after the throw
+      (read via `instance-in`/`status`), and/or (b) add a no-mocks
+      `stop-started-instance-in!` case: seed a runtime-handle with an alive
+      `fake-process` carrying a `:destroyed*` atom, call
+      `stop-started-instance-in!`, assert `@destroyed*` is true and the instance
+      is removed. No production/doc/CHANGELOG change.
