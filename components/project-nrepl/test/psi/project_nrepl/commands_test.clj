@@ -3,8 +3,8 @@
    [clojure.test :refer [deftest is testing]]
    [psi.project-nrepl.commands :as project-nrepl-commands]
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
-   [psi.project-nrepl.test-support :refer [delete-tree! install-instance!
-                                           session-ctx-at temp-dir]]))
+   [psi.project-nrepl.test-support :refer [install-instance!
+                                           session-ctx-at with-temp-dir]]))
 
 (deftest format-project-nrepl-status-test
   (testing "status formatting shows absent instance"
@@ -21,18 +21,15 @@
       (is (re-find #"Project nREPL" (:message result)))))
 
   (testing "/project-repl start reports missing command configuration clearly"
-    (let [worktree-path    (temp-dir "psi-project-nrepl-commands-")
-          [ctx session-id] (session-ctx-at worktree-path)]
-      (try
-        (let [result (project-nrepl-commands/dispatch-project-nrepl-command ctx session-id "/project-repl start")]
-          (is (= :text (:type result)))
-          (is (re-find #"requires a configured start-command" (:message result)))
-          (is (re-find #":agent-session :project-nrepl :start-command" (:message result)))
-          (is (re-find #"~/.psi/agent/config.edn" (:message result)))
-          (is (re-find #"/.psi/project.edn" (:message result)))
-          (is (re-find #"/.psi/project.local.edn" (:message result))))
-        (finally
-          (delete-tree! worktree-path)))))
+    (with-temp-dir [worktree-path "psi-project-nrepl-commands-"]
+      (let [[ctx session-id] (session-ctx-at worktree-path)
+            result (project-nrepl-commands/dispatch-project-nrepl-command ctx session-id "/project-repl start")]
+        (is (= :text (:type result)))
+        (is (re-find #"requires a configured start-command" (:message result)))
+        (is (re-find #":agent-session :project-nrepl :start-command" (:message result)))
+        (is (re-find #"~/.psi/agent/config.edn" (:message result)))
+        (is (re-find #"/.psi/project.edn" (:message result)))
+        (is (re-find #"/.psi/project.local.edn" (:message result))))))
 
   (testing "/project-repl eval routes through real commands → ops/eval-op → eval/eval-instance-in!"
     (let [worktree         (System/getProperty "user.dir")

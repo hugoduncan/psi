@@ -77,6 +77,30 @@
         (doseq [x (reverse (file-seq f))]
           (.delete x))))))
 
+(defmacro with-temp-dir
+  "Bind one or more freshly-created temp directories over `body`, guaranteeing
+   `delete-tree!` cleanup of each in a `finally`. Single-sources the
+   acquire/`(try … (finally (delete-tree! dir)))` lifecycle frame open-coded
+   across the component tests — only the incidental cleanup ceremony is removed;
+   the directory binding stays visible at the call site
+   (`helpers_that_compress(ceremony) ∧ ¬helpers_that_hide(intent)`).
+
+   `bindings` is a `let`-style vector of `sym prefix` pairs (each `prefix` a
+   `temp-dir` prefix string), e.g.
+     (with-temp-dir [dir \"psi-project-nrepl-started-\"] …)
+     (with-temp-dir [home \"psi-project-nrepl-home-\"
+                     worktree \"psi-project-nrepl-wt-\"] …)
+   All directories are created before the body runs and all are deleted in the
+   `finally` (in reverse binding order)."
+  [bindings & body]
+  (let [pairs (partition 2 bindings)
+        syms  (mapv first pairs)]
+    `(let [~@(mapcat (fn [[sym prefix]] [sym `(temp-dir ~prefix)]) pairs)]
+       (try
+         ~@body
+         (finally
+           ~@(map (fn [sym] `(delete-tree! ~sym)) (reverse syms)))))))
+
 (defn session-fn-with-id
   "A fake nREPL session fn carrying the `:nrepl.core/taking-until {:session id}`
    metadata used to derive the managed session-id."

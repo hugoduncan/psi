@@ -1192,3 +1192,57 @@ Considered-and-rejected (no step added): the two file-private
 precedence, ops_test only the project-nrepl slice. Consolidating would force one
 shape onto both and hide that intent; the local divergence is the clearer choice
 (`¬helpers_that_hide(intent)`). No action.
+
+## Test-shaper follow-up execution — TS7 (ψ, 2026-06-03)
+
+Executed the single newly-added test-shaper pass-4 follow-up (TS7) — the only
+unchecked item (TS1–TS6/TR1–TR5/IR1/PA1–PA4/PSI1 all already checked).
+Shape-only/behaviour-preserving: test files + task artifacts + a clj-kondo
+`:lint-as` config entry; no production/doc/CHANGELOG change; no assertion change.
+
+- Added `test_support/with-temp-dir`, a `let`-style macro taking a `[sym prefix …]`
+  bindings vector (each `prefix` a `temp-dir` prefix string). It creates all
+  named temp directories *before* the body, then guarantees `delete-tree!` of
+  each in a `finally` (reverse binding order). Single-sources the
+  `(temp-dir …)` + `(try … (finally (delete-tree! dir)))` acquire/cleanup frame
+  that recurred across the suite.
+
+- Rewired every temp-dir lifecycle frame onto the macro: `started_test` ×13,
+  `config_test` ×7 single-dir + the two `home`+`worktree` `resolve-config` cases
+  via one multi-binding `(with-temp-dir [home … worktree …] …)`, `ops_test` ×3,
+  `attach_test` ×2, `commands_test` ×1. Cases carrying extra non-temp `let`
+  bindings (process/launcher/connector/ctx; config_test's `shared-f`/`local-f`
+  derived from `dir`; commands_test's `[ctx session-id]` derived from the temp
+  worktree) keep those in an inner `let` in the body, so only the cleanup
+  ceremony is removed and the directory binding stays visible at each call site
+  (`helpers_that_compress(ceremony) ∧ ¬helpers_that_hide(intent)`). Dropped the
+  now-unused `delete-tree!`/`temp-dir` `:refer`s from all five test namespaces
+  (both remain public in `test_support`: `with-temp-dir` uses them and
+  `delete-tree!` is still referenced by component code).
+
+- Taught clj-kondo the macro's binding semantics via a `:lint-as
+  clojure.core/let` entry in `.clj-kondo/config.edn`
+  (`psi.project-nrepl.test-support/with-temp-dir`) — the `let`-style `sym prefix`
+  pairs are valid `let` `binding init` forms (the prefix is a string literal
+  init). Without it, the bound symbols (`dir`/`worktree`/`home`) read as
+  unresolved. Folded the TS3 accept-case `launched-at` capture into its outer
+  `let` to avoid a lint-as-induced redundant-nested-let warning (`launched-at`
+  is still captured before any port write — the binding inits have no side
+  effects, so the capture ordering is preserved).
+
+- 🔁 PATTERN: a `let`-style lifecycle macro (`with-temp-dir`) whose binding
+  vector is `sym prefix` pairs lints cleanly with `:lint-as clojure.core/let`
+  *only because* the second element is a value (string), not a symbol — clj-kondo
+  treats each pair as `binding init` and the string init resolves fine. The
+  lint-as expansion also makes a sole nested `(let …)` directly inside the
+  macro body read as a redundant let; merge such a child binding into the macro's
+  body `let` when the child's inits are side-effect-free.
+
+Verified: clj-paren-repair Success (all five test files + test_support);
+clj-kondo 0 errors/0 warnings over `components/project-nrepl/test`;
+`clojure -M:test --focus unit` green; `bb commit-check:file-lengths` exit 0.
+Every rewired file shrank (started 273→234, config 276→247, ops 134→125, attach
+77→71, commands 79→76; test_support 185→209 from the new macro+docstring). No
+design/plan/doc/CHANGELOG change (shape-only; no user-visible surface change).
+
+PASS_STATUS: REVIEW_COMPLETE

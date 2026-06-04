@@ -408,7 +408,7 @@
 
 ## Test-shaper review follow-ups (shape, pass 4)
 
-- [ ] TS7: Single-source the temp-dir lifecycle ceremony
+- [x] TS7: Single-source the temp-dir lifecycle ceremony
       (`minimal_incidental_setup` ∧ `helpers_that_compress(ceremony)` ∧
       `consistent(structure)`). The `(temp-dir …)` + `(try … (finally
       (delete-tree! dir)))` acquire/cleanup frame recurs ~37 times across the
@@ -426,3 +426,26 @@
       (`helpers_that_compress(ceremony) ∧ ¬helpers_that_hide(intent)`).
       Shape-only; behaviour-preserving (no assertion change). Re-run
       started/ops/config/attach/commands + clj-kondo after.
+      → Resolved: added `test_support/with-temp-dir`, a `let`-style macro taking
+      a `[sym prefix …]` bindings vector (each prefix a `temp-dir` prefix
+      string), creating all dirs before the body and guaranteeing
+      `delete-tree!` of each in `finally` (reverse binding order). Rewired every
+      temp-dir acquire/`try…finally` frame across all five files: started ×13,
+      config ×7 single-dir + the 2 `home`+`worktree` cases via one multi-binding
+      `with-temp-dir [home … worktree …]`, ops ×3, attach ×2, commands ×1. Cases
+      with extra non-temp `let` bindings (process/launcher/connector/ctx,
+      config_test's `shared-f`/`local-f`) keep those in an inner `let` in the
+      body, so only the cleanup ceremony is removed and each directory binding
+      stays visible at the call site. Dropped the now-unused `delete-tree!`/
+      `temp-dir` `:refer`s from all five test namespaces (both stay public in
+      `test_support` — `with-temp-dir` uses them and `delete-tree!` is still
+      referenced by component code). Added a `:lint-as clojure.core/let` entry
+      for `with-temp-dir` to `.clj-kondo/config.edn` so its binding semantics are
+      understood (the prefix strings are valid `let` inits). Merged the TS3
+      accept-case `launched-at` into its outer `let` to avoid a lint-as
+      redundant-nested-let warning. Shape-only/behaviour-preserving (no assertion
+      change). clj-paren-repair Success (all files); clj-kondo 0 errors/0
+      warnings over `components/project-nrepl/test`; `clojure -M:test --focus
+      unit` green; `bb commit-check:file-lengths` exit 0 (all files shrank:
+      started 273→234, config 276→247, ops 134→125, attach 77→71, commands
+      79→76, test_support 185→209). PASS_STATUS REVIEW_COMPLETE.

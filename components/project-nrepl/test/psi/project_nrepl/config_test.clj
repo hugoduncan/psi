@@ -3,7 +3,7 @@
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
    [psi.project-nrepl.config :as project-nrepl-config]
-   [psi.project-nrepl.test-support :refer [age-file-back! delete-tree! temp-dir]]))
+   [psi.project-nrepl.test-support :refer [age-file-back! with-temp-dir]]))
 
 (defn- capture-stderr [f]
   (let [w (java.io.StringWriter.)]
@@ -33,85 +33,68 @@
 
 (deftest resolve-config-test
   (testing "merges project nREPL config from real user and project config files (project overrides user)"
-    (let [home     (temp-dir "psi-project-nrepl-home-")
-          worktree (temp-dir "psi-project-nrepl-wt-")]
-      (try
-        ;; on-disk content MUST be nested under [:agent-session :project-nrepl]
-        ;; because resolve-config extracts via (:project-nrepl (agent-session-map ...)).
-        (write-user-config! home
-                            {:agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]
-                                                             :attach {:host "localhost" :port 7888}}}})
-        (write-project-config! worktree
-                               {:agent-session {:project-nrepl {:attach {:port 9999}}}})
-        (with-temp-home home
-          #(is (= {:project-nrepl {:start-command ["bb" "nrepl-server"]
-                                   :attach {:host "localhost" :port 9999}}}
-                  (project-nrepl-config/resolve-config worktree))))
-        (finally
-          (delete-tree! home)
-          (delete-tree! worktree)))))
+    (with-temp-dir [home     "psi-project-nrepl-home-"
+                    worktree "psi-project-nrepl-wt-"]
+      ;; on-disk content MUST be nested under [:agent-session :project-nrepl]
+      ;; because resolve-config extracts via (:project-nrepl (agent-session-map ...)).
+      (write-user-config! home
+                          {:agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]
+                                                           :attach {:host "localhost" :port 7888}}}})
+      (write-project-config! worktree
+                             {:agent-session {:project-nrepl {:attach {:port 9999}}}})
+      (with-temp-home home
+        #(is (= {:project-nrepl {:start-command ["bb" "nrepl-server"]
+                                 :attach {:host "localhost" :port 9999}}}
+                (project-nrepl-config/resolve-config worktree))))))
 
   (testing "returns empty project-nrepl config when no user or project config files exist"
-    (let [home     (temp-dir "psi-project-nrepl-home-")
-          worktree (temp-dir "psi-project-nrepl-wt-")]
-      (try
-        (with-temp-home home
-          #(is (= {:project-nrepl {}}
-                  (project-nrepl-config/resolve-config worktree))))
-        (finally
-          (delete-tree! home)
-          (delete-tree! worktree))))))
+    (with-temp-dir [home     "psi-project-nrepl-home-"
+                    worktree "psi-project-nrepl-wt-"]
+      (with-temp-home home
+        #(is (= {:project-nrepl {}}
+                (project-nrepl-config/resolve-config worktree)))))))
 
 (deftest read-project-preferences-test
   (testing "deep-merges shared then local with local precedence"
-    (let [dir      (temp-dir "psi-project-nrepl-pref-")
-          shared-f (io/file dir ".psi" "project.edn")
-          local-f  (io/file dir ".psi" "project.local.edn")]
-      (.mkdirs (.getParentFile shared-f))
-      (spit shared-f (pr-str {:agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]
-                                                              :attach {:host "localhost" :port 7888}}}}))
-      (spit local-f (pr-str {:agent-session {:project-nrepl {:attach {:port 9999}}}}))
-      (try
+    (with-temp-dir [dir "psi-project-nrepl-pref-"]
+      (let [shared-f (io/file dir ".psi" "project.edn")
+            local-f  (io/file dir ".psi" "project.local.edn")]
+        (.mkdirs (.getParentFile shared-f))
+        (spit shared-f (pr-str {:agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]
+                                                                :attach {:host "localhost" :port 7888}}}}))
+        (spit local-f (pr-str {:agent-session {:project-nrepl {:attach {:port 9999}}}}))
         (is (= {:version 1
                 :agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]
                                                 :attach {:host "localhost" :port 9999}}}}
-               (project-nrepl-config/read-project-preferences dir)))
-        (finally
-          (delete-tree! dir)))))
+               (project-nrepl-config/read-project-preferences dir))))))
 
   (testing "malformed local warns and falls back to shared"
-    (let [dir      (temp-dir "psi-project-nrepl-pref-")
-          shared-f (io/file dir ".psi" "project.edn")
-          local-f  (io/file dir ".psi" "project.local.edn")]
-      (.mkdirs (.getParentFile shared-f))
-      (spit shared-f (pr-str {:agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]}}}))
-      (spit local-f "not valid edn")
-      (try
+    (with-temp-dir [dir "psi-project-nrepl-pref-"]
+      (let [shared-f (io/file dir ".psi" "project.edn")
+            local-f  (io/file dir ".psi" "project.local.edn")]
+        (.mkdirs (.getParentFile shared-f))
+        (spit shared-f (pr-str {:agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]}}}))
+        (spit local-f "not valid edn")
         (let [err (capture-stderr
                    #(is (= {:version 1
                             :agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]}}}
                            (project-nrepl-config/read-project-preferences dir))))]
           (is (.contains err "WARNING: ignoring malformed project preferences file"))
-          (is (.contains err "project.local.edn")))
-        (finally
-          (delete-tree! dir)))))
+          (is (.contains err "project.local.edn"))))))
 
   (testing "malformed shared warns and falls back to local"
-    (let [dir      (temp-dir "psi-project-nrepl-pref-")
-          shared-f (io/file dir ".psi" "project.edn")
-          local-f  (io/file dir ".psi" "project.local.edn")]
-      (.mkdirs (.getParentFile shared-f))
-      (spit shared-f "not valid edn")
-      (spit local-f (pr-str {:agent-session {:project-nrepl {:attach {:port 7888}}}}))
-      (try
+    (with-temp-dir [dir "psi-project-nrepl-pref-"]
+      (let [shared-f (io/file dir ".psi" "project.edn")
+            local-f  (io/file dir ".psi" "project.local.edn")]
+        (.mkdirs (.getParentFile shared-f))
+        (spit shared-f "not valid edn")
+        (spit local-f (pr-str {:agent-session {:project-nrepl {:attach {:port 7888}}}}))
         (let [err (capture-stderr
                    #(is (= {:version 1
                             :agent-session {:project-nrepl {:attach {:port 7888}}}}
                            (project-nrepl-config/read-project-preferences dir))))]
           (is (.contains err "WARNING: ignoring malformed project preferences file"))
-          (is (.contains err "project.edn")))
-        (finally
-          (delete-tree! dir))))))
+          (is (.contains err "project.edn")))))))
 
 (deftest resolve-target-worktree-test
   (testing "explicit target wins over session worktree"
@@ -234,13 +217,10 @@
 
 (deftest read-dot-nrepl-port-test
   (testing "reads integer port from target worktree .nrepl-port"
-    (let [dir (temp-dir "psi-project-nrepl-")]
+    (with-temp-dir [dir "psi-project-nrepl-"]
       (spit (io/file dir ".nrepl-port") "7888\n")
-      (try
-        (is (= {:port 7888 :port-source :dot-nrepl-port}
-               (project-nrepl-config/read-dot-nrepl-port dir)))
-        (finally
-          (delete-tree! dir)))))
+      (is (= {:port 7888 :port-source :dot-nrepl-port}
+             (project-nrepl-config/read-dot-nrepl-port dir)))))
 
   ;; TR4: read-dot-nrepl-port is a mode-agnostic read+validate primitive; the
   ;; started-mode launch-instant mtime gate lives ONLY in started.clj. The shared
@@ -248,29 +228,20 @@
   ;; (old-mtime) one. Aging the file mirrors the started-mode stale fixture
   ;; (- now 60000); a future gate leak into this shared read would fail here.
   (testing "accepts a stale (old-mtime) .nrepl-port — no started-mode gate in shared read"
-    (let [dir (temp-dir "psi-project-nrepl-")]
-      (try
-        (let [port-file (io/file dir ".nrepl-port")]
-          (spit port-file "7888\n")
-          (age-file-back! port-file))
-        (is (= {:port 7888 :port-source :dot-nrepl-port}
-               (project-nrepl-config/read-dot-nrepl-port dir)))
-        (finally
-          (delete-tree! dir)))))
+    (with-temp-dir [dir "psi-project-nrepl-"]
+      (let [port-file (io/file dir ".nrepl-port")]
+        (spit port-file "7888\n")
+        (age-file-back! port-file))
+      (is (= {:port 7888 :port-source :dot-nrepl-port}
+             (project-nrepl-config/read-dot-nrepl-port dir)))))
 
   (testing "fails when .nrepl-port is absent"
-    (let [dir (temp-dir "psi-project-nrepl-")]
-      (try
-        (is (thrown? clojure.lang.ExceptionInfo
-                     (project-nrepl-config/read-dot-nrepl-port dir)))
-        (finally
-          (delete-tree! dir)))))
+    (with-temp-dir [dir "psi-project-nrepl-"]
+      (is (thrown? clojure.lang.ExceptionInfo
+                   (project-nrepl-config/read-dot-nrepl-port dir)))))
 
   (testing "fails when .nrepl-port content is malformed"
-    (let [dir (temp-dir "psi-project-nrepl-")]
-      (try
-        (spit (io/file dir ".nrepl-port") "not-a-port")
-        (is (thrown? clojure.lang.ExceptionInfo
-                     (project-nrepl-config/read-dot-nrepl-port dir)))
-        (finally
-          (delete-tree! dir))))))
+    (with-temp-dir [dir "psi-project-nrepl-"]
+      (spit (io/file dir ".nrepl-port") "not-a-port")
+      (is (thrown? clojure.lang.ExceptionInfo
+                   (project-nrepl-config/read-dot-nrepl-port dir))))))
