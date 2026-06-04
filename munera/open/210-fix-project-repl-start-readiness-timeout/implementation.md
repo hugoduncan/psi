@@ -519,3 +519,59 @@ No new actionable issues. Implementation matches design + architecture; no
 unjustified new pattern, abstraction, or structural performance concern.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Test review — implementation tests (ψ, 2026-06-03)
+
+Skill: task-test-review — `well_formed(tests)` ∧ `∀b∈behaviour(design).∃t.covers(t,b)`
+∧ `∀d∈infra_deps. injectable ∧ nullable ∧ ¬mock ∧ ¬stub`. Scope: the task's
+tests vs design acceptance criteria. Read: `started_test.clj`, `config_test.clj`,
+`ops_test.clj`, `test_support.clj`, `started.clj`, `config.clj`, `ops.clj`, and
+the consuming `project_nrepl_extension_install_test.clj`. Ran focused suites:
+`started-test` 3/25, `config+ops` 10/57 — all green.
+
+Well-formed: tests are deterministic, use `testing` blocks, file-backed real
+`.nrepl-port` readiness, temp dirs cleaned in `finally`. No-mocks: the
+component's new tests inject **real nullable seams** (`fake-process` = real
+`Process` proxy; `fake-connector` = real fn; `process-launcher`) and assert
+state/return, not interactions — compliant with the no-mocks standard. The
+`mtime` gate is exercised via `setLastModified` on real files (no time mocking).
+
+Coverage is strong for: Q1 config range validation (`config_test`
+`resolved-start-readiness-timeout-ms-test`: unset/in-range×3/below/above/
+non-integer + `:phase :validate`); the stale-port gate (unit reject/accept,
+IR1 exit-with-stale, pre-launch removal + fresh acceptance); the happy path
+(`start-instance-in-test` → `:ready`); PA4 failure-path `status` read.
+
+New actionable test-coverage gaps (each maps to a design acceptance criterion
+with **no** covering test; not duplicates of IR1 or the with-redefs note):
+
+- TR1 (raised-default behaviour untested). The headline acceptance criterion —
+  "reaches `:started` with the **raised `120000` ms default** and no per-call
+  config required" — has no test pinning that the **no-opts** path uses
+  `default-readiness-timeout-ms = 120000`. `config_test`'s `120000` references
+  only assert the *config value* passes validation; no test asserts that
+  `start-instance-in!`/`wait-for-started-endpoint!` with no `:timeout-ms`
+  records/uses `120000`. A `start-instance-in!`-with-no-opts test asserting
+  `(:readiness-timeout-ms instance) = 120000` (the effective default) would pin
+  the raise so a regression to `5000` is caught. Today only the *configured*
+  timeout (`90000` in `start-instance-in-test`) is asserted, which would still
+  pass if the default silently reverted.
+
+- TR2 (happy-path `instance-payload` `:readiness-timeout-ms` projection
+  untested at the ops level). AMB3 acceptance — `instance-payload`'s projected
+  key list is extended with `:readiness-timeout-ms` and surfaced through it — is
+  only exercised by the PA4 *failure-path* `status` read in `started_test`.
+  `ops_test.clj` has no assertion that a normal present instance's
+  `instance-payload`/`status` includes `:readiness-timeout-ms`. An `ops_test`
+  case asserting `status`/`instance-payload` projects `:readiness-timeout-ms` on
+  a ready instance would pin the projection (AMB3) at its owning layer, so a
+  future `instance-payload` key-list edit dropping it is caught independently of
+  the started-mode failure path.
+
+Both gaps are coverage-only (the production code is correct and verified by
+inspection); they harden regression detection for two named acceptance criteria.
+The `with-redefs` stub in the consuming
+`project_nrepl_extension_install_test.clj` is already documented as a
+pre-existing out-of-scope idiom (arity-only touch) — no new step.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

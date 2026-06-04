@@ -181,3 +181,18 @@
       `alive? false`) asserting the chosen `:phase`/`:command-exited?`/message.
       started-test 3 tests/25 assertions green (+3 over pass-1's 22);
       lint 0/0; clj-paren-repair Success; files 198/228 (< 800).
+
+## Test review follow-ups (coverage)
+
+- [ ] TR1: Pin the raised `120000` ms default behaviour with a test. Add a
+      `start-instance-in!`-with-**no**-`:timeout-ms`-opts test asserting
+      `(:readiness-timeout-ms instance) = 120000` (the effective
+      `default-readiness-timeout-ms`), so a regression of the default back to
+      `5000` is caught. Today only the *configured* timeout (`90000`) is
+      asserted; the no-config raised-default acceptance criterion is untested.
+- [ ] TR2: Cover the happy-path `instance-payload`/`status`
+      `:readiness-timeout-ms` projection (AMB3) at the ops level. Add an
+      `ops_test.clj` case asserting a normal present/ready instance's
+      `status` (or `instance-payload`) includes `:readiness-timeout-ms`, so the
+      projected-key-list extension is pinned at its owning layer independently of
+      the started-mode PA4 failure-path `status` read.
