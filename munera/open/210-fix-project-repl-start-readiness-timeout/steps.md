@@ -76,3 +76,25 @@
       `:last-error → :data`); Q1 config + `[1000 600000]` validation; both fixes
       unconditional (Q3); attach/happy-path preserved; no-mocks tests; docs.
 - [ ] Update `mementum/state.md` if a reusable insight emerged; commit.
+
+## Plan/steps review follow-ups (ambiguity)
+
+- [ ] PA1: Resolve `:readiness-timeout-ms` write-site ordering. Name the exact
+      `update-instance-in!` (or `ensure-instance-in!` seed) that writes
+      `:readiness-timeout-ms`, and ensure it is written *before*
+      `wait-for-started-endpoint!` so the effective timeout is observable on a
+      timeout *failure*, not only the success path. Update slice-2 steps + plan.
+- [ ] PA2: Specify the `:started-at` launch-site move mechanism. State whether a
+      new launch-site `update-instance-in!` writes `:started-at launched-at`
+      (so it survives the failure path) or it is only written at the existing
+      post-wait update; reconcile with the `:runtime-handle` nesting. Update
+      slice-3 steps + plan.
+- [ ] PA3: Reconcile the stale-port rejection test with pre-launch removal.
+      Specify that the mtime-gate rejection case is exercised at the
+      `wait-for-started-endpoint!` unit level with an injected `:launched-at`
+      (since `start-instance-in!`'s pre-launch removal deletes any pre-existing
+      port before the gate runs). Update slice-3 test steps.
+- [ ] PA4: Disambiguate the failure-path diagnostic surface. State that the
+      stale-port/timeout diagnostics on `instance-payload` are observable via a
+      `status` (op) read of the instance, not via the throwing `start` op return;
+      add/confirm a `status`-read acceptance test. Update slice-2/slice-5 steps.

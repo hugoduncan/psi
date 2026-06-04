@@ -196,3 +196,54 @@ runtime.clj/client.clj). New actionable inconsistencies:
   ex-data), so the projected shape has one interpretation.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Plan/steps review — ambiguity (ψ)
+
+Scope: plan.md + steps.md only (not design.md). Grounded against
+`started.clj`, `ops.clj`, `runtime.clj`, `started_test.clj`. New actionable
+ambiguities a builder would otherwise guess at:
+
+- PA1: `:readiness-timeout-ms` write-site ordering. Slice-2 step says set it
+  "when the launch begins, alongside the existing status fields" — but in
+  `started.clj` the *only* pre-launch instance write is
+  `ensure-instance-in!`; every other status field (`:lifecycle-state`,
+  `:endpoint`, …) is written by the *post-wait* success-path
+  `update-instance-in!`. There is no `update-instance-in!` at the launch site
+  today. For the timeout to be observable on a *timeout failure* (the
+  diagnostic motivation), it must be written *before* `wait-for-started-
+  endpoint!` throws. Plan/steps don't say which `update-instance-in!` writes it
+  nor that it must precede the wait. Resolve: name the write site
+  (ensure-instance-in! seed vs a new pre-wait update) and confirm it survives
+  the failure path.
+
+- PA2: `:started-at` move mechanism unspecified. Plan "Risks" + slice-3 steps
+  say move `:started-at` "to the launch site", but `:started-at` is nested under
+  `:runtime-handle` and is written by the *post-wait* success
+  `update-instance-in!` (`(now)` inside the `update :runtime-handle merge …`).
+  Capturing `launched-at` at the launch site but writing it into the
+  runtime-handle still happens at the post-wait update unless an extra launch-site
+  `update-instance-in!` is added. Steps don't specify whether to (a) add a
+  launch-site update, or (b) capture a `launched-at` local and still write
+  `:started-at launched-at` at the existing post-wait update (in which case it is
+  not present on the failure path). Resolve the write mechanism.
+
+- PA3: Stale-port rejection test vs pre-launch removal tension. Slice-3 steps
+  require BOTH "pre-launch removal occurs" AND "pre-existing too-old `.nrepl-port`
+  is rejected". But pre-launch removal deletes any pre-existing port *before*
+  `(launcher …)`, so via `start-instance-in!` the mtime gate never observes a
+  stale pre-existing port — only ports the launcher writes after delete (which
+  are fresh). The existing `start-instance-in-test` launcher `spit`s the port
+  itself, post-delete. Steps don't say the gate-rejection case must be exercised
+  at the `wait-for-started-endpoint!` *unit* level with an injected
+  `:launched-at` (bypassing removal). Resolve which level tests the gate.
+
+- PA4: `ops/start` failure-path projection. Slice-2/A2 steps assert the new
+  diagnostics are "surfaced through `instance-payload`", but `ops/start` reaches
+  `instance-payload` only via `start-instance-in!`'s *return*; on the stale-port/
+  timeout failure path `start-instance-in!` *throws*, so the `start` op return
+  never projects the instance. The diagnostics are observable only via a separate
+  `status` (op) read of the instance. Steps don't disambiguate that the
+  failure-path diagnostic is a `status`-read surface, not the `start` return.
+  Resolve (or confirm a `status`-read acceptance test covers it).
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
