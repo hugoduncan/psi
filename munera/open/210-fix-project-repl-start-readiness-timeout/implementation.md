@@ -770,3 +770,47 @@ assertions over the prior 40). No design/plan/doc/CHANGELOG change (coverage-onl
 no user-visible surface change).
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Test review — implementation tests (ψ, 2026-06-03, pass 4)
+
+Independent re-review against the design acceptance criteria after TR1–TR4
+landed. Skill: task-test-review — `well_formed(tests)` ∧
+`∀b∈behaviour(design).∃t.covers(t,b)` ∧ `∀d∈infra_deps. injectable ∧ nullable ∧
+¬mock ∧ ¬stub`. Read: `started_test.clj`, `config_test.clj`, `ops_test.clj`,
+`attach_test.clj`, `test_support.clj`, `started.clj`, `config.clj`, `ops.clj`.
+Ran `started-test` (3 tests/26 assertions green). Verified prior gaps closed
+(TR1 no-opts-default 120000; TR2 ops-level projection; TR3 config→ops→opts
+threading; TR4 attach/shared-discovery stale acceptance). No-mocks compliance
+holds: real `fake-process`/`live-fake-process` proxies, `fake-connector` fn,
+file-backed `.nrepl-port`, `setLastModified` mtime — state/return assertions, no
+interaction assertions.
+
+New actionable coverage gap (not a duplicate of IR1/TR1/TR2/TR3/TR4 or the
+with-redefs note):
+
+- TR5 (plain deadline-timeout `:started-readiness` path untested — the original
+  reproduction's failure mode). `wait-for-started-endpoint!`'s deadline branch
+  has two outcomes: `:started-stale-port` (a too-old port is present —
+  tested by `wait-for-started-endpoint-stale-port-gate-test`) and the plain
+  `:started-readiness` else-branch (an alive process, **no** `.nrepl-port`
+  ever appears, deadline fires). The plain `:started-readiness` deadline path is
+  the *exact* failure mode of the design's reproduction
+  (`:phase :started-readiness`, `:timeout-ms`, no fresh port) and the headline
+  acceptance criterion names it as the negative behaviour the raised 120000 ms
+  default exists to avoid. Yet no test exercises it: the only `:started-readiness`
+  assertion (`#"exited before \.nrepl-port became ready"`) hits the **exit**
+  branch (`alive? false`), not the deadline branch. A regression that broke the
+  deadline branch's plain payload (`:phase :started-readiness`, `:timeout-ms`,
+  `:path`) — e.g. by mis-routing it to `:started-stale-port`, dropping
+  `:timeout-ms`, or the `(and endpoint (not fresh?))` guard inverting — would
+  pass every current test. Add a `wait-for-started-endpoint!` unit case: an
+  **alive** `fake-process`, an **empty** temp dir (no `.nrepl-port` ever
+  written), a short `:timeout-ms`, asserting the thrown ex carries
+  `:phase :started-readiness`, the configured `:timeout-ms`, and `:path`, and
+  that `:command-exited?` is **absent/false** (distinguishing it from the exit
+  branch). Coverage-only (production verified by inspection: started.clj's
+  deadline else-branch is correct); pins the deadline-timeout diagnostic shape
+  for the criterion's named negative outcome, symmetric to the
+  `:started-stale-port` deadline test.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
