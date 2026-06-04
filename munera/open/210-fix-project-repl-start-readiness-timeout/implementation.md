@@ -2037,3 +2037,23 @@ Considered but NOT actionable:
   success writes that the design deliberately separates. Leave as-is.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Code-shaper follow-up CS1 (2026-06-03)
+
+CS1 resolved. Extracted private `effective-readiness-timeout-ms [opts]` →
+`(long (or (:timeout-ms opts) default-readiness-timeout-ms))` directly under
+`default-readiness-timeout-ms` in `started.clj`. Replaced the two duplicated
+inline expressions — `wait-for-started-endpoint!` (deadline basis) and
+`start-instance-in!` (pre-wait `:readiness-timeout-ms` record) — with calls to
+the helper, structurally enforcing the PA1 invariant (recorded diagnostic =
+actual wait deadline basis; the fallback can no longer drift between sites).
+
+Behaviour-preserving: identical value computed. Verified:
+- `clj-paren-repair started.clj` → Success.
+- `clj-kondo --lint started.clj` → 0 errors, 0 warnings.
+- started + ops + config focus run → 17 tests, 119 assertions, 0 failures
+  (TR1 no-opts 120000 + configured-90000/threading pins stay green).
+
+Full `bb clojure:test:unit` shows one unrelated failure — the canonical
+prompt-lifecycle retry/backoff test (a pre-existing timing flake; no
+project-nrepl coverage). My change touches only `started.clj`.

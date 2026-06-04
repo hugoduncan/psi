@@ -760,7 +760,7 @@
 
 ## Code-shaper review follow-ups (shape)
 
-- [ ] CS1: Single-source the effective-timeout fallback in `started.clj`
+- [x] CS1: Single-source the effective-timeout fallback in `started.clj`
       (`robust(code)`: structurally enforce the PA1 invariant *recorded
       `:readiness-timeout-ms` = the wait's actual deadline basis*). The
       expression `(long (or (:timeout-ms opts) default-readiness-timeout-ms))`
@@ -776,3 +776,10 @@
       no-opts-`120000` and the configured-`90000`/threading tests already pin
       the values — they must stay green. Re-run started/ops + clj-kondo +
       clj-paren-repair after.
+      → Resolved: extracted private `effective-readiness-timeout-ms [opts]`
+      (`(long (or (:timeout-ms opts) default-readiness-timeout-ms))`) just below
+      `default-readiness-timeout-ms`; both `wait-for-started-endpoint!`
+      (deadline basis) and `start-instance-in!` (pre-wait recorded
+      `:readiness-timeout-ms`) now call it — the duplicated literal is gone, so
+      the two values cannot drift. Behaviour-preserving. started/ops/config
+      17 tests/119 assertions green; clj-kondo 0/0; clj-paren-repair Success.

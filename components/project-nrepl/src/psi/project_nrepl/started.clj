@@ -12,6 +12,16 @@
 (def ^:private default-readiness-timeout-ms 120000)
 (def ^:private default-poll-interval-ms 50)
 
+(defn- effective-readiness-timeout-ms
+  "The readiness wait's effective deadline basis in milliseconds.
+
+   Single source (CS1) for both the wait's deadline (`wait-for-started-endpoint!`)
+   and the pre-wait-recorded instance `:readiness-timeout-ms`
+   (`start-instance-in!`), so the diagnostic cannot drift from the actual
+   deadline (PA1 invariant)."
+  [opts]
+  (long (or (:timeout-ms opts) default-readiness-timeout-ms)))
+
 (defn- now []
   (java.time.Instant/now))
 
@@ -69,7 +79,7 @@
    (wait-for-started-endpoint! worktree-path process {}))
   ([worktree-path process opts]
    (let [effective-worktree (project-nrepl-config/absolute-directory-path! worktree-path)
-         effective-timeout-ms (long (or (:timeout-ms opts) default-readiness-timeout-ms))
+         effective-timeout-ms (effective-readiness-timeout-ms opts)
          deadline           (+ (System/currentTimeMillis) effective-timeout-ms)
          poll-ms            (long (or (:poll-interval-ms opts) default-poll-interval-ms))
          launched-at        (:launched-at opts)
@@ -145,7 +155,7 @@
        (let [instance (project-nrepl-runtime/instance-in ctx effective-worktree)
              launcher (or (get-in instance [:runtime-handle :process-launcher])
                           real-process-launcher)
-             effective-timeout-ms (long (or (:timeout-ms opts) default-readiness-timeout-ms))
+             effective-timeout-ms (effective-readiness-timeout-ms opts)
              ;; Launch instant captured once (INC1): the sole source for both the
              ;; runtime-handle :started-at and the mtime-gate reference, written
              ;; pre-wait so both survive the throwing failure path (PA1/PA2).
