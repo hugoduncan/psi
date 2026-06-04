@@ -6,8 +6,8 @@
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
    [psi.project-nrepl.test-support
     :refer [fake-connector install-instance!
-            make-ctx started-launcher! with-temp-dir
-            write-project-config!]]))
+            make-ctx started-launcher! thrown-ex thrown-ex-data
+            with-temp-dir write-project-config!]]))
 
 (deftest start-test
   (testing "start returns structured missing-start-command result with actionable guidance"
@@ -98,25 +98,19 @@
            worktree
            {:agent-session {:project-nrepl {:start-command command
                                             :start-readiness-timeout-ms 999}}})
-          (is (thrown-with-msg?
-               clojure.lang.ExceptionInfo
-               #"range 1000-600000"
-               (project-nrepl-ops/start ctx worktree)))
-          (is (= :validate
-                 (:phase (ex-data
-                          (try
-                            (project-nrepl-ops/start ctx worktree)
-                            (catch clojure.lang.ExceptionInfo e e)))))))
+          ;; Capture the single throw once (TS12): assert both the range message
+          ;; and :phase :validate against the one captured ex.
+          (let [ex (thrown-ex #(project-nrepl-ops/start ctx worktree))]
+            (is (re-find #"range 1000-600000" (.getMessage ex)))
+            (is (= :validate (:phase (ex-data ex))))))
         (testing "non-integer value"
           (write-project-config!
            worktree
            {:agent-session {:project-nrepl {:start-command command
                                             :start-readiness-timeout-ms "120000"}}})
           (is (= :validate
-                 (:phase (ex-data
-                          (try
-                            (project-nrepl-ops/start ctx worktree)
-                            (catch clojure.lang.ExceptionInfo e e)))))))))))
+                 (:phase (thrown-ex-data
+                          #(project-nrepl-ops/start ctx worktree))))))))))
 
 (deftest eval-op-test
   (testing "eval-op preserves the public success contract through real eval-instance-in!"

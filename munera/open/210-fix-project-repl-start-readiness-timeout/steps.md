@@ -707,7 +707,7 @@
 
 ## Test-shaper review follow-ups (shape, pass 7)
 
-- [ ] TS11: Single-source the thrown-`ExceptionInfo` capture ceremony
+- [x] TS11: Single-source the thrown-`ExceptionInfo` capture ceremony
       (`consistent(assertion_style)` ∧ `helpers_that_compress(ceremony)`). The
       `(try … (catch clojure.lang.ExceptionInfo e e))` capture recurs six times:
       three as `(:phase (ex-data (try … (catch … e e))))` (`ops_test` ×2 in
@@ -723,8 +723,25 @@
       the captured ex, the instant trio). Keep the asserted keys visible at each
       call site (`¬helpers_that_hide(intent)`). Shape-only; behaviour-preserving
       (no assertion change). Re-run started/ops/config + clj-kondo after.
+      → Resolved: added two `test_support` helpers — `thrown-ex` (invokes a
+      0-arg thunk, returns the captured `ExceptionInfo`, throws an
+      `AssertionError` if the thunk returns without throwing, so a silently
+      non-throwing thunk fails loudly instead of passing vacuously) and
+      `thrown-ex-data` (= `(ex-data (thrown-ex thunk))` for the data-only sites).
+      Rewired all six bare-catch sites: `started_test` ×3 (TR5 deadline / reject
+      / IR1 exit cases) use `thrown-ex` (they need both `.getMessage` and the
+      `ex-data` from one capture); `config_test` ×1 (`:phase :validate` `0` case)
+      uses `thrown-ex-data`; `ops_test` ×2 — non-integer block uses
+      `thrown-ex-data`, out-of-range block uses `thrown-ex` (folded with TS12).
+      No `catch clojure.lang.ExceptionInfo` now remains outside the
+      `test_support` helper; the asserted keys/message stay visible at every
+      call site (`¬helpers_that_hide(intent)`). Shape-only/behaviour-preserving:
+      started/config/ops 17 tests/119 assertions green (unchanged); full
+      `bb clojure:test:unit` green; clj-kondo 0/0; clj-paren-repair Success;
+      file-lengths exit 0 (test_support 267, started_test 341, config_test 228,
+      ops_test 152 — all < 800).
 
-- [ ] TS12: Remove the redundant double op-invocation in
+- [x] TS12: Remove the redundant double op-invocation in
       `start-invalid-config-timeout-test`'s "out-of-range value" block
       (`minimal(redundant_tests)` ∧ `single_concern`). It invokes
       `(project-nrepl-ops/start ctx worktree)` twice against the same on-disk
@@ -734,3 +751,9 @@
       both the `#"range 1000-600000"` message and `:phase :validate` against the
       single captured ex. Folds into TS11. Shape-only; behaviour-preserving.
       Re-run ops + clj-kondo after.
+      → Resolved (folded with TS11): the "out-of-range value" block now captures
+      the single throw once via `(let [ex (thrown-ex #(…start…))] …)` and asserts
+      both `(re-find #"range 1000-600000" (.getMessage ex))` and
+      `(= :validate (:phase (ex-data ex)))` against that one ex — `start` is
+      invoked once, not twice. ops-test 4 tests/23 assertions green; clj-kondo
+      0/0.

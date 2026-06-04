@@ -134,6 +134,31 @@
     (.mkdirs (.getParentFile f))
     (spit f (pr-str content))))
 
+(defn thrown-ex
+  "Invoke 0-arg `thunk`, returning the `clojure.lang.ExceptionInfo` it throws.
+   Throws an `AssertionError` (a real test failure) if `thunk` returns without
+   throwing an `ExceptionInfo`. Single-sources the
+   `(try … (catch clojure.lang.ExceptionInfo e e))` capture ceremony so callers
+   assert against the captured ex (its `ex-data`, `.getMessage`) once, instead of
+   open-coding the bare catch and risking a silently-non-throwing thunk passing
+   vacuously. Pair with `ex-data`/`.getMessage` at the call site
+   (`¬helpers_that_hide(intent)`)."
+  [thunk]
+  (let [result (try (thunk) (catch clojure.lang.ExceptionInfo e e))]
+    (if (instance? clojure.lang.ExceptionInfo result)
+      result
+      (throw (AssertionError.
+              (str "Expected thunk to throw clojure.lang.ExceptionInfo, but it "
+                   "returned " (pr-str result)))))))
+
+(defn thrown-ex-data
+  "The `ex-data` of the `ExceptionInfo` thrown by 0-arg `thunk` (via `thrown-ex`,
+   failing if none is thrown). Single-sources the
+   `(ex-data (try … (catch … e e)))` capture+unwrap idiom for the data-only
+   call sites that need no message assertion."
+  [thunk]
+  (ex-data (thrown-ex thunk)))
+
 (defn session-fn-with-id
   "A fake nREPL session fn carrying the `:nrepl.core/taking-until {:session id}`
    metadata used to derive the managed session-id."

@@ -1857,3 +1857,47 @@ No correctness or coverage gaps; these are shape-only, behaviour-preserving
 follow-ups.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Test-shaper follow-up execution — TS11/TS12 (ψ, 2026-06-03)
+
+Executed both newly-added test-shaper follow-ups (TS11, TS12) from the preceding
+pass-7 review. Shape-only / behaviour-preserving (no assertion *added or
+removed*); no production change.
+
+- TS11 (single-source the thrown-`ExceptionInfo` capture). Added two
+  `test_support` helpers: `thrown-ex` invokes a 0-arg thunk and returns the
+  captured `clojure.lang.ExceptionInfo`, throwing an `AssertionError` if the
+  thunk returns without throwing (so a silently non-throwing thunk fails loudly,
+  not vacuously); `thrown-ex-data` = `(ex-data (thrown-ex thunk))` for the
+  data-only sites. Rewired all six bare-`(try … (catch clojure.lang.ExceptionInfo
+  e e))` sites onto them:
+  - `started_test` ×3 (TR5 plain-deadline, the stale-port deadline reject, and
+    the IR1 exit-with-stale cases) → `thrown-ex` (each needs both `.getMessage`
+    and the `ex-data` instant trio / `:phase` / `:command-exited?` from one
+    capture).
+  - `config_test` ×1 (the `:phase :validate` `0` case in
+    `resolved-start-readiness-timeout-ms-test`) → `thrown-ex-data`.
+  - `ops_test` ×2 (`start-invalid-config-timeout-test`): non-integer block →
+    `thrown-ex-data`; out-of-range block → `thrown-ex` (see TS12).
+  No `catch clojure.lang.ExceptionInfo` now lives outside the `test_support`
+  helper; the asserted keys/message stay visible at each call site
+  (`¬helpers_that_hide(intent)`). Added the helpers' requires to the three test
+  namespaces (`thrown-ex` to started/ops, `thrown-ex-data` to config/ops).
+
+- TS12 (remove the redundant double op-invocation — folded with TS11). The
+  out-of-range block previously called `(project-nrepl-ops/start ctx worktree)`
+  twice against the same on-disk config — once in `thrown-with-msg?`, once in a
+  `try/catch` — to assert message and `:phase` of one throw. Now it captures the
+  single throw once via `(let [ex (thrown-ex #(…start…))] …)` and asserts both
+  `(re-find #"range 1000-600000" (.getMessage ex))` and `:phase :validate`
+  against that one ex (`single_concern` ∧ `minimal(redundant_tests)`).
+
+Verified: clj-paren-repair Success (all four files, no changes needed);
+clj-kondo 0/0 over `components/project-nrepl/test`; focused
+started/config/ops 17 tests/119 assertions green (unchanged count — pure shape);
+full `bb clojure:test:unit` green (consuming suites unaffected); file lengths
+`test_support` 267 / `started_test` 341 / `config_test` 228 / `ops_test` 152 (all
+< 800). No design/plan/doc/CHANGELOG change (shape-only; no user-visible surface
+change).
+
+PASS_STATUS: REVIEW_COMPLETE

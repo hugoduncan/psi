@@ -7,7 +7,8 @@
    [psi.project-nrepl.started :as project-nrepl-started]
    [psi.project-nrepl.test-support
     :refer [age-file-back! fake-connector fake-process make-ctx
-            spit-stale-port! started-launcher! touch-fresh! with-temp-dir]]))
+            spit-stale-port! started-launcher! thrown-ex touch-fresh!
+            with-temp-dir]]))
 
 (deftest wait-for-started-endpoint-test
   (testing "reads discovered endpoint once .nrepl-port appears"
@@ -36,10 +37,9 @@
     ;; :command-exited? is absent (the process is still alive).
     (with-temp-dir [dir "psi-project-nrepl-started-"]
       (let [process (fake-process {:alive? true :exit-code 0 :pid 1234})
-            ex (try
-                 (project-nrepl-started/wait-for-started-endpoint!
-                  dir process {:timeout-ms 100 :poll-interval-ms 10})
-                 (catch clojure.lang.ExceptionInfo e e))
+            ex (thrown-ex
+                #(project-nrepl-started/wait-for-started-endpoint!
+                  dir process {:timeout-ms 100 :poll-interval-ms 10}))
             data (ex-data ex)]
         (is (= :started-readiness (:phase data)))
         (is (= 100 (:timeout-ms data)))
@@ -57,11 +57,10 @@
         ;; pre-existing port aged well before the launch instant
         (spit-stale-port! dir 7888)
         (let [launched-at (java.time.Instant/now)
-              ex (try
-                   (project-nrepl-started/wait-for-started-endpoint!
+              ex (thrown-ex
+                  #(project-nrepl-started/wait-for-started-endpoint!
                     dir process
-                    {:timeout-ms 100 :poll-interval-ms 10 :launched-at launched-at})
-                   (catch clojure.lang.ExceptionInfo e e))]
+                    {:timeout-ms 100 :poll-interval-ms 10 :launched-at launched-at}))]
           (is (= :started-stale-port (:phase (ex-data ex))))
           (is (re-find #"only a stale port was present" (.getMessage ex)))
           ;; A2: the rejected/launch instants are carried on the diagnostic.
@@ -79,11 +78,10 @@
       (let [process (fake-process {:alive? false :exit-code 42 :pid 1234})]
         (spit-stale-port! dir 7888)
         (let [launched-at (java.time.Instant/now)
-              ex (try
-                   (project-nrepl-started/wait-for-started-endpoint!
+              ex (thrown-ex
+                  #(project-nrepl-started/wait-for-started-endpoint!
                     dir process
-                    {:timeout-ms 100 :poll-interval-ms 10 :launched-at launched-at})
-                   (catch clojure.lang.ExceptionInfo e e))]
+                    {:timeout-ms 100 :poll-interval-ms 10 :launched-at launched-at}))]
           (is (= :started-stale-port (:phase (ex-data ex))))
           (is (true? (:command-exited? (ex-data ex))))
           (is (re-find #"exited leaving only a stale" (.getMessage ex)))

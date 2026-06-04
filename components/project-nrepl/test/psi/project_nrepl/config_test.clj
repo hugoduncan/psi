@@ -4,7 +4,7 @@
    [clojure.test :refer [deftest is testing]]
    [psi.project-nrepl.config :as project-nrepl-config]
    [psi.project-nrepl.test-support
-    :refer [age-file-back! with-temp-dir write-local-config!
+    :refer [age-file-back! thrown-ex-data with-temp-dir write-local-config!
             write-project-config! write-user-config!]]))
 
 (defn- capture-stderr [f]
@@ -192,11 +192,9 @@
          (project-nrepl-config/resolved-start-readiness-timeout-ms
           {:project-nrepl {:start-readiness-timeout-ms "120000"}})))
     (is (= :validate
-           (:phase (ex-data
-                    (try
-                      (project-nrepl-config/resolved-start-readiness-timeout-ms
-                       {:project-nrepl {:start-readiness-timeout-ms 0}})
-                      (catch clojure.lang.ExceptionInfo e e))))))))
+           (:phase (thrown-ex-data
+                    #(project-nrepl-config/resolved-start-readiness-timeout-ms
+                      {:project-nrepl {:start-readiness-timeout-ms 0}})))))))
 
 (deftest read-dot-nrepl-port-test
   (testing "reads integer port from target worktree .nrepl-port"
