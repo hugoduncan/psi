@@ -1083,3 +1083,35 @@ instant and asserting an ordering relation (`recorded ≤ seam-observed`) that
 only the correct source satisfies. Bundling two contracts (timeout recording +
 :started-at provenance) under one `testing` block also hides which broke — the
 TS5 split makes failures self-naming.
+
+## Test review — test-shaper pass 3 (ψ)
+
+Fresh `test-shaper` read of the project-nrepl test suite (started/ops/config/
+attach + test_support). Passes 1–2 single-sourced the `Process` proxy (TS1), the
+stale/fresh mtime fixtures (TS2/TS3), strengthened `:started-at` provenance
+(TS4), and split the bundled case (TS5). Suite green
+(started/ops/config/attach 17 tests/115 assertions). One new actionable item.
+
+- TS6 (happy-launch arrange duplication — `minimal_incidental_setup` ∧
+  `consistent(fixtures)` ∧ `helpers_that_compress(ceremony)`). Four
+  `start-instance-in-test` cases ("launches command…", "no :timeout-ms opts…
+  120000 default (TR1)", "records the effective :readiness-timeout-ms",
+  "records :started-at = launch instant (TS4/PA2)") each open-code the identical
+  happy-start arrange: a `launcher` that `(spit (io/file worktree ".nrepl-port")
+  "7777\n")` and returns `(fake-process {:alive? true :exit-code 0 :pid 4321})`,
+  plus `(fake-connector "nrepl-session-1")` and the `make-ctx`/`temp-dir`/
+  try-finally `delete-tree!` ceremony. The same launcher shape recurs in
+  `ops_test`'s `start-config-timeout-threading-test`. The repeated 4-line
+  launcher/connector arrange is incidental to each case's actual concern
+  (default-timeout vs configured-timeout vs launch-instant provenance) and the
+  duplicated `"7777"`/`:pid 4321` literals are a `consistent(fixtures)` drift
+  risk (a port/pid change must be hand-propagated across ≥5 sites). Add a
+  `test_support` helper that single-sources the happy started-launcher seam —
+  e.g. `started-launcher!` (a launcher fn of `worktree` that writes a given
+  fresh `.nrepl-port` and returns a happy `fake-process`, default port `7777`
+  pid `4321`), so each case calls the helper and asserts only its distinct
+  contract. The TS4 provenance case must keep its `launcher-at` capture, so the
+  helper should compose with (not hide) an injected pre-write hook or return the
+  launcher for the caller to wrap — `helpers_that_compress(ceremony) ∧
+  ¬helpers_that_hide(intent)`. Shape-only; behaviour-preserving (no assertion
+  change). Re-run started/ops/config/attach + clj-kondo after.

@@ -369,3 +369,23 @@
       `:readiness-timeout-ms 90000`) and "records :started-at = launch instant,
       not connect instant (TS4/PA2)" (the strengthened provenance check). A
       failure now names which contract broke.
+
+## Test-shaper review follow-ups (shape, pass 3)
+
+- [ ] TS6: Single-source the duplicated happy started-launcher arrange. Four
+      `start-instance-in-test` cases ("launches command…", "no :timeout-ms opts…
+      120000 default (TR1)", "records the effective :readiness-timeout-ms",
+      "records :started-at = launch instant (TS4/PA2)") plus `ops_test`'s
+      `start-config-timeout-threading-test` each open-code the same launcher
+      (`(spit … ".nrepl-port" "7777\n")` + happy `(fake-process {:alive? true
+      :exit-code 0 :pid 4321})`) and `(fake-connector "nrepl-session-1")`. Add a
+      `test_support` helper (e.g. `started-launcher!`, default port `7777` pid
+      `4321`) so each case calls it and asserts only its distinct contract,
+      removing the `minimal_incidental_setup` repetition and the
+      `consistent(fixtures)` drift risk of hand-propagating the `"7777"`/`:pid
+      4321` literals across ≥5 sites. Keep the TS4 case's `launcher-at` capture —
+      the helper must compose with (not hide) an injected pre-write hook or hand
+      back the launcher for the caller to wrap
+      (`helpers_that_compress(ceremony) ∧ ¬helpers_that_hide(intent)`).
+      Shape-only; behaviour-preserving (no assertion change). Re-run
+      started/ops/config/attach + clj-kondo after.
