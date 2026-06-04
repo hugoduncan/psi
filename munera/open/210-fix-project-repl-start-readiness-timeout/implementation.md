@@ -2057,3 +2057,42 @@ Behaviour-preserving: identical value computed. Verified:
 Full `bb clojure:test:unit` shows one unrelated failure — the canonical
 prompt-lifecycle retry/backoff test (a pre-existing timing flake; no
 project-nrepl coverage). My change touches only `started.clj`.
+
+## code-shaper review (pass 2)
+
+Production-code shaping re-review (`simplicity ∧ consistency ∧ robustness`) of
+the started-mode change set (`started.clj`, `config.clj`, `ops.clj`) after CS1
+landed (single-source `effective-readiness-timeout-ms` helper). Baseline green:
+started + config + ops focus run = 17 tests / 119 assertions / 0 failures;
+clj-kondo `components/project-nrepl/src` 0/0.
+
+No new actionable finding. CS1 (duplicated effective-timeout fallback) is
+resolved and structurally enforced by the helper. Remaining observations were
+weighed and are non-actionable:
+
+- **TOCTOU fail-open in the freshness gate** (`fresh?` short-circuits to `true`
+  when `(nil? mtime-ms)`, i.e. the port file vanished between
+  `read-dot-nrepl-port-safe` and `port-file-mtime-ms`): already recorded in
+  impl-review pass 2 / pass 3 as an *intentional* design tolerance — pre-launch
+  removal "guarantees correctness even when the gate is lenient" (Q2/A1
+  defence-in-depth). Not a code-shaper defect; not re-raised.
+- **The 2×2 `throw (ex-info …)` sites** in `wait-for-started-endpoint!`
+  (exit/deadline × stale/plain): each carries a distinct key set + message =
+  distinct diagnostic contract, not incidental repetition. Already declined in
+  code-shaper pass 1 (`¬helpers_that_hide(intent)`). Unchanged.
+- **The three pre-wait `update-instance-in!` writes** in `start-instance-in!`
+  (timeout+`:started-at`; `:process`/`:pid`; success): each at a distinct
+  lifecycle point with a distinct survive-the-throw rationale (PA1/PA2/IR2).
+  Merging re-entangles what the design deliberately separates. Already declined
+  in pass 1. Unchanged.
+- **`:last-error {:message :data :at}` shape** shared by `started.clj` and
+  `attach.clj`: this is *consistent* data shape across the component (a
+  positive), not duplication to remove. `attach.clj`'s inline
+  `(java.time.Instant/now)` vs `started.clj`'s private `now` is a minor pre-
+  existing inconsistency in attach-mode — out of this task's scope (do not
+  change attach semantics).
+- **`instance-payload` fixed projected key list** (`ops.clj`): deliberate
+  explicit projection contract (A2/AMB3), verbosity = contract surface. Already
+  declined in pass 1. Unchanged.
+
+PASS_STATUS: REVIEW_COMPLETE
