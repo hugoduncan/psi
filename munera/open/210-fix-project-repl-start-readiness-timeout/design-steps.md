@@ -61,7 +61,7 @@
 
 ## Design follow-up — inconsistency
 
-- [ ] INC1: Resolve the launch-instant ownership contradiction. Q2/A1 launch the
+- [x] INC1: Resolve the launch-instant ownership contradiction. Q2/A1 launch the
       process inside `start-instance-in!` (pre-launch `.nrepl-port` removal
       "immediately before launching") yet also say `wait-for-started-endpoint!`
       "records the launch instant" — but that function runs after the launch and
@@ -72,7 +72,7 @@
       self-timed gate in `wait-for-started-endpoint!`. State the threading and
       reconcile with `:started-at` so the mtime-gate reference instant has a
       single, code-consistent source.
-- [ ] INC2: Align the acceptance-criterion wording for the stale-port `:phase`.
+- [x] INC2: Align the acceptance-criterion wording for the stale-port `:phase`.
       The A2 body places `:phase :started-stale-port` inside `ex-data`, surfaced
       via `:last-error`'s `:data` field ({:message :data :at}); the acceptance
       criterion's "via `:last-error` with `:phase :started-stale-port`" shorthand

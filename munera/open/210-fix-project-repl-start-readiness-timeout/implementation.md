@@ -89,6 +89,42 @@ would otherwise guess at:
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
 
+## Design-review inconsistency follow-up execution (ψ)
+
+Executed both newly-added inconsistency design-steps (INC1, INC2); both resolved
+in design.md, no blockers (design-only task — decisions, grounded by reading
+`started.clj`).
+
+- INC1 (launch-instant ownership): grounded against `started.clj`. Confirmed the
+  process is launched inside `start-instance-in!` (`(launcher effective-worktree
+  validated-command)`) and `wait-for-started-endpoint!` runs *after* that, so it
+  cannot capture the true launch instant — it could only record its own entry
+  time. Also confirmed `:started-at (now)` is currently written onto the
+  runtime-handle on the success path **after** `wait-for-started-endpoint!`
+  returns, not at launch. Resolution: `start-instance-in!` is the sole launch-
+  instant owner — capture a single `launched-at` binding `(now)` at the launch
+  site, use it for **both** the runtime-handle `:started-at` (moved from post-wait
+  to the launch site) **and** the mtime-gate reference, threading it into
+  `wait-for-started-endpoint!` via `opts` (`:launched-at`).
+  `wait-for-started-endpoint!` no longer "records the launch instant"; it
+  consumes the threaded value. Updated Q2 step 2 and A1 (new "Launch-instant
+  ownership (INC1)" bullet) so the gate-reference instant has one code-consistent
+  source reconciled with `:started-at`.
+- INC2 (`:last-error` `:phase` shape): grounded against `start-instance-in!`'s
+  `catch`, which writes `:last-error {:message (.getMessage t) :data (ex-data t)
+  :at (now)}` — so a thrown `:phase :started-stale-port` lands under
+  `:last-error → :data`, not as a direct `:last-error` key. Reworded the
+  acceptance criterion shorthand ("via `:last-error` with `:phase
+  :started-stale-port`") to state the phase is carried on `:last-error`'s
+  `:data`/ex-data, matching the precise A2 body. A2 body already correct; only
+  the acceptance criterion needed alignment.
+
+No blocked design-steps. design.md verified internally coherent (Q2 ↔ A1 launch-
+instant ownership ↔ `:started-at`; A2 body ↔ acceptance criterion `:last-error`
+shape).
+
+PASS_STATUS: REVIEW_COMPLETE
+
 ## Design-review ambiguity follow-up execution (ψ)
 
 Executed all five newly-added ambiguity design-steps (AMB1–AMB5); all resolved

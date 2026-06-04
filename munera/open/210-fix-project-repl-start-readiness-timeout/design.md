@@ -95,13 +95,19 @@ Out of scope:
      `start-instance-in!` deletes any existing `<worktree>/.nrepl-port`. This
      makes any subsequently-observed `.nrepl-port` necessarily a *new* file, so
      correctness does not depend on mtime precision.
-  2. **Mtime acceptance gate (defence in depth).** `wait-for-started-endpoint!`
-     records the launch instant and only accepts a `.nrepl-port` whose
-     last-modified time is **≥ (launch-instant floored to whole seconds)**. The
-     whole-second floor tolerates coarse filesystem mtime granularity (see AMB4)
-     so a legitimately-fresh port written in the same second as launch is not
-     rejected; the pre-launch removal guarantees correctness even when the gate
-     is lenient.
+  2. **Mtime acceptance gate (defence in depth).** The launch instant is
+     **captured in `start-instance-in!` at the moment of launch** (it is the
+     existing `:started-at` runtime-handle value, captured at launch rather than
+     post-wait — see INC1) and **threaded into `wait-for-started-endpoint!` via
+     `opts` (`:launched-at`)**. `wait-for-started-endpoint!` only accepts a
+     `.nrepl-port` whose last-modified time is **≥ (launch-instant floored to
+     whole seconds)**. The whole-second floor tolerates coarse filesystem mtime
+     granularity (see AMB4) so a legitimately-fresh port written in the same
+     second as launch is not rejected; the pre-launch removal guarantees
+     correctness even when the gate is lenient. `wait-for-started-endpoint!`
+     never self-times the launch instant — by the time it runs the launch has
+     already happened in its caller, so a self-timed gate would reference its own
+     entry time, not the true launch (INC1).
   This guarantees "the port belongs to *this* launch" without touching the
   shared discovery primitive or attach-mode (A1). A `.nrepl-port` failing the
   gate (present but older than the launch floor) is treated as stale: the poll
@@ -148,11 +154,21 @@ Out of scope:
     - `start-instance-in!` deletes any existing `<worktree>/.nrepl-port`
       immediately before launching the process, so any observed port file is
       necessarily new.
-    - `wait-for-started-endpoint!` records the launch instant and only accepts a
-      `.nrepl-port` whose last-modified ≥ (launch instant floored to whole
-      seconds — see AMB4 mtime-tolerance note in Q2). The polling loop already
-      owns the started-process lifecycle (`process-exited?`, deadline), so the
-      gate is co-located with the only context that knows "this launch's" instant.
+    - **Launch-instant ownership (INC1).** `start-instance-in!` is the sole owner
+      of the true launch instant: it captures `(now)` at the moment it launches
+      the process (`(launcher …)`), and this single instant is **both** the
+      runtime-handle `:started-at` value **and** the mtime-gate reference. It is
+      threaded into `wait-for-started-endpoint!` via `opts` (`:launched-at`).
+      Today `start-instance-in!` writes `:started-at (now)` onto the
+      runtime-handle on the success path *after* `wait-for-started-endpoint!`
+      returns; this task moves that capture **to the launch site** (a single
+      `launched-at` binding taken immediately before/at `(launcher …)`) and
+      reuses it for both `:started-at` and the gate, so there is exactly one
+      launch-instant source. `wait-for-started-endpoint!` does **not** record the
+      launch instant itself (it runs after the launch and could only capture its
+      own entry time); it consumes the threaded `:launched-at`. The polling loop
+      still owns the rest of the started-process lifecycle (`process-exited?`,
+      deadline) and applies the gate against the passed-in instant.
   - This keeps the started-mode acquisition *policy* (the Q2 stale-port strategy,
     of which A1 is the single authoritative statement) out of the orthogonal
     discovery *mechanism*, satisfying single-responsibility and leaving
@@ -206,9 +222,11 @@ Out of scope:
   implemented in the started-mode layer (`started.clj`), leaving the shared
   `config/read-dot-nrepl-port` discovery primitive and attach-mode discovery
   unchanged (A1).
-- Started-mode observable outcomes (stale-port rejection diagnostic via
-  `:last-error` with `:phase :started-stale-port`; effective configured timeout
-  via a new `:readiness-timeout-ms` field) are projected as canonical status on
+- Started-mode observable outcomes (stale-port rejection diagnostic carried on
+  `:last-error`'s `:data`/ex-data as `:phase :started-stale-port` — matching
+  `start-instance-in!`'s `catch`, which writes `:last-error {:message :data :at}`
+  with the thrown `ex-data` under `:data`; effective configured timeout via a new
+  `:readiness-timeout-ms` field) are projected as canonical status on
   the project-nrepl registry instance and surfaced through `instance-payload`
   (whose projected key list is extended with `:readiness-timeout-ms`, AMB3),
   consistently with the existing `:readiness` / `:last-error` projection — not as
