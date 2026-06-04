@@ -69,33 +69,67 @@ Out of scope:
   possible config key).
 - nREPL session/eval behaviour after a successful connect.
 
-## Open questions (resolve collaboratively before plan)
+## Resolved questions (Q1–Q4)
 
-- **Q1 — Timeout configurability surface.** A new config key under
-  `[:agent-session :project-nrepl]` (e.g. `:start-readiness-timeout-ms`) with a
-  raised default, vs. only raising the default, vs. an explicit `op` arg on
-  psi-tool. Preference: config key + sensible raised default, following the
-  existing `:start-command` / `:attach` config precedence (system < user <
-  project). Confirm name, default value, and validation bounds.
-- **Q2 — Stale-port strategy.** Options:
-  (a) **Remove** any existing `.nrepl-port` immediately before launch, then wait
-      for it to (re)appear — simplest, but destroys a file the running process
-      may legitimately own if a different start raced.
-  (b) **mtime/launch-time gate** — record launch instant, only accept a
-      `.nrepl-port` whose last-modified ≥ launch instant.
-  (c) Combination. Confirm which guarantees "the port belongs to *this* launch"
-      without breaking the existing happy path or attach-mode discovery.
-- **Q3 — Is the 5s timeout the actual failure here, the stale port, or both?**
-  Confirm empirically before fixing: at reproduction time a `.nrepl-port`
-  existed in the worktree (port 64474) belonging to an unrelated REPL, yet start
-  reported a *timeout* — clarify whether discovery never saw that file (so the
-  timeout is the real cause) or the diagnosis differs. The fix must address the
-  confirmed cause(s); avoid speculative changes.
-- **Q4 — Process-exit diagnostics.** When the child exits early
-  (`process-exited?`), the error already surfaces `:exit-code` but not stdout/
-  stderr. Decide whether capturing a tail of child output for the error payload
-  is in scope (it materially aids diagnosing real start-command failures) or
-  deferred.
+- **Q1 — Timeout configurability surface (resolved).**
+  Add a config key `:start-readiness-timeout-ms` under
+  `[:agent-session :project-nrepl]`, following the existing `:start-command` /
+  `:attach` precedence (system < user < project). It carries a **raised default
+  of `120000` ms (120 s)** — a cold `clojure -M …` JVM + classpath build + nREPL/
+  cider middleware load can take well over the prior 5 s, and the default must
+  succeed for a real slow boot out of the box. **Validation bounds:
+  `[1000 600000]`** (1 s–10 min), validated in `config.clj` in the same
+  `cond`-style integer-range idiom as `resolved-attach-endpoint`'s port check;
+  out-of-range or non-integer values throw a `:phase :validate` `ex-info`.
+  Resolution path: `config` → `ops/start` builds `opts` `{:timeout-ms …}` →
+  `started/start-instance-in!` → `wait-for-started-endpoint!`. No new psi-tool
+  `op` arg (no surface-shape change, per scope).
+  - `default-readiness-timeout-ms` in `started.clj` is raised from `5000` to
+    `120000` so the no-config call path also gets the safe default; the config
+    key only overrides it.
+
+- **Q2 — Stale-port strategy (resolved; this is the resolution of A1's gate).**
+  Use the **combination (option c): pre-launch removal *plus* a launch-instant
+  mtime acceptance gate**, both in the started-mode layer (A1):
+  1. **Pre-launch removal.** Immediately before launching the process,
+     `start-instance-in!` deletes any existing `<worktree>/.nrepl-port`. This
+     makes any subsequently-observed `.nrepl-port` necessarily a *new* file, so
+     correctness does not depend on mtime precision.
+  2. **Mtime acceptance gate (defence in depth).** `wait-for-started-endpoint!`
+     records the launch instant and only accepts a `.nrepl-port` whose
+     last-modified time is **≥ (launch-instant floored to whole seconds)**. The
+     whole-second floor tolerates coarse filesystem mtime granularity (see AMB4)
+     so a legitimately-fresh port written in the same second as launch is not
+     rejected; the pre-launch removal guarantees correctness even when the gate
+     is lenient.
+  This guarantees "the port belongs to *this* launch" without touching the
+  shared discovery primitive or attach-mode (A1). A `.nrepl-port` failing the
+  gate (present but older than the launch floor) is treated as stale: the poll
+  loop continues until the gate passes or the deadline fires; a deadline hit
+  while only a too-old port is present is reported as a stale-port rejection
+  (`:phase :started-stale-port`, A2) rather than a plain readiness timeout.
+
+- **Q3 — Confirmed scope of the fix (resolved): both fixes are required
+  unconditionally.** The reproduction (`:phase :started-readiness`,
+  `:timeout-ms 5000`, a port `64474` present in the worktree) is consistent with
+  *either or both* defects: discovery may have read a parseable stale port (then
+  the bug is silent wrong-endpoint, masked here only because connect was not yet
+  reached) **or** never observed it before the 5 s deadline (then the bug is the
+  timeout). Because the two failure modes are not reliably distinguishable from a
+  single observation and each is an independent latent defect, **both fixes ship
+  regardless of which cause a given reproduction exhibits.** A single-cause
+  empirical finding does **not** scope either fix out. "Avoid speculative
+  changes" is satisfied: both changes target defects already proven present by
+  code inspection (hard-coded 5 s with no config path; first-parseable-port
+  acceptance with no launch-ownership check), not speculative ones.
+
+- **Q4 — Process-exit diagnostics (resolved: deferred, out of scope).**
+  Capturing a stdout/stderr tail in the `:exit-code` error payload is **deferred
+  to a follow-up task**. It is orthogonal to both in-scope defects (it improves
+  diagnosis of a *failing* start command, not the timeout or stale-port
+  correctness bugs) and would require process-output capture plumbing
+  (`ProcessBuilder` redirection / reader drain) that broadens scope. The existing
+  `:exit-code` on the early-exit error path is unchanged.
 
 ## Architectural-fit decisions (from design review)
 
@@ -108,15 +142,22 @@ Out of scope:
     documented `.nrepl-port` fallback (`attach/resolve-attach-endpoint`) keeps its
     current semantics: it accepts whatever `.nrepl-port` is present, by design,
     because an attach target is an externally-owned, already-running REPL.
-  - The launch-time/mtime acceptance gate is implemented in
-    `started/wait-for-started-endpoint!` (and its caller
-    `start-instance-in!`), which records the launch instant and only accepts a
-    `.nrepl-port` whose last-modified ≥ launch instant. The polling loop already
-    owns the started-process lifecycle (`process-exited?`, deadline), so the gate
-    is co-located with the only context that knows "this launch's" instant.
-  - This keeps the started-mode acquisition *policy* (Q2 stale-port strategy) out
-    of the orthogonal discovery *mechanism*, satisfying single-responsibility and
-    leaving attach-mode untouched.
+  - The stale-port strategy is the resolved **Q2 combination** (pre-launch
+    removal + launch-instant mtime gate), implemented entirely in the
+    started-mode layer:
+    - `start-instance-in!` deletes any existing `<worktree>/.nrepl-port`
+      immediately before launching the process, so any observed port file is
+      necessarily new.
+    - `wait-for-started-endpoint!` records the launch instant and only accepts a
+      `.nrepl-port` whose last-modified ≥ (launch instant floored to whole
+      seconds — see AMB4 mtime-tolerance note in Q2). The polling loop already
+      owns the started-process lifecycle (`process-exited?`, deadline), so the
+      gate is co-located with the only context that knows "this launch's" instant.
+  - This keeps the started-mode acquisition *policy* (the Q2 stale-port strategy,
+    of which A1 is the single authoritative statement) out of the orthogonal
+    discovery *mechanism*, satisfying single-responsibility and leaving
+    attach-mode untouched. Q2 in "Resolved questions" and this A1 are one
+    decision, not two: A1 is the resolution of Q2.
 
 - **A2 — Observable status projection through the registry instance.**
   New observable started-mode outcomes are projected as canonical instance
@@ -138,6 +179,17 @@ Out of scope:
     the existing instance status fields), and is surfaced through
     `instance-payload` so the resolved timeout is observable as instance status
     rather than inferred from config or returned only ad hoc.
+  - **`instance-payload` projection is extended (AMB3).** `instance-payload`
+    (`ops.clj`) today projects a *fixed* key set
+    (`:worktree-path :acquisition-mode :lifecycle-state :readiness :endpoint
+    :active-session-id :last-eval :last-error`) and would otherwise drop
+    `:readiness-timeout-ms`. This task **adds `:readiness-timeout-ms` to that
+    projected key list** so "surfaced through `instance-payload`" means a
+    concrete change to the projection, with a single interpretation. No
+    additional stale-port diagnostic key is added: the stale-port rejection rides
+    the already-projected `:last-error` (its `ex-data` carries
+    `:phase :started-stale-port` and the rejected/launch instants), so no new
+    projected key is needed for it.
   - `ops/start`'s return shape continues to project from `instance-payload`, so
     the op return is a derived view of the canonical instance status (no new
     op-only status channel).
@@ -146,21 +198,27 @@ Out of scope:
 
 - `psi-tool {action: project-repl, op: start}` against a real, slow-booting
   `:start-command` (the `clojure -M …` case above) reaches `:status :started`
-  /`:present` rather than `:started-readiness` timeout, given a reasonable
-  default and/or configured timeout.
+  /`:present` rather than `:started-readiness` timeout, with the **raised
+  `120000` ms default** and no per-call config required.
 - A pre-existing stale `.nrepl-port` does not cause start to report success
   against the wrong endpoint; start connects only to the port written by the
   process it launched (or fails diagnosably). The stale-port acceptance gate is
   implemented in the started-mode layer (`started.clj`), leaving the shared
   `config/read-dot-nrepl-port` discovery primitive and attach-mode discovery
   unchanged (A1).
-- Started-mode observable outcomes (stale-port rejection diagnostic, effective
-  configured timeout) are projected as canonical status on the project-nrepl
-  registry instance and surfaced through `instance-payload`, consistently with
-  the existing `:readiness` / `:last-error` projection — not as op-return-only
-  data (A2).
-- The readiness timeout is controllable through the confirmed Q1 surface, with
-  validation consistent with existing `project-nrepl` config validation.
+- Started-mode observable outcomes (stale-port rejection diagnostic via
+  `:last-error` with `:phase :started-stale-port`; effective configured timeout
+  via a new `:readiness-timeout-ms` field) are projected as canonical status on
+  the project-nrepl registry instance and surfaced through `instance-payload`
+  (whose projected key list is extended with `:readiness-timeout-ms`, AMB3),
+  consistently with the existing `:readiness` / `:last-error` projection — not as
+  op-return-only data (A2).
+- The readiness timeout is controllable through the
+  `[:agent-session :project-nrepl :start-readiness-timeout-ms]` config key (Q1),
+  with `[1000 600000]` ms integer-range validation in `config.clj` consistent
+  with the existing `resolved-attach-endpoint` port-range idiom.
+- Both the timeout raise and the stale-port gate ship unconditionally; neither is
+  scoped out by a single-cause empirical finding (Q3).
 - Behaviour-preserving for the existing fast happy path and for attach-mode.
 - Tests cover: timeout configurability, the stale-port guard, and the
   unchanged happy path — no `with-redefs`, using the existing

@@ -88,3 +88,35 @@ would otherwise guess at:
   about whether the other fix is still required.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Design-review ambiguity follow-up execution (ψ)
+
+Executed all five newly-added ambiguity design-steps (AMB1–AMB5); all resolved
+in design.md, no blockers (design-only task — decisions, grounded by reading the
+started/ops/config/runtime source).
+
+- AMB1: Rewrote the "Open questions" section as "Resolved questions (Q1–Q4)".
+  Q1: config key `:start-readiness-timeout-ms` under
+  `[:agent-session :project-nrepl]`, default 120000 ms, bounds [1000 600000],
+  validated in `config.clj` (attach-port idiom); `default-readiness-timeout-ms`
+  in `started.clj` raised 5000→120000. Q4: stdout/stderr-tail diagnostics
+  deferred (orthogonal, plumbing cost) — out of scope.
+- AMB2: Folded Q2 into A1 as one decision (stale-port strategy = Q2c
+  combination: pre-launch `.nrepl-port` removal + launch-instant mtime gate).
+  Q2 prose says "A1 is the resolution of Q2"; A1 cross-references back.
+- AMB3: A2 now states `instance-payload`'s fixed key list (ops.clj) is extended
+  with `:readiness-timeout-ms`; stale-port rejection rides existing `:last-error`
+  (`:phase :started-stale-port`), so no extra projected key. Verified the fixed
+  key list in ops.clj `instance-payload`.
+- AMB4: mtime gate = last-modified ≥ launch-instant **floored to whole seconds**
+  (tolerates coarse FS mtime); pre-launch removal (Q2c) makes correctness
+  independent of mtime precision — stated in Q2.
+- AMB5: Q3 resolved to "both fixes ship unconditionally" — each defect is
+  independently proven by code inspection (hard-coded 5s no-config path;
+  first-parseable-port acceptance with no launch-ownership check), so no
+  single-cause empirical finding scopes either out. Acceptance criteria add an
+  explicit Q3 line; criteria referencing "confirmed Q1 surface" / "reasonable
+  default" rewritten to the concrete Q1 decision.
+
+No blocked design-steps. design.md verified internally coherent (Q1–Q4 ↔ A1/A2
+↔ acceptance criteria align).
