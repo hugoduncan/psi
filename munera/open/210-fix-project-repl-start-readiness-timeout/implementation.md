@@ -1958,3 +1958,38 @@ every economy/consistency/robustness gap in the task's tests; the surface is
 behaviour-focused, no-mock, deterministic, and single-sourced.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+---
+
+## review-task-docs (pass 1)
+
+User-facing docs review against the implementation. Scope: `README.md`, `doc/`,
+`CHANGELOG.md`. No prior docs-review pass on this task.
+
+Verified accurate, complete, and consistent — no actionable issues:
+
+- `doc/project-nrepl.md`: documents `:start-readiness-timeout-ms` (default
+  `120000`, range `[1000 600000]`, `system < user < project` precedence,
+  `:phase :validate` rejection), the stale-`.nrepl-port` guard (pre-launch
+  removal + launch-instant gate, `:started-stale-port` vs `:started-readiness`),
+  and the orphaned-child reaping on readiness failure. All claims confirmed
+  against `config.clj` (`resolved-start-readiness-timeout-ms` name/path/range),
+  `started.clj` (`default-readiness-timeout-ms 120000`, `floored-to-whole-seconds`
+  gate, exit-with-stale-port phase), and `ops.clj` (`instance-payload` projects
+  `:readiness-timeout-ms`; `/project-repl status` op exists).
+- `CHANGELOG.md` `[Unreleased]`: one `Added` entry (config key) + three `Fixed`
+  entries (timeout raise, stale-port latch, orphan-process reap) — all
+  user-visible changes covered; footer intact.
+- `README.md`: `## Project nREPL` delegates to `doc/project-nrepl.md`; no new
+  behaviour needs surfacing at the top level. `project-repl` command entry
+  present.
+
+Considered but NOT actionable: the doc says the gate accepts a port "written at
+or after the launch instant" while the implementation floors the launch instant
+to whole seconds (AMB4 mtime-granularity tolerance). This is a faithful
+user-level summary — pre-launch removal is the documented *primary* correctness
+guarantee and the gate is explicitly defence-in-depth; exposing the
+whole-second-floor internal tolerance would reduce user-facing clarity, not
+improve accuracy.
+
+PASS_STATUS: REVIEW_COMPLETE
