@@ -131,3 +131,14 @@
       → Resolved: failure-path diagnostics observable via `status` op read (not
       the throwing `start` return); `status`-read test added to slice-2. Plan
       "PA4" updated.
+
+## Plan/steps review follow-ups (inconsistency)
+
+- [ ] PSI1: Fix the test-runner invocation in slice 1. steps.md says
+      "Run `clojure -X:test` (project-nrepl)", but the repo `:test` alias
+      (`deps.edn`) is a Kaocha `-M` runner (`:main-opts ["-m" "kaocha.runner"]`,
+      no `:exec-fn`), so `clojure -X:test` is invalid. Replace with the project's
+      actual unit-test command (`clojure -M:test --focus unit` / `bb test`, per
+      bb.edn `clojure:test:unit` + AGENTS.md), consistent with the "full
+      project-nrepl test suite" wording in slice 5 and the "Run tests" steps in
+      slices 2–3.

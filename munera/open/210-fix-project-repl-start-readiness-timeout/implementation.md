@@ -291,3 +291,31 @@ No blocked items. plan.md ↔ steps.md ↔ design.md verified coherent (launch-s
 read surface ↔ PA4/A2).
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Plan/steps review — inconsistency (ψ)
+
+Scope: plan.md + steps.md only (not design.md). Cross-checked against
+`started.clj`, `ops.clj`, `runtime.clj`, `config.clj`, `started_test.clj`,
+`deps.edn`, `bb.edn`. Most claims verified consistent: slice numbering plan↔steps
+(1–5); `default-readiness-timeout-ms 5000→120000` ↔ code; `{:phase :validate}`
+range idiom ↔ `resolved-attach-endpoint`; `wait-for-started-endpoint!` already
+reads `:timeout-ms` from opts ↔ code; runtime-handle `:started-at` (started.clj)
+vs `build-instance` top-level slot-creation `:started-at` are distinct fields ↔
+code (PA2 correct); `instance-payload` fixed key list ↔ ops.clj; `:last-error
+{:message :data :at}` catch shape ↔ code; no consumer reads runtime-handle
+`:started-at` (eval `:active-op`/`:timing` `:started-at` are separate) ↔ grep, so
+PA2's move is safe. New actionable inconsistency:
+
+- PSI1 (wrong test runner invocation). steps.md Slice 1 says
+  "Run `clojure -X:test` (project-nrepl) + `clj-kondo --lint`". The repo `:test`
+  alias in `deps.edn` is a Kaocha `-M` runner (`:main-opts ["-m"
+  "kaocha.runner"]`, no `:exec-fn`), so `clojure -X:test` is invalid and would
+  fail. The project's unit-test command (bb.edn `clojure:test:unit`, AGENTS.md)
+  is `clojure -M:test --focus unit` / `bb test`. This is inconsistent both with
+  the runtime config and with the other slices (Slice 5 plan/steps say "full
+  project-nrepl test suite" with no `-X:test` form). Replace the `-X:test`
+  invocation with the actual Kaocha `-M:test --focus unit` (or `bb test`) command
+  in slice 1 (and use the same command consistently where slices 2/3 say "Run
+  tests").
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
