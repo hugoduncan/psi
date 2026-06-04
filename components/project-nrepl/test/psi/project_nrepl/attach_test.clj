@@ -5,7 +5,7 @@
    [psi.project-nrepl.attach :as project-nrepl-attach]
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
    [psi.project-nrepl.test-support
-    :refer [delete-tree! fake-connector make-ctx temp-dir]]))
+    :refer [age-file-back! delete-tree! fake-connector make-ctx temp-dir]]))
 
 (deftest resolve-attach-endpoint-test
   (testing "explicit port wins and host defaults when omitted"
@@ -36,7 +36,7 @@
       (try
         (let [port-file (io/file dir ".nrepl-port")]
           (spit port-file "7999\n")
-          (.setLastModified port-file (- (System/currentTimeMillis) 60000)))
+          (age-file-back! port-file))
         (is (= {:host "127.0.0.1" :port 7999 :port-source :dot-nrepl-port}
                (project-nrepl-attach/resolve-attach-endpoint dir {})))
         (finally

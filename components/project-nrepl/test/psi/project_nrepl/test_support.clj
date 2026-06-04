@@ -97,3 +97,66 @@
                  :client (fn ([] nil) ([_] nil))
                  :client-session (session-fn-with-id session-id)}]
      (fn [_endpoint] handle))))
+
+(def ^:private stale-port-offset-ms
+  "Milliseconds before `now` used to age a `.nrepl-port` file so it is stale
+   relative to the started-mode launch-instant mtime gate. Single-sources the
+   `60000` offset previously open-coded across the started/config/attach tests."
+  60000)
+
+(defn age-file-back!
+  "Set `file`'s last-modified time to `offset-ms` before now (default
+   `stale-port-offset-ms`). Names the staleness convention so a reader sees the
+   intent — age a port file so it falls below the launch floor — rather than a
+   bare `setLastModified` arithmetic. Returns `file`."
+  ([file] (age-file-back! file stale-port-offset-ms))
+  ([file offset-ms]
+   (.setLastModified (io/file file) (- (System/currentTimeMillis) offset-ms))
+   file))
+
+(defn spit-stale-port!
+  "Write `port` into `<dir>/.nrepl-port` and age it back past the launch floor
+   (via `age-file-back!`), the canonical started-mode stale-port fixture. Returns
+   the port file."
+  [dir port]
+  (let [port-file (io/file dir ".nrepl-port")]
+    (spit port-file (str port "\n"))
+    (age-file-back! port-file)))
+
+(defn touch-fresh!
+  "Set `file`'s last-modified time to `offset-ms` *after* now (default 1000 ms),
+   making it unambiguously fresh relative to a launch instant floored to whole
+   seconds. Removes the residual same-second wall-clock dependency when a test
+   needs to assert the mtime≥floor accept path by construction. Returns `file`."
+  ([file] (touch-fresh! file 1000))
+  ([file offset-ms]
+   (.setLastModified (io/file file) (+ (System/currentTimeMillis) offset-ms))
+   file))
+
+(defn fake-process
+  "A real parameterised `java.lang.Process` proxy for the process-launcher seam.
+   Single-sources the 16-method `Process` ceremony shared by the started/ops
+   tests. `opts`:
+     :alive?      → `isAlive`
+     :exit-code   → `waitFor`/`exitValue`
+     :pid         → `pid`
+     :destroyed*  → optional atom set `true` on `destroy`/`destroyForcibly`.
+   The boilerplate `toHandle`/`info`/`children`/`descendants`/`get*Stream`
+   methods return nil; this is a real proxy (no mocking)."
+  [{:keys [alive? exit-code pid destroyed*]}]
+  (proxy [Process] []
+    (isAlive [] alive?)
+    (waitFor
+      ([] exit-code)
+      ([_timeout _unit] true))
+    (exitValue [] exit-code)
+    (destroy [] (when destroyed* (reset! destroyed* true)) nil)
+    (destroyForcibly [] (when destroyed* (reset! destroyed* true)) this)
+    (pid [] pid)
+    (toHandle [] nil)
+    (info [] nil)
+    (children [] nil)
+    (descendants [] nil)
+    (getInputStream [] nil)
+    (getErrorStream [] nil)
+    (getOutputStream [] nil)))

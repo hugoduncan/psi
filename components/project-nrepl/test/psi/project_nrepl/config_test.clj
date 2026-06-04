@@ -3,7 +3,7 @@
    [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
    [psi.project-nrepl.config :as project-nrepl-config]
-   [psi.project-nrepl.test-support :refer [delete-tree! temp-dir]]))
+   [psi.project-nrepl.test-support :refer [age-file-back! delete-tree! temp-dir]]))
 
 (defn- capture-stderr [f]
   (let [w (java.io.StringWriter.)]
@@ -252,7 +252,7 @@
       (try
         (let [port-file (io/file dir ".nrepl-port")]
           (spit port-file "7888\n")
-          (.setLastModified port-file (- (System/currentTimeMillis) 60000)))
+          (age-file-back! port-file))
         (is (= {:port 7888 :port-source :dot-nrepl-port}
                (project-nrepl-config/read-dot-nrepl-port dir)))
         (finally

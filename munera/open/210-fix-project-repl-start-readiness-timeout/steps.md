@@ -299,7 +299,7 @@
 
 ## Test-shaper review follow-ups (shape)
 
-- [ ] TS1: Lift one parameterised `fake-process` `java.lang.Process` proxy into
+- [x] TS1: Lift one parameterised `fake-process` `java.lang.Process` proxy into
       `test_support.clj` and delete `ops_test/live-fake-process` (a strict
       special case: alive / exit 0 / pid 4321). Have `ops_test` call the shared
       helper with `{:alive? true :exit-code 0 :pid 4321}`. Single-sources the
@@ -307,7 +307,13 @@
       (`consistent(fixtures)` ∧ `helpers_that_compress(ceremony)`). Shape-only;
       behaviour-preserving (no assertion change). Re-run the
       `started/ops/config/attach` suite + clj-kondo after.
-- [ ] TS2: Add a `test_support.clj` helper naming the stale-port fixture
+      → Resolved: moved the parameterised 16-method `Process` proxy into
+      `test_support/fake-process` (`{:alive? :exit-code :pid :destroyed*}`);
+      `started_test` now `:refer`s it (deleted its local copy); `ops_test`
+      deleted `live-fake-process` and calls `(fake-process {:alive? true
+      :exit-code 0 :pid 4321})`. clj-kondo 0/0; `started/ops/config/attach`
+      17 tests/113 assertions green (unchanged).
+- [x] TS2: Add a `test_support.clj` helper naming the stale-port fixture
       (e.g. `spit-stale-port!`/`age-file-back!`, defaulting to the `60000` ms
       offset) and replace the six open-coded
       `(.setLastModified port-file (- (System/currentTimeMillis) 60000))` sites
@@ -315,7 +321,15 @@
       the staleness convention so readers see intent, not bare arithmetic
       (`consistent(test_abstractions)` ∧ economy). Shape-only;
       behaviour-preserving.
-- [ ] TS3 (judgement, optional hardening): Make the
+      → Resolved: added `test_support` `age-file-back!` (set mtime `60000` ms —
+      private `stale-port-offset-ms` — before now) and `spit-stale-port!`
+      (write port + age). Replaced all six sites: `started_test` ×4
+      (two via `spit-stale-port!` dropping the now-redundant `port-file` let
+      binding; the pre-launch-removal seed + PA4 launcher via the helpers),
+      `attach_test` + `config_test` via `age-file-back!` (kept the explicit
+      `spit` so the asserted port value stays at the call site). No bare
+      `setLastModified (- … 60000)` remains.
+- [x] TS3 (judgement, optional hardening): Make the
       `wait-for-started-endpoint-stale-port-gate-test` "accepts a fresh
       .nrepl-port" case assert the mtime≥floor relation by construction
       (`setLastModified` to a known-fresh instant) rather than relying on the
@@ -323,3 +337,8 @@
       timing coupling; the whole-second floor (AMB4) means it is not flaky today,
       so treat as optional robustness hardening — consider alongside a TS2 helper
       that can also set a fresh mtime. Shape-only; behaviour-preserving.
+      → Resolved: added `test_support/touch-fresh!` (set mtime `+1000` ms after
+      now, the TS2-companion fresh setter) and called it in the "accepts a fresh
+      .nrepl-port" case after `spit`, so the mtime≥floor accept relation is
+      explicit by construction — symmetric to the reject cases' aging — instead
+      of relying on the same-second wall-clock landing.

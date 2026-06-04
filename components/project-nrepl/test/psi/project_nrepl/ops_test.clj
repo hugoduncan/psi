@@ -6,7 +6,8 @@
    [psi.project-nrepl.ops :as project-nrepl-ops]
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
    [psi.project-nrepl.test-support
-    :refer [delete-tree! fake-connector install-instance! make-ctx temp-dir]]))
+    :refer [delete-tree! fake-connector fake-process install-instance!
+            make-ctx temp-dir]]))
 
 (defn- write-project-config!
   "Write `<worktree>/.psi/project.edn` with the given agent-session project-nrepl map."
@@ -56,24 +57,6 @@
         (finally
           (delete-tree! worktree))))))
 
-(defn- live-fake-process
-  "A minimal live `java.lang.Process` proxy for the launcher seam (alive, exit 0)."
-  []
-  (proxy [Process] []
-    (isAlive [] true)
-    (waitFor ([] 0) ([_timeout _unit] true))
-    (exitValue [] 0)
-    (destroy [] nil)
-    (destroyForcibly [] this)
-    (pid [] 4321)
-    (toHandle [] nil)
-    (info [] nil)
-    (children [] nil)
-    (descendants [] nil)
-    (getInputStream [] nil)
-    (getErrorStream [] nil)
-    (getOutputStream [] nil)))
-
 (deftest start-config-timeout-threading-test
   (testing "ops/start threads a configured :start-readiness-timeout-ms from project config into the instance (TR3/Q1)"
     ;; Pins the central Q1 configurability path end-to-end: a project
@@ -89,7 +72,7 @@
           command   ["bb" "nrepl-server"]
           launcher  (fn [_worktree _command]
                       (spit (io/file worktree ".nrepl-port") "7777\n")
-                      (live-fake-process))
+                      (fake-process {:alive? true :exit-code 0 :pid 4321}))
           connector (fake-connector "nrepl-session-1")]
       (try
         (write-project-config! worktree {:start-command command

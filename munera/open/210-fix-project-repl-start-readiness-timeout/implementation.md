@@ -963,3 +963,49 @@ behaviour assertion); they reduce incidental duplication and one residual timing
 coupling in the otherwise-complete test set.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Test-shaper follow-up execution — TS1/TS2/TS3 (ψ, 2026-06-03)
+
+Executed all three newly-added test-shaper follow-ups (TS1, TS2, TS3) from the
+preceding test-shaper review pass. All shape-only and behaviour-preserving — no
+production change, no new behaviour assertion; they remove incidental
+duplication and one residual timing coupling.
+
+- TS1 (single-source the `Process` proxy). Lifted the parameterised 16-method
+  `java.lang.Process` proxy into `test_support/fake-process`
+  (`{:alive? :exit-code :pid :destroyed*}`, docstring enumerating the seam).
+  `started_test` now `:refer`s it and deleted its local `fake-process`;
+  `ops_test` deleted `live-fake-process` (the strict alive/exit-0/pid-4321
+  special case) and calls `(fake-process {:alive? true :exit-code 0 :pid 4321})`.
+  The `Process` seam shape is now single-sourced and the two files consistent.
+
+- TS2 (name the stale-port fixture). Added `test_support/age-file-back!`
+  (set mtime `offset-ms` — private `stale-port-offset-ms` 60000 default — before
+  now) and `spit-stale-port!` (write `<dir>/.nrepl-port` + age). Replaced all
+  six open-coded `(.setLastModified port-file (- (System/currentTimeMillis)
+  60000))` sites: `started_test` ×4 (two reject cases via `spit-stale-port!`,
+  dropping the now-redundant `port-file` let binding; the pre-launch-removal
+  seed + PA4 launcher via the helpers), `attach_test` + `config_test` via
+  `age-file-back!` (kept the explicit `spit` so the asserted port value — 7999 /
+  7888 — stays visible at the call site). The staleness convention is now
+  single-sourced; no bare arithmetic `setLastModified` remains.
+
+- TS3 (explicit fresh-accept by construction). Added `test_support/touch-fresh!`
+  (set mtime `+1000` ms after now — the TS2-companion fresh setter) and called
+  it in `wait-for-started-endpoint-stale-port-gate-test`'s "accepts a fresh
+  .nrepl-port" case after `spit`, so the mtime≥floor accept relation is asserted
+  by construction (symmetric to the reject cases' aging) rather than relying on
+  the same-second wall-clock landing. Removes the residual timing coupling; the
+  whole-second floor (AMB4) already kept it non-flaky.
+
+Verified: clj-paren-repair Success (all 5 changed test files, no changes
+needed); clj-kondo 0/0 over `components/project-nrepl/test`;
+`started/ops/config/attach` 17 tests/113 assertions green (unchanged — pure
+shape refactor); remaining project-nrepl unit suite (client/eval/commands/
+runtime) 13 tests/73 assertions green; consuming
+`agent-session/project-nrepl-extension-install-test` 1 test/5 assertions green.
+File lengths: `test_support.clj` 162, `started_test.clj` 251, `ops_test.clj`
+136, `attach_test.clj` 77, `config_test.clj` 276 (all < 800). No
+design/plan/doc/CHANGELOG change (shape-only; no user-visible surface change).
+
+PASS_STATUS: REVIEW_COMPLETE

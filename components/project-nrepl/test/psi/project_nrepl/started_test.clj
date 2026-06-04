@@ -6,26 +6,8 @@
    [psi.project-nrepl.runtime :as project-nrepl-runtime]
    [psi.project-nrepl.started :as project-nrepl-started]
    [psi.project-nrepl.test-support
-    :refer [delete-tree! fake-connector make-ctx temp-dir]]))
-
-(defn- fake-process
-  [{:keys [alive? exit-code pid destroyed*]}]
-  (proxy [Process] []
-    (isAlive [] alive?)
-    (waitFor
-      ([] exit-code)
-      ([_timeout _unit] true))
-    (exitValue [] exit-code)
-    (destroy [] (when destroyed* (reset! destroyed* true)) nil)
-    (destroyForcibly [] (when destroyed* (reset! destroyed* true)) this)
-    (pid [] pid)
-    (toHandle [] nil)
-    (info [] nil)
-    (children [] nil)
-    (descendants [] nil)
-    (getInputStream [] nil)
-    (getErrorStream [] nil)
-    (getOutputStream [] nil)))
+    :refer [age-file-back! delete-tree! fake-connector fake-process make-ctx
+            spit-stale-port! temp-dir touch-fresh!]]))
 
 (deftest wait-for-started-endpoint-test
   (testing "reads discovered endpoint once .nrepl-port appears"
@@ -79,13 +61,11 @@
   ;; :launched-at, a pre-existing .nrepl-port older than the launch instant is
   ;; rejected, while a port whose mtime is >= the launch floor is accepted.
   (testing "rejects a stale (too-old) .nrepl-port as :started-stale-port on deadline"
-    (let [dir       (temp-dir "psi-project-nrepl-started-")
-          process   (fake-process {:alive? true :exit-code 0 :pid 1234})
-          port-file (io/file dir ".nrepl-port")]
+    (let [dir     (temp-dir "psi-project-nrepl-started-")
+          process (fake-process {:alive? true :exit-code 0 :pid 1234})]
       (try
-        (spit port-file "7888\n")
-        ;; force the port file's mtime well before the launch instant
-        (.setLastModified port-file (- (System/currentTimeMillis) 60000))
+        ;; pre-existing port aged well before the launch instant
+        (spit-stale-port! dir 7888)
         (let [launched-at (java.time.Instant/now)
               ex (try
                    (project-nrepl-started/wait-for-started-endpoint!
@@ -101,12 +81,10 @@
     ;; When the launched process writes only a too-old .nrepl-port and then
     ;; exits, the exit branch must preserve the A2 stale-port distinction
     ;; rather than degrade to a plain :started-readiness diagnostic.
-    (let [dir       (temp-dir "psi-project-nrepl-started-")
-          process   (fake-process {:alive? false :exit-code 42 :pid 1234})
-          port-file (io/file dir ".nrepl-port")]
+    (let [dir     (temp-dir "psi-project-nrepl-started-")
+          process (fake-process {:alive? false :exit-code 42 :pid 1234})]
       (try
-        (spit port-file "7888\n")
-        (.setLastModified port-file (- (System/currentTimeMillis) 60000))
+        (spit-stale-port! dir 7888)
         (let [launched-at (java.time.Instant/now)
               ex (try
                    (project-nrepl-started/wait-for-started-endpoint!
@@ -124,9 +102,13 @@
           process   (fake-process {:alive? true :exit-code 0 :pid 1234})
           port-file (io/file dir ".nrepl-port")]
       (try
-        ;; capture launch instant first, then write the port (mtime >= launch)
+        ;; capture launch instant first, then write the port and force its mtime
+        ;; unambiguously *after* the launch floor by construction (TS3) — the
+        ;; accept relation no longer depends on the same-second wall-clock
+        ;; landing, mirroring the explicit setLastModified in the reject cases.
         (let [launched-at (java.time.Instant/now)]
           (spit port-file "7888\n")
+          (touch-fresh! port-file)
           (is (= {:host "127.0.0.1" :port 7888 :port-source :dot-nrepl-port}
                  (project-nrepl-started/wait-for-started-endpoint!
                   dir process
@@ -195,7 +177,7 @@
         ;; seed a stale pre-existing port; pre-launch removal must delete it,
         ;; so the launcher-written 7777 (not the stale 9999) is discovered.
         (spit port-file "9999\n")
-        (.setLastModified port-file (- (System/currentTimeMillis) 60000))
+        (age-file-back! port-file)
         (let [instance (project-nrepl-started/start-instance-in!
                         ctx worktree ["bb" "nrepl-server"]
                         {:runtime-handle {:process-launcher launcher
@@ -251,9 +233,7 @@
           ;; launcher writes a stale (too-old) port: the gate rejects it and the
           ;; short timeout fires with :phase :started-stale-port.
           launcher  (fn [_worktree _command]
-                      (let [pf (io/file worktree ".nrepl-port")]
-                        (spit pf "9999\n")
-                        (.setLastModified pf (- (System/currentTimeMillis) 60000)))
+                      (spit-stale-port! worktree 9999)
                       fake-proc)]
       (try
         (is (thrown-with-msg?
