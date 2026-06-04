@@ -184,15 +184,23 @@
 
 ## Test review follow-ups (coverage)
 
-- [ ] TR1: Pin the raised `120000` ms default behaviour with a test. Add a
+- [x] TR1: Pin the raised `120000` ms default behaviour with a test. Add a
       `start-instance-in!`-with-**no**-`:timeout-ms`-opts test asserting
       `(:readiness-timeout-ms instance) = 120000` (the effective
       `default-readiness-timeout-ms`), so a regression of the default back to
       `5000` is caught. Today only the *configured* timeout (`90000`) is
       asserted; the no-config raised-default acceptance criterion is untested.
-- [ ] TR2: Cover the happy-path `instance-payload`/`status`
+      → Resolved: added `started_test.clj` case "no :timeout-ms opts records the
+      raised 120000 ms default (TR1)" (runtime-handle launcher seam, no
+      `:timeout-ms` opt) asserting `(:readiness-timeout-ms instance) = 120000`.
+- [x] TR2: Cover the happy-path `instance-payload`/`status`
       `:readiness-timeout-ms` projection (AMB3) at the ops level. Add an
       `ops_test.clj` case asserting a normal present/ready instance's
       `status` (or `instance-payload`) includes `:readiness-timeout-ms`, so the
       projected-key-list extension is pinned at its owning layer independently of
       the started-mode PA4 failure-path `status` read.
+      → Resolved: added `ops_test.clj` `status-readiness-timeout-projection-test`
+      — installs a real ready attached instance, sets `:readiness-timeout-ms`
+      120000 via `update-instance-in!`, asserts `status` projects `:present`,
+      `:readiness true`, and `:readiness-timeout-ms 120000` through
+      `instance-payload`.

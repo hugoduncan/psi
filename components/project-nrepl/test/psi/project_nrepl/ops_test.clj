@@ -3,6 +3,7 @@
    [clojure.test :refer [deftest is testing]]
    [psi.project-nrepl.config]
    [psi.project-nrepl.ops :as project-nrepl-ops]
+   [psi.project-nrepl.runtime :as project-nrepl-runtime]
    [psi.project-nrepl.test-support
     :refer [delete-tree! install-instance! make-ctx temp-dir]]))
 
@@ -23,6 +24,26 @@
           (is (re-find #":agent-session :project-nrepl :start-command" (:message result)))
           (is (= {:agent-session {:project-nrepl {:start-command ["bb" "nrepl-server"]}}}
                  (:example-config result))))
+        (finally
+          (delete-tree! worktree))))))
+
+(deftest status-readiness-timeout-projection-test
+  (testing "status/instance-payload projects :readiness-timeout-ms on a ready instance (TR2/AMB3)"
+    ;; Pins the instance-payload key-list extension at the ops layer: a normal
+    ;; present/ready instance's status must surface :readiness-timeout-ms, so a
+    ;; future instance-payload edit dropping it is caught independently of the
+    ;; started-mode failure-path status read.
+    (let [ctx      (make-ctx)
+          worktree (temp-dir "psi-project-nrepl-ops-")]
+      (try
+        (install-instance! ctx worktree (fn [_] nil))
+        (project-nrepl-runtime/update-instance-in!
+         ctx worktree
+         #(assoc % :readiness-timeout-ms 120000))
+        (let [result (project-nrepl-ops/status ctx worktree)]
+          (is (= :present (:status result)))
+          (is (= true (get-in result [:instance :readiness])))
+          (is (= 120000 (get-in result [:instance :readiness-timeout-ms]))))
         (finally
           (delete-tree! worktree))))))
 

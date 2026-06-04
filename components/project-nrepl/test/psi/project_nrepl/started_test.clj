@@ -182,6 +182,26 @@
         (finally
           (delete-tree! worktree)))))
 
+  (testing "no :timeout-ms opts records the raised 120000 ms default (TR1)"
+    ;; Pins the raised default-readiness-timeout-ms so a regression back to the
+    ;; prior 5000 ms is caught: with no :timeout-ms opt the effective timeout
+    ;; recorded on the instance must be the 120000 ms default.
+    (let [ctx       (make-ctx)
+          worktree  (temp-dir "psi-project-nrepl-started-")
+          fake-proc (fake-process {:alive? true :exit-code 0 :pid 4321})
+          launcher  (fn [_worktree _command]
+                      (spit (io/file worktree ".nrepl-port") "7777\n")
+                      fake-proc)
+          connector (fake-connector "nrepl-session-1")]
+      (try
+        (let [instance (project-nrepl-started/start-instance-in!
+                        ctx worktree ["bb" "nrepl-server"]
+                        {:runtime-handle {:process-launcher launcher
+                                          :nrepl-connector connector}})]
+          (is (= 120000 (:readiness-timeout-ms instance))))
+        (finally
+          (delete-tree! worktree)))))
+
   (testing "records the effective :readiness-timeout-ms and launch-instant :started-at"
     (let [ctx       (make-ctx)
           worktree  (temp-dir "psi-project-nrepl-started-")

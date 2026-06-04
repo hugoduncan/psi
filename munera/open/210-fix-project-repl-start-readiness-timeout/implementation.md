@@ -575,3 +575,34 @@ The `with-redefs` stub in the consuming
 pre-existing out-of-scope idiom (arity-only touch) — no new step.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Test-review follow-up execution — TR1/TR2 (ψ, 2026-06-03)
+
+Executed both newly-added test-coverage follow-ups (TR1, TR2) from the preceding
+test review. Both are coverage-only (production code already correct and
+verified); no production change.
+
+- TR1 (raised-default behaviour). Added `started_test.clj` case "no :timeout-ms
+  opts records the raised 120000 ms default (TR1)" inside `start-instance-in-test`:
+  a real runtime-handle launcher seam (file-backed `.nrepl-port`), **no**
+  `:timeout-ms` opt, asserting `(:readiness-timeout-ms instance) = 120000`. Pins
+  the effective `default-readiness-timeout-ms` so a silent regression to `5000`
+  is caught (the prior tests only asserted the *configured* `90000`).
+
+- TR2 (happy-path ops-level projection). Added `ops_test.clj`
+  `status-readiness-timeout-projection-test`: installs a real ready attached
+  instance via `install-instance!`, sets `:readiness-timeout-ms 120000` through
+  `update-instance-in!`, then asserts `ops/status` returns `:present`,
+  `:readiness true`, and projects `:readiness-timeout-ms 120000` through
+  `instance-payload` (AMB3). Pins the projected-key-list extension at its owning
+  ops layer, independent of the started-mode PA4 failure-path `status` read.
+  Required adding `psi.project-nrepl.runtime` to the `ops_test` require.
+
+Verified: clj-paren-repair Success (both files, no changes needed); clj-kondo
+0/0 over `components/project-nrepl/test`; `started-test` + `ops-test` 6 tests/46
+assertions green (the two new tests included); remaining project-nrepl unit
+suite (config/attach/eval/commands/runtime/client) 23 tests/130 assertions
+green. File lengths: `started_test.clj` 248, `ops_test.clj` 87 (< 800). No
+design/doc/CHANGELOG change (coverage-only; no user-visible surface change).
+
+PASS_STATUS: REVIEW_COMPLETE
