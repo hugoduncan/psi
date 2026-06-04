@@ -297,6 +297,28 @@
       `(and endpoint (not fresh?))` guard fails green. Coverage-only; no
       production/doc/CHANGELOG change.
 
+- [ ] TR6: Cover the invalid-configured-timeout `:phase :validate` path through
+      `ops/start` — the negative-path sibling of TR3 at the same boundary. The Q1
+      acceptance criterion includes "out-of-range or non-integer values throw a
+      `:phase :validate` `ex-info`". Today that throw is tested only at the
+      `config_test` unit level (`resolved-start-readiness-timeout-ms-test`), and
+      `start-config-timeout-threading-test` (TR3) exercises only a *valid* (90000)
+      configured value through `ops/start`. `ops/start` calls
+      `(resolved-start-readiness-timeout-ms cfg)` **unguarded** (no try/catch)
+      before launch, so a regression swallowing/wrapping the validation throw,
+      mis-reading the config key, or silently coercing an invalid value would pass
+      every current test (config_test exercises the fn directly; the threading
+      test uses a valid value; `start-test` hits only missing-start-command). This
+      is the user-misconfiguration surface where the validation actually fires.
+      Add an `ops_test.clj` case that writes a project `.psi/project.edn` with a
+      valid `:start-command` and an out-of-range (e.g. `999` or `600001`) or
+      non-integer `:start-readiness-timeout-ms`, drives `ops/start`, and asserts a
+      `clojure.lang.ExceptionInfo` with `:phase :validate` is thrown (via
+      `thrown-with-msg?` on the range message, or `(:phase (ex-data …))`), pinning
+      that config validation surfaces at the op boundary. Coverage-only
+      (production verified by inspection); no mocks (real config file + ctx).
+      Re-run config/ops + clj-kondo after.
+
 ## Test-shaper review follow-ups (shape)
 
 - [x] TS1: Lift one parameterised `fake-process` `java.lang.Process` proxy into

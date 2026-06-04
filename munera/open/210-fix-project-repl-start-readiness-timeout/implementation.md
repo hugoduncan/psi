@@ -1536,3 +1536,41 @@ and is fully covered by no-mock state/return tests. All prior review threads
 (IR1, IR2, TR1–5, TS1–10, PA1–4, PSI1) are resolved and checked.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Test review — coverage (ψ, 2026-06-04, task-test-review)
+
+Skill: task-test-review (`well_formed(tests) ∧ ∀b∈behaviour(design).∃t.covers(t,b)
+∧ ∀d∈infra_deps. injectable ∧ nullable ∧ ¬mock ∧ ¬stub`). Independent re-read of
+`config.clj`, `ops.clj`, `started.clj` and the `config/ops/started_test` suites.
+State: `--focus project-nrepl.{started,ops,config}-test` 15 tests/111 assertions
+green; no `with-redefs`/`reify`/`mock`/`stub` anywhere (verified by grep) — all
+infra deps are injected real seams (`fake-process` `Process` proxy, fn
+`:process-launcher`/`:nrepl-connector`, file-backed `.nrepl-port`, real
+`update-instance-in!`/`ensure-instance-in!`). Tests are well-formed and assert
+state/return values, not interactions.
+
+**Coverage gap (one, actionable, non-duplicated): TR6.** The Q1 acceptance
+criterion includes "out-of-range or non-integer values throw a `:phase :validate`
+`ex-info`". That validation is unit-tested in `config_test`
+(`resolved-start-readiness-timeout-ms-test`), and the *valid* config→`ops/start`
+→opts→`start-instance-in!` thread is pinned by `start-config-timeout-threading-test`
+(TR3, 90000). But **no test drives an out-of-range/non-integer configured
+`:start-readiness-timeout-ms` through `ops/start`** to assert the `:phase
+:validate` throw surfaces at the user-facing op boundary. `ops/start` calls
+`(resolved-start-readiness-timeout-ms cfg)` *unguarded* (no try/catch) before
+launch, so a regression wrapping/swallowing the validation throw, mis-reading the
+config key, or silently coercing an invalid value would pass every current test
+(config_test exercises the fn directly; threading test only uses a valid value;
+`start-test` only hits the missing-start-command path). This is the negative-path
+sibling of TR3 at the same boundary — the user-misconfiguration surface where the
+validation actually fires (e.g. a user sets `:start-readiness-timeout-ms 999`).
+
+All other behaviours covered: raised 120000 default (TR1), config→ops valid
+thread (TR3), deadline `:started-readiness` (TR5), stale-port `:started-stale-port`
+deadline + IR1 exit + A2 instant payload (TR5/TS10), pre-launch removal +
+fresh-accept, gate reject/accept, `:readiness-timeout-ms` payload projection
+(TR2/AMB3), `:started-at` launch-instant provenance (TS4), IR2 process reap,
+A1 attach/shared-discovery stale-acceptance (TR4), startup-failure projection.
+No mocks/stubs; infra deps fully nullable.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
