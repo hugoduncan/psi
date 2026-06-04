@@ -503,3 +503,26 @@
       malformed `spit`) and asserts only its distinct merge/fallback/malformed
       contract; the asserted EDN content stays visible at the call site. config
       8 tests/41 assertions green; clj-kondo 0/0.
+
+## Test-shaper review follow-ups (shape, pass 6)
+
+- [ ] TS10: Assert the stale-port diagnostic *instants* — the A2 observability
+      payload. The A2 acceptance criterion is that the stale-port rejection's
+      `ex-data` carries the rejected/launch instants so the diagnostic is
+      **observable from the instance** via `:last-error → :data`. The production
+      `:started-stale-port` ex-data (deadline branch + IR1 exit branch) carries
+      `:port-mtime-ms` / `:min-mtime-ms` / `:launched-at`, but no test asserts
+      any of those keys are present on any path: the `wait-for-started-endpoint!`
+      reject case asserts only `:phase` + message; the IR1 exit case asserts
+      `:phase` + `:command-exited?` + message; and the PA4 `status`-read test —
+      the surface that proves A2's "observable from the instance" claim —
+      asserts `[:instance :last-error :data :phase]` only. A regression dropping
+      the rejected/launch instants from the diagnostic ex-data (gutting A2's
+      observability rationale) passes every current test. Tighten the PA4
+      `status`-read test (the contract's owning surface) to also assert
+      `:port-mtime-ms` / `:min-mtime-ms` / `:launched-at` are present (non-nil,
+      and `min-mtime-ms ≥ port-mtime-ms`) under `[:instance :last-error :data]`,
+      and/or add the instant-presence assertions to the
+      `wait-for-started-endpoint!` reject + IR1 cases. Coverage-only;
+      behaviour-preserving (production already carries the keys). Re-run
+      started/ops + clj-kondo after.

@@ -1328,3 +1328,47 @@ prefer per-file writers whose `.mkdirs` still provisions the shared dir for the
 sibling raw spit.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Test-shaper review (pass 6)
+
+Read all eight project-nrepl test files + `test_support.clj`. Applied
+`λtests. clarity ∧ signal ∧ robustness → shape`.
+
+Passes TS1–TS9 are landed: single-concern, no-mock, behaviour-focused,
+deterministic (explicit-by-construction mtime fixtures), and the `Process`
+proxy / stale-fresh mtime / happy launcher / temp-dir / config-writer ceremony
+are single-sourced. `clojure -M:test --focus unit` exit 0.
+
+One actionable `behavior_focused` / `meaningful_failures` coverage-of-contract
+gap remains, grep-confirmed absent from steps/implementation/tests:
+
+- **TS10 — the stale-port diagnostic *instants* (the A2 observability payload)
+  are never asserted.** The A2 acceptance criterion is that the stale-port
+  rejection's `ex-data` "carries the rejected/launch instants" so the diagnostic
+  is **observable from the instance** via `:last-error → :data`. The production
+  `:started-stale-port` ex-data (both the deadline branch and the IR1 exit
+  branch) carries `:port-mtime-ms` / `:min-mtime-ms` / `:launched-at` — the
+  rejected-vs-floor evidence that makes the rejection diagnosable. But **no test
+  asserts any of these three keys are present** on any path: the
+  `wait-for-started-endpoint!` reject case asserts only `:phase` + message; the
+  IR1 exit case asserts `:phase` + `:command-exited?` + message; and crucially
+  the **PA4 `status`-read test** — the one that proves A2's "observable from the
+  instance" claim — asserts `[:instance :last-error :data :phase]` only, never
+  that the instants survive into `:last-error → :data`. A regression dropping the
+  rejected/launch instants from the diagnostic ex-data (gutting A2's
+  observability rationale) would pass every current test. Tighten the PA4
+  `status`-read test (the contract's owning surface) to also assert
+  `:port-mtime-ms` / `:min-mtime-ms` / `:launched-at` are present (and
+  `min-mtime-ms ≥ port-mtime-ms` / non-nil) under `[:instance :last-error :data]`,
+  and/or add the instant-presence assertions to the
+  `wait-for-started-endpoint!` reject + IR1 cases. Coverage-only;
+  behaviour-preserving (production already carries the keys).
+
+Secondary (judgement, optional — noted, not blocking):
+
+- TS11: the three `wait-for-started-endpoint!` exception cases (TR5 deadline,
+  stale-port reject, IR1 exit) open-code the same `(try … (catch
+  clojure.lang.ExceptionInfo e e))` + repeated `(:phase (ex-data ex))` /
+  `(.getMessage ex)` inspection frame. A `thrown-ex-data` helper would compress
+  the catch-and-inspect ceremony (`consistent(assertion_style)` ∧
+  `minimal_incidental_setup`). Shape-only.
