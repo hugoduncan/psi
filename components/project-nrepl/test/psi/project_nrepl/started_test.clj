@@ -108,7 +108,33 @@
         (is (= {:host "127.0.0.1" :port 7888 :port-source :dot-nrepl-port}
                (project-nrepl-started/wait-for-started-endpoint!
                 dir process
-                {:timeout-ms 1000 :poll-interval-ms 10 :launched-at launched-at})))))))
+                {:timeout-ms 1000 :poll-interval-ms 10 :launched-at launched-at}))))))
+
+  (testing "stale port observed early is accepted on a later poll once it becomes fresh (TR7)"
+    ;; The design's defence-in-depth continuation: a present-but-too-old
+    ;; .nrepl-port is a *soft* not-yet-ready — the poll loop continues rather
+    ;; than hard-rejecting it — so a port that is too-old on an early poll and
+    ;; then replaced by a fresh one is accepted on a *later* poll, before the
+    ;; deadline. Pins the (if (and endpoint fresh?) accept (recur)) soft-continue
+    ;; branch against a regression turning too-old into an immediate short-circuit
+    ;; rejection (which the deadline-rejection and first-poll-accept cases would
+    ;; both still pass). An alive process never short-circuits via the exit path.
+    (with-temp-dir [dir "psi-project-nrepl-started-"]
+      (let [process     (fake-process {:alive? true :exit-code 0 :pid 1234})
+            port-file   (io/file dir ".nrepl-port")
+            launched-at (java.time.Instant/now)]
+        ;; seed a too-old port so the first poll(s) reject it as not-yet-ready
+        (spit port-file "7888\n")
+        (age-file-back! port-file)
+        ;; after a brief delay (≥ a couple of poll intervals) make the same port
+        ;; fresh, so a later poll passes the gate and accepts it.
+        (let [fresher (future (Thread/sleep 60) (touch-fresh! port-file))]
+          (try
+            (is (= {:host "127.0.0.1" :port 7888 :port-source :dot-nrepl-port}
+                   (project-nrepl-started/wait-for-started-endpoint!
+                    dir process
+                    {:timeout-ms 2000 :poll-interval-ms 10 :launched-at launched-at})))
+            (finally @fresher)))))))
 
 (deftest start-instance-in-test
   (testing "started-mode acquisition launches command, discovers endpoint, and marks ready"

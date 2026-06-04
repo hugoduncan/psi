@@ -332,7 +332,7 @@
       (+1/+3); `--focus unit` RC=0; clj-kondo 0/0; clj-paren-repair Success;
       file-lengths exit 0; ops_test 158 lines (< 800).
 
-- [ ] TR7: Cover the stale-gate **poll-continuation accept** path. The design
+- [x] TR7: Cover the stale-gate **poll-continuation accept** path. The design
       states a present-but-too-old `.nrepl-port` is "treated as not-yet-ready:
       the poll loop continues until the gate passes or the deadline fires." The
       current `wait-for-started-endpoint!` gate tests cover only the two
@@ -356,6 +356,25 @@
       continue-then-accept branch against a hard-reject regression.
       Coverage-only; production already correct. Re-run started + clj-kondo
       after.
+      → Resolved: added `wait-for-started-endpoint-stale-port-gate-test` case
+      "stale port observed early is accepted on a later poll once it becomes
+      fresh (TR7)". An **alive** `fake-process` (never short-circuits the exit
+      branch), injected `:launched-at`, `:poll-interval-ms 10`, `:timeout-ms
+      2000`. Seeds a too-old `.nrepl-port` (`age-file-back!`) so the first
+      poll(s) reject it as not-yet-ready, then a `future` `touch-fresh!`es the
+      *same* port after a 60 ms delay (≥6 poll intervals) so a later poll passes
+      the gate and accepts it; asserts the returned `{:host "127.0.0.1" :port
+      7888 :port-source :dot-nrepl-port}` map (ultimate accept, not deadline
+      rejection). Pins the production `(if (and endpoint fresh?) accept (…recur))`
+      soft-continue branch: a regression turning too-old into a hard immediate
+      `:started-stale-port` short-circuit throws on the first poll (before the
+      `future` fires) and fails the accept assertion, while the existing
+      deadline-rejection and first-poll-accept cases would both stay green. The
+      `future` is dereffed in a `finally` so the background thread is joined.
+      Coverage-only; no production/doc/CHANGELOG change. started-test 3 tests/48
+      assertions green (+1 over pass-7's 47); clj-kondo 0/0; clj-paren-repair
+      Success; `--focus unit` RC=0; `bb commit-check:file-lengths` exit 0
+      (started_test 305 lines, < 800).
 
 ## Test-shaper review follow-ups (shape)
 

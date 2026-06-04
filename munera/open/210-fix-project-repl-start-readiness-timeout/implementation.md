@@ -1660,3 +1660,36 @@ or a regression collapsing the soft branch into a hard immediate reject escapes
 a suite that only tests the immediate-accept and the deadline-reject endpoints.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+---
+
+## Test-review follow-up execution (TR7) — 2026-06-03
+
+✅ TR7 resolved (coverage-only). Added `wait-for-started-endpoint-stale-port-gate-test`
+case "stale port observed early is accepted on a later poll once it becomes
+fresh (TR7)" in `started_test.clj`. Arrange: an **alive** `fake-process` (so the
+process-exited short-circuit never fires), injected `:launched-at`,
+`:poll-interval-ms 10`, `:timeout-ms 2000`. Seed a too-old `.nrepl-port` via
+`age-file-back!` so the first poll(s) reject it as not-yet-ready; a `future`
+`touch-fresh!`es the **same** port after a 60 ms delay (≥6 poll intervals) so a
+later poll passes the mtime gate. Assert the returned
+`{:host "127.0.0.1" :port 7888 :port-source :dot-nrepl-port}` map — the ultimate
+**accept**, not a deadline rejection. The `future` is dereffed in a `finally` to
+join the background thread.
+
+🎯 Discrimination: pins production's `(if (and endpoint fresh?) accept (…recur))`
+soft-continue branch. A regression turning too-old into a *hard* immediate
+`:started-stale-port` short-circuit would throw on the very first poll (before
+the `future` fires) and fail the accept assertion, while the existing
+deadline-rejection (`:started-stale-port` on timeout) and first-poll-accept
+(`touch-fresh!` pre-write) cases would both stay green — closing the
+escape window the test-review flagged.
+
+✅ Verification: `clojure -M:test --focus psi.project-nrepl.started-test` → 3
+tests/48 assertions, 0 failures (+1 assertion over pass-7's 47);
+`clojure -M:test --focus unit` RC=0 (full unit suite green, no regressions);
+clj-kondo 0 errors/0 warnings on `started_test.clj`; clj-paren-repair Success;
+`bb commit-check:file-lengths` exit 0 (`started_test.clj` 305 lines, < 800).
+No production / doc / CHANGELOG change (coverage-only).
+
+PASS_STATUS: FOLLOW_UP_COMPLETE
