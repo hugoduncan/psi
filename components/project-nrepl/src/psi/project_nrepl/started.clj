@@ -9,7 +9,7 @@
    (java.io File)
    (java.util UUID)))
 
-(def ^:private default-readiness-timeout-ms 5000)
+(def ^:private default-readiness-timeout-ms 120000)
 (def ^:private default-poll-interval-ms 50)
 
 (defn- now []
@@ -40,34 +40,73 @@
   [^Process process]
   (not (.isAlive process)))
 
+(defn- floored-to-whole-seconds
+  "Floor an epoch-milliseconds instant to whole seconds.
+
+   The mtime acceptance gate compares against this floor so a legitimately-fresh
+   `.nrepl-port` written in the same second as launch is not rejected under
+   coarse filesystem mtime granularity (AMB4)."
+  [epoch-ms]
+  (* 1000 (quot epoch-ms 1000)))
+
+(defn- port-file-mtime-ms
+  "Last-modified epoch-millis of `<worktree>/.nrepl-port`, or nil when absent."
+  [worktree-path]
+  (let [f (io/file worktree-path ".nrepl-port")]
+    (when (.exists f)
+      (.lastModified f))))
+
 (defn wait-for-started-endpoint!
   "Wait for `.nrepl-port` to appear and parse successfully for a started process.
-   Returns {:host :port :port-source} or throws with diagnosable failure context."
+   Returns {:host :port :port-source} or throws with diagnosable failure context.
+
+   When `opts` carries `:launched-at` (a `java.time.Instant`), a `.nrepl-port`
+   is accepted only when its last-modified time is `≥ (:launched-at floored to
+   whole seconds)` — the stale-port ownership gate (A1). A present-but-too-old
+   port is treated as not-yet-ready (poll continues); a deadline hit while only
+   a too-old port exists is reported as `:phase :started-stale-port`."
   ([worktree-path process]
    (wait-for-started-endpoint! worktree-path process {}))
   ([worktree-path process opts]
    (let [effective-worktree (project-nrepl-config/absolute-directory-path! worktree-path)
          effective-timeout-ms (long (or (:timeout-ms opts) default-readiness-timeout-ms))
          deadline           (+ (System/currentTimeMillis) effective-timeout-ms)
-         poll-ms            (long (or (:poll-interval-ms opts) default-poll-interval-ms))]
+         poll-ms            (long (or (:poll-interval-ms opts) default-poll-interval-ms))
+         launched-at        (:launched-at opts)
+         min-mtime-ms       (when launched-at
+                              (floored-to-whole-seconds (.toEpochMilli ^java.time.Instant launched-at)))]
      (loop []
-       (if-let [endpoint (read-dot-nrepl-port-safe effective-worktree)]
-         (assoc endpoint :host "127.0.0.1")
-         (do
-           (when (process-exited? process)
-             (throw (ex-info "Started project nREPL process exited before .nrepl-port became ready"
-                             {:phase :started-readiness
-                              :worktree-path effective-worktree
-                              :command-exited? true
-                              :exit-code (.exitValue process)})))
-           (when (>= (System/currentTimeMillis) deadline)
-             (throw (ex-info "Timed out waiting for started project nREPL .nrepl-port"
-                             {:phase :started-readiness
-                              :worktree-path effective-worktree
-                              :timeout-ms effective-timeout-ms
-                              :path (.getAbsolutePath (io/file effective-worktree ".nrepl-port"))})))
-           (Thread/sleep poll-ms)
-           (recur)))))))
+       (let [endpoint (read-dot-nrepl-port-safe effective-worktree)
+             mtime-ms (when endpoint (port-file-mtime-ms effective-worktree))
+             fresh?   (or (nil? min-mtime-ms)
+                          (nil? mtime-ms)
+                          (>= mtime-ms min-mtime-ms))]
+         (if (and endpoint fresh?)
+           (assoc endpoint :host "127.0.0.1")
+           (do
+             (when (process-exited? process)
+               (throw (ex-info "Started project nREPL process exited before .nrepl-port became ready"
+                               {:phase :started-readiness
+                                :worktree-path effective-worktree
+                                :command-exited? true
+                                :exit-code (.exitValue process)})))
+             (when (>= (System/currentTimeMillis) deadline)
+               (if (and endpoint (not fresh?))
+                 (throw (ex-info "Timed out waiting for a fresh started project nREPL .nrepl-port (only a stale port was present)"
+                                 {:phase :started-stale-port
+                                  :worktree-path effective-worktree
+                                  :timeout-ms effective-timeout-ms
+                                  :path (.getAbsolutePath (io/file effective-worktree ".nrepl-port"))
+                                  :port-mtime-ms mtime-ms
+                                  :min-mtime-ms min-mtime-ms
+                                  :launched-at launched-at}))
+                 (throw (ex-info "Timed out waiting for started project nREPL .nrepl-port"
+                                 {:phase :started-readiness
+                                  :worktree-path effective-worktree
+                                  :timeout-ms effective-timeout-ms
+                                  :path (.getAbsolutePath (io/file effective-worktree ".nrepl-port"))}))))
+             (Thread/sleep poll-ms)
+             (recur))))))))
 
 (defn start-instance-in!
   "Start a managed started-mode project nREPL instance for `worktree-path`.
@@ -89,20 +128,36 @@
        (let [instance (project-nrepl-runtime/instance-in ctx effective-worktree)
              launcher (or (get-in instance [:runtime-handle :process-launcher])
                           real-process-launcher)
-             process  (launcher effective-worktree validated-command)
-             endpoint (wait-for-started-endpoint! effective-worktree process opts)]
+             effective-timeout-ms (long (or (:timeout-ms opts) default-readiness-timeout-ms))
+             ;; Launch instant captured once (INC1): the sole source for both the
+             ;; runtime-handle :started-at and the mtime-gate reference, written
+             ;; pre-wait so both survive the throwing failure path (PA1/PA2).
+             launched-at (now)]
+         ;; Pre-launch removal (Q2/A1): delete any pre-existing .nrepl-port so
+         ;; any subsequently-observed port file is necessarily new.
+         (.delete (project-nrepl-config/dot-nrepl-port-file effective-worktree))
+         ;; Launch-site update (pre-wait): records the effective resolved timeout
+         ;; and the launch-instant :started-at before the wait can throw.
          (project-nrepl-runtime/update-instance-in!
           ctx effective-worktree
           #(-> %
-               (assoc :lifecycle-state :starting
-                      :readiness false
-                      :endpoint endpoint
-                      :last-error nil)
-               (update :runtime-handle merge {:process process
-                                              :pid (.pid process)
-                                              :started-at (now)
-                                              :launch-id (str (UUID/randomUUID))})))
-         (project-nrepl-client/connect-instance-in! ctx effective-worktree))
+               (assoc :readiness-timeout-ms effective-timeout-ms)
+               (update :runtime-handle merge {:started-at launched-at})))
+         (let [process  (launcher effective-worktree validated-command)
+               endpoint (wait-for-started-endpoint!
+                         effective-worktree process
+                         (assoc opts :launched-at launched-at))]
+           (project-nrepl-runtime/update-instance-in!
+            ctx effective-worktree
+            #(-> %
+                 (assoc :lifecycle-state :starting
+                        :readiness false
+                        :endpoint endpoint
+                        :last-error nil)
+                 (update :runtime-handle merge {:process process
+                                                :pid (.pid process)
+                                                :launch-id (str (UUID/randomUUID))})))
+           (project-nrepl-client/connect-instance-in! ctx effective-worktree)))
        (catch Throwable t
          (project-nrepl-runtime/update-instance-in!
           ctx effective-worktree

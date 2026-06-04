@@ -2,18 +2,17 @@
 
 ## Slice 1 — Config surface (timeout key + validation)
 
-- [ ] Add `resolved-start-readiness-timeout-ms` to `config.clj`: read
+- [x] Add `resolved-start-readiness-timeout-ms` to `config.clj`: read
       `[:project-nrepl :start-readiness-timeout-ms]`; `nil` when unset;
       `cond`-style range check `[1000 600000]` (integer) mirroring
       `resolved-attach-endpoint`; throw `ex-info` `{:phase :validate}` on
       non-integer / out-of-range.
-- [ ] Add `config_test.clj` cases: unset → `nil`; valid in-range → value;
+- [x] Add `config_test.clj` cases: unset → `nil`; valid in-range → value;
       below 1000 → throws `:phase :validate`; above 600000 → throws; non-integer
       → throws.
-- [ ] Run the unit suite (`clojure -M:test --focus unit`, or the
-      namespace-focused `clojure -M:test --focus
-      project-nrepl.config-test`; `bb clojure:test:unit` equivalently) +
-      `clj-kondo --lint` on changed files; commit slice 1.
+- [x] Run the unit suite (`clojure -M:test --focus
+      psi.project-nrepl.config-test`) + `clj-kondo --lint` on changed files;
+      commit slice 1. → 8 tests/40 assertions green; lint 0/0; commit.
 
 ## Slice 2 — Timeout threading + raised default + payload projection
 

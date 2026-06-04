@@ -22,14 +22,15 @@
 (defn- instance-payload
   [instance]
   (when instance
-    {:worktree-path     (:worktree-path instance)
-     :acquisition-mode  (:acquisition-mode instance)
-     :lifecycle-state   (:lifecycle-state instance)
-     :readiness         (boolean (:readiness instance))
-     :endpoint          (:endpoint instance)
-     :active-session-id (:active-session-id instance)
-     :last-eval         (:last-eval instance)
-     :last-error        (:last-error instance)}))
+    {:worktree-path        (:worktree-path instance)
+     :acquisition-mode     (:acquisition-mode instance)
+     :lifecycle-state      (:lifecycle-state instance)
+     :readiness            (boolean (:readiness instance))
+     :readiness-timeout-ms (:readiness-timeout-ms instance)
+     :endpoint             (:endpoint instance)
+     :active-session-id    (:active-session-id instance)
+     :last-eval            (:last-eval instance)
+     :last-error           (:last-error instance)}))
 
 (defn status
   [ctx worktree-path]
@@ -72,7 +73,11 @@
         (if (and existing (:readiness existing))
           {:status :present
            :instance (instance-payload existing)}
-          (let [instance (project-nrepl-started/start-instance-in! ctx worktree-path command-vector)]
+          (let [timeout-ms (project-nrepl-config/resolved-start-readiness-timeout-ms cfg)
+                opts       (cond-> {}
+                             (some? timeout-ms) (assoc :timeout-ms timeout-ms))
+                instance   (project-nrepl-started/start-instance-in!
+                            ctx worktree-path command-vector opts)]
             {:status :started
              :instance (instance-payload instance)}))))))
 
