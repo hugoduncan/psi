@@ -606,3 +606,42 @@ green. File lengths: `started_test.clj` 248, `ops_test.clj` 87 (< 800). No
 design/doc/CHANGELOG change (coverage-only; no user-visible surface change).
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Test review — implementation tests (ψ, 2026-06-03, pass 2)
+
+Independent re-review against the design acceptance criteria after the TR1/TR2
+follow-ups landed. Skill: task-test-review — `well_formed(tests)` ∧
+`∀b∈behaviour(design).∃t.covers(t,b)` ∧ `∀d∈infra_deps. injectable ∧ nullable ∧
+¬mock ∧ ¬stub`. Read: `started_test.clj`, `config_test.clj`, `ops_test.clj`,
+`test_support.clj`, `started.clj`, `config.clj`, `ops.clj`. Verified prior gaps
+closed: TR1 (`no :timeout-ms opts records 120000`) and TR2
+(`status-readiness-timeout-projection-test`) present and asserting the right
+state. No-mocks compliance holds: real nullable seams (`fake-process` proxy,
+`fake-connector` fn, file-backed `.nrepl-port`, `setLastModified` mtime), state/
+return assertions, no interaction assertions.
+
+New actionable coverage gap (not a duplicate of IR1/TR1/TR2 or the
+with-redefs note):
+
+- TR3 (`ops/start` config→opts threading untested end-to-end). The Q1 acceptance
+  criterion is that the timeout is *controllable through the
+  `[:agent-session :project-nrepl :start-readiness-timeout-ms]` config key*. The
+  pieces are covered in isolation — `config_test` pins
+  `resolved-start-readiness-timeout-ms`'s value/validation; `started_test` pins
+  `start-instance-in!` recording a *directly-passed* `:timeout-ms` (90000) and
+  the no-opts default (TR1) — but **no test drives a *configured* timeout from
+  project config through `ops/start`'s glue** (`ops.clj`:
+  `(resolved-start-readiness-timeout-ms cfg)` → `cond-> {} (some? timeout-ms)
+  (assoc :timeout-ms …)` → `start-instance-in!`). `ops_test/start-test` only
+  exercises the missing-start-command path, and TR2 sets `:readiness-timeout-ms`
+  directly via `update-instance-in!`, bypassing the config resolution. A
+  regression in that ops seam (dropped `assoc`, wrong config key, not resolving
+  from `cfg`) passes every current test. An `ops_test` case writing a project
+  config with `:start-command` + a configured `:start-readiness-timeout-ms`,
+  driving `ops/start` over a real `:runtime-handle` launcher seam, and asserting
+  the resulting instance's `:readiness-timeout-ms` matches the configured value
+  would pin the central Q1 integration path. Coverage-only (production verified
+  by inspection: `ops.clj`:76-78 reads from `cfg` and threads correctly); this
+  hardens regression detection for the headline configurability criterion.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

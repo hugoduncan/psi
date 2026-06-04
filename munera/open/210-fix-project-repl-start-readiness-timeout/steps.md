@@ -204,3 +204,23 @@
       120000 via `update-instance-in!`, asserts `status` projects `:present`,
       `:readiness true`, and `:readiness-timeout-ms 120000` through
       `instance-payload`.
+- [ ] TR3: Cover the `ops/start` config→opts threading end-to-end. The Q1
+      acceptance criterion — the timeout is *controllable through the
+      `[:agent-session :project-nrepl :start-readiness-timeout-ms]` config key* —
+      has no test that drives a *configured* timeout from project config through
+      `ops/start`'s `cond-> {} (some? timeout-ms) (assoc :timeout-ms …)` glue
+      (`ops.clj`) into `start-instance-in!`. Today `config_test` only asserts
+      `resolved-start-readiness-timeout-ms` returns the value, and `started_test`
+      only asserts `start-instance-in!` records a *directly-passed* `:timeout-ms`
+      (90000) and the no-opts default (TR1, 120000); `ops_test/start-test` only
+      exercises the missing-start-command path and TR2 sets `:readiness-timeout-ms`
+      directly via `update-instance-in!`. A regression in the ops glue (dropped
+      `assoc`, wrong config key, not reading from `cfg`) would pass all current
+      tests. Add an `ops_test.clj` case that writes a project `.psi/project.edn`
+      with both `:start-command` and a configured `:start-readiness-timeout-ms`
+      (e.g. 90000), drives `ops/start` with a seeded `:runtime-handle` launcher
+      seam (no mocks; file-backed `.nrepl-port`), and asserts the resulting
+      instance/`status` carries `:readiness-timeout-ms 90000` — pinning the
+      config-key → ops → opts → `start-instance-in!` resolution path. (Resolve the
+      runtime-handle pre-seed vs `ensure-instance-in!` conflict-detection seam in
+      the builder; the threading is the assertion target.)
