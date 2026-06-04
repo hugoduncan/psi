@@ -264,7 +264,7 @@
       shared read" (asserts `{:port 7888 :port-source :dot-nrepl-port}` still
       reads). Both pin the A1 separation (gate lives only in `started.clj`)
       against a future gate leak into the shared/attach path.
-- [ ] TR5: Cover the plain deadline-timeout `:started-readiness` path — the
+- [x] TR5: Cover the plain deadline-timeout `:started-readiness` path — the
       original reproduction's failure mode. `wait-for-started-endpoint!`'s
       deadline branch has two outcomes: `:started-stale-port` (too-old port
       present — tested) and the plain `:started-readiness` else-branch (alive
@@ -283,3 +283,16 @@
       (distinguishing it from the exit branch). Coverage-only (production
       verified by inspection); symmetric to the `:started-stale-port` deadline
       test.
+      → Resolved: added `wait-for-started-endpoint-test` case "plain deadline
+      timeout (alive process, no .nrepl-port) reports :started-readiness (TR5)".
+      An **alive** `fake-process`, an **empty** temp dir (no `.nrepl-port`), a
+      `:timeout-ms 100` / `:poll-interval-ms 10`, asserting the thrown
+      `ExceptionInfo` carries `:phase :started-readiness`, `:timeout-ms 100`,
+      `:path` = `<dir>/.nrepl-port`, `:command-exited?` absent/false (alive
+      process → distinct from the exit branch), and the "Timed out waiting for
+      started project nREPL" message (distinct from the stale-port deadline's
+      "only a stale port was present"). Pins the deadline else-branch — the
+      design reproduction's exact failure mode — so a regression mis-routing it
+      to `:started-stale-port`, dropping `:timeout-ms`, or inverting the
+      `(and endpoint (not fresh?))` guard fails green. Coverage-only; no
+      production/doc/CHANGELOG change.

@@ -49,6 +49,29 @@
              #"exited before \.nrepl-port became ready"
              (project-nrepl-started/wait-for-started-endpoint! dir process {:timeout-ms 100 :poll-interval-ms 10})))
         (finally
+          (delete-tree! dir)))))
+
+  (testing "plain deadline timeout (alive process, no .nrepl-port) reports :started-readiness (TR5)"
+    ;; The original reproduction's failure mode: an alive process that never
+    ;; writes a .nrepl-port, so the deadline fires on the plain
+    ;; :started-readiness else-branch (distinct from the exit branch and from
+    ;; the :started-stale-port deadline branch). Pins the deadline diagnostic
+    ;; shape (:phase :started-readiness, :timeout-ms, :path) and that
+    ;; :command-exited? is absent (the process is still alive).
+    (let [dir     (temp-dir "psi-project-nrepl-started-")
+          process (fake-process {:alive? true :exit-code 0 :pid 1234})]
+      (try
+        (let [ex (try
+                   (project-nrepl-started/wait-for-started-endpoint!
+                    dir process {:timeout-ms 100 :poll-interval-ms 10})
+                   (catch clojure.lang.ExceptionInfo e e))
+              data (ex-data ex)]
+          (is (= :started-readiness (:phase data)))
+          (is (= 100 (:timeout-ms data)))
+          (is (= (.getAbsolutePath (io/file dir ".nrepl-port")) (:path data)))
+          (is (not (:command-exited? data)))
+          (is (re-find #"Timed out waiting for started project nREPL" (.getMessage ex))))
+        (finally
           (delete-tree! dir))))))
 
 (deftest wait-for-started-endpoint-stale-port-gate-test
