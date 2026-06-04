@@ -193,6 +193,45 @@
     (is (thrown? clojure.lang.ExceptionInfo
                  (project-nrepl-config/resolved-attach-endpoint {:project-nrepl {:attach {:port "7888"}}})))))
 
+(deftest resolved-start-readiness-timeout-ms-test
+  (testing "returns nil when start-readiness-timeout-ms config absent"
+    (is (nil? (project-nrepl-config/resolved-start-readiness-timeout-ms
+               {:project-nrepl {}}))))
+
+  (testing "returns a valid in-range integer timeout"
+    (is (= 120000
+           (project-nrepl-config/resolved-start-readiness-timeout-ms
+            {:project-nrepl {:start-readiness-timeout-ms 120000}})))
+    (is (= 1000
+           (project-nrepl-config/resolved-start-readiness-timeout-ms
+            {:project-nrepl {:start-readiness-timeout-ms 1000}})))
+    (is (= 600000
+           (project-nrepl-config/resolved-start-readiness-timeout-ms
+            {:project-nrepl {:start-readiness-timeout-ms 600000}}))))
+
+  (testing "rejects below-range, above-range, and non-integer timeouts as :phase :validate"
+    (is (thrown-with-msg?
+         clojure.lang.ExceptionInfo
+         #"range 1000-600000"
+         (project-nrepl-config/resolved-start-readiness-timeout-ms
+          {:project-nrepl {:start-readiness-timeout-ms 999}})))
+    (is (thrown-with-msg?
+         clojure.lang.ExceptionInfo
+         #"range 1000-600000"
+         (project-nrepl-config/resolved-start-readiness-timeout-ms
+          {:project-nrepl {:start-readiness-timeout-ms 600001}})))
+    (is (thrown-with-msg?
+         clojure.lang.ExceptionInfo
+         #"range 1000-600000"
+         (project-nrepl-config/resolved-start-readiness-timeout-ms
+          {:project-nrepl {:start-readiness-timeout-ms "120000"}})))
+    (is (= :validate
+           (:phase (ex-data
+                    (try
+                      (project-nrepl-config/resolved-start-readiness-timeout-ms
+                       {:project-nrepl {:start-readiness-timeout-ms 0}})
+                      (catch clojure.lang.ExceptionInfo e e))))))))
+
 (deftest read-dot-nrepl-port-test
   (testing "reads integer port from target worktree .nrepl-port"
     (let [dir (temp-dir "psi-project-nrepl-")]
