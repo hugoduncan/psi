@@ -16,12 +16,12 @@
 
 ## Slice 2 — Timeout threading + raised default + payload projection
 
-- [ ] Raise `default-readiness-timeout-ms` in `started.clj` `5000 → 120000`.
-- [ ] In `ops/start`, resolve the timeout via
+- [x] Raise `default-readiness-timeout-ms` in `started.clj` `5000 → 120000`.
+- [x] In `ops/start`, resolve the timeout via
       `resolved-start-readiness-timeout-ms` from the already-resolved `cfg`, and
       pass `start-instance-in!` an `opts` map carrying `:timeout-ms` (only when
       non-nil; nil falls back to the started.clj default).
-- [ ] In `start-instance-in!`, add a **new launch-site `update-instance-in!`**
+- [x] In `start-instance-in!`, add a **new launch-site `update-instance-in!`**
       (after `ensure-instance-in!`, immediately before `(launcher …)` /
       `wait-for-started-endpoint!`) that writes the top-level status field
       `:readiness-timeout-ms` = effective resolved timeout (`(:timeout-ms opts)`
@@ -29,41 +29,46 @@
       It is written *pre-wait* so it survives the throwing failure path; it is
       *not* seeded via `ensure-instance-in!` and *not* deferred to the post-wait
       success update.
-- [ ] Extend `ops/instance-payload`'s fixed key list with
+- [x] Extend `ops/instance-payload`'s fixed key list with
       `:readiness-timeout-ms` (AMB3).
-- [ ] Add tests: configured timeout flows into `wait-for-started-endpoint!`'s
+- [x] Add tests: configured timeout flows into `wait-for-started-endpoint!`'s
       effective deadline (via the seam); `instance-payload` includes
       `:readiness-timeout-ms`; fast happy path still reaches `:started`; a
       `status` (op) read of the *failure-path* instance carries
       `:readiness-timeout-ms` (PA4 — observable via `status`, not the throwing
       `start` return).
-- [ ] Run tests + lint; commit slice 2.
+- [x] Run tests + lint; commit slice 2. → committed with slice 3 (shared
+      launch-site update); full project-nrepl suite green.
 
 ## Slice 3 — Stale-port ownership guard
 
-- [ ] Grep for consumers of the runtime-handle `:started-at` to confirm none
+- [x] Grep for consumers of the runtime-handle `:started-at` to confirm none
       depend on its current post-wait (connect-time) capture before moving it.
-- [ ] In `start-instance-in!`, capture a single `launched-at (now)` binding at
+      → grep confirms only `eval.clj` `:active-op :started-at` (distinct field)
+      and `ops.clj` `:timing :started-at` (eval-result field); no consumer reads
+      the runtime-handle `:started-at`, so the move is safe (matches the
+      plan/steps inconsistency-review grep).
+- [x] In `start-instance-in!`, capture a single `launched-at (now)` binding at
       the launch site (immediately before `(launcher …)`).
-- [ ] Write the runtime-handle `:started-at` = `launched-at` in the new
+- [x] Write the runtime-handle `:started-at` = `launched-at` in the new
       launch-site `update-instance-in!` (the same pre-wait update that writes
       `:readiness-timeout-ms`, PA1), and **remove** the post-wait success-path
       `:started-at (now)` write, so there is one launch-instant source that
       survives the failure path (PA2). Leave `build-instance`'s top-level
       slot-creation `:started-at` unchanged (distinct field).
-- [ ] In `start-instance-in!`, delete any existing
+- [x] In `start-instance-in!`, delete any existing
       `<worktree>/.nrepl-port` immediately before launching.
-- [ ] Thread `launched-at` into `wait-for-started-endpoint!` via
+- [x] Thread `launched-at` into `wait-for-started-endpoint!` via
       `opts {:launched-at …}`.
-- [ ] In `wait-for-started-endpoint!`, gate acceptance: read the
+- [x] In `wait-for-started-endpoint!`, gate acceptance: read the
       `.nrepl-port` file's last-modified time; accept only when
       `≥ (launched-at floored to whole seconds)` (AMB4). Treat a present
       too-old port as not-yet-ready (continue polling).
-- [ ] On deadline with only a too-old port present, throw
+- [x] On deadline with only a too-old port present, throw
       `ex-info` `:phase :started-stale-port` carrying rejected mtime +
       `launched-at` (so it lands on `:last-error → :data` via the existing
       `catch`), distinct from `:started-readiness`.
-- [ ] Add tests (PA3 — exercise the gate at the right level):
+- [x] Add tests (PA3 — exercise the gate at the right level):
       - At the `wait-for-started-endpoint!` *unit* level (injected
         `:launched-at`, pre-written too-old `.nrepl-port`, bypassing removal):
         a too-old port is rejected — continues polling, then
@@ -74,9 +79,12 @@
         one) and the fresh post-launch port is accepted. Do *not* assert
         gate-rejection through `start-instance-in!` (removal makes the gate see
         only fresh ports there).
-- [ ] Add/confirm a test asserting attach-mode discovery and
+- [x] Add/confirm a test asserting attach-mode discovery and
       `config/read-dot-nrepl-port` are behaviour-preserved (no stale gate).
-- [ ] Run tests + lint; commit slice 3.
+      → existing `attach_test.clj` + `config_test.clj read-dot-nrepl-port-test`
+      remain green unchanged (gate lives only in `started.clj`; the shared
+      discovery primitive and attach-mode are untouched).
+- [x] Run tests + lint; commit slice 3. → committed with slice 2.
 
 ## Slice 4 — Docs + CHANGELOG
 
