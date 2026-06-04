@@ -1389,3 +1389,47 @@ instance" rationale was uncovered. Tightened three assertion sites
   launch instant.
 
 started-test 3/45 (was 3/25), ops-test 4/23, clj-kondo 0/0, paren-repair OK.
+
+## Implementation review — quality (ψ, 2026-06-03, pass 3)
+
+Skill: task-implementation-review (`review(code) ∧ matches(design) ∧
+follows(architecture) ∧ flag(new_pattern ∨ unnecessary_abstraction ∨
+structural_performance)`). Independent re-read of `started.clj`, `config.clj`,
+`ops.clj`, `doc/project-nrepl.md`, `CHANGELOG.md` after the TS1–TS10 shape
+passes. State: clean tree; clj-kondo 0/0 (`components/project-nrepl/{src,test}`);
+`started-test` 3/45 green; docs + CHANGELOG present.
+
+Confirms prior pass-2 conclusions: design match (config key + `[1000 600000]`
+validation, raised 120000 default, pre-launch removal + `floored-to-whole-seconds`
+mtime gate, `:phase :started-stale-port` on both deadline and IR1 exit paths,
+`:readiness-timeout-ms` projection via AMB3, launch-site `:started-at`/INC1),
+architecture fit (gate confined to `started.clj`; shared `read-dot-nrepl-port` +
+attach untouched), no unjustified new pattern or abstraction.
+
+New actionable issue (not previously flagged; amplified by this task):
+
+- IR2 (launched child process leaked on the readiness-failure path). In
+  `start-instance-in!` the launched `process` is bound in the inner `let` and
+  only recorded onto the runtime-handle (`:process`) *after*
+  `wait-for-started-endpoint!` returns. When the wait **throws** (timeout or
+  stale-port) for a process that is *alive but never wrote a usable
+  `.nrepl-port`* (a hung/slow boot — the headline scenario), the `catch
+  Throwable` records `:last-error` and rethrows but (a) never `.destroy`s the
+  launched `process` and (b) never stores it on the runtime-handle, so the
+  later `stop-started-instance-in!` (which reads `:process` from the
+  runtime-handle) cannot reap it either. The child JVM is orphaned. The leak is
+  **pre-existing** (the process was bound-then-stored-after-success before this
+  task), but this task **worsens its blast radius**: raising the default timeout
+  `5000 → 120000` means a hung command now keeps an orphaned JVM alive for up to
+  120 s before the timeout fires and leaks it (vs 5 s prior). The
+  `process-exited?` short-circuit only covers a process that *exits* on its own;
+  an alive-but-port-less hang is exactly the un-covered case. Consider: bind
+  `process` in an outer `let`/atom visible to the `catch` and `.destroy` it (and
+  delete the freshly-removed `.nrepl-port` is already handled) on the failure
+  path, or record `:process` on the runtime-handle pre-wait (mirroring the
+  pre-wait `:readiness-timeout-ms`/`:started-at` launch-site update) so
+  `stop-started-instance-in!`/`catch` can reap it. Not a correctness/wrong-
+  endpoint bug (pre-launch removal still prevents wrong-endpoint connect), but a
+  resource-leak regression-in-impact this task's timeout raise directly enlarges.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

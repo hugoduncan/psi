@@ -541,3 +541,27 @@
       Coverage-only (production already carries the keys). started-test 3
       tests/45 assertions green (was 25); ops-test 4/23 green; clj-kondo 0/0;
       clj-paren-repair Success; started_test 257 lines (< 800).
+
+## Implementation review follow-ups (quality, pass 3)
+
+- [ ] IR2: Reap the launched child process on the readiness-failure path. In
+      `start-instance-in!` the launched `process` is bound in the inner `let`
+      and only stored onto the runtime-handle (`:process`) *after*
+      `wait-for-started-endpoint!` returns; when the wait throws (timeout /
+      stale-port) for an **alive-but-port-less** (hung/slow) process, the
+      `catch Throwable` records `:last-error` and rethrows without `.destroy`ing
+      the process or recording it, so the child JVM is orphaned and
+      `stop-started-instance-in!` (reads `:process` from the runtime-handle)
+      cannot reap it. The leak is pre-existing but this task's `5000 → 120000`
+      default-timeout raise enlarges the window (up to 120 s alive before the
+      timeout fires and leaks). The `process-exited?` short-circuit only covers
+      self-exiting processes, not an alive port-less hang. Make the launched
+      process visible to the failure path — either record `:process` on the
+      runtime-handle via the existing pre-wait launch-site `update-instance-in!`
+      (mirroring `:readiness-timeout-ms`/`:started-at`) so the `catch` /
+      `stop-started-instance-in!` can `.destroy` it, or bind it in an outer
+      scope the `catch` can reach and `.destroy` it there — and add a
+      no-mocks test (alive `fake-process`, no `.nrepl-port`, short
+      `:timeout-ms`) asserting the launched process is destroyed (e.g.
+      `(.isAlive process)` false / a `:destroyed*` flag set) after the
+      readiness timeout throws.
