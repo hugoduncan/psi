@@ -7,6 +7,7 @@ open-task reconciliation audit (completed-task closure, NNN-collision renumber).
 
 Not yet started:
 
+- `munera/open/210-fix-project-repl-start-readiness-timeout/` — fix `psi-tool project-repl op=start` failing with `:started-readiness` timeout for real slow-booting start commands (hard-coded 5s readiness timeout, no config path) plus a stale-`.nrepl-port` false-positive/wrong-endpoint race in `started/wait-for-started-endpoint!`. Design-only; open questions on timeout config surface and stale-port strategy.
 - `munera/open/202-document-at-bounds-in-scheduler-doc/` — (from master) document the resolved-millisecond-delay absolute `:at` bounds in `doc/scheduler.md`. NNN collides with closed `202-reusable-review-follow-up-step` (left as-is per convention).
 - `munera/open/206-emacs-buffer-local-widget-mutation-timers/` — move Emacs widget-projection mutation watchdog timers from a module-global hash into buffer-local `psi-emacs-state` and cancel them in `psi-emacs--teardown-buffer`, fixing orphaned/non-deterministic/cross-buffer timers when a psi buffer is killed mid-mutation. Design-only.
 - `munera/open/203-task-lifecycle-chained-workflow/` — renumbered from 198 (NNN collision with closed `198-fix-tool-metrics-empty-tools-map`); new orchestration workflow chaining review-task-design → create-task-plan → review-task-plan → implement-task → review-task-implementation. Design-only; open questions on stage gating and context threading.
