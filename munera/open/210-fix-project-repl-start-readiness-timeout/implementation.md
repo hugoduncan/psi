@@ -1614,3 +1614,49 @@ valid threading and the invalid-validation surfacing at the boundary that owns
 the user-misconfiguration error.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+---
+
+## Test review (task-test-review) — pass 7
+
+Reviewed tests against `λ review_tests`: well-formedness, behaviour coverage
+of design acceptance criteria, and no-mocks infra-dep injection.
+
+✅ Well-formed / no-mocks: confirmed. All infra seams are real injectables —
+`started-launcher!`/`fake-process` (real `java.lang.Process` proxy),
+`fake-connector` transport, file-backed `.nrepl-port`, real `resolve-config`
+reading on-disk `.psi/project.edn`. No `with-redefs`/mock/stub/spy anywhere
+(grep clean). Shared `test_support` helpers single-source ceremony without
+hiding intent.
+
+✅ Coverage already strong across acceptance criteria: raised 120000 default
+(TR1), config→ops→opts threading (TR3) + invalid-validate surfacing (TR6),
+`instance-payload` projection (TR2), stale-port deadline + exit-with-stale +
+fresh-accept gate (gate-test), plain `:started-readiness` deadline reproduction
+(TR5), A2 diagnostic instants on every `:started-stale-port` path (TS10), IR2
+process reaping, A1 attach/shared-discovery stale-acceptance separation (TR4).
+
+❌ TR7 (new actionable gap): the stale-gate **poll-continuation accept** path is
+untested. The design states "A present-but-too-old port is treated as
+not-yet-ready: the poll loop continues until the gate passes or the deadline
+fires." Current gate tests cover stale→continue→**deadline rejection** and
+fresh→**immediate accept** (first poll), but not stale→continue→**subsequent
+fresh accept** — a port observed too-old on an early poll that is then replaced
+by a fresh one and accepted on a later poll. The production `(if (and endpoint
+fresh?) accept (do …recur))` loop makes too-old a *soft* not-yet-ready that
+recurs; a regression turning a too-old port into a *hard* immediate rejection
+(short-circuiting the loop) would pass every current test (deadline-rejection
+and first-poll-accept both still green). This is the defence-in-depth
+continuation behaviour the design names explicitly. Modest scope: one
+`wait-for-started-endpoint!` unit case (injected `:launched-at`; a port written
+stale then, on a later poll, replaced/touched fresh — e.g. via a launcher-less
+fixture that ages the file then `touch-fresh!`s it after the first poll, or a
+short poll interval with a background mtime bump) asserting the endpoint is
+ultimately accepted (not rejected). Coverage-only; production already correct.
+
+🔁 PATTERN: a soft "continue polling" branch needs both its terminal outcomes
+pinned — the deadline-rejection *and* the eventual-accept-after-continuation —
+or a regression collapsing the soft branch into a hard immediate reject escapes
+a suite that only tests the immediate-accept and the deadline-reject endpoints.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

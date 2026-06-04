@@ -332,6 +332,31 @@
       (+1/+3); `--focus unit` RC=0; clj-kondo 0/0; clj-paren-repair Success;
       file-lengths exit 0; ops_test 158 lines (< 800).
 
+- [ ] TR7: Cover the stale-gate **poll-continuation accept** path. The design
+      states a present-but-too-old `.nrepl-port` is "treated as not-yet-ready:
+      the poll loop continues until the gate passes or the deadline fires." The
+      current `wait-for-started-endpoint!` gate tests cover only the two
+      endpoints — stale→continue→**deadline rejection** (`:started-stale-port`)
+      and a fresh port **accepted on the first poll** — but not the in-between
+      continuation outcome: a port observed too-old on an early poll that is then
+      replaced by a fresh one and **accepted on a later poll**. Production's
+      `(if (and endpoint fresh?) accept (do …recur))` makes too-old a *soft*
+      not-yet-ready that recurs; a regression turning a too-old port into a
+      *hard* immediate rejection (short-circuiting the loop before the deadline)
+      would pass every current test (deadline-rejection and first-poll-accept
+      both still green), silently breaking the design's named defence-in-depth
+      continuation behaviour. Add a `wait-for-started-endpoint!` unit case
+      (injected `:launched-at`, short `:poll-interval-ms`, an **alive**
+      `fake-process`): write a stale (`age-file-back!`) `.nrepl-port` so the
+      first poll(s) reject it as too-old, then make it fresh on a later poll
+      (e.g. a background thread / a launcher-less fixture that `touch-fresh!`s
+      the file after a brief delay, or a process-launcher-side replace) and
+      assert the endpoint is **ultimately accepted** (returns the
+      `{:host :port :port-source}` map), not rejected — pinning the soft
+      continue-then-accept branch against a hard-reject regression.
+      Coverage-only; production already correct. Re-run started + clj-kondo
+      after.
+
 ## Test-shaper review follow-ups (shape)
 
 - [x] TS1: Lift one parameterised `fake-process` `java.lang.Process` proxy into
