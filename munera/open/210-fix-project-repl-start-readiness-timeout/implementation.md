@@ -734,3 +734,39 @@ with-redefs note):
   A1 "attach unchanged" criterion against a future gate leak.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Test-review follow-up execution — TR4 (ψ, 2026-06-03)
+
+Executed the single newly-added test-coverage follow-up (TR4) from the preceding
+test review pass 3. Coverage-only (production already correct and verified by
+inspection: the launch-instant mtime gate lives only in
+`started/wait-for-started-endpoint!`; the shared `config/read-dot-nrepl-port`
+and `attach/resolve-attach-endpoint` are mode-agnostic read+validate with no
+gate); no production change.
+
+- TR4 (A1 attach/shared-discovery "accepts a stale port"). Added two symmetric
+  stale-acceptance cases mirroring the started-mode `(- now 60000)` stale
+  fixture, pinning the A1 separation against a future gate leak into the
+  shared/attach path:
+  - `attach_test.clj` `resolve-attach-endpoint-test`: "accepts a stale
+    (old-mtime) `.nrepl-port` — no started-mode gate in attach". Spits
+    `.nrepl-port` then `setLastModified` to `(- now 60000)`, asserts
+    `resolve-attach-endpoint` still resolves
+    `{:host "127.0.0.1" :port 7999 :port-source :dot-nrepl-port}` (fallback when
+    explicit port absent) — the exact opposite of the started-mode gate.
+  - `config_test.clj` `read-dot-nrepl-port-test`: "accepts a stale (old-mtime)
+    `.nrepl-port` — no started-mode gate in shared read". Same aging fixture,
+    asserts the mode-agnostic primitive still reads
+    `{:port 7888 :port-source :dot-nrepl-port}`.
+  Both differentiate the A1 behaviour from the started-mode stale-rejection:
+  a regression leaking an mtime/launch gate into the shared `read-dot-nrepl-port`
+  or `attach/resolve-attach-endpoint` would now fail these tests (prior fixtures
+  only presented fresh ports, so such a leak passed every test).
+
+Verified: clj-paren-repair Success (both files); clj-kondo 0/0 over both changed
+test files; `psi.project-nrepl.attach-test` + `psi.project-nrepl.config-test`
+10 tests/59 assertions green (the two new `testing` blocks included; +19
+assertions over the prior 40). No design/plan/doc/CHANGELOG change (coverage-only;
+no user-visible surface change).
+
+PASS_STATUS: REVIEW_COMPLETE

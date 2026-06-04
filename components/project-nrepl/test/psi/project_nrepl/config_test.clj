@@ -242,6 +242,22 @@
         (finally
           (delete-tree! dir)))))
 
+  ;; TR4: read-dot-nrepl-port is a mode-agnostic read+validate primitive; the
+  ;; started-mode launch-instant mtime gate lives ONLY in started.clj. The shared
+  ;; primitive must accept whatever .nrepl-port is present — even a stale
+  ;; (old-mtime) one. Aging the file mirrors the started-mode stale fixture
+  ;; (- now 60000); a future gate leak into this shared read would fail here.
+  (testing "accepts a stale (old-mtime) .nrepl-port — no started-mode gate in shared read"
+    (let [dir (temp-dir "psi-project-nrepl-")]
+      (try
+        (let [port-file (io/file dir ".nrepl-port")]
+          (spit port-file "7888\n")
+          (.setLastModified port-file (- (System/currentTimeMillis) 60000)))
+        (is (= {:port 7888 :port-source :dot-nrepl-port}
+               (project-nrepl-config/read-dot-nrepl-port dir)))
+        (finally
+          (delete-tree! dir)))))
+
   (testing "fails when .nrepl-port is absent"
     (let [dir (temp-dir "psi-project-nrepl-")]
       (try

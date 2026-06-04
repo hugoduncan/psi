@@ -24,6 +24,22 @@
         (is (= {:host "localhost" :port 7999 :port-source :dot-nrepl-port}
                (project-nrepl-attach/resolve-attach-endpoint dir {:host "localhost"})))
         (finally
+          (delete-tree! dir)))))
+
+  ;; TR4: the started-mode launch-instant mtime gate lives ONLY in started.clj.
+  ;; Attach-mode discovery must accept whatever .nrepl-port is present, by design
+  ;; — even a stale (old-mtime) one — i.e. the exact opposite of the started gate.
+  ;; Aging the file mirrors the started-mode stale fixture (- now 60000); a future
+  ;; gate leak into the shared/attach path would fail this assertion.
+  (testing "accepts a stale (old-mtime) .nrepl-port — no started-mode gate in attach"
+    (let [dir (temp-dir "psi-project-nrepl-attach-")]
+      (try
+        (let [port-file (io/file dir ".nrepl-port")]
+          (spit port-file "7999\n")
+          (.setLastModified port-file (- (System/currentTimeMillis) 60000)))
+        (is (= {:host "127.0.0.1" :port 7999 :port-source :dot-nrepl-port}
+               (project-nrepl-attach/resolve-attach-endpoint dir {})))
+        (finally
           (delete-tree! dir))))))
 
 (deftest attach-instance-in-test

@@ -238,7 +238,7 @@
       → `start-instance-in!` path. No mocks (real `live-fake-process` proxy +
       `fake-connector` seam, file-backed `.nrepl-port`). Coverage-only; no
       production change.
-- [ ] TR4: Pin the A1 "attach/shared-discovery accepts a stale port" semantics.
+- [x] TR4: Pin the A1 "attach/shared-discovery accepts a stale port" semantics.
       The A1 acceptance criterion keeps the shared `config/read-dot-nrepl-port`
       primitive and `attach/resolve-attach-endpoint` *unchanged* — they must
       accept whatever `.nrepl-port` is present, with **no** mtime/launch gate
@@ -254,3 +254,13 @@
       and asserts the endpoint is **still resolved** — symmetric to the
       started-mode stale-rejection tests, pinning the A1 separation against a
       future gate leak. Coverage-only (production verified by inspection).
+      → Resolved: added two symmetric stale-acceptance cases mirroring the
+      started-mode `(- now 60000)` fixture. `attach_test.clj`
+      `resolve-attach-endpoint-test` gains "accepts a stale (old-mtime)
+      `.nrepl-port` — no started-mode gate in attach" (spit + `setLastModified`
+      to `(- now 60000)`, asserts `{:host "127.0.0.1" :port 7999 :port-source
+      :dot-nrepl-port}` still resolves). `config_test.clj` `read-dot-nrepl-port-test`
+      gains "accepts a stale (old-mtime) `.nrepl-port` — no started-mode gate in
+      shared read" (asserts `{:port 7888 :port-source :dot-nrepl-port}` still
+      reads). Both pin the A1 separation (gate lives only in `started.clj`)
+      against a future gate leak into the shared/attach path.
