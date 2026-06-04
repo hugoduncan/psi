@@ -1780,3 +1780,39 @@ present on the failure instance) and the consuming reaper
 (`stop-started-instance-in!` destroys + removes).
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Test-review pass 9 (task-test-review, ψ, 2026-06-04)
+
+Applied task-test-review (`well_formed(tests) ∧ ∀b∈behaviour(design).∃t.covers
+∧ ∀d∈infra_deps.injectable ∧ nullable ∧ ¬mock ∧ ¬stub`) to the full task test
+surface (started_test, ops_test, config_test, attach_test, test_support).
+
+Behaviour→test coverage (complete): raised 120 s default (TR1); configurable
+timeout end-to-end through ops/start (TR3) + invalid-config `:phase :validate`
+through ops/start (TR6) + range bounds [1000 600000] at fn level (config-test);
+pre-launch `.nrepl-port` removal + mtime-gate rejection `:started-stale-port` +
+soft-continue poll-accept (TR7) + exit-with-stale-port preserves distinction
+(IR1) + fresh-accept by construction; A2 diagnostic instants on
+`:last-error → :data` (PA4/TS10); `:readiness-timeout-ms` instance-payload
+projection (TR2/AMB3); `:started-at` = launch-instant provenance (PA2/TS4); IR2
+reap on failure path + pre-wait `:process`/`:pid` record + `stop` reap (TR8a/b);
+attach-mode behaviour-preserving + no started gate; shared `read-dot-nrepl-port`
+mode-agnostic (TR4); happy path unchanged.
+
+No-mocks discipline holds: real `java.lang.Process` proxy (`fake-process`), real
+on-disk config files (`write-{user,project,local}-config!`), real temp dirs
+(`with-temp-dir`), injectable `:process-launcher`/`:nrepl-connector` seams. No
+`with-redefs`, stubs, or mocks anywhere. State/output assertions only; no
+interaction assertions.
+
+Determinism: `started-test` 4 tests/52 assertions green across 3 consecutive
+runs (the timing-sensitive TR7 poll-continuation case is stable); full
+`clojure -M:test --focus unit` RC=0.
+
+No new actionable test issues. The pass-8 TR8 item (second half of the IR2 reap
+contract) was the last actionable gap and is resolved by both the IR2-case
+extension (pre-wait `:process`/`:pid` on the failure instance) and the new
+`stop-started-instance-in-test` covering the previously-untested `stop` reap
+branch. Tests are well-formed and behaviour-complete.
+
+PASS_STATUS: REVIEW_COMPLETE
