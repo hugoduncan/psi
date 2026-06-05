@@ -312,6 +312,8 @@
          (is (.contains coverage-review-text "CHARACTERIZATION_STATUS: FIXABLE_GAPS"))
          (is (.contains coverage-review-text "CHARACTERIZATION_STATUS: INFEASIBLE")))
        (testing "coverage disposition separates fixable gaps from infeasible characterization"
+         (is (= ["read" "bash" "edit" "write"] (:tools coverage-disposition-step))
+             "coverage-disposition can write durable stop findings for terminal failures")
          (is (= {"DONE" {:goto "coverage-fix"}
                  "REPEAT" {:goto "terminal-stop-summary"}}
                 (:on coverage-disposition-step)))
@@ -326,6 +328,10 @@
          (is (.contains disposition-text "use only the latest committed characterization-status note"))
          (is (.contains disposition-text "both markers appear in the immediately preceding output/latest note"))
          (is (.contains disposition-text "only historical markers are found"))
+         (is (.contains disposition-text "durable coverage-disposition stop finding"))
+         (is (.contains disposition-text "commit that task-artifact update"))
+         (is (.contains disposition-text "stop reason must be recorded in committed task artifacts"))
+         (is (.contains disposition-text "terminal-stop-summary` can explain the stop without relying on ephemeral coverage-disposition child-session output"))
          (is (.contains disposition-text "Do not scan all task artifacts for any marker as the routing source"))
          (is (.contains disposition-text "Do not let stale `FIXABLE_GAPS` or stale `INFEASIBLE` records override")))
        (testing "coverage-fix is constrained to characterization tests and minimal seams, then loops"

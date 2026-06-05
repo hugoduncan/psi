@@ -132,3 +132,17 @@ Additional verification before commit:
 Reviewed the implementation after IR3 against `design.md`, `plan.md`, `steps.md`, `.psi/workflows/reduce-incidental-complexity.edn`, lifecycle delegate workflows, workflow grammar docs, `task_209_workflow_definitions_test.clj`, `doc/workflows.md`, and `CHANGELOG.md`. Focused workflow-definition tests are green (`clojure -M:test --focus psi.workflow-loader.task-209-workflow-definitions-test` — 3 tests / 169 assertions). Found one new actionable issue (**IR4**): `coverage-disposition` can now stop before simplification when the latest characterization status is ambiguous, missing, contains both markers, or only stale historical markers are available, but that stop reason is only in the disposition child-session output. `terminal-stop-summary` receives only the original/select handoff and relies on task artifacts, while `coverage-disposition` has no write tools and does not record/commit its own stop finding, so these disposition-failure stops can be under-evidenced.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## 2026-06-05 — Implementation review follow-up IR4
+
+Completed IR4. Chose the durable artifact-recording contract rather than sourcing ephemeral `coverage-disposition` output in `terminal-stop-summary`. `coverage-disposition` now exposes `edit`/`write` and its prompt requires ambiguous, missing, both-marker, or stale-historical-marker terminal failures to append a durable coverage-disposition stop finding to task artifacts and commit it before emitting `PASS_STATUS: ACTIONABLE_FEEDBACK`. This gives `terminal-stop-summary` a committed task-artifact reason for the stop. Workflow-definition tests now lock the writable tool surface and committed stop-finding contract.
+
+Verification:
+- `clj-paren-repair .psi/workflows/reduce-incidental-complexity.edn components/workflow-loader/test/psi/workflow_loader/task_209_workflow_definitions_test.clj` — success, no changes needed.
+- `clojure -M:test --focus psi.workflow-loader.task-209-workflow-definitions-test` — 3 tests / 174 assertions green.
+- `clojure -M:test --focus psi.workflow-loader.workflow-definitions-test` — 11 tests / 159 assertions green.
+- `bb lint` — 0 errors / 0 warnings (one pre-existing info).
+- `bb fmt:check` — green.
+- `bb commit-check:file-lengths` — green.
+
+PASS_STATUS: REVIEW_COMPLETE
