@@ -199,6 +199,21 @@
            (is (= {:from :workflow-input}
                   (get-in tmpl [:vars "input"]))
                "select-and-create wires input to the bare top-level :workflow-input (no :path)")))
+       (testing "select-and-create uses deterministic PASS_STATUS routing to skip or run lifecycle"
+         (is (= {:type :invoke
+                 :operation "workflow/pass-status-routing"
+                 :args {:text {:from {:step "select-and-create" :output :final-llm-reply}}
+                        :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}}
+                (:judge select-step))
+             "select-and-create judge routes from the actor final reply via deterministic PASS_STATUS parsing")
+         (is (= {"DONE" {:goto "lifecycle"}
+                 "REPEAT" {:goto :done}}
+                (:on select-step))
+             "REVIEW_COMPLETE/DONE runs lifecycle; ACTIONABLE_FEEDBACK/REPEAT skips lifecycle for no-target")
+         (is (.contains select-text "PASS_STATUS: REVIEW_COMPLETE")
+             "target-present select-and-create output is instructed to route to lifecycle")
+         (is (.contains select-text "PASS_STATUS: ACTIONABLE_FEEDBACK")
+             "no-target select-and-create output is instructed to terminate without lifecycle"))
        (testing "lifecycle :delegate targets task-lifecycle directly with :input from select-and-create :yield :text"
          (is (= :delegate (:type delegate-step)))
          (is (= "task-lifecycle" (:target delegate-step)))
