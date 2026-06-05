@@ -167,3 +167,9 @@ PASS_STATUS: REVIEW_COMPLETE
 Reviewed implementation after IR5 against `design.md`, `plan.md`, `steps.md`, `.psi/workflows/reduce-incidental-complexity.edn`, lifecycle delegate workflows and prompts, workflow grammar docs, `task_209_workflow_definitions_test.clj`, `doc/workflows.md`, and `CHANGELOG.md`. No new actionable implementation issue found. The explicit target-present topology, writable/durable gate records, latest-status characterization disposition, clean-baseline/diff-gate stop evidence, no-target direct route, docs, and changelog now align with the task contract. Verification: focused task-209 workflow definitions 3/174 green; broader workflow-definitions 11/159 green; lint/fmt/file-lengths green.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## 2026-06-05 — Test review
+
+Reviewed the task tests after IR5 against `design.md`, `plan.md`, `steps.md`, `.psi/workflows/reduce-incidental-complexity.edn`, `review-task-implementation.edn`, `review-step.edn`, workflow test support, `task_209_workflow_definitions_test.clj`, `workflow_definitions_test.clj`, `doc/workflows.md`, and `CHANGELOG.md`. Focused workflow-definition tests are green (`clojure -M:test --focus psi.workflow-loader.task-209-workflow-definitions-test` — 3 tests / 174 assertions). Found one actionable test issue (**TT1**): the new delegate co-loading test for `reduce-incidental-complexity` registers synthetic stub workflows for `review-task-design`, `create-task-plan`, `review-task-plan`, `implement-task`, and `review-task-implementation` instead of co-loading the real workflow files and their prompt-workflow markdown dependencies. That does not prove the implemented explicit-phase delegate chain resolves against the actual workflow corpus; a missing/renamed real delegate file or broken prompt-workflow dependency could still pass this focused task-212 co-loading assertion via the stubs.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
