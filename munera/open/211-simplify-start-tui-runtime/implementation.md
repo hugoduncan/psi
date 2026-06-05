@@ -28,3 +28,31 @@ PASS_STATUS: REVIEW_COMPLETE
 2026-06-05 plan/steps inconsistency review: no new actionable inconsistency found. Checked `plan.md` and `steps.md` against `design.md`, `design-steps.md`, prior implementation notes, `start-tui-runtime!`, `tui_wiring.clj`, and the sibling app-runtime tests. Slice order, Phase 0 gating, provider lifetime, `/new` focus targeting, nullable execution-mode coverage, callback/wiring assembly, A2/A4 burden-key reconciliation, and A3 gate command all align across task artifacts. No unchecked `steps.md` follow-up added.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+2026-06-05 implementation pass: completed the behaviour-preserving refactor of `psi.app-runtime/start-tui-runtime!`.
+
+Phase 0 safety net assessment:
+- Existing direct app-runtime tests cover the named observable behaviours sufficiently: provider install/clear before normal return and exceptional frontend throw; persisted current-session file and TUI session-root startup; command journaling; `/new` focus targeting followed by extension command execution in the new active session; TUI prompt execution through the prompt lifecycle; and nullable deterministic execution-mode installation/shape through private helper tests.
+- No new characterization tests were required. Focused pre-refactor characterization command was `bb clojure:test:scry --namespace psi.app-runtime-test` → 31 tests, 119 assertions, 0 failures/errors.
+
+Refactor:
+- Kept all changes inside the original target function body.
+- Split the bootstrap `let` from the callback/options assembly `let`, making the runtime bootstrap state (`ctx`, `oauth-ctx`, `cwd`, `startup-rehydrate`, `session-id`, `tui-focus*`) explicit before provider installation and nREPL-visible `session-state` publication.
+- Preserved the direct provider lifetime shape: `ui-capabilities/install-provider!` occurs after bootstrap and `ui-capabilities/clear-provider!` remains in the `finally` around the single `tui-start-fn!` call.
+- Preserved `/new` semantics by leaving `:on-new-session!` reading `@tui-focus*` and ignoring its callback argument.
+- No helper outside the original target body was touched, so A5 blast radius is exactly the target unit.
+
+Verification:
+- `clj-paren-repair components/app-runtime/src/psi/app_runtime.clj` → success. During this formatting/repair step the tool briefly malformed an unrelated existing multiline `resolve-model` string form; restored before verification and commit.
+- `bb clojure:test:scry --namespace psi.app-runtime-test` → 31 tests, 119 assertions, 0 failures/errors.
+- `bb clojure:test:unit` → exit 0.
+- `bb lint` → 0 errors, 0 warnings (one pre-existing info in `workflow_delegate_review_step_live_test.clj`).
+- `bb commit-check:file-lengths` → exit 0.
+
+Gordian acceptance:
+- `bb gordian local --json > /tmp/after-local.json` captured the after metric.
+- A2 reconciliation touched exactly one logical unit: `(components/app-runtime/src/psi/app_runtime.clj, psi.app-runtime, start-tui-runtime!, 5)`. Sum before `7.031652915638373`; sum after `6.9363427358340495`; delta `-0.09531017980432388`, so net burden strictly decreased.
+- A4 target burden decreased: baseline `(psi.app-runtime, start-tui-runtime!, 5, 603)` `lcc-total 7.031652915638373`; after unique logical target line `603` `lcc-total 6.9363427358340495`.
+- A3 `bb gordian gate --baseline munera/open/211-simplify-start-tui-runtime/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0` → PASS, exit 0.
+
+PASS_STATUS: IMPLEMENTATION_COMPLETE
