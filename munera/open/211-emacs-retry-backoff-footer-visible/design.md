@@ -61,6 +61,12 @@ Out of scope:
   after retry-related events, not only `psi-emacs-state-session-retry` storage.
 - Tests cover the backend/RPC trigger path enough to prove active retry state
   causes a footer refresh/update to be sent to Emacs.
+- Tests cover the retry footer event sequence for active retry state, changed
+  retry state, and cleared retry state. The primary expected path is
+  `footer/updated`; if the implementation uses a `session/updated` fallback
+  because `footer/updated` is unavailable, that fallback path must have separate
+  Emacs-visible coverage proving it triggers or reuses the app-runtime-owned
+  footer projection.
 - Existing app-runtime footer formatting tests remain valid and unchanged unless
   a small wording adjustment is explicitly justified.
 
@@ -89,6 +95,36 @@ Prefer making the existing footer projection path fire correctly over adding a
 parallel Emacs-only retry display. The footer is already the adapter-neutral UI
 surface for compact session status and has tested retry formatting; the likely
 root cause is missing invalidation/event emission rather than missing formatting.
+
+### Retry footer freshness
+
+The footer must refresh when retry state is first published, when the backend
+publishes materially changed retry state (for example a new wait duration,
+attempt, or rate-limit detail), and when retry state clears. It does not need an
+Emacs-local countdown timer that ticks every second during a single unchanged
+backoff window. If the visible text says `retry in Ns`, it may remain at the
+last app-runtime-projected value until the backend publishes another retry/footer
+projection or clears the retry state. This keeps the app-runtime footer
+projection as the owner of retry wording and time calculations, and avoids a
+parallel Emacs countdown model.
+
+### Required event coverage
+
+Implementation tests must distinguish storage from visible rendering. Required
+coverage is:
+
+- backend/RPC trigger coverage proving retry activation causes an Emacs-visible
+  footer update path to be published;
+- Emacs-visible `footer/updated` coverage for active retry state showing the
+  rendered footer includes the existing retry text;
+- Emacs-visible `footer/updated` coverage for changed retry state showing the
+  rendered footer updates to the latest app-runtime-projected retry text;
+- Emacs-visible `footer/updated` coverage for cleared retry state showing stale
+  retry text is removed;
+- if and only if the implementation relies on a `session/updated` fallback,
+  separate Emacs-visible coverage that a retry-bearing `session/updated` event
+  triggers or reuses the app-runtime-owned footer projection rather than merely
+  preserving nested retry data in `psi-emacs-state-session-retry`.
 
 If the investigation shows that `session/updated` reliably arrives but
 `footer/updated` does not, the fix should be at the backend/RPC/app-runtime
