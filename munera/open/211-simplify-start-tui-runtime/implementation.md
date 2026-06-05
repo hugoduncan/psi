@@ -196,3 +196,7 @@ Verification:
 - `bb commit-check:file-lengths` → exit 0.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+2026-06-05 implementation review: no new actionable implementation issue found after IR2. Re-read the task artifacts, `start-tui-runtime!`, `tui_wiring.clj`, and the public TUI startup/app-runtime tests. Provider installation now happens only after option assembly, remains cleared by the direct `finally` around frontend execution, and the accepted TT11 idle follow-up fix stays minimal and covered. Re-verified `bb clojure:test:scry --namespace psi.app-runtime-tui-startup-test` (10/65 green), `bb clojure:test:scry --namespace psi.app-runtime-test` (32/128 green), `bb lint` (0 errors/0 warnings; one pre-existing info), and `bb commit-check:file-lengths` (green). Re-ran current-HEAD Gordian gates: A2/A4 target burden remains decreased (`7.031652915638373` → `6.8162713696596535`) and `bb gordian gate --baseline munera/open/211-simplify-start-tui-runtime/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0` passed. No unchecked `steps.md` follow-up added.
+
+PASS_STATUS: REVIEW_COMPLETE
