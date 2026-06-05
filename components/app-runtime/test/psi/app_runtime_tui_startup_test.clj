@@ -6,6 +6,7 @@
    [psi.agent-session.test-support :as test-support]
    [psi.app-runtime :as app-runtime]
    [psi.app-runtime.test-support :as app-test-support]
+   [psi.app-runtime.tui-session-nav :as tui-session-nav]
    [psi.memory.runtime :as memory-runtime]
    [psi.provider-auth.oauth.core :as oauth]
    [psi.session-journal.store :as journal-store]
@@ -281,6 +282,52 @@
               (is (= {:type :tree-open} tree-result))
               (is (not= "[/tree is only available in TUI mode (--tui)]"
                         (:message tree-result))))))))))
+
+(deftest start-tui-runtime-forwards-initial-context-session-tree-widget-test
+  ;; Characterizes the initial context/session-tree widget forwarded through
+  ;; public TUI startup opts when startup has a multi-session context.
+  (app-test-support/with-session-state-restore
+    (fn []
+      (let [real-bootstrap-runtime-session! app-runtime/bootstrap-runtime-session!
+            sibling-session-id*             (atom nil)]
+        (with-redefs-fn (merge (app-test-support/bootstrap-stub-bindings)
+                               {#'app-runtime/resolve-model (fn [_] app-test-support/test-ai-model)
+                                #'ext/discover-extension-paths (fn [& _] [])
+                                #'app-runtime/bootstrap-runtime-session!
+                                (fn [ctx ai-model opts]
+                                  (let [result     (real-bootstrap-runtime-session! ctx ai-model opts)
+                                        sibling-sd (session/create-top-level-session-in!
+                                                    ctx (:session-id result)
+                                                    {:session-name "tree target"})]
+                                    (reset! sibling-session-id* (:session-id sibling-sd))
+                                    result))})
+          (fn []
+            (let [captured-opts* (atom nil)]
+              (is (= :ok (app-runtime/start-tui-runtime!
+                          (fn [_run-agent-fn opts]
+                            (reset! captured-opts* opts)
+                            :ok)
+                          :ignored {} {})))
+              (let [opts            @captured-opts*
+                    ctx             (:ctx @app-runtime/session-state)
+                    active-session  (:focus-session-id opts)
+                    expected-widget (tui-session-nav/current-context-widget ctx active-session)
+                    initial-widget  (:initial-context-session-tree-widget opts)
+                    lines           (:content-lines initial-widget)]
+                (is (= expected-widget initial-widget))
+                (is (= {:placement "left"
+                        :extension-id "psi-session"
+                        :widget-id "session-tree"}
+                       (select-keys initial-widget [:placement :extension-id :widget-id])))
+                (is (seq lines))
+                (is (some #(and (:is-current %)
+                                (= "waiting" (:runtime-state %))
+                                (re-find #"← current" (:text %)))
+                          lines))
+                (is (some #(= {:type "command"
+                               :command (str "/tree " @sibling-session-id*)}
+                              (:action %))
+                          lines))))))))))
 
 (deftest start-tui-runtime-completes-pending-login-from-auth-code-input-test
   ;; Characterizes the public TUI pending-login handoff: /login command dispatch
