@@ -27,3 +27,9 @@ PASS_STATUS: REVIEW_COMPLETE
 Reviewed `design.md` for internal consistency and against referenced workflow artifacts: `.psi/workflows/reduce-incidental-complexity.edn`, `task-lifecycle.edn`, `review-task-design.edn`, `create-task-plan.edn`, `review-task-plan.edn`, `implement-task.edn`, `review-task-implementation.edn`, workflow grammar/docs, task-209 workflow tests, and `doc/workflows.md`; did not review `plan.md` or `steps.md`. No new actionable inconsistency found: target-present ordering, no-target early stop, current-worktree inheritance, characterization-loop routing, baseline/diff gate, and docs/tests expectations are consistent with referenced artifacts and prior ARCH1/AMB1 clarifications.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## 2026-06-05 — Plan ambiguity review
+
+Reviewed `plan.md` and `steps.md` against `design.md`, `.psi/workflows/reduce-incidental-complexity.edn`, `task-lifecycle.edn`, delegated lifecycle workflow definitions, workflow grammar/docs, task-209 workflow tests, and `doc/workflows.md`. Found four actionable plan/steps ambiguities: **PA1** no-target routing is split between direct completion and terminal stop summary; **PA2** infeasible characterization is not distinguishable from fixable coverage feedback before routing to coverage-fix; **PA3** the characterization baseline artifact and committed-vs-uncommitted diff method are unspecified; **PA4** plan wording conflates PASS_STATUS tokens with `workflow/pass-status-routing` EDN outcomes. Added unchecked follow-ups to `steps.md`.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

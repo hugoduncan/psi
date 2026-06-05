@@ -73,3 +73,10 @@
 - [ ] Review `git diff` to confirm changes are limited to workflow definitions/prompts, workflow tests, docs/changelog, and task artifacts.
 - [ ] Mark completed checklist items in `steps.md` and append final implementation status to `implementation.md`.
 - [ ] Commit implementation, docs, tests, and task artifact updates with a symbolized Munera commit message.
+
+## Plan ambiguity review follow-ups
+
+- [ ] PA1: Clarify the no-target terminal route: Slice 1 says `select-and-create` `ACTIONABLE_FEEDBACK` goes directly to workflow completion, while Slice 3 says the terminal stop/summary step reports no-target; choose exactly one no-target path and lock it in tests so no-target runs do not accidentally execute later gate/summary steps or lose the existing selector final report.
+- [ ] PA2: Clarify the infeasible-characterization route from coverage review: the plan says coverage review emits `ACTIONABLE_FEEDBACK` for both fixable coverage gaps and infeasible characterization, but the same route currently points to coverage-fix; specify whether infeasible characterization goes to terminal stop, how it is distinguished from fixable gaps, and what artifact note/status proves simplification will not proceed.
+- [ ] PA3: Specify the characterization baseline artifact contract and diff method: name the baseline file/path in the task directory, define its minimum fields, and state whether the diff gate compares committed changes since the recorded baseline HEAD plus current worktree status so coverage-fix commits cannot make the gate see an empty `git diff`.
+- [ ] PA4: Clarify workflow routing vocabulary in the plan/tests: prompts emit `PASS_STATUS: REVIEW_COMPLETE` / `PASS_STATUS: ACTIONABLE_FEEDBACK`, but `workflow/pass-status-routing` yields `DONE` / `REPEAT` for EDN `:on` maps; make the steps say which layer each token belongs to so implementers do not author unreachable `:on` keys.
