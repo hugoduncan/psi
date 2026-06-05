@@ -307,3 +307,9 @@ PASS_STATUS: REVIEW_COMPLETE
 Reviewed user-facing docs with `.psi/skills/review-task-docs/SKILL.md` against task artifacts, `.psi/workflows/reduce-incidental-complexity.edn`, focused workflow tests, `README.md`, `doc/workflows.md`, and `CHANGELOG.md`. No new actionable documentation issue found: README correctly delegates workflow details to `doc/workflows.md`; `doc/workflows.md` describes the explicit design/plan → clean-baseline → characterization-test-net → diff-gate → implementation/review topology, no-target direct stop, current inherited worktree/no-`work-on` contract, and no push/PR behavior; CHANGELOG Unreleased Added/Changed entries match the implemented workflow behavior after IR5.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## 2026-06-05 — Code-shaper review
+
+Reviewed code shape using `.psi/skills/code-shaper/SKILL.md` against the task artifacts, `.psi/workflows/reduce-incidental-complexity.edn`, `review-task-implementation.edn`, `review-step.edn`, focused workflow-definition tests, `doc/workflows.md`, and `CHANGELOG.md`. Found one actionable code-shape issue (**CS1**): `terminal-stop-summary` is intended to be a terminal gate-failure step, but it is terminal only because it is currently the last step and has no `:judge`/`:on`, while `final-summary` uses an explicit constant route to `:done`. That makes terminality implicit and order-dependent; appending any future step after it could let dirty-baseline, infeasible-characterization, or failed-diff paths fall through. Make the terminal-stop route explicit and tighten the test contract.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

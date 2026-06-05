@@ -102,3 +102,7 @@
 - [x] TT2: Lock the transitive post-implementation test-review gate: add workflow-definition coverage proving `review-task-implementation` includes a `review-task-tests` delegate to `review-step` with `:skill "task-test-review"` (or equivalent), so the final reduce-incidental-complexity implementation-review phase cannot silently lose or retarget the task-test-review pass while focused task-212 tests remain green.
 
 - [x] TT1: Strengthen the `reduce-incidental-complexity` delegate co-loading test to load the real directly referenced workflow files (`review-task-design`, `create-task-plan`, `review-task-plan`, `implement-task`, `review-task-implementation`) plus their required prompt-workflow markdown dependencies, rather than synthetic stub workflows, so the explicit-phase delegate chain is proven against the actual workflow corpus.
+
+## Code-shaper review follow-ups
+
+- [ ] CS1: Make `terminal-stop-summary` terminal by construction: add an explicit `workflow/constant-routing` `DONE` judge with `:on {"DONE" {:goto :done}}` (or an equivalent explicit terminal contract) and tighten the workflow-definition test so gate-failure terminality no longer depends on the step being last.
