@@ -28,14 +28,15 @@ In scope:
 - Ensure the phase can loop: review coverage, perform coverage fixes, review again, then proceed only when coverage is sufficient.
 - Ensure routing is deterministic, using existing workflow routing operations where possible.
 - Ensure the pre-simplification phase distinguishes characterization/test-net work from simplification/refactor work.
-- Update workflow tests so the ordering and routing are locked.
+- Add a workflow-level baseline/diff gate around the characterization phase so simplification routing is allowed only after the workflow proves that the source/target code is still unchanged, except for explicitly recorded minimal testability seams.
+- Update workflow tests so the ordering, routing, and baseline/diff enforcement are locked.
 - Update user-facing workflow documentation and changelog if behavior changes are user-visible.
 
 Out of scope:
 
 - Changing the incidental-complexity selection algorithm.
 - Changing Gordian metrics or acceptance formulas.
-- Implementing a runtime-level proof that no production code changed before the coverage gate, unless a minimal testability seam is explicitly required and recorded.
+- Implementing a runtime-level proof beyond the workflow-owned git baseline/diff gate. The workflow gate must inspect the worktree diff before simplification; deeper runtime attestation is out of scope.
 - Redesigning the whole Munera task lifecycle.
 - Reintroducing `work-on` or workflow-managed worktree switching.
 
@@ -48,12 +49,15 @@ For a target-present `reduce-incidental-complexity` run, the workflow should exe
 3. Create the task plan and steps.
 4. Review/refine the plan.
 5. Establish a characterization-test net:
+   - record a workflow baseline for the target/source state before characterization work begins (at minimum the relevant git `HEAD`/status plus the target file(s) or source paths identified by the task);
    - inspect the target behavior and existing tests;
    - decide whether nominal, edge, and boundary behavior is sufficiently covered;
    - add characterization tests or minimal testability seams when coverage is insufficient;
    - run relevant tests green against the current behavior;
-   - repeat until coverage is sufficient or the task is stopped/closed with an explicit finding.
-6. Only after the test-net gate passes, implement the simplification/refactor.
+   - before routing to simplification, compute the diff from the recorded baseline and classify every coverage-phase change as characterization tests, task artifacts, docs, or an explicitly justified minimal testability seam;
+   - stop before simplification when any source/target change is unclassified, broader than a minimal seam, or already performs the simplification; the workflow must require revert/split/close with an explicit finding rather than proceeding;
+   - repeat until coverage is sufficient, the baseline/diff check passes, or the task is stopped/closed with an explicit finding.
+6. Only after the test-net gate and baseline/diff check pass, implement the simplification/refactor.
 7. Review the implementation as usual.
 
 For a no-target run, the workflow should continue to skip downstream lifecycle work and report that no qualifying target was found.
@@ -67,7 +71,10 @@ The pre-simplification gate is complete only when all of the following are true:
 - Coverage considers nominal, edge, and boundary behavior relevant to the target.
 - Tests avoid interaction assertions except where the interaction is itself the observable behavior.
 - Relevant tests pass before simplification begins.
-- The task artifacts record what coverage was reviewed or added.
+- A workflow-level baseline/diff check runs after characterization work and before simplification routing.
+- The diff check records the pre-characterization baseline and classifies all coverage-phase changes; only tests, task artifacts, docs, and explicitly justified minimal testability seams may be present.
+- If the diff includes unclassified source/target changes, broad production edits, or simplification/refactor work, the workflow stops before simplification and records whether the change must be reverted, split, or the task closed.
+- The task artifacts record what coverage was reviewed or added and the result of the baseline/diff classification.
 - If sufficient characterization is not feasible, the task records the reason and does not proceed to simplification.
 
 ## Acceptance criteria
@@ -78,13 +85,16 @@ The pre-simplification gate is complete only when all of the following are true:
   - actionable coverage feedback causes a coverage-fix pass and another review;
   - review completion allows simplification implementation to begin.
 - The coverage-fix pass is constrained to characterization tests and explicitly justified minimal testability seams; it must not perform the simplification/refactor itself.
-- Tests lock the workflow step order, delegate targets, deterministic routing, and no-refactor-before-test-net intent.
+- A workflow-level baseline/diff gate runs before simplification implementation and prevents routing forward when coverage-phase changes include unclassified or non-minimal source/target edits.
+- Tests lock the workflow step order, delegate targets, deterministic routing, baseline/diff enforcement, and no-refactor-before-test-net intent.
 - Documentation describes the new gate and the fact that `reduce-incidental-complexity` still runs in the current inherited worktree.
 - Existing workflow-loader tests remain green.
 
 ## Architectural fit
 
-This should be implemented as workflow topology and prompt behavior rather than runtime-special-case logic. The change belongs with the workflow definitions and workflow prompt assets because the invariant is process-level: the same existing child-session inheritance, deterministic routing, and task-review machinery should orchestrate the new gate.
+This should be implemented as workflow topology and prompt behavior rather than runtime-special-case logic. The change belongs with the workflow definitions and workflow prompt assets because the invariant is process-level: the same existing child-session inheritance, deterministic routing, git-visible task artifacts, and task-review machinery should orchestrate the new gate.
+
+The baseline/diff check should be a first-class workflow boundary, not merely advice inside the implementation prompt. The characterization phase records the source baseline before adding tests, and the routing step into simplification consumes an explicit classification of the resulting diff. That keeps the proof at the workflow layer: coverage can be strengthened in the current inherited worktree, but simplification cannot begin if the worktree already contains unreviewed target/source changes.
 
 A reusable mini-workflow for establishing a characterization-test net is preferred if it can be named clearly and reused by future behaviour-preserving refactor workflows. If reuse makes the change less direct, an incidental-complexity-specific workflow/prompt pair is acceptable as the first slice.
 
