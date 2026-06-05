@@ -395,6 +395,14 @@
          (is (.contains diff-gate-text "PASS_STATUS: REVIEW_COMPLETE"))
          (is (.contains diff-gate-text "PASS_STATUS: ACTIONABLE_FEEDBACK")))
        (testing "implementation and summaries preserve target-present and no-target terminal contracts"
+         (is (nil? (:judge implementation-review-step))
+             "review-task-implementation has no judge that can shortcut the successful path")
+         (is (nil? (:on implementation-review-step))
+             "review-task-implementation falls through to final-summary by step order")
+         (is (some #(= {:step "review-task-implementation" :yield :text}
+                       (:from %))
+                   (:contributions final-summary-step))
+             "final-summary sources review-task-implementation output as the successful terminal path")
          (is (.contains final-summary-text
                         "design → plan → characterization-test-net gate → baseline/diff gate → simplification implementation → implementation review"))
          (is (= {"DONE" {:goto :done}}

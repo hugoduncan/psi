@@ -233,3 +233,17 @@ PASS_STATUS: REVIEW_COMPLETE
 Reviewed task tests after TT3 using `.psi/skills/task-test-review/SKILL.md` against `design.md`, `plan.md`, `steps.md`, `.psi/workflows/reduce-incidental-complexity.edn`, `review-task-implementation.edn`, `review-step.edn`, workflow grammar docs, workflow test support, `task_209_workflow_definitions_test.clj`, `workflow_definitions_test.clj`, `doc/workflows.md`, and `CHANGELOG.md`. Verification remains green: focused task-209 workflow definitions 3/183, broader workflow-definitions 11/159, lint 0 errors/0 warnings (one pre-existing info), fmt green, file-lengths green. Found one new actionable test issue (**TT4**): the tests assert step order and the final-summary prompt text, but do not assert that successful target-present execution can actually reach `final-summary` after `review-task-implementation`. A regression adding a judge/`:on` shortcut from `review-task-implementation` to `:done` would keep current step-order/prompt assertions green while skipping the user-facing successful run summary required by the task contract.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## 2026-06-05 — Test review follow-up TT4
+
+Completed TT4. Strengthened `task_209_workflow_definitions_test.clj` so the successful target-present `reduce-incidental-complexity` route cannot skip the user-facing final summary: `review-task-implementation` must have no `:judge` and no `:on` shortcut, so it falls through by step order to `final-summary`; `final-summary` must source `review-task-implementation` output and remains the terminal successful path. Marked TT4 checked in `steps.md`.
+
+Verification:
+- `clj-paren-repair components/workflow-loader/test/psi/workflow_loader/task_209_workflow_definitions_test.clj` — success, no changes needed.
+- `clojure -M:test --focus psi.workflow-loader.task-209-workflow-definitions-test` — 3 tests / 186 assertions green.
+- `clojure -M:test --focus psi.workflow-loader.workflow-definitions-test` — 11 tests / 159 assertions green.
+- `bb lint` — 0 errors / 0 warnings (one pre-existing info).
+- `bb fmt:check` — green.
+- `bb commit-check:file-lengths` — green.
+
+PASS_STATUS: REVIEW_COMPLETE
