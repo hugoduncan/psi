@@ -1,3 +1,4 @@
 # Design follow-up steps
 
 - [x] ARCH1: Strengthen the pre-simplification gate with a workflow-level baseline/diff check before routing to simplification: record the target/source baseline before the characterization phase, classify coverage-phase changes, and proceed only when changes are tests/task artifacts/docs or explicitly justified minimal testability seams; otherwise stop/revert/split before simplification.
+- [ ] AMB1: Clarify the baseline precondition for the characterization gate: before recording the pre-characterization baseline, the workflow must either require a clean source/target worktree state (allowing only task artifacts/docs as explicitly classified pre-existing changes) or stop with an explicit finding; pre-existing dirty source/target changes must not be silently absorbed into the baseline that proves unmodified target behavior.
