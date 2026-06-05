@@ -91,6 +91,8 @@
 
 ## Test review follow-ups
 
+- [ ] TT5: Lock the target-present gate-failure terminal route: add workflow-definition assertions that `terminal-stop-summary` is terminal (no `:judge`/`:on` continuation, or only an explicit route to `:done`) so dirty-baseline, infeasible-characterization, and failed-diff paths cannot regress into `implement-task`, `final-summary`, or any other downstream step while existing route/prompt assertions stay green.
+
 - [x] TT4: Lock the successful target-present final-summary route: add workflow-definition assertions that `review-task-implementation` advances to `final-summary` by default (no `:judge`/`:on` shortcut to `:done`) and that the final summary remains the terminal successful path, so a regression cannot keep step-order/prompt tests green while skipping the user-facing design → plan → test-net → diff-gate → simplification → review summary.
 
 - [x] TT3: Lock the gate-step `:judge` contracts, not just `:on` maps and prompt text: add workflow-definition assertions that `clean-baseline`, `coverage-review`, `coverage-disposition`, `coverage-fix`, and `diff-gate` all invoke `workflow/pass-status-routing` from their own `:output :final-llm-reply` with the intended allowed statuses, so a regression to constant routing or the wrong source step cannot keep the focused task-212 tests green while bypassing the raw `PASS_STATUS` gate decisions.

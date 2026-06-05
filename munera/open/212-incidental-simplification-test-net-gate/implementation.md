@@ -247,3 +247,9 @@ Verification:
 - `bb commit-check:file-lengths` — green.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## 2026-06-05 — Test review
+
+Reviewed task tests after TT4 using `.psi/skills/task-test-review/SKILL.md` against `design.md`, `plan.md`, `steps.md`, `.psi/workflows/reduce-incidental-complexity.edn`, lifecycle delegate workflows/prompts, workflow grammar docs, `task_209_workflow_definitions_test.clj`, `workflow_definitions_test.clj`, `doc/workflows.md`, and `CHANGELOG.md`. Found one new actionable test issue (**TT5**): the focused tests lock successful target-present completion through `final-summary`, but do not lock that `terminal-stop-summary` is itself terminal for gate-failure paths. A regression adding a judge/`:on` from `terminal-stop-summary` back to `implement-task`, `final-summary`, or any non-`:done` step could leave current route/prompt assertions green while allowing dirty-baseline, infeasible-characterization, or failed-diff runs to continue after the stop summary.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
