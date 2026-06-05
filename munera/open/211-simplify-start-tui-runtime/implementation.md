@@ -16,3 +16,7 @@ PASS_STATUS: REVIEW_COMPLETE
 2026-06-04 inconsistency review: no new actionable inconsistency found. Checked `design.md` internally and against the referenced target code, existing sibling tests, `before-local.json`, `META.md`, and `doc/architecture.md`. The burden-key clarification from B1 keeps A2/A4 executable, the coverage hint matches the sibling test surface, and the blast-radius/architecture constraints are mutually consistent with app-runtime ownership and TUI adapter boundaries. No `design-steps.md` follow-up added.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+2026-06-05 planning from stable design: created `plan.md` and `steps.md`. Design was complete enough to plan; no unresolved blocking ambiguity found. Noted the resolved B1 metric-key clarification as non-blocking planning context. Plan slices are safety-net assessment, characterization-if-needed, local lifecycle/data-shape refactor, behaviour verification, Gordian burden/architecture gates, and final blast-radius review.
+
+PASS_STATUS: PLAN_COMPLETE
