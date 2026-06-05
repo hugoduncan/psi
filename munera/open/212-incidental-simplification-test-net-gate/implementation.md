@@ -104,3 +104,9 @@ Verification:
 - `bb commit-check:file-lengths` — green.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## 2026-06-05 — Implementation review
+
+Reviewed the implementation after IR2 against `design.md`, `plan.md`, `steps.md`, `.psi/workflows/reduce-incidental-complexity.edn`, lifecycle delegate workflows, workflow grammar docs/runtime routing, `task_209_workflow_definitions_test.clj`, `doc/workflows.md`, and `CHANGELOG.md`. Focused workflow-definition tests are green (`clojure -M:test --focus psi.workflow-loader.task-209-workflow-definitions-test` — 3 tests / 158 assertions). Found one new actionable issue (**IR3**): `coverage-disposition` decides by scanning task artifacts for exactly `CHARACTERIZATION_STATUS: FIXABLE_GAPS` vs `CHARACTERIZATION_STATUS: INFEASIBLE`, but task artifacts such as `implementation.md` are append-only and the coverage loop can run more than once. Historical markers can accumulate, so a later coverage review that changes status can leave both markers present or let a stale marker influence routing. The disposition step should route from the immediately preceding coverage-review output or the latest committed characterization-status note, and tests should lock stale markers as non-authoritative.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
