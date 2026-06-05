@@ -141,7 +141,7 @@
                                    (session/queue-while-streaming-in! ctx sid text :steer)
                                    {:message "Queued steering message."})
                                  (do
-                                   (session/queue-while-streaming-in! ctx sid text :queue)
+                                   (session/follow-up-in! ctx sid text)
                                    {:message "Queued follow-up message."}))))
      :double-press-window-ms 500
      :double-escape-action :none

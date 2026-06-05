@@ -8,6 +8,8 @@
    [psi.app-runtime.test-support :as app-test-support]
    [psi.memory.runtime :as memory-runtime]
    [psi.provider-auth.oauth.core :as oauth]
+   [psi.session-journal.store :as journal-store]
+   [psi.session-persistence.core :as persist]
    [psi.session-state.state :as ss]))
 
 (deftest start-tui-runtime-forwards-memory-runtime-opts-to-bootstrap-sync-test
@@ -156,6 +158,110 @@
                 (is (some #(and (= session-id (get-in % [:ui.item/meta :item/session-id]))
                                 (true? (get-in % [:ui.item/meta :item/is-active])))
                           (:ui/items selector)))))))))))
+
+(deftest start-tui-runtime-frontend-action-fork-and-resume-use-real-navigation-test
+  ;; Characterizes the public frontend-action/fork/resume callback semantics,
+  ;; not just their callability, against real session state.
+  (test-support/with-temp-session-root
+    (fn [session-root]
+      (app-test-support/with-session-state-restore
+        (fn []
+          (with-redefs-fn (merge (app-test-support/bootstrap-stub-bindings)
+                                 {#'app-runtime/resolve-model (fn [_] app-test-support/test-ai-model)
+                                  #'ext/discover-extension-paths (fn [& _] [])})
+            (fn []
+              (let [captured-opts*  (atom nil)
+                    direct-fork-id* (atom nil)]
+                (is (= :ok (app-runtime/start-tui-runtime!
+                            (fn [_run-agent-fn opts]
+                              (reset! captured-opts* opts)
+                              :ok)
+                            :ignored {} {} {:session-root session-root})))
+                (let [opts               @captured-opts*
+                      ctx                (:ctx @app-runtime/session-state)
+                      session-id         (:focus-session-id opts)
+                      parent-user-entry  (persist/message-entry {:role "user"
+                                                                 :content [{:type :text :text "fork from here"}]
+                                                                 :timestamp (java.time.Instant/now)})
+                      parent-user-id     (:id (ss/append-journal-entry-in! ctx session-id parent-user-entry))
+                      _                  (ss/append-journal-entry-in!
+                                          ctx session-id
+                                          (persist/message-entry {:role "assistant"
+                                                                  :content [{:type :text :text "parent reply"}]
+                                                                  :timestamp (java.time.Instant/now)}))
+                      fork-action-result {:ui.result/action-key :select-session
+                                          :ui.result/status :submitted
+                                          :ui.result/value {:action/kind :fork-session
+                                                            :action/entry-id parent-user-id}}
+                      fork-result        ((:frontend-action-handler-fn! opts) fork-action-result)
+                      fork-id            (:session-id fork-result)]
+                  (is (= :session-switch-restored (:type fork-result)))
+                  (is (= [{:role :user :text "fork from here"}
+                          {:role :assistant :text "parent reply"}]
+                         (get-in fork-result [:restored :messages])))
+                  (is (= fork-id (:psi.agent-session/session-id
+                                  ((:query-fn opts) [:psi.agent-session/session-id]))))
+                  (let [fork-event (.poll (:event-queue opts) 2000 java.util.concurrent.TimeUnit/MILLISECONDS)]
+                    (is (= :context-updated (:type fork-event)))
+                    (is (= fork-id (:active-session-id fork-event))))
+                  (let [direct-fork-result ((:fork-session-fn! opts) parent-user-id)
+                        direct-fork-id     (:session-id direct-fork-result)]
+                    (reset! direct-fork-id* direct-fork-id)
+                    (is (= [{:role :user :text "fork from here"}
+                            {:role :assistant :text "parent reply"}]
+                           (:messages direct-fork-result)))
+                    (is (= direct-fork-id (:psi.agent-session/session-id
+                                           ((:query-fn opts) [:psi.agent-session/session-id]))))
+                    (let [direct-fork-event (.poll (:event-queue opts) 2000 java.util.concurrent.TimeUnit/MILLISECONDS)]
+                      (is (= :context-updated (:type direct-fork-event)))
+                      (is (= direct-fork-id (:active-session-id direct-fork-event)))))
+                  (let [resume-file   (java.io.File/createTempFile "psi-tui-resume" ".ndedn")
+                        resume-path   (.getAbsolutePath resume-file)
+                        resume-entry  (persist/message-entry {:role "assistant"
+                                                              :content [{:type :text :text "resumed transcript"}]
+                                                              :timestamp (java.time.Instant/now)})]
+                    (.deleteOnExit resume-file)
+                    (journal-store/flush-journal! resume-file "resumed-session" session-root nil [resume-entry])
+                    (is (= {:messages [{:role :assistant :text "resumed transcript"}]
+                            :tool-calls {}
+                            :tool-order []}
+                           ((:resume-fn! opts) resume-path)))
+                    (is (= "resumed-session" (:psi.agent-session/session-id
+                                              ((:query-fn opts) [:psi.agent-session/session-id]))))
+                    (let [resume-sd    (ss/get-session-data-in ctx "resumed-session")
+                          resume-event (.poll (:event-queue opts) 2000 java.util.concurrent.TimeUnit/MILLISECONDS)]
+                      (is (= (:model (ss/get-session-data-in ctx @direct-fork-id*))
+                             (:model resume-sd)))
+                      (is (= :context-updated (:type resume-event)))
+                      (is (= "resumed-session" (:active-session-id resume-event))))))))))))))
+
+(deftest start-tui-runtime-queues-idle-follow-up-input-test
+  ;; Characterizes the non-streaming on-queue-input branch through public TUI
+  ;; startup opts and real session state.
+  (app-test-support/with-session-state-restore
+    (fn []
+      (with-redefs-fn (merge (app-test-support/bootstrap-stub-bindings)
+                             {#'app-runtime/resolve-model (fn [_] app-test-support/test-ai-model)
+                              #'ext/discover-extension-paths (fn [& _] [])})
+        (fn []
+          (let [captured-opts* (atom nil)]
+            (is (= :ok (app-runtime/start-tui-runtime!
+                        (fn [_run-agent-fn opts]
+                          (reset! captured-opts* opts)
+                          :ok)
+                        :ignored {} {})))
+            (let [opts       @captured-opts*
+                  ctx        (:ctx @app-runtime/session-state)
+                  session-id (:focus-session-id opts)]
+              (is (= :idle (ss/sc-phase-in ctx session-id)))
+              (is (= {:message "Queued follow-up message."}
+                     ((:on-queue-input-fn! opts) "follow up after idle" {})))
+              (is (= ["follow up after idle"]
+                     (:follow-up-messages (ss/get-session-data-in ctx session-id))))
+              (is (= {:queued-text "follow up after idle"
+                      :message "Interrupted active work."}
+                     ((:on-interrupt-fn! opts) {})))
+              (is (= [] (:follow-up-messages (ss/get-session-data-in ctx session-id)))))))))))
 
 (deftest start-tui-runtime-completes-pending-login-from-auth-code-input-test
   ;; Characterizes the public TUI pending-login handoff: /login command dispatch
