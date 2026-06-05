@@ -110,3 +110,19 @@ PASS_STATUS: REVIEW_COMPLETE
 Reviewed the implementation after IR2 against `design.md`, `plan.md`, `steps.md`, `.psi/workflows/reduce-incidental-complexity.edn`, lifecycle delegate workflows, workflow grammar docs/runtime routing, `task_209_workflow_definitions_test.clj`, `doc/workflows.md`, and `CHANGELOG.md`. Focused workflow-definition tests are green (`clojure -M:test --focus psi.workflow-loader.task-209-workflow-definitions-test` — 3 tests / 158 assertions). Found one new actionable issue (**IR3**): `coverage-disposition` decides by scanning task artifacts for exactly `CHARACTERIZATION_STATUS: FIXABLE_GAPS` vs `CHARACTERIZATION_STATUS: INFEASIBLE`, but task artifacts such as `implementation.md` are append-only and the coverage loop can run more than once. Historical markers can accumulate, so a later coverage review that changes status can leave both markers present or let a stale marker influence routing. The disposition step should route from the immediately preceding coverage-review output or the latest committed characterization-status note, and tests should lock stale markers as non-authoritative.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## 2026-06-05 — Implementation review follow-up IR3
+
+Completed IR3. Tightened `.psi/workflows/reduce-incidental-complexity.edn` so `coverage-disposition` routes from the immediately preceding `coverage-review` output first, or from the latest committed characterization-status note explicitly identified by that coverage-review output. The prompt now treats append-only historical `CHARACTERIZATION_STATUS` markers as non-authoritative, stops on ambiguous/both-marker/latest-missing cases, and forbids scanning all task artifacts for any stale marker. Also tightened `coverage-review` so actionable feedback appends a new latest characterization-status note and mentions the marker plus artifact path in its final response body. Added workflow-definition assertions locking latest-status routing and stale-marker rejection.
+
+Verification:
+- `clj-paren-repair components/workflow-loader/test/psi/workflow_loader/task_209_workflow_definitions_test.clj .psi/workflows/reduce-incidental-complexity.edn` — success, no changes needed.
+- `clojure -M:test --focus psi.workflow-loader.task-209-workflow-definitions-test` — 3 tests / 169 assertions green.
+
+PASS_STATUS: REVIEW_COMPLETE
+
+Additional verification before commit:
+- `clojure -M:test --focus psi.workflow-loader.workflow-definitions-test` — 11 tests / 159 assertions green.
+- `bb lint` — 0 errors / 0 warnings (one pre-existing info).
+- `bb fmt:check` — green.
+- `bb commit-check:file-lengths` — green.
