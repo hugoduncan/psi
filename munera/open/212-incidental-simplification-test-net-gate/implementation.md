@@ -72,3 +72,16 @@ PASS_STATUS: IMPLEMENTATION_COMPLETE
 Reviewed the implemented workflow/tests/docs against `design.md`, `plan.md`, `.psi/workflows/reduce-incidental-complexity.edn`, lifecycle delegate workflows, workflow grammar docs, `task_209_workflow_definitions_test.clj`, `doc/workflows.md`, and `CHANGELOG.md`. Found one actionable implementation issue (**IR1**): `coverage-review` and `diff-gate` are required to record characterization status, reviewed coverage, and diff-gate classification/stop findings in task artifacts, but both session steps expose only `read`/`bash`. As authored, those gates cannot write the required evidence themselves, making the gate record advisory/impossible unless an unstated later step does it.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## 2026-06-05 — Implementation review follow-up IR1
+
+Completed IR1. Made the artifact-recording gate steps writable by adding `edit`/`write` to both `coverage-review` and `diff-gate` in `.psi/workflows/reduce-incidental-complexity.edn`. Tightened the prompt contracts so each required coverage/status/diff classification or stop finding must be recorded in task artifacts and committed before the gate emits its `PASS_STATUS`. Added workflow-definition assertions locking the writable tool surface and commit-record wording for both gates.
+
+Verification:
+- `clojure -M:test --focus psi.workflow-loader.task-209-workflow-definitions-test` — 3 tests / 156 assertions green.
+- `clojure -M:test --focus psi.workflow-loader.workflow-definitions-test` — 11 tests / 159 assertions green.
+- `bb lint` — 0 errors / 0 warnings (one pre-existing info).
+- `bb fmt:check` — green.
+- `bb commit-check:file-lengths` — green.
+
+PASS_STATUS: REVIEW_COMPLETE

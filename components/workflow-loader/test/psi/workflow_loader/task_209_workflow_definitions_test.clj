@@ -290,6 +290,8 @@
          (is (.contains clean-text "explicitly classified pre-existing task-artifact-or-doc dirt"))
          (is (.contains clean-text "Do NOT call `work-on`")))
        (testing "coverage review is the pre-simplification characterization gate"
+         (is (= ["read" "bash" "edit" "write"] (:tools coverage-review-step))
+             "coverage-review can write required coverage/status records to task artifacts")
          (is (some #{"task-test-review"} (:skills coverage-review-step)))
          (is (some #{"testing-without-mocks"} (:skills coverage-review-step)))
          (is (= {"DONE" {:goto "diff-gate"}
@@ -302,6 +304,7 @@
          (is (.contains coverage-review-text
                         "avoid interaction assertions unless the interaction is itself the observable behavior"))
          (is (.contains coverage-review-text "green against the unmodified target behavior"))
+         (is (.contains coverage-review-text "commit the task-artifact update"))
          (is (.contains coverage-review-text "CHARACTERIZATION_STATUS: FIXABLE_GAPS"))
          (is (.contains coverage-review-text "CHARACTERIZATION_STATUS: INFEASIBLE")))
        (testing "coverage disposition separates fixable gaps from infeasible characterization"
@@ -326,6 +329,8 @@
          (is (.contains coverage-fix-text "Commit the characterization-fix changes"))
          (is (.contains coverage-fix-text "Do NOT call `work-on`")))
        (testing "diff gate blocks implementation unless coverage-phase diff is classified cleanly"
+         (is (= ["read" "bash" "edit" "write"] (:tools diff-gate-step))
+             "diff-gate can write required diff classification/stop findings to task artifacts")
          (is (= {"DONE" {:goto "implement-task"}
                  "REPEAT" {:goto "terminal-stop-summary"}}
                 (:on diff-gate-step)))
@@ -342,6 +347,7 @@
          (is (.contains diff-gate-text "broad production edit"))
          (is (.contains diff-gate-text "premature simplification/refactor"))
          (is (.contains diff-gate-text "CHARACTERIZATION_STATUS: INFEASIBLE"))
+         (is (.contains diff-gate-text "commit the task-artifact update"))
          (is (.contains diff-gate-text "PASS_STATUS: REVIEW_COMPLETE"))
          (is (.contains diff-gate-text "PASS_STATUS: ACTIONABLE_FEEDBACK")))
        (testing "implementation and summaries preserve target-present and no-target terminal contracts"
