@@ -46,3 +46,8 @@
 - [ ] Update user docs only if the documented retry/footer/event behaviour changes; otherwise record in `implementation.md` that no docs update was needed.
 - [ ] Confirm all design acceptance criteria are covered by tests: active retry visible, no manual refresh, clear removes stale text, backend/RPC trigger proof, active/change/clear event sequence, and optional fallback coverage only if used.
 - [ ] Commit the completed implementation slices with searchable `⚒ 211` commit messages.
+
+## Plan ambiguity follow-ups
+
+- [ ] PA1: Clarify Slice 1 backend/RPC trigger coverage: the retry activation test must exercise the same session retry-state mutation/invalidation edge used by real provider retry scheduling, not only call `footer-updated-payload` directly or manually emit `footer/updated`.
+- [ ] PA2: Clarify Slice 2 changed-retry coverage: name the retry fields whose backend-published changes must produce a fresh footer projection (at minimum those that alter visible retry text such as wait/resume time, attempt/source, and rate-limit remaining/reset detail), or explicitly narrow the required representative changed-state case.
