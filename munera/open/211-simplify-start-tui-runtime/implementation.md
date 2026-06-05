@@ -253,3 +253,7 @@ Verification:
 - `bb commit-check:file-lengths` → exit 0.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+2026-06-05 test review after TT17: no new actionable test coverage issue found. Re-read the task artifacts, `task-test-review` skill, `start-tui-runtime!`, `tui_wiring.clj`, `nrepl_runtime.clj`, and the public TUI startup/app-runtime tests. The current test net covers the design behaviours through public startup paths or narrow nullable infrastructure seams: provider lifetime (normal, frontend throw, and option-assembly throw), bootstrap/config/cwd/memory/current-session/startup-rehydrate forwarding, nullable deterministic execution, command dispatch including TUI-only frontend-action commands and `/tree`, `/new` focus targeting, navigation/fork/resume/model actions, active-input streaming and idle branches, UI projection/footer/selector callbacks, OAuth pending-login handoff, initial session-tree widget forwarding, terminal `:alt-screen false`, and live nREPL focus publication. Tests assert observable state/outputs rather than callback interactions. Verified `bb clojure:test:scry --namespace psi.app-runtime-tui-startup-test` → 14/91 green and `bb clojure:test:scry --namespace psi.app-runtime-test` → 32/128 green. No unchecked `steps.md` follow-up added.
+
+PASS_STATUS: REVIEW_COMPLETE
