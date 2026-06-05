@@ -51,3 +51,7 @@
 
 - [x] PA1: Clarify Slice 1 backend/RPC trigger coverage: the retry activation test must exercise the same session retry-state mutation/invalidation edge used by real provider retry scheduling, not only call `footer-updated-payload` directly or manually emit `footer/updated`.
 - [x] PA2: Clarify Slice 2 changed-retry coverage: name the retry fields whose backend-published changes must produce a fresh footer projection (at minimum those that alter visible retry text such as wait/resume time, attempt/source, and rate-limit remaining/reset detail), or explicitly narrow the required representative changed-state case.
+
+## Code-shaper follow-ups
+
+- [ ] CS1: Shape `clear-active-retry!` so it only emits `:retry-updated`/footer refresh when clearing an actual retry-related state (`:retry`, nonzero `:retry-attempt`, or pending retry abort flag), preserving clear-after-retry behavior without publishing retry footer refreshes for ordinary successful/non-retry prompt completions.
