@@ -301,3 +301,9 @@ PASS_STATUS: REVIEW_COMPLETE
 Reviewed task test shape after TT6 using `.psi/skills/test-shaper/SKILL.md` against `design.md`, `plan.md`, `steps.md`, `.psi/workflows/reduce-incidental-complexity.edn`, `review-task-implementation.edn`, `review-step.edn`, workflow grammar/concepts/IR docs, workflow test support, `task_209_workflow_definitions_test.clj`, `workflow_definitions_test.clj`, `doc/workflows.md`, and `CHANGELOG.md`. No new actionable test-shape issue found. The focused tests now lock the explicit reduce-incidental-complexity topology, gate judge contracts, terminal routes, real delegate co-loading, and transitive `task-test-review`/`test-shaper` review gates without duplicating an already-covered concern. Verification: focused task-209 workflow definitions 3/193 green; broader workflow-definitions 11/159 green; attempted `psi.workflow-loader.workflow-ir-test` focus selected no tests (no matching namespace).
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## 2026-06-05 — Docs review
+
+Reviewed user-facing docs with `.psi/skills/review-task-docs/SKILL.md` against task artifacts, `.psi/workflows/reduce-incidental-complexity.edn`, focused workflow tests, `README.md`, `doc/workflows.md`, and `CHANGELOG.md`. No new actionable documentation issue found: README correctly delegates workflow details to `doc/workflows.md`; `doc/workflows.md` describes the explicit design/plan → clean-baseline → characterization-test-net → diff-gate → implementation/review topology, no-target direct stop, current inherited worktree/no-`work-on` contract, and no push/PR behavior; CHANGELOG Unreleased Added/Changed entries match the implemented workflow behavior after IR5.
+
+PASS_STATUS: REVIEW_COMPLETE
