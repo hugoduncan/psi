@@ -173,3 +173,17 @@ PASS_STATUS: REVIEW_COMPLETE
 Reviewed the task tests after IR5 against `design.md`, `plan.md`, `steps.md`, `.psi/workflows/reduce-incidental-complexity.edn`, `review-task-implementation.edn`, `review-step.edn`, workflow test support, `task_209_workflow_definitions_test.clj`, `workflow_definitions_test.clj`, `doc/workflows.md`, and `CHANGELOG.md`. Focused workflow-definition tests are green (`clojure -M:test --focus psi.workflow-loader.task-209-workflow-definitions-test` — 3 tests / 174 assertions). Found one actionable test issue (**TT1**): the new delegate co-loading test for `reduce-incidental-complexity` registers synthetic stub workflows for `review-task-design`, `create-task-plan`, `review-task-plan`, `implement-task`, and `review-task-implementation` instead of co-loading the real workflow files and their prompt-workflow markdown dependencies. That does not prove the implemented explicit-phase delegate chain resolves against the actual workflow corpus; a missing/renamed real delegate file or broken prompt-workflow dependency could still pass this focused task-212 co-loading assertion via the stubs.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## 2026-06-05 — Test review follow-up TT1
+
+Completed TT1. Strengthened `task-209-workflow-set-loads-together-test` so the `reduce-incidental-complexity` explicit-phase delegate chain is co-loaded with the real directly referenced workflow EDNs (`review-task-design`, `create-task-plan`, `review-task-plan`, `implement-task`, `review-task-implementation`) and their required prompt-workflow markdown dependencies instead of synthetic stub workflows. The test still asserts the outer delegate target set and now fails if a real delegated workflow or required prompt asset is missing/renamed or no longer compiles with the corpus.
+
+Verification:
+- `clj-paren-repair components/workflow-loader/test/psi/workflow_loader/task_209_workflow_definitions_test.clj` — success, no changes needed.
+- `clojure -M:test --focus psi.workflow-loader.task-209-workflow-definitions-test` — 3 tests / 174 assertions green.
+- `clojure -M:test --focus psi.workflow-loader.workflow-definitions-test` — 11 tests / 159 assertions green.
+- `bb lint` — 0 errors / 0 warnings (one pre-existing info).
+- `bb fmt:check` — green.
+- `bb commit-check:file-lengths` — green.
+
+PASS_STATUS: REVIEW_COMPLETE

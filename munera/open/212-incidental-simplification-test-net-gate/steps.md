@@ -91,4 +91,4 @@
 
 ## Test review follow-ups
 
-- [ ] TT1: Strengthen the `reduce-incidental-complexity` delegate co-loading test to load the real directly referenced workflow files (`review-task-design`, `create-task-plan`, `review-task-plan`, `implement-task`, `review-task-implementation`) plus their required prompt-workflow markdown dependencies, rather than synthetic stub workflows, so the explicit-phase delegate chain is proven against the actual workflow corpus.
+- [x] TT1: Strengthen the `reduce-incidental-complexity` delegate co-loading test to load the real directly referenced workflow files (`review-task-design`, `create-task-plan`, `review-task-plan`, `implement-task`, `review-task-implementation`) plus their required prompt-workflow markdown dependencies, rather than synthetic stub workflows, so the explicit-phase delegate chain is proven against the actual workflow corpus.

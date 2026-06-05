@@ -390,32 +390,43 @@
 ;; equality* while loading a single EDN — the loader does NOT validate delegate
 ;; targets at load time, so those asserts give no resolution guarantee. Co-load
 ;; the direct delegate set and assert each target is a registered workflow.
+;; TT1 strengthens this from synthetic stubs to the real directly referenced
+;; workflow EDNs plus their required prompt-workflow markdown files, so missing
+;; or renamed real workflow/prompt assets fail here instead of being hidden by a
+;; stub corpus.
 (deftest task-209-workflow-set-loads-together-test
   (let [target-names ["review-task-design"
                       "create-task-plan"
                       "review-task-plan"
                       "implement-task"
                       "review-task-implementation"]
-        stub-workflow (fn [name]
-                        (pr-str {:steps [{:name "noop"
-                                          :type :invoke
-                                          :operation "workflow/constant-routing"
-                                          :args {:route "DONE"}}]
-                                 :name name
-                                 :description "delegate target resolution stub"}))]
+        workflow-filenames ["reduce-incidental-complexity.edn"
+                            "review-task-design.edn"
+                            "create-task-plan.edn"
+                            "review-task-plan.edn"
+                            "implement-task.edn"
+                            "review-task-implementation.edn"]
+        prompt-filenames ["review-task-design-architecture-review.md"
+                          "review-task-design-ambiguity-review.md"
+                          "review-task-design-inconsistency-review.md"
+                          "review-follow-up-design.md"
+                          "create-task-plan-create-plan.md"
+                          "review-task-plan-ambiguity-review.md"
+                          "review-task-plan-inconsistency-review.md"
+                          "review-follow-up-steps.md"
+                          "implement-task-implement-pass.md"]]
     (with-workflow-dir
-      (into {"reduce-incidental-complexity.edn"
-             (slurp-workflow-file "reduce-incidental-complexity.edn")}
-            (map (fn [name]
-                   [(str name ".edn") (stub-workflow name)]))
-            target-names)
+      (into {}
+            (map (fn [filename]
+                   [filename (slurp-workflow-file filename)]))
+            (concat workflow-filenames prompt-filenames))
       (fn [{:keys [definitions errors]}]
-        (testing "the task-209/212 delegate set loads together without compilation errors"
+        (testing "the task-209/212 real delegate set loads together without compilation errors"
           (is (empty? errors))
           (is (contains? definitions "reduce-incidental-complexity"))
           (doseq [workflow target-names]
             (is (contains? definitions workflow))))
-        (testing "reduce-incidental-complexity direct delegate targets resolve to registered workflows"
+        (testing "reduce-incidental-complexity direct delegate targets resolve to registered real workflows"
           (let [outer-targets (->> (get-in definitions
                                            ["reduce-incidental-complexity" :steps])
                                    (keep #(when (= :delegate (:type %))
