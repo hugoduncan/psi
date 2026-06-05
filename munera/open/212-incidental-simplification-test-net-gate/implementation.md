@@ -207,3 +207,9 @@ Verification:
 - `bb commit-check:file-lengths` — green.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## 2026-06-05 — Test review
+
+Reviewed task tests after TT2 using `.psi/skills/task-test-review/SKILL.md` against `design.md`, `plan.md`, `steps.md`, `.psi/workflows/reduce-incidental-complexity.edn`, `review-task-implementation.edn`, `review-step.edn`, workflow grammar docs, `task_209_workflow_definitions_test.clj`, `workflow_definitions_test.clj`, `doc/workflows.md`, and `CHANGELOG.md`. Focused workflow-definition tests remain green (`clojure -M:test --focus psi.workflow-loader.task-209-workflow-definitions-test` — 3 tests / 178 assertions). Found one new actionable test issue (**TT3**): the task-212 tests assert the gate prompts and `:on` maps, but do not assert that the gate steps' judges actually call `workflow/pass-status-routing` on each step's own `:output :final-llm-reply` with the intended allowed statuses. A regression to `workflow/constant-routing`, a missing `allowed-statuses`, or a judge reading another step's output could bypass the raw `PASS_STATUS` decisions while the current focused tests remain green.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
