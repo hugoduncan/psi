@@ -182,3 +182,17 @@ PASS_STATUS: REVIEW_COMPLETE
 2026-06-05 implementation review: found one new actionable implementation issue (IR2). `start-tui-runtime!` installs the TUI UI provider before constructing navigation callbacks and `tui-opts`, but `ui-capabilities/clear-provider!` is only protected by the `finally` around `tui-start-fn!`. A synchronous failure during post-install option assembly, such as `current-context-widget` or `build-tui-opts`, would leave the attached TUI provider observable from the runtime context despite the provider-lifetime goal. Existing exceptional cleanup coverage only covers frontend failure after options are built. Added an unchecked `steps.md` follow-up to move installation after successful option assembly or widen the protected region and cover the failure path.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+2026-06-05 implementation follow-up IR2 executed: tightened TUI provider lifetime protection for `start-tui-runtime!`. Moved `ui-capabilities/install-provider!` to after navigation callbacks and `tui-opts` are fully assembled, leaving the existing direct `try`/`finally` around `tui-start-fn!` unchanged. This preserves the frontend-observable provider surface for normal startup and frontend exceptions, while preventing a synchronous option-assembly failure from ever installing the attached TUI provider.
+
+Added focused public startup coverage in `app_runtime_tui_startup_test.clj`: `start-tui-runtime-does-not-leak-provider-when-option-assembly-throws-test` forces `tui-session-nav/current-context-widget` to throw during option assembly, captures the real runtime context, asserts the frontend is not entered, and asserts `ui-capabilities/provider` remains nil. Existing provider-lifetime tests still cover provider attachment during frontend execution and cleanup when the frontend throws.
+
+Verification:
+- `clj-paren-repair components/app-runtime/src/psi/app_runtime.clj components/app-runtime/test/psi/app_runtime_tui_startup_test.clj` → success.
+- `bb clojure:test:scry --namespace psi.app-runtime-tui-startup-test` → 10 tests, 65 assertions, 0 failures/errors.
+- `bb clojure:test:scry --namespace psi.app-runtime-test` → 32 tests, 128 assertions, 0 failures/errors.
+- `bb clojure:test:unit` → exit 0.
+- `bb lint` → 0 errors, 0 warnings (one pre-existing info).
+- `bb commit-check:file-lengths` → exit 0.
+
+PASS_STATUS: REVIEW_COMPLETE

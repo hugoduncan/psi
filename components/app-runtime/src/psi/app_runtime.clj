@@ -635,7 +635,6 @@ Available: " (str/join ", " (map name (keys all))))
          (bootstrap-runtime-session! ctx ai-model {:memory-runtime-opts memory-runtime-opts
                                                    :cwd cwd})
          tui-focus* (atom session-id)]
-     (ui-capabilities/install-provider! ctx (ui-capabilities/unsupported-attached-provider :tui))
      (reset! session-state {:ctx ctx :ai-model ai-model
                             :oauth-ctx oauth-ctx
                             :nrepl-runtime-atom nrepl-runtime
@@ -685,6 +684,7 @@ Available: " (str/join ", " (map name (keys all))))
                                 :switch-session-fn! switch-session-fn!
                                 :fork-session-fn! fork-session-fn!
                                 :current-context-widget (tui-session-nav/current-context-widget ctx session-id)})]
+       (ui-capabilities/install-provider! ctx (ui-capabilities/unsupported-attached-provider :tui))
        (try
          (tui-start-fn! run-agent-fn tui-opts)
          (finally

@@ -4,6 +4,7 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.test-support :as test-support]
+   [psi.agent-session.ui-capabilities :as ui-capabilities]
    [psi.app-runtime :as app-runtime]
    [psi.app-runtime.test-support :as app-test-support]
    [psi.app-runtime.tui-session-nav :as tui-session-nav]
@@ -282,6 +283,33 @@
               (is (= {:type :tree-open} tree-result))
               (is (not= "[/tree is only available in TUI mode (--tui)]"
                         (:message tree-result))))))))))
+
+(deftest start-tui-runtime-does-not-leak-provider-when-option-assembly-throws-test
+  ;; Provider installation starts only after synchronous TUI option assembly has
+  ;; completed, so an assembly failure cannot leave an attached TUI provider.
+  (app-test-support/with-session-state-restore
+    (fn []
+      (with-redefs-fn (merge (app-test-support/bootstrap-stub-bindings)
+                             {#'app-runtime/resolve-model (fn [_] app-test-support/test-ai-model)
+                              #'ext/discover-extension-paths (fn [& _] [])})
+        (fn []
+          (let [ctx* (atom nil)
+                failure (try
+                          (with-redefs [tui-session-nav/current-context-widget
+                                        (fn [ctx _session-id]
+                                          (reset! ctx* ctx)
+                                          (throw (ex-info "widget assembly failed" {:phase :ir2})))]
+                            (app-runtime/start-tui-runtime!
+                             (fn [_run-agent-fn _opts]
+                               (throw (ex-info "frontend should not start" {})))
+                             :ignored {} {}))
+                          nil
+                          (catch clojure.lang.ExceptionInfo e
+                            e))]
+            (is (= "widget assembly failed" (ex-message failure)))
+            (is (some? @ctx*) "assembly failure captured the runtime context")
+            (is (nil? (ui-capabilities/provider @ctx*))
+                "TUI provider is not installed until option assembly succeeds")))))))
 
 (deftest start-tui-runtime-forwards-initial-context-session-tree-widget-test
   ;; Characterizes the initial context/session-tree widget forwarded through
