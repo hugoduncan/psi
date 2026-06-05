@@ -235,3 +235,9 @@ Verification:
 - `bb commit-check:file-lengths` → exit 0.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+2026-06-05 test review: found one new actionable coverage gap (TT17). Public-path startup tests now cover the TUI option/callback surface and navigation focus through captured `:query-fn`, but none prove the cross-runtime `session-state` publication of the live `:tui-focus*` atom remains correct for nREPL consumers. `start-tui-runtime!` publishes `:tui-focus*` specifically so `psi.app-runtime.nrepl-runtime/active-session-id-in-session-state` can follow TUI focus changes; a regression that omits it or stores the initial session id/stale atom could leave current TUI callback tests green while editor nREPL operations target the wrong session after navigation. Added an unchecked `steps.md` follow-up to characterize this through public startup plus a real focus change.
+
+Verification during review: inspected task artifacts, `start-tui-runtime!`, `tui_wiring.clj`, `nrepl_runtime.clj`, and public TUI startup/app-runtime tests. No code/tests changed in this review pass.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
