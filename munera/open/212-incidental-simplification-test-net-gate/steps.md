@@ -105,4 +105,4 @@
 
 ## Code-shaper review follow-ups
 
-- [ ] CS1: Make `terminal-stop-summary` terminal by construction: add an explicit `workflow/constant-routing` `DONE` judge with `:on {"DONE" {:goto :done}}` (or an equivalent explicit terminal contract) and tighten the workflow-definition test so gate-failure terminality no longer depends on the step being last.
+- [x] CS1: Make `terminal-stop-summary` terminal by construction: add an explicit `workflow/constant-routing` `DONE` judge with `:on {"DONE" {:goto :done}}` (or an equivalent explicit terminal contract) and tighten the workflow-definition test so gate-failure terminality no longer depends on the step being last.

@@ -313,3 +313,17 @@ PASS_STATUS: REVIEW_COMPLETE
 Reviewed code shape using `.psi/skills/code-shaper/SKILL.md` against the task artifacts, `.psi/workflows/reduce-incidental-complexity.edn`, `review-task-implementation.edn`, `review-step.edn`, focused workflow-definition tests, `doc/workflows.md`, and `CHANGELOG.md`. Found one actionable code-shape issue (**CS1**): `terminal-stop-summary` is intended to be a terminal gate-failure step, but it is terminal only because it is currently the last step and has no `:judge`/`:on`, while `final-summary` uses an explicit constant route to `:done`. That makes terminality implicit and order-dependent; appending any future step after it could let dirty-baseline, infeasible-characterization, or failed-diff paths fall through. Make the terminal-stop route explicit and tighten the test contract.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## 2026-06-05 — Code-shaper follow-up CS1
+
+Completed CS1. Made `terminal-stop-summary` terminal by construction in `.psi/workflows/reduce-incidental-complexity.edn` by adding an explicit `workflow/constant-routing` `DONE` judge and `:on {"DONE" {:goto :done}}`, matching the successful `final-summary` terminal contract. Tightened `task_209_workflow_definitions_test.clj` so the gate-failure terminal route must be explicit and can no longer pass by relying on the step being last/no judge fallthrough. Marked CS1 checked in `steps.md`.
+
+Verification:
+- `clj-paren-repair .psi/workflows/reduce-incidental-complexity.edn components/workflow-loader/test/psi/workflow_loader/task_209_workflow_definitions_test.clj` — success, no changes needed.
+- `clojure -M:test --focus psi.workflow-loader.task-209-workflow-definitions-test` — 3 tests / 193 assertions green.
+- `clojure -M:test --focus psi.workflow-loader.workflow-definitions-test` — 11 tests / 159 assertions green.
+- `bb lint` — 0 errors / 0 warnings (one pre-existing info).
+- `bb fmt:check` — green.
+- `bb commit-check:file-lengths` — green.
+
+PASS_STATUS: REVIEW_COMPLETE

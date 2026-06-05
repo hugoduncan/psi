@@ -170,7 +170,11 @@
     {:type :source, :from {:step "select-and-create" :yield :text}}
     {:type :template,
      :text "Produce a terminal stop summary for the target-present reduce-incidental-complexity run described by {{input}}. This summary is only for gate failures after a target task exists: dirty baseline, missing target/source baseline data, infeasible characterization, or a failed baseline/diff classification. No-target runs route directly from `select-and-create` to workflow completion and must not run this step.\n\nInspect the task artifacts and prior gate outputs recorded there. Report why simplification did not run, what task artifacts were updated, and whether the next action is revert, split, close, or retry coverage work. Do not claim `implement-task`, simplification, implementation review, push, or PR creation occurred.\n\nInput:\n{{input}}",
-     :vars {"input" {:from {:step "select-and-create" :yield :text}}}}]}],
+     :vars {"input" {:from {:step "select-and-create" :yield :text}}}}],
+   :judge {:type :invoke,
+           :operation "workflow/constant-routing",
+           :args {:route "DONE"}},
+   :on {"DONE" {:goto :done}}}],
  :name "reduce-incidental-complexity",
  :description
  "Select the single highest incidental-complexity unit, open a constrained behaviour-preserving refactor task in the current worktree, enforce a pre-simplification characterization-test-net gate, and then drive simplification through implementation and review"}
