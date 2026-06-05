@@ -92,6 +92,8 @@ root cause is missing invalidation/event emission rather than missing formatting
 
 If the investigation shows that `session/updated` reliably arrives but
 `footer/updated` does not, the fix should be at the backend/RPC/app-runtime
-projection boundary so all footer consumers stay coherent. Only use an Emacs-side
-fallback from `session/updated` if backend footer projection cannot be refreshed
-without introducing broader coupling.
+projection boundary so all footer consumers stay coherent. Only use a
+`session/updated` fallback to trigger or reuse delivery of the app-runtime-owned
+footer projection when `footer/updated` is unavailable. The fallback must not
+synthesize retry footer wording in Emacs and must not create a parallel
+Emacs-only retry display.

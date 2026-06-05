@@ -1,1 +1,1 @@
-- [ ] AR1: Tighten the fallback design note: if `session/updated` is used because `footer/updated` is unavailable, it must trigger/reuse delivery of the app-runtime-owned footer projection; do not synthesize retry footer wording or create a parallel retry display in Emacs.
+- [x] AR1: Tighten the fallback design note: if `session/updated` is used because `footer/updated` is unavailable, it must trigger/reuse delivery of the app-runtime-owned footer projection; do not synthesize retry footer wording or create a parallel retry display in Emacs.
