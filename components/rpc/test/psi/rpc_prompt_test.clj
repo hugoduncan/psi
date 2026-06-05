@@ -126,26 +126,38 @@
 
 (deftest rpc-prompt-provider-retry-state-publishes-footer-updated-test
   ;; Provider-boundary retry state changes drive Emacs-visible footer refreshes.
-  (testing "provider retry activation and clear emit footer/updated with projected retry text"
+  (testing "provider retry activation, visible change, and clear emit footer/updated"
     (let [emitted* (atom [])
           [ctx0 _] (support/create-session-context {:persist? false
                                                     :config {:auto-retry-base-delay-ms 8000
-                                                             :auto-retry-max-retries 1}})
+                                                             :auto-retry-max-retries 2}})
           ctx (assoc ctx0
-                     :now-fn #(java.time.Instant/ofEpochMilli 10000)
                      :provider-retry-sleep-fn
-                     (fn [_delay-ms]
-                       (support/await-until
-                        #(some (fn [event]
-                                 (when (str/includes? (or (get-in event [:data :status-line]) "")
-                                                      "retry in")
-                                   event))
-                               @emitted*)
-                        500)))
+                     (fn [delay-ms]
+                       (let [expected-text (str "retry in " (quot (long delay-ms) 1000) "s")]
+                         (support/await-until
+                          #(some (fn [event]
+                                   (when (str/includes? (or (get-in event [:data :status-line]) "")
+                                                        expected-text)
+                                     event))
+                                 @emitted*)
+                          500))))
           session-id (first (map :session-id (ss/list-context-sessions-in ctx)))
           attempts* (atom 0)
           progress-q (java.util.concurrent.LinkedBlockingQueue.)
           emit! (fn [event data] (swap! emitted* conj {:event event :data data}))
+          error-turn (fn [headers]
+                       {:turn-id "turn-retry-footer"
+                        :model {:provider "anthropic" :id "stub"}
+                        :ai-options {}
+                        :turn-ctx nil
+                        :assistant-message {:role "assistant"
+                                            :content [{:type :error :text "rate limit exceeded"}]
+                                            :stop-reason :error
+                                            :error-message "rate limit exceeded"
+                                            :http-status 429
+                                            :provider-error/headers headers
+                                            :timestamp (java.time.Instant/now)}})
           {:keys [stop? thread]} (streams/start-progress-loop!
                                   {:start-daemon-thread! (fn [f name]
                                                            (doto (Thread. ^Runnable f name)
@@ -159,16 +171,13 @@
       (try
         (with-redefs [turn-runtime/execute-live-turn!
                       (fn [& _]
-                        (if (= 1 (swap! attempts* inc))
-                          {:turn-id "turn-retry-footer"
-                           :model {:provider "anthropic" :id "stub"}
-                           :ai-options {}
-                           :turn-ctx nil
-                           :assistant-message {:role "assistant"
-                                               :content [{:type :error :text "Connection reset by peer"}]
-                                               :stop-reason :error
-                                               :error-message "Connection reset by peer"
-                                               :timestamp (java.time.Instant/now)}}
+                        (case (swap! attempts* inc)
+                          1 (error-turn {"Retry-After" "8"
+                                         "RateLimit-Limit" "5000"
+                                         "RateLimit-Remaining" "0"})
+                          2 (error-turn {"Retry-After" "4"
+                                         "RateLimit-Limit" "5000"
+                                         "RateLimit-Remaining" "2"})
                           {:turn-id "turn-retry-footer"
                            :model {:provider "anthropic" :id "stub"}
                            :ai-options {}
@@ -193,14 +202,24 @@
                                         :ctx ctx
                                         :session-id session-id})
           (let [footer-events (filterv #(= "footer/updated" (:event %)) @emitted*)
-                retry-footer (some #(when (str/includes? (or (get-in % [:data :status-line]) "")
-                                                         "retry in")
-                                      %)
-                                   footer-events)
+                first-retry-footer (some #(when (str/includes? (or (get-in % [:data :status-line]) "")
+                                                               "retry in 8s")
+                                            %)
+                                         footer-events)
+                changed-retry-footer (some #(when (and (str/includes? (or (get-in % [:data :status-line]) "")
+                                                                      "retry in 4s")
+                                                       (str/includes? (or (get-in % [:data :status-line]) "")
+                                                                      "remaining 2/5000"))
+                                              %)
+                                           footer-events)
                 final-footer (last footer-events)]
-            (is (= 2 @attempts*))
-            (is (some? retry-footer) "retry activation must publish footer/updated with retry text")
-            (is (= (get-in retry-footer [:data :session-id])
+            (is (= 3 @attempts*))
+            (is (some? first-retry-footer)
+                "retry activation must publish footer/updated with retry text")
+            (is (some? changed-retry-footer)
+                "changed retry metadata must publish footer/updated with latest visible text")
+            (is (= (get-in first-retry-footer [:data :session-id])
+                   (get-in changed-retry-footer [:data :session-id])
                    (get-in final-footer [:data :session-id])))
             (is (not (str/includes? (or (get-in final-footer [:data :status-line]) "")
                                     "retry in"))
