@@ -24,3 +24,7 @@ PASS_STATUS: PLAN_COMPLETE
 2026-06-05 plan/steps ambiguity review: no new actionable ambiguity found. Re-read `plan.md`, `steps.md`, `design.md`, this implementation log, `components/app-runtime/src/psi/app_runtime.clj` around `start-tui-runtime!`, `components/app-runtime/src/psi/app_runtime/tui_wiring.clj`, and the direct sibling app-runtime tests. The execution order is singular (safety-net assessment → characterize gaps if any → local refactor → tests/lint → Gordian gates → blast-radius note), the resolved B1 burden-key rule is referenced where needed, and the potentially under-covered callback/nullable/current-session behaviours are deliberately handled by the Phase 0 coverage-map gate rather than left as undefined implementation choices. No unchecked `steps.md` follow-up added.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+2026-06-05 plan/steps inconsistency review: no new actionable inconsistency found. Checked `plan.md` and `steps.md` against `design.md`, `design-steps.md`, prior implementation notes, `start-tui-runtime!`, `tui_wiring.clj`, and the sibling app-runtime tests. Slice order, Phase 0 gating, provider lifetime, `/new` focus targeting, nullable execution-mode coverage, callback/wiring assembly, A2/A4 burden-key reconciliation, and A3 gate command all align across task artifacts. No unchecked `steps.md` follow-up added.
+
+PASS_STATUS: REVIEW_COMPLETE
