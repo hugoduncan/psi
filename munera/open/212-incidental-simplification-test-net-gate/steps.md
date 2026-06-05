@@ -91,6 +91,8 @@
 
 ## Test review follow-ups
 
+- [ ] TT4: Lock the successful target-present final-summary route: add workflow-definition assertions that `review-task-implementation` advances to `final-summary` by default (no `:judge`/`:on` shortcut to `:done`) and that the final summary remains the terminal successful path, so a regression cannot keep step-order/prompt tests green while skipping the user-facing design → plan → test-net → diff-gate → simplification → review summary.
+
 - [x] TT3: Lock the gate-step `:judge` contracts, not just `:on` maps and prompt text: add workflow-definition assertions that `clean-baseline`, `coverage-review`, `coverage-disposition`, `coverage-fix`, and `diff-gate` all invoke `workflow/pass-status-routing` from their own `:output :final-llm-reply` with the intended allowed statuses, so a regression to constant routing or the wrong source step cannot keep the focused task-212 tests green while bypassing the raw `PASS_STATUS` gate decisions.
 
 - [x] TT2: Lock the transitive post-implementation test-review gate: add workflow-definition coverage proving `review-task-implementation` includes a `review-task-tests` delegate to `review-step` with `:skill "task-test-review"` (or equivalent), so the final reduce-incidental-complexity implementation-review phase cannot silently lose or retarget the task-test-review pass while focused task-212 tests remain green.
