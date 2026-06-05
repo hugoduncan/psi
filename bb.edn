@@ -146,9 +146,39 @@
                     (println (format fmt value path)))
                   rows))
 
+          (def scry-results-dir ".scry-results/")
+
           (defn scry-runner-error? [result]
             (and (pos? (:exit result))
                  (str/includes? (or (:err result) "") "scry CLI error:")))
+
+          (defn print-shell-result! [result]
+            (print (:out result))
+            (when (seq (:err result))
+              (binding [*out* *err*]
+                (print (:err result))))
+            (flush))
+
+          (defn print-scry-results-hint! []
+            (binding [*out* *err*]
+              (println "Scry failure/error details are written under" scry-results-dir
+                       "as EDN files.")))
+
+          (defn scry-test-failure? [result]
+            (and (pos? (:exit result))
+                 (not (scry-runner-error? result))))
+
+          (defn run-scry-cli!
+            "Run focused clojure.test tests with Scry and point failures/errors
+             at the structured result-data directory."
+            [args]
+            (let [result (apply shell {:continue true :out :string :err :string}
+                                "clojure" "-M:test-paths" "-m" "scry.cli"
+                                args)]
+              (print-shell-result! result)
+              (when (scry-test-failure? result)
+                (print-scry-results-hint!))
+              (:exit result)))
 
           (defn run-scry-kaocha-suite!
             "Run a Kaocha suite through Scry first, falling back to the existing
@@ -159,17 +189,16 @@
             (let [result (shell {:continue true :out :string :err :string}
                                 "clojure" "-X:test" "scry.cli/run"
                                 ":runner" ":kaocha" ":suite" (str ":" suite))]
-              (print (:out result))
-              (when (seq (:err result))
-                (binding [*out* *err*]
-                  (print (:err result))))
-              (flush)
+              (print-shell-result! result)
               (if (scry-runner-error? result)
                 (do
                   (binding [*out* *err*]
                     (println "Scry runner unavailable; falling back to Kaocha."))
                   (bb.kaocha-runner/run! kaocha-args))
-                (:exit result)))))
+                (do
+                  (when (scry-test-failure? result)
+                    (print-scry-results-hint!))
+                  (:exit result))))))
 
   fmt:check
   {:doc  "Check Clojure and EDN formatting with cljfmt CLI."
@@ -226,8 +255,8 @@
    :task (System/exit (run-scry-kaocha-suite! "integration" ["--focus" "integration"]))}
 
   clojure:test:scry
-  {:doc  "Run focused clojure.test tests with Scry structured results. Pass scry CLI options, e.g. --namespace psi.session-state.state-test."
-   :task (apply shell "clojure" "-M:test-paths" "-m" "scry.cli" *command-line-args*)}
+  {:doc  "Run focused clojure.test tests with Scry structured results. On failures/errors, inspect .scry-results/*.edn."
+   :task (System/exit (run-scry-cli! *command-line-args*))}
 
   smoke:test
   {:doc  "Smoke-test the live runtime: RPC handshake subprocess test + TUI tmux startup scenario."
