@@ -54,4 +54,4 @@
 
 ## Code-shaper follow-ups
 
-- [ ] CS1: Shape `clear-active-retry!` so it only emits `:retry-updated`/footer refresh when clearing an actual retry-related state (`:retry`, nonzero `:retry-attempt`, or pending retry abort flag), preserving clear-after-retry behavior without publishing retry footer refreshes for ordinary successful/non-retry prompt completions.
+- [x] CS1: Shape `clear-active-retry!` so it only emits `:retry-updated`/footer refresh when clearing an actual retry-related state (`:retry`, nonzero `:retry-attempt`, or pending retry abort flag), preserving clear-after-retry behavior without publishing retry footer refreshes for ordinary successful/non-retry prompt completions.

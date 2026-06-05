@@ -374,15 +374,23 @@
                                          :retry retry-metadata)))
   (emit-retry-updated-progress! progress-queue session-id))
 
+(defn- retry-clear-needed?
+  [session-data]
+  (boolean
+   (or (:retry session-data)
+       (pos? (or (:retry-attempt session-data) 0))
+       (:provider-retry-abort-requested? session-data))))
+
 (defn- clear-active-retry!
   [ctx session-id progress-queue]
-  (ss/apply-root-state-update-in!
-   ctx
-   (ss/session-update session-id #(-> %
-                                      (assoc :retry-attempt 0
-                                             :retry nil)
-                                      (dissoc :provider-retry-abort-requested?))))
-  (emit-retry-updated-progress! progress-queue session-id))
+  (when (retry-clear-needed? (ss/get-session-data-in ctx session-id))
+    (ss/apply-root-state-update-in!
+     ctx
+     (ss/session-update session-id #(-> %
+                                        (assoc :retry-attempt 0
+                                               :retry nil)
+                                        (dissoc :provider-retry-abort-requested?))))
+    (emit-retry-updated-progress! progress-queue session-id)))
 
 (defn- active-turn-cancelled?
   [ctx session-id]
