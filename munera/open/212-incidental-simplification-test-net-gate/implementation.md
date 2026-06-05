@@ -253,3 +253,19 @@ PASS_STATUS: REVIEW_COMPLETE
 Reviewed task tests after TT4 using `.psi/skills/task-test-review/SKILL.md` against `design.md`, `plan.md`, `steps.md`, `.psi/workflows/reduce-incidental-complexity.edn`, lifecycle delegate workflows/prompts, workflow grammar docs, `task_209_workflow_definitions_test.clj`, `workflow_definitions_test.clj`, `doc/workflows.md`, and `CHANGELOG.md`. Found one new actionable test issue (**TT5**): the focused tests lock successful target-present completion through `final-summary`, but do not lock that `terminal-stop-summary` is itself terminal for gate-failure paths. A regression adding a judge/`:on` from `terminal-stop-summary` back to `implement-task`, `final-summary`, or any non-`:done` step could leave current route/prompt assertions green while allowing dirty-baseline, infeasible-characterization, or failed-diff runs to continue after the stop summary.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## 2026-06-05 — Test review follow-up TT5
+
+Completed TT5. Strengthened `task_209_workflow_definitions_test.clj` so gate-failure terminal routing is locked: `terminal-stop-summary` must have no routing judge/on continuation, or only an explicit constant `DONE` route to `:done`. This prevents dirty-baseline, infeasible-characterization, and failed-diff target-present paths from regressing into `implement-task`, `final-summary`, or another downstream step while existing route/prompt assertions stay green. Marked TT5 checked in `steps.md`.
+
+Verification:
+- `clj-paren-repair components/workflow-loader/test/psi/workflow_loader/task_209_workflow_definitions_test.clj` — success, no changes needed.
+- `clojure -M:test --focus psi.workflow-loader.task-209-workflow-definitions-test` — 3 tests / 188 assertions green.
+
+PASS_STATUS: REVIEW_COMPLETE
+
+Additional verification before commit:
+- `clojure -M:test --focus psi.workflow-loader.workflow-definitions-test` — 11 tests / 159 assertions green.
+- `bb lint` — 0 errors / 0 warnings (one pre-existing info).
+- `bb fmt:check` — green.
+- `bb commit-check:file-lengths` — green.

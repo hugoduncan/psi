@@ -410,6 +410,16 @@
              "successful target-present final summary stops before terminal-stop-summary")
          (is (.contains terminal-stop-text
                         "No-target runs route directly from `select-and-create` to workflow completion and must not run this step"))
+         (is (or (nil? (:judge terminal-stop-step))
+                 (= {:type :invoke
+                     :operation "workflow/constant-routing"
+                     :args {:route "DONE"}}
+                    (:judge terminal-stop-step)))
+             "terminal-stop-summary has no routing judge except an explicit terminal DONE route")
+         (is (or (nil? (:on terminal-stop-step))
+                 (= {"DONE" {:goto :done}}
+                    (:on terminal-stop-step)))
+             "terminal-stop-summary cannot continue gate-failure paths to another workflow step")
          (is (.contains terminal-stop-text "dirty baseline"))
          (is (.contains terminal-stop-text "infeasible characterization"))
          (is (.contains terminal-stop-text "failed baseline/diff classification"))
