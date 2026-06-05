@@ -1,6 +1,7 @@
 (ns psi.app-runtime-tui-startup-test
   (:require
    [clojure.test :refer [deftest is]]
+   [psi.agent-session.core :as session]
    [psi.agent-session.extensions :as ext]
    [psi.agent-session.test-support :as test-support]
    [psi.app-runtime :as app-runtime]
@@ -58,3 +59,37 @@
                   (is (= session-config
                          (select-keys (:config ctx) (keys session-config))))
                   (is (= :high (:thinking-level sd))))))))))))
+
+(deftest start-tui-runtime-wires-active-input-callbacks-to-focused-session-test
+  ;; Characterizes public TUI active-input callbacks against real session
+  ;; state.  No tui-wiring/session callback helpers are stubbed.
+  (app-test-support/with-session-state-restore
+    (fn []
+      (with-redefs-fn (merge (app-test-support/bootstrap-stub-bindings)
+                             {#'app-runtime/resolve-model (fn [_] app-test-support/test-ai-model)
+                              #'ext/discover-extension-paths (fn [& _] [])})
+        (fn []
+          (let [captured-opts* (atom nil)]
+            (is (= :ok (app-runtime/start-tui-runtime!
+                        (fn [_run-agent-fn opts]
+                          (reset! captured-opts* opts)
+                          :ok)
+                        :ignored {} {})))
+            (let [opts       @captured-opts*
+                  ctx        (:ctx @app-runtime/session-state)
+                  session-id (:focus-session-id opts)]
+              (session/dispatch-in! ctx :session/prompt {:session-id session-id} {:origin :core})
+              (session/dispatch-in! ctx :on-streaming-entered {:session-id session-id} {:origin :statechart})
+              (swap! (:data-atom (ss/agent-ctx-in ctx session-id))
+                     assoc :pending-tool-calls #{"keep-streaming-for-queue"})
+              (is (= {:message "Queued steering message."}
+                     ((:on-queue-input-fn! opts) "steer while streaming" {})))
+              (is (= ["steer while streaming"]
+                     (:steering-messages (ss/get-session-data-in ctx session-id))))
+              (is (= {:queued-text "steer while streaming"
+                      :message "Interrupted active work."}
+                     ((:on-interrupt-fn! opts) {})))
+              (let [sd (ss/get-session-data-in ctx session-id)]
+                (is (= :idle (ss/sc-phase-in ctx session-id)))
+                (is (= [] (:steering-messages sd)))
+                (is (= [] (:follow-up-messages sd)))))))))))
