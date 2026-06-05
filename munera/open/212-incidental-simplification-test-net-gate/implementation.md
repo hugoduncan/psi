@@ -146,3 +146,9 @@ Verification:
 - `bb commit-check:file-lengths` — green.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## 2026-06-05 — Implementation review
+
+Reviewed the implementation after IR4 against `design.md`, `plan.md`, `steps.md`, `.psi/workflows/reduce-incidental-complexity.edn`, lifecycle delegate workflows, workflow grammar docs, `task_209_workflow_definitions_test.clj`, `doc/workflows.md`, and `CHANGELOG.md`. Focused workflow-definition tests are green (`clojure -M:test --focus psi.workflow-loader.task-209-workflow-definitions-test` — 3 tests / 174 assertions). Found one new actionable issue (**IR5**): the `CHANGELOG.md` Unreleased `Added` entry for `reduce-incidental-complexity` still says the workflow "drives it through the full `task-lifecycle`", which was true before this task but now contradicts the implemented explicit design/plan/test-net/diff-gate/implementation/review topology and the newer `Changed` entry. This is user-facing documentation drift in the same changelog section and should be reconciled before closure.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
