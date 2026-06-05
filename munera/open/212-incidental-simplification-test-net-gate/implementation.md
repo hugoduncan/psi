@@ -33,3 +33,9 @@ PASS_STATUS: REVIEW_COMPLETE
 Reviewed `plan.md` and `steps.md` against `design.md`, `.psi/workflows/reduce-incidental-complexity.edn`, `task-lifecycle.edn`, delegated lifecycle workflow definitions, workflow grammar/docs, task-209 workflow tests, and `doc/workflows.md`. Found four actionable plan/steps ambiguities: **PA1** no-target routing is split between direct completion and terminal stop summary; **PA2** infeasible characterization is not distinguishable from fixable coverage feedback before routing to coverage-fix; **PA3** the characterization baseline artifact and committed-vs-uncommitted diff method are unspecified; **PA4** plan wording conflates PASS_STATUS tokens with `workflow/pass-status-routing` EDN outcomes. Added unchecked follow-ups to `steps.md`.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## 2026-06-05 — Plan ambiguity follow-up PA1–PA4
+
+Completed PA1–PA4 by refining `plan.md` and `steps.md` only. Clarified no-target routing stays at the `select-and-create` boundary (`PASS_STATUS: ACTIONABLE_FEEDBACK` → normalized `"REPEAT"` → `:done`) and must not run the target-present terminal summary. Clarified infeasible characterization is distinguished from fixable coverage gaps by an explicit task-artifact marker (`CHARACTERIZATION_STATUS: INFEASIBLE` vs `CHARACTERIZATION_STATUS: FIXABLE_GAPS`) and routes to terminal stop rather than coverage-fix. Specified the pre-characterization baseline artifact as task-local `characterization-baseline.edn` with HEAD/status/target-source paths/classified pre-existing task-artifact-or-doc dirt, and required diff-gate comparison of committed changes since recorded baseline HEAD plus current uncommitted status/diff. Clarified raw prompt `PASS_STATUS` tokens versus normalized EDN `:on` outcomes (`"DONE"`/`"REPEAT"`). Marked PA1–PA4 checked in `steps.md`.
+
+PASS_STATUS: REVIEW_COMPLETE
