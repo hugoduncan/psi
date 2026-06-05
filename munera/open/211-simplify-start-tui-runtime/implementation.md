@@ -12,3 +12,7 @@ PASS_STATUS: ACTIONABLE_FEEDBACK
 2026-06-04 ambiguity follow-up B1 executed: clarified the burden-comparison identity rules in `design.md`. A2 now reconciles before/after Gordian rows by unique logical key `(file, ns, var, arity)` when that key is unique on both sides, falls back to the selector full key `(ns, var, arity, line)` for ambiguous/unpaired rows, and counts added/deleted units with zero on the missing side. A4 no longer requires preserving line `603`; that line is baseline selector provenance, while the after target is the unique `(components/app-runtime/src/psi/app_runtime.clj, psi.app-runtime, start-tui-runtime!, 5)` row. If the after target is missing or duplicated, A4 fails.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+2026-06-04 inconsistency review: no new actionable inconsistency found. Checked `design.md` internally and against the referenced target code, existing sibling tests, `before-local.json`, `META.md`, and `doc/architecture.md`. The burden-key clarification from B1 keeps A2/A4 executable, the coverage hint matches the sibling test surface, and the blast-radius/architecture constraints are mutually consistent with app-runtime ownership and TUI adapter boundaries. No `design-steps.md` follow-up added.
+
+PASS_STATUS: REVIEW_COMPLETE
