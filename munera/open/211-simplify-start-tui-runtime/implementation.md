@@ -216,3 +216,10 @@ PASS_STATUS: ACTIONABLE_FEEDBACK
 2026-06-05 test-review follow-up TT15 executed: extended `components/app-runtime/test/psi/app_runtime_tui_startup_test.clj` with `start-tui-runtime-dispatches-tui-only-frontend-action-commands-test`. The test drives public `start-tui-runtime!`, captures the real TUI `:dispatch-fn`, creates a real persisted session under the startup `:session-root`, then dispatches `/model`, `/thinking`, and `/resume`. It asserts each result is a `:frontend-action` with the expected action id (`:select-model`, `:select-thinking-level`, `:select-resume-session`), submit contract, and meaningful items/options including a built-in model, all thinking levels, and the persisted resumable session. This makes replacing `tui-frontend-actions/command-result` with plain command dispatch, or dropping those TUI-only branches, fail through the public startup path. Verification: `clj-paren-repair components/app-runtime/test/psi/app_runtime_tui_startup_test.clj` → success/no changes; `bb clojure:test:scry --namespace psi.app-runtime-tui-startup-test` → 12 tests, 81 assertions, 0 failures/errors.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+
+2026-06-05 test review: found one new actionable coverage gap (TT16). Public-path `start-tui-runtime!` tests now cover provider lifetime, startup/config forwarding, callback/action surfaces, command dispatch, session-tree widgets, OAuth, and frontend-action commands, but none assert the terminal mode option `:alt-screen false`. `psi.tui.app/start!` defaults missing `:alt-screen` to true, so a regression dropping this option from `tui_wiring/build-tui-opts` would leave current public startup tests green while changing observable TUI terminal behaviour. Added an unchecked `steps.md` follow-up to characterize the option through public startup opts.
+
+Verification during review: `bb clojure:test:scry --namespace psi.app-runtime-tui-startup-test` → 12/81 green; `bb clojure:test:scry --namespace psi.app-runtime-test` → 32/128 green.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
