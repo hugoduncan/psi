@@ -241,3 +241,15 @@ PASS_STATUS: REVIEW_COMPLETE
 Verification during review: inspected task artifacts, `start-tui-runtime!`, `tui_wiring.clj`, `nrepl_runtime.clj`, and public TUI startup/app-runtime tests. No code/tests changed in this review pass.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+2026-06-05 test-review follow-up TT17 executed: extended `components/app-runtime/test/psi/app_runtime_tui_startup_test.clj` with `start-tui-runtime-publishes-live-tui-focus-for-nrepl-active-session-test`. The test drives public `start-tui-runtime!`, captures real TUI opts, creates a second real top-level session, changes focus through the public `:switch-session-fn!`, and asserts `psi.app-runtime.nrepl-runtime/active-session-id-in-session-state` reads the initial and updated focused session id from `app-runtime/session-state`. It also asserts `:query-fn` focus and the emitted `:context-updated` event, so dropping `:tui-focus*` from `session-state` or publishing a stale/non-live focus value fails outside local TUI callback closures.
+
+Verification:
+- `clj-paren-repair components/app-runtime/test/psi/app_runtime_tui_startup_test.clj` → success/no changes.
+- `bb clojure:test:scry --namespace psi.app-runtime-tui-startup-test` → 14 tests, 91 assertions, 0 failures/errors.
+- `bb clojure:test:scry --namespace psi.app-runtime-test` → 32 tests, 128 assertions, 0 failures/errors.
+- `bb clojure:test:unit` → exit 0.
+- `bb lint` → 0 errors, 0 warnings (one pre-existing info).
+- `bb commit-check:file-lengths` → exit 0.
+
+PASS_STATUS: REVIEW_COMPLETE

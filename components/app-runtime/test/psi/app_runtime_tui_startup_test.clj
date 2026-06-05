@@ -6,6 +6,7 @@
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.ui-capabilities :as ui-capabilities]
    [psi.app-runtime :as app-runtime]
+   [psi.app-runtime.nrepl-runtime :as nrepl-runtime]
    [psi.app-runtime.test-support :as app-test-support]
    [psi.app-runtime.tui-session-nav :as tui-session-nav]
    [psi.memory.runtime :as memory-runtime]
@@ -55,6 +56,42 @@
             (let [opts @captured-opts*]
               (is (contains? opts :alt-screen))
               (is (false? (:alt-screen opts))))))))))
+
+(deftest start-tui-runtime-publishes-live-tui-focus-for-nrepl-active-session-test
+  ;; Characterizes the cross-runtime focus publication: nREPL/editor consumers
+  ;; read the same live TUI focus atom that public navigation callbacks update.
+  (app-test-support/with-session-state-restore
+    (fn []
+      (with-redefs-fn (merge (app-test-support/bootstrap-stub-bindings)
+                             {#'app-runtime/resolve-model (fn [_] app-test-support/test-ai-model)
+                              #'ext/discover-extension-paths (fn [& _] [])})
+        (fn []
+          (let [captured-opts* (atom nil)]
+            (is (= :ok (app-runtime/start-tui-runtime!
+                        (fn [_run-agent-fn opts]
+                          (reset! captured-opts* opts)
+                          :ok)
+                        :ignored {} {})))
+            (let [opts       @captured-opts*
+                  ctx        (:ctx @app-runtime/session-state)
+                  session-id (:focus-session-id opts)
+                  target-id  (:session-id
+                              (session/create-top-level-session-in!
+                               ctx session-id {:session-name "nREPL focus target"}))
+                  fallback   (fn [_ctx] :fallback)]
+              (is (= session-id
+                     (nrepl-runtime/active-session-id-in-session-state
+                      app-runtime/session-state fallback)))
+              (is (= {:messages [] :tool-calls {} :tool-order []}
+                     ((:switch-session-fn! opts) target-id)))
+              (is (= target-id (:psi.agent-session/session-id
+                                ((:query-fn opts) [:psi.agent-session/session-id]))))
+              (is (= target-id
+                     (nrepl-runtime/active-session-id-in-session-state
+                      app-runtime/session-state fallback)))
+              (let [event (.poll (:event-queue opts) 2000 java.util.concurrent.TimeUnit/MILLISECONDS)]
+                (is (= :context-updated (:type event)))
+                (is (= target-id (:active-session-id event)))))))))))
 
 (deftest start-tui-runtime-forwards-session-config-and-thinking-override-to-context-test
   ;; Characterizes public TUI startup runtime configuration forwarding through
