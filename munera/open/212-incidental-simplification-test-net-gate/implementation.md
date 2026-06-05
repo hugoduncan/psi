@@ -295,3 +295,9 @@ Verification:
 - `bb commit-check:file-lengths` — green.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## 2026-06-05 — Test-shaper review
+
+Reviewed task test shape after TT6 using `.psi/skills/test-shaper/SKILL.md` against `design.md`, `plan.md`, `steps.md`, `.psi/workflows/reduce-incidental-complexity.edn`, `review-task-implementation.edn`, `review-step.edn`, workflow grammar/concepts/IR docs, workflow test support, `task_209_workflow_definitions_test.clj`, `workflow_definitions_test.clj`, `doc/workflows.md`, and `CHANGELOG.md`. No new actionable test-shape issue found. The focused tests now lock the explicit reduce-incidental-complexity topology, gate judge contracts, terminal routes, real delegate co-loading, and transitive `task-test-review`/`test-shaper` review gates without duplicating an already-covered concern. Verification: focused task-209 workflow definitions 3/193 green; broader workflow-definitions 11/159 green; attempted `psi.workflow-loader.workflow-ir-test` focus selected no tests (no matching namespace).
+
+PASS_STATUS: REVIEW_COMPLETE
