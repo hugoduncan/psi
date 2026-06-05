@@ -18,8 +18,7 @@
    [psi.agent-session.test-support :as test-support]
    [psi.prompt-assets.system-prompt :as sys-prompt]
    [psi.memory.runtime :as memory-runtime]
-   [psi.app-runtime.test-support :as app-test-support]
-   #_[psi.tui.app :as tui-app]))
+   [psi.app-runtime.test-support :as app-test-support]))
 
 (deftest select-login-provider-test
   (let [providers [{:id :anthropic :name "Anthropic"}
@@ -326,8 +325,9 @@
               (is (contains? msg-texts "/history"))
               (is (contains? msg-texts "/quit")))))))))
 
-(deftest start-tui-runtime-passes-current-session-file-startup-rehydrate-and-nav-callbacks-test
+(deftest start-tui-runtime-passes-current-session-file-startup-rehydrate-nav-callbacks-and-cwd-test
   (let [captured (atom nil)
+        bootstrap-opts* (atom nil)
         target-session-id* (atom nil)
         startup-rehydrate {:messages [{:role :user :text "r"}] :tool-calls {"c" {:name "read"}} :tool-order ["c"]}]
     (test-support/with-temp-session-root
@@ -337,8 +337,9 @@
             (with-redefs-fn (main-bootstrap-stub-bindings)
               (fn []
                 (with-redefs [app-runtime/bootstrap-runtime-session!
-                              (fn [ctx _ai-model _opts]
-                                (let [sid (:session-id (session/new-session-in! ctx nil {}))
+                              (fn [ctx _ai-model opts]
+                                (let [_ (reset! bootstrap-opts* opts)
+                                      sid (:session-id (session/new-session-in! ctx nil {}))
                                       target-id (:session-id
                                                  (session/create-top-level-session-in!
                                                   ctx sid {:session-name "switch target"}))]
@@ -348,27 +349,26 @@
                               (fn [_run-agent-fn opts]
                                 (reset! captured opts)
                                 :ok)
-                              :ignored {} {} {:session-root session-root}))))
+                              :ignored {} {} {:session-root session-root :cwd session-root}))))
                 (let [opts @captured
                       ctx (:ctx @app-runtime/session-state)
                       session-id (:focus-session-id opts)
                       target-id @target-session-id*
                       session-file (:session-file (ss/get-session-data-in ctx session-id))]
-                  (is (every? fn? (map opts [:dispatch-fn :on-interrupt-fn!
-                                             :frontend-action-handler-fn! :resume-fn!
-                                             :switch-session-fn! :fork-session-fn!])))
+                  (is (every? fn? (map opts [:dispatch-fn :on-interrupt-fn! :frontend-action-handler-fn!
+                                             :resume-fn! :switch-session-fn! :fork-session-fn!])))
                   (is (= (select-keys startup-rehydrate [:messages :tool-calls :tool-order])
                          {:messages (:initial-messages opts)
                           :tool-calls (:initial-tool-calls opts)
                           :tool-order (:initial-tool-order opts)}))
                   (is (= :tui (:ui-type (ss/get-session-data-in ctx session-id))))
+                  (is (= [session-root session-root] [(:cwd @bootstrap-opts*) (:cwd opts)]))
                   (is (= session-file (:current-session-file opts)))
                   (is (.startsWith session-file session-root))
                   (is (= {:messages [] :tool-calls {} :tool-order []}
                          ((:switch-session-fn! opts) target-id)))
-                  (is (= target-id
-                         (:psi.agent-session/session-id
-                          ((:query-fn opts) [:psi.agent-session/session-id]))))
+                  (is (= target-id (:psi.agent-session/session-id
+                                    ((:query-fn opts) [:psi.agent-session/session-id]))))
                   (let [event (.poll (:event-queue opts) 2000 java.util.concurrent.TimeUnit/MILLISECONDS)]
                     (is (= :context-updated (:type event)))
                     (is (= target-id (:active-session-id event)))))))))))))
