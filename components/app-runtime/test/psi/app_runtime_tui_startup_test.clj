@@ -93,3 +93,65 @@
                 (is (= :idle (ss/sc-phase-in ctx session-id)))
                 (is (= [] (:steering-messages sd)))
                 (is (= [] (:follow-up-messages sd)))))))))))
+
+(deftest start-tui-runtime-wires-ui-projection-dispatch-footer-and-selector-test
+  ;; Characterizes public TUI UI projection/chrome callbacks against real
+  ;; session and extension-UI state.  No tui-wiring/lower option assembly is stubbed.
+  (app-test-support/with-session-state-restore
+    (fn []
+      (with-redefs-fn (merge (app-test-support/bootstrap-stub-bindings)
+                             {#'app-runtime/resolve-model (fn [_] app-test-support/test-ai-model)
+                              #'ext/discover-extension-paths (fn [& _] [])})
+        (fn []
+          (let [captured-opts* (atom nil)]
+            (is (= :ok (app-runtime/start-tui-runtime!
+                        (fn [_run-agent-fn opts]
+                          (reset! captured-opts* opts)
+                          :ok)
+                        :ignored {} {})))
+            (let [opts       @captured-opts*
+                  ctx        (:ctx @app-runtime/session-state)
+                  session-id (:focus-session-id opts)
+                  target-id  (:session-id
+                              (session/create-top-level-session-in!
+                               ctx session-id {:session-name "selector target"}))]
+              ((:ui-dispatch-fn opts) :session/ui-set-widget
+                                      {:extension-id "ext-tt8"
+                                       :widget-id "status-card"
+                                       :placement :above-editor
+                                       :content ["Projected status"]})
+              ((:ui-dispatch-fn opts) :session/ui-set-status
+                                      {:extension-id "ext-tt8" :text "ready"})
+              (let [snapshot ((:ui-read-fn opts))
+                    footer   ((:footer-model-fn opts))
+                    selector ((:session-selector-fn opts))]
+                (is (= ["ext-tt8" "status-card" ["Projected status"]]
+                       (some (fn [widget]
+                               (when (= ["ext-tt8" "status-card"]
+                                        [(:extension-id widget) (:widget-id widget)])
+                                 [(:extension-id widget) (:widget-id widget) (:content widget)]))
+                             (:widgets snapshot))))
+                (is (= "ready"
+                       (some (fn [status]
+                               (when (= "ext-tt8" (:extension-id status))
+                                 (:text status)))
+                             (:statuses snapshot))))
+                (is (= "ready"
+                       (some (fn [status]
+                               (when (= "ext-tt8" (:status/extension-id status))
+                                 (:status/text status)))
+                             (:footer/statuses footer))))
+                (is (string? (get-in footer [:footer/model :id])))
+                (is (= :select-session (:ui/action-id selector)))
+                (is (= :preserve (:ui/order selector)))
+                (is (some #(= {:action/kind :switch-session
+                               :action/session-id session-id}
+                              (:ui.item/value %))
+                          (:ui/items selector)))
+                (is (some #(= {:action/kind :switch-session
+                               :action/session-id target-id}
+                              (:ui.item/value %))
+                          (:ui/items selector)))
+                (is (some #(and (= session-id (get-in % [:ui.item/meta :item/session-id]))
+                                (true? (get-in % [:ui.item/meta :item/is-active])))
+                          (:ui/items selector)))))))))))
