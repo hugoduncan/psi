@@ -21,3 +21,9 @@ PASS_STATUS: ACTIONABLE_FEEDBACK
 Completed AMB1. Clarified `design.md` so the characterization baseline has a clean-source precondition: before recording the pre-characterization baseline, the workflow verifies target/source paths are not already dirty; only pre-existing task-artifact/doc changes may be carried forward when explicitly classified. Pre-existing dirty target/source changes now stop the workflow with an explicit finding instead of being absorbed into the unmodified-behavior baseline. Also updated acceptance criteria so tests must lock the clean-baseline precondition. Marked AMB1 done in `design-steps.md`.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## 2026-06-05 — Inconsistency review
+
+Reviewed `design.md` for internal consistency and against referenced workflow artifacts: `.psi/workflows/reduce-incidental-complexity.edn`, `task-lifecycle.edn`, `review-task-design.edn`, `create-task-plan.edn`, `review-task-plan.edn`, `implement-task.edn`, `review-task-implementation.edn`, workflow grammar/docs, task-209 workflow tests, and `doc/workflows.md`; did not review `plan.md` or `steps.md`. No new actionable inconsistency found: target-present ordering, no-target early stop, current-worktree inheritance, characterization-loop routing, baseline/diff gate, and docs/tests expectations are consistent with referenced artifacts and prior ARCH1/AMB1 clarifications.
+
+PASS_STATUS: REVIEW_COMPLETE
