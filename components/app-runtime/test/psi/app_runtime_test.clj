@@ -326,44 +326,52 @@
               (is (contains? msg-texts "/history"))
               (is (contains? msg-texts "/quit")))))))))
 
-(deftest start-tui-runtime-passes-current-session-file-and-startup-rehydrate-test
-  (let [captured          (atom nil)
-        startup-rehydrate {:messages [{:role :user :text "resume prompt"} {:role :assistant :text "resume answer"}]
-                           :tool-calls {"call-1" {:name "read" :status :success}}
-                           :tool-order ["call-1"]}]
+(deftest start-tui-runtime-passes-current-session-file-startup-rehydrate-and-nav-callbacks-test
+  (let [captured (atom nil)
+        target-session-id* (atom nil)
+        startup-rehydrate {:messages [{:role :user :text "r"}] :tool-calls {"c" {:name "read"}} :tool-order ["c"]}]
     (test-support/with-temp-session-root
       (fn [session-root]
         (app-test-support/with-session-state-restore
           (fn []
             (with-redefs-fn (main-bootstrap-stub-bindings)
               (fn []
-                (let [mock-tui-start! (fn [_run-agent-fn opts]
-                                        (reset! captured opts)
-                                        :ok)]
-                  (with-redefs [app-runtime/bootstrap-runtime-session!
-                                (fn [ctx _ai-model _opts]
-                                  (let [sid (:session-id (session/new-session-in! ctx nil {}))]
-                                    (assoc {:ctx ctx :session-id sid :templates [] :skills []}
-                                           :startup-rehydrate startup-rehydrate)))]
-                    (is (= :ok (app-runtime/start-tui-runtime! mock-tui-start! :ignored {} {} {:session-root session-root}))))
-                  (is (string? (:current-session-file @captured))
-                      "persisted TUI startup should pass the current session file to the frontend")
-                  (is (fn? (:dispatch-fn @captured)))
-                  (is (fn? (:on-interrupt-fn! @captured)))
+                (with-redefs [app-runtime/bootstrap-runtime-session!
+                              (fn [ctx _ai-model _opts]
+                                (let [sid (:session-id (session/new-session-in! ctx nil {}))
+                                      target-id (:session-id
+                                                 (session/create-top-level-session-in!
+                                                  ctx sid {:session-name "switch target"}))]
+                                  (reset! target-session-id* target-id)
+                                  {:ctx ctx :session-id sid :startup-rehydrate startup-rehydrate}))]
+                  (is (= :ok (app-runtime/start-tui-runtime!
+                              (fn [_run-agent-fn opts]
+                                (reset! captured opts)
+                                :ok)
+                              :ignored {} {} {:session-root session-root}))))
+                (let [opts @captured
+                      ctx (:ctx @app-runtime/session-state)
+                      session-id (:focus-session-id opts)
+                      target-id @target-session-id*
+                      session-file (:session-file (ss/get-session-data-in ctx session-id))]
+                  (is (every? fn? (map opts [:dispatch-fn :on-interrupt-fn!
+                                             :frontend-action-handler-fn! :resume-fn!
+                                             :switch-session-fn! :fork-session-fn!])))
                   (is (= (select-keys startup-rehydrate [:messages :tool-calls :tool-order])
-                         {:messages (:initial-messages @captured)
-                          :tool-calls (:initial-tool-calls @captured)
-                          :tool-order (:initial-tool-order @captured)})
-                      "startup rehydrate should be forwarded to TUI opts")
-                  (let [ctx (:ctx @app-runtime/session-state)
-                        session-id (-> @app-runtime/session-state :ctx ss/list-context-sessions-in first :session-id)
-                        session-file (:session-file (ss/get-session-data-in ctx session-id))]
-                    (is (= :tui (:ui-type (ss/get-session-data-in ctx session-id))))
-                    (is (= session-file (:current-session-file @captured)))
-                    (is (.startsWith session-file session-root)
-                        (str "expected persisted TUI session-file under isolated session-root: "
-                             session-root "\n"
-                             "session-file: " session-file))))))))))))
+                         {:messages (:initial-messages opts)
+                          :tool-calls (:initial-tool-calls opts)
+                          :tool-order (:initial-tool-order opts)}))
+                  (is (= :tui (:ui-type (ss/get-session-data-in ctx session-id))))
+                  (is (= session-file (:current-session-file opts)))
+                  (is (.startsWith session-file session-root))
+                  (is (= {:messages [] :tool-calls {} :tool-order []}
+                         ((:switch-session-fn! opts) target-id)))
+                  (is (= target-id
+                         (:psi.agent-session/session-id
+                          ((:query-fn opts) [:psi.agent-session/session-id]))))
+                  (let [event (.poll (:event-queue opts) 2000 java.util.concurrent.TimeUnit/MILLISECONDS)]
+                    (is (= :context-updated (:type event)))
+                    (is (= target-id (:active-session-id event)))))))))))))
 
 (deftest start-tui-runtime-journals-command-input-test
   (app-test-support/with-session-state-restore
@@ -643,9 +651,6 @@
               {:role :assistant :text "Structured answer."}]
              messages)))))
 
-;; moved to psi.main
-;; moved to psi.main
-;; moved to psi.main
 (deftest bootstrap-runtime-session-initial-context-index-has-single-session-test
   (with-redefs-fn (merge (app-test-support/bootstrap-stub-bindings)
                          {#'ext/discover-extension-paths (fn [& _] [])})
@@ -733,10 +738,6 @@
                 (str "expected persisted bootstrap session-file under isolated session-root\n"
                      "session-root: " session-root "\n"
                      "session-file: " session-file))))))))
-
-;; ---------------------------------------------------------------------------
-;; maybe-install-nullable-execution-mode
-;; ---------------------------------------------------------------------------
 
 (deftest maybe-install-nullable-execution-mode-passthrough-when-absent-test
   (testing "returns ctx unchanged when env var is nil"
