@@ -167,3 +167,13 @@ PASS_STATUS: REVIEW_COMPLETE
 2026-06-05 implementation review: found one new actionable implementation issue (IR1). TT11 introduced a user-visible production behaviour fix in `components/app-runtime/src/psi/app_runtime/tui_wiring.clj` (idle `:on-queue-input-fn!` now calls `session/follow-up-in!`) after the original A2/A3/A4 Gordian acceptance was recorded. That change is valuable, but the task design is a behaviour-preserving `start-tui-runtime!` refactor and the final acceptance/blast-radius notes have not been reconciled against the current HEAD. Added an unchecked `steps.md` follow-up to either justify/update the task scope/artifacts for the defect fix or split/revert it, then rerun and record final A2/A3/A4 gates.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+2026-06-05 implementation follow-up IR1 executed: reconciled the TT11 production behaviour change with the task scope and reran the final Gordian acceptance from current HEAD. Decision: keep the `tui_wiring.clj` idle follow-up fix in this task rather than revert or split it. Although the primary task is a behaviour-preserving refactor of `start-tui-runtime!`, TT11's public-path characterization exposed a pre-existing user-visible defect in the adjacent TUI option helper that implements the callback surface assembled by `start-tui-runtime!`: idle `:on-queue-input-fn!` returned `"Queued follow-up message."` while routing through the streaming-only helper and dropping the follow-up text. The fix is minimal, covered by the new public startup test, documented in CHANGELOG, and remains inside the local TUI startup wiring blast radius; `design.md` and `plan.md` now explicitly record this one accepted exception to behaviour preservation.
+
+Final Gordian acceptance from current HEAD:
+- `bb gordian local --json > /tmp/after-local.json` → captured after metrics.
+- A2 logical-key reconciliation touched exactly one unit, `(components/app-runtime/src/psi/app_runtime.clj, psi.app-runtime, start-tui-runtime!, 5)`: before sum `7.031652915638373`, after sum `6.9363427358340495`, delta `-0.09531017980432388`; net burden strictly decreased.
+- A4 target burden decreased for the unique after logical target `(components/app-runtime/src/psi/app_runtime.clj, psi.app-runtime, start-tui-runtime!, 5)`: before `7.031652915638373`; after line `603` `6.9363427358340495`.
+- A3 `bb gordian gate --baseline munera/open/211-simplify-start-tui-runtime/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0` → PASS, exit 0.
+
+PASS_STATUS: REVIEW_COMPLETE

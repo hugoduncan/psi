@@ -59,15 +59,21 @@ Phase 1 commands must reference these worktree-root-relative paths, not bare fil
 
 Allowed blast radius: the target unit `psi.app-runtime/start-tui-runtime!` plus the minimal surrounding helpers required to decomplect it.
 
-No unrelated cleanup. No broad restructuring. No behavioural changes. The net-burden acceptance below is the objective guard against shifting burden into callers or neighbouring helpers.
+No unrelated cleanup. No broad restructuring. The net-burden acceptance below is the objective guard against shifting burden into callers or neighbouring helpers.
+
+### Scope reconciliation — TT11 idle follow-up defect
+
+The primary task remains a behaviour-preserving refactor of `start-tui-runtime!`. During post-refactor public-path characterization, TT11 exposed one pre-existing user-visible defect in the adjacent TUI option helper that implements the callback surface assembled by `start-tui-runtime!`: the idle `:on-queue-input-fn!` branch returned `"Queued follow-up message."` but used the streaming-only queue helper, so the follow-up text was not stored while the session was idle.
+
+This specific fix is accepted in scope rather than reverted or split because it is the minimal root-cause change for a callback in the same TUI startup wiring blast radius, is covered by the new public-path characterization test, and is documented in the changelog. It does not broaden the refactor into unrelated cleanup; no other behaviour changes are allowed.
 
 ## Behaviour-preserving constraint
 
-This task is a behaviour-preserving refactor under the project formalism:
+Except for the TT11 defect fix explicitly scoped above, this task is a behaviour-preserving refactor under the project formalism:
 
 `refactor_minimal_semantics_spec_tests`
 
-Meta and spec are unchanged. Existing test expectations must not be weakened. Any added tests characterize current observable behaviour; they do not redefine intended behaviour.
+Meta and spec are otherwise unchanged. Existing test expectations must not be weakened. Any added tests characterize current observable behaviour or the explicitly accepted TT11 fix; they do not redefine unrelated intended behaviour.
 
 ## Phase 0 — establish the test safety net
 

@@ -15,7 +15,7 @@ The implementation strategy is local decomplecting rather than broad redesign:
 Key decisions:
 
 - Do not move ownership out of `psi.app-runtime`; extracted helpers, if any, stay local/private and within the target's blast radius.
-- Do not change meta/spec/docs or user-visible behaviour; this task is a behaviour-preserving refactor.
+- Keep the implementation behaviour-preserving except for the explicitly reconciled TT11 idle follow-up defect fix in the adjacent TUI startup wiring helper; that fix is accepted because the public startup callback returned a queued-follow-up success message while dropping the idle follow-up text.
 - Prefer named local data shapes where they reduce live-binding pressure and correspond to real concepts; avoid arbitrary line-range extraction.
 - The target line `603` is baseline provenance only. Burden comparison follows the design's unique logical-key reconciliation rules.
 
