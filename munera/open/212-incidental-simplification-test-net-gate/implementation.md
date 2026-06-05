@@ -126,3 +126,9 @@ Additional verification before commit:
 - `bb lint` — 0 errors / 0 warnings (one pre-existing info).
 - `bb fmt:check` — green.
 - `bb commit-check:file-lengths` — green.
+
+## 2026-06-05 — Implementation review
+
+Reviewed the implementation after IR3 against `design.md`, `plan.md`, `steps.md`, `.psi/workflows/reduce-incidental-complexity.edn`, lifecycle delegate workflows, workflow grammar docs, `task_209_workflow_definitions_test.clj`, `doc/workflows.md`, and `CHANGELOG.md`. Focused workflow-definition tests are green (`clojure -M:test --focus psi.workflow-loader.task-209-workflow-definitions-test` — 3 tests / 169 assertions). Found one new actionable issue (**IR4**): `coverage-disposition` can now stop before simplification when the latest characterization status is ambiguous, missing, contains both markers, or only stale historical markers are available, but that stop reason is only in the disposition child-session output. `terminal-stop-summary` receives only the original/select handoff and relies on task artifacts, while `coverage-disposition` has no write tools and does not record/commit its own stop finding, so these disposition-failure stops can be under-evidenced.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
