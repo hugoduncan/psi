@@ -13,6 +13,7 @@
 
 # Mementum State
 
+- 2026-06-05: Task 211 docs review found no new actionable documentation issues. CHANGELOG Unreleased Fixed already covers the user-visible retry footer bug fix; no README/doc update needed because no documented command/config/RPC topic/footer contract changed. Appended REVIEW_COMPLETE note; no follow-up steps added.
 - 2026-06-05: Task 211 (`emacs-retry-backoff-footer-visible`) implementation complete. Extended backend/RPC regression to cover two real provider-boundary retry updates through `execute-prepared-request!` + real progress loop: `Retry-After: 8`/remaining 0 emits `footer/updated` with `retry in 8s`, then changed metadata `Retry-After: 4`/remaining 2 emits fresh `retry in 4s · remaining 2/5000`, then clear emits footer without stale retry text. Added Emacs-visible `footer/updated` rendering tests for active/change/clear that assert rendered buffer/projection footer text and prove Emacs consumes projected text only (no local retry formatter/fallback). No `session/updated` fallback required. Verified focused Clojure Scry namespaces, focused/full Emacs ERT, full `bb clojure:test:unit`, targeted lint (0 errors; 2 pre-existing unresolved-var warnings). PASS_STATUS IMPLEMENTATION_COMPLETE.
 Bootstrapped on 2026-04-02.
 
