@@ -49,6 +49,7 @@ For a target-present `reduce-incidental-complexity` run, the workflow should exe
 3. Create the task plan and steps.
 4. Review/refine the plan.
 5. Establish a characterization-test net:
+   - before recording the characterization baseline, verify the source/target worktree state is clean for the target file(s) or source paths identified by the task; pre-existing dirty task artifacts/docs may remain only when explicitly classified, but pre-existing dirty source/target changes stop the workflow with an explicit finding instead of being absorbed into the baseline;
    - record a workflow baseline for the target/source state before characterization work begins (at minimum the relevant git `HEAD`/status plus the target file(s) or source paths identified by the task);
    - inspect the target behavior and existing tests;
    - decide whether nominal, edge, and boundary behavior is sufficiently covered;
@@ -71,6 +72,8 @@ The pre-simplification gate is complete only when all of the following are true:
 - Coverage considers nominal, edge, and boundary behavior relevant to the target.
 - Tests avoid interaction assertions except where the interaction is itself the observable behavior.
 - Relevant tests pass before simplification begins.
+- Before the pre-characterization baseline is recorded, the workflow verifies that the target/source paths are not already dirty; only pre-existing task-artifact/doc changes may be carried forward, and they must be explicitly classified.
+- If pre-existing dirty target/source changes are present at baseline time, the workflow stops with an explicit finding instead of treating those changes as the unmodified behavior baseline.
 - A workflow-level baseline/diff check runs after characterization work and before simplification routing.
 - The diff check records the pre-characterization baseline and classifies all coverage-phase changes; only tests, task artifacts, docs, and explicitly justified minimal testability seams may be present.
 - If the diff includes unclassified source/target changes, broad production edits, or simplification/refactor work, the workflow stops before simplification and records whether the change must be reverted, split, or the task closed.
@@ -85,8 +88,8 @@ The pre-simplification gate is complete only when all of the following are true:
   - actionable coverage feedback causes a coverage-fix pass and another review;
   - review completion allows simplification implementation to begin.
 - The coverage-fix pass is constrained to characterization tests and explicitly justified minimal testability seams; it must not perform the simplification/refactor itself.
-- A workflow-level baseline/diff gate runs before simplification implementation and prevents routing forward when coverage-phase changes include unclassified or non-minimal source/target edits.
-- Tests lock the workflow step order, delegate targets, deterministic routing, baseline/diff enforcement, and no-refactor-before-test-net intent.
+- A workflow-level baseline/diff gate runs before simplification implementation and prevents routing forward when baseline-time source/target paths are dirty, or when coverage-phase changes include unclassified or non-minimal source/target edits.
+- Tests lock the workflow step order, delegate targets, deterministic routing, clean-baseline precondition, baseline/diff enforcement, and no-refactor-before-test-net intent.
 - Documentation describes the new gate and the fact that `reduce-incidental-complexity` still runs in the current inherited worktree.
 - Existing workflow-loader tests remain green.
 

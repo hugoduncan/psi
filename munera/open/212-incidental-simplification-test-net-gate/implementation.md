@@ -15,3 +15,9 @@ PASS_STATUS: REVIEW_COMPLETE
 Reviewed `design.md` for ambiguity against `.psi/workflows/reduce-incidental-complexity.edn`, `task-lifecycle.edn`, workflow grammar/docs, and the existing task-209 workflow tests; did not review `plan.md` or `steps.md`. Found one actionable ambiguity (**AMB1**): the baseline/diff gate says to record HEAD/status before characterization and classify the coverage-phase diff, but it does not say what to do if the worktree already has pre-existing dirty source/target changes at baseline time. If such changes are accepted into the baseline, the workflow can still proceed without proving tests are green against unmodified target behavior.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## 2026-06-05 — Ambiguity follow-up AMB1
+
+Completed AMB1. Clarified `design.md` so the characterization baseline has a clean-source precondition: before recording the pre-characterization baseline, the workflow verifies target/source paths are not already dirty; only pre-existing task-artifact/doc changes may be carried forward when explicitly classified. Pre-existing dirty target/source changes now stop the workflow with an explicit finding instead of being absorbed into the unmodified-behavior baseline. Also updated acceptance criteria so tests must lock the clean-baseline precondition. Marked AMB1 done in `design-steps.md`.
+
+PASS_STATUS: REVIEW_COMPLETE
