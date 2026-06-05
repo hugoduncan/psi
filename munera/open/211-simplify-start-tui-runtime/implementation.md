@@ -60,3 +60,7 @@ PASS_STATUS: IMPLEMENTATION_COMPLETE
 2026-06-05 implementation review: no new actionable implementation issue found. Reviewed the task artifacts, implementation diff, `start-tui-runtime!`, `tui_wiring.clj`, and direct app-runtime tests. The change is behaviour-preserving and local: bootstrap remains ordered, nullable execution-mode installation remains before bootstrap, provider install/clear semantics match the pre-existing lifetime shape with `clear-provider!` in the `finally` around `tui-start-fn!`, `/new` still reads `@tui-focus*`, and wiring/options keys are preserved. Re-ran `bb clojure:test:scry --namespace psi.app-runtime-test` (31/119 green), `bb lint` (0 errors/0 warnings; one pre-existing info), and `bb commit-check:file-lengths` (green). No unchecked `steps.md` follow-up added.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+2026-06-05 test review: found one new actionable test coverage issue (TT1). The design/plan name nullable deterministic execution-mode installation as `start-tui-runtime!` behaviour, but the current tests only pin `maybe-install-nullable-execution-mode` directly plus normal TUI prompt flow with the executor redefined. A regression that removes or skips the `start-tui-runtime!` call to `maybe-install-nullable-execution-mode` would leave those helper tests green. Added an unchecked `steps.md` follow-up to characterize the public TUI runtime path under deterministic nullable mode and assert the echoed assistant output/state, without asserting helper interactions.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

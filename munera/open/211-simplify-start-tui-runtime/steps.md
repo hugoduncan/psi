@@ -44,3 +44,7 @@
 - [x] Document in `implementation.md` why every touched helper outside the original target body is within the design's blast radius.
 - [x] Ensure `steps.md` is fully checked for completed implementation work and set the task implementation status in `implementation.md`.
 - [x] Commit the implementation and task artifact updates with a symbolized Munera commit message.
+
+## Review follow-ups
+
+- [ ] TT1 Add a public-path characterization test for `start-tui-runtime!` with nullable deterministic execution mode enabled, exercising the captured TUI `run-agent-fn` without redefining the turn executor and asserting the assistant response echoes the user text.
