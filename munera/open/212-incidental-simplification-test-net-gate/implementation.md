@@ -281,3 +281,17 @@ PASS_STATUS: REVIEW_COMPLETE
 Reviewed task test shape after TT5 using `.psi/skills/test-shaper/SKILL.md` against `design.md`, `plan.md`, `steps.md`, `.psi/workflows/reduce-incidental-complexity.edn`, `review-task-implementation.edn`, `review-step.edn`, workflow grammar/runtime IR docs, workflow test support, `task_209_workflow_definitions_test.clj`, `workflow_definitions_test.clj`, `doc/workflows.md`, and `CHANGELOG.md`. Focused workflow-definition tests remain green (`clojure -M:test --focus psi.workflow-loader.task-209-workflow-definitions-test` — 3 tests / 188 assertions), broader workflow-definition tests remain green (11 tests / 159 assertions), target IR compiler tests remain green (5 tests / 21 assertions), lint/fmt/file-lengths remain green. Found one new actionable test-shape issue (**TT6**): TT2 locks the transitive post-implementation `task-test-review` delegate, but no test locks the adjacent transitive `review-test-shape` delegate that invokes `review-step` with `:skill "test-shaper"` after `review-task-tests`. A regression removing or retargeting that test-shape pass would keep the focused reduce-incidental-complexity tests green while weakening the final test-quality review chain this pass is explicitly exercising.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## 2026-06-05 — Test-shaper review follow-up TT6
+
+Completed TT6. Strengthened `task-209-workflow-set-loads-together-test` so the task-212 workflow-definition coverage now locks the adjacent transitive post-implementation test-shape gate: `review-task-implementation` contains a `review-test-shape` delegate targeting the real `review-step` workflow, passes `:skill "test-shaper"`, appears after `review-task-tests` by step order, and consumes `review-task-tests` output in its context. This prevents focused `reduce-incidental-complexity` tests from staying green if the final implementation-review phase silently loses or retargets the test-shaper pass.
+
+Verification:
+- `clj-paren-repair components/workflow-loader/test/psi/workflow_loader/task_209_workflow_definitions_test.clj` — success, no changes needed.
+- `clojure -M:test --focus psi.workflow-loader.task-209-workflow-definitions-test` — 3 tests / 193 assertions green.
+- `clojure -M:test --focus psi.workflow-loader.workflow-definitions-test` — 11 tests / 159 assertions green.
+- `bb lint` — 0 errors / 0 warnings (one pre-existing info).
+- `bb fmt:check` — green.
+- `bb commit-check:file-lengths` — green.
+
+PASS_STATUS: REVIEW_COMPLETE

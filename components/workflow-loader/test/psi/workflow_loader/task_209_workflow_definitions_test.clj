@@ -500,4 +500,32 @@
                       (:context review-task-tests-step))
                 "test-review gate runs after implementation-review output")
             (is (contains? definitions "review-step")
-                "review-task-tests delegate target resolves to the real review-step workflow")))))))
+                "review-task-tests delegate target resolves to the real review-step workflow")))
+        (testing "implementation review workflow preserves the transitive test-shaper gate (TT6)"
+          (let [implementation-review-steps (get-in definitions
+                                                    ["review-task-implementation" :steps])
+                implementation-review-step-by-name (into {}
+                                                         (map (juxt :name identity)
+                                                              implementation-review-steps))
+                step-index-by-name (into {}
+                                         (map-indexed (fn [idx step]
+                                                        [(:name step) idx])
+                                                      implementation-review-steps))
+                review-test-shape-step (get implementation-review-step-by-name
+                                            "review-test-shape")]
+            (is (= "review-step" (:target review-test-shape-step)))
+            (is (= {:type :map
+                    :fields {:input {:from :workflow-input, :path [:input]}
+                             :skill {:value "test-shaper"}}}
+                   (:prompt-string review-test-shape-step)))
+            (is (< (get step-index-by-name "review-task-tests")
+                   (get step-index-by-name "review-test-shape"))
+                "test-shape gate runs after the test-review gate by step order")
+            (is (some #(= {:type :source
+                           :from {:step "review-task-tests"
+                                  :yield :text}}
+                          %)
+                      (:context review-test-shape-step))
+                "test-shape gate consumes review-task-tests output")
+            (is (contains? definitions "review-step")
+                "review-test-shape delegate target resolves to the real review-step workflow")))))))
