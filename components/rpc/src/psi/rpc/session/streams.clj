@@ -4,6 +4,17 @@
    [psi.rpc.events :as events]
    [psi.rpc.session.emit :as emit]))
 
+(defn- footer-refresh-progress-event?
+  [evt]
+  (contains? #{:tool-result :retry-updated} (:event-kind evt)))
+
+(defn- emit-progress-event!
+  [emit! ctx session-id evt]
+  (when-let [{:keys [event data]} (events/progress-event->rpc-event evt)]
+    (emit! event data))
+  (when (footer-refresh-progress-event? evt)
+    (emit/emit-footer-updated! emit! ctx session-id)))
+
 (defn start-progress-loop!
   [{:keys [start-daemon-thread! ctx session-id emit! progress-q thread-name]
     :or   {thread-name "rpc-progress-loop"}}]
@@ -17,18 +28,10 @@
                   (loop []
                     (when-not @stop?
                       (when-let [evt (.poll progress-q 10 java.util.concurrent.TimeUnit/MILLISECONDS)]
-                        (let [evt* (tag-session evt)]
-                          (when-let [{:keys [event data]} (events/progress-event->rpc-event evt*)]
-                            (emit! event data)
-                            (when (= :tool-result (:event-kind evt*))
-                              (emit/emit-footer-updated! emit! ctx session-id))))
+                        (emit-progress-event! emit! ctx session-id (tag-session evt))
                         (loop []
                           (when-let [more (.poll progress-q)]
-                            (let [more* (tag-session more)]
-                              (when-let [{:keys [event data]} (events/progress-event->rpc-event more*)]
-                                (emit! event data)
-                                (when (= :tool-result (:event-kind more*))
-                                  (emit/emit-footer-updated! emit! ctx session-id))))
+                            (emit-progress-event! emit! ctx session-id (tag-session more))
                             (recur))))
                       (recur))))
                 thread-name)]
@@ -36,12 +39,12 @@
      :thread thread}))
 
 (defn stop-progress-loop!
-  [{:keys [stop? thread progress-q emit! session-id]}]
+  [{:keys [stop? thread progress-q emit! ctx session-id]}]
   (reset! stop? true)
   (.join ^Thread thread 200)
-  (events/emit-progress-queue!
-   progress-q
-   (fn [event data]
-     (emit! event (if (contains? data :session-id)
-                    data
-                    (assoc data :session-id session-id))))))
+  (loop []
+    (when-let [evt (.poll progress-q)]
+      (emit-progress-event! emit! ctx session-id (if (contains? evt :session-id)
+                                                   evt
+                                                   (assoc evt :session-id session-id)))
+      (recur))))

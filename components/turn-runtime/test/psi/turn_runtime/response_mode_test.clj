@@ -392,6 +392,30 @@
                (:failure-reason (last events))))
         (is (nil? (:retry (ss/get-session-data-in ctx session-id))))))))
 
+(deftest execute-prepared-request-success-without-retry-does-not-emit-retry-updated-test
+  (testing "ordinary successful completions do not publish retry footer refreshes"
+    (let [[ctx session-id] (create-session-context {:persist? false})
+          progress-q       (java.util.concurrent.LinkedBlockingQueue.)
+          prepared         (prepared-request ctx session-id)]
+      (with-redefs [psi.turn-runtime.core/execute-live-turn!
+                    (fn [& _]
+                      {:turn-id "turn-1"
+                       :model {:provider "openai" :id "gpt-test"}
+                       :ai-options {}
+                       :turn-ctx nil
+                       :assistant-message {:role "assistant"
+                                           :content [{:type :text :text "done"}]
+                                           :stop-reason :stop
+                                           :timestamp (java.time.Instant/now)}})]
+        (turn-runtime/execute-prepared-request!
+         {:provider-registry (atom {})} ctx session-id prepared progress-q)
+        (let [events (loop [acc []]
+                       (if-let [event (.poll progress-q)]
+                         (recur (conj acc event))
+                         acc))]
+          (is (not-any? #(= :retry-updated (:event-kind %)) events)
+              "non-retry success must not emit retry-updated/footer churn"))))))
+
 (deftest execute-prepared-request-clears-active-retry-state-before-retry-attempt-test
   ;; Active retry fields are visible through the existing retrying phase during
   ;; backoff and cleared before the next provider attempt starts.

@@ -302,6 +302,7 @@
                                                               :thread thread
                                                               :progress-q progress-q
                                                               :emit! emit!
+                                                              :ctx ctx
                                                               :session-id session-id})
                                 (when-let [assistant (session/last-assistant-message-in ctx session-id)]
                                   (emit/emit-assistant-message! emit! session-id assistant))

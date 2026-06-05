@@ -286,6 +286,74 @@ command rehydration."
       (should (>= (marker-position (psi-emacs-state-draft-anchor psi-emacs--state))
                   before-anchor)))))
 
+(ert-deftest psi-extension-ui-footer-updated-renders-retry-text-visibly ()
+  ;; Active retry footer events render backend-projected text in the buffer.
+  (with-temp-buffer
+    (insert "ψ: hello\n")
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (setf (psi-emacs-state-draft-anchor psi-emacs--state) (copy-marker (point-max) nil))
+    (psi-emacs--handle-rpc-event
+     '((:event . "footer/updated")
+       (:data . ((:path-line . "~/psi-main")
+                 (:usage-parts . ["↑4" "↓2"])
+                 (:status-line . "retry in 8s · remaining 0/5000")))))
+    (let ((footer (substring-no-properties
+                   (psi-emacs-state-projection-footer psi-emacs--state)))
+          (buf (buffer-substring-no-properties (point-min) (point-max))))
+      (should (string-match-p "retry in 8s" footer))
+      (should (string-match-p "remaining 0/5000" footer))
+      (should (string-match-p "retry in 8s" buf))
+      (should (string-match-p "remaining 0/5000" buf)))))
+
+(ert-deftest psi-extension-ui-footer-updated-replaces-visible-retry-text ()
+  ;; Changed retry footer events replace stale projected text with the latest text.
+  (with-temp-buffer
+    (insert "ψ: hello\n")
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (setf (psi-emacs-state-draft-anchor psi-emacs--state) (copy-marker (point-max) nil))
+    (psi-emacs--handle-rpc-event
+     '((:event . "footer/updated")
+       (:data . ((:path-line . "~/psi-main")
+                 (:status-line . "retry in 8s · remaining 0/5000")))))
+    (psi-emacs--handle-rpc-event
+     '((:event . "footer/updated")
+       (:data . ((:path-line . "~/psi-main")
+                 (:status-line . "retry in 4s · remaining 2/5000")))))
+    (let ((footer (substring-no-properties
+                   (psi-emacs-state-projection-footer psi-emacs--state)))
+          (buf (buffer-substring-no-properties (point-min) (point-max))))
+      (should (string-match-p "retry in 4s" footer))
+      (should (string-match-p "remaining 2/5000" footer))
+      (should-not (string-match-p "retry in 8s" footer))
+      (should (string-match-p "retry in 4s" buf))
+      (should-not (string-match-p "retry in 8s" buf)))))
+
+(ert-deftest psi-extension-ui-footer-updated-clears-visible-retry-text ()
+  ;; Cleared footer events remove stale retry text from rendered projection.
+  (with-temp-buffer
+    (insert "ψ: hello\n")
+    (psi-emacs-mode)
+    (setq-local psi-emacs--state (psi-emacs--initialize-state nil))
+    (setf (psi-emacs-state-draft-anchor psi-emacs--state) (copy-marker (point-max) nil))
+    (psi-emacs--handle-rpc-event
+     '((:event . "footer/updated")
+       (:data . ((:path-line . "~/psi-main")
+                 (:status-line . "retry in 8s · remaining 0/5000")))))
+    (psi-emacs--handle-rpc-event
+     '((:event . "footer/updated")
+       (:data . ((:path-line . "~/psi-main")
+                 (:usage-parts . ["idle"])))))
+    (let ((footer (substring-no-properties
+                   (psi-emacs-state-projection-footer psi-emacs--state)))
+          (buf (buffer-substring-no-properties (point-min) (point-max))))
+      (should (string-match-p "~/psi-main" footer))
+      (should (string-match-p "idle" footer))
+      (should-not (string-match-p "retry in" footer))
+      (should-not (string-match-p "remaining 0/5000" footer))
+      (should-not (string-match-p "retry in" buf)))))
+
 (ert-deftest psi-extension-ui-footer-structured-activity-applies-state-faces ()
   (with-temp-buffer
     (insert "ψ: hello\n")

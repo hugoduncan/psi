@@ -102,6 +102,7 @@
                                                                   :thread thread
                                                                   :progress-q progress-q
                                                                   :emit! emit!
+                                                                  :ctx ctx
                                                                   :session-id session-id})
                                     (when assistant
                                       (emit/emit-assistant-message! emit! session-id assistant))

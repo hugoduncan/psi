@@ -10,6 +10,9 @@
    [psi.rpc.events :as rpc.events]
    [psi.agent-session.runtime :as runtime]
    [psi.agent-session.tools :as tools]
+   [psi.rpc.session.streams :as streams]
+   [psi.session-state.state :as ss]
+   [psi.turn-runtime.core :as turn-runtime]
    [psi.rpc-test-support :as support]))
 
 (deftest rpc-prompt-streams-events-and-interleaves-test
@@ -120,6 +123,110 @@
       (is (= "/repo/project"
              (get-in (last footer-events) [:data :path-line])))
       (is (empty? runtime-failed)))))
+
+(deftest rpc-prompt-provider-retry-state-publishes-footer-updated-test
+  ;; Provider-boundary retry state changes drive Emacs-visible footer refreshes.
+  (testing "provider retry activation, visible change, and clear emit footer/updated"
+    (let [emitted* (atom [])
+          [ctx0 _] (support/create-session-context {:persist? false
+                                                    :config {:auto-retry-base-delay-ms 8000
+                                                             :auto-retry-max-retries 2}})
+          ctx (assoc ctx0
+                     :provider-retry-sleep-fn
+                     (fn [delay-ms]
+                       (let [expected-text (str "retry in " (quot (long delay-ms) 1000) "s")]
+                         (support/await-until
+                          #(some (fn [event]
+                                   (when (str/includes? (or (get-in event [:data :status-line]) "")
+                                                        expected-text)
+                                     event))
+                                 @emitted*)
+                          500))))
+          session-id (first (map :session-id (ss/list-context-sessions-in ctx)))
+          attempts* (atom 0)
+          progress-q (java.util.concurrent.LinkedBlockingQueue.)
+          emit! (fn [event data] (swap! emitted* conj {:event event :data data}))
+          error-turn (fn [headers]
+                       {:turn-id "turn-retry-footer"
+                        :model {:provider "anthropic" :id "stub"}
+                        :ai-options {}
+                        :turn-ctx nil
+                        :assistant-message {:role "assistant"
+                                            :content [{:type :error :text "rate limit exceeded"}]
+                                            :stop-reason :error
+                                            :error-message "rate limit exceeded"
+                                            :http-status 429
+                                            :provider-error/headers headers
+                                            :timestamp (java.time.Instant/now)}})
+          {:keys [stop? thread]} (streams/start-progress-loop!
+                                  {:start-daemon-thread! (fn [f name]
+                                                           (doto (Thread. ^Runnable f name)
+                                                             (.setDaemon true)
+                                                             (.start)))
+                                   :ctx ctx
+                                   :session-id session-id
+                                   :emit! emit!
+                                   :progress-q progress-q
+                                   :thread-name "rpc-retry-footer-test"})]
+      (try
+        (with-redefs [turn-runtime/execute-live-turn!
+                      (fn [& _]
+                        (case (swap! attempts* inc)
+                          1 (error-turn {"Retry-After" "8"
+                                         "RateLimit-Limit" "5000"
+                                         "RateLimit-Remaining" "0"})
+                          2 (error-turn {"Retry-After" "4"
+                                         "RateLimit-Limit" "5000"
+                                         "RateLimit-Remaining" "2"})
+                          {:turn-id "turn-retry-footer"
+                           :model {:provider "anthropic" :id "stub"}
+                           :ai-options {}
+                           :turn-ctx nil
+                           :assistant-message {:role "assistant"
+                                               :content [{:type :text :text "recovered"}]
+                                               :stop-reason :stop
+                                               :timestamp (java.time.Instant/now)}}))]
+          (turn-runtime/execute-prepared-request!
+           {:provider-registry (atom {})}
+           ctx
+           session-id
+           {:prepared-request/id "turn-retry-footer"
+            :prepared-request/model {:provider :anthropic :id "stub"}
+            :prepared-request/ai-options {}
+            :prepared-request/response-mode :streaming}
+           progress-q)
+          (streams/stop-progress-loop! {:stop? stop?
+                                        :thread thread
+                                        :progress-q progress-q
+                                        :emit! emit!
+                                        :ctx ctx
+                                        :session-id session-id})
+          (let [footer-events (filterv #(= "footer/updated" (:event %)) @emitted*)
+                first-retry-footer (some #(when (str/includes? (or (get-in % [:data :status-line]) "")
+                                                               "retry in 8s")
+                                            %)
+                                         footer-events)
+                changed-retry-footer (some #(when (and (str/includes? (or (get-in % [:data :status-line]) "")
+                                                                      "retry in 4s")
+                                                       (str/includes? (or (get-in % [:data :status-line]) "")
+                                                                      "remaining 2/5000"))
+                                              %)
+                                           footer-events)
+                final-footer (last footer-events)]
+            (is (= 3 @attempts*))
+            (is (some? first-retry-footer)
+                "retry activation must publish footer/updated with retry text")
+            (is (some? changed-retry-footer)
+                "changed retry metadata must publish footer/updated with latest visible text")
+            (is (= (get-in first-retry-footer [:data :session-id])
+                   (get-in changed-retry-footer [:data :session-id])
+                   (get-in final-footer [:data :session-id])))
+            (is (not (str/includes? (or (get-in final-footer [:data :status-line]) "")
+                                    "retry in"))
+                "retry clear must publish a footer without stale retry text")))
+        (finally
+          (reset! stop? true)
+          (.join ^Thread thread 200))))))
 
 (deftest rpc-thinking-delta-after-tool-start-begins-fresh-segment-test
   (testing "post-tool thinking delta can start a fresh cumulative segment"
