@@ -223,3 +223,15 @@ PASS_STATUS: REVIEW_COMPLETE
 Verification during review: `bb clojure:test:scry --namespace psi.app-runtime-tui-startup-test` → 12/81 green; `bb clojure:test:scry --namespace psi.app-runtime-test` → 32/128 green.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+2026-06-05 test-review follow-up TT16 executed: extended `components/app-runtime/test/psi/app_runtime_tui_startup_test.clj` with `start-tui-runtime-forwards-alt-screen-false-to-tui-opts-test`. The test drives public `start-tui-runtime!`, captures the TUI opts passed to the frontend start function, and asserts `:alt-screen` is present and false. This makes dropping the explicit terminal-mode option from `tui_wiring/build-tui-opts` fail through the public startup path instead of falling silently back to `psi.tui.app/start!`'s default true alternate-screen behaviour.
+
+Verification:
+- `clj-paren-repair components/app-runtime/test/psi/app_runtime_tui_startup_test.clj` → success/no changes.
+- `bb clojure:test:scry --namespace psi.app-runtime-tui-startup-test` → 13 tests, 84 assertions, 0 failures/errors.
+- `bb clojure:test:scry --namespace psi.app-runtime-test` → 32 tests, 128 assertions, 0 failures/errors.
+- `bb clojure:test:unit` → exit 0.
+- `bb lint` → 0 errors, 0 warnings (one pre-existing info).
+- `bb commit-check:file-lengths` → exit 0.
+
+PASS_STATUS: REVIEW_COMPLETE

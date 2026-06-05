@@ -37,6 +37,25 @@
                    (select-keys @captured-sync-opts* (keys memory-runtime-opts))))
             (is (string? (:cwd @captured-sync-opts*)))))))))
 
+(deftest start-tui-runtime-forwards-alt-screen-false-to-tui-opts-test
+  ;; Characterizes the public TUI terminal-mode option: app-runtime starts the
+  ;; TUI without alternate-screen mode, overriding psi.tui.app/start!'s default.
+  (app-test-support/with-session-state-restore
+    (fn []
+      (with-redefs-fn (merge (app-test-support/bootstrap-stub-bindings)
+                             {#'app-runtime/resolve-model (fn [_] app-test-support/test-ai-model)
+                              #'ext/discover-extension-paths (fn [& _] [])})
+        (fn []
+          (let [captured-opts* (atom nil)]
+            (is (= :ok (app-runtime/start-tui-runtime!
+                        (fn [_run-agent-fn opts]
+                          (reset! captured-opts* opts)
+                          :ok)
+                        :ignored {} {})))
+            (let [opts @captured-opts*]
+              (is (contains? opts :alt-screen))
+              (is (false? (:alt-screen opts))))))))))
+
 (deftest start-tui-runtime-forwards-session-config-and-thinking-override-to-context-test
   ;; Characterizes public TUI startup runtime configuration forwarding through
   ;; the created context/session, not by stubbing create-runtime-session-context.
