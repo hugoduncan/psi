@@ -45,3 +45,24 @@ PASS_STATUS: REVIEW_COMPLETE
 Reviewed `plan.md` and `steps.md` for inconsistencies against `design.md`, `design-steps.md`, prior implementation notes, `.psi/workflows/reduce-incidental-complexity.edn`, lifecycle delegate workflows, workflow grammar/docs, task-209 workflow tests, and `doc/workflows.md`. No new actionable inconsistency found. The target-present sequence, no-target direct completion, raw `PASS_STATUS` vs normalized route vocabulary, clean-baseline precondition, `characterization-baseline.edn` contract, coverage disposition, diff-gate placement, current-worktree inheritance, tests, docs, and changelog slices are mutually consistent after PA1–PA4.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## 2026-06-05 — Implementation pass
+
+Implemented the target-present `reduce-incidental-complexity` topology as explicit phases instead of the prior opaque `task-lifecycle` delegate. The workflow now routes selector `PASS_STATUS: REVIEW_COMPLETE` / normalized `"DONE"` into `review-task-design` → `create-task-plan` → `review-task-plan`, records a clean-source `characterization-baseline.edn`, iterates `coverage-review` → `coverage-disposition` → `coverage-fix` for fixable characterization gaps, runs `diff-gate` before `implement-task`, then delegates `implement-task` and `review-task-implementation` before a successful final summary. Selector `PASS_STATUS: ACTIONABLE_FEEDBACK` / normalized `"REPEAT"` still routes directly to `:done` for no-target runs and cannot execute the target-present terminal stop summary.
+
+Prompt contracts added/locked:
+- clean-baseline verifies target/source paths are not dirty before baseline recording and writes task-local `characterization-baseline.edn` with HEAD/status/target-source paths/classified task-artifact-or-doc dirt;
+- coverage review uses `task-test-review` + `testing-without-mocks`, requires nominal/edge/boundary observable-behavior coverage green before simplification, and records `CHARACTERIZATION_STATUS: FIXABLE_GAPS` or `CHARACTERIZATION_STATUS: INFEASIBLE` on actionable feedback;
+- coverage-fix is constrained to characterization tests and explicitly justified minimal testability seams, forbidding simplification/refactor work, weakened expectations, unrelated cleanup, and broad production edits;
+- diff-gate compares committed changes since recorded baseline HEAD plus current uncommitted status/diff, allowing only tests/task artifacts/docs/minimal seams and stopping on unclassified/non-minimal source edits or premature simplification.
+
+Updated workflow-loader tests in `task_209_workflow_definitions_test.clj` to lock step order, delegate targets, route vocabulary, no-target direct completion, coverage loop/disposition, diff-gate placement, prompt contracts, inherited-worktree/no-`work-on` constraints, and direct delegate target co-loading with stubs. Updated `doc/workflows.md` and `CHANGELOG.md` for the user-visible workflow behavior change.
+
+Verification:
+- `clojure -M:test --focus psi.workflow-loader.task-209-workflow-definitions-test` — 3 tests / 152 assertions green.
+- `clojure -M:test --focus psi.workflow-loader.workflow-definitions-test` — 11 tests / 159 assertions green.
+- `bb lint` — 0 errors / 0 warnings (one pre-existing info in `workflow_delegate_review_step_live_test.clj`).
+- `bb fmt:check` — green.
+- `bb commit-check:file-lengths` — green.
+
+PASS_STATUS: IMPLEMENTATION_COMPLETE

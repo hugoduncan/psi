@@ -661,7 +661,8 @@ workflow does **not** call `work-on`, create a branch, or switch worktrees.
 Workflow child sessions and nested delegated workflows inherit the same session
 worktree.
 
-The workflow has two steps:
+The target-present workflow exposes the generated task lifecycle as explicit
+phases instead of hiding it behind one opaque lifecycle delegate:
 
 1. **select-and-create** (`:session`) — confirms the current git context,
    applies the `incidental-complexity-finder` skill, and **stops early** with no
@@ -671,14 +672,36 @@ The workflow has two steps:
    id in the current worktree, writes a **two-phase behaviour-preserving
    refactor** `design.md`, commits it on the current branch, and emits a
    structured `munera_task_path:` handoff.
-2. **lifecycle** (`:delegate`) — delegates directly to `task-lifecycle`, using
-   the generated handoff and inherited worktree, to drive the generated task
-   through the full design → plan → implement → review lifecycle.
+2. **review-task-design**, **create-task-plan**, and **review-task-plan** — reuse
+   the standard Munera design/plan review workflows while keeping the same
+   inherited worktree and generated task handoff.
+3. **clean-baseline** — before characterization work begins, records a
+   task-local `characterization-baseline.edn` with the current `HEAD`, status,
+   target/source paths, and any explicitly classified pre-existing task-artifact
+   or doc dirt. Dirty target/source paths at this point stop the workflow instead
+   of being absorbed into the unmodified-behavior baseline.
+4. **coverage-review** / **coverage-disposition** / **coverage-fix** — iterates a
+   pre-simplification characterization-test-net gate. Review completion means
+   nominal, edge, and boundary behavior relevant to the target is sufficiently
+   covered and green against current behavior. Fixable gaps route to a
+   constrained coverage-fix pass that may add characterization tests and
+   explicitly justified minimal testability seams only. Infeasible
+   characterization records the reason and stops before simplification.
+5. **diff-gate** — compares both committed changes since the recorded baseline
+   `HEAD` and the current uncommitted worktree status/diff, then classifies every
+   coverage-phase change. Only characterization tests, task artifacts, docs, and
+   explicitly justified minimal testability seams may pass. Unclassified or
+   non-minimal source/target edits, broad production edits, or premature
+   simplification/refactor work stop the workflow before implementation.
+6. **implement-task** and **review-task-implementation** — only after the
+   characterization net and diff gate pass, delegate simplification
+   implementation and implementation review.
 
-The first step uses a small judge to route no-target runs directly to workflow
-completion. When the selection output contains no real `munera_task_path:` line,
-the lifecycle delegate is skipped and the run ends after reporting that no
-qualifying target was found.
+The first step uses deterministic `PASS_STATUS` routing to send no-target runs
+directly to workflow completion. When the selection output contains no real
+`munera_task_path:` line, every downstream design/plan/test-net/implementation
+step is skipped and the run ends after reporting that no qualifying target was
+found.
 
 Each generated task is a behaviour-preserving refactor: **Phase 0** establishes
 a green characterization-test safety net (gating all refactoring), and

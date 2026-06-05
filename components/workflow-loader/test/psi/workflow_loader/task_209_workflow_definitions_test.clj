@@ -160,255 +160,243 @@
      (let [steps (get-in definitions ["reduce-incidental-complexity" :steps])
            step-by-name (into {} (map (juxt :name identity) steps))
            select-step (get step-by-name "select-and-create")
-           delegate-step (get step-by-name "lifecycle")
-           select-text (step-template-text select-step)]
-       (testing "is a two-step select-and-create (:session) -> lifecycle (:delegate)"
-         (is (= 2 (count steps)))
-         (is (= ["select-and-create" "lifecycle"] (mapv :name steps)))
-         (is (= [:session :delegate] (mapv :type steps))))
-       (testing "select-and-create :session step carries the current-worktree tools + all three design-named skills"
-         ;; The workflow now runs entirely in the invoking session's current
-         ;; worktree. It must not expose `work-on` to the selector step; child
-         ;; and delegated workflow sessions inherit the parent's worktree-path.
-         (is (= ["read" "bash" "edit" "write"] (:tools select-step))
-             "select-and-create tools are read/bash/edit/write only")
-         (is (not (some #{"work-on"} (:tools select-step)))
-             "select-and-create tools do not include work-on")
-         ;; TT-A (test review pass 18, task-test-review): the design (Deliverable
-         ;; 2, Step 1) names three step-1 skills — incidental-complexity-finder
-         ;; (selection recipe), gordian (selection methodology), code-shaper
-         ;; (refactor shaping). Lock all three; a regress dropping gordian or
-         ;; code-shaper previously passed green.
-         (is (some #{"incidental-complexity-finder"} (:skills select-step))
-             "select-and-create skills include incidental-complexity-finder")
-         (is (some #{"gordian"} (:skills select-step))
-             "select-and-create skills include gordian")
-         (is (some #{"code-shaper"} (:skills select-step))
-             "select-and-create skills include code-shaper"))
-       ;; TR15 (test review pass 13, test-shaper): lock the entry-point input
-       ;; flow — step 1 wires "input" to the bare top-level :workflow-input (NO
-       ;; :path, distinct from the wrapper steps' {:path [:input]} :map-field
-       ;; selector). Previously uncovered: a regress dropping :vars/{{input}} or
-       ;; mis-wiring passed green. (step-has-input-var-wired? can't be reused —
-       ;; it requires the :path [:input] shape.)
-       (testing "select-and-create wires {{input}} to the bare :workflow-input (TR15)"
+           review-design-step (get step-by-name "review-task-design")
+           create-plan-step (get step-by-name "create-task-plan")
+           review-plan-step (get step-by-name "review-task-plan")
+           clean-baseline-step (get step-by-name "clean-baseline")
+           coverage-review-step (get step-by-name "coverage-review")
+           coverage-disposition-step (get step-by-name "coverage-disposition")
+           coverage-fix-step (get step-by-name "coverage-fix")
+           diff-gate-step (get step-by-name "diff-gate")
+           implement-step (get step-by-name "implement-task")
+           implementation-review-step (get step-by-name "review-task-implementation")
+           final-summary-step (get step-by-name "final-summary")
+           terminal-stop-step (get step-by-name "terminal-stop-summary")
+           select-text (step-template-text select-step)
+           clean-text (step-template-text clean-baseline-step)
+           coverage-review-text (step-template-text coverage-review-step)
+           disposition-text (step-template-text coverage-disposition-step)
+           coverage-fix-text (step-template-text coverage-fix-step)
+           diff-gate-text (step-template-text diff-gate-step)
+           final-summary-text (step-template-text final-summary-step)
+           terminal-stop-text (step-template-text terminal-stop-step)]
+       (testing "expands target-present execution into explicit phased topology"
+         (is (= ["select-and-create"
+                 "review-task-design"
+                 "create-task-plan"
+                 "review-task-plan"
+                 "clean-baseline"
+                 "coverage-review"
+                 "coverage-disposition"
+                 "coverage-fix"
+                 "diff-gate"
+                 "implement-task"
+                 "review-task-implementation"
+                 "final-summary"
+                 "terminal-stop-summary"]
+                (mapv :name steps)))
+         (is (= [:session
+                 :delegate
+                 :delegate
+                 :delegate
+                 :session
+                 :session
+                 :session
+                 :session
+                 :session
+                 :delegate
+                 :delegate
+                 :session
+                 :session]
+                (mapv :type steps))))
+       (testing "select-and-create carries the current-worktree tools + design-named skills"
+         (is (= ["read" "bash" "edit" "write"] (:tools select-step)))
+         (is (not (some #{"work-on"} (:tools select-step))))
+         (is (some #{"incidental-complexity-finder"} (:skills select-step)))
+         (is (some #{"gordian"} (:skills select-step)))
+         (is (some #{"code-shaper"} (:skills select-step))))
+       (testing "select-and-create wires {{input}} to the bare :workflow-input"
          (let [tmpl (first (filter #(= :template (:type %))
                                    (:contributions select-step)))]
-           (is (.contains (:text tmpl) "{{input}}")
-               "select-and-create prompt references the {{input}} template var")
+           (is (.contains (:text tmpl) "{{input}}"))
            (is (= {:from :workflow-input}
-                  (get-in tmpl [:vars "input"]))
-               "select-and-create wires input to the bare top-level :workflow-input (no :path)")))
-       (testing "select-and-create uses deterministic PASS_STATUS routing to skip or run lifecycle"
+                  (get-in tmpl [:vars "input"])))))
+       (testing "select-and-create routes no-target directly to done and target-present into design review"
          (is (= {:type :invoke
                  :operation "workflow/pass-status-routing"
                  :args {:text {:from {:step "select-and-create" :output :final-llm-reply}}
                         :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}}
-                (:judge select-step))
-             "select-and-create judge routes from the actor final reply via deterministic PASS_STATUS parsing")
-         (is (= {"DONE" {:goto "lifecycle"}
+                (:judge select-step)))
+         (is (= {"DONE" {:goto "review-task-design"}
                  "REPEAT" {:goto :done}}
                 (:on select-step))
-             "REVIEW_COMPLETE/DONE runs lifecycle; ACTIONABLE_FEEDBACK/REPEAT skips lifecycle for no-target")
-         (is (.contains select-text "PASS_STATUS: REVIEW_COMPLETE")
-             "target-present select-and-create output is instructed to route to lifecycle")
-         (is (.contains select-text "PASS_STATUS: ACTIONABLE_FEEDBACK")
-             "no-target select-and-create output is instructed to terminate without lifecycle"))
-       (testing "lifecycle :delegate targets task-lifecycle directly with :input from select-and-create :yield :text"
-         (is (= :delegate (:type delegate-step)))
-         (is (= "task-lifecycle" (:target delegate-step)))
-         (is (= {:type :map
-                 :fields {:input {:from {:step "select-and-create" :yield :text}}}}
-                (:prompt-string delegate-step))))
-       ;; TR13: lock the delegate's :context — the second source propagates the
-       ;; step-1 handoff into the delegated task-lifecycle. The prior
-       ;; :type/:target/:prompt-string-only locks let a regress dropping it pass
-       ;; green.
-       (testing "lifecycle :delegate :context propagates workflow-original + the select-and-create handoff yield (TR13)"
-         (is (= [{:type :source :from :workflow-original}
-                 {:type :source :from {:step "select-and-create" :yield :text}}]
-                (:context delegate-step))))
-       (testing "select-and-create prompt emits the munera_task_path handoff and treats worktree_path as informational only"
-         (is (.contains select-text "munera_task_path:")
-             "step-1 prompt emits munera_task_path: handoff field")
-         (is (.contains select-text "inherited session worktree")
-             "step-1 prompt states downstream execution relies on inherited session worktree")
-         (is (.contains select-text "worktree_path:` as informational context")
-             "step-1 prompt allows worktree_path only as informational context"))
-       (testing "select-and-create prompt encodes the early-stop-on-no-target intent"
-         (is (re-find #"(?i)no unit qualif" select-text)
-             "step-1 prompt encodes early-stop when no unit qualifies")
-         (is (.contains select-text "Do NOT create or switch worktrees")
-             "step-1 prompt forbids creating or switching worktrees on early stop")
-         (is (.contains select-text "Do NOT create a task")
-             "step-1 prompt forbids creating a task on early stop"))
-       (testing "select-and-create prompt embeds the enforcing gate flags + both baselines"
+             "REVIEW_COMPLETE/DONE starts explicit lifecycle; ACTIONABLE_FEEDBACK/REPEAT stops no-target")
+         (is (.contains select-text "PASS_STATUS: REVIEW_COMPLETE"))
+         (is (.contains select-text "PASS_STATUS: ACTIONABLE_FEEDBACK"))
+         (is (.contains select-text "skips every downstream design/plan/test-net/implementation step"))
+         (is (not-any? #(= "task-lifecycle" (:target %)) steps)
+             "target-present path no longer delegates to opaque task-lifecycle"))
+       (testing "explicit lifecycle delegates target the reusable sub-workflows"
+         (is (= "review-task-design" (:target review-design-step)))
+         (is (= "create-task-plan" (:target create-plan-step)))
+         (is (= "review-task-plan" (:target review-plan-step)))
+         (is (= "implement-task" (:target implement-step)))
+         (is (= "review-task-implementation" (:target implementation-review-step)))
+         (doseq [step [review-design-step create-plan-step review-plan-step
+                       implement-step implementation-review-step]]
+           (is (= {:type :map
+                   :fields {:input {:from {:step "select-and-create" :yield :text}}}}
+                  (:prompt-string step)))))
+       (testing "select-and-create prompt preserves task-209 selection and baseline contracts"
+         (is (.contains select-text "munera_task_path:"))
+         (is (.contains select-text "inherited session worktree"))
+         (is (.contains select-text "worktree_path:` as informational context"))
+         (is (re-find #"(?i)no unit qualif" select-text))
+         (is (.contains select-text "Do NOT create or switch worktrees"))
+         (is (.contains select-text "Do NOT create a task"))
+         (is (.contains select-text "bb gordian local --json"))
+         (is (.contains select-text "bb gordian diagnose --edn"))
+         (is (.contains select-text "before-local.json"))
+         (is (.contains select-text "before-diagnose.edn"))
+         (is (.contains select-text "--baseline munera/open/NNN-slug/before-diagnose.edn"))
          (is (.contains select-text
-                        "--fail-on new-cycles,new-high-findings --max-new-medium-findings 0")
-             "step-1 prompt embeds the enforcing gate flags")
-         (is (.contains select-text "before-local.json")
-             "step-1 prompt names the before-local.json baseline (A5)")
-         (is (.contains select-text "before-diagnose.edn")
-             "step-1 prompt names the before-diagnose.edn baseline (A3)"))
-       ;; TR11 (pass 9, test-shaper): A3 baseline paths must be WORKTREE-ROOT-
-       ;; RELATIVE (`munera/open/NNN-slug/...`), NOT a bare filename (which does
-       ;; not resolve from the worktree-root cwd where Phase 1 runs gate). The
-       ;; bare-filename locks above don't anchor this, so the R3-warned regress
-       ;; (`--baseline before-diagnose.edn`) would pass green.
-       (testing "select-and-create prompt resolves A3/A5 baselines by worktree-relative path (TR11)"
+                        "--fail-on new-cycles,new-high-findings --max-new-medium-findings 0"))
          (is (.contains select-text
-                        "--baseline munera/open/NNN-slug/before-diagnose.edn")
-             "step-1 gate command embeds the worktree-root-relative A3 baseline path (not a bare filename)")
+                        "These tests must be GREEN against the unmodified code before any refactoring begins"))
+         (is (.contains select-text "No refactor proceeds without a green net"))
          (is (.contains select-text
-                        "the stored `munera/open/NNN-slug/before-local.json`")
-             "step-1 prompt names the worktree-relative A5 before-local.json comparison path (not a bare filename)"))
-       ;; TR2: the step-7 two-phase behaviour-preserving contract is the design's
-       ;; substantive acceptance, not just the gate flags/filenames locked above.
-       ;; Lock its shape so a paraphrase/regress of the Phase-0 gate, the
-       ;; behaviour-identical constraint, or the F3 A5/A2 key can't pass green.
-       (testing "select-and-create prompt embeds the Phase-0 characterization-test gate"
+                        "behaviour is identical — meta/spec are unchanged; existing test expectations are not weakened"))
+         (is (.contains select-text "keyed by `(ns, var, arity, line)`"))
+         (is (.contains select-text "identified by `(ns, var, arity, line)`"))
          (is (.contains select-text
-                        "These tests must be GREEN against the unmodified code before any refactoring begins")
-             "step-1 prompt requires a green characterization net before refactor (Phase 0)")
-         (is (re-find #"(?i)add characterization tests" select-text)
-             "step-1 prompt instructs adding characterization tests when coverage is insufficient"))
-       (testing "select-and-create prompt embeds the behaviour-identical constraint"
+                        "Blast radius: the target unit PLUS the minimal surrounding helpers required to decomplect it; no unrelated cleanup"))
+         (is (.contains select-text "decreased versus its `before-local.json` value"))
+         (is (.contains select-text "after total is strictly less than the before total"))
          (is (.contains select-text
-                        "behaviour is identical — meta/spec are unchanged; existing test expectations are not weakened")
-             "step-1 prompt states the behaviour-identical / meta-spec-unchanged constraint"))
-       (testing "select-and-create prompt keys A5/A2 acceptance on (ns, var, arity, line) (F3 lock)"
-         ;; F3 re-keyed A5/A2 onto the selector's unique (ns, var, arity, line)
-         ;; join key; a regress back to (ns, var, arity) in the generated
-         ;; contract must not pass green.
-         (is (.contains select-text "keyed by `(ns, var, arity, line)`")
-             "step-1 prompt keys the A5 burden-reduction acceptance on (ns, var, arity, line)")
-         (is (.contains select-text "identified by `(ns, var, arity, line)`")
-             "step-1 prompt keys the A2 touched-set identity on (ns, var, arity, line)"))
-       ;; TT-I (test review pass 24, task-test-review): TR2 locked the Phase-0
-       ;; gate + behaviour-identical constraint; two further clauses of the same
-       ;; generated-design contract were unlocked — (1) the Blast-radius scope
-       ;; fence and (2) the Phase-0 hard gate + untestable-tangle escape hatch.
-       ;; A regress admitting unrelated cleanup, or letting a refactor proceed on
-       ;; an uncharacterized unit without a green net, must not pass green.
-       (testing "select-and-create prompt locks the Blast-radius scope fence (TT-I)"
-         (is (.contains select-text
-                        "Blast radius: the target unit PLUS the minimal surrounding helpers required to decomplect it; no unrelated cleanup")
-             "step-1 prompt fences the refactor scope to the target unit + minimal helpers (no unrelated cleanup)"))
-       (testing "select-and-create prompt locks the Phase-0 hard gate + untestable-tangle handling (TT-I)"
-         (is (.contains select-text "cannot be characterized safely")
-             "step-1 prompt handles the untestable-tangle case (cannot be characterized safely)")
-         (is (.contains select-text "scope drift -> close per Munera")
-             "step-1 prompt closes an uncharacterizable unit per Munera scope-drift")
-         (is (.contains select-text "No refactor proceeds without a green net")
-             "step-1 prompt hard-gates the refactor on a green characterization net"))
-       ;; TT-M (test review pass 28, task-test-review): TT-I/TR2/TT-D locked
-       ;; sibling clauses of the generated-design contract, but its FIRST stated
-       ;; requirement (target unit + captured evidence) and the upstream step-1
-       ;; evidence-capture instruction incl. the coverage hint were unlocked. A
-       ;; regress emitting a refactor task with no evidence block, or dropping the
-       ;; coverage hint (so the generated task can't see its test net), must fail.
-       (testing "select-and-create prompt locks the generated-design evidence clause + capture instruction (TT-M)"
-         (is (.contains select-text
-                        "The target unit and the captured incidental-complexity evidence")
-             "step-1 prompt's generated design.md contract opens with the target unit + captured evidence")
-         (is (.contains select-text "Capture the chosen target's evidence")
-             "step-1 prompt instructs capturing the chosen target's evidence")
-         (is (.contains select-text "and the coverage hint")
-             "step-1 evidence capture includes the coverage hint (the generated task's test-net signal)"))
-       ;; TR8 (pass 6): the distinguishing endpoint — no push/PR (Locked
-       ;; decisions 7 & 8: full lifecycle on a local worktree branch, not a
-       ;; complexity-reduction-pr clone) — was unlocked. A regress adding a
-       ;; push/PR step must not pass green.
-       (testing "select-and-create prompt locks the no-push/PR endpoint constraint (TR8)"
-         (is (.contains select-text "Do NOT push or open a PR")
-             "step-1 prompt forbids pushing or opening a PR")
-         (is (.contains select-text
-                        "ends with a completed, reviewed task on the current local branch")
-             "step-1 prompt states the current-local-branch endpoint (no push/PR)"))
-       ;; TT-B replacement: lock the current-worktree context. The workflow no
-       ;; longer creates or switches to an origin/master worktree; callers must
-       ;; invoke it from the intended branch/worktree and child sessions inherit
-       ;; that worktree-path.
-       (testing "select-and-create prompt locks current-worktree execution (TT-B replacement)"
-         (is (.contains select-text "git status --short --branch")
-             "step-1 prompt checks the current branch/worktree context")
-         (is (.contains select-text "treat the current branch/worktree as the intended refactor location")
-             "step-1 prompt treats the current worktree as authoritative for the run")
-         (is (.contains select-text "Do NOT call `work-on`")
-             "step-1 prompt forbids calling work-on")
-         (is (.contains select-text "Do NOT create or switch worktrees")
-             "step-1 prompt forbids creating or switching worktrees"))
-       ;; TT-C (test review pass 19, task-test-review): lock the baseline
-       ;; *capture commands*, not just the output filenames — before-local.json
-       ;; <- `bb gordian local --json` (bare) and before-diagnose.edn <-
-       ;; `bb gordian diagnose --edn`. A regress to the selector's
-       ;; `local --sort total --json` (forbidden as a baseline) or a wrong
-       ;; diagnose flag previously passed green.
-       (testing "select-and-create prompt locks the baseline capture commands (TT-C)"
-         (is (.contains select-text "bb gordian local --json")
-             "step-1 prompt captures before-local.json via bare bb gordian local --json")
-         (is (.contains select-text "bb gordian diagnose --edn")
-             "step-1 prompt captures before-diagnose.edn via bb gordian diagnose --edn"))
-       ;; TT-D (test review pass 19, task-test-review): lock the A5/A2
-       ;; direction-of-change. The F3 lock asserts only the join key, not the
-       ;; directional acceptance; a paraphrase weakening "decreased" -> "changed"
-       ;; or "strictly less" -> "not greater" previously passed green.
-       (testing "select-and-create prompt locks the A5/A2 direction-of-change (TT-D)"
-         (is (.contains select-text
-                        "decreased versus its `before-local.json` value")
-             "step-1 prompt states A5: target lcc-total decreased versus before-local.json")
-         (is (.contains select-text
-                        "after total is strictly less than the before total")
-             "step-1 prompt states A2: after total strictly less than before total"))
-       ;; TT-G (test review pass 22, task-test-review): lock the A2 "touched
-       ;; units = metric-derived set" discriminator (Locked decision 4 / the
-       ;; design's "Net burden (A2)" paragraph). F3 locks only the
-       ;; (ns, var, arity, line) key and TT-D only the strictly-less direction;
-       ;; neither anchors the metric-vs-file derivation. A paraphrase to "units
-       ;; whose source/files changed" previously passed green while defeating
-       ;; the global-recompute net check (a refactor could hide relocated
-       ;; burden in an unedited caller).
-       (testing "select-and-create prompt locks the metric-derived touched-set discriminator (TT-G)"
-         (is (.contains select-text
-                        "the set is computed from the metric, not from the diff/touched files")
-             "step-1 prompt derives the A2 touched set from the metric, not the diff/touched files"))
-       ;; TT-H replacement: lock current-worktree task creation. Task ids,
-       ;; baselines, and task-creation commits are scoped to the invoking
-       ;; session's current worktree/branch; no outer-vs-inner worktree handoff
-       ;; remains.
-       (testing "select-and-create prompt locks current-worktree task creation (TT-H replacement)"
-         (is (.contains select-text "scanning the CURRENT WORKTREE's")
-             "step-1 prompt allocates NNN by scanning the current worktree's task set")
-         (is (.contains select-text "Commit the task creation on the current branch")
-             "step-1 prompt commits task creation on the current branch")
-         (is (.contains select-text "delegated lifecycle child sessions inherit the same worktree")
-             "step-1 prompt relies on inherited worktree-path for lifecycle resolution"))))))
+                        "the set is computed from the metric, not from the diff/touched files"))
+         (is (.contains select-text "Commit the task creation on the current branch"))
+         (is (.contains select-text "Do NOT push or open a PR")))
+       (testing "clean-baseline step locks the clean-source precondition and baseline artifact contract"
+         (is (= ["read" "bash" "edit" "write"] (:tools clean-baseline-step)))
+         (is (= {"DONE" {:goto "coverage-review"}
+                 "REPEAT" {:goto "terminal-stop-summary"}}
+                (:on clean-baseline-step)))
+         (is (.contains clean-text "characterization-baseline.edn"))
+         (is (.contains clean-text "target/source paths are not already dirty"))
+         (is (.contains clean-text "pre-existing dirty target/source changes must stop the workflow"))
+         (is (.contains clean-text "recorded git `HEAD`"))
+         (is (.contains clean-text "git status --short"))
+         (is (.contains clean-text "target/source paths identified by the task"))
+         (is (.contains clean-text "explicitly classified pre-existing task-artifact-or-doc dirt"))
+         (is (.contains clean-text "Do NOT call `work-on`")))
+       (testing "coverage review is the pre-simplification characterization gate"
+         (is (some #{"task-test-review"} (:skills coverage-review-step)))
+         (is (some #{"testing-without-mocks"} (:skills coverage-review-step)))
+         (is (= {"DONE" {:goto "diff-gate"}
+                 "REPEAT" {:goto "coverage-disposition"}}
+                (:on coverage-review-step)))
+         (is (.contains coverage-review-text "pre-simplification characterization-test net"))
+         (is (.contains coverage-review-text "Do NOT perform simplification or refactor work"))
+         (is (.contains coverage-review-text "nominal, edge, and boundary"))
+         (is (.contains coverage-review-text "externally observable state or outputs"))
+         (is (.contains coverage-review-text
+                        "avoid interaction assertions unless the interaction is itself the observable behavior"))
+         (is (.contains coverage-review-text "green against the unmodified target behavior"))
+         (is (.contains coverage-review-text "CHARACTERIZATION_STATUS: FIXABLE_GAPS"))
+         (is (.contains coverage-review-text "CHARACTERIZATION_STATUS: INFEASIBLE")))
+       (testing "coverage disposition separates fixable gaps from infeasible characterization"
+         (is (= {"DONE" {:goto "coverage-fix"}
+                 "REPEAT" {:goto "terminal-stop-summary"}}
+                (:on coverage-disposition-step)))
+         (is (.contains disposition-text "CHARACTERIZATION_STATUS: FIXABLE_GAPS"))
+         (is (.contains disposition-text "PASS_STATUS: REVIEW_COMPLETE"))
+         (is (.contains disposition-text "CHARACTERIZATION_STATUS: INFEASIBLE"))
+         (is (.contains disposition-text "PASS_STATUS: ACTIONABLE_FEEDBACK")))
+       (testing "coverage-fix is constrained to characterization tests and minimal seams, then loops"
+         (is (= ["read" "bash" "edit" "write"] (:tools coverage-fix-step)))
+         (is (some #{"clojure-coding-standards"} (:skills coverage-fix-step)))
+         (is (some #{"testing-without-mocks"} (:skills coverage-fix-step)))
+         (is (= {"DONE" {:goto "coverage-review"}}
+                (:on coverage-fix-step)))
+         (is (.contains coverage-fix-text "characterization tests"))
+         (is (.contains coverage-fix-text "explicitly justified minimal testability seams"))
+         (is (.contains coverage-fix-text "Do NOT simplify, refactor, decomplect, rename, extract"))
+         (is (.contains coverage-fix-text "Do NOT weaken existing expectations"))
+         (is (.contains coverage-fix-text "Do NOT make broad production edits"))
+         (is (.contains coverage-fix-text "Commit the characterization-fix changes"))
+         (is (.contains coverage-fix-text "Do NOT call `work-on`")))
+       (testing "diff gate blocks implementation unless coverage-phase diff is classified cleanly"
+         (is (= {"DONE" {:goto "implement-task"}
+                 "REPEAT" {:goto "terminal-stop-summary"}}
+                (:on diff-gate-step)))
+         (is (.contains diff-gate-text "before `implement-task`"))
+         (is (.contains diff-gate-text "characterization-baseline.edn"))
+         (is (.contains diff-gate-text "dirty target/source paths at baseline time"))
+         (is (.contains diff-gate-text "git diff <baseline-head>...HEAD"))
+         (is (.contains diff-gate-text "current uncommitted worktree status/diff"))
+         (is (.contains diff-gate-text
+                        "Coverage-fix commits must not hide coverage-phase edits behind an empty uncommitted `git diff`"))
+         (is (.contains diff-gate-text
+                        "Allowed categories are only: characterization tests, task artifacts, docs, and explicitly justified minimal testability seams"))
+         (is (.contains diff-gate-text "unclassified source/target change"))
+         (is (.contains diff-gate-text "broad production edit"))
+         (is (.contains diff-gate-text "premature simplification/refactor"))
+         (is (.contains diff-gate-text "CHARACTERIZATION_STATUS: INFEASIBLE"))
+         (is (.contains diff-gate-text "PASS_STATUS: REVIEW_COMPLETE"))
+         (is (.contains diff-gate-text "PASS_STATUS: ACTIONABLE_FEEDBACK")))
+       (testing "implementation and summaries preserve target-present and no-target terminal contracts"
+         (is (.contains final-summary-text
+                        "design → plan → characterization-test-net gate → baseline/diff gate → simplification implementation → implementation review"))
+         (is (= {"DONE" {:goto :done}}
+                (:on final-summary-step))
+             "successful target-present final summary stops before terminal-stop-summary")
+         (is (.contains terminal-stop-text
+                        "No-target runs route directly from `select-and-create` to workflow completion and must not run this step"))
+         (is (.contains terminal-stop-text "dirty baseline"))
+         (is (.contains terminal-stop-text "infeasible characterization"))
+         (is (.contains terminal-stop-text "failed baseline/diff classification"))
+         (is (.contains terminal-stop-text
+                        "Do not claim `implement-task`, simplification, implementation review, push, or PR creation occurred")))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Reference-chain resolution (TT-K)
 
-;; TT-K: the isolated tests above assert only delegate :target *string equality*
-;; while loading a single EDN — the loader does NOT validate delegate targets at
-;; load time, so those asserts give no resolution guarantee. Co-load the direct
-;; delegate set (reduce-incidental-complexity -> task-lifecycle) and assert the
-;; target is a key in the combined definitions.
+;; TT-K/task-212: the isolated tests above assert only delegate :target *string
+;; equality* while loading a single EDN — the loader does NOT validate delegate
+;; targets at load time, so those asserts give no resolution guarantee. Co-load
+;; the direct delegate set and assert each target is a registered workflow.
 (deftest task-209-workflow-set-loads-together-test
-  (with-workflow-dir
-    {"reduce-incidental-complexity.edn"
-     (slurp-workflow-file "reduce-incidental-complexity.edn")
-     "task-lifecycle.edn"
-     (slurp-workflow-file "task-lifecycle.edn")}
-    (fn [{:keys [definitions errors]}]
-      (testing "the task-209 delegate set loads together without compilation errors"
-        (is (empty? errors))
-        (is (contains? definitions "reduce-incidental-complexity"))
-        (is (contains? definitions "task-lifecycle")))
-      (testing "the reduce-incidental-complexity delegate :target resolves to a registered workflow"
-        (let [outer-target (->> (get-in definitions
-                                        ["reduce-incidental-complexity" :steps])
-                                (some #(when (= "lifecycle" (:name %))
-                                         (:target %))))]
-          (is (= "task-lifecycle" outer-target)
-              "reduce-incidental-complexity delegates directly to task-lifecycle")
-          (is (contains? definitions outer-target)
-              "the outer delegate :target resolves to a registered workflow"))))))
+  (let [target-names ["review-task-design"
+                      "create-task-plan"
+                      "review-task-plan"
+                      "implement-task"
+                      "review-task-implementation"]
+        stub-workflow (fn [name]
+                        (pr-str {:steps [{:name "noop"
+                                          :type :invoke
+                                          :operation "workflow/constant-routing"
+                                          :args {:route "DONE"}}]
+                                 :name name
+                                 :description "delegate target resolution stub"}))]
+    (with-workflow-dir
+      (into {"reduce-incidental-complexity.edn"
+             (slurp-workflow-file "reduce-incidental-complexity.edn")}
+            (map (fn [name]
+                   [(str name ".edn") (stub-workflow name)]))
+            target-names)
+      (fn [{:keys [definitions errors]}]
+        (testing "the task-209/212 delegate set loads together without compilation errors"
+          (is (empty? errors))
+          (is (contains? definitions "reduce-incidental-complexity"))
+          (doseq [workflow target-names]
+            (is (contains? definitions workflow))))
+        (testing "reduce-incidental-complexity direct delegate targets resolve to registered workflows"
+          (let [outer-targets (->> (get-in definitions
+                                           ["reduce-incidental-complexity" :steps])
+                                   (keep #(when (= :delegate (:type %))
+                                            (:target %)))
+                                   set)]
+            (is (= (set target-names) outer-targets))
+            (doseq [target outer-targets]
+              (is (contains? definitions target)
+                  (str "delegate target resolves: " target)))))))))
