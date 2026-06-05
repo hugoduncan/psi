@@ -7,6 +7,7 @@
    [psi.app-runtime :as app-runtime]
    [psi.app-runtime.test-support :as app-test-support]
    [psi.memory.runtime :as memory-runtime]
+   [psi.provider-auth.oauth.core :as oauth]
    [psi.session-state.state :as ss]))
 
 (deftest start-tui-runtime-forwards-memory-runtime-opts-to-bootstrap-sync-test
@@ -155,3 +156,62 @@
                 (is (some #(and (= session-id (get-in % [:ui.item/meta :item/session-id]))
                                 (true? (get-in % [:ui.item/meta :item/is-active])))
                           (:ui/items selector)))))))))))
+
+(deftest start-tui-runtime-completes-pending-login-from-auth-code-input-test
+  ;; Characterizes the public TUI pending-login handoff: /login command dispatch
+  ;; stores pending login, then run-agent-fn consumes the next input as auth code.
+  (app-test-support/with-session-state-restore
+    (fn []
+      (let [completed* (atom nil)
+            oauth-ctx  (oauth/create-null-context
+                        {:providers [{:id                   :anthropic
+                                      :name                 "Anthropic OAuth"
+                                      :uses-callback-server false
+                                      :begin-login          (fn []
+                                                              {:url "https://auth.example/start"
+                                                               :login-state {:nonce "login-nonce"}})
+                                      :complete-login       (fn [code login-state]
+                                                              (reset! completed* {:code code
+                                                                                  :login-state login-state})
+                                                              {:type :oauth
+                                                               :access (str "token-for-" code)
+                                                               :refresh "refresh-token"
+                                                               :expires (+ (System/currentTimeMillis) 3600000)})
+                                      :refresh-token        (fn [credential] credential)
+                                      :get-api-key          :access}]})]
+        (with-redefs-fn (merge (app-test-support/bootstrap-stub-bindings)
+                               {#'app-runtime/resolve-model (fn [_] app-test-support/test-ai-model)
+                                #'ext/discover-extension-paths (fn [& _] [])
+                                #'oauth/create-context (fn [] oauth-ctx)})
+          (fn []
+            (let [captured* (atom nil)]
+              (is (= :ok (app-runtime/start-tui-runtime!
+                          (fn [run-agent-fn opts]
+                            (reset! captured* {:run-agent-fn run-agent-fn
+                                               :opts opts})
+                            :ok)
+                          :ignored {} {})))
+              (let [{:keys [run-agent-fn opts]} @captured*
+                    dispatch-result ((:dispatch-fn opts) "/login")]
+                (is (= :login-start (:type dispatch-result)))
+                (is (= "https://auth.example/start" (:url dispatch-result)))
+                (is (= {:provider-id :anthropic
+                        :provider-name "Anthropic OAuth"
+                        :login-state {:nonce "login-nonce"}}
+                       (:pending-login @app-runtime/session-state)))
+                (is (nil? ((:dispatch-fn opts) "auth-code-123"))
+                    "while login is pending, non-command input falls through to run-agent-fn")
+                (let [queue  (java.util.concurrent.LinkedBlockingQueue.)
+                      _      (run-agent-fn " auth-code-123 " queue)
+                      result (.poll queue 2000 java.util.concurrent.TimeUnit/MILLISECONDS)]
+                  (is (= {:kind :done
+                          :result {:role "assistant"
+                                   :content [{:type :text
+                                              :text "✓ Logged in to Anthropic OAuth"}]}}
+                         result))
+                  (is (nil? (:pending-login @app-runtime/session-state)))
+                  (is (= {:code "auth-code-123"
+                          :login-state {:nonce "login-nonce"}}
+                         @completed*))
+                  (is (= "token-for-auth-code-123"
+                         (oauth/get-api-key oauth-ctx :anthropic))))))))))))
