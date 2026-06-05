@@ -91,3 +91,16 @@ PASS_STATUS: REVIEW_COMPLETE
 Reviewed the implementation after IR1 against `design.md`, `plan.md`, `steps.md`, `.psi/workflows/reduce-incidental-complexity.edn`, lifecycle delegate workflows, workflow grammar docs, `task_209_workflow_definitions_test.clj`, `doc/workflows.md`, and `CHANGELOG.md`. Focused workflow-definition tests are green (`clojure -M:test --focus psi.workflow-loader.task-209-workflow-definitions-test` — 3 tests / 156 assertions). Found one new actionable issue (**IR2**): `clean-baseline` can route to `terminal-stop-summary` on missing target/source paths or dirty target/source paths, but its prompt only says to "stop with an explicit finding" and does not require appending/committing that finding to task artifacts. The terminal-stop summary later inspects task artifacts and has no source contribution from `clean-baseline`, so a baseline failure can be ephemeral and under-evidenced.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## 2026-06-05 — Implementation review follow-up IR2
+
+Completed IR2. Tightened the `clean-baseline` prompt in `.psi/workflows/reduce-incidental-complexity.edn` so missing target/source paths and pre-existing dirty target/source paths must be appended as durable task-artifact failure findings and committed before emitting `PASS_STATUS: ACTIONABLE_FEEDBACK`. Added workflow-definition assertions locking the clean-baseline failure-record contract, including the missing-path/dirty-path committed artifact requirement consumed later by `terminal-stop-summary`.
+
+Verification:
+- `clojure -M:test --focus psi.workflow-loader.task-209-workflow-definitions-test` — 3 tests / 158 assertions green.
+- `clojure -M:test --focus psi.workflow-loader.workflow-definitions-test` — 11 tests / 159 assertions green.
+- `bb lint` — 0 errors / 0 warnings (one pre-existing info).
+- `bb fmt:check` — green.
+- `bb commit-check:file-lengths` — green.
+
+PASS_STATUS: REVIEW_COMPLETE
