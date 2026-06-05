@@ -5,14 +5,14 @@
 - [ ] Trace where provider/LLM retry state is written into session state and where retry clear/terminal state is written.
 - [ ] Trace the RPC projection listener or event-emission path that currently publishes `footer/updated` for session/footer changes.
 - [ ] Identify the missing invalidation/emission edge, or confirm the existing edge and document the exact path in `implementation.md`.
-- [ ] Add backend/RPC test coverage that simulates retry activation and asserts an Emacs-visible `footer/updated` event is emitted.
+- [ ] Add backend/RPC test coverage that drives the real provider retry-state mutation/invalidation edge used by retry scheduling, and asserts an Emacs-visible `footer/updated` event is emitted.
 - [ ] In that backend/RPC test, assert the emitted footer payload contains the app-runtime retry footer text (for example `retry in 8s`) and the matching `:session-id`.
 - [ ] Run the focused backend/RPC test and confirm it fails without the trigger fix or acts as a regression lock if the trigger already exists.
 
 ## Slice 2 — Publish footer on retry activation/change/clear
 
 - [ ] Implement the minimal backend/RPC/app-runtime projection-boundary fix so retry activation publishes `footer/updated`.
-- [ ] Extend or add backend/RPC coverage for materially changed retry state, asserting a fresh `footer/updated` payload with the latest projected retry text.
+- [ ] Extend or add backend/RPC coverage for a backend-published retry change that alters visible retry text (wait/resume time, attempt/source, or rate-limit remaining/reset detail), asserting a fresh `footer/updated` payload with the latest projected retry text.
 - [ ] Extend or add backend/RPC coverage for retry clear/terminal state, asserting a `footer/updated` payload with stale retry text removed.
 - [ ] Verify the fix preserves existing footer payload fields (`:path-line`, `:stats-line`, `:status-line`, usage/model/session-activity fields) and `:session-id` matching.
 - [ ] Run focused backend/RPC tests covering the retry footer trigger sequence.
@@ -49,5 +49,5 @@
 
 ## Plan ambiguity follow-ups
 
-- [ ] PA1: Clarify Slice 1 backend/RPC trigger coverage: the retry activation test must exercise the same session retry-state mutation/invalidation edge used by real provider retry scheduling, not only call `footer-updated-payload` directly or manually emit `footer/updated`.
-- [ ] PA2: Clarify Slice 2 changed-retry coverage: name the retry fields whose backend-published changes must produce a fresh footer projection (at minimum those that alter visible retry text such as wait/resume time, attempt/source, and rate-limit remaining/reset detail), or explicitly narrow the required representative changed-state case.
+- [x] PA1: Clarify Slice 1 backend/RPC trigger coverage: the retry activation test must exercise the same session retry-state mutation/invalidation edge used by real provider retry scheduling, not only call `footer-updated-payload` directly or manually emit `footer/updated`.
+- [x] PA2: Clarify Slice 2 changed-retry coverage: name the retry fields whose backend-published changes must produce a fresh footer projection (at minimum those that alter visible retry text such as wait/resume time, attempt/source, and rate-limit remaining/reset detail), or explicitly narrow the required representative changed-state case.

@@ -13,7 +13,11 @@ Key decisions:
    existing retry-state mutation/publication path and the RPC projection listener
    that emits footer events. Confirm whether retry activation/change/clear causes
    `footer/updated` today. The implementation slice should keep the discovered
-   trigger proof in backend/RPC tests, not only in notes.
+   trigger proof in backend/RPC tests, not only in notes. The Slice 1 trigger test
+   must exercise the same session retry-state mutation/invalidation edge used by
+   real provider retry scheduling; it is not sufficient to call
+   `footer-updated-payload` directly or manually emit `footer/updated` with a
+   constructed payload.
 
 2. **Keep app-runtime as footer owner.** Retry wording stays in
    `psi.app-runtime.retry-display/retry-status-text` and
@@ -24,7 +28,11 @@ Key decisions:
 3. **Make retry changes invalidate/publish the footer.** If retry state changes
    are missing from the projection invalidation path, add the minimal backend/RPC
    trigger so active retry, materially changed retry, and clear/terminal retry
-   states publish an Emacs-visible footer refresh. Prefer changing the
+   states publish an Emacs-visible footer refresh. Changed-retry coverage must
+   prove a fresh projection when a backend-published retry change alters visible
+   retry text. Cover at least one representative visible-text-changing change
+   drawn from the app-runtime retry formatter inputs: wait/resume time, attempt
+   or source, or rate-limit remaining/reset detail. Prefer changing the
    backend/RPC/app-runtime projection boundary so all footer consumers stay
    coherent.
 
@@ -73,10 +81,16 @@ Vertical slices, each independently verifiable:
 1. **Trace and lock backend/RPC trigger gap** — identify the retry state update
    path and the footer projection listener/emission path; add a failing or
    regression-style backend/RPC test proving retry activation publishes an
-   Emacs-visible footer update with app-runtime retry text.
+   Emacs-visible footer update with app-runtime retry text. The test must drive
+   the real provider retry-state mutation/invalidation edge, not only the footer
+   payload helper or a hand-emitted event.
 2. **Publish footer on retry activation/change/clear** — implement the minimal
    invalidation/emission fix so retry activation, materially changed retry state,
-   and retry clear produce the expected `footer/updated` projection.
+   and retry clear produce the expected `footer/updated` projection. For changed
+   retry state, cover a representative backend-published change that changes
+   visible footer text (wait/resume time, attempt/source, or rate-limit
+   remaining/reset detail); do not rely on an arbitrary retry-map edit whose
+   projected footer text is unchanged.
 3. **Emacs-visible `footer/updated` rendering coverage** — add focused Emacs UI
    tests for active retry text rendered in the buffer/footer, changed retry text
    replacing the previous text, and cleared retry removing stale text.
