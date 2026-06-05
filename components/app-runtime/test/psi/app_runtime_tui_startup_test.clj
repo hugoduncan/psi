@@ -237,6 +237,37 @@
                       (is (= :context-updated (:type resume-event)))
                       (is (= "resumed-session" (:active-session-id resume-event))))))))))))))
 
+(deftest start-tui-runtime-frontend-action-select-model-updates-session-test
+  ;; Characterizes the public frontend model-selection action wiring against
+  ;; real runtime session state and the real app-runtime model resolver.
+  (app-test-support/with-session-state-restore
+    (fn []
+      (with-redefs-fn (merge (app-test-support/bootstrap-stub-bindings)
+                             {#'app-runtime/resolve-model (fn [_] app-test-support/test-ai-model)
+                              #'ext/discover-extension-paths (fn [& _] [])})
+        (fn []
+          (let [captured-opts* (atom nil)]
+            (is (= :ok (app-runtime/start-tui-runtime!
+                        (fn [_run-agent-fn opts]
+                          (reset! captured-opts* opts)
+                          :ok)
+                        :ignored {} {})))
+            (let [opts          @captured-opts*
+                  ctx           (:ctx @app-runtime/session-state)
+                  session-id    (:focus-session-id opts)
+                  action-result {:ui.result/action-key :select-model
+                                 :ui.result/status :submitted
+                                 :ui.result/value {:provider "openai"
+                                                   :id "gpt-5.3-codex"}}
+                  result        ((:frontend-action-handler-fn! opts) action-result)]
+              (is (= {:type :text
+                      :message "✓ Model set to openai gpt-5.3-codex"}
+                     result))
+              (is (= {:provider "openai"
+                      :id "gpt-5.3-codex"
+                      :reasoning true}
+                     (:model (ss/get-session-data-in ctx session-id)))))))))))
+
 (deftest start-tui-runtime-queues-idle-follow-up-input-test
   ;; Characterizes the non-streaming on-queue-input branch through public TUI
   ;; startup opts and real session state.
