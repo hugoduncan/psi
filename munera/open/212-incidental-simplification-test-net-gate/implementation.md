@@ -193,3 +193,17 @@ PASS_STATUS: REVIEW_COMPLETE
 Reviewed task tests after TT1 against `design.md`, `plan.md`, `steps.md`, `.psi/workflows/reduce-incidental-complexity.edn`, `review-task-implementation.edn`, `review-step.edn`, workflow test support, `workflow_definitions_test.clj`, and `task_209_workflow_definitions_test.clj`. Focused workflow-definition tests remain green (`clojure -M:test --focus psi.workflow-loader.task-209-workflow-definitions-test` — 3 tests / 174 assertions). Found one new actionable test issue (**TT2**): the task-212 tests prove `reduce-incidental-complexity` delegates to `review-task-implementation`, but they do not lock that the downstream implementation-review workflow still includes the `review-task-tests` delegate using the `task-test-review` skill. A regression that removed or retargeted that test-review pass would keep the focused explicit-phase workflow tests green while weakening the final post-implementation test-quality gate.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## 2026-06-05 — Test review follow-up TT2
+
+Completed TT2. Strengthened `task-209-workflow-set-loads-together-test` so the task-212 workflow-definition coverage now loads the real `review-step.edn` alongside `review-task-implementation.edn` and asserts the transitive post-implementation test-review gate: `review-task-implementation` contains a `review-task-tests` delegate targeting `review-step`, passes `:skill "task-test-review"`, runs after the implementation-review output, and resolves against the real `review-step` workflow. This prevents `reduce-incidental-complexity` focused tests from staying green if the final implementation-review phase silently loses or retargets the task-test-review pass.
+
+Verification:
+- `clj-paren-repair components/workflow-loader/test/psi/workflow_loader/task_209_workflow_definitions_test.clj` — success, formatted.
+- `clojure -M:test --focus psi.workflow-loader.task-209-workflow-definitions-test` — 3 tests / 178 assertions green.
+- `clojure -M:test --focus psi.workflow-loader.workflow-definitions-test` — 11 tests / 159 assertions green.
+- `bb lint` — 0 errors / 0 warnings (one pre-existing info).
+- `bb fmt:check` — green.
+- `bb commit-check:file-lengths` — green.
+
+PASS_STATUS: REVIEW_COMPLETE

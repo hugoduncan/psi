@@ -405,7 +405,8 @@
                             "create-task-plan.edn"
                             "review-task-plan.edn"
                             "implement-task.edn"
-                            "review-task-implementation.edn"]
+                            "review-task-implementation.edn"
+                            "review-step.edn"]
         prompt-filenames ["review-task-design-architecture-review.md"
                           "review-task-design-ambiguity-review.md"
                           "review-task-design-inconsistency-review.md"
@@ -435,4 +436,25 @@
             (is (= (set target-names) outer-targets))
             (doseq [target outer-targets]
               (is (contains? definitions target)
-                  (str "delegate target resolves: " target)))))))))
+                  (str "delegate target resolves: " target)))))
+        (testing "implementation review workflow preserves the transitive task-test-review gate (TT2)"
+          (let [implementation-review-steps (get-in definitions
+                                                    ["review-task-implementation" :steps])
+                implementation-review-step-by-name (into {}
+                                                         (map (juxt :name identity)
+                                                              implementation-review-steps))
+                review-task-tests-step (get implementation-review-step-by-name
+                                            "review-task-tests")]
+            (is (= "review-step" (:target review-task-tests-step)))
+            (is (= {:type :map
+                    :fields {:input {:from :workflow-input, :path [:input]}
+                             :skill {:value "task-test-review"}}}
+                   (:prompt-string review-task-tests-step)))
+            (is (some #(= {:type :source
+                           :from {:step "review-task-implementation"
+                                  :yield :text}}
+                          %)
+                      (:context review-task-tests-step))
+                "test-review gate runs after implementation-review output")
+            (is (contains? definitions "review-step")
+                "review-task-tests delegate target resolves to the real review-step workflow")))))))
