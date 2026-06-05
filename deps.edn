@@ -268,7 +268,8 @@
                              "extensions/metrics/test"
                              "components/extension-test-helpers/src"]
                :extra-deps  {lambdaisland/kaocha {:mvn/version "1.91.1392"}
-                             nrepl/nrepl         {:mvn/version "1.5.1"}}
+                             nrepl/nrepl         {:mvn/version "1.5.1"}
+                             org.hugoduncan/scry {:mvn/version "0.1.28"}}
                :jvm-opts    ["--enable-native-access=ALL-UNNAMED"]}
   :test  {:extra-paths ["test-support"
                         "bases/main/test"
@@ -374,8 +375,10 @@
                         "extensions/metrics/src"
                         "components/extension-test-helpers/src"]
           :extra-deps  {lambdaisland/kaocha    {:mvn/version "1.91.1392"}
-                        nrepl/nrepl            {:mvn/version "1.5.1"}
-                        rewrite-clj/rewrite-clj {:mvn/version "1.1.47"}}
+                        nrepl/nrepl                {:mvn/version "1.5.1"}
+                        org.hugoduncan/scry        {:mvn/version "0.1.28"}
+                        org.hugoduncan/scry-kaocha {:mvn/version "0.1.28"}
+                        rewrite-clj/rewrite-clj    {:mvn/version "1.1.47"}}
           :jvm-opts    ["--enable-native-access=ALL-UNNAMED"]
           :main-opts   ["-m" "kaocha.runner"]}
   :build {:extra-paths ["bases/main/src"]
