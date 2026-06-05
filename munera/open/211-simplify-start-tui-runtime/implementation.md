@@ -177,3 +177,8 @@ Final Gordian acceptance from current HEAD:
 - A3 `bb gordian gate --baseline munera/open/211-simplify-start-tui-runtime/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0` → PASS, exit 0.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+
+2026-06-05 implementation review: found one new actionable implementation issue (IR2). `start-tui-runtime!` installs the TUI UI provider before constructing navigation callbacks and `tui-opts`, but `ui-capabilities/clear-provider!` is only protected by the `finally` around `tui-start-fn!`. A synchronous failure during post-install option assembly, such as `current-context-widget` or `build-tui-opts`, would leave the attached TUI provider observable from the runtime context despite the provider-lifetime goal. Existing exceptional cleanup coverage only covers frontend failure after options are built. Added an unchecked `steps.md` follow-up to move installation after successful option assembly or widen the protected region and cover the failure path.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
