@@ -498,6 +498,34 @@
                 (is (some #(= :session/prompt-finish (:event-type %)) entries))
                 (is (= ["user" "assistant"] roles))))))))))
 
+(deftest start-tui-runtime-uses-nullable-deterministic-mode-on-public-tui-path-test
+  (app-test-support/with-session-state-restore
+    (fn []
+      (with-redefs-fn (main-bootstrap-stub-bindings)
+        (fn []
+          (kernel/clear-event-log!)
+          (with-redefs [app-runtime/nullable-execution-mode (fn [] "deterministic")]
+            (let [prompt "echo through public nullable tui path"
+                  result (app-runtime/start-tui-runtime!
+                          (fn [run-agent-fn _opts]
+                            (let [queue (java.util.concurrent.LinkedBlockingQueue.)]
+                              (run-agent-fn prompt queue)
+                              (.poll queue 2000 java.util.concurrent.TimeUnit/MILLISECONDS)))
+                          :ignored {} {})
+                  ctx     (:ctx @app-runtime/session-state)
+                  sid     (-> @app-runtime/session-state :ctx ss/list-context-sessions-in first :session-id)
+                  entries (kernel/event-log-entries)
+                  texts   (->> (persist/all-entries-in ctx sid)
+                               (filter #(= :message (:kind %)))
+                               (map #(get-in % [:data :message :content 0 :text]))
+                               vec)]
+              (is (= :done (:kind result)))
+              (is (= "assistant" (get-in result [:result :role])))
+              (is (= prompt (get-in result [:result :content 0 :text])))
+              (is (some #(= :session/prompt-record-response (:event-type %)) entries))
+              (is (= [prompt prompt] texts)
+                  "nullable deterministic mode echoes the submitted user text through start-tui-runtime!"))))))))
+
 (deftest agent-messages->tui-resume-state-rehydrates-tool-rows-test
   (let [messages [{:role "user"
                    :content [{:type :text :text "read file"}]}

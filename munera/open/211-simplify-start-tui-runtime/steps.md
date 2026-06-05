@@ -47,4 +47,4 @@
 
 ## Review follow-ups
 
-- [ ] TT1 Add a public-path characterization test for `start-tui-runtime!` with nullable deterministic execution mode enabled, exercising the captured TUI `run-agent-fn` without redefining the turn executor and asserting the assistant response echoes the user text.
+- [x] TT1 Add a public-path characterization test for `start-tui-runtime!` with nullable deterministic execution mode enabled, exercising the captured TUI `run-agent-fn` without redefining the turn executor and asserting the assistant response echoes the user text.
