@@ -247,6 +247,31 @@
            (is (= {:type :map
                    :fields {:input {:from {:step "select-and-create" :yield :text}}}}
                   (:prompt-string step)))))
+       (testing "gate steps judge their own final replies with pass-status-routing (TT3)"
+         (doseq [[step step-name allowed-statuses]
+                 [[clean-baseline-step
+                   "clean-baseline"
+                   ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]]
+                  [coverage-review-step
+                   "coverage-review"
+                   ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]]
+                  [coverage-disposition-step
+                   "coverage-disposition"
+                   ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]]
+                  [coverage-fix-step
+                   "coverage-fix"
+                   ["REVIEW_COMPLETE"]]
+                  [diff-gate-step
+                   "diff-gate"
+                   ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]]]]
+           (is (= {:type :invoke
+                   :operation "workflow/pass-status-routing"
+                   :args {:text {:from {:step step-name
+                                        :output :final-llm-reply}}
+                          :allowed-statuses allowed-statuses}}
+                  (:judge step))
+               (str step-name
+                    " routes only from its own final LLM reply with intended allowed statuses"))))
        (testing "select-and-create prompt preserves task-209 selection and baseline contracts"
          (is (.contains select-text "munera_task_path:"))
          (is (.contains select-text "inherited session worktree"))
