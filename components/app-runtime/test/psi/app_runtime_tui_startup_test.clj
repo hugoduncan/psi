@@ -263,6 +263,25 @@
                      ((:on-interrupt-fn! opts) {})))
               (is (= [] (:follow-up-messages (ss/get-session-data-in ctx session-id)))))))))))
 
+(deftest start-tui-runtime-enables-session-tree-command-through-tui-dispatch-test
+  ;; Characterizes the TUI-only /tree command option through public startup opts.
+  (app-test-support/with-session-state-restore
+    (fn []
+      (with-redefs-fn (merge (app-test-support/bootstrap-stub-bindings)
+                             {#'app-runtime/resolve-model (fn [_] app-test-support/test-ai-model)
+                              #'ext/discover-extension-paths (fn [& _] [])})
+        (fn []
+          (let [captured-opts* (atom nil)]
+            (is (= :ok (app-runtime/start-tui-runtime!
+                        (fn [_run-agent-fn opts]
+                          (reset! captured-opts* opts)
+                          :ok)
+                        :ignored {} {})))
+            (let [tree-result ((:dispatch-fn @captured-opts*) "/tree")]
+              (is (= {:type :tree-open} tree-result))
+              (is (not= "[/tree is only available in TUI mode (--tui)]"
+                        (:message tree-result))))))))))
+
 (deftest start-tui-runtime-completes-pending-login-from-auth-code-input-test
   ;; Characterizes the public TUI pending-login handoff: /login command dispatch
   ;; stores pending login, then run-agent-fn consumes the next input as auth code.

@@ -150,3 +150,8 @@ PASS_STATUS: REVIEW_COMPLETE
 Verification during review: `bb clojure:test:scry --namespace psi.app-runtime-tui-startup-test` → 7/53 green; `bb clojure:test:scry --namespace psi.app-runtime-test` → 32/128 green; `bb lint` → 0 errors/0 warnings (one pre-existing info).
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+
+2026-06-05 test-review follow-up TT12 executed: extended `components/app-runtime/test/psi/app_runtime_tui_startup_test.clj` with `start-tui-runtime-enables-session-tree-command-through-tui-dispatch-test`. The test drives public `start-tui-runtime!`, captures real TUI opts, sends `/tree` through the captured `:dispatch-fn`, and asserts the TUI command surface returns `{:type :tree-open}` rather than the CLI-only unsupported message. This makes dropping or falseing `:supports-session-tree? true` in the TUI command option assembly fail through public startup. Verification: `clj-paren-repair components/app-runtime/test/psi/app_runtime_tui_startup_test.clj` success; `bb clojure:test:scry --namespace psi.app-runtime-tui-startup-test` → 8 tests, 56 assertions, 0 failures/errors; `bb clojure:test:scry --namespace psi.app-runtime-test` → 32 tests, 128 assertions, 0 failures/errors; `bb clojure:test:unit` → exit 0; `bb lint` → 0 errors, 0 warnings (one pre-existing info); `bb commit-check:file-lengths` → exit 0.
+
+PASS_STATUS: REVIEW_COMPLETE
