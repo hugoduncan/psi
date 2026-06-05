@@ -152,3 +152,12 @@ PASS_STATUS: REVIEW_COMPLETE
 Reviewed the implementation after IR4 against `design.md`, `plan.md`, `steps.md`, `.psi/workflows/reduce-incidental-complexity.edn`, lifecycle delegate workflows, workflow grammar docs, `task_209_workflow_definitions_test.clj`, `doc/workflows.md`, and `CHANGELOG.md`. Focused workflow-definition tests are green (`clojure -M:test --focus psi.workflow-loader.task-209-workflow-definitions-test` — 3 tests / 174 assertions). Found one new actionable issue (**IR5**): the `CHANGELOG.md` Unreleased `Added` entry for `reduce-incidental-complexity` still says the workflow "drives it through the full `task-lifecycle`", which was true before this task but now contradicts the implemented explicit design/plan/test-net/diff-gate/implementation/review topology and the newer `Changed` entry. This is user-facing documentation drift in the same changelog section and should be reconciled before closure.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## 2026-06-05 — Implementation review follow-up IR5
+
+Completed IR5. Reconciled the `CHANGELOG.md` Unreleased `Added` entry for `reduce-incidental-complexity` so it no longer says target-present runs drive through the opaque full `task-lifecycle`. The entry now matches the implemented explicit-phase topology: design/plan, characterization-test-net, diff-gate, simplification, and review phases in the invoking session's current worktree. Marked IR5 checked in `steps.md`.
+
+Verification:
+- `git diff -- CHANGELOG.md munera/open/212-incidental-simplification-test-net-gate/steps.md munera/open/212-incidental-simplification-test-net-gate/implementation.md` — reviewed; changelog/task-artifact-only change.
+
+PASS_STATUS: REVIEW_COMPLETE
