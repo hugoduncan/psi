@@ -39,3 +39,9 @@ PASS_STATUS: ACTIONABLE_FEEDBACK
 Completed PA1–PA4 by refining `plan.md` and `steps.md` only. Clarified no-target routing stays at the `select-and-create` boundary (`PASS_STATUS: ACTIONABLE_FEEDBACK` → normalized `"REPEAT"` → `:done`) and must not run the target-present terminal summary. Clarified infeasible characterization is distinguished from fixable coverage gaps by an explicit task-artifact marker (`CHARACTERIZATION_STATUS: INFEASIBLE` vs `CHARACTERIZATION_STATUS: FIXABLE_GAPS`) and routes to terminal stop rather than coverage-fix. Specified the pre-characterization baseline artifact as task-local `characterization-baseline.edn` with HEAD/status/target-source paths/classified pre-existing task-artifact-or-doc dirt, and required diff-gate comparison of committed changes since recorded baseline HEAD plus current uncommitted status/diff. Clarified raw prompt `PASS_STATUS` tokens versus normalized EDN `:on` outcomes (`"DONE"`/`"REPEAT"`). Marked PA1–PA4 checked in `steps.md`.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## 2026-06-05 — Plan inconsistency review
+
+Reviewed `plan.md` and `steps.md` for inconsistencies against `design.md`, `design-steps.md`, prior implementation notes, `.psi/workflows/reduce-incidental-complexity.edn`, lifecycle delegate workflows, workflow grammar/docs, task-209 workflow tests, and `doc/workflows.md`. No new actionable inconsistency found. The target-present sequence, no-target direct completion, raw `PASS_STATUS` vs normalized route vocabulary, clean-baseline precondition, `characterization-baseline.edn` contract, coverage disposition, diff-gate placement, current-worktree inheritance, tests, docs, and changelog slices are mutually consistent after PA1–PA4.
+
+PASS_STATUS: REVIEW_COMPLETE
