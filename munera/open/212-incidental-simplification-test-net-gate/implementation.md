@@ -269,3 +269,9 @@ Additional verification before commit:
 - `bb lint` — 0 errors / 0 warnings (one pre-existing info).
 - `bb fmt:check` — green.
 - `bb commit-check:file-lengths` — green.
+
+## 2026-06-05 — Test review
+
+Reviewed task tests after TT5 using `.psi/skills/task-test-review/SKILL.md` against `design.md`, `plan.md`, `steps.md`, `.psi/workflows/reduce-incidental-complexity.edn`, `review-task-implementation.edn`, `review-step.edn`, workflow grammar/runtime IR docs, workflow test support, `task_209_workflow_definitions_test.clj`, `workflow_definitions_test.clj`, `doc/workflows.md`, and `CHANGELOG.md`. No new actionable test issue found. Focused task-209 workflow definitions remain green (3 tests / 188 assertions), broader workflow-definitions remain green (11 tests / 159 assertions), and `reduce-incidental-complexity` loads then validates through the target IR compiler.
+
+PASS_STATUS: REVIEW_COMPLETE
