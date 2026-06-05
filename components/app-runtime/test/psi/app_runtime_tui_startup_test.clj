@@ -315,6 +315,63 @@
               (is (not= "[/tree is only available in TUI mode (--tui)]"
                         (:message tree-result))))))))))
 
+(deftest start-tui-runtime-dispatches-tui-only-frontend-action-commands-test
+  ;; Characterizes /model, /thinking, and /resume through the public TUI
+  ;; dispatch callback, proving they launch frontend actions instead of plain
+  ;; command-dispatch text/resume results.
+  (test-support/with-temp-session-root
+    (fn [session-root]
+      (app-test-support/with-session-state-restore
+        (fn []
+          (with-redefs-fn (merge (app-test-support/bootstrap-stub-bindings)
+                                 {#'app-runtime/resolve-model (fn [_] app-test-support/test-ai-model)
+                                  #'ext/discover-extension-paths (fn [& _] [])})
+            (fn []
+              (let [captured-opts* (atom nil)]
+                (is (= :ok (app-runtime/start-tui-runtime!
+                            (fn [_run-agent-fn opts]
+                              (reset! captured-opts* opts)
+                              :ok)
+                            :ignored {} {} {:session-root session-root})))
+                (let [opts          @captured-opts*
+                      ctx           (:ctx @app-runtime/session-state)
+                      session-id    (:focus-session-id opts)
+                      worktree-path (ss/session-worktree-path-in ctx session-id)
+                      session-dir   (journal-store/session-dir-for session-root worktree-path)
+                      resume-file   (journal-store/new-session-file-path session-dir "tt15-resume")
+                      resume-path   (.getAbsolutePath resume-file)]
+                  (journal-store/flush-journal!
+                   resume-file "tt15-resume" worktree-path nil
+                   [(persist/session-info-entry "TT15 resumable")
+                    (persist/message-entry {:role "user"
+                                            :content [{:type :text :text "resume me"}]
+                                            :timestamp (java.time.Instant/now)})])
+                  (let [model-result    ((:dispatch-fn opts) "/model")
+                        thinking-result ((:dispatch-fn opts) "/thinking")
+                        resume-result   ((:dispatch-fn opts) "/resume")
+                        model-action    (:ui/action model-result)
+                        thinking-action (:ui/action thinking-result)
+                        resume-action   (:ui/action resume-result)]
+                    (is (= :frontend-action (:type model-result)))
+                    (is (= :select-model (:ui/action-id model-action)))
+                    (is (= :set-model (get-in model-action [:ui/on-submit :submit/kind])))
+                    (is (some #(= {:provider "openai" :id "gpt-5.3-codex"}
+                                  (:ui.item/value %))
+                              (:ui/items model-action)))
+                    (is (= :frontend-action (:type thinking-result)))
+                    (is (= :select-thinking-level (:ui/action-id thinking-action)))
+                    (is (= :set-thinking-level
+                           (get-in thinking-action [:ui/on-submit :submit/kind])))
+                    (is (= ["off" "minimal" "low" "medium" "high" "xhigh"]
+                           (mapv :ui.item/value (:ui/items thinking-action))))
+                    (is (= :frontend-action (:type resume-result)))
+                    (is (= :select-resume-session (:ui/action-id resume-action)))
+                    (is (= :resume-session-path
+                           (get-in resume-action [:ui/on-submit :submit/kind])))
+                    (is (some #(and (= resume-path (:ui.item/value %))
+                                    (= "TT15 resumable" (:ui.item/label %)))
+                              (:ui/items resume-action)))))))))))))
+
 (deftest start-tui-runtime-does-not-leak-provider-when-option-assembly-throws-test
   ;; Provider installation starts only after synchronous TUI option assembly has
   ;; completed, so an assembly failure cannot leave an attached TUI provider.
