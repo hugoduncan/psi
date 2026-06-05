@@ -13,7 +13,7 @@ This task is intentionally authored autonomously: the target, evidence, baseline
 - Arity: `5`
 - File: `components/app-runtime/src/psi/app_runtime.clj`
 - Line range: `603`–`705`
-- Unique metric key: `(psi.app-runtime, start-tui-runtime!, 5, 603)`
+- Baseline selector metric key: `(psi.app-runtime, start-tui-runtime!, 5, 603)`
 
 ## Selection evidence
 
@@ -118,11 +118,18 @@ bb gordian local --json > /tmp/after-local.json
 
 Compare `/tmp/after-local.json` against the stored authoritative baseline `munera/open/211-simplify-start-tui-runtime/before-local.json`.
 
-Define each unit key as `(ns, var, arity, line)`. Define the metric-derived touched set as every unit whose recomputed `lcc-total` changed between the baseline and the after run:
+The selector's full metric key is `(ns, var, arity, line)`. For before/after comparison, reconcile rows as follows so harmless line movement during a refactor does not create an artificial delete/add pair:
+
+1. Define a logical unit key as `(file, ns, var, arity)`.
+2. Pair before/after rows by logical unit key only when that logical key has exactly one row in the baseline and exactly one row in the after run. For such paired rows, the baseline `line` remains provenance, and the after row may have a different `line`.
+3. Any row not paired by logical key is compared by the selector's full metric key `(ns, var, arity, line)`. This preserves line-based disambiguation for duplicate logical units, including null-arity method-style units elsewhere in the codebase.
+4. Added rows have `before.lcc-total = 0`; deleted rows have `after.lcc-total = 0`.
+
+Define the metric-derived touched set as every reconciled row whose recomputed `lcc-total` changed between the baseline and the after run:
 
 `{u | before(u) != after(u)}`
 
-This set is computed from the metric, not from diffed files. It deliberately includes callers whose dependency or working-set burden changes even if their source was not edited.
+This set is computed from the metric, not from diffed files. It deliberately includes callers whose dependency or working-set burden changes even if their source was not edited, and it includes added or deleted helpers through the zero-on-missing rule.
 
 Acceptance: summing `lcc-total` over this metric-derived touched set, the after total is strictly less than the before total:
 
@@ -140,9 +147,9 @@ The command must pass with exit code `0`. The `--fail-on` flag is required; bare
 
 ### A4 — target unit burden decreases
 
-Using the same after `bb gordian local --json` run and the same authoritative `munera/open/211-simplify-start-tui-runtime/before-local.json` baseline, the target unit keyed by `(psi.app-runtime, start-tui-runtime!, 5, 603)` has lower `lcc-total` after the refactor than before.
+Using the same after `bb gordian local --json` run and the same authoritative `munera/open/211-simplify-start-tui-runtime/before-local.json` baseline, the target unit has lower `lcc-total` after the refactor than before.
 
-The line component is part of the unique key, matching the selector's join key and preventing same-var/null-arity collapse elsewhere in the codebase.
+The baseline target is the row keyed by `(psi.app-runtime, start-tui-runtime!, 5, 603)`. The `603` line component is baseline provenance from the selector's join key; implementation does not need to preserve that line number. The after target is re-identified by the unique logical unit key `(components/app-runtime/src/psi/app_runtime.clj, psi.app-runtime, start-tui-runtime!, 5)` in the after run. A4 fails if the after run has no such row or more than one such row, because the target would no longer have one executable comparison identity.
 
 ### A5 — minimal local decomplecting change
 
