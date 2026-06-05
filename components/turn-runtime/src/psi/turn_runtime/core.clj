@@ -360,22 +360,29 @@
                                   exponential-delay-ms
                                   now-ms)))
 
+(defn- emit-retry-updated-progress!
+  [progress-queue session-id]
+  (accum/emit-progress! progress-queue {:event-kind :retry-updated
+                                        :session-id session-id}))
+
 (defn- mark-active-retry!
-  [ctx session-id retry-metadata next-retry-attempt]
+  [ctx session-id retry-metadata next-retry-attempt progress-queue]
   (ss/apply-root-state-update-in!
    ctx
    (ss/session-update session-id #(assoc %
                                          :retry-attempt next-retry-attempt
-                                         :retry retry-metadata))))
+                                         :retry retry-metadata)))
+  (emit-retry-updated-progress! progress-queue session-id))
 
 (defn- clear-active-retry!
-  [ctx session-id]
+  [ctx session-id progress-queue]
   (ss/apply-root-state-update-in!
    ctx
    (ss/session-update session-id #(-> %
                                       (assoc :retry-attempt 0
                                              :retry nil)
-                                      (dissoc :provider-retry-abort-requested?)))))
+                                      (dissoc :provider-retry-abort-requested?))))
+  (emit-retry-updated-progress! progress-queue session-id))
 
 (defn- active-turn-cancelled?
   [ctx session-id]
@@ -532,7 +539,7 @@
                 :retry-attempt retry-attempt
                 :status :succeeded
                 :final? true}))
-            (clear-active-retry! ctx session-id)
+            (clear-active-retry! ctx session-id progress-queue)
             (execution-result ctx session-id prepared-request attempt-data* attempt-result nil))
           (let [{:keys [retryable? error-kind error-message http-status stop-reason] :as error-fields}
                 (provider-error-fields assistant-msg)
@@ -572,12 +579,13 @@
                (= :retry-exhausted failure-reason) (assoc :exhausted? true)))
             (if final?
               (do
-                (clear-active-retry! ctx session-id)
+                (clear-active-retry! ctx session-id progress-queue)
                 (execution-result ctx session-id prepared-request attempt-data* attempt-result retry-outcome))
               (let [next-attempt   (inc retry-attempt)
                     retry-metadata (retry-metadata-for ctx assistant-msg retry-attempt)
                     retry-state    (merge retry-metadata
-                                          {:failed-attempt retry-attempt
+                                          {:active? true
+                                           :failed-attempt retry-attempt
                                            :retry-attempt next-attempt
                                            :error-kind error-kind
                                            :error-message error-message
@@ -600,10 +608,10 @@
                           :error-message error-message
                           :retryable? true}
                    http-status (assoc :http-status http-status)))
-                (mark-active-retry! ctx session-id retry-state next-attempt)
+                (mark-active-retry! ctx session-id retry-state next-attempt progress-queue)
                 (let [cancelled? (sleep-for-retry! ctx session-id (:delay-ms retry-metadata))]
                   (when-not (= false (:provider-retry-sleep? ctx))
-                    (clear-active-retry! ctx session-id))
+                    (clear-active-retry! ctx session-id progress-queue))
                   (if cancelled?
                     (let [retry-outcome (cancelled-retry-outcome turn-id retry-attempt next-attempt
                                                                  max-retries retry-enabled? error-fields)]
