@@ -655,31 +655,30 @@ cyclomatic complexity. The `incidental-complexity-finder` skill encodes this as
 discard false positives. It selects exactly one unit, or reports that none
 qualifies.
 
+The workflow runs entirely in the invoking session's current worktree. The
+caller is responsible for starting it from the intended branch/worktree; the
+workflow does **not** call `work-on`, create a branch, or switch worktrees.
+Workflow child sessions and nested delegated workflows inherit the same session
+worktree.
+
 The workflow has two steps:
 
-1. **select-and-create** (`:session`) — fetches `origin/master`, applies the
-   `incidental-complexity-finder` skill, and **stops early** with no worktree or
-   task if nothing qualifies. Otherwise it creates an isolated worktree via
-   `work-on` off `origin/master`, captures `before-local.json` (per-unit burden
-   baseline) and `before-diagnose.edn` (architectural gate baseline) into the
-   generated task directory, allocates the next Munera task id, writes a
-   **two-phase behaviour-preserving refactor** `design.md`, commits it on the
-   worktree branch, and emits a structured `worktree_path:` / `munera_task_path:`
-   handoff.
-2. **lifecycle-in-worktree** (`:delegate`) — routes that handoff into the
-   `task-lifecycle-in-worktree` wrapper (a three-step
-   `resolve-worktree` → `task-lifecycle` → `summary` adapter, structurally like
-   `review-implementation-in-worktree`), which re-establishes the worktree and
-   drives the generated task through the full design → plan → implement → review
-   lifecycle.
+1. **select-and-create** (`:session`) — confirms the current git context,
+   applies the `incidental-complexity-finder` skill, and **stops early** with no
+   task if nothing qualifies. Otherwise it captures `before-local.json`
+   (per-unit burden baseline) and `before-diagnose.edn` (architectural gate
+   baseline) into the generated task directory, allocates the next Munera task
+   id in the current worktree, writes a **two-phase behaviour-preserving
+   refactor** `design.md`, commits it on the current branch, and emits a
+   structured `munera_task_path:` handoff.
+2. **lifecycle** (`:delegate`) — delegates directly to `task-lifecycle`, using
+   the generated handoff and inherited worktree, to drive the generated task
+   through the full design → plan → implement → review lifecycle.
 
-Because the workflow grammar has no conditional/skip step, the `:delegate`
-always runs even on an early-stop (no-target) handoff. The wrapper handles this
-at the prompt level: when the handoff carries no `worktree_path:` /
-`munera_task_path:`, `resolve-worktree` emits a `NO_TARGET` sentinel (without
-calling `work-on`) and the `summary` step detects it and reports a clean
-"no target this run; nothing done" result instead of inspecting a nonexistent
-task.
+The first step uses a small judge to route no-target runs directly to workflow
+completion. When the selection output contains no real `munera_task_path:` line,
+the lifecycle delegate is skipped and the run ends after reporting that no
+qualifying target was found.
 
 Each generated task is a behaviour-preserving refactor: **Phase 0** establishes
 a green characterization-test safety net (gating all refactoring), and

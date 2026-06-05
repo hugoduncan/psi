@@ -1,6 +1,6 @@
 (ns psi.workflow-loader.task-209-workflow-definitions-test
   "Loader/compiler tests for the task-209 incidental-complexity workflows
-   (task-lifecycle-in-worktree and reduce-incidental-complexity).
+   (reduce-incidental-complexity and related lifecycle wrappers).
 
    Split out of workflow-definitions-test (R6) to keep that shared ns under the
    800-line components/ length guard. These tests share a small set of loader
@@ -160,29 +160,20 @@
      (let [steps (get-in definitions ["reduce-incidental-complexity" :steps])
            step-by-name (into {} (map (juxt :name identity) steps))
            select-step (get step-by-name "select-and-create")
-           delegate-step (get step-by-name "lifecycle-in-worktree")
+           delegate-step (get step-by-name "lifecycle")
            select-text (step-template-text select-step)]
-       (testing "is a two-step select-and-create (:session) -> lifecycle-in-worktree (:delegate)"
+       (testing "is a two-step select-and-create (:session) -> lifecycle (:delegate)"
          (is (= 2 (count steps)))
-         (is (= ["select-and-create" "lifecycle-in-worktree"] (mapv :name steps)))
+         (is (= ["select-and-create" "lifecycle"] (mapv :name steps)))
          (is (= [:session :delegate] (mapv :type steps))))
-       (testing "select-and-create :session step carries all five design-named tools + all three design-named skills"
-         ;; TT-J (test review pass 25, task-test-review): the design (Deliverable
-         ;; 2, Step 1, first bullet) names all five step-1 tools verbatim —
-         ;; read, bash (git fetch + bb gordian selection + baseline capture),
-         ;; edit, write (generated design.md task creation), work-on. Lock all
-         ;; five; a regress dropping read/bash/edit/write previously passed green
-         ;; (only work-on was asserted) — the symmetric gap TT-A closed for skills.
-         (is (some #{"read"} (:tools select-step))
-             "select-and-create tools include read")
-         (is (some #{"bash"} (:tools select-step))
-             "select-and-create tools include bash")
-         (is (some #{"edit"} (:tools select-step))
-             "select-and-create tools include edit")
-         (is (some #{"write"} (:tools select-step))
-             "select-and-create tools include write")
-         (is (some #{"work-on"} (:tools select-step))
-             "select-and-create tools include work-on")
+       (testing "select-and-create :session step carries the current-worktree tools + all three design-named skills"
+         ;; The workflow now runs entirely in the invoking session's current
+         ;; worktree. It must not expose `work-on` to the selector step; child
+         ;; and delegated workflow sessions inherit the parent's worktree-path.
+         (is (= ["read" "bash" "edit" "write"] (:tools select-step))
+             "select-and-create tools are read/bash/edit/write only")
+         (is (not (some #{"work-on"} (:tools select-step)))
+             "select-and-create tools do not include work-on")
          ;; TT-A (test review pass 18, task-test-review): the design (Deliverable
          ;; 2, Step 1) names three step-1 skills — incidental-complexity-finder
          ;; (selection recipe), gordian (selection methodology), code-shaper
@@ -208,30 +199,32 @@
            (is (= {:from :workflow-input}
                   (get-in tmpl [:vars "input"]))
                "select-and-create wires input to the bare top-level :workflow-input (no :path)")))
-       (testing "lifecycle-in-worktree :delegate targets the wrapper with :input from select-and-create :yield :text"
+       (testing "lifecycle :delegate targets task-lifecycle directly with :input from select-and-create :yield :text"
          (is (= :delegate (:type delegate-step)))
-         (is (= "task-lifecycle-in-worktree" (:target delegate-step)))
+         (is (= "task-lifecycle" (:target delegate-step)))
          (is (= {:type :map
                  :fields {:input {:from {:step "select-and-create" :yield :text}}}}
                 (:prompt-string delegate-step))))
-       ;; TR13 (pass 11, test-shaper): lock the delegate's :context — the second
-       ;; source propagates the step-1 handoff into the delegated wrapper
-       ;; (companion to :input, Locked decision 11). The prior :type/:target/
-       ;; :prompt-string-only locks let a regress dropping it pass green.
-       (testing "lifecycle-in-worktree :delegate :context propagates workflow-original + the select-and-create handoff yield (TR13)"
+       ;; TR13: lock the delegate's :context — the second source propagates the
+       ;; step-1 handoff into the delegated task-lifecycle. The prior
+       ;; :type/:target/:prompt-string-only locks let a regress dropping it pass
+       ;; green.
+       (testing "lifecycle :delegate :context propagates workflow-original + the select-and-create handoff yield (TR13)"
          (is (= [{:type :source :from :workflow-original}
                  {:type :source :from {:step "select-and-create" :yield :text}}]
                 (:context delegate-step))))
-       (testing "select-and-create prompt emits the worktree_path:/munera_task_path: handoff fields"
-         (is (.contains select-text "worktree_path:")
-             "step-1 prompt emits worktree_path: handoff field")
+       (testing "select-and-create prompt emits the munera_task_path handoff and treats worktree_path as informational only"
          (is (.contains select-text "munera_task_path:")
-             "step-1 prompt emits munera_task_path: handoff field"))
+             "step-1 prompt emits munera_task_path: handoff field")
+         (is (.contains select-text "inherited session worktree")
+             "step-1 prompt states downstream execution relies on inherited session worktree")
+         (is (.contains select-text "worktree_path:` as informational context")
+             "step-1 prompt allows worktree_path only as informational context"))
        (testing "select-and-create prompt encodes the early-stop-on-no-target intent"
          (is (re-find #"(?i)no unit qualif" select-text)
              "step-1 prompt encodes early-stop when no unit qualifies")
-         (is (.contains select-text "Do NOT create a worktree")
-             "step-1 prompt forbids creating a worktree on early stop")
+         (is (.contains select-text "Do NOT create or switch worktrees")
+             "step-1 prompt forbids creating or switching worktrees on early stop")
          (is (.contains select-text "Do NOT create a task")
              "step-1 prompt forbids creating a task on early stop"))
        (testing "select-and-create prompt embeds the enforcing gate flags + both baselines"
@@ -315,22 +308,21 @@
          (is (.contains select-text "Do NOT push or open a PR")
              "step-1 prompt forbids pushing or opening a PR")
          (is (.contains select-text
-                        "ends with a completed, reviewed task on the local worktree branch")
-             "step-1 prompt states the local-worktree-branch endpoint (no push/PR)"))
-       ;; TT-B (test review pass 19, task-test-review): lock the step-1
-       ;; base-refresh behaviour (design Deliverable 2, Step 1 first bullet) —
-       ;; `git fetch origin master` + treat origin/master as the authoritative
-       ;; base + base the worktree on origin/master. Previously unlocked: a
-       ;; regress dropping the fetch or rebasing off stale local master passed
-       ;; green.
-       (testing "select-and-create prompt locks the origin/master base-refresh (TT-B)"
-         (is (.contains select-text "git fetch origin master")
-             "step-1 prompt refreshes the base with git fetch origin master")
-         (is (.contains select-text
-                        "Treat `origin/master` as the authoritative base")
-             "step-1 prompt treats origin/master as the authoritative base")
-         (is (.contains select-text "Base the worktree on `origin/master`")
-             "step-1 prompt bases the worktree on origin/master"))
+                        "ends with a completed, reviewed task on the current local branch")
+             "step-1 prompt states the current-local-branch endpoint (no push/PR)"))
+       ;; TT-B replacement: lock the current-worktree context. The workflow no
+       ;; longer creates or switches to an origin/master worktree; callers must
+       ;; invoke it from the intended branch/worktree and child sessions inherit
+       ;; that worktree-path.
+       (testing "select-and-create prompt locks current-worktree execution (TT-B replacement)"
+         (is (.contains select-text "git status --short --branch")
+             "step-1 prompt checks the current branch/worktree context")
+         (is (.contains select-text "treat the current branch/worktree as the intended refactor location")
+             "step-1 prompt treats the current worktree as authoritative for the run")
+         (is (.contains select-text "Do NOT call `work-on`")
+             "step-1 prompt forbids calling work-on")
+         (is (.contains select-text "Do NOT create or switch worktrees")
+             "step-1 prompt forbids creating or switching worktrees"))
        ;; TT-C (test review pass 19, task-test-review): lock the baseline
        ;; *capture commands*, not just the output filenames — before-local.json
        ;; <- `bb gordian local --json` (bare) and before-diagnose.edn <-
@@ -365,66 +357,43 @@
          (is (.contains select-text
                         "the set is computed from the metric, not from the diff/touched files")
              "step-1 prompt derives the A2 touched set from the metric, not the diff/touched files"))
-       ;; TT-H (test review pass 23, task-test-review): lock the step-1
-       ;; worktree-scoped task creation behaviour (the P3 resolution). Design
-       ;; Deliverable 2 Step 1 + resolved P3: NNN is allocated by scanning the
-       ;; WORKTREE's open/ ∪ closed/ (not the outer checkout's, so the id does
-       ;; not collide), and the create + commit happen on the worktree branch so
-       ;; the emitted munera_task_path: resolves for the delegated lifecycle.
-       ;; No existing test anchors it: a regress to outer-checkout-scoped id
-       ;; allocation (reintroducing P3) or committing on the wrong branch (so
-       ;; munera_task_path: does not resolve under the delegated work-on) passed
-       ;; green. Same TT-class symmetry gap as TT-B/TT-G.
-       (testing "select-and-create prompt locks the worktree-scoped task creation (TT-H)"
-         (is (.contains select-text "scanning the WORKTREE's")
-             "step-1 prompt allocates NNN by scanning the worktree's task set")
-         (is (.contains select-text
-                        "so the id does not collide with the outer checkout's open tasks")
-             "step-1 prompt states worktree-scoped allocation avoids outer-checkout collision (P3)")
-         (is (.contains select-text "Commit the task creation ON THE WORKTREE BRANCH")
-             "step-1 prompt commits the task creation on the worktree branch so munera_task_path: resolves"))))))
+       ;; TT-H replacement: lock current-worktree task creation. Task ids,
+       ;; baselines, and task-creation commits are scoped to the invoking
+       ;; session's current worktree/branch; no outer-vs-inner worktree handoff
+       ;; remains.
+       (testing "select-and-create prompt locks current-worktree task creation (TT-H replacement)"
+         (is (.contains select-text "scanning the CURRENT WORKTREE's")
+             "step-1 prompt allocates NNN by scanning the current worktree's task set")
+         (is (.contains select-text "Commit the task creation on the current branch")
+             "step-1 prompt commits task creation on the current branch")
+         (is (.contains select-text "delegated lifecycle child sessions inherit the same worktree")
+             "step-1 prompt relies on inherited worktree-path for lifecycle resolution"))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Reference-chain resolution (TT-K)
 
-;; TT-K (test review pass 26, task-test-review): the isolated tests above assert
-;; only delegate :target *string equality* while loading a single EDN — the
-;; loader does NOT validate delegate targets at load time, so those asserts give
-;; no resolution guarantee. Co-load the task-209 delegate set
-;; (reduce-incidental-complexity -> task-lifecycle-in-worktree -> task-lifecycle)
-;; and assert each delegate :target is a key in the combined definitions — the
-;; references-resolve half of the design acceptance the string-equality asserts
-;; cannot give. Mirrors review-workflow-set-loads-together-test. A regress
-;; renaming the wrapper file/:name while an upstream :target string stays stale
-;; would break the live chain yet pass the isolated tests; this fails green.
+;; TT-K: the isolated tests above assert only delegate :target *string equality*
+;; while loading a single EDN — the loader does NOT validate delegate targets at
+;; load time, so those asserts give no resolution guarantee. Co-load the direct
+;; delegate set (reduce-incidental-complexity -> task-lifecycle) and assert the
+;; target is a key in the combined definitions.
 (deftest task-209-workflow-set-loads-together-test
   (with-workflow-dir
     {"reduce-incidental-complexity.edn"
      (slurp-workflow-file "reduce-incidental-complexity.edn")
-     "task-lifecycle-in-worktree.edn"
-     (slurp-workflow-file "task-lifecycle-in-worktree.edn")
      "task-lifecycle.edn"
      (slurp-workflow-file "task-lifecycle.edn")}
     (fn [{:keys [definitions errors]}]
       (testing "the task-209 delegate set loads together without compilation errors"
         (is (empty? errors))
         (is (contains? definitions "reduce-incidental-complexity"))
-        (is (contains? definitions "task-lifecycle-in-worktree"))
         (is (contains? definitions "task-lifecycle")))
-      (testing "each task-209 delegate :target resolves to a registered workflow"
+      (testing "the reduce-incidental-complexity delegate :target resolves to a registered workflow"
         (let [outer-target (->> (get-in definitions
                                         ["reduce-incidental-complexity" :steps])
-                                (some #(when (= "lifecycle-in-worktree" (:name %))
-                                         (:target %))))
-              wrapper-target (->> (get-in definitions
-                                          ["task-lifecycle-in-worktree" :steps])
-                                  (some #(when (= "lifecycle" (:name %))
-                                           (:target %))))]
-          (is (= "task-lifecycle-in-worktree" outer-target)
-              "reduce-incidental-complexity delegates to task-lifecycle-in-worktree")
+                                (some #(when (= "lifecycle" (:name %))
+                                         (:target %))))]
+          (is (= "task-lifecycle" outer-target)
+              "reduce-incidental-complexity delegates directly to task-lifecycle")
           (is (contains? definitions outer-target)
-              "the outer delegate :target resolves to a registered workflow")
-          (is (= "task-lifecycle" wrapper-target)
-              "task-lifecycle-in-worktree delegates to task-lifecycle")
-          (is (contains? definitions wrapper-target)
-              "the wrapper delegate :target resolves to a registered workflow"))))))
+              "the outer delegate :target resolves to a registered workflow"))))))
