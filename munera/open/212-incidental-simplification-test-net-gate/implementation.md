@@ -187,3 +187,9 @@ Verification:
 - `bb commit-check:file-lengths` — green.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## 2026-06-05 — Test review
+
+Reviewed task tests after TT1 against `design.md`, `plan.md`, `steps.md`, `.psi/workflows/reduce-incidental-complexity.edn`, `review-task-implementation.edn`, `review-step.edn`, workflow test support, `workflow_definitions_test.clj`, and `task_209_workflow_definitions_test.clj`. Focused workflow-definition tests remain green (`clojure -M:test --focus psi.workflow-loader.task-209-workflow-definitions-test` — 3 tests / 174 assertions). Found one new actionable test issue (**TT2**): the task-212 tests prove `reduce-incidental-complexity` delegates to `review-task-implementation`, but they do not lock that the downstream implementation-review workflow still includes the `review-task-tests` delegate using the `task-test-review` skill. A regression that removed or retargeted that test-review pass would keep the focused explicit-phase workflow tests green while weakening the final post-implementation test-quality gate.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
