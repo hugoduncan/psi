@@ -875,3 +875,43 @@ No follow-up steps added (nothing actionable). The sole open item remains the hu
 A2-redefinition ratification gate (not a docs concern; already tracked).
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Task-implementation review (ψ) — code-shaper lens, REVIEW_COMPLETE
+
+Applied the `code-shaper` lens (simple ∧ consistent ∧ robust) to the committed
+production change (`components/app-runtime/src/psi/app_runtime/nrepl_runtime.clj`,
+working tree clean). `clj-kondo` on the target ns → 0 errors / 0 warnings.
+
+**Verdict: the refactor is well-shaped — no NEW actionable code-shaper finding.**
+
+- **simple — PASS.** `route-stdout-to-stderr [thunk]` (interop routing seam),
+  `start-server-quietly [port]` (nREPL-start mechanism: resolve + quiet), and
+  `active-session-id-in-session-state` are each single-responsibility, locally
+  comprehensible, well-named. `start-nrepl!` now reads as single-level
+  orchestration (atom reset → gated publish → `.nrepl-port` write → stderr notice →
+  return); the interop ↔ orchestration abstraction oscillation the task targeted is
+  gone.
+- **consistent — PASS.** `start-nrepl!`/`stop-nrepl!` share arg order
+  `[session-state-atom nrepl-runtime-atom default-session-id-fn …]`; data shapes
+  ({:host :port :endpoint}) and idioms (`when-let` gating, `requiring-resolve`)
+  uniform across the pair.
+- **robust — PASS for the change.** Behaviour preserved (acceptance net green);
+  seams are orthogonal; the routing invariant (restore `System/out` in `finally`)
+  is enforced structurally.
+
+**Residual (pre-existing, already tracked — NOT re-flagged to avoid duplication):**
+the gated session-publication block `(when-let [ctx] (when-let [session-id]
+(set-nrepl-runtime-in! …)))`, the `{:host :port :endpoint}` endpoint map, and the
+`(java.io.File. ".nrepl-port")` filename literal are each duplicated across
+`start-nrepl!` and `stop-nrepl!` — a consistency/drift-coupling residual a reader
+must verify by string-matching. This is the same duplication already captured and
+dispositioned in this trail: the endpoint-map dedup is the open Optional follow-up
+(DECLINED — pre-existing, out of blast radius, measured counterproductive on the
+Gordian metric, variant B `6.1276`); the cross-function gating-pattern duplication
+was explicitly judged "same category, would duplicate" in the implementation
+re-review. No new step added (instruction: avoid duplicating existing notes/steps).
+
+The only open item remains the human A2-redefinition ratification gate (not a
+code-quality concern; already tracked). No production/test/doc change this pass.
+
+PASS_STATUS: REVIEW_COMPLETE
