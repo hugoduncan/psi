@@ -304,3 +304,44 @@ Tests added to `components/app-runtime/test/psi/app_runtime_nrepl_test.clj`:
 - **Existing tests untouched** (no weakening); only additive.
 
 Lint clean (`clj-kondo` 0/0). Result: REVIEW_COMPLETE.
+
+## Phase 0 — characterization-net gate RE-review (ψ)
+
+Re-reviewed the authored net against the target's externally-observable behaviour
+(judged on `{nominal, edge, boundary}` per `testing-without-mocks`: assert
+state/outputs, never interactions). HEAD `06ce9373c`, working tree clean.
+
+Ran the net against UNMODIFIED production code:
+`bb clojure:test:scry --namespace psi.app-runtime-nrepl-test` → **GREEN**
+(7 tests, 28 assertions, 0 fail/0 error).
+
+### Surface ↔ coverage (all observable surfaces of `start-nrepl!`/4)
+
+- Returns server map / bound port (nominal) — all start tests assert `:port`.
+- `nrepl-runtime-atom` reset to `{:host :port :endpoint}` (nominal) — EQL
+  reflection test reads the atom via the session resolver.
+- Session `:nrepl-runtime` publication with the BOUND (random) port, not the
+  requested `0` (edge) — `start-nrepl-publishes-bound-port-into-session-runtime-test`.
+- Publication gate negative — ctx present, no active session id (edge) —
+  `start-nrepl-skips-session-publication-without-active-session-test`; no-ctx
+  outer-gate path exercised by the existing EQL test (`session-state` has no `:ctx`).
+- `.nrepl-port` written with exactly the bound port (boundary) +
+  `stop-nrepl!` match-port deletion (edge) —
+  `nrepl-port-file-records-bound-port-and-stop-deletes-on-match-test`.
+- `stop-nrepl!` non-match preservation (edge) —
+  `stop-nrepl-preserves-nrepl-port-file-when-contents-differ-test`.
+- Startup chatter (`*out*` + `System/out`) routed to stderr not stdout (boundary) —
+  `start-nrepl-redirects-startup-chatter-to-stderr-test`.
+- stderr connection notice emitted, absent from stdout (boundary), via REAL
+  captured streams — `start-nrepl-emits-connection-notice-to-stderr-not-stdout-test`.
+
+### Judgement
+
+All four formerly-FIXABLE gaps are now covered; nominal/edge/boundary all present.
+`deleteOnExit` correctly excluded (JVM-exit interaction, not mid-test-observable).
+New file/stream tests prefer real seams over `with-redefs`. The net would catch a
+regression in the three stated refactor risks (stdout routing, `.nrepl-port` side
+effects, gated publication). Coverage is SUFFICIENT and GREEN against unmodified
+code — Phase 0 gate PASSES. Phase 1 simplification may proceed.
+
+Result: REVIEW_COMPLETE.
