@@ -109,7 +109,7 @@
 
 (defn create-run
   "Return [state run-id workflow-run] after creating a new canonical workflow run."
-  [state {:keys [run-id workflow-input workflow-original parent-session-id delegating-run-id inherited-defaults] :as opts}]
+  [state {:keys [run-id workflow-input workflow-original parent-session-id delegating-run-id inherited-defaults session-profile-snapshot] :as opts}]
   (let [{:keys [effective-definition source-definition-id]}
         (resolve-effective-definition state opts)
         initial-step-id (workflow-statechart/initial-step-id effective-definition)
@@ -136,6 +136,8 @@
                           (assoc :delegating-run-id delegating-run-id)
                           (contains? opts :inherited-defaults)
                           (assoc :inherited-defaults inherited-defaults)
+                          (contains? opts :session-profile-snapshot)
+                          (assoc :session-profile-snapshot session-profile-snapshot)
                           (contains? opts :workflow-original)
                           (assoc :workflow-original workflow-original))]
     (when-not (workflow-model/valid-workflow-run? run)

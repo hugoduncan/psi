@@ -114,6 +114,12 @@
                        (:model step-config)
                        (assoc :model (:model step-config))
 
+                       (contains? step-config :speed-mode)
+                       (assoc :speed-mode (:speed-mode step-config))
+
+                       (contains? step-config :effort-override)
+                       (assoc :effort-override (:effort-override step-config))
+
                        (:model-fallback step-config)
                        (assoc :model-fallback (:model-fallback step-config))
 

@@ -211,7 +211,50 @@ For the formal grammar, see [`doc/workflow-grammar.md`](workflow-grammar.md).
 For the conceptual explanation, see
 [`doc/workflow-grammar-concepts.md`](workflow-grammar-concepts.md).
 
-## Inherited session defaults are snapshotted at invoke time
+## Session profiles and inherited defaults are snapshotted at invoke time
+
+Workflow steps can request a named session profile with `:session-profile`. The
+name is resolved against the invoking session's effective config at workflow-run
+creation time, then stored in the run's canonical `:session-profile-snapshot`.
+Later user/project config edits do not affect that run's later steps, delegated
+runs, or blocked-run resume.
+
+```edn
+{:name "plan"
+ :type :session
+ :session-profile :planning
+ :thinking-level :high
+ :contributions [{:type :source :from :workflow-input}]}
+
+{:name "build"
+ :type :delegate
+ :target "builder"
+ :session-profile :coding
+ :prompt-string "Build {{input}}"}
+```
+
+Single-step markdown workflows can use frontmatter:
+
+```markdown
+---
+name: planner
+session-profile: planning
+---
+Plan {{input}}.
+```
+
+For profile-supported fields, workflow precedence is:
+
+```text
+explicit step setting > resolved :session-profile setting > inherited workflow-run default > fallback
+```
+
+This task's direct authored workflow overrides remain `:model` and
+`:thinking-level`. Profile-derived `:speed-mode` and `:effort-override` can still
+flow into the effective step config. A delegated step passes only the resolved
+concrete defaults to the child run's narrow `:inherited-defaults`; profile names,
+profile maps, and invalid-profile diagnostics stay in the run's
+`:session-profile-snapshot`.
 
 When a step does not specify its own override, it inherits its default session
 details — model, prompt-mode, tools, skills, thinking-level, speed-mode, and

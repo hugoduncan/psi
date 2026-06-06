@@ -5,6 +5,7 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.tools :as tools]
+   [psi.session-state.state :as ss]
    [psi.workflow-runtime.core]
    [psi.workflow-registry.registry :as workflow-registry]))
 
@@ -163,6 +164,25 @@
       (is (= :concise (:prompt-mode snapshot)))
       (is (= :fast (:speed-mode snapshot)))
       (is (= :xhigh (:effort-override snapshot)))))
+
+  (testing "workflow create-run captures the session-profile snapshot from the invoking session worktree"
+    (let [[ctx session-id] (create-session-context {:persist? false})
+          cwd (ss/session-worktree-path-in ctx session-id)
+          _ (.mkdirs (java.io.File. cwd ".psi"))
+          _ (spit (java.io.File. cwd ".psi/project.edn")
+                  (pr-str {:agent-session {:session-profiles {:coding {:speed-mode :fast}}}}))
+          tool (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
+          result ((:execute tool) {"action" "workflow"
+                                   "op" "create-run"
+                                   "definition" inline-single-step-definition-edn
+                                   "workflow-input" "{:task \"ship it\"}"})
+          parsed (read-string (:content result))
+          run-id (get-in parsed [:psi-tool/workflow :run-id])
+          snapshot (get-in @(:state* ctx) [:workflows :runs run-id :session-profile-snapshot])]
+      (is (false? (:is-error result)))
+      (is (= [:coding] (:valid-profile-names snapshot)))
+      (is (= {:speed-mode :fast}
+             (get-in snapshot [:profiles :coding :settings])))))
 
   (testing "workflow create-run plus execute-run completes an ad-hoc inline workflow"
     (let [[ctx session-id] (create-session-context {:persist? false})

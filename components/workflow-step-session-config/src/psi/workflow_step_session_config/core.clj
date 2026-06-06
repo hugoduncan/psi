@@ -8,6 +8,7 @@
   (:require
    [psi.ai.model-registry :as model-registry]
    [psi.ai.model-selection :as model-selection]
+   [psi.shared-config.session-profiles :as session-profiles]
    [psi.session-state.state :as ss]
    [psi.skill-registry.registry :as skill-registry]
    [psi.skill-registry.root-storage :as skill-storage]
@@ -168,6 +169,53 @@
     :else
     {:model model-spec}))
 
+(defn- step-session-spec
+  [step-def]
+  (case (:type step-def)
+    :delegate (get-in step-def [:delegate :session])
+    (:session nil) (:session step-def)))
+
+(defn- profile-resolution-error
+  [profile-name result]
+  (let [available (:available result)]
+    (case (:error result)
+      :unknown-profile
+      (ex-info (str "Unknown workflow session profile " (pr-str profile-name))
+               {:reason :unknown-session-profile
+                :profile-name profile-name
+                :available-profile-names available})
+
+      :invalid-profile
+      (ex-info (str "Invalid workflow session profile " (pr-str profile-name))
+               {:reason :invalid-session-profile
+                :profile-name profile-name
+                :diagnostics (get-in result [:profile :diagnostics])
+                :available-profile-names available})
+
+      (ex-info (str "Workflow session profile " (pr-str profile-name) " could not be resolved")
+               {:reason (:error result)
+                :profile-name profile-name
+                :available-profile-names available}))))
+
+(defn- resolve-step-profile-settings
+  [workflow-run session-spec]
+  (if-not (contains? session-spec :session-profile)
+    {}
+    (let [profile-name (:session-profile session-spec)
+          snapshot (:session-profile-snapshot workflow-run)
+          profiles (:profiles snapshot)
+          result (session-profiles/find-valid-profile profiles profile-name)]
+      (if (:ok? result)
+        (get-in result [:profile :settings])
+        (throw (profile-resolution-error profile-name result))))))
+
+(defn- first-present
+  [& maps-and-keys]
+  (some (fn [[m k]]
+          (when (contains? m k)
+            (get m k)))
+        (partition 2 maps-and-keys)))
+
 (defn resolve-step-session-config
   "Resolve child session configuration for a workflow step.
 
@@ -221,11 +269,14 @@
         ;; consumers (step override, base-meta override, no-override fallback,
         ;; model-query selection context) see it.
         parent-session-model (:model inherited)
-        session-spec (:session step-def)
+        session-spec (or (step-session-spec step-def) {})
+        profile-settings (resolve-step-profile-settings workflow-run session-spec)
         developer-prompt (or (:system-prompt session-spec)
                              (:system-prompt base-meta))
         step-model-config (when (contains? session-spec :model)
                             (resolved-step-model-config (:model session-spec) parent-session-model))
+        profile-model-config (when (contains? profile-settings :model)
+                               (resolved-step-model-config (:model profile-settings) parent-session-model))
         base-model-config (when (contains? base-meta :model)
                             (resolved-step-model-config (:model base-meta) parent-session-model))
         resolved-model (cond
@@ -234,6 +285,9 @@
 
                          (contains? session-spec :model)
                          nil
+
+                         (contains? profile-model-config :model)
+                         (:model profile-model-config)
 
                          parent-session-model
                          parent-session-model
@@ -244,6 +298,7 @@
                          :else
                          (:model base-meta))
         model-fallback (or (:model-fallback step-model-config)
+                           (:model-fallback profile-model-config)
                            (:model-fallback base-model-config))]
     (cond->
      (merge
@@ -255,21 +310,33 @@
        ;; → inherited default → base-meta → fallback, so the inherited parent
        ;; value dominates a static :workflow-file-meta default exactly as the
        ;; inherited model does (resolved-model cond), not the inverse.
-       :thinking-level (or (:thinking-level session-spec)
-                           (:thinking-level inherited)
-                           (:thinking-level base-meta)
+       :thinking-level (or (first-present session-spec :thinking-level
+                                          profile-settings :thinking-level
+                                          inherited :thinking-level
+                                          base-meta :thinking-level)
                            :off)
        :skills (resolve-step-skills ctx (:skills inherited) (:skills session-spec))
        :model resolved-model
        :prompt-component-selection (:prompt-component-selection session-spec)}
       (resolved-logprob-config session-spec))
 
-      ;; speed-mode/effort-override flow from the inherited defaults into the
-      ;; step's resolved config (the resolver emits neither today — I1/P2).
-      (some? (:speed-mode inherited))
+      ;; speed-mode/effort-override flow from profiles when present, otherwise
+      ;; from inherited defaults. Presence is authoritative for effort because
+      ;; an explicit profile-derived nil means concrete effort clear.
+      (contains? profile-settings :speed-mode)
+      (assoc :speed-mode (:speed-mode profile-settings))
+
+      (and (not (contains? profile-settings :speed-mode))
+           (contains? inherited :speed-mode)
+           (some? (:speed-mode inherited)))
       (assoc :speed-mode (:speed-mode inherited))
 
-      (some? (:effort-override inherited))
+      (contains? profile-settings :effort-override)
+      (assoc :effort-override (:effort-override profile-settings))
+
+      (and (not (contains? profile-settings :effort-override))
+           (contains? inherited :effort-override)
+           (some? (:effort-override inherited)))
       (assoc :effort-override (:effort-override inherited))
 
       (contains? session-spec :temperature)
@@ -315,17 +382,21 @@
    No ctx reads.
 
    The five resolver-emitted inherited keys (`:model :prompt-mode :tool-defs
-   :skills :thinking-level`) come from the effective config. `:speed-mode` and
-   `:effort-override` come from `parent-snapshot` because
-   `resolve-step-session-config` emits neither (resolved I1/P2) — a projection
-   over the effective config alone would silently drop them under delegation.
-   `:model` is the effective config's already `{:provider :id}`-shaped value
-   (resolved P3)."
+   :skills :thinking-level`) come from the effective config. Profile-derived
+   `:speed-mode`/`:effort-override` also come from the effective config when
+   present; otherwise the task-207 fallback keeps sourcing them from the parent
+   snapshot. `:model` is the effective config's already `{:provider :id}`-shaped
+   value (resolved P3)."
   [effective-config parent-snapshot]
-  {:model (:model effective-config)
-   :prompt-mode (:prompt-mode effective-config)
-   :tool-defs (:tool-defs effective-config)
-   :skills (:skills effective-config)
-   :thinking-level (or (:thinking-level effective-config) :off)
-   :speed-mode (:speed-mode parent-snapshot)
-   :effort-override (:effort-override parent-snapshot)})
+  (let [base {:model (:model effective-config)
+              :prompt-mode (:prompt-mode effective-config)
+              :tool-defs (:tool-defs effective-config)
+              :skills (:skills effective-config)
+              :thinking-level (or (:thinking-level effective-config) :off)}]
+    (-> base
+        (assoc :speed-mode (if (contains? effective-config :speed-mode)
+                             (:speed-mode effective-config)
+                             (:speed-mode parent-snapshot)))
+        (assoc :effort-override (if (contains? effective-config :effort-override)
+                                  (:effort-override effective-config)
+                                  (:effort-override parent-snapshot))))))

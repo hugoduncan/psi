@@ -212,13 +212,18 @@
   [cwd]
   (resolve-profiles (effective-profile-definitions cwd)))
 
+(defn- snapshot-profile
+  [profile]
+  (dissoc profile :ignored-keys))
+
 (defn profile-snapshot
   "Build a self-contained snapshot shape for workflow/run consumers.
 
    The snapshot contains only resolved settings and diagnostics. Unknown profile
-   keys from config are omitted except for `:ignored-keys` observability."
+   keys from config are omitted so workflow runs never persist ignored mutable
+   config data."
   [cwd]
-  (let [profiles (effective-profiles cwd)]
+  (let [profiles (update-vals (effective-profiles cwd) snapshot-profile)]
     {:profiles profiles
      :valid-profile-names (->> profiles
                                (keep (fn [[profile-name profile]]

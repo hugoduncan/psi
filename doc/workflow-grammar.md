@@ -143,11 +143,18 @@ yield-field ::= keyword
 
 arg-map ::= {keyword (literal | source-spec)}*
 
-session-config-entry ::= :model model-selection-spec
+session-config-entry ::= :session-profile keyword
+                       | :model model-selection-spec
                        | :tools [tool-id*]
                        | :skills [skill-id*]
+                       | :thinking-level (:off | :minimal | :low | :medium | :high | :xhigh)
                        | :temperature double   ;; optional, range [0.0, 2.0]; absent = provider default
                        | session-config-extension
+
+;; Delegate steps support the same compact :session-profile, :model, and
+;; :thinking-level keys to shape the delegated run's concrete inherited defaults.
+;; Direct authored :speed-mode/:effort-override keys are intentionally not part
+;; of this grammar; they can flow from resolved session profiles.
 
 judge-session-config-entry ::= :model model-selection-spec
                              | :tools [tool-id*]

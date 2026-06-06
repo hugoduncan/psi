@@ -8,6 +8,8 @@
    [clojure.string :as str]
    [com.wsscode.pathom3.connect.operation :as pco]
    [psi.agent-session.workflow-run-retention :as workflow-run-retention]
+   [psi.session-state.state :as session-state]
+   [psi.shared-config.session-profiles :as session-profiles]
    [psi.workflow-runtime.ir :as workflow-ir]
    [psi.workflow-runtime.core :as workflow-runtime]
    [psi.workflow-registry.registry :as workflow-registry]
@@ -43,6 +45,12 @@
   [exec-result final-run]
   (or (some :error (:steps-executed exec-result))
       (terminal-outcome-error-message (:terminal-outcome final-run))))
+
+(defn- session-profile-snapshot
+  [agent-session-ctx session-id]
+  (when session-id
+    (session-profiles/profile-snapshot
+     (session-state/session-worktree-path-in agent-session-ctx session-id))))
 
 (pco/defmutation register-workflow-definition
   "Register a canonical workflow definition into root state."
@@ -96,11 +104,13 @@
     (let [inherited-defaults (when session-id
                                (workflow-step-session-config/resolve-inherited-defaults-snapshot
                                 agent-session-ctx session-id))
+          profile-snapshot (session-profile-snapshot agent-session-ctx session-id)
           [new-state created-run-id workflow-run]
           (workflow-runtime/create-run @(:state* agent-session-ctx)
                                        (cond-> {:definition-id definition-id}
                                          session-id (assoc :parent-session-id session-id)
                                          inherited-defaults (assoc :inherited-defaults inherited-defaults)
+                                         profile-snapshot (assoc :session-profile-snapshot profile-snapshot)
                                          workflow-input (assoc :workflow-input workflow-input)
                                          run-id (assoc :run-id run-id)))]
       (reset! (:state* agent-session-ctx) new-state)

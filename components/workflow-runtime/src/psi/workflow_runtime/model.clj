@@ -195,6 +195,49 @@
    [:speed-mode {:optional true} [:maybe :keyword]]
    [:effort-override {:optional true} [:maybe :keyword]]])
 
+(def session-profile-model-schema
+  [:map
+   [:provider [:or :string :keyword]]
+   [:id :string]
+   [:reasoning {:optional true} :boolean]
+   [:supports-reasoning {:optional true} :boolean]
+   [:display-name {:optional true} :string]
+   [:context-window {:optional true} :int]
+   [:max-output-tokens {:optional true} :int]
+   [:modalities {:optional true} [:sequential :keyword]]
+   [:thinking {:optional true} :map]
+   [:speed {:optional true} :map]
+   [:effort {:optional true} :map]
+   [:source {:optional true} :keyword]])
+
+(def session-profile-settings-schema
+  [:map
+   [:model {:optional true} [:maybe session-profile-model-schema]]
+   [:thinking-level {:optional true} [:enum :off :minimal :low :medium :high :xhigh]]
+   [:speed-mode {:optional true} [:enum :normal :fast]]
+   [:effort-override {:optional true} [:maybe [:enum :low :medium :high :xhigh]]]])
+
+(def session-profile-diagnostic-schema
+  [:map
+   [:field :keyword]
+   [:reason :keyword]
+   [:message :string]])
+
+(def session-profile-record-schema
+  [:map
+   [:name :keyword]
+   [:status [:enum :valid :invalid]]
+   [:valid? :boolean]
+   [:settings session-profile-settings-schema]
+   [:readable-settings [:vector :string]]
+   [:diagnostics [:vector session-profile-diagnostic-schema]]])
+
+(def session-profile-snapshot-schema
+  [:map
+   [:profiles [:map-of :keyword session-profile-record-schema]]
+   [:valid-profile-names [:vector :keyword]]
+   [:invalid-profile-names [:vector :keyword]]])
+
 (def workflow-run-schema
   [:map
    [:run-id workflow-run-id-schema]
@@ -204,6 +247,7 @@
    [:parent-session-id {:optional true} [:maybe :string]]
    [:delegating-run-id {:optional true} [:maybe workflow-run-id-schema]]
    [:inherited-defaults {:optional true} [:maybe inherited-defaults-schema]]
+   [:session-profile-snapshot {:optional true} [:maybe session-profile-snapshot-schema]]
    [:workflow-input {:optional true} :any]
    [:workflow-original {:optional true} :any]
    [:current-step-id {:optional true} [:maybe workflow-step-id-schema]]

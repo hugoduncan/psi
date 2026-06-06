@@ -9,8 +9,11 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.mutations.canonical-workflows :as cwf-mutations]
    [psi.agent-session.mutations.canonical-workflows-test :as core-test]
+   [psi.session-state.state :as ss]
+   [psi.workflow-runtime.core :as workflow-runtime]
    [psi.agent-session.workflow.orchestration :as orchestration]
-   [psi.agent-session.workflow.runtime-state :as runtime-state]))
+   [psi.agent-session.workflow.runtime-state :as runtime-state]
+   [psi.workflow-step-session-config.core :as workflow-step-session-config]))
 
 (defn- production-like-mutate!
   "A `mutate!` closure mirroring the production `runtime-fns` mutate-fn /
@@ -88,3 +91,67 @@
           "continuation run captures a FRESH snapshot of the continuing session's current model")
       (is (not= (:model original-snapshot) (:model new-snapshot))
           "fresh snapshot is distinguishable from the original terminal run's snapshot"))))
+
+(deftest create-workflow-run-captures-session-profile-snapshot-test
+  ;; Task 217 — Pathom create-run captures effective session-profile resolution
+  ;; once at top-level invocation and stores ignored-key-free records on the run.
+  (testing "psi.workflow/create-run stores a profile snapshot from the invoking session worktree"
+    (let [ctx (core-test/make-test-ctx)
+          sd (session/new-session-in! ctx nil {:session-name "delegator"})
+          session-id (:session-id sd)
+          cwd (ss/session-worktree-path-in ctx session-id)
+          _ (.mkdirs (java.io.File. cwd ".psi"))
+          _ (spit (java.io.File. cwd ".psi/project.edn")
+                  (pr-str {:agent-session
+                           {:session-profiles
+                            {:coding {:speed-mode :fast
+                                      :temperature 0.1}
+                             :empty {}}}}))
+          _ (cwf-mutations/register-workflow-definition
+             {} {:psi/agent-session-ctx ctx :definition core-test/sample-definition})
+          result (cwf-mutations/create-workflow-run
+                  {} {:psi/agent-session-ctx ctx
+                      :session-id session-id
+                      :definition-id "test-workflow"
+                      :workflow-input {:input "go"}
+                      :run-id "run-session-profile-snapshot"})
+          snapshot (get-in @(:state* ctx)
+                           [:workflows :runs "run-session-profile-snapshot" :session-profile-snapshot])]
+      (is (nil? (:psi.workflow/error result)))
+      (is (= [:coding] (:valid-profile-names snapshot)))
+      (is (= [:empty] (:invalid-profile-names snapshot)))
+      (is (= {:speed-mode :fast}
+             (get-in snapshot [:profiles :coding :settings])))
+      (is (not (contains? (get-in snapshot [:profiles :coding]) :ignored-keys))
+          "workflow snapshots omit ignored unknown config keys"))))
+
+(deftest resumed-run-reuses-session-profile-snapshot-test
+  ;; Task 217 — resume consumes the already-stored run snapshot; editing config
+  ;; after create-run does not affect profile resolution.
+  (testing "profile resolution for a resumed run ignores post-invoke config edits"
+    (let [ctx (core-test/make-test-ctx)
+          sd (session/new-session-in! ctx nil {:session-name "delegator"})
+          session-id (:session-id sd)
+          cwd (ss/session-worktree-path-in ctx session-id)
+          profile-file (java.io.File. cwd ".psi/project.edn")
+          definition (assoc-in core-test/sample-definition [:steps 0 :session-profile] :coding)
+          _ (.mkdirs (.getParentFile profile-file))
+          _ (spit profile-file
+                  (pr-str {:agent-session {:session-profiles {:coding {:speed-mode :fast}}}}))
+          _ (cwf-mutations/register-workflow-definition
+             {} {:psi/agent-session-ctx ctx :definition definition})
+          _ (cwf-mutations/create-workflow-run
+             {} {:psi/agent-session-ctx ctx
+                 :session-id session-id
+                 :definition-id "test-workflow"
+                 :workflow-input {:input "go"}
+                 :run-id "run-resume-profile"})
+          _ (spit profile-file
+                  (pr-str {:agent-session {:session-profiles {:coding {:speed-mode :normal}}}}))
+          [state' _] (workflow-runtime/resume-run @(:state* ctx) "run-resume-profile")
+          _ (reset! (:state* ctx) state')
+          workflow-run (workflow-runtime/workflow-run-in @(:state* ctx) "run-resume-profile")
+          config (workflow-step-session-config/resolve-step-session-config
+                  ctx session-id workflow-run "step-1")]
+      (is (= :fast (:speed-mode config))
+          "resumed run reuses the stored :session-profile-snapshot, not edited config"))))

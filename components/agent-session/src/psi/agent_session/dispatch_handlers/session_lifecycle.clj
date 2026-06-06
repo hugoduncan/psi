@@ -112,33 +112,37 @@
 
   (kernel/register-handler!
    :session/create-child
-   (fn [ctx {:keys [session-id child-session-id session-name worktree-path system-prompt prompt-mode response-mode logprobs top-logprobs tool-ids thinking-level speed-mode effort-override model skills developer-prompt developer-prompt-source preloaded-messages cache-breakpoints prompt-component-selection workflow-run-id workflow-step-id workflow-attempt-id workflow-owned? inherited-snapshot?]}]
+   (fn [ctx {:keys [session-id child-session-id session-name worktree-path system-prompt prompt-mode response-mode logprobs top-logprobs tool-ids thinking-level speed-mode effort-override model skills developer-prompt developer-prompt-source preloaded-messages cache-breakpoints prompt-component-selection workflow-run-id workflow-step-id workflow-attempt-id workflow-owned? inherited-snapshot?]
+             :as event}]
      (let [parent-sd (or (session/get-session-data-in ctx session-id)
-                         {:worktree-path worktree-path})]
-       {:root-state-update #(child-session-state/initialize-child-session-state % parent-sd
-                                                                                {:child-session-id       child-session-id
-                                                                                 :session-name           session-name
-                                                                                 :system-prompt          system-prompt
-                                                                                 :prompt-mode            prompt-mode
-                                                                                 :response-mode          response-mode
-                                                                                 :logprobs               logprobs
-                                                                                 :top-logprobs           top-logprobs
-                                                                                 :tool-ids               tool-ids
-                                                                                 :thinking-level         thinking-level
-                                                                                 :speed-mode             speed-mode
-                                                                                 :effort-override        effort-override
-                                                                                 :model                  model
-                                                                                 :skills                 skills
-                                                                                 :developer-prompt       developer-prompt
-                                                                                 :developer-prompt-source developer-prompt-source
-                                                                                 :preloaded-messages     preloaded-messages
-                                                                                 :cache-breakpoints      cache-breakpoints
-                                                                                 :prompt-component-selection prompt-component-selection
-                                                                                 :workflow-run-id        workflow-run-id
-                                                                                 :workflow-step-id       workflow-step-id
-                                                                                 :workflow-attempt-id    workflow-attempt-id
-                                                                                 :workflow-owned?        workflow-owned?
-                                                                                 :inherited-snapshot?    inherited-snapshot?})
+                         {:worktree-path worktree-path})
+           child-opts (cond-> {:child-session-id       child-session-id
+                               :session-name           session-name
+                               :system-prompt          system-prompt
+                               :response-mode          response-mode
+                               :logprobs               logprobs
+                               :top-logprobs           top-logprobs
+                               :tool-ids               tool-ids
+                               :thinking-level         thinking-level
+                               :model                  model
+                               :skills                 skills
+                               :developer-prompt       developer-prompt
+                               :developer-prompt-source developer-prompt-source
+                               :preloaded-messages     preloaded-messages
+                               :cache-breakpoints      cache-breakpoints
+                               :prompt-component-selection prompt-component-selection
+                               :workflow-run-id        workflow-run-id
+                               :workflow-step-id       workflow-step-id
+                               :workflow-attempt-id    workflow-attempt-id
+                               :workflow-owned?        workflow-owned?
+                               :inherited-snapshot?    inherited-snapshot?}
+                        (some? prompt-mode)
+                        (assoc :prompt-mode prompt-mode)
+                        (contains? event :speed-mode)
+                        (assoc :speed-mode speed-mode)
+                        (contains? event :effort-override)
+                        (assoc :effort-override effort-override))]
+       {:root-state-update #(child-session-state/initialize-child-session-state % parent-sd child-opts)
         :effects [{:effect/type :projection/context-changed
                    :session-id child-session-id
                    :reason :session/create-child}]
