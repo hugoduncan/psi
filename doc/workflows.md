@@ -631,17 +631,17 @@ judge/`:on` wiring around each follow-up stays with its host.
 
 ## Task knowledge extraction
 
-`extract-task-knowledge` mines a completed Munera task for durable, project-general
+`extract-task-knowledge` mines a Munera task for durable, project-general
 mementum knowledge.
 
 ```text
 /delegate extract-task-knowledge {NNN-slug}
 ```
 
-Standalone extraction only mines tasks that resolve uniquely under
-`munera/closed/{NNN-slug}`. Inputs may be either an exact `NNN-slug` or an exact
-`munera/{open|closed}/NNN-slug` task path; other shapes, missing tasks, duplicate
-matches, and open-only standalone matches stop with no mementum writes.
+Standalone extraction mines any task that resolves uniquely under
+`munera/closed/{NNN-slug}` or `munera/open/{NNN-slug}`. Inputs may be either an
+exact `NNN-slug` or an exact `munera/{open|closed}/NNN-slug` task path; other
+shapes, missing tasks, and duplicate matches stop with no mementum writes.
 
 The workflow reads the task artifacts (`design.md`, `plan.md`, `steps.md`, and
 `implementation.md` when present) plus task-scoped git history only: commits
@@ -660,17 +660,17 @@ When entries pass those filters, the workflow writes mementum memories or
 knowledge pages and commits them autonomously using the mementum commit
 conventions; it does not request human approval.
 
-`task-lifecycle` now runs `extract-task-knowledge` as its final stage after
-`review-task-implementation`. That lifecycle-only trailing invocation may mine a
-still-open `munera/open/{NNN-slug}` task only when the immediately preceding
-implementation-review yielded text is carried in the extraction delegate's
-labeled `:implementation-review-yield` prompt-string field, rendered to the
-markdown workflow as `{{implementation_review_yield}}`, and contains
-`PASS_STATUS: REVIEW_COMPLETE`. `{{original}}` / `:workflow-original` remains
-ambient reference context and does not authorize open-task extraction. The
-extraction summary preserves the prior implementation-review/lifecycle outcome
-alongside the extraction result, so the lifecycle's final reply still reports
-the review outcome as well as any captured knowledge.
+`task-lifecycle` gates its final extraction stage after
+`review-task-implementation`. It runs `extract-task-knowledge` only when the
+immediately preceding implementation-review yielded text contains
+`PASS_STATUS: REVIEW_COMPLETE`; otherwise it skips extraction and returns a
+summary preserving the implementation-review outcome. When extraction does run,
+that review text is carried in the extraction delegate's labeled
+`:implementation-review-yield` prompt-string field and rendered to the markdown
+workflow as `{{implementation_review_yield}}` so the final extraction summary can
+preserve the prior implementation-review/lifecycle outcome alongside any captured
+knowledge. `{{original}}` / `:workflow-original` remains ambient reference
+context.
 
 ## Incidental-complexity simplification
 
