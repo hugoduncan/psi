@@ -332,7 +332,9 @@
          ;; — a regression to whole-key-group exclusion reopens the 51-row defmethod
          ;; relocation hole.
          (is (.contains select-text "remove ONLY the target's own physical row"))
-         (is (.contains select-text "never the whole"))
+         ;; TS-S4: anchor the whole-key-group exclusion lock to the `(ns, var, arity)`
+         ;; group clause rather than any stray "never the whole" occurrence.
+         (is (.contains select-text "never the whole `(ns, var, arity)` group"))
          (is (.contains select-text "siblings STAY in"))
          ;; TR-T4: the pure-inequality / no-margin invariant (θ/ε removed) — the
          ;; `after(u) < B` lock alone does not guard against a reintroduced margin

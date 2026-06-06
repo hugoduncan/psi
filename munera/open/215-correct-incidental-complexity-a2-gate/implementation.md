@@ -1074,3 +1074,16 @@ Re-confirmed not pursued (unchanged from prior passes): per-assert failure messa
 A2 `.contains` locks (file idiom is uniformly bare `(is (.contains x "…"))`); the ~30 A2
 locks are not a case explosion (each maps to a distinct soundness invariant). No other
 weak/redundant lock found.
+
+## TS-S4 executed (test-shaper follow-up)
+
+Tightened the TR-T3 target-exclusion lock at line 335 from the weak bare
+`(is (.contains select-text "never the whole"))` to the anchored
+`(is (.contains select-text "never the whole `(ns, var, arity)` group"))`, pinning the
+`(ns, var, arity)` key-group exclusion clause rather than any stray "never the whole"
+occurrence — mirroring the TS-S2 EXEMPT anchoring. Companion locks
+`"remove ONLY the target's own physical row"` and `"siblings STAY in"` left as-is.
+
+Verification: workflow-loader suite green (3 tests / 215 assertions / 0 fail / 0 error via
+`scry.cli --namespace psi.workflow-loader.task-209-workflow-definitions-test`);
+`clj-kondo --lint` 0/0; `clj-paren-repair` Success.

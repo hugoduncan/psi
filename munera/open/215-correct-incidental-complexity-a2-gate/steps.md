@@ -232,7 +232,7 @@
 
 ## test-shaper review re-pass follow-ups (ψ, test-shaper)
 
-- [ ] **TS-S4 (signal — weak generic lock):** Tighten the weak TR-T3 target-exclusion
+- [x] **TS-S4 (signal — weak generic lock):** Tighten the weak TR-T3 target-exclusion
       lock `(is (.contains select-text "never the whole"))`
       (`task_209_workflow_definitions_test.clj` line 335) to a phrase anchored to the
       `(ns, var, arity)` key-group exclusion clause it guards — e.g.
