@@ -203,3 +203,48 @@ per scope.
   via A3/A5); the group is never blanket-exempted and the relocation guard has no hole.
 
 No blockers. Both follow-ups completed; `design-steps.md` ambiguity items 3–4 ticked.
+
+## Design review — inconsistencies (ψ)
+
+Reviewed `design.md` for internal inconsistency and inconsistency against referenced
+artifacts (the live emitter `.psi/workflows/reduce-incidental-complexity.edn` `select-and-create`
+step, the cited knowledge page, and the skill files). Did not review plan.md/steps.md.
+Confirmed the skill grep is empty (acceptance 3 "absent" holds). Found two **new**
+actionable inconsistencies; neither is duplicated by the prior architectural-fit,
+taxonomy, or ambiguity passes (those covered the design's *internal* A1→A5 re-anchoring,
+θ/ε, join semantics, change-detection aggregation, and target exclusion).
+
+- **Adopted A2 form contradicts the cited knowledge page's proposed corrected A2, and
+  Scope item 3's knowledge-update is under-specified.** `design.md` adopts
+  `after(n/m) < B` with `B := before(target)` from committed `before-local.json`, and
+  explicitly rejects the recomputed residual ("NOT a recomputed `after(target)`"). The
+  cited `active` knowledge page (`gordian-net-sum-burden-gate-sub-additivity.md`,
+  "The genuine intent, correctly expressed") proposes the *opposite* anchor — "each
+  extracted seam is strictly simpler than the **residual target**:
+  `∀ s ∈ (after-units \ before-units): after(s) < after(target)`" — and labels target
+  reduction **A1**. `design.md` Scope item 3 only directs recording that "the fix has
+  landed" (the "Action for future sessions" item 1 / "Status / ratification" un-filed
+  notes); it does not direct reconciling the knowledge page's proposed `after(target)`
+  formula or its A1 labeling. As written, after the scoped update the knowledge page
+  would still document a *different gate* (`after(target)`, A1) than the one that landed
+  (`B`, A5). Actionable: extend Scope item 3 to reconcile the knowledge page's proposed
+  corrected-A2 formula and its A1 labeling with the adopted `after < B` / A5 form (or
+  explicitly state the knowledge page's `after(target)` form is superseded by `B`), so
+  the post-update knowledge page is consistent with the landed emitter.
+
+- **"Unit" is defined two incompatible ways across sections.** "Proposed corrected A2"
+  states "Units are identified by the line-insensitive key `(ns, var, arity)`" and
+  expresses A2a/A2b in per-unit terms (`before(n)`, `before(m)`, `after(m)`). "How A2 is
+  mechanically checked" states "A2's atomic unit is the **physical defunit row** … the
+  key `k` is used only to *pair* before/after rows … never to merge", replacing the
+  before side with the group-max `before-max(k)` and the after side with per-physical-row
+  `after(u)`. The two framings contradict (key-as-unit vs physical-row-as-unit);
+  consequently A2b's `before(m)`/`after(m)` is undefined for the non-unique-key (51-row
+  `execute-effect!` defmethod) case the design itself foregrounds. This is distinct from
+  the open join-semantics ambiguity item (which concerns *how* to join), being a
+  notational contradiction in the formal A2a/A2b statement itself. Actionable: restate
+  A2a/A2b over the mechanical model's terms — physical-row `after(u)` and group
+  `before-max(k)` — so both sections use one consistent notion of "unit".
+
+Both verified against `design.md` ("Proposed corrected A2", "How A2 is mechanically
+checked", Scope) and the cited knowledge page. Not duplicated by prior passes.

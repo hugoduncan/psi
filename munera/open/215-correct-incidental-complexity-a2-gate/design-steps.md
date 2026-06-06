@@ -44,3 +44,26 @@
       key-sharing sibling — a hole in the relocation guard. State that only the
       target's physical (line-bearing) row is removed, the behaviour when its
       line-insensitive key is shared, and why "(s)" is plural for a single defunit.
+
+## Inconsistencies
+
+- [ ] Reconcile the adopted A2 form with the cited knowledge page. `design.md` adopts
+      `after(n/m) < B`, `B := before(target)` (committed `before-local.json`), and
+      rejects `after(target)`; the `active` knowledge page
+      (`gordian-net-sum-burden-gate-sub-additivity.md`) proposes the opposite
+      `after(s) < after(target)` and labels target reduction **A1**. Scope item 3 only
+      says to record "the fix has landed", leaving the knowledge page documenting a
+      different gate (`after(target)`, A1) than what landed (`B`, A5). Extend Scope
+      item 3 to reconcile the knowledge page's proposed formula and A1 labeling with the
+      adopted `after < B` / A5 form (or explicitly mark the `after(target)` form
+      superseded by `B`).
+- [ ] Reconcile the conflicting definition of "unit". "Proposed corrected A2" says
+      "Units are identified by the line-insensitive key `(ns, var, arity)`" and states
+      A2a/A2b via per-unit `before(n)`/`before(m)`/`after(m)`; "How A2 is mechanically
+      checked" says "A2's atomic unit is the physical defunit row … key used only to
+      pair … never to merge", using group `before-max(k)` and per-row `after(u)`. The
+      two framings contradict (key-as-unit vs row-as-unit), leaving `before(m)`/`after(m)`
+      undefined for the 51-row defmethod case. Restate A2a/A2b over physical-row
+      `after(u)` and group `before-max(k)` so both sections share one notion of "unit".
+      (Distinct from the open join-semantics ambiguity item, which concerns the join
+      procedure rather than the formal A2a/A2b notation.)
