@@ -49,6 +49,25 @@ round-tripped.)
 Rule of thumb: **paren-repair for structural code edits; `edn/read-string` round-trip for
 in-string `:text` span edits in workflow/config EDN.**
 
+## Trap 3 — a contract may be stated twice in one `:text` (what-vs-how)
+
+An emitter `:text` can deliberately state the **same** contract twice: once as the
+declarative criterion clause (the *what*) and once as a mechanical procedure (the *how*).
+Task 215's A2a/A2b appears both as the acceptance-criterion bullet and as steps 5/6 of
+"How A2 is mechanically checked" (the procedure adds `T`-membership the criterion omits).
+
+This is an intentional what-vs-how separation, **but it is a single-source / `λ sync`
+hazard**: a future edit that changes the criterion wording must also change the
+procedure (and vice versa), or the emitted contract becomes self-inconsistent.
+Content-lock tests catch only the substrings they lock — they will not necessarily catch
+a what/how *drift*. When editing such a `:text`, grep the whole `:text` for the contract
+term (e.g. `A2a`, `after(u) < B`) and update **every** occurrence, criterion and
+procedure alike.
+
+(A code-shaper review of task 215 flagged this dual statement, then judged it
+not-actionable because it is settled design inside the scoped criterion text — recorded
+here as an editing hazard, not a defect to remove.)
+
 ## Running the loader content-lock tests
 
 The workflow-loader tests (e.g. `task_209_workflow_definitions_test.clj`,
