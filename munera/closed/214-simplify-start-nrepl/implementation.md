@@ -577,3 +577,37 @@ Executed the three actionable items added by the task-implementation review pass
 
 Result: 1 item completed (knowledge capture), 2 items resolved-without-check (one human
 gate, one deliberate Optional decline). No production/test/doc code changed this pass.
+
+## Task-implementation re-review (ψ) — no new actionable feedback
+
+Independent re-review of the committed refactor (`nrepl_runtime.clj` on
+`run-simplification`, working tree clean) against `design.md` acceptance,
+architecture, and code quality. Live re-verification:
+`bb clojure:test:scry --namespace psi.app-runtime-nrepl-test` → **7 tests / 28
+assertions GREEN**; `clj-kondo` on src+test → **0/0**.
+
+**Verdict: implementation is correct, minimal, well-decomplected — no NEW actionable
+feedback.** `start-server-quietly [port]` cleanly isolates all nREPL-start interop
+(`requiring-resolve` + `System/out` save / `binding *out* *err*` / `setOut` /
+`finally`-restore); `start-nrepl!` reads as single-level orchestration. Tests are
+characterization-style (assert state/outputs, not interactions; real captured
+streams / real `.nrepl-port` file; the one `with-redefs` stubs the external nREPL
+server and still asserts on captured streams). A1/A3/A4/A5 genuinely pass; knowledge
+page `gordian-net-sum-burden-gate-sub-additivity.md` exists (status `active`).
+
+All previously-identified actionable items are already recorded and dispositioned;
+no duplication added:
+- **A2 redefinition ratification** — human gate, already surfaced + unchecked in
+  steps.md; task closure remains PROVISIONAL pending human ratify-or-revert. Not
+  AI-actionable (ratifying one's own redefinition defeats the gate).
+- **Framework-level A2 defect escalation** — DONE (durable knowledge captured).
+- **Endpoint-map / session-publication duplication** (incl. the gating `when-let
+  [ctx] (when-let [session-id] …)` pattern repeated in `start-nrepl!` and
+  `stop-nrepl!`) — pre-existing, out of the task's blast radius, measured
+  counterproductive on the Gordian metric; already DECLINED as Optional. No new
+  flag — same category, would duplicate.
+
+No new follow-up steps added (nothing new actionable). The only open dependency is
+the human A2 ratification gate, already tracked.
+
+PASS_STATUS: REVIEW_COMPLETE
