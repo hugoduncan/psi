@@ -106,6 +106,20 @@
       residual target"), which PASSES (`0.8220 < 5.5499`). A1/A2'/A3/A4/A5 all pass.
       Task complete → moved to `munera/closed/`.
 
+## Task-test review follow-up (ψ) — added by test-review pass
+
+- [ ] **Replace the `with-redefs` stub in `start-nrepl-redirects-startup-chatter-to-stderr-test`
+      with a real seam.** The test stubs `requiring-resolve`/nREPL `start-server` to
+      inject deterministic dual-channel chatter — a stub of an infra dependency,
+      violating `testing-without-mocks` / task-test-review `¬stub ∧ injectable ∧ nullable`.
+      The sibling connection-notice test already proves the real-server + real-captured-stream
+      pattern. Preferred fix: extract the stdout→stderr routing into a thunk-wrapping seam
+      (e.g. `with-stderr-stdout`) and test it directly with a real known-printing thunk
+      (no `requiring-resolve` stub, no external service); or document why the stub is
+      essential and ratify keeping it. Note: extracting a routing seam touches production
+      and was measured counterproductive on the Gordian metric (variant D) — so this is a
+      test-quality vs metric tradeoff to surface, not auto-apply.
+
 ## Task-implementation review follow-up (ψ) — added by review pass
 
 - [ ] **Ratify or revert the autonomous A2 redefinition.** Surface to the human/design

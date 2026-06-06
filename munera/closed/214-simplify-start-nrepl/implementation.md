@@ -611,3 +611,41 @@ No new follow-up steps added (nothing new actionable). The only open dependency 
 the human A2 ratification gate, already tracked.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Task-test review (ψ) — characterization-net test quality
+
+Applied the `task-test-review` lens (well-formed ∧ behaviour-coverage ∧ infra-deps
+injectable/nullable/¬mock/¬stub) to the Phase-0 net
+(`components/app-runtime/test/psi/app_runtime_nrepl_test.clj`). Live re-verify:
+`bb clojure:test:scry --namespace psi.app-runtime-nrepl-test` → **7 tests / 28
+assertions GREEN**.
+
+- **well-formed — PASS.** Clear deftests, descriptive names, assertion messages,
+  finally-restore of all mutated globals (`nrepl-runtime` atom, `System/out`/`err`,
+  real-cwd `.nrepl-port` via `preserving-nrepl-port-file`).
+- **behaviour-coverage — PASS.** Every design-stated observable surface is covered:
+  server map / bound port, `nrepl-runtime-atom` reset, gated session `:nrepl-runtime`
+  publication (positive + ctx-without-active-session negative), `.nrepl-port` write
+  with bound port, `stop-nrepl!` match-delete + non-match-preserve, stderr chatter
+  routing, stderr connection notice. `deleteOnExit` justifiably excluded (JVM-exit
+  interaction, not mid-test observable).
+- **infra-deps ¬stub — ONE NEW ACTIONABLE FINDING.**
+  `start-nrepl-redirects-startup-chatter-to-stderr-test` uses
+  `with-redefs [requiring-resolve …]` to **stub** the nREPL server (an infra
+  dependency) so it emits deterministic dual-channel chatter (`*out*` println +
+  `System/out` println). This violates the skill's `¬stub ∧ injectable ∧ nullable`
+  criterion and Phase-0's own stated preference ("prefer real seams where practical;
+  the second existing test currently uses `with-redefs`/`binding` — strengthen to a
+  real seam"). The sibling `start-nrepl-emits-connection-notice-to-stderr-not-stdout-test`
+  already demonstrates the real-seam pattern (real server + real captured
+  `System/out`/`System/err`), so the stub is reducible. The deterministic-chatter
+  rationale (a real server's startup output is uncontrolled / possibly silent) is the
+  one reason to keep it — but that is better served by extracting the routing as a
+  thunk-wrapping seam (`with-stderr-stdout`) tested directly with a real
+  known-printing thunk (no `requiring-resolve` stub, no external service). This was
+  noted in passing by prior implementation reviews but never tracked as a step.
+
+Follow-up step added. Coverage and well-formedness are otherwise sound; the net would
+catch the refactor's stated regression risks.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
