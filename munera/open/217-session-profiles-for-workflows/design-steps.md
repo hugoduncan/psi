@@ -1,0 +1,4 @@
+# Design follow-up steps
+
+- [ ] AR1: Specify that `/session-profile` and `/session-profiles` are added through the backend single-source built-in command specs and existing slash-command dispatch path, with profile selection mutating canonical session state through existing dispatch/mutation patterns and profile reads exposed via EQL resolvers; no adapter-local profile lists or direct state/atom writes.
+- [ ] AR2: Refine workflow snapshot semantics so top-level runs persist a canonical effective profile-definition/resolved-profile snapshot on workflow-run state, while delegate steps pass profile-derived concrete model/thinking/speed/effort through the existing narrow `:inherited-defaults` snapshot; do not widen `:inherited-defaults` to include profile maps or require nested runs to re-read mutable user/project config to resolve profile names.
