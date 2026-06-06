@@ -47,7 +47,7 @@
 
 ## Inconsistencies
 
-- [ ] Reconcile the adopted A2 form with the cited knowledge page. `design.md` adopts
+- [x] Reconcile the adopted A2 form with the cited knowledge page. `design.md` adopts
       `after(n/m) < B`, `B := before(target)` (committed `before-local.json`), and
       rejects `after(target)`; the `active` knowledge page
       (`gordian-net-sum-burden-gate-sub-additivity.md`) proposes the opposite
@@ -57,7 +57,7 @@
       item 3 to reconcile the knowledge page's proposed formula and A1 labeling with the
       adopted `after < B` / A5 form (or explicitly mark the `after(target)` form
       superseded by `B`).
-- [ ] Reconcile the conflicting definition of "unit". "Proposed corrected A2" says
+- [x] Reconcile the conflicting definition of "unit". "Proposed corrected A2" says
       "Units are identified by the line-insensitive key `(ns, var, arity)`" and states
       A2a/A2b via per-unit `before(n)`/`before(m)`/`after(m)`; "How A2 is mechanically
       checked" says "A2's atomic unit is the physical defunit row … key used only to

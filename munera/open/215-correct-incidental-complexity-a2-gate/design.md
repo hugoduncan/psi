@@ -78,23 +78,38 @@ labels.
 
 Let `B := before(target)` — the original target unit's `lcc-total`, read from the
 committed `before-local.json` baseline (an immutable, already-published anchor; NOT a
-recomputed `after(target)`). Units are identified by the line-insensitive key
-`(ns, var, arity)`; newly-created units take `before(u) := 0` (carried over from the
-existing baseline-identity conventions).
+recomputed `after(target)`).
 
-Over the metric-touched set `T` (same metric-derived set as today, minus the target
-itself, which **A5** already governs):
+**A2's atomic unit is the physical defunit row** `u` (one source occurrence, carrying its
+own `after(u)` burden). Each row carries a **line-insensitive key** `k = (ns, var, arity)`
+used only to *classify* a row's before-side status — never to merge after-rows. For each
+key `k`, `before-max(k)` := the maximum `lcc-total` among `before-local.json` rows carrying
+`k` (`0` if `k` has no before-row). This is the single before-side quantity A2a/A2b
+consume; A2a/A2b are stated over physical-row `after(u)` and group `before-max(k)` (the
+mechanical check in "How A2 is mechanically checked" computes exactly these). Newly-created
+rows take `before-max(k) := 0` (carried over from the existing baseline-identity
+conventions).
 
-- **A2a — new units are genuine pieces, not a relocated tangle.** Every newly-introduced
-  unit `n` (i.e. `before(n) = 0`) satisfies `after(n) < B`. Each extracted seam is
-  strictly simpler than the *original whole* it was carved from.
+Over the metric-touched set `T` (same metric-derived set as today, minus the target's own
+physical row, which **A5** already governs):
 
-- **A2b — no collateral ceiling breach in existing units.** Every pre-existing modified
-  unit `m` (`before(m) > 0`, `m != target`) with `before(m) < B` satisfies
-  `after(m) < B`. (A unit already `>= B` before the refactor — through no fault of this
-  change — is exempt from the ceiling; relocating into an already-oversized sibling
-  cannot make it cross a threshold it already exceeds, and any genuine architectural
-  worsening of such a unit is caught by **A3**.)
+- **A2a — new pieces are genuine, not a relocated tangle.** Every physical after-row `u`
+  whose key is **new** (`before-max(k) = 0`) satisfies `after(u) < B`. Each extracted seam
+  is strictly simpler than the *original whole* it was carved from.
+
+- **A2b — no collateral ceiling breach in existing rows.** Every physical after-row `u`
+  whose key is **pre-existing and below the ceiling** (`0 < before-max(k) < B`) satisfies
+  `after(u) < B`. (A key already `>= B` before the refactor — i.e. `before-max(k) >= B`,
+  through no fault of this change — is exempt from the ceiling; relocating into an
+  already-oversized sibling cannot make it cross a threshold it already exceeds, and any
+  genuine architectural worsening there is caught by **A3**.)
+
+Stating both clauses over physical-row `after(u)` and group `before-max(k)` — rather than a
+key-as-unit `before(m)`/`after(m)` pairing — makes A2a/A2b well-defined even for the
+non-unique-key case (the 51-row `execute-effect!` defmethod): each physical row is checked
+individually against `B`, and the group's largest pre-existing member sets the exemption.
+The "Proposed corrected A2" and "How A2 is mechanically checked" sections therefore share
+one notion of "unit": the physical defunit row.
 
 The target unit itself is intentionally excluded from A2 — its reduction is **A5**'s job;
 including it here would re-conflate the two.
@@ -108,7 +123,7 @@ the earlier open parameters:
 - A non-zero margin is **not architecturally necessary**. The only motivation for a
   margin was global-recompute *jitter* on units whose source was not edited but whose
   `dependency` / `working-set` burden shifts because `local` is recomputed globally. The
-  ceiling form `after(m) < B` is **jitter-immune by construction**: jitter is a small
+  ceiling form `after(u) < B` is **jitter-immune by construction**: jitter is a small
   perturbation, while crossing the original target's whole-tangle burden `B` is a large
   move that only a genuine relocation produces. Small upward jitter that does not cross
   `B` is harmless to the relocation guard, so no slack is required to tolerate it.
@@ -119,7 +134,7 @@ the earlier open parameters:
 - The previously-proposed "no substantial increase" clause is therefore **dropped**. Its
   anti-relocation role is fully subsumed: relocation into an existing sibling is only a
   defect when that sibling approaches the original tangle's size — which is precisely the
-  ceiling `after(m) < B` — while architectural worsening of an already-large sibling is
+  ceiling `after(u) < B` — while architectural worsening of an already-large sibling is
   **A3**'s job and the target's required improvement is **A5**'s.
 
 ### How A2 is mechanically checked (enforceable, objective, agent-run)
@@ -222,7 +237,7 @@ reasonable but separate follow-up.
 The parameters previously left open are now settled:
 
 1. **Substantial-increase threshold `θ` — removed.** A2b is the pure ceiling inequality
-   `after(m) < B`; no margin (see "Pure inequalities" above).
+   `after(u) < B`; no margin (see "Pure inequalities" above).
 2. **Jitter slack `ε` — removed.** The ceiling form is jitter-immune; no absolute slack
    is needed.
 3. **Unit identity / baseline-absent conventions — settled.** A2 joins on the
@@ -242,7 +257,19 @@ The parameters previously left open are now settled:
 - Update `mementum/knowledge/gordian-net-sum-burden-gate-sub-additivity.md`: once the
   emitter is corrected, record that the framework-level fix has landed (its "Action for
   future sessions" item 1 and "Status / ratification" section currently say the fix is
-  un-filed).
+  un-filed). **Reconcile the knowledge page's proposed corrected-A2 formula and labeling
+  with the form that actually landed.** The page's "The genuine intent, correctly
+  expressed" proposes the residual anchor `∀ s ∈ (after-units \ before-units): after(s) <
+  after(target)` and labels target reduction **A1** — both of which the landed emitter
+  rejects: the adopted anchor is `after(u) < B` with `B := before(target)` from the
+  committed `before-local.json` (explicitly **not** a recomputed `after(target)`), and
+  target reduction keeps its live label **A5** (no A1). The knowledge-page update must
+  therefore (a) mark the page's `after(target)` residual form **superseded by** the
+  committed-baseline ceiling `after(u) < B` (with a one-line note why: the residual
+  `after(target)` is a contestable recompute, whereas `B` is an immutable published
+  anchor), and (b) correct the page's **A1** target-reduction label to the live **A5**, so
+  the post-update page documents the gate that landed rather than the originally-proposed
+  one.
 - Out of scope: re-opening or re-running task 214; changing Gordian's transform; the
   human ratification of 214's in-place A2′ redefinition (separate human gate). This task
   fixes the *template* going forward; 214 remains as-is.
@@ -269,7 +296,10 @@ The parameters previously left open are now settled:
    consistently; A2 no longer governs the target unit (**A5** does). The emitter's
    existing (non-sequential) numbering is preserved; no renumbering.
 3. Any A2 restatement in the relevant skill files is aligned (or confirmed absent).
-4. The knowledge page reflects that the framework-level fix has landed.
+4. The knowledge page reflects that the framework-level fix has landed **and is
+   reconciled with the form that landed**: its proposed `after(target)` residual form is
+   marked superseded by the committed-baseline ceiling `after(u) < B`, and its target-
+   reduction label is corrected from **A1** to the live **A5**.
 5. A dry read-through (or a generated sample task) shows the new A2 is satisfiable by a
    genuine extraction and still rejects a relocated/inverted extraction.
 

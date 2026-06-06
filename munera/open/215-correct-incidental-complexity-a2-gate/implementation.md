@@ -248,3 +248,34 @@ taxonomy, or ambiguity passes (those covered the design's *internal* A1→A5 re-
 
 Both verified against `design.md` ("Proposed corrected A2", "How A2 is mechanically
 checked", Scope) and the cited knowledge page. Not duplicated by prior passes.
+
+## Design review follow-up — inconsistencies (ψ, executed)
+
+Resolved both newly-added inconsistency follow-ups in `design.md`. The two earlier
+ambiguity items (non-unique-key join semantics, phantom skill reference) predate this
+pass and were left untouched per scope.
+
+- **Unit definition conflict → restated A2a/A2b over the mechanical model's terms.**
+  Rewrote "Proposed corrected A2" so the **physical defunit row** `u` is A2's atomic unit
+  throughout; the line-insensitive key `k = (ns, var, arity)` is used only to classify a
+  row's before-side status via group `before-max(k)` — never as the unit. A2a now reads
+  "every physical after-row `u` whose key is new (`before-max(k)=0`) satisfies
+  `after(u) < B`"; A2b "every physical after-row `u` with `0 < before-max(k) < B` satisfies
+  `after(u) < B`" (keys `>= B` exempt). Removed the key-as-unit `before(m)`/`after(m)`
+  pairing notation; added a paragraph noting both sections now share one notion of "unit"
+  (physical row) and why this makes A2a/A2b well-defined for the 51-row defmethod case.
+  Aligned the residual prose `after(m) < B` uses (Pure-inequalities ×2, Resolved-parameters
+  ×1) to `after(u) < B`. The deliberate contrast mention at "rather than a key-as-unit
+  `before(m)`/`after(m)` pairing" is intentional and retained.
+
+- **A2 form vs knowledge page → extended Scope item 3 + acceptance 4 to direct
+  reconciliation.** Scope item 3 now directs the knowledge-page update to (a) mark the
+  page's proposed residual anchor `after(s) < after(target)` **superseded by** the
+  committed-baseline ceiling `after(u) < B` (one-line rationale: residual is a contestable
+  recompute, `B` is an immutable published anchor), and (b) correct the page's **A1**
+  target-reduction label to the live **A5**. Acceptance criterion 4 updated to require the
+  page be reconciled with the landed form, not merely note the fix landed.
+
+No blockers. Both follow-ups completed; `design-steps.md` inconsistency items ticked. The
+two open ambiguity items remain (non-unique-key join semantics, phantom skill) — predate
+this pass, out of scope.
