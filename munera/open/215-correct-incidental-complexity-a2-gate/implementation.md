@@ -1048,3 +1048,29 @@ sum definition has real value, matching the reviewer's stated alternative.
 Verification: workflow-loader suite green (3 tests / 215 assertions / 0 fail / 0 error);
 `clj-kondo --lint` 0 errors / 0 warnings; clj-paren-repair Success. All steps.md items
 now checked. PASS_STATUS FOLLOW_UPS_COMPLETE.
+
+## test-shaper review re-pass (ψ, test-shaper) — post TS-S1..TS-S3
+
+Re-pass over `reduce-incidental-complexity-test` after TS-S1/TS-S2/TS-S3 landed. Suite
+green (3 tests / 215 assertions / 0 fail / 0 error). Block is single-concern + correctly
+named; EXEMPT and `before-max(k)` locks anchored. One fresh signal finding — a weak lock
+that escaped TS-S2's same-principle tightening:
+
+- **TS-S4 (signal — weak generic lock).** Line 335
+  `(is (.contains select-text "never the whole"))` (the TR-T3 line-bearing single-row
+  target-exclusion guard) pins a bare generic English phrase. The emitter clause is
+  `... never the whole `(ns, var, arity)` group)` — the substring "never the whole"
+  carries weak signal and could spuriously match unrelated future prose (a false-pass
+  risk: the lock stays green even if the key-group-exclusion clause is reworded away).
+  This is the exact same weakness TS-S2 tightened for "EXEMPT", left unaddressed for the
+  adjacent TR-T3 lock — an inconsistent application of the same anchoring principle.
+  Tighten to a phrase anchored to the `(ns, var, arity)` key-group exclusion it guards,
+  e.g. `"never the whole `(ns, var, arity)` group"`, so it pins the clause rather than
+  any stray "never the whole". The companion `"remove ONLY the target's own physical row"`
+  (line 334) and `"siblings STAY in"` (line 336) locks already carry strong signal and
+  are left as-is.
+
+Re-confirmed not pursued (unchanged from prior passes): per-assert failure messages on the
+A2 `.contains` locks (file idiom is uniformly bare `(is (.contains x "…"))`); the ~30 A2
+locks are not a case explosion (each maps to a distinct soundness invariant). No other
+weak/redundant lock found.

@@ -229,3 +229,17 @@
       (`reduce-incidental-complexity-test` + `task-209-workflow-set-loads-together-test`):
       3 tests / 215 assertions / 0 fail / 0 error; `clj-kondo --lint` 0/0; clj-paren-repair
       Success.
+
+## test-shaper review re-pass follow-ups (ψ, test-shaper)
+
+- [ ] **TS-S4 (signal — weak generic lock):** Tighten the weak TR-T3 target-exclusion
+      lock `(is (.contains select-text "never the whole"))`
+      (`task_209_workflow_definitions_test.clj` line 335) to a phrase anchored to the
+      `(ns, var, arity)` key-group exclusion clause it guards — e.g.
+      `(is (.contains select-text "never the whole `(ns, var, arity)` group"))` — so it
+      pins the clause rather than any stray "never the whole" (false-pass risk). Mirrors
+      the TS-S2 EXEMPT anchoring left unapplied to this adjacent lock. Leave the companion
+      `"remove ONLY the target's own physical row"` and `"siblings STAY in"` locks as-is.
+      Re-run the workflow-loader suite (`reduce-incidental-complexity-test` +
+      `task-209-workflow-set-loads-together-test`) and `clj-kondo --lint` the test file to
+      confirm green + clean.
