@@ -198,7 +198,7 @@
 
 ## Test review follow-ups (ψ, test-shaper)
 
-- [ ] **TS-S1:** Extract the A2 relocation-guard content-locks (`task_209_workflow_definitions_test.clj`
+- [x] **TS-S1:** Extract the A2 relocation-guard content-locks (`task_209_workflow_definitions_test.clj`
       ~lines 300–350: `Net burden (A2 — relocation guard, per-unit)` through `not a per-line
       pairing`) out of the `testing "select-and-create prompt preserves task-209 selection
       and baseline contracts"` block into a dedicated `testing "select-and-create emits the
@@ -209,7 +209,7 @@
       Re-run the workflow-loader suite (`reduce-incidental-complexity-test` +
       `task-209-workflow-set-loads-together-test`) and `clj-kondo --lint` the test file to
       confirm green + clean.
-- [ ] **TS-S2:** Tighten the loose `(is (.contains select-text "EXEMPT"))` lock (line 319)
+- [x] **TS-S2:** Tighten the loose `(is (.contains select-text "EXEMPT"))` lock (line 319)
       to a phrase anchored to the `before-max(k) >= B` exemption branch (e.g.
       `"through no fault of this change is EXEMPT"`), so it pins the exemption clause rather
       than any stray occurrence of "EXEMPT". Keep the companion `"before-max(k) >= B"` lock.

@@ -985,3 +985,24 @@ diff-gate-text all omit messages); adding messages only to the A2 locks would br
 `consistent(assertion_style)` across the file. Intent is already source-visible in the
 TR-Tn comments. The content-lock mechanism itself is accepted as appropriate (A2 is an
 agent-run prose procedure, not executable code).
+
+## test-shaper follow-up execution (TS-S1, TS-S2)
+
+- **TS-S1 (done).** Split the A2 relocation-guard content-locks (`Net burden (A2 —
+  relocation guard, per-unit)` through `not a per-line pairing`) out of `testing
+  "select-and-create prompt preserves task-209 selection and baseline contracts"` into a
+  dedicated `testing "select-and-create emits the corrected per-unit A2 relocation guard"`
+  block. The task-209 selection/baseline asserts (incl. the `Commit the task creation` /
+  `Do NOT push or open a PR` general-contract locks) stay in the original block; only the
+  new-behaviour A2 locks (TR-T1..TR-T7 + TS-S2) moved. Single-concern + the new block name
+  correctly describes the new-behaviour gate this task lands, consistent with the file's
+  per-concern `testing` grouping (clean-baseline / coverage-review / diff-gate).
+- **TS-S2 (done).** Tightened `(is (.contains select-text "EXEMPT"))` to
+  `(is (.contains select-text "through no fault of this change is EXEMPT"))`, anchoring the
+  lock to the `before-max(k) >= B` exemption branch (the emitter text reads
+  `... before-max(k) >= B`) through no fault of this change is EXEMPT — ...`). The companion
+  `"before-max(k) >= B"` lock is retained.
+- Verify: workflow-loader suite green (3 tests / 215 assertions / 0 fail / 0 error via
+  `bb clojure:test:scry --ns psi.workflow-loader.task-209-workflow-definitions-test`);
+  `clj-kondo --lint` of the test file 0 errors / 0 warnings; `clj-paren-repair` round-trips
+  clean. Test-only change; no production/EDN/doc change.

@@ -295,8 +295,13 @@
          (is (.contains select-text
                         "Blast radius: the target unit PLUS the minimal surrounding helpers required to decomplect it; no unrelated cleanup"))
          (is (.contains select-text "decreased versus its `before-local.json` value"))
-         ;; A2 is now the per-unit relocation guard (A2a/A2b ceiling against the
-         ;; original target burden B), replacing the unsatisfiable net-sum gate.
+         (is (.contains select-text "Commit the task creation on the current branch"))
+         (is (.contains select-text "Do NOT push or open a PR")))
+       (testing "select-and-create emits the corrected per-unit A2 relocation guard"
+         ;; A2 is the per-unit relocation guard (A2a/A2b ceiling against the original
+         ;; target burden B), replacing the unsatisfiable net-sum gate. These locks
+         ;; pin new-behaviour wording, so they live in their own concern (not the
+         ;; task-209 selection/baseline-preservation block).
          (is (.contains select-text "Net burden (A2 — relocation guard, per-unit)"))
          (is (.contains select-text "line-insensitive key `k = (ns, var, arity)`"))
          (is (.contains select-text "physical after-row `u`"))
@@ -316,7 +321,9 @@
          (is (.contains select-text "A2a (new pieces are genuine"))
          (is (.contains select-text "A2b (no collateral ceiling breach"))
          (is (.contains select-text "before-max(k) >= B"))
-         (is (.contains select-text "EXEMPT"))
+         ;; TS-S2: anchor the EXEMPT lock to the `before-max(k) >= B` exemption branch
+         ;; rather than any stray "EXEMPT" occurrence.
+         (is (.contains select-text "through no fault of this change is EXEMPT"))
          ;; TR-T3: line-bearing single-row target exclusion (the shared-key hole closure)
          ;; — a regression to whole-key-group exclusion reopens the 51-row defmethod
          ;; relocation hole.
@@ -347,9 +354,7 @@
          ;; catches a sum-regression; a regression to a per-line pairing join (not a sum,
          ;; but breaking non-unique-key handling) is otherwise uncaught.
          (is (.contains select-text "an order-insensitive set comparison"))
-         (is (.contains select-text "not a per-line pairing"))
-         (is (.contains select-text "Commit the task creation on the current branch"))
-         (is (.contains select-text "Do NOT push or open a PR")))
+         (is (.contains select-text "not a per-line pairing")))
        (testing "clean-baseline step locks the clean-source precondition and baseline artifact contract"
          (is (= ["read" "bash" "edit" "write"] (:tools clean-baseline-step)))
          (is (= {"DONE" {:goto "coverage-review"}
