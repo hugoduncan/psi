@@ -629,3 +629,48 @@ All five acceptance criteria plus all design/plan/implementation review follow-u
 (RI1, RI2, RI3, PA1, PI1–PI3) are now complete.
 
 PASS_STATUS: FOLLOW_UPS_COMPLETE
+
+## Implementation review — independent re-verification (ψ)
+
+Re-ran the full review against the landed tree (working tree clean at `d9077b485`).
+Verified against the skill (matches-design, follows-architecture, new-pattern,
+unnecessary-abstraction, structural-perf):
+
+- **Emitter** (`.psi/workflows/reduce-incidental-complexity.edn`): `edn/read-string`
+  round-trips (13 steps); the step-6 A2 bullet emits exactly the per-unit A2a/A2b
+  relocation-guard ceiling (`after(u) < B`, `B := before(target)` line-bearing lookup,
+  line-insensitive `(ns, var, arity)` grouping, `before-max(k)`, multiset `T` filter,
+  single-row line-bearing target exclusion, defmethod shared-key handling); no `θ`/`ε`;
+  matches design.md "Proposed corrected A2" + "How A2 is mechanically checked". A5
+  (line-bearing key) / A3 (`--fail-on … --max-new-medium-findings 0`) / Phase-0 /
+  blast-radius / minimality bullets and the non-sequential (A5, A2, A3) numbering are
+  byte-unchanged.
+- **Tests** (`task_209_workflow_definitions_test.clj`): suite GREEN via
+  `bb`-equivalent scry CLI (`-M:test-paths -m scry.cli --namespace …`) — **3 tests / 196
+  assertions / 0 fail / 0 error**. The three net-sum locks (lines 299/301 strings +
+  line-295 `identified by …`) are gone; six A2a/A2b locks present; the A5 line-294
+  `keyed by `(ns, var, arity, line)`` lock is intact and correctly distinguished.
+- **Doc sync** (`change_chain`): `doc/workflows.md` Phase-1 paragraph describes the
+  per-unit relocation guard (A5 target reduction + `after(u) < B`); CHANGELOG
+  `[Unreleased] → Changed` entry records the gate correction (keep-a-changelog format,
+  adjacent to the prior task-212 workflow entry); `grep` over `doc/`/`README.md` finds no
+  surviving net-sum claim.
+- **Knowledge page**: `LANDED (task 215)`, residual `after(target)` marked SUPERSEDED by
+  `after(u) < B` with rationale, A1→A5 relabel — reconciled with the landed form.
+- **Skill**: grep over `.psi/skills/` for net-sum/A2 restatement empty — confirmed absent.
+- **design↔emitter coherence** (RI1): design.md step 1 reconciled to the line-bearing
+  `B` lookup the emitter uses; no stale "chosen identity — see note below" parenthetical.
+
+Soundness sanity check of the landed gate: a genuine split of a burden-`B` tangle into
+pieces each `< B` always satisfies A2a (no sum → sub-additivity defect gone); relocation
+into a new seam or a below-ceiling sibling that breaches `B` fails A2a/A2b; an
+already-oversized sibling is exempt but caught by A3; the shared-key (51-row defmethod)
+case keeps siblings in `T` so the relocation guard has no hole. The agent-run procedure
+(no dedicated `bb gordian` subcommand) is a documented out-of-scope follow-up, not a
+defect. No new patterns, no unnecessary abstraction, no structural-performance concern
+(text-only emitter edit).
+
+No new actionable implementation issue found; all prior review follow-ups
+(RI1/RI2/RI3, PA1, PI1–PI3) and the four design-review aspects are resolved.
+
+PASS_STATUS: REVIEW_COMPLETE
