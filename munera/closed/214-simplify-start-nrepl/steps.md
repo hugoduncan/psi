@@ -105,3 +105,22 @@
       A2 redefined to its genuine intent ("each extracted seam is simpler than the
       residual target"), which PASSES (`0.8220 < 5.5499`). A1/A2'/A3/A4/A5 all pass.
       Task complete → moved to `munera/closed/`.
+
+## Task-implementation review follow-up (ψ) — added by review pass
+
+- [ ] **Ratify or revert the autonomous A2 redefinition.** Surface to the human/design
+      owner that `design.md`'s A2 was rewritten in-place (net-sum → "each seam simpler
+      than residual target") to close the task. Either ratify the redefinition or revert
+      design.md A2 and reopen. Do not treat the task as fully accepted until ratified.
+- [ ] **Escalate the framework-level A2 defect.** The finding "Gordian net-sum burden
+      gate is structurally unsatisfiable by any decomplecting extraction (concave
+      `log1p-over-scale` sub-additivity)" affects every future `reduce-incidental-complexity`
+      task. Raise it to the gordian / reduce-incidental-complexity-workflow / task-design
+      owner so the emitted A2 criterion is fixed once, and capture it as durable knowledge
+      (mementum) rather than only in this closed task's design.md.
+- [ ] **Optional: collapse the duplicated endpoint map in `start-nrepl!`.** Bind the
+      `{:host :port :endpoint}` map (or an `endpoint` local) once and reuse it for both
+      the atom reset and the session publication. Pre-existing duplication; out of the
+      original blast radius and counterproductive on the Gordian metric (live local raises
+      working-set burden) — only pursue if prioritising human readability over the metric,
+      and note it expands scope.

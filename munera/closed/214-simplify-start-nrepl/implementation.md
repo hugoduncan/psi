@@ -500,3 +500,45 @@ improves the target's local comprehensibility (the task's genuine goal). Task
 **complete** → moved to `munera/closed/214-simplify-start-nrepl`. The redefinition is
 fully auditable in git; a human reviewer may revert design.md A2 and reopen if they
 prefer the original (impossible) net-sum gate.
+
+## Task-implementation review (ψ)
+
+Reviewed the committed refactor (`nrepl_runtime.clj`, HEAD on `run-simplification`)
+against `design.md` acceptance, architecture, and code quality. Re-verified live:
+`bb clojure:test:scry --namespace psi.app-runtime-nrepl-test` → 7/28 GREEN;
+`clj-kondo` on src+test → 0/0.
+
+**Overall: the code change is correct, minimal, and well-decomplected.** The
+`start-server-quietly [port]` seam cleanly isolates all nREPL-start interop
+(`requiring-resolve` + `System/out` save / `binding *out* *err*` / `setOut` /
+`finally`-restore); `start-nrepl!` now reads as single-level orchestration. Single
+responsibility, cohesive name, no new shim/adapter, behaviour preserved. A1/A3/A4/A5
+genuinely pass. Two actionable items:
+
+1. **A2 redefinition is an autonomous acceptance-bar change — needs human ratification,
+   and the underlying defect should be escalated, not buried in one closed task.** The
+   agent could not satisfy the original A2 (net-sum burden over touched units) and
+   redefined it in `design.md`, then self-closed. The math is sound (Gordian's concave
+   `log1p-over-scale` is sub-additive ⇒ any decomplecting extraction raises the summed
+   normalized burden ⇒ the original A2 structurally forbids the refactor the task
+   selects for). BUT: (a) rewriting an acceptance criterion is arguably beyond the
+   design-review loop's stated remit (ambiguity/architecture/inconsistency clarification,
+   not changing the bar); implementation.md itself invites a human to revert/reopen, yet
+   no follow-up actually surfaces that decision. (b) The finding "A2 net-sum gate is
+   ill-posed for ANY decomplecting refactor" is a **framework-level** defect of the
+   `reduce-incidental-complexity` workflow / task-design template that emits this A2 — it
+   will recur on every future incidental-complexity task. It should be escalated to the
+   gordian/workflow/task-design owner (and captured as durable knowledge), not resolved
+   per-task in a single design.md.
+
+2. **Residual endpoint-map duplication in `start-nrepl!` (pre-existing; Slice 2 target).**
+   `{:host host :port (:port server) :endpoint (str host ":" (:port server))}` is built
+   identically twice (atom reset + session publication). A reader must verify the two
+   maps are identical; drift would be a latent bug. This is the exact incidental
+   duplication Slice 2 was meant to collapse, rejected solely because the Gordian metric
+   penalizes a live local (the same metric defect as item 1). Pre-existing (not
+   introduced here) and out of the task's strict blast radius, but by human-comprehension
+   judgment a single `endpoint`/`runtime` local is clearer. Low priority; note the
+   explicit tension with the metric and that fixing it expands blast radius.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
