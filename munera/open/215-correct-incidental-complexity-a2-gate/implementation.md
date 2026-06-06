@@ -340,3 +340,46 @@ the not-yet-executed emitter A2 edit (which predates this review pass) — not e
   either drop coverage prematurely (emitter still emits the net-sum text) or re-point at a
   not-yet-emitted string. The disposition is now unambiguously recorded in plan.md and
   steps.md for that slice-1 execution. PA1 step therefore left unchecked.
+
+## Plan/steps review — inconsistencies (ψ)
+
+Reviewed `plan.md` and `steps.md` for internal inconsistency and inconsistency
+against `design.md` and the referenced artifacts (the live emitter, the test file
+`task_209_workflow_definitions_test.clj`, the cited knowledge page). Did not re-review
+`design.md` internals. Verified test line refs (294 A5 `keyed by`, 295 A2 `identified
+by`, 299/301 net-sum), confirmed `identified by` is emitted once (A2 only) and `keyed
+by` twice (A5 bullet + step-5 note), and confirmed the knowledge page's A1/`after(target)`
+state. Found three **new** actionable inconsistencies, all the residue of the prior PA1
+ambiguity fix correcting the count only in plan.md's "Concrete edit targets" section.
+Not duplicated by the PA1 ambiguity pass (which raised the *count* and added a separate
+PA1 step; it did not reconcile the surviving "two" counts and in fact asserted plan/steps
+"now agree on the count", which these items disprove).
+
+- **PI1 — plan.md contradicts itself on the broken-assertion count.** "Concrete edit
+  targets" #2 (line 31) states "**Three** assertions currently lock net-sum A2 wording and
+  **will break**" (299/301/295), but the Risks section "Content-lock test coupling" (lines
+  61–62) still says "Editing the emitter `:text` necessarily breaks **the two** net-sum
+  assertions." Same artifact, contradictory counts. Actionable: update the Risks bullet
+  from "the two" to three (or "all three").
+
+- **PI2 — steps.md primary content-lock step disagrees with plan.md's three.** steps.md
+  slice-1 (line 25) says "Update **the two** net-sum content-lock assertions" and removes
+  only 299/301, while plan.md (line 31) now enumerates **three** breaking assertions; the
+  third (line-295 `identified by …`) is split into a separate PA1 step. The main step's
+  "two" count is inconsistent with the plan's corrected three. Actionable: align the
+  slice-1 primary step to the three-assertion framing — either fold the line-295 key
+  assertion into it, or explicitly scope the step to "the two literal net-sum strings
+  (299/301)" and cross-reference the PA1 step for the line-295 key assertion, matching how
+  plan.md groups them.
+
+- **PI3 — steps.md PA1 step carries a stale plan cross-reference.** The PA1 step (lines
+  37, 44) says it handles "the *third* … assertion the plan's '**two** assertions' count
+  omits" and ends "**Correct the plan's 'Two assertions … will break' to three.**" But
+  plan.md's concrete-targets section already reads "Three assertions"; the phrase "Two
+  assertions … will break" no longer exists there, and the only surviving "two" is the
+  Risks bullet (PI1) — which this instruction does not target. The instruction references
+  a plan state that no longer exists. Actionable: re-point the PA1 step's count-correction
+  at plan.md's Risks bullet (the surviving "two"), or drop the now-completed
+  correct-the-plan sub-instruction since the concrete-targets count is already three.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

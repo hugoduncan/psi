@@ -79,3 +79,19 @@
 - [ ] Record the dry read-through outcome in `implementation.md`.
 - [ ] Confirm all five acceptance criteria are met; note any residual follow-up (e.g. the
       out-of-scope dedicated `bb gordian` A2 subcommand).
+
+## Plan/steps review follow-ups — inconsistencies
+
+- [ ] **PI1:** Reconcile plan.md's self-contradictory count. The Risks section
+      "Content-lock test coupling" still says "breaks **the two** net-sum assertions"
+      while "Concrete edit targets" #2 says "**Three** assertions … will break". Update
+      the Risks bullet to three (or "all three").
+- [ ] **PI2:** Align this slice-1 primary content-lock step (currently "Update **the two**
+      net-sum content-lock assertions") with plan.md's three-assertion framing — either
+      fold the line-295 `identified by …` key assertion into it, or explicitly scope it to
+      "the two literal net-sum strings (lines 299/301)" and cross-reference the PA1 step
+      for the line-295 key assertion.
+- [ ] **PI3:** Fix the stale plan cross-reference in the PA1 step: it says "Correct the
+      plan's 'Two assertions … will break' to three", but plan.md's concrete-targets
+      section already reads "Three"; the only surviving "two" is the Risks bullet (PI1).
+      Re-point the PA1 count-correction at the Risks bullet, or drop it as already done.
