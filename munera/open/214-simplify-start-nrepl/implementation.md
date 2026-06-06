@@ -196,3 +196,59 @@ Recorded the pre-characterization clean-source baseline into
 - No pre-existing dirty target/source changes; no classified task-artifact/doc dirt.
 
 Baseline clean → behaviour-preservation is anchored to this HEAD. Result: REVIEW_COMPLETE.
+
+## Phase 0 — characterization-net gate review (ψ)
+
+Reviewed the pre-simplification characterization-test net for the selected target
+`psi.app-runtime.nrepl-runtime/start-nrepl!` (arity 4) against its
+externally-observable behaviour, judged on `{nominal, edge, boundary}` per
+`testing-without-mocks` (assert state/outputs, never interactions).
+
+Net under review (current HEAD): `components/app-runtime/test/psi/app_runtime_nrepl_test.clj`
+— the **two pre-existing** deftests only; none of the four Slice-0 characterization
+tests has been written yet (Slice 0 items all unchecked).
+
+Ran the net against unmodified production code:
+`bb clojure:test:scry --namespace psi.app-runtime-nrepl-test` → **GREEN**
+(2 tests, 12 assertions, 0 fail/error).
+
+### Covered observable surfaces (sufficient)
+
+- Returned server map / bound port — both tests (`:port srv`).
+- `nrepl-runtime-atom` value via the EQL resolver path — `nrepl-runtime-eql-reflects-live-start-stop-test`.
+- Bound-vs-requested port — same test calls `start-nrepl! 0` (random) and asserts the
+  reflected port equals the bound `(:port srv)` (0 ≠ bound ⇒ characterizes bound-not-requested).
+- Startup chatter routed to stderr not stdout — `start-nrepl-redirects-startup-chatter-to-stderr-test`
+  (via `with-redefs`/`binding`; interaction-ish seam, to be strengthened to a real captured-stream seam).
+
+### Uncovered gaps (FIXABLE — the net would NOT catch a refactor regression here)
+
+1. **`.nrepl-port` file** (nominal/boundary): not written/asserted anywhere. Need a
+   test that after `start-nrepl!` the `.nrepl-port` file contains exactly `(str (:port srv))`
+   and is marked `deleteOnExit`. Mirror the existing tmp-dir + `user.dir` pattern.
+   Directly guards refactor risk R1/R4.
+2. **`stop-nrepl!` match-port deletion** (edge/boundary): no coverage that `stop-nrepl!`
+   deletes `.nrepl-port` only when its contents equal the running server port, and
+   leaves a non-matching file intact. Need both branches (matching → deleted;
+   non-matching → preserved).
+3. **Session `:nrepl-runtime` publication via `accessors/set-nrepl-runtime-in!`** (edge):
+   test1 exercises only the `nrepl-runtime-atom` resolver path — `app-runtime/session-state`
+   has no `:ctx`, so the nested `when-let [ctx …] (when-let [session-id …] …)` direct-mutation
+   publication branch is never taken. Need a test that, with a ctx + active session id present
+   in `session-state`, the bound (random) port is published into session `:nrepl-runtime`
+   (and the gate's negative path — absent ctx / absent session id ⇒ no publication).
+4. **stderr connection notice** (boundary): the literal
+   `"  nREPL : host:port (connect with your editor)"` is emitted to stderr (not stdout).
+   test2 asserts only the mocked start-server println, not this notice. Need a captured-stream
+   assertion of the notice on stderr and its absence from stdout.
+
+All four are concretely specified in `steps.md` Slice 0 and are routine to author
+(real filesystem/stream seams, tmp-dir + `user.dir` pattern). No infeasibility:
+the target is live-testable end-to-end (test1 already starts/stops a real server).
+
+CHARACTERIZATION_STATUS: FIXABLE_GAPS
+
+Gate decision: net is GREEN but INSUFFICIENT — four observable surfaces uncovered,
+all coinciding with the refactor's stated risks (R1 stdout routing, `.nrepl-port`
+side effects, gated publication). Phase 0 gate does NOT pass; Phase 1 simplification
+must not proceed until these four characterization tests are added and green.
