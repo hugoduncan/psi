@@ -68,3 +68,35 @@ Executed both unchecked design-steps added by review pass `c7f7bd4d6`. Resolved 
    honest.
 
 No code touched; design-only refinement. Both design-steps marked done.
+
+## Design review — inconsistency (ψ)
+
+Reviewed `design.md` for internal inconsistency and design-vs-artifact mismatch
+(not ambiguity/architecture). **No new actionable inconsistency found.**
+
+Verified consistent against referenced artifacts:
+- Line numbers (`start-nrepl!` 12–38, `stop-nrepl!` 40, public wrapper 117–122)
+  match `nrepl_runtime.clj` / `app_runtime.clj`.
+- `lcc-total` `6.015383232244966` matches `before-local.json`; `gap`
+  `2.0051277440816553` = lcc-total / cc(3) (exact). Arity 4 / wrapper arity 1 match.
+- Test ns `psi.app-runtime-nrepl-test` and both deftest names
+  (`nrepl-runtime-eql-reflects-live-start-stop-test`,
+  `start-nrepl-redirects-startup-chatter-to-stderr-test`) match the test file;
+  consumer `psi.main` calls `app-runtime/start-nrepl!`.
+- A3 gate flags (`--baseline`, `--fail-on new-cycles,new-high-findings`,
+  `--max-new-medium-findings`) all exist in `bb gordian gate --help`; `--baseline`
+  expects a diagnose-style snapshot, matching `before-diagnose.edn`
+  (`diagnose --edn`).
+- All four rejected higher-gap candidates exist at the cited namespaces
+  (`start-tui-runtime!`, `print-help!`, `launcher-main/print-debug-summary!`,
+  `adopt-startup-plan-into-session!`).
+- Phase 0 behavioural claims (`.nrepl-port` write + `deleteOnExit`, match-port
+  deletion in `stop-nrepl!`, stderr notice text, nested `when-let` publication
+  using bound port) match the current code.
+
+Non-issue checked: design's gloss that the existing stderr-redirect test shows
+"both println and System/out redirected to stderr" — the test asserts both absent
+from stdout and println present in stderr; the redirect mechanism
+(`binding *out* *err*` + `System/setOut`) does route both to stderr, so the
+behavioural description is accurate (a test-strength nuance, not a design
+contradiction; Phase 0 already plans real-seam strengthening). No follow-up added.
