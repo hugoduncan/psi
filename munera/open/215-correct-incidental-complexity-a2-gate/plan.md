@@ -58,8 +58,9 @@ Concrete edit targets (verified against the live tree):
 
 ## Risks
 
-- **Content-lock test coupling.** Editing the emitter `:text` necessarily breaks the two
-  net-sum assertions. Mitigation: update them in the same slice as the emitter edit so the
+- **Content-lock test coupling.** Editing the emitter `:text` necessarily breaks all three
+  net-sum A2 content-lock assertions (lines 299/301 literal net-sum strings + the line-295
+  `(ns, var, arity, line)` key assertion). Mitigation: update them in the same slice as the emitter edit so the
   workflow-loader suite stays green; do not delete coverage — re-point it at the new A2.
 - **EDN well-formedness.** The `:text` is a single large escaped string; an unbalanced
   quote/paren breaks loading. Mitigation: run `clj-paren-repair` after the edit and load

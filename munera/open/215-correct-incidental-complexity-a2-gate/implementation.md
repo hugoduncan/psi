@@ -383,3 +383,32 @@ PA1 step; it did not reconcile the surviving "two" counts and in fact asserted p
   correct-the-plan sub-instruction since the concrete-targets count is already three.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+---
+
+## Plan/steps inconsistency follow-ups PI1–PI3 executed (2026-06-06)
+
+Executed the three newly-added inconsistency follow-ups (added by inconsistency review
+`274211c8b`). Artifact-only — no code/tests/docs touched (none referenced; all three target
+the residual two-vs-three net-sum content-lock count drift across plan.md/steps.md).
+
+- **PI1 (done):** plan.md Risks "Content-lock test coupling" bullet now reads "breaks **all
+  three** net-sum A2 content-lock assertions (lines 299/301 literal net-sum strings + the
+  line-295 `(ns, var, arity, line)` key assertion)", matching "Concrete edit targets" #2's
+  three-assertion enumeration. The plan is now self-consistent (three everywhere).
+- **PI2 (done):** scoped the slice-1 primary content-lock step to "the **two literal
+  net-sum string** content-lock assertions (lines 299/301)" and appended a cross-reference
+  that the **third** (line-295 key) assertion is handled by the PA1 step + plan.md targets
+  #2 (chose the explicit-scope option over folding line-295 in, keeping the PA1 split the
+  plan already established).
+- **PI3 (done):** replaced the PA1 step's stale "Correct the plan's 'Two assertions … will
+  break' to three" instruction with a count-reconciliation note: targets #2 already reads
+  "Three"; the only residual "two" is the plan Risks bullet, corrected by PI1 — no further
+  count edit required in the PA1 step. The instruction no longer references a plan state
+  that no longer exists.
+
+Net effect: "three" is now the single consistent count across plan.md (targets #2 + Risks)
+and steps.md (slice-1 primary step + PA1 + PI section); the PA1 step no longer carries a
+dangling reference to a removed "two assertions" plan phrase.
+
+PASS_STATUS: FOLLOW_UPS_COMPLETE

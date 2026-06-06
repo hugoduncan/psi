@@ -22,26 +22,31 @@
       preserved (A5, A2, A3 — no renumbering, no A1/A4).
 - [ ] Run `clj-paren-repair .psi/workflows/reduce-incidental-complexity.edn` and re-read the
       file to confirm delimiters/format are intact.
-- [ ] Update the two net-sum content-lock assertions in
+- [ ] Update the two literal net-sum string content-lock assertions (lines 299/301) in
       `components/workflow-loader/test/psi/workflow_loader/task_209_workflow_definitions_test.clj`
       (`reduce-incidental-complexity-test`, "select-and-create prompt preserves … contracts"):
       remove `"after total is strictly less than the before total"` and
       `"the set is computed from the metric, not from the diff/touched files"`; add
       assertions locking the new A2 wording (e.g. the `after(u) < B` ceiling phrase,
       `before-max`, and the line-insensitive `(ns, var, arity)` / per-physical-row phrasing).
+      The **third** net-sum-coupled assertion (the line-295 `identified by `(ns, var, arity,
+      line)`` key) is handled separately by the PA1 step below — see plan.md "Concrete edit
+      targets" #2, which counts all three.
 - [ ] Run the workflow-loader suite (`reduce-incidental-complexity-test` +
       `task-209-workflow-set-loads-together-test`); confirm `load-edn-only` succeeds and all
       content-lock assertions are green.
 - [ ] `clj-kondo --lint` the touched test file; fix any findings.
 - [ ] **PA1 (plan/steps ambiguity):** handle the *third* net-sum-bound content-lock
-      assertion the plan's "two assertions" count omits. In
+      assertion the slice-1 primary step's two-literal-string scope (lines 299/301) omits. In
       `reduce-incidental-complexity-test` the line-295 assertion
       `(is (.contains select-text "identified by `(ns, var, arity, line)`"))` locks text
       emitted **only** by the net-sum A2 bullet and will also break on the A2 replacement.
       Remove it or re-point it at the new line-insensitive `(ns, var, arity)` A2 key; do
       **not** preserve the line-bearing phrase against the new A2. Explicitly leave the
       adjacent **A5** line-294 lock `"keyed by `(ns, var, arity, line)`"` intact (A5 keeps
-      its line-bearing key). Correct the plan's "Two assertions … will break" to three.
+      its line-bearing key). (Count reconciliation: plan.md "Concrete edit targets" #2
+      already reads "Three"; the only residual "two" is the plan Risks bullet, corrected by
+      PI1 below — no further count edit required here.)
 - [ ] Commit: `⊨ reduce-incidental-complexity: replace net-sum A2 with per-unit A2a/A2b gate`.
 
 ## Slice 2 — Skill alignment confirmation (acceptance 3)
@@ -82,16 +87,16 @@
 
 ## Plan/steps review follow-ups — inconsistencies
 
-- [ ] **PI1:** Reconcile plan.md's self-contradictory count. The Risks section
+- [x] **PI1:** Reconcile plan.md's self-contradictory count. The Risks section
       "Content-lock test coupling" still says "breaks **the two** net-sum assertions"
       while "Concrete edit targets" #2 says "**Three** assertions … will break". Update
       the Risks bullet to three (or "all three").
-- [ ] **PI2:** Align this slice-1 primary content-lock step (currently "Update **the two**
+- [x] **PI2:** Align this slice-1 primary content-lock step (currently "Update **the two**
       net-sum content-lock assertions") with plan.md's three-assertion framing — either
       fold the line-295 `identified by …` key assertion into it, or explicitly scope it to
       "the two literal net-sum strings (lines 299/301)" and cross-reference the PA1 step
       for the line-295 key assertion.
-- [ ] **PI3:** Fix the stale plan cross-reference in the PA1 step: it says "Correct the
+- [x] **PI3:** Fix the stale plan cross-reference in the PA1 step: it says "Correct the
       plan's 'Two assertions … will break' to three", but plan.md's concrete-targets
       section already reads "Three"; the only surviving "two" is the Risks bullet (PI1).
       Re-point the PA1 count-correction at the Risks bullet, or drop it as already done.
