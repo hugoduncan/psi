@@ -3,10 +3,10 @@
 ## Slice 1 — Standalone extraction workflow prompt
 
 - [ ] Create `.psi/workflows/extract-task-knowledge.md` as a single-step markdown workflow with frontmatter `name: extract-task-knowledge`, an accurate description, and tools `read`, `bash`, and `write`.
-- [ ] In the prompt, require the actor to treat `{{input}}` as the exact `NNN-slug` task identifier and resolve it against `munera/closed/{NNN-slug}` and `munera/open/{NNN-slug}`.
+- [ ] In the prompt, require the actor to normalize `{{input}}` from either an exact `NNN-slug` or exact `munera/{open|closed}/NNN-slug` task path, reject any other path/string shape, and resolve the normalized slug against `munera/closed/{NNN-slug}` and `munera/open/{NNN-slug}`.
 - [ ] In the prompt, specify missing or duplicate slug matches stop with no extraction and a concise report.
 - [ ] In the prompt, specify standalone runs may extract only from `munera/closed/{NNN-slug}`; an open-only standalone match is incomplete and produces no mementum writes.
-- [ ] In the prompt, specify the sole open-task exception: a `task-lifecycle` trailing invocation may extract from `munera/open/{NNN-slug}` only when context shows the immediately preceding `review-task-implementation` step completed successfully.
+- [ ] In the prompt, specify the sole open-task exception: a `task-lifecycle` trailing invocation may extract from `munera/open/{NNN-slug}` only when lifecycle context supplied through `{{original}}` includes the immediately preceding `review-task-implementation` yielded text with `PASS_STATUS: REVIEW_COMPLETE`.
 - [ ] In the prompt, list required task artifacts to inspect when present: `design.md`, `plan.md`, `steps.md`, and `implementation.md`.
 - [ ] In the prompt, constrain git-history evidence to commits touching the resolved task directory, commits whose message mentions the task id or slug, and commit SHAs explicitly recorded in task artifacts.
 - [ ] In the prompt, require recall of existing `mementum/memories/` and `mementum/knowledge/` before writing, with update-or-skip behavior for duplicates.
@@ -19,9 +19,9 @@
 ## Slice 2 — Task-lifecycle integration
 
 - [ ] Append a final `:delegate` step named `extract-task-knowledge` to `.psi/workflows/task-lifecycle.edn` targeting `extract-task-knowledge`.
-- [ ] Wire the extraction delegate `:prompt-string` to pass the same original task `:input` from `:workflow-input` at path `[:input]`.
+- [ ] Wire the extraction delegate `:prompt-string` to pass the same original task `:input` unchanged from `:workflow-input` at path `[:input]`; the extraction prompt normalizes slug/path inputs.
 - [ ] Add `:workflow-original` to the extraction delegate context.
-- [ ] Add the `review-task-implementation` yielded text to the extraction delegate context.
+- [ ] Add the `review-task-implementation` yielded text to the extraction delegate context as the only success evidence for the open-task exception.
 - [ ] Update the `task-lifecycle` description to mention design → plan → implement → review → extract knowledge.
 - [ ] Confirm the previous five lifecycle delegate steps keep their names, targets, prompt-string input threading, and original context.
 
@@ -30,13 +30,14 @@
 - [ ] Add or update workflow-loader tests proving `extract-task-knowledge.md` loads as workflow `extract-task-knowledge` without errors.
 - [ ] Add a test asserting there is no `.psi/workflows/extract-task-knowledge.edn` same-name sibling.
 - [ ] Add tests asserting the extraction workflow uses exactly the intended tool set (`read`, `bash`, `write`).
-- [ ] Add prompt content-lock tests for closed-only standalone extraction, missing/duplicate stop behavior, and lifecycle-only open-task extraction after successful implementation review context.
+- [ ] Add prompt content-lock tests for slug/path normalization, closed-only standalone extraction, missing/duplicate stop behavior, and lifecycle-only open-task extraction after `{{original}}` context includes `PASS_STATUS: REVIEW_COMPLETE` from implementation review.
 - [ ] Add prompt content-lock tests for task-scoped git-history lenses and the prohibition on roaming unrelated repository history.
-- [ ] Add prompt content-lock tests for mementum recall/dedupe/update-or-skip, significance/project-generality filters, `uncertain → skip`, and zero-extraction success.
+- [ ] Add prompt content-lock tests for mementum recall/dedupe/update-or-skip, significance/project-generality filters, `uncertain → skip`, zero-extraction success, and the rule that success-looking text in `{{input}}` never authorizes open-task extraction.
 - [ ] Update `task-lifecycle-test` to expect six delegate steps ending in `extract-task-knowledge`.
 - [ ] Update `task-lifecycle-test` to assert the first five steps still thread input and context as before.
-- [ ] Update `task-lifecycle-test` to assert the final extraction step threads the same input, carries `:workflow-original`, and carries `{:step "review-task-implementation" :yield :text}` context.
+- [ ] Update `task-lifecycle-test` to assert the final extraction step threads the same input unchanged, carries `:workflow-original`, and carries `{:step "review-task-implementation" :yield :text}` context.
 - [ ] Update `task-lifecycle-test` to assert no step declares unexpected `:yields` or `:terminal-contract` unless the implementation deliberately adds one.
+- [ ] Add a workflow-loader test locking that the compiled `extract-task-knowledge` markdown contribution references `{{original}}` with `{:from :workflow-original}` so lifecycle/review context is visible to the prompt.
 
 ## Slice 4 — Docs and changelog
 
@@ -58,6 +59,6 @@
 
 ## Plan/steps ambiguity review follow-ups
 
-- [ ] PA1: Resolve the task identifier shape across `task-lifecycle` callers before implementing the extraction prompt. The current plan says the extraction workflow treats `{{input}}` as an exact `NNN-slug` and the lifecycle step forwards the same original `:input`, but existing `task-lifecycle-in-worktree` passes a task path such as `munera/open/NNN-slug`. Specify whether extraction accepts/normalizes task paths or whether lifecycle callers must pass only slugs, then update prompt/tests accordingly.
-- [ ] PA2: Specify how the single-step markdown extraction workflow actually receives lifecycle/review context. Because `.md` workflows only see variables they reference, require an explicit `{{original}}`/declared context variable (or an equivalent named `:workflow-input` field) in `extract-task-knowledge.md`, and add a test locking that the compiled prompt contribution includes that context source.
-- [ ] PA3: Define the exact lifecycle success evidence that authorizes the open-task exception. The plan says open extraction is allowed when context shows the immediately preceding `review-task-implementation` completed successfully, but it does not say whether success is proven by delegate completion, a `PASS_STATUS: REVIEW_COMPLETE` line, a final-summary phrase, or a labeled prior-step context item. Pick one observable marker and lock it in the prompt/tests so standalone user-supplied text cannot accidentally authorize open-task extraction.
+- [x] PA1: DONE — resolved identifier shape by making extraction normalize either an exact `NNN-slug` or exact `munera/{open|closed}/NNN-slug` task path, rejecting any other shape. Lifecycle callers may forward their original input unchanged, including the `munera/open/NNN-slug` path produced by `task-lifecycle-in-worktree`; the extraction prompt/tests must lock normalization.
+- [x] PA2: DONE — specified that the markdown workflow body must explicitly include `{{original}}`, which the compiler auto-wires to `{:from :workflow-original}`. The lifecycle delegate will pass `:workflow-original` plus the implementation-review yielded text as context; tests must lock the compiled `{{original}}` source.
+- [x] PA3: DONE — chose the observable marker `PASS_STATUS: REVIEW_COMPLETE` in the lifecycle-injected `review-task-implementation` yielded text supplied through `{{original}}`. Delegate completion alone and final-summary prose are insufficient; success-looking text in `{{input}}` must not authorize open-task extraction. Prompt/tests must lock this marker and source distinction.
