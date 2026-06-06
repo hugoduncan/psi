@@ -33,7 +33,14 @@
    :prompt-string
    {:type :map,
     :fields {:input {:from :workflow-input, :path [:input]}}},
-   :context [{:type :source, :from :workflow-original}]}
+   :context [{:type :source, :from :workflow-original}],
+   :judge
+   {:type :invoke,
+    :operation "workflow/pass-status-routing",
+    :args {:text {:from {:step "review-task-implementation", :yield :text}},
+           :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}},
+   :on {"DONE" {:goto "extract-task-knowledge"},
+        "REPEAT" {:goto "final-summary-without-extraction"}}}
   {:name "extract-task-knowledge",
    :type :delegate,
    :target "extract-task-knowledge",
@@ -42,8 +49,24 @@
     :fields {:input {:from :workflow-input, :path [:input]}
              :implementation-review-yield
              {:from {:step "review-task-implementation", :yield :text}}}},
-   :context [{:type :source, :from :workflow-original}]}],
+   :context [{:type :source, :from :workflow-original}],
+   :judge {:type :invoke,
+           :operation "workflow/constant-routing",
+           :args {:route "DONE"}},
+   :on {"DONE" {:goto :done}}}
+  {:name "final-summary-without-extraction",
+   :type :session,
+   :tools ["read" "bash"],
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "review-task-implementation", :yield :text}}
+    {:type :template,
+     :text "Produce the user-facing final result for the Munera task lifecycle described by {{input}} when implementation review did not complete cleanly. Summarize the design → plan → implement → review outcome, explain that extract-task-knowledge was not invoked because `review-task-implementation` did not yield `PASS_STATUS: REVIEW_COMPLETE`, and preserve the implementation-review outcome. Do not extract or write mementum knowledge here.\n\nInput:\n{{input}}",
+     :vars {"input" {:from :workflow-input, :path [:input]}}}],
+   :judge {:type :invoke,
+           :operation "workflow/constant-routing",
+           :args {:route "DONE"}},
+   :on {"DONE" {:goto :done}}}],
  :name "task-lifecycle",
  :description
- "Run a Munera task through its full design → plan → implement → review → extract knowledge lifecycle by chaining the six task-lifecycle workflows in order."}
-
+ "Run a Munera task through its full design → plan → implement → review → extract knowledge lifecycle by chaining the task-lifecycle workflows in order, extracting knowledge only after implementation review completes."}

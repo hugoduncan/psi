@@ -45,8 +45,8 @@ MemoryArtifacts ≡ {working_memory memories knowledge}   ⟨mementum — own pr
   | change_chain ∉ MemoryArtifacts   ⟨change_chain governs {meta spec tests code doc}⟩
   | post(change_chain) → suggest(trigger(mementum,δ,summary))   ⟨non-authoritative handoff only⟩
   | autonomous_artifact_extraction ≡ workflow(extract-task-knowledge)
-      ∧ source((closed_munera_task_artifacts ∨ lifecycle_post_review_open_task_artifacts) ∪ task_scoped_git_history)
-      ∧ lifecycle_post_review_open_task_artifacts → invoked_by(task-lifecycle) ∧ after(successful(review-task-implementation))
+      ∧ source((munera_task_artifacts ∨ lifecycle_post_review_task_artifacts) ∪ task_scoped_git_history)
+      ∧ lifecycle_post_review_task_artifacts → invoked_by(task-lifecycle) ∧ after(successful(review-task-implementation))
       ∧ filter(gate-1 ∧ gate-2 ∧ project_general ∧ significant ∧ dedupe_recall ∧ uncertain→skip)
       ∧ commit(mementum_conventions)
   | mementum governs MemoryArtifacts   ⟨gate-1 ∧ gate-2 ∧ (approval_gate ∨ autonomous_artifact_extraction) ∈ mementum⟩

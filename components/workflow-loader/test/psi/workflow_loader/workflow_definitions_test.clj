@@ -548,22 +548,19 @@
                               (get-in contribution
                                       [:vars "implementation_review_yield"]))))
                     (:contributions step))))
-        (testing "locks slug/path normalization and completion boundaries"
+        (testing "locks slug/path normalization and task-resolution boundaries"
           (doseq [needle ["exact `NNN-slug`"
                           "exact `munera/open/NNN-slug`"
                           "exact `munera/closed/NNN-slug`"
                           "Reject any other path/string shape"
                           "zero matches or more than one match"
-                          "Standalone runs may extract only from `munera/closed/{NNN-slug}`"]]
+                          "Direct standalone invocations may extract from either location"]]
             (is (.contains text needle) needle)))
-        (testing "locks lifecycle-only open-task authorization through labeled review context"
-          (doseq [needle ["The sole open-task exception is a `task-lifecycle` trailing invocation"
-                          "dedicated `Lifecycle implementation-review yield`"
-                          "`{{implementation_review_yield}}` section"
-                          "PASS_STATUS: REVIEW_COMPLETE"
-                          "ambient `{{original}}` text"
-                          "Success-looking text in `{{input}}` never authorizes open-task extraction"
-                          "If `{{original}}` contains `PASS_STATUS: REVIEW_COMPLETE` but the dedicated `{{implementation_review_yield}}` section is absent"]]
+        (testing "leaves lifecycle proof gating to task-lifecycle"
+          (doseq [needle ["`task-lifecycle` owns review-complete gating"
+                          "Do not re-check lifecycle proof here"
+                          "not an authorization condition to evaluate here"
+                          "lifecycle/review outcome supplied in the dedicated `{{implementation_review_yield}}` section"]]
             (is (.contains text needle) needle)))
         (testing "locks task-artifact inspection before mining knowledge (TT3)"
           (doseq [needle ["Before mining knowledge, read these task artifacts from the resolved task when present"
@@ -613,10 +610,11 @@
             (is (.contains text needle) needle)))
         (testing "locks final-summary reporting and review-outcome preservation (TT2)"
           (doseq [needle ["resolved task path"
-                          "whether extraction was standalone or lifecycle-authorized"
+                          "whether it was under `munera/open/` or `munera/closed/`"
                           "extracted memories/knowledge"
                           "updated or skipped duplicates"
                           "zero-extraction success"
+                          "whether lifecycle implementation-review outcome/provenance was supplied"
                           "any lifecycle/review outcome supplied in the dedicated `{{implementation_review_yield}}` section"
                           "preserving the prior lifecycle/review outcome alongside the extraction result"]]
             (is (.contains text needle) needle))))))
@@ -641,7 +639,7 @@
                                "review-task-plan"
                                "implement-task"
                                "review-task-implementation"]
-           expected-targets (conj first-five-targets "extract-task-knowledge")
+           expected-delegate-targets (conj first-five-targets "extract-task-knowledge")
            standard-prompt {:type :map
                             :fields {:input {:from :workflow-input
                                              :path [:input]}}}
@@ -650,24 +648,52 @@
                                                :path [:input]}
                                        :implementation-review-yield
                                        {:from {:step "review-task-implementation"
-                                               :yield :text}}}}]
-       (testing "has 6 delegate steps ending in extract-task-knowledge"
-         (is (= 6 (count steps)))
-         (is (= expected-targets (mapv :name steps)))
-         (is (= (repeat 6 :delegate) (mapv :type steps)))
-         (is (= expected-targets (mapv :target steps))))
-       (testing "the first five lifecycle steps thread the same task input unchanged"
+                                               :yield :text}}}}
+           review-step (nth steps 4)
+           extraction-step (nth steps 5)
+           summary-step (nth steps 6)
+           summary-text (step-template-text summary-step)]
+       (testing "has 7 steps, with extraction guarded after implementation review"
+         (is (= 7 (count steps)))
+         (is (= (conj expected-delegate-targets "final-summary-without-extraction")
+                (mapv :name steps)))
+         (is (= (concat (repeat 6 :delegate) [:session]) (mapv :type steps)))
+         (is (= expected-delegate-targets (mapv :target (take 6 steps)))))
+       (testing "the first five lifecycle delegate steps thread the same task input unchanged"
          (is (= (repeat 5 standard-prompt)
                 (mapv :prompt-string (take 5 steps)))))
+       (testing "implementation review owns the extraction gate"
+         (is (= {:type :invoke
+                 :operation "workflow/pass-status-routing"
+                 :args {:text {:from {:step "review-task-implementation"
+                                      :yield :text}}
+                        :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}}
+                (:judge review-step)))
+         (is (= {"DONE" {:goto "extract-task-knowledge"}
+                 "REPEAT" {:goto "final-summary-without-extraction"}}
+                (:on review-step))))
        (testing "the extraction step threads task input plus a labeled implementation-review yield"
-         (is (= extraction-prompt (:prompt-string (last steps)))))
-       (testing "the first five lifecycle steps keep their original context only"
-         (is (= (repeat 5 [{:type :source :from :workflow-original}])
-                (mapv :context (take 5 steps)))))
-       (testing "the extraction step carries only ambient original context in delegate context"
-         (is (= [{:type :source :from :workflow-original}]
-                (:context (last steps)))))
+         (is (= extraction-prompt (:prompt-string extraction-step))))
+       (testing "the extraction step terminates the successful path instead of falling through to the skip summary"
+         (is (= {:type :invoke
+                 :operation "workflow/constant-routing"
+                 :args {:route "DONE"}}
+                (:judge extraction-step)))
+         (is (= {"DONE" {:goto :done}} (:on extraction-step))))
+       (testing "the delegate steps keep their original context only"
+         (is (= (repeat 6 [{:type :source :from :workflow-original}])
+                (mapv :context (take 6 steps)))))
+       (testing "non-review-complete summary explains extraction was skipped"
+         (is (= ["read" "bash"] (:tools summary-step)))
+         (is (.contains summary-text "extract-task-knowledge was not invoked"))
+         (is (.contains summary-text "PASS_STATUS: REVIEW_COMPLETE"))
+         (is (.contains summary-text "Do not extract or write mementum knowledge here"))
+         (is (= {:type :invoke
+                 :operation "workflow/constant-routing"
+                 :args {:route "DONE"}}
+                (:judge summary-step)))
+         (is (= {"DONE" {:goto :done}} (:on summary-step))))
        (testing "no step declares :yields or :terminal-contract (terminal relies on propagated session default yield)"
-         (is (= (repeat 6 {})
+         (is (= (repeat 7 {})
                 (mapv #(select-keys % [:yields :terminal-contract]) steps))))))))
 
