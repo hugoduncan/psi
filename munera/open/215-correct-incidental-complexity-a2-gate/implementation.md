@@ -882,3 +882,27 @@ After adding TR-T6/TR-T7 locks, re-run the workflow-loader suite
 `clj-kondo --lint` the test file to confirm green + clean.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+---
+
+## Test review re-pass execution (TR-T6, TR-T7) — done
+
+Both locks added to `reduce-incidental-complexity-test`
+("select-and-create prompt preserves … contracts") in
+`components/workflow-loader/test/psi/workflow_loader/task_209_workflow_definitions_test.clj`,
+immediately after the TR-T5 line-bearing-`B` lock:
+
+- **TR-T6** (objectivity): three positive `.contains` locks —
+  `a deterministic numeric procedure over two JSON artifacts`,
+  `the same KIND of objective check as A3`, `not agent judgement`. Guards against a
+  reword of A2 into a subjective/agent-judgement check.
+- **TR-T7** (order-insensitive multiset `T`-formation): two positive `.contains` locks —
+  `an order-insensitive set comparison`, `not a per-line pairing`. Guards against a
+  per-line-pairing join regression that TR-T1's `never a sum` lock would miss.
+
+All target wording verified present in the emitter EDN before locking (no production
+change needed — these are content locks over the already-landed A2 text).
+
+Verification: `bb clojure:test:scry --ns psi.workflow-loader.task-209-workflow-definitions-test`
+→ 3 tests / 215 assertions / 0 fail / 0 error (assertion count rose 196 → 215 with the new
+locks). `clj-kondo --lint` of the test file → 0 errors / 0 warnings.

@@ -335,6 +335,19 @@
          ;; key. A regression reverting `B`'s lookup to `(ns, var, arity)` reopens the
          ;; 51-row `execute-effect!` defmethod ambiguity RI1 fixed.
          (is (.contains select-text "located by its line-bearing `(ns, var, arity, line)`"))
+         ;; TR-T6: the objective / deterministic-numeric-procedure (¬agent-judgement)
+         ;; invariant — A2 must be an objective numeric check (the same KIND as A3), not
+         ;; agent judgement. A reword into a judgement-based check would silently
+         ;; reintroduce the subjectivity the redesign removes and stay green.
+         (is (.contains select-text "a deterministic numeric procedure over two JSON artifacts"))
+         (is (.contains select-text "the same KIND of objective check as A3"))
+         (is (.contains select-text "not agent judgement"))
+         ;; TR-T7: order-insensitive multiset `T`-formation (¬per-line-pairing) — keeps
+         ;; the non-unique 51-row `execute-effect!` defmethod key well-posed. TR-T1 only
+         ;; catches a sum-regression; a regression to a per-line pairing join (not a sum,
+         ;; but breaking non-unique-key handling) is otherwise uncaught.
+         (is (.contains select-text "an order-insensitive set comparison"))
+         (is (.contains select-text "not a per-line pairing"))
          (is (.contains select-text "Commit the task creation on the current branch"))
          (is (.contains select-text "Do NOT push or open a PR")))
        (testing "clean-baseline step locks the clean-source precondition and baseline artifact contract"

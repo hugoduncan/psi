@@ -175,7 +175,7 @@
 
 ## Test review re-pass follow-ups (ψ, task-test-review)
 
-- [ ] **TR-T6:** Add a regression guard for the objective / deterministic-numeric-procedure
+- [x] **TR-T6:** Add a regression guard for the objective / deterministic-numeric-procedure
       (¬agent-judgement) invariant in `reduce-incidental-complexity-test`
       ("select-and-create prompt preserves … contracts"). The design's Constraints +
       Acceptance require A2 be *objective* (concrete numeric comparisons), and the emitter
@@ -185,7 +185,7 @@
       redesign removes and stay green. Add a content-lock on `the same KIND of objective
       check as A3` (and/or `not agent judgement` / `a deterministic numeric procedure over
       two JSON artifacts`).
-- [ ] **TR-T7:** Lock the order-insensitive multiset `T`-formation (¬per-line-pairing). The
+- [x] **TR-T7:** Lock the order-insensitive multiset `T`-formation (¬per-line-pairing). The
       design forms `T` by an order-insensitive multiset comparison ("an order-insensitive set
       comparison — never a sum"; `before-max` is "not a sum, not a per-line pairing") so the
       non-unique 51-row `execute-effect!` defmethod key stays well-posed. The TR-T1 `never a
