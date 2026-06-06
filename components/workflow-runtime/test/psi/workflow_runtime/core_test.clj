@@ -84,6 +84,38 @@
       (is (= "session-delegator"
              (get-in run [:history 0 :data :parent-session-id]))))))
 
+(deftest create-run-preserves-delegating-run-id-test
+  (testing "create-run persists the delegating run id for nested :delegate-step
+            sub-runs and the run validates against workflow-run-schema"
+    (let [[state1 definition-id _]
+          (workflow-registry/register-definition {:workflows (workflow-model/initial-workflow-state)}
+                                                 registered-definition)
+          [_ _ run]
+          (workflow-runtime/create-run state1 {:definition-id definition-id
+                                               :run-id "nested-run"
+                                               :parent-session-id "session-delegator"
+                                               :delegating-run-id "parent-run"
+                                               :workflow-input {:task "ship it"}})]
+      (is (= "parent-run" (:delegating-run-id run))
+          "nested run records its delegating parent run id")
+      (is (workflow-model/valid-workflow-run? run)
+          "run with delegating-run-id validates against the schema"))))
+
+(deftest create-run-without-delegating-run-id-omits-key-test
+  (testing "create-run without :delegating-run-id omits the key so top-level
+            runs are distinguishable from nested sub-runs (back-compat)"
+    (let [[state1 definition-id _]
+          (workflow-registry/register-definition {:workflows (workflow-model/initial-workflow-state)}
+                                                 registered-definition)
+          [_ _ run]
+          (workflow-runtime/create-run state1 {:definition-id definition-id
+                                               :run-id "top-level-run"
+                                               :parent-session-id "session-delegator"
+                                               :workflow-input {:task "ship it"}})]
+      (is (not (contains? run :delegating-run-id))
+          "top-level run has no delegating-run-id key")
+      (is (workflow-model/valid-workflow-run? run)))))
+
 (deftest create-run-persists-inherited-defaults-snapshot-test
   (testing "create-run records the inherited-defaults snapshot verbatim and the
             run validates against workflow-run-schema (task 207)"
