@@ -82,3 +82,4 @@
 ## Code-shaper review follow-ups
 
 - [x] CS1: DONE — updated `.psi/workflows/task-lifecycle-in-worktree.edn`'s positive-path summary prompt and workflow-loader tests so wrapper callers report the full design → plan → implement → review → extract-knowledge lifecycle, including the extraction result preserved by the inner `task-lifecycle` yield; preserved the existing `NO_TARGET` branch unchanged.
+- [ ] CS2: Tighten `.psi/workflows/extract-task-knowledge.md` and workflow-loader content locks so autonomous mementum commits stage/commit only extraction-owned `mementum/memories/` and `mementum/knowledge/` changes, explicitly leaving unrelated dirty worktree changes untouched and reporting/blocking rather than sweeping them into a mementum commit.
