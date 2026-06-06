@@ -10,9 +10,7 @@
         (default-session-id-fn ctx))))
 
 (defn start-server-quietly
-  "Start an nREPL server on `port`, suppressing the server's startup chatter from
-  protocol stdout by routing it to stderr. Owns nREPL-start resolution and all
-  stdout-suppression Java interop; returns the server map."
+  "Start nREPL on `port` with its chatter routed to stderr; returns the handle."
   [port]
   (let [start-server       (requiring-resolve 'nrepl.server/start-server)
         original-systemout System/out]

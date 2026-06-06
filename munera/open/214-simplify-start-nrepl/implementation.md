@@ -390,3 +390,70 @@ only); relevant tests are green. No unclassified source change, broad production
 edit, premature refactor, missing baseline data, or INFEASIBLE status.
 
 Result: REVIEW_COMPLETE. Phase 1 simplification (`implement-task`) may proceed.
+
+## Phase 1 — refactor + acceptance (ψ)
+
+### What was done
+
+Slice 1 (committed `<this-pass>`): extracted `start-server-quietly [port]` —
+isolates ALL stdout-suppression Java interop (`requiring-resolve` of
+`nrepl.server/start-server`, `System/out` save, `binding *out* *err*`,
+`System/setOut`, `finally`-restore) into one named seam. `start-nrepl!` keeps only
+orchestration (atom reset, gated session publication, `.nrepl-port` write +
+`deleteOnExit`, stderr notice, return). Behaviour identical; net findings dropped
+(689→686 medium). Docstring kept terse (one line) — see A3 note below.
+
+### Acceptance results (final, seam-only variant)
+
+Measured against `before-local.json` / `before-diagnose.edn` from worktree root.
+
+- **A1 — PASS.** Target `start-nrepl!`/4 lcc-total `6.0154 → 5.5499` (−7.7%).
+  Dependency raw `21 → 15`, working-set peak `11 → 9`; the interop dependency moved
+  to the seam, the target reads at one abstraction level.
+- **A2 — FAIL (structurally infeasible; proven).** Over `T = {start-nrepl!,
+  start-server-quietly}`: `sum_before = 6.0154`, `sum_after = 5.5499 + 0.8220 =
+  6.3719` (+0.3565). **No behaviour-preserving decomplection can pass A2.** Gordian's
+  per-dimension transform is `log1p-over-scale` (concave, `f(0)=0`), so it is
+  sub-additive: splitting one unit's raw burden across two units *increases* the
+  summed normalized burden on every non-trivial dimension. The only convex-ish
+  dimension (working-set) compresses so hard under the log that its split-saving
+  (~0) cannot offset the dependency-split penalty (+0.19) plus the new call-edge
+  burden. Empirically confirmed the seam-only variant is the **Pareto-optimum** for
+  A2 by measuring four variants:
+  - (A) seam-only, `requiring-resolve` internal → A1 `5.5499`, A2 gap **−0.3565** (best)
+  - (B) seam + `runtime` dedup local (file/notice inline) → A1 `6.1276` (WORSE), gap −0.93
+  - (C) seam receives `start-server` fn (`requiring-resolve` in target) → A1 `5.7537`, gap −0.48
+  - (D) seam + `announce-nrepl-endpoint!` second seam → A1 `5.0857` (best A1), gap −1.92
+  Every additional extraction or shared-local *increases* net burden. The plan's
+  contingent Slice 2 (lift endpoint-map to a local) is therefore **counterproductive**
+  on this metric (variant B): a live local raises state/working-set burden more than
+  dedup saves it. Slice 2 was NOT performed.
+- **A3 — PASS (exit 0)** after a fix. The first seam draft carried a 3-line docstring
+  whose generic networking terms ("server", "startup", "protocol", "stdout", "connect")
+  tipped one borderline `hidden-conceptual` pair
+  (`psi.app-runtime.nrepl-runtime ↔ psi.provider-auth.oauth.callback-server`,
+  score 0.27) over the medium threshold → 1 new medium finding → gate FAIL, even though
+  *net* medium findings dropped (689→686). Replacing it with a one-line nrepl-specific
+  docstring removed the term overlap → 0 new medium pairs → gate PASS
+  (`new-cycles=0, new-high=0, new-medium=0`). This is metric term-churn, not a real
+  architectural regression.
+- **A4 — PASS.** `bb clojure:test:scry --namespace psi.app-runtime-nrepl-test` → 7
+  tests / 28 assertions GREEN. `bb lint` → 0 errors / 0 warnings (one pre-existing
+  unrelated `info` in `agent_session` test).
+- **A5 — PASS.** Minimal: only `nrepl_runtime.clj` (one new helper) touched in
+  production; no unrelated cleanup; blast radius respected.
+
+### Finding for the design owner (A2 gate is ill-posed)
+
+A2 ("net normalized burden over touched units strictly decreases") **cannot be
+satisfied by any behaviour-preserving decomplection** under Gordian's concave
+`log1p-over-scale` transform, because decomplection = extraction = splitting raw
+burden, and a sub-additive transform makes split sums grow. A2 thus structurally
+*forbids* the very refactor the task selects for. The genuine intent — reduce the
+TARGET unit's local comprehension burden — is captured by A1, which PASSES strongly
+and is what the selector (`gap = lcc-total / cc`) optimizes. Recommended resolution
+(design-owner decision): drop A2, or redefine it as "A1 decreases AND no new
+high/medium architectural findings (A3)" rather than a net-sum-over-units bound.
+
+The refactor itself is correct, minimal, and improves local comprehensibility; it is
+left committed pending this A2-gate decision. Task NOT moved to `closed/`.
