@@ -77,11 +77,16 @@
 
 ## Plan/steps ambiguity review follow-ups
 
-- [ ] PA1: Pin the exact canonical IR path for delegate-step session-profile config (for example `[:delegate :session]` or another named path), and name the loader/compiler/runtime consumers that must read that path instead of the current session-step-only `:session` lookup.
-- [ ] PA2: Decide whether a profile containing `:effort-override nil` is a valid concrete effort-clear setting or is treated as no concrete setting; align validation, snapshots, live application, delegate projection, and tests with that presence-vs-value decision.
-- [ ] PA3: Specify `/session-profile <profile-name>` token normalization: whether users type `planning`, `:planning`, or both; how the token becomes the keyword profile name; and how this interacts with the reserved `clear` action.
-- [ ] PA4: Specify live profile application's final thinking-level semantics when a profile supplies both model and thinking-level, including ordering/clamping for non-reasoning models, so the atomic mutation and journal entries cannot diverge.
-- [ ] PA5: Pin the workflow-run snapshot capture boundary: compute the session-profile snapshot at the impure top-level invocation boundary and pass it into pure workflow-run creation, while delegated runs copy/derive from the parent run snapshot without config reads.
+- [x] PA1: Pin the exact canonical IR path for delegate-step session-profile config (for example `[:delegate :session]` or another named path), and name the loader/compiler/runtime consumers that must read that path instead of the current session-step-only `:session` lookup.
+  - Done: plan now pins delegate profile config at `[:delegate :session :session-profile]`, direct delegate model/thinking at `[:delegate :session]`, and names target IR compiler, normalized run storage, `resolve-step-session-config`, and the delegate inherited-defaults resolver as consumers.
+- [x] PA2: Decide whether a profile containing `:effort-override nil` is a valid concrete effort-clear setting or is treated as no concrete setting; align validation, snapshots, live application, delegate projection, and tests with that presence-vs-value decision.
+  - Done: plan chooses explicit `:effort-override nil` as a valid concrete effort-clear; absence alone means no effort setting; validation/snapshots/live application/delegate projection/tests must preserve key presence.
+- [x] PA3: Specify `/session-profile <profile-name>` token normalization: whether users type `planning`, `:planning`, or both; how the token becomes the keyword profile name; and how this interacts with the reserved `clear` action.
+  - Done: plan accepts bare or EDN-style unqualified keyword tokens, normalizes them to keywords, treats raw bare `clear` as the clear action before normalization, and treats `:clear` as reserved/unavailable.
+- [x] PA4: Specify live profile application's final thinking-level semantics when a profile supplies both model and thinking-level, including ordering/clamping for non-reasoning models, so the atomic mutation and journal entries cannot diverge.
+  - Done: plan specifies validate-first atomic application with model-before-thinking ordering; model mutation clamps current thinking first, explicit profile thinking then clamps against the resulting model and journals the clamped final value.
+- [x] PA5: Pin the workflow-run snapshot capture boundary: compute the session-profile snapshot at the impure top-level invocation boundary and pass it into pure workflow-run creation, while delegated runs copy/derive from the parent run snapshot without config reads.
+  - Done: plan pins snapshot computation to impure top-level invocation boundaries (`psi.workflow/create-run`, psi-tool `workflow create-run`) and stores supplied `:session-profile-snapshot` in pure `workflow-runtime.core/create-run`; delegated runs copy/derive from parent snapshots without config reads.
 
 ## Slice 7 — Verification and coherence
 
