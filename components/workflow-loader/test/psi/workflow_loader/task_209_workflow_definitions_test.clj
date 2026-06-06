@@ -305,7 +305,11 @@
          (is (.contains select-text "Net burden (A2 — relocation guard, per-unit)"))
          (is (.contains select-text "line-insensitive key `k = (ns, var, arity)`"))
          (is (.contains select-text "physical after-row `u`"))
-         (is (.contains select-text "before-max(k)"))
+         ;; TS-S3: lock the `before-max(k)` *definition* (a maximum, not a sum) —
+         ;; re-anchored from the bare `before-max(k)` substring (subsumed by the
+         ;; `before-max(k) >= B` exemption lock below) to the definition phrase that
+         ;; lock does not cover, complementing the TR-T7 "never a sum" guard.
+         (is (.contains select-text "`before-max(k)` := the maximum `lcc-total` among before-rows carrying `k`"))
          (is (.contains select-text "satisfies `after(u) < B`"))
          (is (.contains select-text "NOT a recomputed `after(target)`"))
          ;; TR-T1: the defining "no sum" invariant is regression-protected — the

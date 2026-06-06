@@ -1030,3 +1030,21 @@ clusters; per-assert messages would break `consistent(assertion_style)` for marg
 signal. The ~30 A2 locks are not a case explosion — each maps to a distinct, separately
 argued soundness invariant (no-sum, no-margin, exemption, B-anchor, line-bearing-B,
 line-insensitive grouping, multiset T, objectivity, A2a/A2b, target-row exclusion).
+
+## TS-S3 executed (test-shaper re-pass follow-up)
+
+Resolved the redundant bare `(is (.contains select-text "before-max(k)"))` lock (~line
+308) by **re-anchoring** to the definition phrase, not deleting. The bare substring was
+fully subsumed by the line-323 `before-max(k) >= B` exemption lock (passing 323 implies
+passing 308; deleting `before-max(k)` fails both) — zero independent regression power.
+Re-anchored to `` `before-max(k)` := the maximum `lcc-total` among before-rows carrying
+`k` `` (verbatim emitter string). Rationale: the definition encodes a **maximum, not a
+sum** — a genuinely distinct soundness invariant. The line-323 exemption lock does not
+cover the *definition* of `before-max(k)`; re-anchoring guards an independent property
+(complements TR-T7's "never a sum" / "not a per-line pairing") while removing the
+redundancy the reviewer flagged. Chose re-anchor over delete because locking the max-not-
+sum definition has real value, matching the reviewer's stated alternative.
+
+Verification: workflow-loader suite green (3 tests / 215 assertions / 0 fail / 0 error);
+`clj-kondo --lint` 0 errors / 0 warnings; clj-paren-repair Success. All steps.md items
+now checked. PASS_STATUS FOLLOW_UPS_COMPLETE.

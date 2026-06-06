@@ -217,12 +217,15 @@
 
 ## test-shaper review re-pass follow-ups (ψ, test-shaper)
 
-- [ ] **TS-S3:** Remove the strictly-redundant bare `(is (.contains select-text
-      "before-max(k)"))` lock (~line 308): it is a substring of the `(is (.contains
-      select-text "before-max(k) >= B"))` lock (~line 323), so it detects no regression
-      that 323 does not already catch (violates `minimal(redundant_tests)`). Either delete
-      line 308, or — if locking the bare-vocabulary definition occurrence is intended —
-      re-anchor it to a phrase 323 does not subsume (the emitter defines it as
-      `` `before-max(k)` := the maximum `lcc-total` ``). Re-run the workflow-loader suite
-      (`reduce-incidental-complexity-test` + `task-209-workflow-set-loads-together-test`)
-      and `clj-kondo --lint` the test file to confirm green + clean.
+- [x] **TS-S3:** Resolved the strictly-redundant bare `(is (.contains select-text
+      "before-max(k)"))` lock by **re-anchoring** (not deleting) it to the definition
+      phrase the `before-max(k) >= B` exemption lock does not subsume:
+      `` `before-max(k)` := the maximum `lcc-total` among before-rows carrying `k` ``.
+      Chose re-anchor over delete because the definition (a **maximum**, not a sum) is a
+      genuinely distinct invariant worth locking — it complements the TR-T7 "never a sum"
+      / "not a per-line pairing" guards by pinning the positive max-not-sum definition,
+      while removing the redundancy (the bare substring was fully caught by the line-323
+      `before-max(k) >= B` lock). Re-ran the workflow-loader suite
+      (`reduce-incidental-complexity-test` + `task-209-workflow-set-loads-together-test`):
+      3 tests / 215 assertions / 0 fail / 0 error; `clj-kondo --lint` 0/0; clj-paren-repair
+      Success.
