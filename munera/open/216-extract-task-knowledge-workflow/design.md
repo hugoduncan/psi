@@ -69,11 +69,15 @@ low-value or duplicative entries, degrading recall. The design must therefore:
    `create-knowledge` code surface. The workflow's session step authors and
    commits files purely via `read` / `bash` / `write`. This task introduces **no
    new code in the mementum extension**.
-6. **Extraction guard = significance, not count.** There is no numeric cap on
-   entries per run. The filter is qualitative: an insight is extracted only if
-   it is **useful to the project outside the task's own context** and
-   **significant for the future development of the project**. Task-local detail
-   is rejected.
+6. **Extraction guard = significance, not count, conservative by default.**
+   There is no numeric cap on entries per run. The filter is qualitative: an
+   insight is extracted only if it is **useful to the project outside the task's
+   own context** and **significant for the future development of the project**.
+   Because there is no human to prune false positives, the prompt is
+   **conservative**: when significance is uncertain, do *not* write. This
+   deliberately inverts the interactive mementum default
+   (`false_positive < missed_insight`). Extracting **nothing** is a valid,
+   successful outcome.
 7. **Input = task slug.** Invoked as `/delegate extract-task-knowledge {NNN-slug}`
    (consistent with the other task-* workflows that take the task identifier as
    `:input`). The standalone surface receives the slug; the `task-lifecycle`
@@ -119,6 +123,7 @@ Out of scope (candidate follow-on tasks):
    memory and commits it using mementum commit conventions.
 3. Given a task whose artifacts contain only task-local detail, the workflow
    extracts nothing (no spurious entries) and reports that nothing was extracted.
+   Zero entries is a successful, non-error outcome.
 4. The workflow does not duplicate knowledge/memories already present in
    `mementum/` (it updates or skips rather than re-creating), per its prompt.
 5. `task-lifecycle` ends with an `extract-task-knowledge` `:delegate` step that
@@ -129,9 +134,7 @@ Out of scope (candidate follow-on tasks):
 ## Notes / risks
 
 - **Quality without an approval gate.** The only safeguard against mementum
-  noise is the qualitative significance/project-generality filter in the prompt.
-  The prompt must make this bar explicit and bias toward *not* writing when in
-  doubt (inverting the interactive protocol's "false_positive < missed_insight"
-  default, because here there is no human to prune false positives).
+  noise is the qualitative, conservative significance/project-generality filter
+  in the prompt (see Resolved decision 6).
 - **Autonomous commits.** The workflow commits directly to `mementum/`. Within
   `task-lifecycle` this happens at the very end, after implementation review.
