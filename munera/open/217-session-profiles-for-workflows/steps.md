@@ -31,14 +31,14 @@
 
 ## Slice 3 — Workflow authoring grammar and canonical IR
 
-- [ ] Extend workflow authoring validation to accept compact top-level `:session-profile` on supported `:session` steps and compile it into the canonical step `:session` config.
-- [ ] Extend workflow authoring validation to accept compact top-level `:session-profile` on supported `:delegate` steps and compile it into the canonical delegate inherited-default-shaping session-config surface.
-- [ ] Extend single-step markdown frontmatter parsing/compiler support for `:session-profile`, compiling to the same canonical `:session` config as an EDN `:session` step.
-- [ ] Keep direct authored workflow overrides limited to currently supported `:model` and `:thinking-level`; do not add direct `:speed-mode` or `:effort-override` authored keys.
-- [ ] Add loader/compiler rejection tests for unsupported nested `{:session {:session-profile ...}}` spelling if that path is currently distinguishable.
-- [ ] Add loader/compiler rejection tests for `:session-profile` on `:invoke` steps and LLM judge specs if those validation paths are present.
-- [ ] Add loader/compiler tests proving existing workflows without `:session-profile` compile unchanged.
-- [ ] Add loader/compiler tests proving top-level EDN and markdown frontmatter `:session-profile` land in canonical IR at the expected location.
+- [x] Extend workflow authoring validation to accept compact top-level `:session-profile` on supported `:session` steps and compile it into the canonical step `:session` config.
+- [x] Extend workflow authoring validation to accept compact top-level `:session-profile` on supported `:delegate` steps and compile it into the canonical delegate inherited-default-shaping session-config surface.
+- [x] Extend single-step markdown frontmatter parsing/compiler support for `:session-profile`, compiling to the same canonical `:session` config as an EDN `:session` step.
+- [x] Keep direct authored workflow overrides limited to currently supported `:model` and `:thinking-level`; do not add direct `:speed-mode` or `:effort-override` authored keys.
+- [x] Add loader/compiler rejection tests for unsupported nested `{:session {:session-profile ...}}` spelling if that path is currently distinguishable.
+- [x] Add loader/compiler rejection tests for `:session-profile` on `:invoke` steps and LLM judge specs if those validation paths are present.
+- [x] Add loader/compiler tests proving existing workflows without `:session-profile` compile unchanged.
+- [x] Add loader/compiler tests proving top-level EDN and markdown frontmatter `:session-profile` land in canonical IR at the expected location.
 
 ## Slice 4 — Workflow snapshot and step resolution semantics
 
@@ -103,7 +103,7 @@
 
 - [x] Run focused tests for profile domain/config resolution.
 - [x] Run focused tests for session profile commands, resolvers, and built-in command specs.
-- [ ] Run focused workflow-loader/compiler tests covering `:session-profile` grammar.
+- [x] Run focused workflow-loader/compiler tests covering `:session-profile` grammar.
 - [ ] Run focused workflow runtime/session-config tests covering snapshot, precedence, delegation, invalid-profile blocking, and unchanged no-profile workflows.
 - [x] Run targeted `clj-kondo` over changed Clojure namespaces.
 - [x] Run relevant broader unit/Scry suites if focused changes touch shared workflow/session command paths.

@@ -5,7 +5,7 @@
 
 (deftest parse-markdown-workflow-file-test
   (testing "single-step markdown workflow parses required frontmatter and body"
-    (let [raw "---\nname: planner\ndescription: Plans tasks\nmodel: gpt-5\ntools:\n  - read\nskills:\n  - clojure-coding-standards\nresponse-mode: :non-streaming\nthinking-level: :off\nlogprobs: true\ntop-logprobs: 4\n---\nYou are a planner."
+    (let [raw "---\nname: planner\ndescription: Plans tasks\nmodel: gpt-5\ntools:\n  - read\nskills:\n  - clojure-coding-standards\nresponse-mode: :non-streaming\nthinking-level: :off\nsession-profile: :planning\nlogprobs: true\ntop-logprobs: 4\n---\nYou are a planner."
           result (parser/parse-workflow-file :md raw)]
       (is (= :single-step-markdown (:workflow-kind result)))
       (is (= "planner" (:name result)))
@@ -15,6 +15,7 @@
       (is (= ["clojure-coding-standards"] (get-in result [:session-config :skills])))
       (is (= ":non-streaming" (get-in result [:session-config :response-mode])))
       (is (= ":off" (get-in result [:session-config :thinking-level])))
+      (is (= :planning (get-in result [:session-config :session-profile])))
       (is (= "true" (get-in result [:session-config :logprobs])))
       (is (= "4" (get-in result [:session-config :top-logprobs])))
       (is (= "You are a planner." (:body result)))))

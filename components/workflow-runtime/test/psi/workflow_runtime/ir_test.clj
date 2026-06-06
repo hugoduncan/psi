@@ -20,6 +20,7 @@
   {:name "report"
    :type :session
    :session {:model "gpt-5.4"
+             :session-profile :review
              :tools ["read" "bash"]
              :skills ["issue-feature-triage"]
              :contributions [{:type :source
@@ -40,6 +41,9 @@
                               :text "Review these issues:\n\n{{issues}}"
                               :vars {"issues" {:from {:step "discover" :output :data}
                                                :path [:issues]}}}
+              :session {:session-profile :coding
+                        :model "gpt-5.5"
+                        :thinking-level :high}
               :context [{:type :source
                          :from :workflow-original}
                         {:type :source
@@ -96,6 +100,17 @@
     (is (not (m/validate workflow-ir/delegate-prompt-string-schema
                          {:type :map
                           :fields "not-a-map"}))))
+
+  (testing "delegate session schema accepts only inherited-default shaping keys"
+    (is (m/validate workflow-ir/delegate-session-spec-schema
+                    {:session-profile :coding
+                     :model "gpt-5.5"
+                     :thinking-level :high}))
+    (is (not (m/validate workflow-ir/delegate-session-spec-schema
+                         {:session-profile "coding"})))
+    (is (not (m/validate workflow-ir/delegate-session-spec-schema
+                         {:session-profile :coding
+                          :speed-mode :fast}))))
 
   (testing "contribution schemas accept source and template variants"
     (is (m/validate workflow-ir/source-contribution-schema

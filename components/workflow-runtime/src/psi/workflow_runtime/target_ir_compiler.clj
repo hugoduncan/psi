@@ -178,7 +178,7 @@
 
     :session
     (assoc (compile-common-step-fields step)
-           :session (cond-> (select-keys step [:model :tools :skills :system-prompt :thinking-level :prompt-component-selection :response-mode :temperature :logprobs :top-logprobs])
+           :session (cond-> (select-keys step [:model :session-profile :tools :skills :system-prompt :thinking-level :prompt-component-selection :response-mode :temperature :logprobs :top-logprobs])
                       true (assoc :contributions (mapv compile-contribution (:contributions step)))))
 
     :delegate
@@ -189,6 +189,8 @@
                                                         (= :template (:type prompt-string)))
                                                  (compile-contribution prompt-string)
                                                  prompt-string))}
+                       (some (partial contains? step) [:model :session-profile :thinking-level])
+                       (assoc :session (select-keys step [:model :session-profile :thinking-level]))
                        (contains? step :context)
                        (assoc :context (mapv compile-contribution (:context step)))))
 

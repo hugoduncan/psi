@@ -18,6 +18,7 @@
     :skills
     :model
     :thinking-level
+    :session-profile
     :response-mode
     :temperature
     :logprobs
@@ -30,6 +31,7 @@
    :skills
    :model
    :thinking-level
+   :session-profile
    :response-mode
    :temperature
    :logprobs
@@ -73,11 +75,33 @@
   [body]
   (str/starts-with? (str/triml (or body "")) "{"))
 
+(defn- normalize-session-profile
+  [value]
+  (cond
+    (keyword? value)
+    value
+
+    (string? value)
+    (let [token (str/trim value)]
+      (keyword (if (str/starts-with? token ":")
+                 (subs token 1)
+                 token)))
+
+    :else
+    value))
+
+(defn- session-option-value
+  [frontmatter key]
+  (let [value (get frontmatter key)]
+    (case key
+      :session-profile (normalize-session-profile value)
+      value)))
+
 (defn- single-step-frontmatter
   [frontmatter]
   (reduce (fn [acc key]
             (if (contains? frontmatter key)
-              (assoc acc key (get frontmatter key))
+              (assoc acc key (session-option-value frontmatter key))
               acc))
           {}
           md-session-option-keys))
