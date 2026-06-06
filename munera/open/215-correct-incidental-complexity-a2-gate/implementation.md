@@ -131,3 +131,44 @@ No new actionable architectural-fit misfit found. Root-cause-at-source framing f
 fits single-source-of-truth; out-of-scope command deferral is a documented design
 decision (fits `shims_adapters` exception rule). REVIEW_COMPLETE for architectural
 fit.
+
+## Design review — ambiguities re-pass (ψ)
+
+Re-reviewed current `design.md` for ambiguity only (statements admitting >1
+interpretation by the emitter-edit agent transcribing the A2 procedure). Did not
+review plan.md/steps.md. The two prior ambiguity items (non-unique-key join, phantom
+skill) remain tracked/open. The revised "How A2 is mechanically checked" /
+"Non-unique keys" machinery (`before-max`, per-physical-row checks) introduced two
+**new** actionable ambiguities not covered by those items:
+
+- **Step-4 T-membership uses an undefined second before-side quantity.** Step 3
+  states `before-max(k)` "is the only before-side quantity A2 uses." Step 4 then
+  forms `T` via "the per-key **aggregate** before-burden ≠ **aggregate** after-burden
+  for `k`." "Aggregate" is undefined (sum? max? = `before-max`?) and is a *second*
+  before-side quantity, directly contradicting step 3. The interpretation matters:
+  if `aggregate = sum`, the change-detector reintroduces a per-key **sum** — the very
+  sub-additive quantity this redesign exists to eliminate — into the gate's
+  row-selection (harmless to the pass/fail inequality, but it re-imports sum
+  sensitivity into *which* rows are policed, undercutting the "no sum" framing).
+  Actionable: define the change-detection aggregation explicitly and reconcile it with
+  the "only before-side quantity is `before-max`" claim (e.g. detect change per
+  physical row, or state the aggregation function and exempt it from the no-sum
+  rationale).
+
+- **Target exclusion from `T` is unspecified in A2's keyspace.** The body removes
+  "the target itself, which A5 already governs" and step 4 says "Remove the target's
+  own row(s) from `T`." A5 identifies the target by its **line-bearing** key; A2
+  groups **line-insensitively** by `(ns, var, arity)`. The procedure never says how
+  the target is identified for this exclusion. When the target's line-insensitive key
+  is shared (the design's own 51-row defmethod case), "the target's own row(s)" is
+  ambiguous — the target's single physical row, or every row under its
+  `(ns, var, arity)` key? Removing the whole key group would exempt a relocation that
+  pushes the tangle into a sibling sharing the target's key, opening a hole in the
+  very relocation guard A2 is for. Actionable: specify that the target is identified
+  by its line-bearing identity and only its physical row is removed from `T` (and
+  state the behaviour when the target shares its line-insensitive key with siblings),
+  and clarify why "(s)" is plural for a single defunit target.
+
+Both verified against `design.md` lines 85, 138–148 and the live 214 data the design
+cites. Not duplicated by the architectural-fit passes or the two prior ambiguity
+items.
