@@ -148,3 +148,36 @@ Both were plan/steps-artifact clarifications; no production code/tests touched.
    (member of `T`, `before := 0`); since `sum_{T}` is invariant to which `T`-member
    holds a line, this placement is A2-neutral while improving A1.
    Edited: steps.md Slice 1 first item, plan.md "Seam shape" key decision.
+
+## Plan/steps review — inconsistency (ψ)
+
+Reviewed `plan.md` + `steps.md` for internal inconsistency and plan↔steps↔design↔code
+mismatch (not ambiguity/architecture). **No new actionable inconsistency found.**
+
+Verified mutually consistent:
+- Slice 2 skip criterion is now uniform across plan (Slice-order 3), steps (Slice 2
+  first item), design (acceptance preamble), and the prior follow-up resolutions:
+  SKIP iff A1 strict-decrease AND A2 `sum_{T} after < sum_{T} before`; else PERFORM.
+  No residual "with margin"/"already satisfied" divergence.
+- Seam signature uniform everywhere: `start-server-quietly [port]`, `requiring-resolve`
+  internal, `before := 0`, A2-neutral / A1-improving. Plan, steps, design agree.
+- Baseline `lcc-total 6.015383232244966` (line 12, arity 4) matches `before-local.json`
+  and is quoted identically in plan, steps, design.
+- Line numbers match code: `start-nrepl!` 12–38, `stop-nrepl!` 40, wrapper
+  `psi.app-runtime/start-nrepl!` 117–122 (`app_runtime.clj`).
+- Acceptance commands (A1 `gordian local --json`, A2 `T`/sum rule, A3
+  `gordian gate --baseline … --fail-on … --max-new-medium-findings 0`, A4
+  `clojure:test:scry` + `clojure:test:unit` + `lint`) are identical between design and
+  steps Slice 3; no flag/path drift.
+- Phase-0 characterization items (steps' four tests: `.nrepl-port` write+deleteOnExit,
+  `stop-nrepl!` match-port deletion, bound-port session publication, stderr notice)
+  cover exactly the design Phase-0 bullets and the "four uncovered behaviours" the plan
+  cites — no count mismatch.
+- Test ns `psi.app-runtime-nrepl-test` + both existing deftest names match the test
+  file; design's note that the existing test uses `with-redefs`/`binding` matches code
+  (lines 59/68).
+
+Non-issue checked: steps Slice 3 close-out says "remove the task's entry from
+`munera/plan.md`", but task 214 has no entry there (it is unordered-open per Munera).
+Removal is a conditional no-op under Munera semantics — not an inconsistency, no
+follow-up added.
