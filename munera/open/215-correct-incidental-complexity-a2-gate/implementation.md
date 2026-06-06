@@ -109,3 +109,25 @@ prior architectural-fit pass.
   "the reduce-incidental-complexity skill" denotes (phantom skill vs. the workflow
   already being edited). Actionable: name the actual artifact(s) — drop the phantom
   skill reference, or if a second skill restatement is meant, identify it by path.
+
+## Design review — architectural fit re-pass (ψ)
+
+Re-reviewed current `design.md` for architectural fit only (AGENTS.md principles;
+META.md and doc/architecture.md remain runtime/adapter scope, not governing the
+workflow-emitter contract). The three prior architectural-fit misfits are all
+resolved in the current design:
+
+- Enforcement asymmetry → A2a/A2b now specified as a deterministic numeric `<`
+  procedure over committed `before-local.json` + after `bb gordian local --json`;
+  dedicated `bb gordian` A2 command documented as out-of-scope follow-up (resolved-
+  by-acceptance, recorded in prior pass).
+- Tunable margins → θ/ε removed; pure inequalities against `B` fit `λone_way` and
+  the objective-gate posture.
+- Criterion taxonomy → re-anchored to live A5/A2/A3 labels; no renumbering; contract
+  self-consistent.
+
+No new actionable architectural-fit misfit found. Root-cause-at-source framing fits
+`λ fix(bug). cause(structural) → redesign`; `B` from committed `before-local.json`
+fits single-source-of-truth; out-of-scope command deferral is a documented design
+decision (fits `shims_adapters` exception rule). REVIEW_COMPLETE for architectural
+fit.
