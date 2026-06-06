@@ -635,7 +635,7 @@ judge/`:on` wiring around each follow-up stays with its host.
 mementum knowledge.
 
 ```text
-/delegate extract-task-knowledge 216-extract-task-knowledge-workflow
+/delegate extract-task-knowledge {NNN-slug}
 ```
 
 Standalone extraction only mines tasks that resolve uniquely under

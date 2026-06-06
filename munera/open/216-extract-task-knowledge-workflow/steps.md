@@ -77,4 +77,4 @@
 ## Docs review follow-ups
 
 - [x] DOC1: DONE — updated `CHANGELOG.md` `[Unreleased]` so the earlier `task-lifecycle` Added entry describes the shipped design → plan → implement → review → extract-knowledge lifecycle and six delegated workflows, consistent with the Changed entry.
-- [ ] DOC2: Replace the user-facing `doc/workflows.md` `extract-task-knowledge` usage example that names the in-flight task `216-extract-task-knowledge-workflow` with a generic completed-task placeholder (for example `{NNN-slug}`) or a clearly closed-task example, so the example does not contradict standalone closed-task-only extraction.
+- [x] DOC2: DONE — replaced the user-facing `doc/workflows.md` `extract-task-knowledge` usage example that named the in-flight task `216-extract-task-knowledge-workflow` with the generic completed-task placeholder `{NNN-slug}`, so the example no longer contradicts standalone closed-task-only extraction.
