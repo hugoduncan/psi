@@ -108,3 +108,9 @@
 - [x] Run targeted `clj-kondo` over changed Clojure namespaces.
 - [x] Run relevant broader unit/Scry suites if focused changes touch shared workflow/session command paths.
 - [x] Re-read `design.md`, `plan.md`, `steps.md`, docs, and changed tests/code to verify cross-artifact coherence before implementation review.
+
+## Implementation review follow-ups
+
+- [ ] IR1: Fix canonical workflow IR/session schema so supported session-step direct `:thinking-level` validates alongside `:model` and `:session-profile`; add/repair focused coverage proving a session step with `:session-profile` plus explicit `:thinking-level` creates a run and explicit thinking overrides profile thinking.
+- [ ] IR2: Restore task-207 no-profile delegate speed/effort fallback by distinguishing profile-derived `:speed-mode`/`:effort-override` from inherited effective-config values before `effective-config->snapshot`; add coverage proving no-profile delegate effective speed/effort still falls back to the parent run snapshot while profile-derived speed/effort outrank it.
+- [ ] IR3: Fix the workflow session-profile test invalid-profile helper so diagnostic `:message` is always a string and does not shadow `clojure.core/name`; rerun the invalid-profile pre-attempt failure test so it exercises profile resolution failure rather than workflow-run schema rejection.
