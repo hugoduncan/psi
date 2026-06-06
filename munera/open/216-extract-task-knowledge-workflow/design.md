@@ -37,11 +37,13 @@ future sessions unless someone manually metabolizes them.
 The mementum protocol normally states: `termination: synthesis ≡ AI | approval ≡
 human | human ≡ termination_condition` and `memories: AI_proposes →
 human_approves → AI_commits`. This task uses a **narrow protocol-authorized
-exception** for completed-task artifact extraction: `extract-task-knowledge` may
-autonomously write and commit memories/knowledge when the source is a completed
-Munera task's artifacts plus its git history, and the extraction passes the
-mementum value gates, project-generality/significance filters, dedupe recall, and
-`uncertain → skip` conservatism.
+exception** for task-artifact extraction: `extract-task-knowledge` may
+autonomously write and commit memories/knowledge when the source is either a
+closed Munera task's artifacts or a `task-lifecycle` trailing invocation over the
+still-open task immediately after a successful `review-task-implementation` step,
+plus task-scoped git history. The extraction must pass the mementum value gates,
+project-generality/significance filters, dedupe recall, and `uncertain → skip`
+conservatism.
 
 This raises a quality/noise risk: autonomous writes can flood mementum with
 low-value or duplicative entries, degrading recall. The design therefore:
@@ -96,17 +98,19 @@ low-value or duplicative entries, degrading recall. The design therefore:
    same-name collision that workflow loading treats as an error. The
    `task-lifecycle` change is only an additional trailing `:delegate` step in
    `.psi/workflows/task-lifecycle.edn` with `:target "extract-task-knowledge"`.
-9. **Completed-task resolution is explicit.** The extraction actor resolves the
-   exact slug against `munera/closed/{NNN-slug}` and `munera/open/{NNN-slug}` and
-   stops with no extraction if there are zero matches or more than one match. A
-   standalone invocation may extract only from `munera/closed/{NNN-slug}`; an
-   open-only standalone match is reported as not completed and produces no
-   mementum writes. The `task-lifecycle` trailing invocation may extract from the
-   still-open task directory only because it runs immediately after a successful
-   `review-task-implementation` step; that successful predecessor is the
-   lifecycle-local completion proof. If that predecessor context is absent or
-   does not show a successful implementation review, an open task is treated as
-   incomplete and extraction is skipped.
+9. **Extraction eligibility is explicit.** The extraction actor resolves the exact
+   slug against `munera/closed/{NNN-slug}` and `munera/open/{NNN-slug}` and stops
+   with no extraction if there are zero matches or more than one match. A
+   standalone invocation may extract only from `munera/closed/{NNN-slug}` because
+   Munera's authoritative task state is location-based. An open-only standalone
+   match is reported as not completed and produces no mementum writes. The
+   `task-lifecycle` trailing invocation is the sole authorized exception: it may
+   extract from the still-open task directory only because it runs immediately
+   after a successful `review-task-implementation` step, and that successful
+   predecessor is the lifecycle-local completion proof for the autonomous
+   extraction exception. If that predecessor context is absent or does not show a
+   successful implementation review, an open task is treated as incomplete and
+   extraction is skipped.
 10. **Git-history boundary is task-specific.** The workflow may use only three
     history lenses as evidence: commits touching the resolved task directory
     (`git log --follow -- <task-dir>`), commits whose message mentions the task
@@ -147,6 +151,8 @@ In scope:
   intended (consistent with how other workflow definitions are tested), and that
   `task-lifecycle` includes the new trailing step.
 - Documentation of the new workflow (`doc/workflows.md`).
+- CHANGELOG `[Unreleased]` entries for the user-visible workflow addition and
+  the changed `task-lifecycle` terminal behavior.
 
 Out of scope (candidate follow-on tasks):
 
@@ -175,7 +181,9 @@ Out of scope (candidate follow-on tasks):
    context, and yields a final summary that preserves the lifecycle/review
    outcome plus the extraction outcome.
 6. The workflow definition and the `task-lifecycle` change have test coverage,
-   and the new workflow is documented.
+   the new workflow is documented, and CHANGELOG `[Unreleased]` records the new
+   `/delegate extract-task-knowledge` workflow plus the changed `task-lifecycle`
+   terminal behavior.
 
 ## Notes / risks
 
@@ -184,7 +192,11 @@ Out of scope (candidate follow-on tasks):
   in the prompt (see Resolved decision 6).
 - **Autonomous commits.** The workflow commits directly to `mementum/`. Within
   `task-lifecycle` this happens at the very end, after implementation review.
-- **Open path during lifecycle.** A lifecycle-run task may still physically live
-  under `munera/open/` when extraction runs. That path is authorized only for the
-  trailing lifecycle invocation and only when the successful implementation-review
+- **Open path during lifecycle.** Munera task state remains location-based; a
+  lifecycle-run task may still physically live under `munera/open/` when
+  extraction runs. That path is explicitly authorized only for the trailing
+  lifecycle invocation and only when the successful implementation-review
   predecessor is present as context; standalone open-task extraction is skipped.
+- **User-visible release notes.** Adding `/delegate extract-task-knowledge` and
+  making extraction the final `task-lifecycle` yield are user-visible workflow
+  behavior changes and require CHANGELOG `[Unreleased]` entries.

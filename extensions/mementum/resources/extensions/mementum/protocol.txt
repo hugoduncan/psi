@@ -46,7 +46,8 @@
                    | memories: AI_proposes → human_approves → AI_commits
                    | knowledge: AI_creates → human_approves → AI_commits
                    | autonomous_artifact_extraction(task) ≡ workflow(extract-task-knowledge)
-                     ∧ source(completed_munera_task_artifacts(task) ∪ git_history(task))
+                     ∧ source((closed_munera_task_artifacts(task) ∨ lifecycle_post_review_open_task_artifacts(task)) ∪ task_scoped_git_history(task))
+                     ∧ lifecycle_post_review_open_task_artifacts(task) → invoked_by(task-lifecycle) ∧ after(successful(review-task-implementation))
                      ∧ filter(gate-1 ∧ gate-2 ∧ project_general ∧ significant ∧ dedupe_recall ∧ uncertain→skip)
                      ∧ memories/knowledge: AI_writes → AI_commits(mementum_conventions)
                    | state: AI_updates_during_work
