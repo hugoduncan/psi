@@ -39,10 +39,10 @@
    :target "extract-task-knowledge",
    :prompt-string
    {:type :map,
-    :fields {:input {:from :workflow-input, :path [:input]}}},
-   :context [{:type :source, :from :workflow-original}
-             {:type :source,
-              :from {:step "review-task-implementation", :yield :text}}]}],
+    :fields {:input {:from :workflow-input, :path [:input]}
+             :implementation-review-yield
+             {:from {:step "review-task-implementation", :yield :text}}}},
+   :context [{:type :source, :from :workflow-original}]}],
  :name "task-lifecycle",
  :description
  "Run a Munera task through its full design → plan → implement → review → extract knowledge lifecycle by chaining the six task-lifecycle workflows in order."}
