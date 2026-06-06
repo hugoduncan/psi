@@ -172,7 +172,7 @@
 
 ## Task-test review follow-up (ψ) — test-shaper lens
 
-- [ ] **Remove the misleading `user.dir` ceremony and isolate `.nrepl-port` in
+- [x] **Remove the misleading `user.dir` ceremony and isolate `.nrepl-port` in
       `nrepl-runtime-eql-reflects-live-start-stop-test`.** The test's tmp-dir +
       `System/setProperty "user.dir"` / restore dance isolates nothing observable
       (`:persist? false`, and `.nrepl-port` resolves against the process cwd, not
@@ -185,3 +185,11 @@
       `preserving-nrepl-port-file`, and confirm the net stays green. Pre-existing and
       outside the original blast radius (scope-expanding); does not block the
       committed refactor — pursue only if prioritising test-net clarity/safety.
+      → **DONE.** Removed the `orig-user-dir` / tmp-dir / `System/setProperty
+      "user.dir"` ceremony entirely; the test now passes the real cwd
+      (`(System/getProperty "user.dir")`) as `:cwd` and wraps its whole body in
+      `preserving-nrepl-port-file` (matching the five new tests). A docstring now
+      states the real-cwd `.nrepl-port` rationale. Net stays GREEN
+      (`bb clojure:test:scry --namespace psi.app-runtime-nrepl-test` → 7 tests / 30
+      assertions, 0 fail/0 error); `clj-kondo` 0/0. Test-only change; production
+      `nrepl_runtime.clj` untouched, so acceptance A1–A5 are unaffected.

@@ -777,3 +777,40 @@ bound-port-publication assertion, but each adds distinct value (wrapper+stop-cle
 round-trip vs. isolated 4-arity + negative-gate sibling), so no dedup is warranted.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Task-test review follow-up — test-shaper: drop misleading `user.dir` ceremony (ψ)
+
+Executed the single actionable item added by the test-shaper task-test review pass
+(`298bb27de`): the pre-existing `nrepl-runtime-eql-reflects-live-start-stop-test`
+carried dead/misleading incidental setup (tmp-dir + `System/setProperty "user.dir"`
+dance that isolates nothing — `.nrepl-port` resolves against the process cwd, not a
+rebindable `user.dir`; session is `:persist? false`) and lacked
+`preserving-nrepl-port-file`, so it clobbered the real-cwd `.nrepl-port`
+(uncontrolled-IO defect, inconsistent with the five new tests).
+
+### Test change (`app_runtime_nrepl_test.clj`) — test-only
+
+- Deleted the `user.dir` ceremony: `orig-user-dir`, tmp-dir creation,
+  `System/setProperty "user.dir"` set/restore.
+- Wrapped the whole body in `preserving-nrepl-port-file` (snapshots/restores the
+  real-cwd `.nrepl-port`), matching the five characterization tests — protects a
+  live dev nREPL port file from the test's `start-nrepl!` write + `stop-nrepl!`
+  match-delete.
+- Passes the real cwd (`(System/getProperty "user.dir")`) as `:cwd` for both the
+  live and after-stop session contexts (the `:cwd` is session metadata, unrelated
+  to `.nrepl-port` resolution).
+- Added a docstring stating the real-cwd `.nrepl-port` rationale so a reader does
+  not re-introduce the false isolation premise.
+
+### Verification
+
+- `bb clojure:test:scry --namespace psi.app-runtime-nrepl-test` → **7 tests / 30
+  assertions GREEN**, 0 fail / 0 error (count unchanged; one fewer fixture path).
+- `clj-kondo --lint` on the test ns → **0 errors / 0 warnings**.
+- Production `nrepl_runtime.clj` UNTOUCHED → acceptance A1 (`5.5499`), A2'
+  (seams `< target`), A3 (gate exit 0), A5 (blast radius) all unaffected; A4 net
+  stays green. The net is now consistent (uniform `.nrepl-port` fixture across all
+  live tests) and free of misleading incidental setup.
+
+The only remaining open item is the human A2-redefinition ratification gate (task
+closure stays PROVISIONAL pending that human act); not a test concern.
