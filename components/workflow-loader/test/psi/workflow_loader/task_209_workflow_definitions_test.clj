@@ -96,16 +96,22 @@
                "summary reports that no worktree/task/lifecycle occurred on a no-target run")
            (is (.contains summary-text "Do not inspect or invent task artifacts")
                "summary does not inspect or invent task artifacts on a no-target run")))
-       ;; TR10 (pass 8): lock the summary's positive-path terminal contract
-       ;; (symmetric to TR7). On a real munera/... path summary inspects the task
-       ;; artifacts and reports the design → plan → implement → review run, the
-       ;; artifacts updated, and the closed/open outcome, sourcing lifecycle yield.
+       ;; TR10 (pass 8), extended by task 216 CS1: lock the summary's
+       ;; positive-path terminal contract (symmetric to TR7). On a real
+       ;; munera/... path summary inspects the task artifacts and reports the
+       ;; design → plan → implement → review → extract-knowledge run, the
+       ;; extraction result preserved by the lifecycle yield, the artifacts
+       ;; updated, and the closed/open outcome.
        (testing "summary prompt reports the positive-path lifecycle terminal contract (TR10)"
          (let [summary-text (step-template-text summary-step)]
            (is (re-find #"(?i)independently inspect that specific task" summary-text)
                "summary independently inspects the resolved task's artifacts on a target-present run")
-           (is (.contains summary-text "completed cleanly (design → plan → implement → review)")
-               "summary reports whether the task-lifecycle run completed cleanly (design → plan → implement → review)")
+           (is (.contains summary-text "completed cleanly (design → plan → implement → review → extract knowledge)")
+               "summary reports whether the task-lifecycle run completed cleanly through extract knowledge")
+           (is (.contains summary-text "knowledge-extraction result preserved by the inner `task-lifecycle` yield")
+               "summary reports the extraction result preserved by the inner lifecycle yield")
+           (is (.contains summary-text "extracted/updated/skipped entries, or zero-extraction success")
+               "summary names the extraction result cases surfaced to wrapper callers")
            (is (re-find #"(?i)task artifact files updated" summary-text)
                "summary reports the task artifact files updated")
            (is (re-find #"(?i)closed \(moved to munera/closed/\) or remains open" summary-text)

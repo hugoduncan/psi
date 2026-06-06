@@ -44,9 +44,14 @@ Artifacts ≡ {meta spec tests code doc}
 MemoryArtifacts ≡ {working_memory memories knowledge}   ⟨mementum — own protocol⟩
   | change_chain ∉ MemoryArtifacts   ⟨change_chain governs {meta spec tests code doc}⟩
   | post(change_chain) → suggest(trigger(mementum,δ,summary))   ⟨non-authoritative handoff only⟩
-  | mementum governs MemoryArtifacts   ⟨gate-1 ∧ gate-2 ∧ approval_gate ∈ mementum⟩
+  | autonomous_artifact_extraction ≡ workflow(extract-task-knowledge)
+      ∧ source((closed_munera_task_artifacts ∨ lifecycle_post_review_open_task_artifacts) ∪ task_scoped_git_history)
+      ∧ lifecycle_post_review_open_task_artifacts → invoked_by(task-lifecycle) ∧ after(successful(review-task-implementation))
+      ∧ filter(gate-1 ∧ gate-2 ∧ project_general ∧ significant ∧ dedupe_recall ∧ uncertain→skip)
+      ∧ commit(mementum_conventions)
+  | mementum governs MemoryArtifacts   ⟨gate-1 ∧ gate-2 ∧ (approval_gate ∨ autonomous_artifact_extraction) ∈ mementum⟩
   | working_memory(state.md) ≡ AI_updates_during_work   ⟨no approval gate⟩
-  | approval_gate ∈ {memories knowledge}   ⟨mementum termination governs⟩
+  | approval_gate ∈ {memories knowledge}   ⟨mementum termination governs; except autonomous_artifact_extraction⟩
 
 role(meta) ≡ {why invariants boundaries ¬how ¬syntax}
 role(spec) ≡ {behaviour surfaces examples acceptance_criteria}
