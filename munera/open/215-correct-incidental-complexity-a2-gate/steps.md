@@ -92,3 +92,17 @@
       plan's 'Two assertions … will break' to three", but plan.md's concrete-targets
       section already reads "Three"; the only surviving "two" is the Risks bullet (PI1).
       Re-point the PA1 count-correction at the Risks bullet, or drop it as already done.
+
+## Implementation review follow-ups (ψ)
+
+- [ ] **RI1:** Reconcile the `B` identification key between `design.md` and the landed
+      emitter. design.md "How A2 is mechanically checked" **step 1** (design.md:145–147)
+      keys `B := before(target)` by the **line-insensitive** `(ns, var, arity)`, but the
+      emitter (`.psi/workflows/reduce-incidental-complexity.edn`, A2 step 1) locates `B` by
+      its **line-bearing** `(ns, var, arity, line)` identity (the row A5 governs). The
+      line-bearing form is the well-defined one (line-insensitive `B` is ambiguous for the
+      51-row `execute-effect!` defmethod case the design foregrounds) and matches the
+      design's own target-exclusion rule + A5. Update design.md step 1 (and its
+      parenthetical "A2's chosen identity") to the line-bearing `B` lookup that landed, with
+      a one-line rationale; leave the line-insensitive `(ns, var, arity)` **grouping** for
+      `before-max(k)`/`T` (step 3) unchanged — only `B`'s own lookup key is at issue.

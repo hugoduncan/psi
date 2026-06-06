@@ -485,3 +485,32 @@ artifact sync.
 
 Residual out-of-scope follow-up: a dedicated `bb gordian` A2 join-and-compare subcommand
 (today the emitter spells out an agent-run deterministic procedure).
+
+## Implementation review (ψ)
+
+Verified: EDN round-trips (`edn/read-string`); workflow-loader suite GREEN (3 tests / 196
+assertions / 0 fail / 0 error); acceptance 3 skill grep empty; knowledge page reconciled
+(fix-landed + `after(target)` superseded + A1→A5). Emitter diff confined to the single A2
+bullet; A5/A3/blast-radius/numbering unchanged. Implementation matches design intent for
+acceptance 1–5.
+
+One actionable coherence violation (design ↔ landed artifact disagree):
+
+- **RI1 — `B` identification key mismatch (design step 1 ≠ emitter).** `design.md` "How A2
+  is mechanically checked" **step 1** (design.md:145–147) says `B := before(target)` is
+  "keyed by the **line-insensitive** `(ns, var, arity)`". The landed emitter
+  (`.psi/workflows/reduce-incidental-complexity.edn`, A2 step 1) instead locates `B` "by its
+  **line-bearing** `(ns, var, arity, line)` identity (the same row A5 governs)". The
+  emitter's choice is the *more* well-defined one — line-insensitive `B` is **undefined**
+  for the 51-row `execute-effect!` defmethod case the design itself foregrounds (which of 51
+  rows is "the target"?), and it agrees with the design's own **target-exclusion** rule
+  (which removes the target by line-bearing identity) and with A5. But design.md step 1 was
+  not reconciled to the form that landed, so the design now documents a different `B`-lookup
+  than the emitter emits (a coherence violation per change_chain). Actionable: update
+  design.md step 1 (and the parenthetical "A2's chosen identity") to the line-bearing
+  `(ns, var, arity, line)` lookup for `B` that landed, noting why (line-insensitive `B` is
+  ambiguous for shared-key defmethods; line-bearing matches target-exclusion + A5). The
+  line-insensitive `(ns, var, arity)` *grouping* for `before-max(k)`/`T` (step 3) is correct
+  and stays — only `B`'s own lookup key is at issue.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
