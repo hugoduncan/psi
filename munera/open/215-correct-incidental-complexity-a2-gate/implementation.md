@@ -38,3 +38,39 @@ Actionable architectural-fit misfits found:
   A1–A5 contract. The renumbering must be brought into scope or the rationale
   re-anchored to the actual labels. (Overlaps the inconsistency pass; recorded
   here because it undermines the architectural reframing's premise.)
+
+## Design review follow-up — architectural fit (ψ, executed)
+
+All three architectural-fit follow-up steps resolved in `design.md`:
+
+- **Enforcement asymmetry → resolved by specifying a deterministic computation.**
+  Added "How A2 is mechanically checked" — A2a/A2b are concrete numeric `<`
+  comparisons over `before-local.json` (B, before(m)) and after `bb gordian local
+  --json`, joined per-unit; no judgement, no threshold. Same *kind* of objective
+  check as A3. Noted there is no single `bb gordian` A2 subcommand today and that
+  adding one is out of scope (criterion-text fix only) → agent runs the spelled-out
+  procedure; dedicated command flagged as separate follow-up.
+
+- **Margins θ/ε → removed (pure inequalities).** Justified that a non-zero buffer is
+  NOT architecturally necessary: the only motive was global-recompute jitter, and the
+  ceiling form `after(m) < B` is jitter-immune by construction (jitter is small;
+  crossing B is a large relocation move). Dropped the "no substantial increase" θ
+  clause; its anti-relocation role is subsumed by the ceiling + A3 + A5. Eliminates
+  the undefined buffer / config-drift surface that fought `λone_way`. Updated the
+  former "Open design-review parameters" → "Resolved design parameters".
+
+- **Criterion taxonomy → re-anchored to live emitter labels (no renumbering).** Live
+  emitter labels: A5=target reduction, A2=net burden, A3=gate; no A1/A4; blast radius
+  unnumbered. Added a "Criterion taxonomy" table; rewrote "What A2 is genuinely for"
+  and acceptance criterion 2 to use A5 (not A1) for target reduction and the
+  unnumbered minimality/blast-radius criteria (not A5). Renumbering left out of scope
+  per the task's minimal-change constraint. Fixed stray A1→A5 (empirics) and the
+  Constraints internal-consistency line.
+
+- **Join-key reconciliation (incidental, to avoid a new internal contradiction).**
+  Aligned new sections to the design's deliberate line-insensitive `(ns, var, arity)`
+  A2 key (refactors move lines → line-sensitive join would collapse T). Noted A5's
+  line-bearing key robustness is a separate, out-of-scope question.
+
+No blockers. Skill files confirmed to contain no A2 restatement (grep empty) →
+acceptance 3 "confirmed absent" already holds for the design phase.
