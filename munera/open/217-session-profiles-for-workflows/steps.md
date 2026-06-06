@@ -13,21 +13,21 @@
 
 ## Slice 2 — Live session command surface and observability
 
-- [ ] Add session selected-profile metadata storage on canonical session state with fields for profile name and concrete resolved settings applied.
-- [ ] Add a session-owned mutation/dispatch path that atomically applies an already-validated profile's concrete model/thinking/speed/effort values plus selected-profile metadata.
-- [ ] Ensure model application reuses existing session-model mutation behavior, including thinking-level clamp and model journal entry semantics.
-- [ ] Ensure thinking-level application reuses existing thinking-level mutation behavior and journal entry semantics.
-- [ ] Ensure speed-mode and effort-override application stays session-scoped/transient like `/speed ... session` and `/effort ... session`, with no config write or journal entry.
-- [ ] Add a session-owned mutation/dispatch path for `/session-profile clear` that clears only selected-profile metadata and does not change concrete settings.
-- [ ] Expose effective session profiles, readable resolved settings/invalid reasons, and current selected-profile metadata through EQL resolvers or equivalent session-owned read helpers.
-- [ ] Add `/session-profiles` and `/session-profile` entries to the backend single-source built-in command spec table with appropriate exact/prefixed routing metadata.
-- [ ] Wire slash command dispatch for `/session-profiles`, `/session-profile`, `/session-profile <name>`, and `/session-profile clear` through backend command handlers.
-- [ ] Format `/session-profiles` output to list valid profiles with readable settings and invalid profiles with terse reasons.
-- [ ] Format `/session-profile` output to show selected-profile metadata when present and current concrete model/thinking/speed/effort settings.
-- [ ] Format unknown/invalid profile command failures with the requested profile name, invalid reasons where applicable, and available effective profile names.
-- [ ] Add tests proving invalid/unknown live profile selection leaves model/thinking/speed/effort and selected-profile metadata unchanged.
-- [ ] Add tests proving `/session-profile clear` clears metadata only and does not revert concrete settings.
-- [ ] Add tests proving built-in command resolver/help/autocomplete surfaces include the new backend-defined commands without adapter-local lists.
+- [x] Add session selected-profile metadata storage on canonical session state with fields for profile name and concrete resolved settings applied.
+- [x] Add a session-owned mutation/dispatch path that atomically applies an already-validated profile's concrete model/thinking/speed/effort values plus selected-profile metadata.
+- [x] Ensure model application reuses existing session-model mutation behavior, including thinking-level clamp and model journal entry semantics.
+- [x] Ensure thinking-level application reuses existing thinking-level mutation behavior and journal entry semantics.
+- [x] Ensure speed-mode and effort-override application stays session-scoped/transient like `/speed ... session` and `/effort ... session`, with no config write or journal entry.
+- [x] Add a session-owned mutation/dispatch path for `/session-profile clear` that clears only selected-profile metadata and does not change concrete settings.
+- [x] Expose effective session profiles, readable resolved settings/invalid reasons, and current selected-profile metadata through EQL resolvers or equivalent session-owned read helpers.
+- [x] Add `/session-profiles` and `/session-profile` entries to the backend single-source built-in command spec table with appropriate exact/prefixed routing metadata.
+- [x] Wire slash command dispatch for `/session-profiles`, `/session-profile`, `/session-profile <name>`, and `/session-profile clear` through backend command handlers.
+- [x] Format `/session-profiles` output to list valid profiles with readable settings and invalid profiles with terse reasons.
+- [x] Format `/session-profile` output to show selected-profile metadata when present and current concrete model/thinking/speed/effort settings.
+- [x] Format unknown/invalid profile command failures with the requested profile name, invalid reasons where applicable, and available effective profile names.
+- [x] Add tests proving invalid/unknown live profile selection leaves model/thinking/speed/effort and selected-profile metadata unchanged.
+- [x] Add tests proving `/session-profile clear` clears metadata only and does not revert concrete settings.
+- [x] Add tests proving built-in command resolver/help/autocomplete surfaces include the new backend-defined commands without adapter-local lists.
 
 ## Slice 3 — Workflow authoring grammar and canonical IR
 
@@ -101,10 +101,10 @@
 
 ## Slice 7 — Verification and coherence
 
-- [ ] Run focused tests for profile domain/config resolution.
-- [ ] Run focused tests for session profile commands, resolvers, and built-in command specs.
+- [x] Run focused tests for profile domain/config resolution.
+- [x] Run focused tests for session profile commands, resolvers, and built-in command specs.
 - [ ] Run focused workflow-loader/compiler tests covering `:session-profile` grammar.
 - [ ] Run focused workflow runtime/session-config tests covering snapshot, precedence, delegation, invalid-profile blocking, and unchanged no-profile workflows.
-- [ ] Run targeted `clj-kondo` over changed Clojure namespaces.
-- [ ] Run relevant broader unit/Scry suites if focused changes touch shared workflow/session command paths.
+- [x] Run targeted `clj-kondo` over changed Clojure namespaces.
+- [x] Run relevant broader unit/Scry suites if focused changes touch shared workflow/session command paths.
 - [ ] Re-read `design.md`, `plan.md`, `steps.md`, docs, and changed tests/code to verify cross-artifact coherence before implementation review.

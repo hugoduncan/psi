@@ -57,6 +57,58 @@
   [text source]
   (session-data/make-entry :mid-system {:text (str text) :source source}))
 
+(defn- update-session-profile-settings
+  [session-data settings]
+  (let [model            (:model settings)
+        model?           (contains? settings :model)
+        requested-level  (:thinking-level settings)
+        level?           (contains? settings :thinking-level)
+        current-level    (:thinking-level session-data)
+        after-model      (if model?
+                           (assoc session-data
+                                  :model model
+                                  :thinking-level (session-data/clamp-thinking-level current-level model))
+                           session-data)
+        after-thinking   (if level?
+                           (assoc after-model
+                                  :thinking-level (session-data/clamp-thinking-level requested-level (:model after-model)))
+                           after-model)]
+    (cond-> after-thinking
+      (contains? settings :speed-mode)
+      (assoc :speed-mode (when (= :fast (:speed-mode settings)) :fast))
+
+      (contains? settings :effort-override)
+      (assoc :effort-override (:effort-override settings)))))
+
+(defn- session-profile-effects
+  [session-id profile final-session-data]
+  (let [settings (:settings profile)]
+    (cond-> []
+      (contains? settings :model)
+      (conj {:effect/type :runtime/agent-set-model
+             :model (:model settings)}
+            (journal-append-effect/append-model-effect session-id
+                                                       (:provider (:model settings))
+                                                       (:id (:model settings)))
+            {:effect/type :notify/extension-dispatch
+             :event-name "model_select"
+             :payload {:model (:model settings) :source :session-profile}})
+
+      (contains? settings :thinking-level)
+      (conj {:effect/type :runtime/agent-set-thinking-level
+             :level (:thinking-level final-session-data)}
+            (journal-append-effect/append-thinking-level-effect
+             session-id
+             (:thinking-level final-session-data)))
+
+      (contains? settings :speed-mode)
+      (conj {:effect/type :runtime/agent-set-speed-mode
+             :mode (:speed-mode final-session-data)})
+
+      (contains? settings :effort-override)
+      (conj {:effect/type :runtime/agent-set-effort-override
+             :effort (:effort-override final-session-data)}))))
+
 (defn- register-session-config-handlers! []
   (register-core-handler!
    :session/set-auto-compaction
@@ -80,27 +132,31 @@
   (register-core-handler!
    :session/set-model
    (fn [ctx {:keys [session-id model scope]}]
-     (let [clamped-level  (session-data/clamp-thinking-level
+     (let [runtime-model   (cond-> model
+                             (and (not (contains? model :reasoning))
+                                  (contains? model :supports-reasoning))
+                             (assoc :reasoning (boolean (:supports-reasoning model))))
+           clamped-level  (session-data/clamp-thinking-level
                            (:thinking-level (session/get-session-data-in ctx session-id))
-                           model)
+                           runtime-model)
            persist-effect (case (or scope :project)
                             :user    {:effect/type :persist/user-config-update
-                                      :prefs {:model-provider  (:provider model)
-                                              :model-id        (:id model)
+                                      :prefs {:model-provider  (:provider runtime-model)
+                                              :model-id        (:id runtime-model)
                                               :thinking-level  clamped-level}}
                             :session nil
                             {:effect/type :persist/project-prefs-update
-                             :prefs {:model-provider (:provider model)
-                                     :model-id       (:id model)
+                             :prefs {:model-provider (:provider runtime-model)
+                                     :model-id       (:id runtime-model)
                                      :thinking-level clamped-level}})]
-       {:root-state-update (session/session-update session-id #(assoc % :model model :thinking-level clamped-level))
-        :return {:model model :thinking-level clamped-level}
+       {:root-state-update (session/session-update session-id #(assoc % :model runtime-model :thinking-level clamped-level))
+        :return {:model runtime-model :thinking-level clamped-level}
         :effects (cond-> [{:effect/type :runtime/agent-set-model
-                           :model model}
-                          (journal-append-effect/append-model-effect session-id (:provider model) (:id model))
+                           :model runtime-model}
+                          (journal-append-effect/append-model-effect session-id (:provider runtime-model) (:id runtime-model))
                           {:effect/type :notify/extension-dispatch
                            :event-name "model_select"
-                           :payload {:model model :source :set}}]
+                           :payload {:model runtime-model :source :set}}]
                    persist-effect (conj persist-effect))})))
 
   (register-core-handler!
@@ -121,6 +177,26 @@
                            :level clamped}
                           (journal-append-effect/append-thinking-level-effect session-id clamped)]
                    persist-effect (conj persist-effect))})))
+
+  (register-core-handler!
+   :session/apply-session-profile
+   (fn [ctx {:keys [session-id profile]}]
+     (let [current-sd (session/get-session-data-in ctx session-id)
+           final-sd   (assoc (update-session-profile-settings current-sd (:settings profile))
+                             :selected-session-profile profile)]
+       {:root-state-update (session/session-update session-id (constantly final-sd))
+        :return {:selected-session-profile profile
+                 :model (:model final-sd)
+                 :thinking-level (:thinking-level final-sd)
+                 :speed-mode (:speed-mode final-sd)
+                 :effort-override (:effort-override final-sd)}
+        :effects (session-profile-effects session-id profile final-sd)})))
+
+  (register-core-handler!
+   :session/clear-session-profile
+   (fn [_ctx {:keys [session-id]}]
+     {:root-state-update (session/session-update session-id #(assoc % :selected-session-profile nil))
+      :return {:selected-session-profile nil}}))
 
   (register-core-handler!
    :session/set-speed-mode

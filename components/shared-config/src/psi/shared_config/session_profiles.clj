@@ -86,7 +86,10 @@
       :else
       (let [provider-kw (normalize-provider provider)]
         (if-let [model (model-registry/find-model provider-kw id)]
-          {:settings {:model model} :diagnostics []}
+          {:settings {:model (assoc model
+                                    :provider (name (:provider model))
+                                    :reasoning (boolean (:supports-reasoning model)))}
+           :diagnostics []}
           {:settings {}
            :diagnostics [(diagnostic :model :unknown-model
                                      (str "unknown model " provider "/" id))]})))))

@@ -41,6 +41,10 @@
      [:scope {:optional true} [:enum :session :project :user]]]]
    [:runtime/agent-set-thinking-level
     [:map [:effect/type [:= :runtime/agent-set-thinking-level]] [:level :keyword]]]
+   [:runtime/agent-set-speed-mode
+    [:map [:effect/type [:= :runtime/agent-set-speed-mode]] [:mode [:maybe :keyword]]]]
+   [:runtime/agent-set-effort-override
+    [:map [:effect/type [:= :runtime/agent-set-effort-override]] [:effort [:maybe :keyword]]]]
    [:runtime/agent-set-system-prompt
     [:map [:effect/type [:= :runtime/agent-set-system-prompt]] [:prompt :string]]]
    [:runtime/agent-set-tools

@@ -24,6 +24,13 @@
    [:id :string]
    [:reasoning {:optional true} :boolean]])
 
+(def session-profile-settings-schema
+  [:map
+   [:model {:optional true} [:maybe model-schema]]
+   [:thinking-level {:optional true} thinking-level-schema]
+   [:speed-mode {:optional true} speed-mode-schema]
+   [:effort-override {:optional true} [:maybe effort-override-schema]]])
+
 (def scoped-model-schema
   [:map
    [:model model-schema]
@@ -145,6 +152,12 @@
    [:thinking-level thinking-level-schema]
    [:speed-mode {:optional true} [:maybe speed-mode-schema]]
    [:effort-override {:optional true} [:maybe effort-override-schema]]
+   [:selected-session-profile {:optional true}
+    [:maybe
+     [:map
+      [:name :keyword]
+      [:settings session-profile-settings-schema]
+      [:readable-settings [:vector :string]]]]]
    [:is-streaming :boolean]
    [:is-compacting :boolean]
    [:interrupt-pending :boolean]
@@ -253,6 +266,7 @@
      :thinking-level          :off
      :speed-mode              nil
      :effort-override         nil
+     :selected-session-profile nil
      :is-streaming            false
      :is-compacting           false
      :interrupt-pending       false

@@ -127,6 +127,14 @@
   ([ctx session-id effort scope]
    (settings/set-effort-override-in! ctx session-id effort scope)))
 
+(defn apply-session-profile-in!
+  [ctx session-id profile]
+  (settings/apply-session-profile-in! ctx session-id profile))
+
+(defn clear-session-profile-in!
+  [ctx session-id]
+  (settings/clear-session-profile-in! ctx session-id))
+
 (defn inject-mid-system-message-in!
   ([ctx session-id text]
    (dispatch/dispatch! ctx :session/inject-mid-system-message

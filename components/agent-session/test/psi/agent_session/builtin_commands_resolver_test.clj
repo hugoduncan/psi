@@ -38,6 +38,8 @@
         (is (contains? name-set "reload-extension-installs"))
         (is (contains? name-set "speed"))
         (is (contains? name-set "effort"))
+        (is (contains? name-set "session-profiles"))
+        (is (contains? name-set "session-profile"))
         (is (contains? name-set "project-repl"))))
     (testing "routed-but-help-absent aliases are present (autocomplete)"
       (let [name-set (set (map :name specs))]

@@ -86,7 +86,7 @@
                      :effort-override nil
                      :temperature 0.1})]
       (is (:valid? resolved))
-      (is (= {:provider :openai :id "gpt-5.5"}
+      (is (= {:provider "openai" :id "gpt-5.5"}
              (select-keys (:model (:settings resolved)) [:provider :id])))
       (is (= :medium (:thinking-level (:settings resolved))))
       (is (= :fast (:speed-mode (:settings resolved))))
