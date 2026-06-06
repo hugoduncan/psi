@@ -212,7 +212,19 @@
                   :prompt-string "Ship [\"i-1\" \"i-2\"]"
                   :context [{:ticket 123 :request "Please triage"}
                             ["i-1" "i-2"]]}
-                 (get-in run [:step-runs "report-call" :accepted-result :diagnostics :delegate]))))))))
+                 (get-in run [:step-runs "report-call" :accepted-result :diagnostics :delegate])))
+          ;; The nested run records the delegating run as its run-level parent
+          ;; (`:delegating-run-id`) so workflow-run retention can exclude it from
+          ;; the originating session's per-session budget — without this tag a
+          ;; single multi-step delegation would evict its own sub-run/sessions.
+          (is (= "run-delegate" (:delegating-run-id delegated-run))
+              "nested delegate-step run is tagged with the delegating run's id")
+          ;; The nested run shares the originating execution session as its
+          ;; `:parent-session-id` (sessionless runs pass it straight through),
+          ;; which is exactly why retention must key off `:delegating-run-id`
+          ;; rather than the shared session id.
+          (is (= session-id (:parent-session-id delegated-run))
+              "nested delegate-step run shares the originating session id"))))))
 
 (defn- create-dynamic-delegate-run!
   [{:keys [run-id workflow-input chooser-result register-builder? remove-builder-before-delegate?]}]

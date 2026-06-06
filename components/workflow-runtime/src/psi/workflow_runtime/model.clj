@@ -202,6 +202,7 @@
    [:effective-definition :map]
    [:source-definition-id {:optional true} [:maybe workflow-definition-id-schema]]
    [:parent-session-id {:optional true} [:maybe :string]]
+   [:delegating-run-id {:optional true} [:maybe workflow-run-id-schema]]
    [:inherited-defaults {:optional true} [:maybe inherited-defaults-schema]]
    [:workflow-input {:optional true} :any]
    [:workflow-original {:optional true} :any]

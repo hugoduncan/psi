@@ -57,6 +57,7 @@
         (workflow-runtime/create-run @(:state* ctx)
                                      (cond-> {:definition-id target-name
                                               :parent-session-id parent-session-id
+                                              :delegating-run-id (:run-id workflow-run)
                                               :workflow-input prompt-string
                                               :workflow-original context}
                                        inherited-defaults (assoc :inherited-defaults inherited-defaults)))

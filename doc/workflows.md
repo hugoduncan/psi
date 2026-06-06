@@ -171,6 +171,14 @@ Newest-first ordering uses workflow-run terminal transition time (`:finished-at`
 with canonical workflow-run creation order as the deterministic tie-breaker when
 multiple runs share the same terminal timestamp.
 
+Retention counts only **top-level** delegated runs. A nested run created by a
+`:delegate` workflow step belongs to its delegating parent run, not to the
+originating session's retention budget, so delegating a single multi-step
+workflow does not evict its own internal sub-runs (which would otherwise delete
+the run you just started, along with its sessions). When a top-level run is
+removed, its nested `:delegate` sub-runs and their linked workflow-owned
+sessions are removed transitively along with it.
+
 When an older retained terminal workflow run is removed, psi also tree-closes
 that run's linked workflow-owned child sessions. The cleanup target set is the
 canonical deduplicated union of linked execution-session ids and judge-session
