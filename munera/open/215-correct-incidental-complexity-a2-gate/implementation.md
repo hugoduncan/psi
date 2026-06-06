@@ -1006,3 +1006,27 @@ agent-run prose procedure, not executable code).
   `bb clojure:test:scry --ns psi.workflow-loader.task-209-workflow-definitions-test`);
   `clj-kondo --lint` of the test file 0 errors / 0 warnings; `clj-paren-repair` round-trips
   clean. Test-only change; no production/EDN/doc change.
+
+## test-shaper review re-pass (ψ, test-shaper)
+
+Re-pass over `reduce-incidental-complexity-test` after TS-S1/TS-S2 landed. Suite green
+(focus run: 1 test / 162 assertions / 0 fail) and `clj-kondo --lint` clean. The A2 block
+is now single-concern + correctly named; the EXEMPT lock is anchored. One economy finding:
+
+- **TS-S3 (economy — strictly redundant lock).** Line 308
+  `(is (.contains select-text "before-max(k)"))` is a strict substring of line 323
+  `(is (.contains select-text "before-max(k) >= B"))`: any prompt passing 323 necessarily
+  passes 308, and removing `before-max(k)` entirely fails both — so there is no regression
+  detectable by 308 that 323 does not already catch. The bare-vocabulary lock adds zero
+  regression-detection power (violates `minimal(redundant_tests)`). Either drop line 308,
+  or, if locking the bare-vocabulary *definition* occurrence is intended, anchor it to a
+  distinct phrase 323 does not subsume (the emitter defines it as
+  `` `before-max(k)` := the maximum `lcc-total` ``) so it guards something independent.
+
+Re-confirmed not pursued: per-assert failure messages on the A2 `.contains` locks — the
+file's content-lock idiom is uniformly bare `(is (.contains x "…"))` (clean-text /
+coverage-text / diff-gate-text), and intent is source-visible in the TR-Tn/TS-Sn comment
+clusters; per-assert messages would break `consistent(assertion_style)` for marginal
+signal. The ~30 A2 locks are not a case explosion — each maps to a distinct, separately
+argued soundness invariant (no-sum, no-margin, exemption, B-anchor, line-bearing-B,
+line-insensitive grouping, multiset T, objectivity, A2a/A2b, target-row exclusion).

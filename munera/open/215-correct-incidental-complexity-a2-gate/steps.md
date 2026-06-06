@@ -214,3 +214,15 @@
       `"through no fault of this change is EXEMPT"`), so it pins the exemption clause rather
       than any stray occurrence of "EXEMPT". Keep the companion `"before-max(k) >= B"` lock.
       Re-run the workflow-loader suite and re-lint the test file to confirm green + clean.
+
+## test-shaper review re-pass follow-ups (ψ, test-shaper)
+
+- [ ] **TS-S3:** Remove the strictly-redundant bare `(is (.contains select-text
+      "before-max(k)"))` lock (~line 308): it is a substring of the `(is (.contains
+      select-text "before-max(k) >= B"))` lock (~line 323), so it detects no regression
+      that 323 does not already catch (violates `minimal(redundant_tests)`). Either delete
+      line 308, or — if locking the bare-vocabulary definition occurrence is intended —
+      re-anchor it to a phrase 323 does not subsume (the emitter defines it as
+      `` `before-max(k)` := the maximum `lcc-total` ``). Re-run the workflow-loader suite
+      (`reduce-incidental-complexity-test` + `task-209-workflow-set-loads-together-test`)
+      and `clj-kondo --lint` the test file to confirm green + clean.
