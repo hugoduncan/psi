@@ -292,13 +292,17 @@
          (is (.contains select-text
                         "behaviour is identical — meta/spec are unchanged; existing test expectations are not weakened"))
          (is (.contains select-text "keyed by `(ns, var, arity, line)`"))
-         (is (.contains select-text "identified by `(ns, var, arity, line)`"))
          (is (.contains select-text
                         "Blast radius: the target unit PLUS the minimal surrounding helpers required to decomplect it; no unrelated cleanup"))
          (is (.contains select-text "decreased versus its `before-local.json` value"))
-         (is (.contains select-text "after total is strictly less than the before total"))
-         (is (.contains select-text
-                        "the set is computed from the metric, not from the diff/touched files"))
+         ;; A2 is now the per-unit relocation guard (A2a/A2b ceiling against the
+         ;; original target burden B), replacing the unsatisfiable net-sum gate.
+         (is (.contains select-text "Net burden (A2 — relocation guard, per-unit)"))
+         (is (.contains select-text "line-insensitive key `k = (ns, var, arity)`"))
+         (is (.contains select-text "physical after-row `u`"))
+         (is (.contains select-text "before-max(k)"))
+         (is (.contains select-text "satisfies `after(u) < B`"))
+         (is (.contains select-text "NOT a recomputed `after(target)`"))
          (is (.contains select-text "Commit the task creation on the current branch"))
          (is (.contains select-text "Do NOT push or open a PR")))
        (testing "clean-baseline step locks the clean-source precondition and baseline artifact contract"
