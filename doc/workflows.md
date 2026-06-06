@@ -706,10 +706,13 @@ found.
 Each generated task is a behaviour-preserving refactor: **Phase 0** establishes
 a green characterization-test safety net (gating all refactoring), and
 **Phase 1** decomplects the target under objective acceptance — the target's
-`lcc-total` decreases versus `before-local.json`, net burden across the
-metric-derived touched set strictly decreases, `gordian gate --baseline
-before-diagnose.edn --fail-on new-cycles,new-high-findings
---max-new-medium-findings 0` passes, and all tests stay green. The workflow ends
+`lcc-total` decreases versus `before-local.json` (the A5 burden-reduction
+check), a per-unit relocation guard holds (every new or below-ceiling after-row
+`u` satisfies `after(u) < B`, where `B := before(target)` read from
+`before-local.json`, so a tangle is never merely relocated into a new seam or a
+sibling rather than reduced), `gordian gate --baseline before-diagnose.edn
+--fail-on new-cycles,new-high-findings --max-new-medium-findings 0` passes, and
+all tests stay green. The workflow ends
 with a completed, reviewed task on the local worktree branch; it does **not**
 push or open a PR — that decision is left to the user.
 

@@ -292,15 +292,75 @@
          (is (.contains select-text
                         "behaviour is identical — meta/spec are unchanged; existing test expectations are not weakened"))
          (is (.contains select-text "keyed by `(ns, var, arity, line)`"))
-         (is (.contains select-text "identified by `(ns, var, arity, line)`"))
          (is (.contains select-text
                         "Blast radius: the target unit PLUS the minimal surrounding helpers required to decomplect it; no unrelated cleanup"))
          (is (.contains select-text "decreased versus its `before-local.json` value"))
-         (is (.contains select-text "after total is strictly less than the before total"))
-         (is (.contains select-text
-                        "the set is computed from the metric, not from the diff/touched files"))
          (is (.contains select-text "Commit the task creation on the current branch"))
          (is (.contains select-text "Do NOT push or open a PR")))
+       (testing "select-and-create emits the corrected per-unit A2 relocation guard"
+         ;; A2 is the per-unit relocation guard (A2a/A2b ceiling against the original
+         ;; target burden B), replacing the unsatisfiable net-sum gate. These locks
+         ;; pin new-behaviour wording, so they live in their own concern (not the
+         ;; task-209 selection/baseline-preservation block).
+         (is (.contains select-text "Net burden (A2 — relocation guard, per-unit)"))
+         (is (.contains select-text "line-insensitive key `k = (ns, var, arity)`"))
+         (is (.contains select-text "physical after-row `u`"))
+         ;; TS-S3: lock the `before-max(k)` *definition* (a maximum, not a sum) —
+         ;; re-anchored from the bare `before-max(k)` substring (subsumed by the
+         ;; `before-max(k) >= B` exemption lock below) to the definition phrase that
+         ;; lock does not cover, complementing the TR-T7 "never a sum" guard.
+         (is (.contains select-text "`before-max(k)` := the maximum `lcc-total` among before-rows carrying `k`"))
+         (is (.contains select-text "satisfies `after(u) < B`"))
+         (is (.contains select-text "NOT a recomputed `after(target)`"))
+         ;; TR-T1: the defining "no sum" invariant is regression-protected — the
+         ;; redesign exists to eliminate the sub-additive net-sum gate, so lock the
+         ;; positive no-sum wording and assert the removed net-sum phrasings are absent.
+         (is (.contains select-text "must NOT sum normalized per-unit burdens"))
+         (is (.contains select-text "never a sum"))
+         (is (not (.contains select-text "sum after < sum before")))
+         (is (not (.contains select-text "after total is strictly less than the before total")))
+         ;; TR-T2: A2a/A2b branch structure + the >= B exemption clause that keeps the
+         ;; gate well-posed/satisfiable (dropping the exemption re-introduces an
+         ;; over-strict ceiling).
+         (is (.contains select-text "A2a (new pieces are genuine"))
+         (is (.contains select-text "A2b (no collateral ceiling breach"))
+         (is (.contains select-text "before-max(k) >= B"))
+         ;; TS-S2: anchor the EXEMPT lock to the `before-max(k) >= B` exemption branch
+         ;; rather than any stray "EXEMPT" occurrence.
+         (is (.contains select-text "through no fault of this change is EXEMPT"))
+         ;; TR-T3: line-bearing single-row target exclusion (the shared-key hole closure)
+         ;; — a regression to whole-key-group exclusion reopens the 51-row defmethod
+         ;; relocation hole.
+         (is (.contains select-text "remove ONLY the target's own physical row"))
+         ;; TS-S4: anchor the whole-key-group exclusion lock to the `(ns, var, arity)`
+         ;; group clause rather than any stray "never the whole" occurrence.
+         (is (.contains select-text "never the whole `(ns, var, arity)` group"))
+         (is (.contains select-text "siblings STAY in"))
+         ;; TR-T4: the pure-inequality / no-margin invariant (θ/ε removed) — the
+         ;; `after(u) < B` lock alone does not guard against a reintroduced margin
+         ;; (`after(u) < B + θ` still contains it), so lock the explicit no-margin
+         ;; wording. Analogue of the TR-T1 no-sum guard for the other half of the
+         ;; redesign's soundness pair (no sum, no margin).
+         (is (.contains select-text "pure per-unit inequalities"))
+         (is (.contains select-text "with no margin (no slack threshold, no jitter buffer)"))
+         ;; TR-T5: lock the line-bearing `B` lookup (the RI1 reconciliation) — distinct
+         ;; from the line-insensitive grouping key (locked above) and the A5 line-bearing
+         ;; key. A regression reverting `B`'s lookup to `(ns, var, arity)` reopens the
+         ;; 51-row `execute-effect!` defmethod ambiguity RI1 fixed.
+         (is (.contains select-text "located by its line-bearing `(ns, var, arity, line)`"))
+         ;; TR-T6: the objective / deterministic-numeric-procedure (¬agent-judgement)
+         ;; invariant — A2 must be an objective numeric check (the same KIND as A3), not
+         ;; agent judgement. A reword into a judgement-based check would silently
+         ;; reintroduce the subjectivity the redesign removes and stay green.
+         (is (.contains select-text "a deterministic numeric procedure over two JSON artifacts"))
+         (is (.contains select-text "the same KIND of objective check as A3"))
+         (is (.contains select-text "not agent judgement"))
+         ;; TR-T7: order-insensitive multiset `T`-formation (¬per-line-pairing) — keeps
+         ;; the non-unique 51-row `execute-effect!` defmethod key well-posed. TR-T1 only
+         ;; catches a sum-regression; a regression to a per-line pairing join (not a sum,
+         ;; but breaking non-unique-key handling) is otherwise uncaught.
+         (is (.contains select-text "an order-insensitive set comparison"))
+         (is (.contains select-text "not a per-line pairing")))
        (testing "clean-baseline step locks the clean-source precondition and baseline artifact contract"
          (is (= ["read" "bash" "edit" "write"] (:tools clean-baseline-step)))
          (is (= {"DONE" {:goto "coverage-review"}

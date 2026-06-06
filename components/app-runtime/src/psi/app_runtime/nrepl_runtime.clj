@@ -9,18 +9,30 @@
     (or (some-> tui-focus* deref)
         (default-session-id-fn ctx))))
 
+(defn route-stdout-to-stderr
+  "Run `thunk` with `*out*` and `System/out` routed to stderr; returns its value.
+
+   Restores `System/out` afterwards via `finally`."
+  [thunk]
+  (let [original-systemout System/out]
+    (try
+      (binding [*out* *err*]
+        (System/setOut (java.io.PrintStream. System/err true))
+        (thunk))
+      (finally
+        (System/setOut original-systemout)))))
+
+(defn start-server-quietly
+  "Start nREPL on `port` with its chatter routed to stderr; returns the handle."
+  [port]
+  (let [start-server (requiring-resolve 'nrepl.server/start-server)]
+    (route-stdout-to-stderr #(start-server :port port))))
+
 (defn start-nrepl!
   [session-state-atom nrepl-runtime-atom default-session-id-fn port]
-  (let [start-server       (requiring-resolve 'nrepl.server/start-server)
-        original-systemout System/out
-        server             (try
-                             (binding [*out* *err*]
-                               (System/setOut (java.io.PrintStream. System/err true))
-                               (start-server :port port))
-                             (finally
-                               (System/setOut original-systemout)))
-        host               "localhost"
-        port-file          (java.io.File. ".nrepl-port")]
+  (let [server    (start-server-quietly port)
+        host      "localhost"
+        port-file (java.io.File. ".nrepl-port")]
     (reset! nrepl-runtime-atom {:host host
                                 :port (:port server)
                                 :endpoint (str host ":" (:port server))})
