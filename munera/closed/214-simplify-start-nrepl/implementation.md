@@ -736,3 +736,44 @@ No NEW actionable test finding. The single open item (A2-redefinition human
 ratification) is not a test concern and is already tracked.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Task-test review (ψ) — test-shaper lens (clarity ∧ consistency ∧ robustness)
+
+Applied the `test-shaper` skill (simple ∧ consistent ∧ robust ∧ economical) to the
+characterization net (`app_runtime_nrepl_test.clj`). Live re-verify:
+`bb clojure:test:scry --namespace psi.app-runtime-nrepl-test` → **7 tests / 30
+assertions GREEN**.
+
+**Net is well-shaped overall** — single-concern new deftests, real seams (no stub),
+explicit arrange/act/assert, finally-restore of mutated globals. Behaviour-coverage
+and ¬stub were already confirmed by prior task-test-review passes; not re-litigated.
+
+**ONE NEW ACTIONABLE — misleading incidental setup + inconsistent/unsafe fixture in
+the pre-existing `nrepl-runtime-eql-reflects-live-start-stop-test`.** The test does an
+elaborate tmp-dir + `System/setProperty "user.dir"` / restore dance, but:
+
+- It isolates **nothing observable**: the session is `:persist? false`, and (per this
+  task's own "`user.dir`-isolation premise is false" discovery) `start-nrepl!` writes
+  `.nrepl-port` via a RELATIVE `java.io.File` that resolves against the process cwd at
+  FileSystem init, NOT `user.dir`. So the `user.dir` ceremony is **dead/misleading
+  setup** — a reader reasonably infers it sandboxes filesystem side effects; it does
+  not (test-shaper: `minimal_incidental_setup`, `¬embed(unrelated_details)`, clarity).
+- Unlike the five new tests, it does **not** wrap in `preserving-nrepl-port-file`, so
+  it overwrites (via `start-nrepl!`'s `spit`) and then match-deletes (via `stop-nrepl!`)
+  the **real-cwd** `.nrepl-port` — clobbering a developer's live nREPL port file
+  (consistency: fixtures for the same side effect differ across the net; robustness:
+  uncontrolled real-cwd IO mutation that the new tests deliberately guard against).
+
+This task discovered the premise-false fact (implementation.md "`user.dir`-isolation
+premise is false") but only used it to justify the new tests' helper; it never acted
+on the test-quality consequence for the pre-existing live test. Pre-existing and
+strictly outside the original blast radius (scope-expanding), so flagged as a
+follow-up rather than auto-applied; it does not block the refactor (which is correct
+and green).
+
+Minor (not separately tracked — economy): `nrepl-runtime-eql-reflects-live-start-stop-test`
+also overlaps `start-nrepl-publishes-bound-port-into-session-runtime-test` on the
+bound-port-publication assertion, but each adds distinct value (wrapper+stop-clearing
+round-trip vs. isolated 4-arity + negative-gate sibling), so no dedup is warranted.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

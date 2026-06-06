@@ -169,3 +169,19 @@
       a live local adds state/working-set burden exceeding the dedup saving). No code
       changed. A human prioritising readability over the metric may revive it as a new,
       explicitly scope-expanding task.
+
+## Task-test review follow-up (ψ) — test-shaper lens
+
+- [ ] **Remove the misleading `user.dir` ceremony and isolate `.nrepl-port` in
+      `nrepl-runtime-eql-reflects-live-start-stop-test`.** The test's tmp-dir +
+      `System/setProperty "user.dir"` / restore dance isolates nothing observable
+      (`:persist? false`, and `.nrepl-port` resolves against the process cwd, not
+      `user.dir` — per this task's own "`user.dir`-isolation premise is false"
+      discovery), so it is dead/misleading incidental setup. The test also lacks
+      `preserving-nrepl-port-file`, so it overwrites + match-deletes the real-cwd
+      `.nrepl-port`, clobbering a dev's live port file — inconsistent with the five
+      new tests and an uncontrolled-IO robustness defect. Fix: drop the `user.dir`
+      ceremony (pass real cwd or a plain `:cwd`), wrap the body in
+      `preserving-nrepl-port-file`, and confirm the net stays green. Pre-existing and
+      outside the original blast radius (scope-expanding); does not block the
+      committed refactor — pursue only if prioritising test-net clarity/safety.
