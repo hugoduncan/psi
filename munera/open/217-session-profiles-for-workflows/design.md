@@ -8,14 +8,14 @@ The motivating use case is semantic workflow roles such as `:planning`, `:coding
 
 ## Problem
 
-Workflow steps can currently set concrete session options such as `:model`, `:thinking-level`, `:speed-mode`, and `:effort-override`, and workflow runs snapshot inherited defaults at invocation time. That supports fixed workflow-authored choices, but it does not let users map workflow roles to their own preferred model/session settings.
+Workflow steps can currently set concrete session options such as `:model` and `:thinking-level`, and workflow runs snapshot inherited defaults at invocation time, including speed/effort values inherited from the parent run. That supports fixed workflow-authored choices for currently-supported direct keys, but it does not let users map workflow roles to their own preferred model/session settings.
 
 A workflow author needs to say “this step wants the planning profile” while each user/project decides what `:planning` means. The profile mechanism must use the existing config system rather than introducing another config location.
 
 ## Terms
 
 - **Session profile**: a named config bundle that may contain any subset of this task's supported profile fields: `:model-provider`, `:model-id`, `:thinking-level`, `:speed-mode`, and `:effort-override`.
-- **Profile name**: an open keyword chosen by users/workflows, for example `:planning`, `:coding`, `:review`, `:triage`, or `:fast-summary`.
+- **Profile name**: a user/workflow keyword chosen from the open profile-name space, for example `:planning`, `:coding`, `:review`, `:triage`, or `:fast-summary`. The keyword `:clear` is reserved by the `/session-profile clear` command action and is not an available profile name.
 - **Profile selection**: resolving a named profile to concrete session settings and applying them to a live session or workflow step.
 
 The feature deliberately avoids the generic name “task” because Munera tasks and workflow steps already use that word.
@@ -93,7 +93,7 @@ The effective `:coding` profile keeps the user model/thinking fields and uses pr
 
 ## Profile resolution and validity
 
-A profile is valid when every present supported field is valid and at least one concrete supported setting resolves.
+A profile is valid when its name is not reserved, every present supported field is valid, and at least one concrete supported setting resolves.
 
 Supported-field rules:
 
@@ -103,6 +103,7 @@ Supported-field rules:
 - `:speed-mode` must be one of the existing speed modes: `:normal` or `:fast`.
 - `:effort-override` must be `nil`, `:low`, `:medium`, `:high`, or `:xhigh`.
 - A profile with none of the supported fields, or with supported fields that all resolve to no concrete setting, is invalid for application.
+- A profile named `:clear` is reserved and invalid for application. If config contains `:clear`, `/session-profiles` must show it as unavailable/reserved rather than treating it as a selectable profile.
 
 Partial profiles are allowed when the present supported fields are valid. For example, a profile containing only `:speed-mode :fast` is valid and applies only speed.
 
@@ -132,6 +133,7 @@ Behavior:
 - `/session-profile` shows the currently selected/applied profile metadata for the session, if any, and the session’s current concrete model/thinking/speed/effort settings.
 - `/session-profile <profile-name>` resolves the named effective profile and atomically applies its concrete settings to the current session.
 - `/session-profile clear` clears only the “selected profile” metadata on the current session; it does not revert concrete model/thinking/speed/effort values that were already applied.
+- The command token `clear` is always parsed as the clear action. There is no escaping or alternate spelling for selecting a `:clear` profile in this task because `:clear` is reserved and invalid as a profile name.
 - Unknown profile names fail with an actionable message listing available profile names.
 - Invalid profile names fail with an actionable message containing the profile name and invalid reason; no concrete settings are changed.
 
@@ -178,9 +180,11 @@ Authored EDN workflows use the compact top-level step key, next to existing dire
 
 Supported authored placements for this task:
 
-- `:session` steps may carry top-level `:session-profile` plus top-level concrete profile-affecting overrides `:model`, `:thinking-level`, `:speed-mode`, and `:effort-override`.
-- `:delegate` steps may carry top-level `:session-profile` plus top-level concrete profile-affecting overrides `:model`, `:thinking-level`, `:speed-mode`, and `:effort-override`. These keys shape the concrete inherited-defaults snapshot passed to the delegated run; they do not create an actor session for the delegate step itself.
+- `:session` steps may carry top-level `:session-profile` plus the concrete profile-affecting direct step overrides already supported by the workflow grammar today: `:model` and `:thinking-level`.
+- `:delegate` steps may carry top-level `:session-profile` plus the same supported direct step overrides, `:model` and `:thinking-level`. These keys shape the concrete inherited-defaults snapshot passed to the delegated run; they do not create an actor session for the delegate step itself.
 - Single-step markdown workflows may carry a `:session-profile` frontmatter key. The parser/compiler treats it like the same compact key on the generated target-authored `:session` step.
+
+This task does not introduce direct authored workflow step keys or markdown frontmatter keys for `:speed-mode` or `:effort-override`. Speed and effort can still come from a resolved session profile and then materialize into the step's effective config. A later task may add direct authored speed/effort keys by updating the target IR compiler, markdown frontmatter parser, loader validation, tests, and workflow grammar docs together.
 
 Unsupported placements for this task:
 
@@ -190,8 +194,8 @@ Unsupported placements for this task:
 
 Canonical IR storage:
 
-- For `:session` steps, the target IR compiler stores `:session-profile` and concrete profile-affecting overrides inside the canonical step `:session` config map alongside existing session options.
-- For `:delegate` steps, the target IR compiler stores the same fields in a canonical delegate step session-config surface dedicated to inherited-default shaping. The field is part of the effective step state used by profile resolution, but profile names/profile maps are never stored in `:inherited-defaults`.
+- For `:session` steps, the target IR compiler stores `:session-profile` and supported direct concrete overrides inside the canonical step `:session` config map alongside existing session options.
+- For `:delegate` steps, the target IR compiler stores the same authored fields in a canonical delegate step session-config surface dedicated to inherited-default shaping. The field is part of the effective step state used by profile resolution, but profile names/profile maps are never stored in `:inherited-defaults`.
 - Markdown frontmatter compiles to the same canonical `:session` config as an EDN `:session` step.
 
 For delegate steps, `:session-profile` applies to the delegating step’s effective config and therefore to the inherited-defaults snapshot captured for the delegated sub-workflow. The delegated run receives the delegating step’s profile-derived concrete defaults through that existing narrow inherited-defaults field set, not by passing profile names or profile maps through `:inherited-defaults`. The callee workflow still retains its own explicit overrides.
@@ -204,7 +208,7 @@ When resolving a workflow step session config:
 2. Resolve the step’s `:session-profile` name against the workflow run’s canonical session-profile snapshot.
 3. Fail/block atomically when the profile is unknown or invalid.
 4. Merge the resolved profile settings into the step effective config.
-5. Apply explicit step keys as the highest-precedence workflow-authored overrides.
+5. Apply explicit step keys supported by the current workflow grammar as the highest-precedence workflow-authored overrides for their fields.
 6. Fall back to the workflow run’s inherited defaults snapshot when neither the step nor the profile supplies a value.
 
 Required precedence for a workflow step:
@@ -223,7 +227,7 @@ For example:
 
 uses the `:coding` profile for model/speed/effort, but forces `:thinking-level :high` for that step.
 
-Existing direct step keys (`:model`, `:thinking-level`, `:speed-mode`, `:effort-override`) remain valid where supported and keep their current meaning. Existing workflows with no `:session-profile` keep current behavior.
+Existing direct step keys remain valid where already supported and keep their current meaning. In this task, the supported direct profile-affecting workflow step overrides are `:model` and `:thinking-level`; direct authored `:speed-mode` and `:effort-override` step keys remain out of scope.
 
 ## Snapshot and replay requirement
 
@@ -235,6 +239,8 @@ Nested delegated workflow runs use two distinct deterministic channels:
 
 1. The delegated run copies or derives its own canonical session-profile snapshot from the delegating run’s immutable snapshot, so profile names requested by steps inside the callee resolve without re-reading mutable config.
 2. The delegating step’s already-resolved effective config is projected into the existing narrow `:inherited-defaults` snapshot for the child run. If the delegating step used `:session-profile`, only the resulting concrete model/thinking/speed/effort defaults flow through `:inherited-defaults`; profile maps, profile names, and effective profile definitions do not.
+
+For this task, the nested-run projection must treat profile-derived `:speed-mode` and `:effort-override` in the delegating step's effective config as concrete inherited defaults for the child run. This intentionally extends the task-207 projection rule for those two fields: when the effective config contains a speed or effort field because profile resolution supplied it, that value outranks the parent run snapshot for the delegated child; when the effective config does not contain the field, the projection falls back to the parent run snapshot as task 207 did. This keeps `:inherited-defaults` narrow and concrete while allowing delegate profiles to affect speed/effort deterministically. Implementations must distinguish field presence from truthiness so an explicit resolved effort value of `nil`, if treated as a concrete clear by profile resolution, is not accidentally replaced by the parent snapshot.
 
 This preserves the task-207 inherited-defaults boundary: `:inherited-defaults` remains a resolved concrete default set for model/prompt/tools/skills/thinking/speed/effort, not a profile registry. Profile-name resolution belongs to the workflow-run profile snapshot.
 
@@ -288,7 +294,7 @@ Add a CHANGELOG `[Unreleased]` entry because this is user-visible behavior.
 5. `/session-profile clear` clears selected-profile metadata without reverting concrete session settings.
 6. Unknown or invalid profile selection fails atomically with a helpful message and available names or invalid reasons.
 7. Supported workflow step forms can specify `:session-profile :profile-name` and receive profile-derived model/thinking/speed/effort settings.
-8. Explicit workflow step settings override profile-derived settings.
+8. Explicit workflow step settings override profile-derived settings for fields where direct workflow step settings are supported.
 9. Workflow profile resolution is snapshotted on canonical workflow-run state for deterministic run behavior; mid-run config edits do not affect later steps, delegated runs, or resumed runs.
 10. Existing workflows without `:session-profile` behave unchanged.
 11. Docs and changelog describe the config shape, command surface, workflow key, and snapshot semantics.
