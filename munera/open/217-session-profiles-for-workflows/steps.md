@@ -90,10 +90,14 @@
 
 ## Plan/steps inconsistency review follow-ups
 
-- [ ] PI1: Extend the canonical workflow IR/runtime model schemas and validation tests to allow the PA1 delegate session-config path `[:delegate :session]` with `:session-profile`, `:model`, and `:thinking-level`; prove target compilation, normalization, and `validate-workflow-ir` preserve that path instead of rejecting or dropping it.
-- [ ] PI2: Carry PA2's explicit `:effort-override nil` concrete-clear semantics through all workflow boundaries, not only delegate projection: profile snapshots, `resolve-step-session-config`, nested `effective-config->snapshot`, child-session creation, and tests must distinguish key presence from nil value so a profile-derived nil can clear an inherited parent effort for session and delegated children.
-- [ ] PI3: Add command work/tests for PA3 token normalization: bare `planning` and EDN-style `:planning` select the same profile, raw bare `clear` performs the clear action, `:clear` fails as reserved/unavailable, and multi-token or EDN map/vector tokens are rejected without state changes.
-- [ ] PI4: Make the PA5 snapshot-capture boundary explicit in implementation steps/tests: both Pathom `psi.workflow/create-run` and psi-tool workflow create-run compute/pass `:session-profile-snapshot`, pure `workflow-runtime.core/create-run` only stores the supplied snapshot and never reads config, and delegate runtime passes a copied/derived child snapshot alongside narrow `:inherited-defaults`.
+- [x] PI1: Extend the canonical workflow IR/runtime model schemas and validation tests to allow the PA1 delegate session-config path `[:delegate :session]` with `:session-profile`, `:model`, and `:thinking-level`; prove target compilation, normalization, and `validate-workflow-ir` preserve that path instead of rejecting or dropping it.
+  - Done: plan now pins the canonical delegate `:session` map/schema surface and the exact preserving consumers/tests required.
+- [x] PI2: Carry PA2's explicit `:effort-override nil` concrete-clear semantics through all workflow boundaries, not only delegate projection: profile snapshots, `resolve-step-session-config`, nested `effective-config->snapshot`, child-session creation, and tests must distinguish key presence from nil value so a profile-derived nil can clear an inherited parent effort for session and delegated children.
+  - Done: plan now requires presence-aware handling across resolved settings, snapshots, resolver output, nested projection, delegate inherited-defaults, and child-session creation.
+- [x] PI3: Add command work/tests for PA3 token normalization: bare `planning` and EDN-style `:planning` select the same profile, raw bare `clear` performs the clear action, `:clear` fails as reserved/unavailable, and multi-token or EDN map/vector tokens are rejected without state changes.
+  - Done: plan now adds a command-parser/normalizer seam and concrete command-token test matrix.
+- [x] PI4: Make the PA5 snapshot-capture boundary explicit in implementation steps/tests: both Pathom `psi.workflow/create-run` and psi-tool workflow create-run compute/pass `:session-profile-snapshot`, pure `workflow-runtime.core/create-run` only stores the supplied snapshot and never reads config, and delegate runtime passes a copied/derived child snapshot alongside narrow `:inherited-defaults`.
+  - Done: plan now names Pathom, psi-tool, pure create-run, and delegate runtime wiring/test obligations.
 
 ## Slice 7 — Verification and coherence
 
