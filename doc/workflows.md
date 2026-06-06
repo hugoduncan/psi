@@ -629,6 +629,46 @@ loops back to its review step (`REPEAT → review`, bounded by
 `:max-iterations`). Only the follow-up step *body* is shared; the
 judge/`:on` wiring around each follow-up stays with its host.
 
+## Task knowledge extraction
+
+`extract-task-knowledge` mines a completed Munera task for durable, project-general
+mementum knowledge.
+
+```text
+/delegate extract-task-knowledge 216-extract-task-knowledge-workflow
+```
+
+Standalone extraction only mines tasks that resolve uniquely under
+`munera/closed/{NNN-slug}`. Inputs may be either an exact `NNN-slug` or an exact
+`munera/{open|closed}/NNN-slug` task path; other shapes, missing tasks, duplicate
+matches, and open-only standalone matches stop with no mementum writes.
+
+The workflow reads the task artifacts (`design.md`, `plan.md`, `steps.md`, and
+`implementation.md` when present) plus task-scoped git history only: commits
+touching the task directory, commits whose message mentions the task id or slug,
+and SHAs explicitly recorded in the artifacts. It recalls existing
+`mementum/memories/` and `mementum/knowledge/` before writing, then updates or
+skips existing entries rather than duplicating them.
+
+Extraction uses conservative mementum gates: an insight must help future AI
+sessions, be likely to recur or have taken more than one attempt to learn, be
+useful to the project outside the task's own context, and be significant for
+future project development. Task-local trivia is rejected, and uncertain cases
+are skipped. Producing zero entries is a successful outcome.
+
+When entries pass those filters, the workflow writes mementum memories or
+knowledge pages and commits them autonomously using the mementum commit
+conventions; it does not request human approval.
+
+`task-lifecycle` now runs `extract-task-knowledge` as its final stage after
+`review-task-implementation`. That lifecycle-only trailing invocation may mine a
+still-open `munera/open/{NNN-slug}` task only when the immediately preceding
+implementation-review output supplied through workflow context contains
+`PASS_STATUS: REVIEW_COMPLETE`. The extraction summary preserves the prior
+implementation-review/lifecycle outcome alongside the extraction result, so the
+lifecycle's final reply still reports the review outcome as well as any captured
+knowledge.
+
 ## Incidental-complexity simplification
 
 `reduce-incidental-complexity` is an autonomous workflow that simplifies **one

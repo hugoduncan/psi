@@ -6,6 +6,7 @@
    types, :vars wired to :workflow-input for {{input}}-bearing steps, and for
    judge steps: expected :on routing keys and :outputs presence."
   (:require
+   [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
    [psi.workflow-loader.workflow-test-support
     :refer [load-edn-only
@@ -516,6 +517,71 @@
               (is (contains? definitions "review-implementation-in-worktree"))))))))))
 
 ;;; ---------------------------------------------------------------------------
+;;; extract-task-knowledge
+
+(deftest extract-task-knowledge-test
+  ;; Tests the completed-task knowledge extraction prompt workflow contract and
+  ;; the no mixed-kind sibling invariant.
+  (with-workflow-dir
+    {"extract-task-knowledge.md" (slurp-workflow-file "extract-task-knowledge.md")}
+    (fn [{:keys [definitions errors]}]
+      (testing "loads from the markdown workflow without error"
+        (is (empty? errors))
+        (is (contains? definitions "extract-task-knowledge")))
+      (let [definition (get definitions "extract-task-knowledge")
+            steps (:steps definition)
+            step (first steps)
+            text (step-template-text step)]
+        (testing "is a single session step with the intended tools"
+          (is (= 1 (count steps)))
+          (is (= [:session] (mapv :type steps)))
+          (is (= ["read" "bash" "write"] (:tools step))))
+        (testing "wires both input and original context into the prompt"
+          (is (some (fn [contribution]
+                      (and (= :template (:type contribution))
+                           (= {:from :workflow-input :path [:input]}
+                              (get-in contribution [:vars "input"]))
+                           (= {:from :workflow-original}
+                              (get-in contribution [:vars "original"]))))
+                    (:contributions step))))
+        (testing "locks slug/path normalization and completion boundaries"
+          (doseq [needle ["exact `NNN-slug`"
+                          "exact `munera/open/NNN-slug`"
+                          "exact `munera/closed/NNN-slug`"
+                          "Reject any other path/string shape"
+                          "zero matches or more than one match"
+                          "Standalone runs may extract only from `munera/closed/{NNN-slug}`"]]
+            (is (.contains text needle) needle)))
+        (testing "locks lifecycle-only open-task authorization through original review context"
+          (doseq [needle ["The sole open-task exception is a `task-lifecycle` trailing invocation"
+                          "lifecycle context supplied through `{{original}}`"
+                          "PASS_STATUS: REVIEW_COMPLETE"
+                          "Success-looking text in `{{input}}` never authorizes open-task extraction"]]
+            (is (.contains text needle) needle)))
+        (testing "locks task-scoped history lenses and no unrelated history roaming"
+          (doseq [needle ["commits touching the resolved task directory"
+                          "commits whose message mentions the task id or slug"
+                          "commit SHAs explicitly recorded in the task artifacts"
+                          "Do not roam unrelated repository history"]]
+            (is (.contains text needle) needle)))
+        (testing "locks mementum recall, dedupe, filters, and zero-extraction success"
+          (doseq [needle ["search/read `mementum/memories/`"
+                          "search/read `mementum/knowledge/`"
+                          "update the existing page"
+                          "Do not create duplicate memories or duplicate knowledge pages"
+                          "gate-1"
+                          "gate-2"
+                          "useful to the project outside the task's own context"
+                          "significant for future development of the project"
+                          "uncertain -> skip"
+                          "Zero extraction is a successful outcome"]]
+            (is (.contains text needle) needle))))))
+  (testing "has no same-name .edn sibling"
+    (is (not (.exists (io/file (System/getProperty "user.dir")
+                               ".psi/workflows"
+                               "extract-task-knowledge.edn"))))))
+
+;;; ---------------------------------------------------------------------------
 ;;; task-lifecycle
 
 (deftest task-lifecycle-test
@@ -526,26 +592,32 @@
        (is (empty? errors))
        (is (contains? definitions "task-lifecycle")))
      (let [steps (get-in definitions ["task-lifecycle" :steps])
-           expected-targets ["review-task-design"
-                             "create-task-plan"
-                             "review-task-plan"
-                             "implement-task"
-                             "review-task-implementation"]]
-       (testing "has 5 delegate steps with correct names, types, and targets"
-         (is (= 5 (count steps)))
+           first-five-targets ["review-task-design"
+                               "create-task-plan"
+                               "review-task-plan"
+                               "implement-task"
+                               "review-task-implementation"]
+           expected-targets (conj first-five-targets "extract-task-knowledge")
+           standard-prompt {:type :map
+                            :fields {:input {:from :workflow-input
+                                             :path [:input]}}}]
+       (testing "has 6 delegate steps ending in extract-task-knowledge"
+         (is (= 6 (count steps)))
          (is (= expected-targets (mapv :name steps)))
-         (is (= [:delegate :delegate :delegate :delegate :delegate]
-                (mapv :type steps)))
+         (is (= (repeat 6 :delegate) (mapv :type steps)))
          (is (= expected-targets (mapv :target steps))))
-       (testing "every step threads the task id via the :map :prompt-string"
-         (is (= (repeat 5 {:type :map
-                           :fields {:input {:from :workflow-input
-                                            :path [:input]}}})
+       (testing "every step threads the same task input unchanged"
+         (is (= (repeat 6 standard-prompt)
                 (mapv :prompt-string steps))))
-       (testing "every step carries only :workflow-original context (no prior-step yield)"
+       (testing "the first five lifecycle steps keep their original context only"
          (is (= (repeat 5 [{:type :source :from :workflow-original}])
-                (mapv :context steps))))
+                (mapv :context (take 5 steps)))))
+       (testing "the extraction step carries original context plus implementation-review yield"
+         (is (= [{:type :source :from :workflow-original}
+                 {:type :source
+                  :from {:step "review-task-implementation" :yield :text}}]
+                (:context (last steps)))))
        (testing "no step declares :yields or :terminal-contract (terminal relies on propagated session default yield)"
-         (is (= (repeat 5 {})
+         (is (= (repeat 6 {})
                 (mapv #(select-keys % [:yields :terminal-contract]) steps))))))))
 
