@@ -88,13 +88,47 @@ low-value or duplicative entries, degrading recall. The design therefore:
    (consistent with the other task-* workflows that take the task identifier as
    `:input`). The standalone surface receives the slug; the `task-lifecycle`
    integration threads the same `:input`.
+8. **Workflow file shape = one markdown prompt workflow.** The standalone
+   extraction workflow is authored as exactly
+   `.psi/workflows/extract-task-knowledge.md`, a single-step prompt workflow with
+   `read`, `bash`, and `write` tools. There is **no**
+   `.psi/workflows/extract-task-knowledge.edn`, avoiding the mixed-kind
+   same-name collision that workflow loading treats as an error. The
+   `task-lifecycle` change is only an additional trailing `:delegate` step in
+   `.psi/workflows/task-lifecycle.edn` with `:target "extract-task-knowledge"`.
+9. **Completed-task resolution is explicit.** The extraction actor resolves the
+   exact slug against `munera/closed/{NNN-slug}` and `munera/open/{NNN-slug}` and
+   stops with no extraction if there are zero matches or more than one match. A
+   standalone invocation may extract only from `munera/closed/{NNN-slug}`; an
+   open-only standalone match is reported as not completed and produces no
+   mementum writes. The `task-lifecycle` trailing invocation may extract from the
+   still-open task directory only because it runs immediately after a successful
+   `review-task-implementation` step; that successful predecessor is the
+   lifecycle-local completion proof. If that predecessor context is absent or
+   does not show a successful implementation review, an open task is treated as
+   incomplete and extraction is skipped.
+10. **Git-history boundary is task-specific.** The workflow may use only three
+    history lenses as evidence: commits touching the resolved task directory
+    (`git log --follow -- <task-dir>`), commits whose message mentions the task
+    id or slug, and commit SHAs explicitly recorded in the task artifacts
+    (especially `implementation.md`). It may inspect the diffs/stat for those
+    commits to understand the lesson, but it must not roam unrelated repository
+    history looking for material to mine.
+11. **Lifecycle terminal result preserves the prior outcome.** Because workflow
+    semantics make the last step's yield the `task-lifecycle` result, the
+    trailing extraction delegate must receive the prior
+    `review-task-implementation` yielded text as context and include that prior
+    lifecycle/review outcome in its final summary alongside the extraction
+    result. The `:prompt-string` still passes the same original task `:input`;
+    the review output is context, not a replacement identifier.
 
 ## Scope
 
 In scope:
 
-- A new `extract-task-knowledge` workflow definition (in `.psi/workflows/`,
-  `.edn` + prompt `.md`, in the style of the existing task workflows) that:
+- A new single-step prompt workflow definition,
+  `.psi/workflows/extract-task-knowledge.md` (and no same-name `.edn` file),
+  that:
   - takes a task slug as `:input`,
   - independently inspects that task's artifacts (`design.md`, `plan.md`,
     `steps.md`, `implementation.md`) and relevant git history,
@@ -105,7 +139,10 @@ In scope:
     (mementum commit conventions; no human approval),
   - produces a concise summary of what was (and was not) extracted.
 - Appending `extract-task-knowledge` as the final `:delegate` step of
-  `task-lifecycle`.
+  `task-lifecycle`, passing the same task `:input` and adding the
+  `review-task-implementation` yielded text as context so the final lifecycle
+  output preserves the review/lifecycle outcome as well as the extraction
+  summary.
 - Tests proving the workflow definition is well-formed and routes/terminates as
   intended (consistent with how other workflow definitions are tested), and that
   `task-lifecycle` includes the new trailing step.
@@ -123,7 +160,8 @@ Out of scope (candidate follow-on tasks):
 ## Acceptance criteria
 
 1. The workflow is runnable via `/delegate extract-task-knowledge {NNN-slug}`
-   and runs to completion without requesting human approval.
+   and runs to completion without requesting human approval. It is loaded from
+   `.psi/workflows/extract-task-knowledge.md` with no same-name `.edn` collision.
 2. Given a task whose artifacts contain a project-significant, project-general
    insight, the workflow persists a corresponding mementum knowledge page and/or
    memory and commits it using mementum commit conventions.
@@ -133,7 +171,9 @@ Out of scope (candidate follow-on tasks):
 4. The workflow does not duplicate knowledge/memories already present in
    `mementum/` (it updates or skips rather than re-creating), per its prompt.
 5. `task-lifecycle` ends with an `extract-task-knowledge` `:delegate` step that
-   receives the same task `:input`.
+   receives the same task `:input`, receives the implementation-review output as
+   context, and yields a final summary that preserves the lifecycle/review
+   outcome plus the extraction outcome.
 6. The workflow definition and the `task-lifecycle` change have test coverage,
    and the new workflow is documented.
 
@@ -144,3 +184,7 @@ Out of scope (candidate follow-on tasks):
   in the prompt (see Resolved decision 6).
 - **Autonomous commits.** The workflow commits directly to `mementum/`. Within
   `task-lifecycle` this happens at the very end, after implementation review.
+- **Open path during lifecycle.** A lifecycle-run task may still physically live
+  under `munera/open/` when extraction runs. That path is authorized only for the
+  trailing lifecycle invocation and only when the successful implementation-review
+  predecessor is present as context; standalone open-task extraction is skipped.
