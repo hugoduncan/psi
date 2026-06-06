@@ -25,23 +25,32 @@
 
 ## Plan/steps review follow-up — ambiguity (ψ)
 
-- [ ] Resolve Slice 2's skip criterion: steps say "pass with margin", plan says
+- [x] Resolve Slice 2's skip criterion: steps say "pass with margin", plan says
       "already satisfied". Specify the exact deterministic condition under which
       Slice 2 is skipped (e.g. SKIP iff A1 strictly decreased AND
       `sum_after < sum_before`; otherwise perform), and remove the undefined
       "with margin" wording.
-- [ ] Resolve `start-server-quietly`'s signature: state explicitly whether the helper
+      → Resolved: SKIP iff A1 strict-decrease AND A2 `sum_{T} after < sum_{T} before`
+      both hold; otherwise PERFORM. "With margin" removed in both steps.md + plan.md.
+- [x] Resolve `start-server-quietly`'s signature: state explicitly whether the helper
       performs `(requiring-resolve 'nrepl.server/start-server)` internally (arg list =
       `[port]`) or receives the resolved fn (arg list = `[start-server port]`), so the
       `requiring-resolve` dependency burden's location is fixed and A2 accounting is
       well defined. Align Slice 1 step wording accordingly.
+      → Resolved: arg list `[port]`; helper does `requiring-resolve` internally.
+      A2 accounting fixed (burden charged to seam, `before := 0`); Slice 1 wording
+      aligned in steps.md + plan.md.
 
 ## Slice 1 — Phase 1 extract stdout-suppression seam
 
-- [ ] Add `start-server-quietly` helper in `nrepl_runtime.clj`: takes `port`,
-      performs `original-systemout` save → `binding *out* *err*` +
-      `System/setOut(stderr)` → `(start-server :port port)` → `finally` restore,
-      returns the server map.
+- [ ] Add `start-server-quietly` helper in `nrepl_runtime.clj`. Arg list = `[port]`
+      (single arg). The helper OWNS nrepl-start resolution: it performs
+      `(requiring-resolve 'nrepl.server/start-server)` internally — the
+      `requiring-resolve` moves out of `start-nrepl!` and into the seam, so the
+      nrepl dependency burden is charged to `start-server-quietly` (before := 0),
+      removing it from the target's A1 lcc-total. Body: resolve `start-server` →
+      `original-systemout` save → `binding *out* *err*` + `System/setOut(stderr)` →
+      `(start-server :port port)` → `finally` restore; returns the server map.
 - [ ] Replace the inline `try`/`binding`/`finally` block in `start-nrepl!` with a
       call to `start-server-quietly`; keep the rest of the orchestration unchanged.
 - [ ] Run `clj-paren-repair components/app-runtime/src/psi/app_runtime/nrepl_runtime.clj`
@@ -53,8 +62,12 @@
 
 ## Slice 2 — Phase 1 collapse incidental duplication (contingent)
 
-- [ ] Check A1/A2 after Slice 1 (see Slice 3 commands). If A1 (target lcc-total
-      decreased) and A2 (net burden) already pass with margin, SKIP this slice.
+- [ ] Check A1/A2 after Slice 1 (see Slice 3 commands). SKIP this slice iff BOTH
+      hold: A1 — target `start-nrepl!` lcc-total strictly decreased vs the
+      `before-local.json` baseline (`6.015383232244966`); AND A2 — over
+      `T = {u | before(u) != after(u)}` (line-insensitive key; baseline-absent
+      `before(u) := 0`), `sum_{T} after < sum_{T} before`. Otherwise (either check
+      fails or is exactly equal) PERFORM the slice.
 - [ ] If still needed: lift the endpoint map `{:host :port :endpoint}` into a single
       local (e.g. `runtime`) used for both `reset!` and the session publication,
       removing the duplicated literal and `(str host ":" (:port server))` repetition.

@@ -125,3 +125,26 @@ Two new actionable ambiguities, both distinct from the design-level A1/A2 notes 
 Non-issue checked: `bb clojure:test:scry --namespace psi.app-runtime-nrepl-test`
 matches the real ns (`psi.app-runtime-nrepl-test`) and the task's
 `*command-line-args*` passthrough — no ambiguity.
+
+## Plan/steps review follow-up — resolutions (ψ)
+
+Executed the two ambiguity follow-up items added by the preceding review pass.
+Both were plan/steps-artifact clarifications; no production code/tests touched.
+
+1. **Slice 2 skip criterion — RESOLVED.** Replaced undefined "pass with margin"
+   (steps) and "already satisfied … would not help" (plan) with one deterministic
+   rule: SKIP Slice 2 iff BOTH (A1) target `start-nrepl!` lcc-total strictly
+   decreased vs baseline `6.015383232244966` AND (A2) `sum_{T} after < sum_{T}
+   before` over the changed-unit set `T`; otherwise (any failure or exact equality)
+   PERFORM. A bare strict pass on both is sufficient — no extra margin buffer.
+   Edited: steps.md Slice 2 first item, plan.md Slice-order item 3.
+
+2. **`start-server-quietly` signature — RESOLVED.** Fixed arg list to `[port]`
+   (single arg); the helper performs `(requiring-resolve 'nrepl.server/start-server)`
+   internally. Rationale: the seam then owns ALL nrepl-start mechanism (resolution +
+   stdout suppression), so `start-nrepl!` retains zero nrepl interop, maximally
+   helping A1 (the nrepl-resolution dependency burden leaves the target unit).
+   A2 accounting fixed: the `requiring-resolve` burden is charged to the seam
+   (member of `T`, `before := 0`); since `sum_{T}` is invariant to which `T`-member
+   holds a line, this placement is A2-neutral while improving A1.
+   Edited: steps.md Slice 1 first item, plan.md "Seam shape" key decision.

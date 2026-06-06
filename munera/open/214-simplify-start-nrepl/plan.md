@@ -22,10 +22,17 @@ Two-phase, test-gated:
 
 ### Key decisions
 
-- **Seam shape:** `start-server-quietly` takes the requested `port`, performs the
-  `System/out` save → `binding *out* *err*` → `setOut(stderr)` → `start-server` →
-  `finally` restore, and returns the server map. This isolates *all* Java interop
-  for stdout routing into one unit; `start-nrepl!` keeps only orchestration.
+- **Seam shape:** `start-server-quietly` has arg list `[port]` (single arg). It
+  internally performs `(requiring-resolve 'nrepl.server/start-server)` — the
+  `requiring-resolve` call moves out of `start-nrepl!` into the seam — then the
+  `System/out` save → `binding *out* *err*` → `setOut(stderr)` → `(start-server
+  :port port)` → `finally` restore, and returns the server map. This isolates *all*
+  Java interop for stdout routing AND nrepl-start resolution into one unit;
+  `start-nrepl!` keeps only orchestration. **A2 accounting:** the `requiring-resolve`
+  dependency burden is charged to `start-server-quietly` (a member of `T` with
+  `before := 0`); since the sum over `T` is invariant to which member of `T` holds a
+  given line, this placement does not affect A2's `sum_{T}` totals, but it does
+  remove the nrepl-resolution dependency from the target unit's A1 lcc-total.
 - **Identity under line drift:** Adding a helper shifts `start-nrepl!`/`stop-nrepl!`
   line numbers. Per design A1/A2 conventions, units are matched by line-insensitive
   key `(ns, var, arity)`; new helpers take `before(u) := 0`.
@@ -64,10 +71,13 @@ Two-phase, test-gated:
 2. **Slice 1 — extract `start-server-quietly` seam (Phase 1).** Move the stdout-
    suppression interop into the helper; `start-nrepl!` calls it. Keep behaviour
    identical. Re-run net (A4 tests, A1/A2, A3, lint). Commit.
-3. **Slice 2 — collapse incidental duplication (Phase 1, optional).** Lift the
+3. **Slice 2 — collapse incidental duplication (Phase 1, contingent).** Lift the
    endpoint-map literal to a single local if it lowers burden without widening blast
-   radius. Re-run acceptance. Commit. Skip if A1/A2 already satisfied and the change
-   would not help.
+   radius. Re-run acceptance. Commit. SKIP iff BOTH A1 (target `start-nrepl!`
+   lcc-total strictly decreased vs baseline `6.015383232244966`) AND A2
+   (`sum_{T} after < sum_{T} before` over the changed-unit set `T`) already hold
+   after Slice 1; otherwise PERFORM. No undefined "margin" buffer — a bare strict
+   pass on both A1 and A2 is sufficient to skip.
 4. **Slice 3 — acceptance verification + close-out.** Run all of A1–A5, record
    results in implementation.md, confirm minimality (A5). Commit.
 
