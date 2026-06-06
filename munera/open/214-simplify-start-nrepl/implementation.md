@@ -345,3 +345,48 @@ effects, gated publication). Coverage is SUFFICIENT and GREEN against unmodified
 code — Phase 0 gate PASSES. Phase 1 simplification may proceed.
 
 Result: REVIEW_COMPLETE.
+
+## Pre-simplification baseline/diff gate (ψ)
+
+Ran the workflow-level pre-simplification baseline/diff gate after the Phase 0
+characterization-net RE-review (REVIEW_COMPLETE) and before `implement-task`.
+Inherited session worktree; no `work-on`, no worktree/branch switch.
+
+### Baseline integrity
+- `characterization-baseline.edn` present and complete: HEAD
+  `c1acd2abc4be10ddc3fbd057e9442788cf7f5950`, `:git-status-short ""`,
+  `:working-tree-clean? true`, `:target-source-clean? true`.
+- Target/source/test paths recorded: `nrepl_runtime.clj` (target),
+  `app_runtime.clj` (potentially-touched), `app_runtime_nrepl_test.clj` (net).
+- Baseline did NOT include dirty target/source paths. PASS.
+
+### Coverage-phase change comparison
+- Committed since baseline (`git log c1acd2abc..HEAD`): 5 commits
+  (clean-source baseline record, FIXABLE_GAPS review, characterization net,
+  step ticks, RE-review REVIEW_COMPLETE).
+- Uncommitted worktree: clean (`git diff` empty) — no edits hidden behind an
+  empty uncommitted diff; committed changes inspected directly.
+- `git diff --stat c1acd2abc...HEAD`: 4 files, 367 insertions, 9 deletions.
+
+### Classification (all coverage-phase changes)
+- `app_runtime_nrepl_test.clj` — **characterization tests** (additive: 5 deftests
+  + `preserving-nrepl-port-file` helper + 2 requires). Allowed.
+- `characterization-baseline.edn` — **task artifact**. Allowed.
+- `implementation.md` — **task artifact**. Allowed.
+- `steps.md` — **task artifact**. Allowed.
+- Production/target source: `nrepl_runtime.clj` and `app_runtime.clj` UNTOUCHED
+  since baseline (`git log c1acd2abc..HEAD -- <paths>` empty). No testability
+  seams introduced; no premature simplification/refactor; no broad production edit.
+
+### Status & tests
+- `CHARACTERIZATION_STATUS`: not INFEASIBLE — initial FIXABLE_GAPS resolved; final
+  RE-review REVIEW_COMPLETE (all four gaps covered).
+- `bb clojure:test:scry --namespace psi.app-runtime-nrepl-test` → GREEN
+  (7 tests, 28 assertions, 0 fail / 0 error).
+
+### Gate decision
+All coverage-phase changes are allowed (characterization tests + task artifacts
+only); relevant tests are green. No unclassified source change, broad production
+edit, premature refactor, missing baseline data, or INFEASIBLE status.
+
+Result: REVIEW_COMPLETE. Phase 1 simplification (`implement-task`) may proceed.
