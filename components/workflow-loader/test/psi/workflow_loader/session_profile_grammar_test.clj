@@ -91,7 +91,7 @@
       (is (false? valid?))
       (is (some? structural-errors))))
 
-  (testing "llm judge specs reject session-profile"
+  (testing "llm judge specs reject top-level session-profile"
     (let [{:keys [valid? structural-errors]}
           (workflow-ir/validate-workflow-ir
            {:version :workflow-ir/v1
@@ -104,6 +104,25 @@
                      :judge {:type :llm
                              :session-profile :review
                              :session {:contributions [{:type :template
+                                                        :text "OK?"
+                                                        :vars {}}]}}
+                     :on {"OK" {:goto :done}}}]})]
+      (is (false? valid?))
+      (is (some? structural-errors))))
+
+  (testing "llm judge session config rejects canonical session-profile"
+    (let [{:keys [valid? structural-errors]}
+          (workflow-ir/validate-workflow-ir
+           {:version :workflow-ir/v1
+            :steps [{:name "review"
+                     :type :session
+                     :session {:contributions [{:type :source
+                                                :from :workflow-original}]}
+                     :outputs {:final-llm-reply {:source :session/final-llm-reply}}
+                     :yields {:type :text :text :final-llm-reply}
+                     :judge {:type :llm
+                             :session {:session-profile :review
+                                       :contributions [{:type :template
                                                         :text "OK?"
                                                         :vars {}}]}}
                      :on {"OK" {:goto :done}}}]})]

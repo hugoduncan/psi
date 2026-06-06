@@ -212,10 +212,24 @@
    [:session {:optional true} delegate-session-spec-schema]
    [:context {:optional true} [:vector source-contribution-schema]]])
 
+(def llm-judge-session-spec-schema
+  [:map {:closed true}
+   [:model {:optional true} [:maybe model-id-schema]]
+   [:thinking-level {:optional true} [:enum :off :minimal :low :medium :high :xhigh]]
+   [:system-prompt {:optional true} :string]
+   [:tools {:optional true} [:vector tool-id-schema]]
+   [:skills {:optional true} [:vector skill-id-schema]]
+   [:response-mode {:optional true} [:maybe response-mode-schema]]
+   [:prompt-component-selection {:optional true} [:maybe :map]]
+   [:temperature {:optional true} [:maybe [:double {:min 0.0 :max 2.0}]]]
+   [:logprobs {:optional true} :boolean]
+   [:top-logprobs {:optional true} [:int {:min 1 :max 20}]]
+   [:contributions [:vector contribution-schema]]])
+
 (def llm-judge-schema
   [:map {:closed true}
    [:type [:= :llm]]
-   [:session session-spec-schema]
+   [:session llm-judge-session-spec-schema]
    [:outputs {:optional true} outputs-schema]
    [:projection {:optional true} [:maybe projection-schema]]])
 
