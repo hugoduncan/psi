@@ -81,4 +81,4 @@
 
 ## Code-shaper review follow-ups
 
-- [ ] CS1: Update `.psi/workflows/task-lifecycle-in-worktree.edn`'s positive-path summary prompt and its workflow-loader tests so wrapper callers report the full design → plan → implement → review → extract-knowledge lifecycle, including the extraction result preserved by the inner `task-lifecycle` yield, while keeping the existing `NO_TARGET` branch unchanged.
+- [x] CS1: DONE — updated `.psi/workflows/task-lifecycle-in-worktree.edn`'s positive-path summary prompt and workflow-loader tests so wrapper callers report the full design → plan → implement → review → extract-knowledge lifecycle, including the extraction result preserved by the inner `task-lifecycle` yield; preserved the existing `NO_TARGET` branch unchanged.
