@@ -732,3 +732,34 @@ are about *which* emitted clauses that net protects, not about replacing it with
 executable check.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Test review follow-ups TR-T1..TR-T3 executed (2026-06-06)
+
+Closed the three content-lock coverage gaps in the
+`reduce-incidental-complexity-test` "select-and-create prompt preserves … contracts"
+block (`task_209_workflow_definitions_test.clj`). Test-only change — no
+emitter/doc/knowledge edit (the targeted wording is already emitted; these locks just
+protect it from silent regression). Each new lock substring was confirmed present in
+the loaded `select-text` (or asserted absent for the two negative net-sum locks).
+
+- **TR-T1 (done):** added the positive no-sum locks `must NOT sum normalized per-unit
+  burdens` and `never a sum`, plus two negative assertions that the removed net-sum
+  phrasings (`sum after < sum before`, `after total is strictly less than the before
+  total`) are **absent** — so re-introducing a sum into A2 cannot pass green.
+- **TR-T2 (done):** added branch-structure + exemption locks `A2a (new pieces are
+  genuine`, `A2b (no collateral ceiling breach`, `before-max(k) >= B`, and `EXEMPT` —
+  guards the `>= B` exemption branch that keeps the gate well-posed/satisfiable.
+- **TR-T3 (done):** added single-row line-bearing target-exclusion locks `remove ONLY
+  the target's own physical row`, `never the whole`, and `siblings STAY in` — guards
+  the shared-key (51-row defmethod) relocation-hole closure against a regression to
+  whole-key-group exclusion.
+
+Verification: workflow-loader suite GREEN via scry CLI from repo root
+(`clojure -M:test-paths -m scry.cli --namespace
+psi.workflow-loader.task-209-workflow-definitions-test`) — **3 tests / 207 assertions
+/ 0 fail / 0 error** (was 196; +11 new locks). `clj-kondo --lint` clean
+(0 errors / 0 warnings); `clj-paren-repair` round-trips. The acceptance-5 *semantic*
+satisfiability claim remains correctly out-of-scope for unit testing (A2 is an
+agent-run procedure, not executable code) per the test-review note.
+
+PASS_STATUS: FOLLOW_UPS_COMPLETE

@@ -303,6 +303,26 @@
          (is (.contains select-text "before-max(k)"))
          (is (.contains select-text "satisfies `after(u) < B`"))
          (is (.contains select-text "NOT a recomputed `after(target)`"))
+         ;; TR-T1: the defining "no sum" invariant is regression-protected — the
+         ;; redesign exists to eliminate the sub-additive net-sum gate, so lock the
+         ;; positive no-sum wording and assert the removed net-sum phrasings are absent.
+         (is (.contains select-text "must NOT sum normalized per-unit burdens"))
+         (is (.contains select-text "never a sum"))
+         (is (not (.contains select-text "sum after < sum before")))
+         (is (not (.contains select-text "after total is strictly less than the before total")))
+         ;; TR-T2: A2a/A2b branch structure + the >= B exemption clause that keeps the
+         ;; gate well-posed/satisfiable (dropping the exemption re-introduces an
+         ;; over-strict ceiling).
+         (is (.contains select-text "A2a (new pieces are genuine"))
+         (is (.contains select-text "A2b (no collateral ceiling breach"))
+         (is (.contains select-text "before-max(k) >= B"))
+         (is (.contains select-text "EXEMPT"))
+         ;; TR-T3: line-bearing single-row target exclusion (the shared-key hole closure)
+         ;; — a regression to whole-key-group exclusion reopens the 51-row defmethod
+         ;; relocation hole.
+         (is (.contains select-text "remove ONLY the target's own physical row"))
+         (is (.contains select-text "never the whole"))
+         (is (.contains select-text "siblings STAY in"))
          (is (.contains select-text "Commit the task creation on the current branch"))
          (is (.contains select-text "Do NOT push or open a PR")))
        (testing "clean-baseline step locks the clean-source precondition and baseline artifact contract"
