@@ -707,3 +707,32 @@ untouched and the tradeoff resolves favourably:
 The other open follow-up (A2-redefinition human ratification gate) is unaffected and
 remains the only outstanding item; task closure stays PROVISIONAL pending that human
 act.
+
+## Task-test review (ψ) — re-review after stub removal, REVIEW_COMPLETE
+
+Re-applied the `task-test-review` lens to the net
+(`components/app-runtime/test/psi/app_runtime_nrepl_test.clj`) after the
+`route-stdout-to-stderr` seam extraction + stub removal (commit `77116352d`).
+Live re-verify: `bb clojure:test:scry --namespace psi.app-runtime-nrepl-test`
+→ **7 tests / 30 assertions GREEN**.
+
+- **well-formed — PASS.** Descriptive deftests + assertion messages; all mutated
+  globals (`nrepl-runtime` atom, `System/out`/`err`, real-cwd `.nrepl-port` via
+  `preserving-nrepl-port-file`) restored in `finally`.
+- **behaviour-coverage — PASS.** Every design observable surface covered: server
+  map / bound port, atom reset, gated session publication (positive +
+  ctx-without-active-session negative), `.nrepl-port` write + match-delete +
+  non-match-preserve, stdout→stderr routing seam, stderr connection notice.
+  `deleteOnExit` justifiably excluded (JVM-exit interaction, not mid-test
+  observable).
+- **infra-deps ¬stub — PASS (prior finding resolved).** The previously-flagged
+  `with-redefs` stub of nREPL `start-server` is gone; the routing mechanism is now
+  characterized directly via `route-stdout-to-stderr` on a REAL known-printing
+  thunk, and the end-to-end start path is exercised with a REAL nREPL server + real
+  captured streams / filesystem. Remaining `with-redefs` matches are in comments
+  only.
+
+No NEW actionable test finding. The single open item (A2-redefinition human
+ratification) is not a test concern and is already tracked.
+
+PASS_STATUS: REVIEW_COMPLETE
