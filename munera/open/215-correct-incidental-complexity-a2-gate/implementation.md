@@ -313,6 +313,24 @@ interpretation by the executing emitter/test-edit agent). Did not re-review
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
 
+### RI2 resolution (doc-sync)
+
+Rewrote the `doc/workflows.md` `reduce-incidental-complexity` Phase-1 acceptance
+sentence (~line 709). Replaced "net burden across the metric-derived touched set
+strictly decreases" with the landed per-unit relocation guard: the target's
+`lcc-total` decrease is now explicitly labelled the A5 check, and the A2 clause
+reads "a per-unit relocation guard holds (every new or below-ceiling after-row
+`u` satisfies `after(u) < B`, where `B := before(target)` read from
+`before-local.json`, so a tangle is never merely relocated into a new seam or a
+sibling rather than reduced)". This matches the landed emitter A2a/A2b ceiling
+and the design's How-A2-is-checked procedure (no sum, target excluded).
+
+Verified no other `doc/` or `README.md` sentence restates the net-sum form
+(`grep -rn "net burden\|touched set\|net-sum\|strictly decreases" doc/ README.md`
+now returns no surviving net-sum claim; the two CHANGELOG entries describe the
+workflow generally and do not name the net-sum gate). All five acceptance
+criteria plus the design/plan/implementation review follow-ups are now complete.
+
 ## Plan/steps review follow-up — PA1 (ψ, executed)
 
 Executed the newly-added PA1 follow-up's plan/steps-documentation deliverable. PA1 was
