@@ -99,6 +99,8 @@ Commit any mementum writes autonomously using mementum commit conventions:
 - knowledge commit: `💡 {description}`
 - update commit: `🔄 update: {slug}`
 
+Before committing, inspect `git status --short`. Stage and commit only extraction-owned mementum paths under `mementum/memories/` and `mementum/knowledge/`; use explicit pathspecs such as `git add -- mementum/memories/{slug}.md mementum/knowledge/{topic}.md`. Never use `git add .` or `git add -A` for the mementum commit. Leave unrelated dirty worktree changes untouched, unstaged, and uncommitted. If unrelated dirt overlaps the intended mementum paths or you cannot isolate the extraction-owned changes safely, do not commit; report the blocked mementum commit and the reason.
+
 Do not commit if nothing changed.
 
 ## 6. Final summary

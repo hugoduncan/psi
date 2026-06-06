@@ -601,6 +601,14 @@
                           "memory commit: `{symbol} {slug}`"
                           "knowledge commit: `💡 {description}`"
                           "update commit: `🔄 update: {slug}`"
+                          "Before committing, inspect `git status --short`"
+                          "Stage and commit only extraction-owned mementum paths"
+                          "mementum/memories/` and `mementum/knowledge/"
+                          "use explicit pathspecs such as `git add --"
+                          "Never use `git add .` or `git add -A`"
+                          "Leave unrelated dirty worktree changes untouched, unstaged, and uncommitted"
+                          "If unrelated dirt overlaps the intended mementum paths"
+                          "report the blocked mementum commit and the reason"
                           "Do not commit if nothing changed"]]
             (is (.contains text needle) needle)))
         (testing "locks final-summary reporting and review-outcome preservation (TT2)"
