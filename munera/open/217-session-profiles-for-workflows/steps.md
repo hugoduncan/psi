@@ -2,14 +2,14 @@
 
 ## Slice 1 — Profile domain and config resolution
 
-- [ ] Add a profile domain namespace/helper that defines the supported field set, reserved profile names, canonical thinking/speed/effort values, and normalized resolved-profile data shape.
-- [ ] Implement effective `:agent-session :session-profiles` loading from user config, project shared config, and project local config without changing unrelated `:agent-session` config resolution.
-- [ ] Implement profile-specific recursive merge with precedence `user < project-shared < project-local`, preserving partial profile override behavior.
-- [ ] Filter profile resolution to exactly `:model-provider`, `:model-id`, `:thinking-level`, `:speed-mode`, and `:effort-override`, ignoring unknown keys in resolved/applied/snapshotted profile data.
-- [ ] Validate model identity as an all-or-nothing `:model-provider` plus `:model-id` pair through the existing model registry/model-selection path.
-- [ ] Validate `:thinking-level`, `:speed-mode`, and `:effort-override` values against the design's canonical sets, including `nil` effort where representable.
-- [ ] Mark empty/no-concrete-setting profiles and `:clear` profiles invalid with actionable diagnostic data.
-- [ ] Add tests for profile deep merge, precedence, unknown-key ignoring, partial valid profiles, invalid model pairs, invalid enum values, empty profiles, and reserved `:clear`.
+- [x] Add a profile domain namespace/helper that defines the supported field set, reserved profile names, canonical thinking/speed/effort values, and normalized resolved-profile data shape.
+- [x] Implement effective `:agent-session :session-profiles` loading from user config, project shared config, and project local config without changing unrelated `:agent-session` config resolution.
+- [x] Implement profile-specific recursive merge with precedence `user < project-shared < project-local`, preserving partial profile override behavior.
+- [x] Filter profile resolution to exactly `:model-provider`, `:model-id`, `:thinking-level`, `:speed-mode`, and `:effort-override`, ignoring unknown keys in resolved/applied/snapshotted profile data.
+- [x] Validate model identity as an all-or-nothing `:model-provider` plus `:model-id` pair through the existing model registry/model-selection path.
+- [x] Validate `:thinking-level`, `:speed-mode`, and `:effort-override` values against the design's canonical sets, including `nil` effort where representable.
+- [x] Mark empty/no-concrete-setting profiles and `:clear` profiles invalid with actionable diagnostic data.
+- [x] Add tests for profile deep merge, precedence, unknown-key ignoring, partial valid profiles, invalid model pairs, invalid enum values, empty profiles, and reserved `:clear`.
 
 ## Slice 2 — Live session command surface and observability
 
