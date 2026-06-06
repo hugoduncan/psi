@@ -845,3 +845,33 @@ Only open item remains the human A2-redefinition ratification gate (not a test
 concern; already tracked).
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Task-docs review (ψ) — user-facing documentation, REVIEW_COMPLETE
+
+Applied the `review-task-docs` lens (README ∧ doc/ ∧ CHANGELOG · accuracy ∧
+completeness ∧ consistency) to task 214's change.
+
+**Verdict: no actionable docs finding.** The change is a behaviour-preserving
+internal refactor of `psi.app-runtime.nrepl-runtime/start-nrepl!` (extract the
+`start-server-quietly` and `route-stdout-to-stderr` seams). No observable behaviour,
+command, flag, or extension capability changed.
+
+- **New/changed behaviours** — none. Returned server map, bound port, `.nrepl-port`
+  contents, `nrepl-runtime-atom` value, session `:nrepl-runtime` publication, and
+  stderr routing are all preserved (the acceptance net asserts exactly these).
+- **Removed behaviours** — none; no stale doc references introduced.
+- **CHANGELOG** — correctly absent. Per the changelog policy `δ ∈ {refactor} ⇒
+  ¬user_visible ⇒ ∅`. The new private helpers (`start-server-quietly`,
+  `route-stdout-to-stderr`) are internal mechanism, not user surface. (The
+  `[Unreleased]` nREPL entries — readiness timeout, stale `.nrepl-port` handling —
+  are unrelated prior work, not this task.)
+- **Examples / consistency** — `grep` for `start-nrepl|nrepl-runtime|
+  start-server-quietly|route-stdout-to-stderr` across `README.md`, `doc/`,
+  `CHANGELOG.md` hits only `doc/design-multi-session.md:68` (`:nrepl-runtime-atom`
+  ctx-seeding row), which concerns ctx construction and is untouched by this
+  refactor — accurate and consistent.
+
+No follow-up steps added (nothing actionable). The sole open item remains the human
+A2-redefinition ratification gate (not a docs concern; already tracked).
+
+PASS_STATUS: REVIEW_COMPLETE
