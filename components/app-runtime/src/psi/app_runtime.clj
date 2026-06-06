@@ -634,73 +634,59 @@ Available: " (str/join ", " (map name (keys all))))
          {:keys [startup-rehydrate session-id]}
          (bootstrap-runtime-session! ctx ai-model {:memory-runtime-opts memory-runtime-opts
                                                    :cwd cwd})
-
-         ;; TUI-local focus atom — tracks active session-id
-         tui-focus* (atom session-id)
-
-         _ (ui-capabilities/install-provider! ctx (ui-capabilities/unsupported-attached-provider :tui))
-
-         ;; Expose state for nREPL introspection
-         _         (reset! session-state {:ctx ctx :ai-model ai-model
-                                          :oauth-ctx oauth-ctx
-                                          :nrepl-runtime-atom nrepl-runtime
-                                          :tui-focus* tui-focus*})
-
-         context-event!
-         (partial tui-session-nav/context-event! ctx event-queue)
-
-         ;; Session navigation callbacks
-         resume-fn!         (tui-session-nav/resume-fn! ctx tui-focus* event-queue)
-         switch-session-fn! (tui-session-nav/switch-session-fn! ctx tui-focus* event-queue)
-         fork-session-fn!   (tui-session-nav/fork-session-fn! ctx tui-focus* event-queue)
-
-         cmd-opts  {:oauth-ctx oauth-ctx
-                    :ai-model ai-model
-                    :supports-session-tree? true
-                    ;; Intentionally reads @tui-focus* rather than using the
-                    ;; callback parameter — the TUI always forks from the
-                    ;; currently focused session, which may differ from the
-                    ;; session that dispatched the /new command.
-                    :on-new-session! (fn [_source-session-id]
-                                       (let [source-session-id @tui-focus*
-                                             result             (start-new-session-with-startup! ctx source-session-id nil ai-model)]
-                                         (reset! tui-focus* (:session-id result))
-                                         (context-event! (:session-id result))
-                                         result))}
-
-         ;; Build TUI callbacks via tui-wiring
-         wiring-deps {:ctx ctx
-                      :tui-focus* tui-focus*
-                      :session-state session-state
-                      :ai-model ai-model
-                      :oauth-ctx oauth-ctx
-                      :resolve-model-by-provider+id resolve-model-by-provider+id
-                      :switch-session-fn! switch-session-fn!
-                      :fork-session-fn! fork-session-fn!
-                      :submit-prompt-fn! submit-prompt-in!
-                      :cmd-opts cmd-opts}
-
-         dispatch-fn                 (tui-wiring/make-dispatch-fn wiring-deps)
-         run-agent-fn                (tui-wiring/make-run-agent-fn wiring-deps)
-         on-interrupt-fn!            (tui-wiring/make-on-interrupt-fn wiring-deps)
-         frontend-action-handler-fn! (tui-wiring/make-frontend-action-handler-fn wiring-deps)
-
-         tui-opts (tui-wiring/build-tui-opts
-                   {:ctx ctx
-                    :tui-focus* tui-focus*
-                    :event-queue event-queue
-                    :cwd cwd
-                    :startup-rehydrate startup-rehydrate
-                    :dispatch-fn dispatch-fn
-                    :on-interrupt-fn! on-interrupt-fn!
-                    :frontend-action-handler-fn! frontend-action-handler-fn!
-                    :resume-fn! resume-fn!
-                    :switch-session-fn! switch-session-fn!
-                    :fork-session-fn! fork-session-fn!
-                    :current-context-widget (tui-session-nav/current-context-widget ctx session-id)})]
-
-     (try
-       (tui-start-fn! run-agent-fn tui-opts)
-       (finally
-         (ui-capabilities/clear-provider! ctx))))))
+         tui-focus* (atom session-id)]
+     (reset! session-state {:ctx ctx :ai-model ai-model
+                            :oauth-ctx oauth-ctx
+                            :nrepl-runtime-atom nrepl-runtime
+                            :tui-focus* tui-focus*})
+     (let [context-event!     (partial tui-session-nav/context-event! ctx event-queue)
+           resume-fn!         (tui-session-nav/resume-fn! ctx tui-focus* event-queue)
+           switch-session-fn! (tui-session-nav/switch-session-fn! ctx tui-focus* event-queue)
+           fork-session-fn!   (tui-session-nav/fork-session-fn! ctx tui-focus* event-queue)
+           cmd-opts           {:oauth-ctx oauth-ctx
+                               :ai-model ai-model
+                               :supports-session-tree? true
+                               ;; Intentionally reads @tui-focus* rather than using the
+                               ;; callback parameter — the TUI always forks from the
+                               ;; currently focused session, which may differ from the
+                               ;; session that dispatched the /new command.
+                               :on-new-session! (fn [_source-session-id]
+                                                  (let [source-session-id @tui-focus*
+                                                        result             (start-new-session-with-startup! ctx source-session-id nil ai-model)]
+                                                    (reset! tui-focus* (:session-id result))
+                                                    (context-event! (:session-id result))
+                                                    result))}
+           wiring-deps        {:ctx ctx
+                               :tui-focus* tui-focus*
+                               :session-state session-state
+                               :ai-model ai-model
+                               :oauth-ctx oauth-ctx
+                               :resolve-model-by-provider+id resolve-model-by-provider+id
+                               :switch-session-fn! switch-session-fn!
+                               :fork-session-fn! fork-session-fn!
+                               :submit-prompt-fn! submit-prompt-in!
+                               :cmd-opts cmd-opts}
+           dispatch-fn        (tui-wiring/make-dispatch-fn wiring-deps)
+           run-agent-fn       (tui-wiring/make-run-agent-fn wiring-deps)
+           on-interrupt-fn!   (tui-wiring/make-on-interrupt-fn wiring-deps)
+           frontend-action-handler-fn!
+           (tui-wiring/make-frontend-action-handler-fn wiring-deps)
+           tui-opts           (tui-wiring/build-tui-opts
+                               {:ctx ctx
+                                :tui-focus* tui-focus*
+                                :event-queue event-queue
+                                :cwd cwd
+                                :startup-rehydrate startup-rehydrate
+                                :dispatch-fn dispatch-fn
+                                :on-interrupt-fn! on-interrupt-fn!
+                                :frontend-action-handler-fn! frontend-action-handler-fn!
+                                :resume-fn! resume-fn!
+                                :switch-session-fn! switch-session-fn!
+                                :fork-session-fn! fork-session-fn!
+                                :current-context-widget (tui-session-nav/current-context-widget ctx session-id)})]
+       (ui-capabilities/install-provider! ctx (ui-capabilities/unsupported-attached-provider :tui))
+       (try
+         (tui-start-fn! run-agent-fn tui-opts)
+         (finally
+           (ui-capabilities/clear-provider! ctx)))))))
 ;; RPC runtime moved to psi.rpc.

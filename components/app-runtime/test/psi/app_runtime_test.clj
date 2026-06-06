@@ -18,8 +18,7 @@
    [psi.agent-session.test-support :as test-support]
    [psi.prompt-assets.system-prompt :as sys-prompt]
    [psi.memory.runtime :as memory-runtime]
-   [psi.app-runtime.test-support :as app-test-support]
-   #_[psi.tui.app :as tui-app]))
+   [psi.app-runtime.test-support :as app-test-support]))
 
 (deftest select-login-provider-test
   (let [providers [{:id :anthropic :name "Anthropic"}
@@ -326,31 +325,53 @@
               (is (contains? msg-texts "/history"))
               (is (contains? msg-texts "/quit")))))))))
 
-(deftest start-tui-runtime-passes-current-session-file-test
-  (let [captured (atom nil)]
+(deftest start-tui-runtime-passes-current-session-file-startup-rehydrate-nav-callbacks-and-cwd-test
+  (let [captured (atom nil)
+        bootstrap-opts* (atom nil)
+        target-session-id* (atom nil)
+        startup-rehydrate {:messages [{:role :user :text "r"}] :tool-calls {"c" {:name "read"}} :tool-order ["c"]}]
     (test-support/with-temp-session-root
       (fn [session-root]
         (app-test-support/with-session-state-restore
           (fn []
             (with-redefs-fn (main-bootstrap-stub-bindings)
               (fn []
-                (let [mock-tui-start! (fn [_run-agent-fn opts]
-                                        (reset! captured opts)
-                                        :ok)]
-                  (is (= :ok (app-runtime/start-tui-runtime! mock-tui-start! :ignored {} {} {:session-root session-root})))
-                  (is (string? (:current-session-file @captured))
-                      "persisted TUI startup should pass the current session file to the frontend")
-                  (is (fn? (:dispatch-fn @captured)))
-                  (is (fn? (:on-interrupt-fn! @captured)))
-                  (let [ctx (:ctx @app-runtime/session-state)
-                        session-id (-> @app-runtime/session-state :ctx ss/list-context-sessions-in first :session-id)
-                        session-file (:session-file (ss/get-session-data-in ctx session-id))]
-                    (is (= :tui (:ui-type (ss/get-session-data-in ctx session-id))))
-                    (is (= session-file (:current-session-file @captured)))
-                    (is (.startsWith session-file session-root)
-                        (str "expected persisted TUI session-file under isolated session-root\n"
-                             "session-root: " session-root "\n"
-                             "session-file: " session-file))))))))))))
+                (with-redefs [app-runtime/bootstrap-runtime-session!
+                              (fn [ctx _ai-model opts]
+                                (let [_ (reset! bootstrap-opts* opts)
+                                      sid (:session-id (session/new-session-in! ctx nil {}))
+                                      target-id (:session-id
+                                                 (session/create-top-level-session-in!
+                                                  ctx sid {:session-name "switch target"}))]
+                                  (reset! target-session-id* target-id)
+                                  {:ctx ctx :session-id sid :startup-rehydrate startup-rehydrate}))]
+                  (is (= :ok (app-runtime/start-tui-runtime!
+                              (fn [_run-agent-fn opts]
+                                (reset! captured opts)
+                                :ok)
+                              :ignored {} {} {:session-root session-root :cwd session-root}))))
+                (let [opts @captured
+                      ctx (:ctx @app-runtime/session-state)
+                      session-id (:focus-session-id opts)
+                      target-id @target-session-id*
+                      session-file (:session-file (ss/get-session-data-in ctx session-id))]
+                  (is (every? fn? (map opts [:dispatch-fn :on-interrupt-fn! :frontend-action-handler-fn!
+                                             :resume-fn! :switch-session-fn! :fork-session-fn!])))
+                  (is (= (select-keys startup-rehydrate [:messages :tool-calls :tool-order])
+                         {:messages (:initial-messages opts)
+                          :tool-calls (:initial-tool-calls opts)
+                          :tool-order (:initial-tool-order opts)}))
+                  (is (= :tui (:ui-type (ss/get-session-data-in ctx session-id))))
+                  (is (= [session-root session-root] [(:cwd @bootstrap-opts*) (:cwd opts)]))
+                  (is (= session-file (:current-session-file opts)))
+                  (is (.startsWith session-file session-root))
+                  (is (= {:messages [] :tool-calls {} :tool-order []}
+                         ((:switch-session-fn! opts) target-id)))
+                  (is (= target-id (:psi.agent-session/session-id
+                                    ((:query-fn opts) [:psi.agent-session/session-id]))))
+                  (let [event (.poll (:event-queue opts) 2000 java.util.concurrent.TimeUnit/MILLISECONDS)]
+                    (is (= :context-updated (:type event)))
+                    (is (= target-id (:active-session-id event)))))))))))))
 
 (deftest start-tui-runtime-journals-command-input-test
   (app-test-support/with-session-state-restore
@@ -498,6 +519,34 @@
                 (is (some #(= :session/prompt-finish (:event-type %)) entries))
                 (is (= ["user" "assistant"] roles))))))))))
 
+(deftest start-tui-runtime-uses-nullable-deterministic-mode-on-public-tui-path-test
+  (app-test-support/with-session-state-restore
+    (fn []
+      (with-redefs-fn (main-bootstrap-stub-bindings)
+        (fn []
+          (kernel/clear-event-log!)
+          (with-redefs [app-runtime/nullable-execution-mode (fn [] "deterministic")]
+            (let [prompt "echo through public nullable tui path"
+                  result (app-runtime/start-tui-runtime!
+                          (fn [run-agent-fn _opts]
+                            (let [queue (java.util.concurrent.LinkedBlockingQueue.)]
+                              (run-agent-fn prompt queue)
+                              (.poll queue 2000 java.util.concurrent.TimeUnit/MILLISECONDS)))
+                          :ignored {} {})
+                  ctx     (:ctx @app-runtime/session-state)
+                  sid     (-> @app-runtime/session-state :ctx ss/list-context-sessions-in first :session-id)
+                  entries (kernel/event-log-entries)
+                  texts   (->> (persist/all-entries-in ctx sid)
+                               (filter #(= :message (:kind %)))
+                               (map #(get-in % [:data :message :content 0 :text]))
+                               vec)]
+              (is (= :done (:kind result)))
+              (is (= "assistant" (get-in result [:result :role])))
+              (is (= prompt (get-in result [:result :content 0 :text])))
+              (is (some #(= :session/prompt-record-response (:event-type %)) entries))
+              (is (= [prompt prompt] texts)
+                  "nullable deterministic mode echoes the submitted user text through start-tui-runtime!"))))))))
+
 (deftest agent-messages->tui-resume-state-rehydrates-tool-rows-test
   (let [messages [{:role "user"
                    :content [{:type :text :text "read file"}]}
@@ -602,9 +651,6 @@
               {:role :assistant :text "Structured answer."}]
              messages)))))
 
-;; moved to psi.main
-;; moved to psi.main
-;; moved to psi.main
 (deftest bootstrap-runtime-session-initial-context-index-has-single-session-test
   (with-redefs-fn (merge (app-test-support/bootstrap-stub-bindings)
                          {#'ext/discover-extension-paths (fn [& _] [])})
@@ -692,10 +738,6 @@
                 (str "expected persisted bootstrap session-file under isolated session-root\n"
                      "session-root: " session-root "\n"
                      "session-file: " session-file))))))))
-
-;; ---------------------------------------------------------------------------
-;; maybe-install-nullable-execution-mode
-;; ---------------------------------------------------------------------------
 
 (deftest maybe-install-nullable-execution-mode-passthrough-when-absent-test
   (testing "returns ctx unchanged when env var is nil"
