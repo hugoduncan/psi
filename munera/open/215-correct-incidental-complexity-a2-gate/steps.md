@@ -107,6 +107,18 @@
       a one-line rationale; leave the line-insensitive `(ns, var, arity)` **grouping** for
       `before-max(k)`/`T` (step 3) unchanged — only `B`'s own lookup key is at issue.
 
+- [ ] **RI3:** Add a `[Unreleased]` CHANGELOG entry for the A2 gate correction. The
+      change_chain requires a CHANGELOG entry for user-visible `bug_fix`/`behaviours`
+      changes, and the project already logs `reduce-incidental-complexity` behaviour
+      changes (CHANGELOG line 12 workflow intro; line 19 task-212 test-net-gate hardening).
+      Task 215 changes the same workflow's emitted Phase-1 A2 acceptance from the provably
+      unsatisfiable net-sum gate (`sum after < sum before`) to the sound per-unit A2a/A2b
+      relocation-guard ceiling (`after(u) < B`, target reduction governed by A5) — a
+      bug_fix/behaviour change with no CHANGELOG entry. Add a `[Unreleased]` entry
+      (Changed or Fixed) describing the corrected gate, consistent with the line-19
+      precedent. (Task Scope omitted CHANGELOG, mirroring the RI2 `doc/workflows.md`
+      omission; not a deliberate exclusion.)
+
 - [x] **RI2:** Sync `doc/workflows.md` to the landed per-unit A2. The
       `reduce-incidental-complexity` Phase-1 acceptance paragraph (~line 709) still says
       "net burden across the metric-derived touched set strictly decreases" — the

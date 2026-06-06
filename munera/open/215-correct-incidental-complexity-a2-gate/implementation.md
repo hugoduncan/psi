@@ -579,3 +579,38 @@ not covered by RI1 or any prior pass:
   they are unaffected).
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Implementation review re-pass (ψ, RI3)
+
+Re-verified the landed change end-to-end: emitter EDN round-trips (`edn/read-string`,
+13 steps); workflow-loader content-lock suite GREEN via scry
+(`psi.workflow-loader.task-209-workflow-definitions-test`, 3 tests / 196 assertions /
+0 fail / 0 error); the emitted A2 bullet matches design.md (A2a/A2b ceiling `after(u) < B`,
+line-bearing `B` lookup, line-insensitive `(ns, var, arity)` grouping, `before-max(k)`,
+multiset `T` filter, single-row target exclusion); A5/A3/blast-radius/numbering unchanged;
+knowledge page reconciled (LANDED + `after(target)` superseded + A1→A5); `doc/workflows.md`
+synced (RI2 closed); design step 1 `B`-key reconciled (RI1 closed); skill grep empty.
+Implementation matches design intent for acceptance 1–5. RI1 and RI2 confirmed resolved.
+
+One **new** actionable change_chain doc-sync gap, not covered by RI1/RI2 or any prior pass:
+
+- **RI3 — CHANGELOG missing the A2 gate correction.** `change_chain` requires a
+  `[Unreleased]` CHANGELOG entry for user-visible changes (`bug_fix ∨ behaviours`), and the
+  project already logs `reduce-incidental-complexity` *behaviour* changes: line 12 (the
+  workflow's introduction, Added) and line 19 (task 212's characterization-test-net gate
+  hardening, Changed). Task 215 changes the same workflow's emitted Phase-1 acceptance
+  contract — replacing a **provably unsatisfiable** net-sum A2 gate (a defect that blocked
+  every genuine decomplecting extraction) with the sound per-unit A2a/A2b relocation guard.
+  That is squarely a `bug_fix`/`behaviours` change to the same workflow whose prior gate
+  change was logged, yet `CHANGELOG.md [Unreleased]` has **no** entry for it
+  (`grep -ni "relocation\|net-sum\|net burden\|215" CHANGELOG.md` finds only the pre-existing
+  lines 12/19, neither describing the A2 fix). The task Scope/blast-radius listed the emitter,
+  skill, and knowledge page but omitted the CHANGELOG (an omission, mirroring the RI2
+  `doc/workflows.md` omission — not a deliberate exclusion; out-of-scope lists only 214
+  re-run / Gordian transform / 214 ratification). Actionable: add a `[Unreleased]` CHANGELOG
+  entry (Changed or Fixed) recording that `reduce-incidental-complexity`'s generated Phase-1
+  A2 acceptance is now the per-unit relocation-guard ceiling (`after(u) < B`, no net-sum,
+  target reduction governed by A5), replacing the previously-emitted unsatisfiable
+  `sum after < sum before` gate, consistent with the line-19 precedent.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
