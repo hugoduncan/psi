@@ -14,3 +14,18 @@
       **A4**, blast radius unnumbered). Either bring the renumbering into scope or
       re-anchor the A2-rescoping rationale and acceptance criterion 2 to the actual
       labels so the emitted A1–A5 contract is self-consistent.
+
+## Ambiguities
+
+- [ ] Define the `(ns, var, arity)` join semantics for the non-unique-key case in
+      "How A2 is mechanically checked" step 3. The line-insensitive key is non-unique
+      in the live data (51 `dispatch-effects/execute-effect!` defmethods share it), so
+      the many-to-many join is undefined when such a unit is touched (which
+      `before`/`after` value; aggregate vs. per-line vs. exclude). Either specify the
+      aggregation/fallback rule or qualify the "A2's units are distinct vars/arities"
+      assertion to the units A2 can actually encounter.
+- [ ] Fix the phantom "`reduce-incidental-complexity` skill" reference in
+      Scope / blast radius. No such skill exists (only the
+      `incidental-complexity-finder` skill + the workflow EDN already being edited).
+      Drop the phantom skill reference or, if a distinct skill restatement is intended,
+      identify it by concrete path.

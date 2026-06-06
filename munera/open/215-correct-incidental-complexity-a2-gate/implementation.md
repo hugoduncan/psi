@@ -74,3 +74,38 @@ All three architectural-fit follow-up steps resolved in `design.md`:
 
 No blockers. Skill files confirmed to contain no A2 restatement (grep empty) →
 acceptance 3 "confirmed absent" already holds for the design phase.
+
+## Design review — ambiguities (ψ)
+
+Reviewed `design.md` for ambiguity only (statements admitting >1 interpretation by
+the executing emitter-edit agent). Did not review plan.md/steps.md. Found two new
+actionable ambiguities; both verified against the codebase, neither covered by the
+prior architectural-fit pass.
+
+- **Non-unique `(ns, var, arity)` join key — defmethod collapse (procedure
+  underspecified).** "How A2 is mechanically checked" step 3 forms `T` by "joining
+  the two JSONs on `(ns, var, arity)`" and the design asserts "A2's units are
+  distinct vars/arities, so dropping `line` does not conflate them." That assertion
+  is empirically false: `before-local.json` (task 214) contains **51**
+  `psi.agent-session.dispatch-effects/execute-effect!` units all sharing the exact
+  key `(ns, var, arity) = (…, execute-effect!, null-arity)`, disambiguated only by
+  `line` (the emitter itself calls this out for A5's line-bearing key). When such a
+  unit is touched, the line-insensitive join is many-to-many and the procedure
+  leaves undefined which `before(u)`/`after(u)` value applies (per-line? aggregated?
+  max?) and how A2a/A2b compare against the non-unique group. The step reads as a
+  clean per-unit join but is ambiguous precisely where the live data is non-unique.
+  Actionable: define the join semantics for non-unique `(ns, var, arity)` keys
+  (aggregate, per-line fallback, or explicit exclusion of defmethod groups), or
+  scope/qualify the "distinct vars/arities" assertion to the units A2 can actually
+  encounter.
+
+- **Phantom "`reduce-incidental-complexity` skill" reference.** Scope/blast-radius
+  says: "Check for and align any A2 description in
+  `.psi/skills/incidental-complexity-finder/SKILL.md` **and the
+  `reduce-incidental-complexity` skill**, if either restates the net-sum form." No
+  such skill exists — `.psi/skills/` contains only `incidental-complexity-finder`;
+  `reduce-incidental-complexity` is a **workflow** (`.psi/workflows/…edn`), which is
+  already the primary edit target. The executing agent cannot resolve which artifact
+  "the reduce-incidental-complexity skill" denotes (phantom skill vs. the workflow
+  already being edited). Actionable: name the actual artifact(s) — drop the phantom
+  skill reference, or if a second skill restatement is meant, identify it by path.
