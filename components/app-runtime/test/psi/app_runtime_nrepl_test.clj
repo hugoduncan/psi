@@ -72,30 +72,45 @@
         (System/setProperty "user.dir" orig-user-dir)
         (reset! app-runtime/nrepl-runtime orig-runtime)))))
 
-(deftest start-nrepl-redirects-startup-chatter-to-stderr-test
-  (let [orig-runtime @app-runtime/nrepl-runtime
-        out          (java.io.StringWriter.)
-        err          (java.io.StringWriter.)]
+(deftest route-stdout-to-stderr-redirects-both-stdout-channels-test
+  ;; Characterizes the stdout-suppression seam directly with a REAL
+  ;; known-printing thunk — no infra stub. This is the routing mechanism nREPL
+  ;; startup chatter flows through inside `start-server-quietly`; testing it on a
+  ;; thunk we control gives deterministic dual-channel output (`*out*` via
+  ;; `println` + `System/out` via Java interop) without stubbing nREPL. Both
+  ;; channels must land on stderr while the thunk runs, `System/out` must be
+  ;; restored afterwards, and the thunk's value passes through unchanged.
+  (let [out           (java.io.StringWriter.)
+        err           (java.io.StringWriter.)
+        orig-out      System/out
+        orig-err      System/err
+        out-bytes     (java.io.ByteArrayOutputStream.)
+        err-bytes     (java.io.ByteArrayOutputStream.)
+        installed-out (java.io.PrintStream. out-bytes true)]
     (try
-      (with-redefs [requiring-resolve (fn [sym]
-                                        (case sym
-                                          nrepl.server/start-server
-                                          (fn [& {:keys [port]}]
-                                            (println "nREPL server started on port" (or port 0))
-                                            (.println System/out (str "system-out port " (or port 0)))
-                                            {:port (or port 5555)})
-                                          nrepl.server/stop-server
-                                          (fn [_] nil)))]
-        (binding [*out* out
-                  *err* err]
-          (let [srv (#'app-runtime/start-nrepl! 5555)]
-            (is (= 5555 (:port srv)))
-            (is (not (str/includes? (str out) "nREPL server started on port")))
-            (is (not (str/includes? (str out) "system-out port 5555")))
-            (is (str/includes? (str err) "nREPL server started on port"))
-            (#'app-runtime/stop-nrepl! srv))))
+      (System/setOut installed-out)
+      (System/setErr (java.io.PrintStream. err-bytes true))
+      (let [result (binding [*out* out
+                             *err* err]
+                     (app-nrepl/route-stdout-to-stderr
+                      (fn []
+                        (println "chatter via out-writer")
+                        (.println System/out "chatter via system-out")
+                        :handle)))]
+        ;; thunk value passes through
+        (is (= :handle result))
+        ;; `*out*` (println) was routed to `*err*`, not the bound *out* writer
+        (is (not (str/includes? (str out) "chatter via out-writer")))
+        (is (str/includes? (str err) "chatter via out-writer"))
+        ;; `System/out` interop was routed to System/err, not the installed stdout
+        (is (not (str/includes? (str out-bytes) "chatter via system-out")))
+        (is (str/includes? (str err-bytes) "chatter via system-out"))
+        ;; `System/out` restored to its pre-call value by the seam's finally
+        (is (identical? installed-out System/out)
+            "seam restores System/out"))
       (finally
-        (reset! app-runtime/nrepl-runtime orig-runtime)))))
+        (System/setOut orig-out)
+        (System/setErr orig-err)))))
 
 (deftest nrepl-port-file-records-bound-port-and-stop-deletes-on-match-test
   ;; Characterizes the `.nrepl-port` side effect (gap 1) + the matching-port

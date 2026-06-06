@@ -649,3 +649,61 @@ Follow-up step added. Coverage and well-formedness are otherwise sound; the net 
 catch the refactor's stated regression risks.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Task-test review follow-up — replace `with-redefs` stub with real seam (ψ)
+
+Executed the single actionable item added by the task-test review pass
+(`484fd694a`): the `¬stub` violation in
+`start-nrepl-redirects-startup-chatter-to-stderr-test` (it stubbed
+`requiring-resolve`/nREPL `start-server` to inject deterministic dual-channel
+chatter). Applied the review's PREFERRED fix (extract a thunk-wrapping routing
+seam + test it directly), not the fallback (document/ratify the stub).
+
+### Production change (`nrepl_runtime.clj`)
+
+- Added `route-stdout-to-stderr [thunk]` — runs `thunk` with `*out*` bound to
+  `*err*` and `System/out` set to a stderr `PrintStream`, restoring `System/out` in
+  `finally`, returning the thunk's value. This is exactly the routing mechanism
+  nREPL startup chatter flows through.
+- `start-server-quietly [port]` now delegates the suppression dance:
+  `(route-stdout-to-stderr #(start-server :port port))`. It retains only the
+  `requiring-resolve` of `nrepl.server/start-server`. Behaviour identical.
+
+### Test change (`app_runtime_nrepl_test.clj`)
+
+- Replaced the stubbing test with
+  `route-stdout-to-stderr-redirects-both-stdout-channels-test`: drives a REAL
+  known-printing thunk (`println` → `*out*`, `(.println System/out …)` → interop)
+  through the seam, captures `*out*`/`*err*` (StringWriter) + `System/out`/`System/err`
+  (ByteArrayOutputStream), and asserts both channels route to stderr, `System/out`
+  is restored (`identical?` to the pre-call stream), and the thunk value passes
+  through. No `with-redefs`, no `requiring-resolve` stub, no external service — the
+  net `psi.app-runtime-nrepl-test` is now stub-free.
+
+### Acceptance — preserved (extraction is target-neutral)
+
+The review flagged a "test-quality vs Gordian-metric tradeoff to surface, not
+auto-apply" (its "variant D" measured extracting a SECOND seam from the *target*
+`start-nrepl!` as counterproductive). The applied extraction is one level DOWN —
+inside `start-server-quietly`, not `start-nrepl!` — so the acceptance target is
+untouched and the tradeoff resolves favourably:
+
+- **A1 — PASS, unchanged.** `start-nrepl!`/4 lcc-total `5.549920815558428` —
+  identical to the accepted post-refactor value (`5.5499`). The new helper does not
+  appear on the target's path.
+- **A2' — PASS.** Both extracted seams are strictly simpler than the residual
+  target: `route-stdout-to-stderr` `0.6931` and `start-server-quietly` `0.5108`
+  (down from `0.8220`, since interop moved out) are both `< 5.5499`.
+- **A3 — PASS (exit 0).** `gordian gate … --max-new-medium-findings 0` →
+  `new-cycles=0, new-high=0, new-medium=0`, 3 passed / 0 failed. The terse
+  `route-stdout-to-stderr` docstring did not trip the `hidden-conceptual`
+  oauth.callback-server pair (the prior A3 risk).
+- **A4 — PASS.** `bb clojure:test:scry --namespace psi.app-runtime-nrepl-test` →
+  7 tests / 30 assertions GREEN; `bb lint` → 0 errors / 0 warnings (one pre-existing
+  unrelated `info` in `agent_session` test).
+- **A5 — PASS.** Only `nrepl_runtime.clj` (one new helper) + its test ns touched;
+  blast radius respected.
+
+The other open follow-up (A2-redefinition human ratification gate) is unaffected and
+remains the only outstanding item; task closure stays PROVISIONAL pending that human
+act.

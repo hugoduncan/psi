@@ -108,17 +108,25 @@
 
 ## Task-test review follow-up (ψ) — added by test-review pass
 
-- [ ] **Replace the `with-redefs` stub in `start-nrepl-redirects-startup-chatter-to-stderr-test`
-      with a real seam.** The test stubs `requiring-resolve`/nREPL `start-server` to
+- [x] **Replace the `with-redefs` stub in `start-nrepl-redirects-startup-chatter-to-stderr-test`
+      with a real seam.** The test stubbed `requiring-resolve`/nREPL `start-server` to
       inject deterministic dual-channel chatter — a stub of an infra dependency,
       violating `testing-without-mocks` / task-test-review `¬stub ∧ injectable ∧ nullable`.
-      The sibling connection-notice test already proves the real-server + real-captured-stream
-      pattern. Preferred fix: extract the stdout→stderr routing into a thunk-wrapping seam
-      (e.g. `with-stderr-stdout`) and test it directly with a real known-printing thunk
-      (no `requiring-resolve` stub, no external service); or document why the stub is
-      essential and ratify keeping it. Note: extracting a routing seam touches production
-      and was measured counterproductive on the Gordian metric (variant D) — so this is a
-      test-quality vs metric tradeoff to surface, not auto-apply.
+      → **DONE (preferred fix applied).** Extracted the stdout→stderr routing into a
+      thunk-wrapping seam `route-stdout-to-stderr [thunk]` in `nrepl_runtime.clj`;
+      `start-server-quietly` now calls `(route-stdout-to-stderr #(start-server :port port))`.
+      Replaced the stubbing test with `route-stdout-to-stderr-redirects-both-stdout-channels-test`,
+      which drives a REAL known-printing thunk (no `requiring-resolve` stub, no external
+      service) and asserts both `*out*`(println) and `System/out`(interop) route to stderr,
+      `System/out` is restored, and the thunk value passes through. **Metric tradeoff
+      resolved favourably, not just surfaced:** the extraction is inside
+      `start-server-quietly`, so the acceptance target `start-nrepl!`/4 lcc-total is
+      UNCHANGED (`5.5499`); both seams stay strictly simpler than the residual target
+      (`route-stdout-to-stderr` `0.6931`, `start-server-quietly` `0.5108` < `5.5499`) so
+      A2' still holds; A3 gate PASS (exit 0, 0 new cycles/high/medium); A4 7 tests/30
+      assertions green, lint 0/0; A5 only `nrepl_runtime.clj` + its test ns touched. The
+      "variant D" counterproductive note referred to extracting a SECOND seam from
+      `start-nrepl!` (the target); this extraction is one level down and target-neutral.
 
 ## Task-implementation review follow-up (ψ) — added by review pass
 
