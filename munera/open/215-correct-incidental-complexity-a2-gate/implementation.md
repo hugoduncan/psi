@@ -906,3 +906,46 @@ change needed — these are content locks over the already-landed A2 text).
 Verification: `bb clojure:test:scry --ns psi.workflow-loader.task-209-workflow-definitions-test`
 → 3 tests / 215 assertions / 0 fail / 0 error (assertion count rose 196 → 215 with the new
 locks). `clj-kondo --lint` of the test file → 0 errors / 0 warnings.
+
+## Test review — re-pass after TR-T1..TR-T7 (ψ, task-test-review)
+
+Re-applied `task-test-review` (well-formed ∧ ∀behaviour∈design ∃covering-test ∧
+infra-deps nullable/¬mock) to the landed `reduce-incidental-complexity-test`
+content-lock net. Suite GREEN (3 tests / 215 assertions / 0 fail / 0 error, scry CLI).
+Tests remain **well-formed** (pure `load-edn-only` + `.contains` over `select-text`)
+with **no infra deps** (only dependency is the loaded EDN — no mocks/stubs/nullables).
+
+Read the full emitted A2 `:text` span against the design's settled behaviours and
+cross-checked every soundness-load-bearing *behavioural rule* for a covering lock:
+
+- per-unit / no-sum → TR-T1 ✓ (positive `never a sum` / `must NOT sum …` + negative
+  net-sum-absent asserts)
+- pure-inequality / no-margin (θ/ε) → TR-T4 ✓
+- A2a/A2b branch structure + `>= B` EXEMPT → TR-T2 ✓
+- line-bearing single-row target exclusion + shared-key (`siblings STAY in`) → TR-T3 ✓
+- line-bearing `B` lookup (RI1) → TR-T5 ✓
+- objective / deterministic numeric procedure (¬agent-judgement) → TR-T6 ✓
+- order-insensitive multiset `T`-formation (¬per-line-pairing) → TR-T7 ✓
+- ceiling `after(u) < B`, `before-max(k)`, line-insensitive grouping key,
+  `NOT a recomputed after(target)`, A5 line-bearing key, A3 `--fail-on …`, blast-radius,
+  tests-GREEN → locked from the implementation/PA passes ✓
+
+**No new actionable coverage gap.** Every behavioural rule of the redesign's soundness
+(no sum, no margin, ceiling, branch+exemption, target exclusion, line-bearing `B`,
+objectivity, multiset `T`) now has a regression-protecting content-lock. The emitter
+text that remains *un*-locked is **explanatory/rationale prose, not behaviour** — e.g.
+the concavity/sub-additivity *justification* for no-sum, the "Why this is sound"
+gaming-resistance argument (fragmentation→A5, helper-chasing→A3, sprawl→blast-radius),
+and the criterion-level "A2 does NOT re-police the target's reduction (that is A5)"
+statement. The behavioural content of that last one is already covered at the
+mechanical-procedure layer by TR-T3's `remove ONLY the target's own physical row`
+(target excluded from A2; A5 governs reduction). Adding locks over the remaining
+rationale prose would couple the test net to non-behavioural wording — increasing
+brittleness (any legitimate clarity reword breaks the suite) without adding behavioural
+signal, a net test-quality *decrease*. The content-lock mechanism is the appropriate net
+here (A2 is an agent-run procedure, not executable code — the design accepts this; the
+acceptance-5 semantic-satisfiability claim is correctly out-of-scope for unit testing).
+
+Test net judged adequate and well-formed; further locking would over-specify prose.
+
+PASS_STATUS: REVIEW_COMPLETE
