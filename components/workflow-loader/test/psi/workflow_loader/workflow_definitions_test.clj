@@ -582,6 +582,28 @@
                           "significant for future development of the project"
                           "uncertain -> skip"
                           "Zero extraction is a successful outcome"]]
+            (is (.contains text needle) needle)))
+        (testing "locks autonomous persistence and mementum write contracts (TT1)"
+          (doseq [needle ["Do not request human approval"
+                          "mementum/memories/{slug}.md"
+                          "under 200 words"
+                          "one insight per file"
+                          "content beginning with the appropriate mementum symbol"
+                          "mementum/knowledge/{topic}.md"
+                          "required frontmatter (`title`, `status`"
+                          "memory commit: `{symbol} {slug}`"
+                          "knowledge commit: `💡 {description}`"
+                          "update commit: `🔄 update: {slug}`"
+                          "Do not commit if nothing changed"]]
+            (is (.contains text needle) needle)))
+        (testing "locks final-summary reporting and review-outcome preservation (TT2)"
+          (doseq [needle ["resolved task path"
+                          "whether extraction was standalone or lifecycle-authorized"
+                          "extracted memories/knowledge"
+                          "updated or skipped duplicates"
+                          "zero-extraction success"
+                          "any lifecycle/review outcome supplied in the dedicated `{{implementation_review_yield}}` section"
+                          "preserving the prior lifecycle/review outcome alongside the extraction result"]]
             (is (.contains text needle) needle))))))
   (testing "has no same-name .edn sibling"
     (is (not (.exists (io/file (System/getProperty "user.dir")
