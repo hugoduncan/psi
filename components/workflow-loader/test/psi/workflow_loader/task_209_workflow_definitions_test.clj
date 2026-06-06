@@ -323,6 +323,18 @@
          (is (.contains select-text "remove ONLY the target's own physical row"))
          (is (.contains select-text "never the whole"))
          (is (.contains select-text "siblings STAY in"))
+         ;; TR-T4: the pure-inequality / no-margin invariant (θ/ε removed) — the
+         ;; `after(u) < B` lock alone does not guard against a reintroduced margin
+         ;; (`after(u) < B + θ` still contains it), so lock the explicit no-margin
+         ;; wording. Analogue of the TR-T1 no-sum guard for the other half of the
+         ;; redesign's soundness pair (no sum, no margin).
+         (is (.contains select-text "pure per-unit inequalities"))
+         (is (.contains select-text "with no margin (no slack threshold, no jitter buffer)"))
+         ;; TR-T5: lock the line-bearing `B` lookup (the RI1 reconciliation) — distinct
+         ;; from the line-insensitive grouping key (locked above) and the A5 line-bearing
+         ;; key. A regression reverting `B`'s lookup to `(ns, var, arity)` reopens the
+         ;; 51-row `execute-effect!` defmethod ambiguity RI1 fixed.
+         (is (.contains select-text "located by its line-bearing `(ns, var, arity, line)`"))
          (is (.contains select-text "Commit the task creation on the current branch"))
          (is (.contains select-text "Do NOT push or open a PR")))
        (testing "clean-baseline step locks the clean-source precondition and baseline artifact contract"

@@ -153,7 +153,7 @@
 
 ## Test review re-pass follow-ups (ψ, task-test-review)
 
-- [ ] **TR-T4:** Add a regression guard for the pure-inequality / no-margin (θ/ε removed)
+- [x] **TR-T4:** Add a regression guard for the pure-inequality / no-margin (θ/ε removed)
       invariant in `reduce-incidental-complexity-test` ("select-and-create prompt preserves
       … contracts"). The existing `satisfies `after(u) < B`` lock does NOT guard against a
       reintroduced margin (`after(u) < B + θ` still contains it). Add a positive lock on the
@@ -161,7 +161,7 @@
       inequalities`), so re-adding a tunable threshold/slack — the undefined-buffer surface
       the design forbids — cannot pass green. This is the analogue of the TR-T1 no-sum guard
       for the other half of the redesign's soundness pair (no sum, no margin).
-- [ ] **TR-T5:** Lock the line-bearing `B` lookup (the RI1 reconciliation). Nothing
+- [x] **TR-T5:** Lock the line-bearing `B` lookup (the RI1 reconciliation). Nothing
       currently locks that `B` itself is located line-bearingly; only the line-insensitive
       grouping key and the A5 line-bearing key are locked. Add a content-lock on `located by
       its line-bearing `(ns, var, arity, line)`` (the `B`-lookup phrasing), so a regression

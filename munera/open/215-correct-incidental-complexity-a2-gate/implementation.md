@@ -816,3 +816,32 @@ After adding TR-T4/TR-T5 locks, re-run the workflow-loader suite
 `clj-kondo --lint` the test file to confirm green + clean.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Test review re-pass follow-ups TR-T4..TR-T5 executed (2026-06-05)
+
+Closed the two newly-added content-lock coverage gaps in the
+`reduce-incidental-complexity-test` "select-and-create prompt preserves … contracts"
+block (`task_209_workflow_definitions_test.clj`). Test-only change — the targeted
+wording is already emitted; these locks protect it from silent regression. Each new
+lock substring confirmed present in the loaded `select-text`.
+
+- **TR-T4 (done):** added the pure-inequality / no-margin locks `pure per-unit
+  inequalities` and `with no margin (no slack threshold, no jitter buffer)` — the
+  other half of the redesign's soundness pair (no sum, no margin). The existing
+  `satisfies `after(u) < B`` lock does NOT catch a reintroduced margin
+  (`after(u) < B + θ` still contains it); these locks make a tunable threshold/slack
+  surface fail green.
+- **TR-T5 (done):** added the line-bearing `B`-lookup lock `located by its
+  line-bearing `(ns, var, arity, line)`` (the RI1 reconciliation), distinguished from
+  the already-locked line-insensitive grouping key
+  (`line-insensitive key `k = (ns, var, arity)``) and the A5 line-bearing key. A
+  regression reverting `B`'s lookup to `(ns, var, arity)` would reopen the 51-row
+  `execute-effect!` defmethod ambiguity and now fails the suite.
+
+Verification: workflow-loader suite GREEN via scry CLI from repo root
+(`clojure -M:test-paths -m scry.cli --namespace
+psi.workflow-loader.task-209-workflow-definitions-test`) — 3 tests / 210 assertions /
+0 fail / 0 error (was 207; +3 new locks). `clj-kondo --lint` clean (0/0);
+`clj-paren-repair` round-trips.
+
+PASS_STATUS: FOLLOW_UPS_COMPLETE
