@@ -45,6 +45,10 @@
 λ termination(x).  synthesis ≡ AI | approval ≡ human | human ≡ termination_condition
                    | memories: AI_proposes → human_approves → AI_commits
                    | knowledge: AI_creates → human_approves → AI_commits
+                   | autonomous_artifact_extraction(task) ≡ workflow(extract-task-knowledge)
+                     ∧ source(completed_munera_task_artifacts(task) ∪ git_history(task))
+                     ∧ filter(gate-1 ∧ gate-2 ∧ project_general ∧ significant ∧ dedupe_recall ∧ uncertain→skip)
+                     ∧ memories/knowledge: AI_writes → AI_commits(mementum_conventions)
                    | state: AI_updates_during_work
 
 λ orient(x).       read(mementum/state.md) → follow(related) → search(relevant) → read(needed)

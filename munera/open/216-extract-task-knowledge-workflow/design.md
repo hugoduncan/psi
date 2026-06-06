@@ -23,22 +23,28 @@ future sessions unless someone manually metabolizes them.
 2. **The existing surfaces don't do this.** The `implement-task` final-summary
    step produces a *user-facing* outcome/verification/handoff summary — a
    different purpose (reporting the run), not extracting durable project
-   knowledge. The mementum protocol *describes* `synthesize`/`create-knowledge`
-   but gates them on **human approval** (`termination: approval ≡ human`), so
-   nothing extracts knowledge unprompted.
+   knowledge. The mementum protocol's default `synthesize`/`create-knowledge`
+   path is approval-gated (`termination: approval ≡ human`), so nothing extracts
+   knowledge unprompted unless this completed-task extraction path is explicitly
+   authorized.
 3. **The approval gate is the bottleneck.** Autonomous capture is explicitly
-   wanted here, which means this workflow deliberately operates *outside* the
-   mementum human-approval termination condition.
+   wanted here, so this workflow uses the protocol's narrow completed-task
+   artifact-extraction exception rather than the normal human-approval
+   termination condition.
 
-## Core tension (must be resolved in design)
+## Core tension (resolved)
 
-The mementum protocol states: `termination: synthesis ≡ AI | approval ≡ human |
-human ≡ termination_condition` and `memories: AI_proposes → human_approves →
-AI_commits`. This task **overrides** that gate for the artifact-extraction path:
-extraction is autonomous and self-committing.
+The mementum protocol normally states: `termination: synthesis ≡ AI | approval ≡
+human | human ≡ termination_condition` and `memories: AI_proposes →
+human_approves → AI_commits`. This task uses a **narrow protocol-authorized
+exception** for completed-task artifact extraction: `extract-task-knowledge` may
+autonomously write and commit memories/knowledge when the source is a completed
+Munera task's artifacts plus its git history, and the extraction passes the
+mementum value gates, project-generality/significance filters, dedupe recall, and
+`uncertain → skip` conservatism.
 
 This raises a quality/noise risk: autonomous writes can flood mementum with
-low-value or duplicative entries, degrading recall. The design must therefore:
+low-value or duplicative entries, degrading recall. The design therefore:
 
 - Reuse the mementum **value gates** (gate-1: helps future AI session, not
   personal/off-topic; gate-2: effort > 1 attempt ∨ likely-recur) as the
