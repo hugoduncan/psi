@@ -73,3 +73,7 @@
 - [x] TT1: DONE — added workflow-loader prompt content-lock coverage for the autonomous persistence contract: no human approval request, allowed `mementum/memories/{slug}.md` / `mementum/knowledge/{topic}.md` output shapes, memory under-200-words/one-insight/symbol constraints, knowledge frontmatter, mementum commit conventions, and the no-op `Do not commit if nothing changed` path.
 - [x] TT2: DONE — added workflow-loader prompt content-lock coverage for the final-summary/reporting contract: resolved task path, standalone vs lifecycle-authorized mode, extracted memories/knowledge, updated/skipped duplicates, zero-extraction success, and preservation of any lifecycle/review outcome supplied via the dedicated `{{implementation_review_yield}}` section.
 - [x] TT3: DONE — added workflow-loader prompt content-lock coverage for the required task-artifact inspection surface: before mining knowledge, the extraction prompt must read `design.md`, `plan.md`, `steps.md`, and `implementation.md` from the resolved task when present. Tightened the prompt wording to state the before-mining/resolved-task boundary explicitly.
+
+## Docs review follow-ups
+
+- [ ] DOC1: Update `CHANGELOG.md` `[Unreleased]` so the earlier `task-lifecycle` Added entry no longer describes the workflow as only design → plan → implement → review / five delegates; it should reflect the now-shipped extraction stage or avoid stale stage-count details, consistent with the Changed entry.
