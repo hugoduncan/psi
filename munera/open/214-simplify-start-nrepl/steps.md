@@ -21,7 +21,7 @@
 - [ ] If the unit cannot be characterized safely, record the finding in
       implementation.md and either introduce a minimal seam first or close per
       Munera scope-drift — do NOT proceed to Slice 1 without a green net.
-- [ ] Commit: `⚒ 214 Phase 0: characterization net for start-nrepl! behaviour`.
+- [x] Commit: `⚒ 214 Phase 0: characterization net for start-nrepl! behaviour` (9a8e17a82).
 
 ## Plan/steps review follow-up — ambiguity (ψ)
 
