@@ -76,4 +76,4 @@
 
 ## Docs review follow-ups
 
-- [ ] DOC1: Update `CHANGELOG.md` `[Unreleased]` so the earlier `task-lifecycle` Added entry no longer describes the workflow as only design → plan → implement → review / five delegates; it should reflect the now-shipped extraction stage or avoid stale stage-count details, consistent with the Changed entry.
+- [x] DOC1: DONE — updated `CHANGELOG.md` `[Unreleased]` so the earlier `task-lifecycle` Added entry describes the shipped design → plan → implement → review → extract-knowledge lifecycle and six delegated workflows, consistent with the Changed entry.
