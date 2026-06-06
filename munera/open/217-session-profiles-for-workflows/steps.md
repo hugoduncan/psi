@@ -1,0 +1,85 @@
+# Steps — Session profiles for workflow step configuration
+
+## Slice 1 — Profile domain and config resolution
+
+- [ ] Add a profile domain namespace/helper that defines the supported field set, reserved profile names, canonical thinking/speed/effort values, and normalized resolved-profile data shape.
+- [ ] Implement effective `:agent-session :session-profiles` loading from user config, project shared config, and project local config without changing unrelated `:agent-session` config resolution.
+- [ ] Implement profile-specific recursive merge with precedence `user < project-shared < project-local`, preserving partial profile override behavior.
+- [ ] Filter profile resolution to exactly `:model-provider`, `:model-id`, `:thinking-level`, `:speed-mode`, and `:effort-override`, ignoring unknown keys in resolved/applied/snapshotted profile data.
+- [ ] Validate model identity as an all-or-nothing `:model-provider` plus `:model-id` pair through the existing model registry/model-selection path.
+- [ ] Validate `:thinking-level`, `:speed-mode`, and `:effort-override` values against the design's canonical sets, including `nil` effort where representable.
+- [ ] Mark empty/no-concrete-setting profiles and `:clear` profiles invalid with actionable diagnostic data.
+- [ ] Add tests for profile deep merge, precedence, unknown-key ignoring, partial valid profiles, invalid model pairs, invalid enum values, empty profiles, and reserved `:clear`.
+
+## Slice 2 — Live session command surface and observability
+
+- [ ] Add session selected-profile metadata storage on canonical session state with fields for profile name and concrete resolved settings applied.
+- [ ] Add a session-owned mutation/dispatch path that atomically applies an already-validated profile's concrete model/thinking/speed/effort values plus selected-profile metadata.
+- [ ] Ensure model application reuses existing session-model mutation behavior, including thinking-level clamp and model journal entry semantics.
+- [ ] Ensure thinking-level application reuses existing thinking-level mutation behavior and journal entry semantics.
+- [ ] Ensure speed-mode and effort-override application stays session-scoped/transient like `/speed ... session` and `/effort ... session`, with no config write or journal entry.
+- [ ] Add a session-owned mutation/dispatch path for `/session-profile clear` that clears only selected-profile metadata and does not change concrete settings.
+- [ ] Expose effective session profiles, readable resolved settings/invalid reasons, and current selected-profile metadata through EQL resolvers or equivalent session-owned read helpers.
+- [ ] Add `/session-profiles` and `/session-profile` entries to the backend single-source built-in command spec table with appropriate exact/prefixed routing metadata.
+- [ ] Wire slash command dispatch for `/session-profiles`, `/session-profile`, `/session-profile <name>`, and `/session-profile clear` through backend command handlers.
+- [ ] Format `/session-profiles` output to list valid profiles with readable settings and invalid profiles with terse reasons.
+- [ ] Format `/session-profile` output to show selected-profile metadata when present and current concrete model/thinking/speed/effort settings.
+- [ ] Format unknown/invalid profile command failures with the requested profile name, invalid reasons where applicable, and available effective profile names.
+- [ ] Add tests proving invalid/unknown live profile selection leaves model/thinking/speed/effort and selected-profile metadata unchanged.
+- [ ] Add tests proving `/session-profile clear` clears metadata only and does not revert concrete settings.
+- [ ] Add tests proving built-in command resolver/help/autocomplete surfaces include the new backend-defined commands without adapter-local lists.
+
+## Slice 3 — Workflow authoring grammar and canonical IR
+
+- [ ] Extend workflow authoring validation to accept compact top-level `:session-profile` on supported `:session` steps and compile it into the canonical step `:session` config.
+- [ ] Extend workflow authoring validation to accept compact top-level `:session-profile` on supported `:delegate` steps and compile it into the canonical delegate inherited-default-shaping session-config surface.
+- [ ] Extend single-step markdown frontmatter parsing/compiler support for `:session-profile`, compiling to the same canonical `:session` config as an EDN `:session` step.
+- [ ] Keep direct authored workflow overrides limited to currently supported `:model` and `:thinking-level`; do not add direct `:speed-mode` or `:effort-override` authored keys.
+- [ ] Add loader/compiler rejection tests for unsupported nested `{:session {:session-profile ...}}` spelling if that path is currently distinguishable.
+- [ ] Add loader/compiler rejection tests for `:session-profile` on `:invoke` steps and LLM judge specs if those validation paths are present.
+- [ ] Add loader/compiler tests proving existing workflows without `:session-profile` compile unchanged.
+- [ ] Add loader/compiler tests proving top-level EDN and markdown frontmatter `:session-profile` land in canonical IR at the expected location.
+
+## Slice 4 — Workflow snapshot and step resolution semantics
+
+- [ ] Add a dedicated canonical workflow-run field for the session-profile snapshot, storing valid resolved settings and invalid-profile diagnostics without ignored unknown keys.
+- [ ] Capture the effective session-profile snapshot once at top-level workflow invocation before any step executes.
+- [ ] Ensure blocked/resumed workflow runs reuse the persisted session-profile snapshot rather than re-reading config.
+- [ ] Ensure delegated workflow runs copy or derive their profile snapshot from the delegating run's immutable snapshot rather than reading config.
+- [ ] Extend workflow step session-config resolution to resolve `:session-profile` against the workflow-run profile snapshot.
+- [ ] Merge profile-derived settings into effective step config with precedence `explicit step setting > resolved profile setting > inherited workflow-run default > existing fallback`.
+- [ ] Preserve explicit `:model` and `:thinking-level` step override precedence over profile-derived model/thinking values.
+- [ ] Include profile-derived `:speed-mode` and `:effort-override` in effective step config when present, despite the absence of direct authored speed/effort keys.
+- [ ] Fail/block unknown or invalid workflow profiles before creating the child session or attempt that would consume them.
+- [ ] Add workflow runtime tests proving mid-run config edits do not affect later steps in the same run.
+- [ ] Add workflow runtime tests proving resumed runs and delegated runs resolve profiles from snapshots rather than mutable config.
+- [ ] Add workflow runtime tests proving invalid workflow profiles fail atomically before child-session creation.
+- [ ] Add workflow runtime tests proving workflows without `:session-profile` preserve existing task-207 inheritance behavior.
+
+## Slice 5 — Delegate inherited-defaults projection
+
+- [ ] Update delegated inherited-default snapshot projection so effective config fields `:model`, `:thinking-level`, `:speed-mode`, and `:effort-override` can flow as concrete defaults to the child run when profile resolution supplies them.
+- [ ] Preserve task-207 fallback for delegated `:speed-mode` and `:effort-override` when the delegating effective config does not contain those fields.
+- [ ] Distinguish field presence from truthiness when projecting effort so an explicit resolved concrete nil/clear cannot be replaced accidentally by the parent snapshot if the implementation supports nil as a concrete setting.
+- [ ] Ensure `:inherited-defaults` remains narrow and contains no profile names, raw profile maps, unknown profile keys, or profile diagnostics.
+- [ ] Add delegate tests proving profile-derived speed/effort outrank parent snapshot values when present.
+- [ ] Add delegate tests proving absent profile speed/effort falls back to parent snapshot values.
+- [ ] Add delegate tests proving callee workflow explicit overrides still outrank inherited profile-derived defaults.
+
+## Slice 6 — Docs and changelog
+
+- [ ] Update `doc/configuration.md` with `:agent-session :session-profiles` shape, supported fields, merge precedence, partial override examples, invalid profile behavior, and existing config file locations.
+- [ ] Update workflow authoring docs with `:session-profile` examples for session/delegate steps and markdown frontmatter, plus explicit override precedence.
+- [ ] Document workflow snapshot semantics: profile definitions are captured at run start; mid-run config edits do not affect later steps, delegated runs, or resumed runs.
+- [ ] Document `/session-profiles`, `/session-profile`, `/session-profile <name>`, and `/session-profile clear` command behavior.
+- [ ] Add a `CHANGELOG.md` `[Unreleased]` entry for the new session profile config, slash commands, workflow key, and deterministic snapshot behavior.
+
+## Slice 7 — Verification and coherence
+
+- [ ] Run focused tests for profile domain/config resolution.
+- [ ] Run focused tests for session profile commands, resolvers, and built-in command specs.
+- [ ] Run focused workflow-loader/compiler tests covering `:session-profile` grammar.
+- [ ] Run focused workflow runtime/session-config tests covering snapshot, precedence, delegation, invalid-profile blocking, and unchanged no-profile workflows.
+- [ ] Run targeted `clj-kondo` over changed Clojure namespaces.
+- [ ] Run relevant broader unit/Scry suites if focused changes touch shared workflow/session command paths.
+- [ ] Re-read `design.md`, `plan.md`, `steps.md`, docs, and changed tests/code to verify cross-artifact coherence before implementation review.
