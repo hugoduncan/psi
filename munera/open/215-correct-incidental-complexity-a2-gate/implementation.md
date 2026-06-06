@@ -949,3 +949,39 @@ acceptance-5 semantic-satisfiability claim is correctly out-of-scope for unit te
 Test net judged adequate and well-formed; further locking would over-specify prose.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Test review — test-shaper (ψ, clarity ∧ signal ∧ robustness ∧ economy)
+
+Applied `test-shaper` to the landed `reduce-incidental-complexity-test` content-lock net
+(a *different* lens than the prior `task-test-review` coverage passes TR-T1..TR-T7: those
+proved every soundness behaviour has a covering lock; this pass judges the *shape* of the
+existing locks — single-concern, signal, consistency). Suite assumed GREEN (215
+assertions; structure unchanged). Two actionable shape issues found; neither duplicates a
+prior coverage/design/plan/impl follow-up.
+
+- **TS-S1 (single-concern + clarity naming).** The ~20 A2 relocation-guard locks
+  (`task_209_workflow_definitions_test.clj` ~lines 300–350: A2a/A2b, no-sum, no-margin,
+  ceiling, exemption, target-exclusion, line-bearing `B`, objectivity, multiset `T`) live
+  inside the `testing "select-and-create prompt preserves task-209 selection and baseline
+  contracts"` block. That block conflates two distinct concerns — *preserved* task-209
+  selection/baseline contracts vs. the *new* per-unit A2 gate contract — and its label
+  ("preserves … baseline contracts") misdescribes the A2 half, which locks brand-new
+  behaviour, not preserved contracts. The file already groups per-concern (`clean-baseline`,
+  `coverage-review`, `diff-gate` each get their own `testing` block), so extracting the A2
+  locks into a dedicated `testing "select-and-create emits the corrected per-unit A2
+  relocation guard"` block is *consistent* with the file idiom and improves single-concern
+  + names the failure context for the gate this whole task exists to land.
+
+- **TS-S2 (signal — loose lock).** `(is (.contains select-text "EXEMPT"))` (line 319) pins
+  a bare generic token that matches any occurrence of the word and carries weak signal for
+  the `before-max(k) >= B` exemption branch it guards. Tighten it to a phrase anchored to
+  the exemption clause (the emitted text reads `... before-max(k) >= B`) through no fault
+  of this change is EXEMPT — ...`), e.g. lock `"through no fault of this change is EXEMPT"`,
+  so the assert actually pins the exemption branch rather than any stray "EXEMPT".
+
+Not pursued: adding failure-message strings to the A2 `.contains` locks — the file's
+pervasive content-lock idiom is bare `(is (.contains x "…"))` (clean-text, coverage-text,
+diff-gate-text all omit messages); adding messages only to the A2 locks would break
+`consistent(assertion_style)` across the file. Intent is already source-visible in the
+TR-Tn comments. The content-lock mechanism itself is accepted as appropriate (A2 is an
+agent-run prose procedure, not executable code).
