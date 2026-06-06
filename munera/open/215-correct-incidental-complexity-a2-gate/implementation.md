@@ -1087,3 +1087,44 @@ occurrence — mirroring the TS-S2 EXEMPT anchoring. Companion locks
 Verification: workflow-loader suite green (3 tests / 215 assertions / 0 fail / 0 error via
 `scry.cli --namespace psi.workflow-loader.task-209-workflow-definitions-test`);
 `clj-kondo --lint` 0/0; `clj-paren-repair` Success.
+
+## test-shaper review re-pass (ψ, test-shaper) — post TS-S4
+
+Re-applied `test-shaper` (clarity ∧ signal ∧ robustness ∧ economy) to the landed
+`reduce-incidental-complexity-test` content-lock net after TS-S1..TS-S4 all landed. Suite
+GREEN (3 tests / 215 assertions / 0 fail / 0 error via scry CLI). Tests remain well-formed
+(pure `load-edn-only` + `.contains` over `select-text`; no infra deps / mocks / nullables).
+
+Re-checked every dimension against the current shape:
+- single_concern ✓ — the A2 relocation-guard locks live in their own correctly-named
+  `testing "select-and-create emits the corrected per-unit A2 relocation guard"` block
+  (TS-S1); the residual "preserves … baseline contracts" block holds only the pre-existing
+  selection/baseline/A5/A3/blast-radius/test-net locks this task did not introduce.
+- consistent(assertion_style) ✓ — uniform bare `(is (.contains select-text "…"))`
+  (positive) + two negative `(is (not (.contains …)))` net-sum-absent guards; no per-assert
+  message drift (declined in prior passes to keep file-wide style consistent).
+- signal ✓ — the weak generic locks the prior passes flagged are anchored: `EXEMPT`
+  → `through no fault of this change is EXEMPT` (TS-S2); `never the whole`
+  → `never the whole `(ns, var, arity)` group` (TS-S4); bare `before-max(k)`
+  → its `:= the maximum `lcc-total`` definition (TS-S3). Re-verified each remaining lock
+  (`siblings STAY in`, `physical after-row `u``, `A2a (new pieces are genuine`,
+  `A2b (no collateral ceiling breach`) appears exactly once in the emitter and carries a
+  distinctive anchor — `siblings STAY in` / `physical after-row `u`` were explicitly judged
+  strong-signal and left in TS-S4 with rationale; no fresh weak-lock found.
+- economy ✓ — TS-S3 removed the only strict-subset redundancy; no remaining lock is
+  subsumed by another. The ~25 A2 locks are not a case explosion (each maps to a distinct
+  separately-argued soundness invariant: no-sum, no-margin, ceiling, A2a/A2b branch + `>= B`
+  exemption, line-bearing `B`, line-insensitive grouping, multiset `T`, objectivity,
+  single-row target exclusion).
+- robustness ✓ — deterministic (EDN load), behaviour-focused at the appropriate layer
+  (content-locks are the accepted net; A2 is an agent-run procedure, not executable code —
+  acceptance-5 semantic satisfiability is correctly out-of-scope for unit testing).
+
+No new actionable shape issue. The TR-Tn/TS-Sn provenance tags in the lock comments are
+harmless markers — the accompanying prose explains each lock's behavioural intent, so local
+comprehensibility is not blocked. Further splitting the pre-existing "preserves … baseline
+contracts" block (which still mixes selection / A5 / A3 / blast-radius / test-net concerns)
+would touch assertions this task did not introduce — out of scope for a test-shaper pass on
+this task's changes. Test net judged well-shaped; no follow-up steps added.
+
+PASS_STATUS: REVIEW_COMPLETE
