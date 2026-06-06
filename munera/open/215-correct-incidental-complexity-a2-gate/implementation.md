@@ -763,3 +763,56 @@ satisfiability claim remains correctly out-of-scope for unit testing (A2 is an
 agent-run procedure, not executable code) per the test-review note.
 
 PASS_STATUS: FOLLOW_UPS_COMPLETE
+
+## Test review — re-pass after TR-T1..TR-T3 (ψ, task-test-review)
+
+Re-applied `task-test-review` (well-formed ∧ ∀behaviour∈design ∃covering-test ∧
+infra-deps nullable/¬mock) to the landed `reduce-incidental-complexity-test`
+content-lock net at `bf5a0b18e`. Tests remain **well-formed** (pure `load-edn-only` +
+`.contains` over `select-text`, no infra deps / mocks / stubs — the only dependency is
+the loaded EDN). TR-T1..TR-T3 closed the no-sum, A2a/A2b-branch + exemption, and
+single-row target-exclusion gaps. Re-reading the emitted A2 `:text` against the
+design's settled behaviours surfaced **two further** soundness-load-bearing properties
+that are emitted verbatim (each appears exactly once in the emitter) yet have **no
+content-lock**, and **no negative guard** in the test file (grep for
+`margin|jitter|slack|line-bearing|located by` finds only comments). A careless edit to
+the single large A2 `:text` span could drop either while the suite stays green. Neither
+duplicates TR-T1..TR-T3 (no-sum / branch / exclusion) nor any prior design/plan/impl
+note.
+
+- **TR-T4 — the pure-inequality / no-margin (θ/ε removed) invariant has no regression
+  guard.** The design dedicates a whole settled-parameter subsection ("Pure
+  inequalities — no tunable margins (θ / ε removed)") to dropping any slack/jitter
+  buffer, because a tunable margin reintroduces an undefined buffer + config-drift
+  surface that fights `λone_way` and the objective-gate posture. The emitter emits this
+  as "two pure per-unit inequalities against the ORIGINAL target's burden `B`, with no
+  margin (no slack threshold, no jitter buffer)". No lock protects it: the existing
+  `satisfies `after(u) < B`` lock does **not** guard against a reintroduced margin
+  (e.g. `after(u) < B + θ` still contains the locked substring), so a future edit could
+  re-add a tunable threshold — the exact undefined-buffer surface the design forbids —
+  with the suite green. This is the direct analogue of the TR-T1 no-sum guard for the
+  other half of the redesign's defining soundness pair (no sum, no margin). Actionable:
+  add a positive lock on the `with no margin (no slack threshold, no jitter buffer)`
+  (and/or `pure per-unit inequalities`) wording so reintroducing a margin cannot pass
+  green.
+
+- **TR-T5 — the line-bearing `B` lookup (the RI1 reconciliation) has no regression
+  guard.** RI1 was an entire implementation-review item reconciling `B`'s lookup to the
+  **line-bearing** `(ns, var, arity, line)` identity, because the line-insensitive
+  `(ns, var, arity)` is **ambiguous** for the 51-row `execute-effect!` defmethod case
+  (which of 51 rows is "the target"?). The emitter emits "`B := before(target)` … located
+  by its line-bearing `(ns, var, arity, line)` identity (the same row A5 governs)". The
+  test file locks the line-insensitive **grouping** key (`line-insensitive key
+  `k = (ns, var, arity)``) and the A5 line-bearing key (`keyed by `(ns, var, arity,
+  line)``), but **nothing** locks that `B` itself is *located* line-bearingly — the
+  precise property RI1 fixed. A future edit reverting `B`'s lookup to the line-insensitive
+  key (reopening the defmethod ambiguity) would pass the suite. Actionable: add a lock on
+  `located by its line-bearing `(ns, var, arity, line)`` (the `B`-lookup phrasing), so the
+  RI1-reconciled well-definedness of `B` is regression-protected and distinguished from
+  the line-insensitive grouping key already locked.
+
+After adding TR-T4/TR-T5 locks, re-run the workflow-loader suite
+(`reduce-incidental-complexity-test` + `task-209-workflow-set-loads-together-test`) and
+`clj-kondo --lint` the test file to confirm green + clean.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
