@@ -49,7 +49,7 @@ The sole open-task exception is a `task-lifecycle` trailing invocation. It may e
 
 ## 2. Inspect only task-scoped evidence
 
-Read the task artifacts when present:
+Before mining knowledge, read these task artifacts from the resolved task when present:
 
 - `design.md`
 - `plan.md`
