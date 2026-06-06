@@ -29,14 +29,14 @@
       `incidental-complexity-finder` skill + the workflow EDN already being edited).
       Drop the phantom skill reference or, if a distinct skill restatement is intended,
       identify it by concrete path.
-- [ ] Define the change-detection aggregation in "How A2 is mechanically checked"
+- [x] Define the change-detection aggregation in "How A2 is mechanically checked"
       step 4. It forms `T` via "per-key **aggregate** before-burden ≠ aggregate
       after-burden," but "aggregate" is undefined and is a second before-side quantity
       that contradicts step 3's "`before-max` is the only before-side quantity A2
       uses." If aggregate = sum it re-imports the sub-additive sum the redesign
       eliminates into row-selection. Specify the aggregation function (or detect change
       per physical row) and reconcile it with the "only before-side quantity" claim.
-- [ ] Specify how the target is excluded from `T` in A2's line-insensitive keyspace.
+- [x] Specify how the target is excluded from `T` in A2's line-insensitive keyspace.
       A5 keys the target line-bearing; A2 groups line-insensitive `(ns, var, arity)`.
       Step 4's "Remove the target's own row(s) from `T`" is ambiguous when the target
       shares its key with siblings (the 51-row defmethod case): target physical row

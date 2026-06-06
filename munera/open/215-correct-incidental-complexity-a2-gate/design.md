@@ -131,23 +131,70 @@ JSON artifacts** — not agent judgement. The procedure (run from the worktree r
    `munera/open/NNN-slug/before-local.json`, keyed by the line-insensitive
    `(ns, var, arity)` (A2's chosen identity — see note below).
 2. Recompute after burdens: `bb gordian local --json` (bare, no `--sort`).
-3. Form `T = {u | before(u) != after(u)}` by joining the two JSONs on
-   `(ns, var, arity)`; a unit present only in the after run has `before(u) := 0`
-   (new unit); the target is removed from `T`.
-4. **A2a:** for every `u ∈ T` with `before(u) = 0`, assert `after(u) < B`.
-5. **A2b:** for every `u ∈ T` with `0 < before(u) < B`, assert `after(u) < B`.
+3. **Group both JSONs by the line-insensitive key `k = (ns, var, arity)`.** A2's
+   *atomic unit* is the **physical defunit row** (one source occurrence — its own
+   `after(u)` burden); the key `k` is used only to *pair* before/after rows for
+   classification and exemption, never to merge after-rows into one comparison. For each
+   key `k` define `before-max(k)` := the maximum `lcc-total` among before-rows carrying
+   `k` (`0` if `k` has no before-row). `before-max` — not a sum and not a per-line pairing
+   — is the only before-side quantity the **A2a/A2b pass/fail inequalities** consume
+   (step 4's change filter is a separate, *non-load-bearing* row selection — see below),
+   which makes the check well-defined even when `k` is non-unique (see the defmethod note
+   below).
+4. Form `T`: a physical after-row `u` with key `k` is in `T` iff `k`'s burdens changed —
+   i.e. `k` is **new** (has no before-row) **or** the **multiset of `lcc-total` values over
+   `k`'s before-rows differs from the multiset over `k`'s after-rows** (an order-insensitive
+   set comparison — never a sum). `T`-membership is **not load-bearing for soundness**:
+   including an unchanged row would be harmless, because an untouched row has
+   `after(u) = before(u) ≤ before-max(k)`, so it auto-satisfies A2a/A2b when
+   `before-max(k) < B` and is exempt when `before-max(k) ≥ B`. `T` is therefore a
+   reporting/efficiency filter confining the gate to genuinely touched units; it
+   deliberately uses **no sum**, so the sub-additive sum this redesign eliminates never
+   re-enters even the row selection (this is what reconciles step 4 with step 3's
+   "`before-max` is the only before-side quantity" claim: the pass/fail inequalities use
+   only `before-max`; the multiset filter is order-insensitive set membership, not a
+   burden total).
+
+   **Target exclusion.** Remove **only the target's own physical row** from `T`. The
+   target is identified by its **line-bearing** identity — the same line-bearing
+   `(ns, var, arity, line)` key **A5** uses — *not* by its line-insensitive A2 key. The
+   target is a single physical defunit, so exactly **one** row is removed (hence "row",
+   singular; never the whole `(ns, var, arity)` key group). When the target shares its
+   line-insensitive key with siblings (the 51-row defmethod case), those siblings **stay
+   in `T`** and remain policed by A2a/A2b — so relocating the tangle into a key-sharing
+   sibling still trips the ceiling (or, if that sibling was already `≥ B`, surfaces
+   through **A3**/**A5**); the group is never blanket-exempted and the relocation guard
+   has no hole.
+5. **A2a (new pieces):** for every `u ∈ T` whose key has no before-row
+   (`before-max(k) = 0`), assert `after(u) < B`.
+6. **A2b (no ceiling breach):** for every `u ∈ T` whose key is pre-existing with
+   `0 < before-max(k) < B`, assert `after(u) < B`. (A key with `before-max(k) ≥ B` is
+   exempt — it already contained an oversized member through no fault of this change;
+   genuine architectural worsening there is caught by **A3**.)
 
 Every clause is a numeric `<` over fields read directly from the two JSON files; there is
 no threshold to tune and no interpretation step. This is the same *kind* of objective
 check as **A3**.
 
-A2 deliberately joins on the **line-insensitive** `(ns, var, arity)` key (not the
-line-bearing key A5 uses): a refactor moves line numbers for almost every unit, so a
-line-sensitive join would make nearly all before/after units fail to match and would
-collapse `T` into "everything changed", defeating the per-unit comparison. A2's units are
-distinct vars/arities, so dropping `line` does not conflate them. (The latent question of
-whether A5's line-bearing target key is itself robust to line movement is a separate
-matter, not in this task's scope.)
+A2 deliberately keys on the **line-insensitive** `(ns, var, arity)` (not the line-bearing
+key A5 uses): a refactor moves line numbers for almost every unit, so a line-sensitive
+join would make nearly all before/after units fail to match and would collapse `T` into
+"everything changed", defeating the per-unit comparison. (The latent question of whether
+A5's line-bearing target key is itself robust to line movement is a separate matter, not
+in this task's scope.)
+
+**Non-unique keys (defmethods).** The line-insensitive key is *not* unique in the live
+data: `before-local.json` for task 214 contains 51 rows sharing the exact key
+`(psi.agent-session.dispatch-effects, execute-effect!, nil-arity)`, disambiguated only by
+`line`. The grouping rule above is well-posed precisely for this case: the before side
+collapses to the scalar `before-max(k)` (max over the group, the natural generalization of
+the single-unit exemption), while the ceiling `after(u) < B` is asserted **per physical
+after-row** rather than against a pairing. So a key matching many rows is never undefined
+— each after-row is checked individually against the original tangle `B`, and the
+group's largest pre-existing member sets the exemption. (Relocating a decomplected tangle
+into one member of a polymorphic group is implausible and, were it attempted, would still
+surface through **A5**/**A3**/blast-radius; A2 does not need a special case beyond the
+per-row ceiling.)
 
 Unlike A3, there is **no single `bb gordian` subcommand** that performs the A2 join-and-
 compare today, and adding one is **out of scope** for this task (constrained to a

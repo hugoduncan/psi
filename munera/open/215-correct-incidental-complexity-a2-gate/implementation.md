@@ -172,3 +172,34 @@ skill) remain tracked/open. The revised "How A2 is mechanically checked" /
 Both verified against `design.md` lines 85, 138–148 and the live 214 data the design
 cites. Not duplicated by the architectural-fit passes or the two prior ambiguity
 items.
+
+## Design review follow-up — ambiguities re-pass (ψ, executed)
+
+Resolved both newly-added ambiguity follow-ups from the re-pass in `design.md`
+("How A2 is mechanically checked"). The two earlier ambiguity items (non-unique-key
+join semantics, phantom skill reference) predate this pass and were left untouched
+per scope.
+
+- **Step-4 change-detection aggregation → defined as an order-insensitive multiset
+  comparison (no sum), and reconciled with step 3.** Replaced the undefined "per-key
+  aggregate before-burden ≠ aggregate after-burden" with: `k ∈` changed iff `k` is new
+  *or* the **multiset of `lcc-total` over `k`'s before-rows differs from the multiset
+  over its after-rows** — explicitly never a sum. Added the soundness observation that
+  `T`-membership is *non-load-bearing*: an untouched row has
+  `after(u) = before(u) ≤ before-max(k)`, so it auto-passes A2a/A2b when
+  `before-max(k) < B` and is exempt when `before-max(k) ≥ B`; `T` is therefore a
+  reporting/efficiency filter. Reconciled with step 3 by scoping its "only before-side
+  quantity" claim to the **A2a/A2b pass/fail inequalities** (which consume only
+  `before-max`), distinct from the multiset row-selection filter — so the sub-additive
+  sum never re-enters even row selection.
+
+- **Target exclusion from `T` → specified line-bearing identity, single physical row,
+  shared-key behaviour, singular "row".** Step 4 now removes **only the target's own
+  physical row**, identified by its **line-bearing** `(ns, var, arity, line)` key (the
+  same identity A5 uses), not its line-insensitive A2 key. Stated that the target is a
+  single physical defunit (hence singular "row", never the whole key group), and that
+  in the 51-row defmethod shared-key case the siblings stay in `T` and remain policed by
+  A2a/A2b — so relocating into a key-sharing sibling still trips the ceiling (or surfaces
+  via A3/A5); the group is never blanket-exempted and the relocation guard has no hole.
+
+No blockers. Both follow-ups completed; `design-steps.md` ambiguity items 3–4 ticked.
