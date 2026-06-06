@@ -29,8 +29,8 @@
    :diagnostics []})
 
 (defn- invalid-profile-record
-  [name reason]
-  {:name name
+  [profile-name reason]
+  {:name profile-name
    :status :invalid
    :valid? false
    :settings {}
@@ -185,7 +185,9 @@
                            ctx session-id workflow-run "plan")))]
       (is (= :invalid-session-profile (:reason (ex-data ex))))
       (is (= [:no-concrete-settings]
-             (mapv :reason (:diagnostics (ex-data ex))))))))
+             (mapv :reason (:diagnostics (ex-data ex)))))
+      (is (= ["no-concrete-settings"]
+             (mapv :message (:diagnostics (ex-data ex))))))))
 
 (deftest effective-config->snapshot-preserves-task-207-fallback-test
   ;; Tests no-profile workflows keep task-207 speed/effort inheritance.

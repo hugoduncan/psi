@@ -177,6 +177,7 @@
   [:map {:closed true}
    [:model {:optional true} [:maybe model-id-schema]]
    [:session-profile {:optional true} profile-name-schema]
+   [:thinking-level {:optional true} [:enum :off :minimal :low :medium :high :xhigh]]
    [:system-prompt {:optional true} :string]
    [:tools {:optional true} [:vector tool-id-schema]]
    [:skills {:optional true} [:vector skill-id-schema]]

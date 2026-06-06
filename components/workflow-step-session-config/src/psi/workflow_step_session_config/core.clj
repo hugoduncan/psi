@@ -206,7 +206,8 @@
           profiles (:profiles snapshot)
           result (session-profiles/find-valid-profile profiles profile-name)]
       (if (:ok? result)
-        (get-in result [:profile :settings])
+        (assoc (get-in result [:profile :settings])
+               ::profile-derived-fields (set (keys (get-in result [:profile :settings]))))
         (throw (profile-resolution-error profile-name result))))))
 
 (defn- first-present
@@ -342,6 +343,9 @@
       (contains? session-spec :temperature)
       (assoc :temperature (:temperature session-spec))
 
+      (seq (::profile-derived-fields profile-settings))
+      (assoc ::profile-derived-fields (::profile-derived-fields profile-settings))
+
       model-fallback
       (assoc :model-fallback model-fallback))))
 
@@ -388,15 +392,18 @@
    snapshot. `:model` is the effective config's already `{:provider :id}`-shaped
    value (resolved P3)."
   [effective-config parent-snapshot]
-  (let [base {:model (:model effective-config)
+  (let [profile-derived-fields (::profile-derived-fields effective-config)
+        profile-derived? (fn [k]
+                           (contains? profile-derived-fields k))
+        base {:model (:model effective-config)
               :prompt-mode (:prompt-mode effective-config)
               :tool-defs (:tool-defs effective-config)
               :skills (:skills effective-config)
               :thinking-level (or (:thinking-level effective-config) :off)}]
     (-> base
-        (assoc :speed-mode (if (contains? effective-config :speed-mode)
+        (assoc :speed-mode (if (profile-derived? :speed-mode)
                              (:speed-mode effective-config)
                              (:speed-mode parent-snapshot)))
-        (assoc :effort-override (if (contains? effective-config :effort-override)
+        (assoc :effort-override (if (profile-derived? :effort-override)
                                   (:effort-override effective-config)
                                   (:effort-override parent-snapshot))))))
