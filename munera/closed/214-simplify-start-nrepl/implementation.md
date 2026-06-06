@@ -814,3 +814,34 @@ rebindable `user.dir`; session is `:persist? false`) and lacked
 
 The only remaining open item is the human A2-redefinition ratification gate (task
 closure stays PROVISIONAL pending that human act); not a test concern.
+
+## Task-test review (ψ) — test-shaper re-pass after `user.dir` fix, REVIEW_COMPLETE
+
+Re-applied the `test-shaper` lens (simple ∧ consistent ∧ robust ∧ economical) to the
+net (`app_runtime_nrepl_test.clj`) after the misleading-`user.dir`-ceremony fix
+(`73b76ecff`). Live re-verify: `bb clojure:test:scry --namespace
+psi.app-runtime-nrepl-test` → **7 tests / 30 assertions GREEN**.
+
+- **simple / clarity — PASS.** Single-concern deftests, explicit arrange/act/assert,
+  descriptive names + assertion messages.
+- **consistent — PASS.** All live tests now uniformly guard the real-cwd
+  `.nrepl-port` via `preserving-nrepl-port-file` (the prior fixture inconsistency is
+  resolved); uniform `finally`-restore of mutated globals.
+- **robust — PASS.** Real seams (no stub), real captured streams / filesystem,
+  deterministic (`port 0` random-bind, `deleteOnExit` justifiably unasserted).
+- **economical — PASS.** Behaviour-coverage complete with no redundant tests
+  (the eql round-trip vs. isolated 4-arity overlap each carries distinct signal).
+
+**No NEW actionable test finding.** Sole candidate considered and NOT flagged: the
+repeated process-global save/restore ceremony (`System/out`/`err` ByteArray capture
+in two tests; `@app-runtime/nrepl-runtime` snapshot/`reset!` in four). Consolidating
+into a fixture/helper would trade *local comprehensibility* of process-global
+mutation for economy — a deliberate `locally_comprehensible` vs.
+`helpers_that_compress(ceremony)` tradeoff, not a clear defect; the explicit
+in-test restore is the better default for JVM-global side effects. Per
+test-shaper's `¬helpers_that_hide(intent)`, left as-is.
+
+Only open item remains the human A2-redefinition ratification gate (not a test
+concern; already tracked).
+
+PASS_STATUS: REVIEW_COMPLETE
