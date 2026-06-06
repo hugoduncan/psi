@@ -100,3 +100,28 @@ from stdout and println present in stderr; the redirect mechanism
 (`binding *out* *err*` + `System/setOut`) does route both to stderr, so the
 behavioural description is accurate (a test-strength nuance, not a design
 contradiction; Phase 0 already plans real-seam strengthening). No follow-up added.
+
+## Plan/steps review — ambiguity (ψ)
+
+Reviewed `plan.md` + `steps.md` for ambiguities (not architecture/inconsistency).
+Two new actionable ambiguities, both distinct from the design-level A1/A2 notes above:
+
+1. **Slice 2 skip criterion "with margin" undefined.** Steps Slice 2 says skip "if
+   A1 (target lcc-total decreased) and A2 (net burden) already pass with margin",
+   while plan says skip "if A1/A2 already satisfied and the change would not help".
+   "With margin" introduces an unspecified buffer above a bare pass, so the
+   skip-vs-perform decision for the contingent slice is not deterministic.
+   Unspecified: is a strict decrease (A1) + `sum_after < sum_before` (A2) sufficient
+   to skip, or is a defined margin required.
+
+2. **`start-server-quietly` signature / `requiring-resolve` placement.** Steps Slice
+   1 lists the helper as taking only `port` yet writes `(start-server :port port)`
+   as if `start-server` were already bound. Unspecified whether
+   `(requiring-resolve 'nrepl.server/start-server)` moves into the seam (helper takes
+   only `port`) or the resolved fn is passed in (helper takes `start-server` + `port`).
+   This determines where the `requiring-resolve` dependency burden lands and thus how
+   A2's per-unit net-burden is charged.
+
+Non-issue checked: `bb clojure:test:scry --namespace psi.app-runtime-nrepl-test`
+matches the real ns (`psi.app-runtime-nrepl-test`) and the task's
+`*command-line-args*` passthrough — no ambiguity.

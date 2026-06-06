@@ -23,6 +23,19 @@
       Munera scope-drift — do NOT proceed to Slice 1 without a green net.
 - [ ] Commit: `⚒ 214 Phase 0: characterization net for start-nrepl! behaviour`.
 
+## Plan/steps review follow-up — ambiguity (ψ)
+
+- [ ] Resolve Slice 2's skip criterion: steps say "pass with margin", plan says
+      "already satisfied". Specify the exact deterministic condition under which
+      Slice 2 is skipped (e.g. SKIP iff A1 strictly decreased AND
+      `sum_after < sum_before`; otherwise perform), and remove the undefined
+      "with margin" wording.
+- [ ] Resolve `start-server-quietly`'s signature: state explicitly whether the helper
+      performs `(requiring-resolve 'nrepl.server/start-server)` internally (arg list =
+      `[port]`) or receives the resolved fn (arg list = `[start-server port]`), so the
+      `requiring-resolve` dependency burden's location is fixed and A2 accounting is
+      well defined. Align Slice 1 step wording accordingly.
+
 ## Slice 1 — Phase 1 extract stdout-suppression seam
 
 - [ ] Add `start-server-quietly` helper in `nrepl_runtime.clj`: takes `port`,
