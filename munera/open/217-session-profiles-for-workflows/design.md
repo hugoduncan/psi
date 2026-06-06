@@ -112,6 +112,14 @@ Selecting a profile materializes concrete values into existing session state rat
 
 The command should be discoverable in the built-in slash-command surface and available to existing UIs that consume that surface.
 
+### Command architecture and ownership
+
+`/session-profiles` and `/session-profile` must be added to the backend single-source built-in command spec table, so help text, slash autocomplete, and command routing derive from the same command definitions as the rest of the built-in slash-command surface. Adapters such as TUI and Emacs must continue to consume the backend `:psi.agent-session/builtin-command-specs` resolver; they must not introduce adapter-local profile command lists, profile caches, or profile selection state.
+
+Profile selection mutates canonical session state only through the existing backend command dispatch and session mutation/dispatch patterns. The command handler may format user-facing text, but applying a profile must go through a session-owned mutation/dispatch event that materializes concrete `:model`, `:thinking-level`, `:speed-mode`, and `:effort-override` values plus selected-profile metadata on the session. It must not write directly to the root atom or to adapter-owned state.
+
+Profile reads must be exposed through EQL resolvers using the existing resolver registration surface. At minimum, resolvers should expose the effective session-profile definitions/readable resolved settings and the current session selected-profile metadata. Command formatting should read those resolver surfaces or equivalent session-owned read helpers rather than inspecting adapter state.
+
 ## Workflow grammar
 
 Add a workflow step key named `:session-profile`.
@@ -128,13 +136,13 @@ Compact form:
 
 Structured form may be supported if useful for defaults or future extension, but the compact keyword form is required.
 
-For delegate steps, `:session-profile` applies to the delegating step’s effective config and therefore to the inherited-defaults snapshot captured for the delegated sub-workflow. The callee workflow still retains its own explicit overrides.
+For delegate steps, `:session-profile` applies to the delegating step’s effective config and therefore to the inherited-defaults snapshot captured for the delegated sub-workflow. The delegated run receives the delegating step’s profile-derived concrete defaults through that existing narrow inherited-defaults field set, not by passing profile names or profile maps through `:inherited-defaults`. The callee workflow still retains its own explicit overrides.
 
 ## Workflow resolution semantics
 
 When resolving a workflow step session config:
 
-1. Resolve the step’s `:session-profile` name against the workflow run’s snapshotted effective profile definitions.
+1. Resolve the step’s `:session-profile` name against the workflow run’s canonical session-profile snapshot.
 2. Merge the resolved profile settings into the step effective config.
 3. Apply explicit step keys as the highest-precedence workflow-authored overrides.
 4. Fall back to the workflow run’s inherited defaults snapshot when neither the step nor the profile supplies a value.
@@ -161,13 +169,21 @@ Existing direct step keys (`:model`, `:thinking-level`, `:speed-mode`, `:effort-
 
 Workflow runs must not re-read mutable profile config for later steps after the run starts.
 
-At top-level workflow invocation, snapshot the effective profile definitions needed for workflow resolution, or snapshot an equivalent resolved profile map, into canonical workflow-run state. Nested delegated workflow runs receive profile behavior through the existing inherited-defaults/delegation snapshot mechanism, extended as needed so profile-derived model/thinking/speed/effort settings are deterministic.
+Top-level workflow invocation snapshots the effective session-profile definitions into canonical workflow-run state before any step executes. The snapshot may store profile definitions normalized to runtime-ready settings or an equivalent resolved-profile map, but it must be self-contained enough for later step resolution and replay without consulting user/project config again. A concrete implementation should use a dedicated workflow-run field (for example `:session-profile-snapshot`) rather than overloading `:inherited-defaults`.
+
+Nested delegated workflow runs use two distinct deterministic channels:
+
+1. The delegated run copies or derives its own canonical session-profile snapshot from the delegating run’s immutable snapshot, so profile names requested by steps inside the callee resolve without re-reading mutable config.
+2. The delegating step’s already-resolved effective config is projected into the existing narrow `:inherited-defaults` snapshot for the child run. If the delegating step used `:session-profile`, only the resulting concrete model/thinking/speed/effort defaults flow through `:inherited-defaults`; profile maps, profile names, and effective profile definitions do not.
+
+This preserves the task-207 inherited-defaults boundary: `:inherited-defaults` remains a resolved concrete default set for model/prompt/tools/skills/thinking/speed/effort, not a profile registry. Profile-name resolution belongs to the workflow-run profile snapshot.
 
 Consequences:
 
 - Editing user or project config after a workflow starts does not affect that run’s later steps.
 - Resuming a blocked run reuses its original profile snapshot.
 - A fresh workflow invocation uses the current effective config.
+- A delegated sub-workflow does not re-read user/project config to resolve profile names, and a parent delegate step does not widen `:inherited-defaults` to carry profile maps.
 
 ## Introspection and observability
 
@@ -212,6 +228,6 @@ Add a CHANGELOG `[Unreleased]` entry because this is user-visible behavior.
 6. Unknown profile selection fails with a helpful message and available names.
 7. Workflow steps can specify `:session-profile :profile-name` and receive profile-derived model/thinking/speed/effort settings.
 8. Explicit workflow step settings override profile-derived settings.
-9. Workflow profile resolution is snapshotted for deterministic run behavior; mid-run config edits do not affect later steps or resumed runs.
+9. Workflow profile resolution is snapshotted on canonical workflow-run state for deterministic run behavior; mid-run config edits do not affect later steps, delegated runs, or resumed runs.
 10. Existing workflows without `:session-profile` behave unchanged.
 11. Docs and changelog describe the config shape, command surface, workflow key, and snapshot semantics.
