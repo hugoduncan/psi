@@ -252,8 +252,10 @@ The parameters previously left open are now settled:
   `select-and-create` step's `:text` (the "Net burden (A2 — ...)" bullet under
   "Objective acceptance criteria").
 - Check for and align any A2 description in
-  `.psi/skills/incidental-complexity-finder/SKILL.md` and the
-  `reduce-incidental-complexity` skill, if either restates the net-sum form.
+  `.psi/skills/incidental-complexity-finder/SKILL.md`, if it restates the net-sum
+  form. (The emitter itself is the `.psi/workflows/reduce-incidental-complexity.edn`
+  workflow already covered by the primary edit above; there is no separate
+  `reduce-incidental-complexity` skill.)
 - Update `mementum/knowledge/gordian-net-sum-burden-gate-sub-additivity.md`: once the
   emitter is corrected, record that the framework-level fix has landed (its "Action for
   future sessions" item 1 and "Status / ratification" section currently say the fix is
