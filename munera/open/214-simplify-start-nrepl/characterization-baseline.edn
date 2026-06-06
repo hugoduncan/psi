@@ -1,0 +1,42 @@
+;; Pre-characterization clean-source baseline for task 214-simplify-start-nrepl.
+;; Records the verified-clean source state BEFORE any Phase 0 characterization
+;; tests or Phase 1 refactor edits are made. Behaviour-preservation is judged
+;; against this HEAD.
+{:task "214-simplify-start-nrepl"
+ :recorded-at "2026-06-05"
+ :branch "run-simplification"
+ :git-head "c1acd2abc4be10ddc3fbd057e9442788cf7f5950"
+
+ ;; `git status --short` at baseline time: empty (clean working tree).
+ :git-status-short ""
+ :working-tree-clean? true
+
+ ;; Target unit selected by the incidental-complexity-finder.
+ :target-unit {:ns 'psi.app-runtime.nrepl-runtime
+               :var 'start-nrepl!
+               :arity 4
+               :selector-label-line 12
+               :line-range [12 38]
+               :baseline-lcc-total 6.015383232244966
+               :cc 3
+               :gap 2.0051277440816553}
+
+ ;; Source/target paths identified from the task design.md.
+ :target-source-paths
+ ["components/app-runtime/src/psi/app_runtime/nrepl_runtime.clj"]
+
+ ;; Secondary source touched only if strictly required to decomplect the target
+ ;; (public 1-arity wrapper `psi.app-runtime/start-nrepl!`, lines 117-122).
+ :potentially-touched-source-paths
+ ["components/app-runtime/src/psi/app_runtime.clj"]
+
+ ;; Test ns exercising the target transitively; Phase 0 net extends this file.
+ :test-paths
+ ["components/app-runtime/test/psi/app_runtime_nrepl_test.clj"]
+
+ ;; All target/source/test paths verified present and clean at baseline.
+ :target-source-clean? true
+
+ ;; No pre-existing dirty task-artifact or documentation files classified;
+ ;; working tree was fully clean at baseline.
+ :preexisting-classified-dirt []}

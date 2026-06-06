@@ -181,3 +181,18 @@ Non-issue checked: steps Slice 3 close-out says "remove the task's entry from
 `munera/plan.md`", but task 214 has no entry there (it is unordered-open per Munera).
 Removal is a conditional no-op under Munera semantics — not an inconsistency, no
 follow-up added.
+
+## Phase 0 — pre-characterization clean-source baseline (ψ)
+
+Recorded the pre-characterization clean-source baseline into
+`characterization-baseline.edn` before any Phase 0 test or Phase 1 refactor edit.
+
+- Git HEAD: `c1acd2abc4be10ddc3fbd057e9442788cf7f5950` (branch `run-simplification`).
+- `git status --short`: empty — working tree fully clean.
+- Target/source paths identified from `design.md` and verified present + clean:
+  - `components/app-runtime/src/psi/app_runtime/nrepl_runtime.clj` (target `start-nrepl!`/4).
+  - `components/app-runtime/src/psi/app_runtime.clj` (wrapper; touched only if required).
+  - `components/app-runtime/test/psi/app_runtime_nrepl_test.clj` (Phase 0 net target).
+- No pre-existing dirty target/source changes; no classified task-artifact/doc dirt.
+
+Baseline clean → behaviour-preservation is anchored to this HEAD. Result: REVIEW_COMPLETE.
