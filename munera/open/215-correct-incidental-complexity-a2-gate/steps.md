@@ -172,3 +172,26 @@
       workflow-loader suite (`reduce-incidental-complexity-test` +
       `task-209-workflow-set-loads-together-test`) and `clj-kondo --lint` the test file to
       confirm green + clean.
+
+## Test review re-pass follow-ups (ψ, task-test-review)
+
+- [ ] **TR-T6:** Add a regression guard for the objective / deterministic-numeric-procedure
+      (¬agent-judgement) invariant in `reduce-incidental-complexity-test`
+      ("select-and-create prompt preserves … contracts"). The design's Constraints +
+      Acceptance require A2 be *objective* (concrete numeric comparisons), and the emitter
+      frames the check as "a deterministic numeric procedure over two JSON artifacts — the
+      same KIND of objective check as A3, not agent judgement". Nothing currently locks this:
+      a reword into a judgement-based check would silently reintroduce the subjectivity the
+      redesign removes and stay green. Add a content-lock on `the same KIND of objective
+      check as A3` (and/or `not agent judgement` / `a deterministic numeric procedure over
+      two JSON artifacts`).
+- [ ] **TR-T7:** Lock the order-insensitive multiset `T`-formation (¬per-line-pairing). The
+      design forms `T` by an order-insensitive multiset comparison ("an order-insensitive set
+      comparison — never a sum"; `before-max` is "not a sum, not a per-line pairing") so the
+      non-unique 51-row `execute-effect!` defmethod key stays well-posed. The TR-T1 `never a
+      sum` lock catches only a sum-regression; a regression to a **per-line pairing** join
+      (not a sum, but breaking non-unique-key handling) is uncaught. Add a content-lock on
+      `an order-insensitive set comparison` (and/or `not a per-line pairing`). After adding
+      TR-T6/TR-T7, re-run the workflow-loader suite (`reduce-incidental-complexity-test` +
+      `task-209-workflow-set-loads-together-test`) and `clj-kondo --lint` the test file to
+      confirm green + clean.

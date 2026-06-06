@@ -845,3 +845,40 @@ psi.workflow-loader.task-209-workflow-definitions-test`) — 3 tests / 210 asser
 `clj-paren-repair` round-trips.
 
 PASS_STATUS: FOLLOW_UPS_COMPLETE
+
+## Test review — re-pass after TR-T1..TR-T5 (ψ, task-test-review)
+
+Re-applied `task-test-review` (well-formed ∧ ∀behaviour∈design ∃covering-test ∧
+infra-deps nullable/¬mock). Suite GREEN (3 tests / 210 assertions / 0 fail / 0 error via
+scry CLI); `load-edn-only` exercises the real EDN (no mock/stub). TR-T1..TR-T5 closed the
+no-sum, no-margin, A2a/A2b-branch + exemption, single-row line-bearing target-exclusion,
+and line-bearing-`B`-lookup gaps. Two design behaviours remain uncovered — neither
+duplicates TR-T1..TR-T5 nor any prior design/plan/impl follow-up:
+
+- **TR-T6 — the objective / deterministic-numeric-procedure (¬agent-judgement) invariant
+  has no regression guard.** The design's Constraints + Acceptance require A2 be
+  *objective* ("concrete numeric comparisons against committed baselines") and the emitter
+  frames the check as "a deterministic numeric procedure over two JSON artifacts — the
+  same KIND of objective check as A3, not agent judgement". Nothing locks this framing: a
+  future edit could reword the procedure into a judgement-based check — silently
+  reintroducing the subjectivity the redesign exists to remove (the old net-sum gate was
+  at least mechanical) — and the suite would stay green. Lock the objectivity framing
+  (`the same KIND of objective check as A3` and/or `not agent judgement` /
+  `a deterministic numeric procedure over two JSON artifacts`).
+
+- **TR-T7 — the order-insensitive multiset `T`-formation (¬per-line-pairing) is
+  unguarded.** The design foregrounds that the touched-set `T` is formed by an
+  *order-insensitive multiset* comparison ("an order-insensitive set comparison — never a
+  sum"; `before-max` is "not a sum, not a per-line pairing") precisely so the non-unique
+  51-row `execute-effect!` defmethod key stays well-posed. The existing `never a sum` lock
+  (TR-T1) catches only a sum-regression; a regression to a **per-line pairing** join (also
+  not a sum, but breaking the non-unique-key handling) would NOT be caught by any current
+  lock — the grouping-key/`before-max`/physical-row locks fix the grouping, not the
+  `T`-membership comparison method. Lock the comparison method
+  (`an order-insensitive set comparison` and/or `not a per-line pairing`).
+
+After adding TR-T6/TR-T7 locks, re-run the workflow-loader suite
+(`reduce-incidental-complexity-test` + `task-209-workflow-set-loads-together-test`) and
+`clj-kondo --lint` the test file to confirm green + clean.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
