@@ -527,3 +527,37 @@ lookup with the line-insensitive *join/grouping* key. The line-insensitive group
 now explicitly distinguished from `B`'s lookup. design.md ↔ emitter coherence restored.
 Design-only change; no code/test/emitter edit (emitter was already correct — it was the
 authoritative form RI1 reconciled toward).
+
+## Implementation review re-pass (ψ)
+
+Re-verified the landed change: emitter EDN round-trips (`edn/read-string`, 13 steps);
+workflow-loader suite GREEN (3 tests / 196 assertions / 0 fail / 0 error); old net-sum
+content-lock strings absent from the emitter (word-diff confirms the change is confined to
+the single A2 bullet — A5/A3/blast-radius/minimality byte-unchanged); knowledge page
+reconciled (LANDED + `after(target)` superseded + A1→A5); design.md step 1 reconciled to
+the line-bearing `B` lookup (RI1 closed). Implementation matches design intent for
+acceptance 1–5.
+
+One **new** actionable coherence violation (user-facing doc ↔ landed emitter disagree),
+not covered by RI1 or any prior pass:
+
+- **RI2 — `doc/workflows.md` still documents the superseded net-sum A2.**
+  `doc/workflows.md` (the `reduce-incidental-complexity` section, Phase-1 acceptance
+  paragraph, ~line 709) describes the gate as "**net burden across the metric-derived
+  touched set strictly decreases**" — verbatim the net-sum `sum after < sum before` A2
+  that task 215 removed from the emitter. The landed A2 is the per-unit relocation guard
+  (A2a/A2b ceiling `after(u) < B`, no sum, target excluded — A5 governs target reduction).
+  This is a `change_chain` doc-sync violation (`update(doc,reflect(meta spec code))`) and
+  breaks the project's canonical "keep user docs (`README` + `doc/`) synchronized on every
+  change" rule. The task's own Scope/blast-radius listed only the emitter, the
+  `incidental-complexity-finder` skill, and the knowledge page — it **omitted**
+  `doc/workflows.md` (an omission, not a deliberate exclusion; out-of-scope lists only 214
+  re-run / Gordian transform / 214 ratification). So a user reading the workflow docs is
+  told the gate is a net-sum decrease that the workflow no longer emits. Actionable: update
+  the `doc/workflows.md` Phase-1 acceptance sentence to describe the per-unit A2a/A2b
+  relocation-guard ceiling (`after(u) < B`, target governed by A5), matching the landed
+  emitter; verify no other `doc/` / `README.md` sentence restates the net-sum form (the
+  two CHANGELOG entries describe the workflow generally and do not name the net-sum gate, so
+  they are unaffected).
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

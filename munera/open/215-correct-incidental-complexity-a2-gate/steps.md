@@ -106,3 +106,13 @@
       parenthetical "A2's chosen identity") to the line-bearing `B` lookup that landed, with
       a one-line rationale; leave the line-insensitive `(ns, var, arity)` **grouping** for
       `before-max(k)`/`T` (step 3) unchanged — only `B`'s own lookup key is at issue.
+
+- [ ] **RI2:** Sync `doc/workflows.md` to the landed per-unit A2. The
+      `reduce-incidental-complexity` Phase-1 acceptance paragraph (~line 709) still says
+      "net burden across the metric-derived touched set strictly decreases" — the
+      superseded net-sum gate. Rewrite that clause to describe the per-unit A2a/A2b
+      relocation-guard ceiling (`after(u) < B`, `B := before(target)` from
+      `before-local.json`; target reduction governed by A5), matching the landed emitter
+      (`change_chain` doc-sync; the task Scope omitted this file). Verify no other `doc/`
+      or `README.md` sentence restates the net-sum form (the two CHANGELOG entries describe
+      the workflow generally and are unaffected).
