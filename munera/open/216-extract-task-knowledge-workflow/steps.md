@@ -78,3 +78,7 @@
 
 - [x] DOC1: DONE — updated `CHANGELOG.md` `[Unreleased]` so the earlier `task-lifecycle` Added entry describes the shipped design → plan → implement → review → extract-knowledge lifecycle and six delegated workflows, consistent with the Changed entry.
 - [x] DOC2: DONE — replaced the user-facing `doc/workflows.md` `extract-task-knowledge` usage example that named the in-flight task `216-extract-task-knowledge-workflow` with the generic completed-task placeholder `{NNN-slug}`, so the example no longer contradicts standalone closed-task-only extraction.
+
+## Code-shaper review follow-ups
+
+- [ ] CS1: Update `.psi/workflows/task-lifecycle-in-worktree.edn`'s positive-path summary prompt and its workflow-loader tests so wrapper callers report the full design → plan → implement → review → extract-knowledge lifecycle, including the extraction result preserved by the inner `task-lifecycle` yield, while keeping the existing `NO_TARGET` branch unchanged.
