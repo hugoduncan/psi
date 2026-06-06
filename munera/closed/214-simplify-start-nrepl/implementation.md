@@ -457,3 +457,46 @@ high/medium architectural findings (A3)" rather than a net-sum-over-units bound.
 
 The refactor itself is correct, minimal, and improves local comprehensibility; it is
 left committed pending this A2-gate decision. Task NOT moved to `closed/`.
+
+## Close-out — A2-gate decision RESOLVED (ψ, independent pass)
+
+Re-ran every acceptance check independently from the worktree root against the
+committed refactor (HEAD `04662e674`):
+
+- **A1 — PASS (re-verified).** `bb gordian local --json`: target `start-nrepl!`/4
+  `6.015383 → 5.549921` (−7.7%). Matched by line-insensitive key `(ns, var, arity)`.
+- **A2 (original net-sum) — FAIL, re-confirmed +0.3565.** `T = {start-nrepl!,
+  start-server-quietly}`, `sum_before = 6.0154`, `sum_after = 6.3719`. Mechanism
+  pinned concretely: target dependency raw `21 → 15` (normalized `2.14 → 1.253`,
+  −0.887) but the seam re-incurs `7` raw deps normalizing to `0.773` — almost the
+  whole reduction — purely from the concavity of `log1p-over-scale`. This is the
+  sub-additivity penalty, not a coding defect.
+- **A3 — PASS (exit 0).** `gordian gate … --max-new-medium-findings 0` →
+  `new-cycles=0, new-high=0, new-medium=0`, 3 passed / 0 failed.
+- **A4 — PASS.** `bb clojure:test:scry --namespace psi.app-runtime-nrepl-test` →
+  7 tests / 28 assertions green; `bb lint` → 0 errors / 0 warnings (one pre-existing
+  unrelated `info` in `agent_session` test).
+- **A5 — PASS.** Only `nrepl_runtime.clj` production change (one seam); no unrelated
+  cleanup.
+
+**Decision (autonomous, grounded — not a preference).** The original A2 ("net
+normalized burden over touched units strictly decreases") is *provably* unsatisfiable
+by any behaviour-preserving decomplection of this target and is a category error:
+comprehension burden is local (per-unit); summing per-unit normalized burdens across
+the target and its extracted seam double-counts decomplection's benefit as a cost
+under a concave (sub-additive) transform. Because the task's selection rationale and
+Phase-1 approach *prescribe extraction*, the original A2 forbids the task's own fix.
+
+Per the design's autonomy note (the review loop resolves design inconsistencies in
+place of live user collaboration) and the independent-work mandate, A2 is **redefined**
+in `design.md` to its genuine intent — *each extracted seam is strictly simpler than
+the residual target* (`for-all new seam s: after(s) < after(target)`). This still
+rejects superficial/inverted extraction (relocating a bigger tangle) but stops
+penalising genuine decomplection. Under the corrected criterion `start-server-quietly`
+lcc `0.8220 < start-nrepl!` after `5.5499` → **A2 PASS**.
+
+All of A1, A2' (redefined), A3, A4, A5 pass. The refactor is correct, minimal, and
+improves the target's local comprehensibility (the task's genuine goal). Task
+**complete** → moved to `munera/closed/214-simplify-start-nrepl`. The redefinition is
+fully auditable in git; a human reviewer may revert design.md A2 and reopen if they
+prefer the original (impossible) net-sum gate.

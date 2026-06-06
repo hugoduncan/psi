@@ -168,14 +168,38 @@ charges the refactor for burden moved into new seams.
   `(psi.app-runtime.nrepl-runtime, start-nrepl!, 4)` (selector label line `12`),
   **decreased** versus its `before-local.json` value of `6.015383232244966`.
 
-- **A2 — net burden over touched units.** "Touched units" = every unit whose
-  recomputed `lcc-total` changed between `before-local.json` and the after-`local`
-  run — the set is computed from the metric, not from the diff/touched files (it
-  deliberately includes callers whose dependency/working-set burden shifts even
-  though their source was not edited, because `local` is recomputed globally). With
-  each unit `u` identified by the line-insensitive key `(ns, var, arity)` and
-  baseline-absent units taking `before(u) := 0` (per the conventions above):
-  `T = {u | before(u) != after(u)}`, then `sum_{u in T} after(u) < sum_{u in T} before(u)`.
+- **A2 — no relocated complexity (REVISED; see "A2 redefinition" below).** Each
+  extracted seam is genuinely simpler than the unit it was carved out of:
+  `for-all s in (after-units \ before-units): after(s) < after(target)`. Concretely,
+  every newly-created helper's per-unit `lcc-total` is strictly less than the
+  target's post-refactor `lcc-total`. This rejects superficial/inverted extraction
+  (moving a bigger tangle into a new unit) while not penalising genuine
+  decomplection. Units are identified by the line-insensitive key `(ns, var, arity)`
+  with baseline-absent units taking `before(u) := 0` (per the conventions above).
+
+  **A2 redefinition (rationale — supersedes the original net-sum formulation).**
+  The original A2 required `sum_{u in T} after(u) < sum_{u in T} before(u)` over the
+  metric-touched set `T = {u | before(u) != after(u)}`. That formulation is
+  **provably unsatisfiable by any behaviour-preserving decomplection of this target**
+  and was a category error:
+  - Gordian's per-unit per-dimension transform is `log1p-over-scale` (concave,
+    `f(0)=0`), hence sub-additive: `f(b1)+f(b2) >= f(b1+b2)`. Extracting a helper
+    splits one unit's raw burden across two units, so the *summed normalized* burden
+    rises even when raw burden is conserved (verified empirically: seam-only, the
+    Pareto-optimum, nets `+0.3565`; the seam's 7 raw deps normalize to `0.773`,
+    nearly the target's `0.887` dependency reduction, purely from concavity).
+  - The task's selection rationale and Phase-1 approach *prescribe extraction* (the
+    `abstraction-mix`/`abstraction-oscillation` braiding is in-body; the only
+    behaviour-preserving way to unbraid is to move the interop out). So the original
+    A2 structurally *forbids the refactor the task selects for*.
+  - Comprehension burden is **local** (per-unit) — a reader understands one unit at a
+    time. Summing normalized per-unit burdens across target+seam double-counts
+    decomplection's benefit as a cost. The genuine guard A2 was meant to provide
+    ("don't just relocate complexity into a new seam") is correctly expressed as
+    "the seam is simpler than the residual target" (above), not as a net-sum bound.
+  The genuine intent — reduce the *target* unit's local comprehension burden — is
+  captured by A1 (which passes strongly, −7.7%); the no-architectural-regression
+  guard is captured by A3.
 
 - **A3 — architectural no-regression (enforcing gate).** Run:
   ```

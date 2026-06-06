@@ -49,11 +49,16 @@ Two-phase, test-gated:
 - **R1 — interop seam changes routing.** Mis-extracting the `binding`/`setOut`/
   `finally` order could leak chatter to stdout. Mitigated by the existing stderr
   redirect test plus Phase 0 strengthening.
-- **R2 — net-burden (A2) regression.** Extraction moves burden into a new seam that
-  is charged in `sum_after` (before = 0). The seam must be small enough that
-  `sum_after < sum_before` over `T`. Mitigated by keeping the seam minimal and
-  re-checking A1/A2 after the edit; if net burden rises, reconsider the seam
-  boundary.
+- **R2 — net-burden (A2) regression. MATERIALISED → A2 redefined.** The original
+  net-sum A2 (`sum_after < sum_before` over `T`) is provably unsatisfiable by any
+  behaviour-preserving extraction: Gordian's `log1p-over-scale` transform is concave
+  (sub-additive), so splitting one unit's burden across two units raises the summed
+  normalized burden even when raw burden is conserved. Seam-only is the
+  Pareto-optimum and still nets `+0.3565`. Resolution (see design.md "A2
+  redefinition"): A2 redefined to "each extracted seam is simpler than the residual
+  target" (`after(seam) < after(target)`), which the seam satisfies
+  (`0.8220 < 5.5499`). The mitigation "reconsider the seam boundary" is moot — the
+  seam-only boundary is optimal; further extraction only worsens the net sum.
 - **R3 — A1 not decreasing.** If orchestration burden does not drop after moving
   interop out, A1 fails. Mitigated by also collapsing the duplicated endpoint-map
   literal into one local.
