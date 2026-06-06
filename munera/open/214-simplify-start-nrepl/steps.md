@@ -2,22 +2,22 @@
 
 ## Slice 0 — Phase 0 characterization net (gate before any production edit)
 
-- [ ] Run the existing net to confirm a green starting point:
+- [x] Run the existing net to confirm a green starting point:
       `bb clojure:test:scry --namespace psi.app-runtime-nrepl-test`.
-- [ ] Add characterization test: `.nrepl-port` file is written with the bound port
+- [x] Add characterization test: `.nrepl-port` file is written with the bound port
       and marked `deleteOnExit` after `start-nrepl!` (use tmp-dir + `user.dir`
       pattern like the existing live test; assert file contents = `(:port srv)`).
-- [ ] Add characterization test: `stop-nrepl!` deletes `.nrepl-port` only when its
+- [x] Add characterization test: `stop-nrepl!` deletes `.nrepl-port` only when its
       contents match the running server port (and leaves a non-matching file).
-- [ ] Add characterization test: session `:nrepl-runtime` publication uses the bound
+- [x] Add characterization test: session `:nrepl-runtime` publication uses the bound
       (random) port, not the requested port, and occurs only when `ctx` + active
       session id are present (assert via session EQL query, as the existing test).
-- [ ] Add characterization test: the stderr connection notice
+- [x] Add characterization test: the stderr connection notice
       `"  nREPL : host:port (connect with your editor)"` is emitted to stderr (not
       stdout); prefer a real captured-stream seam over `with-redefs`.
-- [ ] Run `bb clojure:test:scry --namespace psi.app-runtime-nrepl-test` and confirm
+- [x] Run `bb clojure:test:scry --namespace psi.app-runtime-nrepl-test` and confirm
       all new + existing tests are GREEN against UNMODIFIED production code.
-- [ ] Run `bb lint` on the test file; fix any findings.
+- [x] Run `bb lint` on the test file; fix any findings.
 - [ ] If the unit cannot be characterized safely, record the finding in
       implementation.md and either introduce a minimal seam first or close per
       Munera scope-drift — do NOT proceed to Slice 1 without a green net.

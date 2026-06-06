@@ -252,3 +252,55 @@ Gate decision: net is GREEN but INSUFFICIENT — four observable surfaces uncove
 all coinciding with the refactor's stated risks (R1 stdout routing, `.nrepl-port`
 side effects, gated publication). Phase 0 gate does NOT pass; Phase 1 simplification
 must not proceed until these four characterization tests are added and green.
+
+## Phase 0 — characterization net authored (ψ)
+
+Added five characterization deftests (now 7 total / 28 assertions, all GREEN
+against UNMODIFIED production code) covering the four FIXABLE gaps from the gate
+review. No production seam introduced — all four surfaces are observable via real
+filesystem/stream/session-EQL.
+
+Tests added to `components/app-runtime/test/psi/app_runtime_nrepl_test.clj`:
+
+1. `nrepl-port-file-records-bound-port-and-stop-deletes-on-match-test`
+   (gap 1 + matching branch of gap 2): `.nrepl-port` contains exactly the bound
+   port; `stop-nrepl!` deletes it when contents match.
+2. `stop-nrepl-preserves-nrepl-port-file-when-contents-differ-test`
+   (gap 2 non-matching branch): a `.nrepl-port` whose contents ("0", never a
+   bound port) differ from the server port is left intact.
+3. `start-nrepl-publishes-bound-port-into-session-runtime-test`
+   (gap 3 positive): ctx + active session id present ⇒ bound (random) port
+   published into session `:nrepl-runtime` via `set-nrepl-runtime-in!`, observed
+   through the EQL resolver. Context created while `nrepl-runtime-atom` is nil, so
+   seeded `[:runtime :nrepl]` is nil — a non-nil result can only come from the
+   publication branch (not atom seeding).
+4. `start-nrepl-skips-session-publication-without-active-session-test`
+   (gap 3 negative): ctx present but `default-session-id-fn` ⇒ nil ⇒ inner
+   `when-let` short-circuits ⇒ no session publication (EQL attrs nil).
+5. `start-nrepl-emits-connection-notice-to-stderr-not-stdout-test`
+   (gap 4): the literal `"  nREPL : host:port (connect with your editor)"` is
+   emitted to real `System/err`, absent from `System/out`. Uses real captured
+   streams (preferred over `with-redefs`).
+
+### Decisions / discoveries
+
+- **No production testability seam needed.** All four gaps are externally
+  observable, so per the hard constraints no production edit was made.
+- **`user.dir`-isolation premise is false (discovery).** `start-nrepl!` writes
+  `.nrepl-port` via a RELATIVE `java.io.File`, which resolves against the process
+  working directory captured at FileSystem init — NOT a runtime-mutated `user.dir`
+  property. Verified empirically: `(spit (java.io.File. ".relfile") …)` after
+  `(System/setProperty "user.dir" tmp)` lands in the real cwd, not `tmp`. The
+  existing `nrepl-runtime-eql-reflects-live-start-stop-test`'s `user.dir` dance
+  therefore does NOT isolate `.nrepl-port` (it never reads the file, so it was
+  unaffected). New `.nrepl-port` tests instead use a TEST-side
+  `preserving-nrepl-port-file` helper that snapshots/restores the real-cwd file
+  (protecting any live dev `.nrepl-port`). This is a test-harness adaptation, not
+  a production seam; design.md's planned tmp-dir + `user.dir` pattern for these
+  tests is not viable and was not used.
+- **`deleteOnExit` deliberately not asserted.** It is a JVM-exit interaction with
+  no mid-test observable effect; per `testing-without-mocks` (assert state/outputs,
+  not interactions) the net characterizes file contents + match-deletion instead.
+- **Existing tests untouched** (no weakening); only additive.
+
+Lint clean (`clj-kondo` 0/0). Result: REVIEW_COMPLETE.
