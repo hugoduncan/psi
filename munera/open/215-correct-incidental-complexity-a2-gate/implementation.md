@@ -1157,3 +1157,43 @@ Removed-behaviour cleanup, changelog, examples, and naming/flag/path consistency
 No new actionable docs issue.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Code-shaper review (ψ, simplicity ∧ consistency ∧ robustness)
+
+Applied `code-shaper` to the landed artifacts — a *shape* lens distinct from the prior
+correctness (RI/PI/PA), coverage (`task-test-review` TR-Tn), and `test-shaper` (TS-Sn)
+passes. The only true source artifact is the test file
+(`task_209_workflow_definitions_test.clj`); the emitter EDN, knowledge page, doc, and
+CHANGELOG are prose contracts. Runtime checks re-confirmed: suite GREEN (3 tests / 215
+assertions / 0 fail / 0 error via scry CLI); `clj-kondo --lint` of the test file 0/0;
+emitter EDN round-trips (13 steps).
+
+- **simple** ✓ — the A2 content-locks live in their own single-concern, correctly-named
+  `testing "select-and-create emits the corrected per-unit A2 relocation guard"` block
+  (TS-S1); each `(is (.contains …))` carries a single behavioural responsibility; no
+  flow/computation tangle (pure `load-edn-only` + string `.contains`).
+- **consistent** ✓ — uniform bare `(is (.contains select-text "…"))` positive style + two
+  symmetric negative `(is (not (.contains …)))` net-sum-absent guards; idiom matches the
+  file's other per-concern content-lock blocks (clean-baseline / coverage-review /
+  diff-gate).
+- **robust** ✓ — deterministic (EDN load, no mocks/infra deps); the weak generic locks
+  prior passes flagged are anchored (TS-S2 EXEMPT, TS-S4 key-group, TS-S3 `before-max(k)`
+  definition); negative guards make a net-sum/margin regression fail green.
+
+Considered and NOT raised as actionable:
+
+- **A2a/A2b stated twice in the emitter `:text`** (once as the criterion clauses, once as
+  mechanical steps 5/6 of "How A2 is mechanically checked"). This is a mild
+  single-source/`λ sync` hazard for future edits, but it is the design's *deliberate*
+  what-vs-how separation (the steps add `T`-membership the criterion omits) and lies
+  inside the constrained criterion-text the task was scoped to correct — re-structuring it
+  would re-litigate settled design. Not actionable here.
+- **Review-provenance tags (TR-Tn / TS-Sn / RI-n) in lock comments** — borderline against
+  `locally_comprehensible`, but each comment also states the behavioural intent in prose,
+  and a prior `test-shaper` pass explicitly judged the tags harmless. Not re-raised.
+
+No new actionable code-shape issue. The changed artifacts are simple, consistent, and
+robust; the test net is well-shaped and behaviour-focused at the appropriate layer (A2 is
+an agent-run prose procedure, not executable code).
+
+PASS_STATUS: REVIEW_COMPLETE
