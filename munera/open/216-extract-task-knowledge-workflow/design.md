@@ -40,8 +40,10 @@ human_approves → AI_commits`. This task uses a **narrow protocol-authorized
 exception** for task-artifact extraction: `extract-task-knowledge` may
 autonomously write and commit memories/knowledge when the source is either a
 closed Munera task's artifacts or a `task-lifecycle` trailing invocation over the
-still-open task immediately after a successful `review-task-implementation` step,
-plus task-scoped git history. The extraction must pass the mementum value gates,
+still-open task immediately after a successful `review-task-implementation` step
+whose yielded text is carried as the labeled `:implementation-review-yield`
+prompt-string field and rendered as `{{implementation_review_yield}}`, plus
+task-scoped git history. The extraction must pass the mementum value gates,
 project-generality/significance filters, dedupe recall, and `uncertain → skip`
 conservatism.
 
@@ -106,11 +108,14 @@ low-value or duplicative entries, degrading recall. The design therefore:
    match is reported as not completed and produces no mementum writes. The
    `task-lifecycle` trailing invocation is the sole authorized exception: it may
    extract from the still-open task directory only because it runs immediately
-   after a successful `review-task-implementation` step, and that successful
-   predecessor is the lifecycle-local completion proof for the autonomous
-   extraction exception. If that predecessor context is absent or does not show a
-   successful implementation review, an open task is treated as incomplete and
-   extraction is skipped.
+   after a successful `review-task-implementation` step, and that predecessor's
+   yielded text is passed in the extraction delegate `:prompt-string` map as the
+   labeled `:implementation-review-yield` field. The markdown prompt consumes
+   that field through `{{implementation_review_yield}}`; `{{original}}` /
+   `:workflow-original` is ambient context only and cannot authorize open-task
+   extraction. If the labeled implementation-review yield is absent or does not
+   show a successful implementation review, an open task is treated as incomplete
+   and extraction is skipped.
 10. **Git-history boundary is task-specific.** The workflow may use only three
     history lenses as evidence: commits touching the resolved task directory
     (`git log --follow -- <task-dir>`), commits whose message mentions the task
@@ -121,10 +126,13 @@ low-value or duplicative entries, degrading recall. The design therefore:
 11. **Lifecycle terminal result preserves the prior outcome.** Because workflow
     semantics make the last step's yield the `task-lifecycle` result, the
     trailing extraction delegate must receive the prior
-    `review-task-implementation` yielded text as context and include that prior
+    `review-task-implementation` yielded text as a labeled
+    `:implementation-review-yield` prompt-string field and include that prior
     lifecycle/review outcome in its final summary alongside the extraction
     result. The `:prompt-string` still passes the same original task `:input`;
-    the review output is context, not a replacement identifier.
+    the labeled review output is authorization/provenance, not a replacement
+    identifier. `{{original}}` remains ambient carried reference context and is
+    not an open-task authorization source.
 
 ## Scope
 
@@ -144,9 +152,11 @@ In scope:
   - produces a concise summary of what was (and was not) extracted.
 - Appending `extract-task-knowledge` as the final `:delegate` step of
   `task-lifecycle`, passing the same task `:input` and adding the
-  `review-task-implementation` yielded text as context so the final lifecycle
-  output preserves the review/lifecycle outcome as well as the extraction
-  summary.
+  `review-task-implementation` yielded text as the labeled
+  `:implementation-review-yield` prompt-string field consumed through
+  `{{implementation_review_yield}}`, so the final lifecycle output preserves the
+  review/lifecycle outcome as well as the extraction summary. `{{original}}` /
+  `:workflow-original` remains ambient, non-authorizing reference context.
 - Tests proving the workflow definition is well-formed and routes/terminates as
   intended (consistent with how other workflow definitions are tested), and that
   `task-lifecycle` includes the new trailing step.
@@ -178,8 +188,10 @@ Out of scope (candidate follow-on tasks):
    `mementum/` (it updates or skips rather than re-creating), per its prompt.
 5. `task-lifecycle` ends with an `extract-task-knowledge` `:delegate` step that
    receives the same task `:input`, receives the implementation-review output as
-   context, and yields a final summary that preserves the lifecycle/review
-   outcome plus the extraction outcome.
+   the labeled `:implementation-review-yield` prompt-string field consumed via
+   `{{implementation_review_yield}}`, treats `{{original}}` as ambient
+   non-authorizing context, and yields a final summary that preserves the
+   lifecycle/review outcome plus the extraction outcome.
 6. The workflow definition and the `task-lifecycle` change have test coverage,
    the new workflow is documented, and CHANGELOG `[Unreleased]` records the new
    `/delegate extract-task-knowledge` workflow plus the changed `task-lifecycle`
@@ -196,7 +208,10 @@ Out of scope (candidate follow-on tasks):
   lifecycle-run task may still physically live under `munera/open/` when
   extraction runs. That path is explicitly authorized only for the trailing
   lifecycle invocation and only when the successful implementation-review
-  predecessor is present as context; standalone open-task extraction is skipped.
+  predecessor's yielded text is present in the labeled
+  `{{implementation_review_yield}}` prompt section. `{{original}}` /
+  `:workflow-original` is ambient and non-authorizing; standalone open-task
+  extraction is skipped.
 - **User-visible release notes.** Adding `/delegate extract-task-knowledge` and
   making extraction the final `task-lifecycle` yield are user-visible workflow
   behavior changes and require CHANGELOG `[Unreleased]` entries.

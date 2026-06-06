@@ -663,11 +663,14 @@ conventions; it does not request human approval.
 `task-lifecycle` now runs `extract-task-knowledge` as its final stage after
 `review-task-implementation`. That lifecycle-only trailing invocation may mine a
 still-open `munera/open/{NNN-slug}` task only when the immediately preceding
-implementation-review output supplied through workflow context contains
-`PASS_STATUS: REVIEW_COMPLETE`. The extraction summary preserves the prior
-implementation-review/lifecycle outcome alongside the extraction result, so the
-lifecycle's final reply still reports the review outcome as well as any captured
-knowledge.
+implementation-review yielded text is carried in the extraction delegate's
+labeled `:implementation-review-yield` prompt-string field, rendered to the
+markdown workflow as `{{implementation_review_yield}}`, and contains
+`PASS_STATUS: REVIEW_COMPLETE`. `{{original}}` / `:workflow-original` remains
+ambient reference context and does not authorize open-task extraction. The
+extraction summary preserves the prior implementation-review/lifecycle outcome
+alongside the extraction result, so the lifecycle's final reply still reports
+the review outcome as well as any captured knowledge.
 
 ## Incidental-complexity simplification
 
