@@ -88,6 +88,13 @@
 - [x] PA5: Pin the workflow-run snapshot capture boundary: compute the session-profile snapshot at the impure top-level invocation boundary and pass it into pure workflow-run creation, while delegated runs copy/derive from the parent run snapshot without config reads.
   - Done: plan pins snapshot computation to impure top-level invocation boundaries (`psi.workflow/create-run`, psi-tool `workflow create-run`) and stores supplied `:session-profile-snapshot` in pure `workflow-runtime.core/create-run`; delegated runs copy/derive from parent snapshots without config reads.
 
+## Plan/steps inconsistency review follow-ups
+
+- [ ] PI1: Extend the canonical workflow IR/runtime model schemas and validation tests to allow the PA1 delegate session-config path `[:delegate :session]` with `:session-profile`, `:model`, and `:thinking-level`; prove target compilation, normalization, and `validate-workflow-ir` preserve that path instead of rejecting or dropping it.
+- [ ] PI2: Carry PA2's explicit `:effort-override nil` concrete-clear semantics through all workflow boundaries, not only delegate projection: profile snapshots, `resolve-step-session-config`, nested `effective-config->snapshot`, child-session creation, and tests must distinguish key presence from nil value so a profile-derived nil can clear an inherited parent effort for session and delegated children.
+- [ ] PI3: Add command work/tests for PA3 token normalization: bare `planning` and EDN-style `:planning` select the same profile, raw bare `clear` performs the clear action, `:clear` fails as reserved/unavailable, and multi-token or EDN map/vector tokens are rejected without state changes.
+- [ ] PI4: Make the PA5 snapshot-capture boundary explicit in implementation steps/tests: both Pathom `psi.workflow/create-run` and psi-tool workflow create-run compute/pass `:session-profile-snapshot`, pure `workflow-runtime.core/create-run` only stores the supplied snapshot and never reads config, and delegate runtime passes a copied/derived child snapshot alongside narrow `:inherited-defaults`.
+
 ## Slice 7 — Verification and coherence
 
 - [ ] Run focused tests for profile domain/config resolution.
