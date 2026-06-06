@@ -9,18 +9,25 @@
     (or (some-> tui-focus* deref)
         (default-session-id-fn ctx))))
 
+(defn start-server-quietly
+  "Start an nREPL server on `port`, suppressing the server's startup chatter from
+  protocol stdout by routing it to stderr. Owns nREPL-start resolution and all
+  stdout-suppression Java interop; returns the server map."
+  [port]
+  (let [start-server       (requiring-resolve 'nrepl.server/start-server)
+        original-systemout System/out]
+    (try
+      (binding [*out* *err*]
+        (System/setOut (java.io.PrintStream. System/err true))
+        (start-server :port port))
+      (finally
+        (System/setOut original-systemout)))))
+
 (defn start-nrepl!
   [session-state-atom nrepl-runtime-atom default-session-id-fn port]
-  (let [start-server       (requiring-resolve 'nrepl.server/start-server)
-        original-systemout System/out
-        server             (try
-                             (binding [*out* *err*]
-                               (System/setOut (java.io.PrintStream. System/err true))
-                               (start-server :port port))
-                             (finally
-                               (System/setOut original-systemout)))
-        host               "localhost"
-        port-file          (java.io.File. ".nrepl-port")]
+  (let [server    (start-server-quietly port)
+        host      "localhost"
+        port-file (java.io.File. ".nrepl-port")]
     (reset! nrepl-runtime-atom {:host host
                                 :port (:port server)
                                 :endpoint (str host ":" (:port server))})
