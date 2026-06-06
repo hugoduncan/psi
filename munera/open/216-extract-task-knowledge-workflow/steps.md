@@ -55,3 +55,9 @@
 - [ ] Verify each acceptance criterion from `design.md` is represented by workflow prompt text, lifecycle wiring, tests, docs, or changelog.
 - [ ] Append implementation notes summarizing decisions, verification commands, and any non-blocking limitations.
 - [ ] Commit the completed implementation slices.
+
+## Plan/steps ambiguity review follow-ups
+
+- [ ] PA1: Resolve the task identifier shape across `task-lifecycle` callers before implementing the extraction prompt. The current plan says the extraction workflow treats `{{input}}` as an exact `NNN-slug` and the lifecycle step forwards the same original `:input`, but existing `task-lifecycle-in-worktree` passes a task path such as `munera/open/NNN-slug`. Specify whether extraction accepts/normalizes task paths or whether lifecycle callers must pass only slugs, then update prompt/tests accordingly.
+- [ ] PA2: Specify how the single-step markdown extraction workflow actually receives lifecycle/review context. Because `.md` workflows only see variables they reference, require an explicit `{{original}}`/declared context variable (or an equivalent named `:workflow-input` field) in `extract-task-knowledge.md`, and add a test locking that the compiled prompt contribution includes that context source.
+- [ ] PA3: Define the exact lifecycle success evidence that authorizes the open-task exception. The plan says open extraction is allowed when context shows the immediately preceding `review-task-implementation` completed successfully, but it does not say whether success is proven by delegate completion, a `PASS_STATUS: REVIEW_COMPLETE` line, a final-summary phrase, or a labeled prior-step context item. Pick one observable marker and lock it in the prompt/tests so standalone user-supplied text cannot accidentally authorize open-task extraction.
