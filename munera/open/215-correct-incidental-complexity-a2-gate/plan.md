@@ -28,12 +28,18 @@ Concrete edit targets (verified against the live tree):
 2. **Content-lock tests** —
    `components/workflow-loader/test/psi/workflow_loader/task_209_workflow_definitions_test.clj`,
    `reduce-incidental-complexity-test` (the "select-and-create prompt preserves … contracts"
-   block). Two assertions currently lock the net-sum A2 wording and **will break**:
-   - `"after total is strictly less than the before total"`
-   - `"the set is computed from the metric, not from the diff/touched files"`
+   block). **Three** assertions currently lock net-sum A2 wording and **will break**:
+   - `"after total is strictly less than the before total"` (line 299)
+   - `"the set is computed from the metric, not from the diff/touched files"` (line 301)
+   - `"identified by `(ns, var, arity, line)`"` (line 295) — emitted **only** by the net-sum
+     A2 bullet; broken by the line-insensitive `(ns, var, arity)` A2a/A2b replacement (PA1).
    Replace these with assertions that lock the new A2a/A2b wording (e.g. the `after(u) < B`
-   ceiling, `before-max`, the per-physical-row / line-insensitive-key phrasing). Leave the
-   A5/A3/blast-radius/baseline assertions intact.
+   ceiling, `before-max`, the per-physical-row / line-insensitive-key phrasing); for the
+   line-295 assertion, remove it or re-point it at the new line-insensitive `(ns, var, arity)`
+   A2 key (do **not** preserve the line-bearing phrase against the new A2). Leave the
+   A5/A3/blast-radius/baseline assertions intact — in particular the **adjacent A5** lock
+   `"keyed by `(ns, var, arity, line)`"` (line 294), which keeps its line-bearing key and must
+   be distinguished from the line-295 A2 lock.
 
 3. **Knowledge page** — `mementum/knowledge/gordian-net-sum-burden-gate-sub-additivity.md`
    (status `active`). Per acceptance 4:

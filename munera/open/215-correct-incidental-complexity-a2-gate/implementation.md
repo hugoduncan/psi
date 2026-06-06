@@ -312,3 +312,31 @@ interpretation by the executing emitter/test-edit agent). Did not re-review
   it with the leave-intact A5 line-294 `"keyed by …"` lock.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Plan/steps review follow-up — PA1 (ψ, executed)
+
+Executed the newly-added PA1 follow-up's plan/steps-documentation deliverable. PA1 was
+raised by a plan/steps **ambiguity** review; its resolvable scope is making `plan.md`
+and `steps.md` unambiguous and consistent about the third net-sum-bound content-lock
+assertion. The actual test-file edit it directs is slice-1 **implementation**, coupled to
+the not-yet-executed emitter A2 edit (which predates this review pass) — not executed here.
+
+- **plan.md corrected (done).** Slice-1 target 2 "**Two** assertions … will break" →
+  **three**: added the line-295 lock `"identified by `(ns, var, arity, line)`"` (emitted
+  only by the net-sum A2 bullet; broken by the line-insensitive A2a/A2b replacement),
+  directed its disposition (remove or re-point to the line-insensitive `(ns, var, arity)`
+  key; do not preserve the line-bearing phrase), and explicitly contrasted it with the
+  **leave-intact A5** line-294 lock `"keyed by `(ns, var, arity, line)`"`. plan.md and
+  steps.md now agree on the count, the named assertions, and the disposition — ambiguity
+  resolved.
+- **Verified line references** against the live test file
+  (`task_209_workflow_definitions_test.clj`, `reduce-incidental-complexity-test`):
+  line 294 A5 `"keyed by …"` (intact), line 295 A2 `"identified by …"` (PA1 target),
+  line 299 / line 301 the two net-sum locks. Confirmed accurate.
+
+- **Test-edit portion deferred (PA1 step left unchecked).** Removing/re-pointing the
+  line-295 assertion belongs to the slice-1 emitter+content-lock implementation edit,
+  which predates this review pass and is not yet executed; doing it in isolation now would
+  either drop coverage prematurely (emitter still emits the net-sum text) or re-point at a
+  not-yet-emitted string. The disposition is now unambiguously recorded in plan.md and
+  steps.md for that slice-1 execution. PA1 step therefore left unchecked.
