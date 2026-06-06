@@ -128,3 +128,25 @@
       (`change_chain` doc-sync; the task Scope omitted this file). Verify no other `doc/`
       or `README.md` sentence restates the net-sum form (the two CHANGELOG entries describe
       the workflow generally and are unaffected).
+
+## Test review follow-ups (ψ, task-test-review)
+
+- [ ] **TR-T1:** Add a regression guard for the defining "no sum" invariant in
+      `reduce-incidental-complexity-test` ("select-and-create prompt preserves … contracts").
+      The three removed net-sum locks left no guard against re-introducing a sum into A2.
+      Add a positive `(is (.contains select-text "never a sum"))` (and/or
+      `"must NOT sum normalized per-unit burdens"`) lock, and/or a negative
+      `(is (not (.contains select-text "sum after < sum before")))` /
+      `(is (not (.contains select-text "after total is strictly less than the before total")))`
+      assertion, so a future edit cannot silently restore the sub-additive net-sum gate.
+- [ ] **TR-T2:** Lock the A2a/A2b branch structure + the exemption clause. Add
+      content-locks for `"A2a (new pieces are genuine"`, `"A2b (no collateral ceiling breach"`,
+      and the exemption `"before-max(k) >= B"` / `"EXEMPT"` wording, so a drift dropping the
+      `>= B` exemption branch (which keeps the gate satisfiable / well-posed) is caught.
+- [ ] **TR-T3:** Lock the line-bearing single-row target exclusion (shared-key hole
+      closure). Add content-locks for `"remove ONLY the target's own physical row"`,
+      `"never the whole"` (the `(ns, var, arity)` group), and `"siblings STAY in"`, so a
+      regression to whole-key-group exclusion (the documented relocation hole) cannot pass
+      the suite. After adding TR-T1..TR-T3 locks, re-run the workflow-loader suite
+      (`reduce-incidental-complexity-test` + `task-209-workflow-set-loads-together-test`)
+      and `clj-kondo --lint` the test file to confirm green + clean.

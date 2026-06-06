@@ -674,3 +674,61 @@ No new actionable implementation issue found; all prior review follow-ups
 (RI1/RI2/RI3, PA1, PI1–PI3) and the four design-review aspects are resolved.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Test review — content-lock coverage (ψ, task-test-review)
+
+Applied `task-test-review` (well-formed ∧ ∀behaviour∈design ∃covering-test ∧ infra-deps
+nullable/¬mock) to the task's test net — the `reduce-incidental-complexity-test`
+content-lock block in `task_209_workflow_definitions_test.clj` ("select-and-create prompt
+preserves … contracts", lines 275–307). The tests are well-formed (pure `load-edn-only` +
+string `.contains` over `select-text`) and have no infra deps (no mocks/stubs/nullables
+needed — the only dependency is the loaded EDN). Prior passes were all design/plan/
+implementation reviews; none reviewed the **test net's coverage** of the design's A2
+behaviours. The six landed A2 locks (title, `line-insensitive key k = (ns, var, arity)`,
+`physical after-row u`, `before-max(k)`, `after(u) < B`, `NOT a recomputed after(target)`)
+cover the central form, but three **soundness-load-bearing** behaviours the design/review
+loop hard-won are emitted (verified, each appears exactly once in the emitter) yet have
+**no content-lock** — a careless future edit to the large single A2 `:text` span could
+drop any of them and the suite stays green. Found three new actionable coverage gaps;
+none duplicates a prior note (all prior notes concern design/plan/impl correctness, not
+test coverage).
+
+- **TR-T1 — the defining "no sum" invariant has no regression guard.** This task exists to
+  eliminate the sub-additive **net-sum** gate. The three old content-locks that asserted
+  the net-sum wording were correctly *removed*, but nothing replaced their
+  regression-prevention role: there is **no** positive lock on the emitter's `never a sum`
+  / `must NOT sum normalized per-unit burdens` wording (the redesign's defining property),
+  and **no** negative assertion that the net-sum phrasings (`"sum after < sum before"`,
+  `"after total is strictly less than the before total"`) are *absent*. A future edit could
+  reintroduce a sum into the A2 procedure — the exact defect the task fixes — with the
+  suite green. Actionable: add a lock on the `never a sum` / `must NOT sum normalized
+  per-unit burdens` wording, and/or a negative `(is (not (.contains select-text "sum after
+  < sum before")))`-style assertion, so the no-sum invariant is regression-protected.
+
+- **TR-T2 — A2a/A2b branch structure + the exemption clause are uncovered.** The locks
+  assert `before-max(k)` and `after(u) < B` generically but not the load-bearing branch
+  structure that makes the gate *well-posed and satisfiable*: A2a's new-key condition
+  (`A2a (new pieces are genuine`, `before-max(k) = 0`), A2b's body
+  (`A2b (no collateral ceiling breach`), and — critically — the **exemption** clause
+  (`before-max(k) >= B` … `is EXEMPT`). The exemption is what prevents the gate from
+  rejecting an already-oversized sibling (re-introducing an over-strict / potentially
+  unsatisfiable ceiling). A drift dropping `EXEMPT` / the `>= B` branch would stay green.
+  Actionable: lock the `A2a (new pieces are genuine`, `A2b (no collateral ceiling breach`,
+  and `before-max(k) >= B` / `EXEMPT` wording.
+
+- **TR-T3 — line-bearing single-row target exclusion (the shared-key hole closure) is
+  uncovered.** The RI1-reconciled, soundness-critical exclusion — `remove ONLY the
+  target's own physical row` (line-bearing, `never the whole (ns, var, arity) group`) and
+  `siblings STAY in` `T` — has no content-lock. This is the property that closes the
+  shared-key (51-row defmethod) relocation hole; a regression to whole-key-group exclusion
+  (the documented hole) would pass the suite. Actionable: lock the `remove ONLY the
+  target's own physical row`, `never the whole`, and `siblings STAY in` wording.
+
+Note (not actionable): acceptance 5's *semantic* claim (the gate is satisfiable by a
+genuine extraction / rejects relocation) is not unit-testable — A2 is a spelled-out
+agent-run procedure, not executable code, which the design explicitly accepts as
+out-of-scope to automate. Content-locks are the appropriate test net here; the gaps above
+are about *which* emitted clauses that net protects, not about replacing it with an
+executable check.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK
