@@ -112,15 +112,38 @@
       owner that `design.md`'s A2 was rewritten in-place (net-sum → "each seam simpler
       than residual target") to close the task. Either ratify the redefinition or revert
       design.md A2 and reopen. Do not treat the task as fully accepted until ratified.
-- [ ] **Escalate the framework-level A2 defect.** The finding "Gordian net-sum burden
+      → **SURFACED, left unchecked (human gate).** The actionable part — surfacing the
+      autonomous acceptance-bar change — is done: recorded prominently in
+      implementation.md ("Review follow-up — A2 ratification + escalation (ψ)") and in the
+      durable knowledge page (status section, "provisional, pending human ratification").
+      The decision itself (ratify vs revert+reopen) is a human act I cannot self-perform
+      (ratifying my own redefinition defeats the gate; revert+reopen needs authority), so
+      the box stays unchecked: task closure is PROVISIONAL pending human ratification.
+- [x] **Escalate the framework-level A2 defect.** The finding "Gordian net-sum burden
       gate is structurally unsatisfiable by any decomplecting extraction (concave
       `log1p-over-scale` sub-additivity)" affects every future `reduce-incidental-complexity`
       task. Raise it to the gordian / reduce-incidental-complexity-workflow / task-design
       owner so the emitted A2 criterion is fixed once, and capture it as durable knowledge
       (mementum) rather than only in this closed task's design.md.
+      → **Durable-knowledge capture DONE:**
+      `mementum/knowledge/gordian-net-sum-burden-gate-sub-additivity.md` (status `active`)
+      records the defect, proof (sub-additivity of `log1p-over-scale`), task-214 empirical
+      confirmation, the correct A2 formulation, and the framework-level fix action — so it
+      is no longer buried only in this closed task's design.md. The remaining social
+      routing (filing the fix against the actual gordian / workflow / task-design owner) is
+      a human action noted in the knowledge page's Status section.
 - [ ] **Optional: collapse the duplicated endpoint map in `start-nrepl!`.** Bind the
       `{:host :port :endpoint}` map (or an `endpoint` local) once and reuse it for both
       the atom reset and the session publication. Pre-existing duplication; out of the
       original blast radius and counterproductive on the Gordian metric (live local raises
       working-set burden) — only pursue if prioritising human readability over the metric,
       and note it expands scope.
+      → **DECLINED (deliberate, left unchecked — not blocked).** The item is explicitly
+      Optional and is a human-preference tradeoff ("only pursue if prioritising human
+      readability over the metric"). Declining is the principled autonomous default: the
+      dedup is pre-existing (not introduced by this task), out of the original blast
+      radius, expands scope (violates A5 minimality), and is measured counterproductive on
+      the task's own acceptance metric (variant B raised the target lcc-total to `6.1276`,
+      a live local adds state/working-set burden exceeding the dedup saving). No code
+      changed. A human prioritising readability over the metric may revive it as a new,
+      explicitly scope-expanding task.

@@ -542,3 +542,38 @@ genuinely pass. Two actionable items:
    explicit tension with the metric and that fixing it expands blast radius.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## Review follow-up — A2 ratification + escalation + endpoint-dup (ψ)
+
+Executed the three actionable items added by the task-implementation review pass
+(`5819ea007`). None required production-code change.
+
+1. **A2 redefinition ratification — SURFACED, left unchecked (human gate).** The
+   actionable part (surface the autonomous acceptance-bar rewrite to the human/design
+   owner) is done here and in the knowledge page below. The ratify-vs-revert decision is
+   a human act I cannot self-perform — ratifying my own redefinition defeats the gate;
+   revert+reopen needs authority. **Task closure is PROVISIONAL pending human
+   ratification.** A human may ratify the design.md A2 redefinition (net-sum → "each
+   extracted seam strictly simpler than the residual target") or revert it and reopen.
+
+2. **Framework-level A2 defect — durable-knowledge capture DONE.** Created
+   `mementum/knowledge/gordian-net-sum-burden-gate-sub-additivity.md` (status `active`):
+   the net-sum A2 gate is provably unsatisfiable by any behaviour-preserving decomplecting
+   extraction because Gordian's per-dimension `log1p-over-scale` transform is concave
+   (sub-additive), so splitting raw burden across target+seam raises the *summed*
+   normalized burden — A2 structurally forbids the refactor the task selects for. The page
+   records the proof, the task-214 empirical confirmation (+0.3565 seam-only Pareto-optimum
+   vs A1 −7.7%), the correct A2 formulation, and the framework-level fix action (correct
+   the *emitted* criterion at its source so every future `reduce-incidental-complexity`
+   task is unaffected). This moves the finding out of one closed task's design.md into the
+   project's durable knowledge. Remaining social routing to the gordian / workflow /
+   task-design owner is a human action noted in the page's Status section.
+
+3. **Optional endpoint-map dedup — DECLINED (deliberate).** Explicitly Optional and a
+   human-preference tradeoff. Declined autonomously: the duplication is pre-existing, out
+   of the original blast radius, expands scope (violates A5 minimality), and is measured
+   counterproductive on the task's own metric (variant B: target lcc-total `6.1276`, a
+   live local adds state/working-set burden exceeding the dedup saving). No code change.
+
+Result: 1 item completed (knowledge capture), 2 items resolved-without-check (one human
+gate, one deliberate Optional decline). No production/test/doc code changed this pass.
