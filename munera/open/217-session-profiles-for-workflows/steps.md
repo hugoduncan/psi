@@ -74,6 +74,15 @@
 - [ ] Document `/session-profiles`, `/session-profile`, `/session-profile <name>`, and `/session-profile clear` command behavior.
 - [ ] Add a `CHANGELOG.md` `[Unreleased]` entry for the new session profile config, slash commands, workflow key, and deterministic snapshot behavior.
 
+
+## Plan/steps ambiguity review follow-ups
+
+- [ ] PA1: Pin the exact canonical IR path for delegate-step session-profile config (for example `[:delegate :session]` or another named path), and name the loader/compiler/runtime consumers that must read that path instead of the current session-step-only `:session` lookup.
+- [ ] PA2: Decide whether a profile containing `:effort-override nil` is a valid concrete effort-clear setting or is treated as no concrete setting; align validation, snapshots, live application, delegate projection, and tests with that presence-vs-value decision.
+- [ ] PA3: Specify `/session-profile <profile-name>` token normalization: whether users type `planning`, `:planning`, or both; how the token becomes the keyword profile name; and how this interacts with the reserved `clear` action.
+- [ ] PA4: Specify live profile application's final thinking-level semantics when a profile supplies both model and thinking-level, including ordering/clamping for non-reasoning models, so the atomic mutation and journal entries cannot diverge.
+- [ ] PA5: Pin the workflow-run snapshot capture boundary: compute the session-profile snapshot at the impure top-level invocation boundary and pass it into pure workflow-run creation, while delegated runs copy/derive from the parent run snapshot without config reads.
+
 ## Slice 7 — Verification and coherence
 
 - [ ] Run focused tests for profile domain/config resolution.
