@@ -279,3 +279,36 @@ pass and were left untouched per scope.
 No blockers. Both follow-ups completed; `design-steps.md` inconsistency items ticked. The
 two open ambiguity items remain (non-unique-key join semantics, phantom skill) — predate
 this pass, out of scope.
+
+## Plan/steps review — ambiguities (ψ)
+
+Reviewed `plan.md` and `steps.md` for ambiguity only (statements admitting >1
+interpretation by the executing emitter/test-edit agent). Did not re-review
+`design.md`. Found one new actionable ambiguity, verified against the live tree.
+
+- **Content-lock assertion enumeration undercounts — third A2-bound assertion
+  unclassified (PA1).** `plan.md` (slice-1 target 2) asserts "**Two** assertions
+  currently lock the net-sum A2 wording and **will break**" — naming only
+  `"after total is strictly less than the before total"` (test line 299) and
+  `"the set is computed from the metric, not from the diff/touched files"` (line
+  301) — and directs "Leave the A5/A3/blast-radius/baseline assertions intact";
+  `steps.md` slice-1 likewise only removes "the two net-sum content-lock
+  assertions". But a **third** assertion in the same `reduce-incidental-complexity-test`
+  "select-and-create prompt preserves … contracts" block,
+  `(is (.contains select-text "identified by `(ns, var, arity, line)`"))` (line
+  295), locks text emitted **only** by the net-sum A2 bullet ("…the after total is
+  strictly less than the before total, with each unit `u` **identified by
+  `(ns, var, arity, line)`** … then `sum after < sum before`"). Replacing that
+  bullet with the line-insensitive `(ns, var, arity)` A2a/A2b removes the substring,
+  so line 295 also breaks. It is neither one of the named "two" nor an
+  A5/A3/blast-radius/baseline assertion, so its disposition is undefined: the agent
+  cannot tell whether to remove it, re-point it at the new line-insensitive key, or
+  (wrongly) preserve the line-bearing phrase against the new A2. It must be
+  distinguished from the adjacent **A5** assertion at line 294,
+  `"keyed by `(ns, var, arity, line)`"`, which is genuinely "leave intact" (A5 keeps
+  its line-bearing key). Actionable: name the third (line-295) assertion in plan/steps,
+  correct the "two assertions" count to three, and direct its disposition (remove or
+  re-point to the line-insensitive `(ns, var, arity)` A2 key), explicitly contrasting
+  it with the leave-intact A5 line-294 `"keyed by …"` lock.
+
+PASS_STATUS: ACTIONABLE_FEEDBACK

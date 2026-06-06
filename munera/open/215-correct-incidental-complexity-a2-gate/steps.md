@@ -33,6 +33,15 @@
       `task-209-workflow-set-loads-together-test`); confirm `load-edn-only` succeeds and all
       content-lock assertions are green.
 - [ ] `clj-kondo --lint` the touched test file; fix any findings.
+- [ ] **PA1 (plan/steps ambiguity):** handle the *third* net-sum-bound content-lock
+      assertion the plan's "two assertions" count omits. In
+      `reduce-incidental-complexity-test` the line-295 assertion
+      `(is (.contains select-text "identified by `(ns, var, arity, line)`"))` locks text
+      emitted **only** by the net-sum A2 bullet and will also break on the A2 replacement.
+      Remove it or re-point it at the new line-insensitive `(ns, var, arity)` A2 key; do
+      **not** preserve the line-bearing phrase against the new A2. Explicitly leave the
+      adjacent **A5** line-294 lock `"keyed by `(ns, var, arity, line)`"` intact (A5 keeps
+      its line-bearing key). Correct the plan's "Two assertions … will break" to three.
 - [ ] Commit: `⊨ reduce-incidental-complexity: replace net-sum A2 with per-unit A2a/A2b gate`.
 
 ## Slice 2 — Skill alignment confirmation (acceptance 3)
