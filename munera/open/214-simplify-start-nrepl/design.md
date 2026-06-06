@@ -142,21 +142,39 @@ working set.
 All Gordian commands below run from the **worktree root** (cwd); baseline paths are
 worktree-root-relative to this task directory so they resolve from there.
 
+**Unit-identity convention for A1/A2 (line-drift resolution).** The extraction adds
+a helper to `nrepl_runtime.clj`, which shifts the `line` of `start-nrepl!` (12) and
+`stop-nrepl!` (40) between `before-local.json` and the after-`local` run. To keep
+A1's lookup and A2's set membership well defined under that drift, units are matched
+by the **line-insensitive key `(ns, var, arity)`** for all A1/A2 comparisons; the
+`line` field is ignored for identity (it remains only as the human-readable selector
+label `(..., 4, 12)`). If two units in one run collide on `(ns, var, arity)` (e.g.
+two same-arity defs), fall back to including `line` to disambiguate that pair only;
+no such collision exists for the target.
+
+**Baseline-absent units (`before(u)` default).** A unit present in the after-`local`
+run but absent from `before-local.json` — i.e. a newly-created helper such as the
+extracted stdout-suppression seam — is assigned `before(u) := 0`. Consequently any
+new helper with `after(u) > 0` satisfies `before(u) != after(u)`, enters `T`, and
+its after-burden counts in `sum_after`, so the net-burden check (A2) honestly
+charges the refactor for burden moved into new seams.
+
 - **A1 — burden reduction (named comparison source).** Re-run
   `bb gordian local --json` from the worktree root and compare against the stored
   `munera/open/214-simplify-start-nrepl/before-local.json` captured in this task —
   that file is the single authoritative baseline for every "decreased" check (not
   the selector's emitted evidence, not a fresh pre-refactor recompute). The target
-  unit's `lcc-total`, keyed by `(ns, var, arity, line)` =
-  `(psi.app-runtime.nrepl-runtime, start-nrepl!, 4, 12)`, **decreased** versus its
-  `before-local.json` value of `6.015383232244966`.
+  unit's `lcc-total`, matched by the line-insensitive key `(ns, var, arity)` =
+  `(psi.app-runtime.nrepl-runtime, start-nrepl!, 4)` (selector label line `12`),
+  **decreased** versus its `before-local.json` value of `6.015383232244966`.
 
 - **A2 — net burden over touched units.** "Touched units" = every unit whose
   recomputed `lcc-total` changed between `before-local.json` and the after-`local`
   run — the set is computed from the metric, not from the diff/touched files (it
   deliberately includes callers whose dependency/working-set burden shifts even
   though their source was not edited, because `local` is recomputed globally). With
-  each unit `u` identified by `(ns, var, arity, line)`:
+  each unit `u` identified by the line-insensitive key `(ns, var, arity)` and
+  baseline-absent units taking `before(u) := 0` (per the conventions above):
   `T = {u | before(u) != after(u)}`, then `sum_{u in T} after(u) < sum_{u in T} before(u)`.
 
 - **A3 — architectural no-regression (enforcing gate).** Run:

@@ -51,3 +51,20 @@ actionable ambiguities, both in the A1/A2 acceptance unit-identity semantics:
 Non-issue checked: tests are excluded from the `local` scope
 (`before-local.json` `include-tests: false`), so Phase-0 characterization tests do
 not enter `T` — no ambiguity there.
+
+## Design review follow-up — ambiguity resolutions (ψ)
+
+Executed both unchecked design-steps added by review pass `c7f7bd4d6`. Resolved in
+`design.md`'s "Objective acceptance criteria" preamble (two new convention blocks):
+
+1. **Line-drift unit identity.** A1/A2 now match units by the line-insensitive key
+   `(ns, var, arity)`; `line` is demoted to a human-readable selector label only.
+   This makes A1's target lookup and A2's `T` membership well defined when the
+   helper extraction shifts `start-nrepl!`/`stop-nrepl!` line numbers. A collision
+   fallback (re-include `line`) is documented but unused for the target.
+2. **Baseline-absent `before(u)`.** New helper units absent from
+   `before-local.json` take `before(u) := 0`, so any extracted seam with positive
+   burden enters `T` and is charged in `sum_after` — net-burden check (A2) stays
+   honest.
+
+No code touched; design-only refinement. Both design-steps marked done.
