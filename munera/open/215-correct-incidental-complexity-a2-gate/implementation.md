@@ -1128,3 +1128,32 @@ would touch assertions this task did not introduce — out of scope for a test-s
 this task's changes. Test net judged well-shaped; no follow-up steps added.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+## Docs review (ψ, review-task-docs)
+
+Applied `review-task-docs` (README ∧ doc/ ∧ CHANGELOG → accuracy ∧ completeness ∧
+consistency) to the landed user-facing docs. RI2 (`doc/workflows.md`) and RI3
+(`CHANGELOG.md`) — the two doc-sync gaps — were raised and closed by earlier
+implementation-review passes; this is the dedicated docs-review confirmation.
+
+- **doc/workflows.md** (Phase-1 acceptance paragraph, ~line 707): describes the landed
+  per-unit A2 relocation guard (`after(u) < B`, `B := before(target)` read from
+  `before-local.json`, "never merely relocated into a new seam or a sibling"), correctly
+  attributes target reduction to the A5 check, and the A3 gate command
+  (`gordian gate --baseline … --fail-on new-cycles,new-high-findings
+  --max-new-medium-findings 0`) matches the emitter verbatim. Accurate to the landed
+  emitter; no net-sum residue.
+- **CHANGELOG.md** `[Unreleased] → Changed`: accurate entry recording the gate correction
+  (net-sum → per-unit `after(u) < B`, A5 governs target reduction), adjacent to the prior
+  task-212 workflow entry, keep-a-changelog format. The `sum after < sum before` / "net-sum
+  gate" mentions are deliberate historical narration of what the fix replaced — not stale
+  claims of current behaviour.
+- **README.md** and the rest of **doc/**: grep for `net burden | net-sum | sum after |
+  touched set | strictly decrease` is empty; `incidental-complexity` appears only in
+  `doc/workflows.md`. README does not enumerate this workflow at criterion granularity
+  (correct — top-level scope); no coverage gap.
+
+Removed-behaviour cleanup, changelog, examples, and naming/flag/path consistency all pass.
+No new actionable docs issue.
+
+PASS_STATUS: REVIEW_COMPLETE
