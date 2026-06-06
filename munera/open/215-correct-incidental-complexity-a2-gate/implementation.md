@@ -412,3 +412,76 @@ and steps.md (slice-1 primary step + PA1 + PI section); the PA1 step no longer c
 dangling reference to a removed "two assertions" plan phrase.
 
 PASS_STATUS: FOLLOW_UPS_COMPLETE
+
+---
+
+## Implementation executed — slices 1–4 (2026-06-06)
+
+All four slices landed. Two commits (emitter+tests; knowledge page) plus this
+artifact sync.
+
+### Slice 1 — emitter A2 correction + content-lock tests (acceptance 1, 2)
+- Replaced **only** the step-6 "Net burden (A2 — \"touched units\" defined)" bullet in
+  `.psi/workflows/reduce-incidental-complexity.edn` (`select-and-create` step) with the
+  per-unit **A2a/A2b** relocation-guard gate: pure inequalities `after(u) < B`,
+  `B := before(target)` from the committed `before-local.json` (explicitly NOT a recomputed
+  `after(target)`), no `θ`/`ε`. Inlined the full deterministic mechanical-check procedure
+  (line-insensitive `(ns, var, arity)` grouping, `before-max(k)`, physical-row `after(u)`,
+  order-insensitive multiset change filter for `T`, line-bearing single-row target
+  exclusion, per-row A2a/A2b assertions). A5/A3/Phase-0/blast-radius/minimality criteria and
+  the non-sequential numbering (A5, A2, A3) left unchanged.
+- **No `clj-paren-repair` needed** — the edit replaced a contiguous span inside the EDN
+  `:text` string; `bb edn/read-string` round-trips (31765-char value), so delimiters are
+  intact. (Deviation from steps' literal "run clj-paren-repair": substituted an
+  `edn/read-string` load check, which is the actual EDN-well-formedness gate the plan's risk
+  bullet calls for.)
+- Content-lock tests (`task_209_workflow_definitions_test.clj`,
+  `reduce-incidental-complexity-test`): removed all **three** net-sum-coupled assertions
+  (lines 299/301 literal net-sum strings + line-295 `identified by `(ns, var, arity, line)``)
+  and added six new locks for the A2a/A2b wording. Verified each new lock substring is
+  present and each removed substring is absent in the loaded `select-text`. A5 line-294
+  `keyed by `(ns, var, arity, line)`` left intact.
+- Verification: workflow-loader suite run from repo root via an ad-hoc absolute classpath
+  (`-Spath` from the component, then `-Scp` from root so the test's cwd-relative
+  `.psi/workflows/` reads resolve) — **3 tests, 196 assertions, 0 fail, 0 error**.
+  clj-kondo clean.
+  - Note: the full kaocha `--focus` run fails to LOAD unrelated namespaces
+    (`psi.agent_session.tool_execution_test` → missing `psi/metrics/extension` on
+    classpath) — a pre-existing environmental classpath issue, not caused by this change;
+    isolated the affected suite instead.
+
+### Slice 2 — skill alignment (acceptance 3)
+- `grep -rn` over `.psi/skills/` for net-sum / A2 / touched-units restatement: **empty**.
+  Confirmed absent; no edit. (Matches the design's "phantom skill" resolution — only the
+  workflow emits the criterion, and it is the primary edit target.)
+
+### Slice 3 — knowledge-page reconciliation (acceptance 4)
+- `mementum/knowledge/gordian-net-sum-burden-gate-sub-additivity.md`: recorded the fix
+  **LANDED (task 215)** in "Action for future sessions" item 1 + "Status / ratification";
+  struck the proposed residual `after(s) < after(target)` anchor as **SUPERSEDED** by the
+  committed-baseline ceiling `after(u) < B` (one-line rationale: residual is a contestable
+  recompute, `B` is an immutable published anchor); corrected the **A1 → A5** target-reduction
+  label in "The genuine intent" (twice) and the empirical-confirmation line. Empirical PASS
+  figure re-anchored `0.8220 < B ≈ 6.0154` (was `< target after 5.5499`).
+
+### Slice 4 — dry read-through (acceptance 5)
+- **Satisfiable by genuine extraction:** task-214 Pareto seam `start-server-quietly` has
+  lcc `0.8220 < B ≈ 6.0154` → A2a PASS. A genuine decomplecting split of a burden-`B`
+  tangle into pieces each `< B` always satisfies A2a (the sub-additivity defect is gone:
+  no sum).
+- **Rejects relocated/inverted extraction:** a new seam whose `after(u) >= B` fails A2a;
+  pushing the tangle into an existing below-ceiling sibling so its `after(u) >= B` fails
+  A2b; a sibling already `>= B` is exempt but a genuine architectural worsening there is
+  caught by A3, and the target's required improvement is A5's. The guard has no hole for
+  the shared-key (51-row defmethod) case: siblings stay in `T` and are policed per-row.
+
+### Acceptance status
+1. ✅ Emitter no longer emits net-sum A2; emits per-unit A2a/A2b; EDN loads.
+2. ✅ A5/A3/Phase-0/blast-radius/minimality unchanged; numbering preserved; A2 no longer
+   governs the target unit.
+3. ✅ Skill restatement confirmed absent.
+4. ✅ Knowledge page reconciled (fix-landed + `after(target)` superseded + A1→A5).
+5. ✅ Dry read-through shows satisfiable-by-genuine / rejects-relocation.
+
+Residual out-of-scope follow-up: a dedicated `bb gordian` A2 join-and-compare subcommand
+(today the emitter spells out an agent-run deterministic procedure).
