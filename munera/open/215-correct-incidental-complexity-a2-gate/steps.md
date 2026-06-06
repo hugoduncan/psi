@@ -95,7 +95,7 @@
 
 ## Implementation review follow-ups (ψ)
 
-- [ ] **RI1:** Reconcile the `B` identification key between `design.md` and the landed
+- [x] **RI1:** Reconcile the `B` identification key between `design.md` and the landed
       emitter. design.md "How A2 is mechanically checked" **step 1** (design.md:145–147)
       keys `B := before(target)` by the **line-insensitive** `(ns, var, arity)`, but the
       emitter (`.psi/workflows/reduce-incidental-complexity.edn`, A2 step 1) locates `B` by

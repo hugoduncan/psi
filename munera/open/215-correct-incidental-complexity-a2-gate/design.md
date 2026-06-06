@@ -143,8 +143,13 @@ A2a/A2b are **concrete deterministic numeric comparisons over two committed/reco
 JSON artifacts** — not agent judgement. The procedure (run from the worktree root):
 
 1. `B := before(target)` — the target's `lcc-total` in
-   `munera/open/NNN-slug/before-local.json`, keyed by the line-insensitive
-   `(ns, var, arity)` (A2's chosen identity — see note below).
+   `munera/open/NNN-slug/before-local.json`, located by its **line-bearing**
+   `(ns, var, arity, line)` identity (the same row **A5** governs). `B` must name exactly
+   one physical row, so its own lookup is line-bearing: the line-insensitive
+   `(ns, var, arity)` is ambiguous whenever the target shares its key with siblings (the
+   51-row `execute-effect!` defmethod case). This is only `B`'s lookup key; the
+   line-insensitive `(ns, var, arity)` grouping for `before-max(k)` and `T` (step 3)
+   is unchanged.
 2. Recompute after burdens: `bb gordian local --json` (bare, no `--sort`).
 3. **Group both JSONs by the line-insensitive key `k = (ns, var, arity)`.** A2's
    *atomic unit* is the **physical defunit row** (one source occurrence — its own

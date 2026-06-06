@@ -514,3 +514,16 @@ One actionable coherence violation (design ↔ landed artifact disagree):
   and stays — only `B`'s own lookup key is at issue.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## RI1 resolved (review follow-up)
+
+Reconciled design.md step 1 to the landed emitter. `B := before(target)` is now located by
+its **line-bearing** `(ns, var, arity, line)` identity (the row A5 governs), with a one-line
+rationale: `B` must name exactly one physical row, and the line-insensitive
+`(ns, var, arity)` is ambiguous for the 51-row `execute-effect!` defmethod case. Removed the
+misleading "A2's chosen identity — see note below" parenthetical, which conflated `B`'s
+lookup with the line-insensitive *join/grouping* key. The line-insensitive grouping for
+`before-max(k)`/`T` (step 3) and its dedicated note (design.md ~line 194) are unchanged and
+now explicitly distinguished from `B`'s lookup. design.md ↔ emitter coherence restored.
+Design-only change; no code/test/emitter edit (emitter was already correct — it was the
+authoritative form RI1 reconciled toward).
