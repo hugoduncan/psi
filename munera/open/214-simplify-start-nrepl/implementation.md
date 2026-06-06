@@ -23,3 +23,31 @@ Verdict: **fits**. No new actionable architectural-misfit found.
   --max-new-medium-findings 0`) embeds architectural no-regression into acceptance.
 - Phase 0 test net honors `testing-without-mocks` (assert state/outputs; prefer
   real seams over `with-redefs`/`binding`).
+
+## Design review — ambiguity (ψ)
+
+Reviewed `design.md` for ambiguities (not architecture/inconsistency). Two
+actionable ambiguities, both in the A1/A2 acceptance unit-identity semantics:
+
+1. **Line in the unit key vs. line drift.** A1 pins the target by
+   `(ns, var, arity, line) = (..., 4, 12)`, and A2 defines the touched set
+   `T = {u | before(u) != after(u)}` keyed the same way. But the intended
+   refactor adds a helper in `nrepl_runtime.clj`, which shifts the `line` of
+   `start-nrepl!` (12) and `stop-nrepl!` (40) (confirmed against
+   `before-local.json`). With `line` in the key, the same unit appears as a
+   removed+added pair across before/after, so neither A1's exact-key lookup nor
+   A2's set membership is well defined under line drift. Unspecified: match by
+   `(ns, var, arity)` ignoring `line`, pin `start-nrepl!` to line 12, or define a
+   line-matching rule.
+
+2. **`before(u)` for newly-created helper units.** Decomplecting moves burden
+   into a new named seam (e.g. `start-server-quietly`), a source unit absent from
+   `before-local.json`. A2's `before(u) != after(u)` and the `sum_before` term are
+   undefined for a unit with no baseline entry. Whether/how the new helper's
+   after-burden counts toward `sum_after` (and thus whether net burden is honestly
+   captured) is unstated. Unspecified: treat absent `before(u)` as `0` so new
+   helpers count in `sum_after`.
+
+Non-issue checked: tests are excluded from the `local` scope
+(`before-local.json` `include-tests: false`), so Phase-0 characterization tests do
+not enter `T` — no ambiguity there.
