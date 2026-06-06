@@ -44,13 +44,13 @@ Coverage hint: sibling test namespace exists at `components/app-runtime/test/psi
 
 ## Baselines
 
-The task directory is `munera/open/211-simplify-start-tui-runtime`.
+The task directory is `munera/closed/213-simplify-start-tui-runtime`.
 
 Authoritative baselines captured from the current worktree root before any refactor:
 
-- Local comprehension burden baseline: `munera/open/211-simplify-start-tui-runtime/before-local.json`
+- Local comprehension burden baseline: `munera/closed/213-simplify-start-tui-runtime/before-local.json`
   - Captured with: `bb gordian local --json`
-- Architectural diagnose baseline: `munera/open/211-simplify-start-tui-runtime/before-diagnose.edn`
+- Architectural diagnose baseline: `munera/closed/213-simplify-start-tui-runtime/before-diagnose.edn`
   - Captured with: `bb gordian diagnose --edn`
 
 Phase 1 commands must reference these worktree-root-relative paths, not bare filenames, because `gordian gate` and `gordian local` run from the worktree root.
@@ -122,7 +122,7 @@ Re-run from the worktree root:
 bb gordian local --json > /tmp/after-local.json
 ```
 
-Compare `/tmp/after-local.json` against the stored authoritative baseline `munera/open/211-simplify-start-tui-runtime/before-local.json`.
+Compare `/tmp/after-local.json` against the stored authoritative baseline `munera/closed/213-simplify-start-tui-runtime/before-local.json`.
 
 The selector's full metric key is `(ns, var, arity, line)`. For before/after comparison, reconcile rows as follows so harmless line movement during a refactor does not create an artificial delete/add pair:
 
@@ -146,14 +146,14 @@ Acceptance: summing `lcc-total` over this metric-derived touched set, the after 
 Run from the worktree root:
 
 ```sh
-bb gordian gate --baseline munera/open/211-simplify-start-tui-runtime/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0
+bb gordian gate --baseline munera/closed/213-simplify-start-tui-runtime/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0
 ```
 
 The command must pass with exit code `0`. The `--fail-on` flag is required; bare `gate --baseline` only evaluates checks and does not enforce this acceptance.
 
 ### A4 — target unit burden decreases
 
-Using the same after `bb gordian local --json` run and the same authoritative `munera/open/211-simplify-start-tui-runtime/before-local.json` baseline, the target unit has lower `lcc-total` after the refactor than before.
+Using the same after `bb gordian local --json` run and the same authoritative `munera/closed/213-simplify-start-tui-runtime/before-local.json` baseline, the target unit has lower `lcc-total` after the refactor than before.
 
 The baseline target is the row keyed by `(psi.app-runtime, start-tui-runtime!, 5, 603)`. The `603` line component is baseline provenance from the selector's join key; implementation does not need to preserve that line number. The after target is re-identified by the unique logical unit key `(components/app-runtime/src/psi/app_runtime.clj, psi.app-runtime, start-tui-runtime!, 5)` in the after run. A4 fails if the after run has no such row or more than one such row, because the target would no longer have one executable comparison identity.
 

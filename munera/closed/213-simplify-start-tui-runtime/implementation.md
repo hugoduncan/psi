@@ -53,7 +53,7 @@ Gordian acceptance:
 - `bb gordian local --json > /tmp/after-local.json` captured the after metric.
 - A2 reconciliation touched exactly one logical unit: `(components/app-runtime/src/psi/app_runtime.clj, psi.app-runtime, start-tui-runtime!, 5)`. Sum before `7.031652915638373`; sum after `6.9363427358340495`; delta `-0.09531017980432388`, so net burden strictly decreased.
 - A4 target burden decreased: baseline `(psi.app-runtime, start-tui-runtime!, 5, 603)` `lcc-total 7.031652915638373`; after unique logical target line `603` `lcc-total 6.9363427358340495`.
-- A3 `bb gordian gate --baseline munera/open/211-simplify-start-tui-runtime/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0` → PASS, exit 0.
+- A3 `bb gordian gate --baseline munera/closed/213-simplify-start-tui-runtime/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0` → PASS, exit 0.
 
 PASS_STATUS: IMPLEMENTATION_COMPLETE
 
@@ -174,7 +174,7 @@ Final Gordian acceptance from current HEAD:
 - `bb gordian local --json > /tmp/after-local.json` → captured after metrics.
 - A2 logical-key reconciliation touched exactly one unit, `(components/app-runtime/src/psi/app_runtime.clj, psi.app-runtime, start-tui-runtime!, 5)`: before sum `7.031652915638373`, after sum `6.9363427358340495`, delta `-0.09531017980432388`; net burden strictly decreased.
 - A4 target burden decreased for the unique after logical target `(components/app-runtime/src/psi/app_runtime.clj, psi.app-runtime, start-tui-runtime!, 5)`: before `7.031652915638373`; after line `603` `6.9363427358340495`.
-- A3 `bb gordian gate --baseline munera/open/211-simplify-start-tui-runtime/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0` → PASS, exit 0.
+- A3 `bb gordian gate --baseline munera/closed/213-simplify-start-tui-runtime/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0` → PASS, exit 0.
 
 PASS_STATUS: REVIEW_COMPLETE
 
@@ -197,7 +197,7 @@ Verification:
 
 PASS_STATUS: REVIEW_COMPLETE
 
-2026-06-05 implementation review: no new actionable implementation issue found after IR2. Re-read the task artifacts, `start-tui-runtime!`, `tui_wiring.clj`, and the public TUI startup/app-runtime tests. Provider installation now happens only after option assembly, remains cleared by the direct `finally` around frontend execution, and the accepted TT11 idle follow-up fix stays minimal and covered. Re-verified `bb clojure:test:scry --namespace psi.app-runtime-tui-startup-test` (10/65 green), `bb clojure:test:scry --namespace psi.app-runtime-test` (32/128 green), `bb lint` (0 errors/0 warnings; one pre-existing info), and `bb commit-check:file-lengths` (green). Re-ran current-HEAD Gordian gates: A2/A4 target burden remains decreased (`7.031652915638373` → `6.8162713696596535`) and `bb gordian gate --baseline munera/open/211-simplify-start-tui-runtime/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0` passed. No unchecked `steps.md` follow-up added.
+2026-06-05 implementation review: no new actionable implementation issue found after IR2. Re-read the task artifacts, `start-tui-runtime!`, `tui_wiring.clj`, and the public TUI startup/app-runtime tests. Provider installation now happens only after option assembly, remains cleared by the direct `finally` around frontend execution, and the accepted TT11 idle follow-up fix stays minimal and covered. Re-verified `bb clojure:test:scry --namespace psi.app-runtime-tui-startup-test` (10/65 green), `bb clojure:test:scry --namespace psi.app-runtime-test` (32/128 green), `bb lint` (0 errors/0 warnings; one pre-existing info), and `bb commit-check:file-lengths` (green). Re-ran current-HEAD Gordian gates: A2/A4 target burden remains decreased (`7.031652915638373` → `6.8162713696596535`) and `bb gordian gate --baseline munera/closed/213-simplify-start-tui-runtime/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0` passed. No unchecked `steps.md` follow-up added.
 
 PASS_STATUS: REVIEW_COMPLETE
 
@@ -269,3 +269,7 @@ PASS_STATUS: REVIEW_COMPLETE
 2026-06-05 code-shaper review: no new actionable code-shape issue found. Applied `code-shaper` after reading task artifacts plus `start-tui-runtime!`, `tui_wiring.clj`, `nrepl_runtime.clj`, public TUI startup/app-runtime tests, docs/changelog context. The current shape is simple enough for the constrained task: `start-tui-runtime!` keeps runtime bootstrap, live focus publication, option assembly, and provider lifetime in one ordered local path; `tui_wiring` helpers each own one callback/options concern; data crosses the boundary as explicit dependency maps; provider install remains after option assembly and directly protected by `finally`; TT11's idle follow-up fix is isolated and covered. Re-verified focused TUI-startup 14/91 green, app-runtime 32/128 green, lint 0 errors/0 warnings (one pre-existing info), and file-lengths green. No unchecked `steps.md` follow-up added.
 
 PASS_STATUS: REVIEW_COMPLETE
+
+2026-06-05 closure: task completed and moved open→closed. Renumbered from 211 to 213 during PR finalization because master already owns closed task 211 (`emacs-retry-backoff-footer-visible`). All steps were checked and final reviews recorded `PASS_STATUS: REVIEW_COMPLETE`; CI for PR #158 was green.
+
+PASS_STATUS: CLOSED
