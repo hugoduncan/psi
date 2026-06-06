@@ -614,3 +614,18 @@ One **new** actionable change_chain doc-sync gap, not covered by RI1/RI2 or any 
   `sum after < sum before` gate, consistent with the line-19 precedent.
 
 PASS_STATUS: ACTIONABLE_FEEDBACK
+
+## RI3 resolved (review follow-up)
+
+Added the missing `[Unreleased]` CHANGELOG entry for the A2 gate correction. Placed
+a **Changed** bullet immediately above the line-19 task-212 `reduce-incidental-complexity`
+entry (same workflow, same section — consistent with the RI3-cited precedent). The entry
+records that the generated Phase-1 burden-reduction acceptance is now the sound per-unit
+relocation-guard ceiling (`after(u) < B`, `B := before(target)` from `before-local.json`,
+target reduction governed by A5), replacing the previously-emitted, provably-unsatisfiable
+net-sum gate (`sum after < sum before`) that blocked genuine decomplecting extractions.
+Closes the change_chain doc-sync gap. CHANGELOG-only change; no code/test/emitter edit.
+All five acceptance criteria plus all design/plan/implementation review follow-ups
+(RI1, RI2, RI3, PA1, PI1–PI3) are now complete.
+
+PASS_STATUS: FOLLOW_UPS_COMPLETE
