@@ -43,6 +43,7 @@ session-step ::= {:name step-name
 delegate-step ::= {:name step-name
                    :type :delegate
                    :target (workflow-name | source-spec)
+                   delegate-session-config-entry*
                    :prompt-string (string | template-contribution)
                    :context? [source-item*]
                    outputs?
@@ -151,10 +152,14 @@ session-config-entry ::= :session-profile keyword
                        | :temperature double   ;; optional, range [0.0, 2.0]; absent = provider default
                        | session-config-extension
 
-;; Delegate steps support the same compact :session-profile, :model, and
-;; :thinking-level keys to shape the delegated run's concrete inherited defaults.
-;; Direct authored :speed-mode/:effort-override keys are intentionally not part
-;; of this grammar; they can flow from resolved session profiles.
+delegate-session-config-entry ::= :session-profile keyword
+                                | :model model-selection-spec
+                                | :thinking-level (:off | :minimal | :low | :medium | :high | :xhigh)
+
+;; Delegate session config shapes the delegated run's concrete inherited
+;; defaults; it does not construct a delegate actor session. Direct authored
+;; :speed-mode/:effort-override keys are intentionally not part of this grammar;
+;; they can flow from resolved session profiles.
 
 judge-session-config-entry ::= :model model-selection-spec
                              | :tools [tool-id*]
