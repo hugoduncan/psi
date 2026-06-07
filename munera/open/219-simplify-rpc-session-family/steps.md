@@ -3,6 +3,12 @@
 Checklist derived from `plan.md`. Tick each item with the commit sha / decision
 when done.
 
+## Plan/steps ambiguity review follow-ups
+
+- [ ] PA1: Pin the focused RPC baseline/characterization verification command(s) before Slice 1 execution: name the exact Scry/bb command(s) and namespaces/files from the design's affected test set, plus any explicitly added RPC tests, so Slice 1/2/5 rerun the same suite.
+- [ ] PA2: Choose one authoritative location and minimal shape for the coverage map/gap record (for example a root-relative task-local `coverage-map.edn`/`.md` or a named section in `implementation.md`) and update Slice 2/5 references to that location; avoid `implementation.md`-or-unnamed-artifact ambiguity.
+- [ ] PA3: Pin Slice 6 review-gate mechanics to the architecture workflow's exact review-step skill sequence/names (`task-implementation-review`, `task-test-review`, `review-implementation-architecture`, `test-shaper`, `review-task-docs`, `code-shaper`) and make the architecture gate use `review-implementation-architecture`, not the design-only architecture review.
+
 ## Slice 1 — Preflight and clean baseline
 
 - [ ] Confirm `design-steps.md` has no unchecked follow-ups and record the result in `implementation.md`.
