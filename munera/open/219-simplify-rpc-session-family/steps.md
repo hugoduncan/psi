@@ -75,16 +75,16 @@ when done.
 
 ## Slice 5 — Focused verification and Gordian validation
 
-- [ ] Re-run the full pinned focused RPC baseline/characterization suite from Slice 1/2 and record results in `implementation.md`.
-- [ ] Run targeted `clj-kondo` over changed Clojure source/test files and record results.
-- [ ] Run `git diff --check` and record the result.
-- [ ] Run `bb gordian diagnose --edn > munera/open/219-simplify-rpc-session-family/after-diagnose.edn` from the worktree root.
-- [ ] Run `bb gordian architecture-targets --edn > munera/open/219-simplify-rpc-session-family/after-architecture-targets.edn` from the worktree root.
-- [ ] Run `bb gordian compare munera/open/219-simplify-rpc-session-family/before-diagnose.edn munera/open/219-simplify-rpc-session-family/after-diagnose.edn --edn > munera/open/219-simplify-rpc-session-family/architecture-compare.edn` from the worktree root.
-- [ ] Run `bb gordian gate --baseline munera/open/219-simplify-rpc-session-family/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0 --edn > munera/open/219-simplify-rpc-session-family/architecture-gate.edn` from the worktree root.
-- [ ] Verify `architecture-gate.edn` represents a successful gate; if not, add concrete repair steps and return to Slice 4.
-- [ ] Inspect `architecture-compare.edn` for no new cycles, no new high findings, and zero new medium findings; recheck `coverage-map.md` for stale gaps; record any improvement or justified non-improvement in `implementation.md`.
-- [ ] Commit Slice 5 validation artifacts and verification notes.
+- [x] Re-run the full pinned focused RPC baseline/characterization suite from Slice 1/2 and record results in `implementation.md`. Done in Slice 5: green, 57 tests / 439 assertions.
+- [x] Run targeted `clj-kondo` over changed Clojure source/test files and record results. Done in Slice 5: changed source files linted with 0 errors / 0 warnings.
+- [x] Run `git diff --check` and record the result. Done in Slice 5: clean.
+- [x] Run `bb gordian diagnose --edn > munera/open/219-simplify-rpc-session-family/after-diagnose.edn` from the worktree root. Done in Slice 5.
+- [x] Run `bb gordian architecture-targets --edn > munera/open/219-simplify-rpc-session-family/after-architecture-targets.edn` from the worktree root. Done in Slice 5.
+- [x] Run `bb gordian compare munera/open/219-simplify-rpc-session-family/before-diagnose.edn munera/open/219-simplify-rpc-session-family/after-diagnose.edn --edn > munera/open/219-simplify-rpc-session-family/architecture-compare.edn` from the worktree root. Done in Slice 5.
+- [x] Run `bb gordian gate --baseline munera/open/219-simplify-rpc-session-family/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0 --edn > munera/open/219-simplify-rpc-session-family/architecture-gate.edn` from the worktree root. Done in Slice 5; the exact command exited 0 but emitted truncated EDN, so the committed artifact was regenerated through the same Gordian gate functions with unbounded EDN printing and parsed successfully.
+- [x] Verify `architecture-gate.edn` represents a successful gate; if not, add concrete repair steps and return to Slice 4. Done in Slice 5: parsed `:result :pass`, 0 new cycles, 0 new high findings, 0 new medium findings.
+- [x] Inspect `architecture-compare.edn` for no new cycles, no new high findings, and zero new medium findings; recheck `coverage-map.md` for stale gaps; record any improvement or justified non-improvement in `implementation.md`. Done in Slice 5: no new cycles/high/medium, one new low outside target, no stale coverage gaps, target score improved 102.89 → 102.33.
+- [x] Commit Slice 5 validation artifacts and verification notes. Done in the Slice 5 validation commit.
 
 ## Slice 6 — Review gates and closure
 
