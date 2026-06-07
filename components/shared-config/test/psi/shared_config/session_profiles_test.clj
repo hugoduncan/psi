@@ -201,6 +201,14 @@
               :profile-name :missing
               :available [:coding :review]}
              (session-profiles/find-valid-profile profiles :missing))))
+    (testing "reserved names are invalid even when absent from config"
+      (let [result (session-profiles/find-valid-profile profiles :clear)]
+        (is (false? (:ok? result)))
+        (is (= :invalid-profile (:error result)))
+        (is (= :clear (get-in result [:profile :name])))
+        (is (= [:reserved-profile-name]
+               (mapv :reason (get-in result [:profile :diagnostics]))))
+        (is (= [:coding :review] (:available result)))))
     (testing "invalid profile errors include diagnostics and available names"
       (let [result (session-profiles/find-valid-profile profiles :empty)]
         (is (false? (:ok? result)))

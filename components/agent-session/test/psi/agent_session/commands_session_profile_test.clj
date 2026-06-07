@@ -148,9 +148,33 @@
             (is (str/includes? (:message (commands/dispatch-in ctx session-id "/session-profile empty" cmd-opts))
                                "Invalid session profile: empty"))
             (is (= before (session-state ctx session-id)))
-            (is (str/includes? (:message (commands/dispatch-in ctx session-id "/session-profile :clear" cmd-opts))
-                               "Invalid session profile: clear"))
+            (let [message (:message (commands/dispatch-in ctx session-id "/session-profile :clear" cmd-opts))]
+              (is (str/includes? message "Invalid session profile: clear"))
+              (is (str/includes? message "profile name is reserved"))
+              (is (not (str/includes? message "Unknown session profile"))))
             (is (= before (session-state ctx session-id)))))))))
+
+(deftest reserved-clear-profile-selection-without-config-test
+  ;; Tests :clear is globally reserved even when config does not define it.
+  (let [cwd (test-support/temp-cwd)]
+    (write-user-config! cwd {:agent-session {:session-profiles
+                                             {:coding {:speed-mode :fast}}}})
+    (with-redefs [user-config/user-config-file (fn [] (user-config-file-in cwd))]
+      (let [[ctx session-id] (create-session-context
+                              {:session-defaults {:model no-reasoning-model
+                                                  :thinking-level :off
+                                                  :speed-mode :normal
+                                                  :effort-override :high
+                                                  :system-prompt "test prompt"}
+                               :cwd cwd
+                               :persist? false})
+            before           (session-state ctx session-id)
+            result           (commands/dispatch-in ctx session-id "/session-profile :clear" cmd-opts)
+            message          (:message result)]
+        (is (str/includes? message "Invalid session profile: clear"))
+        (is (str/includes? message "profile name is reserved"))
+        (is (not (str/includes? message "Unknown session profile")))
+        (is (= before (session-state ctx session-id)))))))
 
 (deftest session-profile-thinking-clamps-after-model-test
   ;; Tests model-before-thinking semantics: profile thinking is applied against

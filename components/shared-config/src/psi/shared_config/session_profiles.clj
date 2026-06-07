@@ -289,13 +289,24 @@
   "Return the valid resolved profile named `profile-name`, or an error map."
   [profiles profile-name]
   (let [available (->> profiles (keep (fn [[n p]] (when (:valid? p) n))) sort vec)]
-    (if-let [profile (get profiles profile-name)]
-      (if (:valid? profile)
-        {:ok? true :profile profile}
-        {:ok? false
-         :error :invalid-profile
-         :profile profile
-         :available available})
+    (cond
+      (contains? reserved-profile-names profile-name)
+      {:ok? false
+       :error :invalid-profile
+       :profile (or (get profiles profile-name)
+                    (resolve-profile profile-name {}))
+       :available available}
+
+      (contains? profiles profile-name)
+      (let [profile (get profiles profile-name)]
+        (if (:valid? profile)
+          {:ok? true :profile profile}
+          {:ok? false
+           :error :invalid-profile
+           :profile profile
+           :available available}))
+
+      :else
       {:ok? false
        :error :unknown-profile
        :profile-name profile-name
