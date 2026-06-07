@@ -111,6 +111,7 @@ when done.
 ## Task-test-review follow-ups
 
 - [x] TT1: Add a focused RPC test for the prompt-op slash-command `/new` path after the shared command-helper refactor. Done 2026-06-07: added `psi.rpc-prompt-command-test/rpc-prompt-new-slash-command-rehydrates-without-agent-loop-test`, driving an actual prompt request with message `/new` through the RPC/session harness, asserting the agent loop is not invoked, and locking prompt response acceptance, `session/resumed`, `session/rehydrated`, RPC focus, prompt-path assistant confirmation, and session/footer snapshot outputs. Focused prompt-command test and pinned RPC suite are green (58 tests / 449 assertions).
+- [ ] TT2: Add focused RPC coverage for slash-command `/new` when the runtime provides an `:on-new-session!` callback, proving the command/prompt slash path emits the callback-supplied startup transcript/tool metadata through the shared new-session helper; existing tests cover `new_session` callback payloads and default slash `/new`, but not callback-backed slash `/new`.
 
 ## Post-implementation validation recapture failures
 
