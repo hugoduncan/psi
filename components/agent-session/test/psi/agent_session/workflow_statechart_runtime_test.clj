@@ -56,15 +56,18 @@
                              :vars {"review" {:from {:step "review" :yield :text}}}}]}]})
 
 (defn- install-run!
-  [ctx definition run-id]
-  (swap! (:state* ctx)
-         (fn [state]
-           (let [[s _ _] (workflow-registry/register-definition state definition)
-                 [s _ _] (workflow-runtime/create-run s {:definition-id (:definition-id definition)
-                                                         :run-id run-id
-                                                         :workflow-input {:input "ship it"
-                                                                          :original {:ticket 123}}})]
-             s))))
+  ([ctx definition run-id]
+   (install-run! ctx definition run-id {}))
+  ([ctx definition run-id run-opts]
+   (swap! (:state* ctx)
+          (fn [state]
+            (let [[s _ _] (workflow-registry/register-definition state definition)
+                  [s _ _] (workflow-runtime/create-run s (merge {:definition-id (:definition-id definition)
+                                                                 :run-id run-id
+                                                                 :workflow-input {:input "ship it"
+                                                                                  :original {:ticket 123}}}
+                                                                run-opts))]
+              s)))))
 
 (defn- with-stubbed-runtime
   [{:keys [assistant-text judge-result]} f]
@@ -275,6 +278,64 @@
       (is (= :execution-failed (:status attempt)))
       (is (= "Invalid initial agent state"
              (get-in attempt [:execution-error :message]))))))
+
+(deftest invalid-session-profile-fails-before-child-session-creation-test
+  ;; Tests statechart/runtime failure for unavailable workflow profiles before
+  ;; any workflow-owned child execution session is created.
+  (doseq [{:keys [label profile-name snapshot expected-reason]}
+          [{:label "unknown profile"
+            :profile-name :missing
+            :snapshot {:profiles {:coding {:name :coding
+                                           :status :valid
+                                           :valid? true
+                                           :settings {:speed-mode :fast}
+                                           :readable-settings ["speed fast"]
+                                           :diagnostics []}}
+                       :valid-profile-names [:coding]
+                       :invalid-profile-names []}
+            :expected-reason :unknown-session-profile}
+           {:label "invalid profile"
+            :profile-name :empty
+            :snapshot {:profiles {:empty {:name :empty
+                                          :status :invalid
+                                          :valid? false
+                                          :settings {}
+                                          :readable-settings []
+                                          :diagnostics [{:field :settings
+                                                         :reason :no-concrete-settings
+                                                         :message "profile has no supported concrete settings"}]}}
+                       :valid-profile-names []
+                       :invalid-profile-names [:empty]}
+            :expected-reason :invalid-session-profile}]]
+    (testing label
+      (let [[ctx session-id] (create-session-context)
+            run-id (str "run-" label "-profile-runtime")
+            definition {:definition-id run-id
+                        :steps [{:name "plan"
+                                 :type :session
+                                 :session-profile profile-name
+                                 :contributions [{:type :template
+                                                  :text "Plan {{input}}"
+                                                  :vars {"input" {:from :workflow-input :path [:input]}}}]}]}
+            _ (install-run! ctx definition run-id
+                            {:session-profile-snapshot snapshot})
+            wf-ctx (runtime/create-workflow-context ctx session-id run-id)]
+        (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil)
+        (let [run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)
+              attempt (get-in run [:step-runs "plan" :attempts 0])]
+          (is (= :failed (:status run)))
+          (is (= :execution-failed (:status attempt)))
+          (is (nil? (:execution-session-id attempt)))
+          (is (= expected-reason
+                 (get-in attempt [:execution-error :reason])))
+          (is (= profile-name
+                 (get-in attempt [:execution-error :profile-name])))
+          (is (contains? (:execution-error attempt) :available-profile-names)
+              "statechart preserves actionable profile failure data")
+          (is (empty? (filter (fn [[_ {:keys [data]}]]
+                                (:workflow-owned? data))
+                              (get-in @(:state* ctx) [:agent-session :sessions])))
+              "no workflow-owned child execution session is present in canonical state"))))))
 
 (deftest workflow-model-query-ranked-fallback-success-test
   (testing "first-ranked connection-refused failure falls back to the next ranked candidate and completes the step"

@@ -7,8 +7,7 @@
    [psi.agent-session.core :as session]
    [psi.agent-session.test-support :as test-support]
    [psi.session-persistence.core :as persist]
-   [psi.session-state.state :as ss]
-   [psi.shared-config.user :as user-config]))
+   [psi.session-state.state :as ss]))
 
 (def ^:private reasoning-model
   {:provider "anthropic" :id "claude-opus-4-8" :reasoning true :supports-reasoning true})
@@ -28,15 +27,24 @@
     [ctx (:session-id sd)]))
 
 (defn- user-config-file-in
-  [cwd]
-  (java.io.File. (str cwd "/user-home/.psi/agent/config.edn")))
+  [home]
+  (java.io.File. (str home "/.psi/agent/config.edn")))
 
 (defn- write-user-config!
-  [cwd config]
-  (let [f (user-config-file-in cwd)]
+  [home config]
+  (let [f (user-config-file-in home)]
     (.mkdirs (.getParentFile f))
     (spit f (pr-str config))
     f))
+
+(defmacro ^:private with-user-home
+  [home & body]
+  `(let [old-home# (System/getProperty "user.home")]
+     (try
+       (System/setProperty "user.home" ~home)
+       ~@body
+       (finally
+         (System/setProperty "user.home" old-home#)))))
 
 (defn- session-state
   [ctx session-id]
@@ -75,7 +83,7 @@
                                               "oops" {:speed-mode :normal}
                                               :empty {}
                                               :clear {:speed-mode :fast}}}})
-    (with-redefs [user-config/user-config-file (fn [] (user-config-file-in cwd))]
+    (with-user-home cwd
       (let [[ctx session-id] (create-session-context {:cwd cwd :persist? false})]
         (testing "/session-profiles lists valid and invalid effective profiles"
           (let [message (:message (commands/dispatch-in ctx session-id "/session-profiles" cmd-opts))]
@@ -108,7 +116,7 @@
                                       :empty {}
                                       :clear {:speed-mode :fast}}}}]
     (write-user-config! cwd user-config)
-    (with-redefs [user-config/user-config-file (fn [] (user-config-file-in cwd))]
+    (with-user-home cwd
       (let [[ctx session-id] (create-session-context
                               {:session-defaults {:model no-reasoning-model
                                                   :thinking-level :off
@@ -159,7 +167,7 @@
   (let [cwd (test-support/temp-cwd)]
     (write-user-config! cwd {:agent-session {:session-profiles
                                              {:coding {:speed-mode :fast}}}})
-    (with-redefs [user-config/user-config-file (fn [] (user-config-file-in cwd))]
+    (with-user-home cwd
       (let [[ctx session-id] (create-session-context
                               {:session-defaults {:model no-reasoning-model
                                                   :thinking-level :off
@@ -184,7 +192,7 @@
                                              {:haiku-high {:model-provider "anthropic"
                                                            :model-id "claude-3-5-haiku-20241022"
                                                            :thinking-level :high}}}})
-    (with-redefs [user-config/user-config-file (fn [] (user-config-file-in cwd))]
+    (with-user-home cwd
       (let [[ctx session-id] (create-session-context
                               {:session-defaults {:model reasoning-model
                                                   :thinking-level :high
@@ -203,7 +211,7 @@
   (let [cwd (test-support/temp-cwd)]
     (write-user-config! cwd {:agent-session {:session-profiles
                                              {:coding {:speed-mode :fast}}}})
-    (with-redefs [user-config/user-config-file (fn [] (user-config-file-in cwd))]
+    (with-user-home cwd
       (let [[ctx session-id] (create-session-context {:cwd cwd :persist? false})]
         (commands/dispatch-in ctx session-id "/session-profile coding" cmd-opts)
         (let [result (session/query-in ctx session-id
