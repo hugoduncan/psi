@@ -240,9 +240,31 @@ Implementation is forbidden until all gates below pass and are recorded in task 
 6. No implementation before coverage and diff gates pass:
    - Refactoring production source before the clean baseline, coverage review, characterization loop, and diff/baseline gate pass is out of scope.
 
+## Ownership constraints
+
+### Shared command/navigation/action/result surfaces
+
+If implementation extracts or consolidates any shared decision surface around `commands`, `command-results`, `command-tree`, `command-pickers`, `command-resume`, `navigation`, or `frontend-actions`, the extracted seam must preserve existing ownership boundaries:
+
+- RPC may own protocol adaptation: request ids, RPC event names, wire payload encoding, response frames, connection-local focus needed for RPC delivery, and subscriber/transport-specific fanout.
+- Adapter-neutral selector, session-tree, navigation, picker, frontend-action, and command-result semantics that are needed by both TUI and Emacs belong with existing `app-runtime` public-model/selector/navigation/action ownership, not in a new RPC-owned domain layer.
+- A new shared RPC helper is acceptable only when its contract is narrow RPC protocol adaptation over already-shaped domain/app-runtime data. It must not become a semantic orchestration hub that decides UI-domain behaviour for multiple adapters.
+- If a small adapter-neutral semantic helper is required to remove duplication, planning must either route it to an existing `app-runtime` owner or explicitly authorize a narrow adjacent `app-runtime` source area before implementation; it must not be hidden inside the RPC family.
+- Behaviour-preserving simplification should make the semantic owner obvious at call sites: RPC translates and emits, while app-runtime/domain code shapes adapter-neutral meaning.
+
+### Projection, stream, and emit delivery surfaces
+
+Simplification of `projections`, `streams`, or `emit` must preserve the current projection delivery architecture:
+
+- Canonical state and `app-runtime` public models remain authoritative for context, footer, extension UI, selector/session-tree, frontend-action, and other UI-facing projection semantics.
+- RPC may perform subscriber-aware fanout, protocol payload recomputation/adaptation, response framing, and connection-local focus handling. These are delivery concerns, not a second source of projection truth.
+- Projection payloads must be recomputed from the authoritative context/state/public-model functions when invalidations or progress events arrive; RPC must not maintain cached canonical projection snapshots, duplicated footer/context/session-tree models, or projection state that can drift from app-runtime state.
+- Delivery must stay event/invalidation driven through existing listener/progress/event hooks. Do not replace it with polling-style projection refresh, Emacs/TUI-specific RPC timers, or RPC-local freshness models.
+- Any refactor that touches retry/footer refresh, context updates, extension UI snapshots, or navigation emission must keep RPC as the subscriber-aware protocol fanout/adaptation layer over app-runtime-owned semantics.
+
 ## Implementation constraints
 
-- Prefer extracting or clarifying one shared decision/data-shaping seam over moving orchestration sideways.
+- Prefer extracting or clarifying one shared decision/data-shaping seam over moving orchestration sideways, subject to the ownership constraints above.
 - Keep computation and flow-control separated where local code permits.
 - Preserve simple, consistent data shapes across target namespaces.
 - Make invalid states less representable where a target-local contract can be clarified without broad redesign.
