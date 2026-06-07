@@ -110,14 +110,14 @@ when done.
 
 ## Slice 6 — User-facing docs, changelog, and coherence verification
 
-- [ ] Update `doc/workflows.md` to document `reduce-architectural-complexity`, its invoking-worktree requirement, architecture-target scope, and distinction from `reduce-incidental-complexity`.
-- [ ] Update README or other workflow index documentation if it lists user-invokable workflows separately from `doc/workflows.md`.
-- [ ] Add `CHANGELOG.md` `[Unreleased]` `Added` entry for the new architecture-level simplification workflow and implementation architecture review gate/skill.
-- [ ] Verify docs do not claim the workflow creates a worktree, pushes a branch, or opens a PR.
-- [ ] Verify coherence across `design.md`, `plan.md`, `steps.md`, skill, workflow EDN, tests, docs, and changelog for names, artifact paths, route statuses, and review-step order.
-- [ ] Run final focused workflow-loader tests and targeted lint/format checks for changed files.
-- [ ] Append final implementation verification notes to `implementation.md`.
-- [ ] Commit Slice 6 (`⚒ doc: document architecture simplification workflow`).
+- [x] Update `doc/workflows.md` to document `reduce-architectural-complexity`, its invoking-worktree requirement, architecture-target scope, and distinction from `reduce-incidental-complexity`.
+- [x] Update README or other workflow index documentation if it lists user-invokable workflows separately from `doc/workflows.md`.
+- [x] Add `CHANGELOG.md` `[Unreleased]` `Added` entry for the new architecture-level simplification workflow and implementation architecture review gate/skill.
+- [x] Verify docs do not claim the workflow creates a worktree, pushes a branch, or opens a PR. Decision: docs explicitly state the workflow does not call work-on, create/switch worktrees, push, or open a PR.
+- [x] Verify coherence across `design.md`, `plan.md`, `steps.md`, skill, workflow EDN, tests, docs, and changelog for names, artifact paths, route statuses, and review-step order. Decision: names, artifact paths, normalized statuses, `extract-task-path`, validation artifacts, and review-step order are aligned across task artifacts, skill, workflow, tests, docs, and changelog.
+- [x] Run final focused workflow-loader tests and targeted lint/format checks for changed files. Result: focused Scry namespace green (5 tests, 138 assertions), targeted clj-kondo 0/0, and `git diff --check` clean.
+- [x] Append final implementation verification notes to `implementation.md`.
+- [x] Commit Slice 6 (`⚒ doc: document architecture simplification workflow`).
 
 ## Plan/steps ambiguity follow-ups
 

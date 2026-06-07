@@ -51,6 +51,8 @@ This repository includes many examples there, including:
 - `plan-build-review`
 - `delegate-build-review`
 - `gh-bug-triage-modular`
+- `reduce-incidental-complexity`
+- `reduce-architectural-complexity`
 - `planner`
 - `builder`
 - `reviewer`
@@ -814,6 +816,57 @@ sibling rather than reduced), `gordian gate --baseline before-diagnose.edn
 all tests stay green. The workflow ends
 with a completed, reviewed task on the local worktree branch; it does **not**
 push or open a PR — that decision is left to the user.
+
+## Architecture-level simplification
+
+`reduce-architectural-complexity` is the architecture-level sibling of
+`reduce-incidental-complexity`. It targets code **above the function/executable
+unit level**: namespaces, namespace families, namespace pairs, or communities
+ranked by Gordian's architecture-target lens.
+
+```text
+/delegate reduce-architectural-complexity
+```
+
+The workflow runs entirely in the invoking session's current worktree. The caller
+is responsible for starting it from the intended isolated branch/worktree; it
+does **not** call `work-on`, create or switch worktrees, push, or open a PR.
+
+Selection uses `bb gordian architecture-targets --edn`. The workflow consumes the
+authoritative top-level `:winner` and `:candidates` EDN envelope, then optionally
+runs `bb gordian target-issues --candidate '<candidate-id>' --edn` only for
+post-selection framing. Unsupported or failed `target-issues` framing does not
+change the selected target and does not force a no-target stop; missing or
+uninterpretable `architecture-targets` output does stop before task creation.
+
+Target-present runs create a Munera task under `munera/open/NNN-slug/` with
+worktree-root-relative Gordian artifacts such as `before-diagnose.edn`,
+`architecture-targets.edn`, and either `target-issues.edn` or
+`target-issues-unavailable.edn`. A dedicated `extract-task-path` step validates
+the generated `munera_task_path:` handoff before any downstream task consumer
+runs.
+
+Before implementation, the workflow enforces a test-net gate adapted for
+architecture targets: clean baseline recording, coverage review, a constrained
+characterization-test fix loop for fixable gaps, terminal stop for infeasible
+coverage, and a diff gate that allows only characterization tests, task
+artifacts, docs, and explicitly justified minimal testability seams before
+simplification. `implement-task` is unreachable until coverage and diff gates
+pass.
+
+After implementation, the workflow captures objective Gordian validation artifacts
+(`after-diagnose.edn`, `after-architecture-targets.edn`, `architecture-compare.edn`,
+and `architecture-gate.edn`) before review. Failed or unreadable validation writes
+failure maps and routes back to implementation repair. Successful validation then
+runs six explicit `review-step` gates in order: `task-implementation-review`,
+`task-test-review`, the architecture-specific `review-implementation-architecture`,
+`test-shaper`, `review-task-docs`, and `code-shaper`. The architecture review
+skill reads task-local Gordian artifacts and project architecture sources rather
+than relying on inlined workflow context.
+
+Use `reduce-incidental-complexity` when the right target is a single high-burden
+function/executable unit. Use `reduce-architectural-complexity` when the target is
+a higher-level ownership, coupling, cycle, family, pair, or community problem.
 
 ## Related docs
 

@@ -130,6 +130,11 @@ For user-facing workflow usage, workflow file location, `/delegate`, reload
 behavior, and workflow-run retention/cleanup behavior, see:
 - [`doc/workflows.md`](doc/workflows.md)
 
+Project workflows include autonomous simplification helpers: `/delegate
+reduce-incidental-complexity` for function/executable-unit incidental complexity
+and `/delegate reduce-architectural-complexity` for namespace/family/pair/community
+architecture targets selected by Gordian.
+
 Workflow runs now automatically retain only the newest retained terminal runs
 per originating session. By default psi keeps `1` retained terminal workflow
 run per originating session, configurable via
