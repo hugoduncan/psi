@@ -730,7 +730,9 @@ delegate-ir-step ::= {:name step-name
 invoke-spec ::= {:operation operation-id
                  :args {keyword (literal | source-spec)}*}
 
-session-spec ::= {:model? model-selection-spec
+session-spec ::= {:session-profile? keyword
+                  :model? model-selection-spec
+                  :thinking-level? (:off | :minimal | :low | :medium | :high | :xhigh)
                   :tools? [tool-id*]
                   :skills? [skill-id*]
                   :temperature? double           ;; optional, range [0.0, 2.0]; absent = provider default
