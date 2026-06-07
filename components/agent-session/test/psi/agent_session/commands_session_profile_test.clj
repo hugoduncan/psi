@@ -4,8 +4,10 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.commands :as commands]
    [psi.agent-session.commands.session-profile :as session-profile-command]
+   [psi.agent-session.context :as session-context]
    [psi.agent-session.core :as session]
    [psi.agent-session.test-support :as test-support]
+   [psi.session-journal.store :as journal-store]
    [psi.session-persistence.core :as persist]
    [psi.session-state.state :as ss]))
 
@@ -50,6 +52,10 @@
   [ctx session-id]
   (select-keys (ss/get-session-data-in ctx session-id)
                [:model :thinking-level :speed-mode :effort-override :selected-session-profile]))
+
+(defn- model-identity
+  [session-data]
+  (select-keys (:model session-data) [:provider :id]))
 
 (deftest session-profile-token-parser-test
   ;; Tests command-token normalization without any session mutation.
@@ -183,6 +189,96 @@
         (is (str/includes? message "profile name is reserved"))
         (is (not (str/includes? message "Unknown session profile")))
         (is (= before (session-state ctx session-id)))))))
+
+(deftest selected-session-profile-metadata-is-not-inherited-or-resumed-test
+  ;; Task 217 TT4: selected-profile metadata is session-local observability only.
+  ;; Concrete settings may follow their existing lifecycle rules, but descendants
+  ;; and cold resume must never claim the parent profile is selected.
+  (let [cwd (test-support/temp-cwd)]
+    (write-user-config! cwd {:agent-session {:session-profiles
+                                             {:coding {:model-provider "anthropic"
+                                                       :model-id "claude-opus-4-8"
+                                                       :thinking-level :high
+                                                       :speed-mode :fast
+                                                       :effort-override :xhigh}}}})
+    (with-user-home cwd
+      (let [[ctx session-id] (create-session-context
+                              {:session-defaults {:model no-reasoning-model
+                                                  :thinking-level :off
+                                                  :speed-mode :normal
+                                                  :effort-override :low
+                                                  :system-prompt "test prompt"}
+                               :cwd cwd
+                               :persist? false})]
+        (commands/dispatch-in ctx session-id "/session-profile coding" cmd-opts)
+        (let [parent-sd (ss/get-session-data-in ctx session-id)]
+          (is (= :coding (get-in parent-sd [:selected-session-profile :name])))
+
+          (testing "new sessions may inherit concrete settings but not selected metadata"
+            (let [child-sd (session/new-session-in! ctx session-id {})]
+              (is (= {:provider "anthropic" :id "claude-opus-4-8"}
+                     (model-identity child-sd)))
+              (is (= :high (:thinking-level child-sd)))
+              (is (= :fast (:speed-mode child-sd)))
+              (is (= :xhigh (:effort-override child-sd)))
+              (is (nil? (:selected-session-profile child-sd)))))
+
+          (testing "forked sessions may inherit concrete settings but not selected metadata"
+            (let [entry-id (:id (ss/append-journal-entry-in!
+                                 ctx session-id
+                                 (persist/message-entry {:role "user"
+                                                         :content [{:type :text :text "branch here"}]
+                                                         :timestamp (java.time.Instant/now)})))
+                  fork-sd  (session/fork-session-in! ctx session-id entry-id)]
+              (is (= {:provider "anthropic" :id "claude-opus-4-8"}
+                     (model-identity fork-sd)))
+              (is (= :high (:thinking-level fork-sd)))
+              (is (= :fast (:speed-mode fork-sd)))
+              (is (= :xhigh (:effort-override fork-sd)))
+              (is (nil? (:selected-session-profile fork-sd)))))
+
+          (testing "workflow child sessions may inherit concrete request settings but not selected metadata"
+            (let [child-id "workflow-profile-child"
+                  result   ((var-get #'session-context/create-workflow-child-session!)
+                            ctx session-id
+                            {:child-session-id child-id
+                             :session-name "workflow child"
+                             :system-prompt "workflow system"
+                             :tool-ids []
+                             :skills []
+                             :model (:model parent-sd)
+                             :thinking-level (:thinking-level parent-sd)
+                             :speed-mode (:speed-mode parent-sd)
+                             :effort-override (:effort-override parent-sd)
+                             :workflow-run-id "run-tt4"
+                             :workflow-step-id "step-tt4"
+                             :workflow-attempt-id "attempt-tt4"
+                             :workflow-owned? true
+                             :inherited-snapshot? true})
+                  child-sd (ss/get-session-data-in ctx child-id)]
+              (is (= {:psi.agent-session/session-id child-id} result))
+              (is (= {:provider "anthropic" :id "claude-opus-4-8"}
+                     (model-identity child-sd)))
+              (is (= :high (:thinking-level child-sd)))
+              (is (= :fast (:speed-mode child-sd)))
+              (is (= :xhigh (:effort-override child-sd)))
+              (is (nil? (:selected-session-profile child-sd)))))
+
+          (testing "cold journal resume restores journaled model/thinking only and never selected metadata"
+            (let [f (java.io.File/createTempFile "psi-session-profile-resume" ".ndedn")]
+              (.deleteOnExit f)
+              (journal-store/flush-journal! f
+                                            "resumed-profile-session"
+                                            cwd
+                                            nil
+                                            (persist/all-entries-in ctx session-id))
+              (let [resumed-sd (session/resume-session-in! ctx session-id (.getAbsolutePath f))]
+                (is (= {:provider "anthropic" :id "claude-opus-4-8"}
+                       (model-identity resumed-sd)))
+                (is (= :high (:thinking-level resumed-sd)))
+                (is (nil? (:speed-mode resumed-sd)))
+                (is (nil? (:effort-override resumed-sd)))
+                (is (nil? (:selected-session-profile resumed-sd)))))))))))
 
 (deftest session-profile-thinking-clamps-after-model-test
   ;; Tests model-before-thinking semantics: profile thinking is applied against
