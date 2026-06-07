@@ -10,7 +10,7 @@
    [clojure.edn :as edn]
    [clojure.string :as str]
    [psi.prompt-assets.prompt-templates :as pt]
-   [psi.workflow-registry.session-profile-names :as profile-names]))
+   [psi.session-profile.names :as profile-names]))
 
 (def ^:private allowed-md-frontmatter-keys
   #{:name

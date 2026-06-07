@@ -1,4 +1,4 @@
-(ns psi.workflow-registry.session-profile-names
+(ns psi.session-profile.names
   "Shared selectable session-profile name grammar.
 
    This namespace is intentionally small and low-level so config, command,

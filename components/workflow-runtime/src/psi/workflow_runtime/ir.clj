@@ -19,7 +19,7 @@
   (:require
    [clojure.string :as str]
    [malli.core :as m]
-   [psi.workflow-registry.session-profile-names :as profile-names]
+   [psi.session-profile.names :as profile-names]
    [psi.workflow-runtime.structured-output :as structured-output]
    [psi.workflow-runtime.structured-output-schemas :as structured-output-schemas]))
 

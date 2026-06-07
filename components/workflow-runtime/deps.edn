@@ -5,6 +5,7 @@
         psi/tool-registry {:local/root "../tool-registry"}
         psi/deterministic-operation-registry {:local/root "../deterministic-operation-registry"}
         psi/deterministic-operation-runtime {:local/root "../deterministic-operation-runtime"}
+        psi/session-profile {:local/root "../session-profile"}
         psi/workflow-registry {:local/root "../workflow-registry"}
         psi/workflow-step-materialization {:local/root "../workflow-step-materialization"}
         psi/turn-runtime {:local/root "../turn-runtime"}}}

@@ -9,7 +9,7 @@
    [psi.ai.model-registry :as model-registry]
    [psi.shared-config.project :as project-prefs]
    [psi.shared-config.user :as user-config]
-   [psi.workflow-registry.session-profile-names :as profile-names]))
+   [psi.session-profile.names :as profile-names]))
 
 (def supported-fields
   "The only profile fields that affect session/profile materialization."

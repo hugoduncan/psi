@@ -7,7 +7,7 @@
    compiler emits no migration `:compat` metadata."
   (:require
    [psi.workflow-registry.definition :as workflow-definition]
-   [psi.workflow-registry.session-profile-names :as profile-names]
+   [psi.session-profile.names :as profile-names]
    [psi.workflow-runtime.ir :as workflow-ir]))
 
 (def ^:private default-invoke-outputs
