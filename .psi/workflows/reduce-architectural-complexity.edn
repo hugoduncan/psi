@@ -28,11 +28,9 @@
      :vars
      {"handoff" {:from {:step "select-and-create", :yield :text}}}}],
    :judge
-   {:type :llm,
-    :contributions
-    [{:type :template,
-      :text
-      "Inspect the extract-task-path step's final answer. If it consists of exactly one root-relative path matching `munera/open/NNN-slug` and no other prose, respond exactly `DONE`. Otherwise respond exactly `REPEAT`."}]},
+   {:type :invoke,
+    :operation "workflow/munera-open-task-path-routing",
+    :args {:text {:from {:step "extract-task-path" :output :final-llm-reply}}}},
    :on
    {"DONE" {:goto "review-task-design"},
     "REPEAT" {:goto "terminal-stop-summary"}}}

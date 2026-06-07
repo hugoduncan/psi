@@ -28,6 +28,12 @@
    :args {:text {:from {:step step-name :output :final-llm-reply}}
           :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}})
 
+(defn- munera-open-task-path-judge
+  [step-name]
+  {:type :invoke
+   :operation "workflow/munera-open-task-path-routing"
+   :args {:text {:from {:step step-name :output :final-llm-reply}}}})
+
 (defn- extract-input?
   [step]
   (= {:from {:step "extract-task-path" :yield :text}}
@@ -183,8 +189,11 @@
            (is (not (.contains text "--json")))
            (is (not (.contains text "JSON")))))
        (testing "extract-task-path is the target-present identity boundary"
+         (is (= (munera-open-task-path-judge "extract-task-path") (:judge extract-step)))
          (is (= "review-task-design" (get-in extract-step [:on "DONE" :goto])))
          (is (= "terminal-stop-summary" (get-in extract-step [:on "REPEAT" :goto])))
+         (is (not= :llm (:type (:judge extract-step)))
+             "valid path routing must be deterministic, not LLM-judged")
          (let [text (step-template-text extract-step)]
            (is (.contains text "exactly one line matching `munera_task_path: munera/open/NNN-slug`"))
            (is (.contains text "respond with ONLY that root-relative path"))

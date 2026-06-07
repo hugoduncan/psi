@@ -187,6 +187,23 @@
      :summary route
      :details {:actionable-keys actionable-keys}}))
 
+(def ^:private munera-open-task-path-pattern
+  #"^munera/open/[0-9]{3,}-[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+(defn- parse-munera-open-task-path-routing
+  [text]
+  (let [trimmed (when (string? text) (str/trim text))]
+    (if (and trimmed
+             (re-matches munera-open-task-path-pattern trimmed))
+      {:status :ok
+       :data "DONE"
+       :summary "DONE"}
+      {:status :ok
+       :data "REPEAT"
+       :summary "REPEAT"
+       :details {:reason :invalid-munera-open-task-path
+                 :text text}})))
+
 (defn- register-built-in-deterministic-operations!
   [api]
   (when-let [register-operation (:register-operation api)]
@@ -208,7 +225,11 @@
                    {:status :error
                     :reason :invalid-route
                     :message "route must be a string"
-                    :details {:route (:route args)}}))})))
+                    :details {:route (:route args)}}))})
+    (register-operation
+     {:id "workflow/munera-open-task-path-routing"
+      :handler (fn [{:keys [args]}]
+                 (parse-munera-open-task-path-routing (:text args)))})))
 
 (declare refresh-widgets!)
 

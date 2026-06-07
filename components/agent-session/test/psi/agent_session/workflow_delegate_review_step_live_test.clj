@@ -9,6 +9,7 @@
    [psi.agent-session.workflow-test-support :as workflow-test-support]
    [psi.command-registry.registry :as command-registry]
    [psi.deterministic-operation-registry.registry :as op-reg]
+   [psi.deterministic-operation-runtime.core :as deterministic-op-runtime]
    [psi.workflow-runtime.core :as workflow-runtime]))
 
 (use-fixtures :each
@@ -32,6 +33,21 @@
                                             "workflow/pass-status-routing")))
         (is (some? (op-reg/get-operation-in (:deterministic-operation-registry ctx)
                                             "workflow/constant-routing")))
+        (is (some? (op-reg/get-operation-in (:deterministic-operation-registry ctx)
+                                            "workflow/munera-open-task-path-routing")))
+        (is (= {:status :ok :data "DONE" :summary "DONE"}
+               (op-reg/invoke-operation-in
+                (:deterministic-operation-registry ctx)
+                "workflow/munera-open-task-path-routing"
+                {:args {:text "munera/open/219-simplify-rpc-session-family"}}
+                deterministic-op-runtime/invoke-operation)))
+        (is (= "REPEAT"
+               (:data
+                (op-reg/invoke-operation-in
+                 (:deterministic-operation-registry ctx)
+                 "workflow/munera-open-task-path-routing"
+                 {:args {:text "munera/open/219-simplify-rpc-session-family\nextra"}}
+                 deterministic-op-runtime/invoke-operation))))
         (finally
           (context/shutdown-context! ctx))))))
 
@@ -55,7 +71,7 @@
                           (fn [_ctx child-session-id prompt]
                             (let [reply (cond
                                           (str/includes? prompt "end your response with exactly one of:")
-                                          (str "No new actionable feedback found.\n\nPASS_STATUS: REVIEW_COMPLETE")
+                                          "No new actionable feedback found.\n\nPASS_STATUS: REVIEW_COMPLETE"
 
                                           (str/includes? prompt "Execute the newly added actionable follow-up items")
                                           (throw (ex-info "follow-up should not execute on REVIEW_COMPLETE"
