@@ -15,28 +15,28 @@ when done.
 
 ## Slice 2 — Architecture workflow selection and task-generation shell
 
-- [ ] Create `.psi/workflows/reduce-architectural-complexity.edn` with top-level `:name "reduce-architectural-complexity"` and a concise description distinguishing it from `reduce-incidental-complexity`.
-- [ ] Add `select-and-create` as a `:session` step with tools `read`, `bash`, `edit`, and `write`, plus relevant `gordian`/review/code-shaping skills as needed.
-- [ ] In `select-and-create`, require `git status --short --branch` and explicitly forbid `work-on`, worktree creation, and branch/worktree switching.
-- [ ] In `select-and-create`, run `bb gordian architecture-targets --edn` from the worktree root, parse/validate the EDN envelope before task creation, and write raw EDN stdout to `munera/open/NNN-slug/architecture-targets.edn` only after all mandatory pre-task captures are verified.
-- [ ] In `select-and-create`, select only the top-level `:winner` when present, eligible, and carrying interpretable `:candidate/id` and `:candidate/type`; treat missing/non-vector top-level `:candidates` as uninterpretable.
-- [ ] In `select-and-create`, implement the no-target/uninterpretable branch with no task creation, no `munera_task_path:` line, final raw line `PASS_STATUS: ACTIONABLE_FEEDBACK`, judge `workflow/pass-status-routing`, and EDN route `"REPEAT"` directly to `:done`.
-- [ ] In `select-and-create`, implement the target-created branch with final raw line `PASS_STATUS: REVIEW_COMPLETE`, judge normalization to `"DONE"`, and EDN route `"DONE"` to `extract-task-path`.
-- [ ] In `select-and-create`, run `bb gordian target-issues --candidate '<pr-str candidate-id>' --edn` when supported and write raw stdout to `target-issues.edn`.
-- [ ] In `select-and-create`, when `target-issues` is unsupported or fails for an otherwise valid selected candidate, write `target-issues-unavailable.edn` with `:candidate/id`, `:candidate/type`, `:status`, `:command`, and `:reason`, and continue task creation.
-- [ ] In `select-and-create`, run `bb gordian diagnose --edn` before task creation, verify it exits successfully and emits readable EDN, and write raw stdout to root-relative `munera/open/NNN-slug/before-diagnose.edn` only after the all-or-nothing pre-task capture gate passes.
-- [ ] In `select-and-create`, if any mandatory pre-task capture for an otherwise valid winner fails or emits unreadable EDN, create no partial Munera task, emit no `munera_task_path:`, include command/exit/stdout/stderr/readability details, and end with `PASS_STATUS: ACTIONABLE_FEEDBACK`.
-- [ ] In `select-and-create`, resolve candidate membership for `:namespace`, `:family`, `:pair`, and `:community` exactly as specified in design.md.
-- [ ] In `select-and-create`, resolve every target namespace to at least one production Clojure source file and take the no-target route if any target namespace cannot be resolved.
-- [ ] Generate `munera/open/NNN-slug/design.md` containing selected candidate id/type/label, ranking evidence, target-issues framing or unavailable note, scope, non-goals, blast-radius limits, unchanged behaviours, test-net requirements, and Gordian validation criteria.
-- [ ] Ensure generated task references all Gordian artifacts with worktree-root-relative paths under the generated task directory, never bare filenames.
-- [ ] Ensure generated task records `:target/namespaces`, `:target/source-areas`, default/explicit `:target/allowed-adjacent-source-areas`, and `:target/affected-test-areas` semantics.
-- [ ] Commit generated task creation and baseline/ranking/framing artifacts within the workflow prompt contract only after all required pre-task captures have been verified readable.
-- [ ] Emit a structured handoff containing `munera_task_path:` only on the target-created path.
-- [ ] Add an `extract-task-path` session step immediately after the target-created route; it reads the `select-and-create` handoff, validates exactly one root-relative `munera_task_path: munera/open/NNN-slug` line, yields only that path, routes success to `review-task-design`, and routes malformed target-present handoff to `terminal-stop-summary`.
-- [ ] Add `review-task-design`, `create-task-plan`, and `review-task-plan` delegates wired with `:prompt-string {:type :map :fields {:input {:from {:step "extract-task-path" :yield :text}}}}`, while passing the full `select-and-create` handoff only as context.
-- [ ] Verify the workflow EDN parses/loads after Slice 2.
-- [ ] Commit Slice 2 (`⚒ workflow: add architecture target selection`).
+- [x] Create `.psi/workflows/reduce-architectural-complexity.edn` with top-level `:name "reduce-architectural-complexity"` and a concise description distinguishing it from `reduce-incidental-complexity`.
+- [x] Add `select-and-create` as a `:session` step with tools `read`, `bash`, `edit`, and `write`, plus relevant `gordian`/review/code-shaping skills as needed.
+- [x] In `select-and-create`, require `git status --short --branch` and explicitly forbid `work-on`, worktree creation, and branch/worktree switching.
+- [x] In `select-and-create`, run `bb gordian architecture-targets --edn` from the worktree root, parse/validate the EDN envelope before task creation, and write raw EDN stdout to `munera/open/NNN-slug/architecture-targets.edn` only after all mandatory pre-task captures are verified.
+- [x] In `select-and-create`, select only the top-level `:winner` when present, eligible, and carrying interpretable `:candidate/id` and `:candidate/type`; treat missing/non-vector top-level `:candidates` as uninterpretable.
+- [x] In `select-and-create`, implement the no-target/uninterpretable branch with no task creation, no `munera_task_path:` line, final raw line `PASS_STATUS: ACTIONABLE_FEEDBACK`, judge `workflow/pass-status-routing`, and EDN route `"REPEAT"` directly to `:done`.
+- [x] In `select-and-create`, implement the target-created branch with final raw line `PASS_STATUS: REVIEW_COMPLETE`, judge normalization to `"DONE"`, and EDN route `"DONE"` to `extract-task-path`.
+- [x] In `select-and-create`, run `bb gordian target-issues --candidate '<pr-str candidate-id>' --edn` when supported and write raw stdout to `target-issues.edn`.
+- [x] In `select-and-create`, when `target-issues` is unsupported or fails for an otherwise valid selected candidate, write `target-issues-unavailable.edn` with `:candidate/id`, `:candidate/type`, `:status`, `:command`, and `:reason`, and continue task creation.
+- [x] In `select-and-create`, run `bb gordian diagnose --edn` before task creation, verify it exits successfully and emits readable EDN, and write raw stdout to root-relative `munera/open/NNN-slug/before-diagnose.edn` only after the all-or-nothing pre-task capture gate passes.
+- [x] In `select-and-create`, if any mandatory pre-task capture for an otherwise valid winner fails or emits unreadable EDN, create no partial Munera task, emit no `munera_task_path:`, include command/exit/stdout/stderr/readability details, and end with `PASS_STATUS: ACTIONABLE_FEEDBACK`.
+- [x] In `select-and-create`, resolve candidate membership for `:namespace`, `:family`, `:pair`, and `:community` exactly as specified in design.md.
+- [x] In `select-and-create`, resolve every target namespace to at least one production Clojure source file and take the no-target route if any target namespace cannot be resolved.
+- [x] Generate `munera/open/NNN-slug/design.md` containing selected candidate id/type/label, ranking evidence, target-issues framing or unavailable note, scope, non-goals, blast-radius limits, unchanged behaviours, test-net requirements, and Gordian validation criteria.
+- [x] Ensure generated task references all Gordian artifacts with worktree-root-relative paths under the generated task directory, never bare filenames.
+- [x] Ensure generated task records `:target/namespaces`, `:target/source-areas`, default/explicit `:target/allowed-adjacent-source-areas`, and `:target/affected-test-areas` semantics.
+- [x] Commit generated task creation and baseline/ranking/framing artifacts within the workflow prompt contract only after all required pre-task captures have been verified readable.
+- [x] Emit a structured handoff containing `munera_task_path:` only on the target-created path.
+- [x] Add an `extract-task-path` session step immediately after the target-created route; it reads the `select-and-create` handoff, validates exactly one root-relative `munera_task_path: munera/open/NNN-slug` line, yields only that path, routes success to `review-task-design`, and routes malformed target-present handoff to `terminal-stop-summary`.
+- [x] Add `review-task-design`, `create-task-plan`, and `review-task-plan` delegates wired with `:prompt-string {:type :map :fields {:input {:from {:step "extract-task-path" :yield :text}}}}`, while passing the full `select-and-create` handoff only as context.
+- [x] Verify the workflow EDN parses/loads after Slice 2. Decision: `load-edn-only` registered `reduce-architectural-complexity` with no errors.
+- [x] Commit Slice 2 (`⚒ workflow: add architecture target selection`).
 
 ## Slice 3 — Pre-simplification test-net gates
 
