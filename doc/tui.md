@@ -56,6 +56,7 @@ repo-local startup.
 
 `/status` `/history` `/new` `/resume` `/tree [session-id]` `/worktree` `/help` `/quit` `/skills` `/prompts` `/reload-prompts` `/reload-models` `/reload-extension-installs` `/remember [text]`
 `/model <provider> <model-id>` `/thinking <off|minimal|low|medium|high|xhigh>` `/speed [normal|fast [session|project|user]]` `/effort [low|medium|high|xhigh|none [session|project|user]]`
+`/session-profiles` `/session-profile [profile-name|clear]`
 `/jobs [status ...]` `/job <job-id>` `/cancel-job <job-id>`
 `/project-repl` `/project-repl start` `/project-repl attach` `/project-repl stop` `/project-repl eval <code>` `/project-repl interrupt`
 `/operations` `/operation <id> {edn-args}`
@@ -81,6 +82,25 @@ The footer shows `• fast` when speed mode is fast and appends
 `• effort:<value>` to the thinking label when an effort override is active.
 Speed and effort are not restored from cold journal resume; project/user config
 only applies to newly created root sessions.
+
+### Session profile commands
+
+- `/session-profiles` lists the effective named session profiles from user and
+  project config, including readable model/thinking/speed/effort settings for
+  valid profiles and terse repair reasons for invalid profiles.
+- `/session-profile` prints the current session's selected-profile metadata, if
+  any, plus the concrete model/thinking/speed/effort settings currently active.
+- `/session-profile <profile-name>` applies a valid profile atomically to the
+  current session. Profile names may be typed bare (`planning`) or EDN-style
+  (`:planning`). Applying a profile materializes concrete settings; later config
+  edits do not silently change the session.
+- `/session-profile clear` clears only selected-profile metadata. It does not
+  revert model/thinking/speed/effort values already applied.
+
+Define profiles under `:agent-session :session-profiles` in the existing config
+files. See [`configuration.md`](configuration.md) for config shape and merge
+rules, and [`workflows.md`](workflows.md) for using `:session-profile` in
+workflow steps.
 
 ### Prompt templates
 

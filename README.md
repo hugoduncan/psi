@@ -141,8 +141,11 @@ also cleaned up.
 
 Psi includes Claude Opus 4.8 (`claude-opus-4-8`) in the Anthropic model catalog.
 Interactive sessions support `/speed` for provider throughput-tier selection and
-`/effort` for provider reasoning-effort override; see [`doc/tui.md`](doc/tui.md)
-and [`doc/configuration.md`](doc/configuration.md).
+`/effort` for provider reasoning-effort override. Named session profiles can
+bundle reusable model/thinking/speed/effort settings for interactive selection
+(`/session-profile`) and workflow steps (`:session-profile`); see
+[`doc/tui.md`](doc/tui.md), [`doc/configuration.md`](doc/configuration.md), and
+[`doc/workflows.md`](doc/workflows.md).
 
 ### Extension API
 

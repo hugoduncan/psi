@@ -142,4 +142,5 @@
 
 ## Docs review follow-ups
 
-- [ ] DOC1: Update user-facing command discovery docs so session profile commands are visible where interactive commands are enumerated: add `/session-profiles` and `/session-profile [profile-name|clear]` to `doc/tui.md`'s in-session command list/command explanation, and add a terse README pointer under the top-level model/configuration/workflow guidance so README mentions session profiles.
+- [x] DOC1: Update user-facing command discovery docs so session profile commands are visible where interactive commands are enumerated: add `/session-profiles` and `/session-profile [profile-name|clear]` to `doc/tui.md`'s in-session command list/command explanation, and add a terse README pointer under the top-level model/configuration/workflow guidance so README mentions session profiles.
+  - Done: `doc/tui.md` now lists `/session-profiles` and `/session-profile [profile-name|clear]` with a session-profile command explanation, and README model controls now point to session profiles for interactive selection and workflow `:session-profile` usage.
