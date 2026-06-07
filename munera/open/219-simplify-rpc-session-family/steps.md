@@ -103,3 +103,7 @@ when done.
 
 - [x] Created `plan.md` from stable `design.md` with approach, risks, and slice order.
 - [x] Created `steps.md` with concrete implementation checklist grouped by slice.
+
+## Pre-simplification baseline/diff gate
+
+- [x] 2026-06-07 gate: verified baseline data and clean baseline target/source status, compared committed changes from baseline HEAD `c513da4bb7e195956689cfa6455262f565e806ee` through current HEAD plus empty uncommitted status/diff, classified all coverage-phase changes as characterization tests, task artifacts, or documentation/working-memory note with no source implementation changes or testability seams, reran the pinned focused RPC suite green (57 tests / 439 assertions), and recorded no revert/split/closure/retry required.
