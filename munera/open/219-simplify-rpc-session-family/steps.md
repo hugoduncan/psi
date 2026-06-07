@@ -9,6 +9,12 @@ when done.
 - [x] PA2: Choose one authoritative location and minimal shape for the coverage map/gap record (for example a root-relative task-local `coverage-map.edn`/`.md` or a named section in `implementation.md`) and update Slice 2/5 references to that location; avoid `implementation.md`-or-unnamed-artifact ambiguity. Done in this follow-up: `plan.md`, the new `coverage-map.md` template, and Slice 2/5 steps now use `munera/open/219-simplify-rpc-session-family/coverage-map.md` with sections for verification command, source-area coverage, behaviour coverage, and gap disposition.
 - [x] PA3: Pin Slice 6 review-gate mechanics to the architecture workflow's exact review-step skill sequence/names (`task-implementation-review`, `task-test-review`, `review-implementation-architecture`, `test-shaper`, `review-task-docs`, `code-shaper`) and make the architecture gate use `review-implementation-architecture`, not the design-only architecture review. Done in this follow-up: `plan.md` and Slice 6 checklist now name the ordered review-step sequence and explicitly forbid using design-only `review-task-architecture` for the architecture implementation gate.
 
+## Plan/steps inconsistency review follow-ups
+
+- [ ] PI1: Align Slice 1 with the plan/design clean-baseline contract: require the recorded `git status --short --branch` to show a clean pre-refactor worktree before running the baseline suite; if there is pre-existing dirt, record it and stop or explicitly resolve it before claiming a clean baseline.
+- [ ] PI2: Align Slice 2 with the focused-suite propagation contract: if coverage review adds any new RPC characterization namespace/file, update the exact focused command in `plan.md`, the relevant `steps.md` checklist text, and `characterization-baseline.edn` before committing Slice 2, so Slice 1/2/5 do not diverge on what the authoritative suite contains.
+- [ ] PI3: Align the adjacent-source escape hatch across design/plan/steps: if the chosen seam requires any adjacent production file, stop and update the plan/design before editing with the exact root-relative file, why the target cannot be simplified without it, and why the change remains narrow behaviour-preserving contract alignment rather than broader TUI/Emacs/extension/workflow/app-runtime redesign.
+
 ## Slice 1 — Preflight and clean baseline
 
 - [ ] Confirm `design-steps.md` has no unchecked follow-ups and record the result in `implementation.md`.
