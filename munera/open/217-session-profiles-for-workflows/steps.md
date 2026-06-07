@@ -151,3 +151,7 @@
 - [x] DOC4: Update `doc/workflow-ir.md`'s suggested formal `session-spec` grammar so it includes canonical `:session-profile` and `:thinking-level` entries alongside `:model`, matching the implemented IR schema and the workflow authoring docs.
   - Done: `doc/workflow-ir.md`'s suggested formal `session-spec` grammar now includes `:session-profile`, `:model`, and `:thinking-level`, matching the implemented session-step IR schema and workflow authoring docs.
 
+## Code-shaper review follow-ups
+
+- [ ] CS1: Reuse/enforce the shared selectable session-profile name grammar at the canonical workflow IR/schema/compiler boundary for `:session-profile` values on session steps, delegate `[:delegate :session]`, and markdown frontmatter, so namespaced or command-unparseable profile names (for example `:team/coding` or `:fast+coding`) are rejected during workflow validation instead of compiling into runs that can only fail later at step resolution.
+
