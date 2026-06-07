@@ -145,6 +145,19 @@
             (is (= [:thinking-level :model :model :thinking-level]
                    (mapv :kind (persist/all-entries-in ctx session-id)))
                 "only model/thinking journal entries are appended; speed/effort/profile metadata are not")))
+        (testing "malformed profile tokens leave concrete settings and selected metadata unchanged"
+          (let [before (session-state ctx session-id)
+                cases  [["/session-profile planning extra" "Usage: /session-profile"]
+                        ["/session-profile {}" "Invalid session profile token: {}"]
+                        ["/session-profile [:coding]" "Invalid session profile token: [:coding]"]
+                        ["/session-profile (:coding)" "Invalid session profile token: (:coding)"]
+                        ["/session-profile fast+coding" "Invalid session profile token: fast+coding"]]]
+            (doseq [[command expected-message] cases]
+              (let [result (commands/dispatch-in ctx session-id command cmd-opts)]
+                (is (str/includes? (:message result) expected-message)
+                    command)
+                (is (= before (session-state ctx session-id))
+                    command)))))
         (testing "clear removes only selected-profile metadata"
           (let [before (select-keys (ss/get-session-data-in ctx session-id)
                                     [:model :thinking-level :speed-mode :effort-override])]
