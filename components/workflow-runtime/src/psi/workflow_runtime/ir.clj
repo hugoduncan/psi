@@ -19,6 +19,7 @@
   (:require
    [clojure.string :as str]
    [malli.core :as m]
+   [psi.workflow-registry.session-profile-names :as profile-names]
    [psi.workflow-runtime.structured-output :as structured-output]
    [psi.workflow-runtime.structured-output-schemas :as structured-output-schemas]))
 
@@ -171,7 +172,11 @@
 (def response-mode-schema
   [:enum :streaming :non-streaming])
 
-(def profile-name-schema :keyword)
+(def profile-name-schema
+  [:and
+   :keyword
+   [:fn {:error/message "session-profile must match /session-profile token grammar"}
+    profile-names/valid-profile-name?]])
 
 (def session-spec-schema
   [:map {:closed true}

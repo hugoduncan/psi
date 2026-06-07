@@ -153,5 +153,6 @@
 
 ## Code-shaper review follow-ups
 
-- [ ] CS1: Reuse/enforce the shared selectable session-profile name grammar at the canonical workflow IR/schema/compiler boundary for `:session-profile` values on session steps, delegate `[:delegate :session]`, and markdown frontmatter, so namespaced or command-unparseable profile names (for example `:team/coding` or `:fast+coding`) are rejected during workflow validation instead of compiling into runs that can only fail later at step resolution.
+- [x] CS1: Reuse/enforce the shared selectable session-profile name grammar at the canonical workflow IR/schema/compiler boundary for `:session-profile` values on session steps, delegate `[:delegate :session]`, and markdown frontmatter, so namespaced or command-unparseable profile names (for example `:team/coding` or `:fast+coding`) are rejected during workflow validation instead of compiling into runs that can only fail later at step resolution.
+  - Done: extracted the selectable profile-name grammar into low-level `psi.workflow-registry.session-profile-names`, reused it from shared-config, markdown parsing, target IR compilation, and canonical workflow IR schemas, and added grammar tests proving session/delegate IR plus compact authored/markdown profile names reject `:team/coding` and `:fast+coding` before run creation while valid selectable names still pass.
 

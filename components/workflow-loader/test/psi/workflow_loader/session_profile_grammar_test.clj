@@ -62,6 +62,121 @@
       (is (not (contains? (get-in ir [:steps 0 :session]) :session-profile)))
       (is (not (contains? (get-in ir [:steps 1 :delegate]) :session))))))
 
+(deftest session-profile-name-grammar-rejection-test
+  ;; Tests that unsupported session-profile names fail at workflow loading and canonical validation boundaries.
+  (testing "canonical IR rejects namespaced and command-unparseable session-step profile names"
+    (doseq [profile-name [:team/coding :fast+coding]]
+      (let [{:keys [valid? structural-errors]}
+            (workflow-ir/validate-workflow-ir
+             {:version :workflow-ir/v1
+              :steps [{:name "plan"
+                       :type :session
+                       :session {:session-profile profile-name
+                                 :contributions [{:type :source
+                                                  :from :workflow-original}]}
+                       :outputs {:final-llm-reply {:source :session/final-llm-reply}}
+                       :yields {:type :text :text :final-llm-reply}}]})]
+        (is (false? valid?) (str "invalid profile should fail: " (pr-str profile-name)))
+        (is (some? structural-errors)))))
+
+  (testing "canonical IR rejects namespaced and command-unparseable delegate profile names"
+    (doseq [profile-name [:team/coding :fast+coding]]
+      (let [{:keys [valid? structural-errors]}
+            (workflow-ir/validate-workflow-ir
+             {:version :workflow-ir/v1
+              :steps [{:name "build"
+                       :type :delegate
+                       :delegate {:target "builder"
+                                  :prompt-string "Build it."
+                                  :session {:session-profile profile-name}}
+                       :outputs {:handoff {:source :delegate/handoff}}
+                       :yields {:type :delegated}}]})]
+        (is (false? valid?) (str "invalid profile should fail: " (pr-str profile-name)))
+        (is (some? structural-errors)))))
+
+  (testing "target compiler rejects invalid compact session and delegate profile names before run creation"
+    (doseq [[step-type profile-name]
+            [[:session :team/coding]
+             [:session :fast+coding]
+             [:delegate :team/coding]
+             [:delegate :fast+coding]]]
+      (let [step (case step-type
+                   :session {:name "plan"
+                             :type :session
+                             :session-profile profile-name
+                             :contributions [{:type :source
+                                              :from :workflow-original}]}
+                   :delegate {:name "build"
+                              :type :delegate
+                              :target "builder"
+                              :session-profile profile-name
+                              :prompt-string "Build it."})]
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Session profile names must be selectable unqualified keywords"
+             (compile-ir {:steps [step]}))
+            (str "compiler should reject " step-type " " (pr-str profile-name))))))
+
+  (testing "markdown frontmatter invalid profile names fail when compiled to canonical IR"
+    (doseq [frontmatter-profile [":team/coding" "fast+coding"]]
+      (let [parsed (parser/parse-workflow-file
+                    :md
+                    (str "---\nname: planner\ndescription: Plans\nsession-profile: "
+                         frontmatter-profile
+                         "\n---\nPlan {{input}}."))
+            {definition :definition parse-error :error} (compiler/compile-workflow-file parsed)]
+        (is (nil? parse-error))
+        (is (thrown-with-msg?
+             clojure.lang.ExceptionInfo
+             #"Session profile names must be selectable unqualified keywords"
+             (compile-ir definition))))))
+
+  (testing "canonical IR rejects string session-profile names"
+    (let [{:keys [valid? structural-errors]}
+          (workflow-ir/validate-workflow-ir
+           {:version :workflow-ir/v1
+            :steps [{:name "plan"
+                     :type :session
+                     :session {:session-profile "planning"
+                               :contributions [{:type :source
+                                                :from :workflow-original}]}
+                     :outputs {:final-llm-reply {:source :session/final-llm-reply}}
+                     :yields {:type :text :text :final-llm-reply}}]})]
+      (is (false? valid?))
+      (is (some? structural-errors))))
+
+  (testing "valid selectable profile names still pass session and delegate IR validation"
+    (let [session-result (workflow-ir/validate-workflow-ir
+                          {:version :workflow-ir/v1
+                           :steps [{:name "plan"
+                                    :type :session
+                                    :session {:session-profile :fast-coding_1.2
+                                              :contributions [{:type :source
+                                                               :from :workflow-original}]}
+                                    :outputs {:final-llm-reply {:source :session/final-llm-reply}}
+                                    :yields {:type :text :text :final-llm-reply}}]})
+          delegate-result (workflow-ir/validate-workflow-ir
+                           {:version :workflow-ir/v1
+                            :steps [{:name "build"
+                                     :type :delegate
+                                     :delegate {:target "builder"
+                                                :prompt-string "Build it."
+                                                :session {:session-profile :fast-coding_1.2}}
+                                     :outputs {:handoff {:source :delegate/handoff}}
+                                     :yields {:type :delegated}}]})]
+      (is (:valid? session-result))
+      (is (:valid? delegate-result))))
+
+  (testing "parser normalizes markdown frontmatter via shared selectable token spelling"
+    (let [bare (parser/parse-workflow-file
+                :md
+                "---\nname: planner\ndescription: Plans\nsession-profile: fast-coding_1.2\n---\nPlan {{input}}.")
+          edn-style (parser/parse-workflow-file
+                     :md
+                     "---\nname: planner\ndescription: Plans\nsession-profile: :fast-coding_1.2\n---\nPlan {{input}}.")]
+      (is (= :fast-coding_1.2 (get-in bare [:session-config :session-profile])))
+      (is (= :fast-coding_1.2 (get-in edn-style [:session-config :session-profile]))))))
+
 (deftest session-profile-grammar-rejection-test
   ;; Tests that unsupported placements remain invalid at the canonical IR boundary.
   (testing "nested session-profile spelling is rejected by session schema"

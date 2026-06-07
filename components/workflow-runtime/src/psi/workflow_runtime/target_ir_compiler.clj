@@ -6,8 +6,9 @@
    runtime workflow IR. Unlike the current-grammar compatibility compiler, this
    compiler emits no migration `:compat` metadata."
   (:require
-   [psi.workflow-runtime.ir :as workflow-ir]
-   [psi.workflow-registry.definition :as workflow-definition]))
+   [psi.workflow-registry.definition :as workflow-definition]
+   [psi.workflow-registry.session-profile-names :as profile-names]
+   [psi.workflow-runtime.ir :as workflow-ir]))
 
 (def ^:private default-invoke-outputs
   {:data {:source :invoke/data}
@@ -133,6 +134,19 @@
                             (assoc :max-iterations (:max-iterations transition)))]))
           routing-table)))
 
+(defn- compile-session-profile-name
+  [profile-name]
+  (when-not (profile-names/valid-profile-name? profile-name)
+    (throw (ex-info "Session profile names must be selectable unqualified keywords matching /session-profile token grammar"
+                    {:session-profile profile-name})))
+  profile-name)
+
+(defn- compile-session-config
+  [step allowed-keys]
+  (cond-> (select-keys step allowed-keys)
+    (contains? step :session-profile)
+    (update :session-profile compile-session-profile-name)))
+
 (defn- step-default-outputs
   [step-type]
   (case step-type
@@ -178,8 +192,8 @@
 
     :session
     (assoc (compile-common-step-fields step)
-           :session (cond-> (select-keys step [:model :session-profile :tools :skills :system-prompt :thinking-level :prompt-component-selection :response-mode :temperature :logprobs :top-logprobs])
-                      true (assoc :contributions (mapv compile-contribution (:contributions step)))))
+           :session (assoc (compile-session-config step [:model :session-profile :tools :skills :system-prompt :thinking-level :prompt-component-selection :response-mode :temperature :logprobs :top-logprobs])
+                           :contributions (mapv compile-contribution (:contributions step))))
 
     :delegate
     (assoc (compile-common-step-fields step)
@@ -190,7 +204,7 @@
                                                  (compile-contribution prompt-string)
                                                  prompt-string))}
                        (some (partial contains? step) [:model :session-profile :thinking-level])
-                       (assoc :session (select-keys step [:model :session-profile :thinking-level]))
+                       (assoc :session (compile-session-config step [:model :session-profile :thinking-level]))
                        (contains? step :context)
                        (assoc :context (mapv compile-contribution (:context step)))))
 

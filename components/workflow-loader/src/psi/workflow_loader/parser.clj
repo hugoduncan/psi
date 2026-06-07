@@ -9,7 +9,8 @@
   (:require
    [clojure.edn :as edn]
    [clojure.string :as str]
-   [psi.prompt-assets.prompt-templates :as pt]))
+   [psi.prompt-assets.prompt-templates :as pt]
+   [psi.workflow-registry.session-profile-names :as profile-names]))
 
 (def ^:private allowed-md-frontmatter-keys
   #{:name
@@ -82,10 +83,7 @@
     value
 
     (string? value)
-    (let [token (str/trim value)]
-      (keyword (if (str/starts-with? token ":")
-                 (subs token 1)
-                 token)))
+    (or (profile-names/normalize-profile-name-token value) value)
 
     :else
     value))

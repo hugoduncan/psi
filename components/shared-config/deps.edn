@@ -1,2 +1,3 @@
-{:deps {org.clojure/clojure {:mvn/version "1.12.0"}
-        psi/ai              {:local/root "../ai"}}}
+{:deps {org.clojure/clojure   {:mvn/version "1.12.0"}
+        psi/ai                {:local/root "../ai"}
+        psi/workflow-registry {:local/root "../workflow-registry"}}}

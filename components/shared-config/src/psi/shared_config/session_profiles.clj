@@ -8,7 +8,8 @@
    [clojure.string :as str]
    [psi.ai.model-registry :as model-registry]
    [psi.shared-config.project :as project-prefs]
-   [psi.shared-config.user :as user-config]))
+   [psi.shared-config.user :as user-config]
+   [psi.workflow-registry.session-profile-names :as profile-names]))
 
 (def supported-fields
   "The only profile fields that affect session/profile materialization."
@@ -20,20 +21,15 @@
 
 (def profile-name-token-pattern
   "The selectable `/session-profile <name>` token grammar, excluding any leading `:`."
-  #"[A-Za-z0-9][A-Za-z0-9._-]*")
+  profile-names/profile-name-token-pattern)
 
-(defn valid-profile-name-token?
+(def valid-profile-name-token?
   "Return true when `token` can be typed as a profile name in `/session-profile`."
-  [token]
-  (boolean (and (string? token)
-                (re-matches profile-name-token-pattern token))))
+  profile-names/valid-profile-name-token?)
 
-(defn valid-profile-name?
+(def valid-profile-name?
   "Return true when `profile-name` is a keyword addressable by `/session-profile`."
-  [profile-name]
-  (and (keyword? profile-name)
-       (nil? (namespace profile-name))
-       (valid-profile-name-token? (name profile-name))))
+  profile-names/valid-profile-name?)
 
 (def canonical-thinking-levels
   #{:off :minimal :low :medium :high :xhigh})
