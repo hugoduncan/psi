@@ -20,9 +20,10 @@ The initial implementation strategy is:
 
 1. Establish and record a clean focused RPC baseline before any production
    refactor.
-2. Build a coverage map from target behaviours to existing/new tests, especially
-   command dispatch/results, command tree/resume/pickers, navigation,
-   prompt/stream progress, projection delivery, and frontend action results.
+2. Build `munera/open/219-simplify-rpc-session-family/coverage-map.md`
+   from target behaviours to existing/new tests, especially command
+   dispatch/results, command tree/resume/pickers, navigation, prompt/stream
+   progress, projection delivery, and frontend action results.
 3. Add characterization tests for fixable behaviour gaps before production code
    changes. If a required behaviour cannot be safely characterized, stop before
    simplification and record why.
@@ -31,12 +32,63 @@ The initial implementation strategy is:
    moving domain/UI semantics into a new RPC-owned hub.
 5. Refactor only the recorded target source files unless this plan is explicitly
    amended before implementation to authorize a narrow adjacent source file.
-6. Re-run focused RPC tests, targeted lint/format checks, and the mandatory
-   Gordian after/compare/gate validation commands.
+6. Re-run the focused RPC verification suite pinned below, targeted
+   lint/format checks, and the mandatory Gordian after/compare/gate validation
+   commands.
 7. Run the explicit review gates required by the design and record any
    follow-ups in `steps.md` / `implementation.md`.
 
-### Key decisions from design
+## Focused RPC verification suite
+
+The focused RPC baseline/characterization suite for Slices 1, 2, and 5 is the
+following exact command from the worktree root:
+
+```bash
+bb clojure:test:scry --dir components/rpc/test \
+  --namespace psi.rpc-command-results-test \
+  --namespace psi.rpc-prompt-command-test \
+  --namespace psi.rpc-prompt-test \
+  --namespace psi.rpc-session-navigation-test \
+  --namespace psi.rpc-events-test \
+  --namespace psi.rpc-invariants-test \
+  --namespace psi.rpc-ops-test \
+  --namespace psi.rpc-test
+```
+
+Those namespaces correspond to these design-listed affected test files:
+
+- `components/rpc/test/psi/rpc_command_results_test.clj`
+- `components/rpc/test/psi/rpc_prompt_command_test.clj`
+- `components/rpc/test/psi/rpc_prompt_test.clj`
+- `components/rpc/test/psi/rpc_session_navigation_test.clj`
+- `components/rpc/test/psi/rpc_events_test.clj`
+- `components/rpc/test/psi/rpc_invariants_test.clj`
+- `components/rpc/test/psi/rpc_ops_test.clj`
+- `components/rpc/test/psi/rpc_test.clj`
+
+Characterization tests should normally be added inside those namespaces so the
+same suite remains stable across Slices 1/2/5. If Slice 2 must add a new RPC test
+namespace, update this exact command, `steps.md`, and
+`characterization-baseline.edn` before committing Slice 2; do not leave an
+unlisted characterization namespace outside the focused suite.
+
+## Coverage map artifact
+
+The authoritative coverage map/gap record is
+`munera/open/219-simplify-rpc-session-family/coverage-map.md`. Slice 2 fills it
+before production edits; Slice 5 rechecks it when recording final focused-suite
+verification. Minimal shape:
+
+- `## Verification command`: the focused RPC command above, plus any explicitly
+  authorized additions.
+- `## Source-area coverage`: one subsection per target source file naming covered
+  behaviours and tests/vars.
+- `## Behaviour coverage`: command/result, picker/model/thinking/frontend-action,
+  command-tree/resume/navigation, prompt/stream, and projection/emit coverage.
+- `## Gaps and disposition`: each gap as `covered-by`, `added-test`,
+  `infeasible-stop`, or `accepted-existing-coverage`, with terse evidence.
+
+## Key decisions from design
 
 - The selected target is exactly the captured `[:family "psi.rpc.session"]`
   winner from `architecture-targets.edn`; do not recompute or expand membership
@@ -102,10 +154,11 @@ The initial implementation strategy is:
 1. **Slice 1 — Preflight and clean baseline.** Verify task artifacts, confirm the
    worktree state, run the focused RPC baseline from a clean pre-refactor state,
    and write a baseline artifact with commands/results/status.
-2. **Slice 2 — Coverage review and characterization gate.** Map all target
-   behaviours/source areas to existing tests, add characterization tests for
-   fixable gaps, rerun the focused suite, and enforce a pre-implementation diff
-   gate that permits only task artifacts and characterization work.
+2. **Slice 2 — Coverage review and characterization gate.** Fill
+   `coverage-map.md` by mapping all target behaviours/source areas to existing
+   tests, add characterization tests for fixable gaps, rerun the pinned focused
+   RPC suite, and enforce a pre-implementation diff gate that permits only task
+   artifacts and characterization work.
 3. **Slice 3 — Ownership seam selection.** Inspect the target family after the
    test net is green, record the selected shared decision/data-shaping seam, and
    confirm whether the implementation will touch command/result/navigation
@@ -118,14 +171,20 @@ The initial implementation strategy is:
    division between command dispatch and result adaptation, or projection/stream
    delivery helpers that can be made more obviously subscriber/fanout-only. Keep
    semantic owners obvious at call sites.
-5. **Slice 5 — Focused verification and Gordian validation.** Re-run focused RPC
-   tests and targeted lint/format checks, then capture `after-diagnose.edn`,
+5. **Slice 5 — Focused verification and Gordian validation.** Re-run the pinned
+   focused RPC suite and targeted lint/format checks, recheck `coverage-map.md`
+   for stale gaps, then capture `after-diagnose.edn`,
    `after-architecture-targets.edn`, `architecture-compare.edn`, and
    `architecture-gate.edn` with the exact design commands.
-6. **Slice 6 — Review gates and closure.** Run/record behaviour, test-net,
-   architecture, test-shape, docs, and code-shape reviews; execute any follow-up
-   checklist items; confirm docs/changelog remain unnecessary unless behaviour
-   changed; summarize final verification.
+6. **Slice 6 — Review gates and closure.** Run/record the architecture
+   workflow's exact `review-step` skill sequence in order:
+   `task-implementation-review`, `task-test-review`,
+   `review-implementation-architecture`, `test-shaper`, `review-task-docs`, and
+   `code-shaper`. The architecture gate uses the implementation-specific
+   `review-implementation-architecture` skill, not the design-only
+   `review-task-architecture` skill. Execute any follow-up checklist items;
+   confirm docs/changelog remain unnecessary unless behaviour changed; summarize
+   final verification.
 
 ## Non-blocking notes
 

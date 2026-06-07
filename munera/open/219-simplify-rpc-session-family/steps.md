@@ -5,9 +5,9 @@ when done.
 
 ## Plan/steps ambiguity review follow-ups
 
-- [ ] PA1: Pin the focused RPC baseline/characterization verification command(s) before Slice 1 execution: name the exact Scry/bb command(s) and namespaces/files from the design's affected test set, plus any explicitly added RPC tests, so Slice 1/2/5 rerun the same suite.
-- [ ] PA2: Choose one authoritative location and minimal shape for the coverage map/gap record (for example a root-relative task-local `coverage-map.edn`/`.md` or a named section in `implementation.md`) and update Slice 2/5 references to that location; avoid `implementation.md`-or-unnamed-artifact ambiguity.
-- [ ] PA3: Pin Slice 6 review-gate mechanics to the architecture workflow's exact review-step skill sequence/names (`task-implementation-review`, `task-test-review`, `review-implementation-architecture`, `test-shaper`, `review-task-docs`, `code-shaper`) and make the architecture gate use `review-implementation-architecture`, not the design-only architecture review.
+- [x] PA1: Pin the focused RPC baseline/characterization verification command(s) before Slice 1 execution: name the exact Scry/bb command(s) and namespaces/files from the design's affected test set, plus any explicitly added RPC tests, so Slice 1/2/5 rerun the same suite. Done in this follow-up: `plan.md` now pins the exact `bb clojure:test:scry --dir components/rpc/test --namespace ...` command for the eight design-listed RPC namespaces/files and requires any added characterization namespace to update the command before Slice 2 commit.
+- [x] PA2: Choose one authoritative location and minimal shape for the coverage map/gap record (for example a root-relative task-local `coverage-map.edn`/`.md` or a named section in `implementation.md`) and update Slice 2/5 references to that location; avoid `implementation.md`-or-unnamed-artifact ambiguity. Done in this follow-up: `plan.md`, the new `coverage-map.md` template, and Slice 2/5 steps now use `munera/open/219-simplify-rpc-session-family/coverage-map.md` with sections for verification command, source-area coverage, behaviour coverage, and gap disposition.
+- [x] PA3: Pin Slice 6 review-gate mechanics to the architecture workflow's exact review-step skill sequence/names (`task-implementation-review`, `task-test-review`, `review-implementation-architecture`, `test-shaper`, `review-task-docs`, `code-shaper`) and make the architecture gate use `review-implementation-architecture`, not the design-only architecture review. Done in this follow-up: `plan.md` and Slice 6 checklist now name the ordered review-step sequence and explicitly forbid using design-only `review-task-architecture` for the architecture implementation gate.
 
 ## Slice 1 — Preflight and clean baseline
 
@@ -16,7 +16,7 @@ when done.
 - [ ] Re-read `design.md`, `architecture-targets.edn`, and `target-issues.edn`; record the selected candidate id/type and fixed target namespace/source-area list in `implementation.md`.
 - [ ] Verify every target source file listed in `design.md` exists under `components/rpc/src/psi/rpc/session/`; stop if any target file is missing.
 - [ ] Verify the candidate affected test files listed in `design.md` exist; note any missing or additionally relevant RPC tests in `implementation.md`.
-- [ ] Run the focused existing RPC baseline suite covering command results, prompt commands, prompt streaming, navigation, RPC events, invariants, ops, and RPC end-to-end behaviour.
+- [ ] Run the pinned focused RPC baseline suite from `plan.md` covering command results, prompt commands, prompt streaming, navigation, RPC events, invariants, ops, and RPC end-to-end behaviour.
 - [ ] Write `munera/open/219-simplify-rpc-session-family/characterization-baseline.edn` with `:git/head`, `:git/status-short`, selected candidate map, target namespaces, target source areas, affected test areas, baseline commands, and pass/fail summaries.
 - [ ] If baseline tests fail for unrelated reasons that cannot be resolved locally, stop before implementation and record the failure/disposition in `implementation.md`.
 - [ ] Commit Slice 1 baseline/task-artifact updates.
@@ -29,10 +29,10 @@ when done.
 - [ ] Cover command tree/resume/session rehydration/navigation behaviours in the map, including session matching, rename, already-active, missing-session, switch, fork, and new-session cases when currently observable.
 - [ ] Cover prompt/stream behaviours in the map, including slash command handling, progress event mapping, assistant message emission, footer refresh on retry/tool-result, and stop/drain semantics.
 - [ ] Cover projection/emit behaviours in the map, including context/footer/session snapshot events, UI snapshot subscription, and event-driven invalidation delivery.
-- [ ] Record the coverage map and identified gaps in `implementation.md` or a task-local coverage artifact.
+- [ ] Record the coverage map and identified gaps in `munera/open/219-simplify-rpc-session-family/coverage-map.md`.
 - [ ] For each fixable gap, add a characterization test that proves current behaviour without asserting the future refactored structure.
 - [ ] Ensure characterization tests assert emitted events, response frames, state changes, or public outputs; do not assert internal interactions or mocks for logic dependencies.
-- [ ] Re-run the focused RPC baseline/characterization suite until green.
+- [ ] Re-run the pinned focused RPC baseline/characterization suite from `plan.md` until green.
 - [ ] If required behaviour cannot be characterized safely, stop before implementation and record the infeasible-coverage reason in `implementation.md`.
 - [ ] Run `git diff --stat` and `git diff --` before production refactoring; verify the diff contains only task artifacts and characterization/test-net changes.
 - [ ] Commit Slice 2 characterization-test-net updates.
@@ -64,7 +64,7 @@ when done.
 
 ## Slice 5 — Focused verification and Gordian validation
 
-- [ ] Re-run the full focused RPC baseline/characterization suite from Slice 1/2 and record results in `implementation.md`.
+- [ ] Re-run the full pinned focused RPC baseline/characterization suite from Slice 1/2 and record results in `implementation.md`.
 - [ ] Run targeted `clj-kondo` over changed Clojure source/test files and record results.
 - [ ] Run `git diff --check` and record the result.
 - [ ] Run `bb gordian diagnose --edn > munera/open/219-simplify-rpc-session-family/after-diagnose.edn` from the worktree root.
@@ -72,17 +72,17 @@ when done.
 - [ ] Run `bb gordian compare munera/open/219-simplify-rpc-session-family/before-diagnose.edn munera/open/219-simplify-rpc-session-family/after-diagnose.edn --edn > munera/open/219-simplify-rpc-session-family/architecture-compare.edn` from the worktree root.
 - [ ] Run `bb gordian gate --baseline munera/open/219-simplify-rpc-session-family/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0 --edn > munera/open/219-simplify-rpc-session-family/architecture-gate.edn` from the worktree root.
 - [ ] Verify `architecture-gate.edn` represents a successful gate; if not, add concrete repair steps and return to Slice 4.
-- [ ] Inspect `architecture-compare.edn` for no new cycles, no new high findings, and zero new medium findings; record any improvement or justified non-improvement in `implementation.md`.
+- [ ] Inspect `architecture-compare.edn` for no new cycles, no new high findings, and zero new medium findings; recheck `coverage-map.md` for stale gaps; record any improvement or justified non-improvement in `implementation.md`.
 - [ ] Commit Slice 5 validation artifacts and verification notes.
 
 ## Slice 6 — Review gates and closure
 
-- [ ] Run a task-implementation review of the final diff against `design.md`, `plan.md`, and `steps.md`; append findings or `REVIEW_COMPLETE` to `implementation.md`.
-- [ ] Run a task-test review of the characterization and regression tests; append findings or `REVIEW_COMPLETE` to `implementation.md`.
-- [ ] Run an architecture review against the selected Gordian target, ownership constraints, validation artifacts, and blast-radius limits; append findings or `REVIEW_COMPLETE` to `implementation.md`.
-- [ ] Run a test-shaper review for clarity, signal, determinism, and absence of interaction/mock assertions; append findings or `REVIEW_COMPLETE` to `implementation.md`.
-- [ ] Run a docs review; confirm no README/doc/CHANGELOG update is required for behaviour-preserving internal simplification, or update user-facing docs if observable behaviour changed.
-- [ ] Run a code-shaper review for simplicity, consistency, robustness, and absence of sideways orchestration/adapter/shim complexity.
+- [ ] Run `review-step` with skill `task-implementation-review` for the final diff against `design.md`, `plan.md`, and `steps.md`; append findings or `REVIEW_COMPLETE` to `implementation.md`.
+- [ ] Run `review-step` with skill `task-test-review` for the characterization and regression tests; append findings or `REVIEW_COMPLETE` to `implementation.md`.
+- [ ] Run `review-step` with skill `review-implementation-architecture` against the selected Gordian target, ownership constraints, validation artifacts, and blast-radius limits; append findings or `REVIEW_COMPLETE` to `implementation.md`; do not use design-only `review-task-architecture` here.
+- [ ] Run `review-step` with skill `test-shaper` for clarity, signal, determinism, and absence of interaction/mock assertions; append findings or `REVIEW_COMPLETE` to `implementation.md`.
+- [ ] Run `review-step` with skill `review-task-docs`; confirm no README/doc/CHANGELOG update is required for behaviour-preserving internal simplification, or update user-facing docs if observable behaviour changed.
+- [ ] Run `review-step` with skill `code-shaper` for simplicity, consistency, robustness, and absence of sideways orchestration/adapter/shim complexity.
 - [ ] Add any actionable review follow-ups as new unchecked checklist items under this section and execute them before closure.
 - [ ] Run final focused tests, targeted lint, `git diff --check`, and any formatter checks required by changed files.
 - [ ] Append final implementation verification notes and PASS_STATUS to `implementation.md`.
