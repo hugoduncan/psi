@@ -19,6 +19,7 @@
   (:require
    [clojure.string :as str]
    [malli.core :as m]
+   [psi.session-profile.names :as profile-names]
    [psi.workflow-runtime.structured-output :as structured-output]
    [psi.workflow-runtime.structured-output-schemas :as structured-output-schemas]))
 
@@ -171,12 +172,22 @@
 (def response-mode-schema
   [:enum :streaming :non-streaming])
 
+(def profile-name-schema
+  [:and
+   :keyword
+   [:fn {:error/message "session-profile must match /session-profile token grammar and must not be reserved"}
+    profile-names/valid-profile-name?]])
+
 (def session-spec-schema
-  [:map
+  [:map {:closed true}
    [:model {:optional true} [:maybe model-id-schema]]
+   [:session-profile {:optional true} profile-name-schema]
+   [:thinking-level {:optional true} [:enum :off :minimal :low :medium :high :xhigh]]
+   [:system-prompt {:optional true} :string]
    [:tools {:optional true} [:vector tool-id-schema]]
    [:skills {:optional true} [:vector skill-id-schema]]
    [:response-mode {:optional true} [:maybe response-mode-schema]]
+   [:prompt-component-selection {:optional true} [:maybe :map]]
    [:temperature {:optional true} [:maybe [:double {:min 0.0 :max 2.0}]]]
    [:logprobs {:optional true} :boolean]
    [:top-logprobs {:optional true} [:int {:min 1 :max 20}]]
@@ -193,21 +204,42 @@
 (def delegate-target-schema
   [:or workflow-name-schema source-spec-schema])
 
+(def delegate-session-spec-schema
+  [:map {:closed true}
+   [:model {:optional true} [:maybe model-id-schema]]
+   [:session-profile {:optional true} profile-name-schema]
+   [:thinking-level {:optional true} [:enum :off :minimal :low :medium :high :xhigh]]])
+
 (def delegate-spec-schema
   [:map
    [:target delegate-target-schema]
    [:prompt-string delegate-prompt-string-schema]
+   [:session {:optional true} delegate-session-spec-schema]
    [:context {:optional true} [:vector source-contribution-schema]]])
 
+(def llm-judge-session-spec-schema
+  [:map {:closed true}
+   [:model {:optional true} [:maybe model-id-schema]]
+   [:thinking-level {:optional true} [:enum :off :minimal :low :medium :high :xhigh]]
+   [:system-prompt {:optional true} :string]
+   [:tools {:optional true} [:vector tool-id-schema]]
+   [:skills {:optional true} [:vector skill-id-schema]]
+   [:response-mode {:optional true} [:maybe response-mode-schema]]
+   [:prompt-component-selection {:optional true} [:maybe :map]]
+   [:temperature {:optional true} [:maybe [:double {:min 0.0 :max 2.0}]]]
+   [:logprobs {:optional true} :boolean]
+   [:top-logprobs {:optional true} [:int {:min 1 :max 20}]]
+   [:contributions [:vector contribution-schema]]])
+
 (def llm-judge-schema
-  [:map
+  [:map {:closed true}
    [:type [:= :llm]]
-   [:session session-spec-schema]
+   [:session llm-judge-session-spec-schema]
    [:outputs {:optional true} outputs-schema]
    [:projection {:optional true} [:maybe projection-schema]]])
 
 (def invoke-judge-schema
-  [:map
+  [:map {:closed true}
    [:type [:= :invoke]]
    [:invoke invoke-spec-schema]])
 
@@ -225,7 +257,7 @@
   [:map-of outcome-schema routing-directive-schema])
 
 (def invoke-step-schema
-  [:map
+  [:map {:closed true}
    [:name step-name-schema]
    [:type [:= :invoke]]
    [:invoke invoke-spec-schema]
@@ -237,7 +269,7 @@
    [:compat {:optional true} [:maybe compat-schema]]])
 
 (def session-step-schema
-  [:map
+  [:map {:closed true}
    [:name step-name-schema]
    [:type [:= :session]]
    [:session session-spec-schema]
@@ -249,7 +281,7 @@
    [:compat {:optional true} [:maybe compat-schema]]])
 
 (def delegate-step-schema
-  [:map
+  [:map {:closed true}
    [:name step-name-schema]
    [:type [:= :delegate]]
    [:delegate delegate-spec-schema]

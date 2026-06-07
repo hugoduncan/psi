@@ -2,4 +2,5 @@
         metosin/malli {:mvn/version "0.16.4"}
         psi/prompt-assets {:local/root "../prompt-assets"}
         psi/session-state {:local/root "../session-state"}
+        psi/session-profile {:local/root "../session-profile"}
         psi/workflow-registry {:local/root "../workflow-registry"}}}

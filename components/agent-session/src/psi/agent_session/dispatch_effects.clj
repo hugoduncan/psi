@@ -98,6 +98,12 @@
   (when-let [ac (effect-agent-ctx ctx effect)] (agent/set-model-in! ac (:model effect))))
 (defmethod execute-effect! :runtime/agent-set-thinking-level [ctx effect]
   (when-let [ac (effect-agent-ctx ctx effect)] (agent/set-thinking-level-in! ac (:level effect))))
+(defmethod execute-effect! :runtime/agent-set-speed-mode [ctx effect]
+  (when-let [data* (some-> (effect-agent-ctx ctx effect) :data-atom)]
+    (swap! data* assoc :speed-mode (:mode effect))))
+(defmethod execute-effect! :runtime/agent-set-effort-override [ctx effect]
+  (when-let [data* (some-> (effect-agent-ctx ctx effect) :data-atom)]
+    (swap! data* assoc :effort-override (:effort effect))))
 (defmethod execute-effect! :runtime/agent-set-system-prompt [ctx effect]
   (when-let [ac (effect-agent-ctx ctx effect)] (agent/set-system-prompt-in! ac (:prompt effect))))
 (defmethod execute-effect! :runtime/agent-set-tools [ctx effect]

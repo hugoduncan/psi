@@ -64,6 +64,7 @@
    "/reload-prompts" :reload-prompts
    "/reload-extension-installs" :reload-extension-installs
    "/operations" :operations
+   "/session-profiles" :session-profiles
    "/project-repl" :project-repl})
 
 (def ^:private snapshot-prefixed-command-prefixes
@@ -72,7 +73,7 @@
    another under the dispatch matcher), so the regression lock compares as a
    set."
   #{"/tree" "/jobs" "/job" "/cancel-job" "/remember" "/model" "/thinking"
-    "/speed" "/effort" "/login" "/operation" "/project-repl"})
+    "/speed" "/effort" "/session-profile" "/login" "/operation" "/project-repl"})
 
 (def ^:private snapshot-builtin-command-names
   "Snapshot of the derived built-in command name set (bare names)."
@@ -80,7 +81,8 @@
     "skills" "worktree" "logout" "reload-models" "reload-prompts"
     "reload-extension-installs" "operations" "operation" "project-repl"
     "tree" "jobs" "job" "cancel-job"
-    "remember" "model" "thinking" "speed" "effort" "login"})
+    "remember" "model" "thinking" "speed" "effort" "session-profiles"
+    "session-profile" "login"})
 
 (deftest builtin-command-specs-entry-schema-rejects-malformations-test
   ;; CS3/TT3: the per-entry well-formedness invariant of the single source
@@ -155,7 +157,8 @@
     (testing ":usage arg-hints render inline before the em-dash"
       (is (str/includes? message "  /model [provider model-id [session|project|user]] — show current model or set model"))
       (is (str/includes? message "  /speed [normal|fast [session|project|user]] — show or set speed mode"))
-      (is (str/includes? message "  /effort [low|medium|high|xhigh|none [session|project|user]] — show or set effort override")))
+      (is (str/includes? message "  /effort [low|medium|high|xhigh|none [session|project|user]] — show or set effort override"))
+      (is (str/includes? message "  /session-profile [profile-name|clear] — show, select, or clear the current session profile")))
     (testing "non-routed /skill:name helper line stays literal"
       (is (str/includes? message "/skill:name — invoke a skill")))))
 

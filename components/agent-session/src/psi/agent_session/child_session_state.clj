@@ -149,14 +149,19 @@
         ;; prompt-mode and relies on live parent inheritance) keep the parent-sd
         ;; fallback. Non-workflow children also keep the live parent-sd fallback.
         defaults (session-data/initial-session)
-        inherited-default (fn [supplied parent-value default-value]
-                            (if inherited-snapshot?'
-                              (or supplied default-value)
-                              (or supplied parent-value)))
-        child-model (inherited-default model (:model parent-sd) (:model defaults))
-        child-prompt-mode (inherited-default prompt-mode (:prompt-mode parent-sd) (:prompt-mode defaults))
-        child-speed-mode (inherited-default speed-mode (:speed-mode parent-sd) (:speed-mode defaults))
-        child-effort-override (inherited-default effort-override (:effort-override parent-sd) (:effort-override defaults))
+        inherited-default (fn [present? supplied parent-value default-value]
+                            (cond
+                              present? supplied
+                              inherited-snapshot?' default-value
+                              :else parent-value))
+        child-model (inherited-default (contains? child-opts :model)
+                                       model (:model parent-sd) (:model defaults))
+        child-prompt-mode (inherited-default (contains? child-opts :prompt-mode)
+                                             prompt-mode (:prompt-mode parent-sd) (:prompt-mode defaults))
+        child-speed-mode (inherited-default (contains? child-opts :speed-mode)
+                                            speed-mode (:speed-mode parent-sd) (:speed-mode defaults))
+        child-effort-override (inherited-default (contains? child-opts :effort-override)
+                                                 effort-override (:effort-override parent-sd) (:effort-override defaults))
         ts (java.time.Instant/now)
         session-data
         (merge (session-data/initial-session
@@ -198,7 +203,9 @@
                  (some? child-speed-mode)
                  (assoc :speed-mode child-speed-mode)
 
-                 (some? child-effort-override)
+                 (or (some? child-effort-override)
+                     (and inherited-snapshot?'
+                          (contains? child-opts :effort-override)))
                  (assoc :effort-override child-effort-override)
 
                  (some? temperature)

@@ -117,14 +117,16 @@
 
 (defn- create-workflow-child-session!
   [ctx parent-session-id request]
-  (let [{:keys [child-session-id session-name system-prompt prompt-mode response-mode logprobs top-logprobs tool-ids thinking-level speed-mode effort-override temperature model skills
+  (let [request'
+        (workflow-child-session-contract/assert-valid-request!
+         request
+         :psi.agent-session.context/create-workflow-child-session!)
+        {:keys [child-session-id session-name system-prompt prompt-mode response-mode logprobs top-logprobs tool-ids thinking-level speed-mode effort-override temperature model skills
                 developer-prompt developer-prompt-source preloaded-messages
                 cache-breakpoints prompt-component-selection
                 workflow-run-id workflow-step-id workflow-attempt-id workflow-owned?
                 inherited-snapshot?]}
-        (workflow-child-session-contract/assert-valid-request!
-         request
-         :psi.agent-session.context/create-workflow-child-session!)]
+        request']
     (dispatch/dispatch! ctx
                         :session/create-child
                         (cond-> {:session-id parent-session-id
@@ -138,9 +140,11 @@
                                  :tool-ids tool-ids
                                  :thinking-level thinking-level
                                  :skills skills}
+                          (contains? request' :speed-mode)
+                          (assoc :speed-mode speed-mode)
+                          (contains? request' :effort-override)
+                          (assoc :effort-override effort-override)
                           (some? prompt-mode) (assoc :prompt-mode prompt-mode)
-                          (some? speed-mode) (assoc :speed-mode speed-mode)
-                          (some? effort-override) (assoc :effort-override effort-override)
                           (some? response-mode) (assoc :response-mode response-mode)
                           (contains? {:logprobs logprobs} :logprobs) (assoc :logprobs logprobs)
                           (some? top-logprobs) (assoc :top-logprobs top-logprobs)

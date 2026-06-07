@@ -2,6 +2,8 @@
   "Workflow action handler for psi-tool: parse, summarise, and execute workflow ops."
   (:require
    [clojure.edn :as edn]
+   [psi.session-state.state :as session-state]
+   [psi.shared-config.session-profiles :as session-profiles]
    [psi.workflow-runtime.core :as workflow-runtime]
    [psi.workflow-runtime.execution-adapter :as workflow-execution-adapter]
    [psi.workflow-registry.registry :as workflow-registry]
@@ -143,8 +145,11 @@
               "create-run"
               (let [inherited-defaults (workflow-step-session-config/resolve-inherited-defaults-snapshot
                                         ctx session-id)
+                    profile-snapshot (session-profiles/profile-snapshot
+                                      (session-state/session-worktree-path-in ctx session-id))
                     create-opts (cond-> {:parent-session-id session-id
-                                         :inherited-defaults inherited-defaults}
+                                         :inherited-defaults inherited-defaults
+                                         :session-profile-snapshot profile-snapshot}
                                   definition-id (assoc :definition-id definition-id)
                                   definition    (assoc :definition (parse-workflow-definition-string definition))
                                   true          (assoc :workflow-input (or (parse-workflow-input-string workflow-input) {})))

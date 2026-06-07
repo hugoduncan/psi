@@ -12,6 +12,7 @@
    [psi.agent-session.state-accessors :as accessors]
    [psi.agent-session.statechart :as sc]
    [psi.ai.model-registry :as model-registry]
+   [psi.shared-config.session-profiles :as session-profiles]
    [psi.history.git :as git]
    [psi.skill-registry.root-storage :as skill-storage]))
 
@@ -126,6 +127,7 @@
                  :psi.agent-session/thinking-level
                  :psi.agent-session/speed-mode
                  :psi.agent-session/effort-override
+                 :psi.agent-session/selected-session-profile
                  :psi.agent-session/prompt-mode
                  :psi.agent-session/ui-type]}
   (let [sd (support/session-data agent-session-ctx session-id)]
@@ -133,6 +135,7 @@
      :psi.agent-session/thinking-level  (:thinking-level sd)
      :psi.agent-session/speed-mode      (or (:speed-mode sd) :normal)
      :psi.agent-session/effort-override (:effort-override sd)
+     :psi.agent-session/selected-session-profile (:selected-session-profile sd)
      :psi.agent-session/prompt-mode     (:prompt-mode sd)
      :psi.agent-session/ui-type        (:ui-type sd)}))
 
@@ -155,6 +158,17 @@
      :psi.agent-session/last-execution-stop-reason    (:stop-reason executed)
      :psi.agent-session/last-execution-tool-call-count (:tool-call-count executed)
      :psi.agent-session/last-execution-recorded-at    (:recorded-at executed)}))
+
+(pco/defresolver agent-session-profiles
+  "Resolve effective session profiles for the session worktree."
+  [{:keys [psi/agent-session-ctx psi.agent-session/session-id]}]
+  {::pco/input  [:psi/agent-session-ctx :psi.agent-session/session-id]
+   ::pco/output [:psi.agent-session/session-profiles
+                 :psi.agent-session/session-profile-snapshot]}
+  (let [cwd      (support/session-worktree-path agent-session-ctx session-id)
+        snapshot (session-profiles/profile-snapshot cwd)]
+    {:psi.agent-session/session-profiles (:profiles snapshot)
+     :psi.agent-session/session-profile-snapshot snapshot}))
 
 (pco/defresolver agent-session-queues
   "Resolve queue depths, prompt layers, and prompt lifecycle summaries."
@@ -609,6 +623,7 @@
    context-session-summaries-resolver
    agent-session-phase
    agent-session-model
+   agent-session-profiles
    agent-session-queues
    agent-session-retry-compact
    agent-session-resources

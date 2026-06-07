@@ -203,6 +203,9 @@ Illustrative shape:
 {:name "report-call"
  :type :delegate
  :delegate {:target "builder"
+            :session {:session-profile :coding
+                      :model "gpt-5.5"
+                      :thinking-level :medium}
             :prompt-string {:type :template
                             :text "Review these issues:\n\n{{issues}}"
                             :vars {"issues" {:from {:step "discover" :output :data}
@@ -224,7 +227,9 @@ Illustrative shape:
 - the delegated workflow's local `:workflow-original` is rebound for the delegated invocation
 - by default, the step yields the delegated workflow's yielded value unchanged
 - first cut does not re-export the callee workflow's step-local output surfaces through downstream `{:step ... :output ...}` refs against the delegate step itself
-- first cut does not use delegated session overrides; delegation is a workflow boundary, not a child-session customization surface
+- optional `[:delegate :session]` config contains only `:session-profile`, `:model`, and `:thinking-level` in the current IR
+- delegate session config shapes the concrete `:inherited-defaults` snapshot passed to the delegated run; it does not construct a delegate actor session for the delegate step itself
+- profile-derived `:speed-mode` and `:effort-override` may flow into the delegated run through that inherited-defaults snapshot, but direct authored delegate session config does not accept `:speed-mode` or `:effort-override`
 
 ## Outputs
 
@@ -725,7 +730,9 @@ delegate-ir-step ::= {:name step-name
 invoke-spec ::= {:operation operation-id
                  :args {keyword (literal | source-spec)}*}
 
-session-spec ::= {:model? model-selection-spec
+session-spec ::= {:session-profile? keyword
+                  :model? model-selection-spec
+                  :thinking-level? (:off | :minimal | :low | :medium | :high | :xhigh)
                   :tools? [tool-id*]
                   :skills? [skill-id*]
                   :temperature? double           ;; optional, range [0.0, 2.0]; absent = provider default
@@ -733,8 +740,13 @@ session-spec ::= {:model? model-selection-spec
                   session-extension*}
 
 delegate-spec ::= {:target workflow-name
+                   :session? delegate-session-spec
                    :prompt-string (string | template-contribution)
                    :context? [source-contribution*]}
+
+delegate-session-spec ::= {:session-profile? keyword
+                           :model? model-selection-spec
+                           :thinking-level? (:off | :minimal | :low | :medium | :high | :xhigh)}
 
 control-flow ::= :judge judge-spec
                | :on outcome-map

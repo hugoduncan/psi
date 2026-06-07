@@ -114,6 +114,12 @@
                        (:model step-config)
                        (assoc :model (:model step-config))
 
+                       (contains? step-config :speed-mode)
+                       (assoc :speed-mode (:speed-mode step-config))
+
+                       (contains? step-config :effort-override)
+                       (assoc :effort-override (:effort-override step-config))
+
                        (:model-fallback step-config)
                        (assoc :model-fallback (:model-fallback step-config))
 
@@ -185,7 +191,8 @@
                 :else
                 (step-execution/execute-session-step! ctx execution-session step-def step-id attempt-id working-memory* event-queue* prompt)))
             (catch Exception e
-              (let [failure-payload {:message (ex-message e)}
+              (let [failure-payload (merge (ex-data e)
+                                           {:message (ex-message e)})
                     attempt-present? (= attempt-id (get-in @working-memory* [:attempt-ids step-id]))]
                 (when-not attempt-present?
                   (swap! (:state* ctx)

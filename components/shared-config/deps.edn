@@ -1,1 +1,3 @@
-{:deps {org.clojure/clojure {:mvn/version "1.12.0"}}}
+{:deps {org.clojure/clojure   {:mvn/version "1.12.0"}
+        psi/ai                {:local/root "../ai"}
+        psi/session-profile   {:local/root "../session-profile"}}}

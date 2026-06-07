@@ -10,7 +10,8 @@
    :name "planner"
    :description "Plans tasks"
    :session-config {:tools ["read" "bash"]
-                    :thinking-level :off}
+                    :thinking-level :off
+                    :session-profile :planning}
    :body "You are a planner."
    :vars nil
    :source-path "/tmp/planner.md"})
@@ -47,6 +48,7 @@
               :type :session
               :tools ["read" "bash"]
               :thinking-level :off
+              :session-profile :planning
               :contributions [{:type :template :text "You are a planner." :vars {}}]}
              (first (:steps definition))))
       (is (workflow-definition/target-authored-workflow-definition? definition))))

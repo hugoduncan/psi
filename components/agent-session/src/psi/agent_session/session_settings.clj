@@ -3,6 +3,7 @@
    [clojure.string :as str]
    [psi.agent-session.dispatch :as dispatch]
    [psi.agent-session.extension-runtime :as extension-runtime]
+   [psi.shared-config.session-profiles :as session-profiles]
    [psi.session-state.model :as session]
    [psi.session-state.state :as ss]))
 
@@ -64,6 +65,30 @@
       (let [next-l (session/next-thinking-level (:thinking-level sd) model)]
         (set-thinking-level-in! ctx session-id next-l)))
     (ss/get-session-data-in ctx session-id)))
+
+(defn- selected-profile-metadata
+  [profile]
+  {:name (:name profile)
+   :settings (:settings profile)
+   :readable-settings (session-profiles/readable-settings (:settings profile))})
+
+(defn apply-session-profile-in!
+  "Apply an already validated resolved profile to `session-id` atomically.
+
+   The dispatch handler owns model-before-thinking ordering, transient speed and
+   effort application, and selected-profile metadata storage."
+  [ctx session-id profile]
+  (dispatch/dispatch! ctx :session/apply-session-profile
+                      {:session-id session-id
+                       :profile (selected-profile-metadata profile)}
+                      {:origin :core}))
+
+(defn clear-session-profile-in!
+  "Clear selected profile metadata without changing concrete session settings."
+  [ctx session-id]
+  (dispatch/dispatch! ctx :session/clear-session-profile
+                      {:session-id session-id}
+                      {:origin :core}))
 
 (defn set-session-name-in!
   "Set the session name for `session-id`."

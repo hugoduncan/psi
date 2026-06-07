@@ -33,6 +33,7 @@
         psi/session-journal                           {:local/root "components/session-journal"}
         psi/session-persistence                       {:local/root "components/session-persistence"}
         psi/shared-config                             {:local/root "components/shared-config"}
+        psi/session-profile                           {:local/root "components/session-profile"}
         psi/project-nrepl                             {:local/root "components/project-nrepl"}
         psi/prompt-assets                             {:local/root "components/prompt-assets"}
         psi/prompt-registry                           {:local/root "components/prompt-registry"}
@@ -68,6 +69,7 @@
                         "components/session-journal/src"
                         "components/session-persistence/src"
                         "components/shared-config/src"
+                        "components/session-profile/src"
                         "components/project-nrepl/src"
                         "components/agent-core/src"
                         "components/ai/src"
@@ -105,6 +107,7 @@
                         "components/session-journal/src"
                         "components/session-persistence/src"
                         "components/shared-config/src"
+                        "components/session-profile/src"
                         "components/project-nrepl/src"
                         "components/agent-core/src"
                         "components/ai/src"
@@ -171,6 +174,7 @@
                            "components/rpc/src"
                            "components/state-kernel/src"
                            "components/shared-config/src"
+                           "components/session-profile/src"
                            "components/project-nrepl/src"
                            "components/ui-state/src"
                            "components/system-bootstrap/src"
@@ -349,6 +353,7 @@
                         "components/session-journal/src"
                         "components/session-persistence/src"
                         "components/shared-config/src"
+                        "components/session-profile/src"
                         "components/project-nrepl/src"
                         "components/prompt-assets/src"
                         "components/prompt-registry/src"

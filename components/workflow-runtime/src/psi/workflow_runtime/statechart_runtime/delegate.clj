@@ -60,6 +60,8 @@
                                               :delegating-run-id (:run-id workflow-run)
                                               :workflow-input prompt-string
                                               :workflow-original context}
+                                       (contains? workflow-run :session-profile-snapshot)
+                                       (assoc :session-profile-snapshot (:session-profile-snapshot workflow-run))
                                        inherited-defaults (assoc :inherited-defaults inherited-defaults)))
         _ (reset! (:state* ctx) state')
         delegate-wf-ctx (create-workflow-context-fn ctx parent-session-id delegate-run-id)

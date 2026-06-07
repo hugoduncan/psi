@@ -76,6 +76,11 @@
                :usage "[normal|fast [session|project|user]]"}
    "/effort"  {:kinds #{:prefixed} :description "show or set effort override"
                :usage "[low|medium|high|xhigh|none [session|project|user]]"}
+   "/session-profiles" {:kinds #{:exact} :handler :session-profiles
+                        :description "list configured session profiles"}
+   "/session-profile" {:kinds #{:prefixed}
+                       :description "show, select, or clear the current session profile"
+                       :usage "[profile-name|clear]"}
    "/remember" {:kinds #{:prefixed} :description "capture a memory note for future ψ"
                 :usage "[text]"}
    "/worktree" {:kinds #{:exact} :handler :worktree :description "show git worktree context"}

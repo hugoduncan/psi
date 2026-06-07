@@ -16,6 +16,7 @@
            {:name "report"
             :type :session
             :model "gpt-5.4"
+            :session-profile :review
             :tools ["read" "bash"]
             :skills ["issue-feature-triage"]
             :contributions [{:type :source
@@ -27,6 +28,8 @@
            {:name "report-call"
             :type :delegate
             :target "builder"
+            :session-profile :coding
+            :thinking-level :high
             :prompt-string {:type :template
                             :text "Review these issues:\n\n{{issues}}"
                             :vars {"issues" {:from {:step "discover" :output :data}
@@ -84,6 +87,7 @@
                       {:name "report"
                        :type :session
                        :session {:model "gpt-5.4"
+                                 :session-profile :review
                                  :tools ["read" "bash"]
                                  :skills ["issue-feature-triage"]
                                  :contributions [{:type :source
@@ -103,6 +107,8 @@
                                                   :text "Review these issues:\n\n{{issues}}"
                                                   :vars {"issues" {:from {:step "discover" :output :data}
                                                                    :path [:issues]}}}
+                                  :session {:session-profile :coding
+                                            :thinking-level :high}
                                   :context [{:type :source
                                              :from :workflow-original}
                                             {:type :source

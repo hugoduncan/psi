@@ -14,6 +14,7 @@
    :skills
    :model
    :thinking-level
+   :session-profile
    :response-mode
    :temperature
    :logprobs

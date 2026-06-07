@@ -2,12 +2,14 @@
   (:require
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.core :as session]
+   [psi.agent-session.mutations.canonical-workflows :as cwf-mutations]
    [psi.agent-session.turn]
    [psi.workflow-runtime.turn-execution-contract]
    [psi.agent-session.test-support :as test-support]
    [psi.workflow-runtime.attempts]
    [psi.workflow-runtime.execution-adapter]
    [psi.agent-session.workflow-judge]
+   [psi.session-state.state :as ss]
    [psi.workflow-runtime.core :as workflow-runtime]
    [psi.workflow-registry.registry :as workflow-registry]
    [psi.workflow-runtime.statechart-runtime :as runtime]))
@@ -56,15 +58,18 @@
                              :vars {"review" {:from {:step "review" :yield :text}}}}]}]})
 
 (defn- install-run!
-  [ctx definition run-id]
-  (swap! (:state* ctx)
-         (fn [state]
-           (let [[s _ _] (workflow-registry/register-definition state definition)
-                 [s _ _] (workflow-runtime/create-run s {:definition-id (:definition-id definition)
-                                                         :run-id run-id
-                                                         :workflow-input {:input "ship it"
-                                                                          :original {:ticket 123}}})]
-             s))))
+  ([ctx definition run-id]
+   (install-run! ctx definition run-id {}))
+  ([ctx definition run-id run-opts]
+   (swap! (:state* ctx)
+          (fn [state]
+            (let [[s _ _] (workflow-registry/register-definition state definition)
+                  [s _ _] (workflow-runtime/create-run s (merge {:definition-id (:definition-id definition)
+                                                                 :run-id run-id
+                                                                 :workflow-input {:input "ship it"
+                                                                                  :original {:ticket 123}}}
+                                                                run-opts))]
+              s)))))
 
 (defn- with-stubbed-runtime
   [{:keys [assistant-text judge-result]} f]
@@ -275,6 +280,150 @@
       (is (= :execution-failed (:status attempt)))
       (is (= "Invalid initial agent state"
              (get-in attempt [:execution-error :message]))))))
+
+(deftest running-top-level-workflow-uses-original-session-profile-snapshot-test
+  ;; Tests a still-running top-level multi-step workflow resolves a later
+  ;; :session-profile step from the run's original snapshot after mutable config
+  ;; changes, not from the edited project config.
+  (let [[ctx session-id] (create-session-context)
+        cwd (ss/session-worktree-path-in ctx session-id)
+        profile-file (java.io.File. cwd ".psi/project.edn")
+        definition {:definition-id "profile-mid-run"
+                    :name "profile-mid-run"
+                    :steps [{:name "first"
+                             :type :session
+                             :contributions [{:type :template
+                                              :text "First {{input}}"
+                                              :vars {"input" {:from :workflow-input :path [:input]}}}]}
+                            {:name "later"
+                             :type :session
+                             :session-profile :coding
+                             :contributions [{:type :template
+                                              :text "Later {{first}}"
+                                              :vars {"first" {:from {:step "first" :yield :text}}}}]}]}
+        child-requests* (atom [])]
+    (.mkdirs (.getParentFile profile-file))
+    (spit profile-file
+          (pr-str {:agent-session
+                   {:session-profiles
+                    {:coding {:model-provider "openai"
+                              :model-id "gpt-5.5"
+                              :thinking-level :low
+                              :speed-mode :fast
+                              :effort-override :xhigh}}}}))
+    (cwf-mutations/register-workflow-definition
+     {} {:psi/agent-session-ctx ctx :definition definition})
+    (cwf-mutations/create-workflow-run
+     {} {:psi/agent-session-ctx ctx
+         :session-id session-id
+         :definition-id "profile-mid-run"
+         :workflow-input {:input "ship"}
+         :run-id "run-profile-mid-run"})
+    (let [wf-ctx (runtime/create-workflow-context ctx session-id "run-profile-mid-run")]
+      (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
+                    (fn [_ctx _parent-session-id opts]
+                      (let [child-session-id (str (:workflow-step-id opts) "-child")]
+                        (swap! child-requests* conj
+                               (select-keys opts [:workflow-step-id
+                                                  :model
+                                                  :thinking-level
+                                                  :speed-mode
+                                                  :effort-override]))
+                        {:attempt {:attempt-id (:attempt-id opts)
+                                   :status :pending
+                                   :execution-session-id child-session-id}
+                         :execution-session {:session-id child-session-id}}))
+                    psi.agent-session.turn/prompt-execution-result-in!
+                    (fn [_ctx sid _prompt]
+                      (when (= "first-child" sid)
+                        (spit profile-file
+                              (pr-str {:agent-session
+                                       {:session-profiles
+                                        {:coding {:model-provider "anthropic"
+                                                  :model-id "claude-opus-4-8"
+                                                  :thinking-level :high
+                                                  :speed-mode :normal
+                                                  :effort-override :low}}}})))
+                      {:execution-result/assistant-message
+                       {:role "assistant"
+                        :content [{:type :text
+                                   :text (if (= "first-child" sid)
+                                           "first output"
+                                           "later output")}]
+                        :stop-reason :stop}})]
+        (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil)))
+    (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-profile-mid-run")
+          later-request (some #(when (= "later" (:workflow-step-id %)) %)
+                              @child-requests*)]
+      (is (= :completed (:status run)))
+      (is (= ["first" "later"] (mapv :workflow-step-id @child-requests*)))
+      (is (= {:provider "openai" :id "gpt-5.5"}
+             (select-keys (:model later-request) [:provider :id]))
+          "later step uses the model captured in the original run snapshot")
+      (is (= :low (:thinking-level later-request))
+          "later step uses original snapshot thinking, not edited config")
+      (is (= :fast (:speed-mode later-request))
+          "later step uses original snapshot speed, not edited config")
+      (is (= :xhigh (:effort-override later-request))
+          "later step uses original snapshot effort, not edited config"))))
+
+(deftest invalid-session-profile-fails-before-child-session-creation-test
+  ;; Tests statechart/runtime failure for unavailable workflow profiles before
+  ;; any workflow-owned child execution session is created.
+  (doseq [{:keys [label profile-name snapshot expected-reason]}
+          [{:label "unknown profile"
+            :profile-name :missing
+            :snapshot {:profiles {:coding {:name :coding
+                                           :status :valid
+                                           :valid? true
+                                           :settings {:speed-mode :fast}
+                                           :readable-settings ["speed fast"]
+                                           :diagnostics []}}
+                       :valid-profile-names [:coding]
+                       :invalid-profile-names []}
+            :expected-reason :unknown-session-profile}
+           {:label "invalid profile"
+            :profile-name :empty
+            :snapshot {:profiles {:empty {:name :empty
+                                          :status :invalid
+                                          :valid? false
+                                          :settings {}
+                                          :readable-settings []
+                                          :diagnostics [{:field :settings
+                                                         :reason :no-concrete-settings
+                                                         :message "profile has no supported concrete settings"}]}}
+                       :valid-profile-names []
+                       :invalid-profile-names [:empty]}
+            :expected-reason :invalid-session-profile}]]
+    (testing label
+      (let [[ctx session-id] (create-session-context)
+            run-id (str "run-" label "-profile-runtime")
+            definition {:definition-id run-id
+                        :steps [{:name "plan"
+                                 :type :session
+                                 :session-profile profile-name
+                                 :contributions [{:type :template
+                                                  :text "Plan {{input}}"
+                                                  :vars {"input" {:from :workflow-input :path [:input]}}}]}]}
+            _ (install-run! ctx definition run-id
+                            {:session-profile-snapshot snapshot})
+            wf-ctx (runtime/create-workflow-context ctx session-id run-id)]
+        (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil)
+        (let [run (workflow-runtime/workflow-run-in @(:state* ctx) run-id)
+              attempt (get-in run [:step-runs "plan" :attempts 0])]
+          (is (= :failed (:status run)))
+          (is (= :execution-failed (:status attempt)))
+          (is (nil? (:execution-session-id attempt)))
+          (is (= expected-reason
+                 (get-in attempt [:execution-error :reason])))
+          (is (= profile-name
+                 (get-in attempt [:execution-error :profile-name])))
+          (is (contains? (:execution-error attempt) :available-profile-names)
+              "statechart preserves actionable profile failure data")
+          (is (empty? (filter (fn [[_ {:keys [data]}]]
+                                (:workflow-owned? data))
+                              (get-in @(:state* ctx) [:agent-session :sessions])))
+              "no workflow-owned child execution session is present in canonical state"))))))
 
 (deftest workflow-model-query-ranked-fallback-success-test
   (testing "first-ranked connection-refused failure falls back to the next ranked candidate and completes the step"

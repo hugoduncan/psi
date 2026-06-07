@@ -56,36 +56,41 @@
    Returns {:attempt attempt-map :execution-session session-data}.
 
    The created session is marked as workflow-owned and linked by run/step/attempt ids."
-  [ctx parent-session-id {:keys [workflow-run-id workflow-step-id attempt-id session-name system-prompt prompt-mode response-mode logprobs top-logprobs tool-defs thinking-level speed-mode effort-override model skills developer-prompt developer-prompt-source preloaded-messages cache-breakpoints prompt-component-selection model-fallback]}]
+  [ctx parent-session-id {:keys [workflow-run-id workflow-step-id attempt-id session-name system-prompt prompt-mode response-mode logprobs top-logprobs tool-defs thinking-level speed-mode effort-override model skills developer-prompt developer-prompt-source preloaded-messages cache-breakpoints prompt-component-selection model-fallback]
+                          :as opts}]
   (let [attempt-id'      (normalize-attempt-id attempt-id)
         child-session-id (str (java.util.UUID/randomUUID))
+        request-map      (cond-> {:child-session-id           child-session-id
+                                  :session-name               session-name
+                                  :system-prompt              system-prompt
+                                  :response-mode              response-mode
+                                  :logprobs                   logprobs
+                                  :top-logprobs               top-logprobs
+                                  :tool-ids                   (when tool-defs (mapv :name tool-defs))
+                                  :thinking-level             thinking-level
+                                  :model                      model
+                                  :skills                     skills
+                                  :developer-prompt           developer-prompt
+                                  :developer-prompt-source    developer-prompt-source
+                                  :preloaded-messages         preloaded-messages
+                                  :cache-breakpoints          cache-breakpoints
+                                  :prompt-component-selection prompt-component-selection
+                                  :workflow-run-id            workflow-run-id
+                                  :workflow-step-id           workflow-step-id
+                                  :workflow-attempt-id        attempt-id'
+                                  :workflow-owned?            true
+                                   ;; task 207 (R4): step-attempt children carry the
+                                   ;; resolver's snapshot-governed inherited defaults;
+                                   ;; they must not fall back to the live parent.
+                                  :inherited-snapshot?        true}
+                           (some? prompt-mode)
+                           (assoc :prompt-mode prompt-mode)
+                           (contains? opts :speed-mode)
+                           (assoc :speed-mode speed-mode)
+                           (contains? opts :effort-override)
+                           (assoc :effort-override effort-override))
         request          (child-session-contract/assert-valid-request!
-                          {:child-session-id           child-session-id
-                           :session-name               session-name
-                           :system-prompt              system-prompt
-                           :prompt-mode                prompt-mode
-                           :response-mode              response-mode
-                           :logprobs                   logprobs
-                           :top-logprobs               top-logprobs
-                           :tool-ids                   (when tool-defs (mapv :name tool-defs))
-                           :thinking-level             thinking-level
-                           :speed-mode                 speed-mode
-                           :effort-override            effort-override
-                           :model                      model
-                           :skills                     skills
-                           :developer-prompt           developer-prompt
-                           :developer-prompt-source    developer-prompt-source
-                           :preloaded-messages         preloaded-messages
-                           :cache-breakpoints          cache-breakpoints
-                           :prompt-component-selection prompt-component-selection
-                           :workflow-run-id            workflow-run-id
-                           :workflow-step-id           workflow-step-id
-                           :workflow-attempt-id        attempt-id'
-                           :workflow-owned?            true
-                           ;; task 207 (R4): step-attempt children carry the
-                           ;; resolver's snapshot-governed inherited defaults;
-                           ;; they must not fall back to the live parent.
-                           :inherited-snapshot?        true}
+                          request-map
                           :psi.workflow-runtime.attempts/create-step-attempt-session!)
         result           (-> (execution-adapter/create-child-session!
                               ctx

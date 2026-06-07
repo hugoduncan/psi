@@ -106,6 +106,69 @@ layers.
 Both `:model-provider` and `:model-id` must be set together; a partial entry is
 ignored and the next lower source is used instead.
 
+## Session profiles
+
+Named session profiles let you define reusable model/session-setting bundles in
+the same existing config files. They live under `:agent-session :session-profiles`:
+
+```edn
+{:version 1
+ :agent-session
+ {:session-profiles
+  {:planning {:model-provider "anthropic"
+              :model-id "claude-opus-4-8"
+              :thinking-level :high
+              :speed-mode :normal
+              :effort-override :high}
+   :coding   {:model-provider "openai"
+              :model-id "gpt-5.5"
+              :thinking-level :medium
+              :speed-mode :fast}
+   :review   {:thinking-level :high}}}}
+```
+
+Supported profile fields are exactly `:model-provider`, `:model-id`,
+`:thinking-level`, `:speed-mode`, and `:effort-override`. Unknown keys may remain
+in the raw EDN files, but profile resolution ignores them and they are not
+applied to sessions or stored in workflow snapshots.
+
+Profile definitions are deep-merged only for the `:session-profiles` map, with
+precedence:
+
+```text
+project.local.edn > project.edn > ~/.psi/agent/config.edn
+```
+
+That lets a project override one field of a user profile without redefining the
+whole profile. This profile-specific merge does not change ordinary top-level
+`:agent-session` setting resolution.
+
+A profile is valid when it has at least one supported concrete setting, its
+model provider/id pair is complete and known, enum values are valid, and its
+name is a selectable unqualified keyword that is not reserved. Selectable names
+match the `/session-profile` command token grammar: the first character must be
+a letter or digit, and later characters may be letters, digits, `.`, `_`, or
+`-`. Namespaced keywords such as `:team/coding` and command-unparseable names
+such as `:fast+coding` are invalid. `:clear` is reserved for `/session-profile
+clear` and is not selectable. `/session-profiles` lists valid profiles with
+readable settings and invalid profiles with terse reasons.
+
+Commands:
+
+- `/session-profiles` — list effective valid and invalid profiles.
+- `/session-profile` — show the current selected-profile metadata and concrete
+  model/thinking/speed/effort settings.
+- `/session-profile <name>` — apply a valid profile atomically to the current
+  session. Names can be typed as `planning` or `:planning`.
+- `/session-profile clear` — clear only selected-profile metadata; concrete
+  settings already applied remain unchanged.
+
+Applying a profile is session-scoped. It does not write config files. Model and
+thinking use the same journaled session mutation semantics as `/model` and
+`/thinking`; speed and effort remain transient like `/speed` and `/effort`.
+Selected-profile metadata is session-local observability state and is not
+journaled, cold-resumed, or inherited by child sessions.
+
 ---
 
 ## Outbound model API proxy configuration
