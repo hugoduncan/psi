@@ -185,4 +185,20 @@
   {:path "components/rpc/test/psi/rpc_invariants_test.clj",
    :exists? true}
   {:path "components/rpc/test/psi/rpc_ops_test.clj", :exists? true}
-  {:path "components/rpc/test/psi/rpc_test.clj", :exists? true}]}
+  {:path "components/rpc/test/psi/rpc_test.clj", :exists? true}]
+ :baseline/commands
+ [{:label "focused RPC baseline/characterization suite"
+   :command ["bb" "clojure:test:scry" "--dir" "components/rpc/test"
+             "--namespace" "psi.rpc-command-results-test"
+             "--namespace" "psi.rpc-prompt-command-test"
+             "--namespace" "psi.rpc-prompt-test"
+             "--namespace" "psi.rpc-session-navigation-test"
+             "--namespace" "psi.rpc-events-test"
+             "--namespace" "psi.rpc-invariants-test"
+             "--namespace" "psi.rpc-ops-test"
+             "--namespace" "psi.rpc-test"]}]
+ :baseline/results
+ [{:label "focused RPC baseline/characterization suite"
+   :status :pass
+   :summary {:test 55 :pass 422 :fail 0 :error 0}
+   :notes ["Updated after characterization pass adding picker/model/thinking/frontend-action RPC coverage in psi.rpc-test/rpc-model-and-thinking-picker-frontend-actions-test."]}]}

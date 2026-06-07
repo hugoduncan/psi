@@ -16,14 +16,179 @@ bb clojure:test:scry --dir components/rpc/test \
   --namespace psi.rpc-test
 ```
 
+Latest characterization pass in this map: green, 55 tests / 422 assertions.
+
 ## Source-area coverage
 
-To be completed in Slice 2. Record one subsection per target source file, naming covered behaviours and tests/vars.
+### `components/rpc/src/psi/rpc/session/command_pickers.clj`
+
+Covered behaviours:
+
+- `/model` command emits a `ui/frontend-action-requested` event whose `:ui/action` is the adapter-neutral `:select-model` picker, with backend-owned provider/id ordering and model item values.
+  - `psi.rpc-test/rpc-model-and-thinking-picker-frontend-actions-test` (`/model command emits a frontend action request with model picker payload`)
+- `/thinking` command emits a `ui/frontend-action-requested` event whose `:ui/action` is the adapter-neutral `:select-thinking-level` picker with current thinking-level ordering.
+  - `psi.rpc-test/rpc-model-and-thinking-picker-frontend-actions-test` (`/thinking command emits a frontend action request with thinking picker payload`)
+- Submitted `select-model` frontend result updates canonical session model and emits current RPC command/session/footer outputs.
+  - `psi.rpc-test/rpc-model-and-thinking-picker-frontend-actions-test` (`submitted select-model frontend action updates model and emits command/session snapshots`)
+- Submitted `select-thinking-level` frontend result updates canonical thinking level and emits current RPC command/session/footer outputs.
+  - `psi.rpc-test/rpc-model-and-thinking-picker-frontend-actions-test` (`submitted select-thinking-level frontend action updates thinking and emits command/session snapshots`)
+
+### `components/rpc/src/psi/rpc/session/command_results.clj`
+
+Covered behaviours:
+
+- Extension command output precedence: returned string, returned `{:message ...}`, stdout, blank output suppression, and deterministic handler-error text.
+  - `psi.rpc-command-results-test/extension-command-output-test`
+- Command op `:extension-cmd` emits no placeholder for blank output and emits text command-result for returned/stdout output.
+  - `psi.rpc-command-results-test/handle-command-result-extension-command-test`
+- Legacy prompt path suppresses blank extension command placeholders.
+  - `psi.rpc-command-results-test/handle-prompt-command-result-extension-command-test`
+- Prompt-path slash command result mappings for text, extension command, login start/manual/callback, quit, resume, remember success/block/fallback.
+  - `psi.rpc-prompt-command-test/rpc-prompt-handle-command-result-types-test`
+- Command op template fallback and unknown command-result text.
+  - `psi.rpc-prompt-command-test/rpc-command-op-template-fallback-test`
+
+### `components/rpc/src/psi/rpc/session/command_resume.clj`
+
+Covered behaviours:
+
+- `/resume <path>` emits canonical `session/resumed` and `session/rehydrated` events with journal-derived messages.
+  - `psi.rpc-session-navigation-test/rpc-session-resume-and-rehydrate-events-test`
+- `/tree <session-id>` reuses session matching/rehydration and emits context update for the active session.
+  - `psi.rpc-session-navigation-test/rpc-session-resume-and-rehydrate-events-test`
+- Switch/get-messages derive transcript from canonical ctx journal when agent messages drift.
+  - `psi.rpc-session-navigation-test/rpc-session-resume-and-rehydrate-events-test`
+
+### `components/rpc/src/psi/rpc/session/command_tree.clj`
+
+Covered behaviours:
+
+- `/tree` emits a frontend selector payload with backend-owned session/fork-point order.
+  - `psi.rpc-session-navigation-test/rpc-session-resume-and-rehydrate-events-test`
+- `/tree <session-id>` emits canonical resume/rehydrate/context events for an existing context session.
+  - `psi.rpc-session-navigation-test/rpc-session-resume-and-rehydrate-events-test`
+
+Known remaining edge candidates for coverage review: `/tree name ...` rename, missing-session text, already-active text, and prefix ambiguity edge cases are not newly characterized in this pass.
+
+### `components/rpc/src/psi/rpc/session/commands.clj`
+
+Covered behaviours:
+
+- Slash dispatch gate: command result suppresses agent loop; nil command dispatch runs agent loop.
+  - `psi.rpc-prompt-command-test/rpc-prompt-slash-dispatch-gate-test`
+- Command op prompt-template fallback routes through canonical prompt semantics and journals submitted slash text.
+  - `psi.rpc-prompt-command-test/rpc-command-op-template-fallback-test`
+- Command `/new` emits canonical resume/rehydrate, command-result, footer update, and makes the new session active for later extension commands.
+  - `psi.rpc-session-navigation-test/rpc-session-resume-and-rehydrate-events-test`
+  - `psi.rpc-session-navigation-test/rpc-extension-command-after-new-emits-assistant-message-for-new-session-test`
+- Picker command routing for `/model` and `/thinking` is covered by the new characterization test in `psi.rpc-test`.
+  - `psi.rpc-test/rpc-model-and-thinking-picker-frontend-actions-test`
+
+### `components/rpc/src/psi/rpc/session/emit.clj`
+
+Covered behaviours:
+
+- Navigation result emission sets active focus and emits resume/rehydrate/session/footer/context outputs for new/switch/fork and frontend-action navigation.
+  - `psi.rpc-test/rpc-fork-emits-context-updated-test`
+  - `psi.rpc-test/rpc-new-session-emits-context-updated-test`
+  - `psi.rpc-test/rpc-model-and-thinking-picker-frontend-actions-test`
+  - `psi.rpc-session-navigation-test/rpc-session-resume-and-rehydrate-events-test`
+- Assistant message/text and command-result payload shapes are exercised through prompt, command-result, extension-command, and picker/frontend-action tests.
+  - `psi.rpc-prompt-test/rpc-prompt-streams-events-and-interleaves-test`
+  - `psi.rpc-command-results-test/handle-command-result-extension-command-test`
+  - `psi.rpc-prompt-command-test/rpc-prompt-handle-command-result-types-test`
+
+### `components/rpc/src/psi/rpc/session/frontend_actions.clj`
+
+Covered behaviours:
+
+- `frontend_action_result` `select-session` submitted values switch to an existing session or fork from a fork-point and emit canonical navigation events.
+  - `psi.rpc-test/rpc-fork-emits-context-updated-test`
+- `frontend_action_result` `select-model` and `select-thinking-level` submitted values update canonical session state and emit command/session/footer snapshots.
+  - `psi.rpc-test/rpc-model-and-thinking-picker-frontend-actions-test`
+
+Known remaining edge candidates for coverage review: frontend-action cancelled and failed response/event payloads are not newly characterized in this pass.
+
+### `components/rpc/src/psi/rpc/session/navigation.clj`
+
+Covered behaviours:
+
+- `new_session` emits `session/resumed`, `session/rehydrated`, response data, and `context/updated` from app-runtime navigation results.
+  - `psi.rpc-session-navigation-test/rpc-session-resume-and-rehydrate-events-test`
+  - `psi.rpc-test/rpc-new-session-emits-context-updated-test`
+- `switch_session` and `fork` emit canonical navigation events and journal-derived rehydration.
+  - `psi.rpc-session-navigation-test/rpc-session-resume-and-rehydrate-events-test`
+  - `psi.rpc-test/rpc-fork-emits-context-updated-test`
+
+### `components/rpc/src/psi/rpc/session/projections.clj`
+
+Covered behaviours:
+
+- Subscribing to UI topics emits initial canonical extension UI snapshots and backend-owned widget/status ordering.
+  - `psi.rpc-ops-test/rpc-subscribe-ui-topics-emits-initial-widget-snapshot-test`
+  - `psi.rpc-ops-test/rpc-subscribe-ui-topics-emits-canonical-widget-and-status-order-test`
+  - `psi.rpc-ops-test/rpc-subscribe-ui-topics-emits-initial-notification-snapshot-test`
+- UI widget, notification, status, and dialog updates stream from event-driven projection delivery without prompt polling.
+  - `psi.rpc-ops-test/rpc-event-driven-ui-projection-streams-widget-updates-without-prompt-test`
+  - `psi.rpc-ops-test/rpc-event-driven-ui-projection-streams-notifications-without-prompt-test`
+  - `psi.rpc-ops-test/rpc-event-driven-ui-projection-streams-status-and-dialog-without-prompt-test`
+- Projection listener unregisters when projection topics are removed.
+  - `psi.rpc-ops-test/session-request-handler-query-eql-and-op-mapping-test`
+
+### `components/rpc/src/psi/rpc/session/prompt.clj`
+
+Covered behaviours:
+
+- Prompt worker uses explicit `:session-id` routing.
+  - `psi.rpc-prompt-command-test/rpc-prompt-honors-explicit-session-id-test`
+- Prompt slash dispatch gates agent loop and journals slash commands; plain text prompts are journaled on the agent-loop path.
+  - `psi.rpc-prompt-command-test/rpc-prompt-slash-dispatch-gate-test`
+  - `psi.rpc-prompt-command-test/rpc-prompt-slash-command-journaled-test`
+  - `psi.rpc-prompt-command-test/rpc-prompt-plain-text-journaled-test`
+- Non-command prompt request preparation expands skill input and forwards runtime-resolved API keys.
+  - `psi.rpc-prompt-command-test/rpc-prompt-expands-skill-input-during-request-preparation-test`
+  - `psi.rpc-prompt-command-test/rpc-prompt-passes-resolved-api-key-to-agent-loop-test`
+- Prompt routes through dispatch-visible prompt lifecycle, not mutable executor state.
+  - `psi.rpc-invariants-test/rpc-prompt-uses-dispatch-lifecycle-invariant-test`
+
+### `components/rpc/src/psi/rpc/session/streams.clj`
+
+Covered behaviours:
+
+- Prompt stream interleaves accepted response with assistant/tool/session/footer events and monotonically increasing event seq values.
+  - `psi.rpc-prompt-test/rpc-prompt-streams-events-and-interleaves-test`
+- Footer updates tolerate sentinel values and provider retry activation/change/clear publishes visible footer refreshes.
+  - `psi.rpc-prompt-test/rpc-prompt-footer-updated-tolerates-keyword-sentinel-values-test`
+  - `psi.rpc-prompt-test/rpc-prompt-provider-retry-state-publishes-footer-updated-test`
+- Thinking deltas after tool-start begin a fresh segment; OpenAI Codex tool events include final args.
+  - `psi.rpc-prompt-test/rpc-thinking-delta-after-tool-start-begins-fresh-segment-test`
+  - `psi.rpc-prompt-test/rpc-openai-codex-prompt-emits-tool-events-with-final-args-test`
 
 ## Behaviour coverage
 
-To be completed in Slice 2. Cover command/result, picker/model/thinking/frontend-action, command-tree/resume/navigation, prompt/stream, and projection/emit behaviours.
+### Command dispatch and command results
+
+- `covered-by`: dispatch gate, prompt result mapping, extension command output, template fallback, unknown command text, `/new` command activation, and command snapshots are covered by `psi.rpc-prompt-command-test`, `psi.rpc-command-results-test`, and `psi.rpc-session-navigation-test` vars listed above.
+
+### Picker/model/thinking/frontend-action behaviours
+
+- `added-test`: `psi.rpc-test/rpc-model-and-thinking-picker-frontend-actions-test` now characterizes `/model`, `/thinking`, submitted `select-model`, and submitted `select-thinking-level` through externally observable RPC frames and canonical session/footer outputs.
+
+### Command tree/resume/session rehydration/navigation
+
+- `covered-by`: `psi.rpc-session-navigation-test/rpc-session-resume-and-rehydrate-events-test` and `psi.rpc-test/rpc-fork-emits-context-updated-test` cover new, resume, switch, fork, selector order, and journal-derived rehydration.
+- `pending-characterization-review`: `/tree name`, missing-session, already-active, and ambiguous-prefix behaviours remain visible candidates for the next coverage-review pass.
+
+### Prompt/stream behaviours
+
+- `covered-by`: prompt command tests plus prompt stream tests cover slash handling, event mapping, assistant message emission, retry/footer refresh, thinking/tool events, and prompt lifecycle invariants.
+
+### Projection/emit behaviours
+
+- `covered-by`: RPC ops/projection tests cover initial snapshots, event-driven invalidation delivery, listener unregister, canonical UI projection delegation, and context/footer/session payload shapes.
 
 ## Gaps and disposition
 
-To be completed in Slice 2. Record each gap as `covered-by`, `added-test`, `infeasible-stop`, or `accepted-existing-coverage`, with terse evidence.
+- `added-test` — Picker/model/thinking/frontend-action RPC gap: before this pass, picker selection semantics were covered mostly outside the pinned RPC suite or only through app-runtime/TUI tests. Added `psi.rpc-test/rpc-model-and-thinking-picker-frontend-actions-test` to assert RPC `/model` and `/thinking` event outputs plus submitted frontend-action results using state/output assertions.
+- `pending-characterization-review` — Command-tree edge cases (`/tree name`, missing-session, already-active, ambiguous prefix) are called out for the next coverage review; no production edits are allowed before review disposition and any required characterization fix.
+- `pending-characterization-review` — Frontend-action cancelled/failed RPC result payloads are called out for the next coverage review; no production edits are allowed before review disposition and any required characterization fix.

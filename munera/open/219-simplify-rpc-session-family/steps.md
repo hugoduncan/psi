@@ -43,6 +43,10 @@ when done.
 - [ ] Run `git diff --stat` and `git diff --` before production refactoring; verify the diff contains only task artifacts and characterization/test-net changes.
 - [ ] Commit Slice 2 characterization-test-net updates.
 
+## Characterization fix passes
+
+- [x] 2026-06-07 pass: Filled `coverage-map.md` with source-area/behaviour coverage, added `psi.rpc-test/rpc-model-and-thinking-picker-frontend-actions-test` for `/model`, `/thinking`, submitted `select-model`, and submitted `select-thinking-level` RPC behaviour, updated `characterization-baseline.edn` with the focused command/result summary, and reran the pinned focused suite green (55 tests / 422 assertions). No production changes and no testability seam.
+
 ## Slice 3 — Ownership seam selection
 
 - [ ] Inspect dependencies and call flow among `commands`, `command-results`, `command-tree`, `command-resume`, `command-pickers`, `frontend-actions`, `navigation`, `emit`, `projections`, `prompt`, and `streams`.

@@ -328,6 +328,120 @@
       (is (= child-id (get-in resumed-evt [:data :session-id])))
       (is (= child-id (get-in context-evt [:data :active-session-id]))))))
 
+(deftest rpc-model-and-thinking-picker-frontend-actions-test
+  ;; Characterizes RPC-owned picker command protocol adaptation and submitted
+  ;; frontend action results for model/thinking selection.
+  (testing "/model command emits a frontend action request with model picker payload"
+    (let [[ctx session-id] (support/create-session-context)
+          state            (atom {:transport {:ready? true :pending {}}
+                                  :connection {:focus-session-id session-id
+                                               :subscribed-topics #{"ui/frontend-action-requested"}}})
+          handler          (support/make-handler ctx state)
+          input            (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                                "{:id \"c1\" :kind :request :op \"command\" :params {:text \"/model\"}}\n")
+          {:keys [out-lines]} (support/run-loop input handler state)
+          frames           (support/parse-frames out-lines)
+          command-response (some #(when (and (= :response (:kind %))
+                                             (= "command" (:op %))) %)
+                                 frames)
+          action-event     (some #(when (= "ui/frontend-action-requested" (:event %)) %) frames)
+          action           (get-in action-event [:data :ui/action])
+          items            (:ui/items action)
+          model-keys       (mapv (juxt #(get-in % [:ui.item/value :provider])
+                                       #(get-in % [:ui.item/value :id]))
+                                 items)]
+      (is (= {:accepted true :handled true}
+             (:data command-response)))
+      (is (= "c1" (get-in action-event [:data :request-id])))
+      (is (= :select-model (:ui/action-name action)))
+      (is (= "Select a model" (:ui/prompt action)))
+      (is (= {:submit/kind :set-model} (:ui/on-submit action)))
+      (is (seq items))
+      (is (= model-keys (sort model-keys))
+          "RPC model picker payload preserves backend-owned provider/id order")
+      (is (some #(= ["openai" "gpt-5.4-mini"] %) model-keys))
+      (is (every? #(= (:ui.item/value %)
+                      (select-keys (:ui.item/meta %) [:provider :id]))
+                  items))))
+
+  (testing "/thinking command emits a frontend action request with thinking picker payload"
+    (let [[ctx session-id] (support/create-session-context)
+          state            (atom {:transport {:ready? true :pending {}}
+                                  :connection {:focus-session-id session-id
+                                               :subscribed-topics #{"ui/frontend-action-requested"}}})
+          handler          (support/make-handler ctx state)
+          input            (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                                "{:id \"c1\" :kind :request :op \"command\" :params {:text \"/thinking\"}}\n")
+          {:keys [out-lines]} (support/run-loop input handler state)
+          frames           (support/parse-frames out-lines)
+          command-response (some #(when (and (= :response (:kind %))
+                                             (= "command" (:op %))) %)
+                                 frames)
+          action-event     (some #(when (= "ui/frontend-action-requested" (:event %)) %) frames)
+          action           (get-in action-event [:data :ui/action])
+          items            (:ui/items action)]
+      (is (= {:accepted true :handled true}
+             (:data command-response)))
+      (is (= "c1" (get-in action-event [:data :request-id])))
+      (is (= :select-thinking-level (:ui/action-name action)))
+      (is (= "Select a thinking level" (:ui/prompt action)))
+      (is (= {:submit/kind :set-thinking-level} (:ui/on-submit action)))
+      (is (= ["off" "minimal" "low" "medium" "high" "xhigh"]
+             (mapv :ui.item/value items)))))
+
+  (testing "submitted select-model frontend action updates model and emits command/session snapshots"
+    (let [[ctx session-id] (support/create-session-context)
+          state            (atom {:transport {:ready? true :pending {}}
+                                  :connection {:focus-session-id session-id
+                                               :subscribed-topics #{"command-result"
+                                                                    "session/updated"
+                                                                    "footer/updated"}}})
+          handler          (support/make-handler ctx state)
+          input            (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                                "{:id \"a1\" :kind :request :op \"frontend_action_result\" :params {:request-id \"req-model\" :action-name \"select-model\" :status \"submitted\" :value {:provider \"openai\" :id \"gpt-5.4-mini\"}}}\n")
+          {:keys [out-lines]} (support/run-loop input handler state)
+          frames           (support/parse-frames out-lines)
+          response         (some #(when (and (= :response (:kind %))
+                                             (= "frontend_action_result" (:op %))) %)
+                                 frames)
+          command-result   (some #(when (= "command-result" (:event %)) %) frames)
+          session-updated  (some #(when (= "session/updated" (:event %)) %) frames)
+          footer-updated   (some #(when (= "footer/updated" (:event %)) %) frames)]
+      (is (= {:accepted true :request-id "req-model"}
+             (:data response)))
+      (is (= {:type "text"
+              :message "✓ Model set to openai gpt-5.4-mini"}
+             (:data command-result)))
+      (is (= "openai" (get-in session-updated [:data :model-provider])))
+      (is (= "gpt-5.4-mini" (get-in session-updated [:data :model-id])))
+      (is (some? footer-updated))))
+
+  (testing "submitted select-thinking-level frontend action updates thinking and emits command/session snapshots"
+    (let [[ctx session-id] (support/create-session-context)
+          state            (atom {:transport {:ready? true :pending {}}
+                                  :connection {:focus-session-id session-id
+                                               :subscribed-topics #{"command-result"
+                                                                    "session/updated"
+                                                                    "footer/updated"}}})
+          handler          (support/make-handler ctx state)
+          input            (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                                "{:id \"a1\" :kind :request :op \"frontend_action_result\" :params {:request-id \"req-thinking\" :action-name \"select-thinking-level\" :status \"submitted\" :value \"high\"}}\n")
+          {:keys [out-lines]} (support/run-loop input handler state)
+          frames           (support/parse-frames out-lines)
+          response         (some #(when (and (= :response (:kind %))
+                                             (= "frontend_action_result" (:op %))) %)
+                                 frames)
+          command-result   (some #(when (= "command-result" (:event %)) %) frames)
+          session-updated  (some #(when (= "session/updated" (:event %)) %) frames)
+          footer-updated   (some #(when (= "footer/updated" (:event %)) %) frames)]
+      (is (= {:accepted true :request-id "req-thinking"}
+             (:data response)))
+      (is (= {:type "text"
+              :message "✓ Thinking level set to high"}
+             (:data command-result)))
+      (is (= "high" (get-in session-updated [:data :thinking-level])))
+      (is (some? footer-updated)))))
+
 (deftest rpc-new-session-emits-context-updated-test
   (testing "new_session emits context/updated event"
     (let [[ctx session-id] (support/create-session-context)
