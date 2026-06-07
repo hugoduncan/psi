@@ -16,7 +16,7 @@ bb clojure:test:scry --dir components/rpc/test \
   --namespace psi.rpc-test
 ```
 
-Latest characterization pass in this map: green, 57 tests / 439 assertions.
+Latest characterization pass in this map: green, 58 tests / 449 assertions.
 
 ## Source-area coverage
 
@@ -161,6 +161,8 @@ Covered behaviours:
   - `psi.rpc-prompt-command-test/rpc-prompt-slash-dispatch-gate-test`
   - `psi.rpc-prompt-command-test/rpc-prompt-slash-command-journaled-test`
   - `psi.rpc-prompt-command-test/rpc-prompt-plain-text-journaled-test`
+- Prompt-op `/new` slash-command path bypasses the agent loop and emits externally observable rehydration/focus/snapshot outputs after the shared command-helper refactor.
+  - `psi.rpc-prompt-command-test/rpc-prompt-new-slash-command-rehydrates-without-agent-loop-test`
 - Non-command prompt request preparation expands skill input and forwards runtime-resolved API keys.
   - `psi.rpc-prompt-command-test/rpc-prompt-expands-skill-input-during-request-preparation-test`
   - `psi.rpc-prompt-command-test/rpc-prompt-passes-resolved-api-key-to-agent-loop-test`
@@ -208,3 +210,4 @@ Covered behaviours:
 - `added-test` — Picker/model/thinking/frontend-action RPC gap: before this pass, picker selection semantics were covered mostly outside the pinned RPC suite or only through app-runtime/TUI tests. Added `psi.rpc-test/rpc-model-and-thinking-picker-frontend-actions-test` to assert RPC `/model` and `/thinking` event outputs plus submitted frontend-action results using state/output assertions.
 - `added-test` — Command-tree edge cases: added `psi.rpc-session-navigation-test/rpc-tree-command-edge-behaviour-test` for `/tree` already-active, missing-session, rename, and unique-prefix switch behaviours. Ambiguous-prefix handling remains accepted existing source-path coverage because multiple prefix matches intentionally fall through to the same unmatched-selector text path as the characterized missing-session case.
 - `added-test` — Frontend-action cancelled/failed RPC result payloads: added `psi.rpc-test/rpc-frontend-action-cancelled-and-failed-result-test` for accepted responses, command-result payloads, and no session/footer snapshot emission on cancelled/failed outcomes.
+- `added-test` — Prompt-op `/new` shared-helper regression gap: added `psi.rpc-prompt-command-test/rpc-prompt-new-slash-command-rehydrates-without-agent-loop-test` for accepted prompt response, no agent-loop invocation, `session/resumed`, `session/rehydrated`, RPC focus movement, prompt-path assistant confirmation, and session/footer snapshots.

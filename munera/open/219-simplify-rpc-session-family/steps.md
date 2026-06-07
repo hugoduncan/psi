@@ -110,7 +110,7 @@ when done.
 
 ## Task-test-review follow-ups
 
-- [ ] TT1: Add a focused RPC test for the prompt-op slash-command `/new` path after the shared command-helper refactor. The test should drive an actual `prompt` request with message `/new` through the existing RPC/session harness, assert the agent loop is not invoked, and lock the externally observable rehydration/focus/snapshot outputs that changed source now routes through `rpc.commands/emit-new-session-command!` (for example `session/rehydrated`, active/focus/session/footer outputs as applicable), without mocking logic dependencies.
+- [x] TT1: Add a focused RPC test for the prompt-op slash-command `/new` path after the shared command-helper refactor. Done 2026-06-07: added `psi.rpc-prompt-command-test/rpc-prompt-new-slash-command-rehydrates-without-agent-loop-test`, driving an actual prompt request with message `/new` through the RPC/session harness, asserting the agent loop is not invoked, and locking prompt response acceptance, `session/resumed`, `session/rehydrated`, RPC focus, prompt-path assistant confirmation, and session/footer snapshot outputs. Focused prompt-command test and pinned RPC suite are green (58 tests / 449 assertions).
 
 ## Post-implementation validation recapture failures
 

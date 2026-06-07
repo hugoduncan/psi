@@ -87,6 +87,60 @@
         (is (true? @loop-called?)
             "execute-prepared-request-fn must be called when dispatch returns nil")))))
 
+(deftest rpc-prompt-new-slash-command-rehydrates-without-agent-loop-test
+  ;; Tests prompt-op /new preserves externally observable command rehydration
+  ;; while bypassing the agent loop.
+  (testing "prompt /new bypasses agent loop and emits rehydration, focus, and snapshots"
+    (let [[ctx session-id] (support/create-session-context {:session-defaults {:model {:provider "openai"
+                                                                                       :id "gpt-5.4"
+                                                                                       :reasoning false}}})
+          loop-called? (atom false)
+          state        (atom {:transport {:ready? true :pending {}}
+                              :connection {:focus-session-id session-id}
+                              :rpc-ai-model {:provider "anthropic" :id "stub" :supports-reasoning true}
+                              :execute-prepared-request-fn (fn [_ai-ctx _ctx session-id _prepared-request _opts]
+                                                             (reset! loop-called? true)
+                                                             (support/ok-execution-result session-id [{:type :text :text "should not run"}]))})
+          handler      (support/make-handler ctx state)
+          input        (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                            "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"session/resumed\" \"session/rehydrated\" \"assistant/message\" \"session/updated\" \"footer/updated\"]}}\n"
+                            "{:id \"p-new\" :kind :request :op \"prompt\" :params {:message \"/new\"}}\n")
+          {:keys [out-lines]} (support/run-loop input handler state 300)
+          frames       (support/parse-frames out-lines)
+          prompt-frame (some #(when (and (= :response (:kind %))
+                                         (= "p-new" (:id %))
+                                         (= "prompt" (:op %))) %)
+                             frames)
+          events       (filter #(and (= :event (:kind %))
+                                     (= "p-new" (:id %)))
+                               frames)
+          rehydrated   (some #(when (= "session/rehydrated" (:event %)) %) events)
+          resumed      (some #(when (= "session/resumed" (:event %)) %) events)
+          updated      (some #(when (= "session/updated" (:event %)) %) events)
+          footer       (some #(when (= "footer/updated" (:event %)) %) events)
+          assistant    (some #(when (= "assistant/message" (:event %)) %) events)
+          new-session-id (get-in rehydrated [:data :session-id])]
+      (is (true? (get-in prompt-frame [:data :accepted]))
+          "prompt request should be accepted before the async command worker completes")
+      (is (false? @loop-called?)
+          "prompt /new must be handled as a slash command without invoking the agent loop")
+      (is (string? new-session-id)
+          "prompt /new must emit a rehydrated new-session id")
+      (is (= new-session-id (get-in resumed [:data :session-id]))
+          "resumed and rehydrated events must identify the same new session")
+      (is (vector? (get-in rehydrated [:data :messages]))
+          "rehydration payload must include externally consumable messages")
+      (is (= new-session-id (get-in @state [:connection :focus-session-id]))
+          "RPC focus should move to the rehydrated new session")
+      (is (some #(str/includes? (get % :text "") "[New session started]")
+                (get-in assistant [:data :content]))
+          "prompt-path command result should still surface the new-session confirmation")
+      (is (= session-id (get-in updated [:data :session-id]))
+          "prompt command completion should emit the current prompt session snapshot")
+      (is (= session-id (get-in footer [:data :session-id]))
+          "prompt command completion should emit the current prompt footer snapshot")
+      (is (= "(openai) gpt-5.4" (get-in footer [:data :model-text]))))))
+
 (deftest rpc-prompt-expands-skill-input-during-request-preparation-test
   (testing "non-command /skill prompt is expanded during request preparation"
     (let [skill-file   (java.io.File/createTempFile "psi-rpc-skill-" ".md")
