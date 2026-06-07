@@ -139,3 +139,7 @@
   - Done: added statechart runtime coverage for a top-level two-step workflow created through `psi.workflow/create-run`; the first step mutates real project profile config after the original run snapshot is captured, and the later profiled step's child-session request still uses the stored snapshot model/thinking/speed/effort.
 - [x] TT6: Add command-dispatch coverage for invalid `/session-profile` token forms (`planning extra`, EDN map/vector/list tokens, and command-unparseable tokens such as `fast+coding`) proving the command path rejects them without changing model/thinking/speed/effort or selected-profile metadata. Existing tests exercise the parser seam, but PI3's no-state-change contract is not locked at the backend command boundary.
   - Done: command-dispatch coverage now drives malformed multi-token, EDN map/vector/list, and command-unparseable `/session-profile` inputs through `commands/dispatch-in` after a profile is selected, asserting parser error messages and unchanged model/thinking/speed/effort plus selected-profile metadata.
+
+## Docs review follow-ups
+
+- [ ] DOC1: Update user-facing command discovery docs so session profile commands are visible where interactive commands are enumerated: add `/session-profiles` and `/session-profile [profile-name|clear]` to `doc/tui.md`'s in-session command list/command explanation, and add a terse README pointer under the top-level model/configuration/workflow guidance so README mentions session profiles.
