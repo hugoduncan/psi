@@ -16,7 +16,7 @@ bb clojure:test:scry --dir components/rpc/test \
   --namespace psi.rpc-test
 ```
 
-Latest characterization pass in this map: green, 58 tests / 449 assertions.
+Latest characterization pass in this map: green, 59 tests / 459 assertions.
 
 ## Source-area coverage
 
@@ -163,6 +163,8 @@ Covered behaviours:
   - `psi.rpc-prompt-command-test/rpc-prompt-plain-text-journaled-test`
 - Prompt-op `/new` slash-command path bypasses the agent loop and emits externally observable rehydration/focus/snapshot outputs after the shared command-helper refactor.
   - `psi.rpc-prompt-command-test/rpc-prompt-new-slash-command-rehydrates-without-agent-loop-test`
+- Callback-backed prompt-op `/new` emits callback-supplied startup transcript and tool metadata through the shared command rehydration helper.
+  - `psi.rpc-prompt-command-test/rpc-prompt-new-slash-command-uses-callback-rehydrate-payload-test`
 - Non-command prompt request preparation expands skill input and forwards runtime-resolved API keys.
   - `psi.rpc-prompt-command-test/rpc-prompt-expands-skill-input-during-request-preparation-test`
   - `psi.rpc-prompt-command-test/rpc-prompt-passes-resolved-api-key-to-agent-loop-test`
@@ -211,3 +213,4 @@ Covered behaviours:
 - `added-test` — Command-tree edge cases: added `psi.rpc-session-navigation-test/rpc-tree-command-edge-behaviour-test` for `/tree` already-active, missing-session, rename, and unique-prefix switch behaviours. Ambiguous-prefix handling remains accepted existing source-path coverage because multiple prefix matches intentionally fall through to the same unmatched-selector text path as the characterized missing-session case.
 - `added-test` — Frontend-action cancelled/failed RPC result payloads: added `psi.rpc-test/rpc-frontend-action-cancelled-and-failed-result-test` for accepted responses, command-result payloads, and no session/footer snapshot emission on cancelled/failed outcomes.
 - `added-test` — Prompt-op `/new` shared-helper regression gap: added `psi.rpc-prompt-command-test/rpc-prompt-new-slash-command-rehydrates-without-agent-loop-test` for accepted prompt response, no agent-loop invocation, `session/resumed`, `session/rehydrated`, RPC focus movement, prompt-path assistant confirmation, and session/footer snapshots.
+- `added-test` — Callback-backed prompt-op `/new` shared-helper regression gap: added `psi.rpc-prompt-command-test/rpc-prompt-new-slash-command-uses-callback-rehydrate-payload-test` for callback source-session id, no agent-loop invocation, callback-created new-session rehydration, startup transcript messages, tool-calls/tool-order metadata, RPC focus movement, and prompt-path confirmation.
