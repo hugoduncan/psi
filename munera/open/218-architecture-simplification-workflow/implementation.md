@@ -1,0 +1,3 @@
+# Implementation Notes
+
+- 2026-06-07 architecture-fit review found actionable follow-up **AR1**. The design fits the architecture-targets → Munera task → test-net → Gordian validation shape and preserves the invoking-worktree boundary, but its new post-implementation architecture review gate is not yet anchored to the existing `review-step`/`review-follow-up-steps` review-loop infrastructure or explicitly scoped to this architecture workflow. A bespoke review loop, or broadening generic `review-task-implementation` for all tasks, would fight the project's workflow/review architecture. Added AR1 to `design-steps.md`. PASS_STATUS ACTIONABLE_FEEDBACK.

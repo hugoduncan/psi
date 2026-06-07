@@ -1,0 +1,3 @@
+# Design Follow-ups
+
+- [ ] **AR1** Pin the post-implementation architecture review gate to the existing review-loop architecture: the `review-implementation-architecture` skill should be executed through the shared `review-step` / `review-follow-up-steps` machinery as a workflow-local gate in `reduce-architectural-complexity`, with the selected Gordian target and task artifacts in context. The design must also state that this architecture-specific gate should not be implemented as a bespoke review loop and should not broaden the generic `review-task-implementation` workflow for unrelated tasks unless a separate general review-design decision explicitly does so.
