@@ -11,14 +11,14 @@ when done.
 
 ## Plan/steps inconsistency review follow-ups
 
-- [ ] PI1: Align Slice 1 with the plan/design clean-baseline contract: require the recorded `git status --short --branch` to show a clean pre-refactor worktree before running the baseline suite; if there is pre-existing dirt, record it and stop or explicitly resolve it before claiming a clean baseline.
-- [ ] PI2: Align Slice 2 with the focused-suite propagation contract: if coverage review adds any new RPC characterization namespace/file, update the exact focused command in `plan.md`, the relevant `steps.md` checklist text, and `characterization-baseline.edn` before committing Slice 2, so Slice 1/2/5 do not diverge on what the authoritative suite contains.
-- [ ] PI3: Align the adjacent-source escape hatch across design/plan/steps: if the chosen seam requires any adjacent production file, stop and update the plan/design before editing with the exact root-relative file, why the target cannot be simplified without it, and why the change remains narrow behaviour-preserving contract alignment rather than broader TUI/Emacs/extension/workflow/app-runtime redesign.
+- [x] PI1: Align Slice 1 with the plan/design clean-baseline contract: require the recorded `git status --short --branch` to show a clean pre-refactor worktree before running the baseline suite; if there is pre-existing dirt, record it and stop or explicitly resolve it before claiming a clean baseline. Done in this follow-up: `plan.md` and Slice 1 steps now require `git status --short --branch` to show only the branch header/no short-status entries before running or claiming a clean baseline; pre-existing dirt must be recorded and stopped/resolved first.
+- [x] PI2: Align Slice 2 with the focused-suite propagation contract: if coverage review adds any new RPC characterization namespace/file, update the exact focused command in `plan.md`, the relevant `steps.md` checklist text, and `characterization-baseline.edn` before committing Slice 2, so Slice 1/2/5 do not diverge on what the authoritative suite contains. Done in this follow-up: `plan.md` now requires `plan.md`, `steps.md`, `coverage-map.md`, and `characterization-baseline.edn` to share one authoritative command/namespace set across Slices 1/2/5 after any new characterization namespace; Slice 2 checklist now requires that propagation before committing the characterization gate.
+- [x] PI3: Align the adjacent-source escape hatch across design/plan/steps: if the chosen seam requires any adjacent production file, stop and update the plan/design before editing with the exact root-relative file, why the target cannot be simplified without it, and why the change remains narrow behaviour-preserving contract alignment rather than broader TUI/Emacs/extension/workflow/app-runtime redesign. Done in this follow-up: `plan.md` and Slice 3 steps now require stopping before adjacent production edits and synchronizing `design.md`/`plan.md` with the exact root-relative file, necessity, and narrow behaviour-preserving contract-alignment rationale, explicitly excluding broader redesign.
 
 ## Slice 1 — Preflight and clean baseline
 
 - [ ] Confirm `design-steps.md` has no unchecked follow-ups and record the result in `implementation.md`.
-- [ ] Run `git status --short --branch` from the worktree root and record the pre-refactor worktree state in `implementation.md`.
+- [ ] Run `git status --short --branch` from the worktree root and record the pre-refactor worktree state in `implementation.md`; require the output to show only the branch header and no short-status entries before running or claiming the clean baseline. If there is pre-existing dirt, record it and stop or explicitly resolve it before continuing.
 - [ ] Re-read `design.md`, `architecture-targets.edn`, and `target-issues.edn`; record the selected candidate id/type and fixed target namespace/source-area list in `implementation.md`.
 - [ ] Verify every target source file listed in `design.md` exists under `components/rpc/src/psi/rpc/session/`; stop if any target file is missing.
 - [ ] Verify the candidate affected test files listed in `design.md` exist; note any missing or additionally relevant RPC tests in `implementation.md`.
@@ -36,9 +36,9 @@ when done.
 - [ ] Cover prompt/stream behaviours in the map, including slash command handling, progress event mapping, assistant message emission, footer refresh on retry/tool-result, and stop/drain semantics.
 - [ ] Cover projection/emit behaviours in the map, including context/footer/session snapshot events, UI snapshot subscription, and event-driven invalidation delivery.
 - [ ] Record the coverage map and identified gaps in `munera/open/219-simplify-rpc-session-family/coverage-map.md`.
-- [ ] For each fixable gap, add a characterization test that proves current behaviour without asserting the future refactored structure.
+- [ ] For each fixable gap, add a characterization test that proves current behaviour without asserting the future refactored structure; if adding a new RPC characterization namespace/file, first update the exact focused command in `plan.md`, this checklist's verification wording, and `characterization-baseline.edn` so Slices 1/2/5 share one authoritative suite.
 - [ ] Ensure characterization tests assert emitted events, response frames, state changes, or public outputs; do not assert internal interactions or mocks for logic dependencies.
-- [ ] Re-run the pinned focused RPC baseline/characterization suite from `plan.md` until green.
+- [ ] Re-run the pinned focused RPC baseline/characterization suite from `plan.md` until green, verifying it includes every characterization namespace/file recorded in `coverage-map.md` and `characterization-baseline.edn`.
 - [ ] If required behaviour cannot be characterized safely, stop before implementation and record the infeasible-coverage reason in `implementation.md`.
 - [ ] Run `git diff --stat` and `git diff --` before production refactoring; verify the diff contains only task artifacts and characterization/test-net changes.
 - [ ] Commit Slice 2 characterization-test-net updates.
@@ -51,7 +51,7 @@ when done.
 - [ ] Record the chosen seam, evidence, and rejected alternatives in `implementation.md` before source edits.
 - [ ] Verify the chosen seam keeps RPC limited to protocol adaptation/fanout and leaves adapter-neutral semantics with existing `app-runtime`/domain owners.
 - [ ] Verify the chosen seam can be implemented inside authorized target source files only.
-- [ ] If the chosen seam requires an adjacent production source file, stop and update `plan.md` before editing that file.
+- [ ] If the chosen seam requires an adjacent production source file, stop and update `design.md` and `plan.md` before editing that file with the exact root-relative file, why the target cannot be simplified without it, and why the change remains narrow behaviour-preserving contract alignment rather than broader TUI/Emacs/extension/workflow/app-runtime redesign.
 - [ ] Commit Slice 3 seam-selection notes if task artifacts changed.
 
 ## Slice 4 — Target-local architecture simplification

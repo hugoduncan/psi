@@ -19,7 +19,10 @@ prompt/stream behaviour, projection semantics, or workflow/session semantics.
 The initial implementation strategy is:
 
 1. Establish and record a clean focused RPC baseline before any production
-   refactor.
+   refactor; `git status --short --branch` must show only the branch header and
+   no short-status entries before the baseline is run or claimed clean. If
+   pre-existing dirt exists, record it and stop or explicitly resolve it before
+   continuing.
 2. Build `munera/open/219-simplify-rpc-session-family/coverage-map.md`
    from target behaviours to existing/new tests, especially command
    dispatch/results, command tree/resume/pickers, navigation, prompt/stream
@@ -68,9 +71,11 @@ Those namespaces correspond to these design-listed affected test files:
 
 Characterization tests should normally be added inside those namespaces so the
 same suite remains stable across Slices 1/2/5. If Slice 2 must add a new RPC test
-namespace, update this exact command, `steps.md`, and
+namespace, update this exact command, `steps.md`, `coverage-map.md`, and
 `characterization-baseline.edn` before committing Slice 2; do not leave an
-unlisted characterization namespace outside the focused suite.
+unlisted characterization namespace outside the focused suite. Slice 1, Slice 2,
+and Slice 5 must always refer to the same authoritative command and namespace
+set after any characterization additions.
 
 ## Coverage map artifact
 
@@ -109,7 +114,10 @@ verification. Minimal shape:
 - No adjacent production source files are authorized at planning time. If source
   inspection shows that a small adapter-neutral semantic helper must move to an
   existing `app-runtime` owner, stop and update the plan/design before editing
-  that adjacent file.
+  that adjacent file. The update must name the exact root-relative file, explain
+  why the captured target cannot be simplified without it, and explain why the
+  change remains narrow behaviour-preserving contract alignment rather than
+  broader TUI/Emacs/extension/workflow/app-runtime redesign.
 - RPC may own request ids, RPC event names, wire payload encoding, response
   frames, subscriber fanout, protocol payload recomputation/adaptation, and
   connection-local focus. Adapter-neutral selector/navigation/picker/action/result
