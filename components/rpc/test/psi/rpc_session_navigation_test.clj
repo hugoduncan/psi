@@ -91,6 +91,68 @@
       (is (= "(openai) gpt-5.4"
              (get-in footer-event [:data :model-text])))))
 
+  (testing "command /new with callback emits callback rehydration and command result"
+    (let [[ctx session-id] (support/create-session-context)
+          callback-sources (atom [])
+          state            (atom {:transport {:ready? true :pending {}}
+                                  :connection {:focus-session-id session-id}
+                                  :on-new-session!
+                                  (fn [source-session-id]
+                                    (swap! callback-sources conj source-session-id)
+                                    (let [sd (session/new-session-in! ctx source-session-id {})]
+                                      {:session-id (:session-id sd)
+                                       :agent-messages [{:role "assistant"
+                                                         :content [{:type :text
+                                                                    :text "command startup reply"}]}]
+                                       :messages [{:role :assistant
+                                                   :text "legacy command startup reply"}]
+                                       :tool-calls {"call-command" {:name "bash"}}
+                                       :tool-order ["call-command"]}))})
+          handler          (support/make-handler ctx state)
+          input            (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                                "{:id \"s1\" :kind :request :op \"subscribe\" :params {:topics [\"session/resumed\" \"session/rehydrated\" \"command-result\"]}}\n"
+                                "{:id \"c-new-callback\" :kind :request :op \"command\" :params {:text \"/new\"}}\n")
+          {:keys [out-lines]} (support/run-loop input handler state 300)
+          frames           (support/parse-frames out-lines)
+          command-response (some #(when (and (= :response (:kind %))
+                                             (= "c-new-callback" (:id %))
+                                             (= "command" (:op %))) %)
+                                 frames)
+          events           (filter #(and (= :event (:kind %))
+                                         (= "c-new-callback" (:id %)))
+                                   frames)
+          rehydrated       (some #(when (= "session/rehydrated" (:event %)) %) events)
+          resumed          (some #(when (= "session/resumed" (:event %)) %) events)
+          command-result   (some #(when (= "command-result" (:event %)) %) events)
+          new-session-id   (get-in rehydrated [:data :session-id])]
+      (is (= [session-id] @callback-sources)
+          "command /new callback should receive the source session id")
+      (is (= {:accepted true :handled true}
+             (:data command-response))
+          "command /new should return the accepted command response")
+      (is (string? new-session-id)
+          "command /new must rehydrate the callback-created session")
+      (is (= new-session-id (get-in resumed [:data :session-id]))
+          "resumed and rehydrated events must describe the same callback-created session")
+      (is (= 1 (get-in resumed [:data :message-count]))
+          "resumed event must count callback-provided startup transcript messages")
+      (is (= [{:role "assistant"
+               :content [{:type :text :text "command startup reply"}]}]
+             (get-in rehydrated [:data :messages]))
+          "rehydrated event must prefer callback-provided agent transcript messages")
+      (is (= {"call-command" {:name "bash"}}
+             (get-in rehydrated [:data :tool-calls]))
+          "rehydrated event must include callback-provided tool metadata")
+      (is (= ["call-command"]
+             (get-in rehydrated [:data :tool-order]))
+          "rehydrated event must include callback-provided tool ordering")
+      (is (= new-session-id (get-in @state [:connection :focus-session-id]))
+          "RPC focus should move to the callback-created new session")
+      (is (= {:type "new_session"
+              :message "[New session started]"}
+             (:data command-result))
+          "command-result output should be emitted through the shared new-session helper")))
+
   (testing "command /resume <path> emits session/resumed and session/rehydrated canonical events"
     (let [cwd                 (str (System/getProperty "java.io.tmpdir") "/psi-rpc-resume-" (java.util.UUID/randomUUID))
           _                   (.mkdirs (java.io.File. cwd))
