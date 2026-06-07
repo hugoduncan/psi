@@ -61,17 +61,17 @@ when done.
 
 ## Slice 4 — Target-local architecture simplification
 
-- [ ] Apply the smallest production refactor for the chosen seam inside the authorized target source files.
-- [ ] If extracting helpers, give them narrow names and contracts that describe RPC protocol adaptation, response/event emission, or subscriber fanout rather than adapter-neutral UI semantics.
-- [ ] Keep command dispatch orchestration separate from command result/event shaping where local code permits.
-- [ ] Keep navigation/result call sites clearly using existing `app-runtime` navigation/action/selector owners for adapter-neutral meaning.
-- [ ] Keep projection/stream/emit delivery event-driven and recompute payloads from canonical context/state/public-model functions.
-- [ ] Do not introduce RPC-local cached canonical projection snapshots, polling refresh, compatibility shims, or adapter-specific freshness models.
-- [ ] Re-read every changed source file after edits and verify formatting/parentheses locally.
-- [ ] Run `clj-paren-repair` or equivalent formatter on changed Clojure source/test files when needed.
-- [ ] Run the focused RPC tests affected by the changed source files.
-- [ ] Record implementation decisions, changed files, and focused test results in `implementation.md`.
-- [ ] Commit Slice 4 production simplification and related test updates.
+- [x] Apply the smallest production refactor for the chosen seam inside the authorized target source files. Done in Slice 4: centralized duplicated `/new` command-result rehydration shaping in `commands.clj`; attempted resume/tree navigation routing was reverted before commit after Gordian gate failure.
+- [x] If extracting helpers, give them narrow names and contracts that describe RPC protocol adaptation, response/event emission, or subscriber fanout rather than adapter-neutral UI semantics. Done: `commands/new-session-command-payload`, `commands/focus-new-session-command!`, and `commands/emit-new-session-command!` describe RPC command-result emission/adaptation.
+- [x] Keep command dispatch orchestration separate from command result/event shaping where local code permits. Done: command/prompt dispatch call the shared command-path helper rather than shaping `/new` rehydration inline.
+- [x] Keep navigation/result call sites clearly using existing `app-runtime` navigation/action/selector owners for adapter-neutral meaning. Done/verified: committed change did not move adapter-neutral navigation semantics; `/resume` and `/tree` behaviour remains with existing owners, while `/new` command rehydration shaping is a narrow RPC command-result adapter.
+- [x] Keep projection/stream/emit delivery event-driven and recompute payloads from canonical context/state/public-model functions. Done: no projection/stream changes; emit still recomputes payloads from canonical context/state helpers.
+- [x] Do not introduce RPC-local cached canonical projection snapshots, polling refresh, compatibility shims, or adapter-specific freshness models. Done: no cache, polling, shim, or adapter-specific freshness model added.
+- [x] Re-read every changed source file after edits and verify formatting/parentheses locally. Done after editing/reverting candidates and re-reading the committed changed source files `commands.clj` and `prompt.clj`.
+- [x] Run `clj-paren-repair` or equivalent formatter on changed Clojure source/test files when needed. Done on all changed Clojure source files.
+- [x] Run the focused RPC tests affected by the changed source files. Done: pinned focused RPC suite green, 57 tests / 439 assertions.
+- [x] Record implementation decisions, changed files, and focused test results in `implementation.md`. Done in Slice 4 implementation note dated 2026-06-07.
+- [x] Commit Slice 4 production simplification and related test updates. Done in the Slice 4 production simplification commit.
 
 ## Slice 5 — Focused verification and Gordian validation
 
