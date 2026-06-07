@@ -102,6 +102,7 @@
 
   (testing "reserved :clear profile is invalid even with concrete settings"
     (let [resolved (session-profiles/resolve-profile :clear {:speed-mode :fast})]
+      (is (false? (session-profiles/valid-profile-name? :clear)))
       (is (false? (:valid? resolved)))
       (is (= [:reserved-profile-name]
              (mapv :reason (:diagnostics resolved))))))

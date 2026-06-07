@@ -17,7 +17,7 @@
 
 (def reserved-profile-names
   "Profile names that cannot be selected because they are command actions."
-  #{:clear})
+  profile-names/reserved-profile-names)
 
 (def profile-name-token-pattern
   "The selectable `/session-profile <name>` token grammar, excluding any leading `:`."
@@ -205,7 +205,7 @@
                            [(diagnostic :name :invalid-profile-name
                                         "profile name must match /session-profile token characters: letters, digits, dot, underscore, or hyphen")]
 
-                           (contains? reserved-profile-names profile-name)
+                           (profile-names/reserved-profile-name? profile-name)
                            [(diagnostic :name :reserved-profile-name
                                         "profile name is reserved by /session-profile clear")]
 

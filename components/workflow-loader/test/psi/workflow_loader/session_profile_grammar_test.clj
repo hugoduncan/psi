@@ -64,8 +64,8 @@
 
 (deftest session-profile-name-grammar-rejection-test
   ;; Tests that unsupported session-profile names fail at workflow loading and canonical validation boundaries.
-  (testing "canonical IR rejects namespaced and command-unparseable session-step profile names"
-    (doseq [profile-name [:team/coding :fast+coding]]
+  (testing "canonical IR rejects namespaced, command-unparseable, and reserved session-step profile names"
+    (doseq [profile-name [:team/coding :fast+coding :clear]]
       (let [{:keys [valid? structural-errors]}
             (workflow-ir/validate-workflow-ir
              {:version :workflow-ir/v1
@@ -79,8 +79,8 @@
         (is (false? valid?) (str "invalid profile should fail: " (pr-str profile-name)))
         (is (some? structural-errors)))))
 
-  (testing "canonical IR rejects namespaced and command-unparseable delegate profile names"
-    (doseq [profile-name [:team/coding :fast+coding]]
+  (testing "canonical IR rejects namespaced, command-unparseable, and reserved delegate profile names"
+    (doseq [profile-name [:team/coding :fast+coding :clear]]
       (let [{:keys [valid? structural-errors]}
             (workflow-ir/validate-workflow-ir
              {:version :workflow-ir/v1
@@ -98,8 +98,10 @@
     (doseq [[step-type profile-name]
             [[:session :team/coding]
              [:session :fast+coding]
+             [:session :clear]
              [:delegate :team/coding]
-             [:delegate :fast+coding]]]
+             [:delegate :fast+coding]
+             [:delegate :clear]]]
       (let [step (case step-type
                    :session {:name "plan"
                              :type :session
@@ -113,12 +115,12 @@
                               :prompt-string "Build it."})]
         (is (thrown-with-msg?
              clojure.lang.ExceptionInfo
-             #"Session profile names must be selectable unqualified keywords"
+             #"Session profile names must be selectable unqualified non-reserved keywords"
              (compile-ir {:steps [step]}))
             (str "compiler should reject " step-type " " (pr-str profile-name))))))
 
   (testing "markdown frontmatter invalid profile names fail when compiled to canonical IR"
-    (doseq [frontmatter-profile [":team/coding" "fast+coding"]]
+    (doseq [frontmatter-profile [":team/coding" "fast+coding" "clear" ":clear"]]
       (let [parsed (parser/parse-workflow-file
                     :md
                     (str "---\nname: planner\ndescription: Plans\nsession-profile: "
@@ -128,7 +130,7 @@
         (is (nil? parse-error))
         (is (thrown-with-msg?
              clojure.lang.ExceptionInfo
-             #"Session profile names must be selectable unqualified keywords"
+             #"Session profile names must be selectable unqualified non-reserved keywords"
              (compile-ir definition))))))
 
   (testing "canonical IR rejects string session-profile names"

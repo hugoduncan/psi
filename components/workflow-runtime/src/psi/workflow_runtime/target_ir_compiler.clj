@@ -137,7 +137,7 @@
 (defn- compile-session-profile-name
   [profile-name]
   (when-not (profile-names/valid-profile-name? profile-name)
-    (throw (ex-info "Session profile names must be selectable unqualified keywords matching /session-profile token grammar"
+    (throw (ex-info "Session profile names must be selectable unqualified non-reserved keywords matching /session-profile token grammar"
                     {:session-profile profile-name})))
   profile-name)
 

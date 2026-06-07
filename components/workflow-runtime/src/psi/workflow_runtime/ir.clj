@@ -175,7 +175,7 @@
 (def profile-name-schema
   [:and
    :keyword
-   [:fn {:error/message "session-profile must match /session-profile token grammar"}
+   [:fn {:error/message "session-profile must match /session-profile token grammar and must not be reserved"}
     profile-names/valid-profile-name?]])
 
 (def session-spec-schema
