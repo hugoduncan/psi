@@ -194,8 +194,13 @@ All downstream task consumers use the extracted path consistently:
   and all six `review-step` delegates set `:prompt-string` field `:input` from
   `{:step "extract-task-path" :yield :text}`.
 - `validation-capture`, `clean-baseline`, coverage/disposition/fix, diff-gate,
-  terminal-stop-summary, and final-summary templates use the same extracted path
-  as their task identity variable.
+  post-task terminal-stop-summary branches, and final-summary templates use the
+  same extracted path as their task identity variable.
+- `terminal-stop-summary` also has a pre-design, no-validated-task-path branch
+  for malformed `extract-task-path` handoffs. That branch consumes the full
+  `select-and-create` handoff and the path-extraction failure summary as
+  context, must not require or invent an extracted task path, and must not read
+  task-local artifacts.
 - The full `select-and-create` handoff remains available as context/evidence,
   not as the task-path argument.
 
@@ -214,6 +219,32 @@ including `architecture-targets.edn`, `target-issues.edn` or
 `target-issues-unavailable.edn`, `before-diagnose.edn`, `after-diagnose.edn`,
 `after-architecture-targets.edn`, `architecture-compare.edn`,
 `architecture-gate.edn`, and the Munera artifacts.
+
+
+### PI1–PI3 — Topology, terminal-stop, and evidence-boundary synchronization
+
+The single target-present topology is now: `select-and-create` `"DONE"` →
+`extract-task-path` → `review-task-design`; no downstream task consumer may use
+or bypass the raw `select-and-create` handoff as its task path. Planned workflow
+and tests should prove that `extract-task-path` is the sole source for generated
+Munera task identity.
+
+`terminal-stop-summary` must support two deterministic stop shapes:
+
+- pre-design/no-validated-task-path: reached only from malformed
+  `extract-task-path` output; summarizes the full selection handoff and the
+  extraction failure without reading task-local artifacts or inventing a task
+  path;
+- post-task/no-implementation: reached after a validated extracted path exists
+  from clean-baseline, coverage/disposition/fix, diff-gate, or later gate
+  failures; uses the extracted task path to read/update task artifacts.
+
+The architecture implementation review gate receives workflow-yield context for
+handoff summaries and prior decisions, but Gordian artifact contents are not
+runtime-inlined. The `review-implementation-architecture` skill must read
+`architecture-targets.edn`, `target-issues.edn` or
+`target-issues-unavailable.edn`, validation artifacts, and Munera artifacts from
+task-local root-relative paths.
 
 ### PA4 — Real Gordian envelope test shape
 
