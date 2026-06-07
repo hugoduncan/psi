@@ -16,7 +16,7 @@ bb clojure:test:scry --dir components/rpc/test \
   --namespace psi.rpc-test
 ```
 
-Latest characterization pass in this map: green, 59 tests / 459 assertions.
+Latest characterization pass in this map: green, 59 tests / 469 assertions.
 
 ## Source-area coverage
 
@@ -92,6 +92,8 @@ Covered behaviours:
 - Command `/new` emits canonical resume/rehydrate, command-result, footer update, and makes the new session active for later extension commands.
   - `psi.rpc-session-navigation-test/rpc-session-resume-and-rehydrate-events-test`
   - `psi.rpc-session-navigation-test/rpc-extension-command-after-new-emits-assistant-message-for-new-session-test`
+- Callback-backed command-op `/new` threads runtime `:on-new-session!` into slash resolution and emits callback-created rehydration, startup transcript, tool metadata/order, RPC focus movement, accepted command response, and `new_session` command-result output through the shared helper.
+  - `psi.rpc-session-navigation-test/rpc-session-resume-and-rehydrate-events-test` (`command /new with callback emits callback rehydration and command result`)
 - Picker command routing for `/model` and `/thinking` is covered by the new characterization test in `psi.rpc-test`.
   - `psi.rpc-test/rpc-model-and-thinking-picker-frontend-actions-test`
 
@@ -188,7 +190,7 @@ Covered behaviours:
 
 ### Command dispatch and command results
 
-- `covered-by`: dispatch gate, prompt result mapping, extension command output, template fallback, unknown command text, `/new` command activation, and command snapshots are covered by `psi.rpc-prompt-command-test`, `psi.rpc-command-results-test`, and `psi.rpc-session-navigation-test` vars listed above.
+- `covered-by`: dispatch gate, prompt result mapping, extension command output, template fallback, unknown command text, default and callback-backed `/new` command activation, and command snapshots are covered by `psi.rpc-prompt-command-test`, `psi.rpc-command-results-test`, and `psi.rpc-session-navigation-test` vars listed above.
 
 ### Picker/model/thinking/frontend-action behaviours
 
@@ -214,3 +216,4 @@ Covered behaviours:
 - `added-test` — Frontend-action cancelled/failed RPC result payloads: added `psi.rpc-test/rpc-frontend-action-cancelled-and-failed-result-test` for accepted responses, command-result payloads, and no session/footer snapshot emission on cancelled/failed outcomes.
 - `added-test` — Prompt-op `/new` shared-helper regression gap: added `psi.rpc-prompt-command-test/rpc-prompt-new-slash-command-rehydrates-without-agent-loop-test` for accepted prompt response, no agent-loop invocation, `session/resumed`, `session/rehydrated`, RPC focus movement, prompt-path assistant confirmation, and session/footer snapshots.
 - `added-test` — Callback-backed prompt-op `/new` shared-helper regression gap: added `psi.rpc-prompt-command-test/rpc-prompt-new-slash-command-uses-callback-rehydrate-payload-test` for callback source-session id, no agent-loop invocation, callback-created new-session rehydration, startup transcript messages, tool-calls/tool-order metadata, RPC focus movement, and prompt-path confirmation.
+- `added-test` — Callback-backed command-op `/new` shared-helper regression gap: added callback-backed command-op coverage in `psi.rpc-session-navigation-test/rpc-session-resume-and-rehydrate-events-test` for callback source-session id, accepted command response, callback-created `session/resumed` / `session/rehydrated` payloads, callback startup transcript messages, tool metadata/order, RPC focus movement, and `new_session` command-result output.
