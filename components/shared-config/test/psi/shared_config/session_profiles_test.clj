@@ -132,7 +132,13 @@
                     :bad-model
                     {:model-provider "openai" :model-id "does-not-exist"})]
       (is (false? (:valid? resolved)))
-      (is (= [:unknown-model] (mapv :reason (:diagnostics resolved)))))))
+      (is (= [:unknown-model] (mapv :reason (:diagnostics resolved))))))
+
+  (testing "non-keyword profile names resolve to invalid-profile-name diagnostics"
+    (let [resolved (session-profiles/resolve-profile "oops" {:speed-mode :fast})]
+      (is (false? (:valid? resolved)))
+      (is (= [:invalid-profile-name]
+             (mapv :reason (:diagnostics resolved)))))))
 
 (deftest effective-profiles-test
   ;; Tests the public read+resolve entry point with real file IO and registry.
@@ -152,7 +158,17 @@
             (is (= [:clear :coding :review] (keys profiles)))
             (is (false? (:valid? (profile profiles :clear))))
             (is (:valid? (profile profiles :coding)))
-            (is (:valid? (profile profiles :review)))))))))
+            (is (:valid? (profile profiles :review))))))))
+
+  (testing "mixed keyword and string profile names are reported without throwing"
+    (let [profiles (session-profiles/resolve-profiles
+                    {:coding {:speed-mode :fast}
+                     "oops" {:speed-mode :normal}})]
+      (is (= [:coding "oops"] (keys profiles)))
+      (is (:valid? (profile profiles :coding)))
+      (is (false? (:valid? (profile profiles "oops"))))
+      (is (= [:invalid-profile-name]
+             (mapv :reason (get-in profiles ["oops" :diagnostics])))))))
 
 (deftest find-valid-profile-test
   ;; Tests the small state-free selection helper used by commands/workflows.

@@ -67,6 +67,7 @@
                                              {:coding {:model-provider "openai"
                                                        :model-id "gpt-5.5"
                                                        :speed-mode :fast}
+                                              "oops" {:speed-mode :normal}
                                               :empty {}
                                               :clear {:speed-mode :fast}}}})
     (with-redefs [user-config/user-config-file (fn [] (user-config-file-in cwd))]
@@ -75,7 +76,8 @@
           (let [message (:message (commands/dispatch-in ctx session-id "/session-profiles" cmd-opts))]
             (is (str/includes? message "coding — model openai/gpt-5.5, speed fast"))
             (is (str/includes? message "empty — unavailable: profile has no supported concrete settings"))
-            (is (str/includes? message "clear — unavailable: profile name is reserved"))))
+            (is (str/includes? message "clear — unavailable: profile name is reserved"))
+            (is (str/includes? message "oops — unavailable: profile name must be a keyword"))))
         (testing "/session-profile shows current concrete settings with no selected metadata"
           (let [message (:message (commands/dispatch-in ctx session-id "/session-profile" cmd-opts))]
             (is (str/includes? message "Selected: (none)"))

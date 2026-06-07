@@ -106,6 +106,7 @@
                            {:session-profiles
                             {:coding {:speed-mode :fast
                                       :temperature 0.1}
+                             "oops" {:speed-mode :normal}
                              :empty {}}}}))
           _ (cwf-mutations/register-workflow-definition
              {} {:psi/agent-session-ctx ctx :definition core-test/sample-definition})
@@ -119,9 +120,12 @@
                            [:workflows :runs "run-session-profile-snapshot" :session-profile-snapshot])]
       (is (nil? (:psi.workflow/error result)))
       (is (= [:coding] (:valid-profile-names snapshot)))
-      (is (= [:empty] (:invalid-profile-names snapshot)))
+      (is (= [:empty "oops"] (:invalid-profile-names snapshot)))
       (is (= {:speed-mode :fast}
              (get-in snapshot [:profiles :coding :settings])))
+      (is (= [:invalid-profile-name]
+             (mapv :reason (get-in snapshot [:profiles "oops" :diagnostics])))
+          "workflow snapshots report non-keyword profile names instead of throwing")
       (is (not (contains? (get-in snapshot [:profiles :coding]) :ignored-keys))
           "workflow snapshots omit ignored unknown config keys"))))
 

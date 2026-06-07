@@ -52,9 +52,15 @@
                      :psi.agent-session/speed-mode
                      :psi.agent-session/effort-override]))
 
+(defn- profile-name-text
+  [profile-name]
+  (if (or (keyword? profile-name) (string? profile-name))
+    (name profile-name)
+    (pr-str profile-name)))
+
 (defn- profile-line
   [profile]
-  (let [name-text (name (:name profile))]
+  (let [name-text (profile-name-text (:name profile))]
     (if (:valid? profile)
       (str "  " name-text " — " (str/join ", " (:readable-settings profile)))
       (str "  " name-text " — unavailable: " (session-profiles/format-diagnostics profile)))))
@@ -97,11 +103,11 @@
   [{:keys [error profile profile-name available]}]
   (case error
     :unknown-profile
-    (str "Unknown session profile: " (name profile-name)
+    (str "Unknown session profile: " (profile-name-text profile-name)
          ". Available: " (available-text available))
 
     :invalid-profile
-    (str "Invalid session profile: " (name (:name profile))
+    (str "Invalid session profile: " (profile-name-text (:name profile))
          ". " (session-profiles/format-diagnostics profile)
          ". Available: " (available-text available))
 

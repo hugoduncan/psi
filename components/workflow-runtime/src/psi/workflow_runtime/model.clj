@@ -223,20 +223,34 @@
    [:reason :keyword]
    [:message :string]])
 
-(def session-profile-record-schema
+(def session-profile-valid-record-schema
   [:map
    [:name :keyword]
-   [:status [:enum :valid :invalid]]
-   [:valid? :boolean]
+   [:status [:= :valid]]
+   [:valid? [:= true]]
    [:settings session-profile-settings-schema]
    [:readable-settings [:vector :string]]
    [:diagnostics [:vector session-profile-diagnostic-schema]]])
 
+(def session-profile-invalid-record-schema
+  [:map
+   [:name :any]
+   [:status [:= :invalid]]
+   [:valid? [:= false]]
+   [:settings session-profile-settings-schema]
+   [:readable-settings [:vector :string]]
+   [:diagnostics [:vector session-profile-diagnostic-schema]]])
+
+(def session-profile-record-schema
+  [:multi {:dispatch :valid?}
+   [true session-profile-valid-record-schema]
+   [false session-profile-invalid-record-schema]])
+
 (def session-profile-snapshot-schema
   [:map
-   [:profiles [:map-of :keyword session-profile-record-schema]]
+   [:profiles [:map-of :any session-profile-record-schema]]
    [:valid-profile-names [:vector :keyword]]
-   [:invalid-profile-names [:vector :keyword]]])
+   [:invalid-profile-names [:vector :any]]])
 
 (def workflow-run-schema
   [:map

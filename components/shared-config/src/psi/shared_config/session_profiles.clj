@@ -131,6 +131,24 @@
   [model]
   (str (name (:provider model)) "/" (:id model)))
 
+(defn- heterogeneous-sort-key
+  [x]
+  [(cond
+     (keyword? x) 0
+     (string? x) 1
+     :else 2)
+   (if (keyword? x) (or (namespace x) "") "")
+   (cond
+     (keyword? x) (name x)
+     (string? x) x
+     :else (pr-str x))
+   (str (class x))])
+
+(defn- compare-heterogeneous-keys
+  [a b]
+  (compare (heterogeneous-sort-key a)
+           (heterogeneous-sort-key b)))
+
 (defn readable-settings
   "Return deterministic user-facing setting fragments for resolved `settings`."
   [settings]
@@ -159,7 +177,7 @@
         supported        (select-keys profile-map supported-fields)
         ignored-keys     (->> (keys profile-map)
                               (remove supported-fields)
-                              sort
+                              (sort-by heterogeneous-sort-key)
                               vec)
         name-diagnostics (cond
                            (not (keyword? profile-name))
@@ -202,7 +220,7 @@
 (defn resolve-profiles
   "Resolve a raw profile definition map into deterministic profile records."
   [profile-definitions]
-  (into (sorted-map)
+  (into (sorted-map-by compare-heterogeneous-keys)
         (map (fn [[profile-name profile]]
                [profile-name (resolve-profile profile-name profile)]))
         profile-definitions))
