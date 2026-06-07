@@ -5,13 +5,13 @@ when done.
 
 ## Slice 1 — Preflight and dedicated review skill
 
-- [ ] Run `bb gordian architecture-targets --edn` from the repository root and record the observed top-level `:winner` / `:candidates` envelope shape in `implementation.md`.
-- [ ] Run or smoke-check `bb gordian target-issues --candidate '<candidate-id>' --edn` for a supported candidate type when available, and record the supported/unsupported behaviour in `implementation.md`.
-- [ ] Create `.psi/skills/review-implementation-architecture/SKILL.md` with frontmatter name exactly `review-implementation-architecture`.
-- [ ] In the skill, require reading the selected Gordian target, `architecture-targets.edn`, `target-issues.edn` or `target-issues-unavailable.edn`, validation artifacts, Munera task artifacts, and project architecture sources (`AGENTS.md`, `META.md`, `doc/architecture.md`, relevant local architecture docs).
-- [ ] In the skill, require judging the implemented code change for behaviour preservation, target fit, blast-radius discipline, architectural improvement/no-regression, and absence of adapter/shim/indirection complexity.
-- [ ] Verify the new skill loads through the skills registry or existing workflow-loader skill discovery seam.
-- [ ] Commit Slice 1 (`⚒ skill: add implementation architecture review`).
+- [x] Run `bb gordian architecture-targets --edn` from the repository root and record the observed top-level `:winner` / `:candidates` envelope shape in `implementation.md`. Decision: observed live EDN top-level map with `:winner` map and `:candidates` vector; recorded in implementation notes.
+- [x] Run or smoke-check `bb gordian target-issues --candidate '<candidate-id>' --edn` for a supported candidate type when available, and record the supported/unsupported behaviour in `implementation.md`. Decision: live winner candidate `[:family "psi.rpc.session"]` supports `target-issues --edn`; recorded in implementation notes.
+- [x] Create `.psi/skills/review-implementation-architecture/SKILL.md` with frontmatter name exactly `review-implementation-architecture`.
+- [x] In the skill, require reading the selected Gordian target, `architecture-targets.edn`, `target-issues.edn` or `target-issues-unavailable.edn`, validation artifacts, Munera task artifacts, and project architecture sources (`AGENTS.md`, `META.md`, `doc/architecture.md`, relevant local architecture docs).
+- [x] In the skill, require judging the implemented code change for behaviour preservation, target fit, blast-radius discipline, architectural improvement/no-regression, and absence of adapter/shim/indirection complexity.
+- [x] Verify the new skill loads through the skills registry or existing workflow-loader skill discovery seam. Decision: `psi.prompt-assets.skills/discover-skills` found the project skill with no matching diagnostics.
+- [x] Commit Slice 1 (`⚒ skill: add implementation architecture review`).
 
 ## Slice 2 — Architecture workflow selection and task-generation shell
 
