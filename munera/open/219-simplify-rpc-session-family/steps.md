@@ -50,14 +50,14 @@ when done.
 
 ## Slice 3 — Ownership seam selection
 
-- [ ] Inspect dependencies and call flow among `commands`, `command-results`, `command-tree`, `command-resume`, `command-pickers`, `frontend-actions`, `navigation`, `emit`, `projections`, `prompt`, and `streams`.
-- [ ] Identify the repeated shared decision/data-shaping surface that best explains conceptual overlap around `commands`, `command-results`, and `command-tree`.
-- [ ] Decide whether the simplification seam is command/result/navigation-oriented, projection/stream/emit-oriented, or a smaller cross-cutting protocol-adaptation seam.
-- [ ] Record the chosen seam, evidence, and rejected alternatives in `implementation.md` before source edits.
-- [ ] Verify the chosen seam keeps RPC limited to protocol adaptation/fanout and leaves adapter-neutral semantics with existing `app-runtime`/domain owners.
-- [ ] Verify the chosen seam can be implemented inside authorized target source files only.
-- [ ] If the chosen seam requires an adjacent production source file, stop and update `design.md` and `plan.md` before editing that file with the exact root-relative file, why the target cannot be simplified without it, and why the change remains narrow behaviour-preserving contract alignment rather than broader TUI/Emacs/extension/workflow/app-runtime redesign.
-- [ ] Commit Slice 3 seam-selection notes if task artifacts changed.
+- [x] Inspect dependencies and call flow among `commands`, `command-results`, `command-tree`, `command-resume`, `command-pickers`, `frontend-actions`, `navigation`, `emit`, `projections`, `prompt`, and `streams`. Done in Slice 3 seam-selection notes: command/result/navigation duplication and app-runtime navigation ownership were inspected before source edits.
+- [x] Identify the repeated shared decision/data-shaping surface that best explains conceptual overlap around `commands`, `command-results`, and `command-tree`. Done in Slice 3: duplicated command-result-driven rehydration and manual resume/tree-switch navigation emission were selected as the shared RPC adaptation surface.
+- [x] Decide whether the simplification seam is command/result/navigation-oriented, projection/stream/emit-oriented, or a smaller cross-cutting protocol-adaptation seam. Done in Slice 3: chose a command/result/navigation-oriented RPC protocol-adaptation seam.
+- [x] Record the chosen seam, evidence, and rejected alternatives in `implementation.md` before source edits. Done in Slice 3 implementation note dated 2026-06-07.
+- [x] Verify the chosen seam keeps RPC limited to protocol adaptation/fanout and leaves adapter-neutral semantics with existing `app-runtime`/domain owners. Done in Slice 3: app-runtime navigation/messages remain authoritative; RPC emits protocol frames/events only.
+- [x] Verify the chosen seam can be implemented inside authorized target source files only. Done in Slice 3: planned edits are limited to target RPC session source files.
+- [x] If the chosen seam requires an adjacent production source file, stop and update `design.md` and `plan.md` before editing that file with the exact root-relative file, why the target cannot be simplified without it, and why the change remains narrow behaviour-preserving contract alignment rather than broader TUI/Emacs/extension/workflow/app-runtime redesign. Not needed: Slice 3 chose a target-local seam using existing app-runtime contracts.
+- [x] Commit Slice 3 seam-selection notes if task artifacts changed. Done in the Slice 3 seam-selection commit.
 
 ## Slice 4 — Target-local architecture simplification
 
