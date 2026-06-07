@@ -9,7 +9,8 @@
    [psi.ai.model-registry :as model-registry]
    [psi.shared-config.project :as project-prefs]
    [psi.shared-config.user :as user-config]
-   [psi.session-profile.names :as profile-names]))
+   [psi.session-profile.names :as profile-names]
+   [psi.session-profile.selection :as profile-selection]))
 
 (def supported-fields
   "The only profile fields that affect session/profile materialization."
@@ -281,32 +282,13 @@
   [profile]
   (str/join "; " (map :message (:diagnostics profile))))
 
-(defn find-valid-profile
-  "Return the valid resolved profile named `profile-name`, or an error map."
-  [profiles profile-name]
-  (let [available (->> profiles (keep (fn [[n p]] (when (:valid? p) n))) sort vec)]
-    (cond
-      (contains? reserved-profile-names profile-name)
-      {:ok? false
-       :error :invalid-profile
-       :profile (or (get profiles profile-name)
-                    (resolve-profile profile-name {}))
-       :available available}
+(def find-valid-profile
+  "Alias for the pure already-resolved profile selector.
 
-      (contains? profiles profile-name)
-      (let [profile (get profiles profile-name)]
-        (if (:valid? profile)
-          {:ok? true :profile profile}
-          {:ok? false
-           :error :invalid-profile
-           :profile profile
-           :available available}))
-
-      :else
-      {:ok? false
-       :error :unknown-profile
-       :profile-name profile-name
-       :available available})))
+   Kept here for config/command callers; deterministic workflow step resolution
+   depends directly on `psi.session-profile.selection` so it does not depend on
+   shared config IO/model-registry ownership."
+  profile-selection/find-valid-profile)
 
 (comment
   (effective-profiles (System/getProperty "user.dir")))

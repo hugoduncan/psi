@@ -1,6 +1,6 @@
 {:deps {org.clojure/clojure {:mvn/version "1.12.0"}
         psi/ai {:local/root "../ai"}
-        psi/shared-config {:local/root "../shared-config"}
+        psi/session-profile {:local/root "../session-profile"}
         psi/tool-registry {:local/root "../tool-registry"}
         psi/session-state {:local/root "../session-state"}
         psi/workflow-registry {:local/root "../workflow-registry"}

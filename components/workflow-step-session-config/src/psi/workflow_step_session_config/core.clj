@@ -8,7 +8,7 @@
   (:require
    [psi.ai.model-registry :as model-registry]
    [psi.ai.model-selection :as model-selection]
-   [psi.shared-config.session-profiles :as session-profiles]
+   [psi.session-profile.selection :as profile-selection]
    [psi.session-state.state :as ss]
    [psi.skill-registry.registry :as skill-registry]
    [psi.skill-registry.root-storage :as skill-storage]
@@ -204,7 +204,7 @@
     (let [profile-name (:session-profile session-spec)
           snapshot (:session-profile-snapshot workflow-run)
           profiles (:profiles snapshot)
-          result (session-profiles/find-valid-profile profiles profile-name)]
+          result (profile-selection/find-valid-profile profiles profile-name)]
       (if (:ok? result)
         (assoc (get-in result [:profile :settings])
                ::profile-derived-fields (set (keys (get-in result [:profile :settings]))))

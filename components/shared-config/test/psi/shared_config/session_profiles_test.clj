@@ -3,6 +3,7 @@
    [clojure.java.io :as io]
    [clojure.test :refer [deftest testing is]]
    [psi.ai.model-registry :as model-registry]
+   [psi.session-profile.selection :as profile-selection]
    [psi.shared-config.session-profiles :as session-profiles])
   (:import
    (java.nio.file Files)
@@ -194,8 +195,10 @@
                    :empty {}
                    :review {:thinking-level :high}})]
     (testing "returns the valid resolved profile"
-      (is (= :coding (get-in (session-profiles/find-valid-profile profiles :coding)
-                             [:profile :name]))))
+      (is (= :coding (get-in (profile-selection/find-valid-profile profiles :coding)
+                             [:profile :name])))
+      (is (identical? profile-selection/find-valid-profile
+                      session-profiles/find-valid-profile)))
     (testing "unknown profile errors include available valid names"
       (is (= {:ok? false
               :error :unknown-profile
