@@ -118,7 +118,7 @@ when done.
 
 ## Code-shaper review follow-ups
 
-- [ ] CS1: Complete the `/new` RPC command-helper seam by removing prompt-local focus adaptation duplication: route `psi.rpc.session.prompt` through the shared `commands/focus-new-session-command!` helper, or through one narrow shared focus+rehydration command helper, so prompt no longer manually extracts `[:rehydrate :session-id]`, calls `events/set-focus-session-id!`, or keeps an unnecessary direct `psi.rpc.events` dependency. Preserve existing prompt/command `/new` observable behaviour and keep the helper limited to RPC protocol focus/rehydration adaptation.
+- [x] CS1: Complete the `/new` RPC command-helper seam by removing prompt-local focus adaptation duplication: route `psi.rpc.session.prompt` through the shared `commands/focus-new-session-command!` helper, or through one narrow shared focus+rehydration command helper, so prompt no longer manually extracts `[:rehydrate :session-id]`, calls `events/set-focus-session-id!`, or keeps an unnecessary direct `psi.rpc.events` dependency. Preserve existing prompt/command `/new` observable behaviour and keep the helper limited to RPC protocol focus/rehydration adaptation. Done 2026-06-07: `prompt.clj` now calls `rpc.commands/focus-new-session-command!` before `emit-new-session-command!` for prompt-path `/new`, removing the prompt-local `psi.rpc.events` dependency and manual `[:rehydrate :session-id]` extraction. Verification green: prompt-command namespace 10 tests / 92 assertions, pinned focused RPC suite 59 tests / 469 assertions, targeted clj-kondo 0/0, `git diff --check` clean.
 
 ## Post-implementation validation recapture failures
 

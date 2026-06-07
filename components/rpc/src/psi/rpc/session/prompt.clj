@@ -4,7 +4,6 @@
    [psi.agent-session.commands :as commands]
    [psi.agent-session.core :as session]
    [psi.agent-session.runtime :as runtime]
-   [psi.rpc.events :as events]
    [psi.rpc.session.commands :as rpc.commands]
    [psi.rpc.session.emit :as emit]
    [psi.rpc.session.streams :as streams]
@@ -61,8 +60,7 @@
                                       (login-handle-start-command! {:ctx ctx :state state :session-id session-id :emit-frame! emit-frame! :request-id request-id :cmd-result cmd-result :emit! emit! :start-daemon-thread! start-daemon-thread!})
                                       (do
                                         (when (= :new-session (:type cmd-result))
-                                          (when-let [sid (get-in cmd-result [:rehydrate :session-id])]
-                                            (events/set-focus-session-id! state sid))
+                                          (rpc.commands/focus-new-session-command! state cmd-result)
                                           (rpc.commands/emit-new-session-command! emit! ctx cmd-result))
                                         (rpc.commands/handle-prompt-command-result! cmd-result emit!)))
                                     (emit/emit-session-snapshots! emit! ctx state session-id))
