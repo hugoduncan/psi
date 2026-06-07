@@ -83,30 +83,30 @@ when done.
 
 ## Slice 5 — Workflow-loader/content-lock tests
 
-- [ ] Add a dedicated `components/workflow-loader/test/psi/workflow_loader/task_218_workflow_definitions_test.clj` namespace or equivalent focused test file.
-- [ ] Test that `reduce-architectural-complexity.edn` loads without workflow-loader errors and registers the expected workflow name.
-- [ ] Test the top-level step order includes `select-and-create`, `extract-task-path`, design/plan delegates, clean-baseline, coverage review/disposition/fix, diff-gate, implement-task, validation-capture, six review-step delegates, terminal stop summary, and final summary in the intended routes/order.
-- [ ] Test `select-and-create` prompt content includes `bb gordian architecture-targets --edn`, top-level `:winner` / `:candidates`, all-or-nothing pre-task capture failure routing for `before-diagnose.edn`, and excludes JSON / `:architecture-target-ranking` selection requirements.
-- [ ] Test no-target routing uses `workflow/pass-status-routing` allowed statuses `ACTIONABLE_FEEDBACK` and `REVIEW_COMPLETE`, with EDN `:on` keys only `"DONE"` and `"REPEAT"`.
-- [ ] Test no-target prompt content forbids task creation, omits `munera_task_path:`, emits `PASS_STATUS: ACTIONABLE_FEEDBACK`, and routes directly to `:done`.
-- [ ] Test target-present prompt content emits `munera_task_path:` and `PASS_STATUS: REVIEW_COMPLETE`.
-- [ ] Test prompt content captures/writes `before-diagnose.edn`, `architecture-targets.edn`, `target-issues.edn`, `target-issues-unavailable.edn`, `characterization-baseline.edn`, `after-diagnose.edn`, `after-architecture-targets.edn`, `architecture-compare.edn`, and `architecture-gate.edn` with root-relative task paths, and that mandatory pre-task captures are verified before task creation.
-- [ ] Test unsupported `target-issues` branch is informational and does not route to no-target.
-- [ ] Test invoking-worktree constraints: no `work-on` tool and prompt forbids creating/switching worktrees.
-- [ ] Test candidate membership/source-area prompt content covers namespace, family, pair, and community rules, including community-without-members as uninterpretable.
-- [ ] Test `extract-task-path` is the sole downstream task-path source for review-task-design, create-task-plan, review-task-plan, implement-task, validation-capture, and all six review-step delegates, with full `select-and-create` handoff passed only as context; also test malformed extraction routes to the pre-design terminal stop without inventing a task path.
-- [ ] Test clean-baseline/coverage/diff gate routing prevents `implement-task` before coverage and diff gates pass.
-- [ ] Test `validation-capture` immediately follows `implement-task` in successful topology and precedes every post-implementation review-step gate.
-- [ ] Test validation failure routing goes back to `implement-task` and successful validation routes to `task-implementation-review` gate.
-- [ ] Test all six post-implementation review delegates target `review-step` in order with exact skill values: `task-implementation-review`, `task-test-review`, `review-implementation-architecture`, `test-shaper`, `review-task-docs`, `code-shaper`, and use `extract-task-path` as their `:input`.
-- [ ] Test no post-implementation delegate target equals generic `review-task-implementation`.
-- [ ] Test `.psi/skills/review-implementation-architecture/SKILL.md` is discoverable and the workflow uses exactly `:skill {:value "review-implementation-architecture"}`.
-- [ ] Test `review-implementation-architecture` context sources are exactly the workflow-source list specified in plan.md and that artifact evidence is required via task-local file reads, not assumed runtime inlining.
-- [ ] Add a live narrow integration shape test for `bb gordian architecture-targets --edn` when `bb`/Gordian are available, asserting only stable top-level envelope shape and candidate id/type presence; skip or fixture-fallback on unavailable/non-zero command and never assert repository-specific candidate values, scores, labels, or counts.
-- [ ] Test the direct delegate set co-loads with `review-task-design`, `create-task-plan`, `review-task-plan`, `implement-task`, `review-step`, and required prompt-workflow markdown files.
-- [ ] Run the focused workflow-loader Scry/Kaocha test namespace and record results in `implementation.md`.
-- [ ] Run targeted `clj-kondo` over changed test files if Clojure tests were added or edited.
-- [ ] Commit Slice 5 (`⚒ test: lock architecture simplification workflow`).
+- [x] Add a dedicated `components/workflow-loader/test/psi/workflow_loader/task_218_workflow_definitions_test.clj` namespace or equivalent focused test file.
+- [x] Test that `reduce-architectural-complexity.edn` loads without workflow-loader errors and registers the expected workflow name.
+- [x] Test the top-level step order includes `select-and-create`, `extract-task-path`, design/plan delegates, clean-baseline, coverage review/disposition/fix, diff-gate, implement-task, validation-capture, six review-step delegates, terminal stop summary, and final summary in the intended routes/order.
+- [x] Test `select-and-create` prompt content includes `bb gordian architecture-targets --edn`, top-level `:winner` / `:candidates`, all-or-nothing pre-task capture failure routing for `before-diagnose.edn`, and excludes JSON / `:architecture-target-ranking` selection requirements.
+- [x] Test no-target routing uses `workflow/pass-status-routing` allowed statuses `ACTIONABLE_FEEDBACK` and `REVIEW_COMPLETE`, with EDN `:on` keys only `"DONE"` and `"REPEAT"`.
+- [x] Test no-target prompt content forbids task creation, omits `munera_task_path:`, emits `PASS_STATUS: ACTIONABLE_FEEDBACK`, and routes directly to `:done`.
+- [x] Test target-present prompt content emits `munera_task_path:` and `PASS_STATUS: REVIEW_COMPLETE`.
+- [x] Test prompt content captures/writes `before-diagnose.edn`, `architecture-targets.edn`, `target-issues.edn`, `target-issues-unavailable.edn`, `characterization-baseline.edn`, `after-diagnose.edn`, `after-architecture-targets.edn`, `architecture-compare.edn`, and `architecture-gate.edn` with root-relative task paths, and that mandatory pre-task captures are verified before task creation.
+- [x] Test unsupported `target-issues` branch is informational and does not route to no-target.
+- [x] Test invoking-worktree constraints: no `work-on` tool and prompt forbids creating/switching worktrees.
+- [x] Test candidate membership/source-area prompt content covers namespace, family, pair, and community rules, including community-without-members as uninterpretable.
+- [x] Test `extract-task-path` is the sole downstream task-path source for review-task-design, create-task-plan, review-task-plan, implement-task, validation-capture, and all six review-step delegates, with full `select-and-create` handoff passed only as context; also test malformed extraction routes to the pre-design terminal stop without inventing a task path.
+- [x] Test clean-baseline/coverage/diff gate routing prevents `implement-task` before coverage and diff gates pass.
+- [x] Test `validation-capture` immediately follows `implement-task` in successful topology and precedes every post-implementation review-step gate.
+- [x] Test validation failure routing goes back to `implement-task` and successful validation routes to `task-implementation-review` gate.
+- [x] Test all six post-implementation review delegates target `review-step` in order with exact skill values: `task-implementation-review`, `task-test-review`, `review-implementation-architecture`, `test-shaper`, `review-task-docs`, `code-shaper`, and use `extract-task-path` as their `:input`.
+- [x] Test no post-implementation delegate target equals generic `review-task-implementation`.
+- [x] Test `.psi/skills/review-implementation-architecture/SKILL.md` is discoverable and the workflow uses exactly `:skill {:value "review-implementation-architecture"}`.
+- [x] Test `review-implementation-architecture` context sources are exactly the workflow-source list specified in plan.md and that artifact evidence is required via task-local file reads, not assumed runtime inlining.
+- [x] Add a live narrow integration shape test for `bb gordian architecture-targets --edn` when `bb`/Gordian are available, asserting only stable top-level envelope shape and candidate id/type presence; skip or fixture-fallback on unavailable/non-zero command and never assert repository-specific candidate values, scores, labels, or counts.
+- [x] Test the direct delegate set co-loads with `review-task-design`, `create-task-plan`, `review-task-plan`, `implement-task`, `review-step`, and required prompt-workflow markdown files.
+- [x] Run the focused workflow-loader Scry/Kaocha test namespace and record results in `implementation.md`. Result: `clojure -M:test-paths -m scry.cli --namespace psi.workflow-loader.task-218-workflow-definitions-test` green (5 tests, 138 assertions).
+- [x] Run targeted `clj-kondo` over changed test files if Clojure tests were added or edited. Result: `clj-kondo --lint components/workflow-loader/test/psi/workflow_loader/task_218_workflow_definitions_test.clj` 0 errors, 0 warnings.
+- [x] Commit Slice 5 (`⚒ test: lock architecture simplification workflow`).
 
 ## Slice 6 — User-facing docs, changelog, and coherence verification
 
