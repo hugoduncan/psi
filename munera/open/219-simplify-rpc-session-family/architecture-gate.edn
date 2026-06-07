@@ -1,1 +1,319 @@
-{:status :failed, :command "bb gordian gate --baseline munera/open/219-simplify-rpc-session-family/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0 --edn", :exit 0, :stdout-summary "{:gordian/command :gate,\n :baseline-file\n \"munera/open/219-simplify-rpc-session-family/before-diagnose.edn\",\n :result :pass,\n :checks\n [{:name :new-cycles,\n   :status :pass,\n   :limit 0,\n   :actual 0,\n   :reason \"0 new cycles\"}\n  {:name :new-high-findings,\n   :status :pass,\n   :limit 0,\n   :actual 0,\n   :reason \"0 new high findings\"}\n  {:name :new-medium-findings,\n   :status :pass,\n   :limit 0,\n   :actual 0,\n   :reason \"0 new medium findings\"}],\n :summary {:passed 3, :failed 0, :total 3},\n :warnings [],\n :src-dirs\n [\"components/turn-statechart/src\"\n  \"components/provider-auth/src\"\n  \"components/prompt-registry/src\"\n  \"components/session-state/src\"\n  \"components/tool-runtime/src\"\n  \"components/extension-test-helpers/src\"\n  \"components/tool-registry/src\"\n  \"components/memory/src\"\n  \"components/root-registry/src\"\n  \"components/recursion/src\"\n  \"components/workflow-step-session-config/src\"\n  \"components/tui/src\"\n  \"components/workflow-loader/src\"\n  \"components/shared-config/src\"\n  \"compone…", :stderr-summary ""}
+{:gordian/command :gate,
+ :baseline-file
+ "munera/open/219-simplify-rpc-session-family/before-diagnose.edn",
+ :result :pass,
+ :checks
+ [{:name :new-cycles,
+   :status :pass,
+   :limit 0,
+   :actual 0,
+   :reason "0 new cycles"}
+  {:name :new-high-findings,
+   :status :pass,
+   :limit 0,
+   :actual 0,
+   :reason "0 new high findings"}
+  {:name :new-medium-findings,
+   :status :pass,
+   :limit 0,
+   :actual 0,
+   :reason "0 new medium findings"}],
+ :summary {:passed 3, :failed 0, :total 3},
+ :warnings [],
+ :src-dirs
+ ["components/turn-statechart/src"
+  "components/provider-auth/src"
+  "components/prompt-registry/src"
+  "components/session-state/src"
+  "components/tool-runtime/src"
+  "components/extension-test-helpers/src"
+  "components/tool-registry/src"
+  "components/memory/src"
+  "components/root-registry/src"
+  "components/recursion/src"
+  "components/workflow-step-session-config/src"
+  "components/tui/src"
+  "components/workflow-loader/src"
+  "components/shared-config/src"
+  "components/graph/src"
+  "components/turn-runtime/src"
+  "components/state-kernel/src"
+  "components/session-profile/src"
+  "components/introspection/src"
+  "components/app-runtime/src"
+  "components/workflow-registry/src"
+  "components/agent-session/src"
+  "components/system-bootstrap/src"
+  "components/ai/src"
+  "components/skill-registry/src"
+  "components/history/src"
+  "components/workflow-judge/src"
+  "components/workflow-runtime/src"
+  "components/deterministic-operation-runtime/src"
+  "components/workflow-step-materialization/src"
+  "components/agent-core/src"
+  "components/command-registry/src"
+  "components/project-nrepl/src"
+  "components/rpc/src"
+  "components/query/src"
+  "components/deterministic-operation-registry/src"
+  "components/engine/src"
+  "components/session-journal/src"
+  "components/prompt-assets/src"
+  "components/ui-state/src"
+  "components/session-persistence/src"
+  "bases/main/src"
+  "extensions/work-on/src"
+  "extensions/metrics/src"
+  "extensions/auto-session-name/src"
+  "extensions/plan-state-learning/src"
+  "extensions/hello-ext/src"
+  "extensions/munera/src"
+  "extensions/github/src"
+  "extensions/mementum/src"
+  "extensions/edit-clj/src"
+  "extensions/logprobs/src"
+  "extensions/mcp-tasks-run/src"
+  "extensions/commit-checks/src"],
+ :compare
+ {:findings
+  {:added
+   [{:severity :low,
+     :category :hidden-conceptual,
+     :action :monitor-or-extract,
+     :next-step
+     "gordian explain-pair psi.app-runtime.tui-session-nav psi.tui.app.update",
+     :subject
+     {:ns-a psi.app-runtime.tui-session-nav, :ns-b psi.tui.app.update},
+     :reason "hidden conceptual coupling — score=0.15",
+     :evidence
+     {:score 0.15026493033158242,
+      :shared-terms ["context" "session" "tui"],
+      :same-family? false,
+      :family-terms [],
+      :independent-terms ["context" "session" "tui"]}}],
+   :removed []},
+  :cycles {:added [], :removed []},
+  :change-pairs
+  {:added [],
+   :removed [],
+   :changed
+   [{:ns-a psi.rpc.session.commands,
+     :ns-b psi.rpc.session.frontend-actions,
+     :before {:score 0.3333333333333333},
+     :after {:score 0.3181818181818182},
+     :delta {:score -0.015151515151515138}}]},
+  :gordian/command :compare,
+  :after
+  {:gordian/version "0.2.0",
+   :gordian/schema 1,
+   :src-dirs
+   ["components/turn-statechart/src"
+    "components/provider-auth/src"
+    "components/prompt-registry/src"
+    "components/session-state/src"
+    "components/tool-runtime/src"
+    "components/extension-test-helpers/src"
+    "components/tool-registry/src"
+    "components/memory/src"
+    "components/root-registry/src"
+    "components/recursion/src"
+    "components/workflow-step-session-config/src"
+    "components/tui/src"
+    "components/workflow-loader/src"
+    "components/shared-config/src"
+    "components/graph/src"
+    "components/turn-runtime/src"
+    "components/state-kernel/src"
+    "components/session-profile/src"
+    "components/introspection/src"
+    "components/app-runtime/src"
+    "components/workflow-registry/src"
+    "components/agent-session/src"
+    "components/system-bootstrap/src"
+    "components/ai/src"
+    "components/skill-registry/src"
+    "components/history/src"
+    "components/workflow-judge/src"
+    "components/workflow-runtime/src"
+    "components/deterministic-operation-runtime/src"
+    "components/workflow-step-materialization/src"
+    "components/agent-core/src"
+    "components/command-registry/src"
+    "components/project-nrepl/src"
+    "components/rpc/src"
+    "components/query/src"
+    "components/deterministic-operation-registry/src"
+    "components/engine/src"
+    "components/session-journal/src"
+    "components/prompt-assets/src"
+    "components/ui-state/src"
+    "components/session-persistence/src"
+    "bases/main/src"
+    "extensions/work-on/src"
+    "extensions/metrics/src"
+    "extensions/auto-session-name/src"
+    "extensions/plan-state-learning/src"
+    "extensions/hello-ext/src"
+    "extensions/munera/src"
+    "extensions/github/src"
+    "extensions/mementum/src"
+    "extensions/edit-clj/src"
+    "extensions/logprobs/src"
+    "extensions/mcp-tasks-run/src"
+    "extensions/commit-checks/src"],
+   :lenses
+   {:structural true,
+    :conceptual
+    {:enabled true,
+     :threshold 0.15,
+     :candidate-pairs 36421,
+     :reported-pairs 1413},
+    :change
+    {:enabled true,
+     :threshold 0.3,
+     :candidate-pairs 7693,
+     :reported-pairs 177}}},
+  :nodes {:added [], :removed [], :changed []},
+  :health
+  {:before
+   {:propagation-cost 0.040372543946841685,
+    :cycle-count 0,
+    :ns-count 271},
+   :after
+   {:propagation-cost 0.040372543946841685,
+    :cycle-count 0,
+    :ns-count 271},
+   :delta {:propagation-cost 0.0, :cycle-count 0, :ns-count 0}},
+  :conceptual-pairs
+  {:added
+   [{:independent-terms ["context" "session" "tui"],
+     :ns-b psi.tui.app.update,
+     :family-terms [],
+     :ns-a psi.app-runtime.tui-session-nav,
+     :score 0.15026493033158242,
+     :kind :conceptual,
+     :structural-edge? false,
+     :shared-terms ["context" "session" "tui"],
+     :same-family? false}
+    {:independent-terms ["emit" "command"],
+     :ns-b psi.rpc.session.emit,
+     :family-terms ["session"],
+     :ns-a psi.rpc.session.commands,
+     :score 0.18750872285928502,
+     :kind :conceptual,
+     :structural-edge? true,
+     :shared-terms ["emit" "command" "session"],
+     :same-family? true}],
+   :removed [],
+   :changed
+   [{:ns-a psi.project-nrepl.commands,
+     :ns-b psi.rpc.session.commands,
+     :before {:score 0.30999924019526803},
+     :after {:score 0.32210572679543154},
+     :delta {:score 0.012106486600163502}}
+    {:ns-a psi.command-registry.registry,
+     :ns-b psi.rpc.session.commands,
+     :before {:score 0.4734473354400654},
+     :after {:score 0.4951245185873444},
+     :delta {:score 0.02167718314727901}}
+    {:ns-a psi.rpc.session.command-tree,
+     :ns-b psi.rpc.session.commands,
+     :before {:score 0.6025202932691963},
+     :after {:score 0.5799629187403542},
+     :delta {:score -0.0225573745288421}}
+    {:ns-a psi.app-runtime.tui-frontend-actions,
+     :ns-b psi.rpc.session.commands,
+     :before {:score 0.4653912204468064},
+     :after {:score 0.4542315570280729},
+     :delta {:score -0.011159663418733534}}
+    {:ns-a psi.rpc.session.command-results,
+     :ns-b psi.rpc.session.commands,
+     :before {:score 0.6421771548531807},
+     :after {:score 0.66883611829225},
+     :delta {:score 0.02665896343906926}}
+    {:ns-a psi.rpc.session.commands,
+     :ns-b psi.tui.app.update,
+     :before {:score 0.34525266612514216},
+     :after {:score 0.30932074016523087},
+     :delta {:score -0.03593192595991129}}
+    {:ns-a psi.rpc.session.command-pickers,
+     :ns-b psi.rpc.session.commands,
+     :before {:score 0.5814068616819182},
+     :after {:score 0.5333127185937985},
+     :delta {:score -0.04809414308811977}}
+    {:ns-a psi.rpc.session.commands,
+     :ns-b psi.turn-runtime.accumulator,
+     :before {:score 0.21849958698801827},
+     :after {:score 0.19392787011725596},
+     :delta {:score -0.024571716870762317}}]},
+  :before
+  {:gordian/version "0.2.0",
+   :gordian/schema 1,
+   :src-dirs
+   ["components/turn-statechart/src"
+    "components/provider-auth/src"
+    "components/prompt-registry/src"
+    "components/session-state/src"
+    "components/tool-runtime/src"
+    "components/extension-test-helpers/src"
+    "components/tool-registry/src"
+    "components/memory/src"
+    "components/root-registry/src"
+    "components/recursion/src"
+    "components/workflow-step-session-config/src"
+    "components/tui/src"
+    "components/workflow-loader/src"
+    "components/shared-config/src"
+    "components/graph/src"
+    "components/turn-runtime/src"
+    "components/state-kernel/src"
+    "components/session-profile/src"
+    "components/introspection/src"
+    "components/app-runtime/src"
+    "components/workflow-registry/src"
+    "components/agent-session/src"
+    "components/system-bootstrap/src"
+    "components/ai/src"
+    "components/skill-registry/src"
+    "components/history/src"
+    "components/workflow-judge/src"
+    "components/workflow-runtime/src"
+    "components/deterministic-operation-runtime/src"
+    "components/workflow-step-materialization/src"
+    "components/agent-core/src"
+    "components/command-registry/src"
+    "components/project-nrepl/src"
+    "components/rpc/src"
+    "components/query/src"
+    "components/deterministic-operation-registry/src"
+    "components/engine/src"
+    "components/session-journal/src"
+    "components/prompt-assets/src"
+    "components/ui-state/src"
+    "components/session-persistence/src"
+    "bases/main/src"
+    "extensions/work-on/src"
+    "extensions/metrics/src"
+    "extensions/auto-session-name/src"
+    "extensions/plan-state-learning/src"
+    "extensions/hello-ext/src"
+    "extensions/munera/src"
+    "extensions/github/src"
+    "extensions/mementum/src"
+    "extensions/edit-clj/src"
+    "extensions/logprobs/src"
+    "extensions/mcp-tasks-run/src"
+    "extensions/commit-checks/src"],
+   :lenses
+   {:structural true,
+    :conceptual
+    {:enabled true,
+     :threshold 0.15,
+     :candidate-pairs 36421,
+     :reported-pairs 1411},
+    :change
+    {:enabled true,
+     :threshold 0.3,
+     :candidate-pairs 7693,
+     :reported-pairs 177}}}}}
