@@ -272,20 +272,20 @@ Simplification of `projections`, `streams`, or `emit` must preserve the current 
 
 ## Post-implementation Gordian validation
 
-After implementation, write `munera/open/219-simplify-rpc-session-family/after-diagnose.edn`, `munera/open/219-simplify-rpc-session-family/after-architecture-targets.edn`, `munera/open/219-simplify-rpc-session-family/compare.edn`, and `munera/open/219-simplify-rpc-session-family/gate.edn` using these commands from the worktree root:
+After implementation, write `munera/open/219-simplify-rpc-session-family/after-diagnose.edn`, `munera/open/219-simplify-rpc-session-family/after-architecture-targets.edn`, `munera/open/219-simplify-rpc-session-family/architecture-compare.edn`, and `munera/open/219-simplify-rpc-session-family/architecture-gate.edn` using these commands from the worktree root:
 
 ```bash
 bb gordian diagnose --edn > munera/open/219-simplify-rpc-session-family/after-diagnose.edn
 bb gordian architecture-targets --edn > munera/open/219-simplify-rpc-session-family/after-architecture-targets.edn
-bb gordian compare munera/open/219-simplify-rpc-session-family/before-diagnose.edn munera/open/219-simplify-rpc-session-family/after-diagnose.edn --edn > munera/open/219-simplify-rpc-session-family/compare.edn
-bb gordian gate --baseline munera/open/219-simplify-rpc-session-family/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0 --edn > munera/open/219-simplify-rpc-session-family/gate.edn
+bb gordian compare munera/open/219-simplify-rpc-session-family/before-diagnose.edn munera/open/219-simplify-rpc-session-family/after-diagnose.edn --edn > munera/open/219-simplify-rpc-session-family/architecture-compare.edn
+bb gordian gate --baseline munera/open/219-simplify-rpc-session-family/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0 --edn > munera/open/219-simplify-rpc-session-family/architecture-gate.edn
 ```
 
 Validation acceptance:
 
 - All focused and relevant baseline/characterization tests pass.
 - `bb gordian gate ...` succeeds under the specified fail conditions.
-- `compare.edn` shows no new cycles, no new high findings, and zero new medium findings.
+- `architecture-compare.edn` shows no new cycles, no new high findings, and zero new medium findings.
 - The target's hidden-coupling density or concentration improves, or any non-improvement is explicitly explained with source/test evidence and no regression under the gate.
 - Review gates confirm behaviour preservation, test-net adequacy, architectural fit, and code shape.
 
@@ -295,5 +295,5 @@ Validation acceptance:
 - The pre-simplification test net is established before production refactoring.
 - Production changes are limited to the captured target source areas unless the plan explicitly authorizes a narrow adjacent source area.
 - Existing RPC session behaviour remains unchanged.
-- Post-implementation Gordian validation artifacts are captured at the worktree-root-relative paths listed above.
+- Post-implementation Gordian validation artifacts are captured at the worktree-root-relative paths listed above; the authoritative compare/gate artifact names are `architecture-compare.edn` and `architecture-gate.edn`, matching the architecture workflow validation-capture and review-gate contract.
 - The final implementation passes tests, lint/format checks relevant to touched files, Gordian gate, and explicit review gates.
