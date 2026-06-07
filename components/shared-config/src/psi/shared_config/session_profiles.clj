@@ -182,7 +182,11 @@
         name-diagnostics (cond
                            (not (keyword? profile-name))
                            [(diagnostic :name :invalid-profile-name
-                                        "profile name must be a keyword")]
+                                        "profile name must be an unqualified keyword")]
+
+                           (some? (namespace profile-name))
+                           [(diagnostic :name :invalid-profile-name
+                                        "profile name must be an unqualified keyword")]
 
                            (contains? reserved-profile-names profile-name)
                            [(diagnostic :name :reserved-profile-name

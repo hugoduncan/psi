@@ -106,6 +106,7 @@
                            {:session-profiles
                             {:coding {:speed-mode :fast
                                       :temperature 0.1}
+                             :team/coding {:speed-mode :normal}
                              "oops" {:speed-mode :normal}
                              :empty {}}}}))
           _ (cwf-mutations/register-workflow-definition
@@ -120,9 +121,12 @@
                            [:workflows :runs "run-session-profile-snapshot" :session-profile-snapshot])]
       (is (nil? (:psi.workflow/error result)))
       (is (= [:coding] (:valid-profile-names snapshot)))
-      (is (= [:empty "oops"] (:invalid-profile-names snapshot)))
+      (is (= [:empty :team/coding "oops"] (:invalid-profile-names snapshot)))
       (is (= {:speed-mode :fast}
              (get-in snapshot [:profiles :coding :settings])))
+      (is (= [:invalid-profile-name]
+             (mapv :reason (get-in snapshot [:profiles :team/coding :diagnostics])))
+          "workflow snapshots report namespaced keyword profile names as invalid diagnostics")
       (is (= [:invalid-profile-name]
              (mapv :reason (get-in snapshot [:profiles "oops" :diagnostics])))
           "workflow snapshots report non-keyword profile names instead of throwing")

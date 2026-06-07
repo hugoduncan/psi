@@ -55,8 +55,9 @@
            (session-profile-command/parse-profile-argument "clear")))
     (is (= {:action :select :profile-name :clear}
            (session-profile-command/parse-profile-argument ":clear"))))
-  (testing "compound and EDN collection tokens fail"
+  (testing "compound, namespaced keyword, and EDN collection tokens fail"
     (is (= :error (:action (session-profile-command/parse-profile-argument "planning extra"))))
+    (is (= :error (:action (session-profile-command/parse-profile-argument ":team/coding"))))
     (is (= :error (:action (session-profile-command/parse-profile-argument "{:a 1}"))))
     (is (= :error (:action (session-profile-command/parse-profile-argument "[:planning]"))))))
 
@@ -67,6 +68,7 @@
                                              {:coding {:model-provider "openai"
                                                        :model-id "gpt-5.5"
                                                        :speed-mode :fast}
+                                              :team/coding {:speed-mode :normal}
                                               "oops" {:speed-mode :normal}
                                               :empty {}
                                               :clear {:speed-mode :fast}}}})
@@ -75,9 +77,12 @@
         (testing "/session-profiles lists valid and invalid effective profiles"
           (let [message (:message (commands/dispatch-in ctx session-id "/session-profiles" cmd-opts))]
             (is (str/includes? message "coding — model openai/gpt-5.5, speed fast"))
+            (is (str/includes? message "team/coding — unavailable: profile name must be an unqualified keyword"))
+            (is (not (str/includes? message "  coding — speed normal"))
+                "a namespaced :team/coding profile must not display as a selectable coding profile")
             (is (str/includes? message "empty — unavailable: profile has no supported concrete settings"))
             (is (str/includes? message "clear — unavailable: profile name is reserved"))
-            (is (str/includes? message "oops — unavailable: profile name must be a keyword"))))
+            (is (str/includes? message "oops — unavailable: profile name must be an unqualified keyword"))))
         (testing "/session-profile shows current concrete settings with no selected metadata"
           (let [message (:message (commands/dispatch-in ctx session-id "/session-profile" cmd-opts))]
             (is (str/includes? message "Selected: (none)"))

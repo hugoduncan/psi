@@ -54,9 +54,10 @@
 
 (defn- profile-name-text
   [profile-name]
-  (if (or (keyword? profile-name) (string? profile-name))
-    (name profile-name)
-    (pr-str profile-name)))
+  (cond
+    (keyword? profile-name) (subs (pr-str profile-name) 1)
+    (string? profile-name) profile-name
+    :else (pr-str profile-name)))
 
 (defn- profile-line
   [profile]
