@@ -40,21 +40,21 @@ when done.
 
 ## Slice 3 — Pre-simplification test-net gates
 
-- [ ] Add `clean-baseline` session step after `review-task-plan`, before coverage review.
-- [ ] In `clean-baseline`, read generated task artifacts and write `characterization-baseline.edn` containing `:git/head`, `:git/status-short`, selected candidate map, `:target/namespaces`, `:target/source-areas`, `:target/allowed-adjacent-source-areas`, `:target/affected-test-areas` when known, and classified pre-existing task/doc dirt.
-- [ ] In `clean-baseline`, stop and route to terminal stop if target/source areas are already dirty in a way that makes current behaviour ambiguous.
-- [ ] Add `coverage-review` session step that reviews affected behaviour coverage against observable state/outputs and nominal/edge/boundary cases for the recorded target/source areas.
-- [ ] In `coverage-review`, record either sufficient green coverage, `CHARACTERIZATION_STATUS: FIXABLE_GAPS`, or `CHARACTERIZATION_STATUS: INFEASIBLE` in committed task artifacts.
-- [ ] Add `coverage-disposition` step that routes only the immediately preceding coverage-review result: fixable gaps to `coverage-fix`, infeasible/ambiguous disposition to terminal stop.
-- [ ] Add `coverage-fix` step constrained to characterization tests and explicitly justified minimal testability seams, with no architecture simplification/refactor work.
-- [ ] Route `coverage-fix` back to `coverage-review` after committing characterization work.
-- [ ] Add `diff-gate` step after coverage review succeeds and before `implement-task`.
-- [ ] In `diff-gate`, compare committed changes since `characterization-baseline.edn` `:git/head` plus current uncommitted status/diff.
-- [ ] In `diff-gate`, allow only characterization tests, task artifacts, docs, and explicitly justified minimal testability seams before implementation.
-- [ ] In `diff-gate`, stop before implementation on unclassified source change, broad production edit, premature simplification/refactor, missing baseline data, or infeasible characterization.
-- [ ] Wire `diff-gate` `"DONE"` route to `implement-task` and failure route to `terminal-stop-summary`.
-- [ ] Verify from the EDN step order/routes that `implement-task` cannot run before clean baseline, coverage review, and diff gate succeed.
-- [ ] Commit Slice 3 (`⚒ workflow: add architecture test-net gates`).
+- [x] Add `clean-baseline` session step after `review-task-plan`, before coverage review.
+- [x] In `clean-baseline`, read generated task artifacts and write `characterization-baseline.edn` containing `:git/head`, `:git/status-short`, selected candidate map, `:target/namespaces`, `:target/source-areas`, `:target/allowed-adjacent-source-areas`, `:target/affected-test-areas` when known, and classified pre-existing task/doc dirt.
+- [x] In `clean-baseline`, stop and route to terminal stop if target/source areas are already dirty in a way that makes current behaviour ambiguous.
+- [x] Add `coverage-review` session step that reviews affected behaviour coverage against observable state/outputs and nominal/edge/boundary cases for the recorded target/source areas.
+- [x] In `coverage-review`, record either sufficient green coverage, `CHARACTERIZATION_STATUS: FIXABLE_GAPS`, or `CHARACTERIZATION_STATUS: INFEASIBLE` in committed task artifacts.
+- [x] Add `coverage-disposition` step that routes only the immediately preceding coverage-review result: fixable gaps to `coverage-fix`, infeasible/ambiguous disposition to terminal stop.
+- [x] Add `coverage-fix` step constrained to characterization tests and explicitly justified minimal testability seams, with no architecture simplification/refactor work.
+- [x] Route `coverage-fix` back to `coverage-review` after committing characterization work.
+- [x] Add `diff-gate` step after coverage review succeeds and before `implement-task`.
+- [x] In `diff-gate`, compare committed changes since `characterization-baseline.edn` `:git/head` plus current uncommitted status/diff.
+- [x] In `diff-gate`, allow only characterization tests, task artifacts, docs, and explicitly justified minimal testability seams before implementation.
+- [x] In `diff-gate`, stop before implementation on unclassified source change, broad production edit, premature simplification/refactor, missing baseline data, or infeasible characterization.
+- [x] Wire `diff-gate` `"DONE"` route to `implement-task` and failure route to `terminal-stop-summary`.
+- [x] Verify from the EDN step order/routes that `implement-task` cannot run before clean baseline, coverage review, and diff gate succeed. Decision: successful route is review-task-plan → clean-baseline → coverage-review → diff-gate → implement-task, with coverage-fix looping back to coverage-review and failures going to terminal-stop-summary.
+- [x] Commit Slice 3 (`⚒ workflow: add architecture test-net gates`).
 
 ## Slice 4 — Validation capture and post-implementation review chain
 

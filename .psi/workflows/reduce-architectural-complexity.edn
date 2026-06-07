@@ -1,75 +1,232 @@
 {:steps
- [{:name "select-and-create"
-   :type :session
-   :tools ["read" "bash" "edit" "write"]
-   :skills ["gordian" "review-task-architecture" "code-shaper"]
-   :thinking-level :high
+ [{:name "select-and-create",
+   :type :session,
+   :tools ["read" "bash" "edit" "write"],
+   :skills ["gordian" "review-task-architecture" "code-shaper"],
+   :thinking-level :high,
    :contributions
-   [{:type :template
-     :text "You are executing the architecture-level simplification workflow in this repository. This workflow runs entirely in the invoking session's current inherited worktree. It selects one above-function architecture target with Gordian, captures task-local evidence, creates a constrained behaviour-preserving Munera task in the current worktree, commits that task creation, and emits a structured handoff. Later workflow steps review the generated design, create/review the task plan, establish a pre-simplification test net, run a diff gate, implement the task, capture before/after architecture validation, and run explicit review gates.\n\nRequired procedure:\n\n1. Confirm the current worktree context.\n   - Run `git status --short --branch` and treat the current branch/worktree as the intended simplification location.\n   - Do NOT call `work-on`.\n   - Do NOT create another worktree.\n   - Do NOT switch branches or checkout a different worktree. The caller is responsible for invoking this workflow from the intended isolated branch/worktree.\n\n2. Capture and validate the architecture ranking before task creation.\n   - Run `bb gordian architecture-targets --edn` from the worktree root.\n   - Parse the EDN and require a top-level map with top-level `:candidates` as a vector.\n   - Select only the top-level `:winner` when it is present, eligible, and carries interpretable `:candidate/id` and `:candidate/type`. The top-level `:candidates` vector is ranking/evidence context, not a second selection envelope.\n   - Treat no eligible top-level `:winner`, missing/non-vector top-level `:candidates`, missing candidate id/type, unsupported candidate shape needed for membership resolution, unreadable EDN, or any other unsafe interpretation as a no-target/uninterpretable result.\n\n3. Resolve candidate membership and target source areas before task creation.\n   - `:namespace`: target namespaces are exactly the namespace named by the candidate id, for example `[:namespace ns-name]`; attached findings are evidence only.\n   - `:family`: target namespaces are the winner's `:members` vector when present. If `:members` is absent, use the family prefix from `[:family prefix]` and the production namespaces discovered in the captured ranking at that time whose name equals the prefix or starts with `prefix.`; do not recompute later from a changed worktree.\n   - `:pair`: target namespaces are exactly the two namespaces in `[:pair ns-a ns-b]` or the equivalent two-element `:members` vector; no family expansion is implied.\n   - `:community`: target namespaces are exactly the winner's `:members` vector. A bare community id such as `[:community 3]` without members is uninterpretable and must take the no-target route.\n   - Resolve every target namespace immediately to at least one root-relative production Clojure source file. Use namespace declarations in `.clj`, `.cljc`, or `.cljs` files under production source roots; conventional path mapping is only a recorded fallback. If any target namespace cannot be resolved to a root-relative source file, take the no-target route.\n\n4. Stage all mandatory pre-task captures in temporary verified values before creating `munera/open/NNN-slug/`.\n   - Keep the raw `bb gordian architecture-targets --edn` stdout readable as EDN.\n   - Run `bb gordian diagnose --edn` from the worktree root; it must exit successfully and emit readable EDN for `before-diagnose.edn`.\n   - For the selected candidate, run `bb gordian target-issues --candidate '<pr-str candidate-id>' --edn` when supported. If it exits successfully and emits readable EDN, keep the raw stdout for `target-issues.edn`. If it is unsupported or fails for an otherwise valid selected candidate, prepare a readable EDN map for `target-issues-unavailable.edn` shaped at least as `{:candidate/id ..., :candidate/type ..., :status :unsupported | :failed, :command ..., :reason ...}` and continue. This informational branch must not change the selected target and must not force a no-target stop.\n   - Required pre-task capture is all-or-nothing: only after the readable architecture ranking, readable before-diagnose baseline, readable target-issues output OR readable target-issues-unavailable map, resolved target namespaces, and resolved source areas all exist may you allocate/create the Munera task directory.\n\n5. No-target / uninterpretable / mandatory-capture-failure route.\n   - Do NOT create a Munera task directory.\n   - Do NOT write baseline artifacts under `munera/open/NNN-slug/`.\n   - Remove any temporary files you created.\n   - Do NOT emit a `munera_task_path:` line.\n   - Include enough command, exit status, stdout/stderr summary, readability, membership, or source-resolution detail for diagnosis.\n   - End the final response with exactly one raw line: `PASS_STATUS: ACTIONABLE_FEEDBACK`. The workflow judge normalizes this to `REPEAT`, and the EDN route completes directly without running downstream design/plan/test/implementation steps.\n\n6. Target-created route.\n   - Allocate the next canonical Munera task id by scanning the current worktree's `munera/open/` and `munera/closed/`: `NNN = max(NNN over open/ union closed/) + 1`, zero-padded to at least 3 digits.\n   - Create `munera/open/NNN-slug/`. Slug should name the architecture target tersely.\n   - Copy the verified raw architecture ranking to `munera/open/NNN-slug/architecture-targets.edn`.\n   - Copy the verified raw diagnose baseline to `munera/open/NNN-slug/before-diagnose.edn`.\n   - Write either `munera/open/NNN-slug/target-issues.edn` with raw readable target-issues EDN or `munera/open/NNN-slug/target-issues-unavailable.edn` with the prepared unavailable map.\n   - Write `munera/open/NNN-slug/design.md`.\n\n7. Generated `design.md` contract. It must describe a behaviour-preserving architectural simplification and include:\n   - selected candidate id, type, label, score, confidence, members when present, and ranking evidence summary copied from the authoritative top-level `:winner`;\n   - why the target was selected, citing `architecture-targets.edn` evidence;\n   - `target-issues.edn` problem framing when available, preserving the boundary between observations, hypotheses, directions, review questions, and success signals; or an explicit note that supplemental target-issues framing was unavailable and selection is based on `architecture-targets.edn`;\n   - intended simplification scope, explicit non-goals, blast-radius limits, and existing behaviour that must remain unchanged;\n   - `:target/namespaces`, `:target/source-areas`, default or explicit `:target/allowed-adjacent-source-areas`, and `:target/affected-test-areas` semantics;\n   - task-local worktree-root-relative artifact references only, including `munera/open/NNN-slug/before-diagnose.edn`, `munera/open/NNN-slug/architecture-targets.edn`, and the target-issues file; never rely on bare filenames resolving from the task directory;\n   - pre-simplification test-net requirements: clean baseline, coverage review, characterization-test fix loop for fixable gaps, infeasible-coverage stop, diff/baseline gate, and no implementation before coverage and diff gates pass;\n   - Gordian validation criteria after implementation: `bb gordian diagnose --edn`, `bb gordian architecture-targets --edn`, `bb gordian compare munera/open/NNN-slug/before-diagnose.edn munera/open/NNN-slug/after-diagnose.edn --edn`, and `bb gordian gate --baseline munera/open/NNN-slug/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0 --edn`.\n\n8. Commit the task creation and verified artifacts.\n   - Commit the generated task directory, `design.md`, and all baseline/ranking/framing artifacts on the current branch after all required pre-task captures have been verified readable.\n\n9. Emit a structured handoff as your final response.\n   - Use compact Markdown with headings exactly `## Selection Outcome`, `## Munera Task`, and `## Handoff Data`.\n   - Under `## Handoff Data`, include exactly one machine-friendly line `munera_task_path: munera/open/NNN-slug` for the generated task path.\n   - Do not include `munera_task_path:` on any no-target/uninterpretable/capture-failure route.\n   - End the target-created final response with exactly one raw line: `PASS_STATUS: REVIEW_COMPLETE`. The workflow judge normalizes this to `DONE`, and the EDN route goes to `extract-task-path`.\n\nInput:\n{{input}}"
-     :vars {"input" {:from :workflow-input}}}]
-   :judge {:type :invoke
-           :operation "workflow/pass-status-routing"
-           :args {:text {:from {:step "select-and-create" :output :final-llm-reply}}
-                  :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}}
-   :on {"DONE" {:goto "extract-task-path"}
-        "REPEAT" {:goto :done}}}
-  {:name "extract-task-path"
-   :type :session
-   :tools ["read" "bash" "edit" "write"]
+   [{:type :template,
+     :text
+     "You are executing the architecture-level simplification workflow in this repository. This workflow runs entirely in the invoking session's current inherited worktree. It selects one above-function architecture target with Gordian, captures task-local evidence, creates a constrained behaviour-preserving Munera task in the current worktree, commits that task creation, and emits a structured handoff. Later workflow steps review the generated design, create/review the task plan, establish a pre-simplification test net, run a diff gate, implement the task, capture before/after architecture validation, and run explicit review gates.\n\nRequired procedure:\n\n1. Confirm the current worktree context.\n   - Run `git status --short --branch` and treat the current branch/worktree as the intended simplification location.\n   - Do NOT call `work-on`.\n   - Do NOT create another worktree.\n   - Do NOT switch branches or checkout a different worktree. The caller is responsible for invoking this workflow from the intended isolated branch/worktree.\n\n2. Capture and validate the architecture ranking before task creation.\n   - Run `bb gordian architecture-targets --edn` from the worktree root.\n   - Parse the EDN and require a top-level map with top-level `:candidates` as a vector.\n   - Select only the top-level `:winner` when it is present, eligible, and carries interpretable `:candidate/id` and `:candidate/type`. The top-level `:candidates` vector is ranking/evidence context, not a second selection envelope.\n   - Treat no eligible top-level `:winner`, missing/non-vector top-level `:candidates`, missing candidate id/type, unsupported candidate shape needed for membership resolution, unreadable EDN, or any other unsafe interpretation as a no-target/uninterpretable result.\n\n3. Resolve candidate membership and target source areas before task creation.\n   - `:namespace`: target namespaces are exactly the namespace named by the candidate id, for example `[:namespace ns-name]`; attached findings are evidence only.\n   - `:family`: target namespaces are the winner's `:members` vector when present. If `:members` is absent, use the family prefix from `[:family prefix]` and the production namespaces discovered in the captured ranking at that time whose name equals the prefix or starts with `prefix.`; do not recompute later from a changed worktree.\n   - `:pair`: target namespaces are exactly the two namespaces in `[:pair ns-a ns-b]` or the equivalent two-element `:members` vector; no family expansion is implied.\n   - `:community`: target namespaces are exactly the winner's `:members` vector. A bare community id such as `[:community 3]` without members is uninterpretable and must take the no-target route.\n   - Resolve every target namespace immediately to at least one root-relative production Clojure source file. Use namespace declarations in `.clj`, `.cljc`, or `.cljs` files under production source roots; conventional path mapping is only a recorded fallback. If any target namespace cannot be resolved to a root-relative source file, take the no-target route.\n\n4. Stage all mandatory pre-task captures in temporary verified values before creating `munera/open/NNN-slug/`.\n   - Keep the raw `bb gordian architecture-targets --edn` stdout readable as EDN.\n   - Run `bb gordian diagnose --edn` from the worktree root; it must exit successfully and emit readable EDN for `before-diagnose.edn`.\n   - For the selected candidate, run `bb gordian target-issues --candidate '<pr-str candidate-id>' --edn` when supported. If it exits successfully and emits readable EDN, keep the raw stdout for `target-issues.edn`. If it is unsupported or fails for an otherwise valid selected candidate, prepare a readable EDN map for `target-issues-unavailable.edn` shaped at least as `{:candidate/id ..., :candidate/type ..., :status :unsupported | :failed, :command ..., :reason ...}` and continue. This informational branch must not change the selected target and must not force a no-target stop.\n   - Required pre-task capture is all-or-nothing: only after the readable architecture ranking, readable before-diagnose baseline, readable target-issues output OR readable target-issues-unavailable map, resolved target namespaces, and resolved source areas all exist may you allocate/create the Munera task directory.\n\n5. No-target / uninterpretable / mandatory-capture-failure route.\n   - Do NOT create a Munera task directory.\n   - Do NOT write baseline artifacts under `munera/open/NNN-slug/`.\n   - Remove any temporary files you created.\n   - Do NOT emit a `munera_task_path:` line.\n   - Include enough command, exit status, stdout/stderr summary, readability, membership, or source-resolution detail for diagnosis.\n   - End the final response with exactly one raw line: `PASS_STATUS: ACTIONABLE_FEEDBACK`. The workflow judge normalizes this to `REPEAT`, and the EDN route completes directly without running downstream design/plan/test/implementation steps.\n\n6. Target-created route.\n   - Allocate the next canonical Munera task id by scanning the current worktree's `munera/open/` and `munera/closed/`: `NNN = max(NNN over open/ union closed/) + 1`, zero-padded to at least 3 digits.\n   - Create `munera/open/NNN-slug/`. Slug should name the architecture target tersely.\n   - Copy the verified raw architecture ranking to `munera/open/NNN-slug/architecture-targets.edn`.\n   - Copy the verified raw diagnose baseline to `munera/open/NNN-slug/before-diagnose.edn`.\n   - Write either `munera/open/NNN-slug/target-issues.edn` with raw readable target-issues EDN or `munera/open/NNN-slug/target-issues-unavailable.edn` with the prepared unavailable map.\n   - Write `munera/open/NNN-slug/design.md`.\n\n7. Generated `design.md` contract. It must describe a behaviour-preserving architectural simplification and include:\n   - selected candidate id, type, label, score, confidence, members when present, and ranking evidence summary copied from the authoritative top-level `:winner`;\n   - why the target was selected, citing `architecture-targets.edn` evidence;\n   - `target-issues.edn` problem framing when available, preserving the boundary between observations, hypotheses, directions, review questions, and success signals; or an explicit note that supplemental target-issues framing was unavailable and selection is based on `architecture-targets.edn`;\n   - intended simplification scope, explicit non-goals, blast-radius limits, and existing behaviour that must remain unchanged;\n   - `:target/namespaces`, `:target/source-areas`, default or explicit `:target/allowed-adjacent-source-areas`, and `:target/affected-test-areas` semantics;\n   - task-local worktree-root-relative artifact references only, including `munera/open/NNN-slug/before-diagnose.edn`, `munera/open/NNN-slug/architecture-targets.edn`, and the target-issues file; never rely on bare filenames resolving from the task directory;\n   - pre-simplification test-net requirements: clean baseline, coverage review, characterization-test fix loop for fixable gaps, infeasible-coverage stop, diff/baseline gate, and no implementation before coverage and diff gates pass;\n   - Gordian validation criteria after implementation: `bb gordian diagnose --edn`, `bb gordian architecture-targets --edn`, `bb gordian compare munera/open/NNN-slug/before-diagnose.edn munera/open/NNN-slug/after-diagnose.edn --edn`, and `bb gordian gate --baseline munera/open/NNN-slug/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0 --edn`.\n\n8. Commit the task creation and verified artifacts.\n   - Commit the generated task directory, `design.md`, and all baseline/ranking/framing artifacts on the current branch after all required pre-task captures have been verified readable.\n\n9. Emit a structured handoff as your final response.\n   - Use compact Markdown with headings exactly `## Selection Outcome`, `## Munera Task`, and `## Handoff Data`.\n   - Under `## Handoff Data`, include exactly one machine-friendly line `munera_task_path: munera/open/NNN-slug` for the generated task path.\n   - Do not include `munera_task_path:` on any no-target/uninterpretable/capture-failure route.\n   - End the target-created final response with exactly one raw line: `PASS_STATUS: REVIEW_COMPLETE`. The workflow judge normalizes this to `DONE`, and the EDN route goes to `extract-task-path`.\n\nInput:\n{{input}}",
+     :vars {"input" {:from :workflow-input}}}],
+   :judge
+   {:type :invoke,
+    :operation "workflow/pass-status-routing",
+    :args
+    {:text
+     {:from {:step "select-and-create", :output :final-llm-reply}},
+     :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}},
+   :on {"DONE" {:goto "extract-task-path"}, "REPEAT" {:goto :done}}}
+  {:name "extract-task-path",
+   :type :session,
+   :tools ["read" "bash" "edit" "write"],
    :contributions
-   [{:type :source :from {:step "select-and-create" :yield :text}}
-    {:type :template
-     :text "Validate the target-present handoff from `select-and-create` and extract the generated Munera task path.\n\nRules:\n1. Read only the `select-and-create` handoff provided in context for the task path.\n2. It must contain exactly one line matching `munera_task_path: munera/open/NNN-slug`, where NNN is zero-padded digits and slug is kebab-case path text with no spaces.\n3. On success, respond with ONLY that root-relative path and no other prose. Example: `munera/open/218-example-task`.\n4. On malformed input, missing path, multiple paths, absolute path, non-open path, or non-root-relative value, do not guess. Respond with a terse extraction failure summary. Do not invent or read task-local artifacts. The judge will route this to `terminal-stop-summary`.\n\nInput handoff:\n{{handoff}}"
-     :vars {"handoff" {:from {:step "select-and-create" :yield :text}}}}]
-   :judge {:type :llm
-           :contributions
-           [{:type :template
-             :text "Inspect the extract-task-path step's final answer. If it consists of exactly one root-relative path matching `munera/open/NNN-slug` and no other prose, respond exactly `DONE`. Otherwise respond exactly `REPEAT`."}]}
-   :on {"DONE" {:goto "review-task-design"}
-        "REPEAT" {:goto "terminal-stop-summary"}}}
-  {:name "review-task-design"
-   :type :delegate
-   :target "review-task-design"
-   :prompt-string {:type :map
-                   :fields {:input {:from {:step "extract-task-path" :yield :text}}}}
-   :context [{:type :source :from :workflow-original}
-             {:type :source :from {:step "select-and-create" :yield :text}}]}
-  {:name "create-task-plan"
-   :type :delegate
-   :target "create-task-plan"
-   :prompt-string {:type :map
-                   :fields {:input {:from {:step "extract-task-path" :yield :text}}}}
-   :context [{:type :source :from :workflow-original}
-             {:type :source :from {:step "select-and-create" :yield :text}}
-             {:type :source :from {:step "review-task-design" :yield :text}}]}
-  {:name "review-task-plan"
-   :type :delegate
-   :target "review-task-plan"
-   :prompt-string {:type :map
-                   :fields {:input {:from {:step "extract-task-path" :yield :text}}}}
-   :context [{:type :source :from :workflow-original}
-             {:type :source :from {:step "select-and-create" :yield :text}}
-             {:type :source :from {:step "review-task-design" :yield :text}}
-             {:type :source :from {:step "create-task-plan" :yield :text}}]
-   :judge {:type :invoke
-           :operation "workflow/constant-routing"
-           :args {:route "DONE"}}
+   [{:type :source, :from {:step "select-and-create", :yield :text}}
+    {:type :template,
+     :text
+     "Validate the target-present handoff from `select-and-create` and extract the generated Munera task path.\n\nRules:\n1. Read only the `select-and-create` handoff provided in context for the task path.\n2. It must contain exactly one line matching `munera_task_path: munera/open/NNN-slug`, where NNN is zero-padded digits and slug is kebab-case path text with no spaces.\n3. On success, respond with ONLY that root-relative path and no other prose. Example: `munera/open/218-example-task`.\n4. On malformed input, missing path, multiple paths, absolute path, non-open path, or non-root-relative value, do not guess. Respond with a terse extraction failure summary. Do not invent or read task-local artifacts. The judge will route this to `terminal-stop-summary`.\n\nInput handoff:\n{{handoff}}",
+     :vars
+     {"handoff" {:from {:step "select-and-create", :yield :text}}}}],
+   :judge
+   {:type :llm,
+    :contributions
+    [{:type :template,
+      :text
+      "Inspect the extract-task-path step's final answer. If it consists of exactly one root-relative path matching `munera/open/NNN-slug` and no other prose, respond exactly `DONE`. Otherwise respond exactly `REPEAT`."}]},
+   :on
+   {"DONE" {:goto "review-task-design"},
+    "REPEAT" {:goto "terminal-stop-summary"}}}
+  {:name "review-task-design",
+   :type :delegate,
+   :target "review-task-design",
+   :prompt-string
+   {:type :map,
+    :fields
+    {:input {:from {:step "extract-task-path", :yield :text}}}},
+   :context
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "select-and-create", :yield :text}}]}
+  {:name "create-task-plan",
+   :type :delegate,
+   :target "create-task-plan",
+   :prompt-string
+   {:type :map,
+    :fields
+    {:input {:from {:step "extract-task-path", :yield :text}}}},
+   :context
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "select-and-create", :yield :text}}
+    {:type :source, :from {:step "review-task-design", :yield :text}}]}
+  {:name "review-task-plan",
+   :type :delegate,
+   :target "review-task-plan",
+   :prompt-string
+   {:type :map,
+    :fields
+    {:input {:from {:step "extract-task-path", :yield :text}}}},
+   :context
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "select-and-create", :yield :text}}
+    {:type :source, :from {:step "review-task-design", :yield :text}}
+    {:type :source, :from {:step "create-task-plan", :yield :text}}],
+   :judge
+   {:type :invoke,
+    :operation "workflow/constant-routing",
+    :args {:route "DONE"}},
+   :on {"DONE" {:goto "clean-baseline"}}}
+  {:name "clean-baseline",
+   :type :session,
+   :tools ["read" "bash" "edit" "write"],
+   :skills ["testing-without-mocks"],
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "select-and-create", :yield :text}}
+    {:type :source, :from {:step "extract-task-path", :yield :text}}
+    {:type :source, :from {:step "review-task-design", :yield :text}}
+    {:type :source, :from {:step "create-task-plan", :yield :text}}
+    {:type :source, :from {:step "review-task-plan", :yield :text}}
+    {:type :template,
+     :text
+     "Establish the pre-characterization clean-source baseline for the architecture-level Munera task at {{input}}. Work only in the invoking session's current inherited worktree. Do NOT call `work-on`, create a worktree, or switch branches.\n\nRequired procedure:\n1. Read the generated task artifacts (`design.md`, `plan.md`, `steps.md`, `implementation.md`) and the task-local Gordian evidence paths recorded in the design.\n2. Read `architecture-targets.edn`, `before-diagnose.edn`, and either `target-issues.edn` or `target-issues-unavailable.edn` from worktree-root-relative paths under the task directory.\n3. Confirm the selected candidate map and recorded `:target/namespaces`, `:target/source-areas`, `:target/allowed-adjacent-source-areas`, and any known `:target/affected-test-areas`. Do not recompute target membership from the changed worktree.\n4. Inspect `git status --short` and verify the union of `:target/source-areas` and `:target/allowed-adjacent-source-areas` is not already dirty in a way that makes current behaviour ambiguous. Pre-existing dirty task artifacts or docs may remain only when explicitly classified.\n5. Write `characterization-baseline.edn` in the generated task directory. It must contain at least `:git/head`, `:git/status-short`, the recorded selected candidate map, `:target/namespaces`, `:target/source-areas`, `:target/allowed-adjacent-source-areas`, `:target/affected-test-areas` when known, and classified pre-existing task-artifact/doc dirt.\n6. Update `implementation.md` tersely with the clean-baseline result and commit task-artifact updates.\n7. End with exactly `PASS_STATUS: REVIEW_COMPLETE` when the baseline was recorded and target/source areas are clean enough to characterize; otherwise record the dirty/missing-path stop in task artifacts, commit it, and end with exactly `PASS_STATUS: ACTIONABLE_FEEDBACK`.\n\nInput task path:\n{{input}}",
+     :vars
+     {"input" {:from {:step "extract-task-path", :yield :text}}}}],
+   :judge
+   {:type :invoke,
+    :operation "workflow/pass-status-routing",
+    :args
+    {:text {:from {:step "clean-baseline", :output :final-llm-reply}},
+     :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}},
+   :on
+   {"DONE" {:goto "coverage-review"},
+    "REPEAT" {:goto "terminal-stop-summary"}}}
+  {:name "coverage-review",
+   :type :session,
+   :tools ["read" "bash" "edit" "write"],
+   :skills ["task-test-review" "testing-without-mocks"],
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "select-and-create", :yield :text}}
+    {:type :source, :from {:step "extract-task-path", :yield :text}}
+    {:type :source, :from {:step "clean-baseline", :yield :text}}
+    {:type :template,
+     :text
+     "Review the pre-simplification characterization-test net for the architecture-level Munera task at {{input}}. This is a test-net gate before architecture simplification. Do NOT perform simplification or refactor work. Do NOT call `work-on`; use the current inherited worktree.\n\nRequired procedure:\n1. Read the task artifacts and `characterization-baseline.edn`. Confirm the selected architecture target, target/source areas, allowed adjacent source areas, and affected behaviour under review are clear.\n2. Inspect existing and newly added tests for externally observable state/outputs affected by the architecture target. Cover relevant nominal, edge, and boundary behaviour. For architecture-level targets, subsystem or narrow integration tests are acceptable when focused; avoid broad slow tests as the default. Follow `testing-without-mocks`: prefer real collaborators, nullable infrastructure seams when needed, and state/output assertions rather than interaction assertions.\n3. Run the relevant tests needed to prove the characterization net is green against current pre-simplification behaviour.\n4. If coverage is sufficient and green, record reviewed coverage, affected test areas, commands run, and result in task artifacts, commit the task-artifact update, then end with exactly `PASS_STATUS: REVIEW_COMPLETE`.\n5. If fixable characterization gaps remain, append a latest note containing exactly `CHARACTERIZATION_STATUS: FIXABLE_GAPS` with concrete coverage work required, commit it, mention that marker and artifact path in the final response, and end with exactly `PASS_STATUS: ACTIONABLE_FEEDBACK`.\n6. If sufficient characterization is infeasible, append a latest note containing exactly `CHARACTERIZATION_STATUS: INFEASIBLE` with the reason, commit it, mention that marker and artifact path in the final response, and end with exactly `PASS_STATUS: ACTIONABLE_FEEDBACK`.\n\nInput task path:\n{{input}}",
+     :vars
+     {"input" {:from {:step "extract-task-path", :yield :text}}}}],
+   :judge
+   {:type :invoke,
+    :operation "workflow/pass-status-routing",
+    :args
+    {:text {:from {:step "coverage-review", :output :final-llm-reply}},
+     :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}},
+   :on
+   {"DONE" {:goto "diff-gate"},
+    "REPEAT" {:goto "coverage-disposition"}}}
+  {:name "coverage-disposition",
+   :type :session,
+   :tools ["read" "bash" "edit" "write"],
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "select-and-create", :yield :text}}
+    {:type :source, :from {:step "extract-task-path", :yield :text}}
+    {:type :source, :from {:step "coverage-review", :yield :text}}
+    {:type :template,
+     :text
+     "Determine the next route for the failed architecture characterization review for {{input}}. Read the immediately preceding `coverage-review` output first, then task artifacts only to resolve the latest committed characterization-status note identified by that coverage review. Historical markers from earlier loops are non-authoritative.\n\nRouting rule:\n1. If the immediately preceding coverage-review output or its identified latest committed note says exactly `CHARACTERIZATION_STATUS: FIXABLE_GAPS`, report that a constrained `coverage-fix` pass should run and end with exactly `PASS_STATUS: REVIEW_COMPLETE`.\n2. If it says exactly `CHARACTERIZATION_STATUS: INFEASIBLE`, report that the workflow must stop before simplification and end with exactly `PASS_STATUS: ACTIONABLE_FEEDBACK`.\n3. If the latest status is ambiguous, both markers appear, neither marker is present, or only stale historical markers are found, append a durable coverage-disposition stop finding to task artifacts, commit it, and end with exactly `PASS_STATUS: ACTIONABLE_FEEDBACK`.\n\nDo not edit source code. Do not perform coverage fixes here. Do not call `work-on`.\n\nInput task path:\n{{input}}",
+     :vars
+     {"input" {:from {:step "extract-task-path", :yield :text}}}}],
+   :judge
+   {:type :invoke,
+    :operation "workflow/pass-status-routing",
+    :args
+    {:text
+     {:from {:step "coverage-disposition", :output :final-llm-reply}},
+     :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}},
+   :on
+   {"DONE" {:goto "coverage-fix"},
+    "REPEAT" {:goto "terminal-stop-summary"}}}
+  {:name "coverage-fix",
+   :type :session,
+   :tools ["read" "bash" "edit" "write"],
+   :skills ["clojure-coding-standards" "testing-without-mocks"],
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "select-and-create", :yield :text}}
+    {:type :source, :from {:step "extract-task-path", :yield :text}}
+    {:type :source, :from {:step "coverage-review", :yield :text}}
+    {:type :source, :from {:step "coverage-disposition", :yield :text}}
+    {:type :template,
+     :text
+     "Execute only the next constrained characterization-test-net fix for the architecture-level Munera task at {{input}}. This pass exists before simplification, so it may add or refine characterization tests and explicitly justified minimal testability seams only.\n\nHard constraints:\n- Do NOT simplify, refactor, rename, extract, reorganize, or otherwise improve the target architecture.\n- Do NOT perform unrelated cleanup.\n- Do NOT weaken existing expectations.\n- Production changes are allowed only as explicitly justified minimal testability seams needed to observe current behaviour; record any such seam in `implementation.md` before proceeding.\n- Assert externally observable state or outputs; avoid interaction assertions unless the interaction is itself observable behaviour.\n- Use the current inherited worktree. Do NOT call `work-on`, create a worktree, or switch branches.\n\nRequired procedure:\n1. Read task artifacts, `characterization-baseline.edn`, and latest coverage-review findings.\n2. Add/refine characterization tests for the recorded nominal, edge, or boundary gaps, or add one explicitly justified minimal seam if tests cannot otherwise observe behaviour.\n3. Run relevant tests and keep them green against current behaviour.\n4. Update `steps.md`/`implementation.md` with what was added and any minimal seam justification.\n5. Commit the characterization-fix changes.\n6. End with exactly `PASS_STATUS: REVIEW_COMPLETE` so coverage review runs again.\n\nInput task path:\n{{input}}",
+     :vars
+     {"input" {:from {:step "extract-task-path", :yield :text}}}}],
+   :judge
+   {:type :invoke,
+    :operation "workflow/pass-status-routing",
+    :args
+    {:text {:from {:step "coverage-fix", :output :final-llm-reply}},
+     :allowed-statuses ["REVIEW_COMPLETE"]}},
+   :on {"DONE" {:goto "coverage-review"}}}
+  {:name "diff-gate",
+   :type :session,
+   :tools ["read" "bash" "edit" "write"],
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "select-and-create", :yield :text}}
+    {:type :source, :from {:step "extract-task-path", :yield :text}}
+    {:type :source, :from {:step "clean-baseline", :yield :text}}
+    {:type :source, :from {:step "coverage-review", :yield :text}}
+    {:type :template,
+     :text
+     "Run the workflow-level pre-simplification baseline/diff gate for the architecture-level Munera task at {{input}}. This gate runs after characterization coverage is reviewed complete and before `implement-task`. Work in the current inherited worktree; do NOT call `work-on`, create a worktree, or switch branches.\n\nRequired procedure:\n1. Read task artifacts and `characterization-baseline.edn`. If it is missing or lacks recorded HEAD, status, selected candidate, target namespaces, target source areas, and allowed adjacent source areas, stop.\n2. Verify the baseline did not include dirty target/source areas at baseline time. If it did, stop before simplification.\n3. Compare committed changes since the baseline HEAD and current uncommitted status/diff. Coverage-fix commits must not hide coverage-phase edits behind an empty uncommitted diff.\n4. Classify every coverage-phase change. Allowed categories are only characterization tests, task artifacts, docs, and explicitly justified minimal testability seams. Treat `:target/affected-test-areas` as coverage proof, not source membership.\n5. Stop before implementation on unclassified source change, broad production edit, premature simplification/refactor, missing baseline data, or `CHARACTERIZATION_STATUS: INFEASIBLE`. Record whether the change must be reverted, split, closed, or retried, and commit the task-artifact update.\n6. If and only if all coverage-phase changes are allowed and relevant tests are green, record the diff-gate classification in task artifacts, commit it, and end with exactly `PASS_STATUS: REVIEW_COMPLETE`. Otherwise end with exactly `PASS_STATUS: ACTIONABLE_FEEDBACK`.\n\nInput task path:\n{{input}}",
+     :vars
+     {"input" {:from {:step "extract-task-path", :yield :text}}}}],
+   :judge
+   {:type :invoke,
+    :operation "workflow/pass-status-routing",
+    :args
+    {:text {:from {:step "diff-gate", :output :final-llm-reply}},
+     :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}},
+   :on
+   {"DONE" {:goto "implement-task"},
+    "REPEAT" {:goto "terminal-stop-summary"}}}
+  {:name "implement-task",
+   :type :delegate,
+   :target "implement-task",
+   :prompt-string
+   {:type :map,
+    :fields
+    {:input {:from {:step "extract-task-path", :yield :text}}}},
+   :context
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "select-and-create", :yield :text}}
+    {:type :source, :from {:step "extract-task-path", :yield :text}}
+    {:type :source, :from {:step "clean-baseline", :yield :text}}
+    {:type :source, :from {:step "coverage-review", :yield :text}}
+    {:type :source, :from {:step "diff-gate", :yield :text}}],
+   :judge
+   {:type :invoke,
+    :operation "workflow/constant-routing",
+    :args {:route "DONE"}},
    :on {"DONE" {:goto :done}}}
-  {:name "terminal-stop-summary"
-   :type :session
-   :tools ["read" "bash"]
+  {:name "terminal-stop-summary",
+   :type :session,
+   :tools ["read" "bash"],
    :contributions
-   [{:type :source :from :workflow-original}
-    {:type :source :from {:step "select-and-create" :yield :text}}
-    {:type :source :from {:step "extract-task-path" :yield :text}}
-    {:type :template
-     :text "Produce a deterministic terminal stop summary for a malformed target-present handoff from `extract-task-path`. This is the pre-design, no-validated-task-path branch. Summarize the full `select-and-create` handoff and the path-extraction failure. Do not require, invent, or read a generated task path. Do not read task-local artifacts. Do not claim design review, plan creation, test-net gates, implementation, validation, push, or PR creation occurred.\n\nInput handoff:\n{{handoff}}\n\nExtraction result:\n{{extraction}}"
-     :vars {"handoff" {:from {:step "select-and-create" :yield :text}}
-            "extraction" {:from {:step "extract-task-path" :yield :text}}}}]
-   :judge {:type :invoke
-           :operation "workflow/constant-routing"
-           :args {:route "DONE"}}
-   :on {"DONE" {:goto :done}}}]
- :name "reduce-architectural-complexity"
- :description "Select one architecture-level Gordian target in the invoking worktree, create a constrained behaviour-preserving Munera task, and drive it through design, planning, test-net gating, implementation, validation, and explicit architecture-aware review gates"}
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "select-and-create", :yield :text}}
+    {:type :source, :from {:step "extract-task-path", :yield :text}}
+    {:type :template,
+     :text
+     "Produce a deterministic terminal stop summary for `reduce-architectural-complexity`. There are two stop shapes.\n\n1. Pre-design/no-validated-task-path: reached only from malformed `extract-task-path`; summarize the full `select-and-create` handoff and the extraction failure. Do not require, invent, or read a task path. Do not read task-local artifacts.\n2. Post-task/no-implementation: reached after a validated extracted task path exists from clean-baseline, coverage-disposition, or diff-gate failure; use `{{input}}` as the task path, inspect task artifacts, and summarize why simplification did not run and whether the next action is revert, split, close, or retry coverage work.\n\nNever claim `implement-task`, architecture simplification, validation capture, review gates, push, or PR creation occurred on a terminal stop.\n\nValidated-or-attempted task path:\n{{input}}\n\nSelection handoff:\n{{handoff}}",
+     :vars
+     {"input" {:from {:step "extract-task-path", :yield :text}},
+      "handoff" {:from {:step "select-and-create", :yield :text}}}}],
+   :judge
+   {:type :invoke,
+    :operation "workflow/constant-routing",
+    :args {:route "DONE"}},
+   :on {"DONE" {:goto :done}}}],
+ :name "reduce-architectural-complexity",
+ :description
+ "Select one architecture-level Gordian target in the invoking worktree, create a constrained behaviour-preserving Munera task, and drive it through design, planning, test-net gating, implementation, validation, and explicit architecture-aware review gates"}
