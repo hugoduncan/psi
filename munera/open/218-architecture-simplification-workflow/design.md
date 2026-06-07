@@ -54,8 +54,8 @@ The workflow should follow the proven shape of `reduce-incidental-complexity` wh
 A `:session` step should:
 
 1. Confirm it is running in the intended invoking worktree. It must not call `work-on`, create another worktree, or switch branches; the caller is responsible for invoking the workflow from the intended isolated branch/worktree.
-2. Run `bb gordian architecture-targets --edn` or `--json` from the worktree root.
-3. Select the deterministic winner from the emitted `:architecture-target-ranking` unless there is no eligible/actionable target. The selected target is based on `architecture-targets`, not on what `target-issues` can describe.
+2. Run `bb gordian architecture-targets --edn` from the worktree root. JSON is not part of this workflow contract; the selector and tests consume the authoritative EDN envelope.
+3. Select the deterministic winner from the top-level `:winner` map when it is present, eligible, and has an interpretable candidate id/type. The top-level `:candidates` vector is retained as ranking context and evidence for tests/review, but selection is the top-level `:winner`. The selected target is based on `architecture-targets`, not on what `target-issues` can describe.
 4. Run `bb gordian target-issues --candidate '<candidate-id>'` for the selected candidate when `target-issues` supports that candidate type.
    - `target-issues` is informational framing after selection. It must not change the selected target and must not cause the workflow to skip a valid `architecture-targets` winner.
    - If `target-issues` cannot describe the selected candidate type, the workflow should still create the task from the `architecture-targets` evidence and record that no `target-issues` framing was available for this candidate. The generated task should then require the implementation architecture review to compensate by checking the broader project architecture sources and relevant Gordian evidence directly.
@@ -80,7 +80,7 @@ The no-target response should be deterministic and should route the workflow to 
 The `select-and-create` step owns the only no-target / uninterpretable-output decision. Its final response must use exactly one raw `PASS_STATUS` line, and the workflow EDN must route only through the normalized `workflow/pass-status-routing` result:
 
 - target selected and task created: final line exactly `PASS_STATUS: REVIEW_COMPLETE`; `workflow/pass-status-routing` is invoked with `:allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]`, normalizes this to `"DONE"`, and the `select-and-create` `:on` map routes `"DONE"` to `review-task-design`,
-- no eligible `architecture-targets` winner, missing ranking, missing candidate id/type, unsupported candidate shape needed for membership resolution, or otherwise uninterpretable `architecture-targets` output: final line exactly `PASS_STATUS: ACTIONABLE_FEEDBACK`; the same judge normalizes this to `"REPEAT"`, and the `select-and-create` `:on` map routes `"REPEAT"` directly to `:done`,
+- no eligible top-level `:winner`, missing or non-vector top-level `:candidates`, missing candidate id/type on the winner, unsupported candidate shape needed for membership resolution, or otherwise uninterpretable `architecture-targets --edn` envelope: final line exactly `PASS_STATUS: ACTIONABLE_FEEDBACK`; the same judge normalizes this to `"REPEAT"`, and the `select-and-create` `:on` map routes `"REPEAT"` directly to `:done`,
 - the no-target / uninterpretable response must not emit a `munera_task_path:` line and must not create a Munera task or baseline artifact,
 - raw `PASS_STATUS` tokens must never appear as EDN `:on` keys; EDN routes consume only `"DONE"` and `"REPEAT"`.
 
@@ -104,7 +104,7 @@ The generated task should not prescribe exact implementation mechanics beyond th
 
 ### Candidate membership and target/source area contract
 
-The generated task must record a single authoritative candidate map copied from the selected `architecture-targets` winner: at minimum `:candidate/id`, `:candidate/type`, `:candidate/label`, `:members` when present, `:score`, `:confidence`, and the ranking evidence summary. Every later clean-baseline check, coverage review, diff-gate classification, blast-radius decision, and implementation architecture review must use the same recorded target/source area derived from that candidate.
+The generated task must record a single authoritative candidate map copied from the selected top-level `:winner` in `architecture-targets.edn`: at minimum `:candidate/id`, `:candidate/type`, `:candidate/label`, `:members` when present, `:score`, `:confidence`, and the ranking evidence summary. The top-level `:candidates` vector remains supporting ranking context, not a second selection envelope. Every later clean-baseline check, coverage review, diff-gate classification, blast-radius decision, validation capture, and implementation architecture review must use the same recorded target/source area derived from that candidate.
 
 Candidate membership is resolved as follows:
 
@@ -131,7 +131,7 @@ All generated-task artifact references must be worktree-root-relative paths unde
 At task creation, `select-and-create` must write these artifacts:
 
 - `munera/open/NNN-slug/before-diagnose.edn` — raw EDN stdout from `bb gordian diagnose --edn` run at the worktree root; this is the baseline passed to `bb gordian gate --baseline munera/open/NNN-slug/before-diagnose.edn`,
-- `munera/open/NNN-slug/architecture-targets.edn` — raw EDN stdout from `bb gordian architecture-targets --edn` run at the worktree root; this is the authoritative ranking/selection evidence,
+- `munera/open/NNN-slug/architecture-targets.edn` — raw EDN stdout from `bb gordian architecture-targets --edn` run at the worktree root; this is the authoritative ranking/selection evidence and must contain the top-level `:winner` / `:candidates` envelope consumed by the selector,
 - `munera/open/NNN-slug/target-issues.edn` — raw EDN stdout from `bb gordian target-issues --candidate '<pr-str candidate-id>' --edn` when the command succeeds for the selected candidate,
 - `munera/open/NNN-slug/target-issues-unavailable.edn` — EDN map written instead of `target-issues.edn` when the selected candidate is valid but `target-issues` cannot describe it, shaped at least as `{:candidate/id ..., :candidate/type ..., :status :unsupported | :failed, :command ..., :reason ...}`. This file records missing supplemental framing; it is not a no-target condition.
 
@@ -139,14 +139,14 @@ During the clean-baseline gate, the workflow must write:
 
 - `munera/open/NNN-slug/characterization-baseline.edn` — EDN map containing at least `:git/head`, `:git/status-short`, the recorded candidate map, `:target/namespaces`, `:target/source-areas`, `:target/allowed-adjacent-source-areas`, `:target/affected-test-areas` when known, and any classified pre-existing task-artifact/doc dirt.
 
-After implementation, before post-implementation reviews are considered complete, the generated task must contain these validation artifacts:
+After implementation, before any post-implementation review-step gate runs, a workflow-local `validation-capture` session gate must produce or update the validation artifacts below. `implement-task` is not responsible for producing them before yielding; the architecture workflow owns this producer-before-review boundary explicitly.
 
 - `munera/open/NNN-slug/after-diagnose.edn` — raw EDN stdout from rerunning `bb gordian diagnose --edn`,
 - `munera/open/NNN-slug/after-architecture-targets.edn` — raw EDN stdout from rerunning `bb gordian architecture-targets --edn`, used to interpret whether the selected target's ranking/evidence improved, disappeared, or requires explanation,
 - `munera/open/NNN-slug/architecture-compare.edn` — raw EDN stdout from `bb gordian compare munera/open/NNN-slug/before-diagnose.edn munera/open/NNN-slug/after-diagnose.edn --edn`,
 - `munera/open/NNN-slug/architecture-gate.edn` — raw EDN stdout from `bb gordian gate --baseline munera/open/NNN-slug/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0 --edn`.
 
-If a validation command fails, record its command, exit status, and stderr/stdout summary in `implementation.md`; the relevant review gate must treat the missing or failed artifact as actionable feedback unless the generated task design explicitly marked the validation as inapplicable with a reason before implementation.
+For each validation command, successful artifacts are raw EDN stdout. If a command exits non-zero or cannot emit readable EDN, `validation-capture` must write an EDN failure map to the same worktree-root-relative artifact path, shaped at least as `{:status :failed, :command ..., :exit ..., :stdout-summary ..., :stderr-summary ...}`, append the same terse failure to `implementation.md`, add a concrete unchecked repair item to the generated task's `steps.md` when repair is plausible, commit the artifact update, and end with `PASS_STATUS: ACTIONABLE_FEEDBACK`. That status routes back to `implement-task` for repair before validation is retried. Only `PASS_STATUS: REVIEW_COMPLETE` from `validation-capture` may route to the post-implementation review-step chain. Missing, unreadable, failed, or explicitly inapplicable-without-a-pre-implementation-design-reason validation artifacts must never be silently accepted by later review gates.
 
 ## Test-net gate requirement
 
@@ -199,7 +199,7 @@ These reviews must reuse the existing shared review-loop architecture rather tha
 
 The architecture-specific gate is workflow-local to `reduce-architectural-complexity`. It must not be implemented as a custom review/follow-up loop, and it must not broaden the generic `review-task-implementation` workflow for unrelated tasks unless a separate general review-design decision explicitly chooses that broader policy.
 
-Post-implementation review sequence is explicit and workflow-local for this architecture workflow rather than a single delegate to the generic `review-task-implementation` wrapper. After `implement-task`, `reduce-architectural-complexity` must run these `review-step` delegates in order, each with the generated task path as `:input` and the named skill as `:skill`:
+Post-implementation review sequence is explicit and workflow-local for this architecture workflow rather than a single delegate to the generic `review-task-implementation` wrapper. After `implement-task`, `reduce-architectural-complexity` must first run the workflow-local `validation-capture` gate described above. Only after that gate succeeds may it run these `review-step` delegates in order, each with the generated task path as `:input` and the named skill as `:skill`:
 
 1. `task-implementation-review` — included; verifies implementation correctness/completeness against the task,
 2. `task-test-review` — included; verifies implementation test coverage and behaviour proof,
@@ -208,7 +208,7 @@ Post-implementation review sequence is explicit and workflow-local for this arch
 5. `review-task-docs` — included; verifies README/doc/CHANGELOG synchronization when the task changed user-facing docs or workflow surfaces,
 6. `code-shaper` — included; final shape gate for simplicity, consistency, robustness, and absence of adapter/shim complexity.
 
-The generic `review-task-implementation` workflow is intentionally not called by `reduce-architectural-complexity` in this sequence, because its fixed internal order has no slot for the architecture-specific gate and broadening it would affect unrelated tasks. The architecture workflow instead reuses the same underlying `review-step` / `review-follow-up-steps` machinery explicitly. `implement-task` output is not considered complete for this workflow until all six review-step gates above have resolved with no actionable feedback.
+The generic `review-task-implementation` workflow is intentionally not called by `reduce-architectural-complexity` in this sequence, because its fixed internal order has no slot for the architecture-specific gate and broadening it would affect unrelated tasks. The architecture workflow instead reuses the same underlying `review-step` / `review-follow-up-steps` machinery explicitly. `implement-task` output is not considered complete for this workflow until `validation-capture` has produced successful before/after validation artifacts and all six review-step gates above have resolved with no actionable feedback.
 
 ## Relationship to existing workflows
 
@@ -218,6 +218,7 @@ The generic `review-task-implementation` workflow is intentionally not called by
 - Reuse existing review/design/plan/implementation workflows where possible instead of inventing a parallel lifecycle.
 - Reuse or mirror the existing `clean-baseline`, `coverage-review`, `coverage-disposition`, `coverage-fix`, `diff-gate`, and `implement-task` routing pattern from `reduce-incidental-complexity` when it remains appropriate.
 - Mirror the generic implementation-review workflow's underlying `review-step` gate pattern, but do not delegate to the fixed `review-task-implementation` wrapper; the architecture workflow owns its explicit post-implementation review-step sequence.
+- Insert an explicit workflow-local `validation-capture` gate after `implement-task` and before the review-step sequence; it writes the after/compare/gate artifacts, commits them, and routes failed or missing validation back to `implement-task` repair before reviews can run.
 - Add post-implementation review routing so task-implementation-review, task-test-review, review-implementation-architecture, test-shaper, review-task-docs, and code-shaper are explicit gates for this architecture-level workflow.
 
 ## Acceptance criteria for this task
@@ -228,7 +229,7 @@ The generic `review-task-implementation` workflow is intentionally not called by
 - Generated Munera tasks include architecture-target evidence, target-issues framing when available, behaviour-preservation constraints, test-net gate requirements, and Gordian validation criteria.
 - The workflow includes a mandatory pre-simplification test-net gate equivalent in strength to `reduce-incidental-complexity` for this higher-level target type.
 - `implement-task` cannot run unless the characterization coverage review and baseline/diff gate pass.
-- Tests lock workflow parsing/loading, command/prompt contracts, pass-status routing, no-target routing, unsupported-`target-issues` informational routing, generated-task prompt content, test-net gate ordering, invoking-worktree constraints, and post-implementation implementation-architecture/test-shaper/code-shaper review gates.
+- Tests lock workflow parsing/loading, command/prompt contracts, the real `architecture-targets --edn` top-level `:winner` / `:candidates` envelope, pass-status routing, no-target routing, unsupported-`target-issues` informational routing, generated-task prompt content, test-net gate ordering, invoking-worktree constraints, validation-capture producer-before-review ordering, and all six ordered post-implementation review-step gates (`task-implementation-review`, `task-test-review`, `review-implementation-architecture`, `test-shaper`, `review-task-docs`, `code-shaper`) with their required contexts.
 - User-facing docs mention the new workflow and distinguish it from `reduce-incidental-complexity`.
 - CHANGELOG `[Unreleased]` records the new workflow.
 
@@ -237,6 +238,6 @@ The generic `review-task-implementation` workflow is intentionally not called by
 1. Workflow name is `reduce-architectural-complexity`.
 2. The workflow runs in the invoking worktree. It must not call `work-on`, create another worktree, or switch branches.
 3. Selection is based on `architecture-targets`. `target-issues` is post-selection information only; unsupported `target-issues` candidate types do not cause the workflow to choose a different target.
-4. Post-implementation completion requires explicit workflow-local `review-step` gates for task-implementation-review, task-test-review, review-implementation-architecture, test-shaper, review-task-docs, and code-shaper. The sequence is in the repeat-until-clean style of the generic implementation-review workflow but is not a delegate to that wrapper, because numeric Gordian validation alone cannot capture all architectural-fit concerns and the architecture gate needs a fixed slot.
+4. Post-implementation completion requires a successful workflow-local `validation-capture` gate followed by explicit workflow-local `review-step` gates for task-implementation-review, task-test-review, review-implementation-architecture, test-shaper, review-task-docs, and code-shaper. The sequence is in the repeat-until-clean style of the generic implementation-review workflow but is not a delegate to that wrapper, because numeric Gordian validation alone cannot capture all architectural-fit concerns and the architecture gate needs a fixed slot.
 5. The implementation architecture review skill is distinct from the existing design-oriented `review-task-architecture` skill. It verifies the actual implemented code change against the selected Gordian target, the project's broader existing architecture, and the intended architecture direction.
 6. The implementation architecture review skill identity is exactly `review-implementation-architecture` at `.psi/skills/review-implementation-architecture/SKILL.md`.
