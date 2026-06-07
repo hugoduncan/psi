@@ -88,16 +88,16 @@ when done.
 
 ## Slice 6 — Review gates and closure
 
-- [ ] Run `review-step` with skill `task-implementation-review` for the final diff against `design.md`, `plan.md`, and `steps.md`; append findings or `REVIEW_COMPLETE` to `implementation.md`.
-- [ ] Run `review-step` with skill `task-test-review` for the characterization and regression tests; append findings or `REVIEW_COMPLETE` to `implementation.md`.
-- [ ] Run `review-step` with skill `review-implementation-architecture` against the selected Gordian target, ownership constraints, validation artifacts, and blast-radius limits; append findings or `REVIEW_COMPLETE` to `implementation.md`; do not use design-only `review-task-architecture` here.
-- [ ] Run `review-step` with skill `test-shaper` for clarity, signal, determinism, and absence of interaction/mock assertions; append findings or `REVIEW_COMPLETE` to `implementation.md`.
-- [ ] Run `review-step` with skill `review-task-docs`; confirm no README/doc/CHANGELOG update is required for behaviour-preserving internal simplification, or update user-facing docs if observable behaviour changed.
-- [ ] Run `review-step` with skill `code-shaper` for simplicity, consistency, robustness, and absence of sideways orchestration/adapter/shim complexity.
-- [ ] Add any actionable review follow-ups as new unchecked checklist items under this section and execute them before closure.
-- [ ] Run final focused tests, targeted lint, `git diff --check`, and any formatter checks required by changed files.
-- [ ] Append final implementation verification notes and PASS_STATUS to `implementation.md`.
-- [ ] Commit Slice 6 review/closure updates.
+- [x] Run `review-step` with skill `task-implementation-review` for the final diff against `design.md`, `plan.md`, and `steps.md`; append findings or `REVIEW_COMPLETE` to `implementation.md`. Done in Slice 6 review note: no actionable feedback.
+- [x] Run `review-step` with skill `task-test-review` for the characterization and regression tests; append findings or `REVIEW_COMPLETE` to `implementation.md`. Done in Slice 6 review note: no actionable feedback.
+- [x] Run `review-step` with skill `review-implementation-architecture` against the selected Gordian target, ownership constraints, validation artifacts, and blast-radius limits; append findings or `REVIEW_COMPLETE` to `implementation.md`; do not use design-only `review-task-architecture` here. Done in Slice 6 architecture review note: no actionable feedback.
+- [x] Run `review-step` with skill `test-shaper` for clarity, signal, determinism, and absence of interaction/mock assertions; append findings or `REVIEW_COMPLETE` to `implementation.md`. Done in Slice 6 test-shaper note: no actionable feedback.
+- [x] Run `review-step` with skill `review-task-docs`; confirm no README/doc/CHANGELOG update is required for behaviour-preserving internal simplification, or update user-facing docs if observable behaviour changed. Done in Slice 6 docs review note: no user-facing docs/changelog update required.
+- [x] Run `review-step` with skill `code-shaper` for simplicity, consistency, robustness, and absence of sideways orchestration/adapter/shim complexity. Done in Slice 6 code-shaper note: no actionable feedback.
+- [x] Add any actionable review follow-ups as new unchecked checklist items under this section and execute them before closure. Done: no actionable review follow-ups were found.
+- [x] Run final focused tests, targeted lint, `git diff --check`, and any formatter checks required by changed files. Done in Slice 6 final verification: formatter no-op, focused RPC suite green 57/439, targeted clj-kondo 0/0, `git diff --check` clean.
+- [x] Append final implementation verification notes and PASS_STATUS to `implementation.md`. Done in Slice 6 final note.
+- [x] Commit Slice 6 review/closure updates. Done in the Slice 6 closure commit.
 
 ## Plan-created checklist
 
