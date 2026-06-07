@@ -33,7 +33,11 @@
    :prompt-string
    {:type :map,
     :fields {:input {:from :workflow-input, :path [:input]}}},
-   :context [{:type :source, :from :workflow-original}],
+   :context [{:type :source, :from :workflow-original}]}
+  {:name "check-implementation-review-status",
+   :type :invoke,
+   :operation "workflow/constant-routing",
+   :args {:route "DONE"},
    :judge
    {:type :invoke,
     :operation "workflow/pass-status-routing",
@@ -50,6 +54,20 @@
              :implementation-review-yield
              {:from {:step "review-task-implementation", :yield :text}}}},
    :context [{:type :source, :from :workflow-original}],
+   :judge {:type :invoke,
+           :operation "workflow/constant-routing",
+           :args {:route "DONE"}},
+   :on {"DONE" {:goto "final-summary-after-extraction"}}}
+  {:name "final-summary-after-extraction",
+   :type :session,
+   :tools ["read" "bash"],
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "review-task-implementation", :yield :text}}
+    {:type :source, :from {:step "extract-task-knowledge", :yield :text}}
+    {:type :template,
+     :text "Produce the user-facing final result for the Munera task lifecycle described by {{input}} after implementation review completed and mementum knowledge extraction ran. Independently inspect the specific task artifacts (design.md, plan.md, steps.md, implementation.md, and whether the task is under munera/open or munera/closed) and use the prior step outputs as supporting context.\n\nRespond with a concise summary for the user. Include:\n- whether the task-lifecycle run completed cleanly through design → plan → implement → review → extract knowledge\n- the main work completed in this run\n- the implementation-review outcome proving extraction was authorized\n- the knowledge-extraction result and any memories/knowledge pages created or updated\n- the task artifact files updated\n- whether the task was closed or remains open, with the reason recorded in the task artifacts\n- any remaining notes or risks explicitly recorded in the task artifacts\n- any commit ids created during the run that are evident from the provided step outputs\n\nInput:\n{{input}}",
+     :vars {"input" {:from :workflow-input, :path [:input]}}}],
    :judge {:type :invoke,
            :operation "workflow/constant-routing",
            :args {:route "DONE"}},
