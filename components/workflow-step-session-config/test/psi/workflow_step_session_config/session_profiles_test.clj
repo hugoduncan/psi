@@ -1,10 +1,14 @@
 (ns psi.workflow-step-session-config.session-profiles-test
   (:require
+   [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]
    [psi.workflow-runtime.core :as workflow-runtime]
+   [psi.workflow-runtime.statechart-runtime.delegate :as delegate]
    [psi.workflow-runtime.step-test-support :as support]
    [psi.workflow-step-session-config.core :as workflow-step-session-config]
-   [psi.workflow-registry.registry :as workflow-registry]))
+   [psi.workflow-registry.registry :as workflow-registry])
+  (:import
+   [java.nio.file Files]))
 
 (defn- workflow-run-for
   [ctx definitions run-opts]
@@ -18,6 +22,21 @@
                  [state' _ _] (workflow-runtime/create-run state run-opts)]
              state')))
   (workflow-runtime/workflow-run-in @(:state* ctx) (:run-id run-opts)))
+
+(defn- write-user-config!
+  [home content]
+  (let [f (io/file home ".psi" "agent" "config.edn")]
+    (.mkdirs (.getParentFile f))
+    (spit f (pr-str content))))
+
+(defmacro ^:private with-user-home
+  [home & body]
+  `(let [old-home# (System/getProperty "user.home")]
+     (try
+       (System/setProperty "user.home" (str ~home))
+       ~@body
+       (finally
+         (System/setProperty "user.home" old-home#)))))
 
 (defn- profile-record
   [name settings]
@@ -188,6 +207,86 @@
              (mapv :reason (:diagnostics (ex-data ex)))))
       (is (= ["no-concrete-settings"]
              (mapv :message (:diagnostics (ex-data ex))))))))
+
+(deftest delegate-runtime-copies-session-profile-snapshot-test
+  ;; Tests the delegate runtime's run-creation boundary, not only the pure
+  ;; inherited-defaults projection: delegated child runs receive the parent's
+  ;; immutable :session-profile-snapshot and callee profile resolution uses that
+  ;; child snapshot after mutable config changes.
+  (testing "delegated runs copy parent profile snapshots and callee steps resolve from the copy"
+    (let [home (.toFile (Files/createTempDirectory "psi-profile-delegate-home" (make-array java.nio.file.attribute.FileAttribute 0)))]
+      (try
+        (let [[ctx session-id] (support/create-session-context {:persist? false})
+              parent-snapshot (profile-snapshot
+                               {:coding (profile-record :coding
+                                                        {:model {:provider "anthropic"
+                                                                 :id "claude-parent-snapshot"}
+                                                         :thinking-level :low
+                                                         :speed-mode :fast
+                                                         :effort-override :xhigh})})
+              child-definition {:definition-id "profile-child"
+                                :name "profile-child"
+                                :steps [{:name "child-profile-step"
+                                         :type :session
+                                         :session-profile :coding
+                                         :contributions [{:type :source
+                                                          :from :workflow-input}]}]}
+              delegating-definition {:definition-id "profile-delegator"
+                                     :name "profile-delegator"
+                                     :steps [{:name "delegate-step"
+                                              :type :delegate
+                                              :target "profile-child"
+                                              :prompt-string "build"
+                                              :delegate {:target "profile-child"}}]}
+              workflow-run (workflow-run-for ctx [child-definition delegating-definition]
+                                             {:definition-id "profile-delegator"
+                                              :run-id "run-profile-delegator"
+                                              :parent-session-id session-id
+                                              :inherited-defaults base-inherited-defaults
+                                              :session-profile-snapshot parent-snapshot
+                                              :workflow-input {:input "build"}})
+              resolve-inherited-defaults-fn
+              (fn [ctx* parent-session-id* workflow-run* step-id*]
+                (workflow-step-session-config/effective-config->snapshot
+                 (workflow-step-session-config/resolve-step-session-config
+                  ctx* parent-session-id* workflow-run* step-id*)
+                 (:inherited-defaults workflow-run*)))
+              create-workflow-context-fn (fn [ctx* _parent-session-id _run-id]
+                                           (assoc ctx* :wm nil))
+              send-and-drain-fn (fn [_wf-ctx _wm _event _payload] nil)
+              step-def (get-in workflow-run [:effective-definition :steps "delegate-step"])]
+          ;; Mutate the real config after the parent run's snapshot exists.
+          ;; A delegate implementation that re-read config for the child run
+          ;; would capture these changed values instead of the parent snapshot.
+          (write-user-config! home {:agent-session
+                                    {:session-profiles
+                                     {:coding {:model-provider "openai"
+                                               :model-id "gpt-5"
+                                               :thinking-level :high
+                                               :speed-mode :normal
+                                               :effort-override :low}}}})
+          (with-user-home (.getAbsolutePath home)
+            (let [result (delegate/delegate-step-runtime-result
+                          create-workflow-context-fn
+                          send-and-drain-fn
+                          resolve-inherited-defaults-fn
+                          ctx session-id "delegate-step" step-def workflow-run)
+                  child-run-id (get-in result [:payload :delegate-run-id])
+                  child-run (workflow-runtime/workflow-run-in @(:state* ctx) child-run-id)
+                  child-config (workflow-step-session-config/resolve-step-session-config
+                                ctx session-id child-run "child-profile-step")]
+              (is (some? child-run-id) "delegate created a child workflow run")
+              (is (= parent-snapshot (:session-profile-snapshot child-run))
+                  "child run stores the copied parent session-profile snapshot")
+              (is (= {:provider "anthropic" :id "claude-parent-snapshot"}
+                     (:model child-config))
+                  "callee profile resolution uses the child snapshot, not edited config")
+              (is (= :low (:thinking-level child-config)))
+              (is (= :fast (:speed-mode child-config)))
+              (is (= :xhigh (:effort-override child-config))))))
+        (finally
+          (doseq [f (reverse (file-seq home))]
+            (.delete f)))))))
 
 (deftest effective-config->snapshot-preserves-task-207-fallback-test
   ;; Tests no-profile workflows keep task-207 speed/effort inheritance.
