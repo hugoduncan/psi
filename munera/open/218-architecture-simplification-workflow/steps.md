@@ -58,28 +58,28 @@ when done.
 
 ## Slice 4 — Validation capture and post-implementation review chain
 
-- [ ] Add `implement-task` delegate targeting `implement-task`, with input from `extract-task-path` and context from the full `select-and-create` handoff plus prior gate outputs.
-- [ ] Add `validation-capture` session step immediately after `implement-task` and before any post-implementation review-step delegate.
-- [ ] In `validation-capture`, rerun `bb gordian diagnose --edn` and write `after-diagnose.edn` under the generated task directory.
-- [ ] In `validation-capture`, rerun `bb gordian architecture-targets --edn` and write `after-architecture-targets.edn` under the generated task directory.
-- [ ] In `validation-capture`, run `bb gordian compare munera/open/NNN-slug/before-diagnose.edn munera/open/NNN-slug/after-diagnose.edn --edn` and write `architecture-compare.edn`.
-- [ ] In `validation-capture`, run `bb gordian gate --baseline munera/open/NNN-slug/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0 --edn` and write `architecture-gate.edn`.
-- [ ] In `validation-capture`, write EDN failure maps to the same artifact paths for non-zero/unreadable validation commands, append terse failures to `implementation.md`, add plausible repair checklist items to generated `steps.md`, commit artifacts, and end with `PASS_STATUS: ACTIONABLE_FEEDBACK`.
-- [ ] Route `validation-capture` `PASS_STATUS: ACTIONABLE_FEEDBACK` / normalized `"REPEAT"` back to `implement-task` for repair.
-- [ ] Route `validation-capture` `PASS_STATUS: REVIEW_COMPLETE` / normalized `"DONE"` to the first post-implementation review-step gate.
-- [ ] Add ordered delegate `review-implementation-correctness` targeting `review-step` with `:skill {:value "task-implementation-review"}` and `extract-task-path` output as `:input`.
-- [ ] Add ordered delegate `review-implementation-tests` targeting `review-step` with `:skill {:value "task-test-review"}` and `extract-task-path` output as `:input`.
-- [ ] Add ordered delegate `review-implementation-architecture` targeting `review-step` with `:skill {:value "review-implementation-architecture"}` and `extract-task-path` output as `:input`.
-- [ ] Ensure the architecture review-step context includes exactly these workflow sources: `:workflow-original`, `select-and-create`, `clean-baseline`, `coverage-review`, `diff-gate`, `implement-task`, `validation-capture`, `review-implementation-correctness`, and `review-implementation-tests`; do not imply artifact file contents are automatically inlined by runtime context.
-- [ ] Ensure the `review-implementation-architecture` skill requires reading selected Gordian evidence and validation artifacts from task-local root-relative paths: `architecture-targets.edn`, `target-issues.edn` or `target-issues-unavailable.edn`, `before-diagnose.edn`, `after-diagnose.edn`, `after-architecture-targets.edn`, `architecture-compare.edn`, `architecture-gate.edn`, and Munera task artifacts.
-- [ ] Add ordered delegate `review-test-shape` targeting `review-step` with `:skill {:value "test-shaper"}` and `extract-task-path` output as `:input`.
-- [ ] Add ordered delegate `review-task-docs` targeting `review-step` with `:skill {:value "review-task-docs"}` and `extract-task-path` output as `:input`.
-- [ ] Add ordered delegate `review-code-shape` targeting `review-step` with `:skill {:value "code-shaper"}` and `extract-task-path` output as `:input`.
-- [ ] Ensure the workflow does not call the generic `review-task-implementation` workflow as a delegate target.
-- [ ] Add `terminal-stop-summary` with two deterministic branches: malformed `extract-task-path` before design with no validated task path, and no-implementation gate failures after task creation with an extracted task path.
-- [ ] Add `final-summary` for completed target-present runs, summarizing design → plan → test-net → diff-gate → implementation → validation-capture → six review gates.
-- [ ] Verify the full workflow EDN parses/loads after Slice 4.
-- [ ] Commit Slice 4 (`⚒ workflow: add architecture validation and reviews`).
+- [x] Add `implement-task` delegate targeting `implement-task`, with input from `extract-task-path` and context from the full `select-and-create` handoff plus prior gate outputs.
+- [x] Add `validation-capture` session step immediately after `implement-task` and before any post-implementation review-step delegate.
+- [x] In `validation-capture`, rerun `bb gordian diagnose --edn` and write `after-diagnose.edn` under the generated task directory.
+- [x] In `validation-capture`, rerun `bb gordian architecture-targets --edn` and write `after-architecture-targets.edn` under the generated task directory.
+- [x] In `validation-capture`, run `bb gordian compare munera/open/NNN-slug/before-diagnose.edn munera/open/NNN-slug/after-diagnose.edn --edn` and write `architecture-compare.edn`.
+- [x] In `validation-capture`, run `bb gordian gate --baseline munera/open/NNN-slug/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0 --edn` and write `architecture-gate.edn`.
+- [x] In `validation-capture`, write EDN failure maps to the same artifact paths for non-zero/unreadable validation commands, append terse failures to `implementation.md`, add plausible repair checklist items to generated `steps.md`, commit artifacts, and end with `PASS_STATUS: ACTIONABLE_FEEDBACK`.
+- [x] Route `validation-capture` `PASS_STATUS: ACTIONABLE_FEEDBACK` / normalized `"REPEAT"` back to `implement-task` for repair.
+- [x] Route `validation-capture` `PASS_STATUS: REVIEW_COMPLETE` / normalized `"DONE"` to the first post-implementation review-step gate.
+- [x] Add ordered delegate `review-implementation-correctness` targeting `review-step` with `:skill {:value "task-implementation-review"}` and `extract-task-path` output as `:input`.
+- [x] Add ordered delegate `review-implementation-tests` targeting `review-step` with `:skill {:value "task-test-review"}` and `extract-task-path` output as `:input`.
+- [x] Add ordered delegate `review-implementation-architecture` targeting `review-step` with `:skill {:value "review-implementation-architecture"}` and `extract-task-path` output as `:input`.
+- [x] Ensure the architecture review-step context includes exactly these workflow sources: `:workflow-original`, `select-and-create`, `clean-baseline`, `coverage-review`, `diff-gate`, `implement-task`, `validation-capture`, `review-implementation-correctness`, and `review-implementation-tests`; do not imply artifact file contents are automatically inlined by runtime context.
+- [x] Ensure the `review-implementation-architecture` skill requires reading selected Gordian evidence and validation artifacts from task-local root-relative paths: `architecture-targets.edn`, `target-issues.edn` or `target-issues-unavailable.edn`, `before-diagnose.edn`, `after-diagnose.edn`, `after-architecture-targets.edn`, `architecture-compare.edn`, `architecture-gate.edn`, and Munera task artifacts.
+- [x] Add ordered delegate `review-test-shape` targeting `review-step` with `:skill {:value "test-shaper"}` and `extract-task-path` output as `:input`.
+- [x] Add ordered delegate `review-task-docs` targeting `review-step` with `:skill {:value "review-task-docs"}` and `extract-task-path` output as `:input`.
+- [x] Add ordered delegate `review-code-shape` targeting `review-step` with `:skill {:value "code-shaper"}` and `extract-task-path` output as `:input`.
+- [x] Ensure the workflow does not call the generic `review-task-implementation` workflow as a delegate target.
+- [x] Add `terminal-stop-summary` with two deterministic branches: malformed `extract-task-path` before design with no validated task path, and no-implementation gate failures after task creation with an extracted task path.
+- [x] Add `final-summary` for completed target-present runs, summarizing design → plan → test-net → diff-gate → implementation → validation-capture → six review gates.
+- [x] Verify the full workflow EDN parses/loads after Slice 4. Decision: `load-edn-only` registered the full workflow with validation-capture and six review-step gates with no errors.
+- [x] Commit Slice 4 (`⚒ workflow: add architecture validation and reviews`).
 
 ## Slice 5 — Workflow-loader/content-lock tests
 

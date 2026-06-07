@@ -208,6 +208,193 @@
    {:type :invoke,
     :operation "workflow/constant-routing",
     :args {:route "DONE"}},
+   :on {"DONE" {:goto "validation-capture"}}}
+  {:name "validation-capture",
+   :type :session,
+   :tools ["read" "bash" "edit" "write"],
+   :skills ["gordian"],
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "select-and-create", :yield :text}}
+    {:type :source, :from {:step "extract-task-path", :yield :text}}
+    {:type :source, :from {:step "clean-baseline", :yield :text}}
+    {:type :source, :from {:step "coverage-review", :yield :text}}
+    {:type :source, :from {:step "diff-gate", :yield :text}}
+    {:type :source, :from {:step "implement-task", :yield :text}}
+    {:type :template,
+     :text
+     "Capture post-implementation Gordian validation artifacts for the architecture-level Munera task at {{input}} before any post-implementation review-step gate runs. Work in the current inherited worktree. Do NOT call `work-on`, create a worktree, or switch branches.\n\nRequired procedure:\n1. Read task artifacts and verify `munera/open/NNN-slug/before-diagnose.edn` exists and is readable.\n2. Run `bb gordian diagnose --edn` from the worktree root and write raw EDN stdout to `{{input}}/after-diagnose.edn`.\n3. Run `bb gordian architecture-targets --edn` from the worktree root and write raw EDN stdout to `{{input}}/after-architecture-targets.edn`.\n4. Run `bb gordian compare {{input}}/before-diagnose.edn {{input}}/after-diagnose.edn --edn` and write raw EDN stdout to `{{input}}/architecture-compare.edn`.\n5. Run `bb gordian gate --baseline {{input}}/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0 --edn` and write raw EDN stdout to `{{input}}/architecture-gate.edn`.\n6. For each validation command, successful artifacts are raw EDN stdout. If a command exits non-zero or cannot emit readable EDN, write an EDN failure map to the same artifact path, shaped at least as `{:status :failed, :command ..., :exit ..., :stdout-summary ..., :stderr-summary ...}`. Append the same terse failure to `implementation.md`, add a concrete unchecked repair item to `steps.md` when repair is plausible, commit the artifact/task update, and end with exactly `PASS_STATUS: ACTIONABLE_FEEDBACK` so implementation repair runs before validation is retried.\n7. If and only if all validation artifacts are present, readable, and not failure maps, append a terse validation-capture note to `implementation.md`, commit artifacts/task notes, and end with exactly `PASS_STATUS: REVIEW_COMPLETE`.\n\nMissing, unreadable, failed, or explicitly inapplicable-without-a-pre-implementation-design-reason validation artifacts must never be silently accepted by later review gates.\n\nInput task path:\n{{input}}",
+     :vars
+     {"input" {:from {:step "extract-task-path", :yield :text}}}}],
+   :judge
+   {:type :invoke,
+    :operation "workflow/pass-status-routing",
+    :args
+    {:text
+     {:from {:step "validation-capture", :output :final-llm-reply}},
+     :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}},
+   :on
+   {"DONE" {:goto "review-implementation-correctness"},
+    "REPEAT" {:goto "implement-task"}}}
+  {:name "review-implementation-correctness",
+   :type :delegate,
+   :target "review-step",
+   :prompt-string
+   {:type :map,
+    :fields
+    {:input {:from {:step "extract-task-path", :yield :text}},
+     :skill {:value "task-implementation-review"}}},
+   :context
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "select-and-create", :yield :text}}
+    {:type :source, :from {:step "extract-task-path", :yield :text}}
+    {:type :source, :from {:step "clean-baseline", :yield :text}}
+    {:type :source, :from {:step "coverage-review", :yield :text}}
+    {:type :source, :from {:step "diff-gate", :yield :text}}
+    {:type :source, :from {:step "implement-task", :yield :text}}
+    {:type :source, :from {:step "validation-capture", :yield :text}}]}
+  {:name "review-implementation-tests",
+   :type :delegate,
+   :target "review-step",
+   :prompt-string
+   {:type :map,
+    :fields
+    {:input {:from {:step "extract-task-path", :yield :text}},
+     :skill {:value "task-test-review"}}},
+   :context
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "select-and-create", :yield :text}}
+    {:type :source, :from {:step "extract-task-path", :yield :text}}
+    {:type :source, :from {:step "clean-baseline", :yield :text}}
+    {:type :source, :from {:step "coverage-review", :yield :text}}
+    {:type :source, :from {:step "diff-gate", :yield :text}}
+    {:type :source, :from {:step "implement-task", :yield :text}}
+    {:type :source, :from {:step "validation-capture", :yield :text}}
+    {:type :source,
+     :from {:step "review-implementation-correctness", :yield :text}}]}
+  {:name "review-implementation-architecture",
+   :type :delegate,
+   :target "review-step",
+   :prompt-string
+   {:type :map,
+    :fields
+    {:input {:from {:step "extract-task-path", :yield :text}},
+     :skill {:value "review-implementation-architecture"}}},
+   :context
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "select-and-create", :yield :text}}
+    {:type :source, :from {:step "clean-baseline", :yield :text}}
+    {:type :source, :from {:step "coverage-review", :yield :text}}
+    {:type :source, :from {:step "diff-gate", :yield :text}}
+    {:type :source, :from {:step "implement-task", :yield :text}}
+    {:type :source, :from {:step "validation-capture", :yield :text}}
+    {:type :source,
+     :from {:step "review-implementation-correctness", :yield :text}}
+    {:type :source,
+     :from {:step "review-implementation-tests", :yield :text}}]}
+  {:name "review-test-shape",
+   :type :delegate,
+   :target "review-step",
+   :prompt-string
+   {:type :map,
+    :fields
+    {:input {:from {:step "extract-task-path", :yield :text}},
+     :skill {:value "test-shaper"}}},
+   :context
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "select-and-create", :yield :text}}
+    {:type :source, :from {:step "extract-task-path", :yield :text}}
+    {:type :source, :from {:step "clean-baseline", :yield :text}}
+    {:type :source, :from {:step "coverage-review", :yield :text}}
+    {:type :source, :from {:step "diff-gate", :yield :text}}
+    {:type :source, :from {:step "implement-task", :yield :text}}
+    {:type :source, :from {:step "validation-capture", :yield :text}}
+    {:type :source,
+     :from {:step "review-implementation-correctness", :yield :text}}
+    {:type :source,
+     :from {:step "review-implementation-tests", :yield :text}}
+    {:type :source,
+     :from
+     {:step "review-implementation-architecture", :yield :text}}]}
+  {:name "review-task-docs",
+   :type :delegate,
+   :target "review-step",
+   :prompt-string
+   {:type :map,
+    :fields
+    {:input {:from {:step "extract-task-path", :yield :text}},
+     :skill {:value "review-task-docs"}}},
+   :context
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "select-and-create", :yield :text}}
+    {:type :source, :from {:step "extract-task-path", :yield :text}}
+    {:type :source, :from {:step "clean-baseline", :yield :text}}
+    {:type :source, :from {:step "coverage-review", :yield :text}}
+    {:type :source, :from {:step "diff-gate", :yield :text}}
+    {:type :source, :from {:step "implement-task", :yield :text}}
+    {:type :source, :from {:step "validation-capture", :yield :text}}
+    {:type :source,
+     :from {:step "review-implementation-correctness", :yield :text}}
+    {:type :source,
+     :from {:step "review-implementation-tests", :yield :text}}
+    {:type :source,
+     :from {:step "review-implementation-architecture", :yield :text}}
+    {:type :source, :from {:step "review-test-shape", :yield :text}}]}
+  {:name "review-code-shape",
+   :type :delegate,
+   :target "review-step",
+   :prompt-string
+   {:type :map,
+    :fields
+    {:input {:from {:step "extract-task-path", :yield :text}},
+     :skill {:value "code-shaper"}}},
+   :context
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "select-and-create", :yield :text}}
+    {:type :source, :from {:step "extract-task-path", :yield :text}}
+    {:type :source, :from {:step "clean-baseline", :yield :text}}
+    {:type :source, :from {:step "coverage-review", :yield :text}}
+    {:type :source, :from {:step "diff-gate", :yield :text}}
+    {:type :source, :from {:step "implement-task", :yield :text}}
+    {:type :source, :from {:step "validation-capture", :yield :text}}
+    {:type :source,
+     :from {:step "review-implementation-correctness", :yield :text}}
+    {:type :source,
+     :from {:step "review-implementation-tests", :yield :text}}
+    {:type :source,
+     :from {:step "review-implementation-architecture", :yield :text}}
+    {:type :source, :from {:step "review-test-shape", :yield :text}}
+    {:type :source, :from {:step "review-task-docs", :yield :text}}]}
+  {:name "final-summary",
+   :type :session,
+   :tools ["read" "bash"],
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "select-and-create", :yield :text}}
+    {:type :source, :from {:step "extract-task-path", :yield :text}}
+    {:type :source, :from {:step "clean-baseline", :yield :text}}
+    {:type :source, :from {:step "coverage-review", :yield :text}}
+    {:type :source, :from {:step "diff-gate", :yield :text}}
+    {:type :source, :from {:step "implement-task", :yield :text}}
+    {:type :source, :from {:step "validation-capture", :yield :text}}
+    {:type :source,
+     :from {:step "review-implementation-correctness", :yield :text}}
+    {:type :source,
+     :from {:step "review-implementation-tests", :yield :text}}
+    {:type :source,
+     :from {:step "review-implementation-architecture", :yield :text}}
+    {:type :source, :from {:step "review-test-shape", :yield :text}}
+    {:type :source, :from {:step "review-task-docs", :yield :text}}
+    {:type :source, :from {:step "review-code-shape", :yield :text}}
+    {:type :template,
+     :text
+     "Produce the user-facing final result for the completed target-present `reduce-architectural-complexity` run for {{input}}. Independently inspect the Munera task artifacts. Summarize the design → plan → test-net → diff-gate → implementation → validation-capture → six review gates outcome. Include validation artifacts captured, verification performed, task artifact files updated, commit ids evident from step outputs, and whether the task remains open or was closed. Do not claim a PR was opened or pushed.\n\nInput task path:\n{{input}}",
+     :vars
+     {"input" {:from {:step "extract-task-path", :yield :text}}}}],
+   :judge
+   {:type :invoke,
+    :operation "workflow/constant-routing",
+    :args {:route "DONE"}},
    :on {"DONE" {:goto :done}}}
   {:name "terminal-stop-summary",
    :type :session,
@@ -218,7 +405,7 @@
     {:type :source, :from {:step "extract-task-path", :yield :text}}
     {:type :template,
      :text
-     "Produce a deterministic terminal stop summary for `reduce-architectural-complexity`. There are two stop shapes.\n\n1. Pre-design/no-validated-task-path: reached only from malformed `extract-task-path`; summarize the full `select-and-create` handoff and the extraction failure. Do not require, invent, or read a task path. Do not read task-local artifacts.\n2. Post-task/no-implementation: reached after a validated extracted task path exists from clean-baseline, coverage-disposition, or diff-gate failure; use `{{input}}` as the task path, inspect task artifacts, and summarize why simplification did not run and whether the next action is revert, split, close, or retry coverage work.\n\nNever claim `implement-task`, architecture simplification, validation capture, review gates, push, or PR creation occurred on a terminal stop.\n\nValidated-or-attempted task path:\n{{input}}\n\nSelection handoff:\n{{handoff}}",
+     "Produce a deterministic terminal stop summary for `reduce-architectural-complexity`. There are two stop shapes.\n\n1. Pre-design/no-validated-task-path: reached only from malformed `extract-task-path`; summarize the full `select-and-create` handoff and the extraction failure. Do not require, invent, or read a task path. Do not read task-local artifacts.\n2. Post-task/no-implementation: reached after a validated extracted task path exists from clean-baseline, coverage-disposition, diff-gate, or later gate failure; use `{{input}}` as the task path, inspect task artifacts, and summarize why simplification or reviews did not run and whether the next action is revert, split, close, repair validation, or retry coverage work.\n\nNever claim architecture simplification, validation capture, review gates, push, or PR creation occurred unless the prior workflow yields prove they occurred.\n\nValidated-or-attempted task path:\n{{input}}\n\nSelection handoff:\n{{handoff}}",
      :vars
      {"input" {:from {:step "extract-task-path", :yield :text}},
       "handoff" {:from {:step "select-and-create", :yield :text}}}}],
