@@ -46,6 +46,7 @@ when done.
 ## Characterization fix passes
 
 - [x] 2026-06-07 pass: Filled `coverage-map.md` with source-area/behaviour coverage, added `psi.rpc-test/rpc-model-and-thinking-picker-frontend-actions-test` for `/model`, `/thinking`, submitted `select-model`, and submitted `select-thinking-level` RPC behaviour, updated `characterization-baseline.edn` with the focused command/result summary, and reran the pinned focused suite green (55 tests / 422 assertions). No production changes and no testability seam.
+- [x] 2026-06-07 pass 2: Added `psi.rpc-session-navigation-test/rpc-tree-command-edge-behaviour-test` for `/tree` already-active, missing-session, rename, and unique-prefix switch behaviours; added `psi.rpc-test/rpc-frontend-action-cancelled-and-failed-result-test` for cancelled/failed `frontend_action_result` payloads and no snapshot emission; updated `coverage-map.md` and `characterization-baseline.edn`; reran the pinned focused suite green (57 tests / 439 assertions). No production changes and no testability seam.
 
 ## Slice 3 — Ownership seam selection
 

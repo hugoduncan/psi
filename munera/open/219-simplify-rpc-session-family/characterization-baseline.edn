@@ -200,5 +200,5 @@
  :baseline/results
  [{:label "focused RPC baseline/characterization suite"
    :status :pass
-   :summary {:test 55 :pass 422 :fail 0 :error 0}
-   :notes ["Updated after characterization pass adding picker/model/thinking/frontend-action RPC coverage in psi.rpc-test/rpc-model-and-thinking-picker-frontend-actions-test."]}]}
+   :summary {:test 57 :pass 439 :fail 0 :error 0}
+   :notes ["Updated after characterization passes adding picker/model/thinking/frontend-action RPC coverage, command-tree edge coverage, and frontend_action_result cancelled/failed coverage."]}]}

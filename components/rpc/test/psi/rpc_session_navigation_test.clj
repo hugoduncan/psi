@@ -232,3 +232,77 @@
              (get-in rehydrate-event [:data :messages])))
       (is (= canonical-messages
              (get-in get-messages-resp [:data :messages]))))))
+
+(deftest rpc-tree-command-edge-behaviour-test
+  ;; Characterizes target-local /tree edge outputs before architecture simplification.
+  (testing "/tree reports already-active sessions without rehydrating"
+    (let [[ctx session-id]    (support/create-session-context {:persist? false})
+          state               (atom {:transport {:ready? true :pending {}}
+                                     :connection {:focus-session-id session-id
+                                                  :subscribed-topics #{"command-result" "session/resumed"}}})
+          handler             (support/make-handler ctx state)
+          input               (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                                   "{:id \"c1\" :kind :request :op \"command\" :params {:text \"/tree " session-id "\"}}\n")
+          {:keys [out-lines]} (support/run-loop input handler state)
+          frames              (support/parse-frames out-lines)
+          command-result      (some #(when (= "command-result" (:event %)) %) frames)]
+      (is (= {:type "text"
+              :message (str "Already active session: " session-id)}
+             (:data command-result)))
+      (is (not-any? #(= "session/resumed" (:event %)) frames))))
+
+  (testing "/tree reports missing sessions as command-result text"
+    (let [[ctx session-id]    (support/create-session-context {:persist? false})
+          state               (atom {:transport {:ready? true :pending {}}
+                                     :connection {:focus-session-id session-id
+                                                  :subscribed-topics #{"command-result" "session/resumed"}}})
+          handler             (support/make-handler ctx state)
+          input               (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                                   "{:id \"c1\" :kind :request :op \"command\" :params {:text \"/tree definitely-missing\"}}\n")
+          {:keys [out-lines]} (support/run-loop input handler state)
+          frames              (support/parse-frames out-lines)
+          command-result      (some #(when (= "command-result" (:event %)) %) frames)]
+      (is (= {:type "text"
+              :message "Session not found in context: definitely-missing"}
+             (:data command-result)))
+      (is (not-any? #(= "session/resumed" (:event %)) frames))))
+
+  (testing "/tree name renames a matched session and reports the exact text result"
+    (let [[ctx session-id]    (support/create-session-context {:persist? false})
+          child-id            (:session-id (session/new-session-in! ctx session-id {}))
+          state               (atom {:transport {:ready? true :pending {}}
+                                     :connection {:focus-session-id session-id
+                                                  :subscribed-topics #{"command-result"}}})
+          handler             (support/make-handler ctx state)
+          input               (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                                   "{:id \"c1\" :kind :request :op \"command\" :params {:text \"/tree name " child-id " renamed child\"}}\n")
+          {:keys [out-lines]} (support/run-loop input handler state)
+          frames              (support/parse-frames out-lines)
+          command-result      (some #(when (= "command-result" (:event %)) %) frames)]
+      (is (= {:type "text"
+              :message (str "Renamed session " child-id " to \"renamed child\"")}
+             (:data command-result)))
+      (is (= "renamed child" (:session-name (ss/get-session-data-in ctx child-id))))))
+
+  (testing "/tree accepts a unique session-id prefix and switches to the matching session"
+    (let [[ctx session-id]    (support/create-session-context {:persist? false})
+          child-id            (:session-id (session/new-session-in! ctx session-id {}))
+          prefix              (subs child-id 0 8)
+          _                   (ss/append-journal-entry-in! ctx child-id
+                                                           (persist/message-entry {:role "assistant"
+                                                                                   :content [{:type :text :text "child"}]}))
+          state               (atom {:transport {:ready? true :pending {}}
+                                     :connection {:focus-session-id session-id
+                                                  :subscribed-topics #{"session/resumed" "session/rehydrated" "context/updated"}}})
+          handler             (support/make-handler ctx state)
+          input               (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                                   "{:id \"c1\" :kind :request :op \"command\" :params {:text \"/tree " prefix "\"}}\n")
+          {:keys [out-lines]} (support/run-loop input handler state)
+          frames              (support/parse-frames out-lines)
+          resumed-event       (some #(when (= "session/resumed" (:event %)) %) frames)
+          rehydrated-event    (some #(when (= "session/rehydrated" (:event %)) %) frames)
+          context-event       (some #(when (= "context/updated" (:event %)) %) frames)]
+      (is (= child-id (get-in resumed-event [:data :session-id])))
+      (is (= [{:role "assistant" :content [{:type :text :text "child"}]}]
+             (get-in rehydrated-event [:data :messages])))
+      (is (= child-id (get-in context-event [:data :active-session-id]))))))

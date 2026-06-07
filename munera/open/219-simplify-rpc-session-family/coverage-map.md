@@ -16,7 +16,7 @@ bb clojure:test:scry --dir components/rpc/test \
   --namespace psi.rpc-test
 ```
 
-Latest characterization pass in this map: green, 55 tests / 422 assertions.
+Latest characterization pass in this map: green, 57 tests / 439 assertions.
 
 ## Source-area coverage
 
@@ -68,7 +68,18 @@ Covered behaviours:
 - `/tree <session-id>` emits canonical resume/rehydrate/context events for an existing context session.
   - `psi.rpc-session-navigation-test/rpc-session-resume-and-rehydrate-events-test`
 
-Known remaining edge candidates for coverage review: `/tree name ...` rename, missing-session text, already-active text, and prefix ambiguity edge cases are not newly characterized in this pass.
+Additional characterization added in this pass:
+
+- `/tree <active-session>` reports `Already active session: <sid>` as text and does not emit rehydration.
+  - `psi.rpc-session-navigation-test/rpc-tree-command-edge-behaviour-test`
+- `/tree <missing>` reports `Session not found in context: <arg>` as text and does not emit rehydration.
+  - `psi.rpc-session-navigation-test/rpc-tree-command-edge-behaviour-test`
+- `/tree name <session-id> <name>` mutates canonical session name state and reports the exact rename text.
+  - `psi.rpc-session-navigation-test/rpc-tree-command-edge-behaviour-test`
+- `/tree <unique-session-id-prefix>` switches to the matched session and emits canonical resume/rehydrate/context events.
+  - `psi.rpc-session-navigation-test/rpc-tree-command-edge-behaviour-test`
+
+Disposition: ambiguous prefix behaviour remains accepted existing behaviour by source inspection of `command-resume/maybe-match-selector-session`: zero or multiple prefix matches produce the same not-found text path as other unmatched selectors; the missing-session characterization locks the externally observable unmatched-selector result.
 
 ### `components/rpc/src/psi/rpc/session/commands.clj`
 
@@ -107,7 +118,12 @@ Covered behaviours:
 - `frontend_action_result` `select-model` and `select-thinking-level` submitted values update canonical session state and emit command/session/footer snapshots.
   - `psi.rpc-test/rpc-model-and-thinking-picker-frontend-actions-test`
 
-Known remaining edge candidates for coverage review: frontend-action cancelled and failed response/event payloads are not newly characterized in this pass.
+Additional characterization added in this pass:
+
+- `frontend_action_result` cancelled emits a text command-result (`Cancelled <action-name>.`), returns `{:accepted true}`, and emits no session/footer snapshots.
+  - `psi.rpc-test/rpc-frontend-action-cancelled-and-failed-result-test`
+- `frontend_action_result` failed emits an error command-result with the frontend error message, returns `{:accepted true}`, and emits no session/footer snapshots.
+  - `psi.rpc-test/rpc-frontend-action-cancelled-and-failed-result-test`
 
 ### `components/rpc/src/psi/rpc/session/navigation.clj`
 
@@ -177,7 +193,7 @@ Covered behaviours:
 ### Command tree/resume/session rehydration/navigation
 
 - `covered-by`: `psi.rpc-session-navigation-test/rpc-session-resume-and-rehydrate-events-test` and `psi.rpc-test/rpc-fork-emits-context-updated-test` cover new, resume, switch, fork, selector order, and journal-derived rehydration.
-- `pending-characterization-review`: `/tree name`, missing-session, already-active, and ambiguous-prefix behaviours remain visible candidates for the next coverage-review pass.
+- `added-test`: `psi.rpc-session-navigation-test/rpc-tree-command-edge-behaviour-test` characterizes `/tree` already-active, missing-session, rename, and unique-prefix switch outputs/state/events. Ambiguous-prefix handling is accepted existing coverage via the same unmatched-selector result path locked by the missing-session case.
 
 ### Prompt/stream behaviours
 
@@ -190,5 +206,5 @@ Covered behaviours:
 ## Gaps and disposition
 
 - `added-test` — Picker/model/thinking/frontend-action RPC gap: before this pass, picker selection semantics were covered mostly outside the pinned RPC suite or only through app-runtime/TUI tests. Added `psi.rpc-test/rpc-model-and-thinking-picker-frontend-actions-test` to assert RPC `/model` and `/thinking` event outputs plus submitted frontend-action results using state/output assertions.
-- `pending-characterization-review` — Command-tree edge cases (`/tree name`, missing-session, already-active, ambiguous prefix) are called out for the next coverage review; no production edits are allowed before review disposition and any required characterization fix.
-- `pending-characterization-review` — Frontend-action cancelled/failed RPC result payloads are called out for the next coverage review; no production edits are allowed before review disposition and any required characterization fix.
+- `added-test` — Command-tree edge cases: added `psi.rpc-session-navigation-test/rpc-tree-command-edge-behaviour-test` for `/tree` already-active, missing-session, rename, and unique-prefix switch behaviours. Ambiguous-prefix handling remains accepted existing source-path coverage because multiple prefix matches intentionally fall through to the same unmatched-selector text path as the characterized missing-session case.
+- `added-test` — Frontend-action cancelled/failed RPC result payloads: added `psi.rpc-test/rpc-frontend-action-cancelled-and-failed-result-test` for accepted responses, command-result payloads, and no session/footer snapshot emission on cancelled/failed outcomes.

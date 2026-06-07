@@ -442,6 +442,54 @@
       (is (= "high" (get-in session-updated [:data :thinking-level])))
       (is (some? footer-updated)))))
 
+(deftest rpc-frontend-action-cancelled-and-failed-result-test
+  ;; Characterizes RPC frontend_action_result cancelled/failed observable payloads.
+  (testing "cancelled frontend action emits text command-result and accepted response"
+    (let [[ctx session-id]    (support/create-session-context)
+          state               (atom {:transport {:ready? true :pending {}}
+                                     :connection {:focus-session-id session-id
+                                                  :subscribed-topics #{"command-result"
+                                                                       "session/updated"
+                                                                       "footer/updated"}}})
+          handler             (support/make-handler ctx state)
+          input               (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                                   "{:id \"a1\" :kind :request :op \"frontend_action_result\" :params {:request-id \"req-cancel\" :action-name \"select-model\" :status \"cancelled\"}}\n")
+          {:keys [out-lines]} (support/run-loop input handler state)
+          frames              (support/parse-frames out-lines)
+          response            (some #(when (and (= :response (:kind %))
+                                                (= "frontend_action_result" (:op %))) %)
+                                    frames)
+          command-result      (some #(when (= "command-result" (:event %)) %) frames)]
+      (is (= {:accepted true} (:data response)))
+      (is (= {:type "text"
+              :message "Cancelled select-model."}
+             (:data command-result)))
+      (is (not-any? #(= "session/updated" (:event %)) frames))
+      (is (not-any? #(= "footer/updated" (:event %)) frames))))
+
+  (testing "failed frontend action emits error command-result and accepted response"
+    (let [[ctx session-id]    (support/create-session-context)
+          state               (atom {:transport {:ready? true :pending {}}
+                                     :connection {:focus-session-id session-id
+                                                  :subscribed-topics #{"command-result"
+                                                                       "session/updated"
+                                                                       "footer/updated"}}})
+          handler             (support/make-handler ctx state)
+          input               (str "{:id \"h1\" :kind :request :op \"handshake\" :params {:client-info {:protocol-version \"1.0\"}}}\n"
+                                   "{:id \"a1\" :kind :request :op \"frontend_action_result\" :params {:request-id \"req-failed\" :action-name \"select-model\" :status \"failed\" :error-message \"Picker exploded\"}}\n")
+          {:keys [out-lines]} (support/run-loop input handler state)
+          frames              (support/parse-frames out-lines)
+          response            (some #(when (and (= :response (:kind %))
+                                                (= "frontend_action_result" (:op %))) %)
+                                    frames)
+          command-result      (some #(when (= "command-result" (:event %)) %) frames)]
+      (is (= {:accepted true} (:data response)))
+      (is (= {:type "error"
+              :message "Picker exploded"}
+             (:data command-result)))
+      (is (not-any? #(= "session/updated" (:event %)) frames))
+      (is (not-any? #(= "footer/updated" (:event %)) frames)))))
+
 (deftest rpc-new-session-emits-context-updated-test
   (testing "new_session emits context/updated event"
     (let [[ctx session-id] (support/create-session-context)
