@@ -65,6 +65,51 @@
                 "review-step.edn"]))
     f))
 
+(def ^:private supported-architecture-candidate-types
+  #{:namespace :family :pair :community})
+
+(defn- non-blank-string?
+  [value]
+  (and (string? value)
+       (not (str/blank? value))))
+
+(defn- architecture-targets-command
+  [sh]
+  (try
+    (let [{:keys [exit out err]} (sh "bb" "gordian" "architecture-targets" "--edn")]
+      (if (zero? exit)
+        {:status :ok
+         :out out}
+        {:status :unavailable
+         :reason (str "exit " exit)
+         :err err}))
+    (catch java.io.IOException e
+      {:status :unavailable
+       :reason (.getMessage e)})))
+
+(defn- interpretable-candidate?
+  [candidate]
+  (let [candidate-type (:candidate/type candidate)
+        candidate-id (:candidate/id candidate)
+        members (:members candidate)]
+    (and (contains? supported-architecture-candidate-types candidate-type)
+         (vector? candidate-id)
+         (= candidate-type (first candidate-id))
+         (case candidate-type
+           :namespace (and (= 2 (count candidate-id))
+                           (non-blank-string? (second candidate-id)))
+           :family (and (= 2 (count candidate-id))
+                        (non-blank-string? (second candidate-id)))
+           :pair (and (= 3 (count candidate-id))
+                      (non-blank-string? (second candidate-id))
+                      (non-blank-string? (nth candidate-id 2)))
+           :community (and (= 2 (count candidate-id))
+                           (integer? (second candidate-id))
+                           (vector? members)
+                           (seq members)
+                           (every? non-blank-string? members))
+           false))))
+
 (deftest reduce-architectural-complexity-loads-and-shapes-test
   (load-edn-only
    "reduce-architectural-complexity.edn"
@@ -294,19 +339,31 @@
                      "review-step"]]
          (is (contains? definitions name)))))))
 
+(deftest architecture-targets-command-unavailable-test
+  ;; Tests absent bb/Gordian command handling without depending on the host
+  ;; environment.
+  (let [result (architecture-targets-command
+                (fn [& _]
+                  (throw (java.io.IOException. "bb missing"))))]
+    (is (= :unavailable (:status result)))
+    (is (= "bb missing" (:reason result)))))
+
 (deftest architecture-targets-live-envelope-shape-test
-  (let [{:keys [exit out err]} (shell/sh "bb" "gordian" "architecture-targets" "--edn")]
-    (if (zero? exit)
+  ;; Tests the live Gordian architecture-targets envelope shape when available,
+  ;; without making bb/Gordian availability or repository-specific rankings a
+  ;; test requirement.
+  (let [{:keys [status out reason err]} (architecture-targets-command shell/sh)]
+    (if (= :ok status)
       (let [payload (edn/read-string out)
             winner (:winner payload)]
         (is (map? payload))
         (is (vector? (:candidates payload)))
         (when (some? winner)
           (is (map? winner))
-          (is (contains? winner :candidate/id))
-          (is (contains? winner :candidate/type))
-          (is (some? (:candidate/id winner)))
-          (is (some? (:candidate/type winner)))))
+          (is (interpretable-candidate? winner)
+              (str "winner must carry selector-interpretable candidate id/type shape, got "
+                   (pr-str (select-keys winner [:candidate/id :candidate/type :members]))))))
       (do
-        (println "Skipping live architecture-targets shape check; command unavailable or non-zero:" err)
+        (println "Skipping live architecture-targets shape check; command unavailable or non-zero:"
+                 (or err reason))
         (is true)))))
