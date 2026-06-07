@@ -17857,20 +17857,6 @@
     :confidence-b 0.4}}
   {:severity :medium,
    :category :hidden-change,
-   :action :investigate-contract,
-   :next-step
-   "gordian explain-pair psi.rpc.session.commands psi.rpc.session.frontend-actions",
-   :subject
-   {:ns-a psi.rpc.session.commands,
-    :ns-b psi.rpc.session.frontend-actions},
-   :reason "hidden change coupling — score=0.33 (7 co-changes)",
-   :evidence
-   {:score 0.3333333333333333,
-    :co-changes 7,
-    :confidence-a 0.5,
-    :confidence-b 0.5}}
-  {:severity :medium,
-   :category :hidden-change,
    :action :narrow-satellite-interface,
    :next-step
    "gordian explain-pair extensions.mcp-tasks-run psi.agent-session.service-protocol",
@@ -17930,6 +17916,20 @@
     :co-changes 15,
     :confidence-a 0.5357142857142857,
     :confidence-b 0.4411764705882353}}
+  {:severity :medium,
+   :category :hidden-change,
+   :action :investigate-contract,
+   :next-step
+   "gordian explain-pair psi.rpc.session.commands psi.rpc.session.frontend-actions",
+   :subject
+   {:ns-a psi.rpc.session.commands,
+    :ns-b psi.rpc.session.frontend-actions},
+   :reason "hidden change coupling — score=0.32 (7 co-changes)",
+   :evidence
+   {:score 0.3181818181818182,
+    :co-changes 7,
+    :confidence-a 0.4666666666666667,
+    :confidence-b 0.5}}
   {:severity :medium,
    :category :hidden-change,
    :action :narrow-satellite-interface,
@@ -21453,14 +21453,6 @@
    :confidence-a 0.6666666666666666,
    :confidence-b 0.4,
    :structural-edge? false}
-  {:ns-a psi.rpc.session.commands,
-   :ns-b psi.rpc.session.frontend-actions,
-   :score 0.3333333333333333,
-   :kind :change,
-   :co-changes 7,
-   :confidence-a 0.5,
-   :confidence-b 0.5,
-   :structural-edge? false}
   {:ns-a psi.agent-session.child-session-state,
    :ns-b psi.session-state.init,
    :score 0.3333333333333333,
@@ -21516,6 +21508,14 @@
    :co-changes 15,
    :confidence-a 0.5357142857142857,
    :confidence-b 0.4411764705882353,
+   :structural-edge? false}
+  {:ns-a psi.rpc.session.commands,
+   :ns-b psi.rpc.session.frontend-actions,
+   :score 0.3181818181818182,
+   :kind :change,
+   :co-changes 7,
+   :confidence-a 0.4666666666666667,
+   :confidence-b 0.5,
    :structural-edge? false}
   {:ns-a psi.agent-session.extension-installs,
    :ns-b psi.launcher.extensions,
@@ -54684,21 +54684,6 @@
      :actionability-score 9.666666666666666}
     {:severity :medium,
      :category :hidden-change,
-     :action :investigate-contract,
-     :next-step
-     "gordian explain-pair psi.rpc.session.commands psi.rpc.session.frontend-actions",
-     :subject
-     {:ns-a psi.rpc.session.commands,
-      :ns-b psi.rpc.session.frontend-actions},
-     :reason "hidden change coupling — score=0.33 (7 co-changes)",
-     :evidence
-     {:score 0.3333333333333333,
-      :co-changes 7,
-      :confidence-a 0.5,
-      :confidence-b 0.5},
-     :actionability-score 9.666666666666666}
-    {:severity :medium,
-     :category :hidden-change,
      :action :narrow-satellite-interface,
      :next-step
      "gordian explain-pair extensions.mcp-tasks-run psi.agent-session.service-protocol",
@@ -54762,6 +54747,21 @@
       :confidence-a 0.5357142857142857,
       :confidence-b 0.4411764705882353},
      :actionability-score 9.638297872340425}
+    {:severity :medium,
+     :category :hidden-change,
+     :action :investigate-contract,
+     :next-step
+     "gordian explain-pair psi.rpc.session.commands psi.rpc.session.frontend-actions",
+     :subject
+     {:ns-a psi.rpc.session.commands,
+      :ns-b psi.rpc.session.frontend-actions},
+     :reason "hidden change coupling — score=0.32 (7 co-changes)",
+     :evidence
+     {:score 0.3181818181818182,
+      :co-changes 7,
+      :confidence-a 0.4666666666666667,
+      :confidence-b 0.5},
+     :actionability-score 9.636363636363637}
     {:severity :medium,
      :category :hidden-change,
      :action :narrow-satellite-interface,

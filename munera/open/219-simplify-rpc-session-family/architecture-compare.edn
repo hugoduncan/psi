@@ -16,7 +16,15 @@
      :independent-terms ["context" "session" "tui"]}}],
   :removed []},
  :cycles {:added [], :removed []},
- :change-pairs {:added [], :removed [], :changed []},
+ :change-pairs
+ {:added [],
+  :removed [],
+  :changed
+  [{:ns-a psi.rpc.session.commands,
+    :ns-b psi.rpc.session.frontend-actions,
+    :before {:score 0.3333333333333333},
+    :after {:score 0.3181818181818182},
+    :delta {:score -0.015151515151515138}}]},
  :gordian/command :compare,
  :after
  {:gordian/version "0.2.0",
