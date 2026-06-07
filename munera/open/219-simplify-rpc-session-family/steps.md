@@ -108,6 +108,10 @@ when done.
 
 - [x] 2026-06-07 gate: verified baseline data and clean baseline target/source status, compared committed changes from baseline HEAD `c513da4bb7e195956689cfa6455262f565e806ee` through current HEAD plus empty uncommitted status/diff, classified all coverage-phase changes as characterization tests, task artifacts, or documentation/working-memory note with no source implementation changes or testability seams, reran the pinned focused RPC suite green (57 tests / 439 assertions), and recorded no revert/split/closure/retry required.
 
+## Task-test-review follow-ups
+
+- [ ] TT1: Add a focused RPC test for the prompt-op slash-command `/new` path after the shared command-helper refactor. The test should drive an actual `prompt` request with message `/new` through the existing RPC/session harness, assert the agent loop is not invoked, and lock the externally observable rehydration/focus/snapshot outputs that changed source now routes through `rpc.commands/emit-new-session-command!` (for example `session/rehydrated`, active/focus/session/footer outputs as applicable), without mocking logic dependencies.
+
 ## Post-implementation validation recapture failures
 
 - [x] REPAIR-VALIDATION-1: Repair the Gordian gate EDN output path so `bb gordian gate --baseline munera/open/219-simplify-rpc-session-family/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0 --edn` emits complete parseable EDN to stdout without truncation, then rerun the full post-implementation validation-capture procedure before any review-step gate accepts the validation artifacts. Done 2026-06-07: fixed local Gordian CLI process-exit flushing (`42f1daa` in `/Users/duncan/projects/hugoduncan/gordian/gordian-master`), reran diagnose/architecture-targets/compare/gate capture from the psi worktree, and verified all four validation artifacts parse; `architecture-gate.edn` is raw complete EDN with `:result :pass`.
