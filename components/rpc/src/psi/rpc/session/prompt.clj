@@ -59,9 +59,7 @@
                                     (if (= :login-start (:type cmd-result))
                                       (login-handle-start-command! {:ctx ctx :state state :session-id session-id :emit-frame! emit-frame! :request-id request-id :cmd-result cmd-result :emit! emit! :start-daemon-thread! start-daemon-thread!})
                                       (do
-                                        (when (= :new-session (:type cmd-result))
-                                          (rpc.commands/focus-new-session-command! state cmd-result)
-                                          (rpc.commands/emit-new-session-command! emit! ctx cmd-result))
+                                        (rpc.commands/handle-new-session-command-result! ctx state emit! cmd-result)
                                         (rpc.commands/handle-prompt-command-result! cmd-result emit!)))
                                     (emit/emit-session-snapshots! emit! ctx state session-id))
 

@@ -21,7 +21,7 @@
 (def handle-command-result!
   command-results/handle-command-result!)
 
-(defn new-session-command-payload
+(defn- new-session-command-payload
   [ctx cmd-result]
   (when-let [source (:rehydrate cmd-result)]
     (let [sid  (:session-id source)
@@ -36,15 +36,22 @@
        :tool-calls    (or (:tool-calls source) {})
        :tool-order    (or (:tool-order source) [])})))
 
-(defn focus-new-session-command!
+(defn- focus-new-session-command!
   [state cmd-result]
   (when-let [sid (get-in cmd-result [:rehydrate :session-id])]
     (events/set-focus-session-id! state sid)))
 
-(defn emit-new-session-command!
+(defn- emit-new-session-command!
   [emit! ctx cmd-result]
   (when-let [rehydration (new-session-command-payload ctx cmd-result)]
     (emit/emit-session-rehydration! emit! rehydration)))
+
+(defn handle-new-session-command-result!
+  "Applies RPC focus and rehydration effects for :new-session command results."
+  [ctx state emit! cmd-result]
+  (when (= :new-session (:type cmd-result))
+    (focus-new-session-command! state cmd-result)
+    (emit-new-session-command! emit! ctx cmd-result)))
 
 (defn- handle-dispatched-command!
   [ctx state emit-frame! request-id start-daemon-thread! login-handler cmd-result emit!]
@@ -57,9 +64,7 @@
                     :emit! emit!
                     :start-daemon-thread! start-daemon-thread!})
     (do
-      (when (= :new-session (:type cmd-result))
-        (focus-new-session-command! state cmd-result)
-        (emit-new-session-command! emit! ctx cmd-result))
+      (handle-new-session-command-result! ctx state emit! cmd-result)
       (command-results/handle-command-result! request-id cmd-result emit!)
       (when (= :extension-cmd (:type cmd-result))
         (Thread/sleep 50)))))
