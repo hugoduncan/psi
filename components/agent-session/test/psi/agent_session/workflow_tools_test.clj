@@ -170,7 +170,8 @@
           cwd (ss/session-worktree-path-in ctx session-id)
           _ (.mkdirs (java.io.File. cwd ".psi"))
           _ (spit (java.io.File. cwd ".psi/project.edn")
-                  (pr-str {:agent-session {:session-profiles {:coding {:speed-mode :fast}}}}))
+                  (pr-str {:agent-session {:session-profiles {:coding {:speed-mode :fast}
+                                                              :fast+coding {:speed-mode :normal}}}}))
           tool (tools/make-psi-tool (fn [_q] {}) {:ctx ctx :session-id session-id})
           result ((:execute tool) {"action" "workflow"
                                    "op" "create-run"
@@ -181,8 +182,11 @@
           snapshot (get-in @(:state* ctx) [:workflows :runs run-id :session-profile-snapshot])]
       (is (false? (:is-error result)))
       (is (= [:coding] (:valid-profile-names snapshot)))
+      (is (= [:fast+coding] (:invalid-profile-names snapshot)))
       (is (= {:speed-mode :fast}
-             (get-in snapshot [:profiles :coding :settings])))))
+             (get-in snapshot [:profiles :coding :settings])))
+      (is (= [:invalid-profile-name]
+             (mapv :reason (get-in snapshot [:profiles :fast+coding :diagnostics]))))))
 
   (testing "workflow create-run plus execute-run completes an ad-hoc inline workflow"
     (let [[ctx session-id] (create-session-context {:persist? false})

@@ -18,6 +18,23 @@
   "Profile names that cannot be selected because they are command actions."
   #{:clear})
 
+(def profile-name-token-pattern
+  "The selectable `/session-profile <name>` token grammar, excluding any leading `:`."
+  #"[A-Za-z0-9][A-Za-z0-9._-]*")
+
+(defn valid-profile-name-token?
+  "Return true when `token` can be typed as a profile name in `/session-profile`."
+  [token]
+  (boolean (and (string? token)
+                (re-matches profile-name-token-pattern token))))
+
+(defn valid-profile-name?
+  "Return true when `profile-name` is a keyword addressable by `/session-profile`."
+  [profile-name]
+  (and (keyword? profile-name)
+       (nil? (namespace profile-name))
+       (valid-profile-name-token? (name profile-name))))
+
 (def canonical-thinking-levels
   #{:off :minimal :low :medium :high :xhigh})
 
@@ -182,11 +199,15 @@
         name-diagnostics (cond
                            (not (keyword? profile-name))
                            [(diagnostic :name :invalid-profile-name
-                                        "profile name must be an unqualified keyword")]
+                                        "profile name must be a selectable unqualified keyword")]
 
                            (some? (namespace profile-name))
                            [(diagnostic :name :invalid-profile-name
-                                        "profile name must be an unqualified keyword")]
+                                        "profile name must be a selectable unqualified keyword")]
+
+                           (not (valid-profile-name-token? (name profile-name)))
+                           [(diagnostic :name :invalid-profile-name
+                                        "profile name must match /session-profile token characters: letters, digits, dot, underscore, or hyphen")]
 
                            (contains? reserved-profile-names profile-name)
                            [(diagnostic :name :reserved-profile-name

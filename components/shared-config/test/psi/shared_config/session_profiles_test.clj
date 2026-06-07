@@ -134,15 +134,19 @@
       (is (false? (:valid? resolved)))
       (is (= [:unknown-model] (mapv :reason (:diagnostics resolved))))))
 
-  (testing "non-keyword and namespaced keyword profile names resolve to invalid-profile-name diagnostics"
-    (let [string-name (session-profiles/resolve-profile "oops" {:speed-mode :fast})
-          namespaced  (session-profiles/resolve-profile :team/coding {:speed-mode :fast})]
+  (testing "unselectable profile names resolve to invalid-profile-name diagnostics"
+    (let [string-name   (session-profiles/resolve-profile "oops" {:speed-mode :fast})
+          namespaced    (session-profiles/resolve-profile :team/coding {:speed-mode :fast})
+          unparseable   (session-profiles/resolve-profile :fast+coding {:speed-mode :fast})]
       (is (false? (:valid? string-name)))
       (is (= [:invalid-profile-name]
              (mapv :reason (:diagnostics string-name))))
       (is (false? (:valid? namespaced)))
       (is (= [:invalid-profile-name]
-             (mapv :reason (:diagnostics namespaced)))))))
+             (mapv :reason (:diagnostics namespaced))))
+      (is (false? (:valid? unparseable)))
+      (is (= [:invalid-profile-name]
+             (mapv :reason (:diagnostics unparseable)))))))
 
 (deftest effective-profiles-test
   ;; Tests the public read+resolve entry point with real file IO and registry.
@@ -164,15 +168,19 @@
             (is (:valid? (profile profiles :coding)))
             (is (:valid? (profile profiles :review))))))))
 
-  (testing "mixed keyword, namespaced keyword, and string profile names are reported without throwing"
+  (testing "mixed keyword, unselectable keyword, and string profile names are reported without throwing"
     (let [profiles (session-profiles/resolve-profiles
                     {:coding {:speed-mode :fast}
+                     :fast+coding {:speed-mode :fast}
                      :team/coding {:speed-mode :normal}
                      "oops" {:speed-mode :normal}})]
-      (is (= [:coding :team/coding "oops"] (keys profiles)))
+      (is (= [:coding :fast+coding :team/coding "oops"] (keys profiles)))
       (is (:valid? (profile profiles :coding)))
+      (is (false? (:valid? (profile profiles :fast+coding))))
       (is (false? (:valid? (profile profiles :team/coding))))
       (is (false? (:valid? (profile profiles "oops"))))
+      (is (= [:invalid-profile-name]
+             (mapv :reason (get-in profiles [:fast+coding :diagnostics]))))
       (is (= [:invalid-profile-name]
              (mapv :reason (get-in profiles [:team/coding :diagnostics]))))
       (is (= [:invalid-profile-name]

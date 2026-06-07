@@ -145,9 +145,11 @@ whole profile. This profile-specific merge does not change ordinary top-level
 
 A profile is valid when it has at least one supported concrete setting, its
 model provider/id pair is complete and known, enum values are valid, and its
-name is an unqualified keyword that is not reserved. Namespaced keywords such
-as `:team/coding` are invalid because the `/session-profile` command accepts
-only unqualified selectable names. `:clear` is reserved for `/session-profile
+name is a selectable unqualified keyword that is not reserved. Selectable names
+match the `/session-profile` command token grammar: the first character must be
+a letter or digit, and later characters may be letters, digits, `.`, `_`, or
+`-`. Namespaced keywords such as `:team/coding` and command-unparseable names
+such as `:fast+coding` are invalid. `:clear` is reserved for `/session-profile
 clear` and is not selectable. `/session-profiles` lists valid profiles with
 readable settings and invalid profiles with terse reasons.
 

@@ -27,9 +27,8 @@
 
       :else
       (let [keyword-token? (str/starts-with? trimmed ":")
-            valid-token?   (if keyword-token?
-                             (boolean (re-matches #":[A-Za-z0-9][A-Za-z0-9._-]*" trimmed))
-                             (boolean (re-matches #"[A-Za-z0-9][A-Za-z0-9._-]*" trimmed)))
+            token-text     (if keyword-token? (subs trimmed 1) trimmed)
+            valid-token?   (session-profiles/valid-profile-name-token? token-text)
             parsed         (when valid-token?
                              (try
                                (if keyword-token?
