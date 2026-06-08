@@ -47,12 +47,16 @@
    :operation "workflow/constant-routing"
    :args {:route route}})
 
-(defn- constant-routing-step
-  [step-name route]
+(defn- pass-feedback-routing-step
+  [step-name args on]
   {:name step-name
    :type :invoke
    :operation "workflow/constant-routing"
-   :args {:route route}})
+   :args {:route "DONE"}
+   :judge {:type :invoke
+           :operation "workflow/pass-feedback-routing"
+           :args args}
+   :on on})
 
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-design
@@ -158,11 +162,15 @@
              (is (.contains (step-template-text follow-up)
                             "predate the preceding review pass")
                  (str (:name follow-up) " carries the predate-exclusion guard"))))
-         (testing "clarity-status is deterministic invoke routing, not an LLM judge"
-           (is (= (constant-routing-step "clarity-status" "DONE")
-                  (select-keys clarity-step [:name :type :operation :args])))
-           (is (nil? (:on clarity-step)))
-           (is (nil? (:judge clarity-step)))))))))
+         (testing "clarity-status deterministically routes on pass-level feedback memory"
+           (is (= (pass-feedback-routing-step
+                   "clarity-status"
+                   {:architecture-text {:from {:step "architecture-review" :output :final-llm-reply}}
+                    :ambiguity-text {:from {:step "ambiguity-review" :output :final-llm-reply}}
+                    :inconsistency-text {:from {:step "inconsistency-review" :output :final-llm-reply}}}
+                   {"REPEAT" {:goto "architecture-review" :max-iterations 6}
+                    "DONE" {:goto "final-summary"}})
+                  (select-keys clarity-step [:name :type :operation :args :judge :on])))))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-plan
@@ -246,11 +254,14 @@
            (doseq [follow-up [ambiguity-follow-up inconsistency-follow-up]]
              (is (.contains (step-template-text follow-up) "code, tests, and docs")
                  (str (:name follow-up) " permits editing referenced code/tests/docs"))))
-         (testing "clarity-status is deterministic invoke routing, not an LLM judge"
-           (is (= (constant-routing-step "clarity-status" "DONE")
-                  (select-keys clarity-step [:name :type :operation :args])))
-           (is (nil? (:on clarity-step)))
-           (is (nil? (:judge clarity-step)))))))))
+         (testing "clarity-status deterministically routes on pass-level feedback memory"
+           (is (= (pass-feedback-routing-step
+                   "clarity-status"
+                   {:ambiguity-text {:from {:step "ambiguity-review" :output :final-llm-reply}}
+                    :inconsistency-text {:from {:step "inconsistency-review" :output :final-llm-reply}}}
+                   {"REPEAT" {:goto "ambiguity-review" :max-iterations 5}
+                    "DONE" {:goto "final-summary"}})
+                  (select-keys clarity-step [:name :type :operation :args :judge :on])))))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; review task prompt artifact targets
@@ -286,7 +297,22 @@
                               "review-task-plan-ambiguity-follow-up.md"
                               "review-task-plan-inconsistency-follow-up.md"]]
       (is (not (.contains (slurp-workflow-file edn-filename) removed-filename))
-          (str edn-filename " must not reference removed " removed-filename)))))
+          (str edn-filename " must not reference removed " removed-filename))))
+  (testing "deterministic clarity-status leaves no stale prompt workflows"
+    ;; The design/plan host workflows now encode clarity-status as deterministic
+    ;; invoke routing. Stale prompt workflows would still be delegate-visible and
+    ;; could instruct the old artifact re-read control behaviour.
+    (doseq [removed-filename ["review-task-design-clarity-status.md"
+                              "review-task-plan-clarity-status.md"]]
+      (is (not (.exists (io/file (System/getProperty "user.dir")
+                                 ".psi/workflows"
+                                 removed-filename)))
+          (str removed-filename " must not exist as a standalone prompt workflow")))
+    (doseq [edn-filename ["review-task-design.edn" "review-task-plan.edn"]
+            removed-filename ["review-task-design-clarity-status.md"
+                              "review-task-plan-clarity-status.md"]]
+      (is (not (.contains (slurp-workflow-file edn-filename) removed-filename))
+          (str edn-filename " must not reference stale " removed-filename)))))
 
 (deftest architecture-review-prompt-contract-test
   ;; AC2a contract guard for review-task-design-architecture-review.md.
@@ -397,7 +423,7 @@
                  :operation "workflow/constant-routing"
                  :args {:route "REPEAT"}}
                 (:judge follow-up-step)))
-         (is (= {"REPEAT" {:goto "review" :max-iterations 6}}
+         (is (= {"REPEAT" {:goto "review" :max-iterations 10}}
                 (:on follow-up-step))))
        (testing "follow-up step uses the shared steps-profile follow-up body"
          (let [text (step-template-text follow-up-step)]

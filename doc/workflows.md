@@ -625,9 +625,16 @@ Like the ambiguity and inconsistency aspects, architectural fit is a review
 step + follow-up step pair gated by `pass-status-routing`: actionable misfits
 are recorded as unchecked `design-steps.md` items, the `architecture-follow-up`
 step reuses the shared `design`-profile follow-up (see below) to execute them,
-and the loop advances `architecture → ambiguity → inconsistency → clarity-status
-→ final-summary`. The `final-summary` pass reports the architectural-fit pass
-alongside ambiguity and inconsistency.
+and each pass advances deterministically through `architecture → ambiguity →
+inconsistency → clarity-status`. `review-task-design` completes the remaining
+phases in the current pass even when an earlier phase produced actionable
+feedback. The `clarity-status` step is EDN invoke routing, not a standalone
+prompt workflow; it remembers whether any phase in the completed pass returned
+`ACTIONABLE_FEEDBACK` from the phase outputs rather than re-reading task
+artifacts after follow-up execution. A clean pass goes to `final-summary`; a
+feedback pass restarts at `architecture-review` with `:max-iterations 6`, so the
+workflow can enter the first phase at most six total times including the initial
+pass.
 
 ## Shared review follow-up steps
 
@@ -666,11 +673,17 @@ review step, so "the preceding review pass" is unambiguous at runtime. Both
 profiles execute only the items the immediately preceding review pass added,
 leaving any pre-existing unchecked items untouched.
 
-Host routing and looping are unchanged by this sharing: `review-task-design` and
-`review-task-plan` advance forward one aspect at a time, while `review-step`
-loops back to its review step (`REPEAT → review`, bounded by
-`:max-iterations`). Only the follow-up step *body* is shared; the
-judge/`:on` wiring around each follow-up stays with its host.
+Host routing owns repetition; only the follow-up step *body* is shared.
+`review-task-design` and `review-task-plan` both finish every phase in the
+current pass before the deterministic `clarity-status` invoke step decides
+whether to restart another full pass from the first phase. `review-task-design`
+can enter `architecture-review` at most six total times, and `review-task-plan`
+can enter `ambiguity-review` at most five total times. `review-step` loops back
+to its `review` step (`REPEAT → review`) with `:max-iterations 10`, so
+implementation-review profiles delegated through `review-task-implementation`
+can enter the review step at most ten total times (the initial review plus up to
+nine follow-up-driven re-reviews). The workflow runtime counts
+`:max-iterations` as total target-step entries, including the initial entry.
 
 ## Task knowledge extraction
 

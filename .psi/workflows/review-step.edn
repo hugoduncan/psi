@@ -22,7 +22,7 @@
    :judge {:type :invoke
            :operation "workflow/constant-routing"
            :args {:route "REPEAT"}},
-   :on {"REPEAT" {:goto "review", :max-iterations 6}}}],
+   :on {"REPEAT" {:goto "review", :max-iterations 10}}}],
  :name "review-step",
  :description
  "Run a single named review skill against a Munera task, record terse notes, execute follow-up steps, and repeat until the review returns no actionable feedback"}
