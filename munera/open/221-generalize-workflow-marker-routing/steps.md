@@ -2,11 +2,11 @@
 
 ## Slice 1 — Preflight and source mapping
 
-- [ ] Read `components/agent-session/src/psi/agent_session/workflow/routing.clj` and confirm all proof-sync / validation-capture hard-coded route vocabularies and wrappers to remove.
-- [ ] Read `components/agent-session/src/psi/agent_session/workflow/core.clj` and identify the built-in deterministic operation registration block to change.
-- [ ] Read `.psi/workflows/reduce-architectural-complexity.edn` and record the validation/proof disposition steps, current operation ids, text arg sources, route labels, and `:on` maps.
-- [ ] Read `.psi/workflows/reduce-incidental-complexity.edn` and record the validation/proof disposition steps, current operation ids, text arg sources, route labels, and `:on` maps.
-- [ ] Search `README.md`, `doc/`, and `CHANGELOG.md` for old/new workflow operation ids and note which user-facing docs, if any, require updates.
+- [x] Read `components/agent-session/src/psi/agent_session/workflow/routing.clj` and confirm all proof-sync / validation-capture hard-coded route vocabularies and wrappers to remove.
+- [x] Read `components/agent-session/src/psi/agent_session/workflow/core.clj` and identify the built-in deterministic operation registration block to change.
+- [x] Read `.psi/workflows/reduce-architectural-complexity.edn` and record the validation/proof disposition steps, current operation ids, text arg sources, route labels, and `:on` maps.
+- [x] Read `.psi/workflows/reduce-incidental-complexity.edn` and record the validation/proof disposition steps, current operation ids, text arg sources, route labels, and `:on` maps.
+- [x] Search `README.md`, `doc/`, and `CHANGELOG.md` for old/new workflow operation ids and note which user-facing docs, if any, require updates.
 
 ## Slice 2 — Generic exact-marker parser
 
