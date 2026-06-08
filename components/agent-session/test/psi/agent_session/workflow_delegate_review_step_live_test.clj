@@ -45,13 +45,6 @@
                 "workflow/munera-open-task-path-routing"
                 {:args {:text "munera/open/219-simplify-rpc-session-family"}}
                 deterministic-op-runtime/invoke-operation)))
-        (is (= "REPEAT"
-               (:data
-                (op-reg/invoke-operation-in
-                 (:deterministic-operation-registry ctx)
-                 "workflow/munera-open-task-path-routing"
-                 {:args {:text "munera/open/219-simplify-rpc-session-family\nextra"}}
-                 deterministic-op-runtime/invoke-operation))))
         (finally
           (context/shutdown-context! ctx))))))
 
@@ -62,6 +55,22 @@
    operation-id
    {:args {:text text}}
    deterministic-op-runtime/invoke-operation))
+
+(defn- assert-munera-task-path-route
+  [ctx text expected-route]
+  (let [result (invoke-operation ctx "workflow/munera-open-task-path-routing" text)]
+    (is (= :ok (:status result)) (pr-str result))
+    (is (= expected-route (:data result)) (pr-str result))
+    (is (= expected-route (:summary result)) (pr-str result))
+    result))
+
+(defn- assert-invalid-munera-task-path
+  [ctx text]
+  (let [result (assert-munera-task-path-route ctx text "REPEAT")]
+    (is (= {:reason :invalid-munera-open-task-path
+            :text text}
+           (:details result))
+        (pr-str result))))
 
 (defn- assert-marker-route
   [ctx operation-id marker route]
@@ -81,6 +90,29 @@
     (is (= expected-lines
            (get-in result [:details :route-marker-lines]))
         (pr-str result))))
+
+(deftest munera-open-task-path-routing-operation-test
+  ;; Tests deterministic Munera task identity routing rejects anything except
+  ;; one root-relative munera/open task path with no surrounding handoff prose.
+  (testing "munera open task path routing"
+    (let [[ctx session-id] (workflow-test-support/create-tui-context+session mutations/all-mutations)]
+      (try
+        (workflow-test-support/init-built-in-workflow! ctx session-id)
+        (assert-munera-task-path-route ctx "munera/open/220-harden-simplification-workflow-proof-gates" "DONE")
+        (doseq [invalid ["Here is the generated task.\nmunera/open/220-harden-simplification-workflow-proof-gates"
+                         "munera/open/220-harden-simplification-workflow-proof-gates\nPASS_STATUS: REVIEW_COMPLETE"
+                         "munera/open/220-harden-simplification-workflow-proof-gates\nmunera/open/221-other-task"
+                         "munera/closed/220-harden-simplification-workflow-proof-gates"
+                         "/Users/duncan/projects/hugoduncan/psi/reduce-architectural-complexity/munera/open/220-harden-simplification-workflow-proof-gates"
+                         "munera_task_path: munera/open/220-harden-simplification-workflow-proof-gates"
+                         "## Munera Task\n\nmunera_task_path: munera/open/220-harden-simplification-workflow-proof-gates\nPASS_STATUS: REVIEW_COMPLETE"
+                         "munera/open/not-a-number-task"
+                         "munera/open/220-Harden-Simplification-Workflow-Proof-Gates"
+                         "munera/open/220_harden_simplification_workflow_proof_gates"
+                         "munera/open/220-harden-simplification-workflow-proof-gates/"]]
+          (assert-invalid-munera-task-path ctx invalid))
+        (finally
+          (context/shutdown-context! ctx))))))
 
 (deftest proof-sync-disposition-routing-operation-test
   ;; Tests exact proof-sync route marker parsing through the registered
