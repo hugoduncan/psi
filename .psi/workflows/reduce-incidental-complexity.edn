@@ -40,14 +40,14 @@
    :type :session,
    :tools ["read" "bash"],
    :contributions
-   [{:type :source, :from :workflow-original}
-    {:type :source, :from {:step "select-and-create", :yield :text}}
+   [{:type :source, :from {:step "select-and-create", :yield :text}}
     {:type :source, :from {:step "extract-task-path", :yield :text}}
     {:type :template,
      :text
-     "Produce the terminal stop summary for `reduce-incidental-complexity` when the generated task path handoff is malformed.\n\nStop source: malformed/missing task path from `extract-task-path`.\nUse only the `select-and-create` handoff and the `extract-task-path` output supplied as context.\nDo not consume a validated task path. Do not require, invent, or read a task path. Do not read task-local artifacts.\nReport that design/plan/test/implementation did not run because task identity could not be validated.\n\nSelection handoff / extraction context:\n{{handoff}}",
+     "Produce the terminal stop summary for `reduce-incidental-complexity` when the generated task path handoff is malformed.\n\nStop source: malformed/missing task path from `extract-task-path`.\nUse only the `select-and-create` handoff and the `extract-task-path` output supplied as context.\nDo not consume a validated task path. Do not require, invent, or read a task path. Do not read task-local artifacts.\nReport that design/plan/test/implementation did not run because task identity could not be validated.\n\nSelection handoff:\n{{handoff}}\n\nExtraction output:\n{{extraction}}",
      :vars
-     {"handoff" {:from {:step "select-and-create", :yield :text}}}}],
+     {"handoff" {:from {:step "select-and-create", :yield :text}}
+      "extraction" {:from {:step "extract-task-path", :yield :text}}}}],
    :judge
    {:type :invoke,
     :operation "workflow/constant-routing",
@@ -117,7 +117,6 @@
     {:type :source, :from {:step "extract-task-path", :yield :text}}
     {:type :source,
      :from {:step "incidental-validation-capture", :yield :text}}
-    {:type :source, :from {:step "proof-sync", :yield :text}}
     {:type :template,
      :text
      "Produce the terminal stop summary for `reduce-incidental-complexity` after an unrecoverable validation-capture failure for {{input}}.\n\nStop source: validation-capture. Later validation routes must pass the failing validation yield as explicit context.\nRead committed task artifacts and name the parse-checked failure-map artifact path (for example `architecture-gate.edn` or `incidental-gate.edn`) when available.\nDo not infer the failed gate from missing artifacts alone.\n\nInput task path:\n{{input}}",
@@ -478,7 +477,7 @@ Input task path:
     {:type :source, :from {:step "proof-sync", :yield :text}}
     {:type :template,
      :text
-     "Produce the user-facing final result for the completed target-present reduce-incidental-complexity run described by {{input}}. Independently inspect the Munera task artifacts. Summarize the design → plan → characterization-test-net gate → baseline/diff gate → simplification implementation → implementation review → incidental validation-capture outcome. Include verification performed, task artifact files updated, commit ids evident from step outputs, and whether the task remains open or was closed. Do not claim a PR was opened or pushed.\n\nInput:\n{{input}}\n\nProof authority: read committed task-local `coverage-map.md`, `characterization-baseline.edn`, `before-local.json`, `before-diagnose.edn`, and validation artifacts (`after-local.json`, `incidental-burden-check.edn`, `incidental-gate.edn`). Treat `coverage-map.md` as the canonical coverage/proof map rather than relying on review prose alone.",
+     "Produce the user-facing final result for the completed target-present reduce-incidental-complexity run described by {{input}}. Independently inspect the Munera task artifacts. Summarize the design → plan → characterization-test-net gate → baseline/diff gate → simplification implementation → implementation review → incidental validation-capture outcome. Include verification performed, task artifact files updated, commit ids evident from step outputs, and whether the task remains open or was closed. Do not claim a PR was opened or pushed.\n\nInput:\n{{input}}\n\nProof authority: independently read committed task-local `coverage-map.md`, `characterization-baseline.edn`, `before-local.json`, `before-diagnose.edn`, and validation artifacts (`after-local.json`, `incidental-burden-check.edn`, `incidental-gate.edn`). Treat `coverage-map.md` and parse-checked task-local proof artifacts as the canonical coverage/proof authority. Do not claim proof coherence from workflow/review prose, prior yields, or artifact existence alone; cite the clean proof-sync or fixed-point route plus the committed proof artifacts that support the claim.",
      :vars
      {"input" {:from {:step "extract-task-path", :yield :text}}}}],
    :judge

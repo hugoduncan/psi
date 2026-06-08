@@ -117,22 +117,22 @@ when done.
 
 ## Slice 5 — Split terminal stops and final summaries
 
-- [ ] Complete architecture split terminal-stop prompt content and remove any remaining generic `terminal-stop-summary` route targets now that split terminal steps were defined before first use.
-- [ ] Complete incidental split terminal-stop prompt content and remove any remaining generic `terminal-stop-summary` route targets now that split terminal steps were defined before first use.
-- [ ] Route malformed `extract-task-path` failures to `terminal-stop-malformed-task-path` with `select-and-create` handoff and extraction output only.
-- [ ] Route `clean-baseline` failures to `terminal-stop-clean-baseline` with validated task path and failing `clean-baseline` yield.
-- [ ] Route `coverage-disposition` failures or infeasible coverage to `terminal-stop-coverage-disposition` with validated task path and failing coverage/disposition yield.
-- [ ] Route `diff-gate` failures to `terminal-stop-diff-gate` with validated task path and failing diff-gate yield.
-- [ ] Route architecture `validation-capture` unrecoverable failures to `terminal-stop-validation-capture` when they cannot route back to implementation repair.
-- [ ] Route incidental `incidental-validation-capture` unrecoverable failures to `terminal-stop-validation-capture`.
-- [ ] Route only `proof-sync-fixed-point` failures to `terminal-stop-proof-sync` with validated task path, mutating proof-sync yield, and read-only fixed-point yield.
-- [ ] In malformed-task-path terminal prompt, forbid reading task-local artifacts or inventing a task path.
-- [ ] In post-task terminal prompts, require reading committed task artifacts and naming the durable failing artifact path where available.
-- [ ] In proof-sync terminal prompt, require naming the committed proof-sync blocking note and affected proof artifact paths.
-- [ ] Update final summaries in both workflows to independently read committed proof artifacts and not claim proof coherence from workflow/review prose alone.
-- [ ] Verify both workflow EDNs load/compile through the workflow-loader/registry path after Slice 5 topology edits, not only parse as EDN.
-- [ ] Record Slice 5 implementation and verification notes in `implementation.md`.
-- [ ] Commit Slice 5 (`⚒ workflow: split simplification terminal stops`).
+- [x] Complete architecture split terminal-stop prompt content and remove any remaining generic `terminal-stop-summary` route targets now that split terminal steps were defined before first use.
+- [x] Complete incidental split terminal-stop prompt content and remove any remaining generic `terminal-stop-summary` route targets now that split terminal steps were defined before first use.
+- [x] Route malformed `extract-task-path` failures to `terminal-stop-malformed-task-path` with `select-and-create` handoff and extraction output only.
+- [x] Route `clean-baseline` failures to `terminal-stop-clean-baseline` with validated task path and failing `clean-baseline` yield.
+- [x] Route `coverage-disposition` failures or infeasible coverage to `terminal-stop-coverage-disposition` with validated task path and failing coverage/disposition yield.
+- [x] Route `diff-gate` failures to `terminal-stop-diff-gate` with validated task path and failing diff-gate yield.
+- [x] Route architecture `validation-capture` unrecoverable failures to `terminal-stop-validation-capture` when they cannot route back to implementation repair.
+- [x] Route incidental `incidental-validation-capture` unrecoverable failures to `terminal-stop-validation-capture`.
+- [x] Route only `proof-sync-fixed-point` failures to `terminal-stop-proof-sync` with validated task path, mutating proof-sync yield, and read-only fixed-point yield.
+- [x] In malformed-task-path terminal prompt, forbid reading task-local artifacts or inventing a task path.
+- [x] In post-task terminal prompts, require reading committed task artifacts and naming the durable failing artifact path where available.
+- [x] In proof-sync terminal prompt, require naming the committed proof-sync blocking note and affected proof artifact paths.
+- [x] Update final summaries in both workflows to independently read committed proof artifacts and not claim proof coherence from workflow/review prose alone.
+- [x] Verify both workflow EDNs load/compile through the workflow-loader/registry path after Slice 5 topology edits, not only parse as EDN.
+- [x] Record Slice 5 implementation and verification notes in `implementation.md`.
+- [x] Commit Slice 5 (`⚒ workflow: split simplification terminal stops`).
 
 ## Slice 6 — Workflow-loader/content-lock tests
 
