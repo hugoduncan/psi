@@ -92,28 +92,28 @@ when done.
 
 ## Slice 4 — Proof-sync fixed-point topology
 
-- [ ] Add architecture `proof-sync` after `review-code-shape` and before `final-summary`.
-- [ ] Add incidental `proof-sync` after `incidental-validation-capture` and before `final-summary`.
-- [ ] In each `proof-sync` prompt, require rereading committed task-local artifacts as proof authority: `design.md`, `plan.md`, `steps.md`, `implementation.md`, `characterization-baseline.edn`, coverage artifact, and named Gordian validation artifacts.
-- [ ] In architecture `proof-sync`, require reading/synchronizing `coverage-map.md`, `after-diagnose.edn`, `after-architecture-targets.edn`, `architecture-compare.edn`, and `architecture-gate.edn`.
-- [ ] In incidental `proof-sync`, require reading/synchronizing `coverage-map.md`, `before-local.json`, `before-diagnose.edn`, `after-local.json`, `incidental-burden-check.edn`, `incidental-gate.edn`, and `characterization-baseline.edn`.
-- [ ] In each `proof-sync`, return `PASS_STATUS: REVIEW_COMPLETE` only when proof artifacts are already coherent and no artifact was mutated.
-- [ ] In each `proof-sync`, when stale/incomplete proof artifacts are fixed, update and commit task artifacts, return `PASS_STATUS: ACTIONABLE_FEEDBACK`, and emit exactly one `PROOF_SYNC_ROUTE: ...` marker.
-- [ ] Add `proof-sync-disposition` invoke step in both workflows using operation `workflow/proof-sync-disposition-routing`.
-- [ ] Route `PROOF_SYNC_ROUTE: COVERAGE_REVIEW` in architecture to `review-implementation-tests`, then continue normal architecture/test/docs/code-shape review chain before returning to proof-sync.
-- [ ] Route `PROOF_SYNC_ROUTE: VALIDATION_RECAPTURE` in architecture to `validation-capture`, then rerun validation and all post-implementation review gates before returning to proof-sync.
-- [ ] Route `PROOF_SYNC_ROUTE: BOOKKEEPING_FIXED_POINT` in architecture to `proof-sync-fixed-point`.
-- [ ] Route `PROOF_SYNC_ROUTE: COVERAGE_REVIEW` in incidental to `review-task-implementation`, then `incidental-validation-capture`, then proof-sync.
-- [ ] Route `PROOF_SYNC_ROUTE: VALIDATION_RECAPTURE` in incidental to `incidental-validation-capture`, then proof-sync.
-- [ ] Route `PROOF_SYNC_ROUTE: BOOKKEEPING_FIXED_POINT` in incidental to `proof-sync-fixed-point`.
-- [ ] Add read-only `proof-sync-fixed-point` in both workflows.
-- [ ] In `proof-sync-fixed-point`, route `PASS_STATUS: REVIEW_COMPLETE` to `final-summary` only when the second pass is clean/no-op.
-- [ ] In `proof-sync-fixed-point`, route `PASS_STATUS: ACTIONABLE_FEEDBACK` to `terminal-stop-proof-sync` when committed proof artifacts are still stale, missing, contradictory, unparseable, or contain an unresolved blocking note.
-- [ ] Ensure `terminal-stop-proof-sync` is not reachable directly from `proof-sync` or `proof-sync-disposition`.
-- [ ] Verify final summaries are reachable only after clean/no-op proof-sync or clean fixed-point verification.
-- [ ] Verify both workflow EDNs load/compile through the workflow-loader/registry path after Slice 4 topology edits, not only parse as EDN.
-- [ ] Record Slice 4 implementation and verification notes in `implementation.md`.
-- [ ] Commit Slice 4 (`⚒ workflow: add proof sync fixed point`).
+- [x] Add architecture `proof-sync` after `review-code-shape` and before `final-summary`.
+- [x] Add incidental `proof-sync` after `incidental-validation-capture` and before `final-summary`.
+- [x] In each `proof-sync` prompt, require rereading committed task-local artifacts as proof authority: `design.md`, `plan.md`, `steps.md`, `implementation.md`, `characterization-baseline.edn`, coverage artifact, and named Gordian validation artifacts.
+- [x] In architecture `proof-sync`, require reading/synchronizing `coverage-map.md`, `after-diagnose.edn`, `after-architecture-targets.edn`, `architecture-compare.edn`, and `architecture-gate.edn`.
+- [x] In incidental `proof-sync`, require reading/synchronizing `coverage-map.md`, `before-local.json`, `before-diagnose.edn`, `after-local.json`, `incidental-burden-check.edn`, `incidental-gate.edn`, and `characterization-baseline.edn`.
+- [x] In each `proof-sync`, return `PASS_STATUS: REVIEW_COMPLETE` only when proof artifacts are already coherent and no artifact was mutated.
+- [x] In each `proof-sync`, when stale/incomplete proof artifacts are fixed, update and commit task artifacts, return `PASS_STATUS: ACTIONABLE_FEEDBACK`, and emit exactly one `PROOF_SYNC_ROUTE: ...` marker.
+- [x] Add `proof-sync-disposition` invoke step in both workflows using operation `workflow/proof-sync-disposition-routing`.
+- [x] Route `PROOF_SYNC_ROUTE: COVERAGE_REVIEW` in architecture to `review-implementation-tests`, then continue normal architecture/test/docs/code-shape review chain before returning to proof-sync.
+- [x] Route `PROOF_SYNC_ROUTE: VALIDATION_RECAPTURE` in architecture to `validation-capture`, then rerun validation and all post-implementation review gates before returning to proof-sync.
+- [x] Route `PROOF_SYNC_ROUTE: BOOKKEEPING_FIXED_POINT` in architecture to `proof-sync-fixed-point`.
+- [x] Route `PROOF_SYNC_ROUTE: COVERAGE_REVIEW` in incidental to `review-task-implementation`, then `incidental-validation-capture`, then proof-sync.
+- [x] Route `PROOF_SYNC_ROUTE: VALIDATION_RECAPTURE` in incidental to `incidental-validation-capture`, then proof-sync.
+- [x] Route `PROOF_SYNC_ROUTE: BOOKKEEPING_FIXED_POINT` in incidental to `proof-sync-fixed-point`.
+- [x] Add read-only `proof-sync-fixed-point` in both workflows.
+- [x] In `proof-sync-fixed-point`, route `PASS_STATUS: REVIEW_COMPLETE` to `final-summary` only when the second pass is clean/no-op.
+- [x] In `proof-sync-fixed-point`, route `PASS_STATUS: ACTIONABLE_FEEDBACK` to `terminal-stop-proof-sync` when committed proof artifacts are still stale, missing, contradictory, unparseable, or contain an unresolved blocking note.
+- [x] Ensure `terminal-stop-proof-sync` is not reachable directly from `proof-sync` or `proof-sync-disposition`.
+- [x] Verify final summaries are reachable only after clean/no-op proof-sync or clean fixed-point verification.
+- [x] Verify both workflow EDNs load/compile through the workflow-loader/registry path after Slice 4 topology edits, not only parse as EDN.
+- [x] Record Slice 4 implementation and verification notes in `implementation.md`.
+- [x] Commit Slice 4 (`⚒ workflow: add proof sync fixed point`).
 
 ## Slice 5 — Split terminal stops and final summaries
 

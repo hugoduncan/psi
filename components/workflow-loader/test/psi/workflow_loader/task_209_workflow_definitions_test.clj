@@ -185,6 +185,9 @@
            implementation-review-step (get step-by-name "review-task-implementation")
            validation-capture-step (get step-by-name "incidental-validation-capture")
            validation-disposition-step (get step-by-name "validation-capture-disposition")
+           proof-sync-step (get step-by-name "proof-sync")
+           proof-disposition-step (get step-by-name "proof-sync-disposition")
+           proof-fixed-point-step (get step-by-name "proof-sync-fixed-point")
            final-summary-step (get step-by-name "final-summary")
            select-text (step-template-text select-step)
            clean-text (step-template-text clean-baseline-step)
@@ -193,6 +196,8 @@
            coverage-fix-text (step-template-text coverage-fix-step)
            diff-gate-text (step-template-text diff-gate-step)
            validation-capture-text (step-template-text validation-capture-step)
+           proof-sync-text (step-template-text proof-sync-step)
+           proof-fixed-point-text (step-template-text proof-fixed-point-step)
            final-summary-text (step-template-text final-summary-step)
            malformed-stop-text (step-template-text malformed-stop-step)
            clean-stop-text (step-template-text clean-stop-step)
@@ -221,6 +226,9 @@
                  "review-task-implementation"
                  "incidental-validation-capture"
                  "validation-capture-disposition"
+                 "proof-sync"
+                 "proof-sync-disposition"
+                 "proof-sync-fixed-point"
                  "final-summary"]
                 (mapv :name steps)))
          (is (= [:session
@@ -243,6 +251,9 @@
                  :delegate
                  :session
                  :invoke
+                 :session
+                 :invoke
+                 :session
                  :session]
                 (mapv :type steps))))
        (testing "select-and-create carries the current-worktree tools + design-named skills"
@@ -515,7 +526,7 @@
          (is (.contains diff-gate-text "PASS_STATUS: REVIEW_COMPLETE"))
          (is (.contains diff-gate-text "PASS_STATUS: ACTIONABLE_FEEDBACK")))
        (testing "incidental validation capture parse-checks proof artifacts and routes deterministically"
-         (is (= "final-summary" (get-in validation-capture-step [:on "DONE" :goto])))
+         (is (= "proof-sync" (get-in validation-capture-step [:on "DONE" :goto])))
          (is (= "validation-capture-disposition"
                 (get-in validation-capture-step [:on "REPEAT" :goto])))
          (is (= :invoke (:type validation-disposition-step)))
@@ -536,6 +547,37 @@
          (is (.contains validation-capture-text "VALIDATION_CAPTURE_ROUTE: IMPLEMENTATION_REPAIR"))
          (is (.contains validation-capture-text "VALIDATION_CAPTURE_ROUTE: TERMINAL_STOP"))
          (is (.contains validation-capture-text "No final A5/A2/A3 proof claim is allowed from unparseable JSON/EDN")))
+
+       (testing "proof-sync fixed-point gate follows incidental validation before final summary"
+         (is (= "final-summary" (get-in proof-sync-step [:on "DONE" :goto])))
+         (is (= "proof-sync-disposition" (get-in proof-sync-step [:on "REPEAT" :goto])))
+         (is (= {:type :invoke
+                 :operation "workflow/pass-status-routing"
+                 :args {:text {:from {:step "proof-sync"
+                                      :output :final-llm-reply}}
+                        :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}}
+                (:judge proof-sync-step)))
+         (is (= :invoke (:type proof-disposition-step)))
+         (is (= "workflow/proof-sync-disposition-routing"
+                (:operation proof-disposition-step)))
+         (is (= {"COVERAGE_REVIEW" {:goto "review-task-implementation"}
+                 "VALIDATION_RECAPTURE" {:goto "incidental-validation-capture"}
+                 "BOOKKEEPING_FIXED_POINT" {:goto "proof-sync-fixed-point"}}
+                (:on proof-disposition-step)))
+         (is (= "final-summary" (get-in proof-fixed-point-step [:on "DONE" :goto])))
+         (is (= "terminal-stop-proof-sync"
+                (get-in proof-fixed-point-step [:on "REPEAT" :goto])))
+         (is (.contains proof-sync-text "committed task-local artifacts as proof authority"))
+         (is (.contains proof-sync-text "before-local.json"))
+         (is (.contains proof-sync-text "after-local.json"))
+         (is (.contains proof-sync-text "incidental-burden-check.edn"))
+         (is (.contains proof-sync-text "incidental-gate.edn"))
+         (is (.contains proof-sync-text "PROOF_SYNC_ROUTE: COVERAGE_REVIEW"))
+         (is (.contains proof-sync-text "PROOF_SYNC_ROUTE: VALIDATION_RECAPTURE"))
+         (is (.contains proof-sync-text "PROOF_SYNC_ROUTE: BOOKKEEPING_FIXED_POINT"))
+         (is (.contains proof-sync-text "must never route directly to final success"))
+         (is (.contains proof-fixed-point-text "read-only proof-sync fixed-point"))
+         (is (.contains proof-fixed-point-text "Do not mutate anything")))
        (testing "implementation and split summaries preserve target-present and terminal contracts"
          (is (nil? (:judge implementation-review-step))
              "review-task-implementation has no judge that can shortcut the successful path")
@@ -549,6 +591,10 @@
                        (:from %))
                    (:contributions final-summary-step))
              "final-summary sources parse-checked incidental validation output as the successful terminal path")
+         (is (some #(= {:step "proof-sync" :yield :text}
+                       (:from %))
+                   (:contributions final-summary-step))
+             "final-summary sources the clean proof-sync output")
          (is (.contains final-summary-text
                         "design → plan → characterization-test-net gate → baseline/diff gate → simplification implementation → implementation review → incidental validation-capture"))
          (is (.contains final-summary-text "after-local.json"))

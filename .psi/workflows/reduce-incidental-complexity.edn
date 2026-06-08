@@ -117,6 +117,7 @@
     {:type :source, :from {:step "extract-task-path", :yield :text}}
     {:type :source,
      :from {:step "incidental-validation-capture", :yield :text}}
+    {:type :source, :from {:step "proof-sync", :yield :text}}
     {:type :template,
      :text
      "Produce the terminal stop summary for `reduce-incidental-complexity` after an unrecoverable validation-capture failure for {{input}}.\n\nStop source: validation-capture. Later validation routes must pass the failing validation yield as explicit context.\nRead committed task artifacts and name the parse-checked failure-map artifact path (for example `architecture-gate.edn` or `incidental-gate.edn`) when available.\nDo not infer the failed gate from missing artifacts alone.\n\nInput task path:\n{{input}}",
@@ -134,6 +135,8 @@
    [{:type :source, :from :workflow-original}
     {:type :source, :from {:step "select-and-create", :yield :text}}
     {:type :source, :from {:step "extract-task-path", :yield :text}}
+    {:type :source, :from {:step "proof-sync", :yield :text}}
+    {:type :source, :from {:step "proof-sync-fixed-point", :yield :text}}
     {:type :template,
      :text
      "Produce the terminal stop summary for `reduce-incidental-complexity` after proof-sync fixed-point verification failed for {{input}}.\n\nStop source: proof-sync-fixed-point. This step must be reachable only from read-only fixed-point failure.\nLater proof-sync routes must provide both the mutating `proof-sync` yield and the read-only `proof-sync-fixed-point` yield as explicit context.\nRead committed task artifacts and name the committed proof-sync blocking note plus affected proof artifact paths.\nDo not claim proof coherence from workflow/review prose alone.\n\nInput task path:\n{{input}}",
@@ -352,7 +355,7 @@
        :output :final-llm-reply}},
      :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}},
    :on
-   {"DONE" {:goto "final-summary"},
+   {"DONE" {:goto "proof-sync"},
     "REPEAT" {:goto "validation-capture-disposition"}}}
   {:name "validation-capture-disposition",
    :type :invoke,
@@ -365,6 +368,98 @@
    :on
    {"IMPLEMENTATION_REPAIR" {:goto "implement-task"},
     "TERMINAL_STOP" {:goto "terminal-stop-validation-capture"}}}
+  {:name "proof-sync",
+   :type :session,
+   :tools ["read" "bash" "edit" "write"],
+   :skills ["task-test-review" "testing-without-mocks" "gordian"],
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "select-and-create", :yield :text}}
+    {:type :source, :from {:step "extract-task-path", :yield :text}}
+    {:type :source, :from {:step "clean-baseline", :yield :text}}
+    {:type :source, :from {:step "coverage-review", :yield :text}}
+    {:type :source, :from {:step "diff-gate", :yield :text}}
+    {:type :source, :from {:step "implement-task", :yield :text}}
+    {:type :source,
+     :from {:step "review-task-implementation", :yield :text}}
+    {:type :source,
+     :from {:step "incidental-validation-capture", :yield :text}}
+    {:type :template,
+     :text
+     "Run the proof-artifact synchronization fixed-point gate for the incidental-complexity Munera task at {{input}} after implementation review and incidental validation capture, before final summary. Work in the current inherited worktree. Do NOT call `work-on`, create a worktree, or switch branches.
+
+Authority and required reads:
+1. Reread committed task-local artifacts as proof authority: `design.md`, `plan.md`, `steps.md`, `implementation.md`, `coverage-map.md`, `characterization-baseline.edn`, `before-local.json`, `before-diagnose.edn`, `after-local.json`, `incidental-burden-check.edn`, and `incidental-gate.edn`.
+2. Parse-check `before-local.json` and `after-local.json` as JSON with a top-level `units` array before relying on burden claims. Parse-check `before-diagnose.edn`, `incidental-burden-check.edn`, `incidental-gate.edn`, and `characterization-baseline.edn` as EDN before relying on them.
+3. Treat workflow yields and review child-session prose only as context for likely stale files or recent follow-ups. They cannot establish final proof coherence by themselves.
+
+Coherence checks:
+- Verify `coverage-map.md` records target identity, selected `(ns, var, arity, line)` key, selector proof, guard evidence, authoritative test commands, latest test/assertion counts when reported, newly added characterization tests, coverage/gap dispositions, and the relationship to `characterization-baseline.edn`.
+- Verify `coverage-map.md` references final parse-checked Gordian proof artifacts: `after-local.json`, `incidental-burden-check.edn`, and `incidental-gate.edn`.
+- Verify `incidental-burden-check.edn` records target key, original target burden `B`, after target burden, A5, A2a/A2b row summaries, and overall pass/fail from the parse-checked before/after local JSON files.
+- Verify no review follow-up added or changed tests, seams, validation artifacts, or proof claims without a matching committed coverage/proof update.
+
+Routing contract:
+- If proof artifacts are already coherent and you do not mutate any task artifact, end with exactly `PASS_STATUS: REVIEW_COMPLETE`. Do not emit a `PROOF_SYNC_ROUTE:` marker. This clean/no-op pass is the only direct route to `final-summary`.
+- If stale or incomplete proof artifacts can be fixed, update the committed task-local artifacts, commit the update, end with exactly `PASS_STATUS: ACTIONABLE_FEEDBACK`, and emit exactly one whole-line route marker: `PROOF_SYNC_ROUTE: COVERAGE_REVIEW`, `PROOF_SYNC_ROUTE: VALIDATION_RECAPTURE`, or `PROOF_SYNC_ROUTE: BOOKKEEPING_FIXED_POINT`.
+- Use `PROOF_SYNC_ROUTE: COVERAGE_REVIEW` when stale coverage/test proof or changed characterization tests need implementation/test review to rerun.
+- Use `PROOF_SYNC_ROUTE: VALIDATION_RECAPTURE` when incidental validation proof must be recaptured before proof-sync reruns.
+- Use `PROOF_SYNC_ROUTE: BOOKKEEPING_FIXED_POINT` only for pure bookkeeping proof updates or a durable proof-sync blocking note that needs the read-only fixed-point check.
+- A mutating proof-sync pass must never route directly to final success. A potentially terminal proof problem must be recorded as a committed blocking note by this step and then routed to `proof-sync-fixed-point`; terminal stopping is decided only by that read-only check.
+
+Input task path:
+{{input}}",
+     :vars
+     {"input" {:from {:step "extract-task-path", :yield :text}}}}],
+   :judge
+   {:type :invoke,
+    :operation "workflow/pass-status-routing",
+    :args
+    {:text {:from {:step "proof-sync", :output :final-llm-reply}},
+     :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}},
+   :on
+   {"DONE" {:goto "final-summary"},
+    "REPEAT" {:goto "proof-sync-disposition"}}}
+  {:name "proof-sync-disposition",
+   :type :invoke,
+   :operation "workflow/proof-sync-disposition-routing",
+   :args
+   {:text {:from {:step "proof-sync", :output :final-llm-reply}}},
+   :on
+   {"COVERAGE_REVIEW" {:goto "review-task-implementation"},
+    "VALIDATION_RECAPTURE" {:goto "incidental-validation-capture"},
+    "BOOKKEEPING_FIXED_POINT" {:goto "proof-sync-fixed-point"}}}
+  {:name "proof-sync-fixed-point",
+   :type :session,
+   :tools ["read" "bash"],
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "extract-task-path", :yield :text}}
+    {:type :template,
+     :text
+     "Run the read-only proof-sync fixed-point verification for the incidental-complexity Munera task at {{input}}. This step follows a mutating `proof-sync` bookkeeping pass. Do not edit files, commit, run implementation repair, or mutate task artifacts.
+
+Required procedure:
+1. Reread committed task-local proof authority: `design.md`, `plan.md`, `steps.md`, `implementation.md`, `coverage-map.md`, `characterization-baseline.edn`, `before-local.json`, `before-diagnose.edn`, `after-local.json`, `incidental-burden-check.edn`, and `incidental-gate.edn`.
+2. Parse-check JSON and EDN proof artifacts before relying on them.
+3. Confirm the preceding mutating `proof-sync` update reached a clean fixed point: no stale, missing, contradictory, unparseable, or incoherent proof artifacts remain, and no unresolved committed proof-sync blocking note remains.
+4. If the second pass is clean/no-op, end with exactly `PASS_STATUS: REVIEW_COMPLETE` and do not emit a `PROOF_SYNC_ROUTE:` marker.
+5. If proof artifacts are still stale, missing, contradictory, unparseable, or contain an unresolved committed proof-sync blocking note that cannot be resolved by coverage review or validation recapture, cite the existing committed blocking note and affected artifact paths and end with exactly `PASS_STATUS: ACTIONABLE_FEEDBACK`. Do not mutate anything.
+
+Input task path:
+{{input}}",
+     :vars
+     {"input" {:from {:step "extract-task-path", :yield :text}}}}],
+   :judge
+   {:type :invoke,
+    :operation "workflow/pass-status-routing",
+    :args
+    {:text
+     {:from {:step "proof-sync-fixed-point", :output :final-llm-reply}},
+     :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}},
+   :on
+   {"DONE" {:goto "final-summary"},
+    "REPEAT" {:goto "terminal-stop-proof-sync"}}}
   {:name "final-summary",
    :type :session,
    :tools ["read" "bash"],
@@ -380,6 +475,7 @@
      :from {:step "review-task-implementation", :yield :text}}
     {:type :source,
      :from {:step "incidental-validation-capture", :yield :text}}
+    {:type :source, :from {:step "proof-sync", :yield :text}}
     {:type :template,
      :text
      "Produce the user-facing final result for the completed target-present reduce-incidental-complexity run described by {{input}}. Independently inspect the Munera task artifacts. Summarize the design → plan → characterization-test-net gate → baseline/diff gate → simplification implementation → implementation review → incidental validation-capture outcome. Include verification performed, task artifact files updated, commit ids evident from step outputs, and whether the task remains open or was closed. Do not claim a PR was opened or pushed.\n\nInput:\n{{input}}\n\nProof authority: read committed task-local `coverage-map.md`, `characterization-baseline.edn`, `before-local.json`, `before-diagnose.edn`, and validation artifacts (`after-local.json`, `incidental-burden-check.edn`, `incidental-gate.edn`). Treat `coverage-map.md` as the canonical coverage/proof map rather than relying on review prose alone.",

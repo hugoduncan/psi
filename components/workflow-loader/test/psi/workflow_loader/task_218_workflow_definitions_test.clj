@@ -153,6 +153,9 @@
                  "review-test-shape"
                  "review-task-docs"
                  "review-code-shape"
+                 "proof-sync"
+                 "proof-sync-disposition"
+                 "proof-sync-fixed-point"
                  "final-summary"
                  "terminal-stop-malformed-task-path"
                  "terminal-stop-clean-baseline"
@@ -246,7 +249,10 @@
            diff (by-name "diff-gate")
            implement (by-name "implement-task")
            validation (by-name "validation-capture")
-           validation-disposition (by-name "validation-capture-disposition")]
+           validation-disposition (by-name "validation-capture-disposition")
+           proof-sync (by-name "proof-sync")
+           proof-disposition (by-name "proof-sync-disposition")
+           proof-fixed-point (by-name "proof-sync-fixed-point")]
        (testing "downstream task consumers all use extract-task-path as input"
          (doseq [step-name ["review-task-design" "create-task-plan" "review-task-plan"
                             "implement-task" "review-implementation-correctness"
@@ -298,6 +304,30 @@
          (is (= {"IMPLEMENTATION_REPAIR" {:goto "implement-task"}
                  "TERMINAL_STOP" {:goto "terminal-stop-validation-capture"}}
                 (:on validation-disposition))))
+
+       (testing "proof-sync fixed-point gate follows code-shape before final summary"
+         (is (= "final-summary" (get-in proof-sync [:on "DONE" :goto])))
+         (is (= "proof-sync-disposition" (get-in proof-sync [:on "REPEAT" :goto])))
+         (is (= (pass-status-judge "proof-sync") (:judge proof-sync)))
+         (is (= :invoke (:type proof-disposition)))
+         (is (= "workflow/proof-sync-disposition-routing" (:operation proof-disposition)))
+         (is (= {"COVERAGE_REVIEW" {:goto "review-implementation-tests"}
+                 "VALIDATION_RECAPTURE" {:goto "validation-capture"}
+                 "BOOKKEEPING_FIXED_POINT" {:goto "proof-sync-fixed-point"}}
+                (:on proof-disposition)))
+         (is (= "final-summary" (get-in proof-fixed-point [:on "DONE" :goto])))
+         (is (= "terminal-stop-proof-sync" (get-in proof-fixed-point [:on "REPEAT" :goto])))
+         (let [text (step-template-text proof-sync)
+               fixed-text (step-template-text proof-fixed-point)]
+           (is (.contains text "committed task-local artifacts as proof authority"))
+           (is (.contains text "coverage-map.md"))
+           (is (.contains text "after-architecture-targets.edn"))
+           (is (.contains text "PROOF_SYNC_ROUTE: COVERAGE_REVIEW"))
+           (is (.contains text "PROOF_SYNC_ROUTE: VALIDATION_RECAPTURE"))
+           (is (.contains text "PROOF_SYNC_ROUTE: BOOKKEEPING_FIXED_POINT"))
+           (is (.contains text "must never route directly to final success"))
+           (is (.contains fixed-text "read-only proof-sync fixed-point"))
+           (is (.contains fixed-text "Do not mutate anything"))))
        (testing "validation prompt locks producer-before-review artifacts and failure routing"
          (let [text (step-template-text validation)]
            (is (.contains text "after-diagnose.edn"))
