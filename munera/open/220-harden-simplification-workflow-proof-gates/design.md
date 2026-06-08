@@ -85,6 +85,8 @@ Required shape:
   - or require an explicit coverage/proof section in `implementation.md` plus `characterization-baseline.edn` updates.
   The choice must be explicit and tested.
 - If proof artifacts are stale, the gate must update task artifacts, commit them, and route appropriately rather than finalizing with stale proof.
+- Final success must only follow a clean/no-op proof-sync pass. A proof-sync pass that mutates artifacts must return `ACTIONABLE_FEEDBACK` and route back through the relevant proof/review gate or repeat proof-sync until a later pass verifies a fixed point.
+- Committed task-local artifacts are the authoritative proof-sync inputs and outputs. Review/workflow yields are context only and cannot establish final proof coherence by themselves.
 
 ### 3. Parse-check Gordian artifacts
 
@@ -114,7 +116,7 @@ Terminal summaries should not infer failure causes from missing artifacts when t
 
 Required shape:
 
-- Split terminal summaries by stop source, or pass the failing step yield into a single terminal summary with enough context to name the failing gate.
+- Split terminal summaries by stop source, or pass the failing step yield/source envelope into a single terminal summary with enough explicit context to name the failing gate. This must be represented in workflow topology/data-flow, not inferred from hidden runtime state, cross-step introspection, or missing artifacts.
 - At minimum, terminal summaries should distinguish:
   - malformed/missing task path before design,
   - clean-baseline failure,
@@ -145,6 +147,30 @@ Incidental workflow:
 - It should record top candidates considered or at least the candidates rejected as essential false positives when that occurred.
 - If the target barely passes thresholds or evidence is uncertain, the generated design must call that out for review rather than treating it as high-confidence.
 
+
+## Architecture follow-up decisions
+
+### Terminal-stop topology and failing-gate context
+
+Terminal-stop handling must stay inside explicit workflow topology and data-flow. Do not solve failing-gate context by adding hidden runtime state, cross-step introspection, or inference from missing artifacts. The implementation should use one of these explicit shapes, in priority order:
+
+1. **Split terminal-stop summary steps by stop source.** Each failing route goes to a dedicated summary step such as `terminal-stop-malformed-task-path`, `terminal-stop-clean-baseline`, `terminal-stop-coverage-disposition`, `terminal-stop-diff-gate`, `terminal-stop-validation-capture`, or `terminal-stop-proof-sync`. The step contribution includes the validated task path when one exists and the immediately preceding failing step yield for that stop source.
+2. **Single terminal-stop step with explicit source envelope.** If a single summary step is kept, each failing route must pass an explicit `stop_source` / `failed_gate` map or equivalent prior-step source through existing workflow source/judge data-flow. The prompt must name the stop source from that explicit value, not from absent artifacts or prose reconstruction.
+
+For both simplification workflows, terminal summaries must report the actual gate that failed and the committed task-local artifact path where the gate recorded its durable finding, when such an artifact exists. Pre-design malformed task-path stops must not read task-local artifacts or invent a path. Post-task stops must read committed task artifacts to summarize durable state, using the failed step yield only as context for which artifact/gate to inspect.
+
+### Proof synchronization authority and fixed point
+
+The proof-artifact synchronization gate is a **verifying fixed-point gate**, not a final mutating writer. Its authoritative inputs and outputs are committed task-local artifacts: `design.md`, `plan.md`, `steps.md`, `implementation.md`, `characterization-baseline.edn`, `coverage-map.md` when required, Gordian validation artifacts, and any explicitly named task-local proof files. Workflow yields and review child-session prose may identify likely stale files or recent follow-up context, but they are not proof authority across session/workflow boundaries.
+
+Required proof-sync routing:
+
+- If proof artifacts are already coherent, the gate performs no mutation, records no new proof changes, and ends with `PASS_STATUS: REVIEW_COMPLETE`; only this clean/no-op pass may route to `final-summary`.
+- If proof artifacts are stale or incomplete, the gate updates the committed task-local artifacts, commits those updates, and ends with `PASS_STATUS: ACTIONABLE_FEEDBACK`; it must not route directly to final success from the same mutating pass.
+- After a mutating proof-sync pass, the workflow must route back through the relevant proof/review gate or repeat proof-sync until a later clean/no-op proof-sync pass proves a fixed point. Examples: stale coverage proof routes through coverage/test review before proof-sync is retried; stale validation proof routes through validation capture or architecture review as appropriate; pure bookkeeping proof updates may repeat proof-sync and require the next pass to be clean before final summary.
+
+`final-summary` must independently read the committed task-local proof artifacts and may use prior yields only as context. It must not claim proof coherence from ephemeral review prose, child-session summaries, or the mere existence of previous workflow yields.
+
 ## Acceptance criteria
 
 - `reduce-incidental-complexity` uses a deterministic `extract-task-path` boundary for downstream task identity, and tests prove downstream delegates no longer consume raw `select-and-create` handoff as `:input`.
@@ -160,7 +186,7 @@ Incidental workflow:
 
 ## Open design questions
 
-1. Should the proof-sync gate be a shared small workflow/prompt reused by both simplification workflows, or two workflow-local steps with different artifact expectations?
+1. Proof-sync should be implemented as workflow-local steps initially, because the two workflows have different artifact expectations. Shared helper extraction is allowed later only if it preserves the same fixed-point/no-op success contract.
 2. For incidental tasks, should `coverage-map.md` become mandatory, optional based on scope size, or should `characterization-baseline.edn` plus `implementation.md` be the canonical proof shape?
-3. Should terminal-stop summaries be split into multiple dedicated steps, or should a single terminal summary accept a `stop_source`/previous-yield map from each failing route?
+3. Prefer split terminal-stop summary steps per stop source. A single summary is acceptable only if each failing route passes an explicit `stop_source`/previous-yield envelope through workflow data-flow.
 4. Should low-confidence architecture targets ever stop automatically, or always proceed to design review with explicit uncertainty?
