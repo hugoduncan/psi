@@ -38,6 +38,38 @@
                       "architecture-compare.edn"
                       "architecture-gate.edn"]}])
 
+(def ^:private extract-task-path-source
+  {:step "extract-task-path" :yield :text})
+
+(def ^:private extract-task-path-input
+  {:from extract-task-path-source})
+
+(def ^:private post-task-terminal-steps
+  ["terminal-stop-clean-baseline"
+   "terminal-stop-coverage-disposition"
+   "terminal-stop-diff-gate"
+   "terminal-stop-validation-capture"
+   "terminal-stop-proof-sync"])
+
+(def ^:private incidental-post-implementation-steps
+  ["review-task-implementation"
+   "incidental-validation-capture"
+   "proof-sync"
+   "proof-sync-fixed-point"
+   "final-summary"])
+
+(def ^:private architecture-post-implementation-steps
+  ["validation-capture"
+   "review-implementation-correctness"
+   "review-implementation-tests"
+   "review-implementation-architecture"
+   "review-test-shape"
+   "review-task-docs"
+   "review-code-shape"
+   "proof-sync"
+   "proof-sync-fixed-point"
+   "final-summary"])
+
 (defn- step-by-name
   [steps]
   (into {} (map (juxt :name identity) steps)))
@@ -57,7 +89,7 @@
 
 (defn- input-from-extract?
   [step]
-  (= {:from {:step "extract-task-path" :yield :text}}
+  (= extract-task-path-input
      (get-in step [:prompt-string :fields :input])))
 
 (defn- template-vars
@@ -67,11 +99,31 @@
        (mapcat #(keys (:vars %)))
        set))
 
+(defn- template-inputs
+  [step]
+  (->> (:contributions step)
+       (filter #(= :template (:type %)))
+       (keep #(get-in % [:vars "input"]))
+       vec))
+
 (defn- source-refs
   [step]
   (->> (:contributions step)
        (filter #(= :source (:type %)))
        (mapv :from)))
+
+(defn- source-from-extract?
+  [step]
+  (some #(= extract-task-path-source %) (source-refs step)))
+
+(defn- task-path-template-input-from-extract?
+  [step]
+  (= [extract-task-path-input] (template-inputs step)))
+
+(defn- task-path-from-extract?
+  [step]
+  (or (input-from-extract? step)
+      (task-path-template-input-from-extract? step)))
 
 (defn- incoming-gotos
   [steps target]
@@ -128,6 +180,35 @@
                                                   :yield :text}}}}
                          (:prompt-string step))
                    (str step-name " does not consume select handoff as input"))))))))))
+
+(deftest post-implementation-task-identity-boundaries-test
+  ;; Tests post-implementation validation/proof/final paths keep using the
+  ;; extracted Munera path as task identity instead of the selection prose.
+  (doseq [workflow workflows]
+    (load-workflow
+     workflow
+     (fn [steps]
+       (let [by-name (step-by-name steps)
+             post-implementation-steps (case (:name workflow)
+                                         "reduce-incidental-complexity"
+                                         incidental-post-implementation-steps
+
+                                         "reduce-architectural-complexity"
+                                         architecture-post-implementation-steps)]
+         (testing (str (:name workflow) " post-implementation steps use extracted path as task input")
+           (doseq [step-name post-implementation-steps]
+             (let [step (by-name step-name)]
+               (is (some? step) step-name)
+               (is (task-path-from-extract? step)
+                   (str step-name " consumes extracted path as task path")))))
+         (testing (str (:name workflow) " split post-task terminal summaries use extracted path")
+           (doseq [step-name post-task-terminal-steps]
+             (let [step (by-name step-name)]
+               (is (some? step) step-name)
+               (is (task-path-template-input-from-extract? step)
+                   (str step-name " renders extracted path as input"))
+               (is (source-from-extract? step)
+                   (str step-name " carries extracted path source context"))))))))))
 
 (deftest disposition-routing-topology-test
   ;; Tests deterministic registered operations and route labels for proof-sync
