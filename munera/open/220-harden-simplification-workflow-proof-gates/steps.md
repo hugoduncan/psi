@@ -23,22 +23,22 @@ when done.
 
 ## Slice 1 — Preflight and deterministic operations
 
-- [ ] Confirm `design-steps.md` has no unchecked follow-ups and record the result in `implementation.md`.
-- [ ] Re-read `.psi/workflows/reduce-incidental-complexity.edn`, `.psi/workflows/reduce-architectural-complexity.edn`, `components/agent-session/src/psi/agent_session/workflow/core.clj`, and focused workflow-loader tests to verify current routing/operation seams before editing.
-- [ ] Add registered deterministic operation `workflow/proof-sync-disposition-routing` in the same built-in operation registry as `workflow/pass-status-routing` and `workflow/munera-open-task-path-routing`.
-- [ ] Add registered deterministic operation `workflow/validation-capture-disposition-routing` in the same built-in operation registry before workflow EDNs invoke it.
-- [ ] Implement `workflow/proof-sync-disposition-routing` to accept `{:text ...}`, allow surrounding final-reply prose/`PASS_STATUS` lines, extract exactly one whole line matching `PROOF_SYNC_ROUTE: <route>` at column 0 with exactly one space after the colon and no trailing whitespace/text, and return route data `COVERAGE_REVIEW`, `VALIDATION_RECAPTURE`, or `BOOKKEEPING_FIXED_POINT`.
-- [ ] Implement `workflow/validation-capture-disposition-routing` to accept `{:text ...}`, allow surrounding final-reply prose/`PASS_STATUS` lines, extract exactly one whole line matching `VALIDATION_CAPTURE_ROUTE: <route>` at column 0 with exactly one space after the colon and no trailing whitespace/text, and return route data `IMPLEMENTATION_REPAIR` or `TERMINAL_STOP`.
-- [ ] Ensure both marker-routing operations reject missing route markers with a tagged error result.
-- [ ] Ensure both marker-routing operations reject duplicated route markers with a tagged error result including the duplicate lines.
-- [ ] Ensure both marker-routing operations reject unsupported route tokens, malformed prefixes, leading whitespace before the prefix, trailing whitespace, or extra same-line route text with a tagged error result.
-- [ ] Add runtime/operation tests covering all three valid proof-sync route markers, including valid surrounding prose and a surrounding `PASS_STATUS` line.
-- [ ] Add runtime/operation tests covering both valid validation-capture route markers.
-- [ ] Add runtime/operation tests covering missing, duplicated, unsupported, malformed-prefix, trailing-whitespace, and malformed same-line extra-text route markers for both operations.
-- [ ] Verify existing deterministic operations still register and existing workflow routing tests remain green.
-- [ ] Run focused agent-session workflow operation/routing tests and targeted lint for changed runtime/test files.
-- [ ] Record Slice 1 implementation and verification notes in `implementation.md`.
-- [ ] Commit Slice 1 (`⚒ workflow: add proof sync disposition routing`).
+- [x] Confirm `design-steps.md` has no unchecked follow-ups and record the result in `implementation.md`.
+- [x] Re-read `.psi/workflows/reduce-incidental-complexity.edn`, `.psi/workflows/reduce-architectural-complexity.edn`, `components/agent-session/src/psi/agent_session/workflow/core.clj`, and focused workflow-loader tests to verify current routing/operation seams before editing.
+- [x] Add registered deterministic operation `workflow/proof-sync-disposition-routing` in the same built-in operation registry as `workflow/pass-status-routing` and `workflow/munera-open-task-path-routing`.
+- [x] Add registered deterministic operation `workflow/validation-capture-disposition-routing` in the same built-in operation registry before workflow EDNs invoke it.
+- [x] Implement `workflow/proof-sync-disposition-routing` to accept `{:text ...}`, allow surrounding final-reply prose/`PASS_STATUS` lines, extract exactly one whole line matching `PROOF_SYNC_ROUTE: <route>` at column 0 with exactly one space after the colon and no trailing whitespace/text, and return route data `COVERAGE_REVIEW`, `VALIDATION_RECAPTURE`, or `BOOKKEEPING_FIXED_POINT`.
+- [x] Implement `workflow/validation-capture-disposition-routing` to accept `{:text ...}`, allow surrounding final-reply prose/`PASS_STATUS` lines, extract exactly one whole line matching `VALIDATION_CAPTURE_ROUTE: <route>` at column 0 with exactly one space after the colon and no trailing whitespace/text, and return route data `IMPLEMENTATION_REPAIR` or `TERMINAL_STOP`.
+- [x] Ensure both marker-routing operations reject missing route markers with a tagged error result.
+- [x] Ensure both marker-routing operations reject duplicated route markers with a tagged error result including the duplicate lines.
+- [x] Ensure both marker-routing operations reject unsupported route tokens, malformed prefixes, leading whitespace before the prefix, trailing whitespace, or extra same-line route text with a tagged error result.
+- [x] Add runtime/operation tests covering all three valid proof-sync route markers, including valid surrounding prose and a surrounding `PASS_STATUS` line.
+- [x] Add runtime/operation tests covering both valid validation-capture route markers.
+- [x] Add runtime/operation tests covering missing, duplicated, unsupported, malformed-prefix, trailing-whitespace, and malformed same-line extra-text route markers for both operations.
+- [x] Verify existing deterministic operations still register and existing workflow routing tests remain green.
+- [x] Run focused agent-session workflow operation/routing tests and targeted lint for changed runtime/test files.
+- [x] Record Slice 1 implementation and verification notes in `implementation.md`.
+- [x] Commit Slice 1 (`⚒ workflow: add proof sync disposition routing`) — this commit.
 
 ## Slice 2 — Task identity boundary, terminal prerequisites, and selector/proof generation contracts
 

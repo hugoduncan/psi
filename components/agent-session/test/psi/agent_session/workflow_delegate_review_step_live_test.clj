@@ -35,6 +35,10 @@
                                             "workflow/constant-routing")))
         (is (some? (op-reg/get-operation-in (:deterministic-operation-registry ctx)
                                             "workflow/munera-open-task-path-routing")))
+        (is (some? (op-reg/get-operation-in (:deterministic-operation-registry ctx)
+                                            "workflow/proof-sync-disposition-routing")))
+        (is (some? (op-reg/get-operation-in (:deterministic-operation-registry ctx)
+                                            "workflow/validation-capture-disposition-routing")))
         (is (= {:status :ok :data "DONE" :summary "DONE"}
                (op-reg/invoke-operation-in
                 (:deterministic-operation-registry ctx)
@@ -48,6 +52,91 @@
                  "workflow/munera-open-task-path-routing"
                  {:args {:text "munera/open/219-simplify-rpc-session-family\nextra"}}
                  deterministic-op-runtime/invoke-operation))))
+        (finally
+          (context/shutdown-context! ctx))))))
+
+(defn- invoke-operation
+  [ctx operation-id text]
+  (op-reg/invoke-operation-in
+   (:deterministic-operation-registry ctx)
+   operation-id
+   {:args {:text text}}
+   deterministic-op-runtime/invoke-operation))
+
+(defn- assert-marker-route
+  [ctx operation-id marker route]
+  (is (= {:status :ok :data route :summary route}
+         (invoke-operation ctx operation-id (str "Before prose\nPASS_STATUS: ACTIONABLE_FEEDBACK\n" marker ": " route "\nAfter prose")))))
+
+(defn- assert-marker-error
+  [ctx operation-id reason text]
+  (let [result (invoke-operation ctx operation-id text)]
+    (is (= :error (:status result)) (pr-str result))
+    (is (= reason (:reason result)) (pr-str result))))
+
+(deftest proof-sync-disposition-routing-operation-test
+  ;; Tests exact proof-sync route marker parsing through the registered
+  ;; deterministic operation, including valid surrounding final-reply prose.
+  (testing "proof-sync disposition routing"
+    (let [[ctx session-id] (workflow-test-support/create-tui-context+session mutations/all-mutations)]
+      (try
+        (workflow-test-support/init-built-in-workflow! ctx session-id)
+        (doseq [route ["COVERAGE_REVIEW" "VALIDATION_RECAPTURE" "BOOKKEEPING_FIXED_POINT"]]
+          (assert-marker-route ctx "workflow/proof-sync-disposition-routing" "PROOF_SYNC_ROUTE" route))
+        (assert-marker-error ctx "workflow/proof-sync-disposition-routing"
+                             :missing-route-marker
+                             "PASS_STATUS: ACTIONABLE_FEEDBACK")
+        (assert-marker-error ctx "workflow/proof-sync-disposition-routing"
+                             :ambiguous-route-marker
+                             "PROOF_SYNC_ROUTE: COVERAGE_REVIEW\nPROOF_SYNC_ROUTE: VALIDATION_RECAPTURE")
+        (assert-marker-error ctx "workflow/proof-sync-disposition-routing"
+                             :unsupported-route-marker
+                             "PROOF_SYNC_ROUTE: TERMINAL_STOP")
+        (assert-marker-error ctx "workflow/proof-sync-disposition-routing"
+                             :malformed-route-marker
+                             " PROOF_SYNC_ROUTE: COVERAGE_REVIEW")
+        (assert-marker-error ctx "workflow/proof-sync-disposition-routing"
+                             :malformed-route-marker
+                             "PROOF_SYNC_ROUTE:COVERAGE_REVIEW")
+        (assert-marker-error ctx "workflow/proof-sync-disposition-routing"
+                             :malformed-route-marker
+                             "PROOF_SYNC_ROUTE: COVERAGE_REVIEW ")
+        (assert-marker-error ctx "workflow/proof-sync-disposition-routing"
+                             :malformed-route-marker
+                             "PROOF_SYNC_ROUTE: COVERAGE_REVIEW because tests changed")
+        (finally
+          (context/shutdown-context! ctx))))))
+
+(deftest validation-capture-disposition-routing-operation-test
+  ;; Tests exact validation-capture route marker parsing through the registered
+  ;; deterministic operation, including repair versus terminal disposition.
+  (testing "validation-capture disposition routing"
+    (let [[ctx session-id] (workflow-test-support/create-tui-context+session mutations/all-mutations)]
+      (try
+        (workflow-test-support/init-built-in-workflow! ctx session-id)
+        (doseq [route ["IMPLEMENTATION_REPAIR" "TERMINAL_STOP"]]
+          (assert-marker-route ctx "workflow/validation-capture-disposition-routing" "VALIDATION_CAPTURE_ROUTE" route))
+        (assert-marker-error ctx "workflow/validation-capture-disposition-routing"
+                             :missing-route-marker
+                             "PASS_STATUS: ACTIONABLE_FEEDBACK")
+        (assert-marker-error ctx "workflow/validation-capture-disposition-routing"
+                             :ambiguous-route-marker
+                             "VALIDATION_CAPTURE_ROUTE: IMPLEMENTATION_REPAIR\nVALIDATION_CAPTURE_ROUTE: TERMINAL_STOP")
+        (assert-marker-error ctx "workflow/validation-capture-disposition-routing"
+                             :unsupported-route-marker
+                             "VALIDATION_CAPTURE_ROUTE: COVERAGE_REVIEW")
+        (assert-marker-error ctx "workflow/validation-capture-disposition-routing"
+                             :malformed-route-marker
+                             " VALIDATION_CAPTURE_ROUTE: IMPLEMENTATION_REPAIR")
+        (assert-marker-error ctx "workflow/validation-capture-disposition-routing"
+                             :malformed-route-marker
+                             "VALIDATION_CAPTURE_ROUTE:IMPLEMENTATION_REPAIR")
+        (assert-marker-error ctx "workflow/validation-capture-disposition-routing"
+                             :malformed-route-marker
+                             "VALIDATION_CAPTURE_ROUTE: IMPLEMENTATION_REPAIR ")
+        (assert-marker-error ctx "workflow/validation-capture-disposition-routing"
+                             :malformed-route-marker
+                             "VALIDATION_CAPTURE_ROUTE: IMPLEMENTATION_REPAIR because gate failed")
         (finally
           (context/shutdown-context! ctx))))))
 

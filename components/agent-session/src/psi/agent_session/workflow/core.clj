@@ -18,6 +18,7 @@
    [psi.agent-session.workflow.delegate-list :as delegate-list-projection]
    [psi.agent-session.workflow.delivery :as delivery]
    [psi.agent-session.workflow.orchestration :as orchestration]
+   [psi.agent-session.workflow.routing :as routing]
    [psi.agent-session.workflow.runtime-state :as runtime-state]
    [psi.agent-session.workflow.text :as text]
    [psi.workflow-loader.core :as loader]))
@@ -229,7 +230,15 @@
     (register-operation
      {:id "workflow/munera-open-task-path-routing"
       :handler (fn [{:keys [args]}]
-                 (parse-munera-open-task-path-routing (:text args)))})))
+                 (parse-munera-open-task-path-routing (:text args)))})
+    (register-operation
+     {:id "workflow/proof-sync-disposition-routing"
+      :handler (fn [{:keys [args]}]
+                 (routing/parse-proof-sync-disposition-routing (:text args)))})
+    (register-operation
+     {:id "workflow/validation-capture-disposition-routing"
+      :handler (fn [{:keys [args]}]
+                 (routing/parse-validation-capture-disposition-routing (:text args)))})))
 
 (declare refresh-widgets!)
 
