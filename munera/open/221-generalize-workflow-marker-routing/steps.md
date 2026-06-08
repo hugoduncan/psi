@@ -18,7 +18,7 @@
 - [ ] Include per-candidate maps with `:line`, `:kind`, and route/reason/value fields for exact, malformed, and unsupported candidates.
 - [ ] Apply result precedence exactly: missing candidates, ambiguous multi-candidate, supported exact, unsupported single candidate, malformed single candidate.
 - [ ] Include `:marker-label`, `:route-marker-lines`, and `:route-marker-candidates` in ambiguous diagnostics.
-- [ ] Remove `proof-sync-routes`, `validation-capture-routes`, `parse-proof-sync-disposition-routing`, and `parse-validation-capture-disposition-routing` from runtime code.
+- [ ] Keep `proof-sync-routes`, `validation-capture-routes`, `parse-proof-sync-disposition-routing`, and `parse-validation-capture-disposition-routing` as temporary compile-safe delegators until Slice 4; do not remove them in Slice 2 while `workflow.core` still registers the old operations.
 
 ## Slice 3 — Parser test net
 
@@ -30,17 +30,17 @@
 - [ ] Add malformed single-candidate tests for leading whitespace, whitespace before colon, missing post-colon space, trailing whitespace, same-line extra text, and invalid/lowercase route tokens.
 - [ ] Add mixed-candidate precedence tests for valid+malformed, valid+unsupported, malformed+unsupported, multiple malformed/unsupported, and duplicate valid candidates; assert `:ambiguous-route-marker` always wins.
 - [ ] Add invalid-arg tests for all required invalid arg cases, including missing/non-string text, invalid marker labels, empty/non-vector allowed routes, duplicate routes, invalid route tokens, and accumulation of multiple errors.
-- [ ] Run the routing parser Scry test namespace and fix failures before editing workflow EDNs.
+- [ ] Run `bb clojure:test:scry --namespace psi.agent-session.workflow.routing-test` and fix failures before editing workflow EDNs.
 
 ## Slice 4 — Operation registration cleanup
 
 - [ ] Register `workflow/exact-marker-routing` in `register-built-in-deterministic-operations!` with a handler that passes resolved args to `routing/parse-exact-marker-routing`.
-- [ ] Remove registration for `workflow/proof-sync-disposition-routing`.
-- [ ] Remove registration for `workflow/validation-capture-disposition-routing`.
+- [ ] In the same Slice 4 code edit/commit, remove registration for `workflow/proof-sync-disposition-routing` and remove the now-unused `routing/parse-proof-sync-disposition-routing` wrapper / `proof-sync-routes` constant; do not leave `workflow.core` referencing a deleted var.
+- [ ] In the same Slice 4 code edit/commit, remove registration for `workflow/validation-capture-disposition-routing` and remove the now-unused `routing/parse-validation-capture-disposition-routing` wrapper / `validation-capture-routes` constant; do not leave `workflow.core` referencing a deleted var.
 - [ ] Update built-in workflow operation registration tests to assert the new operation is present and the two old operation ids are absent.
 - [ ] Update live operation invocation smoke tests to invoke `workflow/exact-marker-routing` with an arbitrary marker label and allowed routes.
 - [ ] Add an operation smoke test proving invalid args return `:invalid-route-marker-args` without throwing through the registry.
-- [ ] Run the focused operation/registry Scry tests covering built-in deterministic operation registration and invocation.
+- [ ] Run `bb clojure:test:scry --namespace psi.agent-session.workflow-delegate-review-step-live-test` for built-in deterministic operation registration and live invocation smoke coverage.
 
 ## Slice 5 — Workflow EDN migration
 
@@ -57,21 +57,25 @@
 - [ ] Update `task_209_workflow_definitions_test.clj` to expect `workflow/exact-marker-routing` and exact authored validation/proof marker policy args for the incidental workflow.
 - [ ] Update `task_220_workflow_proof_gates_test.clj` to expect `workflow/exact-marker-routing` and exact authored marker policy args for both simplification workflows.
 - [ ] Keep existing assertions for route topology, terminal-stop routing, prompts, and route-label prompt text unchanged unless the operation arg shape requires a narrow assertion update.
-- [ ] Run focused workflow-loader/content-lock Scry tests for tasks 209, 218, and 220 and fix failures.
+- [ ] Run `bb clojure:test:scry --dir components/workflow-loader/test --namespace psi.workflow-loader.task-209-workflow-definitions-test --namespace psi.workflow-loader.task-218-workflow-definitions-test --namespace psi.workflow-loader.task-220-workflow-proof-gates-test` and fix failures.
 
 ## Slice 7 — Docs/changelog and verification
 
 - [ ] Add a CHANGELOG `[Unreleased]` entry noting the new `workflow/exact-marker-routing` registered operation and removal of `workflow/proof-sync-disposition-routing` / `workflow/validation-capture-disposition-routing`.
 - [ ] Update `README.md` or `doc/` only if the preflight search found explicit mentions of the old or new built-in workflow operation ids.
 - [ ] Run `clj-paren-repair` on changed Clojure files if edits disturb formatting or delimiters.
-- [ ] Run targeted `clj-kondo` on changed Clojure source/test paths.
-- [ ] Run relevant focused Scry suites for routing parser, operation registration/invocation, and workflow-loader task 209/218/220 tests.
-- [ ] Run workflow EDN read checks for `reduce-architectural-complexity.edn` and `reduce-incidental-complexity.edn`.
+- [ ] Run targeted `clj-kondo` on changed Clojure source/test paths: `clj-kondo --lint components/agent-session/src/psi/agent_session/workflow/routing.clj components/agent-session/src/psi/agent_session/workflow/core.clj components/agent-session/test/psi/agent_session/workflow/routing_test.clj components/agent-session/test/psi/agent_session/workflow_delegate_review_step_live_test.clj components/workflow-loader/test/psi/workflow_loader/task_209_workflow_definitions_test.clj components/workflow-loader/test/psi/workflow_loader/task_218_workflow_definitions_test.clj components/workflow-loader/test/psi/workflow_loader/task_220_workflow_proof_gates_test.clj`.
+- [ ] Run `bb clojure:test:scry --namespace psi.agent-session.workflow.routing-test` for generic routing parser coverage.
+- [ ] Run `bb clojure:test:scry --namespace psi.agent-session.workflow-delegate-review-step-live-test` for built-in operation registration/invocation coverage.
+- [ ] Run `bb clojure:test:scry --dir components/workflow-loader/test --namespace psi.workflow-loader.task-209-workflow-definitions-test --namespace psi.workflow-loader.task-218-workflow-definitions-test --namespace psi.workflow-loader.task-220-workflow-proof-gates-test` for workflow-loader/content-lock coverage.
+- [ ] Run workflow EDN read checks: `bb -e '(require (quote clojure.edn) (quote clojure.java.io)) (doseq [p [".psi/workflows/reduce-architectural-complexity.edn" ".psi/workflows/reduce-incidental-complexity.edn"]] (with-open [r (java.io.PushbackReader. (clojure.java.io/reader p))] (clojure.edn/read r)) (println "read" p))'`.
+- [ ] Run runtime-boundary cleanup negative assertion: `! grep -R -n -E 'proof-sync-routes|validation-capture-routes|workflow/proof-sync-disposition-routing|workflow/validation-capture-disposition-routing|PROOF_SYNC_ROUTE|VALIDATION_CAPTURE_ROUTE|COVERAGE_REVIEW|VALIDATION_RECAPTURE|BOOKKEEPING_FIXED_POINT|IMPLEMENTATION_REPAIR|TERMINAL_STOP' components/agent-session/src/psi/agent_session/workflow components/workflow-runtime/src components/workflow-loader/src components/deterministic-operation-runtime/src components/deterministic-operation-registry/src`.
+- [ ] Run authored-policy positive assertion: `grep -R -n -E '"PROOF_SYNC_ROUTE"|"VALIDATION_CAPTURE_ROUTE"|"COVERAGE_REVIEW"|"VALIDATION_RECAPTURE"|"BOOKKEEPING_FIXED_POINT"|"IMPLEMENTATION_REPAIR"|"TERMINAL_STOP"' .psi/workflows/reduce-architectural-complexity.edn .psi/workflows/reduce-incidental-complexity.edn components/workflow-loader/test/psi/workflow_loader/task_209_workflow_definitions_test.clj components/workflow-loader/test/psi/workflow_loader/task_218_workflow_definitions_test.clj components/workflow-loader/test/psi/workflow_loader/task_220_workflow_proof_gates_test.clj`.
 - [ ] Run `git diff --check`.
 - [ ] Append a concise implementation note to `implementation.md` with verification commands and results when implementation completes.
 
 ## Review follow-ups — plan ambiguity
 
-- [ ] PA1: Refine `plan.md`/`steps.md` so specialized parser wrappers and old operation registrations are removed in a compile-safe handoff: either remove `parse-proof-sync-disposition-routing` / `parse-validation-capture-disposition-routing` and their `workflow.core` registrations in the same slice/commit, or explicitly keep temporary wrappers until registration cleanup; do not leave `workflow.core` referencing deleted routing vars between slices.
-- [ ] PA2: Pin the focused verification commands/namespaces in `plan.md`/`steps.md` instead of saying only "relevant focused Scry suites": name the routing parser namespace, built-in operation registration/invocation namespace, workflow-loader task 209/218/220 namespaces, and the exact EDN read checks for both simplification workflows.
-- [ ] PA3: Add a concrete final boundary-cleanup verification step that scopes grep/assertions precisely: generic runtime source must not contain `proof-sync-routes`, `validation-capture-routes`, `workflow/proof-sync-disposition-routing`, `workflow/validation-capture-disposition-routing`, `PROOF_SYNC_ROUTE`, `VALIDATION_CAPTURE_ROUTE`, or workflow-owned route labels, while the authored workflow EDNs/content-lock tests still contain the expected marker labels and allowed route vectors.
+- [x] PA1: Refine `plan.md`/`steps.md` so specialized parser wrappers and old operation registrations are removed in a compile-safe handoff: either remove `parse-proof-sync-disposition-routing` / `parse-validation-capture-disposition-routing` and their `workflow.core` registrations in the same slice/commit, or explicitly keep temporary wrappers until registration cleanup; do not leave `workflow.core` referencing deleted routing vars between slices.
+- [x] PA2: Pin the focused verification commands/namespaces in `plan.md`/`steps.md` instead of saying only "relevant focused Scry suites": name the routing parser namespace, built-in operation registration/invocation namespace, workflow-loader task 209/218/220 namespaces, and the exact EDN read checks for both simplification workflows.
+- [x] PA3: Add a concrete final boundary-cleanup verification step that scopes grep/assertions precisely: generic runtime source must not contain `proof-sync-routes`, `validation-capture-routes`, `workflow/proof-sync-disposition-routing`, `workflow/validation-capture-disposition-routing`, `PROOF_SYNC_ROUTE`, `VALIDATION_CAPTURE_ROUTE`, or workflow-owned route labels, while the authored workflow EDNs/content-lock tests still contain the expected marker labels and allowed route vectors.
