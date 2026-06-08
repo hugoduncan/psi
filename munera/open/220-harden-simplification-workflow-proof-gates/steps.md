@@ -178,3 +178,7 @@ when done.
 - [x] Verify coherence across `design.md`, `plan.md`, `steps.md`, workflow EDNs, runtime operation, tests, docs, and changelog for operation id, artifact names, route labels, terminal step names, and proof-sync fixed-point semantics.
 - [x] Append final verification notes and PASS_STATUS to `implementation.md`.
 - [x] Commit Slice 7 (`⚒ doc: document hardened simplification gates`) — this commit.
+
+## Implementation review follow-ups
+
+- [ ] IR1: Add `proof-sync-fixed-point` yielded source context to both simplification workflow `final-summary` steps and content-lock it in tests; final summaries can be reached from clean fixed-point verification, so they must not have to infer that final proof gate from topology or stale `proof-sync` prose.
