@@ -69,3 +69,9 @@
 - [ ] Run workflow EDN read checks for `reduce-architectural-complexity.edn` and `reduce-incidental-complexity.edn`.
 - [ ] Run `git diff --check`.
 - [ ] Append a concise implementation note to `implementation.md` with verification commands and results when implementation completes.
+
+## Review follow-ups — plan ambiguity
+
+- [ ] PA1: Refine `plan.md`/`steps.md` so specialized parser wrappers and old operation registrations are removed in a compile-safe handoff: either remove `parse-proof-sync-disposition-routing` / `parse-validation-capture-disposition-routing` and their `workflow.core` registrations in the same slice/commit, or explicitly keep temporary wrappers until registration cleanup; do not leave `workflow.core` referencing deleted routing vars between slices.
+- [ ] PA2: Pin the focused verification commands/namespaces in `plan.md`/`steps.md` instead of saying only "relevant focused Scry suites": name the routing parser namespace, built-in operation registration/invocation namespace, workflow-loader task 209/218/220 namespaces, and the exact EDN read checks for both simplification workflows.
+- [ ] PA3: Add a concrete final boundary-cleanup verification step that scopes grep/assertions precisely: generic runtime source must not contain `proof-sync-routes`, `validation-capture-routes`, `workflow/proof-sync-disposition-routing`, `workflow/validation-capture-disposition-routing`, `PROOF_SYNC_ROUTE`, `VALIDATION_CAPTURE_ROUTE`, or workflow-owned route labels, while the authored workflow EDNs/content-lock tests still contain the expected marker labels and allowed route vectors.
