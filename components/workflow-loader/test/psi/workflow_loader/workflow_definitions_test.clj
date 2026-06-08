@@ -412,7 +412,7 @@
                  :operation "workflow/constant-routing"
                  :args {:route "REPEAT"}}
                 (:judge follow-up-step)))
-         (is (= {"REPEAT" {:goto "review" :max-iterations 6}}
+         (is (= {"REPEAT" {:goto "review" :max-iterations 10}}
                 (:on follow-up-step))))
        (testing "follow-up step uses the shared steps-profile follow-up body"
          (let [text (step-template-text follow-up-step)]

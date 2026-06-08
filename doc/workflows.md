@@ -668,11 +668,14 @@ review step, so "the preceding review pass" is unambiguous at runtime. Both
 profiles execute only the items the immediately preceding review pass added,
 leaving any pre-existing unchecked items untouched.
 
-Host routing and looping are unchanged by this sharing: `review-task-design` and
-`review-task-plan` advance forward one aspect at a time, while `review-step`
-loops back to its review step (`REPEAT → review`, bounded by
-`:max-iterations`). Only the follow-up step *body* is shared; the
-judge/`:on` wiring around each follow-up stays with its host.
+Host routing owns repetition; only the follow-up step *body* is shared.
+`review-task-design` and `review-task-plan` advance forward one aspect at a
+time. `review-step` loops back to its `review` step (`REPEAT → review`) with
+`:max-iterations 10`, so implementation-review profiles delegated through
+`review-task-implementation` can enter the review step at most ten total times
+(the initial review plus up to nine follow-up-driven re-reviews). The workflow
+runtime counts `:max-iterations` as total target-step entries, including the
+initial entry.
 
 ## Task knowledge extraction
 

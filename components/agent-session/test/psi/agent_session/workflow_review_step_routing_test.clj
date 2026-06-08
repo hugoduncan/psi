@@ -38,7 +38,7 @@
             :judge {:type :invoke
                     :operation "workflow/constant-routing"
                     :args {:route "REPEAT"}}
-            :on {"REPEAT" {:goto "review" :max-iterations 6}}}]})
+            :on {"REPEAT" {:goto "review" :max-iterations 10}}}]})
 
 (defn- register-review-routing-ops!
   [ctx]
@@ -196,7 +196,40 @@
           (is (= ["Review munera/open/189-deterministic-review-step-routing with task-implementation-review"
                   "Execute follow-up for munera/open/189-deterministic-review-step-routing"
                   "Review munera/open/189-deterministic-review-step-routing with task-implementation-review"]
-                 (mapv :prompt @prompts*))))))))
+                 (mapv :prompt @prompts*)))))))
+  (testing "review can be entered ten total times before an eleventh entry fails the iteration guard"
+    (let [[ctx session-id] (support/create-session-context {:persist? false})
+          prompts* (atom [])]
+      (register-review-routing-ops! ctx)
+      (create-review-run! ctx "run-review-repeat-limit")
+      (with-redefs [psi.agent-session.turn/prompt-execution-result-in!
+                    (fn [_ctx child-session-id prompt]
+                      (swap! prompts* conj {:session-id child-session-id :prompt prompt})
+                      {:execution-result/assistant-message
+                       {:role "assistant"
+                        :content [{:type :text
+                                   :text (case prompt
+                                           "Review munera/open/189-deterministic-review-step-routing with task-implementation-review"
+                                           "PASS_STATUS: ACTIONABLE_FEEDBACK"
+
+                                           "Execute follow-up for munera/open/189-deterministic-review-step-routing"
+                                           "follow-up complete")}]
+                        :stop-reason :stop}})]
+        (let [result (workflow-execution/execute-run! ctx session-id "run-review-repeat-limit")
+              run (workflow-runtime/workflow-run-in @(:state* ctx) "run-review-repeat-limit")]
+          (is (= :failed (:status result)))
+          (is (= :failed (:status run)))
+          (is (= 10 (count (get-in run [:step-runs "review" :attempts]))))
+          (is (= 10 (count (get-in run [:step-runs "follow-up" :attempts]))))
+          (is (= {:outcome :failed
+                  :reason :iteration-exhausted
+                  :step-id "follow-up"
+                  :attempt-id nil
+                  :judge-output {:routing-result {:status :ok
+                                                  :data "REPEAT"
+                                                  :summary "REPEAT"}}}
+                 (:terminal-outcome run)))
+          (is (= 20 (count @prompts*))))))))
 
 (deftest review-step-pass-status-operation-error-fails-before-follow-up-test
   (testing "missing PASS_STATUS fails with invoke-judge diagnostics and does not execute follow-up"

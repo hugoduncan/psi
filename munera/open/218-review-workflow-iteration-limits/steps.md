@@ -2,16 +2,16 @@
 
 ## Slice 1 — Inspect current workflow consumers and test seams
 
-- [ ] Search workflow definitions and tests for all `review-step` delegate targets/usages and record whether any non-implementation-review consumer would be harmed by changing the shared loop limit.
-- [ ] Inspect existing workflow-definition tests for `review-step`, `review-task-design`, and `review-task-plan` and list assertions that encode the old limits or old topology.
-- [ ] Inspect existing workflow runtime/review routing tests for reusable helpers that can exercise pass loops and iteration-limit failures without adding broad new harness code.
+- [x] Search workflow definitions and tests for all `review-step` delegate targets/usages and record whether any non-implementation-review consumer would be harmed by changing the shared loop limit.
+- [x] Inspect existing workflow-definition tests for `review-step`, `review-task-design`, and `review-task-plan` and list assertions that encode the old limits or old topology.
+- [x] Inspect existing workflow runtime/review routing tests for reusable helpers that can exercise pass loops and iteration-limit failures without adding broad new harness code.
 
 ## Slice 2 — Implementation-review limit
 
-- [ ] Update `.psi/workflows/review-step.edn` so `follow-up` routes back to `review` with `:max-iterations 10`.
-- [ ] Update workflow-definition coverage that currently expects `:max-iterations 6` on the `review-step` loop to expect 10 total target-step entries.
-- [ ] Add or update a focused runtime test proving the `review` step may be entered 10 total times and that an attempted 11th entry fails through the workflow iteration-limit path.
-- [ ] Verify `review-task-implementation.edn` delegates still target the shared `review-step` workflow for all implementation/test/docs/shape review profiles.
+- [x] Update `.psi/workflows/review-step.edn` so `follow-up` routes back to `review` with `:max-iterations 10`.
+- [x] Update workflow-definition coverage that currently expects `:max-iterations 6` on the `review-step` loop to expect 10 total target-step entries.
+- [x] Add or update a focused runtime test proving the `review` step may be entered 10 total times and that an attempted 11th entry fails through the workflow iteration-limit path.
+- [x] Verify `review-task-implementation.edn` delegates still target the shared `review-step` workflow for all implementation/test/docs/shape review profiles.
 
 ## Slice 3 — Design-review full-pass loop
 
@@ -45,15 +45,15 @@
 
 ## Slice 6 — Docs and changelog
 
-- [ ] Search `README.md`, `doc/`, and `CHANGELOG.md` for review workflow repetition/limit descriptions.
-- [ ] Update user-facing workflow docs if they describe old single-pass behavior, old one-follow-up-per-phase behavior, or old review-loop limits.
-- [ ] Add a `[Unreleased]` `CHANGELOG.md` entry if the changed review-loop limits/repetition are user-visible.
+- [x] Search `README.md`, `doc/`, and `CHANGELOG.md` for review workflow repetition/limit descriptions.
+- [x] Update user-facing workflow docs if they describe old single-pass behavior, old one-follow-up-per-phase behavior, or old review-loop limits.
+- [x] Add a `[Unreleased]` `CHANGELOG.md` entry if the changed review-loop limits/repetition are user-visible.
 
 ## Slice 7 — Verification and coherence
 
-- [ ] Run focused workflow-loader tests covering workflow definitions.
-- [ ] Run focused workflow runtime/review routing tests covering the new loop behavior and iteration-limit failures.
-- [ ] Run targeted `clj-kondo` on touched Clojure test/source files.
-- [ ] Run `clj-paren-repair` or formatter on touched Clojure files if edits change Clojure structure/formatting.
+- [x] Run focused workflow-loader tests covering workflow definitions.
+- [x] Run focused workflow runtime/review routing tests covering the new loop behavior and iteration-limit failures.
+- [x] Run targeted `clj-kondo` on touched Clojure test/source files.
+- [x] Run `clj-paren-repair` or formatter on touched Clojure files if edits change Clojure structure/formatting.
 - [ ] Re-read changed workflow definitions, tests, docs, `plan.md`, and `steps.md` to verify coherence with `design.md` acceptance criteria.
 - [ ] Append implementation notes with verification results to `implementation.md`.
