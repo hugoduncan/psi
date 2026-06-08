@@ -70,25 +70,25 @@ when done.
 
 ## Slice 3 — Parse-checked validation capture
 
-- [ ] Strengthen architecture `validation-capture` wording so every successful validation artifact is parsed after write, not trusted from exit code alone.
-- [ ] In architecture `validation-capture`, explicitly parse-check `after-diagnose.edn`, `after-architecture-targets.edn`, `architecture-compare.edn`, and `architecture-gate.edn` after writing.
-- [ ] In architecture `validation-capture`, require exit-0 unreadable/truncated EDN to be replaced with a readable EDN failure map and routed through `validation-capture-disposition`.
-- [ ] In architecture `validation-capture`, emit exactly one `VALIDATION_CAPTURE_ROUTE: IMPLEMENTATION_REPAIR` marker for fixable validation failures and exactly one `VALIDATION_CAPTURE_ROUTE: TERMINAL_STOP` marker for unrecoverable capture failures; both failure paths also emit `PASS_STATUS: ACTIONABLE_FEEDBACK`.
-- [ ] Add architecture `validation-capture-disposition` invoke step using operation `workflow/validation-capture-disposition-routing`; route `IMPLEMENTATION_REPAIR` to `implement-task` and `TERMINAL_STOP` to `terminal-stop-validation-capture` with the failing validation yield as context.
-- [ ] Add incidental `incidental-validation-capture` after `review-task-implementation` and before `proof-sync`.
-- [ ] In `incidental-validation-capture`, run `bb gordian local --json` from the worktree root and write raw stdout to `{{input}}/after-local.json`.
-- [ ] In `incidental-validation-capture`, parse-check `after-local.json` as JSON and require a `units` array.
-- [ ] In `incidental-validation-capture`, compute and write `incidental-burden-check.edn` containing target key, original target burden `B`, after target burden, A5 result, A2a/A2b checked row summaries, and overall pass/fail.
-- [ ] In `incidental-validation-capture`, run `bb gordian gate --baseline {{input}}/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0 --edn` and write `incidental-gate.edn`.
-- [ ] In `incidental-validation-capture`, parse-check `incidental-gate.edn` as EDN and treat exit-0 unreadable/truncated EDN as failure-map replacement.
-- [ ] In `incidental-validation-capture`, emit exactly one `VALIDATION_CAPTURE_ROUTE: IMPLEMENTATION_REPAIR` marker for fixable validation failures and exactly one `VALIDATION_CAPTURE_ROUTE: TERMINAL_STOP` marker for unrecoverable capture failures; both failure paths also emit `PASS_STATUS: ACTIONABLE_FEEDBACK`.
-- [ ] Add incidental `validation-capture-disposition` invoke step using operation `workflow/validation-capture-disposition-routing`; route `IMPLEMENTATION_REPAIR` to `implement-task` and `TERMINAL_STOP` to `terminal-stop-validation-capture` with the failing validation yield as context.
-- [ ] Route fixable incidental validation failures back to `implement-task` only through `validation-capture-disposition` after committing repair notes/artifacts.
-- [ ] Route unrecoverable incidental capture failures to `terminal-stop-validation-capture` only through `validation-capture-disposition` with the failing validation yield as explicit context.
-- [ ] Ensure no final A5/A2/A3 proof claim is allowed from unparseable JSON/EDN or uncaptured validation output.
-- [ ] Verify both workflow EDNs load/compile through the workflow-loader/registry path after Slice 3 topology edits, not only parse as EDN.
-- [ ] Record Slice 3 implementation and verification notes in `implementation.md`.
-- [ ] Commit Slice 3 (`⚒ workflow: parse-check simplification validation`).
+- [x] Strengthen architecture `validation-capture` wording so every successful validation artifact is parsed after write, not trusted from exit code alone.
+- [x] In architecture `validation-capture`, explicitly parse-check `after-diagnose.edn`, `after-architecture-targets.edn`, `architecture-compare.edn`, and `architecture-gate.edn` after writing.
+- [x] In architecture `validation-capture`, require exit-0 unreadable/truncated EDN to be replaced with a readable EDN failure map and routed through `validation-capture-disposition`.
+- [x] In architecture `validation-capture`, emit exactly one `VALIDATION_CAPTURE_ROUTE: IMPLEMENTATION_REPAIR` marker for fixable validation failures and exactly one `VALIDATION_CAPTURE_ROUTE: TERMINAL_STOP` marker for unrecoverable capture failures; both failure paths also emit `PASS_STATUS: ACTIONABLE_FEEDBACK`.
+- [x] Add architecture `validation-capture-disposition` invoke step using operation `workflow/validation-capture-disposition-routing`; route `IMPLEMENTATION_REPAIR` to `implement-task` and `TERMINAL_STOP` to `terminal-stop-validation-capture` with the failing validation yield as context.
+- [x] Add incidental `incidental-validation-capture` after `review-task-implementation` and before `proof-sync`.
+- [x] In `incidental-validation-capture`, run `bb gordian local --json` from the worktree root and write raw stdout to `{{input}}/after-local.json`.
+- [x] In `incidental-validation-capture`, parse-check `after-local.json` as JSON and require a `units` array.
+- [x] In `incidental-validation-capture`, compute and write `incidental-burden-check.edn` containing target key, original target burden `B`, after target burden, A5 result, A2a/A2b checked row summaries, and overall pass/fail.
+- [x] In `incidental-validation-capture`, run `bb gordian gate --baseline {{input}}/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0 --edn` and write `incidental-gate.edn`.
+- [x] In `incidental-validation-capture`, parse-check `incidental-gate.edn` as EDN and treat exit-0 unreadable/truncated EDN as failure-map replacement.
+- [x] In `incidental-validation-capture`, emit exactly one `VALIDATION_CAPTURE_ROUTE: IMPLEMENTATION_REPAIR` marker for fixable validation failures and exactly one `VALIDATION_CAPTURE_ROUTE: TERMINAL_STOP` marker for unrecoverable capture failures; both failure paths also emit `PASS_STATUS: ACTIONABLE_FEEDBACK`.
+- [x] Add incidental `validation-capture-disposition` invoke step using operation `workflow/validation-capture-disposition-routing`; route `IMPLEMENTATION_REPAIR` to `implement-task` and `TERMINAL_STOP` to `terminal-stop-validation-capture` with the failing validation yield as context.
+- [x] Route fixable incidental validation failures back to `implement-task` only through `validation-capture-disposition` after committing repair notes/artifacts.
+- [x] Route unrecoverable incidental capture failures to `terminal-stop-validation-capture` only through `validation-capture-disposition` with the failing validation yield as explicit context.
+- [x] Ensure no final A5/A2/A3 proof claim is allowed from unparseable JSON/EDN or uncaptured validation output.
+- [x] Verify both workflow EDNs load/compile through the workflow-loader/registry path after Slice 3 topology edits, not only parse as EDN.
+- [x] Record Slice 3 implementation and verification notes in `implementation.md`.
+- [x] Commit Slice 3 (`⚒ workflow: parse-check simplification validation`).
 
 ## Slice 4 — Proof-sync fixed-point topology
 

@@ -183,6 +183,8 @@
            diff-gate-step (get step-by-name "diff-gate")
            implement-step (get step-by-name "implement-task")
            implementation-review-step (get step-by-name "review-task-implementation")
+           validation-capture-step (get step-by-name "incidental-validation-capture")
+           validation-disposition-step (get step-by-name "validation-capture-disposition")
            final-summary-step (get step-by-name "final-summary")
            select-text (step-template-text select-step)
            clean-text (step-template-text clean-baseline-step)
@@ -190,6 +192,7 @@
            disposition-text (step-template-text coverage-disposition-step)
            coverage-fix-text (step-template-text coverage-fix-step)
            diff-gate-text (step-template-text diff-gate-step)
+           validation-capture-text (step-template-text validation-capture-step)
            final-summary-text (step-template-text final-summary-step)
            malformed-stop-text (step-template-text malformed-stop-step)
            clean-stop-text (step-template-text clean-stop-step)
@@ -216,6 +219,8 @@
                  "diff-gate"
                  "implement-task"
                  "review-task-implementation"
+                 "incidental-validation-capture"
+                 "validation-capture-disposition"
                  "final-summary"]
                 (mapv :name steps)))
          (is (= [:session
@@ -236,6 +241,8 @@
                  :session
                  :delegate
                  :delegate
+                 :session
+                 :invoke
                  :session]
                 (mapv :type steps))))
        (testing "select-and-create carries the current-worktree tools + design-named skills"
@@ -303,6 +310,9 @@
                    ["REVIEW_COMPLETE"]]
                   [diff-gate-step
                    "diff-gate"
+                   ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]]
+                  [validation-capture-step
+                   "incidental-validation-capture"
                    ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]]]]
            (is (= {:type :invoke
                    :operation "workflow/pass-status-routing"
@@ -504,17 +514,46 @@
          (is (.contains diff-gate-text "commit the task-artifact update"))
          (is (.contains diff-gate-text "PASS_STATUS: REVIEW_COMPLETE"))
          (is (.contains diff-gate-text "PASS_STATUS: ACTIONABLE_FEEDBACK")))
+       (testing "incidental validation capture parse-checks proof artifacts and routes deterministically"
+         (is (= "final-summary" (get-in validation-capture-step [:on "DONE" :goto])))
+         (is (= "validation-capture-disposition"
+                (get-in validation-capture-step [:on "REPEAT" :goto])))
+         (is (= :invoke (:type validation-disposition-step)))
+         (is (= "workflow/validation-capture-disposition-routing"
+                (:operation validation-disposition-step)))
+         (is (= {:text {:from {:step "incidental-validation-capture"
+                               :output :final-llm-reply}}}
+                (:args validation-disposition-step)))
+         (is (= {"IMPLEMENTATION_REPAIR" {:goto "implement-task"}
+                 "TERMINAL_STOP" {:goto "terminal-stop-validation-capture"}}
+                (:on validation-disposition-step)))
+         (is (.contains validation-capture-text "after-local.json"))
+         (is (.contains validation-capture-text "top-level `units` array"))
+         (is (.contains validation-capture-text "incidental-burden-check.edn"))
+         (is (.contains validation-capture-text "incidental-gate.edn"))
+         (is (.contains validation-capture-text "Parse-check the written EDN file"))
+         (is (.contains validation-capture-text "Exit 0 with unreadable, truncated, empty, or non-EDN stdout"))
+         (is (.contains validation-capture-text "VALIDATION_CAPTURE_ROUTE: IMPLEMENTATION_REPAIR"))
+         (is (.contains validation-capture-text "VALIDATION_CAPTURE_ROUTE: TERMINAL_STOP"))
+         (is (.contains validation-capture-text "No final A5/A2/A3 proof claim is allowed from unparseable JSON/EDN")))
        (testing "implementation and split summaries preserve target-present and terminal contracts"
          (is (nil? (:judge implementation-review-step))
              "review-task-implementation has no judge that can shortcut the successful path")
          (is (nil? (:on implementation-review-step))
-             "review-task-implementation falls through to final-summary by step order")
+             "review-task-implementation falls through to incidental-validation-capture by step order")
          (is (some #(= {:step "review-task-implementation" :yield :text}
                        (:from %))
                    (:contributions final-summary-step))
-             "final-summary sources review-task-implementation output as the successful terminal path")
+             "final-summary sources review-task-implementation output")
+         (is (some #(= {:step "incidental-validation-capture" :yield :text}
+                       (:from %))
+                   (:contributions final-summary-step))
+             "final-summary sources parse-checked incidental validation output as the successful terminal path")
          (is (.contains final-summary-text
-                        "design → plan → characterization-test-net gate → baseline/diff gate → simplification implementation → implementation review"))
+                        "design → plan → characterization-test-net gate → baseline/diff gate → simplification implementation → implementation review → incidental validation-capture"))
+         (is (.contains final-summary-text "after-local.json"))
+         (is (.contains final-summary-text "incidental-burden-check.edn"))
+         (is (.contains final-summary-text "incidental-gate.edn"))
          (is (= {"DONE" {:goto :done}}
                 (:on final-summary-step))
              "successful target-present final summary stops at done")

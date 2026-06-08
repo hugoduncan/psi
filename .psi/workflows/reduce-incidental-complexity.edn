@@ -115,6 +115,8 @@
    [{:type :source, :from :workflow-original}
     {:type :source, :from {:step "select-and-create", :yield :text}}
     {:type :source, :from {:step "extract-task-path", :yield :text}}
+    {:type :source,
+     :from {:step "incidental-validation-capture", :yield :text}}
     {:type :template,
      :text
      "Produce the terminal stop summary for `reduce-incidental-complexity` after an unrecoverable validation-capture failure for {{input}}.\n\nStop source: validation-capture. Later validation routes must pass the failing validation yield as explicit context.\nRead committed task artifacts and name the parse-checked failure-map artifact path (for example `architecture-gate.edn` or `incidental-gate.edn`) when available.\nDo not infer the failed gate from missing artifacts alone.\n\nInput task path:\n{{input}}",
@@ -321,6 +323,48 @@
     {:type :source, :from {:step "coverage-review", :yield :text}}
     {:type :source, :from {:step "diff-gate", :yield :text}}
     {:type :source, :from {:step "implement-task", :yield :text}}]}
+  {:name "incidental-validation-capture",
+   :type :session,
+   :tools ["read" "bash" "edit" "write"],
+   :skills ["gordian"],
+   :contributions
+   [{:type :source, :from :workflow-original}
+    {:type :source, :from {:step "select-and-create", :yield :text}}
+    {:type :source, :from {:step "extract-task-path", :yield :text}}
+    {:type :source, :from {:step "clean-baseline", :yield :text}}
+    {:type :source, :from {:step "coverage-review", :yield :text}}
+    {:type :source, :from {:step "diff-gate", :yield :text}}
+    {:type :source, :from {:step "implement-task", :yield :text}}
+    {:type :source,
+     :from {:step "review-task-implementation", :yield :text}}
+    {:type :template,
+     :text
+     "Capture post-implementation Gordian validation artifacts for the incidental-complexity Munera task at {{input}} after implementation review and before proof/final summary. Work in the current inherited worktree. Do NOT call `work-on`, create a worktree, or switch branches.\n\nRequired procedure:\n1. Read task artifacts, `coverage-map.md`, `characterization-baseline.edn`, `before-local.json`, and `before-diagnose.edn`. Parse-check `before-local.json` as JSON and require a top-level `units` array. Parse-check `before-diagnose.edn` as EDN before using it as the gate baseline.\n2. Identify the target row from the task artifacts using the line-bearing `(ns, var, arity, line)` key and read the original target burden `B` from `before-local.json`. If the target row cannot be found exactly once, record a failure map/finding and route according to the failure rules below.\n3. Run `bb gordian local --json` from the worktree root and write raw JSON stdout to `{{input}}/after-local.json`. Immediately parse-check the written file as JSON and require a top-level `units` array. Exit 0 with unreadable, truncated, empty, or non-JSON stdout is failure, not proof; replace it with a readable EDN or JSON failure map at the same path before routing failure.\n4. Compute the deterministic A5 target-reduction result and A2 relocation-guard result from the parse-checked `before-local.json` and `after-local.json`. Write `{{input}}/incidental-burden-check.edn` as an EDN map containing at least `:target-key`, `:before-target-burden`, `:after-target-burden`, `:a5/pass?`, `:a2a/checked-rows`, `:a2a/pass?`, `:a2b/checked-rows`, `:a2b/pass?`, and `:overall/pass?`. Parse-check the written EDN file before making any A5/A2 claim.\n5. Run `bb gordian gate --baseline {{input}}/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0 --edn` from the worktree root and write raw EDN stdout to `{{input}}/incidental-gate.edn`. Immediately parse-check the written file as EDN. Exit 0 with unreadable, truncated, empty, or non-EDN stdout is failure, not proof; replace it with a readable EDN failure map at the same path.\n6. If `after-local.json`, `incidental-burden-check.edn`, or `incidental-gate.edn` is missing, unparseable, a failure map, or records failing A5/A2/A3 results, append a terse validation-capture finding to `implementation.md`, add a concrete unchecked repair item to `steps.md` when implementation repair is plausible, update `coverage-map.md` with the failing artifact reference, and commit the artifact/task update.\n7. For fixable implementation or validation failures, end with exactly one `VALIDATION_CAPTURE_ROUTE: IMPLEMENTATION_REPAIR` line and exactly one `PASS_STATUS: ACTIONABLE_FEEDBACK` line. Examples include A5 not reduced, A2 relocation-guard failure, A3 gate failure, or parseable validation failures caused by implementation changes.\n8. For unrecoverable capture failures, end with exactly one `VALIDATION_CAPTURE_ROUTE: TERMINAL_STOP` line and exactly one `PASS_STATUS: ACTIONABLE_FEEDBACK` line. Examples include absent/unparseable required baselines, unable-to-identify target identity, command unavailability, or repeated capture infrastructure failure that cannot be repaired by implementation edits.\n9. If and only if `after-local.json` parses as JSON with `units`, `incidental-burden-check.edn` parses as EDN and records overall pass, and `incidental-gate.edn` parses as EDN and records the A3 gate pass, append a terse validation-capture note to `implementation.md`, update `coverage-map.md` with references to the three final proof artifacts, commit artifacts/task notes, and end with exactly `PASS_STATUS: REVIEW_COMPLETE`. Do not emit a `VALIDATION_CAPTURE_ROUTE:` marker on success.\n\nNo final A5/A2/A3 proof claim is allowed from unparseable JSON/EDN, uncaptured command output, or exit code alone. The only validation failure routes are through the deterministic `validation-capture-disposition` step.\n\nInput task path:\n{{input}}",
+     :vars
+     {"input" {:from {:step "extract-task-path", :yield :text}}}}],
+   :judge
+   {:type :invoke,
+    :operation "workflow/pass-status-routing",
+    :args
+    {:text
+     {:from
+      {:step "incidental-validation-capture",
+       :output :final-llm-reply}},
+     :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}},
+   :on
+   {"DONE" {:goto "final-summary"},
+    "REPEAT" {:goto "validation-capture-disposition"}}}
+  {:name "validation-capture-disposition",
+   :type :invoke,
+   :operation "workflow/validation-capture-disposition-routing",
+   :args
+   {:text
+    {:from
+     {:step "incidental-validation-capture",
+      :output :final-llm-reply}}},
+   :on
+   {"IMPLEMENTATION_REPAIR" {:goto "implement-task"},
+    "TERMINAL_STOP" {:goto "terminal-stop-validation-capture"}}}
   {:name "final-summary",
    :type :session,
    :tools ["read" "bash"],
@@ -334,9 +378,11 @@
     {:type :source, :from {:step "implement-task", :yield :text}}
     {:type :source,
      :from {:step "review-task-implementation", :yield :text}}
+    {:type :source,
+     :from {:step "incidental-validation-capture", :yield :text}}
     {:type :template,
      :text
-     "Produce the user-facing final result for the completed target-present reduce-incidental-complexity run described by {{input}}. Independently inspect the Munera task artifacts. Summarize the design → plan → characterization-test-net gate → baseline/diff gate → simplification implementation → implementation review outcome. Include verification performed, task artifact files updated, commit ids evident from step outputs, and whether the task remains open or was closed. Do not claim a PR was opened or pushed.\n\nInput:\n{{input}}\n\nProof authority: read committed task-local `coverage-map.md`, `characterization-baseline.edn`, `before-local.json`, `before-diagnose.edn`, and any later incidental validation/proof artifacts that exist. Treat `coverage-map.md` as the canonical coverage/proof map rather than relying on review prose alone.",
+     "Produce the user-facing final result for the completed target-present reduce-incidental-complexity run described by {{input}}. Independently inspect the Munera task artifacts. Summarize the design → plan → characterization-test-net gate → baseline/diff gate → simplification implementation → implementation review → incidental validation-capture outcome. Include verification performed, task artifact files updated, commit ids evident from step outputs, and whether the task remains open or was closed. Do not claim a PR was opened or pushed.\n\nInput:\n{{input}}\n\nProof authority: read committed task-local `coverage-map.md`, `characterization-baseline.edn`, `before-local.json`, `before-diagnose.edn`, and validation artifacts (`after-local.json`, `incidental-burden-check.edn`, `incidental-gate.edn`). Treat `coverage-map.md` as the canonical coverage/proof map rather than relying on review prose alone.",
      :vars
      {"input" {:from {:step "extract-task-path", :yield :text}}}}],
    :judge

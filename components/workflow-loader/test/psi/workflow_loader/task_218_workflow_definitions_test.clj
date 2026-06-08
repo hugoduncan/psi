@@ -146,6 +146,7 @@
                  "diff-gate"
                  "implement-task"
                  "validation-capture"
+                 "validation-capture-disposition"
                  "review-implementation-correctness"
                  "review-implementation-tests"
                  "review-implementation-architecture"
@@ -244,7 +245,8 @@
            fix (by-name "coverage-fix")
            diff (by-name "diff-gate")
            implement (by-name "implement-task")
-           validation (by-name "validation-capture")]
+           validation (by-name "validation-capture")
+           validation-disposition (by-name "validation-capture-disposition")]
        (testing "downstream task consumers all use extract-task-path as input"
          (doseq [step-name ["review-task-design" "create-task-plan" "review-task-plan"
                             "implement-task" "review-implementation-correctness"
@@ -285,16 +287,31 @@
        (testing "validation capture immediately follows implementation and precedes reviews"
          (is (= "validation-capture" (get-in implement [:on "DONE" :goto])))
          (is (= "review-implementation-correctness" (get-in validation [:on "DONE" :goto])))
-         (is (= "implement-task" (get-in validation [:on "REPEAT" :goto])))
-         (is (= (pass-status-judge "validation-capture") (:judge validation))))
+         (is (= "validation-capture-disposition" (get-in validation [:on "REPEAT" :goto])))
+         (is (= (pass-status-judge "validation-capture") (:judge validation)))
+         (is (= :invoke (:type validation-disposition)))
+         (is (= "workflow/validation-capture-disposition-routing"
+                (:operation validation-disposition)))
+         (is (= {:text {:from {:step "validation-capture"
+                               :output :final-llm-reply}}}
+                (:args validation-disposition)))
+         (is (= {"IMPLEMENTATION_REPAIR" {:goto "implement-task"}
+                 "TERMINAL_STOP" {:goto "terminal-stop-validation-capture"}}
+                (:on validation-disposition))))
        (testing "validation prompt locks producer-before-review artifacts and failure routing"
          (let [text (step-template-text validation)]
            (is (.contains text "after-diagnose.edn"))
            (is (.contains text "after-architecture-targets.edn"))
            (is (.contains text "architecture-compare.edn"))
            (is (.contains text "architecture-gate.edn"))
-           (is (.contains text "EDN failure map"))
+           (is (.contains text "Immediately parse-check the written file as EDN"))
+           (is (.contains text "Exit code alone is never proof"))
+           (is (.contains text "Exit 0 with unreadable, truncated, empty, or non-EDN stdout"))
+           (is (.contains text "readable EDN failure map"))
+           (is (.contains text "VALIDATION_CAPTURE_ROUTE: IMPLEMENTATION_REPAIR"))
+           (is (.contains text "VALIDATION_CAPTURE_ROUTE: TERMINAL_STOP"))
            (is (.contains text "PASS_STATUS: ACTIONABLE_FEEDBACK"))
+           (is (.contains text "deterministic `validation-capture-disposition` step"))
            (is (.contains text "Missing, unreadable, failed"))))))))
 
 (deftest reduce-architectural-complexity-review-chain-test
