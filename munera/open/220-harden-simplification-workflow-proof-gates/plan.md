@@ -61,6 +61,10 @@ Implement dependency-first:
   `coverage-map.md`, `before-local.json`, `before-diagnose.edn`,
   `after-local.json`, `incidental-burden-check.edn`, `incidental-gate.edn`, and
   `characterization-baseline.edn` as named proof artifacts.
+- Architecture target-present tasks require task-local `coverage-map.md` as
+  proof authority, written first by `select-and-create` as an initial scaffold
+  and maintained by coverage review/fix, diff gate, validation capture,
+  proof-sync, and final summary.
 - Architecture validation artifacts remain `after-diagnose.edn`,
   `after-architecture-targets.edn`, `architecture-compare.edn`, and
   `architecture-gate.edn`; every successful artifact must parse after write, and
@@ -116,6 +120,39 @@ Implement dependency-first:
   synchronizer when stale, and `final-summary` reads it as committed proof
   authority.
 
+### Plan/steps inconsistency follow-up decisions
+
+- **Architecture `coverage-map.md` writer/lifecycle (PI1).** Architecture
+  target-present tasks use the same committed coverage-proof authority model as
+  incidental tasks. `select-and-create` is the first writer: it creates and
+  commits an initial `coverage-map.md` scaffold alongside `design.md`,
+  `architecture-targets.edn`, `before-diagnose.edn`, and the target-issues
+  artifact. Pending coverage/test counts must be represented explicitly. The
+  architecture lifecycle ownership is: `coverage-review` records affected
+  behaviours, authoritative test commands, coverage/test-net fields, and latest
+  counts; `coverage-fix` updates it for added characterization tests or minimal
+  seams; `diff-gate` records coverage-phase classification and its relationship
+  to `characterization-baseline.edn`; `validation-capture` records references to
+  `after-diagnose.edn`, `after-architecture-targets.edn`,
+  `architecture-compare.edn`, and `architecture-gate.edn`; `proof-sync`
+  synchronizes stale coverage/proof fields; and `final-summary` reads
+  `coverage-map.md` as committed proof authority. Do not narrow architecture
+  proof-sync's artifact set to omit `coverage-map.md`.
+- **Mandatory low-confidence architecture handling (PI2).** Architecture
+  `select-and-create` generated-design prompt and content-lock tests must always
+  cover selected candidate score and confidence. When `:confidence` is `:low`,
+  the generated design must include actionability despite low confidence,
+  falsification evidence, design-review questions, and scope-narrowing
+  considerations. This is not optional and has no Slice 2 `if needed` escape
+  hatch.
+- **Terminal-stop route ordering (PI3).** Split terminal-stop step definitions
+  are a topology prerequisite. Add the split terminal-stop steps in both
+  workflow EDNs before the first slice that routes to any of them, then migrate
+  routes slice-by-slice only after their target step already exists. After every
+  slice that changes workflow topology, verify the affected EDN loads through
+  the workflow-loader/registry path, not merely that the file is EDN-readable,
+  so undefined route targets are caught immediately.
+
 ## Risks
 
 - **R1 — Workflow topology regression.** Adding proof-sync loops and split
@@ -155,12 +192,14 @@ Implement dependency-first:
    `workflow/proof-sync-disposition-routing` and
    `workflow/validation-capture-disposition-routing`, and cover valid/malformed
    exact-marker parsing with runtime tests.
-2. **Slice 2 — Incidental task identity boundary and selector/proof generation
-   contracts.** Add incidental `extract-task-path` plus deterministic routing,
-   wire all downstream incidental task consumers to the extracted path, and
-   strengthen `select-and-create` prompts to create the initial mandatory
-   `coverage-map.md` scaffold, name parse-checked proof artifacts, record guard
-   evidence, and record marginal target notes.
+2. **Slice 2 — Task identity boundary, terminal prerequisites, and
+   selector/proof generation contracts.** Add split terminal-stop step
+   definitions before routing to them; add incidental `extract-task-path` plus
+   deterministic routing; wire downstream incidental task consumers to the
+   extracted path; and strengthen both `select-and-create` prompts so
+   architecture and incidental generated tasks create initial mandatory
+   `coverage-map.md` scaffolds, name parse-checked proof artifacts, and record
+   selector uncertainty/guard evidence.
 3. **Slice 3 — Parse-checked validation capture.** Strengthen architecture
    `validation-capture` parse-after-write/failure-map contract and add incidental
    `incidental-validation-capture` for `after-local.json`,
@@ -171,11 +210,11 @@ Implement dependency-first:
    both workflows in the design-specified order. Wire coverage-review,
    validation-recapture, bookkeeping fixed-point, clean final-summary, and
    proof-sync terminal-stop routes.
-5. **Slice 5 — Split terminal stops and final summaries.** Replace generic
-   terminal-stop summaries with stop-source-specific summary steps for malformed
-   task path, clean baseline, coverage disposition, diff gate,
-   validation-capture, and proof-sync. Ensure final summaries independently read
-   committed proof artifacts.
+5. **Slice 5 — Split terminal prompt completion and final summaries.** Complete
+   stop-source-specific terminal prompt content and remove any remaining generic
+   `terminal-stop-summary` routes for malformed task path, clean baseline,
+   coverage disposition, diff gate, validation-capture, and proof-sync. Ensure
+   final summaries independently read committed proof artifacts.
 6. **Slice 6 — Workflow-loader/content-lock tests.** Expand focused tests for
    both simplification workflows to lock task-path routing, proof-sync ordering,
    registered operation id, terminal-stop context, parse-check artifact contracts,

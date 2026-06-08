@@ -17,9 +17,9 @@ when done.
 
 ## Plan/steps inconsistency review follow-ups
 
-- [ ] PI1: Align architecture `coverage-map.md` proof authority with its writer lifecycle: because plan/steps require architecture `proof-sync` and final summary to read/synchronize `coverage-map.md`, add explicit architecture first-writer/update obligations (or explicitly narrow the proof-sync artifact set) so `coverage-map.md` is created before proof-sync can require it and maintained by coverage review/fix, diff gate, validation capture, proof-sync, and final summary as appropriate.
-- [ ] PI2: Make low-confidence architecture selector handling mandatory rather than optional: remove the Slice 2 `if needed` escape hatch and require the architecture `select-and-create` generated-design prompt plus content-lock tests to always cover score/confidence, and for `:confidence :low` the actionability, falsification evidence, design-review questions, and scope-narrowing considerations required by `design.md` and `plan.md`.
-- [ ] PI3: Reconcile split terminal-stop route ordering with slice boundaries: routes introduced in Slices 2-4 must not point at terminal stop steps that are only created in Slice 5. Either create the relevant split terminal steps before the first route to them, or move the routing changes into the same slice as the step definitions, and verify workflow EDNs load/compile (not only parse) after each slice that changes topology.
+- [x] PI1: Align architecture `coverage-map.md` proof authority with its writer lifecycle: because plan/steps require architecture `proof-sync` and final summary to read/synchronize `coverage-map.md`, add explicit architecture first-writer/update obligations (or explicitly narrow the proof-sync artifact set) so `coverage-map.md` is created before proof-sync can require it and maintained by coverage review/fix, diff gate, validation capture, proof-sync, and final summary as appropriate. — resolved in `plan.md`: architecture `select-and-create` is first writer; lifecycle owners are coverage review/fix, diff gate, validation capture, proof-sync, and final summary.
+- [x] PI2: Make low-confidence architecture selector handling mandatory rather than optional: remove the Slice 2 `if needed` escape hatch and require the architecture `select-and-create` generated-design prompt plus content-lock tests to always cover score/confidence, and for `:confidence :low` the actionability, falsification evidence, design-review questions, and scope-narrowing considerations required by `design.md` and `plan.md`. — resolved in `plan.md`/Slice 2/6 steps as mandatory architecture prompt and test obligations.
+- [x] PI3: Reconcile split terminal-stop route ordering with slice boundaries: routes introduced in Slices 2-4 must not point at terminal stop steps that are only created in Slice 5. Either create the relevant split terminal steps before the first route to them, or move the routing changes into the same slice as the step definitions, and verify workflow EDNs load/compile (not only parse) after each slice that changes topology. — resolved by making split terminal-stop step definitions a Slice 2 prerequisite, leaving Slice 5 for prompt completion/final cleanup, and requiring workflow-loader/registry load verification after each topology slice.
 
 ## Slice 1 — Preflight and deterministic operations
 
@@ -40,8 +40,10 @@ when done.
 - [ ] Record Slice 1 implementation and verification notes in `implementation.md`.
 - [ ] Commit Slice 1 (`⚒ workflow: add proof sync disposition routing`).
 
-## Slice 2 — Incidental task identity boundary and selector/proof generation contracts
+## Slice 2 — Task identity boundary, terminal prerequisites, and selector/proof generation contracts
 
+- [ ] Add split terminal-stop step definitions to both workflow EDNs before adding or changing any route to them: `terminal-stop-malformed-task-path`, `terminal-stop-clean-baseline`, `terminal-stop-coverage-disposition`, `terminal-stop-diff-gate`, `terminal-stop-validation-capture`, and `terminal-stop-proof-sync`.
+- [ ] Keep split terminal-stop step definitions loadable with placeholder-safe prompts if needed; all routes introduced in later Slice 2-4 work must target already-defined steps, never a future Slice 5 step.
 - [ ] Add an `extract-task-path` session step to `reduce-incidental-complexity` immediately after target-created `select-and-create` success.
 - [ ] Wire incidental `select-and-create` `PASS_STATUS: REVIEW_COMPLETE` / normalized `"DONE"` route to `extract-task-path`, and keep no-target `"REPEAT"` route directly to `:done`.
 - [ ] In incidental `extract-task-path`, require exactly one `munera_task_path: munera/open/NNN-slug` line and respond with only the root-relative path on success.
@@ -58,8 +60,11 @@ when done.
 - [ ] Require `before-diagnose.edn` parse as EDN before baseline/gate claims.
 - [ ] Require generated incidental tasks to record top-5 guard evidence and say explicitly when no higher candidate was rejected before the chosen target.
 - [ ] Require generated incidental tasks to mark marginal targets according to the design thresholds and record falsification/review questions.
-- [ ] Update architecture `select-and-create` generated-design prompt, if needed, so low-confidence targets record score/confidence, actionability, falsification evidence, review questions, and scope-narrowing considerations.
-- [ ] Verify both workflow EDNs parse after Slice 2 edits.
+- [ ] Update architecture `select-and-create` generated-design prompt so every generated design records score and confidence, and so `:confidence :low` always records actionability despite low confidence, falsification evidence, design-review questions, and scope-narrowing considerations.
+- [ ] Require architecture `select-and-create` to create and commit an initial `coverage-map.md` scaffold before emitting the target-present handoff; pending/unknown values must be represented explicitly rather than omitting required fields.
+- [ ] In the architecture prompt, require `coverage-map.md` fields for selected candidate identity, score/confidence, target namespaces/source areas, selector proof, authoritative test commands, affected behaviours, coverage/gap dispositions, latest test/assertion counts, relationship to `characterization-baseline.edn`, and references to `after-diagnose.edn`, `after-architecture-targets.edn`, `architecture-compare.edn`, and `architecture-gate.edn`.
+- [ ] State the architecture `coverage-map.md` lifecycle in the relevant prompts: `coverage-review` updates coverage/test-net fields, `coverage-fix` updates it for added tests or seams, `diff-gate` records coverage-phase classification relationship to `characterization-baseline.edn`, `validation-capture` records final Gordian proof references, `proof-sync` performs final synchronization when stale, and `final-summary` reads it as proof authority.
+- [ ] Verify both workflow EDNs load/compile through the workflow-loader/registry path after Slice 2 topology edits, not only parse as EDN.
 - [ ] Record Slice 2 implementation and verification notes in `implementation.md`.
 - [ ] Commit Slice 2 (`⚒ workflow: harden simplification task identity`).
 
@@ -81,7 +86,7 @@ when done.
 - [ ] Route fixable incidental validation failures back to `implement-task` only through `validation-capture-disposition` after committing repair notes/artifacts.
 - [ ] Route unrecoverable incidental capture failures to `terminal-stop-validation-capture` only through `validation-capture-disposition` with the failing validation yield as explicit context.
 - [ ] Ensure no final A5/A2/A3 proof claim is allowed from unparseable JSON/EDN or uncaptured validation output.
-- [ ] Verify both workflow EDNs parse after Slice 3 edits.
+- [ ] Verify both workflow EDNs load/compile through the workflow-loader/registry path after Slice 3 topology edits, not only parse as EDN.
 - [ ] Record Slice 3 implementation and verification notes in `implementation.md`.
 - [ ] Commit Slice 3 (`⚒ workflow: parse-check simplification validation`).
 
@@ -106,14 +111,14 @@ when done.
 - [ ] In `proof-sync-fixed-point`, route `PASS_STATUS: ACTIONABLE_FEEDBACK` to `terminal-stop-proof-sync` when committed proof artifacts are still stale, missing, contradictory, unparseable, or contain an unresolved blocking note.
 - [ ] Ensure `terminal-stop-proof-sync` is not reachable directly from `proof-sync` or `proof-sync-disposition`.
 - [ ] Verify final summaries are reachable only after clean/no-op proof-sync or clean fixed-point verification.
-- [ ] Verify both workflow EDNs parse after Slice 4 edits.
+- [ ] Verify both workflow EDNs load/compile through the workflow-loader/registry path after Slice 4 topology edits, not only parse as EDN.
 - [ ] Record Slice 4 implementation and verification notes in `implementation.md`.
 - [ ] Commit Slice 4 (`⚒ workflow: add proof sync fixed point`).
 
 ## Slice 5 — Split terminal stops and final summaries
 
-- [ ] Replace generic architecture `terminal-stop-summary` route targets with split terminal stop steps named `terminal-stop-malformed-task-path`, `terminal-stop-clean-baseline`, `terminal-stop-coverage-disposition`, `terminal-stop-diff-gate`, `terminal-stop-validation-capture`, and `terminal-stop-proof-sync`.
-- [ ] Replace generic incidental `terminal-stop-summary` route targets with the same split terminal stop step names.
+- [ ] Complete architecture split terminal-stop prompt content and remove any remaining generic `terminal-stop-summary` route targets now that split terminal steps were defined before first use.
+- [ ] Complete incidental split terminal-stop prompt content and remove any remaining generic `terminal-stop-summary` route targets now that split terminal steps were defined before first use.
 - [ ] Route malformed `extract-task-path` failures to `terminal-stop-malformed-task-path` with `select-and-create` handoff and extraction output only.
 - [ ] Route `clean-baseline` failures to `terminal-stop-clean-baseline` with validated task path and failing `clean-baseline` yield.
 - [ ] Route `coverage-disposition` failures or infeasible coverage to `terminal-stop-coverage-disposition` with validated task path and failing coverage/disposition yield.
@@ -125,7 +130,7 @@ when done.
 - [ ] In post-task terminal prompts, require reading committed task artifacts and naming the durable failing artifact path where available.
 - [ ] In proof-sync terminal prompt, require naming the committed proof-sync blocking note and affected proof artifact paths.
 - [ ] Update final summaries in both workflows to independently read committed proof artifacts and not claim proof coherence from workflow/review prose alone.
-- [ ] Verify both workflow EDNs parse after Slice 5 edits.
+- [ ] Verify both workflow EDNs load/compile through the workflow-loader/registry path after Slice 5 topology edits, not only parse as EDN.
 - [ ] Record Slice 5 implementation and verification notes in `implementation.md`.
 - [ ] Commit Slice 5 (`⚒ workflow: split simplification terminal stops`).
 
@@ -144,6 +149,7 @@ when done.
 - [ ] Test split terminal-stop prompts include explicit `:type :source` context from the immediately failed preceding gate.
 - [ ] Test malformed task-path terminal stop does not consume an extracted task path and forbids task-local artifact reads.
 - [ ] Test terminal-stop prompts name their source gate and durable artifact path expectations.
+- [ ] Test architecture prompt content requires mandatory `coverage-map.md`, first-writer scaffold creation, score/confidence fields, and the architecture coverage-map lifecycle through coverage review/fix, diff gate, validation capture, proof-sync, and final summary.
 - [ ] Test incidental prompt content requires mandatory `coverage-map.md` and the minimum field set from design.
 - [ ] Test incidental `select-and-create` prompt content requires creating and committing the initial `coverage-map.md` scaffold before handoff.
 - [ ] Test incidental coverage-review, coverage-fix, diff-gate, incidental-validation-capture, proof-sync, and final-summary prompt content follow the pinned `coverage-map.md` lifecycle.
