@@ -182,3 +182,7 @@ when done.
 ## Implementation review follow-ups
 
 - [x] IR1: Add `proof-sync-fixed-point` yielded source context to both simplification workflow `final-summary` steps and content-lock it in tests; final summaries can be reached from clean fixed-point verification, so they must not have to infer that final proof gate from topology or stale `proof-sync` prose. — done; both final summaries now source `proof-sync-fixed-point` yield alongside `proof-sync`, with task-220 content-lock assertions.
+
+## Task test review follow-ups
+
+- [ ] TT1: Strengthen deterministic marker-routing operation tests to assert duplicate-marker error details include the duplicate marker lines for both `workflow/proof-sync-disposition-routing` and `workflow/validation-capture-disposition-routing`; current tests only assert `:reason :ambiguous-route-marker`, so they do not prove the design/plan diagnostic contract for duplicated markers.
