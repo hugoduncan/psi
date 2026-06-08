@@ -8,6 +8,13 @@ when done.
 - [x] Created `plan.md` from stable `design.md` with approach, risks, and slice order.
 - [x] Created `steps.md` with concrete implementation checklist grouped by slice.
 
+
+## Plan/steps ambiguity review follow-ups
+
+- [ ] PA1: Pin the exact `PROOF_SYNC_ROUTE:` marker grammar before implementing `workflow/proof-sync-disposition-routing`: decide whether normal final-reply prose/`PASS_STATUS` lines may surround the single marker, require the marker line's route token to be exact with no trailing text, and add operation tests for valid surrounding prose versus malformed same-line route text.
+- [ ] PA2: Define the deterministic routing mechanism that distinguishes fixable validation-capture failures from unrecoverable terminal validation-capture failures in both simplification workflows; choose a route marker/disposition step or another explicit topology, and ensure `terminal-stop-validation-capture` is not reached via the same undifferentiated `ACTIONABLE_FEEDBACK` branch used for implementation repair.
+- [ ] PA3: Pin the first-writer and lifecycle contract for incidental `coverage-map.md`: decide whether `select-and-create` must create an initial scaffold or whether `coverage-review` creates it before any proof-sync can run, then update Slice 2/Slice 6 steps so the mandatory artifact's creation, updates, and content-lock tests are explicit.
+
 ## Slice 1 — Preflight and deterministic operation
 
 - [ ] Confirm `design-steps.md` has no unchecked follow-ups and record the result in `implementation.md`.
