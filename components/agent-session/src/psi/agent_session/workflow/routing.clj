@@ -16,12 +16,6 @@
 (def ^:private munera-open-task-path-pattern
   #"^munera/open/[0-9]{3,}-[a-z0-9]+(?:-[a-z0-9]+)*$")
 
-(def ^:private proof-sync-routes
-  ["COVERAGE_REVIEW" "VALIDATION_RECAPTURE" "BOOKKEEPING_FIXED_POINT"])
-
-(def ^:private validation-capture-routes
-  ["IMPLEMENTATION_REPAIR" "TERMINAL_STOP"])
-
 (defn- pass-status-line-value
   [line]
   (when (str/starts-with? line pass-status-prefix)
@@ -300,17 +294,3 @@
                                  :line line
                                  :reason reason}
                           value (assoc :value value))})))))))
-
-(defn parse-proof-sync-disposition-routing
-  "Parse a proof-sync final reply into one deterministic route result."
-  [text]
-  (parse-exact-marker-routing {:text text
-                               :marker-label "PROOF_SYNC_ROUTE"
-                               :allowed-routes proof-sync-routes}))
-
-(defn parse-validation-capture-disposition-routing
-  "Parse a validation-capture final reply into one deterministic route result."
-  [text]
-  (parse-exact-marker-routing {:text text
-                               :marker-label "VALIDATION_CAPTURE_ROUTE"
-                               :allowed-routes validation-capture-routes}))

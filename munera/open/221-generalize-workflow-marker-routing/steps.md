@@ -34,23 +34,23 @@
 
 ## Slice 4 — Coherent operation/EDN handoff
 
-- [ ] Register `workflow/exact-marker-routing` in `register-built-in-deterministic-operations!` with a handler that passes resolved args to `routing/parse-exact-marker-routing`.
-- [ ] In the same Slice 4 handoff commit, update architecture workflow `validation-capture-disposition` to use `workflow/exact-marker-routing` with `:marker-label "VALIDATION_CAPTURE_ROUTE"` and allowed routes `["IMPLEMENTATION_REPAIR" "TERMINAL_STOP"]`.
-- [ ] In the same Slice 4 handoff commit, update architecture workflow `proof-sync-disposition` to use `workflow/exact-marker-routing` with `:marker-label "PROOF_SYNC_ROUTE"` and allowed routes `["COVERAGE_REVIEW" "VALIDATION_RECAPTURE" "BOOKKEEPING_FIXED_POINT"]`.
-- [ ] In the same Slice 4 handoff commit, update incidental workflow `validation-capture-disposition` to use `workflow/exact-marker-routing`, sourcing text from `incidental-validation-capture` and supplying the validation marker policy args.
-- [ ] In the same Slice 4 handoff commit, update incidental workflow `proof-sync-disposition` to use `workflow/exact-marker-routing` and supply the proof-sync marker policy args.
-- [ ] In the same Slice 4 handoff commit, remove registration for `workflow/proof-sync-disposition-routing` and remove the now-unused `routing/parse-proof-sync-disposition-routing` wrapper / `proof-sync-routes` constant; do not leave `workflow.core` referencing a deleted var and do not commit checked-in workflow EDNs that still call the removed operation id.
-- [ ] In the same Slice 4 handoff commit, remove registration for `workflow/validation-capture-disposition-routing` and remove the now-unused `routing/parse-validation-capture-disposition-routing` wrapper / `validation-capture-routes` constant; do not leave `workflow.core` referencing a deleted var and do not commit checked-in workflow EDNs that still call the removed operation id.
-- [ ] Update built-in workflow operation registration tests to assert the new operation is present and the two old operation ids are absent.
-- [ ] Update live operation invocation smoke tests to invoke `workflow/exact-marker-routing` with an arbitrary marker label and allowed routes.
-- [ ] Add an operation smoke test proving invalid args return `:invalid-route-marker-args` without throwing through the registry.
-- [ ] Run `bb clojure:test:scry --namespace psi.agent-session.workflow-delegate-review-step-live-test` for built-in deterministic operation registration and live invocation smoke coverage.
+- [x] Register `workflow/exact-marker-routing` in `register-built-in-deterministic-operations!` with a handler that passes resolved args to `routing/parse-exact-marker-routing`.
+- [x] In the same Slice 4 handoff commit, update architecture workflow `validation-capture-disposition` to use `workflow/exact-marker-routing` with `:marker-label "VALIDATION_CAPTURE_ROUTE"` and allowed routes `["IMPLEMENTATION_REPAIR" "TERMINAL_STOP"]`.
+- [x] In the same Slice 4 handoff commit, update architecture workflow `proof-sync-disposition` to use `workflow/exact-marker-routing` with `:marker-label "PROOF_SYNC_ROUTE"` and allowed routes `["COVERAGE_REVIEW" "VALIDATION_RECAPTURE" "BOOKKEEPING_FIXED_POINT"]`.
+- [x] In the same Slice 4 handoff commit, update incidental workflow `validation-capture-disposition` to use `workflow/exact-marker-routing`, sourcing text from `incidental-validation-capture` and supplying the validation marker policy args.
+- [x] In the same Slice 4 handoff commit, update incidental workflow `proof-sync-disposition` to use `workflow/exact-marker-routing` and supply the proof-sync marker policy args.
+- [x] In the same Slice 4 handoff commit, remove registration for `workflow/proof-sync-disposition-routing` and remove the now-unused `routing/parse-proof-sync-disposition-routing` wrapper / `proof-sync-routes` constant; do not leave `workflow.core` referencing a deleted var and do not commit checked-in workflow EDNs that still call the removed operation id.
+- [x] In the same Slice 4 handoff commit, remove registration for `workflow/validation-capture-disposition-routing` and remove the now-unused `routing/parse-validation-capture-disposition-routing` wrapper / `validation-capture-routes` constant; do not leave `workflow.core` referencing a deleted var and do not commit checked-in workflow EDNs that still call the removed operation id.
+- [x] Update built-in workflow operation registration tests to assert the new operation is present and the two old operation ids are absent.
+- [x] Update live operation invocation smoke tests to invoke `workflow/exact-marker-routing` with an arbitrary marker label and allowed routes.
+- [x] Add an operation smoke test proving invalid args return `:invalid-route-marker-args` without throwing through the registry.
+- [x] Run `bb clojure:test:scry --namespace psi.agent-session.workflow-delegate-review-step-live-test` for built-in deterministic operation registration and live invocation smoke coverage.
 
 ## Slice 5 — Post-handoff EDN verification
 
-- [ ] Verify all disposition `:on` maps are unchanged after operation migration.
-- [ ] Parse-read both workflow EDN files and fix syntax/formatting issues.
-- [ ] Confirm neither simplification workflow EDN references `workflow/proof-sync-disposition-routing` or `workflow/validation-capture-disposition-routing` after the same handoff that removes their registrations.
+- [x] Verify all disposition `:on` maps are unchanged after operation migration.
+- [x] Parse-read both workflow EDN files and fix syntax/formatting issues.
+- [x] Confirm neither simplification workflow EDN references `workflow/proof-sync-disposition-routing` or `workflow/validation-capture-disposition-routing` after the same handoff that removes their registrations.
 
 ## Slice 6 — Workflow-loader/content-lock updates
 

@@ -36,9 +36,11 @@
         (is (some? (op-reg/get-operation-in (:deterministic-operation-registry ctx)
                                             "workflow/munera-open-task-path-routing")))
         (is (some? (op-reg/get-operation-in (:deterministic-operation-registry ctx)
-                                            "workflow/proof-sync-disposition-routing")))
-        (is (some? (op-reg/get-operation-in (:deterministic-operation-registry ctx)
-                                            "workflow/validation-capture-disposition-routing")))
+                                            "workflow/exact-marker-routing")))
+        (is (nil? (op-reg/get-operation-in (:deterministic-operation-registry ctx)
+                                           "workflow/proof-sync-disposition-routing")))
+        (is (nil? (op-reg/get-operation-in (:deterministic-operation-registry ctx)
+                                           "workflow/validation-capture-disposition-routing")))
         (is (= {:status :ok :data "DONE" :summary "DONE"}
                (op-reg/invoke-operation-in
                 (:deterministic-operation-registry ctx)
@@ -55,27 +57,35 @@
     (let [[ctx session-id] (workflow-test-support/create-tui-context+session mutations/all-mutations)]
       (try
         (workflow-test-support/init-built-in-workflow! ctx session-id)
-        (doseq [[operation-id text expected-route]
+        (doseq [[operation-id args expected-route]
                 [["workflow/pass-status-routing"
-                  "PASS_STATUS: REVIEW_COMPLETE"
+                  {:text "PASS_STATUS: REVIEW_COMPLETE"}
                   "DONE"]
                  ["workflow/munera-open-task-path-routing"
-                  "munera/open/220-harden-simplification-workflow-proof-gates"
+                  {:text "munera/open/220-harden-simplification-workflow-proof-gates"}
                   "DONE"]
-                 ["workflow/proof-sync-disposition-routing"
-                  "PROOF_SYNC_ROUTE: COVERAGE_REVIEW"
-                  "COVERAGE_REVIEW"]
-                 ["workflow/validation-capture-disposition-routing"
-                  "VALIDATION_CAPTURE_ROUTE: TERMINAL_STOP"
-                  "TERMINAL_STOP"]]]
+                 ["workflow/exact-marker-routing"
+                  {:text "QUALITY_GATE: APPROVE"
+                   :marker-label "QUALITY_GATE"
+                   :allowed-routes ["APPROVE" "REPAIR"]}
+                  "APPROVE"]]]
           (is (= {:status :ok
                   :data expected-route
                   :summary expected-route}
                  (op-reg/invoke-operation-in
                   (:deterministic-operation-registry ctx)
                   operation-id
-                  {:args {:text text}}
+                  {:args args}
                   deterministic-op-runtime/invoke-operation))))
+        (is (= :invalid-route-marker-args
+               (:reason
+                (op-reg/invoke-operation-in
+                 (:deterministic-operation-registry ctx)
+                 "workflow/exact-marker-routing"
+                 {:args {:text "QUALITY_GATE: APPROVE"
+                         :marker-label "QUALITY_GATE"
+                         :allowed-routes []}}
+                 deterministic-op-runtime/invoke-operation))))
         (finally
           (context/shutdown-context! ctx))))))
 

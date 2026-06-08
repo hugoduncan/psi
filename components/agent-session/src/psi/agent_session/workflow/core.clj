@@ -148,13 +148,9 @@
       :handler (fn [{:keys [args]}]
                  (routing/parse-munera-open-task-path-routing (:text args)))})
     (register-operation
-     {:id "workflow/proof-sync-disposition-routing"
+     {:id "workflow/exact-marker-routing"
       :handler (fn [{:keys [args]}]
-                 (routing/parse-proof-sync-disposition-routing (:text args)))})
-    (register-operation
-     {:id "workflow/validation-capture-disposition-routing"
-      :handler (fn [{:keys [args]}]
-                 (routing/parse-validation-capture-disposition-routing (:text args)))})))
+                 (routing/parse-exact-marker-routing args))})))
 
 (declare refresh-widgets!)
 

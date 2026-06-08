@@ -238,10 +238,12 @@
     "REPEAT" {:goto "validation-capture-disposition"}}}
   {:name "validation-capture-disposition",
    :type :invoke,
-   :operation "workflow/validation-capture-disposition-routing",
+   :operation "workflow/exact-marker-routing",
    :args
    {:text
-    {:from {:step "validation-capture", :output :final-llm-reply}}},
+    {:from {:step "validation-capture", :output :final-llm-reply}},
+    :marker-label "VALIDATION_CAPTURE_ROUTE",
+    :allowed-routes ["IMPLEMENTATION_REPAIR" "TERMINAL_STOP"]},
    :on
    {"IMPLEMENTATION_REPAIR" {:goto "implement-task"},
     "TERMINAL_STOP" {:goto "terminal-stop-validation-capture"}}}
@@ -434,9 +436,13 @@ Input task path:
     "REPEAT" {:goto "proof-sync-disposition"}}}
   {:name "proof-sync-disposition",
    :type :invoke,
-   :operation "workflow/proof-sync-disposition-routing",
+   :operation "workflow/exact-marker-routing",
    :args
-   {:text {:from {:step "proof-sync", :output :final-llm-reply}}},
+   {:text {:from {:step "proof-sync", :output :final-llm-reply}},
+    :marker-label "PROOF_SYNC_ROUTE",
+    :allowed-routes ["COVERAGE_REVIEW"
+                     "VALIDATION_RECAPTURE"
+                     "BOOKKEEPING_FIXED_POINT"]},
    :on
    {"COVERAGE_REVIEW" {:goto "review-implementation-tests"},
     "VALIDATION_RECAPTURE" {:goto "validation-capture"},
