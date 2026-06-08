@@ -15,6 +15,12 @@ when done.
 - [x] PA2: Define the deterministic routing mechanism that distinguishes fixable validation-capture failures from unrecoverable terminal validation-capture failures in both simplification workflows; choose a route marker/disposition step or another explicit topology, and ensure `terminal-stop-validation-capture` is not reached via the same undifferentiated `ACTIONABLE_FEEDBACK` branch used for implementation repair.
 - [x] PA3: Pin the first-writer and lifecycle contract for incidental `coverage-map.md`: decide whether `select-and-create` must create an initial scaffold or whether `coverage-review` creates it before any proof-sync can run, then update Slice 2/Slice 6 steps so the mandatory artifact's creation, updates, and content-lock tests are explicit.
 
+## Plan/steps inconsistency review follow-ups
+
+- [ ] PI1: Align architecture `coverage-map.md` proof authority with its writer lifecycle: because plan/steps require architecture `proof-sync` and final summary to read/synchronize `coverage-map.md`, add explicit architecture first-writer/update obligations (or explicitly narrow the proof-sync artifact set) so `coverage-map.md` is created before proof-sync can require it and maintained by coverage review/fix, diff gate, validation capture, proof-sync, and final summary as appropriate.
+- [ ] PI2: Make low-confidence architecture selector handling mandatory rather than optional: remove the Slice 2 `if needed` escape hatch and require the architecture `select-and-create` generated-design prompt plus content-lock tests to always cover score/confidence, and for `:confidence :low` the actionability, falsification evidence, design-review questions, and scope-narrowing considerations required by `design.md` and `plan.md`.
+- [ ] PI3: Reconcile split terminal-stop route ordering with slice boundaries: routes introduced in Slices 2-4 must not point at terminal stop steps that are only created in Slice 5. Either create the relevant split terminal steps before the first route to them, or move the routing changes into the same slice as the step definitions, and verify workflow EDNs load/compile (not only parse) after each slice that changes topology.
+
 ## Slice 1 — Preflight and deterministic operations
 
 - [ ] Confirm `design-steps.md` has no unchecked follow-ups and record the result in `implementation.md`.
