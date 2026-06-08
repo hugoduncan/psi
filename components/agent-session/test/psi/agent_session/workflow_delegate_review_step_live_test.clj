@@ -48,145 +48,34 @@
         (finally
           (context/shutdown-context! ctx))))))
 
-(defn- invoke-operation
-  [ctx operation-id text]
-  (op-reg/invoke-operation-in
-   (:deterministic-operation-registry ctx)
-   operation-id
-   {:args {:text text}}
-   deterministic-op-runtime/invoke-operation))
-
-(defn- assert-munera-task-path-route
-  [ctx text expected-route]
-  (let [result (invoke-operation ctx "workflow/munera-open-task-path-routing" text)]
-    (is (= :ok (:status result)) (pr-str result))
-    (is (= expected-route (:data result)) (pr-str result))
-    (is (= expected-route (:summary result)) (pr-str result))
-    result))
-
-(defn- assert-invalid-munera-task-path
-  [ctx text]
-  (let [result (assert-munera-task-path-route ctx text "REPEAT")]
-    (is (= {:reason :invalid-munera-open-task-path
-            :text text}
-           (:details result))
-        (pr-str result))))
-
-(defn- assert-marker-route
-  [ctx operation-id marker route]
-  (is (= {:status :ok :data route :summary route}
-         (invoke-operation ctx operation-id (str "Before prose\nPASS_STATUS: ACTIONABLE_FEEDBACK\n" marker ": " route "\nAfter prose")))))
-
-(defn- assert-marker-error
-  [ctx operation-id reason text]
-  (let [result (invoke-operation ctx operation-id text)]
-    (is (= :error (:status result)) (pr-str result))
-    (is (= reason (:reason result)) (pr-str result))
-    result))
-
-(defn- assert-duplicate-marker-lines
-  [ctx operation-id text expected-lines]
-  (let [result (assert-marker-error ctx operation-id :ambiguous-route-marker text)]
-    (is (= expected-lines
-           (get-in result [:details :route-marker-lines]))
-        (pr-str result))))
-
-(deftest munera-open-task-path-routing-operation-test
-  ;; Tests deterministic Munera task identity routing rejects anything except
-  ;; one root-relative munera/open task path with no surrounding handoff prose.
-  (testing "munera open task path routing"
+(deftest built-in-routing-operations-invoke-through-registry-test
+  ;; Tests the live built-in operation registry seam with compact smoke cases;
+  ;; pure parser edge cases live in psi.agent-session.workflow.routing-test.
+  (testing "registered routing operations invoke through the deterministic operation registry"
     (let [[ctx session-id] (workflow-test-support/create-tui-context+session mutations/all-mutations)]
       (try
         (workflow-test-support/init-built-in-workflow! ctx session-id)
-        (assert-munera-task-path-route ctx "munera/open/220-harden-simplification-workflow-proof-gates" "DONE")
-        (doseq [invalid ["Here is the generated task.\nmunera/open/220-harden-simplification-workflow-proof-gates"
-                         "munera/open/220-harden-simplification-workflow-proof-gates\nPASS_STATUS: REVIEW_COMPLETE"
-                         "munera/open/220-harden-simplification-workflow-proof-gates\nmunera/open/221-other-task"
-                         "munera/closed/220-harden-simplification-workflow-proof-gates"
-                         "/Users/duncan/projects/hugoduncan/psi/reduce-architectural-complexity/munera/open/220-harden-simplification-workflow-proof-gates"
-                         "munera_task_path: munera/open/220-harden-simplification-workflow-proof-gates"
-                         "## Munera Task\n\nmunera_task_path: munera/open/220-harden-simplification-workflow-proof-gates\nPASS_STATUS: REVIEW_COMPLETE"
-                         "munera/open/not-a-number-task"
-                         "munera/open/220-Harden-Simplification-Workflow-Proof-Gates"
-                         "munera/open/220_harden_simplification_workflow_proof_gates"
-                         "munera/open/220-harden-simplification-workflow-proof-gates/"]]
-          (assert-invalid-munera-task-path ctx invalid))
-        (finally
-          (context/shutdown-context! ctx))))))
-
-(deftest proof-sync-disposition-routing-operation-test
-  ;; Tests exact proof-sync route marker parsing through the registered
-  ;; deterministic operation, including valid surrounding final-reply prose.
-  (testing "proof-sync disposition routing"
-    (let [[ctx session-id] (workflow-test-support/create-tui-context+session mutations/all-mutations)]
-      (try
-        (workflow-test-support/init-built-in-workflow! ctx session-id)
-        (doseq [route ["COVERAGE_REVIEW" "VALIDATION_RECAPTURE" "BOOKKEEPING_FIXED_POINT"]]
-          (assert-marker-route ctx "workflow/proof-sync-disposition-routing" "PROOF_SYNC_ROUTE" route))
-        (assert-marker-error ctx "workflow/proof-sync-disposition-routing"
-                             :missing-route-marker
-                             "Mentioned PROOF_SYNC_ROUTE in prose without emitting a route.\nPASS_STATUS: ACTIONABLE_FEEDBACK")
-        (assert-duplicate-marker-lines ctx
-                                       "workflow/proof-sync-disposition-routing"
-                                       "PROOF_SYNC_ROUTE: COVERAGE_REVIEW\nPROOF_SYNC_ROUTE: VALIDATION_RECAPTURE"
-                                       ["PROOF_SYNC_ROUTE: COVERAGE_REVIEW"
-                                        "PROOF_SYNC_ROUTE: VALIDATION_RECAPTURE"])
-        (assert-marker-error ctx "workflow/proof-sync-disposition-routing"
-                             :unsupported-route-marker
-                             "PROOF_SYNC_ROUTE: TERMINAL_STOP")
-        (assert-marker-error ctx "workflow/proof-sync-disposition-routing"
-                             :malformed-route-marker
-                             " PROOF_SYNC_ROUTE: COVERAGE_REVIEW")
-        (assert-marker-error ctx "workflow/proof-sync-disposition-routing"
-                             :malformed-route-marker
-                             "PROOF_SYNC_ROUTE:COVERAGE_REVIEW")
-        (assert-marker-error ctx "workflow/proof-sync-disposition-routing"
-                             :malformed-route-marker
-                             "PROOF_SYNC_ROUTE : COVERAGE_REVIEW")
-        (assert-marker-error ctx "workflow/proof-sync-disposition-routing"
-                             :malformed-route-marker
-                             "PROOF_SYNC_ROUTE: COVERAGE_REVIEW ")
-        (assert-marker-error ctx "workflow/proof-sync-disposition-routing"
-                             :malformed-route-marker
-                             "PROOF_SYNC_ROUTE: COVERAGE_REVIEW because tests changed")
-        (finally
-          (context/shutdown-context! ctx))))))
-
-(deftest validation-capture-disposition-routing-operation-test
-  ;; Tests exact validation-capture route marker parsing through the registered
-  ;; deterministic operation, including repair versus terminal disposition.
-  (testing "validation-capture disposition routing"
-    (let [[ctx session-id] (workflow-test-support/create-tui-context+session mutations/all-mutations)]
-      (try
-        (workflow-test-support/init-built-in-workflow! ctx session-id)
-        (doseq [route ["IMPLEMENTATION_REPAIR" "TERMINAL_STOP"]]
-          (assert-marker-route ctx "workflow/validation-capture-disposition-routing" "VALIDATION_CAPTURE_ROUTE" route))
-        (assert-marker-error ctx "workflow/validation-capture-disposition-routing"
-                             :missing-route-marker
-                             "Mentioned VALIDATION_CAPTURE_ROUTE in prose without emitting a route.\nPASS_STATUS: ACTIONABLE_FEEDBACK")
-        (assert-duplicate-marker-lines ctx
-                                       "workflow/validation-capture-disposition-routing"
-                                       "VALIDATION_CAPTURE_ROUTE: IMPLEMENTATION_REPAIR\nVALIDATION_CAPTURE_ROUTE: TERMINAL_STOP"
-                                       ["VALIDATION_CAPTURE_ROUTE: IMPLEMENTATION_REPAIR"
-                                        "VALIDATION_CAPTURE_ROUTE: TERMINAL_STOP"])
-        (assert-marker-error ctx "workflow/validation-capture-disposition-routing"
-                             :unsupported-route-marker
-                             "VALIDATION_CAPTURE_ROUTE: COVERAGE_REVIEW")
-        (assert-marker-error ctx "workflow/validation-capture-disposition-routing"
-                             :malformed-route-marker
-                             " VALIDATION_CAPTURE_ROUTE: IMPLEMENTATION_REPAIR")
-        (assert-marker-error ctx "workflow/validation-capture-disposition-routing"
-                             :malformed-route-marker
-                             "VALIDATION_CAPTURE_ROUTE:IMPLEMENTATION_REPAIR")
-        (assert-marker-error ctx "workflow/validation-capture-disposition-routing"
-                             :malformed-route-marker
-                             "VALIDATION_CAPTURE_ROUTE : TERMINAL_STOP")
-        (assert-marker-error ctx "workflow/validation-capture-disposition-routing"
-                             :malformed-route-marker
-                             "VALIDATION_CAPTURE_ROUTE: IMPLEMENTATION_REPAIR ")
-        (assert-marker-error ctx "workflow/validation-capture-disposition-routing"
-                             :malformed-route-marker
-                             "VALIDATION_CAPTURE_ROUTE: IMPLEMENTATION_REPAIR because gate failed")
+        (doseq [[operation-id text expected-route]
+                [["workflow/pass-status-routing"
+                  "PASS_STATUS: REVIEW_COMPLETE"
+                  "DONE"]
+                 ["workflow/munera-open-task-path-routing"
+                  "munera/open/220-harden-simplification-workflow-proof-gates"
+                  "DONE"]
+                 ["workflow/proof-sync-disposition-routing"
+                  "PROOF_SYNC_ROUTE: COVERAGE_REVIEW"
+                  "COVERAGE_REVIEW"]
+                 ["workflow/validation-capture-disposition-routing"
+                  "VALIDATION_CAPTURE_ROUTE: TERMINAL_STOP"
+                  "TERMINAL_STOP"]]]
+          (is (= {:status :ok
+                  :data expected-route
+                  :summary expected-route}
+                 (op-reg/invoke-operation-in
+                  (:deterministic-operation-registry ctx)
+                  operation-id
+                  {:args {:text text}}
+                  deterministic-op-runtime/invoke-operation))))
         (finally
           (context/shutdown-context! ctx))))))
 
