@@ -15,7 +15,7 @@
 
 ## Slice 3 — Design-review full-pass loop
 
-- [ ] PA1: Decide what happens to the existing `.psi/workflows/review-task-design-clarity-status.md` and `.psi/workflows/review-task-plan-clarity-status.md` prompt files when pass completion is encoded by deterministic topology instead of artifact re-reading: either remove/stop referencing them, or update their wording/tests so no stale file instructs the old re-read-after-follow-up behavior.
+- [x] PA1: Decide what happens to the existing `.psi/workflows/review-task-design-clarity-status.md` and `.psi/workflows/review-task-plan-clarity-status.md` prompt files when pass completion is encoded by deterministic topology instead of artifact re-reading: either remove/stop referencing them, or update their wording/tests so no stale file instructs the old re-read-after-follow-up behavior.
 - [ ] Rework `.psi/workflows/review-task-design.edn` so a pass always runs `architecture-review`, `ambiguity-review`, and `inconsistency-review` in that order.
 - [ ] Preserve conditional follow-up behavior for each design phase: `ACTIONABLE_FEEDBACK` runs that phase's follow-up, while `REVIEW_COMPLETE` skips it.
 - [ ] Encode explicit pass-level feedback memory so any actionable architecture, ambiguity, or inconsistency result in the completed pass routes to a restart decision after the inconsistency phase.

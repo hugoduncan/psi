@@ -286,7 +286,22 @@
                               "review-task-plan-ambiguity-follow-up.md"
                               "review-task-plan-inconsistency-follow-up.md"]]
       (is (not (.contains (slurp-workflow-file edn-filename) removed-filename))
-          (str edn-filename " must not reference removed " removed-filename)))))
+          (str edn-filename " must not reference removed " removed-filename))))
+  (testing "deterministic clarity-status leaves no stale prompt workflows"
+    ;; The design/plan host workflows now encode clarity-status as deterministic
+    ;; invoke routing. Stale prompt workflows would still be delegate-visible and
+    ;; could instruct the old artifact re-read control behaviour.
+    (doseq [removed-filename ["review-task-design-clarity-status.md"
+                              "review-task-plan-clarity-status.md"]]
+      (is (not (.exists (io/file (System/getProperty "user.dir")
+                                 ".psi/workflows"
+                                 removed-filename)))
+          (str removed-filename " must not exist as a standalone prompt workflow")))
+    (doseq [edn-filename ["review-task-design.edn" "review-task-plan.edn"]
+            removed-filename ["review-task-design-clarity-status.md"
+                              "review-task-plan-clarity-status.md"]]
+      (is (not (.contains (slurp-workflow-file edn-filename) removed-filename))
+          (str edn-filename " must not reference stale " removed-filename)))))
 
 (deftest architecture-review-prompt-contract-test
   ;; AC2a contract guard for review-task-design-architecture-review.md.

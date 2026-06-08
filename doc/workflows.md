@@ -625,9 +625,11 @@ Like the ambiguity and inconsistency aspects, architectural fit is a review
 step + follow-up step pair gated by `pass-status-routing`: actionable misfits
 are recorded as unchecked `design-steps.md` items, the `architecture-follow-up`
 step reuses the shared `design`-profile follow-up (see below) to execute them,
-and the loop advances `architecture → ambiguity → inconsistency → clarity-status
-→ final-summary`. The `final-summary` pass reports the architectural-fit pass
-alongside ambiguity and inconsistency.
+and the loop advances deterministically through `architecture → ambiguity →
+inconsistency → clarity-status → final-summary`. The `clarity-status` step is an
+EDN invoke step, not a standalone prompt workflow; it does not re-read task
+artifacts after follow-up execution. The `final-summary` pass reports the
+architectural-fit pass alongside ambiguity and inconsistency.
 
 ## Shared review follow-up steps
 
