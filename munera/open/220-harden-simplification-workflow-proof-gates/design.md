@@ -204,7 +204,9 @@ Architecture tasks continue to use the existing task-local validation artifact n
 
 ### Proof-sync topology and routing
 
-Both simplification workflows use the same fixed-point topology shape, with workflow-local prompt content specialized to each artifact set. `proof-sync` emits an explicit durable route marker when it mutates artifacts so routing is deterministic rather than inferred from prose. The route marker is one of `PROOF_SYNC_ROUTE: COVERAGE_REVIEW`, `PROOF_SYNC_ROUTE: VALIDATION_RECAPTURE`, `PROOF_SYNC_ROUTE: BOOKKEEPING_FIXED_POINT`, or `PROOF_SYNC_ROUTE: TERMINAL`. A small deterministic `proof-sync-disposition` invoke step, backed by a workflow-local routing operation, maps only that marker to the next step.
+Both simplification workflows use the same fixed-point topology shape, with workflow-local prompt content specialized to each artifact set. `proof-sync` emits an explicit durable route marker when it mutates artifacts so routing is deterministic rather than inferred from prose. The route marker is one of `PROOF_SYNC_ROUTE: COVERAGE_REVIEW`, `PROOF_SYNC_ROUTE: VALIDATION_RECAPTURE`, or `PROOF_SYNC_ROUTE: BOOKKEEPING_FIXED_POINT`. There is no direct proof-sync terminal marker: every proof-sync terminal stop must pass through `proof-sync-fixed-point` so the stop has both the mutating `proof-sync` context and the read-only fixed-point context.
+
+`proof-sync-disposition` is a `:type :invoke` step backed by the registered deterministic operation `workflow/proof-sync-disposition-routing`, added through the same built-in operation registry as `workflow/pass-status-routing` and `workflow/munera-open-task-path-routing`. It is not a workflow-local EDN operation definition. The operation accepts `{:text ...}` from the mutating `proof-sync` final reply, extracts exactly one `PROOF_SYNC_ROUTE: ...` line, and returns the route label `COVERAGE_REVIEW`, `VALIDATION_RECAPTURE`, or `BOOKKEEPING_FIXED_POINT`. Missing, duplicated, or unsupported markers return a tagged error. Runtime operation tests must cover each valid marker plus malformed/missing/duplicated marker errors; workflow-loader/content-lock tests must assert both simplification workflow EDNs invoke this exact registered operation id and route only those three labels.
 
 Architecture workflow order after post-implementation review gates:
 
@@ -214,8 +216,7 @@ Architecture workflow order after post-implementation review gates:
 4. mutating `proof-sync` -> `proof-sync-disposition` -> one of:
    - `COVERAGE_REVIEW` -> `review-implementation-tests`, after which the normal architecture review chain continues through architecture/test/docs/code-shape and returns to `proof-sync`;
    - `VALIDATION_RECAPTURE` -> `validation-capture`, after which validation and all post-implementation review gates rerun before `proof-sync`;
-   - `BOOKKEEPING_FIXED_POINT` -> `proof-sync-fixed-point`;
-   - `TERMINAL` -> `terminal-stop-proof-sync`.
+   - `BOOKKEEPING_FIXED_POINT` -> `proof-sync-fixed-point`.
 
 Incidental workflow order after implementation review:
 
@@ -226,22 +227,21 @@ Incidental workflow order after implementation review:
 5. mutating `proof-sync` -> `proof-sync-disposition` -> one of:
    - `COVERAGE_REVIEW` -> `review-task-implementation`, after which `incidental-validation-capture` and `proof-sync` rerun;
    - `VALIDATION_RECAPTURE` -> `incidental-validation-capture`, then `proof-sync`;
-   - `BOOKKEEPING_FIXED_POINT` -> `proof-sync-fixed-point`;
-   - `TERMINAL` -> `terminal-stop-proof-sync`.
+   - `BOOKKEEPING_FIXED_POINT` -> `proof-sync-fixed-point`.
 
 `incidental-validation-capture` captures and parse-checks `after-local.json`, `incidental-burden-check.edn`, and `incidental-gate.edn` before proof-sync runs. If it fails to capture parseable proof or records a failing A5/A2/A3 result, it appends a durable repair/stop finding to task artifacts, commits it, and routes back to `implement-task` for fixable implementation/validation failures; unrecoverable capture failures route to `terminal-stop-validation-capture`.
 
 `proof-sync` PASS_STATUS mapping:
 
 - `PASS_STATUS: REVIEW_COMPLETE` only when proof artifacts are already coherent and no task artifact was mutated. Route `DONE -> final-summary`.
-- `PASS_STATUS: ACTIONABLE_FEEDBACK` when it updates and commits stale/incomplete proof artifacts or records a proof-sync stop reason. Route `REPEAT -> proof-sync-disposition`, whose deterministic marker mapping selects coverage review, validation recapture, bookkeeping fixed-point verification, or terminal proof-sync stop.
+- `PASS_STATUS: ACTIONABLE_FEEDBACK` when it updates and commits stale/incomplete proof artifacts. Route `REPEAT -> proof-sync-disposition`, whose deterministic marker mapping selects coverage review, validation recapture, or bookkeeping fixed-point verification. A proof-sync pass that detects a potentially terminal proof problem must still record the durable finding as a bookkeeping proof update and emit `PROOF_SYNC_ROUTE: BOOKKEEPING_FIXED_POINT`; terminal stopping is decided only by the subsequent read-only fixed-point check.
 
-`proof-sync-fixed-point` is read-only and is used only after pure bookkeeping proof updates. It rereads committed task-local artifacts after the mutating pass:
+`proof-sync-fixed-point` is read-only and is used after pure bookkeeping proof updates, including proof-sync updates that recorded a durable terminal-looking proof finding. It rereads committed task-local artifacts after the mutating pass:
 
 - `PASS_STATUS: REVIEW_COMPLETE` when the second pass is clean/no-op. Route `DONE -> final-summary`.
-- `PASS_STATUS: ACTIONABLE_FEEDBACK` when proof artifacts are still stale, missing, contradictory, or unparseable. Route `REPEAT -> terminal-stop-proof-sync` after recording the blocking reason in committed task artifacts.
+- `PASS_STATUS: ACTIONABLE_FEEDBACK` when proof artifacts are still stale, missing, contradictory, unparseable, or contain a durable proof-sync blocking note that cannot be resolved by coverage review or validation recapture. Route `REPEAT -> terminal-stop-proof-sync` without mutating any task artifact. The blocking note must already have been written and committed by the preceding mutating `proof-sync` pass; `proof-sync-fixed-point` may only cite that existing note and affected artifact paths in its final reply.
 
-This topology guarantees final success never follows directly from a mutating proof-sync pass. Stale coverage/test proof goes back through the relevant review gate, stale validation/Gordian proof goes back through validation capture, and pure bookkeeping updates require a clean fixed-point check. It also avoids hidden runtime state: routing uses the explicit route marker and committed task-local files plus explicit prior-step source context only.
+This topology guarantees final success never follows directly from a mutating proof-sync pass. Stale coverage/test proof goes back through the relevant review gate, stale validation/Gordian proof goes back through validation capture, and pure bookkeeping or terminal-looking proof updates require the read-only fixed-point check. It also avoids hidden runtime state: routing uses the registered `workflow/proof-sync-disposition-routing` operation, explicit route marker, committed task-local files, and explicit prior-step source context only.
 
 ### Terminal-stop workflow shape
 
@@ -254,7 +254,7 @@ Required terminal steps and routes:
 - `terminal-stop-coverage-disposition`: from `coverage-disposition` failure or infeasible coverage. Inputs include the validated task path and the failing coverage/disposition yield; summary names the latest committed `CHARACTERIZATION_STATUS` artifact.
 - `terminal-stop-diff-gate`: from `diff-gate` failure. Inputs include the validated task path and failing diff-gate yield; summary names the durable diff-gate classification/failure artifact.
 - `terminal-stop-validation-capture`: from architecture `validation-capture` or incidental `incidental-validation-capture` unrecoverable failure. Inputs include the validated task path and failing validation yield; summary names the parse-checked failure map artifact, for example `architecture-gate.edn` or `incidental-gate.edn`.
-- `terminal-stop-proof-sync`: from `proof-sync-fixed-point` failure. Inputs include the validated task path, the mutating `proof-sync` yield, and the read-only fixed-point yield; summary names the committed proof-sync blocking note and affected proof artifacts.
+- `terminal-stop-proof-sync`: only from `proof-sync-fixed-point` failure. Inputs include the validated task path, the mutating `proof-sync` yield, and the read-only fixed-point yield; summary names the committed proof-sync blocking note and affected proof artifacts. It must not be reachable directly from `proof-sync-disposition`.
 
 Workflow-loader/content-lock tests must prove terminal-stop prompts include the relevant preceding gate context (`:type :source` from the failed step) and that malformed task-path terminal handling does not consume a task path.
 
