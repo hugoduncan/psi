@@ -167,14 +167,14 @@ when done.
 
 ## Slice 7 — User-facing docs, changelog, and verification
 
-- [ ] Update `doc/workflows.md` to document the hardened `reduce-incidental-complexity` and `reduce-architectural-complexity` proof gates, deterministic task-path boundary, parse-checked validation artifacts, proof-sync fixed point, and split terminal stops.
-- [ ] Update README only if its workflow overview needs a pointer to the hardened simplification guarantees.
-- [ ] Add `CHANGELOG.md` `[Unreleased]` entry under `Changed` for user-visible hardening of simplification workflows.
-- [ ] Verify docs do not claim new selection algorithms, worktree creation, branch pushing, or PR creation.
-- [ ] Run final focused runtime operation tests for deterministic routing.
-- [ ] Run final focused workflow-loader tests covering both simplification workflows.
-- [ ] Run targeted lint/format checks for changed Clojure files.
-- [ ] Run `git diff --check`.
-- [ ] Verify coherence across `design.md`, `plan.md`, `steps.md`, workflow EDNs, runtime operation, tests, docs, and changelog for operation id, artifact names, route labels, terminal step names, and proof-sync fixed-point semantics.
-- [ ] Append final verification notes and PASS_STATUS to `implementation.md`.
-- [ ] Commit Slice 7 (`⚒ doc: document hardened simplification gates`).
+- [x] Update `doc/workflows.md` to document the hardened `reduce-incidental-complexity` and `reduce-architectural-complexity` proof gates, deterministic task-path boundary, parse-checked validation artifacts, proof-sync fixed point, and split terminal stops.
+- [x] Update README only if its workflow overview needs a pointer to the hardened simplification guarantees. — no README edit needed; existing workflow overview already points to `doc/workflows.md` and names both simplification workflows without detailing guarantees.
+- [x] Add `CHANGELOG.md` `[Unreleased]` entry under `Changed` for user-visible hardening of simplification workflows.
+- [x] Verify docs do not claim new selection algorithms, worktree creation, branch pushing, or PR creation.
+- [x] Run final focused runtime operation tests for deterministic routing.
+- [x] Run final focused workflow-loader tests covering both simplification workflows.
+- [x] Run targeted lint/format checks for changed Clojure files.
+- [x] Run `git diff --check`.
+- [x] Verify coherence across `design.md`, `plan.md`, `steps.md`, workflow EDNs, runtime operation, tests, docs, and changelog for operation id, artifact names, route labels, terminal step names, and proof-sync fixed-point semantics.
+- [x] Append final verification notes and PASS_STATUS to `implementation.md`.
+- [x] Commit Slice 7 (`⚒ doc: document hardened simplification gates`) — this commit.
