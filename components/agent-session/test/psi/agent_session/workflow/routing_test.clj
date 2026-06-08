@@ -3,6 +3,21 @@
    [clojure.test :refer [deftest is testing]]
    [psi.agent-session.workflow.routing :as routing]))
 
+(def ^:private example-marker-label "QUALITY_GATE")
+(def ^:private example-routes ["APPROVE" "REPAIR" "ESCALATE_NOW"])
+
+(defn- exact-marker-args
+  ([text]
+   (exact-marker-args text example-routes))
+  ([text allowed-routes]
+   {:text text
+    :marker-label example-marker-label
+    :allowed-routes allowed-routes}))
+
+(defn- parse-exact-marker
+  [text]
+  (routing/parse-exact-marker-routing (exact-marker-args text)))
+
 (defn- assert-route
   [expected-route result]
   (is (= :ok (:status result)) (pr-str result))
@@ -77,65 +92,137 @@
                (:details result))
             (pr-str result))))))
 
-(defn- parse-marker-routing
-  [marker-label text]
-  (case marker-label
-    "PROOF_SYNC_ROUTE"
-    (routing/parse-proof-sync-disposition-routing text)
+(deftest exact-marker-routing-valid-and-missing-test
+  ;; Tests generic exact-marker routing accepts arbitrary workflow-owned marker
+  ;; labels/routes and ignores surrounding non-candidate lines.
+  (testing "routes exact supported markers with surrounding prose and PASS_STATUS"
+    (assert-route "APPROVE"
+                  (parse-exact-marker
+                   "Intro prose\nPASS_STATUS: ACTIONABLE_FEEDBACK\nQUALITY_GATE: APPROVE\nDone"))
+    (assert-route "ESCALATE_NOW"
+                  (parse-exact-marker "QUALITY_GATE: ESCALATE_NOW")))
+  (testing "reports missing marker for empty text and prose-only marker mentions"
+    (assert-error :missing-route-marker (parse-exact-marker ""))
+    (assert-error :missing-route-marker
+                  (parse-exact-marker
+                   "The QUALITY_GATE should probably approve, but no marker colon exists."))))
 
-    "VALIDATION_CAPTURE_ROUTE"
-    (routing/parse-validation-capture-disposition-routing text)))
+(deftest exact-marker-routing-duplicate-and-unsupported-test
+  ;; Tests duplicate candidates always produce ambiguity diagnostics, while one
+  ;; unsupported exact-shape route reports the unsupported token.
+  (testing "duplicate valid markers include complete candidate diagnostics"
+    (let [result (assert-error :ambiguous-route-marker
+                               (parse-exact-marker
+                                "QUALITY_GATE: APPROVE\nQUALITY_GATE: REPAIR"))]
+      (is (= example-marker-label (get-in result [:details :marker-label]))
+          (pr-str result))
+      (is (= ["QUALITY_GATE: APPROVE" "QUALITY_GATE: REPAIR"]
+             (get-in result [:details :route-marker-lines]))
+          (pr-str result))
+      (is (= [{:kind :exact :line "QUALITY_GATE: APPROVE" :route "APPROVE"}
+              {:kind :exact :line "QUALITY_GATE: REPAIR" :route "REPAIR"}]
+             (get-in result [:details :route-marker-candidates]))
+          (pr-str result))))
+  (testing "one unsupported marker reports value and allowed routes"
+    (let [result (assert-error :unsupported-route-marker
+                               (parse-exact-marker "QUALITY_GATE: DENY"))]
+      (is (= {:text "QUALITY_GATE: DENY"
+              :marker-label example-marker-label
+              :line "QUALITY_GATE: DENY"
+              :value "DENY"
+              :allowed-routes example-routes}
+             (:details result))
+          (pr-str result)))))
 
-(defn- assert-marker-route
-  [marker-label route]
-  (assert-route route
-                (parse-marker-routing
-                 marker-label
-                 (str "Before prose\nPASS_STATUS: ACTIONABLE_FEEDBACK\n"
-                      marker-label ": " route
-                      "\nAfter prose"))))
+(deftest exact-marker-routing-malformed-test
+  ;; Tests malformed marker attempts are candidate errors, not ordinary prose.
+  (testing "single malformed candidates identify the malformed line shape"
+    (doseq [[text reason value]
+            [[" QUALITY_GATE: APPROVE" :leading-whitespace nil]
+             ["QUALITY_GATE : APPROVE" :whitespace-before-colon nil]
+             ["QUALITY_GATE:APPROVE" :missing-space-after-colon nil]
+             ["QUALITY_GATE: APPROVE " :malformed-route-token "APPROVE "]
+             ["QUALITY_GATE: APPROVE because done" :malformed-route-token "APPROVE because done"]
+             ["QUALITY_GATE: approve" :malformed-route-token "approve"]]]
+      (let [result (assert-error :malformed-route-marker
+                                 (parse-exact-marker text))]
+        (is (= reason (get-in result [:details :reason])) (pr-str result))
+        (is (= text (get-in result [:details :line])) (pr-str result))
+        (when value
+          (is (= value (get-in result [:details :value])) (pr-str result)))))))
 
-(defn- assert-marker-error
-  [marker-label expected-reason text]
-  (assert-error expected-reason (parse-marker-routing marker-label text)))
+(deftest exact-marker-routing-mixed-candidate-precedence-test
+  ;; Tests all multi-candidate replies return ambiguity before malformed or
+  ;; unsupported single-candidate handling, with every candidate classified.
+  (testing "mixed candidates all return ambiguous-route-marker"
+    (doseq [[text expected-candidates]
+            [["QUALITY_GATE: APPROVE\n QUALITY_GATE: REPAIR"
+              [{:kind :exact :line "QUALITY_GATE: APPROVE" :route "APPROVE"}
+               {:kind :malformed :line " QUALITY_GATE: REPAIR" :reason :leading-whitespace}]]
+             ["QUALITY_GATE: APPROVE\nQUALITY_GATE: DENY"
+              [{:kind :exact :line "QUALITY_GATE: APPROVE" :route "APPROVE"}
+               {:kind :unsupported :line "QUALITY_GATE: DENY" :value "DENY"}]]
+             ["QUALITY_GATE: nope\nQUALITY_GATE: DENY"
+              [{:kind :malformed
+                :line "QUALITY_GATE: nope"
+                :reason :malformed-route-token
+                :value "nope"}
+               {:kind :unsupported :line "QUALITY_GATE: DENY" :value "DENY"}]]
+             [" QUALITY_GATE: APPROVE\nQUALITY_GATE: nope\nQUALITY_GATE: DENY"
+              [{:kind :malformed :line " QUALITY_GATE: APPROVE" :reason :leading-whitespace}
+               {:kind :malformed
+                :line "QUALITY_GATE: nope"
+                :reason :malformed-route-token
+                :value "nope"}
+               {:kind :unsupported :line "QUALITY_GATE: DENY" :value "DENY"}]]]]
+      (let [result (assert-error :ambiguous-route-marker (parse-exact-marker text))]
+        (is (= (mapv :line expected-candidates)
+               (get-in result [:details :route-marker-lines]))
+            (pr-str result))
+        (is (= expected-candidates
+               (get-in result [:details :route-marker-candidates]))
+            (pr-str result))))))
 
-(defn- assert-marker-routing-contract
-  [{:keys [marker-label valid-routes unsupported-route]}]
-  (doseq [route valid-routes]
-    (assert-marker-route marker-label route))
-  (assert-marker-error marker-label
-                       :missing-route-marker
-                       (str "Mentioned " marker-label " in prose without emitting a route.\nPASS_STATUS: ACTIONABLE_FEEDBACK"))
-  (let [duplicate-text (str marker-label ": " (first valid-routes)
-                            "\n"
-                            marker-label ": " (second valid-routes))
-        result (assert-marker-error marker-label :ambiguous-route-marker duplicate-text)]
-    (is (= [(str marker-label ": " (first valid-routes))
-            (str marker-label ": " (second valid-routes))]
-           (get-in result [:details :route-marker-lines]))
-        (pr-str result)))
-  (assert-marker-error marker-label
-                       :unsupported-route-marker
-                       (str marker-label ": " unsupported-route))
-  (doseq [text [(str " " marker-label ": " (first valid-routes))
-                (str marker-label ":" (first valid-routes))
-                (str marker-label " : " (first valid-routes))
-                (str marker-label ": " (first valid-routes) " ")
-                (str marker-label ": " (first valid-routes) " because tests changed")]]
-    (assert-marker-error marker-label :malformed-route-marker text)))
-
-(deftest proof-sync-disposition-routing-parser-test
-  ;; Tests pure proof-sync route marker parsing and classifier edge cases.
-  (testing "proof-sync route marker grammar"
-    (assert-marker-routing-contract
-     {:marker-label "PROOF_SYNC_ROUTE"
-      :valid-routes ["COVERAGE_REVIEW" "VALIDATION_RECAPTURE" "BOOKKEEPING_FIXED_POINT"]
-      :unsupported-route "TERMINAL_STOP"})))
-
-(deftest validation-capture-disposition-routing-parser-test
-  ;; Tests pure validation-capture route marker parsing and classifier edge cases.
-  (testing "validation-capture route marker grammar"
-    (assert-marker-routing-contract
-     {:marker-label "VALIDATION_CAPTURE_ROUTE"
-      :valid-routes ["IMPLEMENTATION_REPAIR" "TERMINAL_STOP"]
-      :unsupported-route "COVERAGE_REVIEW"})))
+(deftest exact-marker-routing-invalid-args-test
+  ;; Tests exact-marker operation arguments are validated before marker parsing
+  ;; and return accumulated diagnostics without throwing.
+  (testing "invalid args report the tagged invalid-arg result"
+    (let [result (routing/parse-exact-marker-routing {})]
+      (is (= :error (:status result)) (pr-str result))
+      (is (= :invalid-route-marker-args (:reason result)) (pr-str result))
+      (is (= "workflow/exact-marker-routing args are invalid" (:message result))
+          (pr-str result))))
+  (testing "required invalid arg cases"
+    (doseq [[args expected-errors]
+            [[{} [{:field :text :reason :missing-text}
+                  {:field :marker-label :reason :missing-marker-label}
+                  {:field :allowed-routes :reason :missing-allowed-routes}]]
+             [{:text 1 :marker-label "QUALITY_GATE" :allowed-routes ["APPROVE"]}
+              [{:field :text :reason :non-string-text :value 1}]]
+             [{:text "" :marker-label 1 :allowed-routes ["APPROVE"]}
+              [{:field :marker-label :reason :non-string-marker-label :value 1}]]
+             [{:text "" :marker-label "QUALITY-GATE" :allowed-routes ["APPROVE"]}
+              [{:field :marker-label :reason :invalid-marker-label :value "QUALITY-GATE"}]]
+             [{:text "" :marker-label "QUALITY_GATE" :allowed-routes #{"APPROVE"}}
+              [{:field :allowed-routes
+                :reason :non-vector-allowed-routes
+                :value #{"APPROVE"}}]]
+             [{:text "" :marker-label "QUALITY_GATE" :allowed-routes []}
+              [{:field :allowed-routes :reason :empty-allowed-routes}]]
+             [{:text "" :marker-label "QUALITY_GATE" :allowed-routes ["APPROVE" "approve" 1 "APPROVE"]}
+              [{:field :allowed-routes
+                :reason :invalid-allowed-route
+                :index 1
+                :value "approve"}
+               {:field :allowed-routes
+                :reason :invalid-allowed-route
+                :index 2
+                :value 1}
+               {:field :allowed-routes
+                :reason :duplicate-allowed-route
+                :value "APPROVE"
+                :indices [0 3]}]]]]
+      (let [result (assert-error :invalid-route-marker-args
+                                 (routing/parse-exact-marker-routing args))]
+        (is (= expected-errors (get-in result [:details :errors]))
+            (pr-str result))))))

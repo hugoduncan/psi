@@ -10,27 +10,27 @@
 
 ## Slice 2 — Generic exact-marker parser
 
-- [ ] Make `parse-exact-marker-routing` public/testable and accept a map containing `:text`, `:marker-label`, and `:allowed-routes`.
-- [ ] Add argument validation that accumulates `:details :errors` and returns `{:status :error :reason :invalid-route-marker-args :message "workflow/exact-marker-routing args are invalid" ...}` before candidate parsing.
-- [ ] Implement validation errors for missing/non-string `:text`, missing/non-string/invalid `:marker-label`, missing/non-vector/empty `:allowed-routes`, invalid route entries, and duplicate route tokens with indices.
-- [ ] Restrict marker labels and route tokens to strings matching `^[A-Z_]+$`.
-- [ ] Update candidate classification so candidates include exact marker lines, whitespace-before-colon attempts, and leading-whitespace marker attempts, while ordinary prose mentions without marker colon remain ordinary prose.
-- [ ] Include per-candidate maps with `:line`, `:kind`, and route/reason/value fields for exact, malformed, and unsupported candidates.
-- [ ] Apply result precedence exactly: missing candidates, ambiguous multi-candidate, supported exact, unsupported single candidate, malformed single candidate.
-- [ ] Include `:marker-label`, `:route-marker-lines`, and `:route-marker-candidates` in ambiguous diagnostics.
-- [ ] Keep `proof-sync-routes`, `validation-capture-routes`, `parse-proof-sync-disposition-routing`, and `parse-validation-capture-disposition-routing` as temporary compile-safe delegators until Slice 4; do not remove them in Slice 2 while `workflow.core` still registers the old operations.
+- [x] Make `parse-exact-marker-routing` public/testable and accept a map containing `:text`, `:marker-label`, and `:allowed-routes`.
+- [x] Add argument validation that accumulates `:details :errors` and returns `{:status :error :reason :invalid-route-marker-args :message "workflow/exact-marker-routing args are invalid" ...}` before candidate parsing.
+- [x] Implement validation errors for missing/non-string `:text`, missing/non-string/invalid `:marker-label`, missing/non-vector/empty `:allowed-routes`, invalid route entries, and duplicate route tokens with indices.
+- [x] Restrict marker labels and route tokens to strings matching `^[A-Z_]+$`.
+- [x] Update candidate classification so candidates include exact marker lines, whitespace-before-colon attempts, and leading-whitespace marker attempts, while ordinary prose mentions without marker colon remain ordinary prose.
+- [x] Include per-candidate maps with `:line`, `:kind`, and route/reason/value fields for exact, malformed, and unsupported candidates.
+- [x] Apply result precedence exactly: missing candidates, ambiguous multi-candidate, supported exact, unsupported single candidate, malformed single candidate.
+- [x] Include `:marker-label`, `:route-marker-lines`, and `:route-marker-candidates` in ambiguous diagnostics.
+- [x] Keep `proof-sync-routes`, `validation-capture-routes`, `parse-proof-sync-disposition-routing`, and `parse-validation-capture-disposition-routing` as temporary compile-safe delegators until Slice 4; do not remove them in Slice 2 while `workflow.core` still registers the old operations.
 
 ## Slice 3 — Parser test net
 
-- [ ] Replace workflow-specific routing parser tests with generic `parse-exact-marker-routing` tests using arbitrary marker labels and route tokens.
-- [ ] Add valid-route tests proving surrounding prose and `PASS_STATUS` lines are ignored.
-- [ ] Add missing-marker and prose-mention tests proving prose mentions of the marker label are ignored.
-- [ ] Add duplicate valid marker tests asserting `:ambiguous-route-marker`, complete `:route-marker-lines`, and complete `:route-marker-candidates`.
-- [ ] Add unsupported single-candidate tests asserting `:unsupported-route-marker` diagnostics include value and allowed routes.
-- [ ] Add malformed single-candidate tests for leading whitespace, whitespace before colon, missing post-colon space, trailing whitespace, same-line extra text, and invalid/lowercase route tokens.
-- [ ] Add mixed-candidate precedence tests for valid+malformed, valid+unsupported, malformed+unsupported, multiple malformed/unsupported, and duplicate valid candidates; assert `:ambiguous-route-marker` always wins.
-- [ ] Add invalid-arg tests for all required invalid arg cases, including missing/non-string text, invalid marker labels, empty/non-vector allowed routes, duplicate routes, invalid route tokens, and accumulation of multiple errors.
-- [ ] Run `bb clojure:test:scry --namespace psi.agent-session.workflow.routing-test` and fix failures before editing workflow EDNs.
+- [x] Replace workflow-specific routing parser tests with generic `parse-exact-marker-routing` tests using arbitrary marker labels and route tokens.
+- [x] Add valid-route tests proving surrounding prose and `PASS_STATUS` lines are ignored.
+- [x] Add missing-marker and prose-mention tests proving prose mentions of the marker label are ignored.
+- [x] Add duplicate valid marker tests asserting `:ambiguous-route-marker`, complete `:route-marker-lines`, and complete `:route-marker-candidates`.
+- [x] Add unsupported single-candidate tests asserting `:unsupported-route-marker` diagnostics include value and allowed routes.
+- [x] Add malformed single-candidate tests for leading whitespace, whitespace before colon, missing post-colon space, trailing whitespace, same-line extra text, and invalid/lowercase route tokens.
+- [x] Add mixed-candidate precedence tests for valid+malformed, valid+unsupported, malformed+unsupported, multiple malformed/unsupported, and duplicate valid candidates; assert `:ambiguous-route-marker` always wins.
+- [x] Add invalid-arg tests for all required invalid arg cases, including missing/non-string text, invalid marker labels, empty/non-vector allowed routes, duplicate routes, invalid route tokens, and accumulation of multiple errors.
+- [x] Run `bb clojure:test:scry --namespace psi.agent-session.workflow.routing-test` and fix failures before editing workflow EDNs.
 
 ## Slice 4 — Coherent operation/EDN handoff
 

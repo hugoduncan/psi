@@ -5,6 +5,8 @@
 
 (def ^:private pass-status-prefix "PASS_STATUS:")
 
+(def ^:private route-token-pattern #"^[A-Z_]+$")
+
 (def ^:private known-pass-status->route
   {"REVIEW_COMPLETE" "DONE"
    "ACTIONABLE_FEEDBACK" "REPEAT"
@@ -95,16 +97,105 @@
        :details {:reason :invalid-munera-open-task-path
                  :text text}})))
 
+(defn- route-token? [value]
+  (and (string? value)
+       (boolean (re-matches route-token-pattern value))))
+
+(defn- invalid-marker-label-error
+  [args]
+  (cond
+    (not (contains? args :marker-label))
+    {:field :marker-label :reason :missing-marker-label}
+
+    (not (string? (:marker-label args)))
+    {:field :marker-label
+     :reason :non-string-marker-label
+     :value (:marker-label args)}
+
+    (not (route-token? (:marker-label args)))
+    {:field :marker-label
+     :reason :invalid-marker-label
+     :value (:marker-label args)}))
+
+(defn- invalid-text-error
+  [args]
+  (cond
+    (not (contains? args :text))
+    {:field :text :reason :missing-text}
+
+    (not (string? (:text args)))
+    {:field :text
+     :reason :non-string-text
+     :value (:text args)}))
+
+(defn- invalid-allowed-route-entry-errors
+  [allowed-routes]
+  (->> allowed-routes
+       (map-indexed (fn [idx route]
+                      (when-not (route-token? route)
+                        {:field :allowed-routes
+                         :reason :invalid-allowed-route
+                         :index idx
+                         :value route})))
+       (remove nil?)
+       vec))
+
+(defn- duplicate-route-errors
+  [allowed-routes]
+  (->> allowed-routes
+       (map-indexed vector)
+       (group-by second)
+       (keep (fn [[route indexed-routes]]
+               (let [indices (mapv first indexed-routes)]
+                 (when (and (route-token? route)
+                            (> (count indices) 1))
+                   {:field :allowed-routes
+                    :reason :duplicate-allowed-route
+                    :value route
+                    :indices indices}))))
+       vec))
+
+(defn- invalid-allowed-routes-errors
+  [args]
+  (cond
+    (not (contains? args :allowed-routes))
+    [{:field :allowed-routes :reason :missing-allowed-routes}]
+
+    (not (vector? (:allowed-routes args)))
+    [{:field :allowed-routes
+      :reason :non-vector-allowed-routes
+      :value (:allowed-routes args)}]
+
+    (empty? (:allowed-routes args))
+    [{:field :allowed-routes :reason :empty-allowed-routes}]
+
+    :else
+    (into (invalid-allowed-route-entry-errors (:allowed-routes args))
+          (duplicate-route-errors (:allowed-routes args)))))
+
+(defn- exact-marker-routing-arg-errors
+  [args]
+  (vec (concat (keep identity [(invalid-text-error args)
+                               (invalid-marker-label-error args)])
+               (invalid-allowed-routes-errors args))))
+
+(defn- invalid-exact-marker-routing-args-result
+  [errors]
+  {:status :error
+   :reason :invalid-route-marker-args
+   :message "workflow/exact-marker-routing args are invalid"
+   :details {:errors errors}})
+
 (defn- marker-line-classification
   [{:keys [marker-label allowed-routes-set]} line]
   (let [trimmed-left (str/triml line)
-        exact-prefix (str marker-label ": ")
         marker-prefix? (str/starts-with? trimmed-left marker-label)
         after-marker-label (if marker-prefix?
                              (subs trimmed-left (count marker-label))
                              "")
-        marker-attempt? (or (str/starts-with? after-marker-label ":")
-                            (boolean (re-find #"^\s+:" after-marker-label)))]
+        marker-attempt? (and marker-prefix?
+                             (or (str/starts-with? after-marker-label ":")
+                                 (boolean (re-find #"^\s+:" after-marker-label))))]
     (cond
       (not marker-attempt?)
       {:kind :ordinary
@@ -115,15 +206,20 @@
        :line line
        :reason :leading-whitespace}
 
-      (not (str/starts-with? line exact-prefix))
+      (re-find #"^\s+:" after-marker-label)
       {:kind :malformed
        :line line
-       :reason :malformed-prefix}
+       :reason :whitespace-before-colon}
+
+      (not (str/starts-with? line (str marker-label ": ")))
+      {:kind :malformed
+       :line line
+       :reason :missing-space-after-colon}
 
       :else
-      (let [raw-route (subs line (count exact-prefix))]
+      (let [raw-route (subs line (count (str marker-label ": ")))]
         (cond
-          (not (re-matches #"[A-Z_]+" raw-route))
+          (not (route-token? raw-route))
           {:kind :malformed
            :line line
            :reason :malformed-route-token
@@ -143,54 +239,67 @@
   [{:keys [text marker-label allowed-routes]}]
   (let [classification-opts {:marker-label marker-label
                              :allowed-routes-set (set allowed-routes)}]
-    (->> (str/split-lines (or text ""))
+    (->> (str/split-lines text)
          (mapv #(marker-line-classification classification-opts %))
          (remove #(= :ordinary (:kind %)))
          vec)))
 
-(defn- parse-exact-marker-routing
-  [{:keys [text marker-label allowed-routes]}]
-  (let [candidates (route-marker-candidates {:text text
-                                             :marker-label marker-label
-                                             :allowed-routes allowed-routes})]
-    (cond
-      (empty? candidates)
-      {:status :error
-       :reason :missing-route-marker
-       :message (str marker-label " marker missing")
-       :details {:text text}}
+(defn parse-exact-marker-routing
+  "Parse one exact workflow-owned route marker from text.
 
-      (> (count candidates) 1)
-      {:status :error
-       :reason :ambiguous-route-marker
-       :message (str "Multiple " marker-label " marker lines found")
-       :details {:text text
-                 :route-marker-lines (mapv :line candidates)}}
-
-      :else
-      (let [{:keys [kind line route value]} (first candidates)]
-        (case kind
-          :exact
-          {:status :ok
-           :data route
-           :summary route}
-
-          :unsupported
+   Args must contain string :text, all-caps/underscore :marker-label, and a
+   non-empty vector of distinct all-caps/underscore :allowed-routes. Invalid
+   args return :invalid-route-marker-args before marker parsing."
+  [args]
+  (let [errors (exact-marker-routing-arg-errors args)]
+    (if (seq errors)
+      (invalid-exact-marker-routing-args-result errors)
+      (let [{:keys [text marker-label allowed-routes]} args
+            candidates (route-marker-candidates args)]
+        (cond
+          (empty? candidates)
           {:status :error
-           :reason :unsupported-route-marker
-           :message (str marker-label " route token is not supported")
+           :reason :missing-route-marker
+           :message (str marker-label " marker missing")
            :details {:text text
-                     :line line
-                     :value value
-                     :allowed-routes allowed-routes}}
+                     :marker-label marker-label}}
 
-          :malformed
+          (> (count candidates) 1)
           {:status :error
-           :reason :malformed-route-marker
-           :message (str marker-label " marker must start at column 0 with exactly one space after colon, one route token, and no trailing text")
-           :details (cond-> {:text text
-                             :line line}
-                      value (assoc :value value))})))))
+           :reason :ambiguous-route-marker
+           :message (str "Multiple " marker-label " marker lines found")
+           :details {:text text
+                     :marker-label marker-label
+                     :route-marker-lines (mapv :line candidates)
+                     :route-marker-candidates candidates}}
+
+          :else
+          (let [{:keys [kind line route value reason]} (first candidates)]
+            (case kind
+              :exact
+              {:status :ok
+               :data route
+               :summary route}
+
+              :unsupported
+              {:status :error
+               :reason :unsupported-route-marker
+               :message (str marker-label " route token is not supported")
+               :details {:text text
+                         :marker-label marker-label
+                         :line line
+                         :value value
+                         :allowed-routes allowed-routes}}
+
+              :malformed
+              {:status :error
+               :reason :malformed-route-marker
+               :message (str marker-label " marker must start at column 0 with exactly one space after colon, one route token, and no trailing text")
+               :details (cond-> {:text text
+                                 :marker-label marker-label
+                                 :line line
+                                 :reason reason}
+                          value (assoc :value value))})))))))
 
 (defn parse-proof-sync-disposition-routing
   "Parse a proof-sync final reply into one deterministic route result."
