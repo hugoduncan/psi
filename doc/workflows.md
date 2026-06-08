@@ -754,7 +754,11 @@ cyclomatic complexity. The `incidental-complexity-finder` skill encodes this as
 `lcc-total ≥ 5.0 ∧ gap ≥ 2.0`, ranks by
 `gap`, and applies an essential-vs-incidental judgment guard over the top 5 to
 discard false positives. It selects exactly one unit, or reports that none
-qualifies.
+qualifies. For target-present runs, the generated task records the selector
+justification in committed task artifacts: `design.md` explains why the chosen
+unit passed the incidental guard, while `coverage-map.md` records selector proof,
+top-5 guard evidence, rejected essential false positives when present, and any
+marginal-target concerns, falsification evidence, or scope-review questions.
 
 The workflow runs entirely in the invoking session's current worktree. The
 caller is responsible for starting it from the intended branch/worktree; the
@@ -835,9 +839,11 @@ a green characterization-test safety net (gating all refactoring), and
 check), a per-unit relocation guard holds (every new or below-ceiling after-row
 `u` satisfies `after(u) < B`, where `B := before(target)` read from
 `before-local.json`, so a tangle is never merely relocated into a new seam or a
-sibling rather than reduced), `gordian gate --baseline before-diagnose.edn
---fail-on new-cycles,new-high-findings --max-new-medium-findings 0` passes, and
-all tests stay green. The workflow ends
+sibling rather than reduced), `gordian gate --baseline
+munera/open/NNN-slug/before-diagnose.edn --fail-on
+new-cycles,new-high-findings --max-new-medium-findings 0` passes (with
+`NNN-slug` replaced by the generated task id), and all tests stay green. The
+workflow ends
 with a completed, reviewed task on the local worktree branch; it does **not**
 push or open a PR — that decision is left to the user.
 
