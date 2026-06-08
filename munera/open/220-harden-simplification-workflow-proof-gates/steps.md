@@ -185,4 +185,4 @@ when done.
 
 ## Task test review follow-ups
 
-- [ ] TT1: Strengthen deterministic marker-routing operation tests to assert duplicate-marker error details include the duplicate marker lines for both `workflow/proof-sync-disposition-routing` and `workflow/validation-capture-disposition-routing`; current tests only assert `:reason :ambiguous-route-marker`, so they do not prove the design/plan diagnostic contract for duplicated markers.
+- [x] TT1: Strengthen deterministic marker-routing operation tests to assert duplicate-marker error details include the duplicate marker lines for both `workflow/proof-sync-disposition-routing` and `workflow/validation-capture-disposition-routing`; current tests only assert `:reason :ambiguous-route-marker`, so they do not prove the design/plan diagnostic contract for duplicated markers. — done; operation tests now assert `:details :route-marker-lines` contains the exact duplicate proof-sync and validation-capture marker lines.

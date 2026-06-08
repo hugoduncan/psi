@@ -72,7 +72,15 @@
   [ctx operation-id reason text]
   (let [result (invoke-operation ctx operation-id text)]
     (is (= :error (:status result)) (pr-str result))
-    (is (= reason (:reason result)) (pr-str result))))
+    (is (= reason (:reason result)) (pr-str result))
+    result))
+
+(defn- assert-duplicate-marker-lines
+  [ctx operation-id text expected-lines]
+  (let [result (assert-marker-error ctx operation-id :ambiguous-route-marker text)]
+    (is (= expected-lines
+           (get-in result [:details :route-marker-lines]))
+        (pr-str result))))
 
 (deftest proof-sync-disposition-routing-operation-test
   ;; Tests exact proof-sync route marker parsing through the registered
@@ -86,9 +94,11 @@
         (assert-marker-error ctx "workflow/proof-sync-disposition-routing"
                              :missing-route-marker
                              "PASS_STATUS: ACTIONABLE_FEEDBACK")
-        (assert-marker-error ctx "workflow/proof-sync-disposition-routing"
-                             :ambiguous-route-marker
-                             "PROOF_SYNC_ROUTE: COVERAGE_REVIEW\nPROOF_SYNC_ROUTE: VALIDATION_RECAPTURE")
+        (assert-duplicate-marker-lines ctx
+                                       "workflow/proof-sync-disposition-routing"
+                                       "PROOF_SYNC_ROUTE: COVERAGE_REVIEW\nPROOF_SYNC_ROUTE: VALIDATION_RECAPTURE"
+                                       ["PROOF_SYNC_ROUTE: COVERAGE_REVIEW"
+                                        "PROOF_SYNC_ROUTE: VALIDATION_RECAPTURE"])
         (assert-marker-error ctx "workflow/proof-sync-disposition-routing"
                              :unsupported-route-marker
                              "PROOF_SYNC_ROUTE: TERMINAL_STOP")
@@ -119,9 +129,11 @@
         (assert-marker-error ctx "workflow/validation-capture-disposition-routing"
                              :missing-route-marker
                              "PASS_STATUS: ACTIONABLE_FEEDBACK")
-        (assert-marker-error ctx "workflow/validation-capture-disposition-routing"
-                             :ambiguous-route-marker
-                             "VALIDATION_CAPTURE_ROUTE: IMPLEMENTATION_REPAIR\nVALIDATION_CAPTURE_ROUTE: TERMINAL_STOP")
+        (assert-duplicate-marker-lines ctx
+                                       "workflow/validation-capture-disposition-routing"
+                                       "VALIDATION_CAPTURE_ROUTE: IMPLEMENTATION_REPAIR\nVALIDATION_CAPTURE_ROUTE: TERMINAL_STOP"
+                                       ["VALIDATION_CAPTURE_ROUTE: IMPLEMENTATION_REPAIR"
+                                        "VALIDATION_CAPTURE_ROUTE: TERMINAL_STOP"])
         (assert-marker-error ctx "workflow/validation-capture-disposition-routing"
                              :unsupported-route-marker
                              "VALIDATION_CAPTURE_ROUTE: COVERAGE_REVIEW")
