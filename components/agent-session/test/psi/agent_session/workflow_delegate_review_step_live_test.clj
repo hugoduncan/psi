@@ -125,7 +125,7 @@
           (assert-marker-route ctx "workflow/proof-sync-disposition-routing" "PROOF_SYNC_ROUTE" route))
         (assert-marker-error ctx "workflow/proof-sync-disposition-routing"
                              :missing-route-marker
-                             "PASS_STATUS: ACTIONABLE_FEEDBACK")
+                             "Mentioned PROOF_SYNC_ROUTE in prose without emitting a route.\nPASS_STATUS: ACTIONABLE_FEEDBACK")
         (assert-duplicate-marker-lines ctx
                                        "workflow/proof-sync-disposition-routing"
                                        "PROOF_SYNC_ROUTE: COVERAGE_REVIEW\nPROOF_SYNC_ROUTE: VALIDATION_RECAPTURE"
@@ -160,7 +160,7 @@
           (assert-marker-route ctx "workflow/validation-capture-disposition-routing" "VALIDATION_CAPTURE_ROUTE" route))
         (assert-marker-error ctx "workflow/validation-capture-disposition-routing"
                              :missing-route-marker
-                             "PASS_STATUS: ACTIONABLE_FEEDBACK")
+                             "Mentioned VALIDATION_CAPTURE_ROUTE in prose without emitting a route.\nPASS_STATUS: ACTIONABLE_FEEDBACK")
         (assert-duplicate-marker-lines ctx
                                        "workflow/validation-capture-disposition-routing"
                                        "VALIDATION_CAPTURE_ROUTE: IMPLEMENTATION_REPAIR\nVALIDATION_CAPTURE_ROUTE: TERMINAL_STOP"
