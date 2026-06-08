@@ -523,6 +523,26 @@
               "ambiguity-review" "inconsistency-review"
               "architecture-review" "ambiguity-review" "inconsistency-review"
               "final-summary"]
+             prompts))))
+  (testing "actionable final-phase inconsistency feedback restarts instead of completing"
+    (let [inconsistency-count* (atom 0)
+          {:keys [result prompts]} (execute-conditional-review-proof!
+                                    "review-task-design-proof" "design-inconsistency-restart"
+                                    (fn [prompt]
+                                      (case prompt
+                                        "architecture-review" "PASS_STATUS: REVIEW_COMPLETE"
+                                        "ambiguity-review" "PASS_STATUS: REVIEW_COMPLETE"
+                                        "inconsistency-review"
+                                        (if (= 1 (swap! inconsistency-count* inc))
+                                          "PASS_STATUS: ACTIONABLE_FEEDBACK"
+                                          "PASS_STATUS: REVIEW_COMPLETE")
+                                        prompt))
+                                    {:kind :design})]
+      (is (= :completed (:status result)))
+      (is (= ["architecture-review" "ambiguity-review"
+              "inconsistency-review" "inconsistency-review-follow-up"
+              "architecture-review" "ambiguity-review" "inconsistency-review"
+              "final-summary"]
              prompts)))))
 
 (deftest plan-review-full-pass-routing-test
@@ -549,6 +569,24 @@
       (is (= :completed (:status result)))
       (is (= ["ambiguity-review" "ambiguity-review-follow-up"
               "inconsistency-review"
+              "ambiguity-review" "inconsistency-review"
+              "final-summary"]
+             prompts))))
+  (testing "actionable final-phase inconsistency feedback restarts instead of completing"
+    (let [inconsistency-count* (atom 0)
+          {:keys [result prompts]} (execute-conditional-review-proof!
+                                    "review-task-plan-proof" "plan-inconsistency-restart"
+                                    (fn [prompt]
+                                      (case prompt
+                                        "ambiguity-review" "PASS_STATUS: REVIEW_COMPLETE"
+                                        "inconsistency-review"
+                                        (if (= 1 (swap! inconsistency-count* inc))
+                                          "PASS_STATUS: ACTIONABLE_FEEDBACK"
+                                          "PASS_STATUS: REVIEW_COMPLETE")
+                                        prompt)))]
+      (is (= :completed (:status result)))
+      (is (= ["ambiguity-review" "inconsistency-review"
+              "inconsistency-review-follow-up"
               "ambiguity-review" "inconsistency-review"
               "final-summary"]
              prompts)))))

@@ -40,7 +40,7 @@
 - [x] Add or update design-review runtime tests proving pass 6 with actionable feedback fails on attempted pass 7 through the iteration-limit path.
 - [x] Add or update plan-review runtime tests proving actionable ambiguity feedback still completes inconsistency review before restarting at ambiguity review.
 - [x] Add or update plan-review runtime tests proving pass-level feedback memory survives follow-up execution and causes restart even when follow-up files would be clear.
-- [ ] TT1: Add runtime coverage proving final-phase actionable feedback (`inconsistency-review` only, with earlier phases clean) causes `clarity-status` to restart the next design and plan review pass, not complete.
+- [x] TT1: Add runtime coverage proving final-phase actionable feedback (`inconsistency-review` only, with earlier phases clean) causes `clarity-status` to restart the next design and plan review pass, not complete.
 - [x] Add or update plan-review runtime tests proving pass 5 with actionable feedback fails on attempted pass 6 through the iteration-limit path.
 - [x] Keep tests behavior/state focused; avoid asserting incidental prompt wording except where content-locks already exist for workflow definitions.
 
