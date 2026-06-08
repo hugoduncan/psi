@@ -494,6 +494,8 @@ Input task path:
     {:type :source, :from {:step "review-task-docs", :yield :text}}
     {:type :source, :from {:step "review-code-shape", :yield :text}}
     {:type :source, :from {:step "proof-sync", :yield :text}}
+    {:type :source,
+     :from {:step "proof-sync-fixed-point", :yield :text}}
     {:type :template,
      :text
      "Produce the user-facing final result for the completed target-present `reduce-architectural-complexity` run for {{input}}. Independently inspect the Munera task artifacts. Summarize the design → plan → test-net → diff-gate → implementation → validation-capture → six review gates outcome. Include validation artifacts captured, verification performed, task artifact files updated, commit ids evident from step outputs, and whether the task remains open or was closed. Do not claim a PR was opened or pushed.\n\nInput task path:\n{{input}}\n\nProof authority: independently read committed task-local `coverage-map.md`, `characterization-baseline.edn`, `before-diagnose.edn`, `architecture-targets.edn`, `target-issues.edn` or `target-issues-unavailable.edn`, and validation artifacts (`after-diagnose.edn`, `after-architecture-targets.edn`, `architecture-compare.edn`, `architecture-gate.edn`). Treat `coverage-map.md` and parse-checked task-local proof artifacts as committed proof authority. Do not claim proof coherence from workflow/review prose, prior yields, or artifact existence alone; cite the clean proof-sync or fixed-point route plus the committed proof artifacts that support the claim.",

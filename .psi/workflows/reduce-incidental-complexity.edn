@@ -475,6 +475,8 @@ Input task path:
     {:type :source,
      :from {:step "incidental-validation-capture", :yield :text}}
     {:type :source, :from {:step "proof-sync", :yield :text}}
+    {:type :source,
+     :from {:step "proof-sync-fixed-point", :yield :text}}
     {:type :template,
      :text
      "Produce the user-facing final result for the completed target-present reduce-incidental-complexity run described by {{input}}. Independently inspect the Munera task artifacts. Summarize the design → plan → characterization-test-net gate → baseline/diff gate → simplification implementation → implementation review → incidental validation-capture outcome. Include verification performed, task artifact files updated, commit ids evident from step outputs, and whether the task remains open or was closed. Do not claim a PR was opened or pushed.\n\nInput:\n{{input}}\n\nProof authority: independently read committed task-local `coverage-map.md`, `characterization-baseline.edn`, `before-local.json`, `before-diagnose.edn`, and validation artifacts (`after-local.json`, `incidental-burden-check.edn`, `incidental-gate.edn`). Treat `coverage-map.md` and parse-checked task-local proof artifacts as the canonical coverage/proof authority. Do not claim proof coherence from workflow/review prose, prior yields, or artifact existence alone; cite the clean proof-sync or fixed-point route plus the committed proof artifacts that support the claim.",

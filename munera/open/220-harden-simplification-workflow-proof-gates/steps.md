@@ -181,4 +181,4 @@ when done.
 
 ## Implementation review follow-ups
 
-- [ ] IR1: Add `proof-sync-fixed-point` yielded source context to both simplification workflow `final-summary` steps and content-lock it in tests; final summaries can be reached from clean fixed-point verification, so they must not have to infer that final proof gate from topology or stale `proof-sync` prose.
+- [x] IR1: Add `proof-sync-fixed-point` yielded source context to both simplification workflow `final-summary` steps and content-lock it in tests; final summaries can be reached from clean fixed-point verification, so they must not have to infer that final proof gate from topology or stale `proof-sync` prose. — done; both final summaries now source `proof-sync-fixed-point` yield alongside `proof-sync`, with task-220 content-lock assertions.

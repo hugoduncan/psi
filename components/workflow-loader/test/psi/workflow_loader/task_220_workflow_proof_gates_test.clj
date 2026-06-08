@@ -233,7 +233,8 @@
              validation-text (step-template-text (by-name (:validation-step workflow)))
              proof-text (step-template-text (by-name "proof-sync"))
              fixed-text (step-template-text (by-name "proof-sync-fixed-point"))
-             final-text (step-template-text (by-name "final-summary"))]
+             final-summary (by-name "final-summary")
+             final-text (step-template-text final-summary)]
          (testing (str (:name workflow) " select prompt creates mandatory coverage-map scaffold")
            (is (.contains select-text "coverage-map.md"))
            (is (.contains select-text "first writer"))
@@ -266,6 +267,12 @@
          (testing (str (:name workflow) " final summary reads committed proof artifacts")
            (doseq [artifact (:proof-artifacts workflow)]
              (is (.contains final-text artifact) artifact))
+           (is (some #(= {:step "proof-sync" :yield :text} %)
+                     (source-refs final-summary))
+               "final-summary receives the clean proof-sync yield")
+           (is (some #(= {:step "proof-sync-fixed-point" :yield :text} %)
+                     (source-refs final-summary))
+               "final-summary receives clean fixed-point verification yield")
            (is (.contains final-text "independently read committed task-local"))
            (is (.contains final-text "Do not claim proof coherence from workflow/review prose"))))))))
 
