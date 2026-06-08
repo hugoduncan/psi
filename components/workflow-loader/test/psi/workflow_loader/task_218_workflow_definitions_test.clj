@@ -127,7 +127,12 @@
            by-name (step-by-name steps)
            select-step (by-name "select-and-create")
            extract-step (by-name "extract-task-path")
-           terminal-step (by-name "terminal-stop-summary")]
+           malformed-stop (by-name "terminal-stop-malformed-task-path")
+           clean-stop (by-name "terminal-stop-clean-baseline")
+           coverage-stop (by-name "terminal-stop-coverage-disposition")
+           diff-stop (by-name "terminal-stop-diff-gate")
+           validation-stop (by-name "terminal-stop-validation-capture")
+           proof-stop (by-name "terminal-stop-proof-sync")]
        (testing "top-level step order covers selection, test-net, validation, reviews, and summaries"
          (is (= ["select-and-create"
                  "extract-task-path"
@@ -148,7 +153,12 @@
                  "review-task-docs"
                  "review-code-shape"
                  "final-summary"
-                 "terminal-stop-summary"]
+                 "terminal-stop-malformed-task-path"
+                 "terminal-stop-clean-baseline"
+                 "terminal-stop-coverage-disposition"
+                 "terminal-stop-diff-gate"
+                 "terminal-stop-validation-capture"
+                 "terminal-stop-proof-sync"]
                 (mapv :name steps))))
        (testing "select-and-create uses pass-status routing and normalized route keys"
          (is (= (pass-status-judge "select-and-create") (:judge select-step)))
@@ -183,6 +193,15 @@
            (is (.contains text "uninterpretable"))
            (is (.contains text "architecture-targets.edn"))
            (is (.contains text "target-issues.edn"))
+           (is (.contains text "coverage-map.md"))
+           (is (.contains text "initial `munera/open/NNN-slug/coverage-map.md` scaffold"))
+           (is (.contains text "selected candidate score and confidence"))
+           (is (.contains text "confidence is `:low`"))
+           (is (.contains text "why the target remains actionable despite low confidence"))
+           (is (.contains text "evidence that would falsify the target"))
+           (is (.contains text "whether implementation scope should be narrowed"))
+           (is (.contains text "validation-capture` records references to `after-diagnose.edn`"))
+           (is (.contains text "final-summary` reads it as committed proof authority"))
            (is (.contains text "characterization-test"))
            (is (.contains text "--fail-on new-cycles,new-high-findings --max-new-medium-findings 0 --edn"))
            (is (not (.contains text ":architecture-target-ranking")))
@@ -191,7 +210,7 @@
        (testing "extract-task-path is the target-present identity boundary"
          (is (= (munera-open-task-path-judge "extract-task-path") (:judge extract-step)))
          (is (= "review-task-design" (get-in extract-step [:on "DONE" :goto])))
-         (is (= "terminal-stop-summary" (get-in extract-step [:on "REPEAT" :goto])))
+         (is (= "terminal-stop-malformed-task-path" (get-in extract-step [:on "REPEAT" :goto])))
          (is (not= :llm (:type (:judge extract-step)))
              "valid path routing must be deterministic, not LLM-judged")
          (let [text (step-template-text extract-step)]
@@ -199,11 +218,18 @@
            (is (.contains text "respond with ONLY that root-relative path"))
            (is (.contains text "do not guess"))
            (is (.contains text "Do not invent or read task-local artifacts"))))
-       (testing "terminal stop has the pre-design no-path branch"
-         (let [text (step-template-text terminal-step)]
-           (is (.contains text "Pre-design/no-validated-task-path"))
-           (is (.contains text "Post-task/no-implementation"))
-           (is (.contains text "Do not require, invent, or read a task path"))))))))
+       (testing "split terminal stops name explicit failed-gate sources"
+         (is (.contains (step-template-text malformed-stop)
+                        "Stop source: malformed/missing task path"))
+         (is (.contains (step-template-text malformed-stop)
+                        "Do not consume a validated task path"))
+         (is (.contains (step-template-text malformed-stop)
+                        "Do not require, invent, or read a task path"))
+         (is (.contains (step-template-text clean-stop) "Stop source: clean-baseline"))
+         (is (.contains (step-template-text coverage-stop) "Stop source: coverage-disposition"))
+         (is (.contains (step-template-text diff-stop) "Stop source: diff-gate"))
+         (is (.contains (step-template-text validation-stop) "Stop source: validation-capture"))
+         (is (.contains (step-template-text proof-stop) "Stop source: proof-sync-fixed-point")))))))
 
 (deftest reduce-architectural-complexity-routing-and-gates-test
   (load-edn-only
@@ -242,9 +268,9 @@
          (is (= "coverage-review" (get-in fix [:on "DONE" :goto])))
          (is (= "diff-gate" (get-in coverage [:on "DONE" :goto])))
          (is (= "implement-task" (get-in diff [:on "DONE" :goto])))
-         (is (= "terminal-stop-summary" (get-in clean [:on "REPEAT" :goto])))
-         (is (= "terminal-stop-summary" (get-in disposition [:on "REPEAT" :goto])))
-         (is (= "terminal-stop-summary" (get-in diff [:on "REPEAT" :goto]))))
+         (is (= "terminal-stop-clean-baseline" (get-in clean [:on "REPEAT" :goto])))
+         (is (= "terminal-stop-coverage-disposition" (get-in disposition [:on "REPEAT" :goto])))
+         (is (= "terminal-stop-diff-gate" (get-in diff [:on "REPEAT" :goto]))))
        (testing "gate prompt content locks architecture test-net semantics"
          (is (.contains (step-template-text clean) "characterization-baseline.edn"))
          (is (.contains (step-template-text clean) "`:target/source-areas`"))

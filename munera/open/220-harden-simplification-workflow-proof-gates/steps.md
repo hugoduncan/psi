@@ -42,31 +42,31 @@ when done.
 
 ## Slice 2 — Task identity boundary, terminal prerequisites, and selector/proof generation contracts
 
-- [ ] Add split terminal-stop step definitions to both workflow EDNs before adding or changing any route to them: `terminal-stop-malformed-task-path`, `terminal-stop-clean-baseline`, `terminal-stop-coverage-disposition`, `terminal-stop-diff-gate`, `terminal-stop-validation-capture`, and `terminal-stop-proof-sync`.
-- [ ] Keep split terminal-stop step definitions loadable with placeholder-safe prompts if needed; all routes introduced in later Slice 2-4 work must target already-defined steps, never a future Slice 5 step.
-- [ ] Add an `extract-task-path` session step to `reduce-incidental-complexity` immediately after target-created `select-and-create` success.
-- [ ] Wire incidental `select-and-create` `PASS_STATUS: REVIEW_COMPLETE` / normalized `"DONE"` route to `extract-task-path`, and keep no-target `"REPEAT"` route directly to `:done`.
-- [ ] In incidental `extract-task-path`, require exactly one `munera_task_path: munera/open/NNN-slug` line and respond with only the root-relative path on success.
-- [ ] Use deterministic `workflow/munera-open-task-path-routing` as the incidental `extract-task-path` judge.
-- [ ] Route malformed incidental extraction to `terminal-stop-malformed-task-path` without reading task-local artifacts or inventing a task path.
-- [ ] Update incidental `review-task-design`, `create-task-plan`, `review-task-plan`, `clean-baseline`, `coverage-review`, `coverage-disposition`, `coverage-fix`, `diff-gate`, `implement-task`, `review-task-implementation`, validation/proof steps, and summaries so task identity comes from `extract-task-path` yield.
-- [ ] Keep the full incidental `select-and-create` handoff available only as context/evidence for downstream steps.
-- [ ] Update incidental generated `design.md` prompt contract to require mandatory task-local `coverage-map.md` for every target-present task.
-- [ ] Require incidental `select-and-create` to create and commit the initial `coverage-map.md` scaffold before emitting the target-present handoff; pending/unknown values must be represented explicitly rather than omitting required fields.
-- [ ] In the incidental prompt, require `coverage-map.md` fields for target identity, selected row key, selector proof, top-5 guard decision, rejected essential false positives, authoritative test commands, coverage/gap dispositions, latest test/assertion counts, and relationship to `characterization-baseline.edn`.
-- [ ] State the incidental `coverage-map.md` lifecycle in the relevant prompts: `coverage-review` updates coverage/test-net fields, `coverage-fix` updates it for added tests or seams, `diff-gate` records coverage-phase classification relationship to `characterization-baseline.edn`, `incidental-validation-capture` records final Gordian proof references, `proof-sync` performs final synchronization when stale, and `final-summary` reads it as proof authority.
-- [ ] Update incidental generated `design.md` prompt contract to name root-relative `before-local.json`, `before-diagnose.edn`, `after-local.json`, `incidental-burden-check.edn`, `incidental-gate.edn`, `coverage-map.md`, and `characterization-baseline.edn`.
-- [ ] Require `before-local.json` parse as JSON with a `units` array before baseline/selector proof claims.
-- [ ] Require `before-diagnose.edn` parse as EDN before baseline/gate claims.
-- [ ] Require generated incidental tasks to record top-5 guard evidence and say explicitly when no higher candidate was rejected before the chosen target.
-- [ ] Require generated incidental tasks to mark marginal targets according to the design thresholds and record falsification/review questions.
-- [ ] Update architecture `select-and-create` generated-design prompt so every generated design records score and confidence, and so `:confidence :low` always records actionability despite low confidence, falsification evidence, design-review questions, and scope-narrowing considerations.
-- [ ] Require architecture `select-and-create` to create and commit an initial `coverage-map.md` scaffold before emitting the target-present handoff; pending/unknown values must be represented explicitly rather than omitting required fields.
-- [ ] In the architecture prompt, require `coverage-map.md` fields for selected candidate identity, score/confidence, target namespaces/source areas, selector proof, authoritative test commands, affected behaviours, coverage/gap dispositions, latest test/assertion counts, relationship to `characterization-baseline.edn`, and references to `after-diagnose.edn`, `after-architecture-targets.edn`, `architecture-compare.edn`, and `architecture-gate.edn`.
-- [ ] State the architecture `coverage-map.md` lifecycle in the relevant prompts: `coverage-review` updates coverage/test-net fields, `coverage-fix` updates it for added tests or seams, `diff-gate` records coverage-phase classification relationship to `characterization-baseline.edn`, `validation-capture` records final Gordian proof references, `proof-sync` performs final synchronization when stale, and `final-summary` reads it as proof authority.
-- [ ] Verify both workflow EDNs load/compile through the workflow-loader/registry path after Slice 2 topology edits, not only parse as EDN.
-- [ ] Record Slice 2 implementation and verification notes in `implementation.md`.
-- [ ] Commit Slice 2 (`⚒ workflow: harden simplification task identity`).
+- [x] Add split terminal-stop step definitions to both workflow EDNs before adding or changing any route to them: `terminal-stop-malformed-task-path`, `terminal-stop-clean-baseline`, `terminal-stop-coverage-disposition`, `terminal-stop-diff-gate`, `terminal-stop-validation-capture`, and `terminal-stop-proof-sync`.
+- [x] Keep split terminal-stop step definitions loadable with placeholder-safe prompts if needed; all routes introduced in later Slice 2-4 work must target already-defined steps, never a future Slice 5 step.
+- [x] Add an `extract-task-path` session step to `reduce-incidental-complexity` immediately after target-created `select-and-create` success.
+- [x] Wire incidental `select-and-create` `PASS_STATUS: REVIEW_COMPLETE` / normalized `"DONE"` route to `extract-task-path`, and keep no-target `"REPEAT"` route directly to `:done`.
+- [x] In incidental `extract-task-path`, require exactly one `munera_task_path: munera/open/NNN-slug` line and respond with only the root-relative path on success.
+- [x] Use deterministic `workflow/munera-open-task-path-routing` as the incidental `extract-task-path` judge.
+- [x] Route malformed incidental extraction to `terminal-stop-malformed-task-path` without reading task-local artifacts or inventing a task path.
+- [x] Update incidental `review-task-design`, `create-task-plan`, `review-task-plan`, `clean-baseline`, `coverage-review`, `coverage-disposition`, `coverage-fix`, `diff-gate`, `implement-task`, `review-task-implementation`, validation/proof steps, and summaries so task identity comes from `extract-task-path` yield.
+- [x] Keep the full incidental `select-and-create` handoff available only as context/evidence for downstream steps.
+- [x] Update incidental generated `design.md` prompt contract to require mandatory task-local `coverage-map.md` for every target-present task.
+- [x] Require incidental `select-and-create` to create and commit the initial `coverage-map.md` scaffold before emitting the target-present handoff; pending/unknown values must be represented explicitly rather than omitting required fields.
+- [x] In the incidental prompt, require `coverage-map.md` fields for target identity, selected row key, selector proof, top-5 guard decision, rejected essential false positives, authoritative test commands, coverage/gap dispositions, latest test/assertion counts, and relationship to `characterization-baseline.edn`.
+- [x] State the incidental `coverage-map.md` lifecycle in the relevant prompts: `coverage-review` updates coverage/test-net fields, `coverage-fix` updates it for added tests or seams, `diff-gate` records coverage-phase classification relationship to `characterization-baseline.edn`, `incidental-validation-capture` records final Gordian proof references, `proof-sync` performs final synchronization when stale, and `final-summary` reads it as proof authority.
+- [x] Update incidental generated `design.md` prompt contract to name root-relative `before-local.json`, `before-diagnose.edn`, `after-local.json`, `incidental-burden-check.edn`, `incidental-gate.edn`, `coverage-map.md`, and `characterization-baseline.edn`.
+- [x] Require `before-local.json` parse as JSON with a `units` array before baseline/selector proof claims.
+- [x] Require `before-diagnose.edn` parse as EDN before baseline/gate claims.
+- [x] Require generated incidental tasks to record top-5 guard evidence and say explicitly when no higher candidate was rejected before the chosen target.
+- [x] Require generated incidental tasks to mark marginal targets according to the design thresholds and record falsification/review questions.
+- [x] Update architecture `select-and-create` generated-design prompt so every generated design records score and confidence, and so `:confidence :low` always records actionability despite low confidence, falsification evidence, design-review questions, and scope-narrowing considerations.
+- [x] Require architecture `select-and-create` to create and commit an initial `coverage-map.md` scaffold before emitting the target-present handoff; pending/unknown values must be represented explicitly rather than omitting required fields.
+- [x] In the architecture prompt, require `coverage-map.md` fields for selected candidate identity, score/confidence, target namespaces/source areas, selector proof, authoritative test commands, affected behaviours, coverage/gap dispositions, latest test/assertion counts, relationship to `characterization-baseline.edn`, and references to `after-diagnose.edn`, `after-architecture-targets.edn`, `architecture-compare.edn`, and `architecture-gate.edn`.
+- [x] State the architecture `coverage-map.md` lifecycle in the relevant prompts: `coverage-review` updates coverage/test-net fields, `coverage-fix` updates it for added tests or seams, `diff-gate` records coverage-phase classification relationship to `characterization-baseline.edn`, `validation-capture` records final Gordian proof references, `proof-sync` performs final synchronization when stale, and `final-summary` reads it as proof authority.
+- [x] Verify both workflow EDNs load/compile through the workflow-loader/registry path after Slice 2 topology edits, not only parse as EDN.
+- [x] Record Slice 2 implementation and verification notes in `implementation.md`.
+- [x] Commit Slice 2 (`⚒ workflow: harden simplification task identity`) — this commit.
 
 ## Slice 3 — Parse-checked validation capture
 
