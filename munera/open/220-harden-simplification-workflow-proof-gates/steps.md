@@ -136,34 +136,34 @@ when done.
 
 ## Slice 6 — Workflow-loader/content-lock tests
 
-- [ ] Add a focused task-220 workflow-loader/content-lock test namespace or extend the existing task-209/task-218 tests only where the assertion naturally belongs.
-- [ ] Test `reduce-incidental-complexity` loads and includes `extract-task-path` immediately after target-created selection.
-- [ ] Test incidental downstream delegates/session steps consume `extract-task-path` as task identity and do not use the raw `select-and-create` handoff as `:prompt-string` input.
-- [ ] Test architecture workflow still uses deterministic `workflow/munera-open-task-path-routing` for `extract-task-path`.
-- [ ] Test both workflow EDNs invoke `workflow/proof-sync-disposition-routing` exactly for `proof-sync-disposition`.
-- [ ] Test both workflow EDNs invoke `workflow/validation-capture-disposition-routing` exactly for `validation-capture-disposition`.
-- [ ] Test both workflow EDNs route only `COVERAGE_REVIEW`, `VALIDATION_RECAPTURE`, and `BOOKKEEPING_FIXED_POINT` out of proof-sync disposition.
-- [ ] Test both workflow EDNs route only `IMPLEMENTATION_REPAIR` and `TERMINAL_STOP` out of validation-capture disposition, and that `terminal-stop-validation-capture` is not reached via the same undifferentiated `ACTIONABLE_FEEDBACK` branch used for repair.
-- [ ] Test proof-sync clean/no-op routing reaches `final-summary`, while mutating proof-sync routes through disposition or fixed-point before any final summary.
-- [ ] Test `terminal-stop-proof-sync` is reachable only from `proof-sync-fixed-point` failure.
-- [ ] Test split terminal-stop prompts include explicit `:type :source` context from the immediately failed preceding gate.
-- [ ] Test malformed task-path terminal stop does not consume an extracted task path and forbids task-local artifact reads.
-- [ ] Test terminal-stop prompts name their source gate and durable artifact path expectations.
-- [ ] Test architecture prompt content requires mandatory `coverage-map.md`, first-writer scaffold creation, score/confidence fields, and the architecture coverage-map lifecycle through coverage review/fix, diff gate, validation capture, proof-sync, and final summary.
-- [ ] Test incidental prompt content requires mandatory `coverage-map.md` and the minimum field set from design.
-- [ ] Test incidental `select-and-create` prompt content requires creating and committing the initial `coverage-map.md` scaffold before handoff.
-- [ ] Test incidental coverage-review, coverage-fix, diff-gate, incidental-validation-capture, proof-sync, and final-summary prompt content follow the pinned `coverage-map.md` lifecycle.
-- [ ] Test incidental prompt content names and parse-checks `before-local.json`, `before-diagnose.edn`, `after-local.json`, `incidental-burden-check.edn`, `incidental-gate.edn`, and `characterization-baseline.edn`.
-- [ ] Test architecture validation prompt content parse-checks `after-diagnose.edn`, `after-architecture-targets.edn`, `architecture-compare.edn`, and `architecture-gate.edn` after write.
-- [ ] Test exit-0 unreadable/truncated EDN/JSON wording is treated as failure-map replacement in relevant prompts.
-- [ ] Test generated architecture design prompt requires low-confidence actionability/falsification/review/scope-narrowing notes.
-- [ ] Test generated incidental design prompt requires top-5 guard evidence, rejected essential false positives when present, and marginal target concerns.
-- [ ] Test final-summary prompts read committed task-local proof artifacts rather than relying on review prose.
-- [ ] Run focused workflow-loader Scry/Kaocha tests for task-209, task-218, and task-220 affected namespaces.
-- [ ] Run targeted clj-kondo over changed workflow-loader and runtime test namespaces.
-- [ ] Verify workflow EDN files read as EDN after all edits.
-- [ ] Record Slice 6 implementation and verification notes in `implementation.md`.
-- [ ] Commit Slice 6 (`⚒ test: lock simplification proof gates`).
+- [x] Add a focused task-220 workflow-loader/content-lock test namespace or extend the existing task-209/task-218 tests only where the assertion naturally belongs.
+- [x] Test `reduce-incidental-complexity` loads and includes `extract-task-path` immediately after target-created selection.
+- [x] Test incidental downstream delegates/session steps consume `extract-task-path` as task identity and do not use the raw `select-and-create` handoff as `:prompt-string` input.
+- [x] Test architecture workflow still uses deterministic `workflow/munera-open-task-path-routing` for `extract-task-path`.
+- [x] Test both workflow EDNs invoke `workflow/proof-sync-disposition-routing` exactly for `proof-sync-disposition`.
+- [x] Test both workflow EDNs invoke `workflow/validation-capture-disposition-routing` exactly for `validation-capture-disposition`.
+- [x] Test both workflow EDNs route only `COVERAGE_REVIEW`, `VALIDATION_RECAPTURE`, and `BOOKKEEPING_FIXED_POINT` out of proof-sync disposition.
+- [x] Test both workflow EDNs route only `IMPLEMENTATION_REPAIR` and `TERMINAL_STOP` out of validation-capture disposition, and that `terminal-stop-validation-capture` is not reached via the same undifferentiated `ACTIONABLE_FEEDBACK` branch used for repair.
+- [x] Test proof-sync clean/no-op routing reaches `final-summary`, while mutating proof-sync routes through disposition or fixed-point before any final summary.
+- [x] Test `terminal-stop-proof-sync` is reachable only from `proof-sync-fixed-point` failure.
+- [x] Test split terminal-stop prompts include explicit `:type :source` context from the immediately failed preceding gate.
+- [x] Test malformed task-path terminal stop does not consume an extracted task path and forbids task-local artifact reads.
+- [x] Test terminal-stop prompts name their source gate and durable artifact path expectations.
+- [x] Test architecture prompt content requires mandatory `coverage-map.md`, first-writer scaffold creation, score/confidence fields, and the architecture coverage-map lifecycle through coverage review/fix, diff gate, validation capture, proof-sync, and final summary.
+- [x] Test incidental prompt content requires mandatory `coverage-map.md` and the minimum field set from design.
+- [x] Test incidental `select-and-create` prompt content requires creating and committing the initial `coverage-map.md` scaffold before handoff.
+- [x] Test incidental coverage-review, coverage-fix, diff-gate, incidental-validation-capture, proof-sync, and final-summary prompt content follow the pinned `coverage-map.md` lifecycle.
+- [x] Test incidental prompt content names and parse-checks `before-local.json`, `before-diagnose.edn`, `after-local.json`, `incidental-burden-check.edn`, `incidental-gate.edn`, and `characterization-baseline.edn`.
+- [x] Test architecture validation prompt content parse-checks `after-diagnose.edn`, `after-architecture-targets.edn`, `architecture-compare.edn`, and `architecture-gate.edn` after write.
+- [x] Test exit-0 unreadable/truncated EDN/JSON wording is treated as failure-map replacement in relevant prompts.
+- [x] Test generated architecture design prompt requires low-confidence actionability/falsification/review/scope-narrowing notes.
+- [x] Test generated incidental design prompt requires top-5 guard evidence, rejected essential false positives when present, and marginal target concerns.
+- [x] Test final-summary prompts read committed task-local proof artifacts rather than relying on review prose.
+- [x] Run focused workflow-loader Scry/Kaocha tests for task-209, task-218, and task-220 affected namespaces.
+- [x] Run targeted clj-kondo over changed workflow-loader and runtime test namespaces.
+- [x] Verify workflow EDN files read as EDN after all edits.
+- [x] Record Slice 6 implementation and verification notes in `implementation.md`.
+- [x] Commit Slice 6 (`⚒ test: lock simplification proof gates`).
 
 ## Slice 7 — User-facing docs, changelog, and verification
 
