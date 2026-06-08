@@ -142,6 +142,9 @@
                              "PROOF_SYNC_ROUTE:COVERAGE_REVIEW")
         (assert-marker-error ctx "workflow/proof-sync-disposition-routing"
                              :malformed-route-marker
+                             "PROOF_SYNC_ROUTE : COVERAGE_REVIEW")
+        (assert-marker-error ctx "workflow/proof-sync-disposition-routing"
+                             :malformed-route-marker
                              "PROOF_SYNC_ROUTE: COVERAGE_REVIEW ")
         (assert-marker-error ctx "workflow/proof-sync-disposition-routing"
                              :malformed-route-marker
@@ -175,6 +178,9 @@
         (assert-marker-error ctx "workflow/validation-capture-disposition-routing"
                              :malformed-route-marker
                              "VALIDATION_CAPTURE_ROUTE:IMPLEMENTATION_REPAIR")
+        (assert-marker-error ctx "workflow/validation-capture-disposition-routing"
+                             :malformed-route-marker
+                             "VALIDATION_CAPTURE_ROUTE : TERMINAL_STOP")
         (assert-marker-error ctx "workflow/validation-capture-disposition-routing"
                              :malformed-route-marker
                              "VALIDATION_CAPTURE_ROUTE: IMPLEMENTATION_REPAIR ")

@@ -100,9 +100,11 @@
   (let [trimmed-left (str/triml line)
         exact-prefix (str marker-label ": ")
         marker-prefix? (str/starts-with? trimmed-left marker-label)
-        after-marker-label (when marker-prefix?
-                             (subs trimmed-left (count marker-label)))
-        marker-attempt? (str/starts-with? (or after-marker-label "") ":")]
+        after-marker-label (if marker-prefix?
+                             (subs trimmed-left (count marker-label))
+                             "")
+        marker-attempt? (or (str/starts-with? after-marker-label ":")
+                            (boolean (re-find #"^\s+:" after-marker-label)))]
     (cond
       (not marker-attempt?)
       {:kind :ordinary
