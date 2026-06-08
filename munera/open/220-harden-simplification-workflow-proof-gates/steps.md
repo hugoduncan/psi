@@ -11,21 +11,24 @@ when done.
 
 ## Plan/steps ambiguity review follow-ups
 
-- [ ] PA1: Pin the exact `PROOF_SYNC_ROUTE:` marker grammar before implementing `workflow/proof-sync-disposition-routing`: decide whether normal final-reply prose/`PASS_STATUS` lines may surround the single marker, require the marker line's route token to be exact with no trailing text, and add operation tests for valid surrounding prose versus malformed same-line route text.
-- [ ] PA2: Define the deterministic routing mechanism that distinguishes fixable validation-capture failures from unrecoverable terminal validation-capture failures in both simplification workflows; choose a route marker/disposition step or another explicit topology, and ensure `terminal-stop-validation-capture` is not reached via the same undifferentiated `ACTIONABLE_FEEDBACK` branch used for implementation repair.
-- [ ] PA3: Pin the first-writer and lifecycle contract for incidental `coverage-map.md`: decide whether `select-and-create` must create an initial scaffold or whether `coverage-review` creates it before any proof-sync can run, then update Slice 2/Slice 6 steps so the mandatory artifact's creation, updates, and content-lock tests are explicit.
+- [x] PA1: Pin the exact `PROOF_SYNC_ROUTE:` marker grammar before implementing `workflow/proof-sync-disposition-routing`: decide whether normal final-reply prose/`PASS_STATUS` lines may surround the single marker, require the marker line's route token to be exact with no trailing text, and add operation tests for valid surrounding prose versus malformed same-line route text.
+- [x] PA2: Define the deterministic routing mechanism that distinguishes fixable validation-capture failures from unrecoverable terminal validation-capture failures in both simplification workflows; choose a route marker/disposition step or another explicit topology, and ensure `terminal-stop-validation-capture` is not reached via the same undifferentiated `ACTIONABLE_FEEDBACK` branch used for implementation repair.
+- [x] PA3: Pin the first-writer and lifecycle contract for incidental `coverage-map.md`: decide whether `select-and-create` must create an initial scaffold or whether `coverage-review` creates it before any proof-sync can run, then update Slice 2/Slice 6 steps so the mandatory artifact's creation, updates, and content-lock tests are explicit.
 
-## Slice 1 — Preflight and deterministic operation
+## Slice 1 — Preflight and deterministic operations
 
 - [ ] Confirm `design-steps.md` has no unchecked follow-ups and record the result in `implementation.md`.
 - [ ] Re-read `.psi/workflows/reduce-incidental-complexity.edn`, `.psi/workflows/reduce-architectural-complexity.edn`, `components/agent-session/src/psi/agent_session/workflow/core.clj`, and focused workflow-loader tests to verify current routing/operation seams before editing.
 - [ ] Add registered deterministic operation `workflow/proof-sync-disposition-routing` in the same built-in operation registry as `workflow/pass-status-routing` and `workflow/munera-open-task-path-routing`.
-- [ ] Implement the operation to accept `{:text ...}`, extract exactly one line beginning `PROOF_SYNC_ROUTE:`, and return route data `COVERAGE_REVIEW`, `VALIDATION_RECAPTURE`, or `BOOKKEEPING_FIXED_POINT`.
-- [ ] Ensure the operation rejects missing route markers with a tagged error result.
-- [ ] Ensure the operation rejects duplicated route markers with a tagged error result including the duplicate lines.
-- [ ] Ensure the operation rejects unsupported route tokens, malformed prefixes, or extra route text with a tagged error result.
-- [ ] Add runtime/operation tests covering all three valid route markers.
-- [ ] Add runtime/operation tests covering missing, duplicated, unsupported, and malformed route markers.
+- [ ] Add registered deterministic operation `workflow/validation-capture-disposition-routing` in the same built-in operation registry before workflow EDNs invoke it.
+- [ ] Implement `workflow/proof-sync-disposition-routing` to accept `{:text ...}`, allow surrounding final-reply prose/`PASS_STATUS` lines, extract exactly one whole line matching `PROOF_SYNC_ROUTE: <route>` at column 0 with exactly one space after the colon and no trailing whitespace/text, and return route data `COVERAGE_REVIEW`, `VALIDATION_RECAPTURE`, or `BOOKKEEPING_FIXED_POINT`.
+- [ ] Implement `workflow/validation-capture-disposition-routing` to accept `{:text ...}`, allow surrounding final-reply prose/`PASS_STATUS` lines, extract exactly one whole line matching `VALIDATION_CAPTURE_ROUTE: <route>` at column 0 with exactly one space after the colon and no trailing whitespace/text, and return route data `IMPLEMENTATION_REPAIR` or `TERMINAL_STOP`.
+- [ ] Ensure both marker-routing operations reject missing route markers with a tagged error result.
+- [ ] Ensure both marker-routing operations reject duplicated route markers with a tagged error result including the duplicate lines.
+- [ ] Ensure both marker-routing operations reject unsupported route tokens, malformed prefixes, leading whitespace before the prefix, trailing whitespace, or extra same-line route text with a tagged error result.
+- [ ] Add runtime/operation tests covering all three valid proof-sync route markers, including valid surrounding prose and a surrounding `PASS_STATUS` line.
+- [ ] Add runtime/operation tests covering both valid validation-capture route markers.
+- [ ] Add runtime/operation tests covering missing, duplicated, unsupported, malformed-prefix, trailing-whitespace, and malformed same-line extra-text route markers for both operations.
 - [ ] Verify existing deterministic operations still register and existing workflow routing tests remain green.
 - [ ] Run focused agent-session workflow operation/routing tests and targeted lint for changed runtime/test files.
 - [ ] Record Slice 1 implementation and verification notes in `implementation.md`.
@@ -41,7 +44,9 @@ when done.
 - [ ] Update incidental `review-task-design`, `create-task-plan`, `review-task-plan`, `clean-baseline`, `coverage-review`, `coverage-disposition`, `coverage-fix`, `diff-gate`, `implement-task`, `review-task-implementation`, validation/proof steps, and summaries so task identity comes from `extract-task-path` yield.
 - [ ] Keep the full incidental `select-and-create` handoff available only as context/evidence for downstream steps.
 - [ ] Update incidental generated `design.md` prompt contract to require mandatory task-local `coverage-map.md` for every target-present task.
+- [ ] Require incidental `select-and-create` to create and commit the initial `coverage-map.md` scaffold before emitting the target-present handoff; pending/unknown values must be represented explicitly rather than omitting required fields.
 - [ ] In the incidental prompt, require `coverage-map.md` fields for target identity, selected row key, selector proof, top-5 guard decision, rejected essential false positives, authoritative test commands, coverage/gap dispositions, latest test/assertion counts, and relationship to `characterization-baseline.edn`.
+- [ ] State the incidental `coverage-map.md` lifecycle in the relevant prompts: `coverage-review` updates coverage/test-net fields, `coverage-fix` updates it for added tests or seams, `diff-gate` records coverage-phase classification relationship to `characterization-baseline.edn`, `incidental-validation-capture` records final Gordian proof references, `proof-sync` performs final synchronization when stale, and `final-summary` reads it as proof authority.
 - [ ] Update incidental generated `design.md` prompt contract to name root-relative `before-local.json`, `before-diagnose.edn`, `after-local.json`, `incidental-burden-check.edn`, `incidental-gate.edn`, `coverage-map.md`, and `characterization-baseline.edn`.
 - [ ] Require `before-local.json` parse as JSON with a `units` array before baseline/selector proof claims.
 - [ ] Require `before-diagnose.edn` parse as EDN before baseline/gate claims.
@@ -56,15 +61,19 @@ when done.
 
 - [ ] Strengthen architecture `validation-capture` wording so every successful validation artifact is parsed after write, not trusted from exit code alone.
 - [ ] In architecture `validation-capture`, explicitly parse-check `after-diagnose.edn`, `after-architecture-targets.edn`, `architecture-compare.edn`, and `architecture-gate.edn` after writing.
-- [ ] In architecture `validation-capture`, require exit-0 unreadable/truncated EDN to be replaced with a readable EDN failure map and route to repair.
+- [ ] In architecture `validation-capture`, require exit-0 unreadable/truncated EDN to be replaced with a readable EDN failure map and routed through `validation-capture-disposition`.
+- [ ] In architecture `validation-capture`, emit exactly one `VALIDATION_CAPTURE_ROUTE: IMPLEMENTATION_REPAIR` marker for fixable validation failures and exactly one `VALIDATION_CAPTURE_ROUTE: TERMINAL_STOP` marker for unrecoverable capture failures; both failure paths also emit `PASS_STATUS: ACTIONABLE_FEEDBACK`.
+- [ ] Add architecture `validation-capture-disposition` invoke step using operation `workflow/validation-capture-disposition-routing`; route `IMPLEMENTATION_REPAIR` to `implement-task` and `TERMINAL_STOP` to `terminal-stop-validation-capture` with the failing validation yield as context.
 - [ ] Add incidental `incidental-validation-capture` after `review-task-implementation` and before `proof-sync`.
 - [ ] In `incidental-validation-capture`, run `bb gordian local --json` from the worktree root and write raw stdout to `{{input}}/after-local.json`.
 - [ ] In `incidental-validation-capture`, parse-check `after-local.json` as JSON and require a `units` array.
 - [ ] In `incidental-validation-capture`, compute and write `incidental-burden-check.edn` containing target key, original target burden `B`, after target burden, A5 result, A2a/A2b checked row summaries, and overall pass/fail.
 - [ ] In `incidental-validation-capture`, run `bb gordian gate --baseline {{input}}/before-diagnose.edn --fail-on new-cycles,new-high-findings --max-new-medium-findings 0 --edn` and write `incidental-gate.edn`.
 - [ ] In `incidental-validation-capture`, parse-check `incidental-gate.edn` as EDN and treat exit-0 unreadable/truncated EDN as failure-map replacement.
-- [ ] Route fixable incidental validation failures back to `implement-task` after committing repair notes/artifacts.
-- [ ] Route unrecoverable incidental capture failures to `terminal-stop-validation-capture` with the failing validation yield as explicit context.
+- [ ] In `incidental-validation-capture`, emit exactly one `VALIDATION_CAPTURE_ROUTE: IMPLEMENTATION_REPAIR` marker for fixable validation failures and exactly one `VALIDATION_CAPTURE_ROUTE: TERMINAL_STOP` marker for unrecoverable capture failures; both failure paths also emit `PASS_STATUS: ACTIONABLE_FEEDBACK`.
+- [ ] Add incidental `validation-capture-disposition` invoke step using operation `workflow/validation-capture-disposition-routing`; route `IMPLEMENTATION_REPAIR` to `implement-task` and `TERMINAL_STOP` to `terminal-stop-validation-capture` with the failing validation yield as context.
+- [ ] Route fixable incidental validation failures back to `implement-task` only through `validation-capture-disposition` after committing repair notes/artifacts.
+- [ ] Route unrecoverable incidental capture failures to `terminal-stop-validation-capture` only through `validation-capture-disposition` with the failing validation yield as explicit context.
 - [ ] Ensure no final A5/A2/A3 proof claim is allowed from unparseable JSON/EDN or uncaptured validation output.
 - [ ] Verify both workflow EDNs parse after Slice 3 edits.
 - [ ] Record Slice 3 implementation and verification notes in `implementation.md`.
@@ -121,13 +130,17 @@ when done.
 - [ ] Test incidental downstream delegates/session steps consume `extract-task-path` as task identity and do not use the raw `select-and-create` handoff as `:prompt-string` input.
 - [ ] Test architecture workflow still uses deterministic `workflow/munera-open-task-path-routing` for `extract-task-path`.
 - [ ] Test both workflow EDNs invoke `workflow/proof-sync-disposition-routing` exactly for `proof-sync-disposition`.
+- [ ] Test both workflow EDNs invoke `workflow/validation-capture-disposition-routing` exactly for `validation-capture-disposition`.
 - [ ] Test both workflow EDNs route only `COVERAGE_REVIEW`, `VALIDATION_RECAPTURE`, and `BOOKKEEPING_FIXED_POINT` out of proof-sync disposition.
+- [ ] Test both workflow EDNs route only `IMPLEMENTATION_REPAIR` and `TERMINAL_STOP` out of validation-capture disposition, and that `terminal-stop-validation-capture` is not reached via the same undifferentiated `ACTIONABLE_FEEDBACK` branch used for repair.
 - [ ] Test proof-sync clean/no-op routing reaches `final-summary`, while mutating proof-sync routes through disposition or fixed-point before any final summary.
 - [ ] Test `terminal-stop-proof-sync` is reachable only from `proof-sync-fixed-point` failure.
 - [ ] Test split terminal-stop prompts include explicit `:type :source` context from the immediately failed preceding gate.
 - [ ] Test malformed task-path terminal stop does not consume an extracted task path and forbids task-local artifact reads.
 - [ ] Test terminal-stop prompts name their source gate and durable artifact path expectations.
 - [ ] Test incidental prompt content requires mandatory `coverage-map.md` and the minimum field set from design.
+- [ ] Test incidental `select-and-create` prompt content requires creating and committing the initial `coverage-map.md` scaffold before handoff.
+- [ ] Test incidental coverage-review, coverage-fix, diff-gate, incidental-validation-capture, proof-sync, and final-summary prompt content follow the pinned `coverage-map.md` lifecycle.
 - [ ] Test incidental prompt content names and parse-checks `before-local.json`, `before-diagnose.edn`, `after-local.json`, `incidental-burden-check.edn`, `incidental-gate.edn`, and `characterization-baseline.edn`.
 - [ ] Test architecture validation prompt content parse-checks `after-diagnose.edn`, `after-architecture-targets.edn`, `architecture-compare.edn`, and `architecture-gate.edn` after write.
 - [ ] Test exit-0 unreadable/truncated EDN/JSON wording is treated as failure-map replacement in relevant prompts.

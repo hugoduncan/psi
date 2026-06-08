@@ -73,6 +73,49 @@ Implement dependency-first:
   notes in generated `design.md`; marginal incidental targets record top-5 guard
   evidence, rejected essential false positives when present, and review questions.
 
+
+### Plan/steps ambiguity follow-up decisions
+
+- **Proof-sync marker grammar (PA1).** A mutating `proof-sync` final reply may
+  contain normal final-reply prose and its `PASS_STATUS` line around the route
+  marker. The deterministic operation reads split lines and accepts exactly one
+  marker line whose whole line is `PROOF_SYNC_ROUTE: <route>`, with the prefix at
+  column 0, exactly one ASCII space after the colon, and no leading whitespace,
+  trailing whitespace, or same-line prose after the route token. The only route
+  tokens are `COVERAGE_REVIEW`, `VALIDATION_RECAPTURE`, and
+  `BOOKKEEPING_FIXED_POINT`. Surrounding prose is valid; same-line route prose
+  such as `PROOF_SYNC_ROUTE: COVERAGE_REVIEW because tests changed`, duplicated
+  marker lines, unsupported tokens, malformed prefixes, or missing markers are
+  tagged operation errors. Runtime tests must lock valid surrounding prose and
+  malformed same-line route text.
+- **Validation-capture repair-vs-terminal routing (PA2).** Validation-capture
+  failure routing uses an explicit disposition marker and registered
+  deterministic operation rather than the undifferentiated `ACTIONABLE_FEEDBACK`
+  branch. Add `workflow/validation-capture-disposition-routing`, accepting
+  exactly one line `VALIDATION_CAPTURE_ROUTE: IMPLEMENTATION_REPAIR` or
+  `VALIDATION_CAPTURE_ROUTE: TERMINAL_STOP` with the same exact-line grammar as
+  proof-sync markers. In both simplification workflows, `validation-capture` (or
+  `incidental-validation-capture`) routes `PASS_STATUS: REVIEW_COMPLETE` to the
+  next review/proof gate. On any validation failure it records/commits the
+  failure artifact, emits `PASS_STATUS: ACTIONABLE_FEEDBACK` plus the validation
+  route marker, then goes to a `validation-capture-disposition` invoke step.
+  `IMPLEMENTATION_REPAIR` routes to `implement-task`; `TERMINAL_STOP` routes to
+  `terminal-stop-validation-capture` with the failing validation yield. Thus the
+  terminal stop is not reached through the same branch used for repair.
+- **Incidental `coverage-map.md` first writer and lifecycle (PA3).** For every
+  target-present incidental task, `select-and-create` is the first writer: it
+  creates and commits an initial `coverage-map.md` scaffold alongside
+  `design.md`, `before-local.json`, and `before-diagnose.edn`. The scaffold
+  contains the mandatory field headings from the design and records unknown
+  coverage/test counts as pending rather than omitting the fields. Subsequent
+  lifecycle ownership is: `coverage-review` reads and updates coverage/test-net
+  fields, `coverage-fix` updates it when tests or seams are added,
+  `diff-gate` records coverage-phase classification relationship to
+  `characterization-baseline.edn`, `incidental-validation-capture` records final
+  Gordian proof-artifact references, `proof-sync` is the final mutating
+  synchronizer when stale, and `final-summary` reads it as committed proof
+  authority.
+
 ## Risks
 
 - **R1 — Workflow topology regression.** Adding proof-sync loops and split
@@ -107,20 +150,22 @@ Implement dependency-first:
 
 ## Slice order
 
-1. **Slice 1 — Preflight and deterministic operation.** Reconfirm current
-   workflow/runtime surfaces, add registered operation
-   `workflow/proof-sync-disposition-routing`, and cover valid/malformed route
-   marker parsing with runtime tests.
+1. **Slice 1 — Preflight and deterministic operations.** Reconfirm current
+   workflow/runtime surfaces, add registered operations
+   `workflow/proof-sync-disposition-routing` and
+   `workflow/validation-capture-disposition-routing`, and cover valid/malformed
+   exact-marker parsing with runtime tests.
 2. **Slice 2 — Incidental task identity boundary and selector/proof generation
    contracts.** Add incidental `extract-task-path` plus deterministic routing,
    wire all downstream incidental task consumers to the extracted path, and
-   strengthen `select-and-create` prompts for mandatory `coverage-map.md`, named
-   parse-checked proof artifacts, guard evidence, and marginal target notes.
+   strengthen `select-and-create` prompts to create the initial mandatory
+   `coverage-map.md` scaffold, name parse-checked proof artifacts, record guard
+   evidence, and record marginal target notes.
 3. **Slice 3 — Parse-checked validation capture.** Strengthen architecture
    `validation-capture` parse-after-write/failure-map contract and add incidental
    `incidental-validation-capture` for `after-local.json`,
-   `incidental-burden-check.edn`, and `incidental-gate.edn` with repair/terminal
-   routing.
+   `incidental-burden-check.edn`, and `incidental-gate.edn`, with explicit
+   validation-capture disposition routing for repair versus terminal stops.
 4. **Slice 4 — Proof-sync fixed-point topology.** Add workflow-local
    `proof-sync`, `proof-sync-disposition`, and `proof-sync-fixed-point` steps to
    both workflows in the design-specified order. Wire coverage-review,
