@@ -47,12 +47,16 @@
    :operation "workflow/constant-routing"
    :args {:route route}})
 
-(defn- constant-routing-step
-  [step-name route]
+(defn- pass-feedback-step
+  [step-name args on]
   {:name step-name
    :type :invoke
-   :operation "workflow/constant-routing"
-   :args {:route route}})
+   :operation "workflow/pass-feedback-routing"
+   :args args
+   :judge {:type :invoke
+           :operation "workflow/pass-feedback-routing"
+           :args args}
+   :on on})
 
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-design
@@ -158,11 +162,15 @@
              (is (.contains (step-template-text follow-up)
                             "predate the preceding review pass")
                  (str (:name follow-up) " carries the predate-exclusion guard"))))
-         (testing "clarity-status is deterministic invoke routing, not an LLM judge"
-           (is (= (constant-routing-step "clarity-status" "DONE")
-                  (select-keys clarity-step [:name :type :operation :args])))
-           (is (nil? (:on clarity-step)))
-           (is (nil? (:judge clarity-step)))))))))
+         (testing "clarity-status deterministically routes on pass-level feedback memory"
+           (is (= (pass-feedback-step
+                   "clarity-status"
+                   {:architecture-text {:from {:step "architecture-review" :output :final-llm-reply}}
+                    :ambiguity-text {:from {:step "ambiguity-review" :output :final-llm-reply}}
+                    :inconsistency-text {:from {:step "inconsistency-review" :output :final-llm-reply}}}
+                   {"REPEAT" {:goto "architecture-review" :max-iterations 6}
+                    "DONE" {:goto "final-summary"}})
+                  (select-keys clarity-step [:name :type :operation :args :judge :on])))))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; review-task-plan
@@ -246,11 +254,14 @@
            (doseq [follow-up [ambiguity-follow-up inconsistency-follow-up]]
              (is (.contains (step-template-text follow-up) "code, tests, and docs")
                  (str (:name follow-up) " permits editing referenced code/tests/docs"))))
-         (testing "clarity-status is deterministic invoke routing, not an LLM judge"
-           (is (= (constant-routing-step "clarity-status" "DONE")
-                  (select-keys clarity-step [:name :type :operation :args])))
-           (is (nil? (:on clarity-step)))
-           (is (nil? (:judge clarity-step)))))))))
+         (testing "clarity-status deterministically routes on pass-level feedback memory"
+           (is (= (pass-feedback-step
+                   "clarity-status"
+                   {:ambiguity-text {:from {:step "ambiguity-review" :output :final-llm-reply}}
+                    :inconsistency-text {:from {:step "inconsistency-review" :output :final-llm-reply}}}
+                   {"REPEAT" {:goto "ambiguity-review" :max-iterations 5}
+                    "DONE" {:goto "final-summary"}})
+                  (select-keys clarity-step [:name :type :operation :args :judge :on])))))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; review task prompt artifact targets

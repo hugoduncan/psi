@@ -52,8 +52,18 @@
    :on {"DONE" {:goto "clarity-status"}}}
   {:name "clarity-status",
    :type :invoke,
-   :operation "workflow/constant-routing",
-   :args {:route "DONE"}}
+   :operation "workflow/pass-feedback-routing",
+   :args {:architecture-text {:from {:step "architecture-review", :output :final-llm-reply}},
+          :ambiguity-text {:from {:step "ambiguity-review", :output :final-llm-reply}},
+          :inconsistency-text {:from {:step "inconsistency-review", :output :final-llm-reply}}},
+   :judge
+   {:type :invoke,
+    :operation "workflow/pass-feedback-routing",
+    :args {:architecture-text {:from {:step "architecture-review", :output :final-llm-reply}},
+           :ambiguity-text {:from {:step "ambiguity-review", :output :final-llm-reply}},
+           :inconsistency-text {:from {:step "inconsistency-review", :output :final-llm-reply}}}},
+   :on {"REPEAT" {:goto "architecture-review", :max-iterations 6},
+        "DONE" {:goto "final-summary"}}}
   {:name "final-summary",
    :type :session,
    :tools ["read" "bash"],
