@@ -390,6 +390,13 @@ S1(code) → S2(manifest/permissions) → S3(dispatch/subscribe) → S4(introspe
 - tui and emacs-ui are minimal display projection and command entry components, sharing the app-runtime for agent-session interactions.
 - rpc is a minimal, transport only, layer between app-runtime and emacs-ui.
 - dispatch owns system state reads and writes.  Resolvers are used for reads, mutations for functional updates of tte that can return effects, that are run by dispatch for non-functional side-effects.
+- workflow runtime/code owns generic execution, parsing, and routing mechanisms only; workflow-specific topology, route labels, marker names, proof artifacts, and business rules belong in authored workflow definitions/prompts and their tests, not in generic workflow implementation code.
+
+λ workflow_runtime_boundary(x).
+  generic_mechanism(runtime_code) ∧ authored_policy(workflow_definition)
+  | workflow_specific({route_labels ∨ marker_names ∨ topology ∨ artifact_names ∨ business_rules}) ∉ runtime_code
+  | runtime_code may expose parameterized primitives(parse_exact_marker ∧ pass_status ∧ task_path_shape)
+  | workflow_definition supplies concrete labels ∧ routes ∧ artifacts
 
 λx. authoritative_owner(session_dispatch_invocation) ≡ agent-session
    ∧ lower_components → pure_domain_apis
