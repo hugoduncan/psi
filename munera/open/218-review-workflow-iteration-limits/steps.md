@@ -50,7 +50,7 @@
 - [x] Update user-facing workflow docs if they describe old single-pass behavior, old one-follow-up-per-phase behavior, or old review-loop limits.
 - [x] Add a `[Unreleased]` `CHANGELOG.md` entry if the changed review-loop limits/repetition are user-visible.
 
-- [ ] CS1: Simplify design/plan `clarity-status` invoke-step shape so `workflow/pass-feedback-routing` is evaluated only by the routing judge, not redundantly as both the actor operation and judge; use the existing constant-actor + routing-judge idiom and update workflow-definition tests accordingly.
+- [x] CS1: Simplify design/plan `clarity-status` invoke-step shape so `workflow/pass-feedback-routing` is evaluated only by the routing judge, not redundantly as both the actor operation and judge; use the existing constant-actor + routing-judge idiom and update workflow-definition tests accordingly.
 
 ## Slice 7 — Verification and coherence
 

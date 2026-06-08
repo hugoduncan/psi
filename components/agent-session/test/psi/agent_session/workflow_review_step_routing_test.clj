@@ -382,8 +382,8 @@
                    phase-steps)]
     {:name "clarity-status"
      :type :invoke
-     :operation "workflow/pass-feedback-routing"
-     :args args
+     :operation "workflow/constant-routing"
+     :args {:route "DONE"}
      :judge {:type :invoke
              :operation "workflow/pass-feedback-routing"
              :args args}

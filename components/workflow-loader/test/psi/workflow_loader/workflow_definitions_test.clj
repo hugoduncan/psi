@@ -47,12 +47,12 @@
    :operation "workflow/constant-routing"
    :args {:route route}})
 
-(defn- pass-feedback-step
+(defn- pass-feedback-routing-step
   [step-name args on]
   {:name step-name
    :type :invoke
-   :operation "workflow/pass-feedback-routing"
-   :args args
+   :operation "workflow/constant-routing"
+   :args {:route "DONE"}
    :judge {:type :invoke
            :operation "workflow/pass-feedback-routing"
            :args args}
@@ -163,7 +163,7 @@
                             "predate the preceding review pass")
                  (str (:name follow-up) " carries the predate-exclusion guard"))))
          (testing "clarity-status deterministically routes on pass-level feedback memory"
-           (is (= (pass-feedback-step
+           (is (= (pass-feedback-routing-step
                    "clarity-status"
                    {:architecture-text {:from {:step "architecture-review" :output :final-llm-reply}}
                     :ambiguity-text {:from {:step "ambiguity-review" :output :final-llm-reply}}
@@ -255,7 +255,7 @@
              (is (.contains (step-template-text follow-up) "code, tests, and docs")
                  (str (:name follow-up) " permits editing referenced code/tests/docs"))))
          (testing "clarity-status deterministically routes on pass-level feedback memory"
-           (is (= (pass-feedback-step
+           (is (= (pass-feedback-routing-step
                    "clarity-status"
                    {:ambiguity-text {:from {:step "ambiguity-review" :output :final-llm-reply}}
                     :inconsistency-text {:from {:step "inconsistency-review" :output :final-llm-reply}}}

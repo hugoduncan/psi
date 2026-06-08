@@ -35,9 +35,8 @@
    :on {"DONE" {:goto "clarity-status"}}}
   {:name "clarity-status",
    :type :invoke,
-   :operation "workflow/pass-feedback-routing",
-   :args {:ambiguity-text {:from {:step "ambiguity-review", :output :final-llm-reply}},
-          :inconsistency-text {:from {:step "inconsistency-review", :output :final-llm-reply}}},
+   :operation "workflow/constant-routing",
+   :args {:route "DONE"},
    :judge
    {:type :invoke,
     :operation "workflow/pass-feedback-routing",
