@@ -227,10 +227,12 @@
          (testing (str (:name workflow) " validation failures route via deterministic disposition")
            (is (= "validation-capture-disposition"
                   (get-in validation [:on "REPEAT" :goto])))
-           (is (= "workflow/validation-capture-disposition-routing"
+           (is (= "workflow/exact-marker-routing"
                   (:operation validation-disposition)))
            (is (= {:text {:from {:step validation-step-name
-                                 :output :final-llm-reply}}}
+                                 :output :final-llm-reply}}
+                   :marker-label "VALIDATION_CAPTURE_ROUTE"
+                   :allowed-routes ["IMPLEMENTATION_REPAIR" "TERMINAL_STOP"]}
                   (:args validation-disposition)))
            (is (= {"IMPLEMENTATION_REPAIR" {:goto "implement-task"}
                    "TERMINAL_STOP" {:goto "terminal-stop-validation-capture"}}
@@ -241,10 +243,14 @@
            (is (= "final-summary" (get-in proof-sync [:on "DONE" :goto])))
            (is (= "proof-sync-disposition"
                   (get-in proof-sync [:on "REPEAT" :goto])))
-           (is (= "workflow/proof-sync-disposition-routing"
+           (is (= "workflow/exact-marker-routing"
                   (:operation proof-disposition)))
            (is (= {:text {:from {:step "proof-sync"
-                                 :output :final-llm-reply}}}
+                                 :output :final-llm-reply}}
+                   :marker-label "PROOF_SYNC_ROUTE"
+                   :allowed-routes ["COVERAGE_REVIEW"
+                                    "VALIDATION_RECAPTURE"
+                                    "BOOKKEEPING_FIXED_POINT"]}
                   (:args proof-disposition)))
            (is (= {"COVERAGE_REVIEW" {:goto (:review-reentry-step workflow)}
                    "VALIDATION_RECAPTURE" {:goto (:validation-recapture-step workflow)}

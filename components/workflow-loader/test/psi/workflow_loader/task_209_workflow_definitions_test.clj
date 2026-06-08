@@ -530,10 +530,12 @@
          (is (= "validation-capture-disposition"
                 (get-in validation-capture-step [:on "REPEAT" :goto])))
          (is (= :invoke (:type validation-disposition-step)))
-         (is (= "workflow/validation-capture-disposition-routing"
+         (is (= "workflow/exact-marker-routing"
                 (:operation validation-disposition-step)))
          (is (= {:text {:from {:step "incidental-validation-capture"
-                               :output :final-llm-reply}}}
+                               :output :final-llm-reply}}
+                 :marker-label "VALIDATION_CAPTURE_ROUTE"
+                 :allowed-routes ["IMPLEMENTATION_REPAIR" "TERMINAL_STOP"]}
                 (:args validation-disposition-step)))
          (is (= {"IMPLEMENTATION_REPAIR" {:goto "implement-task"}
                  "TERMINAL_STOP" {:goto "terminal-stop-validation-capture"}}
@@ -558,8 +560,15 @@
                         :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}}
                 (:judge proof-sync-step)))
          (is (= :invoke (:type proof-disposition-step)))
-         (is (= "workflow/proof-sync-disposition-routing"
+         (is (= "workflow/exact-marker-routing"
                 (:operation proof-disposition-step)))
+         (is (= {:text {:from {:step "proof-sync"
+                               :output :final-llm-reply}}
+                 :marker-label "PROOF_SYNC_ROUTE"
+                 :allowed-routes ["COVERAGE_REVIEW"
+                                  "VALIDATION_RECAPTURE"
+                                  "BOOKKEEPING_FIXED_POINT"]}
+                (:args proof-disposition-step)))
          (is (= {"COVERAGE_REVIEW" {:goto "review-task-implementation"}
                  "VALIDATION_RECAPTURE" {:goto "incidental-validation-capture"}
                  "BOOKKEEPING_FIXED_POINT" {:goto "proof-sync-fixed-point"}}

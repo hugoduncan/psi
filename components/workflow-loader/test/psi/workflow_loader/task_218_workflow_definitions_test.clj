@@ -296,10 +296,12 @@
          (is (= "validation-capture-disposition" (get-in validation [:on "REPEAT" :goto])))
          (is (= (pass-status-judge "validation-capture") (:judge validation)))
          (is (= :invoke (:type validation-disposition)))
-         (is (= "workflow/validation-capture-disposition-routing"
+         (is (= "workflow/exact-marker-routing"
                 (:operation validation-disposition)))
          (is (= {:text {:from {:step "validation-capture"
-                               :output :final-llm-reply}}}
+                               :output :final-llm-reply}}
+                 :marker-label "VALIDATION_CAPTURE_ROUTE"
+                 :allowed-routes ["IMPLEMENTATION_REPAIR" "TERMINAL_STOP"]}
                 (:args validation-disposition)))
          (is (= {"IMPLEMENTATION_REPAIR" {:goto "implement-task"}
                  "TERMINAL_STOP" {:goto "terminal-stop-validation-capture"}}
@@ -310,7 +312,14 @@
          (is (= "proof-sync-disposition" (get-in proof-sync [:on "REPEAT" :goto])))
          (is (= (pass-status-judge "proof-sync") (:judge proof-sync)))
          (is (= :invoke (:type proof-disposition)))
-         (is (= "workflow/proof-sync-disposition-routing" (:operation proof-disposition)))
+         (is (= "workflow/exact-marker-routing" (:operation proof-disposition)))
+         (is (= {:text {:from {:step "proof-sync"
+                               :output :final-llm-reply}}
+                 :marker-label "PROOF_SYNC_ROUTE"
+                 :allowed-routes ["COVERAGE_REVIEW"
+                                  "VALIDATION_RECAPTURE"
+                                  "BOOKKEEPING_FIXED_POINT"]}
+                (:args proof-disposition)))
          (is (= {"COVERAGE_REVIEW" {:goto "review-implementation-tests"}
                  "VALIDATION_RECAPTURE" {:goto "validation-capture"}
                  "BOOKKEEPING_FIXED_POINT" {:goto "proof-sync-fixed-point"}}

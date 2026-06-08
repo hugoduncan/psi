@@ -54,11 +54,11 @@
 
 ## Slice 6 — Workflow-loader/content-lock updates
 
-- [ ] Update `task_218_workflow_definitions_test.clj` to expect `workflow/exact-marker-routing` and exact authored validation/proof marker policy args.
-- [ ] Update `task_209_workflow_definitions_test.clj` to expect `workflow/exact-marker-routing` and exact authored validation/proof marker policy args for the incidental workflow.
-- [ ] Update `task_220_workflow_proof_gates_test.clj` to expect `workflow/exact-marker-routing` and exact authored marker policy args for both simplification workflows.
-- [ ] Keep existing assertions for route topology, terminal-stop routing, prompts, and route-label prompt text unchanged unless the operation arg shape requires a narrow assertion update.
-- [ ] Run `bb clojure:test:scry --dir components/workflow-loader/test --namespace psi.workflow-loader.task-209-workflow-definitions-test --namespace psi.workflow-loader.task-218-workflow-definitions-test --namespace psi.workflow-loader.task-220-workflow-proof-gates-test` and fix failures.
+- [x] Update `task_218_workflow_definitions_test.clj` to expect `workflow/exact-marker-routing` and exact authored validation/proof marker policy args.
+- [x] Update `task_209_workflow_definitions_test.clj` to expect `workflow/exact-marker-routing` and exact authored validation/proof marker policy args for the incidental workflow.
+- [x] Update `task_220_workflow_proof_gates_test.clj` to expect `workflow/exact-marker-routing` and exact authored marker policy args for both simplification workflows.
+- [x] Keep existing assertions for route topology, terminal-stop routing, prompts, and route-label prompt text unchanged unless the operation arg shape requires a narrow assertion update.
+- [x] Run `bb clojure:test:scry --dir components/workflow-loader/test --namespace psi.workflow-loader.task-209-workflow-definitions-test --namespace psi.workflow-loader.task-218-workflow-definitions-test --namespace psi.workflow-loader.task-220-workflow-proof-gates-test` and fix failures.
 
 ## Slice 7 — Docs/changelog and verification
 
