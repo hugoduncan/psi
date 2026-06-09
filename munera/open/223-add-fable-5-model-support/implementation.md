@@ -146,6 +146,29 @@ code + META.md:
 
 No new design-steps items.
 
+### Ambiguity review (design, 3rd pass) — ψ
+
+Verdict: no new actionable ambiguity. Re-verified design against current code.
+
+- Prior 3 ambiguities (docs scope, changelog obligation, test-extension shape)
+  remain resolved in design "Resolved ambiguities"; design-steps all `[x]`.
+- Target `:fable-5` entry values map unambiguously to existing fields, near-
+  identical to `:opus-4.8` (models.clj:171-187); pricing/cache ratios explicit
+  (cache-read 1.0=10×0.1, cache-write 12.5=10×1.25) — no underspecified field.
+- Structured-output wiring exact: add `:fable-5` to
+  `anthropic-json-schema-native-model-keys` (models.clj:589-596); dispatch via
+  `built-in-structured-output-capability` `:anthropic-messages` + set membership
+  (models.clj:597-613). Unambiguous.
+- Test-extension shape matches current `anthropic_models_api_test.clj`
+  (single `target-model-id "claude-opus-4-8"`, two opus-named deftests,
+  list + `/{id}` retrieve); parameterize-over-set resolution is concrete and
+  fully mappable.
+- Entry placement within the (unordered) `anthropic-models` map and the
+  deftest-rename "e.g." names are cosmetic, not design-level decisions → not
+  actionable (consistent with prior pass).
+
+No new design-steps items.
+
 ### Ambiguity review (design, 2nd pass) — ψ
 
 Verdict: no new actionable ambiguity. Re-verified design against current code.
