@@ -84,3 +84,8 @@
 ## Review follow-ups — plan inconsistency
 
 - [x] PI1: Refine `plan.md`/`steps.md` so old operation-id removal and simplification workflow EDN migration are one coherent repository-state handoff: either migrate both `.psi/workflows/reduce-architectural-complexity.edn` and `.psi/workflows/reduce-incidental-complexity.edn` in the same commit that removes `workflow/proof-sync-disposition-routing` / `workflow/validation-capture-disposition-routing`, or keep the old registered operation ids until no checked-in workflow references them. Do not commit an intermediate state where authored workflow EDNs still call removed built-in operation ids.
+
+## Review follow-ups — test review
+
+- [ ] TR1: Add a `parse-exact-marker-routing` test for a column-0 line that starts with the marker label but has no marker colon (e.g. `"QUALITY_GATE recommends APPROVE"`), asserting it is treated as ordinary prose (`:missing-route-marker`, not `:malformed-route-marker`). This exercises the `marker-prefix? ∧ ¬marker-attempt?` → `:ordinary` branch and guards against a regression that collapses `marker-attempt?` into `marker-prefix?`.
+- [ ] TR2 (minor): Broaden invalid marker-label arg coverage (lowercase, digit, space, and blank marker-label) and add `:allowed-routes` nil and list rejection cases, so the `^[A-Z_]+$` marker-label contract and non-vector `:allowed-routes` rule are fully exercised, not just hyphen/non-string and set.
