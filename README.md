@@ -113,21 +113,6 @@ Frontend contributors: see
 For TUI login flow, in-session commands, and runtime behavior, see:
 - [`doc/tui.md`](doc/tui.md)
 
-### Workflows
-
-For user-facing workflow usage, workflow file location, `/delegate`, reload
-behavior, and workflow-run retention/cleanup behavior, see:
-- [`doc/workflows.md`](doc/workflows.md)
-
-Project workflows include autonomous simplification helpers: `/delegate
-reduce-incidental-complexity` for function/executable-unit incidental complexity
-and `/delegate reduce-architectural-complexity` for namespace/family/pair/community
-architecture targets selected by Gordian.
-
-Completed workflow runs are retained per originating session and older runs are
-cleaned up automatically; retention is configurable. See
-[`doc/workflows.md`](doc/workflows.md).
-
 ### Model controls
 
 Interactive sessions support `/speed` for provider throughput-tier selection and
@@ -144,10 +129,6 @@ reference, runtime scoped setters, outbound model API proxy environment variable
 - [`doc/configuration.md`](doc/configuration.md)
 - [`doc/custom-providers.md`](doc/custom-providers.md)
 
-## Developer documentation
-
-The sections below cover extending psi, runtime introspection, and internals.
-
 ### Built-in Tools
 
 `read` `bash` `edit` `write` `psi-tool`
@@ -161,11 +142,47 @@ The sections below cover extending psi, runtime introspection, and internals.
 - `scheduler` — delayed one-shot work via explicit `create|list|cancel`, including both delayed same-session prompts and delayed fresh top-level session creation
 - `operation` — list and invoke registered deterministic operations via explicit `list|invoke`
 
-See:
-- [`doc/psi-project-config.md`](doc/psi-project-config.md) for query/mutate/reload examples and worktree-authoritative reload targeting rules, including the recommended self-reload loop
-- [`doc/graph-surface.md`](doc/graph-surface.md) for graph discovery, root-queryable attrs, and session inventory discovery surfaces
-- [`doc/scheduler.md`](doc/scheduler.md) for scheduler kinds, session-config support, status semantics, and introspection attrs
-- [`doc/operations.md`](doc/operations.md) for the deterministic-operation `list`/`invoke` request shapes, params, all-key + 2000-char truncation rendering, and error surfacing (both the psi-tool action and the `/operations` / `/operation` commands)
+### Project nREPL
+
+For direct project-local REPL support distinct from psi's own runtime nREPL, see:
+- [`doc/project-nrepl.md`](doc/project-nrepl.md)
+
+### Workflows
+
+For user-facing workflow usage, workflow file location, `/delegate`, reload
+behavior, and workflow-run retention/cleanup behavior, see:
+- [`doc/workflows.md`](doc/workflows.md)
+
+Project workflows include autonomous simplification helpers: `/delegate
+reduce-incidental-complexity` for function/executable-unit incidental complexity
+and `/delegate reduce-architectural-complexity` for namespace/family/pair/community
+architecture targets selected by Gordian.
+
+Completed workflow runs are retained per originating session and older runs are
+cleaned up automatically; retention is configurable. See
+[`doc/workflows.md`](doc/workflows.md).
+
+## Extensions
+
+Extensions customise psi by adding tools, commands, event handlers, and UI.
+Built-in extensions that ship with this repo (activated via
+`.psi/extensions.edn`):
+
+- **mcp-tasks-run** — run mcp-tasks task/story workflows with sub-agent
+  execution per step (`/mcp-tasks-run`).
+- **commit-checks** — run project-local checks after a local commit and feed
+  failures back into the session.
+- **metrics** — accumulate persistent per-capability usage counters (`/metrics`).
+- **plan-state-learning** — update `munera/plan.md` and `mementum/state.md`
+  after non-PSL commits (`/psl`).
+- **hello-ext** — minimal example extension used in docs and tests (`/hello`).
+
+For the extension list, configuration, and authoring details, see:
+- [`doc/extensions.md`](doc/extensions.md)
+
+## Developer documentation
+
+The sections below cover extending psi, runtime introspection, and internals.
 
 ### Extension API
 
@@ -194,27 +211,40 @@ Project-local extension/config examples in this repo include:
 
 ### Architecture
 
-For architecture overview, components, EQL introspection guidance, and roadmap, see:
+For architecture overview, components, EQL introspection guidance, and
+roadmap, see:
 - [`doc/architecture.md`](doc/architecture.md)
 
 ### Graph discovery
 
-For the session-root graph discovery surface (`:psi.graph/*`), canonical discovery
-workflow, and graph semantics, see:
+For the session-root graph discovery surface (`:psi.graph/*`), canonical
+discovery workflow, and graph semantics, see:
 - [`doc/graph-surface.md`](doc/graph-surface.md)
 
-For prompt lifecycle introspection summaries and normalized prompt-turn attrs, see:
+For prompt lifecycle introspection summaries and normalized prompt-turn
+attrs, see:
 - [`doc/architecture.md`](doc/architecture.md)
 
 ### ψ Psi project config
 
-Project query/config tool details:
+Project query/config tool details, for query/mutate/reload examples and
+worktree-authoritative reload targeting rules, including the recommended
+self-reload loop:
 - [`doc/psi-project-config.md`](doc/psi-project-config.md)
 
-### Project nREPL
+### Scheduler
 
-For direct project-local REPL support distinct from psi's own runtime nREPL, see:
-- [`doc/project-nrepl.md`](doc/project-nrepl.md)
+For scheduler kinds, session-config support, status semantics, and
+introspection attrs:
+- [`doc/scheduler.md`](doc/scheduler.md)
+
+### Determinisitc Operations
+
+for the deterministic-operation `list`/`invoke` request shapes, params,
+all-key + 2000-char truncation rendering, and error surfacing (both the
+psi-tool action and the `/operations` / `/operation` commands)
+- [`doc/operations.md`](doc/operations.md)
+
 
 ## References
 
