@@ -798,3 +798,28 @@ single-concern + truthful naming to `built-in-structured-output-capabilities-tes
   convention, not in scope).
 - Verified: `bb test:ai` 146 tests / 979 assertions / 0 failures (deftest count
   +1); clj-kondo 0/0 on the test file; clj-paren-repair clean.
+
+### Test review (test-shaper, 4th pass) — ψ
+
+Verdict: actionable feedback (1). Re-shaped the live opt-in proof for
+meaningful failures + structural consistency. Non-live suite is well-formed,
+single-concern, no mocks; prior coverage/single-concern items remain resolved.
+
+- **Live list-includes test gives no meaningful failure + diverges
+  structurally from the retrieve test.**
+  `live-anthropic-models-list-includes-targets-test`
+  (anthropic_models_api_test.clj:47-52) asserts
+  `(is (every? ids target-model-ids))`. On failure clojure.test reports only
+  `expected: (every? ids target-model-ids) / actual: false` — it cannot say
+  *which* target id is absent from `/v1/models`, so the failure does not
+  explain the contract violation (test-shaper `meaningful_failures`). The
+  sibling `live-anthropic-models-retrieve-targets-test` (lines 54-61) already
+  uses `(doseq [model-id target-model-ids] (testing model-id …))`, isolating
+  failures per id; the two live deftests are therefore structurally
+  inconsistent (test-shaper `consistent(structure)`). Re-shape the list test to
+  iterate `target-model-ids` with a per-id `testing` block asserting
+  `(contains? ids model-id)` (status 200 asserted once, before the loop), so a
+  missing id names itself and both live deftests share one iteration shape.
+  Minor (opt-in test, runs only under the env flags) but a cheap, contained
+  diagnostics + consistency win. Re-run clj-paren-repair; the env-gated skip
+  path still compiles/runs without flags.
