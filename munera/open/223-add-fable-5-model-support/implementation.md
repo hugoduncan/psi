@@ -407,3 +407,30 @@ executed here).
   `registry/find-model :anthropic "claude-fable-5"` (string id). Verified the
   test ns already requires `[psi.ai.models :as built-in]` and uses
   `built-in/all-models` keyed by keyword in `all-models-by-key-test`.
+
+### Ambiguity review (plan + steps, 2nd pass) — ψ
+
+Verdict: no new actionable ambiguity. Independently re-verified plan/steps
+against the live referenced artifacts:
+- Prior 3 plan/steps ambiguities (non-live test target, private-fn assertion
+  path, `all-models` namespace/key form) remain resolved in steps Slice 1
+  steps 4–5; follow-ups all `[x]`.
+- Confirmed in code: `init-built-ins-only-test` (model_registry_test.clj:47)
+  and `built-in-structured-output-capabilities-test` (line 103, Opus 4.8 block
+  144-151) exist; ns aliases `built-in` (psi.ai.models) and `structured-output`
+  present (lines 5-6). Steps map cleanly to these.
+- Live-test rewrite unambiguous against current
+  `anthropic_models_api_test.clj`: single `target-model-id "claude-opus-4-8"`
+  (line 7), `ids` bound as `(set (map :id …))` (the `(every? (set ids) …)`
+  step is well-defined), two opus-named deftests at lines 41/49 to rename.
+- Docs edit target verified: `doc/extension-api.md:217` reads "Support is true
+  for Claude Opus 4.8 and for OpenAI chat-completions models …" — Slice 3 edit
+  is concrete.
+- Below-threshold nits only (non-actionable, consistent with prior passes):
+  Slice 1 step 6 retains plural "namespace(s)" after the single-ns resolution;
+  Slice 2 step 2 specifies only the `every?` assertion without restating the
+  existing `200` status check (behaviour-preserving, obvious); Slice 4 "non-live
+  suite" is the env-gated skip path, not a separate selector. Cosmetic, not
+  contradictions.
+
+No new steps.md follow-ups.
