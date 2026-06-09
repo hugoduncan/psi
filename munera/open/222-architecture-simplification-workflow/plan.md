@@ -1,4 +1,4 @@
-# 218 — Plan
+# 222 — Plan
 
 Derived from the stable `design.md` after architecture-fit, ambiguity, and
 inconsistency design follow-ups were resolved (`design-steps.md` unchecked count
