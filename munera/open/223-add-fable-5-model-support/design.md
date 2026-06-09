@@ -34,9 +34,12 @@ In scope:
 - Add a Fable 5 model entry to the built-in catalog with correct metadata.
 - Wire its structured-output capability via the appropriate native-capability
   key set.
-- Extend (or add) a live opt-in `/v1/models`-style verification test for the
-  Fable 5 canonical id.
-- Update user-facing docs / changelog if model availability is documented.
+- Extend the existing live opt-in `/v1/models` verification test to also
+  assert the Fable 5 canonical id, by parameterizing the asserted ids over a
+  set (retaining the existing Opus 4.8 assertions) — see "Resolved ambiguities".
+- Add a CHANGELOG `[Unreleased]` → `Added` entry (a new selectable built-in
+  model is user-visible). No prose doc file changes are required — see
+  "Resolved ambiguities".
 
 Out of scope (adjacent, separate tasks if needed):
 
@@ -57,7 +60,9 @@ Out of scope (adjacent, separate tasks if needed):
   retrievable on the provider model-listing endpoint (opt-in, gated by the
   existing env flags).
 - `bb test` green (non-live suite); clj-kondo clean.
-- Docs/changelog updated where model availability is user-visible.
+- A CHANGELOG `[Unreleased]` → `Added` entry announces Fable 5 as selectable.
+- No prose doc (`doc/*.md`, `README.md`) changes are required (rationale in
+  "Resolved ambiguities").
 
 ## Resolved facts (from live Anthropic `/v1/models`, 2026-06)
 
@@ -115,6 +120,52 @@ The catalog entry is structurally near-identical to `:opus-4.8`.
 
 Plus: add `:fable-5` to `anthropic-json-schema-native-model-keys`; extend
 `anthropic_models_api_test.clj` to assert `"claude-fable-5"` present and
-retrievable.
+retrievable (test shape resolved below).
+
+## Resolved ambiguities (from review, 2026-06)
+
+### Docs scope — no prose doc changes required
+
+No user-facing doc enumerates the model catalog; `models.clj` is the single
+source of truth. Every existing model mention in `doc/*.md` is an *illustrative
+example* of a capability, not an exhaustive list:
+
+- `doc/configuration.md` (`:xhigh` / effort): "Anthropic adaptive-thinking
+  models **such as** Claude Opus 4.7 and Claude Opus 4.8" — a non-exhaustive
+  "such as" example that remains accurate without Fable 5.
+- `doc/tui.md` and `doc/extension-api.md`: single-model worked examples of
+  `/model` selection and mid-system-message support, not catalog inventories.
+
+Decision: this additive task makes **no** `doc/*.md` or `README.md` changes.
+The illustrative example lists stay correct as written; rewriting them to chase
+the newest model is out of scope and would invite ongoing churn.
+
+### Changelog obligation — required
+
+A new selectable built-in model is user-visible per the changelog protocol
+(new capability / behaviour). Decision: a CHANGELOG `[Unreleased]` → `Added`
+entry is **mandatory**, not optional. Draft entry:
+
+> Added Claude Fable 5 (`claude-fable-5`) as a selectable built-in Anthropic
+> model: adaptive-thinking, image + text input, 1M-token context, native
+> JSON-Schema structured output, and mid-conversation system-message support.
+> Select with `/model anthropic claude-fable-5`.
+
+### Test extension shape — parameterize over a set, retain Opus 4.8
+
+Resolve the structural ambiguity by parameterizing the asserted ids rather
+than duplicating deftests or replacing the Opus 4.8 target:
+
+- Replace the single `target-model-id "claude-opus-4-8"` with a set
+  `target-model-ids #{"claude-opus-4-8" "claude-fable-5"}`.
+- The list-includes deftest asserts `(every? (set ids) target-model-ids)` for
+  the `/v1/models` listing (keeps Opus 4.8 coverage, adds Fable 5).
+- The retrieve deftest uses `doseq`/`testing` over `target-model-ids`,
+  asserting a 200 and an id round-trip per id.
+- Rename the two deftests to drop the Opus-specific names (e.g.
+  `live-anthropic-models-list-includes-targets-test`,
+  `live-anthropic-models-retrieve-targets-test`).
+
+No parallel fable-5 deftests are added; Opus 4.8 assertions are retained.
 
 Design is complete and unambiguous; ready for planning.

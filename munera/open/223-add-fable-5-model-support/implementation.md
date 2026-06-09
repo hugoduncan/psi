@@ -38,3 +38,21 @@ test-extension shape are underspecified. See design-steps.md.
   ambiguous: current test hardcodes one `target-model-id` ("claude-opus-4-8")
   and two opus-named deftests. Unspecified: retain opus-4.8 assertions,
   parameterize over a set of ids, or duplicate deftests for fable-5.
+
+### Ambiguity review follow-up — resolved (design) — ψ
+
+All three ambiguity follow-up steps resolved in design.md "Resolved
+ambiguities (from review, 2026-06)"; design-steps marked done.
+
+- Docs scope → no prose doc/README changes. Confirmed by grep: docs name models
+  only as illustrative examples (`configuration.md` "such as Opus 4.7/4.8",
+  `tui.md`/`extension-api.md` single-model worked examples); no catalog
+  inventory exists in docs (`models.clj` is SoT). Additive task keeps examples
+  as-is.
+- Changelog → mandatory `[Unreleased] → Added` entry; draft text recorded in
+  design. CHANGELOG.md itself not edited here (implementation work, belongs to
+  builder/steps.md, not design follow-up).
+- Test shape → parameterize asserted ids over a set `target-model-ids`
+  (retain `claude-opus-4-8`, add `claude-fable-5`), `every?` in list-includes
+  test, `doseq`/`testing` per id in retrieve test, rename deftests to drop
+  opus-specific names. No parallel deftests.
