@@ -254,3 +254,25 @@
       `doc/extension-api.md:217`; line now reads "Support is true for Claude
       Opus 4.8 and Claude Fable 5, and for OpenAI chat-completions models".
       Pure prose clarity edit; accuracy unchanged, no code/test impact.
+
+## Plan/steps inconsistency review follow-ups (6th pass, ψ)
+
+- [ ] Reconcile the stale "no new deftests / full mirror" non-live-test
+      decision in plan.md and steps.md Slice 1 step 5 with the test-shaper
+      3rd-pass follow-up and the implemented code. plan.md still says the
+      non-live proof is done by "extending the existing deftests (no new
+      deftests)" and that `built-in-structured-output-capabilities-test` gets a
+      Fable 5 block that is a "full mirror" of the Opus 4.8 block (catalog
+      metadata + structured-output surface, all seven assertions); steps.md
+      Slice 1 step 5 (`[x]`) enumerates the same seven-assertion full mirror and
+      "do not add a new deftest". The later test-shaper 3rd-pass follow-up
+      (`[x]`) reversed both: it added a dedicated `fable-5-catalog-entry-test`
+      deftest and slimmed the structured-output Fable 5 block to the three
+      structured-output assertions only — matching the implemented code
+      (`fable-5-catalog-entry-test` at model_registry_test.clj:163; slim
+      3-assertion block at line 156). Update plan.md's Approach/Key-decisions
+      ("no new deftests", "full mirror … all seven assertions") and steps.md
+      Slice 1 step 5 to reflect the final structure (slim structured-output
+      block + dedicated catalog-entry deftest), or add an explicit note that
+      the test-shaper 3rd-pass follow-up supersedes the original Slice 1 step 5
+      decision, so plan, steps, and code agree on the non-live test structure.

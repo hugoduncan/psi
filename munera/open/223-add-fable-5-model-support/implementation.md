@@ -954,3 +954,35 @@ clj-kondo 0/0 on ai src+test.
   established catalog convention — correctly left as flat data.
 
 No new steps.md follow-ups.
+
+### Inconsistency review (plan + steps, 6th pass) — ψ
+
+Verdict: actionable inconsistency found (1). See steps.md.
+
+- **Plan/steps Slice 1 carry the now-reversed "no new deftests / full mirror"
+  non-live-test decision (stale vs the test-shaper follow-ups and the
+  implementation).** plan.md still states the non-live proof is done by
+  "**extending** the existing deftests … (no new deftests)" and that
+  `built-in-structured-output-capabilities-test` gets a Fable 5 block that is a
+  "**full mirror** of the Opus 4.8 block … asserting the catalog-metadata fields
+  **and** the structured-output capability surface (all seven assertions)".
+  steps.md Slice 1 step 5 (`[x]`) likewise enumerates the seven-assertion full
+  mirror in `built-in-structured-output-capabilities-test` and says "do **not**
+  add a new deftest". But the later **test-shaper 3rd-pass follow-up** in
+  steps.md (`[x]`) reversed both decisions: it *added* a dedicated
+  `fable-5-catalog-entry-test` deftest and *slimmed* the Fable 5 structured-output
+  block to the three structured-output assertions only. The implemented code
+  confirms the reversal — `fable-5-catalog-entry-test` exists
+  (model_registry_test.clj:163) and the Fable 5 block in
+  `built-in-structured-output-capabilities-test` (line 156) is the slim
+  3-assertion form. So plan.md's "no new deftests / full mirror" decision and
+  steps.md Slice 1 step 5's seven-assertion/no-new-deftest text now contradict
+  steps.md's own test-shaper follow-up and the built code. The last plan/steps
+  inconsistency review (5th pass, commit 1dcbd1f61) ran *before* the test-shaper
+  extract commit (9523ac736), so no prior pass reconciled this. Now carried into
+  steps.md as a follow-up.
+- Re-verified other plan/steps claims still hold: catalog values
+  (`10.0/50.0/1.0/12.5`, 1M, 128k) match design and `:fable-5`
+  (models.clj:189-205); `:fable-5` ∈ `anthropic-json-schema-native-model-keys`;
+  live deftests renamed + per-id `doseq`/`testing`; CHANGELOG `[Unreleased] →
+  Added` and `doc/extension-api.md` enumeration present.
