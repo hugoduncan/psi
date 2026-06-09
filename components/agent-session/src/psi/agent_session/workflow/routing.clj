@@ -184,12 +184,12 @@
   [{:keys [marker-label allowed-routes-set]} line]
   (let [trimmed-left (str/triml line)
         marker-prefix (str marker-label ": ")
-        marker-prefix? (str/starts-with? trimmed-left marker-label)
-        after-marker-label (if marker-prefix?
+        starts-with-label? (str/starts-with? trimmed-left marker-label)
+        after-marker-label (if starts-with-label?
                              (subs trimmed-left (count marker-label))
                              "")
         whitespace-before-colon? (boolean (re-find #"^\s+:" after-marker-label))
-        marker-attempt? (and marker-prefix?
+        marker-attempt? (and starts-with-label?
                              (or (str/starts-with? after-marker-label ":")
                                  whitespace-before-colon?))]
     (cond
