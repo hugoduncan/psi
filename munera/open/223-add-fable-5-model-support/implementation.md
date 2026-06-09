@@ -343,3 +343,28 @@ docs edit, and changelog are concrete and unambiguous. See steps.md.
   (keyed `"claude-fable-5"`). Unqualified `all-models` + differing key forms
   (the plan's own Risks flags the `:fable-5` keyword form) leaves the assertion
   target/key form undecided.
+
+### Plan/steps ambiguity review follow-ups — resolved (steps) — ψ
+
+The three plan/steps ambiguity follow-ups (added by the plan/steps ambiguity
+review pass) are resolved by disambiguating Slice 1 steps 4–5 in steps.md; no
+production code/tests/docs changed (the underlying Slice 1 implementation steps
+remain unchecked and predate this review pass, so they were intentionally not
+executed here).
+
+- Test target pinned: Slice 1 steps 4–5 now name
+  `components/ai/test/psi/ai/model_registry_test.clj` and direct **extending**
+  the existing `init-built-ins-only-test` and
+  `built-in-structured-output-capabilities-test` deftests (no new deftests).
+- Private-fn reference removed: step 5 now specifies the public path
+  `structured-output/effective-capability` on the `find-model` result with the
+  three public assertions (`:supported? true`,
+  `:native-mechanism :anthropic/json-schema-output`,
+  `:provider-native` ∈ `(set (:strategies …))`), mirroring the existing Opus 4.8
+  block (model_registry_test.clj:144-151). Verified `built-in-structured-output-capability`
+  is `defn-` private at models.clj:598.
+- `all-models` disambiguated: step 4 asserts `built-in/all-models`
+  (`psi.ai.models/all-models`) keyed by keyword `:fable-5`, and
+  `registry/find-model :anthropic "claude-fable-5"` (string id). Verified the
+  test ns already requires `[psi.ai.models :as built-in]` and uses
+  `built-in/all-models` keyed by keyword in `all-models-by-key-test`.

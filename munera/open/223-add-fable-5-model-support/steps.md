@@ -15,11 +15,24 @@
 - [ ] Add `:fable-5` to the `anthropic-json-schema-native-model-keys` set in
       `models.clj`.
 - [ ] `clj-paren-repair components/ai/src/psi/ai/models.clj` after the edits.
-- [ ] Add/extend a non-live test asserting `:fable-5` resolves via
-      `model-registry/find-model` and appears in `all-models`.
-- [ ] Add/extend a non-live test asserting Fable 5 reports native JSON-Schema
-      structured-output capability (`built-in-structured-output-capability`
-      path).
+- [ ] Extend the existing `init-built-ins-only-test` deftest in
+      `components/ai/test/psi/ai/model_registry_test.clj` (do **not** add a new
+      deftest) to assert Fable 5 resolution and catalog membership: add
+      `(is (some? (registry/find-model :anthropic "claude-fable-5")))` (string
+      id resolution) and `(is (contains? built-in/all-models :fable-5))`
+      (keyword `:fable-5` key in the `psi.ai.models/all-models` source map,
+      aliased `built-in` in this ns). Note: `registry/find-model` keys on the
+      string id `"claude-fable-5"`; `built-in/all-models` keys on the keyword
+      `:fable-5` — assert both forms accordingly.
+- [ ] Extend the existing `built-in-structured-output-capabilities-test`
+      deftest in the same namespace (do **not** add a new deftest, do **not**
+      reference the private `built-in-structured-output-capability` fn) with a
+      new `testing` block for Fable 5 that mirrors the existing Claude Opus 4.8
+      block: bind `model (registry/find-model :anthropic "claude-fable-5")` and
+      `capability (structured-output/effective-capability model)`, then assert
+      the public capability surface — `(is (= true (:supported? capability)))`,
+      `(is (= :anthropic/json-schema-output (:native-mechanism capability)))`,
+      and `(is (contains? (set (:strategies capability)) :provider-native))`.
 - [ ] Run the focused model/registry test namespace(s) green.
 
 ## Slice 2 — Live verification test
@@ -56,19 +69,27 @@
 
 ## Plan/steps ambiguity review follow-ups (ψ)
 
-- [ ] Pin the non-live test target in Slice 1 steps 4–5: name the namespace
+- [x] Pin the non-live test target in Slice 1 steps 4–5: name the namespace
       (`components/ai/test/psi/ai/model_registry_test.clj`) and state whether to
       extend the existing `init-built-ins-only-test` (find-model resolution) and
       `built-in-structured-output-capabilities-test` deftests or add new ones,
       so "Add/extend … namespace(s)" is no longer an open choice.
-- [ ] Replace the private `built-in-structured-output-capability` reference in
+      → Resolved: Slice 1 steps 4–5 now name the ns and direct extending the two
+      existing deftests (no new deftests).
+- [x] Replace the private `built-in-structured-output-capability` reference in
       Slice 1 step 5 with the public assertion path used by the existing test:
       `structured-output/effective-capability` on the `find-model` result,
       asserting `:supported? true`, `:native-mechanism
       :anthropic/json-schema-output`, and `:provider-native` ∈ `:strategies`.
-- [ ] Disambiguate "appears in `all-models`" in Slice 1 step 4: specify which
+      → Resolved: Slice 1 step 5 now uses `structured-output/effective-capability`
+      with the three public assertions, mirroring the Opus 4.8 block; private fn
+      reference removed.
+- [x] Disambiguate "appears in `all-models`" in Slice 1 step 4: specify which
       var (`psi.ai.models/all-models` keyed `:fable-5`, vs `registry/all-models`
       keyed `"claude-fable-5"`) and the key form to assert against.
+      → Resolved: Slice 1 step 4 now asserts `built-in/all-models`
+      (`psi.ai.models/all-models`) keyed by keyword `:fable-5`, plus
+      `registry/find-model` keyed by string id `"claude-fable-5"`.
 
 ## Slice 4 — Verify + finalize
 
