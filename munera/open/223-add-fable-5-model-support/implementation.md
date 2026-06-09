@@ -745,3 +745,33 @@ against design acceptance criteria:
   coverage gap.
 
 No new steps.md follow-ups.
+
+### Test review (test-shaper, 3rd pass) — ψ
+
+Verdict: actionable feedback (1). Suite is green, deterministic, no mocks; the
+live opt-in proof is correctly gated. Independently re-shaped the Fable 5
+additions for clarity/single-concern.
+
+- **Catalog-value concern misplaced inside the structured-output deftest
+  (single_concern + naming).** `built-in-structured-output-capabilities-test`
+  (model_registry_test.clj:105) is named for, and otherwise asserts, the
+  structured-output capability surface. The new
+  "Claude Fable 5 catalog entry carries the agreed pricing and capability
+  values" block (lines 167-178) asserts pure catalog data
+  (`:input-cost`/`:output-cost`/`:cache-*`/`:context-window`/`:max-tokens`/
+  boolean flags) that has nothing to do with structured output, and — unlike
+  the catalog-metadata woven into the Opus 4.8 / Fable 5 "findable" mirror
+  blocks (a pre-existing convention) — has no Opus 4.8 counterpart, so it is a
+  unique concern lodged in the wrong deftest. A pricing transcription error now
+  fails a deftest whose name asserts a different contract. test-shaper
+  `single_concern` + `consistent(naming)` + `behavior_focused`: extract the
+  pricing/numeric catalog-value assertions into a dedicated Fable 5
+  catalog-entry deftest (e.g. `fable-5-catalog-entry-test`), keeping
+  `built-in-structured-output-capabilities-test` to the structured-output
+  surface only. Optionally relocate the Fable 5 "findable" block's
+  catalog-metadata assertions (`:name`/`:adaptive-thinking`/
+  `:supports-mid-conversation-system-messages`) into the same catalog-entry
+  deftest so the structured-output block mirrors the slimmer gpt-5.5 / sonnet
+  blocks; this also removes the duplicated `find-model` + `(some? model)`
+  between the two Fable 5 blocks (economical). Net: each deftest name stays
+  truthful and each failure points at the contract it actually broke.

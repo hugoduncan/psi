@@ -191,3 +191,19 @@
       "Final catalog entry". A transcription error in any pricing/numeric field
       is now caught by the non-live suite. `bb test:ai` 145 tests / 980
       assertions / 0 failures; clj-kondo 0/0 on the test file.
+
+## Test review follow-ups (test-shaper, 3rd pass, ψ)
+
+- [ ] Extract the Fable 5 catalog-value/pricing assertions out of
+      `built-in-structured-output-capabilities-test` (model_registry_test.clj:167-178)
+      into a dedicated Fable 5 catalog-entry deftest (e.g.
+      `fable-5-catalog-entry-test`), so the structured-output deftest keeps a
+      single concern (structured-output surface) and a pricing/numeric
+      transcription failure reports under a truthfully-named test. test-shaper
+      `single_concern` + `consistent(naming)` + `behavior_focused`. Optionally
+      move the Fable 5 "findable" block's catalog-metadata assertions
+      (`:name`/`:adaptive-thinking`/`:supports-mid-conversation-system-messages`,
+      lines 156-165) into the same catalog-entry deftest, slimming the
+      structured-output block to mirror the gpt-5.5/sonnet blocks and removing
+      the duplicated `find-model` + `(some? model)` across the two Fable 5
+      blocks. Re-run `bb test:ai` + clj-kondo.
