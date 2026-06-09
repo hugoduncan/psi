@@ -51,6 +51,8 @@ This repository includes many examples there, including:
 - `plan-build-review`
 - `delegate-build-review`
 - `gh-bug-triage-modular`
+- `reduce-incidental-complexity`
+- `reduce-architectural-complexity`
 - `planner`
 - `builder`
 - `reviewer`
@@ -752,7 +754,11 @@ cyclomatic complexity. The `incidental-complexity-finder` skill encodes this as
 `lcc-total ≥ 5.0 ∧ gap ≥ 2.0`, ranks by
 `gap`, and applies an essential-vs-incidental judgment guard over the top 5 to
 discard false positives. It selects exactly one unit, or reports that none
-qualifies.
+qualifies. For target-present runs, the generated task records the selector
+justification in committed task artifacts: `design.md` explains why the chosen
+unit passed the incidental guard, while `coverage-map.md` records selector proof,
+top-5 guard evidence, rejected essential false positives when present, and any
+marginal-target concerns, falsification evidence, or scope-review questions.
 
 The workflow runs entirely in the invoking session's current worktree. The
 caller is responsible for starting it from the intended branch/worktree; the
@@ -765,42 +771,66 @@ phases instead of hiding it behind one opaque lifecycle delegate:
 
 1. **select-and-create** (`:session`) — confirms the current git context,
    applies the `incidental-complexity-finder` skill, and **stops early** with no
-   task if nothing qualifies. Otherwise it captures `before-local.json`
-   (per-unit burden baseline) and `before-diagnose.edn` (architectural gate
-   baseline) into the generated task directory, allocates the next Munera task
-   id in the current worktree, writes a **two-phase behaviour-preserving
-   refactor** `design.md`, commits it on the current branch, and emits a
-   structured `munera_task_path:` handoff.
-2. **review-task-design**, **create-task-plan**, and **review-task-plan** — reuse
+   task if nothing qualifies. Otherwise it captures parse-checked
+   `before-local.json` (per-unit burden baseline; JSON with a `units` array) and
+   `before-diagnose.edn` (architectural gate baseline) into the generated task
+   directory, allocates the next Munera task id in the current worktree, writes a
+   **two-phase behaviour-preserving refactor** `design.md`, creates an initial
+   `coverage-map.md` proof scaffold, commits them on the current branch, and
+   emits a structured `munera_task_path:` handoff.
+2. **extract-task-path** — validates the handoff through deterministic
+   `workflow/munera-open-task-path-routing` before any task-local step runs.
+   Downstream task identity is the extracted root-relative task path; the full
+   selection handoff is reference context only. Malformed handoffs route to a
+   terminal stop that does not invent a task path or read task artifacts.
+3. **review-task-design**, **create-task-plan**, and **review-task-plan** — reuse
    the standard Munera design/plan review workflows while keeping the same
-   inherited worktree and generated task handoff.
-3. **clean-baseline** — before characterization work begins, records a
+   inherited worktree and validated task path.
+4. **clean-baseline** — before characterization work begins, records a
    task-local `characterization-baseline.edn` with the current `HEAD`, status,
    target/source paths, and any explicitly classified pre-existing task-artifact
    or doc dirt. Dirty target/source paths at this point stop the workflow instead
    of being absorbed into the unmodified-behavior baseline.
-4. **coverage-review** / **coverage-disposition** / **coverage-fix** — iterates a
+5. **coverage-review** / **coverage-disposition** / **coverage-fix** — iterates a
    pre-simplification characterization-test-net gate. Review completion means
    nominal, edge, and boundary behavior relevant to the target is sufficiently
    covered and green against current behavior. Fixable gaps route to a
    constrained coverage-fix pass that may add characterization tests and
    explicitly justified minimal testability seams only. Infeasible
-   characterization records the reason and stops before simplification.
-5. **diff-gate** — compares both committed changes since the recorded baseline
+   characterization records the reason and stops before simplification. These
+   steps maintain `coverage-map.md` with authoritative test commands, coverage
+   dispositions, latest counts when available, and the relationship to
+   `characterization-baseline.edn`.
+6. **diff-gate** — compares both committed changes since the recorded baseline
    `HEAD` and the current uncommitted worktree status/diff, then classifies every
    coverage-phase change. Only characterization tests, task artifacts, docs, and
    explicitly justified minimal testability seams may pass. Unclassified or
    non-minimal source/target edits, broad production edits, or premature
    simplification/refactor work stop the workflow before implementation.
-6. **implement-task** and **review-task-implementation** — only after the
+7. **implement-task** and **review-task-implementation** — only after the
    characterization net and diff gate pass, delegate simplification
    implementation and implementation review.
+8. **incidental-validation-capture** — captures and parse-checks
+   `after-local.json`, writes a deterministic `incidental-burden-check.edn` for
+   the A5 target-reduction and A2 relocation-guard checks, and captures
+   parse-checked `incidental-gate.edn` for the A3 Gordian gate. Exit-0 unreadable
+   JSON/EDN is treated as failure and replaced by a readable failure map; fixable
+   validation failures route back through implementation repair, while
+   unrecoverable capture failures route to a validation terminal stop.
+9. **proof-sync** / **proof-sync-fixed-point** / **final-summary** — rereads the
+   committed task-local proof authority (`coverage-map.md`,
+   `characterization-baseline.edn`, before/after Gordian artifacts, and task
+   notes) after review follow-ups. Final success is reachable only from a
+   clean/no-op proof-sync pass or a clean read-only fixed-point pass. If
+   proof-sync mutates stale proof artifacts, it commits those updates and routes
+   back through coverage review, validation recapture, or fixed-point verification
+   before any final summary.
 
 The first step uses deterministic `PASS_STATUS` routing to send no-target runs
-directly to workflow completion. When the selection output contains no real
+directly to workflow completion. When the selection output contains no valid
 `munera_task_path:` line, every downstream design/plan/test-net/implementation
 step is skipped and the run ends after reporting that no qualifying target was
-found.
+found or that task identity could not be validated.
 
 Each generated task is a behaviour-preserving refactor: **Phase 0** establishes
 a green characterization-test safety net (gating all refactoring), and
@@ -809,11 +839,89 @@ a green characterization-test safety net (gating all refactoring), and
 check), a per-unit relocation guard holds (every new or below-ceiling after-row
 `u` satisfies `after(u) < B`, where `B := before(target)` read from
 `before-local.json`, so a tangle is never merely relocated into a new seam or a
-sibling rather than reduced), `gordian gate --baseline before-diagnose.edn
---fail-on new-cycles,new-high-findings --max-new-medium-findings 0` passes, and
-all tests stay green. The workflow ends
+sibling rather than reduced), `gordian gate --baseline
+munera/open/NNN-slug/before-diagnose.edn --fail-on
+new-cycles,new-high-findings --max-new-medium-findings 0` passes (with
+`NNN-slug` replaced by the generated task id), and all tests stay green. The
+workflow ends
 with a completed, reviewed task on the local worktree branch; it does **not**
 push or open a PR — that decision is left to the user.
+
+## Architecture-level simplification
+
+`reduce-architectural-complexity` is the architecture-level sibling of
+`reduce-incidental-complexity`. It targets code **above the function/executable
+unit level**: namespaces, namespace families, namespace pairs, or communities
+ranked by Gordian's architecture-target lens.
+
+```text
+/delegate reduce-architectural-complexity
+```
+
+The workflow runs entirely in the invoking session's current worktree. The caller
+is responsible for starting it from the intended isolated branch/worktree; it
+does **not** call `work-on`, create or switch worktrees, push, or open a PR.
+
+Selection uses `bb gordian architecture-targets --edn`. The workflow consumes the
+authoritative top-level `:winner` and `:candidates` EDN envelope, then optionally
+runs `bb gordian target-issues --candidate '<candidate-id>' --edn` only for
+post-selection framing. Unsupported or failed `target-issues` framing does not
+change the selected target and does not force a no-target stop; missing or
+uninterpretable `architecture-targets` output does stop before task creation.
+
+Target-present runs create a Munera task under `munera/open/NNN-slug/` with
+worktree-root-relative Gordian artifacts such as `before-diagnose.edn`,
+`architecture-targets.edn`, and either `target-issues.edn` or
+`target-issues-unavailable.edn`. A dedicated `extract-task-path` step validates
+the generated `munera_task_path:` handoff before any downstream task consumer
+runs.
+
+Before implementation, the workflow enforces a test-net gate adapted for
+architecture targets: clean baseline recording, coverage review, a constrained
+characterization-test fix loop for fixable gaps, terminal stop for infeasible
+coverage, and a diff gate that allows only characterization tests, task
+artifacts, docs, and explicitly justified minimal testability seams before
+simplification. `implement-task` is unreachable until coverage and diff gates
+pass.
+
+After implementation, the workflow captures objective Gordian validation artifacts
+(`after-diagnose.edn`, `after-architecture-targets.edn`, `architecture-compare.edn`,
+and `architecture-gate.edn`) before review. Each artifact is parsed immediately
+after it is written; exit-0 unreadable or truncated EDN is not accepted as proof
+and is replaced by a readable failure map. Fixable validation failures route back
+through implementation repair via deterministic validation-capture disposition;
+unrecoverable capture failures route to a validation terminal stop with the
+failing gate context. Successful validation then runs six explicit `review-step`
+gates in order: `task-implementation-review`, `task-test-review`, the
+architecture-specific `review-implementation-architecture`, `test-shaper`,
+`review-task-docs`, and `code-shaper`. The architecture review skill reads
+task-local Gordian artifacts and project architecture sources rather than relying
+on inlined workflow context.
+
+Target-present architecture tasks also use a committed `coverage-map.md` proof
+artifact. The generated task creates an initial scaffold recording the selected
+candidate identity, score, confidence, source areas, pending coverage/test fields,
+and validation artifact references. Low-confidence winners do not auto-stop when
+otherwise interpretable, but the generated design records actionability,
+falsification evidence, review questions, and any scope-narrowing considerations.
+
+Both simplification workflows use split terminal-stop summaries for malformed
+task paths, clean-baseline failures, coverage-disposition stops, diff-gate stops,
+validation-capture stops, and proof-sync fixed-point failures. Each terminal stop
+receives explicit preceding-gate context in workflow topology and reads durable
+task-local findings when a validated task exists, rather than inferring causes
+from missing files or hidden runtime state.
+
+Both workflows finish through a proof-sync fixed-point gate. `proof-sync` may
+update stale proof artifacts and commit them, but that mutating pass cannot route
+directly to final success. It must emit a deterministic disposition marker that
+routes to coverage review, validation recapture, or a read-only fixed-point
+verification. The final summary independently reads committed proof artifacts and
+must not claim proof coherence from review prose or prior workflow yields alone.
+
+Use `reduce-incidental-complexity` when the right target is a single high-burden
+function/executable unit. Use `reduce-architectural-complexity` when the target is
+a higher-level ownership, coupling, cycle, family, pair, or community problem.
 
 ## Related docs
 

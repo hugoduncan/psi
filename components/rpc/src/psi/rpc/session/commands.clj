@@ -21,6 +21,38 @@
 (def handle-command-result!
   command-results/handle-command-result!)
 
+(defn- new-session-command-payload
+  [ctx cmd-result]
+  (when-let [source (:rehydrate cmd-result)]
+    (let [sid  (:session-id source)
+          sd   (when sid (ss/get-session-data-in ctx sid))
+          msgs (or (:agent-messages source)
+                   (when sid
+                     (app-messages/session-messages ctx sid)))]
+      {:session-id    (:session-id sd)
+       :session-file  (:session-file sd)
+       :message-count (count msgs)
+       :messages      msgs
+       :tool-calls    (or (:tool-calls source) {})
+       :tool-order    (or (:tool-order source) [])})))
+
+(defn- focus-new-session-command!
+  [state cmd-result]
+  (when-let [sid (get-in cmd-result [:rehydrate :session-id])]
+    (events/set-focus-session-id! state sid)))
+
+(defn- emit-new-session-command!
+  [emit! ctx cmd-result]
+  (when-let [rehydration (new-session-command-payload ctx cmd-result)]
+    (emit/emit-session-rehydration! emit! rehydration)))
+
+(defn handle-new-session-command-result!
+  "Applies RPC focus and rehydration effects for :new-session command results."
+  [ctx state emit! cmd-result]
+  (when (= :new-session (:type cmd-result))
+    (focus-new-session-command! state cmd-result)
+    (emit-new-session-command! emit! ctx cmd-result)))
+
 (defn- handle-dispatched-command!
   [ctx state emit-frame! request-id start-daemon-thread! login-handler cmd-result emit!]
   (if (= :login-start (:type cmd-result))
@@ -32,22 +64,7 @@
                     :emit! emit!
                     :start-daemon-thread! start-daemon-thread!})
     (do
-      (when (= :new-session (:type cmd-result))
-        (let [rehydrate (:rehydrate cmd-result)
-              new-sid   (:session-id rehydrate)
-              _         (when new-sid (events/set-focus-session-id! state new-sid))
-              sd        (when new-sid (ss/get-session-data-in ctx new-sid))
-              msgs      (or (:agent-messages rehydrate)
-                            (when new-sid
-                              (app-messages/session-messages ctx new-sid)))]
-          (emit/emit-session-rehydration!
-           emit!
-           {:session-id   (:session-id sd)
-            :session-file (:session-file sd)
-            :message-count (count msgs)
-            :messages msgs
-            :tool-calls (or (:tool-calls rehydrate) {})
-            :tool-order (or (:tool-order rehydrate) [])})))
+      (handle-new-session-command-result! ctx state emit! cmd-result)
       (command-results/handle-command-result! request-id cmd-result emit!)
       (when (= :extension-cmd (:type cmd-result))
         (Thread/sleep 50)))))

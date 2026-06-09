@@ -18,6 +18,7 @@
    [psi.agent-session.workflow.delegate-list :as delegate-list-projection]
    [psi.agent-session.workflow.delivery :as delivery]
    [psi.agent-session.workflow.orchestration :as orchestration]
+   [psi.agent-session.workflow.routing :as routing]
    [psi.agent-session.workflow.runtime-state :as runtime-state]
    [psi.agent-session.workflow.text :as text]
    [psi.workflow-loader.core :as loader]))
@@ -106,76 +107,9 @@
     (register-prompt-contribution!)
     result))
 
-(def ^:private pass-status-prefix "PASS_STATUS:")
-(def ^:private known-pass-status->route
-  {"REVIEW_COMPLETE" "DONE"
-   "ACTIONABLE_FEEDBACK" "REPEAT"
-   "IMPLEMENTATION_COMPLETE" "DONE"
-   "MORE_WORK_REMAINS" "REPEAT"})
-
-(defn- pass-status-line-value
-  [line]
-  (when-let [idx (str/index-of line pass-status-prefix)]
-    (when (= 0 idx)
-      (subs line (count pass-status-prefix)))))
-
-(defn- parse-pass-status-routing
-  [text allowed-statuses]
-  (let [lines (str/split-lines (or text ""))
-        allowed-statuses-set (when (seq allowed-statuses)
-                               (set allowed-statuses))
-        status-lines (keep (fn [line]
-                             (when-let [raw-value (pass-status-line-value line)]
-                               {:line line
-                                :raw-value raw-value
-                                :trimmed-value (str/trim raw-value)}))
-                           lines)]
-    (cond
-      (empty? status-lines)
-      {:status :error
-       :reason :missing-pass-status
-       :message "PASS_STATUS missing"
-       :details {:text text}}
-
-      (> (count status-lines) 1)
-      {:status :error
-       :reason :ambiguous-pass-status
-       :message "Multiple PASS_STATUS lines found"
-       :details {:text text
-                 :pass-status-lines (mapv :line status-lines)}}
-
-      :else
-      (let [{:keys [line raw-value trimmed-value]} (first status-lines)
-            route (get known-pass-status->route trimmed-value)
-            exact-known? (= raw-value (str " " trimmed-value))
-            allowed? (or (nil? allowed-statuses-set)
-                         (contains? allowed-statuses-set trimmed-value))]
-        (cond
-          (and route exact-known? allowed?)
-          {:status :ok
-           :data route
-           :summary route}
-
-          (and route exact-known? (not allowed?))
-          {:status :error
-           :reason :invalid-pass-status
-           :message "PASS_STATUS token is not valid for this workflow step"
-           :details {:text text
-                     :line line
-                     :value trimmed-value
-                     :allowed-statuses (vec allowed-statuses)}}
-
-          :else
-          {:status :error
-           :reason :malformed-pass-status
-           :message "PASS_STATUS line must contain exactly one known token"
-           :details {:text text
-                     :line line
-                     :value trimmed-value}})))))
-
 (defn- actionable-feedback?
   [text]
-  (= :ok (:status (parse-pass-status-routing text ["ACTIONABLE_FEEDBACK"]))))
+  (= :ok (:status (routing/parse-pass-status-routing text ["ACTIONABLE_FEEDBACK"]))))
 
 (defn- pass-feedback-routing
   [args]
@@ -193,7 +127,7 @@
     (register-operation
      {:id "workflow/pass-status-routing"
       :handler (fn [{:keys [args]}]
-                 (parse-pass-status-routing (:text args) (:allowed-statuses args)))})
+                 (routing/parse-pass-status-routing (:text args) (:allowed-statuses args)))})
     (register-operation
      {:id "workflow/pass-feedback-routing"
       :handler (fn [{:keys [args]}]
@@ -208,7 +142,15 @@
                    {:status :error
                     :reason :invalid-route
                     :message "route must be a string"
-                    :details {:route (:route args)}}))})))
+                    :details {:route (:route args)}}))})
+    (register-operation
+     {:id "workflow/munera-open-task-path-routing"
+      :handler (fn [{:keys [args]}]
+                 (routing/parse-munera-open-task-path-routing (:text args)))})
+    (register-operation
+     {:id "workflow/exact-marker-routing"
+      :handler (fn [{:keys [args]}]
+                 (routing/parse-exact-marker-routing args))})))
 
 (declare refresh-widgets!)
 

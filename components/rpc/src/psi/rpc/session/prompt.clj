@@ -1,12 +1,9 @@
 (ns psi.rpc.session.prompt
   "Prompt execution workflow for RPC session handling."
   (:require
-   [psi.agent-core.core :as agent]
    [psi.agent-session.commands :as commands]
    [psi.agent-session.core :as session]
    [psi.agent-session.runtime :as runtime]
-   [psi.session-state.state :as ss]
-   [psi.rpc.events :as events]
    [psi.rpc.session.commands :as rpc.commands]
    [psi.rpc.session.emit :as emit]
    [psi.rpc.session.streams :as streams]
@@ -62,22 +59,7 @@
                                     (if (= :login-start (:type cmd-result))
                                       (login-handle-start-command! {:ctx ctx :state state :session-id session-id :emit-frame! emit-frame! :request-id request-id :cmd-result cmd-result :emit! emit! :start-daemon-thread! start-daemon-thread!})
                                       (do
-                                        (when (= :new-session (:type cmd-result))
-                                          (let [rehydrate (:rehydrate cmd-result)
-                                                new-sid   (:session-id rehydrate)
-                                                _         (when new-sid (events/set-focus-session-id! state new-sid))
-                                                sd        (when new-sid (ss/get-session-data-in ctx new-sid))
-                                                msgs      (or (:agent-messages rehydrate)
-                                                              (when new-sid
-                                                                (:messages (agent/get-data-in (ss/agent-ctx-in ctx new-sid)))))]
-                                            (emit/emit-session-rehydration!
-                                             emit!
-                                             {:session-id (:session-id sd)
-                                              :session-file (:session-file sd)
-                                              :message-count (count msgs)
-                                              :messages msgs
-                                              :tool-calls (or (:tool-calls rehydrate) {})
-                                              :tool-order (or (:tool-order rehydrate) [])})))
+                                        (rpc.commands/handle-new-session-command-result! ctx state emit! cmd-result)
                                         (rpc.commands/handle-prompt-command-result! cmd-result emit!)))
                                     (emit/emit-session-snapshots! emit! ctx state session-id))
 

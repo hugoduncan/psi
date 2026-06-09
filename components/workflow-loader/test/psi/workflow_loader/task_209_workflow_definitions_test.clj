@@ -166,6 +166,13 @@
      (let [steps (get-in definitions ["reduce-incidental-complexity" :steps])
            step-by-name (into {} (map (juxt :name identity) steps))
            select-step (get step-by-name "select-and-create")
+           extract-step (get step-by-name "extract-task-path")
+           malformed-stop-step (get step-by-name "terminal-stop-malformed-task-path")
+           clean-stop-step (get step-by-name "terminal-stop-clean-baseline")
+           coverage-stop-step (get step-by-name "terminal-stop-coverage-disposition")
+           diff-stop-step (get step-by-name "terminal-stop-diff-gate")
+           validation-stop-step (get step-by-name "terminal-stop-validation-capture")
+           proof-stop-step (get step-by-name "terminal-stop-proof-sync")
            review-design-step (get step-by-name "review-task-design")
            create-plan-step (get step-by-name "create-task-plan")
            review-plan-step (get step-by-name "review-task-plan")
@@ -176,18 +183,37 @@
            diff-gate-step (get step-by-name "diff-gate")
            implement-step (get step-by-name "implement-task")
            implementation-review-step (get step-by-name "review-task-implementation")
+           validation-capture-step (get step-by-name "incidental-validation-capture")
+           validation-disposition-step (get step-by-name "validation-capture-disposition")
+           proof-sync-step (get step-by-name "proof-sync")
+           proof-disposition-step (get step-by-name "proof-sync-disposition")
+           proof-fixed-point-step (get step-by-name "proof-sync-fixed-point")
            final-summary-step (get step-by-name "final-summary")
-           terminal-stop-step (get step-by-name "terminal-stop-summary")
            select-text (step-template-text select-step)
            clean-text (step-template-text clean-baseline-step)
            coverage-review-text (step-template-text coverage-review-step)
            disposition-text (step-template-text coverage-disposition-step)
            coverage-fix-text (step-template-text coverage-fix-step)
            diff-gate-text (step-template-text diff-gate-step)
+           validation-capture-text (step-template-text validation-capture-step)
+           proof-sync-text (step-template-text proof-sync-step)
+           proof-fixed-point-text (step-template-text proof-fixed-point-step)
            final-summary-text (step-template-text final-summary-step)
-           terminal-stop-text (step-template-text terminal-stop-step)]
+           malformed-stop-text (step-template-text malformed-stop-step)
+           clean-stop-text (step-template-text clean-stop-step)
+           coverage-stop-text (step-template-text coverage-stop-step)
+           diff-stop-text (step-template-text diff-stop-step)
+           validation-stop-text (step-template-text validation-stop-step)
+           proof-stop-text (step-template-text proof-stop-step)]
        (testing "expands target-present execution into explicit phased topology"
          (is (= ["select-and-create"
+                 "extract-task-path"
+                 "terminal-stop-malformed-task-path"
+                 "terminal-stop-clean-baseline"
+                 "terminal-stop-coverage-disposition"
+                 "terminal-stop-diff-gate"
+                 "terminal-stop-validation-capture"
+                 "terminal-stop-proof-sync"
                  "review-task-design"
                  "create-task-plan"
                  "review-task-plan"
@@ -198,10 +224,21 @@
                  "diff-gate"
                  "implement-task"
                  "review-task-implementation"
-                 "final-summary"
-                 "terminal-stop-summary"]
+                 "incidental-validation-capture"
+                 "validation-capture-disposition"
+                 "proof-sync"
+                 "proof-sync-disposition"
+                 "proof-sync-fixed-point"
+                 "final-summary"]
                 (mapv :name steps)))
          (is (= [:session
+                 :session
+                 :session
+                 :session
+                 :session
+                 :session
+                 :session
+                 :session
                  :delegate
                  :delegate
                  :delegate
@@ -212,6 +249,10 @@
                  :session
                  :delegate
                  :delegate
+                 :session
+                 :invoke
+                 :session
+                 :invoke
                  :session
                  :session]
                 (mapv :type steps))))
@@ -227,16 +268,27 @@
            (is (.contains (:text tmpl) "{{input}}"))
            (is (= {:from :workflow-input}
                   (get-in tmpl [:vars "input"])))))
-       (testing "select-and-create routes no-target directly to done and target-present into design review"
+       (testing "select-and-create routes no-target directly to done and target-present into deterministic path extraction"
          (is (= {:type :invoke
                  :operation "workflow/pass-status-routing"
                  :args {:text {:from {:step "select-and-create" :output :final-llm-reply}}
                         :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}}
                 (:judge select-step)))
-         (is (= {"DONE" {:goto "review-task-design"}
+         (is (= {"DONE" {:goto "extract-task-path"}
                  "REPEAT" {:goto :done}}
                 (:on select-step))
-             "REVIEW_COMPLETE/DONE starts explicit lifecycle; ACTIONABLE_FEEDBACK/REPEAT stops no-target")
+             "REVIEW_COMPLETE/DONE validates task identity; ACTIONABLE_FEEDBACK/REPEAT stops no-target")
+         (is (= {:type :invoke
+                 :operation "workflow/munera-open-task-path-routing"
+                 :args {:text {:from {:step "extract-task-path" :output :final-llm-reply}}}}
+                (:judge extract-step)))
+         (is (= {"DONE" {:goto "review-task-design"}
+                 "REPEAT" {:goto "terminal-stop-malformed-task-path"}}
+                (:on extract-step)))
+         (is (.contains (step-template-text extract-step)
+                        "exactly one line matching `munera_task_path: munera/open/NNN-slug`"))
+         (is (.contains (step-template-text extract-step)
+                        "respond with ONLY that root-relative path"))
          (is (.contains select-text "PASS_STATUS: REVIEW_COMPLETE"))
          (is (.contains select-text "PASS_STATUS: ACTIONABLE_FEEDBACK"))
          (is (.contains select-text "skips every downstream design/plan/test-net/implementation step"))
@@ -251,7 +303,7 @@
          (doseq [step [review-design-step create-plan-step review-plan-step
                        implement-step implementation-review-step]]
            (is (= {:type :map
-                   :fields {:input {:from {:step "select-and-create" :yield :text}}}}
+                   :fields {:input {:from {:step "extract-task-path" :yield :text}}}}
                   (:prompt-string step)))))
        (testing "gate steps judge their own final replies with pass-status-routing (TT3)"
          (doseq [[step step-name allowed-statuses]
@@ -269,6 +321,9 @@
                    ["REVIEW_COMPLETE"]]
                   [diff-gate-step
                    "diff-gate"
+                   ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]]
+                  [validation-capture-step
+                   "incidental-validation-capture"
                    ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]]]]
            (is (= {:type :invoke
                    :operation "workflow/pass-status-routing"
@@ -280,6 +335,16 @@
                     " routes only from its own final LLM reply with intended allowed statuses"))))
        (testing "select-and-create prompt preserves task-209 selection and baseline contracts"
          (is (.contains select-text "munera_task_path:"))
+         (is (.contains select-text "coverage-map.md"))
+         (is (.contains select-text "initial `munera/open/NNN-slug/coverage-map.md` scaffold"))
+         (is (.contains select-text "after-local.json"))
+         (is (.contains select-text "incidental-burden-check.edn"))
+         (is (.contains select-text "incidental-gate.edn"))
+         (is (.contains select-text "top-level `units` array"))
+         (is (.contains select-text "top-5 guard evidence table"))
+         (is (.contains select-text "rejected-essential"))
+         (is (.contains select-text "marginal"))
+         (is (.contains select-text "incidental-validation-capture` records final Gordian proof references"))
          (is (.contains select-text "inherited session worktree"))
          (is (.contains select-text "worktree_path:` as informational context"))
          (is (re-find #"(?i)no unit qualif" select-text))
@@ -370,7 +435,7 @@
        (testing "clean-baseline step locks the clean-source precondition and baseline artifact contract"
          (is (= ["read" "bash" "edit" "write"] (:tools clean-baseline-step)))
          (is (= {"DONE" {:goto "coverage-review"}
-                 "REPEAT" {:goto "terminal-stop-summary"}}
+                 "REPEAT" {:goto "terminal-stop-clean-baseline"}}
                 (:on clean-baseline-step)))
          (is (.contains clean-text "characterization-baseline.edn"))
          (is (.contains clean-text "target/source paths are not already dirty"))
@@ -406,7 +471,7 @@
          (is (= ["read" "bash" "edit" "write"] (:tools coverage-disposition-step))
              "coverage-disposition can write durable stop findings for terminal failures")
          (is (= {"DONE" {:goto "coverage-fix"}
-                 "REPEAT" {:goto "terminal-stop-summary"}}
+                 "REPEAT" {:goto "terminal-stop-coverage-disposition"}}
                 (:on coverage-disposition-step)))
          (is (.contains disposition-text "CHARACTERIZATION_STATUS: FIXABLE_GAPS"))
          (is (.contains disposition-text "PASS_STATUS: REVIEW_COMPLETE"))
@@ -422,7 +487,7 @@
          (is (.contains disposition-text "durable coverage-disposition stop finding"))
          (is (.contains disposition-text "commit that task-artifact update"))
          (is (.contains disposition-text "stop reason must be recorded in committed task artifacts"))
-         (is (.contains disposition-text "terminal-stop-summary` can explain the stop without relying on ephemeral coverage-disposition child-session output"))
+         (is (.contains disposition-text "terminal-stop-coverage-disposition` can explain the stop without relying on ephemeral coverage-disposition child-session output"))
          (is (.contains disposition-text "Do not scan all task artifacts for any marker as the routing source"))
          (is (.contains disposition-text "Do not let stale `FIXABLE_GAPS` or stale `INFEASIBLE` records override")))
        (testing "coverage-fix is constrained to characterization tests and minimal seams, then loops"
@@ -442,7 +507,7 @@
          (is (= ["read" "bash" "edit" "write"] (:tools diff-gate-step))
              "diff-gate can write required diff classification/stop findings to task artifacts")
          (is (= {"DONE" {:goto "implement-task"}
-                 "REPEAT" {:goto "terminal-stop-summary"}}
+                 "REPEAT" {:goto "terminal-stop-diff-gate"}}
                 (:on diff-gate-step)))
          (is (.contains diff-gate-text "before `implement-task`"))
          (is (.contains diff-gate-text "characterization-baseline.edn"))
@@ -460,35 +525,107 @@
          (is (.contains diff-gate-text "commit the task-artifact update"))
          (is (.contains diff-gate-text "PASS_STATUS: REVIEW_COMPLETE"))
          (is (.contains diff-gate-text "PASS_STATUS: ACTIONABLE_FEEDBACK")))
-       (testing "implementation and summaries preserve target-present and no-target terminal contracts"
+       (testing "incidental validation capture parse-checks proof artifacts and routes deterministically"
+         (is (= "proof-sync" (get-in validation-capture-step [:on "DONE" :goto])))
+         (is (= "validation-capture-disposition"
+                (get-in validation-capture-step [:on "REPEAT" :goto])))
+         (is (= :invoke (:type validation-disposition-step)))
+         (is (= "workflow/exact-marker-routing"
+                (:operation validation-disposition-step)))
+         (is (= {:text {:from {:step "incidental-validation-capture"
+                               :output :final-llm-reply}}
+                 :marker-label "VALIDATION_CAPTURE_ROUTE"
+                 :allowed-routes ["IMPLEMENTATION_REPAIR" "TERMINAL_STOP"]}
+                (:args validation-disposition-step)))
+         (is (= {"IMPLEMENTATION_REPAIR" {:goto "implement-task"}
+                 "TERMINAL_STOP" {:goto "terminal-stop-validation-capture"}}
+                (:on validation-disposition-step)))
+         (is (.contains validation-capture-text "after-local.json"))
+         (is (.contains validation-capture-text "top-level `units` array"))
+         (is (.contains validation-capture-text "incidental-burden-check.edn"))
+         (is (.contains validation-capture-text "incidental-gate.edn"))
+         (is (.contains validation-capture-text "Parse-check the written EDN file"))
+         (is (.contains validation-capture-text "Exit 0 with unreadable, truncated, empty, or non-EDN stdout"))
+         (is (.contains validation-capture-text "VALIDATION_CAPTURE_ROUTE: IMPLEMENTATION_REPAIR"))
+         (is (.contains validation-capture-text "VALIDATION_CAPTURE_ROUTE: TERMINAL_STOP"))
+         (is (.contains validation-capture-text "No final A5/A2/A3 proof claim is allowed from unparseable JSON/EDN")))
+
+       (testing "proof-sync fixed-point gate follows incidental validation before final summary"
+         (is (= "final-summary" (get-in proof-sync-step [:on "DONE" :goto])))
+         (is (= "proof-sync-disposition" (get-in proof-sync-step [:on "REPEAT" :goto])))
+         (is (= {:type :invoke
+                 :operation "workflow/pass-status-routing"
+                 :args {:text {:from {:step "proof-sync"
+                                      :output :final-llm-reply}}
+                        :allowed-statuses ["ACTIONABLE_FEEDBACK" "REVIEW_COMPLETE"]}}
+                (:judge proof-sync-step)))
+         (is (= :invoke (:type proof-disposition-step)))
+         (is (= "workflow/exact-marker-routing"
+                (:operation proof-disposition-step)))
+         (is (= {:text {:from {:step "proof-sync"
+                               :output :final-llm-reply}}
+                 :marker-label "PROOF_SYNC_ROUTE"
+                 :allowed-routes ["COVERAGE_REVIEW"
+                                  "VALIDATION_RECAPTURE"
+                                  "BOOKKEEPING_FIXED_POINT"]}
+                (:args proof-disposition-step)))
+         (is (= {"COVERAGE_REVIEW" {:goto "review-task-implementation"}
+                 "VALIDATION_RECAPTURE" {:goto "incidental-validation-capture"}
+                 "BOOKKEEPING_FIXED_POINT" {:goto "proof-sync-fixed-point"}}
+                (:on proof-disposition-step)))
+         (is (= "final-summary" (get-in proof-fixed-point-step [:on "DONE" :goto])))
+         (is (= "terminal-stop-proof-sync"
+                (get-in proof-fixed-point-step [:on "REPEAT" :goto])))
+         (is (.contains proof-sync-text "committed task-local artifacts as proof authority"))
+         (is (.contains proof-sync-text "before-local.json"))
+         (is (.contains proof-sync-text "after-local.json"))
+         (is (.contains proof-sync-text "incidental-burden-check.edn"))
+         (is (.contains proof-sync-text "incidental-gate.edn"))
+         (is (.contains proof-sync-text "PROOF_SYNC_ROUTE: COVERAGE_REVIEW"))
+         (is (.contains proof-sync-text "PROOF_SYNC_ROUTE: VALIDATION_RECAPTURE"))
+         (is (.contains proof-sync-text "PROOF_SYNC_ROUTE: BOOKKEEPING_FIXED_POINT"))
+         (is (.contains proof-sync-text "must never route directly to final success"))
+         (is (.contains proof-fixed-point-text "read-only proof-sync fixed-point"))
+         (is (.contains proof-fixed-point-text "Do not mutate anything")))
+       (testing "implementation and split summaries preserve target-present and terminal contracts"
          (is (nil? (:judge implementation-review-step))
              "review-task-implementation has no judge that can shortcut the successful path")
          (is (nil? (:on implementation-review-step))
-             "review-task-implementation falls through to final-summary by step order")
+             "review-task-implementation falls through to incidental-validation-capture by step order")
          (is (some #(= {:step "review-task-implementation" :yield :text}
                        (:from %))
                    (:contributions final-summary-step))
-             "final-summary sources review-task-implementation output as the successful terminal path")
+             "final-summary sources review-task-implementation output")
+         (is (some #(= {:step "incidental-validation-capture" :yield :text}
+                       (:from %))
+                   (:contributions final-summary-step))
+             "final-summary sources parse-checked incidental validation output as the successful terminal path")
+         (is (some #(= {:step "proof-sync" :yield :text}
+                       (:from %))
+                   (:contributions final-summary-step))
+             "final-summary sources the clean proof-sync output")
          (is (.contains final-summary-text
-                        "design → plan → characterization-test-net gate → baseline/diff gate → simplification implementation → implementation review"))
+                        "design → plan → characterization-test-net gate → baseline/diff gate → simplification implementation → implementation review → incidental validation-capture"))
+         (is (.contains final-summary-text "after-local.json"))
+         (is (.contains final-summary-text "incidental-burden-check.edn"))
+         (is (.contains final-summary-text "incidental-gate.edn"))
          (is (= {"DONE" {:goto :done}}
                 (:on final-summary-step))
-             "successful target-present final summary stops before terminal-stop-summary")
-         (is (.contains terminal-stop-text
-                        "No-target runs route directly from `select-and-create` to workflow completion and must not run this step"))
-         (is (= {:type :invoke
-                 :operation "workflow/constant-routing"
-                 :args {:route "DONE"}}
-                (:judge terminal-stop-step))
-             "terminal-stop-summary explicitly routes to terminal DONE instead of depending on step order")
-         (is (= {"DONE" {:goto :done}}
-                (:on terminal-stop-step))
-             "terminal-stop-summary cannot fall through or continue gate-failure paths to another workflow step")
-         (is (.contains terminal-stop-text "dirty baseline"))
-         (is (.contains terminal-stop-text "infeasible characterization"))
-         (is (.contains terminal-stop-text "failed baseline/diff classification"))
-         (is (.contains terminal-stop-text
-                        "Do not claim `implement-task`, simplification, implementation review, push, or PR creation occurred")))))))
+             "successful target-present final summary stops at done")
+         (doseq [step [malformed-stop-step clean-stop-step coverage-stop-step
+                       diff-stop-step validation-stop-step proof-stop-step]]
+           (is (= {:type :invoke
+                   :operation "workflow/constant-routing"
+                   :args {:route "DONE"}}
+                  (:judge step)))
+           (is (= {"DONE" {:goto :done}} (:on step))))
+         (is (.contains malformed-stop-text "Do not consume a validated task path"))
+         (is (.contains malformed-stop-text "Do not require, invent, or read a task path"))
+         (is (.contains clean-stop-text "Stop source: clean-baseline"))
+         (is (.contains coverage-stop-text "Stop source: coverage-disposition"))
+         (is (.contains diff-stop-text "Stop source: diff-gate"))
+         (is (.contains validation-stop-text "Stop source: validation-capture"))
+         (is (.contains proof-stop-text "Stop source: proof-sync-fixed-point")))))))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Reference-chain resolution (TT-K)

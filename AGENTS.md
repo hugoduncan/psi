@@ -53,6 +53,17 @@ MemoryArtifacts ≡ {working_memory memories knowledge}   ⟨mementum — own pr
   | working_memory(state.md) ≡ AI_updates_during_work   ⟨no approval gate⟩
   | approval_gate ∈ {memories knowledge}   ⟨mementum termination governs; except autonomous_artifact_extraction⟩
 
+λ state_md(x).   ⟨project convention; mementum stays external/unchanged⟩
+  | state.md ≡ current_state_snapshot(features ∧ structure ∧ orientation)   ⟨bootloader⟩
+  | update(state.md) ≡ edit_in_place ∧ prune_stale   ⟨¬append_log⟩
+  | ¬contains(state.md, {task_pass_notes ∨ review_pass_log ∨ per_commit_history ∨ progress_entries})
+  | task_progress → munera_task_artifacts({implementation.md ∧ steps.md})   ⟨not state.md⟩
+  | durable_lesson → memories ∨ knowledge   ⟨not state.md⟩
+  | history(state.md) ≡ git   ⟨recover via git log, ¬accreted in-file⟩
+  | delegated_session(review ∨ implement ∨ plan) → ¬obligated(update(state.md))
+      ⟨write task_progress to task artifacts; touch state.md only on real feature/structure shift⟩
+  | size(state.md) → small ∧ scannable(≤ ~30s)   ⟨grows → prune, ¬accrete⟩
+
 role(meta) ≡ {why invariants boundaries ¬how ¬syntax}
 role(spec) ≡ {behaviour surfaces examples acceptance_criteria}
 role(tests) ≡ executable_proof(spec)
@@ -390,6 +401,13 @@ S1(code) → S2(manifest/permissions) → S3(dispatch/subscribe) → S4(introspe
 - tui and emacs-ui are minimal display projection and command entry components, sharing the app-runtime for agent-session interactions.
 - rpc is a minimal, transport only, layer between app-runtime and emacs-ui.
 - dispatch owns system state reads and writes.  Resolvers are used for reads, mutations for functional updates of tte that can return effects, that are run by dispatch for non-functional side-effects.
+- workflow runtime/code owns generic execution, parsing, and routing mechanisms only; workflow-specific topology, route labels, marker names, proof artifacts, and business rules belong in authored workflow definitions/prompts and their tests, not in generic workflow implementation code.
+
+λ workflow_runtime_boundary(x).
+  generic_mechanism(runtime_code) ∧ authored_policy(workflow_definition)
+  | workflow_specific({route_labels ∨ marker_names ∨ topology ∨ artifact_names ∨ business_rules}) ∉ runtime_code
+  | runtime_code may expose parameterized primitives(parse_exact_marker ∧ pass_status ∧ task_path_shape)
+  | workflow_definition supplies concrete labels ∧ routes ∧ artifacts
 
 λx. authoritative_owner(session_dispatch_invocation) ≡ agent-session
    ∧ lower_components → pure_domain_apis

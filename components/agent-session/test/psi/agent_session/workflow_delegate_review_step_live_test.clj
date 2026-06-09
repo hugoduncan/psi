@@ -9,6 +9,7 @@
    [psi.agent-session.workflow-test-support :as workflow-test-support]
    [psi.command-registry.registry :as command-registry]
    [psi.deterministic-operation-registry.registry :as op-reg]
+   [psi.deterministic-operation-runtime.core :as deterministic-op-runtime]
    [psi.workflow-runtime.core :as workflow-runtime]))
 
 (use-fixtures :each
@@ -32,6 +33,59 @@
                                             "workflow/pass-status-routing")))
         (is (some? (op-reg/get-operation-in (:deterministic-operation-registry ctx)
                                             "workflow/constant-routing")))
+        (is (some? (op-reg/get-operation-in (:deterministic-operation-registry ctx)
+                                            "workflow/munera-open-task-path-routing")))
+        (is (some? (op-reg/get-operation-in (:deterministic-operation-registry ctx)
+                                            "workflow/exact-marker-routing")))
+        (is (nil? (op-reg/get-operation-in (:deterministic-operation-registry ctx)
+                                           "workflow/proof-sync-disposition-routing")))
+        (is (nil? (op-reg/get-operation-in (:deterministic-operation-registry ctx)
+                                           "workflow/validation-capture-disposition-routing")))
+        (is (= {:status :ok :data "DONE" :summary "DONE"}
+               (op-reg/invoke-operation-in
+                (:deterministic-operation-registry ctx)
+                "workflow/munera-open-task-path-routing"
+                {:args {:text "munera/open/219-simplify-rpc-session-family"}}
+                deterministic-op-runtime/invoke-operation)))
+        (finally
+          (context/shutdown-context! ctx))))))
+
+(deftest built-in-routing-operations-invoke-through-registry-test
+  ;; Tests the live built-in operation registry seam with compact smoke cases;
+  ;; pure parser edge cases live in psi.agent-session.workflow.routing-test.
+  (testing "registered routing operations invoke through the deterministic operation registry"
+    (let [[ctx session-id] (workflow-test-support/create-tui-context+session mutations/all-mutations)]
+      (try
+        (workflow-test-support/init-built-in-workflow! ctx session-id)
+        (doseq [[operation-id args expected-route]
+                [["workflow/pass-status-routing"
+                  {:text "PASS_STATUS: REVIEW_COMPLETE"}
+                  "DONE"]
+                 ["workflow/munera-open-task-path-routing"
+                  {:text "munera/open/220-harden-simplification-workflow-proof-gates"}
+                  "DONE"]
+                 ["workflow/exact-marker-routing"
+                  {:text "QUALITY_GATE: APPROVE"
+                   :marker-label "QUALITY_GATE"
+                   :allowed-routes ["APPROVE" "REPAIR"]}
+                  "APPROVE"]]]
+          (is (= {:status :ok
+                  :data expected-route
+                  :summary expected-route}
+                 (op-reg/invoke-operation-in
+                  (:deterministic-operation-registry ctx)
+                  operation-id
+                  {:args args}
+                  deterministic-op-runtime/invoke-operation))))
+        (is (= :invalid-route-marker-args
+               (:reason
+                (op-reg/invoke-operation-in
+                 (:deterministic-operation-registry ctx)
+                 "workflow/exact-marker-routing"
+                 {:args {:text "QUALITY_GATE: APPROVE"
+                         :marker-label "QUALITY_GATE"
+                         :allowed-routes []}}
+                 deterministic-op-runtime/invoke-operation))))
         (finally
           (context/shutdown-context! ctx))))))
 
@@ -55,7 +109,7 @@
                           (fn [_ctx child-session-id prompt]
                             (let [reply (cond
                                           (str/includes? prompt "end your response with exactly one of:")
-                                          (str "No new actionable feedback found.\n\nPASS_STATUS: REVIEW_COMPLETE")
+                                          "No new actionable feedback found.\n\nPASS_STATUS: REVIEW_COMPLETE"
 
                                           (str/includes? prompt "Execute the newly added actionable follow-up items")
                                           (throw (ex-info "follow-up should not execute on REVIEW_COMPLETE"

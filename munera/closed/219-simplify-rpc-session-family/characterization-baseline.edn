@@ -1,0 +1,204 @@
+{:git/head "c513da4bb7e195956689cfa6455262f565e806ee",
+ :pre-existing-dirt
+ {:task-artifacts [],
+  :docs [],
+  :other [],
+  :classification
+  "No pre-existing dirty task artifacts, docs, target source areas, or allowed adjacent source areas were present before writing this baseline artifact."},
+ :target/source-areas
+ ["components/rpc/src/psi/rpc/session/command_pickers.clj"
+  "components/rpc/src/psi/rpc/session/command_results.clj"
+  "components/rpc/src/psi/rpc/session/command_resume.clj"
+  "components/rpc/src/psi/rpc/session/command_tree.clj"
+  "components/rpc/src/psi/rpc/session/commands.clj"
+  "components/rpc/src/psi/rpc/session/emit.clj"
+  "components/rpc/src/psi/rpc/session/frontend_actions.clj"
+  "components/rpc/src/psi/rpc/session/navigation.clj"
+  "components/rpc/src/psi/rpc/session/projections.clj"
+  "components/rpc/src/psi/rpc/session/prompt.clj"
+  "components/rpc/src/psi/rpc/session/streams.clj"],
+ :git/status-short "",
+ :target/allowed-adjacent-source-areas [],
+ :target/affected-test-areas
+ ["components/rpc/test/psi/rpc_command_results_test.clj"
+  "components/rpc/test/psi/rpc_prompt_command_test.clj"
+  "components/rpc/test/psi/rpc_prompt_test.clj"
+  "components/rpc/test/psi/rpc_session_navigation_test.clj"
+  "components/rpc/test/psi/rpc_events_test.clj"
+  "components/rpc/test/psi/rpc_invariants_test.clj"
+  "components/rpc/test/psi/rpc_ops_test.clj"
+  "components/rpc/test/psi/rpc_test.clj"],
+ :selected-candidate
+ {:score-breakdown
+  {:finding-score 95.89000000000014,
+   :concentration-bonus 6.0,
+   :cohesion-bonus 1.0,
+   :change-pressure-bonus 0.0,
+   :test-risk-bonus 0.0,
+   :penalties 0.0},
+  :why-not-broader
+  {:supporting-overlaps
+   [{:candidate/id [:namespace "psi.rpc.session.command-results"],
+     :candidate/type :namespace,
+     :candidate/label "psi.rpc.session.command-results",
+     :score 28.449999999999985}
+    {:candidate/id [:namespace "psi.rpc.session.commands"],
+     :candidate/type :namespace,
+     :candidate/label "psi.rpc.session.commands",
+     :score 25.637499999999992}
+    {:candidate/id [:namespace "psi.rpc.session.command-resume"],
+     :candidate/type :namespace,
+     :candidate/label "psi.rpc.session.command-resume",
+     :score 23.699999999999992}]},
+  :top-reasons [{:reason :concentration-bonus, :score 6.0}],
+  :evidence-summary
+  {:category-counts
+   {:hidden-change 3, :hidden-conceptual 90, :hub 7, :sdp-violation 2},
+   :severity-counts {:medium 56, :low 46},
+   :top-findings
+   [{:category :hidden-change,
+     :severity :medium,
+     :location :touching,
+     :subject
+     {:ns-a extensions.mcp-tasks-run,
+      :ns-b psi.rpc.session.projections}}
+    {:category :hidden-change,
+     :severity :medium,
+     :location :touching,
+     :subject
+     {:ns-a extensions.plan-state-learning,
+      :ns-b psi.rpc.session.projections}}
+    {:category :hidden-change,
+     :severity :medium,
+     :location :internal,
+     :subject
+     {:ns-a psi.rpc.session.commands,
+      :ns-b psi.rpc.session.frontend-actions}}
+    {:category :hidden-conceptual,
+     :severity :medium,
+     :location :touching,
+     :subject
+     {:ns-a extensions.mcp-tasks-run, :ns-b psi.rpc.session.streams}}
+    {:category :hidden-conceptual,
+     :severity :medium,
+     :location :touching,
+     :subject
+     {:ns-a psi.agent-session.commands,
+      :ns-b psi.rpc.session.command-results}}],
+   :hidden-coupling-hubs
+   [{:ns psi.rpc.session.commands, :hidden-degree 9}
+    {:ns psi.rpc.session.command-results, :hidden-degree 7}
+    {:ns psi.rpc.session.command-tree, :hidden-degree 7}
+    {:ns psi.rpc.session.navigation, :hidden-degree 7}
+    {:ns psi.rpc.session.command-pickers, :hidden-degree 6}
+    {:ns psi.rpc.session.command-resume, :hidden-degree 6}
+    {:ns psi.rpc.session.frontend-actions, :hidden-degree 5}
+    {:ns psi.rpc.session.projections, :hidden-degree 4}
+    {:ns psi.rpc.session.prompt, :hidden-degree 4}
+    {:ns psi.rpc.session.streams, :hidden-degree 4}
+    {:ns psi.rpc.session.emit, :hidden-degree 3}],
+   :test-notes []},
+  :eligible? true,
+  :rank 1,
+  :candidate/type :family,
+  :why-now/data
+  {:candidate-id [:family "psi.rpc.session"],
+   :score 102.89000000000014,
+   :high-findings 0,
+   :cross-lens-hidden-findings 0,
+   :member-count 11},
+  :candidate/id [:family "psi.rpc.session"],
+  :score 102.89000000000014,
+  :candidate/label "psi.rpc.session",
+  :members
+  [psi.rpc.session.command-pickers
+   psi.rpc.session.command-results
+   psi.rpc.session.command-resume
+   psi.rpc.session.command-tree
+   psi.rpc.session.commands
+   psi.rpc.session.emit
+   psi.rpc.session.frontend-actions
+   psi.rpc.session.navigation
+   psi.rpc.session.projections
+   psi.rpc.session.prompt
+   psi.rpc.session.streams],
+  :confidence :low},
+ :target/source-area-status-short "",
+ :git/status-short-branch "## reduce-architectural-complexity\n",
+ :baseline/allowed-adjacent-source-areas-clean? true,
+ :baseline/notes
+ ["Target membership, source areas, allowed adjacent areas, and affected test areas are copied from recorded task artifacts; no target membership was recomputed from the changed worktree."
+  "git status --short was empty before writing this baseline artifact."
+  "The union of target source areas and allowed adjacent source areas had no dirty status entries."],
+ :evidence/paths
+ {:architecture-targets
+  "munera/open/219-simplify-rpc-session-family/architecture-targets.edn",
+  :before-diagnose
+  "munera/open/219-simplify-rpc-session-family/before-diagnose.edn",
+  :target-issues
+  "munera/open/219-simplify-rpc-session-family/target-issues.edn"},
+ :target/namespaces
+ [psi.rpc.session.command-pickers
+  psi.rpc.session.command-results
+  psi.rpc.session.command-resume
+  psi.rpc.session.command-tree
+  psi.rpc.session.commands
+  psi.rpc.session.emit
+  psi.rpc.session.frontend-actions
+  psi.rpc.session.navigation
+  psi.rpc.session.projections
+  psi.rpc.session.prompt
+  psi.rpc.session.streams],
+ :baseline/target-source-areas-clean? true,
+ :target/source-files
+ [{:path "components/rpc/src/psi/rpc/session/command_pickers.clj",
+   :exists? true}
+  {:path "components/rpc/src/psi/rpc/session/command_results.clj",
+   :exists? true}
+  {:path "components/rpc/src/psi/rpc/session/command_resume.clj",
+   :exists? true}
+  {:path "components/rpc/src/psi/rpc/session/command_tree.clj",
+   :exists? true}
+  {:path "components/rpc/src/psi/rpc/session/commands.clj",
+   :exists? true}
+  {:path "components/rpc/src/psi/rpc/session/emit.clj", :exists? true}
+  {:path "components/rpc/src/psi/rpc/session/frontend_actions.clj",
+   :exists? true}
+  {:path "components/rpc/src/psi/rpc/session/navigation.clj",
+   :exists? true}
+  {:path "components/rpc/src/psi/rpc/session/projections.clj",
+   :exists? true}
+  {:path "components/rpc/src/psi/rpc/session/prompt.clj",
+   :exists? true}
+  {:path "components/rpc/src/psi/rpc/session/streams.clj",
+   :exists? true}],
+ :baseline/clean-enough-to-characterize? true,
+ :target/affected-test-files
+ [{:path "components/rpc/test/psi/rpc_command_results_test.clj",
+   :exists? true}
+  {:path "components/rpc/test/psi/rpc_prompt_command_test.clj",
+   :exists? true}
+  {:path "components/rpc/test/psi/rpc_prompt_test.clj", :exists? true}
+  {:path "components/rpc/test/psi/rpc_session_navigation_test.clj",
+   :exists? true}
+  {:path "components/rpc/test/psi/rpc_events_test.clj", :exists? true}
+  {:path "components/rpc/test/psi/rpc_invariants_test.clj",
+   :exists? true}
+  {:path "components/rpc/test/psi/rpc_ops_test.clj", :exists? true}
+  {:path "components/rpc/test/psi/rpc_test.clj", :exists? true}]
+ :baseline/commands
+ [{:label "focused RPC baseline/characterization suite"
+   :command ["bb" "clojure:test:scry" "--dir" "components/rpc/test"
+             "--namespace" "psi.rpc-command-results-test"
+             "--namespace" "psi.rpc-prompt-command-test"
+             "--namespace" "psi.rpc-prompt-test"
+             "--namespace" "psi.rpc-session-navigation-test"
+             "--namespace" "psi.rpc-events-test"
+             "--namespace" "psi.rpc-invariants-test"
+             "--namespace" "psi.rpc-ops-test"
+             "--namespace" "psi.rpc-test"]}]
+ :baseline/results
+ [{:label "focused RPC baseline/characterization suite"
+   :status :pass
+   :summary {:test 57 :pass 439 :fail 0 :error 0}
+   :notes ["Updated after characterization passes adding picker/model/thinking/frontend-action RPC coverage, command-tree edge coverage, and frontend_action_result cancelled/failed coverage."]}]}

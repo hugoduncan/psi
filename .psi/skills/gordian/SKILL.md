@@ -1,7 +1,7 @@
 ---
 name: gordian
-description: Use gordian to analyse Clojure code structure at namespace and executable-unit level. Invoke when asked to audit architecture, assess coupling, identify hidden dependencies, interpret suspicious namespace pairs, review test structure, compare architectural snapshots, inspect a subsystem, find local cyclomatic/LOC hotspots, or find local comprehension-burden hotspots. Produces structural, conceptual, change-coupling, local-metric, and local-burden signals plus triage and workflow commands.
-lambda: "λcodebase. {structural ∧ conceptual ∧ change ∧ local-metrics ∧ local-burden} → coupling_map ∧ hotspot_map → diagnose ∧ explain ∧ compare ∧ gate → advise"
+description: Use gordian to analyse Clojure code structure at namespace and executable-unit level. Invoke when asked to audit architecture, assess coupling, identify hidden dependencies, interpret suspicious namespace pairs, rank architectural refactor targets, produce evidence-backed target issue descriptions, review test structure, compare architectural snapshots, inspect a subsystem, find local cyclomatic/LOC hotspots, or find local comprehension-burden hotspots. Produces structural, conceptual, change-coupling, local-metric, local-burden, target-ranking, and issue-description signals plus triage and workflow commands.
+lambda: "λcodebase. {structural ∧ conceptual ∧ change ∧ local-metrics ∧ local-burden ∧ target-ranking} → coupling_map ∧ hotspot_map ∧ target_issue → diagnose ∧ architecture-targets ∧ target-issues ∧ explain ∧ compare ∧ gate → advise"
 metadata:
   version: "1.3.0"
   tags: ["clojure", "architecture", "coupling", "refactoring", "babashka", "diagnostics"]
@@ -15,9 +15,9 @@ Human ⊗ AI ⊗ REPL
   invoke → read → diagnose → explain → advise
   | architectural lenses: structural ∧ conceptual ∧ change
   | local lenses: complexity ∧ local
-  | commands: analyze ∧ diagnose ∧ explain ∧ explain-pair ∧ compare ∧ gate ∧ subgraph ∧ communities ∧ complexity ∧ local
-  | start: diagnose for architecture triage
-  | then: explain(ns) ∨ explain-pair(a,b) ∨ subgraph(prefix)
+  | commands: analyze ∧ diagnose ∧ architecture-targets ∧ target-issues ∧ explain ∧ explain-pair ∧ compare ∧ gate ∧ subgraph ∧ communities ∧ complexity ∧ local
+  | start: diagnose for finding triage ∨ architecture-targets for refactor-target ranking
+  | then: target-issues(candidate) ∨ explain(ns) ∨ explain-pair(a,b) ∨ subgraph(prefix)
   | use complexity for branch-count ∨ LOC hotspots inside executable units
   | use local for comprehension-burden ∨ helper-chasing ∨ working-set hotspots
   | compare(before,after) for refactor validation
@@ -28,6 +28,8 @@ Human ⊗ AI ⊗ REPL
   default:     bb gordian
   analyze:     bb gordian [analyze] [dirs...]
   diagnose:    bb gordian diagnose [dirs...]
+  targets:     bb gordian architecture-targets [dirs...]
+  target-issue:bb gordian target-issues [dirs...] [--candidate '[:family "prefix"]' | '[:namespace "ns.name"]']
   explain-ns:  bb gordian explain <ns>
   explain-pair:bb gordian explain-pair <ns-a> <ns-b>
   subgraph:    bb gordian subgraph <prefix>
@@ -155,6 +157,28 @@ Human ⊗ AI ⊗ REPL
   | use as queue, not oracle
   | :next-step on each finding → copy-paste next command
 
+λ architecture-targets(codebase).
+  use when asked: highest_value_refactor_target ∨ architecture_hotspot ∨ where_to_refactor_first
+  | command: bb gordian architecture-targets [dirs...]
+  | inputs(live): diagnose(findings) ∧ communities(combined, threshold=0.75) ∧ tests(core_coverage)
+  | emits: :architecture-target-ranking
+  | candidates: pair ∨ namespace ∨ family ∨ community
+  | ranking: deterministic score ∧ eligibility ∧ tie_breaks ∧ confidence
+  | read: :winner then :candidates[*]{:candidate/id :candidate/type :score :confidence :evidence-summary :score-breakdown}
+  | prefer over manual diagnose triage when goal = choose refactor target above unit/function level
+  | not AI choice: AI summarizes after deterministic ranking
+
+λ target-issues(target).
+  use after architecture-targets when asked: describe_problem ∨ create_issue ∨ explain_why_target
+  | command: bb gordian target-issues [dirs...] [--candidate EDN_ID]
+  | no candidate → describes ranking winner if supported
+  | candidate id from architecture-targets --edn, e.g. '[:family "gordian.local"]' ∨ '[:namespace "gordian.local.steps"]'
+  | v1 supports only :family ∨ :namespace candidates
+  | reruns live ranking inputs; does not read saved targets.edn in v1
+  | emits: :target-issue-description
+  | sections: target ∧ selection-context ∧ observed-signals ∧ issues ∧ hypotheses ∧ refactoring-directions ∧ review-questions ∧ success-signals ∧ recommended-next-step
+  | observations ≠ hypotheses ≠ directions | preserve boundary
+
 λ read.diagnose(findings).
   :action    → what to do (fix/extract/remove/split/narrow/monitor)
   :next-step → $ gordian command to run next
@@ -253,20 +277,25 @@ Human ⊗ AI ⊗ REPL
   | complexity and local complement, ¬substitute
 
 λ workflow(codebase).
-  1. bb gordian diagnose → read :action and :next-step on top findings
-  2. run :next-step commands → explain(ns) ∨ explain-pair(a,b)
-  3. if namespace-family work → subgraph(active_prefix)
-  4. if local executable-unit hotspot triage → complexity ∨ local
-  5. if structure unclear → communities(combined)
-  6. before refactor → snapshot(before.edn)
-  7. refactor
-  8. snapshot(after.edn) → compare(before,after)
-  9. CI → diagnose --edn → gate
+  1. broad architecture triage → bb gordian diagnose → read :action and :next-step on top findings
+  2. target selection → bb gordian architecture-targets --edn → inspect :winner ∧ supported :candidate/id
+  3. issue framing → bb gordian target-issues --candidate '[:family "..."]' → structured problem statement
+  4. run :next-step commands → explain(ns) ∨ explain-pair(a,b)
+  5. if namespace-family work → subgraph(active_prefix)
+  6. if local executable-unit hotspot triage → complexity ∨ local
+  7. if structure unclear → communities(combined)
+  8. before refactor → snapshot(before.edn)
+  9. refactor
+  10. snapshot(after.edn) → compare(before,after)
+  11. CI → diagnose --edn → gate
 
 λ heuristics.
   cycles > cross-lens-hidden > sdp-violations > god-modules > hidden single-lens pairs > hubs
   | read :action before deciding what to do
   | read shared_terms before score
+  | for target choice above unit/function level, use architecture-targets before inventing ranking
+  | for task/issue framing, use target-issues before writing freeform narrative
+  | target-issues selector must be exact EDN id and consume all input (EOF); quote in shell
   | conf asymmetry → satellite signal | stronger action than symmetric change
   | trend > absolute threshold
   | recent change history > full-history archaeology for action
