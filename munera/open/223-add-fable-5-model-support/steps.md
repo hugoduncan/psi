@@ -27,12 +27,28 @@
 - [ ] Extend the existing `built-in-structured-output-capabilities-test`
       deftest in the same namespace (do **not** add a new deftest, do **not**
       reference the private `built-in-structured-output-capability` fn) with a
-      new `testing` block for Fable 5 that mirrors the existing Claude Opus 4.8
-      block: bind `model (registry/find-model :anthropic "claude-fable-5")` and
-      `capability (structured-output/effective-capability model)`, then assert
-      the public capability surface — `(is (= true (:supported? capability)))`,
-      `(is (= :anthropic/json-schema-output (:native-mechanism capability)))`,
-      and `(is (contains? (set (:strategies capability)) :provider-native))`.
+      new `testing` block for Fable 5 that is a **full mirror** of the existing
+      Claude Opus 4.8 block (model_registry_test.clj:144-151) — i.e. it asserts
+      the catalog-metadata fields **and** the structured-output capability
+      surface, not only the three structured-output assertions. Bind
+      `model (registry/find-model :anthropic "claude-fable-5")` and
+      `capability (structured-output/effective-capability model)`, then assert,
+      in this order:
+      - `(is (some? model))`
+      - `(is (= "Claude Fable 5" (:name model)))`
+      - `(is (= true (:adaptive-thinking model)))`
+      - `(is (= true (:supports-mid-conversation-system-messages model)))`
+      - `(is (= true (:supported? capability)))`
+      - `(is (= :anthropic/json-schema-output (:native-mechanism capability)))`
+      - `(is (contains? (set (:strategies capability)) :provider-native))`
+
+      The catalog-metadata assertions (`:name`, `:adaptive-thinking`,
+      `:supports-mid-conversation-system-messages`) are **required**, not
+      optional: no other step asserts these Fable 5 field values (Slice 1 step 4
+      only asserts `find-model` presence + `built-in/all-models` membership), so
+      this full mirror is what makes the acceptance criterion "Fable 5 appears …
+      with … capabilities … matching the agreed spec" covered by the non-live
+      suite.
 - [ ] Run the focused model/registry test namespace(s) green.
 
 ## Slice 2 — Live verification test
@@ -116,7 +132,7 @@
 
 ## Plan/steps ambiguity review follow-ups (3rd pass, ψ)
 
-- [ ] Pin the assertion set for the Fable 5 `built-in-structured-output-capabilities-test`
+- [x] Pin the assertion set for the Fable 5 `built-in-structured-output-capabilities-test`
       block in Slice 1 step 5: "mirrors the existing Claude Opus 4.8 block" but
       then enumerates only the three structured-output assertions, while the
       Opus 4.8 block (model_registry_test.clj:144-151) also asserts
@@ -130,6 +146,14 @@
       (Slice 1 step 4 only asserts `find-model` presence + `built-in/all-models`
       membership), so this choice determines whether acceptance criterion
       "capabilities … matching the agreed spec" is covered by the non-live suite.
+      → Resolved: chose **full mirror**. Slice 1 step 5 now directs a Fable 5
+      `testing` block that asserts the catalog-metadata fields (`:name`,
+      `:adaptive-thinking`, `:supports-mid-conversation-system-messages`) **and**
+      the structured-output surface, exactly mirroring the Opus 4.8 block
+      (model_registry_test.clj:144-151), with all seven assertions enumerated.
+      Rationale: this is the only step that asserts Fable 5's catalog-metadata
+      field values, so the full mirror is required to cover the acceptance
+      criterion "capabilities … matching the agreed spec" in the non-live suite.
 
 ## Slice 4 — Verify + finalize
 

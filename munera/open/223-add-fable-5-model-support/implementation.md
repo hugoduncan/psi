@@ -503,3 +503,27 @@ Verdict: actionable ambiguity found (1). See steps.md.
   `built-in-structured-output-capabilities-test` (line 103, Opus block 144-151)
   exist; live test still has single `target-model-id "claude-opus-4-8"` and two
   opus-named deftests (lines 43/51); `doc/extension-api.md` enumeration present.
+
+### Plan/steps ambiguity review follow-up (3rd pass) — resolved (steps) — ψ
+
+The 3rd-pass plan/steps ambiguity follow-up ("mirror Opus 4.8 block" vs the
+narrower three-assertion enumeration in Slice 1 step 5) is resolved by
+disambiguating Slice 1 step 5 in steps.md. No production code/tests/docs
+changed — the underlying Slice 1–4 implementation steps remain unchecked and
+predate this review pass, so they were intentionally not executed here.
+
+- Decision: **full mirror**. Slice 1 step 5 now directs a Fable 5 `testing`
+  block that asserts the catalog-metadata fields (`(some? model)`,
+  `(= "Claude Fable 5" (:name model))`, `(= true (:adaptive-thinking model))`,
+  `(= true (:supports-mid-conversation-system-messages model))`) **and** the
+  structured-output capability surface (`:supported? true`, `:native-mechanism
+  :anthropic/json-schema-output`, `:provider-native` ∈ `:strategies`) — all
+  seven assertions enumerated in order, mirroring the Opus 4.8 block
+  (model_registry_test.clj:144-151).
+- Rationale: Slice 1 step 4 only asserts Fable 5's `find-model` presence +
+  `built-in/all-models` keyword membership; no step asserts the
+  name/adaptive-thinking/mid-system-message field values. The full mirror is
+  therefore required for the non-live suite to cover the acceptance criterion
+  "Fable 5 appears … with … capabilities … matching the agreed spec." Choosing
+  the narrower three-assertion reading would have left that criterion
+  unverified outside the opt-in live suite.

@@ -26,11 +26,17 @@ pass, since design.md resolved only the live-test shape):
   extend `init-built-ins-only-test` to assert
   `registry/find-model :anthropic "claude-fable-5"` (string id) and
   `built-in/all-models` keyed by keyword `:fable-5`; extend
-  `built-in-structured-output-capabilities-test` with a Fable 5 block mirroring
-  the Opus 4.8 block, asserting the public
+  `built-in-structured-output-capabilities-test` with a Fable 5 block that is a
+  **full mirror** of the Opus 4.8 block (model_registry_test.clj:144-151) —
+  asserting the catalog-metadata fields (`(some? model)`,
+  `:name "Claude Fable 5"`, `:adaptive-thinking true`,
+  `:supports-mid-conversation-system-messages true`) **and** the public
   `structured-output/effective-capability` surface (`:supported? true`,
   `:native-mechanism :anthropic/json-schema-output`,
-  `:provider-native` ∈ `:strategies`). This non-live test structure was decided
+  `:provider-native` ∈ `:strategies`). The catalog-metadata assertions are
+  required because no other step asserts those Fable 5 field values, so the full
+  mirror is what covers the acceptance criterion "capabilities … matching the
+  agreed spec" in the non-live suite. This non-live test structure was decided
   by the plan/steps ambiguity-review pass (not design.md).
 - Parameterize the live Anthropic models-api test over a set
   `target-model-ids #{"claude-opus-4-8" "claude-fable-5"}`, retaining Opus 4.8
