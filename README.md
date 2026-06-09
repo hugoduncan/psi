@@ -168,14 +168,15 @@ Extensions customise psi by adding tools, commands, event handlers, and UI.
 Built-in extensions that ship with this repo (activated via
 `.psi/extensions.edn`):
 
-- **mcp-tasks-run** — run mcp-tasks task/story workflows with sub-agent
-  execution per step (`/mcp-tasks-run`).
 - **commit-checks** — run project-local checks after a local commit and feed
   failures back into the session.
+- **edit-clj** — structural Clojure/EDN editing tool that replaces whole forms
+  by structural equality (`edit-clj`).
+- **mementum** — git-based memory protocol: memories, knowledge, and
+  working-memory `state.md`.
 - **metrics** — accumulate persistent per-capability usage counters (`/metrics`).
-- **plan-state-learning** — update `munera/plan.md` and `mementum/state.md`
-  after non-PSL commits (`/psl`).
-- **hello-ext** — minimal example extension used in docs and tests (`/hello`).
+- **munera** — git-native Markdown task protocol (design → plan → implement →
+  review) under `munera/`.
 
 For the extension list, configuration, and authoring details, see:
 - [`doc/extensions.md`](doc/extensions.md)
