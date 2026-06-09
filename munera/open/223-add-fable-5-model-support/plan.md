@@ -9,7 +9,9 @@ test shape are all fixed in `design.md` ("Final catalog entry", "Resolved
 policy", "Resolved ambiguities") — implementation is mechanical transcription
 against those resolved facts.
 
-Key decisions (all inherited from design, no new decisions required):
+Key decisions (catalog/live-test/docs decisions inherited from design; the
+non-live test structure was decided during the plan/steps ambiguity-review
+pass, since design.md resolved only the live-test shape):
 
 - Add `:fable-5` to `anthropic-models` in
   `components/ai/src/psi/ai/models.clj`, structurally near-identical to
@@ -18,6 +20,18 @@ Key decisions (all inherited from design, no new decisions required):
   adaptive-thinking + images + text + mid-conversation system messages).
 - Add `:fable-5` to the `anthropic-json-schema-native-model-keys` set for native
   JSON-Schema structured output.
+- Prove non-live catalog resolution + structured-output capability by
+  **extending** the existing deftests in
+  `components/ai/test/psi/ai/model_registry_test.clj` (no new deftests):
+  extend `init-built-ins-only-test` to assert
+  `registry/find-model :anthropic "claude-fable-5"` (string id) and
+  `built-in/all-models` keyed by keyword `:fable-5`; extend
+  `built-in-structured-output-capabilities-test` with a Fable 5 block mirroring
+  the Opus 4.8 block, asserting the public
+  `structured-output/effective-capability` surface (`:supported? true`,
+  `:native-mechanism :anthropic/json-schema-output`,
+  `:provider-native` ∈ `:strategies`). This non-live test structure was decided
+  by the plan/steps ambiguity-review pass (not design.md).
 - Parameterize the live Anthropic models-api test over a set
   `target-model-ids #{"claude-opus-4-8" "claude-fable-5"}`, retaining Opus 4.8
   coverage; rename the two deftests to drop Opus-specific names.

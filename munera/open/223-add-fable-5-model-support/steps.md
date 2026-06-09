@@ -93,7 +93,7 @@
 
 ## Plan/steps inconsistency review follow-ups (ψ)
 
-- [ ] Reconcile plan.md with the non-live test decisions in steps Slice 1.
+- [x] Reconcile plan.md with the non-live test decisions in steps Slice 1.
       plan.md's "Key decisions (all inherited from design, no new decisions
       required)" header and its Approach/Key-decisions deliverable list omit the
       non-live `model_registry_test.clj` work (extend `init-built-ins-only-test`
@@ -105,6 +105,14 @@
       an explicit plan decision/deliverable, or drop the "all inherited from
       design, no new decisions required" claim so plan and steps agree on
       decision provenance.
+      → Resolved: plan.md now (1) reframes the Key-decisions header to scope
+      "inherited from design" to the catalog/live-test/docs decisions and
+      attribute the non-live test structure to the plan/steps ambiguity-review
+      pass, and (2) adds an explicit deliverable bullet for the non-live
+      `model_registry_test.clj` work (extend the two existing deftests; public
+      `structured-output/effective-capability` assertions; `:fable-5` /
+      `"claude-fable-5"` key forms). Plan and steps now agree on decision
+      provenance.
 
 ## Slice 4 — Verify + finalize
 

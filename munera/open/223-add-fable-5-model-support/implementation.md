@@ -458,3 +458,21 @@ Verdict: actionable inconsistency found (1). See steps.md.
   (`10.0/50.0/1.0/12.5`, 1M, 128k) match design; `doc/extension-api.md:217`
   enumeration text matches; renamed live deftests target the two opus-named
   deftests at lines 43/51; CHANGELOG `[Unreleased] → Added` exists.
+
+### Plan/steps inconsistency review follow-up — resolved (plan) — ψ
+
+The plan/steps inconsistency follow-up (plan decision-provenance vs non-live
+test steps) is resolved in plan.md; steps marked done. No production
+code/tests/docs changed — the underlying Slice 1–4 implementation steps remain
+unchecked and predate this review pass, so they were intentionally not executed.
+
+- Reframed the Key-decisions header: "inherited from design" now scoped to the
+  catalog/live-test/docs decisions; the non-live test *structure* is explicitly
+  attributed to the plan/steps ambiguity-review pass (design.md resolved only
+  the live-test shape).
+- Added an explicit plan deliverable for the non-live `model_registry_test.clj`
+  work: extend `init-built-ins-only-test` (`find-model` string id +
+  `built-in/all-models` keyword `:fable-5`) and
+  `built-in-structured-output-capabilities-test` (public
+  `structured-output/effective-capability` assertions mirroring the Opus 4.8
+  block). Plan and steps now agree on decision provenance.
