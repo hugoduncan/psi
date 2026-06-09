@@ -95,32 +95,36 @@
   (and (string? value)
        (boolean (re-matches route-token-pattern value))))
 
-(defn- invalid-marker-label-error
+(defn- marker-label-errors
   [args]
   (cond
     (not (contains? args :marker-label))
-    {:field :marker-label :reason :missing-marker-label}
+    [{:field :marker-label :reason :missing-marker-label}]
 
     (not (string? (:marker-label args)))
-    {:field :marker-label
-     :reason :non-string-marker-label
-     :value (:marker-label args)}
+    [{:field :marker-label
+      :reason :non-string-marker-label
+      :value (:marker-label args)}]
 
     (not (route-token? (:marker-label args)))
-    {:field :marker-label
-     :reason :invalid-marker-label
-     :value (:marker-label args)}))
+    [{:field :marker-label
+      :reason :invalid-marker-label
+      :value (:marker-label args)}]
 
-(defn- invalid-text-error
+    :else []))
+
+(defn- text-errors
   [args]
   (cond
     (not (contains? args :text))
-    {:field :text :reason :missing-text}
+    [{:field :text :reason :missing-text}]
 
     (not (string? (:text args)))
-    {:field :text
-     :reason :non-string-text
-     :value (:text args)}))
+    [{:field :text
+      :reason :non-string-text
+      :value (:text args)}]
+
+    :else []))
 
 (defn- invalid-allowed-route-entry-errors
   [allowed-routes]
@@ -149,7 +153,7 @@
                     :indices indices}))))
        vec))
 
-(defn- invalid-allowed-routes-errors
+(defn- allowed-routes-errors
   [args]
   (cond
     (not (contains? args :allowed-routes))
@@ -169,9 +173,9 @@
 
 (defn- exact-marker-routing-arg-errors
   [args]
-  (vec (concat (keep identity [(invalid-text-error args)
-                               (invalid-marker-label-error args)])
-               (invalid-allowed-routes-errors args))))
+  (vec (concat (text-errors args)
+               (marker-label-errors args)
+               (allowed-routes-errors args))))
 
 (defn- invalid-exact-marker-routing-args-result
   [errors]
