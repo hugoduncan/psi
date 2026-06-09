@@ -45,8 +45,9 @@ Out of scope (adjacent, separate tasks if needed):
 
 - Changing any default model selection.
 - New provider transport/api protocol implementation beyond what an existing
-  `:api` value already supports (unless Fable 5 requires a genuinely new
-  protocol — see open questions).
+  `:api` value already supports. Resolved facts fix Fable 5 at
+  `:api :anthropic-messages` (an existing protocol family), so no new protocol
+  work is in scope.
 - Custom user/project model-file changes (`models.edn`).
 
 ## Acceptance criteria
@@ -76,8 +77,13 @@ Discovered by querying the Anthropic Models API with the agent OAuth token:
   `adaptive=true`) → `:supports-reasoning true` + `:adaptive-thinking true`
   (same protocol family as Opus 4.7/4.8).
 - **Capabilities**: `image_input` supported (`:supports-images true`),
-  text (`:supports-text true`), `pdf_input` supported,
+  text (`:supports-text true`),
   `context-window 1000000` (`max_input_tokens`), `max-tokens 128000`.
+  `pdf_input` is also supported by the provider, but the psi catalog has **no**
+  `pdf`/document capability field (none exists anywhere in
+  `components/ai/src`). It is therefore intentionally omitted from the catalog
+  entry and acceptance criteria — there is nothing to represent it against, so
+  it is a provider no-op for this task.
 - **Structured output**: `structured_outputs` supported → native JSON-schema →
   add `:fable-5` to `anthropic-json-schema-native-model-keys` in `models.clj`.
 - **Test placement**: extend the existing Anthropic models-api test

@@ -56,6 +56,19 @@ Verdict: actionable inconsistencies found (2). See design-steps.md.
   field exists anywhere in `components/ai/src` — so it is a no-op fact dropped
   without rationale. Intent ("correct capabilities") leaves its scope unstated.
 
+### Inconsistency review follow-up — resolved (design) — ψ
+
+Both inconsistency follow-up steps resolved in design.md; design-steps marked
+done.
+
+- Dangling cross-reference → "Out of scope" bullet rephrased to drop the
+  non-existent "Open questions" reference; now states resolved facts fix
+  `:api :anthropic-messages`, so no new-protocol work is in scope.
+- `pdf_input` fact → "Resolved facts → Capabilities" now states pdf is
+  provider-supported but has no catalog representation (verified: zero
+  pdf/document refs in `components/ai/src`), so it is intentionally omitted
+  from the catalog entry and acceptance criteria.
+
 ### Ambiguity review follow-up — resolved (design) — ψ
 
 All three ambiguity follow-up steps resolved in design.md "Resolved

@@ -29,15 +29,22 @@
 
 ## Inconsistency review (ψ)
 
-- [ ] Fix dangling cross-reference in Scope "Out of scope": the parenthetical
+- [x] Fix dangling cross-reference in Scope "Out of scope": the parenthetical
       "unless Fable 5 requires a genuinely new protocol — see open questions"
       points to a non-existent "Open questions" section, and "Resolved facts"
       already settles `:api :anthropic-messages` (an existing protocol). Remove
       or rephrase the parenthetical so it no longer references open questions
       and is consistent with the resolved no-new-protocol fact.
-- [ ] Resolve the `pdf_input` capability fact: "Resolved facts" lists
+      → Resolved: rephrased the "Out of scope" bullet to drop the open-questions
+      reference and instead state that resolved facts fix
+      `:api :anthropic-messages`, so no new protocol work is in scope.
+- [x] Resolve the `pdf_input` capability fact: "Resolved facts" lists
       `pdf_input` supported but it maps to no catalog field (none exists in
       `components/ai/src`) and is absent from the "Final catalog entry" and
       acceptance criteria. State explicitly that pdf has no catalog
       representation and is intentionally omitted (or drop it from the facts),
       so the discovered capabilities and the target entry agree.
+      → Resolved: design.md "Resolved facts → Capabilities" now states pdf is
+      provider-supported but has no catalog field (verified: no pdf/document
+      refs in `components/ai/src`), so it is intentionally omitted from the
+      entry and acceptance criteria.
