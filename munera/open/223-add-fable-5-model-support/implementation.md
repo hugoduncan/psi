@@ -584,3 +584,34 @@ against design.md and the live referenced artifacts:
   single-ns resolution. Cosmetic, not contradictions.
 
 No new steps.md follow-ups.
+
+### Inconsistency review (plan + steps, 5th pass) — ψ
+
+Verdict: no new actionable inconsistency. Independently re-verified plan/steps
+against design.md and the live referenced artifacts:
+- Slice mapping aligned: plan "Slice order" 1–4 ↔ steps Slice 1–4.
+- Catalog values consistent (design "Final catalog entry" = steps Slice 1 step 1
+  = plan `10.0/50.0/1.0/12.5`, 1M, 128k); `:opus-4.8` (models.clj:171) +
+  `:fable-5` ∈ `anthropic-json-schema-native-model-keys` (models.clj:589-596)
+  verified; `:fable-5` key (no dot) used consistently in entry and native set.
+- Non-live test steps consistent plan↔steps: extend `init-built-ins-only-test`
+  (line 47) + `built-in-structured-output-capabilities-test` (line 103, Opus
+  block 143-152); both cite the same seven mirror assertions in the same order;
+  `find-model` string id + `built-in/all-models` keyword `:fable-5`. Provenance
+  reconciled (plan scopes "inherited from design" to catalog/live-test/docs and
+  attributes the non-live test structure to the ambiguity-review pass).
+- Live-test parameterize+rename matches current `anthropic_models_api_test.clj`
+  (single `target-model-id "claude-opus-4-8"` line 8; opus-named deftests
+  lines 43/51; `^:integration` + opt-in gate retained).
+- Docs/changelog consistent: Slice 3 edits the verified `doc/extension-api.md`
+  mid-system enumeration (line 217: "Support is true for Claude Opus 4.8 and for
+  OpenAI chat-completions models …") and adds the design's exact
+  `[Unreleased] → Added` draft; CHANGELOG `[Unreleased]` present; illustrative
+  `configuration.md`/`tui.md` excluded in both plan and steps.
+- Below-threshold nits only (non-actionable, consistent with prior passes):
+  the `model_registry_test.clj:144-151` citation is cited identically in plan
+  and steps (one line short of the 143-152 block, so not a cross-file
+  discrepancy), and Slice 1's final step retains plural "namespace(s)". Cosmetic,
+  not contradictions.
+
+No new steps.md follow-ups.
