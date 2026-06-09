@@ -103,3 +103,27 @@ ambiguities (from review, 2026-06)"; design-steps marked done.
   (retain `claude-opus-4-8`, add `claude-fable-5`), `every?` in list-includes
   test, `doseq`/`testing` per id in retrieve test, rename deftests to drop
   opus-specific names. No parallel deftests.
+
+### Ambiguity review (design, 2nd pass) — ψ
+
+Verdict: no new actionable ambiguity. Re-verified design against current code.
+
+- Prior 3 ambiguities (docs scope, changelog obligation, test-extension shape)
+  remain resolved in design "Resolved ambiguities"; design-steps all `[x]`.
+- Catalog placement unambiguous: provider `:anthropic` + "near-identical to
+  `:opus-4.8`" fixes the entry in `anthropic-models`; `all-models` (models.clj:630)
+  and `built-in-catalog` (model_registry) derive it automatically — no extra
+  registration gap.
+- `find-model`/cycling resolvability needs no explicit ordering list:
+  `next-model` (session_state/model.clj) cycles registry-derived candidates;
+  additive entry flows through.
+- Structured-output wiring exact: `built-in-structured-output-capability`
+  (models.clj:598-613) dispatches on `:api :anthropic-messages` + set
+  membership; adding `:fable-5` to `anthropic-json-schema-native-model-keys`
+  (models.clj:589) is unambiguous.
+- Cache ratios consistent: `cache-read 1.0`=10×0.1, `cache-write 12.5`=10×1.25,
+  matching established per-entry ratio.
+- Only soft spot — deftest rename "e.g." names — is cosmetic implementation
+  detail, not a design-level decision affecting built behaviour → not actionable.
+
+No new design-steps items.
