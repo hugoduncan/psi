@@ -344,6 +344,45 @@ docs edit, and changelog are concrete and unambiguous. See steps.md.
   (the plan's own Risks flags the `:fable-5` keyword form) leaves the assertion
   target/key form undecided.
 
+### Inconsistency review (plan + steps) — ψ
+
+Verdict: no new actionable inconsistency. Plan and steps are mutually
+consistent and agree with design.md and verified code/docs:
+
+- Slice mapping aligns: plan "Slice order" 1–4 ↔ steps Slice 1–4
+  (catalog+native-keys+resolution/structured-output proof / live-test
+  parameterize+rename / docs+changelog / verify+finalize).
+- Catalog values consistent everywhere: design "Final catalog entry" =
+  steps Slice 1 step 1 = plan pricing `10.0/50.0/1.0/12.5`, 1M context,
+  128k max-tokens; verified `:opus-4.8` (models.clj:171-187) carries every
+  field including `:supports-text`, so the "near-identical/verbatim" claim
+  holds. `:fable-5` keyword (no dot) used consistently in both the entry and
+  `anthropic-json-schema-native-model-keys` (models.clj:589-596).
+- Non-live test target consistent post-resolution: steps name
+  `model_registry_test.clj` and extend `init-built-ins-only-test`
+  (find-model + `built-in/all-models` keyword membership) and
+  `built-in-structured-output-capabilities-test` (public
+  `structured-output/effective-capability` assertions mirroring the Opus 4.8
+  block) — verified both deftests exist (lines 47, 103) and the ns requires
+  `[psi.ai.models :as built-in]`.
+- Live-test shape consistent with design: parameterize
+  `target-model-ids #{"claude-opus-4-8" "claude-fable-5"}`, `every?` in
+  list-includes, `doseq`/`testing` in retrieve, rename to
+  `…-targets-test`, retain `^:integration` + `with-live-models-api` —
+  matches current `anthropic_models_api_test.clj` (single `target-model-id`,
+  two opus-named deftests).
+- Docs/changelog consistent: steps Slice 3 edits the
+  `doc/extension-api.md` enumeration at the verified line (217:
+  "Support is true for Claude Opus 4.8 and for OpenAI chat-completions
+  models …") to add Fable 5, and adds the design's exact `[Unreleased] →
+  Added` draft; CHANGELOG `[Unreleased]` exists (line 7). The illustrative
+  `configuration.md`/`tui.md` examples are excluded in both plan and steps.
+- Below-threshold nit only (non-actionable, consistent with prior passes):
+  Slice 1's final step retains plural "namespace(s)" though the resolution
+  pinned a single namespace — cosmetic wording residue, not a contradiction.
+
+No new steps.md follow-ups.
+
 ### Plan/steps ambiguity review follow-ups — resolved (steps) — ψ
 
 The three plan/steps ambiguity follow-ups (added by the plan/steps ambiguity
