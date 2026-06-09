@@ -102,13 +102,32 @@ For CLI flags, launcher-only flags, environment variables, and switch behavior, 
 
 ### Emacs UI usage
 
-For keybindings, rendering behavior, reconnect semantics, and developer checks, see:
+For keybindings, rendering behavior, and reconnect semantics, see:
 - [`doc/emacs-ui.md`](doc/emacs-ui.md)
+
+Frontend contributors: see
+[`doc/emacs-ui-development.md`](doc/emacs-ui-development.md).
 
 ### TUI usage
 
 For TUI login flow, in-session commands, and runtime behavior, see:
 - [`doc/tui.md`](doc/tui.md)
+
+### Model controls
+
+Interactive sessions support `/speed` for provider throughput-tier selection and
+`/effort` for provider reasoning-effort override. Named session profiles bundle
+reusable model/thinking/speed/effort settings for interactive selection
+(`/session-profile`) and workflow steps (`:session-profile`); see
+[`doc/tui.md`](doc/tui.md), [`doc/configuration.md`](doc/configuration.md), and
+[`doc/workflows.md`](doc/workflows.md).
+
+## Configuration
+
+Config file locations, precedence (session > project-local > project-shared > user > system), settings
+reference, runtime scoped setters, outbound model API proxy environment variables, and custom provider setup:
+- [`doc/configuration.md`](doc/configuration.md)
+- [`doc/custom-providers.md`](doc/custom-providers.md)
 
 ### Built-in Tools
 
@@ -123,11 +142,10 @@ For TUI login flow, in-session commands, and runtime behavior, see:
 - `scheduler` — delayed one-shot work via explicit `create|list|cancel`, including both delayed same-session prompts and delayed fresh top-level session creation
 - `operation` — list and invoke registered deterministic operations via explicit `list|invoke`
 
-See:
-- [`doc/psi-project-config.md`](doc/psi-project-config.md) for query/mutate/reload examples and worktree-authoritative reload targeting rules, including the recommended self-reload loop
-- [`doc/graph-surface.md`](doc/graph-surface.md) for graph discovery, root-queryable attrs, and session inventory discovery surfaces
-- [`doc/scheduler.md`](doc/scheduler.md) for scheduler kinds, session-config support, status semantics, and introspection attrs
-- [`doc/operations.md`](doc/operations.md) for the deterministic-operation `list`/`invoke` request shapes, params, all-key + 2000-char truncation rendering, and error surfacing (both the psi-tool action and the `/operations` / `/operation` commands)
+### Project nREPL
+
+For direct project-local REPL support distinct from psi's own runtime nREPL, see:
+- [`doc/project-nrepl.md`](doc/project-nrepl.md)
 
 ### Workflows
 
@@ -144,14 +162,30 @@ Completed workflow runs are retained per originating session and older runs are
 cleaned up automatically; retention is configurable. See
 [`doc/workflows.md`](doc/workflows.md).
 
-### Model controls
+## Extensions
 
-Interactive sessions support `/speed` for provider throughput-tier selection and
-`/effort` for provider reasoning-effort override. Named session profiles bundle
-reusable model/thinking/speed/effort settings for interactive selection
-(`/session-profile`) and workflow steps (`:session-profile`); see
-[`doc/tui.md`](doc/tui.md), [`doc/configuration.md`](doc/configuration.md), and
-[`doc/workflows.md`](doc/workflows.md).
+Extensions customise psi by adding tools, commands, event handlers, and UI.
+Built-in extensions that ship with this repo (activated via
+`.psi/extensions.edn`):
+
+- **auto-session-name** — derive a session name automatically from early
+  conversation context.
+- **commit-checks** — run project-local checks after a local commit and feed
+  failures back into the session.
+- **edit-clj** — structural Clojure/EDN editing tool that replaces whole forms
+  by structural equality (`edit-clj`).
+- **mementum** — git-based memory protocol: memories, knowledge, and
+  working-memory `state.md`.
+- **metrics** — accumulate persistent per-capability usage counters (`/metrics`).
+- **munera** — git-native Markdown task protocol (design → plan → implement →
+  review) under `munera/`.
+
+For the extension list, configuration, and authoring details, see:
+- [`doc/extensions.md`](doc/extensions.md)
+
+## Developer documentation
+
+The sections below cover extending psi, runtime introspection, and internals.
 
 ### Extension API
 
@@ -178,36 +212,42 @@ Project-local extension/config examples in this repo include:
 - `bb commit-check:file-lengths`
 - `bb commit-check:dispatch-architecture`
 
-## Architecture
+### Architecture
 
-For architecture overview, components, EQL introspection guidance, and roadmap, see:
+For architecture overview, components, EQL introspection guidance, and
+roadmap, see:
 - [`doc/architecture.md`](doc/architecture.md)
 
-## Graph discovery
+### Graph discovery
 
-For the session-root graph discovery surface (`:psi.graph/*`), canonical discovery
-workflow, and graph semantics, see:
+For the session-root graph discovery surface (`:psi.graph/*`), canonical
+discovery workflow, and graph semantics, see:
 - [`doc/graph-surface.md`](doc/graph-surface.md)
 
-For prompt lifecycle introspection summaries and normalized prompt-turn attrs, see:
+For prompt lifecycle introspection summaries and normalized prompt-turn
+attrs, see:
 - [`doc/architecture.md`](doc/architecture.md)
 
-## Configuration
+### ψ Psi project config
 
-Config file locations, precedence (session > project-local > project-shared > user > system), settings
-reference, runtime scoped setters, outbound model API proxy environment variables, and custom provider setup:
-- [`doc/configuration.md`](doc/configuration.md)
-- [`doc/custom-providers.md`](doc/custom-providers.md)
-
-## ψ Psi project config
-
-Project query/config tool details:
+Project query/config tool details, for query/mutate/reload examples and
+worktree-authoritative reload targeting rules, including the recommended
+self-reload loop:
 - [`doc/psi-project-config.md`](doc/psi-project-config.md)
 
-## Project nREPL
+### Scheduler
 
-For direct project-local REPL support distinct from psi's own runtime nREPL, see:
-- [`doc/project-nrepl.md`](doc/project-nrepl.md)
+For scheduler kinds, session-config support, status semantics, and
+introspection attrs:
+- [`doc/scheduler.md`](doc/scheduler.md)
+
+### Determinisitc Operations
+
+for the deterministic-operation `list`/`invoke` request shapes, params,
+all-key + 2000-char truncation rendering, and error surfacing (both the
+psi-tool action and the `/operations` / `/operation` commands)
+- [`doc/operations.md`](doc/operations.md)
+
 
 ## References
 

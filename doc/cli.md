@@ -1,6 +1,7 @@
 # CLI Reference
 
-psi now has a launcher-owned canonical CLI surface.
+This reference covers the `psi` command-line surface for end users, with
+contributor-specific notes called out where they apply.
 
 ## Canonical usage
 
@@ -12,24 +13,24 @@ The launcher constructs startup basis data before `psi.main` starts.
 That means user/project extension manifests participate in classpath and
 extension availability before the JVM launches.
 
+## Launcher realization policy
+
+The realization policy controls how psi and psi-owned extensions are resolved
+at startup. The launcher selects a policy from the startup artifact layout:
+a packaged artifact (no source-tree resource root) selects `jar`, and a
+source/repo layout selects `installed`.
+
+| Policy | Selected when | How psi is resolved |
+|--------|---------------|---------------------|
+| `jar` | Running from a packaged artifact (released builds) | Single `org.hugoduncan/psi` Maven coordinate from Clojars |
+| `installed` | Running from a source/repo layout (unreleased/git installs) | Local paths relative to the launcher root (git checkout) |
+| `development` | Contributor/repo-local flows | Local paths relative to the launcher root (source tree) |
+
 Under `jar` policy, the launcher reads psi's shipped runtime dependency closure
 from jar-owned release metadata packaged inside `org.hugoduncan/psi`, rather
 than reconstructing psi's own runtime basis from repo-local component layout.
 Psi-owned runtime source/resource trees are packaged in the published jar, while
 user/project extension manifests layer additively on top.
-
-Launcher realization policy controls how psi and psi-owned extensions are
-resolved at startup. Three policies exist:
-
-| Policy | When used | How psi is resolved |
-|--------|-----------|---------------------|
-| `jar` | Default for released versions | Single `org.hugoduncan/psi` Maven coordinate from Clojars — fast, cached |
-| `installed` | Default for unreleased/git installs | Local paths relative to the launcher root (git checkout) |
-| `development` | Contributor/repo-local flows | Local paths relative to the launcher root (source tree) |
-
-Auto-detection: when running from a packaged artifact (no source-tree resource
-root), the launcher defaults to `:jar` policy. When running from source/repo
-layout, it defaults to `:installed`.
 
 Override with `PSI_LAUNCHER_POLICY`:
 
@@ -77,9 +78,12 @@ These are consumed by the launcher and are **not** forwarded to `psi.main`.
 
 - `--cwd <path>`
   - Override the working directory used for project manifest lookup and the launched psi process.
+  - Use this to run psi against a project directory other than the shell's current directory.
 - `--launcher-debug`
   - Print a pre-launch summary of cwd, manifest presence, merged manifest libs,
     psi-owned defaults, inferred `:psi/init` usage, and basis summary.
+  - Use this to troubleshoot startup, such as the selected realization policy,
+    a missing project manifest, or unexpected extension availability.
 
 ## Forwarded psi runtime flags
 
@@ -103,6 +107,7 @@ All other flags are forwarded unchanged to `psi.main`.
 
 - `--model <key>`
   - Select model key (same keys as `psi.ai.models/all-models`).
+  - In TUI mode, the `/model` command lists the available model keys.
   - Falls back to `PSI_MODEL` when not provided.
 - `--log-level <LEVEL>`
   - Set Timbre minimum level.
@@ -171,8 +176,8 @@ psi --nrepl 7888
 # TUI + nREPL
 psi --tui --nrepl
 
-# Pick model key
-psi --model sonnet-4.6
+# Pick model key (list available keys with /model in TUI mode)
+psi --model <model-key>
 
 # Memory retention
 psi --memory-store in-memory \
