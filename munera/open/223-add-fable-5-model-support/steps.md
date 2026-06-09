@@ -54,6 +54,22 @@
 - [ ] Do **not** edit `doc/configuration.md`, `doc/tui.md`, or `README.md`
       (illustrative examples, intentionally out of scope).
 
+## Plan/steps ambiguity review follow-ups (ψ)
+
+- [ ] Pin the non-live test target in Slice 1 steps 4–5: name the namespace
+      (`components/ai/test/psi/ai/model_registry_test.clj`) and state whether to
+      extend the existing `init-built-ins-only-test` (find-model resolution) and
+      `built-in-structured-output-capabilities-test` deftests or add new ones,
+      so "Add/extend … namespace(s)" is no longer an open choice.
+- [ ] Replace the private `built-in-structured-output-capability` reference in
+      Slice 1 step 5 with the public assertion path used by the existing test:
+      `structured-output/effective-capability` on the `find-model` result,
+      asserting `:supported? true`, `:native-mechanism
+      :anthropic/json-schema-output`, and `:provider-native` ∈ `:strategies`.
+- [ ] Disambiguate "appears in `all-models`" in Slice 1 step 4: specify which
+      var (`psi.ai.models/all-models` keyed `:fable-5`, vs `registry/all-models`
+      keyed `"claude-fable-5"`) and the key form to assert against.
+
 ## Slice 4 — Verify + finalize
 
 - [ ] Run `bb test` (non-live suite) and confirm green.

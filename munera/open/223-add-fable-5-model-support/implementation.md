@@ -314,3 +314,32 @@ against the referenced artifacts:
   passes treating naming/placement/line-precision as non-actionable.
 
 No new design-steps items.
+
+### Ambiguity review (plan + steps) — ψ
+
+Verdict: actionable ambiguities found (3) in the non-live test specification
+(Slice 1 steps 4–6). Live-test shape, catalog entry, structured-output wiring,
+docs edit, and changelog are concrete and unambiguous. See steps.md.
+
+- Non-live test target file + add-vs-extend unspecified: Slice 1 says
+  "Add/extend a non-live test …" / "Run the focused model/registry test
+  namespace(s) green" without naming the namespace or whether to add new
+  deftests or extend existing ones. A canonical home already exists:
+  `components/ai/test/psi/ai/model_registry_test.clj` has
+  `init-built-ins-only-test` (asserts `find-model :anthropic "claude-opus-4-8"`)
+  and `built-in-structured-output-capabilities-test` ("Claude Opus 4.8 is
+  findable …" block). Builder could reasonably add a new file/deftest or extend
+  these — materially different outcomes; design resolved only the *live* test
+  shape, not the non-live ones.
+- Structured-output assertion path names a private fn: step 5 says assert via
+  "(`built-in-structured-output-capability` path)", but that fn is `defn-`
+  private (`models.clj:598`). The existing public assertion path is
+  `structured-output/effective-capability` on a `find-model` result
+  (`:supported? true`, `:native-mechanism :anthropic/json-schema-output`,
+  `:provider-native` strategy — model_registry_test.clj:144-151). The step
+  should name the public surface + expected values, not an internal path.
+- "appears in `all-models`" is namespace-ambiguous: two vars exist —
+  `psi.ai.models/all-models` (keyed `:fable-5`) and `registry/all-models`
+  (keyed `"claude-fable-5"`). Unqualified `all-models` + differing key forms
+  (the plan's own Risks flags the `:fable-5` keyword form) leaves the assertion
+  target/key form undecided.
