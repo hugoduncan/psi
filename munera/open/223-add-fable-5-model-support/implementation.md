@@ -718,3 +718,30 @@ pricing/numeric field now fails the non-live suite, covering the "pricing …
 matching the agreed spec" acceptance criterion outside the opt-in live suite.
 Verified: `bb test:ai` 145 tests / 980 assertions / 0 failures (was 970);
 clj-kondo 0/0 on the test file; clj-paren-repair no changes needed.
+
+### Test review (2nd pass) — ψ
+
+Verdict: no new actionable feedback. Independently re-verified the test suite
+against design acceptance criteria:
+
+- Tests well-formed; no mocks/stubs. Non-live tests drive the real
+  `registry/init!` catalog; the live opt-in test uses real `clj-http` as its
+  deliberate provider proof (`^:integration` + `with-live-models-api` gate) —
+  not an infra dep needing nullable injection.
+- Pricing/numeric coverage gap from the prior pass is closed
+  (model_registry_test.clj "Claude Fable 5 catalog entry carries the agreed
+  pricing and capability values" — costs `10.0/50.0/1.0/12.5`,
+  `:context-window` 1000000, `:max-tokens` 128000, boolean flags).
+- `:provider` covered indirectly: `find-model :anthropic "claude-fable-5"`
+  non-nil proves the entry keys under the `:anthropic` provider.
+- `:api :anthropic-messages` covered indirectly: structured-output
+  `:native-mechanism :anthropic/json-schema-output` is produced by case-dispatch
+  on `:api`, so a wrong `:api` would fail the Fable 5 mirror block.
+- `:base-url` not directly asserted, but is a shared constant outside the
+  acceptance criterion's explicit field list ("provider, api, capabilities,
+  pricing") → below actionable threshold.
+- Model-cycling path is a generic registry-iterating mechanism; the additive
+  entry flows through with no fable-5-specific behaviour to assert → not a
+  coverage gap.
+
+No new steps.md follow-ups.
