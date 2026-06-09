@@ -901,3 +901,25 @@ enumeration now reads "Support is true for Claude Opus 4.8 and Claude Fable 5,
 and for OpenAI chat-completions models …". Pure prose clarity edit — accuracy
 unaffected, no code/test/changelog impact. steps.md docs-review follow-up
 marked done.
+
+### Docs review pass 2 (review-task-docs) — REVIEW_COMPLETE — ψ
+
+Re-reviewed user-facing docs against the implementation (README, doc/,
+CHANGELOG). All accurate, complete, consistent; no new actionable issues:
+
+- CHANGELOG `[Unreleased]` → Added entry present; every claim (adaptive-thinking,
+  image+text input, 1M-token context, native JSON-Schema structured output,
+  mid-conversation system messages) verified against the `:fable-5` catalog
+  entry (models.clj:189-205) and `anthropic-json-schema-native-model-keys`
+  (models.clj:615). `/model anthropic claude-fable-5` matches the documented
+  `/model <provider> <model-id>` form (tui.md:58,68).
+- `doc/extension-api.md:217` enumeration lists Claude Fable 5 alongside Opus 4.8,
+  comma-corrected from pass 1; matches `:supports-mid-conversation-system-messages
+  true`.
+- Illustrative example lists (`doc/configuration.md:237-238` "such as",
+  `doc/tui.md:68-69` worked example, `doc/custom-providers.md`) correctly left
+  unchanged — non-exhaustive examples, out of scope per design.
+- No stale refs, no removed-behaviour cleanup needed, README has no model
+  catalog. Prior comma nit resolved.
+
+No new follow-up steps required.
