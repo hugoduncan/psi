@@ -262,3 +262,27 @@ Verdict: no new actionable ambiguity. Re-verified design against current code.
   detail, not a design-level decision affecting built behaviour → not actionable.
 
 No new design-steps items.
+
+### Ambiguity review (design, 3rd pass) — ψ
+
+Verdict: no new actionable ambiguity. Independently re-verified design vs code.
+
+- All 3 prior ambiguities (docs scope, changelog obligation, test-extension
+  shape) remain resolved in design "Resolved ambiguities"; design-steps `[x]`.
+- Final `:fable-5` entry maps field-for-field to `:opus-4.8`
+  (models.clj:171-187) — only id/name/pricing differ; every field
+  (`:supports-text` included) already exists. Cache ratios explicit and
+  consistent (read 1.0=10×0.1, write 12.5=10×1.25). No underspecified field.
+- `:cost-tier` is auto-derived by `annotate-model` (models.clj) → not a design
+  decision; additive entry flows through `all-models`/`built-in-catalog`.
+- Structured-output wiring exact: add `:fable-5` to
+  `anthropic-json-schema-native-model-keys` (models.clj:589-596); dispatch via
+  `built-in-structured-output-capability` `:anthropic-messages` + set membership
+  (models.clj:597-613).
+- Test shape matches current `anthropic_models_api_test.clj` (single
+  `target-model-id "claude-opus-4-8"`, two opus-named deftests at lines 43/51);
+  parameterize-over-set resolution is concrete and fully mappable.
+- Deftest rename "e.g." names + map placement are cosmetic, not actionable
+  (consistent with prior passes).
+
+No new design-steps items.
