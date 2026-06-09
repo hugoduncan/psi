@@ -700,3 +700,21 @@ so no nullable-injection concern. Coverage gap below.
   presence only, not catalog values). The full-mirror decision matched the
   Opus 4.8 block, but that block also omits these fields, so mirroring did not
   close the pricing/numeric-field coverage the acceptance criterion calls for.
+
+### Test review follow-up — resolved (tests) — ψ
+
+The pricing/numeric-capability coverage gap is closed. Added a focused
+`testing` block to `built-in-structured-output-capabilities-test`
+(model_registry_test.clj) — "Claude Fable 5 catalog entry carries the agreed
+pricing and capability values" — asserting the boolean capability flags
+(`:supports-reasoning`, `:supports-images`, `:supports-text` all true), the
+numeric capability fields (`:context-window 1000000`, `:max-tokens 128000`),
+and all four pricing fields (`:input-cost 10.0`, `:output-cost 50.0`,
+`:cache-read-cost 1.0`, `:cache-write-cost 12.5`) against the design's "Final
+catalog entry". Chose a focused block (over folding into the structured-output
+mirror block) to keep the structured-output capability assertions and the
+catalog-value assertions separately legible. A transcription error in any
+pricing/numeric field now fails the non-live suite, covering the "pricing …
+matching the agreed spec" acceptance criterion outside the opt-in live suite.
+Verified: `bb test:ai` 145 tests / 980 assertions / 0 failures (was 970);
+clj-kondo 0/0 on the test file; clj-paren-repair no changes needed.

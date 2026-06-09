@@ -169,7 +169,7 @@
 
 ## Test review follow-ups (ψ)
 
-- [ ] Close the pricing/numeric-capability coverage gap: no non-live test
+- [x] Close the pricing/numeric-capability coverage gap: no non-live test
       asserts Fable 5's `:input-cost 10.0`, `:output-cost 50.0`,
       `:cache-read-cost 1.0`, `:cache-write-cost 12.5`, `:context-window 1000000`,
       or `:max-tokens 128000` (nor `:supports-images`/`:supports-text`/
@@ -181,3 +181,13 @@
       `:max-tokens` values (and the boolean capability flags) against the
       design's "Final catalog entry", so a transcription error is caught by the
       non-live suite. Re-run `bb test:ai` + clj-kondo.
+      → Resolved: added a focused `testing` block "Claude Fable 5 catalog entry
+      carries the agreed pricing and capability values" to
+      `built-in-structured-output-capabilities-test`
+      (model_registry_test.clj) asserting `:supports-reasoning`,
+      `:supports-images`, `:supports-text` (all true), `:context-window 1000000`,
+      `:max-tokens 128000`, `:input-cost 10.0`, `:output-cost 50.0`,
+      `:cache-read-cost 1.0`, `:cache-write-cost 12.5` against the design's
+      "Final catalog entry". A transcription error in any pricing/numeric field
+      is now caught by the non-live suite. `bb test:ai` 145 tests / 980
+      assertions / 0 failures; clj-kondo 0/0 on the test file.

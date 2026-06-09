@@ -162,7 +162,20 @@
       (is (= true (:supports-mid-conversation-system-messages model)))
       (is (= true (:supported? capability)))
       (is (= :anthropic/json-schema-output (:native-mechanism capability)))
-      (is (contains? (set (:strategies capability)) :provider-native)))))
+      (is (contains? (set (:strategies capability)) :provider-native))))
+
+  (testing "Claude Fable 5 catalog entry carries the agreed pricing and capability values"
+    (let [model (registry/find-model :anthropic "claude-fable-5")]
+      (is (some? model))
+      (is (= true (:supports-reasoning model)))
+      (is (= true (:supports-images model)))
+      (is (= true (:supports-text model)))
+      (is (= 1000000 (:context-window model)))
+      (is (= 128000 (:max-tokens model)))
+      (is (= 10.0 (:input-cost model)))
+      (is (= 50.0 (:output-cost model)))
+      (is (= 1.0 (:cache-read-cost model)))
+      (is (= 12.5 (:cache-write-cost model))))))
 
 ;; ── Init with user models ────────────────────────────────────────────────────
 
