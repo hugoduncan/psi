@@ -166,3 +166,18 @@
       and doc enumeration all reference Fable 5 consistently.
 - [x] Commit the change (`⚒` vocabulary) with a message referencing task 223.
       → Committed in slices 1–4.
+
+## Test review follow-ups (ψ)
+
+- [ ] Close the pricing/numeric-capability coverage gap: no non-live test
+      asserts Fable 5's `:input-cost 10.0`, `:output-cost 50.0`,
+      `:cache-read-cost 1.0`, `:cache-write-cost 12.5`, `:context-window 1000000`,
+      or `:max-tokens 128000` (nor `:supports-images`/`:supports-text`/
+      `:supports-reasoning`), yet the acceptance criterion requires "provider,
+      api, capabilities, and **pricing** matching the agreed spec". Extend the
+      Fable 5 block in `built-in-structured-output-capabilities-test`
+      (model_registry_test.clj:153-161) — or add a focused Fable 5 catalog-value
+      assertion — to assert the pricing fields and the `:context-window` /
+      `:max-tokens` values (and the boolean capability flags) against the
+      design's "Final catalog entry", so a transcription error is caught by the
+      non-live suite. Re-run `bb test:ai` + clj-kondo.

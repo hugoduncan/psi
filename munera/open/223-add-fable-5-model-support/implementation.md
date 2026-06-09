@@ -674,3 +674,29 @@ and live code:
   pattern.
 
 No new steps.md follow-ups.
+
+### Test review — ψ
+
+Verdict: actionable feedback (1). Tests are well-formed (`bb test:ai` green per
+notes) and the live opt-in proof is correctly gated (`^:integration` +
+`with-live-models-api`); the live test uses real `clj-http` but that is its
+deliberate purpose as an opt-in provider proof — not a mocked/stubbed infra dep,
+so no nullable-injection concern. Coverage gap below.
+
+- **Pricing + numeric capability fields unasserted (coverage gap).** Acceptance
+  criterion: "Fable 5 appears in `all-models` with provider, api, capabilities,
+  and **pricing** matching the agreed spec." The non-live Fable 5 block in
+  `built-in-structured-output-capabilities-test` (model_registry_test.clj:153-161)
+  asserts only `:name`, `:adaptive-thinking`,
+  `:supports-mid-conversation-system-messages`, and the structured-output
+  surface. No non-live test asserts Fable 5's pricing
+  (`:input-cost 10.0`, `:output-cost 50.0`, `:cache-read-cost 1.0`,
+  `:cache-write-cost 12.5`) or the numeric capability fields
+  (`:context-window 1000000`, `:max-tokens 128000`) — nor
+  `:supports-images`/`:supports-text`/`:supports-reasoning`. A transcription
+  error in any of these (e.g. `:output-cost 5.0`, `:max-tokens 12800`) would
+  pass the non-live suite undetected, leaving the "pricing … matching the agreed
+  spec" criterion uncovered outside the opt-in live suite (which proves id
+  presence only, not catalog values). The full-mirror decision matched the
+  Opus 4.8 block, but that block also omits these fields, so mirroring did not
+  close the pricing/numeric-field coverage the acceptance criterion calls for.
