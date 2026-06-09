@@ -91,6 +91,21 @@
       (`psi.ai.models/all-models`) keyed by keyword `:fable-5`, plus
       `registry/find-model` keyed by string id `"claude-fable-5"`.
 
+## Plan/steps inconsistency review follow-ups (ψ)
+
+- [ ] Reconcile plan.md with the non-live test decisions in steps Slice 1.
+      plan.md's "Key decisions (all inherited from design, no new decisions
+      required)" header and its Approach/Key-decisions deliverable list omit the
+      non-live `model_registry_test.clj` work (extend `init-built-ins-only-test`
+      + `built-in-structured-output-capabilities-test`, public
+      `structured-output/effective-capability` assertions,
+      `:fable-5`/`"claude-fable-5"` key forms) — a test structure decided during
+      the plan/steps ambiguity-review pass, not present in design.md (which
+      resolved only the live-test shape). Either add the non-live test work as
+      an explicit plan decision/deliverable, or drop the "all inherited from
+      design, no new decisions required" claim so plan and steps agree on
+      decision provenance.
+
 ## Slice 4 — Verify + finalize
 
 - [ ] Run `bb test` (non-live suite) and confirm green.

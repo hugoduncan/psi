@@ -434,3 +434,27 @@ against the live referenced artifacts:
   contradictions.
 
 No new steps.md follow-ups.
+
+### Inconsistency review (plan + steps, 3rd pass) — ψ
+
+Verdict: actionable inconsistency found (1). See steps.md.
+
+- Plan vs steps decision-provenance mismatch: plan.md heads its decision list
+  "Key decisions (all inherited from design, no new decisions required)" and its
+  Approach/Key-decisions deliverable enumeration lists only catalog entry +
+  native-keys + live-test parameterization + changelog + one doc edit. But steps
+  Slice 1 makes the **non-live** `model_registry_test.clj` work central
+  (extend `init-built-ins-only-test` + `built-in-structured-output-capabilities-test`,
+  public `structured-output/effective-capability` assertion path,
+  `:fable-5`/`"claude-fable-5"` key forms). That non-live test *structure* was
+  decided during the plan/steps ambiguity-review pass — it is **not** in
+  design.md, which resolved only the *live* test shape (confirmed: design names
+  only `anthropic_models_api_test.clj`; implementation.md's own ambiguity review
+  states "design resolved only the *live* test shape, not the non-live ones").
+  So plan's "no new decisions required / all inherited from design" claim and
+  its deliverable list are stale relative to steps. Now carried into steps.md as
+  a follow-up.
+- Re-verified other plan/steps claims hold against code/docs: catalog values
+  (`10.0/50.0/1.0/12.5`, 1M, 128k) match design; `doc/extension-api.md:217`
+  enumeration text matches; renamed live deftests target the two opus-named
+  deftests at lines 43/51; CHANGELOG `[Unreleased] → Added` exists.
