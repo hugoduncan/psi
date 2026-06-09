@@ -54,6 +54,8 @@
       (is (some? (registry/find-model :anthropic "claude-sonnet-4-6")))
       (is (some? (registry/find-model :anthropic "claude-opus-4-7")))
       (is (some? (registry/find-model :anthropic "claude-opus-4-8")))
+      (is (some? (registry/find-model :anthropic "claude-fable-5")))
+      (is (contains? built-in/all-models :fable-5))
       (is (some? (registry/find-model :openai "gpt-5.5")))
       (is (some? (registry/find-model :openai "gpt-5.4-mini")))))
 
@@ -149,7 +151,33 @@
       (is (= true (:supports-mid-conversation-system-messages model)))
       (is (= true (:supported? capability)))
       (is (= :anthropic/json-schema-output (:native-mechanism capability)))
+      (is (contains? (set (:strategies capability)) :provider-native))))
+
+  (testing "Claude Fable 5 declares native Anthropic JSON Schema output"
+    (let [capability (-> (registry/find-model :anthropic "claude-fable-5")
+                         structured-output/effective-capability)]
+      (is (= true (:supported? capability)))
+      (is (= :anthropic/json-schema-output (:native-mechanism capability)))
       (is (contains? (set (:strategies capability)) :provider-native)))))
+
+(deftest fable-5-catalog-entry-test
+  (registry/init! {})
+
+  (testing "Claude Fable 5 catalog entry carries the agreed metadata, capability, and pricing values"
+    (let [model (registry/find-model :anthropic "claude-fable-5")]
+      (is (some? model))
+      (is (= "Claude Fable 5" (:name model)))
+      (is (= true (:adaptive-thinking model)))
+      (is (= true (:supports-mid-conversation-system-messages model)))
+      (is (= true (:supports-reasoning model)))
+      (is (= true (:supports-images model)))
+      (is (= true (:supports-text model)))
+      (is (= 1000000 (:context-window model)))
+      (is (= 128000 (:max-tokens model)))
+      (is (= 10.0 (:input-cost model)))
+      (is (= 50.0 (:output-cost model)))
+      (is (= 1.0 (:cache-read-cost model)))
+      (is (= 12.5 (:cache-write-cost model))))))
 
 ;; ── Init with user models ────────────────────────────────────────────────────
 

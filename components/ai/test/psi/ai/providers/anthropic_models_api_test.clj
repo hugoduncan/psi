@@ -5,7 +5,7 @@
    [clojure.test :refer [deftest is testing]]))
 
 (def ^:private models-url "https://api.anthropic.com/v1/models")
-(def ^:private target-model-id "claude-opus-4-8")
+(def ^:private target-model-ids #{"claude-opus-4-8" "claude-fable-5"})
 (def ^:private anthropic-version "2023-06-01")
 
 (defn- enabled?
@@ -40,18 +40,22 @@
      :else
      (do ~@body)))
 
-(deftest ^:integration live-anthropic-models-list-includes-opus-4-8-test
-  ;; Opt-in live proof for Anthropic Models API availability of Opus 4.8.
+(deftest ^:integration live-anthropic-models-list-includes-targets-test
+  ;; Opt-in live proof for Anthropic Models API availability of every target id.
   (with-live-models-api
     (let [response (http/get models-url (request-options))
           ids      (set (map :id (:data (:body response))))]
       (is (= 200 (:status response)))
-      (is (contains? ids target-model-id)))))
+      (doseq [model-id target-model-ids]
+        (testing model-id
+          (is (contains? ids model-id)))))))
 
-(deftest ^:integration live-anthropic-models-retrieve-opus-4-8-test
-  ;; Opt-in live proof for the canonical Opus 4.8 model id.
+(deftest ^:integration live-anthropic-models-retrieve-targets-test
+  ;; Opt-in live proof that each canonical target model id is retrievable.
   (with-live-models-api
-    (let [response (http/get (str models-url "/" target-model-id)
-                             (request-options))]
-      (is (= 200 (:status response)))
-      (is (= target-model-id (get-in response [:body :id]))))))
+    (doseq [model-id target-model-ids]
+      (testing model-id
+        (let [response (http/get (str models-url "/" model-id)
+                                 (request-options))]
+          (is (= 200 (:status response)))
+          (is (= model-id (get-in response [:body :id]))))))))

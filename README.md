@@ -1,17 +1,39 @@
 # ψ Psi — A Clojure AI Agent
 
-A self-evolving AI coding agent built in Clojure. Statechart-driven,
-EQL-queryable, extensible. Inspired by
+Psi is an AI coding agent harness built in Clojure. Inspired by
 [pi-mono](https://github.com/badlogic/pi-mono).
 
-## Values
+## The problem
 
-- Extensions can completely customise the agent.
-- Everything is introspectable
-- AI provider agnostic
-- Minimal builtin behaviour
+AI coding agents often contain a lot of built-in tools, behaviour and
+assumptions, which can be hard to override. They can also be hard to extend.
 
----
+## The approach
+
+Psi treats the agent as an inspectable, programmable system rather than a fixed
+product:
+
+- **Extensions can completely customise the agent** — built-in behaviour is
+  deliberately minimal; extensions add tools, prompts, skills, and workflows.
+- **Everything is introspectable** — runtime state is read through an EQL graph
+  and changed through dispatched mutations, so you can query and drive the agent
+  live.
+- **Deterministic and replayable** — all changes flow through an event log;
+  statecharts enforce valid transitions.
+- **AI-provider agnostic** — providers are pluggable.
+
+See [`doc/architecture.md`](doc/architecture.md) for how these fit together.
+
+## AI usage disclaimer
+
+Psi is developed with substantial AI-agent assistance, including its own
+agent. Review code and documentation before relying on them.
+
+## Project maturity
+
+Psi is pre-1.0 and under active development. It is usable but not yet stable:
+interfaces, configuration, and behaviour may change between releases without a
+compatibility layer. Pin a specific release for reproducible environments.
 
 ## Quick Start
 
@@ -59,12 +81,8 @@ Releases are tagged `vMAJOR.MINOR.PATCH` on the
 See [CHANGELOG.md](CHANGELOG.md) for what changed in each release.
 
 Each release is also published to [Clojars](https://clojars.org/org.hugoduncan/psi)
-as `org.hugoduncan/psi`. Released startup now uses jar-owned release metadata
-packaged inside that artifact to construct psi’s shipped runtime basis, instead
-of reconstructing psi’s own runtime closure from repo-local component layout.
-Extensions still layer additively on top. Force a specific resolution strategy
-with `PSI_LAUNCHER_POLICY` (`jar` | `installed` | `development`); see
-[`doc/cli.md`](doc/cli.md).
+as `org.hugoduncan/psi`. For launcher resolution strategy
+(`PSI_LAUNCHER_POLICY`) and startup details, see [`doc/cli.md`](doc/cli.md).
 
 Then run psi directly:
 
@@ -81,19 +99,6 @@ psi --rpc-edn
 
 For CLI flags, launcher-only flags, environment variables, and switch behavior, see:
 - [`doc/cli.md`](doc/cli.md)
-
-### Migration note
-
-Old alias-based startup is now non-canonical:
-
-```bash
-clojure -M:psi           -> psi
-clojure -M:psi --tui     -> psi --tui
-clojure -M:psi --rpc-edn -> psi --rpc-edn
-```
-
-Development contributors may still use repo-local invocation paths during transition,
-and may set `PSI_LAUNCHER_POLICY=development` when they want launcher basis construction to use repo-local roots. The launcher-owned `psi` command remains the primary operator-facing startup surface.
 
 ### Emacs UI usage
 
@@ -116,7 +121,7 @@ For TUI login flow, in-session commands, and runtime behavior, see:
 - `reload-code` — explicit namespace/worktree code reload with distinct reload and graph-refresh reporting
 - `project-repl` — managed project REPL status/start/attach/stop/eval/interrupt operations with structured reports
 - `scheduler` — delayed one-shot work via explicit `create|list|cancel`, including both delayed same-session prompts and delayed fresh top-level session creation
-- `operation` — list and invoke registered deterministic operations via explicit `list|invoke`; `list` returns each operation's id and description (sorted by id), `invoke` runs `operation-id` with an EDN-map `args` (default `{}`) and returns the tagged result with every top-level key rendered (each value `pr-str`'d, truncated to 2000 chars). Side-effecting operations are invokable.
+- `operation` — list and invoke registered deterministic operations via explicit `list|invoke`
 
 See:
 - [`doc/psi-project-config.md`](doc/psi-project-config.md) for query/mutate/reload examples and worktree-authoritative reload targeting rules, including the recommended self-reload loop
@@ -135,19 +140,15 @@ reduce-incidental-complexity` for function/executable-unit incidental complexity
 and `/delegate reduce-architectural-complexity` for namespace/family/pair/community
 architecture targets selected by Gordian.
 
-Workflow runs now automatically retain only the newest retained terminal runs
-per originating session. By default psi keeps `1` retained terminal workflow
-run per originating session, configurable via
-`[:config :completed-workflow-run-retention-count]`. When older retained
-terminal runs are removed, their linked workflow-owned child-session trees are
-also cleaned up.
+Completed workflow runs are retained per originating session and older runs are
+cleaned up automatically; retention is configurable. See
+[`doc/workflows.md`](doc/workflows.md).
 
 ### Model controls
 
-Psi includes Claude Opus 4.8 (`claude-opus-4-8`) in the Anthropic model catalog.
 Interactive sessions support `/speed` for provider throughput-tier selection and
-`/effort` for provider reasoning-effort override. Named session profiles can
-bundle reusable model/thinking/speed/effort settings for interactive selection
+`/effort` for provider reasoning-effort override. Named session profiles bundle
+reusable model/thinking/speed/effort settings for interactive selection
 (`/session-profile`) and workflow steps (`:session-profile`); see
 [`doc/tui.md`](doc/tui.md), [`doc/configuration.md`](doc/configuration.md), and
 [`doc/workflows.md`](doc/workflows.md).
@@ -166,10 +167,6 @@ workflow-backed extensions.
 For the deps-shaped `extensions.edn` install model, launcher-owned startup basis construction,
 concise psi-owned manifest syntax, apply semantics, and introspection fields, see:
 - [`doc/extensions-install.md`](doc/extensions-install.md)
-
-Note: extension slash commands now route implicit extension query/mutate calls through
-the active session that invoked the command. Explicit `query-session` / `mutate-session`
-helpers remain the preferred surface for cross-session or delayed/background extension work.
 
 For built-in extension docs (`extensions/` per-project local roots), see:
 - [`doc/extensions.md`](doc/extensions.md)
