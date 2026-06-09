@@ -102,8 +102,9 @@ For CLI flags, launcher-only flags, environment variables, and switch behavior, 
 
 ### Emacs UI usage
 
-For keybindings, rendering behavior, reconnect semantics, and developer checks, see:
+For keybindings, rendering behavior, and reconnect semantics, see:
 - [`doc/emacs-ui.md`](doc/emacs-ui.md)
+- [`doc/emacs-ui-development.md`](doc/emacs-ui-development.md) for frontend developer checks
 
 ### TUI usage
 

@@ -1,7 +1,8 @@
 # Emacs UI (rpc-edn)
 
-This guide is for Emacs users who want to drive psi from within Emacs, and for
-contributors working on the frontend (see [Developer checks](#developer-checks)).
+This guide is for Emacs users who want to drive psi from within Emacs.
+Contributors working on the frontend should see
+[`emacs-ui-development.md`](emacs-ui-development.md).
 
 The repository includes an Emacs frontend at `components/emacs-ui/` that runs
 psi in a dedicated process buffer over rpc-edn. Running psi as an owned
@@ -115,11 +116,7 @@ Requirement: command must launch psi in rpc-edn mode (include `--rpc-edn`).
 Streaming stall detection defaults to 600 seconds (10 minutes) in Emacs.
 Customize `psi-emacs-stream-timeout-seconds` to change the frontend watchdog.
 
-## Developer checks
+## Contributing
 
-For contributors working on the frontend. From repo root:
-
-- `bb emacs:test` (loads the split frontend suites, including `psi-buffer-lifecycle-test.el`, `psi-dispatch-test.el`, `psi-streaming-transcript-test.el`, `psi-tool-output-mode-test.el`, `psi-extension-ui-test.el`, `psi-capf-test.el`, and `psi-session-tree-test.el`)
-- `bb emacs:e2e` (live end-to-end harness against `psi --rpc-edn`)
-- `bb emacs:byte-compile`
-- `bb emacs:check`
+For frontend developer checks (test suites, byte-compile, e2e harness), see
+[`emacs-ui-development.md`](emacs-ui-development.md).
