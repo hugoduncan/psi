@@ -220,7 +220,7 @@
 
 ## Test review follow-ups (test-shaper, 4th pass, ψ)
 
-- [ ] Re-shape `live-anthropic-models-list-includes-targets-test`
+- [x] Re-shape `live-anthropic-models-list-includes-targets-test`
       (anthropic_models_api_test.clj:47-52) for meaningful failures and
       structural consistency with the retrieve deftest. The current
       `(is (every? ids target-model-ids))` reports only `actual: false` on
@@ -233,3 +233,11 @@
       itself and both live deftests share one iteration shape. Run
       clj-paren-repair; confirm the env-gated skip path still compiles without
       `PSI_LIVE_ANTHROPIC_MODELS_API`/`ANTHROPIC_API_KEY`.
+      → Resolved: replaced `(is (every? ids target-model-ids))` with the `200`
+      status assertion once followed by
+      `(doseq [model-id target-model-ids] (testing model-id (is (contains? ids
+      model-id))))`. A missing target id now names itself on failure, and both
+      live deftests share the per-id `doseq`/`testing` iteration shape. The
+      env-gated skip path still compiles (loaded clean under `bb test:ai`);
+      clj-paren-repair no changes; clj-kondo 0/0; `bb test:ai` 146 tests / 979
+      assertions / 0 failures.

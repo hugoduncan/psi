@@ -46,7 +46,9 @@
     (let [response (http/get models-url (request-options))
           ids      (set (map :id (:data (:body response))))]
       (is (= 200 (:status response)))
-      (is (every? ids target-model-ids)))))
+      (doseq [model-id target-model-ids]
+        (testing model-id
+          (is (contains? ids model-id)))))))
 
 (deftest ^:integration live-anthropic-models-retrieve-targets-test
   ;; Opt-in live proof that each canonical target model id is retrievable.

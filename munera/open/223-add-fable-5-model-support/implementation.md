@@ -823,3 +823,18 @@ single-concern, no mocks; prior coverage/single-concern items remain resolved.
   Minor (opt-in test, runs only under the env flags) but a cheap, contained
   diagnostics + consistency win. Re-run clj-paren-repair; the env-gated skip
   path still compiles/runs without flags.
+
+### Test review follow-up (test-shaper, 4th pass) — resolved (tests) — ψ
+
+Re-shaped `live-anthropic-models-list-includes-targets-test`
+(anthropic_models_api_test.clj) for meaningful per-id failures and structural
+consistency with the retrieve deftest. Replaced
+`(is (every? ids target-model-ids))` with the `200` status assertion (once,
+before the loop) followed by
+`(doseq [model-id target-model-ids] (testing model-id (is (contains? ids
+model-id))))`. A missing target id now names itself on failure (test-shaper
+`meaningful_failures`), and both live deftests share one per-id
+`doseq`/`testing` iteration shape (`consistent(structure)`). The env-gated
+skip path still compiles (loaded clean under `bb test:ai`). Verified:
+clj-paren-repair no changes; clj-kondo 0/0 on the test file; `bb test:ai`
+146 tests / 979 assertions / 0 failures.
