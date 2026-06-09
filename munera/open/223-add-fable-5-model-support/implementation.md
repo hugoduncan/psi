@@ -126,6 +126,26 @@ Verdict: actionable inconsistency found (1). See design-steps.md.
   fact) remain resolved; catalog entry/structured-output/cache-ratio claims
   match models.clj; test-shape claims match current `anthropic_models_api_test`.
 
+### Architectural-fit review (design, 3rd pass) — ψ
+
+Verdict: fits architecture; no new actionable misfit. Re-verified against
+code + META.md:
+- META.md:32-33 "psi has a model catalog of built-in and user-defined AI
+  models; built-in models are compiled into the AI component" — Fable 5 as a
+  compiled Anthropic built-in entry is exactly this; honors catalog SoT.
+- Proposed `:fable-5` structurally identical to `:opus-4.8` (models.clj:171-187):
+  same provider/api/adaptive-thinking/context/max-tokens; only existing
+  capability fields, no catalog schema extension.
+- Structured output via `anthropic-json-schema-native-model-keys` set
+  (models.clj:589-596) + `case`-on-`:api` dispatch (models.clj:598-613);
+  adding `:fable-5` to the set is the canonical mechanism — no new dispatch.
+- Pure additive data, no default-selection change → `extend: addition >
+  modification`; flows through `all-models`/`built-in-catalog` automatically.
+- Live proof extends existing opt-in `anthropic_models_api_test.clj` rather
+  than a parallel verification mechanism.
+
+No new design-steps items.
+
 ### Ambiguity review (design, 2nd pass) — ψ
 
 Verdict: no new actionable ambiguity. Re-verified design against current code.
