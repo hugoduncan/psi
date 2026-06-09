@@ -20,6 +20,23 @@ Verdict: fits architecture; no new actionable misfit.
 - Split capability source (model map + native-key set) is a pre-existing
   project pattern; following it is correct fit, not a task-scoped misfit.
 
+### Architectural-fit review (design, 2nd pass) — ψ
+
+Verdict: fits architecture; no new actionable misfit. Re-verified against
+current code:
+
+- `:fable-5` entry structurally identical to `:opus-4.8` (models.clj:171-187):
+  same provider/api/adaptive-thinking/context/pricing shape; only existing
+  capability fields — no catalog schema extension (single-source-of-truth held).
+- Structured output via established `anthropic-json-schema-native-model-keys`
+  set + `built-in-structured-output-capability` case dispatch
+  (models.clj:589-613) — canonical mechanism, no new dispatch path.
+- Additive-only, no default-selection change → `extend: addition > modification`.
+- Live proof extends existing `anthropic_models_api_test.clj` (parameterize
+  ids over a set) rather than adding a parallel verification mechanism.
+
+No new design-steps items.
+
 ### Ambiguity review (design) — ψ
 
 Verdict: actionable ambiguities found (3). Design self-declares
