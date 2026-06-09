@@ -642,3 +642,35 @@ against design.md and the live referenced artifacts:
   not contradictions.
 
 No new steps.md follow-ups.
+
+### Implementation review — ψ
+
+Verdict: no new actionable feedback. Independently re-verified the four build
+commits (5dc7310f6, 849da3859, 87aa7ba49, 09fbee3a5) against design/plan/steps
+and live code:
+
+- Catalog: `:fable-5` (models.clj:188-205) is field-for-field identical to
+  `:opus-4.8` (models.clj:171-186) except id/name/pricing (input 10/output 50/
+  cache-read 1.0/cache-write 12.5, ratios consistent 10×0.1, 10×1.25); only
+  existing capability fields — no schema extension. `:fable-5` added to
+  `anthropic-json-schema-native-model-keys` (models.clj:614). Canonical
+  additive mechanism, single-source-of-truth held.
+- Non-live tests: `init-built-ins-only-test` extended with `find-model`
+  string-id + `built-in/all-models` keyword `:fable-5`; full seven-assertion
+  mirror of the Opus 4.8 block added to
+  `built-in-structured-output-capabilities-test`. Matches the resolved
+  full-mirror decision; covers the "capabilities … matching the agreed spec"
+  acceptance criterion in the non-live suite.
+- Live test: parameterized over `target-model-ids` set, both deftests renamed,
+  `^:integration` + `with-live-models-api` opt-in gating retained. Opus 4.8
+  coverage preserved.
+- Docs/changelog: one targeted `doc/extension-api.md` enumeration edit;
+  `[Unreleased] → Added` entry verbatim from design. No illustrative docs
+  touched.
+- Verified green independently: `bb test:ai` 145 tests / 970 assertions /
+  0 failures; clj-kondo 0/0 on the touched src+test files.
+- No new patterns, no unnecessary abstraction, no structural performance
+  concern. Pure additive data change following the established built-in-model
+  pattern.
+
+No new steps.md follow-ups.
