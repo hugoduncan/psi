@@ -20,24 +20,37 @@ pass, since design.md resolved only the live-test shape):
   adaptive-thinking + images + text + mid-conversation system messages).
 - Add `:fable-5` to the `anthropic-json-schema-native-model-keys` set for native
   JSON-Schema structured output.
-- Prove non-live catalog resolution + structured-output capability by
-  **extending** the existing deftests in
-  `components/ai/test/psi/ai/model_registry_test.clj` (no new deftests):
+- Prove non-live catalog resolution + structured-output capability in
+  `components/ai/test/psi/ai/model_registry_test.clj` as follows (final
+  structure, after the test-shaper 3rd-pass follow-up — see note below):
   extend `init-built-ins-only-test` to assert
   `registry/find-model :anthropic "claude-fable-5"` (string id) and
   `built-in/all-models` keyed by keyword `:fable-5`; extend
-  `built-in-structured-output-capabilities-test` with a Fable 5 block that is a
-  **full mirror** of the Opus 4.8 block (model_registry_test.clj:144-151) —
-  asserting the catalog-metadata fields (`(some? model)`,
-  `:name "Claude Fable 5"`, `:adaptive-thinking true`,
-  `:supports-mid-conversation-system-messages true`) **and** the public
-  `structured-output/effective-capability` surface (`:supported? true`,
-  `:native-mechanism :anthropic/json-schema-output`,
-  `:provider-native` ∈ `:strategies`). The catalog-metadata assertions are
-  required because no other step asserts those Fable 5 field values, so the full
-  mirror is what covers the acceptance criterion "capabilities … matching the
+  `built-in-structured-output-capabilities-test` with a **slim** Fable 5 block
+  asserting only the public `structured-output/effective-capability` surface
+  (`:supported? true`, `:native-mechanism :anthropic/json-schema-output`,
+  `:provider-native` ∈ `:strategies`), mirroring the sibling gpt-5.5/sonnet
+  blocks; and add a **dedicated** `fable-5-catalog-entry-test` deftest holding
+  all catalog-value assertions (metadata `:name "Claude Fable 5"`,
+  `:adaptive-thinking true`, `:supports-mid-conversation-system-messages true`;
+  boolean flags `:supports-reasoning`/`:supports-images`/`:supports-text`;
+  numeric `:context-window 1000000`/`:max-tokens 128000`; and the four pricing
+  fields `10.0`/`50.0`/`1.0`/`12.5`). These catalog-value assertions are what
+  cover the acceptance criterion "capabilities … (and pricing) … matching the
   agreed spec" in the non-live suite. This non-live test structure was decided
-  by the plan/steps ambiguity-review pass (not design.md).
+  by the plan/steps ambiguity-review pass (not design.md) and refined by the
+  test-shaper 3rd-pass review.
+
+  Note (decision history): the ambiguity-review pass originally chose a
+  single-deftest "full mirror" (extend `init-built-ins-only-test` +
+  `built-in-structured-output-capabilities-test`, no new deftests, with the
+  Fable 5 structured-output block carrying all seven catalog-metadata +
+  structured-output assertions). The later test-shaper 3rd-pass review
+  **supersedes** that: it extracted the catalog-value assertions into the
+  dedicated `fable-5-catalog-entry-test` (single-concern + truthful naming) and
+  slimmed the structured-output block to the three structured-output assertions
+  only. The final structure above and the implemented code reflect this
+  superseding decision.
 - Parameterize the live Anthropic models-api test over a set
   `target-model-ids #{"claude-opus-4-8" "claude-fable-5"}`, retaining Opus 4.8
   coverage; rename the two deftests to drop Opus-specific names.

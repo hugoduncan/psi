@@ -986,3 +986,26 @@ Verdict: actionable inconsistency found (1). See steps.md.
   (models.clj:189-205); `:fable-5` ∈ `anthropic-json-schema-native-model-keys`;
   live deftests renamed + per-id `doseq`/`testing`; CHANGELOG `[Unreleased] →
   Added` and `doc/extension-api.md` enumeration present.
+
+### Inconsistency review follow-up (plan + steps, 6th pass) — resolved (plan + steps) — ψ
+
+Reconciled the stale "no new deftests / full mirror" non-live-test decision in
+plan.md and steps.md with the test-shaper 3rd-pass follow-up and the implemented
+code. Artifact-only change — no production code/test/doc touched (the final test
+structure was already built by the test-shaper 3rd-pass follow-up).
+
+- Verified the implemented structure: slim 3-assertion Fable 5 block in
+  `built-in-structured-output-capabilities-test` (model_registry_test.clj:156,
+  mirroring the gpt-5.5/sonnet sibling blocks) + dedicated
+  `fable-5-catalog-entry-test` deftest (line 163) holding the catalog-value
+  assertions (metadata, boolean flags, numeric fields, four pricing fields).
+- plan.md: rewrote the Key-decisions non-live-test bullet to describe this final
+  structure and added a "decision history" note recording that the test-shaper
+  3rd-pass review supersedes the earlier ambiguity-review "full mirror / no new
+  deftest" choice.
+- steps.md: left Slice 1 step 5 `[x]` (its enumerated assertions record the
+  earlier decision) and added an inline "Superseded by the test-shaper 3rd-pass
+  follow-up" note pointing to the slim block + dedicated deftest as the
+  implemented final structure. Marked the 6th-pass follow-up `[x]` with a
+  resolution note.
+- Plan, steps, and code now agree on the non-live test structure.

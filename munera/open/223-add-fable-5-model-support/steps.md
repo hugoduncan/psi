@@ -49,6 +49,20 @@
       this full mirror is what makes the acceptance criterion "Fable 5 appears …
       with … capabilities … matching the agreed spec" covered by the non-live
       suite.
+
+      **Superseded by the test-shaper 3rd-pass follow-up** (see
+      "Test review follow-ups (test-shaper, 3rd pass)" below and the
+      implemented code): the single-deftest "full mirror" decided here was
+      replaced by (a) a **slim** Fable 5 block in
+      `built-in-structured-output-capabilities-test` asserting only the three
+      structured-output assertions (`:supported?`, `:native-mechanism`,
+      `:provider-native`), mirroring the gpt-5.5/sonnet blocks; and (b) a
+      **dedicated** `fable-5-catalog-entry-test` deftest holding all
+      catalog-value assertions (metadata + boolean flags + numeric fields + the
+      four pricing fields). The final test structure (slim structured-output
+      block + dedicated catalog-entry deftest) is what the code implements; the
+      "full mirror / no new deftest" wording above records the earlier decision
+      only.
 - [x] Run the focused model/registry test namespace(s) green.
 
 ## Slice 2 — Live verification test
@@ -257,7 +271,7 @@
 
 ## Plan/steps inconsistency review follow-ups (6th pass, ψ)
 
-- [ ] Reconcile the stale "no new deftests / full mirror" non-live-test
+- [x] Reconcile the stale "no new deftests / full mirror" non-live-test
       decision in plan.md and steps.md Slice 1 step 5 with the test-shaper
       3rd-pass follow-up and the implemented code. plan.md still says the
       non-live proof is done by "extending the existing deftests (no new
@@ -276,3 +290,18 @@
       block + dedicated catalog-entry deftest), or add an explicit note that
       the test-shaper 3rd-pass follow-up supersedes the original Slice 1 step 5
       decision, so plan, steps, and code agree on the non-live test structure.
+      → Resolved: plan and steps now agree with the implemented code. (1) plan.md
+      Key-decisions non-live-test bullet rewritten to describe the **final**
+      structure — slim 3-assertion Fable 5 block in
+      `built-in-structured-output-capabilities-test` (mirroring gpt-5.5/sonnet)
+      plus a dedicated `fable-5-catalog-entry-test` deftest holding the
+      catalog-value assertions — with a "decision history" note recording that
+      the test-shaper 3rd-pass review supersedes the earlier ambiguity-review
+      "full mirror / no new deftest" choice. (2) steps.md Slice 1 step 5 left
+      `[x]` (its enumerated full-mirror assertions record the earlier decision)
+      with an inline **"Superseded by the test-shaper 3rd-pass follow-up"** note
+      pointing to the slim block + dedicated deftest as the implemented final
+      structure. Verified against code: `fable-5-catalog-entry-test` at
+      model_registry_test.clj:163; slim 3-assertion structured-output block at
+      line 156. No production code/test/doc change (artifact reconciliation
+      only).
