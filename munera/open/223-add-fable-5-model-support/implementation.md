@@ -527,3 +527,31 @@ predate this review pass, so they were intentionally not executed here.
   "Fable 5 appears … with … capabilities … matching the agreed spec." Choosing
   the narrower three-assertion reading would have left that criterion
   unverified outside the opt-in live suite.
+
+### Inconsistency review (plan + steps, 4th pass) — ψ
+
+Verdict: no new actionable inconsistency. Independently re-verified plan/steps
+against design.md and the live referenced artifacts:
+- Slice mapping aligned: plan "Slice order" 1–4 ↔ steps Slice 1–4.
+- Catalog values consistent (design "Final catalog entry" = steps Slice 1 step 1
+  = plan `10.0/50.0/1.0/12.5`, 1M, 128k); `:opus-4.8` entry (models.clj:171) and
+  `:fable-5` ∈ `anthropic-json-schema-native-model-keys` (models.clj:596) verified.
+- Non-live test target + decision-provenance reconciled (prior 3rd-pass
+  follow-up resolved): plan now scopes "inherited from design" to
+  catalog/live-test/docs and attributes the non-live test structure to the
+  ambiguity-review pass; steps agree.
+- Full-mirror assertion set agrees between plan (Key decisions) and steps
+  (Slice 1 step 5): same seven assertions in the same order; verified against
+  the actual Opus 4.8 block (model_registry_test.clj:143-152).
+- Live-test parameterization/rename consistent with design and current
+  `anthropic_models_api_test.clj` (single `target-model-id "claude-opus-4-8"`
+  line 8; opus-named deftests lines 43/51; `with-live-models-api` + `^:integration`).
+- Docs/changelog consistent: Slice 3 edits verified `doc/extension-api.md:217`
+  enumeration and adds design's exact `[Unreleased] → Added` draft; illustrative
+  `configuration.md`/`tui.md` excluded in both plan and steps.
+- Below-threshold nits only (non-actionable, consistent with prior passes):
+  the `model_registry_test.clj:144-151` citation is one line short of the actual
+  144-152 block, and Slice 1's final step retains plural "namespace(s)" after the
+  single-ns resolution. Cosmetic, not contradictions.
+
+No new steps.md follow-ups.
