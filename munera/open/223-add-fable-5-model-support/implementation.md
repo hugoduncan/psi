@@ -923,3 +923,34 @@ CHANGELOG). All accurate, complete, consistent; no new actionable issues:
   catalog. Prior comma nit resolved.
 
 No new follow-up steps required.
+
+### Code-shaper review — ψ
+
+Verdict: no new actionable feedback. Reviewed the implemented code/tests
+(models.clj catalog + native-key set; model_registry_test.clj;
+anthropic_models_api_test.clj) against code-shaper (simple ∧ consistent ∧
+robust). Suite green (`bb test:ai` 146 tests / 979 assertions / 0 failures);
+clj-kondo 0/0 on ai src+test.
+
+- simple: `:fable-5` is pure additive catalog data (single responsibility,
+  locally comprehensible); each touched deftest holds one concern
+  (`init-built-ins-only-test` presence/membership; structured-output block the
+  capability surface; `fable-5-catalog-entry-test` the agreed catalog values;
+  live deftests the opt-in provider proof).
+- consistent: `:fable-5` (models.clj:189-205) mirrors `:opus-4.8` field-for-field
+  in identical key order; `:fable-5` ∈ `anthropic-json-schema-native-model-keys`
+  (models.clj:615); the slim Fable 5 structured-output block uses the same `->`
+  threading idiom as the gpt-5.5/sonnet sibling blocks; both live deftests share
+  one per-id `doseq`/`testing` shape.
+- robust: only existing capability fields used — no catalog schema extension;
+  orthogonal additive change flows through `all-models`/`built-in-catalog`
+  automatically.
+- The catalog-entry / native-key-set dual-edit coupling (adding a model touches
+  two sites) is a non-orthogonality, but it is a pre-existing project pattern
+  (flagged in prior architecture reviews); reshaping it is out of scope for this
+  additive task and would reduce the flat-data locality. Not task-actionable.
+- Flat per-model maps duplicate shape across anthropic adaptive-thinking entries;
+  introducing a template/merge helper would trade locality for DRY against the
+  established catalog convention — correctly left as flat data.
+
+No new steps.md follow-ups.
