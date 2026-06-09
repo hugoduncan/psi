@@ -111,7 +111,18 @@
     ;; starting at column 0 with the marker label but no marker colon must be
     ;; missing-route-marker, never malformed-route-marker.
     (assert-error :missing-route-marker
-                  (parse-exact-marker "QUALITY_GATE recommends APPROVE"))))
+                  (parse-exact-marker "QUALITY_GATE recommends APPROVE")))
+  (testing "column-0 line whose leading token is a superstring of the marker label is ordinary prose"
+    ;; Guards the marker-attempt? prefix boundary: the char immediately after
+    ;; the marker label must be a colon (or whitespace-before-colon). A line
+    ;; whose leading token merely *starts with* the label and has a later colon
+    ;; (e.g. "QUALITY_GATED:" / "QUALITY_GATE_NOW:") is ordinary prose, never a
+    ;; candidate, so it routes to missing-route-marker. Distinct from the
+    ;; label + space + no colon case above.
+    (assert-error :missing-route-marker
+                  (parse-exact-marker "QUALITY_GATED: APPROVE"))
+    (assert-error :missing-route-marker
+                  (parse-exact-marker "QUALITY_GATE_NOW: APPROVE"))))
 
 (deftest exact-marker-routing-duplicate-and-unsupported-test
   ;; Tests duplicate candidates always produce ambiguity diagnostics, while one
