@@ -105,7 +105,13 @@
     (assert-error :missing-route-marker (parse-exact-marker ""))
     (assert-error :missing-route-marker
                   (parse-exact-marker
-                   "The QUALITY_GATE should probably approve, but no marker colon exists."))))
+                   "The QUALITY_GATE should probably approve, but no marker colon exists.")))
+  (testing "column-0 marker-prefix prose without a marker colon is ordinary prose"
+    ;; Guards the marker-prefix? ∧ ¬marker-attempt? → :ordinary branch: a line
+    ;; starting at column 0 with the marker label but no marker colon must be
+    ;; missing-route-marker, never malformed-route-marker.
+    (assert-error :missing-route-marker
+                  (parse-exact-marker "QUALITY_GATE recommends APPROVE"))))
 
 (deftest exact-marker-routing-duplicate-and-unsupported-test
   ;; Tests duplicate candidates always produce ambiguity diagnostics, while one
@@ -203,10 +209,26 @@
               [{:field :marker-label :reason :non-string-marker-label :value 1}]]
              [{:text "" :marker-label "QUALITY-GATE" :allowed-routes ["APPROVE"]}
               [{:field :marker-label :reason :invalid-marker-label :value "QUALITY-GATE"}]]
+             [{:text "" :marker-label "quality_gate" :allowed-routes ["APPROVE"]}
+              [{:field :marker-label :reason :invalid-marker-label :value "quality_gate"}]]
+             [{:text "" :marker-label "QUALITY1" :allowed-routes ["APPROVE"]}
+              [{:field :marker-label :reason :invalid-marker-label :value "QUALITY1"}]]
+             [{:text "" :marker-label "QUALITY GATE" :allowed-routes ["APPROVE"]}
+              [{:field :marker-label :reason :invalid-marker-label :value "QUALITY GATE"}]]
+             [{:text "" :marker-label "" :allowed-routes ["APPROVE"]}
+              [{:field :marker-label :reason :invalid-marker-label :value ""}]]
              [{:text "" :marker-label "QUALITY_GATE" :allowed-routes #{"APPROVE"}}
               [{:field :allowed-routes
                 :reason :non-vector-allowed-routes
                 :value #{"APPROVE"}}]]
+             [{:text "" :marker-label "QUALITY_GATE" :allowed-routes nil}
+              [{:field :allowed-routes
+                :reason :non-vector-allowed-routes
+                :value nil}]]
+             [{:text "" :marker-label "QUALITY_GATE" :allowed-routes '("APPROVE")}
+              [{:field :allowed-routes
+                :reason :non-vector-allowed-routes
+                :value '("APPROVE")}]]
              [{:text "" :marker-label "QUALITY_GATE" :allowed-routes []}
               [{:field :allowed-routes :reason :empty-allowed-routes}]]
              [{:text "" :marker-label "QUALITY_GATE" :allowed-routes ["APPROVE" "approve" 1 "APPROVE"]}

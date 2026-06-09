@@ -87,5 +87,5 @@
 
 ## Review follow-ups — test review
 
-- [ ] TR1: Add a `parse-exact-marker-routing` test for a column-0 line that starts with the marker label but has no marker colon (e.g. `"QUALITY_GATE recommends APPROVE"`), asserting it is treated as ordinary prose (`:missing-route-marker`, not `:malformed-route-marker`). This exercises the `marker-prefix? ∧ ¬marker-attempt?` → `:ordinary` branch and guards against a regression that collapses `marker-attempt?` into `marker-prefix?`.
-- [ ] TR2 (minor): Broaden invalid marker-label arg coverage (lowercase, digit, space, and blank marker-label) and add `:allowed-routes` nil and list rejection cases, so the `^[A-Z_]+$` marker-label contract and non-vector `:allowed-routes` rule are fully exercised, not just hyphen/non-string and set.
+- [x] TR1: Add a `parse-exact-marker-routing` test for a column-0 line that starts with the marker label but has no marker colon (e.g. `"QUALITY_GATE recommends APPROVE"`), asserting it is treated as ordinary prose (`:missing-route-marker`, not `:malformed-route-marker`). This exercises the `marker-prefix? ∧ ¬marker-attempt?` → `:ordinary` branch and guards against a regression that collapses `marker-attempt?` into `marker-prefix?`.
+- [x] TR2 (minor): Broaden invalid marker-label arg coverage (lowercase, digit, space, and blank marker-label) and add `:allowed-routes` nil and list rejection cases, so the `^[A-Z_]+$` marker-label contract and non-vector `:allowed-routes` rule are fully exercised, not just hyphen/non-string and set.
