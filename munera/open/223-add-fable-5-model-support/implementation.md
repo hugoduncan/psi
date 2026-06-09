@@ -528,6 +528,35 @@ predate this review pass, so they were intentionally not executed here.
   the narrower three-assertion reading would have left that criterion
   unverified outside the opt-in live suite.
 
+### Ambiguity review (plan + steps, 4th pass) — ψ
+
+Verdict: no new actionable ambiguity. Independently re-verified plan/steps
+against the live referenced artifacts:
+- Prior plan/steps ambiguities (non-live test target, private-fn assertion
+  path, `all-models` namespace/key form, full-mirror assertion set) all remain
+  resolved in steps Slice 1 steps 4–5; follow-ups `[x]`.
+- Catalog entry (steps Slice 1 step 1) maps field-for-field to `:opus-4.8`
+  (models.clj:171-187) — verbatim shape, `:fable-5` key (no dot) consistent with
+  `anthropic-json-schema-native-model-keys` (models.clj:589-596). Unambiguous.
+- Non-live test steps concrete: ns named, two existing deftests named
+  (`init-built-ins-only-test` line 47 / `built-in-structured-output-capabilities-test`
+  line 103, Opus block 143-152), public `structured-output/effective-capability`
+  path, all seven mirror assertions enumerated in order; `built-in/all-models`
+  keyed by keyword `:fable-5` (models.clj:630) verified — `contains?` well-defined.
+- Live test rewrite matches current `anthropic_models_api_test.clj` (single
+  `target-model-id "claude-opus-4-8"` line 8, two opus-named deftests lines 43/51,
+  `with-live-models-api` + `^:integration`). `every?`/`doseq` shapes concrete.
+- Docs edit target verified: `doc/extension-api.md:217` ("Support is true for
+  Claude Opus 4.8 and for OpenAI chat-completions models …") + exact replacement
+  string given; CHANGELOG `[Unreleased] → Added` exists with exact draft text.
+- Below-threshold nits only (non-actionable, consistent with prior passes):
+  `model_registry_test.clj:144-151` cite is one line short of the 143-152 block;
+  Slice 1 final step retains plural "namespace(s)"; testing-block placement,
+  testing labels, and changelog-entry insertion position are unspecified but
+  cosmetic. None change built behaviour.
+
+No new steps.md follow-ups.
+
 ### Inconsistency review (plan + steps, 4th pass) — ψ
 
 Verdict: no new actionable inconsistency. Independently re-verified plan/steps
