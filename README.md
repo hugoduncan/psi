@@ -104,31 +104,14 @@ For CLI flags, launcher-only flags, environment variables, and switch behavior, 
 
 For keybindings, rendering behavior, and reconnect semantics, see:
 - [`doc/emacs-ui.md`](doc/emacs-ui.md)
-- [`doc/emacs-ui-development.md`](doc/emacs-ui-development.md) for frontend developer checks
+
+Frontend contributors: see
+[`doc/emacs-ui-development.md`](doc/emacs-ui-development.md).
 
 ### TUI usage
 
 For TUI login flow, in-session commands, and runtime behavior, see:
 - [`doc/tui.md`](doc/tui.md)
-
-### Built-in Tools
-
-`read` `bash` `edit` `write` `psi-tool`
-
-`psi-tool` is the live runtime introspection/modification tool with canonical action-based requests:
-- `query` — EQL graph reads
-- `eval` — in-process ψ namespace-scoped Clojure eval
-- `mutate` — invoke registered runtime mutations with structured success/error reports
-- `reload-code` — explicit namespace/worktree code reload with distinct reload and graph-refresh reporting
-- `project-repl` — managed project REPL status/start/attach/stop/eval/interrupt operations with structured reports
-- `scheduler` — delayed one-shot work via explicit `create|list|cancel`, including both delayed same-session prompts and delayed fresh top-level session creation
-- `operation` — list and invoke registered deterministic operations via explicit `list|invoke`
-
-See:
-- [`doc/psi-project-config.md`](doc/psi-project-config.md) for query/mutate/reload examples and worktree-authoritative reload targeting rules, including the recommended self-reload loop
-- [`doc/graph-surface.md`](doc/graph-surface.md) for graph discovery, root-queryable attrs, and session inventory discovery surfaces
-- [`doc/scheduler.md`](doc/scheduler.md) for scheduler kinds, session-config support, status semantics, and introspection attrs
-- [`doc/operations.md`](doc/operations.md) for the deterministic-operation `list`/`invoke` request shapes, params, all-key + 2000-char truncation rendering, and error surfacing (both the psi-tool action and the `/operations` / `/operation` commands)
 
 ### Workflows
 
@@ -153,6 +136,36 @@ reusable model/thinking/speed/effort settings for interactive selection
 (`/session-profile`) and workflow steps (`:session-profile`); see
 [`doc/tui.md`](doc/tui.md), [`doc/configuration.md`](doc/configuration.md), and
 [`doc/workflows.md`](doc/workflows.md).
+
+## Configuration
+
+Config file locations, precedence (session > project-local > project-shared > user > system), settings
+reference, runtime scoped setters, outbound model API proxy environment variables, and custom provider setup:
+- [`doc/configuration.md`](doc/configuration.md)
+- [`doc/custom-providers.md`](doc/custom-providers.md)
+
+## Developer documentation
+
+The sections below cover extending psi, runtime introspection, and internals.
+
+### Built-in Tools
+
+`read` `bash` `edit` `write` `psi-tool`
+
+`psi-tool` is the live runtime introspection/modification tool with canonical action-based requests:
+- `query` — EQL graph reads
+- `eval` — in-process ψ namespace-scoped Clojure eval
+- `mutate` — invoke registered runtime mutations with structured success/error reports
+- `reload-code` — explicit namespace/worktree code reload with distinct reload and graph-refresh reporting
+- `project-repl` — managed project REPL status/start/attach/stop/eval/interrupt operations with structured reports
+- `scheduler` — delayed one-shot work via explicit `create|list|cancel`, including both delayed same-session prompts and delayed fresh top-level session creation
+- `operation` — list and invoke registered deterministic operations via explicit `list|invoke`
+
+See:
+- [`doc/psi-project-config.md`](doc/psi-project-config.md) for query/mutate/reload examples and worktree-authoritative reload targeting rules, including the recommended self-reload loop
+- [`doc/graph-surface.md`](doc/graph-surface.md) for graph discovery, root-queryable attrs, and session inventory discovery surfaces
+- [`doc/scheduler.md`](doc/scheduler.md) for scheduler kinds, session-config support, status semantics, and introspection attrs
+- [`doc/operations.md`](doc/operations.md) for the deterministic-operation `list`/`invoke` request shapes, params, all-key + 2000-char truncation rendering, and error surfacing (both the psi-tool action and the `/operations` / `/operation` commands)
 
 ### Extension API
 
@@ -179,12 +192,12 @@ Project-local extension/config examples in this repo include:
 - `bb commit-check:file-lengths`
 - `bb commit-check:dispatch-architecture`
 
-## Architecture
+### Architecture
 
 For architecture overview, components, EQL introspection guidance, and roadmap, see:
 - [`doc/architecture.md`](doc/architecture.md)
 
-## Graph discovery
+### Graph discovery
 
 For the session-root graph discovery surface (`:psi.graph/*`), canonical discovery
 workflow, and graph semantics, see:
@@ -193,19 +206,12 @@ workflow, and graph semantics, see:
 For prompt lifecycle introspection summaries and normalized prompt-turn attrs, see:
 - [`doc/architecture.md`](doc/architecture.md)
 
-## Configuration
-
-Config file locations, precedence (session > project-local > project-shared > user > system), settings
-reference, runtime scoped setters, outbound model API proxy environment variables, and custom provider setup:
-- [`doc/configuration.md`](doc/configuration.md)
-- [`doc/custom-providers.md`](doc/custom-providers.md)
-
-## ψ Psi project config
+### ψ Psi project config
 
 Project query/config tool details:
 - [`doc/psi-project-config.md`](doc/psi-project-config.md)
 
-## Project nREPL
+### Project nREPL
 
 For direct project-local REPL support distinct from psi's own runtime nREPL, see:
 - [`doc/project-nrepl.md`](doc/project-nrepl.md)
