@@ -1041,3 +1041,35 @@ steps.md against the live implemented artifacts:
   behaviour.
 
 No new steps.md follow-ups.
+
+### Inconsistency review (plan + steps, 7th pass) — ψ
+
+Verdict: no new actionable inconsistency. Independently re-verified plan.md and
+steps.md against each other, design.md, and the live implemented artifacts
+(post the 6th-pass reconciliation, commit d02d13a71):
+
+- Non-live test structure now agrees across plan/steps/code: slim 3-assertion
+  Fable 5 structured-output block (model_registry_test.clj:156-161, mirroring
+  the gpt-5.5/sonnet siblings) + dedicated `fable-5-catalog-entry-test`
+  (line 163) holding metadata + boolean flags + numeric + four pricing fields.
+  plan.md Key-decisions describes this final structure with a decision-history
+  note; steps.md Slice 1 step 5 carries the explicit "Superseded by the
+  test-shaper 3rd-pass follow-up" pointer. The earlier ambiguity-review staleness
+  was the 6th pass's finding and is resolved.
+- Catalog values consistent: design "Final catalog entry" = steps Slice 1 step 1
+  = plan `10.0/50.0/1.0/12.5`, 1M context, 128k max-tokens; verified against
+  `:fable-5` (models.clj:189-205) and `:fable-5` ∈
+  `anthropic-json-schema-native-model-keys` (models.clj:615). `:fable-5` keyword
+  (no dot) consistent in entry and native set.
+- Live test consistent with design + code: `target-model-ids` set (line 8),
+  per-id `doseq`/`testing` in both renamed deftests (43/53), `^:integration` +
+  `with-live-models-api` opt-in gate retained.
+- Docs/changelog consistent: `doc/extension-api.md:217` comma-corrected
+  enumeration lists Fable 5; CHANGELOG `[Unreleased] → Added` entry verbatim
+  from design. Illustrative `configuration.md`/`tui.md` excluded in both files.
+- Below-threshold nit only (non-actionable, consistent with all prior passes):
+  the `model_registry_test.clj:144-151` Opus-block citation is one line short of
+  the actual 145-154 block, but it is cited identically in plan and steps, so it
+  is a shared line-precision nit, not a cross-file contradiction.
+
+No new steps.md follow-ups.
