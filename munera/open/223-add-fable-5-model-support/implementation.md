@@ -838,3 +838,31 @@ model-id))))`. A missing target id now names itself on failure (test-shaper
 skip path still compiles (loaded clean under `bb test:ai`). Verified:
 clj-paren-repair no changes; clj-kondo 0/0 on the test file; `bb test:ai`
 146 tests / 979 assertions / 0 failures.
+
+### Test review (test-shaper, 5th pass) — ψ
+
+Verdict: no new actionable feedback. Independently re-reviewed the four test
+surfaces the task touched against test-shaper (simple/consistent/robust/
+economical/behavior-focused):
+
+- `init-built-ins-only-test` (find-model `"claude-fable-5"` +
+  `built-in/all-models` keyword `:fable-5`), `built-in-structured-output-
+  capabilities-test` (slim 3-assertion Fable 5 block mirroring gpt-5.5/sonnet),
+  `fable-5-catalog-entry-test` (metadata + boolean flags + numeric + four
+  pricing fields), and both live deftests (per-id `doseq`/`testing`, meaningful
+  failures, `^:integration` + `with-live-models-api` opt-in gate, real
+  `clj-http` as deliberate provider proof) are all well-shaped.
+- single_concern: each deftest holds one concern; the catalog-entry deftest's
+  12 assertions are the single cohesive "agreed catalog entry" contract.
+- consistent: live-test structural symmetry restored (4th pass); structured-
+  output Fable 5 block mirrors the slim sibling blocks.
+- robust: deterministic, no mocks; live proof correctly gated.
+- economical: pricing/numeric coverage gap closed (2nd pass); cross-deftest
+  find-model recurrence is a necessary precondition, not redundant tests.
+- The Fable-5-only dedicated catalog deftest vs Opus 4.8's woven metadata is a
+  deliberate, documented asymmetry justified by the pricing acceptance
+  criterion; closing it would touch out-of-scope Opus tests → not actionable.
+- Verified green independently: `bb test:ai` 146 tests / 979 assertions /
+  0 failures; clj-kondo 0/0 on both touched test files.
+
+No new steps.md follow-ups.
