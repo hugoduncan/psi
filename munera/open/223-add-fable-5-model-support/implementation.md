@@ -1009,3 +1009,35 @@ structure was already built by the test-shaper 3rd-pass follow-up).
   implemented final structure. Marked the 6th-pass follow-up `[x]` with a
   resolution note.
 - Plan, steps, and code now agree on the non-live test structure.
+
+### Ambiguity review (plan + steps, 5th pass) — ψ
+
+Verdict: no new actionable ambiguity. Independently re-verified plan.md and
+steps.md against the live implemented artifacts:
+
+- Slice 1 steps 1–3 (catalog entry verbatim, `:fable-5` ∈
+  `anthropic-json-schema-native-model-keys`, paren-repair) map field-for-field
+  to `:fable-5` (models.clj:189-205) + the native-keys set (models.clj:615);
+  `:fable-5` key (no dot) consistent in entry and set. Unambiguous.
+- Slice 1 step 4 names the ns and both assertion forms — `registry/find-model
+  :anthropic "claude-fable-5"` (string id) + `built-in/all-models` keyed by
+  keyword `:fable-5`; both present in `init-built-ins-only-test`
+  (model_registry_test.clj:56-57). No open choice.
+- Slice 1 step 5's earlier "full mirror / no new deftest" enumeration carries
+  the explicit **"Superseded by the test-shaper 3rd-pass follow-up"** note (and
+  the reconciled plan.md decision-history bullet) pinning the final structure:
+  slim 3-assertion structured-output block (model_registry_test.clj:156-160,
+  mirroring the gpt-5.5/sonnet siblings) + dedicated `fable-5-catalog-entry-test`
+  (line 163). Supersession is resolved, not an undecided fork → not actionable.
+- Slice 2 (parameterize `target-model-ids #{…}`, per-id `doseq`/`testing`,
+  renamed `…-targets-test` deftests, `^:integration` + `with-live-models-api`
+  gate) maps exactly to `anthropic_models_api_test.clj`. Concrete.
+- Slice 3 (one `doc/extension-api.md` enumeration edit + exact `[Unreleased] →
+  Added` draft) and Slice 4 (verify/lint/commit) are concrete with exact
+  targets/text.
+- Below-threshold residue only (non-actionable, consistent with prior passes):
+  Slice 1 final step retains plural "namespace(s)"; testing-block placement and
+  changelog insert position unspecified but cosmetic. None change built
+  behaviour.
+
+No new steps.md follow-ups.
