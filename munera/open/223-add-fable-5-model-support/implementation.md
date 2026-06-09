@@ -866,3 +866,29 @@ economical/behavior-focused):
   0 failures; clj-kondo 0/0 on both touched test files.
 
 No new steps.md follow-ups.
+
+### Docs review (review-task-docs) — ψ
+
+Reviewed user-facing docs against the implementation (review-task-docs
+checklist: accuracy ∧ completeness ∧ consistency).
+
+- **Changelog** ✓ — `[Unreleased] → Added` entry present and accurate against
+  the catalog (`claude-fable-5`, adaptive-thinking, image+text, 1M context,
+  native JSON-Schema structured output, mid-conversation system messages).
+  Selection syntax `/model anthropic claude-fable-5` matches the worked example
+  in `doc/tui.md:68`.
+- **`doc/extension-api.md` enumeration** ✓ accurate — Fable 5 sets
+  `:supports-mid-conversation-system-messages true`, so listing it as supported
+  is correct.
+- **`configuration.md` / `tui.md` / `README.md` unchanged** ✓ correct — these
+  are illustrative `claude-opus-4-8` examples / single-model worked examples,
+  not catalog inventories (design "Resolved ambiguities"). No stale refs; no
+  removed behaviours to clean up. README mentions no model catalog.
+
+One minor actionable readability issue (added as a steps follow-up):
+
+- `doc/extension-api.md:217` now reads "Support is true for Claude Opus 4.8 and
+  Claude Fable 5 and for OpenAI chat-completions models". The doubled "and …
+  and for" reads awkwardly for a two-item list. Suggest a comma before the
+  second clause: "… for Claude Opus 4.8 and Claude Fable 5, and for OpenAI
+  chat-completions models". Accuracy is unaffected; this is a clarity nit only.

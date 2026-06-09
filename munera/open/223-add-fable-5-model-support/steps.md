@@ -241,3 +241,12 @@
       env-gated skip path still compiles (loaded clean under `bb test:ai`);
       clj-paren-repair no changes; clj-kondo 0/0; `bb test:ai` 146 tests / 979
       assertions / 0 failures.
+
+## Docs review follow-ups (review-task-docs, ψ)
+
+- [ ] Improve readability of the edited mid-conversation enumeration in
+      `doc/extension-api.md:217`. The current "Support is true for Claude Opus
+      4.8 and Claude Fable 5 and for OpenAI chat-completions models" doubles
+      "and … and for" for a two-item list. Add a comma before the second
+      clause: "… for Claude Opus 4.8 and Claude Fable 5, and for OpenAI
+      chat-completions models" (accuracy unaffected; clarity nit only).
