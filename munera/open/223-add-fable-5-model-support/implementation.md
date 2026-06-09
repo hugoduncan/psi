@@ -286,3 +286,31 @@ Verdict: no new actionable ambiguity. Independently re-verified design vs code.
   (consistent with prior passes).
 
 No new design-steps items.
+
+### Inconsistency review (design, 4th pass) — ψ
+
+Verdict: no new actionable inconsistency. Independently re-verified design.md
+against the referenced artifacts:
+- Final `:fable-5` entry vs `:opus-4.8` (models.clj:171-187): only id/name/
+  pricing differ; every field exists; cache ratios consistent (read 1.0=10×0.1,
+  write 12.5=10×1.25). "structurally near-identical" claim holds.
+- Structured-output: `anthropic-json-schema-native-model-keys` (models.clj:589-596)
+  + `:anthropic-messages` set-membership dispatch (models.clj:597-613) match
+  the design's wiring claim.
+- Test-shape claims match current `anthropic_models_api_test.clj` (single
+  `target-model-id "claude-opus-4-8"`, two opus-named deftests, list+retrieve).
+- `doc/extension-api.md` enumeration text (lines 217-220) matches the quoted
+  enumeration; `supports-mid-system-messages?` (model_capabilities.clj:8) returns
+  true on explicit support — the required one-line update is coherent.
+- `doc/configuration.md` (adaptive "such as" list, l.237-238) and `doc/tui.md`
+  (`/model` worked example, l.68-70) are genuinely illustrative, supporting the
+  no-change decision; `/model anthropic claude-fable-5` changelog draft matches
+  the `/model <provider> <model-id>` syntax (tui.md:58).
+- Prior resolved inconsistencies (open-questions cross-ref, pdf fact,
+  extension-api.md mischaracterization) remain resolved.
+- Below-threshold nits only: keyword `:fable-5` vs `:opus-4.8` dot form, and the
+  `doc/extension-api.md:215-220` citation being a superset of the actual 217-220
+  enumeration (overlaps, not contradictory) — cosmetic, consistent with prior
+  passes treating naming/placement/line-precision as non-actionable.
+
+No new design-steps items.
