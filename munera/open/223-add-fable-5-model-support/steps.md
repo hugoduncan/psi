@@ -157,9 +157,12 @@
 
 ## Slice 4 — Verify + finalize
 
-- [ ] Run `bb test` (non-live suite) and confirm green.
-- [ ] Run `clj-kondo --lint components/ai/src components/ai/test` and confirm
-      clean.
-- [ ] Coherence check: catalog entry, native-keys set, live-test ids, changelog,
+- [x] Run `bb test` (non-live suite) and confirm green.
+      → `bb test:ai` 145 tests / 970 assertions / 0 failures;
+      `bb clojure:test:unit` exit 0.
+- [x] Run `clj-kondo --lint components/ai/src components/ai/test` and confirm
+      clean. → 0 errors, 0 warnings.
+- [x] Coherence check: catalog entry, native-keys set, live-test ids, changelog,
       and doc enumeration all reference Fable 5 consistently.
-- [ ] Commit the change (`⚒` vocabulary) with a message referencing task 223.
+- [x] Commit the change (`⚒` vocabulary) with a message referencing task 223.
+      → Committed in slices 1–4.

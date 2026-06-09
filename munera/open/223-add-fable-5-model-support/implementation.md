@@ -1,5 +1,32 @@
 # Implementation notes
 
+## Implementation (ψ) — 2026-06-09
+
+Executed all four slices as planned; no deviations from design/plan.
+
+- Slice 1: Added `:fable-5` to `anthropic-models` (models.clj, after `:opus-4.8`)
+  verbatim from design's "Final catalog entry"; added `:fable-5` to
+  `anthropic-json-schema-native-model-keys`. Extended `init-built-ins-only-test`
+  (`find-model :anthropic "claude-fable-5"` + `contains? built-in/all-models
+  :fable-5`) and `built-in-structured-output-capabilities-test` (full Opus 4.8
+  mirror, all seven assertions).
+- Slice 2: Parameterized `anthropic_models_api_test.clj` over
+  `target-model-ids #{"claude-opus-4-8" "claude-fable-5"}`; renamed deftests to
+  `live-anthropic-models-list-includes-targets-test` /
+  `live-anthropic-models-retrieve-targets-test`; list uses `(every? ids
+  target-model-ids)` (ids already a set), retrieve uses `doseq`/`testing`.
+  Retained `^:integration` + `with-live-models-api`. Live path not exercised
+  (opt-in, no env flags); skip path runs (2 assertions).
+- Slice 3: One-line `doc/extension-api.md` enumeration edit; CHANGELOG
+  `[Unreleased] → Added` entry (design's exact draft). No other prose docs
+  touched.
+- Slice 4: `bb test:ai` green (145 tests / 970 assertions / 0 failures);
+  `bb clojure:test:unit` exit 0; clj-kondo clean (0/0) on ai src+test.
+
+Minor note: the list-includes assertion is `(every? ids target-model-ids)`
+where `ids` is already the `(set …)` of response ids — equivalent to the plan's
+`(every? (set ids) target-model-ids)` (re-setting a set is a no-op).
+
 ## Reviews
 
 ### Architectural-fit review (design) — ψ
