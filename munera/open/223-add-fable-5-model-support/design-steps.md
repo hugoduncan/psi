@@ -48,3 +48,18 @@
       provider-supported but has no catalog field (verified: no pdf/document
       refs in `components/ai/src`), so it is intentionally omitted from the
       entry and acceptance criteria.
+- [ ] Fix the `doc/extension-api.md` docs-scope inconsistency: design "Resolved
+      ambiguities → Docs scope" characterizes `doc/extension-api.md` as a
+      "single-model worked example of `/model` selection and mid-system-message
+      support, not catalog inventory" to justify no prose-doc changes. But the
+      referenced text (`doc/extension-api.md:217-220`) is a capability-support
+      *enumeration*: "Support is true for Claude Opus 4.8 and for OpenAI
+      chat-completions models … older Anthropic models are reported
+      unsupported." Fable 5 sets
+      `:supports-mid-conversation-system-messages true` and will report
+      supported, so the enumeration becomes incomplete/misleading. Either
+      correct the characterization in the design and decide explicitly whether
+      `doc/extension-api.md` must add Fable 5 to the mid-system-message support
+      enumeration, or document why the enumeration stays accurate without it.
+      (Previously raised in the 2nd-pass inconsistency review, which referenced
+      design-steps.md but added no follow-up step.)

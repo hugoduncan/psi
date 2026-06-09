@@ -169,6 +169,33 @@ Verdict: no new actionable ambiguity. Re-verified design against current code.
 
 No new design-steps items.
 
+### Inconsistency review (design, 3rd pass) — ψ
+
+Verdict: actionable inconsistency found (1, previously identified but unaddressed).
+See design-steps.md.
+
+- The 2nd-pass inconsistency review (above) flagged the `doc/extension-api.md`
+  mischaracterization and said "See design-steps.md", but no follow-up step was
+  ever added and design.md remains unchanged → the inconsistency is still live.
+  Re-confirmed: design "Resolved ambiguities → Docs scope" calls
+  `doc/extension-api.md` a "single-model worked example … not catalog inventory"
+  to justify no-doc-change, but the referenced text
+  (`doc/extension-api.md:217-220`) is a capability-support *enumeration*:
+  "Support is true for Claude Opus 4.8 and for OpenAI chat-completions models …
+  older Anthropic models are reported unsupported." Fable 5 sets
+  `:supports-mid-conversation-system-messages true` and will report supported,
+  so the enumeration becomes incomplete/misleading after the addition. The
+  characterization does not match the referenced artifact, and the no-doc-change
+  decision for `extension-api.md` rests on that inaccurate framing. Now carried
+  into design-steps.md as a follow-up.
+- Re-verified other design claims hold: `:fable-5` final entry vs `:opus-4.8`
+  (models.clj:171-187) — only id/name/pricing differ; cache ratios consistent
+  (read 1.0=10×0.1, write 12.5=10×1.25). Structured-output set + dispatch
+  (models.clj:589-613) matches. Test-shape claims match current
+  `anthropic_models_api_test.clj` (single `target-model-id "claude-opus-4-8"`,
+  two opus-named deftests). Prior resolved inconsistencies (open-questions
+  cross-ref, pdf fact) remain resolved.
+
 ### Ambiguity review (design, 2nd pass) — ψ
 
 Verdict: no new actionable ambiguity. Re-verified design against current code.
