@@ -41,7 +41,8 @@ Comprehensive Clojure coding standards for maintainable, readable code.
 - Do not use `try` `catch` exception handling for flow control
 - Do not shadow locals, vars or functions
 - Break dependency cycles architecturally, not use requiring-resolve
-- Vars (e.g. functions) do not need to be public to be tested; tests can use the @#' idiom.
+- Vars (e.g. functions) do not need to be public to be tested; tests can use the #' idiom.
+- Prefer clojure idioms to java interop
 
 λx.prefer(compose(transducers))∧when(working_with(sequences),thread(sequence_functions))
 
