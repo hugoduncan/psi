@@ -183,13 +183,15 @@
 (defn- marker-line-classification
   [{:keys [marker-label allowed-routes-set]} line]
   (let [trimmed-left (str/triml line)
+        marker-prefix (str marker-label ": ")
         marker-prefix? (str/starts-with? trimmed-left marker-label)
         after-marker-label (if marker-prefix?
                              (subs trimmed-left (count marker-label))
                              "")
+        whitespace-before-colon? (boolean (re-find #"^\s+:" after-marker-label))
         marker-attempt? (and marker-prefix?
                              (or (str/starts-with? after-marker-label ":")
-                                 (boolean (re-find #"^\s+:" after-marker-label))))]
+                                 whitespace-before-colon?))]
     (cond
       (not marker-attempt?)
       {:kind :ordinary
@@ -200,18 +202,18 @@
        :line line
        :reason :leading-whitespace}
 
-      (re-find #"^\s+:" after-marker-label)
+      whitespace-before-colon?
       {:kind :malformed
        :line line
        :reason :whitespace-before-colon}
 
-      (not (str/starts-with? line (str marker-label ": ")))
+      (not (str/starts-with? line marker-prefix))
       {:kind :malformed
        :line line
        :reason :missing-space-after-colon}
 
       :else
-      (let [raw-route (subs line (count (str marker-label ": ")))]
+      (let [raw-route (subs line (count marker-prefix))]
         (cond
           (not (route-token? raw-route))
           {:kind :malformed
