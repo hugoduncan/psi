@@ -53,6 +53,17 @@ MemoryArtifacts ≡ {working_memory memories knowledge}   ⟨mementum — own pr
   | working_memory(state.md) ≡ AI_updates_during_work   ⟨no approval gate⟩
   | approval_gate ∈ {memories knowledge}   ⟨mementum termination governs; except autonomous_artifact_extraction⟩
 
+λ state_md(x).   ⟨project convention; mementum stays external/unchanged⟩
+  | state.md ≡ current_state_snapshot(features ∧ structure ∧ orientation)   ⟨bootloader⟩
+  | update(state.md) ≡ edit_in_place ∧ prune_stale   ⟨¬append_log⟩
+  | ¬contains(state.md, {task_pass_notes ∨ review_pass_log ∨ per_commit_history ∨ progress_entries})
+  | task_progress → munera_task_artifacts({implementation.md ∧ steps.md})   ⟨not state.md⟩
+  | durable_lesson → memories ∨ knowledge   ⟨not state.md⟩
+  | history(state.md) ≡ git   ⟨recover via git log, ¬accreted in-file⟩
+  | delegated_session(review ∨ implement ∨ plan) → ¬obligated(update(state.md))
+      ⟨write task_progress to task artifacts; touch state.md only on real feature/structure shift⟩
+  | size(state.md) → small ∧ scannable(≤ ~30s)   ⟨grows → prune, ¬accrete⟩
+
 role(meta) ≡ {why invariants boundaries ¬how ¬syntax}
 role(spec) ≡ {behaviour surfaces examples acceptance_criteria}
 role(tests) ≡ executable_proof(spec)
