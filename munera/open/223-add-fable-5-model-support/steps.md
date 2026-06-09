@@ -194,7 +194,7 @@
 
 ## Test review follow-ups (test-shaper, 3rd pass, ψ)
 
-- [ ] Extract the Fable 5 catalog-value/pricing assertions out of
+- [x] Extract the Fable 5 catalog-value/pricing assertions out of
       `built-in-structured-output-capabilities-test` (model_registry_test.clj:167-178)
       into a dedicated Fable 5 catalog-entry deftest (e.g.
       `fable-5-catalog-entry-test`), so the structured-output deftest keeps a
@@ -207,3 +207,13 @@
       structured-output block to mirror the gpt-5.5/sonnet blocks and removing
       the duplicated `find-model` + `(some? model)` across the two Fable 5
       blocks. Re-run `bb test:ai` + clj-kondo.
+      → Resolved: added a dedicated `fable-5-catalog-entry-test` deftest holding
+      all catalog-value assertions (metadata `:name`/`:adaptive-thinking`/
+      `:supports-mid-conversation-system-messages`, boolean flags, numeric
+      `:context-window`/`:max-tokens`, and the four pricing fields). Took the
+      optional path: slimmed the Fable 5 structured-output block in
+      `built-in-structured-output-capabilities-test` to the three
+      structured-output assertions only (mirroring the gpt-5.5/sonnet blocks),
+      removing the duplicated `find-model` + `(some? model)`. The Opus 4.8 block
+      is untouched (pre-existing convention). `bb test:ai` 146 tests / 979
+      assertions / 0 failures; clj-kondo 0/0; clj-paren-repair clean.

@@ -153,20 +153,22 @@
       (is (= :anthropic/json-schema-output (:native-mechanism capability)))
       (is (contains? (set (:strategies capability)) :provider-native))))
 
-  (testing "Claude Fable 5 is findable and declares native Anthropic JSON Schema output"
-    (let [model      (registry/find-model :anthropic "claude-fable-5")
-          capability (structured-output/effective-capability model)]
+  (testing "Claude Fable 5 declares native Anthropic JSON Schema output"
+    (let [capability (-> (registry/find-model :anthropic "claude-fable-5")
+                         structured-output/effective-capability)]
+      (is (= true (:supported? capability)))
+      (is (= :anthropic/json-schema-output (:native-mechanism capability)))
+      (is (contains? (set (:strategies capability)) :provider-native)))))
+
+(deftest fable-5-catalog-entry-test
+  (registry/init! {})
+
+  (testing "Claude Fable 5 catalog entry carries the agreed metadata, capability, and pricing values"
+    (let [model (registry/find-model :anthropic "claude-fable-5")]
       (is (some? model))
       (is (= "Claude Fable 5" (:name model)))
       (is (= true (:adaptive-thinking model)))
       (is (= true (:supports-mid-conversation-system-messages model)))
-      (is (= true (:supported? capability)))
-      (is (= :anthropic/json-schema-output (:native-mechanism capability)))
-      (is (contains? (set (:strategies capability)) :provider-native))))
-
-  (testing "Claude Fable 5 catalog entry carries the agreed pricing and capability values"
-    (let [model (registry/find-model :anthropic "claude-fable-5")]
-      (is (some? model))
       (is (= true (:supports-reasoning model)))
       (is (= true (:supports-images model)))
       (is (= true (:supports-text model)))

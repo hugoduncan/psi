@@ -775,3 +775,26 @@ additions for clarity/single-concern.
   blocks; this also removes the duplicated `find-model` + `(some? model)`
   between the two Fable 5 blocks (economical). Net: each deftest name stays
   truthful and each failure points at the contract it actually broke.
+
+### Test review follow-up (test-shaper, 3rd pass) — resolved (tests) — ψ
+
+Extracted the Fable 5 catalog-value assertions into a dedicated
+`fable-5-catalog-entry-test` deftest (model_registry_test.clj), restoring
+single-concern + truthful naming to `built-in-structured-output-capabilities-test`.
+
+- New `fable-5-catalog-entry-test` holds all catalog-value assertions for Fable 5:
+  metadata (`:name`/`:adaptive-thinking`/`:supports-mid-conversation-system-messages`),
+  boolean capability flags (`:supports-reasoning`/`:supports-images`/`:supports-text`),
+  numeric fields (`:context-window 1000000`/`:max-tokens 128000`), and the four
+  pricing fields (`10.0`/`50.0`/`1.0`/`12.5`) against the design's "Final catalog
+  entry". A pricing/numeric transcription error now fails a truthfully-named test.
+- Took the optional path: slimmed the Fable 5 block in
+  `built-in-structured-output-capabilities-test` to the three structured-output
+  assertions only (`:supported?`/`:native-mechanism`/`:provider-native`),
+  mirroring the gpt-5.5/sonnet blocks and removing the duplicated `find-model`
+  + `(some? model)`. The previous standalone pricing block in that deftest was
+  relocated into the new deftest.
+- Opus 4.8 block left untouched (its woven catalog-metadata is a pre-existing
+  convention, not in scope).
+- Verified: `bb test:ai` 146 tests / 979 assertions / 0 failures (deftest count
+  +1); clj-kondo 0/0 on the test file; clj-paren-repair clean.
