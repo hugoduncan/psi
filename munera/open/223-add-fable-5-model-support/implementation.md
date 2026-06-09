@@ -104,6 +104,28 @@ ambiguities (from review, 2026-06)"; design-steps marked done.
   test, `doseq`/`testing` per id in retrieve test, rename deftests to drop
   opus-specific names. No parallel deftests.
 
+### Inconsistency review (design, 2nd pass) — ψ
+
+Verdict: actionable inconsistency found (1). See design-steps.md.
+
+- Docs-scope rationale vs referenced artifact: design "Resolved ambiguities →
+  Docs scope" (and the resolved ambiguity follow-up) characterizes
+  `doc/extension-api.md` as a "single-model worked example … not catalog
+  inventories", justifying "no prose doc changes required". But the referenced
+  text (`doc/extension-api.md:217-220`) is a capability-coverage statement, not
+  a worked example: "Support is true for Claude Opus 4.8 and for OpenAI
+  chat-completions models … older Anthropic models are reported unsupported."
+  The design sets `:supports-mid-conversation-system-messages true` for Fable 5,
+  and `model_capabilities/supports-mid-system-messages?` returns true on
+  explicit support, so Fable 5 *will* report supported. Adding Fable 5 makes
+  that enumeration incomplete/misleading (a reader may infer the newer Fable 5
+  is unsupported). Inconsistent with the design's "all model mentions are
+  illustrative" premise for that doc and undermines the no-doc-change decision
+  for `extension-api.md` specifically.
+- Re-verified prior resolved inconsistencies (open-questions cross-ref, pdf
+  fact) remain resolved; catalog entry/structured-output/cache-ratio claims
+  match models.clj; test-shape claims match current `anthropic_models_api_test`.
+
 ### Ambiguity review (design, 2nd pass) — ψ
 
 Verdict: no new actionable ambiguity. Re-verified design against current code.
