@@ -39,6 +39,23 @@ test-extension shape are underspecified. See design-steps.md.
   and two opus-named deftests. Unspecified: retain opus-4.8 assertions,
   parameterize over a set of ids, or duplicate deftests for fable-5.
 
+### Inconsistency review (design) — ψ
+
+Verdict: actionable inconsistencies found (2). See design-steps.md.
+
+- Dangling cross-reference: Scope "Out of scope" (l.49) says "unless Fable 5
+  requires a genuinely new protocol — see open questions", but design.md has
+  no "Open questions" section, and "Resolved facts" already fixes
+  `:api :anthropic-messages` (existing protocol family). The reference is
+  stale and contradicts the design's own resolved facts.
+- Unmapped capability fact: "Resolved facts" (l.79) lists `pdf_input` supported
+  alongside capabilities that each map to a catalog field
+  (image_input→:supports-images, text→:supports-text, context-window,
+  max-tokens), but pdf has no `→ :field` mapping, is absent from the "Final
+  catalog entry", and is unmentioned in acceptance criteria. Confirmed no pdf
+  field exists anywhere in `components/ai/src` — so it is a no-op fact dropped
+  without rationale. Intent ("correct capabilities") leaves its scope unstated.
+
 ### Ambiguity review follow-up — resolved (design) — ψ
 
 All three ambiguity follow-up steps resolved in design.md "Resolved

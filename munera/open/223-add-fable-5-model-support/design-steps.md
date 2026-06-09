@@ -26,3 +26,18 @@
       → Resolved: parameterize over a set `target-model-ids`, retain Opus 4.8,
       `doseq`/`testing` per id, no parallel deftests. See design.md "Resolved
       ambiguities → Test extension shape".
+
+## Inconsistency review (ψ)
+
+- [ ] Fix dangling cross-reference in Scope "Out of scope": the parenthetical
+      "unless Fable 5 requires a genuinely new protocol — see open questions"
+      points to a non-existent "Open questions" section, and "Resolved facts"
+      already settles `:api :anthropic-messages` (an existing protocol). Remove
+      or rephrase the parenthetical so it no longer references open questions
+      and is consistent with the resolved no-new-protocol fact.
+- [ ] Resolve the `pdf_input` capability fact: "Resolved facts" lists
+      `pdf_input` supported but it maps to no catalog field (none exists in
+      `components/ai/src`) and is absent from the "Final catalog entry" and
+      acceptance criteria. State explicitly that pdf has no catalog
+      representation and is intentionally omitted (or drop it from the facts),
+      so the discovered capabilities and the target entry agree.
