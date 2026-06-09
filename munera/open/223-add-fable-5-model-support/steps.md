@@ -114,6 +114,23 @@
       `"claude-fable-5"` key forms). Plan and steps now agree on decision
       provenance.
 
+## Plan/steps ambiguity review follow-ups (3rd pass, ψ)
+
+- [ ] Pin the assertion set for the Fable 5 `built-in-structured-output-capabilities-test`
+      block in Slice 1 step 5: "mirrors the existing Claude Opus 4.8 block" but
+      then enumerates only the three structured-output assertions, while the
+      Opus 4.8 block (model_registry_test.clj:144-151) also asserts
+      `(some? model)`, `(= "Claude Fable 5" (:name model))`,
+      `(= true (:adaptive-thinking model))`, and
+      `(= true (:supports-mid-conversation-system-messages model))`. Decide
+      explicitly whether the Fable 5 block includes those catalog-metadata
+      assertions (full mirror) or only the three structured-output assertions,
+      and update the step so it is no longer an open choice. Note no other step
+      asserts Fable 5's name/adaptive-thinking/mid-system-message field values
+      (Slice 1 step 4 only asserts `find-model` presence + `built-in/all-models`
+      membership), so this choice determines whether acceptance criterion
+      "capabilities … matching the agreed spec" is covered by the non-live suite.
+
 ## Slice 4 — Verify + finalize
 
 - [ ] Run `bb test` (non-live suite) and confirm green.

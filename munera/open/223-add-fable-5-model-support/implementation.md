@@ -476,3 +476,30 @@ unchecked and predate this review pass, so they were intentionally not executed.
   `built-in-structured-output-capabilities-test` (public
   `structured-output/effective-capability` assertions mirroring the Opus 4.8
   block). Plan and steps now agree on decision provenance.
+
+### Ambiguity review (plan + steps, 3rd pass) — ψ
+
+Verdict: actionable ambiguity found (1). See steps.md.
+
+- "Mirror the Opus 4.8 block" vs three-assertion enumeration conflict
+  (Slice 1 step 5): steps direct a Fable 5 `testing` block that "mirrors the
+  existing Claude Opus 4.8 block" but then enumerate only the three
+  structured-output assertions (`:supported? true`, `:native-mechanism
+  :anthropic/json-schema-output`, `:provider-native` ∈ `:strategies`). The
+  actual Opus 4.8 block (model_registry_test.clj:144-151) additionally asserts
+  `(some? model)`, `(= "Claude Opus 4.8" (:name model))`,
+  `(= true (:adaptive-thinking model))`, and
+  `(= true (:supports-mid-conversation-system-messages model))`. "Mirror" plus
+  the narrower three-assertion list leaves it undecided whether the Fable 5
+  block also asserts the catalog-metadata fields. This is material coverage:
+  no other step asserts Fable 5's `:name "Claude Fable 5"`, `:adaptive-thinking`,
+  or `:supports-mid-conversation-system-messages` values (Slice 1 step 4 only
+  asserts `find-model` presence + `built-in/all-models` keyword membership), so
+  the acceptance criterion "Fable 5 appears … with … capabilities … matching
+  the agreed spec" would be unverified by the non-live suite under the
+  three-assertion reading.
+- Re-verified prior plan/steps ambiguity resolutions still hold against code:
+  `init-built-ins-only-test` (line 47) and
+  `built-in-structured-output-capabilities-test` (line 103, Opus block 144-151)
+  exist; live test still has single `target-model-id "claude-opus-4-8"` and two
+  opus-named deftests (lines 43/51); `doc/extension-api.md` enumeration present.
