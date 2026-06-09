@@ -892,3 +892,12 @@ One minor actionable readability issue (added as a steps follow-up):
   and for" reads awkwardly for a two-item list. Suggest a comma before the
   second clause: "… for Claude Opus 4.8 and Claude Fable 5, and for OpenAI
   chat-completions models". Accuracy is unaffected; this is a clarity nit only.
+
+### Docs review follow-up (review-task-docs) — resolved (docs) — ψ
+
+Resolved the readability nit in `doc/extension-api.md:217`. Added a comma
+before the second clause; the mid-conversation system-message support
+enumeration now reads "Support is true for Claude Opus 4.8 and Claude Fable 5,
+and for OpenAI chat-completions models …". Pure prose clarity edit — accuracy
+unaffected, no code/test/changelog impact. steps.md docs-review follow-up
+marked done.

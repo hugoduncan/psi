@@ -214,7 +214,7 @@ Capability can be checked before injection with:
 ((:query api) [:psi.agent-session/model-supports-mid-system-messages])
 ```
 
-Support is true for Claude Opus 4.8 and Claude Fable 5 and for OpenAI chat-completions models
+Support is true for Claude Opus 4.8 and Claude Fable 5, and for OpenAI chat-completions models
 (including runtime/custom maps inferred from `:provider :openai` and
 `:api :openai-completions`). Codex/responses models and older Anthropic models
 are reported unsupported. When `:source` is omitted, the mutation infers
