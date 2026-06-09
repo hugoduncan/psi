@@ -217,6 +217,28 @@ design.md; design-steps marked done.
   unchanged. Threaded into Scope and acceptance criteria. The actual doc edit
   belongs to builder/steps.md (implementation), not this design follow-up.
 
+### Architectural-fit review (design, 4th pass) — ψ
+
+Verdict: fits architecture; no new actionable misfit. Independently
+re-verified design claims against current code:
+- `:fable-5` entry structurally identical to `:opus-4.8` (models.clj:171-187):
+  only id/name/pricing differ; uses only existing capability fields — no
+  catalog schema extension (single-source-of-truth held, per META.md
+  model-catalog model).
+- Structured output: `anthropic-json-schema-native-model-keys` set
+  (models.clj:589-596) + `built-in-structured-output-capability` `case`-on-`:api`
+  dispatch (models.clj:598-613); adding `:fable-5` to the set is the canonical
+  mechanism — no new dispatch.
+- Pure additive data, no default-selection change → `extend: addition >
+  modification`; flows through `all-models` (models.clj:630) /
+  `built-in-catalog` (model_registry.clj:22-29) automatically.
+- Live proof extends existing opt-in `anthropic_models_api_test.clj` rather
+  than a parallel verification mechanism.
+- One targeted `doc/extension-api.md` enumeration update is a docs-accuracy
+  obligation already threaded into scope, not an architectural misfit.
+
+No new design-steps items.
+
 ### Ambiguity review (design, 2nd pass) — ψ
 
 Verdict: no new actionable ambiguity. Re-verified design against current code.
