@@ -196,6 +196,27 @@ See design-steps.md.
   two opus-named deftests). Prior resolved inconsistencies (open-questions
   cross-ref, pdf fact) remain resolved.
 
+### Inconsistency review follow-up (3rd pass) — resolved (design) — ψ
+
+The 3rd-pass `doc/extension-api.md` docs-scope inconsistency is resolved in
+design.md; design-steps marked done.
+
+- Verified in code: `model-capabilities/supports-mid-system-messages?`
+  (components/agent-session/.../model_capabilities.clj:8-27) returns true on
+  explicit `(true? :supports-mid-conversation-system-messages)`. Fable 5
+  declares that flag true (final catalog entry), so it *will* report supported.
+- Corrected the design mischaracterization: design.md "Resolved ambiguities →
+  Docs scope" now separates the illustrative "such as" examples
+  (`configuration.md`, `tui.md`, unchanged) from the *definitive* capability
+  enumeration at `doc/extension-api.md:215-220` ("Support is true for Claude
+  Opus 4.8 and for OpenAI chat-completions models … older Anthropic models are
+  reported unsupported"), which is not illustrative.
+- Decision recorded: one targeted `doc/extension-api.md` update — add Claude
+  Fable 5 to the mid-conversation system-message support enumeration — is
+  **required** to keep the factual enumeration accurate; all other prose docs
+  unchanged. Threaded into Scope and acceptance criteria. The actual doc edit
+  belongs to builder/steps.md (implementation), not this design follow-up.
+
 ### Ambiguity review (design, 2nd pass) — ψ
 
 Verdict: no new actionable ambiguity. Re-verified design against current code.

@@ -48,7 +48,7 @@
       provider-supported but has no catalog field (verified: no pdf/document
       refs in `components/ai/src`), so it is intentionally omitted from the
       entry and acceptance criteria.
-- [ ] Fix the `doc/extension-api.md` docs-scope inconsistency: design "Resolved
+- [x] Fix the `doc/extension-api.md` docs-scope inconsistency: design "Resolved
       ambiguities → Docs scope" characterizes `doc/extension-api.md` as a
       "single-model worked example of `/model` selection and mid-system-message
       support, not catalog inventory" to justify no prose-doc changes. But the
@@ -63,3 +63,12 @@
       enumeration, or document why the enumeration stays accurate without it.
       (Previously raised in the 2nd-pass inconsistency review, which referenced
       design-steps.md but added no follow-up step.)
+      → Resolved: corrected the characterization — design.md "Resolved
+      ambiguities → Docs scope" now distinguishes the illustrative "such as"
+      examples (`configuration.md`, `tui.md`) from the *definitive* mid-system
+      support enumeration at `doc/extension-api.md:215-220`. Verified
+      `supports-mid-system-messages?` returns true on explicit `true` support,
+      so Fable 5 reports supported. Decision: one targeted `extension-api.md`
+      update (add Fable 5 to the support enumeration) is **required** to keep
+      the factual enumeration accurate; added to Scope and acceptance criteria.
+      The actual edit is builder/steps.md work, not a design follow-up.

@@ -38,8 +38,10 @@ In scope:
   assert the Fable 5 canonical id, by parameterizing the asserted ids over a
   set (retaining the existing Opus 4.8 assertions) — see "Resolved ambiguities".
 - Add a CHANGELOG `[Unreleased]` → `Added` entry (a new selectable built-in
-  model is user-visible). No prose doc file changes are required — see
-  "Resolved ambiguities".
+  model is user-visible).
+- Make one targeted `doc/extension-api.md` update: add Claude Fable 5 to the
+  mid-conversation system-message support enumeration. No other prose doc file
+  changes are required — see "Resolved ambiguities".
 
 Out of scope (adjacent, separate tasks if needed):
 
@@ -62,8 +64,10 @@ Out of scope (adjacent, separate tasks if needed):
   existing env flags).
 - `bb test` green (non-live suite); clj-kondo clean.
 - A CHANGELOG `[Unreleased]` → `Added` entry announces Fable 5 as selectable.
-- No prose doc (`doc/*.md`, `README.md`) changes are required (rationale in
-  "Resolved ambiguities").
+- `doc/extension-api.md`'s mid-conversation system-message support enumeration
+  lists Claude Fable 5 as supported (alongside Claude Opus 4.8). No other prose
+  doc (`doc/*.md`, `README.md`) changes are required (rationale in "Resolved
+  ambiguities").
 
 ## Resolved facts (from live Anthropic `/v1/models`, 2026-06)
 
@@ -130,21 +134,37 @@ retrievable (test shape resolved below).
 
 ## Resolved ambiguities (from review, 2026-06)
 
-### Docs scope — no prose doc changes required
+### Docs scope — one targeted `extension-api.md` update; no other prose changes
 
-No user-facing doc enumerates the model catalog; `models.clj` is the single
-source of truth. Every existing model mention in `doc/*.md` is an *illustrative
-example* of a capability, not an exhaustive list:
+No user-facing doc enumerates the model *catalog*; `models.clj` is the single
+source of truth. Most existing model mentions in `doc/*.md` are *illustrative
+examples* of a capability, not exhaustive lists, and stay correct as-is:
 
 - `doc/configuration.md` (`:xhigh` / effort): "Anthropic adaptive-thinking
   models **such as** Claude Opus 4.7 and Claude Opus 4.8" — a non-exhaustive
   "such as" example that remains accurate without Fable 5.
-- `doc/tui.md` and `doc/extension-api.md`: single-model worked examples of
-  `/model` selection and mid-system-message support, not catalog inventories.
+- `doc/tui.md`: a single-model worked example of `/model` selection, not a
+  catalog inventory.
 
-Decision: this additive task makes **no** `doc/*.md` or `README.md` changes.
-The illustrative example lists stay correct as written; rewriting them to chase
-the newest model is out of scope and would invite ongoing churn.
+One referenced passage is **not** illustrative: `doc/extension-api.md:215-220`
+is a definitive capability-support *enumeration* for mid-conversation system
+messages — "Support is true for Claude Opus 4.8 and for OpenAI chat-completions
+models … Codex/responses models and older Anthropic models are reported
+unsupported." Fable 5 sets `:supports-mid-conversation-system-messages true`,
+and `psi.agent-session.model-capabilities/supports-mid-system-messages?` returns
+true on explicit `true` support (verified), so Fable 5 *will* report supported.
+Leaving the enumeration unchanged would make it incomplete/misleading — a reader
+could infer the newer Fable 5 is unsupported. Because this is a factual support
+enumeration, not a "such as" example, it must be kept accurate.
+
+Decision: this additive task makes **one** targeted prose-doc change — add
+Claude Fable 5 to the `doc/extension-api.md` mid-conversation system-message
+support enumeration (alongside Claude Opus 4.8) — and makes **no** other
+`doc/*.md` or `README.md` changes. The illustrative example lists
+(`configuration.md`, `tui.md`) stay as written; chasing the newest model
+through non-exhaustive "such as" examples would invite ongoing churn, but a
+definitive capability enumeration must stay accurate. (The actual edit is
+implementation/builder work in `steps.md`, not a design follow-up.)
 
 ### Changelog obligation — required
 
