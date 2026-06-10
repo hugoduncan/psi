@@ -754,3 +754,29 @@ Consistency check: D20 is consistent with D18 (no global lock, re-entrant in-thr
 and D13/D16/D17 (single logical run-`:status` writer; terminalize-before-remove via
 in-thread sequencing). No new contradictions; no step-machine redesign; cancellation
 effect set unchanged.
+
+## Architecture-fit review (ψ pass 4, 2026-06-10)
+
+Fresh architecture-fit pass over design.md against AGENTS.md VSM (S1 effects /
+S3 dispatch, `λ parity`, `λ extend`, `λ(state)`, `λ shims_adapters`), META.md, and
+doc/architecture.md (State boundary, Dispatch sequencing contract, replay-trim,
+dispatch trace). D1–D20 already commit cancellation to effects-as-data canonical
+`:runtime/*` effects through the dispatch `:effects` interceptor (D1/D12), the
+signal/handle split (D2/D10/D14/D15), the agent-session session-dispatch authority
+for the cascade (D3/D9), terminalization reuse + two-dispatch ordering under
+apply-before-effects (D13/D16/D17/D18), and the apply-phase atom-CAS atomicity
+basis (D4/D20). Each fits the project boundaries.
+
+Verified the one candidate **new** concern not explicitly stated in the design —
+the D18 re-entrant `:runtime/dispatch-event` remove dispatch vs the S5 replay
+closure D12 invokes. Code-confirmed (`dispatch_effects.clj:186`): its
+`execute-effect!` calls `dispatch/dispatch!`, so the remove dispatch logs its own
+event-log entry. On replay the triggering effect is trimmed while the
+independently-logged remove event re-applies its pure `remove-run` dissoc — replay
+fidelity is preserved. This matches the existing reentry-safe pattern
+(scheduler-drain / post-tool). Architecturally sound, not a misfit.
+
+No new actionable architectural-fit misfit found. The design fits the architecture
+and principles; the only adjacent residual is the already-noted (D18) doc gap to
+document `:runtime/dispatch-event` re-entrancy in the sequencing contract, owned by
+the change-chain doc step at implementation time — not a new design misfit.
