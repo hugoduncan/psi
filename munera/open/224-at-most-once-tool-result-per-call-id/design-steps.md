@@ -90,3 +90,22 @@
       question is resolved in D1.
       → Resolved: replaced "Remaining Open Question" with a "Resolved Questions"
       section (items 1–3, no gap); all questions now resolved, none open.
+
+# Design follow-up — inconsistency review
+
+- [ ] Reconcile the **two interrupt-result producer citations**. Root Cause
+      step 2 + Evidence attribute the interrupt to `:on-agent-done`
+      (`statechart_actions.clj:129/149`) → `:runtime/record-pending-tool-call-interrupts`
+      effect (`dispatch_effects.clj:127`), while Desired Behaviour + D1 Mechanism
+      attribute it to `turn.clj:223 record-pending-tool-call-interrupts!`
+      (`abort-in!`). The code has **both** distinct producers, each enumerating
+      `:pending-tool-calls` and dispatching `:session/tool-agent-record-result`
+      with an `"interrupted"` toolResult. State explicitly that there are two
+      interrupt producers, that the single-chokepoint guard at
+      `:session/tool-agent-record-result` covers both, and fix D1's determinism
+      wording ("recorded **synchronously at abort time**, `turn.clj`") so it
+      grounds in the actual reproduced `:user-abort` path (which can run through
+      the `:on-agent-done` effect, not only the literal synchronous `abort-in!`
+      call). Also update D1's "`:pending-tool-calls` retained for enumeration
+      only (`turn.clj:220`)" to note the second enumeration site
+      (`dispatch_effects.clj`).

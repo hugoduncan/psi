@@ -161,3 +161,37 @@ handler `session_mutations.clj:529` currently emits both effects unconditionally
   gap); none remain open.
 
 No blockers; all six items completed.
+
+## Inconsistency review (design.md)
+
+Reviewed design.md for internal inconsistencies and design-vs-code
+inconsistencies (not ambiguity/architecture-fit). Verified cited line numbers
+against code: `core.clj:424` (swap-data! :pending-tool-calls) ✓,
+`turn.clj:220/223` (record-pending-tool-call-interrupts! enumerate+dispatch) ✓,
+`tool_runtime_adapter.clj:114` (:record-result! re-dispatch) ✓,
+`session_mutations.clj:528` (handler) ✓.
+
+New actionable inconsistency (see design-steps.md):
+1. **The interrupt-result producer is cited as two different code locations,
+   and there are in fact two distinct producers.** Root Cause step 2 + Evidence
+   attribute the interrupt to `:on-agent-done`
+   (`statechart_actions.clj:129/149`) emitting the
+   `:runtime/record-pending-tool-call-interrupts` **effect**, whose handler
+   (`dispatch_effects.clj:127`) enumerates `:pending-tool-calls` and dispatches
+   `:session/tool-agent-record-result`. Desired Behaviour + D1 Mechanism instead
+   attribute the interrupt to `turn.clj:223 record-pending-tool-call-interrupts!`
+   (called by `abort-in!` `turn.clj:233`). The code contains **both** producers,
+   each enumerating `:pending-tool-calls` and dispatching the same event with an
+   `"interrupted"` toolResult. design.md treats them as a single "interrupt
+   path" and never reconciles them. This matters twice: (a) D1's determinism
+   argument ("records `interrupted` results **synchronously at abort time**,
+   `turn.clj`") describes only the `abort-in!` path, yet the reproduced
+   `:user-abort` Evidence can flow through the `:on-agent-done` **effect** path
+   (effect executed during dispatch, not the literal synchronous `abort-in!`
+   call); (b) D1's "`:pending-tool-calls` retained for enumeration only
+   (`turn.clj:220`)" omits the second enumeration site (`dispatch_effects.clj`).
+   The single-chokepoint fix (guard at `:session/tool-agent-record-result`)
+   still covers both, but the design must acknowledge both producers and ground
+   the determinism reasoning in the actual reproduced path.
+
+No blockers; one actionable inconsistency.
