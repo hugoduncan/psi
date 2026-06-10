@@ -195,3 +195,35 @@ New actionable inconsistency (see design-steps.md):
    the determinism reasoning in the actual reproduced path.
 
 No blockers; one actionable inconsistency.
+
+## Inconsistency follow-up resolution (design-steps)
+
+Executed the single inconsistency-review follow-up item; all updates landed in
+design.md. Verified both producers in code before editing:
+- `turn.clj:217` `record-pending-tool-call-interrupts!` (enumerates
+  `:pending-tool-calls` at `turn.clj:220`, dispatches the record event), called
+  synchronously by `abort-in!` (`turn.clj:233`).
+- `statechart_actions.clj:129/149` `:on-agent-done` emits
+  `:runtime/record-pending-tool-call-interrupts`, whose handler
+  (`dispatch_effects.clj:127`) enumerates `:pending-tool-calls`
+  (`dispatch_effects.clj:131`) and dispatches the same record event.
+
+Resolution applied:
+- **Root Cause step 2** rewritten to state explicitly there are **two distinct
+  interrupt producers** (statechart-effect path + synchronous abort path), both
+  enumerating `:pending-tool-calls` and converging on the single event
+  `:session/tool-agent-record-result`; notes the reproduced `:user-abort` can
+  flow through the statechart-effect path, not only the literal synchronous
+  `abort-in!` call.
+- **Desired Behaviour determinism bullet** + **D1 Mechanism determinism bullet**
+  no longer say "synchronously at abort time, `turn.clj`"; they now ground in
+  *either* producer (effect-execution or synchronous) recording the interrupt
+  for still-pending ids before the real-result re-dispatch.
+- **D1 Mechanism atomicity bullet** now names all three producers (two interrupt
+  + real-result) and states the single chokepoint covers all three.
+- **D1 `:pending-tool-calls` retention bullet** now notes **both** enumeration
+  sites (`turn.clj:220` and `dispatch_effects.clj:131`).
+- Generalized "whichever of the two events" → record-event dispatch wording to
+  cover >2 producers per id.
+
+No blockers; item completed.

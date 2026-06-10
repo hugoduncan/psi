@@ -93,7 +93,7 @@
 
 # Design follow-up — inconsistency review
 
-- [ ] Reconcile the **two interrupt-result producer citations**. Root Cause
+- [x] Reconcile the **two interrupt-result producer citations**. Root Cause
       step 2 + Evidence attribute the interrupt to `:on-agent-done`
       (`statechart_actions.clj:129/149`) → `:runtime/record-pending-tool-call-interrupts`
       effect (`dispatch_effects.clj:127`), while Desired Behaviour + D1 Mechanism
@@ -109,3 +109,16 @@
       call). Also update D1's "`:pending-tool-calls` retained for enumeration
       only (`turn.clj:220`)" to note the second enumeration site
       (`dispatch_effects.clj`).
+      → Resolved: Root Cause step 2 rewritten to state **two distinct interrupt
+      producers** — statechart-effect path (`:on-agent-done`
+      `statechart_actions.clj:129/149` → `:runtime/record-pending-tool-call-interrupts`
+      → `dispatch_effects.clj:127`) and synchronous abort path (`abort-in!`
+      `turn.clj:233` → `record-pending-tool-call-interrupts!` `turn.clj:217`) —
+      both enumerating `:pending-tool-calls` and converging on the single event
+      `:session/tool-agent-record-result` (chokepoint covers both); the
+      reproduced `:user-abort` can flow through the effect path, not only the
+      literal synchronous call. Fixed D1 + Desired-Behaviour determinism wording
+      (no longer "synchronously at abort time, `turn.clj`"; now "either producer
+      records still-pending interrupts before the real-result re-dispatch"), and
+      D1's retention bullet now cites **both** enumeration sites (`turn.clj:220`
+      and `dispatch_effects.clj:131`). Code verified before editing.
