@@ -1736,3 +1736,32 @@ assertions fail; this is the regression the test locks.
 Test-only change (no production edit, no docs/changelog — the guarantee is
 already documented). clj-kondo clean, clj-paren-repair clean. Focused suite green
 (5 tests / 19 assertions).
+
+## Implementation review (task-implementation-review) — third pass
+
+Re-reviewed code/tests/docs against design D1 (Option C) + architecture.
+Independently verified the single-upstream-chokepoint claim by tracing the
+production provider-request path end to end:
+`session->provider-messages` (`prompt_request.clj:151`) →
+`journal->provider-messages` (de-dup applied after `repair-dangling-tool-uses`,
+`prompt_request.clj:139`) → `:turn/messages` (`prompt_request.clj:317`) →
+`build-provider-conversation` (`request.clj:54/81`, sole production caller, reads
+`:turn/messages`) → `agent-messages->ai-conversation` (`conversation.clj:136`,
+sole production caller of the rebuild) → `add-tool-result` (`conversation.clj:95`,
+sole `tool_result`-block emitter). The de-dup sits strictly upstream of the only
+block emitter, and the rebuild has exactly one production caller — so the
+single-chokepoint guarantee holds.
+
+Also verified no `:pending-tool-calls` leak from suppression: the winning writer's
+`:runtime/agent-record-tool-result` effect always `disj`s the id
+(`agent_core/core.clj:407`); the suppressed loser shares the same id, so pending
+is always cleared by the winner regardless of which producer wins.
+
+Verification: focused suites green (`tool-result-at-most-once-test` 5/19,
+`prompt-request-test` 17/48); clj-kondo clean on all changed files; CHANGELOG
+Fixed entry present and user-facing.
+
+No new architectural/abstraction/performance/correctness misfit. The two prior
+implementation-review actionable items (public `emit-tool-start-in!` seeding;
+cross-turn lifetime regression test) remain resolved. **No new actionable
+feedback.**
