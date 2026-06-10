@@ -1999,3 +1999,29 @@ Executed both second-pass test-shaper items in
 
 Verification: focused suite green (6 tests / 29 assertions, up from 27 — the two
 new memory-layer winner assertions); clj-kondo clean; parens balanced.
+
+## Test shaper review (third pass)
+
+Independent test-shaper pass on `tool_result_at_most_once_test.clj` and the
+projection test `journal-duplicate-tool-results-project-to-one-test`
+(`prompt_request_test.clj`). Prior two passes (assertion messages, both-layer
+winner symmetry) are resolved and present. The projection test is well-shaped
+(first-occurrence-wins content locked, non-contiguous case included). Two new
+actionable items, both in `tool_result_at_most_once_test.clj` (see steps.md):
+
+1. **Repeated both-layer count+winner assertion ceremony** (`economical` ∧
+   `consistent(assertion_style)` ∧ robust). Five of the six handler-layer tests
+   repeat the identical four-assertion block (count=1 on `journal` + `memory`,
+   winner `:tool-name` on `journal` + `memory`, each layer-named). This is the
+   exact ceremony the prior two test-shaper passes had to repair *per test by
+   hand* (pass 1: missing messages; pass 2: a test missing the memory winner
+   assertion) — i.e. the duplication is the source of the divergence drift.
+   Extract a shared `assert-single-recorded-result` helper (winner name passed
+   at the call site so intent stays visible; helper keeps the layer-naming
+   messages) → compresses ceremony without hiding intent, makes the both-layer
+   invariant uniform and drift-resistant.
+
+2. **Uncontrolled time in message builders** (`deterministic(control(time))` ∧
+   `minimal_incidental_setup`). `real-result-msg`/`interrupt-result-msg` stamp
+   `:timestamp (java.time.Instant/now)` — incidental wall-clock time, never
+   asserted, no de-dup/ordering keys off it. Use a fixed instant. Low priority.

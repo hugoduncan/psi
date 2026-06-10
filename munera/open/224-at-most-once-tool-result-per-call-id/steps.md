@@ -473,3 +473,40 @@
       … layer"), matching the layer-naming style the first pass applied to the
       `count` assertions. Focused suite green (6 tests / 29 assertions, up from
       27); clj-kondo clean, parens balanced.
+
+## Test shaper review follow-ups (third pass)
+
+- [ ] **Compress the repeated both-layer count+winner assertion ceremony into a
+      shared helper** in `tool_result_at_most_once_test.clj` (test-shaper
+      `economical` ∧ `consistent(assertion_style)` ∧ robustness-against-drift).
+      Five of the six handler-layer tests
+      (`abort-races-real-result-yields-one-tool-result-test`,
+      `recorded-ids-survive-turn-boundary-test`,
+      `normal-single-result-path-unaffected-test`,
+      `interrupt-only-path-yields-one-result-test`,
+      `concurrent-completion-real-result-wins-test`) repeat the identical
+      four-assertion block — `count=1` on `journal` and `memory`, plus the
+      winning `:tool-name` on `journal` and `memory`, each with a layer-naming
+      message. This ceremony is exactly what the prior two test-shaper passes had
+      to repair *per test by hand* (first pass: missing failure messages; second
+      pass: a test missing the memory winner assertion), so the duplication is
+      the active source of divergence drift. Extract a single helper
+      e.g. `(assert-single-recorded-result ctx session-id tool-call-id
+      expected-tool-name)` that asserts `count=1` + winner on **both** layers
+      with the established layer-naming messages, and call it from the five
+      single-id tests; keep the winner name at the call site (passed as an arg)
+      so intent stays locally visible — the helper compresses ceremony without
+      hiding intent (`helpers_that_compress(ceremony) ∧ ¬helpers_that_hide(intent)`).
+      `distinct-tool-call-ids-both-recorded-test` (two ids) calls it twice. This
+      collapses the per-test divergence the prior passes fixed by hand into one
+      enforced contract. Re-run the focused suite green.
+
+- [ ] **Control time in the test message builders** (test-shaper
+      `deterministic(control(time))` ∧ `minimal_incidental_setup`). `real-result-msg`
+      and `interrupt-result-msg` (`tool_result_at_most_once_test.clj`) stamp
+      `:timestamp (java.time.Instant/now)`, injecting uncontrolled wall-clock
+      time into setup; the timestamp is never asserted and no de-dup/ordering
+      keys off it, so it is incidental non-determinism. Replace with a fixed
+      instant (e.g. a named `test`-constant or `java.time.Instant/EPOCH`) so the
+      setup is fully deterministic and carries no incidental time detail. Low
+      priority (no assertion currently depends on it).
