@@ -1953,3 +1953,30 @@ Applied both test-shaper follow-ups to `tool_result_at_most_once_test.clj`
 
 Verify: focused suite green (6 tests / 27 assertions, up from 25 — the two added
 memory winner assertions); clj-kondo clean; clj-paren-repair balanced.
+
+## Test shaper review (test-shaper) — second pass
+
+Re-read `tool_result_at_most_once_test.clj` + `prompt_request_test.clj` against
+test-shaper (`consistent` ∧ `meaningful_failures`). The first-pass normalization
+left two residual asymmetries — both test-only, no behaviour gap.
+
+New actionable (2) — see steps.md "Test shaper review follow-ups (second pass)":
+
+1. **Winner-symmetry regression in `distinct-tool-call-ids-both-recorded-test`**
+   (`consistent(assertion_style)`). The first pass established a both-layer
+   winner check (assert `:tool-name` on **journal and memory**) for the
+   headline/cross-turn/concurrent/normal/interrupt tests, but
+   `distinct-tool-call-ids-both-recorded-test` (added after, in test-review 2nd
+   pass) asserts the winning `:tool-name` only on `journal-a`/`journal-b`, never
+   on `memory-a`/`memory-b` — even though it already binds both. It breaks the
+   suite-wide both-or-neither winner symmetry. Add the two memory-layer
+   `:tool-name` assertions.
+
+2. **Winner `:tool-name` assertions are message-less suite-wide**
+   (`meaningful_failures` ∧ `consistent(assertion_style)`). The first pass added
+   layer-naming failure messages to every `count` assertion, but the `:tool-name`
+   winner assertions across all tests in `tool_result_at_most_once_test.clj`
+   remain bare. The suite is now internally inconsistent: count assertions report
+   which layer diverged, winner assertions do not. Add layer-naming failure
+   messages to the winner `:tool-name` assertions so a winner mismatch also
+   reports journal-vs-memory. Low priority.

@@ -443,3 +443,24 @@
       and `memory`, matching the headline/cross-turn/concurrent tests. Focused
       suite green (6 tests / 27 assertions, up from 25); clj-kondo clean, parens
       balanced.
+
+## Test shaper review follow-ups (second pass)
+
+- [ ] **Restore both-layer winner symmetry in
+      `distinct-tool-call-ids-both-recorded-test`**
+      (`tool_result_at_most_once_test.clj`). The test asserts the winning
+      `:tool-name` (`"bash"`) only on `journal-a`/`journal-b`, not on
+      `memory-a`/`memory-b` — breaking the suite-wide both-layer winner check the
+      first test-shaper pass established for the other tests (which assert the
+      winner on **both** `journal` and `memory`). The memory bindings already
+      exist (used by the count assertions). Add `(is (= "bash" (:tool-name (first
+      memory-a))))` and the `memory-b` equivalent so the winner check is uniform
+      across the suite.
+- [ ] **Add layer-naming failure messages to the winner `:tool-name` assertions**
+      across `tool_result_at_most_once_test.clj`
+      (`consistent(assertion_style)` ∧ `meaningful_failures`). The first pass
+      messaged every `count` assertion ("…in the journal" / "…in the in-memory
+      history") but the `:tool-name` winner assertions remain bare in all tests,
+      so a winner mismatch does not report which recorded layer diverged.
+      Normalize the winner assertions to carry the same journal/memory layer
+      messages. Low priority.
