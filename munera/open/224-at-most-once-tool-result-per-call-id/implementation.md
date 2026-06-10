@@ -976,3 +976,44 @@ Checked and judged **non-actionable** (recorded so future passes do not re-raise
 **No new actionable ambiguity.** The design is exhaustively disambiguated; five
 prior passes show clear convergence (the last two addressed single-bullet phrasing
 alignment, both resolved).
+
+## Inconsistency review (design.md) — sixth pass
+
+Independent inconsistency pass (internal + design-vs-code; not ambiguity/arch-fit).
+Re-verified every load-bearing cite against current source — all accurate:
+- statechart-effect producer: read `:interrupt-reason` `statechart_actions.clj:132`;
+  emit `:runtime/record-pending-tool-call-interrupts` guarded by `interruption-reason`
+  `:149/150` ✓
+- effect handler `dispatch_effects.clj:127`, enumerate `:131`, dispatch `:134`;
+  in-memory record effect `:124` ✓
+- synchronous abort: `record-pending-tool-call-interrupts!` `turn.clj:217`,
+  enumerate `:220`, `abort-in!` `:229` calling with `:user-abort` `:233` ✓
+- session-close: `repair-pending-tool-calls-before-close!` `session_close.clj:55`,
+  enumerate `:58`, dispatch `:61`; `close-session-in!` runs `abort-session-runtime!`
+  `:105` then repair `:106` ✓
+- real-result re-dispatch `tool_runtime_adapter.clj:113/114` ✓
+- handler emits both effects `session_mutations.clj:529`; `:interrupt-reason
+  (or reason :deferred-interrupt)` `:638`; `:session/request-interrupt` handler `:630`,
+  sole dispatcher `turn.clj:189` passing `:deferred-interrupt` `:193` ✓
+- `:user-abort` only at `turn.clj:233` (message reason); schema enum
+  `model.clj:89` permits it for `:interrupt-reason` but no `assoc` ever writes it
+  there — matches "only ever `:deferred-interrupt`" claim ✓
+
+Cross-section narrative consistent: `:user-abort` ⇒ synchronous path /
+`:deferred-interrupt` ⇒ statechart-effect path; at-most-once (deterministic) vs
+first-writer-wins-by-dispatch (which result); single de-dup chokepoint at
+`journal->provider-messages` with block emission via the conversation rebuild;
+session-lifetime recorded-ids decoupled from per-turn `:pending-tool-calls`.
+
+Considered and judged **non-actionable** (recorded so future passes do not
+re-raise): Root Cause's "`:interrupt-reason` is written **only** by the
+`:session/request-interrupt` handler" is, strictly, an overstatement —
+`statechart_actions.clj:144/160` also write `:interrupt-reason nil` (the
+`:on-agent-done` reset). But those are clearing writes; the load-bearing
+conclusion the sentence supports ("the only non-nil reason ever set is
+`:deferred-interrupt`; no code ever writes `:interrupt-reason :user-abort`") is
+correct and code-verified. The imprecision changes no conclusion and re-flagging
+would be a sixth-order nitpick.
+
+**No new actionable inconsistency.** Design is internally consistent and
+consistent with referenced code on all checked points.
