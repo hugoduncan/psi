@@ -122,3 +122,21 @@
       records still-pending interrupts before the real-result re-dispatch"), and
       D1's retention bullet now cites **both** enumeration sites (`turn.clj:220`
       and `dispatch_effects.clj:131`). Code verified before editing.
+
+# Design follow-up — ambiguity review (second pass)
+
+- [ ] Disambiguate the **defensive projection de-dup location and keying
+      source**. Scope + Desired Behaviour require "at most one `tool_result` per
+      tool-call-id" across two named sites — `journal->provider-messages`
+      (`prompt_request.clj`, journal-derived) **and** the conversation rebuild
+      (`turn_runtime/conversation.clj` `agent-messages->ai-conversation`, derived
+      from agent-core in-memory history) — and qualify it "purely derived from
+      the journal, first occurrence wins". Two interpretations remain open:
+      (a) implement the guard independently at **both** sites, or (b) one shared
+      downstream chokepoint suffices (note: code shows the conversation rebuild,
+      not `journal->provider-messages`, is what emits provider `tool_result`
+      blocks via `conv/add-tool-result`). Also reconcile "purely derived from the
+      journal" with the conversation-rebuild site, whose input is in-memory
+      agent-core history, not the journal — state the de-dup keying source for
+      each site. (Distinct from resolved item 1, which fixed only the
+      in/out-of-scope question.)

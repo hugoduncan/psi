@@ -267,3 +267,38 @@ Resolution applied:
   cover >2 producers per id.
 
 No blockers; item completed.
+
+## Ambiguity review (design.md) — second pass
+
+Re-reviewed design.md for ambiguities (statements admitting >1 interpretation),
+not architecture-fit/correctness. Prior six ambiguity items + the inconsistency
+item are all resolved and verified present in design.md. Grounded the projection
+claims against code:
+- `journal->provider-messages` (`prompt_request.clj:111`) projects the
+  **persisted journal**; repair via `repair-dangling-tool-uses`.
+- `agent-messages->ai-conversation` (`turn_runtime/conversation.clj:136`)
+  rebuilds the conversation **from agent-core in-memory message history**
+  (docstring), turning each `"toolResult"` message into one `add-tool-result`
+  block keyed by `:tool-call-id` (`conversation.clj:93`). Its input is *not* the
+  journal.
+
+New actionable ambiguity (see design-steps.md):
+1. **Defensive de-dup location across the two named projection sites is
+   ambiguous, and its keying source is self-contradictory for one site.** Scope
+   and the final Desired-Behaviour bullet require "at most one `tool_result` per
+   tool-call-id" in "the provider-facing projection (`journal->provider-messages`
+   **and** the conversation rebuild)" and qualify it "**Purely derived from the
+   journal** … first occurrence wins". Two interpretations are left open:
+   (a) the guard must be implemented independently at **both** sites, vs (b) a
+   single shared downstream chokepoint suffices (the design's Root Cause implies
+   `journal->provider-messages` emits the duplicate `tool_result` blocks, but the
+   code shows the conversation rebuild is what emits provider `tool_result`
+   blocks). Additionally, "**purely derived from the journal**" only fits
+   `journal->provider-messages`; the conversation rebuild derives from in-memory
+   agent-core history, not the journal, so the de-dup's keying source (journal vs
+   history) for that second site is unspecified/contradicted. A reader cannot
+   tell where the guard(s) live or what each keys off. Distinct from resolved
+   ambiguity item 1 (which fixed only the in/out-of-scope question, not the
+   location/keying).
+
+No blockers; one actionable ambiguity.
