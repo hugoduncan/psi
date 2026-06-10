@@ -1856,3 +1856,46 @@ guard records both. Symmetric to the cross-turn lifetime lock already present
 (`recorded-ids-survive-turn-boundary-test`). Focused suite green (6 tests / 25
 assertions, scry CLI `-n` RC=0); clj-kondo clean, parens balanced. Test-only
 change; no production code touched, no doc/changelog impact.
+
+## Test review (task-test-review) — third pass
+
+Re-applied `task-test-review` criteria: well-formed ∧ behaviour-coverage
+(∀b∈design.∃t.covers) ∧ infra-hygiene (injectable ∧ nullable ∧ ¬mock ∧ ¬stub).
+Suites green: `tool-result-at-most-once` 6/25, `prompt-request` 17/49.
+
+- **Well-formed.** All tests isolated (`safe-context-opts {:persist? false}`),
+  clear arrange/act/assert, descriptive names + `testing` strings; direct-dispatch
+  vs `abort-in!` seams documented inline where load-bearing.
+- **Infra hygiene clean.** Real `session/create-context` + in-memory persistence,
+  real agent-core via `agent/emit-tool-start-in!`/`abort-in!`/`end-loop-in!`;
+  state/output assertions only (journal counts, in-memory message counts, winning
+  tool-name) — no mocks, stubs, or interaction assertions.
+- **Behaviour coverage (all design behaviours mapped).** headline interrupt-wins
+  (`abort-races…`); both-or-neither (journal ∧ memory asserted together, divergence
+  caught); normal single-result (`normal-single-result…`); interrupt-only
+  (`interrupt-only…`); concurrent-completion real-wins (`concurrent-completion…`,
+  design-pinned direct-dispatch seam); cross-turn session-scoped lifetime
+  (`recorded-ids-survive-turn-boundary…`); per-tool-call-id granularity
+  (`distinct-tool-call-ids-both-recorded…`); already-wedged projection recovery
+  contiguous+non-contiguous + first-occurrence-wins
+  (`journal-duplicate-tool-results-project-to-one…`).
+
+Candidate gaps examined and discharged (no new actionable):
+- **Per-producer coverage** (statechart-effect `:deferred-interrupt`,
+  session-close): design's funnel property makes producer enumeration explicitly
+  *not load-bearing* — all producers funnel through the single
+  `:session/tool-agent-record-result` event, whose chokepoint suppression is
+  directly locked by `concurrent-completion…`. Per-producer tests would test the
+  non-load-bearing enumeration, not new behaviour.
+- **"any tool" (delegate/psi-tool)**: guard is keyed by tool-call-id and
+  tool-name-agnostic; bash exercises the mechanism. Extra tool-names = redundant,
+  low-signal.
+- **Non-`toolResult` message preservation through `dedupe-tool-results`**: already
+  covered by `journal->provider-messages-repairs-dangling-tool-use-test`
+  (`(= ["assistant" "toolResult" "user"] (mapv :role messages))`) which runs the
+  full projection including the new de-dup.
+- **Async re-surfacing / background delivery**: explicitly out of scope.
+
+Verdict: REVIEW_COMPLETE — three skill criteria satisfied; the two prior passes
+resolved the genuine gaps (first-occurrence-wins, per-tool-call-id granularity).
+No new actionable feedback.
