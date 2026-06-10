@@ -2251,3 +2251,31 @@ Executed the single second-pass code-shaper item (seed
   assertions).
 
 No blockers; item completed.
+
+## Code-shaper review (third pass) — no actionable feedback
+
+Re-read the production surface through the code-shaper lens
+(`simple ∧ consistent ∧ robust`); no new actionable issues.
+
+- **Handler guard** (`session_mutations.clj:530` `:session/tool-agent-record-result`)
+  is single-responsibility and pure: reads canonical `recorded-ids` once via the
+  bound `recorded-ids-path`, branches `{:effects []}` (valid no-op pure-result,
+  fixed 1st pass) vs both-effects + `:root-state-update`. xor(computation,
+  flow-control) holds; locally comprehensible. `(or … #{})` defence-in-depth is
+  documented intent alongside init seeding, not redundancy.
+- **`dedupe-tool-results`** (`prompt_request.clj:105`) is a clean pure first-wins
+  fold; de-dup-after-repair placement (`:139`) is pinned and correct. Single
+  upstream chokepoint — no second guard at the rebuild. Distinct, orthogonal
+  responsibility from the handler guard (forward-fix vs already-wedged recovery),
+  so the two guards are not duplicated mechanism.
+- **Init seed** (`init.clj:88`) single-sources the path via the helper (fixed 2nd
+  pass), consistent with the handler's read/update site.
+- **Consistency:** path helper named with `session-` prefix per convention; no-op
+  idiom matches sibling handlers; lint clean (0 warnings) across all four changed
+  source files.
+
+Minor `let`-binding vertical-alignment drift in the handler (the longer
+`recorded-ids-path` value column does not match the two padded shorter bindings)
+is cosmetic, governed by cljfmt, and below the actionable bar — not raised.
+
+No blockers; no follow-up items added.
