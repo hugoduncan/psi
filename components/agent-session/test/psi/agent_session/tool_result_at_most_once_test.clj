@@ -64,7 +64,7 @@
           agent-ctx        (ss/agent-ctx-in ctx session-id)
           tool-call-id     "tc-abort-race"]
       ;; tool-call genuinely in-flight: pending, real result not yet produced
-      (swap! (:data-atom agent-ctx) update :pending-tool-calls (fnil conj #{}) tool-call-id)
+      (agent/emit-tool-start-in! agent-ctx {:id tool-call-id :name "bash" :arguments "{}"})
       ;; :user-abort synchronous abort-in! records the synthetic interrupt first
       (session/abort-in! ctx session-id)
       ;; the in-flight tool then completes and dispatches its real result
@@ -96,7 +96,7 @@
     (let [[ctx session-id] (create-session-context)
           agent-ctx        (ss/agent-ctx-in ctx session-id)
           tool-call-id     "tc-interrupt-only"]
-      (swap! (:data-atom agent-ctx) update :pending-tool-calls (fnil conj #{}) tool-call-id)
+      (agent/emit-tool-start-in! agent-ctx {:id tool-call-id :name "bash" :arguments "{}"})
       (session/abort-in! ctx session-id)
       (let [journal (journal-tool-results ctx session-id tool-call-id)
             memory  (memory-tool-results ctx session-id tool-call-id)]

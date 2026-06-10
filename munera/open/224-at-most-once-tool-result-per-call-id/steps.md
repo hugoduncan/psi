@@ -291,7 +291,7 @@
 
 ## Implementation review follow-ups (first pass)
 
-- [ ] **Seed in-flight tool state via the public `agent/emit-tool-start-in!`
+- [x] **Seed in-flight tool state via the public `agent/emit-tool-start-in!`
       API, not a direct `:data-atom` swap, in the characterization tests.**
       `abort-races-real-result-yields-one-tool-result-test` and
       `interrupt-only-path-yields-one-result-test`
@@ -305,6 +305,13 @@
       the `:pending-tool-calls` representation. Leave
       `concurrent-completion-real-result-wins-test` on direct dispatch (its
       design-pinned seam). Re-run the suite to confirm still green.
+      → **Resolved:** both `abort-races-real-result-yields-one-tool-result-test`
+      and `interrupt-only-path-yields-one-result-test` now seed in-flight tool
+      state via `(agent/emit-tool-start-in! agent-ctx {:id tool-call-id :name
+      "bash" :arguments "{}"})` instead of the direct `:data-atom` swap;
+      `concurrent-completion-real-result-wins-test` left on its design-pinned
+      direct dispatch. Focused suite green (4 tests / 14 assertions) and the full
+      unit suite green.
 
 ## Plan/steps inconsistency review follow-ups (third pass)
 

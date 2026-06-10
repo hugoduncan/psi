@@ -1654,3 +1654,22 @@ Actionable (one):
    `:pending-tool-calls` representation rather than silently breaking or passing
    vacuously. (`concurrent-completion-…` correctly uses direct dispatch by
    design and is out of scope for this item.)
+
+## Implementation review follow-up (1st pass) — resolved
+
+Replaced the direct `:data-atom` swap with the public
+`agent/emit-tool-start-in!` API in the two characterization tests that seed
+in-flight tool state (`tool_result_at_most_once_test.clj`):
+
+- `abort-races-real-result-yields-one-tool-result-test`
+- `interrupt-only-path-yields-one-result-test`
+
+Both now call
+`(agent/emit-tool-start-in! agent-ctx {:id tool-call-id :name "bash" :arguments "{}"})`,
+exercising the real in-flight path (incl. the `:tool-execution-start` event) and
+staying robust to `:pending-tool-calls` representation changes.
+`concurrent-completion-real-result-wins-test` left on its design-pinned direct
+dispatch (out of scope).
+
+Verification: clj-kondo clean, clj-paren-repair success; focused suite green
+(4 tests / 14 assertions); full `bb clojure:test:unit` green (exit 0).
