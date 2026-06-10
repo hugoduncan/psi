@@ -906,3 +906,43 @@ Checked the cross-section narrative for residual contradiction:
 
 **No new actionable inconsistency.** Design is internally consistent and
 consistent with referenced code on all checked points.
+
+## Architecture-fit review (design.md) — fifth pass
+
+Independent architecture-fit pass on the current post-D1 (Option-C) design.
+Grounded against doc/architecture.md (State boundary: canonical root vs runtime
+handles; Dispatch sequencing contract — pure result → apply → effects last;
+request preparation as pure projection), META.md, and AGENTS.md
+(single-source-of-truth atom, dispatch-owns-writes, effects-as-data, one_way,
+¬shims/adapters).
+
+Fit confirmed; **no new actionable architectural misfit**:
+- recorded-tool-result-ids in `:state*`, `:pending-tool-calls` (agent-core
+  `swap-data!` atom) kept external for interrupt enumeration → State-boundary
+  conformant.
+- pure guarded handler returning `:root-state-update` with both-or-neither
+  effect emission, atomicity from dispatch serialization (no test-and-set) →
+  Dispatch sequencing contract.
+- defensive de-dup at `journal->provider-messages` is a purely-derived
+  provider-request projection keyed by tool-call-id (request prep = pure
+  projection); complementary recovery of legacy duplicate journals, not a
+  parallel source of truth → robust(code), defense-in-depth over distinct
+  temporal populations (new-write prevention vs already-persisted recovery).
+- single chokepoint at `:session/tool-agent-record-result` (funnel) → one_way /
+  single-source; interrupt producers not routing through the dispatch-owned
+  `:session/tool-record-result` slice is pre-existing topology, rerouting is out
+  of scope.
+- session-lifetime recorded-ids cleared on session reset/clear (same boundary as
+  journal/history) → coherent canonical-state lifecycle; bounded by per-session
+  tool-call count.
+
+Considered and judged **non-actionable** (recorded so future passes do not
+re-raise): D1's rationale invokes "observable, queryable status" to prefer
+Option C, but the design specifies no EQL resolver over recorded-ids. This is
+not a misfit — the State-boundary principle does not mandate a resolver for
+every `:state*` datum, and adding one would be scope creep. The C-over-B
+decision is independently load-bearing on the Dispatch-sequencing (pure-result
+vs test-and-set) and cross-component-layering rationales, so the unrealized
+queryability claim is non-load-bearing.
+
+No new follow-up items; prior architecture-fit items remain resolved by D1.
