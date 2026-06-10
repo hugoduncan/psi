@@ -197,3 +197,25 @@
       Both required: (a) alone mislabels outcome/skips pure-removal; (b) alone hits
       post-removal `workflow-in`→nil. Code-confirmed the `(when wf …)` +
       `:error?`/`:done?`-only handler.
+
+## Architecture-fit follow-ups (ψ pass 3, 2026-06-10)
+
+- [ ] Reconcile D16's terminalize-before-remove ordering with the dispatch
+      apply-before-effects sequencing contract (doc/architecture.md "Dispatch
+      sequencing contract": effective after-order `:apply → :validate →
+      :trim-effects-on-replay → :effects`). The run-record removal is the pure
+      `remove-run` `:state*` dissoc (`workflow-runtime/core.clj`, `state →
+      [state', run]`), so it executes in the `:apply` phase — **before** the
+      `:runtime/mark-workflow-jobs-terminal` effect (D13), which re-reads the run
+      via `workflow-in` in the `:effects` phase. In a single cancel-then-remove
+      dispatch the apply-phase removal therefore precedes the terminalize effect →
+      `workflow-in`→nil → job skipped, defeating the D16 "no lingering job"
+      guarantee. State the fit resolution: either (a) split cancel-then-remove so
+      the canonical run-record removal occurs in a **distinct subsequent dispatch**
+      (cancel dispatch terminalizes the job while the run is still present; a later
+      remove dispatch drops the canonical record), or (b) make the
+      `:runtime/mark-workflow-jobs-terminal` reconcile **not depend** on re-reading
+      the canonical run (carry run identity + `:cancelled` outcome in the effect
+      payload). Update D5/D13/D16 so the ordering is expressible under the
+      apply-before-effects pipeline (a pure `:state*` removal cannot be sequenced
+      after an effect within one dispatch).

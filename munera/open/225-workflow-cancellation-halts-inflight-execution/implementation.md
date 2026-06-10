@@ -477,3 +477,44 @@ Consistency check: D16 is consistent with D4 (run `:status` single-writer), D5
 (cancel-then-remove sequence ordering), and D13 (single background-job terminal
 writer, reuse not a second writer). No new contradictions introduced; no
 step-machine redesign.
+
+## Architecture-fit review (ψ pass 3, 2026-06-10)
+
+Fresh architecture-fit pass over design.md against doc/architecture.md "Dispatch
+sequencing contract" and the confirmed pure transition functions. D1–D16 already
+fit the effects-as-data / signal-handle / session-dispatch-authority / serialized
+single-writer / dispatch-effect-parity boundaries — those stand. One **new**
+actionable misfit: D16's terminalize-before-remove ordering collides with the
+dispatch apply-before-effects sequencing.
+
+1. **D16(1) "terminalize-before-remove" ordering is unachievable within one
+   dispatch because run-record removal is a pure `:state*` transition, not an
+   effect.** doc/architecture.md fixes the effective dispatch after-order as
+   `:apply → :validate → :trim-effects-on-replay → :effects` — **all** pure state
+   application precedes **all** effects in a single dispatch. The run-record
+   removal is the pure `remove-run` dissoc on canonical `:state*`
+   (`workflow-runtime/core.clj`: `(update-in (runs-path) dissoc run-id)`,
+   `state → [state', run]`), so it runs in the `:apply` phase. The job
+   terminalization is the `:runtime/mark-workflow-jobs-terminal` effect (D13),
+   which runs in the `:effects` phase and re-reads the run via
+   `extension-workflow-runtime/workflow-in`. Therefore, if D5 cancel-then-remove is
+   a single dispatch, the apply phase removes the canonical run **before** the
+   terminalize effect runs → `workflow-in` returns nil → job skipped — exactly the
+   lingering-job failure D16 set out to prevent. D16 frames "terminalize before
+   remove" as ordering *within the effect set*, but a pure `:state*` removal cannot
+   be sequenced after an effect within one dispatch; the architecture's
+   apply-before-effects contract forces the removal first. Fit decision the design
+   must state: split cancel-then-remove so the canonical run-record removal happens
+   in a **distinct, subsequent dispatch** (the cancel dispatch terminalizes the job
+   via the effect while the run is still present; a following remove dispatch then
+   drops the canonical record), or make the terminalize reconcile **not depend** on
+   re-reading the canonical run (carry the run identity/`:cancelled` outcome in the
+   `:runtime/mark-workflow-jobs-terminal` effect payload so it terminalizes without
+   `workflow-in`). Either reconciles D16 with the dispatch sequencing contract; the
+   current "order the removal after the terminalize effect" is not expressible given
+   apply-before-effects.
+
+This is a boundary-sequencing decision for the design to state, not a step-machine
+redesign (correctly out of scope). It is distinct from the pass-2 inconsistency
+note/D16, which identified the `(when wf …)`-skip + missing `:cancelled` branch but
+did not reconcile the ordering against the dispatch apply-before-effects pipeline.
