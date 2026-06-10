@@ -2161,3 +2161,29 @@ idiomatic and single-responsibility; reduce (vs the surrounding loop/recur) is
 the natural fit for a stateful first-wins fold; the dual nil-safety
 (`or … #{}` read + `(fnil conj #{})` update) is documented defense-in-depth, not
 redundancy.
+
+## Code-shaper review follow-ups (first pass) — executed
+
+Executed both first-pass code-shaper follow-up items in
+`session_mutations.clj` (`:session/tool-agent-record-result` handler).
+
+1. **Suppression branch → `{:effects []}`** (was `{}`). `{}` is not a valid
+   pure-result per `pure-result-schema` (requires ≥1 recognized key) and only
+   worked via `normalize-handler-result`'s `{:return result}` coercion;
+   `{:effects []}` expresses "no effects, no state update" directly and matches
+   the established no-op idiom (`:session/retarget-runtime-prompt-metadata`,
+   `session_mutations.clj:429`). Suppression behaviour unchanged.
+
+2. **Path bound once.** Added `recorded-ids-path
+   (session/session-recorded-tool-result-ids-path session-id)` to the handler
+   `let`, reused for both the `get-state-value-in` read and the
+   `:root-state-update` `update-in` (previously the path was recomputed inside
+   the update closure). Declined the optional `record-tool-result-id-root-update`
+   closure-builder: a `*-root-update` builder owns its own path internally (like
+   `append-journal-entry-root-update`), which would reintroduce a second path
+   computation at the read site and defeat the bind-once goal. The single `let`
+   binding is the simpler shape that puts the path in one place for both uses.
+
+Verification: at-most-once suite green (6 tests / 29 assertions); clj-kondo
+clean, parens balanced. No design/spec/doc/changelog change (pure-result idiom +
+DRY refactor; behaviour identical, no user surface).

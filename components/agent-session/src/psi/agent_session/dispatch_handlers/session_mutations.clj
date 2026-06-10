@@ -534,19 +534,16 @@
      ;; funnels through this event, so a pure guard here covers them all.
      ;; Atomicity comes from dispatch serialization (single writer to :state*),
      ;; not a runtime test-and-set.
-     (let [tool-call-id (:tool-call-id tool-result-msg)
-           recorded-ids (or (session/get-state-value-in
-                             ctx
-                             (session/session-recorded-tool-result-ids-path session-id))
-                            #{})]
+     (let [tool-call-id    (:tool-call-id tool-result-msg)
+           recorded-ids-path (session/session-recorded-tool-result-ids-path
+                              session-id)
+           recorded-ids    (or (session/get-state-value-in ctx recorded-ids-path)
+                               #{})]
        (if (contains? recorded-ids tool-call-id)
-         {}
+         {:effects []}
          {:root-state-update
           (fn [state]
-            (update-in state
-                       (session/session-recorded-tool-result-ids-path session-id)
-                       (fnil conj #{})
-                       tool-call-id))
+            (update-in state recorded-ids-path (fnil conj #{}) tool-call-id))
           :effects [{:effect/type :runtime/agent-record-tool-result
                      :tool-result-msg tool-result-msg}
                     (journal-append-effect/append-message-effect session-id tool-result-msg)]}))))
