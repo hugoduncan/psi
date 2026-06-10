@@ -125,3 +125,44 @@ contracts under-specified:
    refinement"; D1–D4 only resolve the boundary questions (Q2 via D3, Q4 partly via
    D2), leaving Q1 and Q3 open with no marker of resolution status. An implementer
    cannot tell which questions are still live.
+
+## Ambiguity follow-up resolution (ψ, 2026-06-10)
+
+Executed all six ambiguity follow-up design-steps. Each was a design-decision step
+(pick one explicit contract, state in design.md); all completable now — no
+blockers. Resolutions written to design.md as "Behaviour-Contract Decisions"
+D5–D9 plus a "Design Questions — Resolution status" section, and the ambiguous
+prose in Intent / Desired Behaviour / Scope / Acceptance / Design Questions was
+reconciled:
+
+- D5 — `remove` of a live run = cancel-then-remove (commit `:cancelled`, emit
+  cancel effects, remove record); future-cancel interrupt prevents re-orphaning
+  after removal. Resolves Q3; dropped the "(or refuse/reject)" alternatives in
+  Desired Behaviour and Scope.
+- D6 — in-flight child turn is *always* interrupted (guaranteed action via
+  `:session/abort`); the guarantee is "no **new** side effects initiated after the
+  cancel checkpoint," with the lone already-in-syscall-flight effect a physics
+  exception. Resolves Q1; reconciled the absolute Intent/Acceptance wording and
+  removed the "/" in Desired Behaviour and acceptance #3/#4.
+- D7 — cancel during a parked `send-and-drain` wait actively interrupts the wait
+  (`future-cancel(true)`); guaranteed stop bound = interrupt delivery + child
+  abort, not natural turn completion. Concretises D2's "interrupt-aware wait
+  wake-ups."
+- D8 — division of labor: cooperative read-path check = primary advance-guard
+  (pull, for cancels arriving between steps); `future-cancel(true)`/interrupt =
+  wait-wakeup + removed-run backstop (push). Both required for different runtime
+  states → `send-and-drain` wait interrupt-safety is in scope.
+- D9 — D1 and D3 describe one path, not two owners: the D1 effect-as-data handler
+  invokes D3's `:session/abort` dispatch (single agent-session owner, single effect
+  path).
+- Design Questions Q1–Q4 each tagged RESOLVED inline with D-pointers; resolution
+  summary section added; no questions remain live.
+
+Self-consistency check: D5–D9 are consistent with D1–D4 (effects-as-data at the
+runtime boundary, signal/handle split, agent-session-owned cascade, serialized
+terminal transitions) — D8/D9 reuse the D1 effect boundary and D3 dispatch
+authority; D7's interrupt is the push companion to D2's pull read; D5's
+cancel-then-remove routes its terminal transition through D4's serialized writer.
+No new ambiguity introduced; the only acknowledged residual is the physics
+exception in D6 (one in-flight effect may land), which is testable as a negative
+(no *new* effect initiated).

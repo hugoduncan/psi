@@ -32,29 +32,46 @@
 
 ## Ambiguity follow-ups (ψ, 2026-06-10)
 
-- [ ] Resolve Design Question 3: pick one explicit contract for `remove` of a
+- [x] Resolve Design Question 3: pick one explicit contract for `remove` of a
       live run — cancel-then-remove vs reject-while-live — and update Desired
       Behaviour, Scope, and Q3 to state the single chosen semantics (no "(or …)"
       alternatives).
-- [ ] Resolve Design Question 1: state whether interrupting the directly-cancelled
+      → design.md D5: cancel-then-remove; Desired Behaviour/Scope/Q3 updated to
+      drop the "or refuse while live" / "(or rejects)" alternatives.
+- [x] Resolve Design Question 1: state whether interrupting the directly-cancelled
       run's in-flight child turn (preventing the one in-flight commit) is a
       *guaranteed* acceptance requirement or best-effort. Reconcile the absolute
       Intent/Acceptance "no further side effects after cancel" with Desired
       Behaviour's "at minimum … ideally … interrupted" and acceptance criterion
       #3's "signalled to stop / turn does not advance" — remove the "/" ambiguity.
-- [ ] Define the cancel-during-blocking-`send-and-drain`-wait contract: is a cancel
+      → design.md D6: interrupt is a guaranteed action; contract restated as "no
+      new side effects initiated after the cancel checkpoint" (one already-in-flight
+      tool call may complete — physics). Intent, Desired Behaviour, Scope, and
+      Acceptance #3/#4 updated; "/" removed.
+- [x] Define the cancel-during-blocking-`send-and-drain`-wait contract: is a cancel
       arriving mid-wait observed only at the next between-steps checkpoint (turn
       runs to natural completion) or is the wait actively interrupted to stop
       promptly? State the guaranteed stop bound (ties D2 "interrupt-aware wait
       wake-ups" to a concrete behaviour).
-- [ ] Specify the division of labor between the cooperative signal-read stop (D2)
+      → design.md D7: wait is actively interrupted (`future-cancel(true)`);
+      guaranteed stop bound = interrupt delivery + child abort, not natural turn
+      completion.
+- [x] Specify the division of labor between the cooperative signal-read stop (D2)
       and `future-cancel`/interrupt of the worker future: which is primary for
       unblocking a parked wait, and whether `future-cancel` is a backstop after
       cooperative exit. Determines whether wait interrupt-safety is in scope.
-- [ ] Make explicit whether D1 (child-session abort executed at the orchestration
+      → design.md D8: read-path check = primary advance-guard (pull);
+      `future-cancel(true)` = wait-wakeup + removed-run backstop (push); both
+      required for different states; wait interrupt-safety is in scope.
+- [x] Make explicit whether D1 (child-session abort executed at the orchestration
       runtime boundary as effect-as-data) and D3 (child-session abort via the
       agent-session `:session/abort` dispatch authority) describe one path (effect
       handler invokes the dispatch authority) or two owners; state the single path.
-- [ ] Update the "Design Questions (resolve during refinement)" section to mark
+      → design.md D9: one path — D1 effect handler invokes D3's `:session/abort`
+      dispatch; single owner (agent-session) reached through a single effect path.
+- [x] Update the "Design Questions (resolve during refinement)" section to mark
       each of Q1–Q4 as resolved (with pointer to its D-decision) or still-open, so
       an implementer can tell which questions remain live.
+      → design.md: Q1–Q4 each tagged RESOLVED inline with D-pointers, plus a
+      "Design Questions — Resolution status" summary section; no questions remain
+      live.

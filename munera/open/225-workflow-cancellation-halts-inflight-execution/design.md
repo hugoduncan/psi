@@ -8,8 +8,10 @@ Cancelling a running delegated workflow must actually stop it. Today, cancelling
 agent sessions, and committing to the worktree. A cancelled run is a runaway.
 
 This task makes cancellation authoritative: after a cancel, no further steps
-execute, no further child sessions spawn, and no further side effects (commits,
-journal writes) are produced — transitively across nested sub-runs.
+execute, no further child sessions spawn, and **no new side effects are
+initiated** (commits, journal writes) — transitively across nested sub-runs. A
+single tool call already in syscall flight at the interrupt instant may complete;
+nothing past that point starts (see D6).
 
 ## Evidence (observed this session)
 
@@ -55,15 +57,16 @@ loop:
   next safe checkpoint (at minimum, between steps) — it must not start another
   step, create another sub-run, or spawn another child session.
 - **No orphaned futures:** cancelling a run cancels/interrupts its worker future;
-  `remove` of a live run must cancel it first (or refuse while live) — never drop
-  the handle and leave the thread running.
+  `remove` of a live run cancels it first then removes the record (cancel-then-
+  remove, D5) — never drop the handle and leave the thread running.
 - **Transitive propagation:** cancelling a parent run cancels its in-flight nested
   delegate sub-runs and signals their child agent sessions to stop, so the whole
   tree winds down.
-- **In-flight child turn:** define and implement the intended behaviour for a
-  child agent turn already mid-execution when cancel arrives (cooperative signal
-  vs. thread interrupt) — at minimum the workflow must not advance past that step,
-  and ideally the child turn is interrupted so no further tool calls / commits run.
+- **In-flight child turn:** when cancel arrives with a child agent turn already
+  mid-execution, the workflow does not advance past that step **and** the child
+  turn is interrupted (guaranteed, via the `:session/abort` path) so it initiates
+  no further tool calls / commits — only a single already-in-syscall-flight effect
+  may complete (D6).
 - **Idempotent / race-safe:** cancel during a step boundary, during a blocking
   wait, and after natural completion must all behave sanely (no double-terminal,
   no resurrection).
@@ -77,8 +80,7 @@ In scope:
 - A cooperative cancellation check in the workflow execution/step-advance loop
   keyed on run status (`:cancelled`/removed), so the loop exits promptly.
 - `execute-async!` / inflight-run lifecycle: `future-cancel` (with interrupt) on
-  cancel; `remove` of a live run cancels-then-removes (or rejects) rather than
-  orphaning.
+  cancel; `remove` of a live run cancels-then-removes (D5) rather than orphaning.
 - Propagation of cancellation to nested delegate sub-runs and their child agent
   sessions (reuse the existing session interrupt/abort path where possible).
 - Ensuring the background job for a cancelled run is marked terminal.
@@ -97,20 +99,23 @@ Out of scope:
 
 ## Design Questions (resolve during refinement)
 
+All four resolved — see "Design Questions — Resolution status" below for pointers.
+
 1. **Checkpoint granularity.** Between-steps cooperative check only, vs. also
    interrupting an in-flight child agent turn. Between-steps is simplest and stops
    runaway advancement; interrupting the current turn additionally prevents the
-   one in-flight commit. Decide the guaranteed contract.
+   one in-flight commit. Decide the guaranteed contract. → **RESOLVED (D6, D7).**
 2. **Child-session stop mechanism.** Cooperative cancel signal threaded into the
    child session turn vs. thread interrupt of the executing worker. Prefer the
    existing session interrupt/abort pathway if it cleanly aborts a turn.
+   → **RESOLVED (D3, D9).**
 3. **`remove` semantics on a live run.** Cancel-then-remove vs. reject-with-error
    while running. Cancel-then-remove is friendlier; reject is safer against
-   orphaning. Pick one and make it explicit.
+   orphaning. Pick one and make it explicit. → **RESOLVED (D5): cancel-then-remove.**
 4. **Synchronous `execute-run` boundary.** Whether cancellation needs the step
    loop to poll run status (pull) or to receive an interrupt/flag (push), given
    the loop blocks on `send-and-drain` promises — likely both: a status poll at
-   each step boundary plus interrupt-aware waits.
+   each step boundary plus interrupt-aware waits. → **RESOLVED (D2, D7, D8): both.**
 
 ## Architecture & Boundary Decisions (ψ, 2026-06-10)
 
@@ -208,6 +213,113 @@ functions keep their argument-checks (terminal-status precondition) but the
 authoritative atomicity comes from dispatch serialization, not the mutation's
 outer `when` guard.
 
+## Behaviour-Contract Decisions (ψ, 2026-06-10)
+
+Resolves the ambiguity follow-ups raised by the design review. These pick a
+single explicit contract for each under-specified behaviour and remove the
+remaining "(or …)" / "/" alternatives. They do not redesign the step machine.
+
+### D5. `remove` of a live run = cancel-then-remove (resolves Q3)
+
+`remove` of a live (non-terminal) run is **cancel-then-remove**, not
+reject-while-live. A `remove` request on a live run:
+
+1. commits the `:cancelled` terminal transition (D4: serialized single-writer),
+2. emits the cancellation effects (D1: `future-cancel`/interrupt + transitive
+   cascade per D3),
+3. removes the run record from the registry/`inflight-runs`.
+
+The `future-cancel` interrupt (D8) guarantees the worker stops even though its run
+record and canonical signal are gone after removal — so removal cannot re-orphan
+the thread. This matches the observed user intent in the Evidence (the operator
+ran `delegate remove` expecting the run to stop). `remove` of an
+already-terminal run is unchanged (plain record removal). This is the single
+chosen semantics; Desired Behaviour and Scope are updated to drop the "or refuse
+while live" / "(or rejects)" alternative.
+
+### D6. In-flight child turn: guaranteed interrupt action; "no new side effects initiated" contract (resolves Q1)
+
+The directly-cancelled run's in-flight child turn is **always interrupted** (a
+guaranteed action, via the D3/D9 `:session/abort` path), not best-effort. The
+guarantee is stated over side effects that have **not yet started**:
+
+- **Guaranteed:** after the cancel checkpoint no further step executes, no further
+  sub-run is created, no further child session spawns, and the in-flight child
+  turn is interrupted so it initiates **no new tool calls / commits**.
+- **Not guaranteed (physics):** a single tool call already in syscall flight at the
+  instant of interrupt (e.g. a `git commit` already issued) may complete; it cannot
+  be recalled.
+
+So the absolute Intent/Acceptance "no further side effects after cancel" is
+restated precisely as "**no new side effects are initiated** after the cancel
+checkpoint." The interrupt itself is the guaranteed requirement; the residual
+in-flight effect is the only permitted exception. The nullable/controlled
+acceptance harness asserts the guaranteed property (no *new* tool call initiated
+after the checkpoint), which is deterministic.
+
+### D7. Cancel during a blocking `send-and-drain` wait: actively interrupted (resolves part of Q4)
+
+A cancel arriving while the step loop is parked on a `send-and-drain` deref
+**actively interrupts the wait** — it does not wait for the child turn to complete
+naturally. `future-cancel(mayInterruptIfRunning=true)` (D8) delivers a thread
+interrupt that wakes the parked deref; the loop then returns to the cooperative
+checkpoint, observes the `:cancelled` signal (or the `InterruptedException`), and
+exits to a clean terminal. **Guaranteed stop bound:** interrupt delivery + child
+abort, *not* natural turn completion. This is the concrete behaviour behind D2's
+"interrupt-aware wait wake-ups"; the "next safe checkpoint (at minimum, between
+steps)" wording in Desired Behaviour is the *cooperative* path for cancels that
+arrive while running between steps — the parked-wait case is the interrupt path.
+
+### D8. Division of labor: cooperative read = advance-guard (pull); future-cancel/interrupt = wait-wakeup + removed-run backstop (push)
+
+Both mechanisms are required and cover **different runtime states**; neither is
+merely a backstop:
+
+- **Cooperative read-path check (D2) — primary advance-guard (pull).** At each
+  step boundary and after each wait wake-up the loop reads the canonical
+  `:cancelled` signal via the read path and refuses to start the next
+  step/sub-run/child-session. This is the authoritative "do not advance"
+  mechanism, and the only one needed when a cancel arrives while the loop is
+  running between steps.
+- **`future-cancel(true)` / interrupt — wait-wakeup + removed-run backstop
+  (push).** Used to (a) wake a thread parked on a `send-and-drain` deref so the
+  cooperative check can run (D7), and (b) stop a worker whose run record/signal was
+  already removed by `remove` (D5), where no signal remains to read.
+
+Consequently **interrupt-safety of the `send-and-drain` wait is in scope**: the
+wait must propagate/handle `InterruptedException` so control returns to the
+cooperative checkpoint for a clean terminal exit rather than leaking the interrupt
+or dying uncleanly.
+
+### D9. Single child-session-abort path: effect handler invokes the dispatch authority (reconciles D1 and D3)
+
+D1 and D3 describe **one path, not two owners**. Child-session abort is a
+cancellation effect-as-data emitted at the cancel/remove boundary (D1) whose
+**effect handler invokes the agent-session session-dispatch authority's
+`:session/abort`** (D3) — i.e. `emit effect → runtime-boundary effect handler →
+:session/abort dispatch → agent-core/abort-in! → context thread interrupt`. D1
+names *where the effect is emitted and executed* (the runtime boundary that owns
+`inflight-runs`); D3 names *what that handler invokes* (the session-dispatch
+authority). There is a single owner of the invocation (agent-session) reached
+through a single effect path.
+
+## Design Questions — Resolution status (ψ, 2026-06-10)
+
+The "Design Questions (resolve during refinement)" Q1–Q4 above are resolved as:
+
+- **Q1 (checkpoint granularity / in-flight child turn):** RESOLVED by D6 (+ D7) —
+  guaranteed between-steps non-advancement *and* guaranteed interrupt of the
+  in-flight child turn; contract is "no new side effects initiated after the cancel
+  checkpoint."
+- **Q2 (child-session stop mechanism):** RESOLVED by D3 + D9 — reuse the existing
+  `:session/abort` session interrupt/abort pathway (compose > new mechanism).
+- **Q3 (`remove` semantics on a live run):** RESOLVED by D5 — cancel-then-remove.
+- **Q4 (synchronous `execute-run` boundary, pull vs push):** RESOLVED by D2 + D7 +
+  D8 — both: read-path status poll at each step boundary (pull) *plus*
+  interrupt-aware `send-and-drain` waits via `future-cancel(true)` (push).
+
+No Design Questions remain live.
+
 ## Acceptance Criteria
 
 - A test cancels a multi-step workflow run mid-flight and asserts that **no step
@@ -215,9 +327,11 @@ outer `when` guard.
   `:cancelled` terminal state with its background job terminal.
 - A test asserts `remove` of a live run does not leave a running worker future /
   orphaned thread (future is cancelled, inflight cleared only after cancel).
-- A test asserts cancellation propagates to a nested delegate sub-run (and its
-  child session is signalled to stop / its turn does not advance the parent).
-- No side effects (commits, journal writes, new child sessions) occur after a run
-  is cancelled, verified in a nullable/controlled harness.
+- A test asserts cancellation propagates to a nested delegate sub-run: its child
+  session is signalled to stop so its turn does not advance the parent.
+- No **new** side effects (commits, journal writes, new child sessions) are
+  initiated after the cancel checkpoint — the in-flight turn is interrupted and at
+  most one already-in-flight tool call may complete (D6) — verified in a
+  nullable/controlled harness.
 - `bb test` green; clj-kondo clean; CHANGELOG updated (user-visible: cancelling a
   delegated workflow now actually stops it).
