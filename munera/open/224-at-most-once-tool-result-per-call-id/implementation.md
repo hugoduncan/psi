@@ -521,3 +521,46 @@ the enumeration for accuracy):
   sites (`turn.clj:220`, `dispatch_effects.clj:131`, `session_close.clj:58`).
 
 No blockers; item completed.
+
+## Inconsistency review (design.md) — third pass
+
+Re-reviewed design.md for design-vs-code inconsistencies. Re-verified producer
+line numbers (`statechart_actions.clj:129/149`, `dispatch_effects.clj:127/131`,
+`turn.clj:217/220/233`, `session_close.clj:55/58/60/106`,
+`tool_runtime_adapter.clj:114`, `session_mutations.clj:529`) — all accurate.
+Audited how `:user-abort` vs `:deferred-interrupt` reach each interrupt producer.
+
+New actionable inconsistency (see design-steps.md):
+1. **The design claims the reproduced `:user-abort` evidence can flow through the
+   statechart-effect interrupt producer; code shows it cannot.** `:on-agent-done`
+   (`statechart_actions.clj:132`) reads session-data `:interrupt-reason`. The
+   **only** writer of `:interrupt-reason` is the `:session/request-interrupt`
+   handler (`session_mutations.clj:638`, `(or reason :deferred-interrupt)`),
+   whose **only** dispatcher passes `:reason :deferred-interrupt`
+   (`turn.clj:189/193`). `:user-abort` appears **only** at `turn.clj:233` as the
+   interrupt *message* reason in the synchronous `abort-in!` inline path and is
+   **never** written to `:interrupt-reason` (verified: no code assigns
+   `:interrupt-reason :user-abort`; the schema enum `:session-close` /
+   `:context-shutdown` values are likewise unwired). So the statechart-effect
+   producer (`:on-agent-done` → `:runtime/record-pending-tool-call-interrupts`,
+   `dispatch_effects.clj:127`) fires only for `:deferred-interrupt`, never for
+   `:user-abort`. design.md contradicts this in three places: (a) Root Cause
+   step 2 statechart-effect bullet "sees `:interrupt-reason` (e.g. `:user-abort`)"
+   — wrong example, should be `:deferred-interrupt`; (b) the Funnel-property
+   paragraph "The reproduced `:user-abort` Evidence below can flow through the
+   statechart-effect producer ... not only the literal synchronous `abort-in!`
+   call" — false; the `:user-abort` evidence flows **exclusively** through the
+   synchronous path; (c) the Desired-Behaviour and D1 Mechanism determinism
+   bullets frame the headline `:user-abort` race as recordable by "either
+   interrupt producer (statechart-effect ... or synchronous `abort-in!`)" — for
+   the `:user-abort` race the first writer is deterministically the synchronous
+   inline recording in `abort-in!`; the statechart-effect path applies to the
+   distinct `:deferred-interrupt` race. The funnel property (general invariant,
+   any producer dispatches the one event) is unaffected, but the evidence and
+   determinism attribution must distinguish `:user-abort` ⇒ synchronous path
+   from `:deferred-interrupt` ⇒ statechart-effect path. (Introduced by the
+   first-pass inconsistency resolution, which asserted the reproduced
+   `:user-abort` "can run through the `:on-agent-done` effect"; that assertion is
+   incorrect.)
+
+No blockers; one actionable inconsistency.

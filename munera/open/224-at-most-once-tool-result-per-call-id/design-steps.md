@@ -244,3 +244,38 @@
       recording — so the review's specific "abort-in! `turn.clj:223` + repair
       both enumerate during close" duplicate mechanism is inaccurate; the funnel
       framing makes the precise interaction non-load-bearing.
+
+# Design follow-up — inconsistency review (third pass)
+
+- [ ] Fix the design's claim that the reproduced `:user-abort` evidence can flow
+      through the **statechart-effect interrupt producer**; code shows it cannot.
+      `:on-agent-done` (`statechart_actions.clj:132`) reads session-data
+      `:interrupt-reason`, whose **only** writer is the `:session/request-interrupt`
+      handler (`session_mutations.clj:638`, `(or reason :deferred-interrupt)`)
+      and whose **only** dispatcher passes `:reason :deferred-interrupt`
+      (`turn.clj:189/193`). `:user-abort` appears **only** at `turn.clj:233` as
+      the interrupt *message* reason on the synchronous `abort-in!` inline path
+      and is **never** written to `:interrupt-reason` (no code assigns
+      `:interrupt-reason :user-abort`; schema enum `:session-close`/`:context-shutdown`
+      are also unwired). So the statechart-effect producer
+      (`:on-agent-done` → `:runtime/record-pending-tool-call-interrupts`,
+      `dispatch_effects.clj:127`) fires only for `:deferred-interrupt`, never for
+      `:user-abort`. Correct all three contradicting sites:
+      (a) Root Cause step 2 statechart-effect bullet — change the example
+      "sees `:interrupt-reason` (e.g. `:user-abort`)" to `:deferred-interrupt`;
+      (b) the Funnel-property paragraph — remove/rewrite "The reproduced
+      `:user-abort` Evidence below can flow through the statechart-effect
+      producer ... not only the literal synchronous `abort-in!` call" (false);
+      state the `:user-abort` evidence flows exclusively through the synchronous
+      path, and the statechart-effect path is the producer for the distinct
+      `:deferred-interrupt` race;
+      (c) the Desired-Behaviour and D1 Mechanism determinism bullets — stop
+      attributing the headline `:user-abort` race to "either producer
+      (statechart-effect ... or synchronous `abort-in!`)"; for `:user-abort` the
+      first writer is deterministically the synchronous inline recording in
+      `abort-in!`. Keep the funnel property (general invariant) intact — it is
+      unaffected — but the evidence/determinism attribution must distinguish
+      `:user-abort` ⇒ synchronous path vs `:deferred-interrupt` ⇒
+      statechart-effect path. (Introduced by the first-pass inconsistency
+      resolution, which incorrectly asserted the reproduced `:user-abort` "can
+      run through the `:on-agent-done` effect".)
