@@ -1299,6 +1299,29 @@ follow-ups (second pass)"):
 
 No blockers; one actionable plan/steps inconsistency.
 
+## Plan/steps inconsistency follow-up resolution (third pass)
+
+Executed the single third-pass plan/steps inconsistency item (Slice-A proposed
+path-helper name vs `session-` prefix convention).
+
+Verified the convention against code: every per-session path helper in
+`components/session-state/src/psi/session_state/state.clj` is `session-`-prefixed
+(`session-data-path` `:29`, `session-telemetry-path` `:30`,
+`session-turn-ctx-path` `:33`, `session-scheduler-path` `:34`,
+`session-scheduler-schedules-path` `:35`, `session-scheduler-queue-path` `:36`).
+
+Resolution applied to steps.md Slice A step 1: renamed the proposed helper from
+`recorded-tool-result-ids-path [sid]` to the `session-`-prefixed form
+`session-recorded-tool-result-ids-path [sid]`
+(`[:agent-session :sessions sid :recorded-tool-result-ids]`), and inlined the
+existing `session-`-prefixed helpers it must match (replacing the prior loose
+"consistent with existing per-session path helpers" wording with the explicit
+prefixed list). The proposed name and the consistency requirement now agree.
+plan.md needs no change — it refers to "the `:state*` path helper" generically
+and never names the helper.
+
+No blockers; item completed.
+
 ## Plan/steps inconsistency review (second pass) follow-up — design repro-test assertion layer
 
 Executed the single second-pass plan/steps inconsistency item: design.md still

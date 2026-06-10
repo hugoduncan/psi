@@ -3,10 +3,14 @@
 ## Slice A — canonical recorded-ids state
 
 - [ ] Add a `:state*` path helper for per-session recorded tool-result ids
-      (e.g. `recorded-tool-result-ids-path [sid]` →
+      (`session-recorded-tool-result-ids-path [sid]` →
       `[:agent-session :sessions sid :recorded-tool-result-ids]`) in
-      `components/session-state/src/psi/session_state/state.clj` (consistent with
-      existing per-session path helpers).
+      `components/session-state/src/psi/session_state/state.clj`. The
+      `session-`-prefixed name is required to match the existing per-session path
+      helpers (`session-data-path` `:29`, `session-telemetry-path` `:30`,
+      `session-turn-ctx-path` `:33`, `session-scheduler-path` `:34`,
+      `session-scheduler-schedules-path` `:35`, `session-scheduler-queue-path`
+      `:36`), every one of which carries the `session-` prefix.
 - [ ] **Default source = init seeding (decided; see Slice-A ambiguity follow-up
       item 3).** Seed `:recorded-tool-result-ids #{}` in
       `initialize-session-slots`
@@ -287,7 +291,7 @@
 
 ## Plan/steps inconsistency review follow-ups (third pass)
 
-- [ ] **Reconcile the Slice-A path-helper name with the `session-` prefix
+- [x] **Reconcile the Slice-A path-helper name with the `session-` prefix
       convention the same step requires.** Slice A proposes the helper
       `recorded-tool-result-ids-path [sid]` (no `session-` prefix) yet its third
       bullet requires naming "consistent with existing per-session path helpers
@@ -301,3 +305,7 @@
       (`session-recorded-tool-result-ids-path [sid]` →
       `[:agent-session :sessions sid :recorded-tool-result-ids]`) in the Slice-A
       step so the proposed name and the convention bullet agree.
+      → **Resolved:** Slice-A step 1 now names the helper
+      `session-recorded-tool-result-ids-path [sid]` (with the `session-` prefix)
+      and inlines the `session-`-prefixed existing helpers it must match, so the
+      proposed name and the consistency requirement now agree.
