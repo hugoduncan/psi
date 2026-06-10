@@ -763,3 +763,42 @@ resolved work.
 
 **No new actionable inconsistency.** Design is internally consistent and
 consistent with referenced code on all checked points.
+
+## Architecture-fit review (design.md) — fifth pass
+
+Independent architecture-fit pass on the current post-D1 (Option-C) design.
+Grounded against doc/architecture.md (State boundary: canonical root vs runtime
+handles; Dispatch sequencing contract: pure result → apply → effects last;
+dispatch-owned tool-execution slice `:session/tool-run` → `:session/tool-execute-prepared`
+→ `:session/tool-record-result`) and AGENTS.md (single-source-of-truth atom,
+one_way, effects-as-data). Verified code topology directly.
+
+Fit confirmed; **no new actionable architectural misfit**:
+- **Chokepoint claim grounded in code.** `:session/tool-agent-record-result`
+  handler (`session_mutations.clj:529`) is where *both* the in-memory record
+  effect (`:runtime/agent-record-tool-result`) and the journal append
+  (`append-message-effect`, `:533`) are emitted. The converged tool slice's
+  `:session/tool-record-result` (`:565`) delegates via
+  `record-tool-call-prepared-result!` → `:record-result!`
+  (`tool_runtime_adapter.clj:114`) into that same inner event; the three
+  interrupt producers (`turn.clj:223`, `dispatch_effects.clj:134`,
+  `session_close.clj:61`) also dispatch it directly, bypassing
+  `:session/tool-record-result`. So `:session/tool-agent-record-result` is the
+  only event all producers share — guarding it (not the outer slice) is the
+  correct single chokepoint. Matches one_way / single-source.
+- **recorded-ids in `:state*` is the State-boundary pattern.** `:pending-tool-calls`
+  is an agent-core runtime-handle atom (not queryable `:state*`); the
+  at-most-once status is projected into canonical `:state*` through dispatch and
+  the handle stays external — exactly the architecture's stated direction.
+- **Pure both-or-neither + dispatch-serialized atomicity** conforms to the
+  Dispatch sequencing contract (pure result → apply → effects last); no runtime
+  test-and-set gating effect emission.
+- **Defensive de-dup at `journal->provider-messages`** is a provider-request
+  projection in agent-session/turn-runtime — appropriately scoped to the path
+  that produces the provider 400, distinct from the app-runtime canonical
+  transcript reconstruction in the adapter-convergence roadmap. Purely derived,
+  keyed by tool-call-id. Not a misfit.
+- **Session-lifetime recorded-ids** correctly decoupled from per-turn
+  `:pending-tool-calls`, matching the cross-turn race; bounded set.
+
+No new follow-up items; prior architecture-fit items remain resolved by D1.
