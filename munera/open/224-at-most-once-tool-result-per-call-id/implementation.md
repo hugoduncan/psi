@@ -302,3 +302,36 @@ New actionable ambiguity (see design-steps.md):
    location/keying).
 
 No blockers; one actionable ambiguity.
+
+## Ambiguity follow-up resolution (design-steps) — second pass
+
+Executed the single second-pass ambiguity item (de-dup projection
+location/keying). Verified the provider-request pipeline in code before editing:
+
+- `journal->provider-messages` (`prompt_request.clj:111`) projects the journal
+  into `toolResult`-role provider *message maps*; `session->provider-messages`
+  wraps it (`prompt_request.clj:131/280`).
+- `agent-messages->ai-conversation` (`turn_runtime/conversation.clj:136`) is the
+  **only** production emitter of provider `tool_result` blocks — one per
+  `toolResult` message via `conv/add-tool-result` (`conversation.clj:95`).
+- Its only production caller is `build-provider-conversation`
+  (`request.clj:54/60`), which reads `:turn/messages` — set from
+  `prepared-turn-messages` → `session->provider-messages`
+  (`prompt_request.clj:296`). So in the provider path the rebuild's input is the
+  **journal-derived** message list, not separate in-memory agent-core history.
+  (The rebuild's docstring "from agent-core message history" is the generic
+  contract; here that history is the journal-derived `:turn/messages`.)
+
+Resolution applied to design.md:
+- **Location → single upstream chokepoint at `journal->provider-messages`**
+  (interpretation b). One-to-one `toolResult` message → block mapping means
+  de-duping messages once upstream removes the duplicate before it can become a
+  second block; no independent guard at the conversation rebuild.
+- **Keying → the journal, by `tool-call-id`, first occurrence wins.** "Purely
+  derived from the journal" is now accurate (guard at the journal projection);
+  the rebuild is not a second de-dup site and has no separate keying source.
+- Edited: Desired Behaviour (rewrote final journal-tolerance bullet, added two
+  location/keying bullets), Scope in-scope de-dup bullet, Acceptance criterion,
+  Resolved Question 2.
+
+No blockers; item completed.

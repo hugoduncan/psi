@@ -125,7 +125,7 @@
 
 # Design follow-up — ambiguity review (second pass)
 
-- [ ] Disambiguate the **defensive projection de-dup location and keying
+- [x] Disambiguate the **defensive projection de-dup location and keying
       source**. Scope + Desired Behaviour require "at most one `tool_result` per
       tool-call-id" across two named sites — `journal->provider-messages`
       (`prompt_request.clj`, journal-derived) **and** the conversation rebuild
@@ -140,3 +140,24 @@
       agent-core history, not the journal — state the de-dup keying source for
       each site. (Distinct from resolved item 1, which fixed only the
       in/out-of-scope question.)
+      → Resolved: **interpretation (b), single upstream chokepoint at
+      `journal->provider-messages`.** Verified the production provider-request
+      pipeline in code: journal → `session->provider-messages` /
+      `journal->provider-messages` (`prompt_request.clj:111`, emits
+      `toolResult`-role message maps) → `agent-messages->ai-conversation`
+      (`conversation.clj:136`, the only production emitter of provider
+      `tool_result` blocks, one per `toolResult` message via `conv/add-tool-result`
+      `conversation.clj:95`). The rebuild's only production caller
+      (`build-provider-conversation` `request.clj:54/60`) reads `:turn/messages`
+      (`prompt_request.clj:296`), which is the **journal-derived** list — so the
+      rebuild consumes `journal->provider-messages`' output, it is not fed a
+      separate in-memory history in this path. Because the mapping is one
+      `toolResult` message → one block, de-duping `toolResult` messages once
+      upstream removes the duplicate before it can become a second block; no
+      independent guard at the rebuild. **Keying source: the journal**, by
+      `:tool-call-id`, first occurrence wins — so "purely derived from the
+      journal" is now accurate (the guard lives at the journal projection; the
+      rebuild has no separate keying source). Updated design.md Desired Behaviour
+      (rewrote the final journal-tolerance bullet + added two location/keying
+      bullets), Scope in-scope bullet, Acceptance criterion, and Resolved
+      Question 2. Distinct from resolved item 1.

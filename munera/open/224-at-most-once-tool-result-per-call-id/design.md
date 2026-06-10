@@ -118,14 +118,41 @@ has exactly this shape: one synthetic `"interrupted"` result plus one real resul
 - No change to the non-interrupted happy path: a normal tool call still records
   exactly one real result.
 - Existing journals already containing duplicates must not crash subsequent
-  requests. The provider-facing projection
-  (`prompt-request/journal->provider-messages` and the conversation rebuild)
-  must tolerate already-persisted duplicates by emitting at most one
-  `tool_result` per id. **This defensive de-dup is in scope** (see Scope): the
-  forward-fix alone leaves already-wedged sessions broken because their journals
-  already contain two `toolResult` entries, so recovering them requires the
-  projection to be tolerant. It is a cheap, purely-derived projection guard
-  keyed by tool-call-id.
+  requests. The provider-facing projection must tolerate already-persisted
+  duplicates by emitting at most one `tool_result` per id. **This defensive
+  de-dup is in scope** (see Scope): the forward-fix alone leaves already-wedged
+  sessions broken because their journals already contain two `toolResult`
+  entries, so recovering them requires the projection to be tolerant. It is a
+  cheap, purely-derived projection guard keyed by tool-call-id.
+- **De-dup location: a single upstream chokepoint at
+  `prompt-request/journal->provider-messages`, not two independent guards.** The
+  production provider-request pipeline is: journal →
+  `session->provider-messages` / `journal->provider-messages`
+  (`prompt_request.clj:111`, emits `toolResult`-role provider *message maps*) →
+  `agent-messages->ai-conversation` (`turn_runtime/conversation.clj:136`, the
+  conversation rebuild, which emits exactly **one** provider `tool_result`
+  *block* per `toolResult` message via `conv/add-tool-result`
+  `conversation.clj:95`). The rebuild is the only place provider `tool_result`
+  blocks are emitted, but in this path its input
+  (`:turn/messages`, `prompt_request.clj:296`) is the **journal-derived**
+  message list — it consumes `journal->provider-messages`' output, it is not fed
+  a separate in-memory history. (`build-provider-conversation`
+  `request.clj:54/60` is the rebuild's only production caller and reads
+  `:turn/messages`.) Because the rebuild maps `toolResult` messages to blocks
+  one-to-one, dropping duplicate `toolResult` messages once at
+  `journal->provider-messages` (later message whose tool-call-id already
+  appeared is dropped) removes the duplicate before it can become a second
+  provider block. A single guard at the upstream journal projection therefore
+  suffices; **no independent guard is added at the conversation rebuild.**
+- **De-dup keying source: the journal, by `tool-call-id`, first occurrence
+  wins.** Because the guard lives at `journal->provider-messages`, "purely
+  derived from the journal" is accurate: it keys off the `:tool-call-id` of
+  `toolResult` journal-derived messages, keeping the first and dropping later
+  duplicates. The conversation rebuild is not a separate de-dup site and so has
+  no separate keying source; it inherits the already-de-duped journal-derived
+  messages. (The rebuild's generic docstring "from agent-core message history"
+  describes its general contract; in the provider-request path that history is
+  the journal-derived `:turn/messages`.)
 
 ## Scope
 
@@ -143,11 +170,16 @@ In scope:
   provider conversation.
 - Coverage that the normal single-result path is unaffected and that the
   interrupt-only path still yields exactly one `"interrupted"` result.
-- Defensive de-dup in the provider-facing projection
-  (`prompt-request/journal->provider-messages` and the conversation rebuild):
-  emit at most one `tool_result` per tool-call-id so already-persisted duplicate
-  journals do not crash subsequent requests. Purely derived from the journal,
-  keyed by tool-call-id; first occurrence wins.
+- Defensive de-dup at a single upstream chokepoint —
+  `prompt-request/journal->provider-messages` — so already-persisted duplicate
+  journals do not crash subsequent requests. It drops a `toolResult`
+  journal-derived message whose `tool-call-id` already appeared (first
+  occurrence wins, purely derived from the journal), so the downstream
+  conversation rebuild (`turn_runtime/conversation.clj`
+  `agent-messages->ai-conversation`), which emits the provider `tool_result`
+  blocks one-per-`toolResult`-message, sees at most one result per id. The
+  rebuild consumes this de-duped journal-derived message list and is **not** a
+  second de-dup site (see the Desired-Behaviour location/keying bullets).
 
 Out of scope:
 
@@ -265,10 +297,13 @@ All previously-open questions are now resolved in this design; none remain open.
    rejected.
 
 2. **Defensive projection de-dup.** Resolved: **in scope** (see Scope and the
-   final Desired-Behaviour bullet). The forward-fix alone leaves already-wedged
-   sessions broken, so the provider-facing projection must emit at most one
-   `tool_result` per tool-call-id to recover them. Cheap, purely-derived,
-   first-occurrence-wins.
+   Desired-Behaviour location/keying bullets). The forward-fix alone leaves
+   already-wedged sessions broken, so the projection must emit at most one
+   `tool_result` per tool-call-id to recover them. The guard is a **single
+   upstream chokepoint at `journal->provider-messages`**, keyed off the journal
+   `tool-call-id` (first occurrence wins); the downstream conversation rebuild
+   consumes the de-duped messages and is not a second de-dup site. Cheap,
+   purely-derived, first-occurrence-wins.
 
 3. **First-wins outcome on abort.** Resolved: keeping the `"interrupted"` result
    and suppressing the late real result is the intended model-visible behaviour.
@@ -288,8 +323,9 @@ All previously-open questions are now resolved in this design; none remain open.
 - The non-interrupted single-result path and the interrupt-only path each yield
   exactly one result; existing agent-core / agent-session tests stay green.
 - A journal already containing duplicate `toolResult` entries for one
-  tool-call-id projects to exactly one `tool_result` per id through
-  `journal->provider-messages` / conversation rebuild (defensive de-dup), so an
-  already-wedged session recovers on its next request.
+  tool-call-id projects to exactly one `tool_result` per id through the upstream
+  `journal->provider-messages` de-dup (and thus through the downstream
+  conversation rebuild that consumes its output), so an already-wedged session
+  recovers on its next request.
 - `bb test` green; clj-kondo clean; CHANGELOG updated if user-visible (a tool-use
   no longer wedges the session after an abort qualifies as a user-visible fix).
