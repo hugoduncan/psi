@@ -779,6 +779,62 @@ resolved work.
 **No new actionable inconsistency.** Design is internally consistent and
 consistent with referenced code on all checked points.
 
+## Plan/steps ambiguity review (plan.md + steps.md) — first pass
+
+Reviewed `plan.md` and `steps.md` (not `design.md`) for ambiguities — statements
+admitting >1 implementer interpretation. Grounded against code:
+`session_mutations.clj:529` handler returns **only** `{:effects [...]}` (no other
+keys), so steps' "return `{}`" / "emit both effects" is complete (not actionable);
+path helpers (`session-data-path`, `session-telemetry-path`) live in
+`session_state/state.clj` (plan's primary Slice-A home is correct → the
+parenthetical "or … most consistent home" is harmless); `journal->provider-messages`
+(`prompt_request.clj:111`) wraps `repair-dangling-tool-uses` and toolResult
+messages carry top-level `:tool-call-id` (`tool-result-id` `:31`), so the
+de-dup keying field in Slice C is accurate; session slots are explicitly seeded
+(`session_state/init.clj` `initialize-session-slots` `:78/87` + `model/initial-session`,
+`initial-telemetry` `:11`).
+
+New actionable ambiguities (see steps.md → "Plan/steps ambiguity review follow-ups"):
+
+1. **Forward-fix characterization test assertion layer is unspecified, and the
+   Slice-C de-dup can mask a forward-fix regression.** Steps Slice B writes the
+   reproduction test to "rebuild the provider conversation and assert exactly one
+   `tool_result` per `tool_use` id." Once Slice C adds the de-dup at
+   `journal->provider-messages` (the production input to the rebuild,
+   `request.clj:60` `:turn/messages`), an assertion on the *rebuilt provider
+   conversation* would emit one `tool_result` **even if the forward fix
+   regressed**, because the projection de-dups. Two interpretations: (a) assert
+   on the raw recorded layer (exactly one `toolResult` entry in the journal +
+   in-memory message history) — isolates the forward fix; (b) assert on the
+   post-de-dup rebuild — does not isolate it. The forward-fix test must pin layer
+   (a) so the two fixes are independently characterized; "fails on `main`" alone
+   does not guarantee post-Slice-C isolation.
+
+2. **Which interrupt producer/reason the Slice-B reproduction drives is
+   unspecified.** Steps Slice B says only "interrupt the turn." design.md
+   distinguishes three producers with different ordering semantics and identifies
+   the reproduced Evidence as `:user-abort` via the **synchronous `abort-in!`
+   path** (`turn.clj:233`; never the statechart-effect `:deferred-interrupt`
+   path). The determinism framing (interrupt is the first writer only because it
+   records synchronously) is path-specific, so the reproduction should specify
+   driving the `:user-abort` synchronous abort path to match the Evidence;
+   otherwise an implementer could exercise a different producer with different
+   first-writer ordering.
+
+3. **Slice-A "defaulting to `#{}`" conflates a path helper with the default
+   source.** Steps Slice A asks for a path helper "defaulting to `#{}`," but a
+   path helper returns a vector and cannot itself default. The codebase seeds
+   per-session slots explicitly (`init.clj` `initialize-session-slots`,
+   `model/initial-session`, `initial-telemetry`), so it is unspecified whether
+   recorded-tool-result-ids is (a) seeded in the session model/init alongside
+   telemetry, or (b) relied on nil-safe at the Slice-B read/update site
+   (`get-state-value-in … #{}` + `(fnil conj #{})`). This is outcome-affecting:
+   choice (a) means Slice A touches init/model (not just "add a path"), and it
+   interacts with the Slice-B clearing-boundary decision (re-init vs explicit
+   clear). Pin which mechanism supplies the default and at which site.
+
+No blockers; three actionable plan/steps ambiguities.
+
 ## Architecture-fit review (design.md) — fifth pass
 
 Independent architecture-fit pass on the current post-D1 (Option-C) design.

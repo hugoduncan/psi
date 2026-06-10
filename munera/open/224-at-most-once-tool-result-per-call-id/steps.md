@@ -72,3 +72,21 @@
 - [ ] Update any affected doc if a user-facing behaviour/guarantee is documented
       (otherwise none).
 - [ ] Final coherence check: meta/spec(design)/tests/code/doc agree.
+
+## Plan/steps ambiguity review follow-ups
+
+- [ ] Pin the **forward-fix reproduction test assertion layer** to the raw
+      recorded layer: assert **exactly one `toolResult` entry** in the journal +
+      in-memory message history (not only on the rebuilt provider conversation),
+      so the Slice-C `journal->provider-messages` de-dup cannot mask a forward-fix
+      regression. Keep a separate Slice-C test for the projection-level recovery.
+- [ ] Specify in Slice B that the reproduction drives the **`:user-abort`
+      synchronous `abort-in!` path** (`turn.clj:233`), matching the design
+      Evidence, rather than an unspecified "interrupt the turn" (the three
+      producers have different first-writer ordering).
+- [ ] Resolve the Slice-A **default source** for recorded-tool-result-ids: decide
+      and state whether it is (a) seeded in the session model/init
+      (`init.clj` `initialize-session-slots` / `model/initial-session`, alongside
+      `initial-telemetry`) or (b) supplied nil-safe at the Slice-B read/update
+      site (`get-state-value-in … #{}` + `(fnil conj #{})`). A path helper alone
+      cannot "default"; the choice interacts with the clearing-boundary decision.
