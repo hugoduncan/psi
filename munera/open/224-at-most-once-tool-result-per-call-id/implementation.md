@@ -727,3 +727,39 @@ rewritten in design.md:
 At-most-once invariant explicitly unaffected (always exactly one result); only
 the over-asserted determinism of *which* result was corrected. No blockers; item
 completed.
+
+## Inconsistency review (design.md) — fourth pass
+
+Re-reviewed design.md for internal inconsistencies and design-vs-code
+inconsistencies (not ambiguity/architecture-fit). Re-verified all load-bearing
+code cites against current source:
+- handler emits **both** effects unconditionally:
+  `session_mutations.clj:529/531/533` (`:runtime/agent-record-tool-result` +
+  `append-message-effect`) — matches Root Cause step 4 ✓
+- `:runtime/agent-record-tool-result` effect (`dispatch_effects.clj:124/125`) →
+  `agent/record-tool-result-in!` clears `:pending-tool-calls`
+  (`core.clj:398/407` `disj`) — matches D1 apply-state/pending-clear ordering ✓
+- real-result re-dispatch `tool_runtime_adapter.clj:114`; synchronous abort path
+  `turn.clj:217/220/233` (`:user-abort`); statechart-effect producer
+  `dispatch_effects.clj:127/131`; session-close producer `session_close.clj:55/58/61`,
+  called by `close-session-in!` `:106` ✓
+- `:user-abort` only at `turn.clj:233` (message reason); never written to
+  `:interrupt-reason` — matches third-pass correction ✓
+
+Examined the funnel paragraph's illustrative example "a later producer such as
+session-close re-enumerates an id an earlier producer already recorded": code
+shows recording (the winning dispatch) emits `:runtime/agent-record-tool-result`
+which clears the id from `:pending-tool-calls`, and in `close-session-in!`
+`abort-session-runtime!` (`:105` → agent-core `agent/abort-in!` `core.clj:466`,
+clears pending to `#{}` when running) runs **before**
+`repair-pending-tool-calls-before-close!` (`:106`). So re-enumeration of an
+already-recorded id is essentially unrealizable. Judged **not a new actionable
+inconsistency**: the design frames this as a hypothetical ("even if …")
+robustness statement, the funnel property (general invariant) is sound
+regardless, and the third-pass resolution already considered the
+abort-clears-pending fact and deliberately chose the funnel framing to render the
+precise per-producer interaction non-load-bearing. Re-flagging would duplicate
+resolved work.
+
+**No new actionable inconsistency.** Design is internally consistent and
+consistent with referenced code on all checked points.
