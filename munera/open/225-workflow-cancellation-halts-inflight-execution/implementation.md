@@ -275,3 +275,44 @@ not commit the effects to the project's canonical dispatch-effect pathway:
 
 Both are boundary-commitment decisions for the design to state, not step-machine
 redesigns (correctly out of scope).
+
+## Architecture-fit follow-up resolution (ψ pass 2, 2026-06-10)
+
+Executed both pass-2 architecture-fit follow-up design-steps. Both were
+design-decision steps (state a boundary commitment in design.md); both completable
+now — no blockers. Verified the cited dispatch infrastructure exists before
+committing:
+
+- `effect-schema` (`dispatch_schema.clj`) + `execute-effect!` multimethods
+  (`dispatch_effects.clj`) confirmed, including existing `:runtime/agent-abort` and
+  `:runtime/mark-workflow-jobs-terminal` effects with parity schema entries.
+- Dispatch `:effects` interceptor + `:trim-effects-on-replay` + dispatch-trace
+  `:dispatch/effect-start`/`-finish` confirmed (`dispatch.clj`, dispatch tests,
+  doc/architecture.md §replay-trim and §dispatch trace).
+
+Resolutions written to design.md as "Dispatch-Effect Parity Decisions" D12–D13,
+with D1/D9 refined and Scope/Desired Behaviour updated:
+
+- D12 — cancellation effects (worker `future-cancel`/interrupt, child-session
+  abort) are canonical dispatch `:runtime/*` effect types (parity: `effect-schema`
+  + `execute-effect!`) executed by the dispatch `:effects` interceptor, not an
+  out-of-dispatch orchestration path. Child abort reuses the existing
+  `:runtime/agent-abort` effect (compose > new mechanism, consistent with D3/D9);
+  the worker-future cancel is emitted as a `:runtime/*` effect carrying `run-id`
+  whose `execute-effect!` cancels the future in the `inflight-runs` handle via ctx.
+  Routing earns validate-interceptor schema check, `:trim-effects-on-replay`
+  suppression (replay closure), and dispatch-trace observability. D1's "runtime
+  boundary" and D9's "runtime-boundary effect handler" wording refined to name the
+  `:effects` interceptor as executor (handle supplied via ctx).
+- D13 — background-job terminalization reuses the existing
+  `:runtime/mark-workflow-jobs-terminal` effect, emitted from the D2/D4 serialized
+  terminal transition (single writer for run-terminal status, projected from the
+  workflow-registry handle), not a separate ad-hoc registry write. Scope and
+  Desired Behaviour updated to name the reuse and single owner.
+
+Consistency check: D12/D13 are consistent with D1 (effects-as-data, no inline
+mutation side effects — they only sharpen *where* executed), D3/D9 (agent-session
+session-dispatch authority reached via the `:runtime/agent-abort` effect), and
+D2/D4 (signal/handle split; serialized terminal transition emits the
+terminalization + cancellation effects together). No new contradictions; no
+step-machine redesign.

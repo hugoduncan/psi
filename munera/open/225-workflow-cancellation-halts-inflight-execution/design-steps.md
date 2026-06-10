@@ -105,7 +105,7 @@
 
 ## Architecture-fit follow-ups (ψ pass 2, 2026-06-10)
 
-- [ ] State that the cancellation effects (worker `future-cancel`/interrupt and
+- [x] State that the cancellation effects (worker `future-cancel`/interrupt and
       child-session abort) are canonical dispatch `:runtime/*` effect types
       registered in the agent-session `effect-schema` with matching
       `execute-effect!` methods (parity), executed by the dispatch `:effects`
@@ -115,8 +115,16 @@
       closure), and emit dispatch-trace `:dispatch/effect-start`/`-finish`. Update
       D1/D9 to name the dispatch `:effects` interceptor as the executor. (AGENTS.md
       `λ parity`, S1/S3; doc/architecture.md replay-trim + dispatch trace)
-- [ ] Assign ownership of "background job marked terminal" to the D2/D4 terminal
+      → design.md D12: canonical `:runtime/*` effects (parity: `effect-schema` +
+      `execute-effect!`) executed by the dispatch `:effects` interceptor; child
+      abort reuses existing `:runtime/agent-abort`; routes through
+      validate/`:trim-effects-on-replay`/dispatch-trace; D1/D9 refined to name the
+      `:effects` interceptor as executor.
+- [x] Assign ownership of "background job marked terminal" to the D2/D4 terminal
       run transition by reusing the existing `:runtime/mark-workflow-jobs-terminal`
       effect (λ extend compose > new mechanism), rather than a separate ad-hoc
       registry write — avoids a second writer for run-terminal status. State this
       in Scope/Desired Behaviour. (doc/architecture.md State-boundary projection)
+      → design.md D13: terminalization emitted by the D2/D4 terminal transition
+      reusing existing `:runtime/mark-workflow-jobs-terminal` (single writer);
+      Scope + Desired Behaviour updated to name the reuse.

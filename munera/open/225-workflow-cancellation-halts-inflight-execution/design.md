@@ -71,7 +71,10 @@ loop:
   wait, and after natural completion must all behave sanely (no double-terminal,
   no resurrection).
 - Cancelled runs reach a clean terminal state with their background job marked
-  terminal (no lingering `:running` job, as also seen this session).
+  terminal (no lingering `:running` job, as also seen this session) — job
+  terminalization is emitted by the D2/D4 terminal transition reusing the existing
+  `:runtime/mark-workflow-jobs-terminal` effect, the single writer for run-terminal
+  status (D13), not a separate registry write.
 
 ## Scope
 
@@ -83,7 +86,14 @@ In scope:
   cancel; `remove` of a live run cancels-then-removes (D5) rather than orphaning.
 - Propagation of cancellation to nested delegate sub-runs and their child agent
   sessions (reuse the existing session interrupt/abort path where possible).
-- Ensuring the background job for a cancelled run is marked terminal.
+- Modelling the cancellation side effects as canonical dispatch `:runtime/*`
+  effects (parity: `effect-schema` + `execute-effect!`) executed by the dispatch
+  `:effects` interceptor — child-session abort reusing the existing
+  `:runtime/agent-abort` effect (D12); not an out-of-dispatch execution path.
+- Ensuring the background job for a cancelled run is marked terminal by reusing the
+  existing `:runtime/mark-workflow-jobs-terminal` effect from the D2/D4 terminal
+  transition (single writer for run-terminal status, D13) — not a separate ad-hoc
+  registry write.
 - Tests: (a) a cancelled run performs no further step attempts after the cancel
   checkpoint; (b) `remove` of a live run does not leave a running future; (c)
   nested sub-run + child-session cancellation propagation; (d) no commits/journal
@@ -152,6 +162,13 @@ mutation bodies, satisfying AGENTS.md S1/S3 + `λ(state)` (effects flow as data,
 executed at the boundary). No legacy-mutation exception is taken; the only
 canonical-state write in the mutation is the pure status transition (see D4 for
 its serialization).
+
+**Executor (refined by D12):** the "orchestration runtime boundary" wording above
+is made precise by D12 — these cancellation effects are canonical dispatch
+`:runtime/*` effect types executed by the dispatch **`:effects` interceptor**, not
+by an out-of-dispatch orchestration-layer execution path. The runtime boundary
+that owns `inflight-runs` supplies the handle the `execute-effect!` method acts on
+(via ctx), but the *executor* of record is the dispatch `:effects` interceptor.
 
 ### D2. Signal in canonical `:state*`; future/`inflight-runs` is a runtime handle
 
@@ -315,6 +332,13 @@ names *where the effect is emitted and executed* (the runtime boundary that owns
 authority). There is a single owner of the invocation (agent-session) reached
 through a single effect path.
 
+**Executor (refined by D12):** the "runtime-boundary effect handler" is the
+`execute-effect!` method for the canonical `:runtime/*` cancellation effect,
+invoked by the dispatch **`:effects` interceptor** (not an orchestration-layer
+handler). Concretely the child-session-abort effect reuses the existing
+`:runtime/agent-abort` effect type (whose `execute-effect!` already drives the
+`:session/abort` path), per D12.
+
 ## Consistency Reconciliations (ψ, 2026-06-10)
 
 Resolves the inconsistency follow-ups raised by the design review. These remove
@@ -362,6 +386,70 @@ The two sections do not assign thread interruption opposite statuses: the *inten
 mechanism* is the cooperative wait-wakeup interrupt (in scope); what is out of
 scope is *unsafe abrupt termination as the primary stop mechanism*. Scope
 Out-of-scope is updated to name the rejected thing precisely and point here.
+
+## Dispatch-Effect Parity Decisions (ψ pass 2, 2026-06-10)
+
+Resolves the two architecture-fit (pass 2) follow-ups. These commit the
+cancellation effects to the project's canonical dispatch-effect pathway and reuse
+the existing terminalization effect — boundary commitments, not step-machine
+redesigns.
+
+### D12. Cancellation effects are canonical dispatch `:runtime/*` effects executed by the `:effects` interceptor (parity)
+
+The three cancellation side effects (worker `future-cancel`/interrupt and
+child-session abort) are **canonical dispatch effect types**, registered in the
+agent-session `effect-schema` (`dispatch_schema.clj`) with matching
+`execute-effect!` methods (`dispatch_effects.clj`) — **parity** (AGENTS.md
+`λ parity`). They are executed by the dispatch **`:effects` interceptor**, the same
+path used by every other `:runtime/*` effect — **not** by an out-of-dispatch
+"orchestration runtime boundary" execution path. This refines D1/D9's
+runtime-boundary wording: the layer that owns `inflight-runs` only supplies the
+handle (through `ctx`) on which the canonical `execute-effect!` method acts.
+
+Mapping:
+
+- **Child-session abort** reuses the **existing** `:runtime/agent-abort` effect
+  (already present with an `execute-effect!` method driving the `:session/abort` /
+  `agent-core/abort-in!` path) — `λ extend` compose > new mechanism (consistent
+  with D3/D9).
+- **Worker `future-cancel(true)` / interrupt** is emitted as a canonical
+  `:runtime/*` cancellation effect carrying the `run-id`; its `execute-effect!`
+  method cancels the future held in the `inflight-runs` runtime handle (reached via
+  `ctx`). A new effect type is added only where no existing one matches, and it is
+  registered in `effect-schema` with a parity `execute-effect!` method.
+
+Routing through the dispatch `:effects` interceptor is required so the cancellation
+effects:
+
+1. pass the **validate-interceptor** effect-schema check (malli `effect-schema`);
+2. are suppressed by **`:trim-effects-on-replay`** — preserving the S5
+   `∀change → event → log → replayable` closure for the real side effects
+   (`future-cancel`/interrupt/abort) so replay does not re-fire them;
+3. emit dispatch-trace **`:dispatch/effect-start` / `:dispatch/effect-finish`**
+   observability (the very diagnostic signal whose absence made the Evidence
+   runaway hard to trace).
+
+Executing them at the orchestration layer would bypass all three. Decision: no
+orchestration-layer execution path for cancellation effects; they are canonical
+dispatch effects only.
+
+### D13. Background-job terminalization reuses the existing `:runtime/mark-workflow-jobs-terminal` effect (no second writer)
+
+"The background job for a cancelled run is marked terminal" is **not** a separate
+ad-hoc registry write. It falls out of the D2/D4 terminal run transition by
+reusing the **existing** `:runtime/mark-workflow-jobs-terminal` effect (already
+registered in `effect-schema` with an `execute-effect!` method) — `λ extend`
+compose > new mechanism. The background job is a projection of the
+workflow-registry runtime handle into `:state*` (doc/architecture.md State-boundary
+table), so terminalizing it must go through the one existing writer for
+run-terminal status, not a second out-of-band path that would re-introduce a
+double-writer for the same projected status.
+
+Concretely: the cancel/remove terminal transition (D4, serialized single-writer)
+emits `:runtime/mark-workflow-jobs-terminal` as part of its effect set (alongside
+the D12 cancellation effects), and the job reaches terminal via the existing
+handler. Scope and Desired Behaviour are updated to name this reuse and the single
+owner.
 
 ## Design Questions — Resolution status (ψ, 2026-06-10)
 
