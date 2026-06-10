@@ -70,3 +70,60 @@ decision; resolved together in design.md ("Design Decisions → D1").
 - Plan-time detail flagged in D1: confirm the recorded-ids reset point (mirror
   `:pending-tool-calls` turn/session reset) so the set stays bounded.
 - No blockers; all three items completed.
+
+## Ambiguity review (design.md)
+
+Reviewed design.md for ambiguities (statements admitting >1 interpretation),
+not architecture-fit or correctness. Grounded against code: both producers
+dispatch the same `:session/tool-agent-record-result` — interrupt path
+`turn.clj` `record-pending-tool-call-interrupts!` and real-result path
+`tool_runtime_adapter.clj` `record-tool-call-result!`'s `:record-result!`.
+
+New actionable ambiguities (see design-steps.md):
+1. **Defensive projection de-dup scope is inconsistent across three sections.**
+   Desired Behaviour states it as a hard requirement ("The provider-facing
+   projection … **must** tolerate already-persisted duplicates by emitting at
+   most one `tool_result` per id"), Scope lists it in neither in- nor out-of-
+   scope, and Open Question 2 says whether it is in scope "is an open question."
+   A reader cannot tell if it is required, deferred, or out of scope.
+2. **Late real result: suppressed-at-handler vs rerouted-to-background are two
+   different mechanisms, both asserted.** Desired Behaviour: the real completion
+   "is still delivered through the existing async/background completion path …
+   **not as a second `tool_result`**", implying it never reaches the record
+   handler. Root Cause step 3 + D1 Mechanism: the real result **still dispatches
+   `:session/tool-agent-record-result`** and is suppressed by the recorded-ids
+   guard. Code confirms the latter (adapter `:record-result!` dispatches the
+   event). Design does not say which mechanism prevents the second
+   `tool_result`, so the role of the recorded-ids guard vs the background path
+   is ambiguous.
+3. **recorded-ids reset boundary vs cross-turn late result is under-specified
+   and outcome-determining.** D1 says recorded-ids is "cleared/reset on the same
+   lifecycle boundaries that already reset `:pending-tool-calls` (turn/session
+   reset)" yet defers the "exact reset point" to plan-time. But an aborted
+   tool's real result arrives **after** the turn that recorded the interrupt; if
+   recorded-ids resets at the turn boundary, the late real result finds its id
+   absent and is **not** suppressed — re-introducing the duplicate the task
+   exists to remove. The reset semantics are not a mere plan detail; they decide
+   whether the invariant holds for the headline race. Design must state the
+   required persistence (the id must outlive the turn until the late result is
+   resolved) or the assumption that the late result never re-dispatches the
+   record event (ties to item 2).
+4. **"First-writer-wins" (nondeterministic) vs "aborted async tool keeps its
+   'interrupted' result" (deterministic) are not reconciled.** D1 grounds
+   correctness in dispatch ordering ("dispatch ordering decides the first
+   writer"), which does not guarantee the interrupt result is recorded before
+   the real one. Yet Desired Behaviour asserts the aborted tool "keeps its
+   `interrupted` result", a deterministic outcome. Open Question 3 frames this
+   as "confirm intended behaviour" but not as "is interrupt-wins guaranteed by
+   ordering?" Specify whether interrupt-first is guaranteed or whether the
+   model-visible result is genuinely whichever races first.
+5. **Suppressed real result for synchronous tools is unspecified.** Desired
+   Behaviour describes the suppressed real completion being surfaced via the
+   "async/background completion path (chat-injection / background-job
+   terminal)". The Root Cause evidence includes synchronous tools (`bash`,
+   `psi-tool`) which may have no background-completion path. The intended fate
+   of a suppressed real result for a synchronous tool (silently dropped? is that
+   acceptable model-visible behaviour?) is not stated.
+6. **Open Question numbering starts at 2 (no item 1).** The resolved
+   guard-location question (now D1) left a numbering gap, so "Remaining Open
+   Question" is ambiguous about whether an item 1 still exists. Minor: renumber.
