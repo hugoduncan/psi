@@ -2,7 +2,7 @@
 
 ## Slice A — canonical recorded-ids state
 
-- [ ] Add a `:state*` path helper for per-session recorded tool-result ids
+- [x] Add a `:state*` path helper for per-session recorded tool-result ids
       (`session-recorded-tool-result-ids-path [sid]` →
       `[:agent-session :sessions sid :recorded-tool-result-ids]`) in
       `components/session-state/src/psi/session_state/state.clj`. The
@@ -11,7 +11,7 @@
       `session-turn-ctx-path` `:33`, `session-scheduler-path` `:34`,
       `session-scheduler-schedules-path` `:35`, `session-scheduler-queue-path`
       `:36`), every one of which carries the `session-` prefix.
-- [ ] **Default source = init seeding (decided; see Slice-A ambiguity follow-up
+- [x] **Default source = init seeding (decided; see Slice-A ambiguity follow-up
       item 3).** Seed `:recorded-tool-result-ids #{}` in
       `initialize-session-slots`
       (`components/session-state/src/psi/session_state/init.clj:78`) alongside
@@ -20,14 +20,14 @@
       fork, branch, child), so seeding here supplies the `#{}` default **and**
       clears the set on every session-lifecycle reset for free — this also
       resolves the Slice-B clearing-boundary item (no separate clear needed).
-- [ ] Confirm naming/placement is consistent with existing per-session path
+- [x] Confirm naming/placement is consistent with existing per-session path
       helpers (`session-data-path`, `session-telemetry-path`) and that the init
       seeding mirrors the existing `:telemetry` slot; no behaviour change in this
       slice.
 
 ## Slice B — guarded handler (forward fix) + tests
 
-- [ ] Write a **failing** characterization/regression test that reproduces the
+- [x] Write a **failing** characterization/regression test that reproduces the
       race end-to-end via the **`:user-abort` synchronous `abort-in!` path**
       (`turn.clj:233` → `record-pending-tool-call-interrupts!` `turn.clj:217`;
       decided, see ambiguity follow-up item 2 — *not* the statechart-effect
@@ -41,11 +41,11 @@
       provider conversation, so the Slice-C `journal->provider-messages` de-dup
       cannot mask a forward-fix regression). Verify it fails against current
       `main` behaviour (two recorded entries).
-- [ ] Add a test that the **normal single-result** path still records exactly one
+- [x] Add a test that the **normal single-result** path still records exactly one
       real result (happy path unaffected).
-- [ ] Add a test that the **interrupt-only** path yields exactly one
+- [x] Add a test that the **interrupt-only** path yields exactly one
       `"interrupted"` result.
-- [ ] Add a test asserting **at-most-once** under the concurrent-completion
+- [x] Add a test asserting **at-most-once** under the concurrent-completion
       window (real result recorded first → real result kept, interrupt
       suppressed) — assert exactly one result, not which one, per the determinism
       framing. **Construction (pinned, ambiguity follow-up 3rd pass):** this test
@@ -65,18 +65,18 @@
       has the id" window only exists under real apply/effect interleaving, which
       sequential tests cannot reproduce; direct dispatch of the two record events
       is the faithful sequential seam for the chokepoint suppression.
-- [ ] Rename `_ctx` → `ctx` in the `:session/tool-agent-record-result` handler
+- [x] Rename `_ctx` → `ctx` in the `:session/tool-agent-record-result` handler
       (`dispatch_handlers/session_mutations.clj:529`) and read the canonical
       recorded-ids set for `session-id` via `session/get-state-value-in`,
       nil-safe to `#{}` (defense-in-depth for pre-existing in-flight sessions;
       the canonical default is the Slice-A init seeding).
-- [ ] Extract `tool-call-id` from `tool-result-msg` (`:tool-call-id`).
-- [ ] Make the handler a pure both-or-neither transform:
+- [x] Extract `tool-call-id` from `tool-result-msg` (`:tool-call-id`).
+- [x] Make the handler a pure both-or-neither transform:
       - if `tool-call-id` ∈ recorded-ids → return `{}` (no `:root-state-update`,
         no `:effects`);
       - else → return `{:root-state-update <(fnil conj #{}) id into recorded-ids>
         :effects [<agent-record-tool-result> <append-message-effect>]}`.
-- [ ] Session reset/clear boundary: **resolved in Slice A** — seeding
+- [x] Session reset/clear boundary: **resolved in Slice A** — seeding
       `:recorded-tool-result-ids #{}` in `initialize-session-slots` (the
       journal/history-discard + session-init boundary) re-seeds the set on every
       session-lifecycle reset (new/resume/fork/branch/child), so the set is
@@ -85,12 +85,12 @@
       per-turn `:pending-tool-calls` reset; **no** separate explicit clear
       handler needed. Confirm there is no journal-only `/clear`-style reset that
       bypasses `initialize-session-slots`; if one exists, add the reseed there.
-- [ ] Run the reproduction + new tests; confirm all pass after the fix.
-- [ ] Run the existing agent-core / agent-session suites; confirm still green.
+- [x] Run the reproduction + new tests; confirm all pass after the fix.
+- [x] Run the existing agent-core / agent-session suites; confirm still green.
 
 ## Slice C — defensive projection de-dup + test
 
-- [ ] In `prompt_request/journal->provider-messages`
+- [x] In `prompt_request/journal->provider-messages`
       (`prompt_request.clj:111`), drop any `toolResult`-role projected message
       whose `:tool-call-id` already appeared (first occurrence wins), keying off
       the journal-derived messages. Apply the de-dup to
@@ -106,7 +106,7 @@
       ordering and non-`toolResult` messages intact (de-dup removes extras
       *including* synthetics repair adds for non-contiguous ids; repair still adds
       missing for genuinely dangling blocks).
-- [ ] Add a test: a journal pre-populated with **duplicate** `toolResult` entries
+- [x] Add a test: a journal pre-populated with **duplicate** `toolResult` entries
       for one `tool-call-id` projects to **exactly one** `tool_result` per id
       through the downstream conversation rebuild
       (`agent-messages->ai-conversation`), so an already-wedged session recovers
@@ -118,21 +118,21 @@
       id). The non-contiguous case distinguishes and locks
       de-dup-after-repair: it must still yield exactly one `tool_result` for that
       id (de-dup-before-repair would emit two).
-- [ ] Confirm no independent de-dup is added at the conversation rebuild (single
+- [x] Confirm no independent de-dup is added at the conversation rebuild (single
       upstream chokepoint only).
 
 ## Slice D — verify, docs, changelog
 
-- [ ] `bb test` green.
-- [ ] `clj-kondo --lint` clean on all changed files; `clj-paren-repair` on edited
+- [x] `bb test` green.
+- [x] `clj-kondo --lint` clean on all changed files; `clj-paren-repair` on edited
       Clojure files.
-- [ ] Update `CHANGELOG.md` `[Unreleased]` → `Fixed`: a tool-use no longer wedges
+- [x] Update `CHANGELOG.md` `[Unreleased]` → `Fixed`: a tool-use no longer wedges
       the session after a turn abort (provider 400 "each tool_use must have a
       single result") — at-most-once toolResult per tool-call-id; already-wedged
       sessions recover via the provider-facing projection de-dup.
-- [ ] Update any affected doc if a user-facing behaviour/guarantee is documented
+- [x] Update any affected doc if a user-facing behaviour/guarantee is documented
       (otherwise none).
-- [ ] Final coherence check: meta/spec(design)/tests/code/doc agree.
+- [x] Final coherence check: meta/spec(design)/tests/code/doc agree.
 
 ## Plan/steps ambiguity review follow-ups
 

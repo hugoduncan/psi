@@ -527,10 +527,29 @@
 
   (register-core-handler!
    :session/tool-agent-record-result
-   (fn [_ctx {:keys [session-id tool-result-msg]}]
-     {:effects [{:effect/type :runtime/agent-record-tool-result
-                 :tool-result-msg tool-result-msg}
-                (journal-append-effect/append-message-effect session-id tool-result-msg)]}))
+   (fn [ctx {:keys [session-id tool-result-msg]}]
+     ;; At-most-once toolResult per tool-call-id (first-writer-wins). The
+     ;; canonical recorded-tool-result-ids set in :state* is the single source
+     ;; of truth; every producer (interrupt paths + real-result re-dispatch)
+     ;; funnels through this event, so a pure guard here covers them all.
+     ;; Atomicity comes from dispatch serialization (single writer to :state*),
+     ;; not a runtime test-and-set.
+     (let [tool-call-id (:tool-call-id tool-result-msg)
+           recorded-ids (or (session/get-state-value-in
+                             ctx
+                             (session/session-recorded-tool-result-ids-path session-id))
+                            #{})]
+       (if (contains? recorded-ids tool-call-id)
+         {}
+         {:root-state-update
+          (fn [state]
+            (update-in state
+                       (session/session-recorded-tool-result-ids-path session-id)
+                       (fnil conj #{})
+                       tool-call-id))
+          :effects [{:effect/type :runtime/agent-record-tool-result
+                     :tool-result-msg tool-result-msg}
+                    (journal-append-effect/append-message-effect session-id tool-result-msg)]}))))
 
   (register-core-handler!
    :session/tool-execute

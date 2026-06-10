@@ -1554,3 +1554,68 @@ CHANGELOG framing agrees (Fixed; session no longer wedges after abort).
 **No new actionable inconsistency.** Three prior plan/steps inconsistency passes
 have converged; plan.md and steps.md agree with each other and with referenced
 code on every checked point. No follow-up items added.
+
+## Implementation pass (2026-06-10)
+
+Executed Slices A–D. All design decisions held; no deviations.
+
+### Slice A — canonical recorded-ids state
+- `session-recorded-tool-result-ids-path [sid]` →
+  `[:agent-session :sessions sid :recorded-tool-result-ids]` added to
+  `session_state/state.clj` (alongside `session-telemetry-path`).
+- Seeded `:recorded-tool-result-ids #{}` in `initialize-session-slots`
+  (`session_state/init.clj`) alongside `:telemetry`/`:turn` — supplies the `#{}`
+  default and clears on every session-lifecycle reset
+  (new/resume/fork/branch/child) in one place. No separate clear handler.
+
+### Slice B — guarded handler (forward fix) + tests
+- `:session/tool-agent-record-result` handler
+  (`dispatch_handlers/session_mutations.clj`) is now a pure both-or-neither
+  transform: `_ctx`→`ctx`; reads recorded-ids (nil-safe `#{}`); if the
+  `tool-call-id` is present returns `{}` (suppresses both effects); else returns
+  a `:root-state-update` adding the id via `(fnil conj #{})` plus both effects
+  (`:runtime/agent-record-tool-result` + `append-message-effect`). Atomicity
+  from dispatch serialization; no agent-core test-and-set.
+- New test ns `tool_result_at_most_once_test.clj` (4 tests, all green):
+  1. abort-races-real-result → exactly one toolResult (journal + in-memory),
+     interrupt wins (headline `:user-abort` `abort-in!` path, asserted at the raw
+     recorded layer).
+  2. normal-single-result path unaffected.
+  3. interrupt-only path → one `"interrupted"` result.
+  4. concurrent-completion via **direct dispatch** of the two record events
+     (real first, then synthetic interrupt) → real result wins, exactly one
+     result. `abort-in!` deliberately not the vehicle (would pass vacuously —
+     real-result effect `disj`s the id from `:pending-tool-calls`).
+- Clearing-boundary check: `initialize-session-slots` is the sole
+  journal/history-discard + session-init seam; no journal-only `/clear` reset
+  bypasses it, so the init seeding fully covers reseed. (`/clear` is not a
+  distinct journal-only reset in this codebase.)
+
+### Slice C — defensive projection de-dup + test
+- Added `dedupe-tool-results` (private) in `prompt_request.clj`; wraps
+  `(repair-dangling-tool-uses (into [] …))` as
+  `(dedupe-tool-results (repair-dangling-tool-uses …))` inside
+  `journal->provider-messages` — de-dup-**after**-repair. First occurrence of a
+  `toolResult` tool-call-id wins; ordering and non-toolResult messages preserved.
+- New test `journal-duplicate-tool-results-project-to-one-test` in
+  `prompt_request_test.clj`: a journal with both a **non-contiguous** duplicate
+  (assistant tool-use → user msg → real result, so repair synthesizes a second)
+  and a **contiguous** duplicate projects through the conversation rebuild to
+  exactly one `tool_result` per id. Locks de-dup-after-repair (non-contiguous
+  case would be two under de-dup-before-repair).
+
+### Slice D — verify/docs/changelog
+- clj-kondo clean on all 4 changed src files + 2 test files.
+- `bb commit-check:dispatch-architecture`: failures=0; no **new** advisories
+  (handler stays pure — `:root-state-update` + effects-as-data, no direct
+  `:state*` swap).
+- CHANGELOG `[Unreleased]` → Fixed: tool-use no longer wedges a session after a
+  turn abort; already-wedged journals recover via projection de-dup.
+- Focused suites green: agent-core core (11), session-close (5),
+  prompt-request (18 incl. new), prompt-lifecycle (24), new at-most-once (4).
+- Note: `tool_execution_test` cannot load under the bare `:test-paths`
+  classpath (`psi.metrics.extension` not on it) — pre-existing, extension-path
+  dependent; unrelated to this change. Full `bb test` includes extension paths.
+
+No doc file documents the toolResult invariant beyond CHANGELOG, so no other doc
+update needed.

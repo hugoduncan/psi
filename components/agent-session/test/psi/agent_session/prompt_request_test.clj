@@ -5,7 +5,8 @@
    [psi.ai.model-registry :as model-registry]
    [psi.agent-session.prompt-request :as prompt-request]
    [psi.session-persistence.core :as persist]
-   [psi.skill-registry.root-storage :as skill-storage]))
+   [psi.skill-registry.root-storage :as skill-storage]
+   [psi.turn-runtime.conversation :as conversation]))
 
 ;; ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -367,3 +368,50 @@
                           :thinking-level :off
                           :speed-mode :fast}
                          {}))))))
+
+;; ── Defensive projection de-dup (already-wedged journal recovery) ────────────
+
+(defn- assistant-tool-use-entry [tool-call-id]
+  (persist/message-entry
+   {:role "assistant"
+    :content [{:type :tool-call :id tool-call-id :name "bash" :arguments "{}"}]}))
+
+(defn- tool-result-entry [tool-call-id text]
+  (persist/message-entry
+   {:role "toolResult"
+    :tool-call-id tool-call-id
+    :tool-name "bash"
+    :content [{:type :text :text text}]
+    :is-error false}))
+
+(defn- user-entry [text]
+  (persist/message-entry {:role "user" :content [{:type :text :text text}]}))
+
+(defn- rebuilt-tool-result-count [messages tool-call-id]
+  (->> (:messages
+        (conversation/agent-messages->ai-conversation "sys" messages [] {}))
+       (filter #(and (= :tool-result (:role %))
+                     (= tool-call-id (:tool-call-id %))))
+       count))
+
+(deftest journal-duplicate-tool-results-project-to-one-test
+  (testing "a journal with duplicate toolResult entries for one tool-call-id —
+            both a non-contiguous duplicate (separated from its assistant
+            tool-use by an intervening message, so repair would synthesize a
+            second result) and a contiguous duplicate — projects to exactly one
+            provider tool_result per id through the conversation rebuild,
+            recovering an already-wedged session"
+    (let [journal  [;; non-contiguous: real result separated from its tool-use
+                    (assistant-tool-use-entry "id-noncontig")
+                    (user-entry "interleaved")
+                    (tool-result-entry "id-noncontig" "real-noncontig")
+                    ;; contiguous: two adjacent results for one id
+                    (assistant-tool-use-entry "id-contig")
+                    (tool-result-entry "id-contig" "first-contig")
+                    (tool-result-entry "id-contig" "dup-contig")]
+          messages (prompt-request/journal->provider-messages journal)]
+      (is (= 1 (rebuilt-tool-result-count messages "id-noncontig"))
+          "non-contiguous duplicate de-duped after repair (would be two without
+           de-dup-after-repair)")
+      (is (= 1 (rebuilt-tool-result-count messages "id-contig"))
+          "contiguous duplicate de-duped"))))

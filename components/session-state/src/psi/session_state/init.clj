@@ -85,6 +85,7 @@
                                                        :session-file session-file
                                                        :flushed? flushed?})
         (assoc-in [:agent-session :sessions sid :telemetry] initial-telemetry)
+        (assoc-in [:agent-session :sessions sid :recorded-tool-result-ids] #{})
         (assoc-in [:agent-session :sessions sid :turn] {:ctx nil}))))
 
 (defn update-runtime-rpc-trace-state [state* enabled? file]
