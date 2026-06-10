@@ -239,29 +239,43 @@ agent-session remains the authoritative owner of session-dispatch invocation;
 workflow-runtime exposes pure domain APIs (run-tree reads, pure transitions) that
 the agent-session cascade composes.
 
-### D4. Terminal transitions route through serialized dispatch (single-writer)
+### D4. Terminal transitions route through dispatch; atomicity from the apply-phase atom CAS with the guard inside the update fn (refined by D20)
 
 Terminal-state transitions (cancel / remove / natural complete) route through the
-serialized dispatch single-writer path (`state-kernel` dispatch pipeline) to earn
-the design's idempotent / no-double-terminal / cancel-during-wait race-safety —
-the same shape solved in task 224 by atomicity-from-dispatch-serialization.
+dispatch pipeline (`state-kernel`) to earn the design's idempotent /
+no-double-terminal / cancel-during-wait race-safety — the same shape solved in
+task 224.
+
+**Atomicity basis (corrected by D20).** `dispatch!` does **not** serialize against
+concurrent threads (no global lock — see D20); the authoritative atomicity is the
+per-`swap!` CAS on `:state*` in the `:apply` phase, and it only covers the terminal
+transition if the **terminal-status guard is evaluated inside the
+`:root-state-update` fn** passed to that `swap!` (so the read-guard-and-commit are
+one CAS-retried step), not as a separate pre-read in the handler. Earlier wording
+in this section attributing the safety to "serialized single-writer dispatch" /
+"atomicity-from-dispatch-serialization" is superseded by D20; read those phrases as
+"the apply-phase atom CAS with the guard inside the update fn."
 
 The current `reset!`-on-`:state*` check-then-write in the cancel/remove mutations
 is a TOCTOU race (status guard read, then unconditional `reset!`). The decision:
-the read-guard-and-commit of the terminal transition is performed atomically under
-the single serialized writer (dispatch), so that:
+the read-guard-and-commit of the terminal transition is performed atomically by the
+apply-phase atom CAS with the guard inside the update fn (D20), so that:
 
 - two concurrent cancels, or cancel racing natural completion, cannot both apply a
-  terminal transition (no double-terminal, no resurrection);
-- a cancel arriving during a blocking wait commits the signal atomically, and the
+  terminal transition (no double-terminal, no resurrection) — the second CAS
+  re-runs its update fn against the already-`:cancelled` state and the in-fn guard
+  makes it a no-op;
+- a cancel arriving during a blocking wait commits the signal in one CAS, and the
   step loop observes it at the next read-path checkpoint (D2);
 - terminal transitions are idempotent — a second terminal request on an
-  already-terminal run is a no-op via the in-pipeline guard, not a racy outer check.
+  already-terminal run is a no-op via the in-update-fn guard, not a racy outer
+  check.
 
 This supersedes ad-hoc guards on a directly-`reset!`'d atom. The pure transition
-functions keep their argument-checks (terminal-status precondition) but the
-authoritative atomicity comes from dispatch serialization, not the mutation's
-outer `when` guard.
+functions keep their terminal-status precondition, and that precondition is the
+guard evaluated **inside** the `swap!` update fn (D20) — the authoritative atomicity
+is the atom CAS, not the (non-existent) dispatch serialization, and not the
+mutation's outer `when` guard.
 
 ## Behaviour-Contract Decisions (ψ, 2026-06-10)
 
@@ -274,7 +288,8 @@ remaining "(or …)" / "/" alternatives. They do not redesign the step machine.
 `remove` of a live (non-terminal) run is **cancel-then-remove**, not
 reject-while-live. A `remove` request on a live run:
 
-1. commits the `:cancelled` terminal transition (D4: serialized single-writer),
+1. commits the `:cancelled` terminal transition (D4: apply-phase atom CAS with the
+   guard inside the update fn — D20),
 2. emits the cancellation effects (D1: `future-cancel`/interrupt + transitive
    cascade per D3) **and** the job-terminalization effect (D13), all in the same
    **cancel dispatch** while the run record is still present,
@@ -690,15 +705,20 @@ over carrying run identity + outcome in the effect payload):
    is still resolvable via `workflow-in` during this dispatch's `:effects` phase,
    the D16(2) `:cancelled` reconcile branch terminalizes the background job with
    `:outcome :cancelled`.
-2. **Remove dispatch.** A **distinct, subsequent** serialized dispatch applies the
+2. **Remove dispatch.** A **distinct, subsequent** dispatch applies the
    pure `remove-run` dissoc, dropping the canonical run record and its
    `inflight-runs` entry. The job is already terminal from dispatch 1, so this
    dispatch performs no terminalization and the dropped record cannot leave a
    lingering job.
 
-Serialized dispatch (D4 single-writer) guarantees dispatch 2 observes dispatch 1's
-applied state, so the ordering (terminalize → then remove) holds across the two
-dispatches even though it is impossible within one.
+The two-dispatch ordering holds **not** via dispatch serialization (which does not
+exist — D20) but via **in-thread sequencing** (D20): the remove dispatch is the
+re-entrant `:runtime/dispatch-event` effect (D18) executed synchronously on the
+same worker thread, in the cancel dispatch's `:effects` phase, **after** the
+terminalize effect — so dispatch 2 runs strictly after dispatch 1's apply+effects
+on one thread and observes dispatch 1's applied `:state*`. The ordering
+(terminalize → then remove) thus holds across the two dispatches even though it is
+impossible within one.
 
 **Trigger/chaining mechanism (D18).** Dispatch 2 is issued by dispatch 1 as
 **effects-as-data**: the cancel dispatch's effect set ends with a re-entrant
@@ -720,7 +740,8 @@ reconcile-from-canonical-state semantics and from its other call site
 still needs the run's job mapping, which lives in canonical state anyway. The
 two-dispatch split keeps the effect's reconcile-from-canonical-state contract
 intact (`λ extend` compose; no divergent payload path) and reuses D4's existing
-serialized single-writer ordering.
+ordering — realized by the apply-phase atom CAS plus in-thread sequencing of the
+re-entrant remove dispatch, not dispatch serialization (D20).
 
 D5 step 3, D13, and D16(1) are updated to name the two-dispatch split as the
 ordering mechanism. D16(2)'s `:cancelled` reconcile branch remains required (it is
@@ -772,8 +793,10 @@ handled by the change-chain doc step when implemented.
 Effects within a dispatch execute in declared order, so the terminalize effect (1)
 runs before the re-entrant remove dispatch (3) — i.e. the job is terminalized while
 the run record is still resolvable via `workflow-in`, satisfying D17/D16(1)
-terminalize-before-remove. The re-entrant remove dispatch is itself a serialized
-dispatch (D4 single-writer), so it observes the applied `:cancelled` state. Plain
+terminalize-before-remove. The re-entrant remove dispatch runs synchronously
+in-thread (D18/D20) strictly after the cancel dispatch's apply+effects, so it
+observes the applied `:cancelled` state — ordering by in-thread sequencing, not
+dispatch serialization (D20). Plain
 `cancel` (no remove) simply omits effect (3); a direct `remove` of a live run is
 the only flow that emits (3). This keeps the chaining as effects-as-data at the
 dispatch boundary (consistent with D1/D12) rather than command-layer orchestration.
@@ -830,6 +853,79 @@ parent itself is the runaway, so the single top-level worker `future-cancel(true
 *is* emitted (D14) and the parent terminates — distinct from the direct-sub-run
 case above. Scope is updated to name direct sub-run cancellation in scope with this
 failed-delegate-step contract.
+
+## Atomicity-Basis Reconciliation (ψ pass 3, 2026-06-10)
+
+Resolves the pass-3 inconsistency follow-up: D4's "serialized single-writer
+dispatch" race-safety claim contradicts D18's "no global lock" and the dispatch
+code. States the real atomicity basis and aligns the dependent D4/D13/D16/D17
+wording. No change to the cancellation mechanism.
+
+### D20. Race-safety atomicity = the apply-phase atom CAS with the terminal guard inside the `:root-state-update` fn (not dispatch serialization)
+
+**Premise (code- + contract-confirmed).** `kernel/dispatch!`
+(`state-kernel/dispatch.clj`) runs the interceptor chain **synchronously on the
+calling thread with no global lock**; worker futures dispatch from
+`clojure-agent-send-off-pool` threads (Evidence), so two cancels on two threads run
+two **unsynchronized** `dispatch!` calls — dispatch is **not** a serialized
+single-writer against concurrent threads. doc/architecture.md's "Dispatch
+sequencing contract" specifies only the per-dispatch phase order
+(`:apply → :validate → :trim-effects-on-replay → :effects`), **not** cross-thread
+serialization. The only atomicity primitive in the pipeline is the per-`swap!`
+CAS on `:state*` in the `:apply` phase (`apply-root-state-update!` =
+`(swap! (:state* env) root-update-fn)`). Crucially, the handler computes its
+`:root-state-update` fn in the `:handler` `:before` (reading `:state*` then), and
+that fn is applied later by the `:apply` `swap!`: so a terminal-status guard read in
+the handler, separate from the update fn, is a TOCTOU race — **not** made atomic by
+dispatch.
+
+**Decision — option (a): the guard lives inside the `swap!` update fn.** The
+terminal transition's read-guard-and-commit is atomic **iff** the terminal-status
+precondition is re-evaluated **inside** the `:root-state-update` fn passed to the
+`:apply` `swap!` (the pure transition `cancel-run`/`remove-run` receives the current
+state as its argument and itself decides terminal-or-no-op). `swap!` re-runs that fn
+on CAS contention, so:
+
+- **Two concurrent cancels / cancel-racing-completion:** the first CAS commits
+  `:cancelled`; the second CAS re-runs its update fn against the now-`:cancelled`
+  state, the in-fn guard sees the terminal precondition, and it commits a **no-op**
+  — no double-terminal, no resurrection. The atom CAS, not a lock, provides this.
+- **Idempotency:** a second terminal request on an already-terminal run is a no-op
+  via the same in-fn guard.
+- **Cancel during a blocking wait:** the signal commits in one CAS; the step loop
+  observes it at the next read-path checkpoint (D2).
+
+Option (b) (naming an actual serialization point) is rejected — **none exists**;
+`dispatch!` holds no lock and the atom is the only synchronizer.
+
+**Alignment of dependent wording (D4/D13/D16/D17).** Everywhere this design says
+"serialized (single-writer) dispatch" / "atomicity-from-dispatch-serialization" /
+"D4 single-writer" as the *atomicity / race-safety* basis, read it as **the
+apply-phase atom CAS with the guard inside the update fn** (D20). Two consequences:
+
+1. **Run-`:status` "single writer" (D4/D13/D16/D17).** The run's `:status :cancelled`
+   is still authored by exactly one logical writer — the `cancel-run` terminal
+   transition applied through the `:apply` `swap!`. "Single writer" remains true as
+   a *logical* statement (one transition function owns run-`:status`); it is **not**
+   underwritten by thread serialization. The CAS + in-fn guard is what makes
+   concurrent attempts converge to one terminal commit.
+2. **D17 two-dispatch cross-ordering.** The cancel-dispatch-then-remove-dispatch
+   ordering holds via **in-thread sequencing** of the re-entrant
+   `:runtime/dispatch-event` effect (D18) — the remove dispatch executes
+   synchronously on the same thread, in the cancel dispatch's `:effects` phase,
+   after the terminalize effect — **not** via serialization. Same applied-state
+   visibility (dispatch 2 sees dispatch 1's CAS-applied `:state*`), different
+   (correct) mechanism.
+
+**Implementation constraint for the builder.** The terminal-status guard must be
+expressed *inside* the pure `:root-state-update` fn (so it rides the `swap!` CAS
+retry), never as a handler-level pre-read followed by an unconditional update — the
+latter reintroduces the very TOCTOU the current `reset!`-after-`when` mutations have
+(D4). This is the concrete shape that earns the idempotent / no-double-terminal /
+no-resurrection guarantees on a no-global-lock dispatch.
+
+D4, D13, D16, and D17's "serialized"/"single-writer" phrasings are reconciled here;
+no step-machine redesign and no change to the cancellation effect set.
 
 ## Design Questions — Resolution status (ψ, 2026-06-10)
 

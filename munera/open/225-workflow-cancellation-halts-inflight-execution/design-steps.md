@@ -269,7 +269,7 @@
 
 ## Inconsistency follow-ups (ψ pass 3, 2026-06-10)
 
-- [ ] Reconcile D4's race-safety mechanism with the actual dispatch concurrency
+- [x] Reconcile D4's race-safety mechanism with the actual dispatch concurrency
       model now made explicit by D18. D4 attributes terminal-transition idempotency
       / no-double-terminal / no-resurrection / "two concurrent cancels cannot both
       apply a terminal transition" to "the single serialized writer (dispatch)" /

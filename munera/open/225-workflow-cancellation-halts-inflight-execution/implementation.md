@@ -706,3 +706,51 @@ D10/D11/D16/D17/D18/D19 reconciliations stand. One **new** actionable contradict
 This is an internal D4⟷D18 contradiction and a design-vs-code/doc inconsistency;
 it does not redesign the step machine (the fix is to restate the real atomicity
 basis, not change the cancellation mechanism).
+
+## Inconsistency follow-up resolution (ψ pass 3, 2026-06-10)
+
+Executed the single pass-3 inconsistency follow-up design-step (a design-decision
+step: reconcile D4's race-safety mechanism with the now-explicit dispatch
+concurrency model). Completable now — no blocker. Code basis re-confirmed before
+deciding (read `state-kernel/dispatch.clj`):
+
+- `kernel/dispatch!` runs the interceptor chain synchronously on the **calling
+  thread with no global lock** (no `locking`/monitor; worker futures dispatch from
+  pool threads) — so dispatch is **not** a serialized single-writer against
+  concurrent threads.
+- `handler-interceptor` `:before` computes the `:root-state-update` fn (reading
+  `:state*` then); `apply-interceptor` `:after` applies it via
+  `apply-root-state-update!` = `(swap! (:state* env) root-update-fn)`. The only
+  atomicity primitive is that per-`swap!` CAS. A guard read in the handler separate
+  from the update fn is TOCTOU; the read-guard-and-commit is atomic **only if** the
+  terminal-status guard is evaluated **inside** the `:root-state-update` fn (so it
+  rides the CAS retry).
+- doc/architecture.md "Dispatch sequencing contract" documents only phase order,
+  not cross-thread serialization.
+
+Resolution written to design.md as "Atomicity-Basis Reconciliation (ψ pass 3)" D20,
+with D4/D13/D16/D17 wording aligned:
+
+- D20 — chose option (a): race-safety atomicity = the apply-phase atom CAS with the
+  terminal guard inside the `:root-state-update` fn; option (b) (name a real
+  serialization point) rejected — none exists (no lock). Two concurrent cancels
+  converge to one terminal commit because the second CAS re-runs its update fn
+  against the already-`:cancelled` state and the in-fn guard makes it a no-op
+  (idempotent, no double-terminal, no resurrection). Added an explicit builder
+  constraint: express the guard inside the pure update fn, never as a
+  handler-level pre-read + unconditional update.
+- D4 heading + body restated: the safety is the atom CAS with the in-fn guard, not
+  "dispatch serialization"; "serialized single-writer" phrases flagged as
+  superseded by D20.
+- D13/D16/D17 dependent phrasings reconciled: run-`:status` "single writer" is a
+  *logical* statement (one transition fn owns status), not thread serialization;
+  the D17 two-dispatch cross-ordering holds via **in-thread sequencing** of the
+  re-entrant `:runtime/dispatch-event` effect (D18), not serialization. Edited the
+  concrete "serialized dispatch (D4 single-writer) guarantees dispatch 2 observes
+  dispatch 1" claims (lines in D17/D18) to name in-thread sequencing.
+
+Consistency check: D20 is consistent with D18 (no global lock, re-entrant in-thread
+`:runtime/dispatch-event`), D4 (atom CAS replaces the TOCTOU `reset!`-after-`when`),
+and D13/D16/D17 (single logical run-`:status` writer; terminalize-before-remove via
+in-thread sequencing). No new contradictions; no step-machine redesign; cancellation
+effect set unchanged.
