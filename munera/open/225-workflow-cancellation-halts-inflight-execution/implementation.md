@@ -316,3 +316,41 @@ session-dispatch authority reached via the `:runtime/agent-abort` effect), and
 D2/D4 (signal/handle split; serialized terminal transition emits the
 terminalization + cancellation effects together). No new contradictions; no
 step-machine redesign.
+
+## Ambiguity review (ψ pass 2, 2026-06-10)
+
+Fresh ambiguity pass over design.md against the actual execution model. D5–D11
+resolved the prior contract ambiguities, but checking the code reveals two new
+under-specified contracts where the design's transitive-cancellation wording does
+not match the single-thread synchronous execution structure:
+
+1. **Per-sub-run `future-cancel` target unspecified for nested sub-runs.** Intent
+   ("transitively across nested sub-runs"), Desired Behaviour ("cancelling a parent
+   run cancels its in-flight nested delegate sub-runs"), Scope, and D12 ("worker
+   `future-cancel(true)` … cancels the future held in the `inflight-runs` handle …
+   carrying the `run-id`") together read as if each nested sub-run has its own
+   cancellable worker future. But `delegate/delegate-step-runtime-result` drives
+   sub-runs **synchronously on the parent worker thread** via `send-and-drain-fn`;
+   only top-level runs (`execute-async!`, `continue-blocked-run-async!`) register a
+   `{:future :job-id}` in `inflight-runs`. A nested sub-run has no `inflight-runs`
+   entry, so a per-sub-run `:runtime/*` future-cancel effect (D12) has no target.
+   The design does not state whether (a) only the single top-level worker future is
+   `future-cancel`'d/interrupted (the synchronous sub-tree winds down via per-sub-run
+   cooperative `:cancelled` signals + the one parent-thread interrupt + child abort),
+   or (b) sub-runs are expected to carry their own futures. An implementer cannot
+   tell what the recursive D3 sub-run cancel emits as its cancellation *effect*.
+
+2. **Child-session-abort target (session-id) resolution unspecified.** D9/D12 reuse
+   the existing `:runtime/agent-abort` effect, but its `execute-effect!` is keyed on
+   a **session-id** (`effect-session-id ctx effect`). The design never states how the
+   cancel/cascade path derives which session-id(s) to abort — the in-flight attempt's
+   `:execution-session-id` (working-memory `:sessions` / step-run attempts) vs the
+   run's `:parent-session-id`. Without a stated rule for reading the active child
+   session-id from canonical run state, the abort effect's required argument is
+   undefined, and "which child session(s) does a parent cancel abort" (only the one
+   in-flight turn vs every descendant run's recorded session) is ambiguous.
+
+Both are contract gaps an implementer hits immediately; neither redesigns the step
+machine. Note: the run-tree enumeration filter for "in-flight nested sub-run" (which
+statuses qualify for cascade) is adjacent but secondary — folded into item 1's
+clarification.

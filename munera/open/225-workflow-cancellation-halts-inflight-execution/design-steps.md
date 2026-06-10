@@ -128,3 +128,26 @@
       → design.md D13: terminalization emitted by the D2/D4 terminal transition
       reusing existing `:runtime/mark-workflow-jobs-terminal` (single writer);
       Scope + Desired Behaviour updated to name the reuse.
+
+## Ambiguity follow-ups (ψ pass 2, 2026-06-10)
+
+- [ ] Resolve the per-sub-run cancellation-effect target for nested sub-runs.
+      Nested delegate sub-runs run **synchronously on the parent worker thread**
+      (`delegate/delegate-step-runtime-result` calls `send-and-drain-fn` inline);
+      only top-level runs register a `{:future :job-id}` in `inflight-runs`. State
+      explicitly whether the D12 worker `future-cancel(true)` effect targets only
+      the single top-level run's future (with the synchronous sub-tree winding down
+      via per-sub-run cooperative `:cancelled` signals + the one parent-thread
+      interrupt + child-session abort), or whether sub-runs carry their own futures.
+      Reconcile Intent ("transitively across nested sub-runs"), Desired Behaviour,
+      Scope, and D3/D12 so the recursive sub-run cancel's *effect* (not just its
+      signal) has a defined target. Include the "in-flight sub-run" status filter
+      used for the D3 cascade enumeration.
+- [ ] Specify how the cancel/cascade path resolves the **session-id** argument for
+      the `:runtime/agent-abort` child-session-abort effect. Its `execute-effect!`
+      is keyed on a session-id (`effect-session-id`), but D9/D12 do not state whether
+      that session-id comes from the in-flight attempt's `:execution-session-id`
+      (working-memory `:sessions` / step-run attempts) or the run's
+      `:parent-session-id`, nor whether a parent cancel aborts only the single
+      in-flight child turn or every descendant run's recorded child session. State
+      the read rule (from canonical run state) and the set of sessions aborted.
