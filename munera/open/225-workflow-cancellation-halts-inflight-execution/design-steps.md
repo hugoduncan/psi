@@ -75,3 +75,21 @@
       → design.md: Q1–Q4 each tagged RESOLVED inline with D-pointers, plus a
       "Design Questions — Resolution status" summary section; no questions remain
       live.
+
+## Inconsistency follow-ups (ψ, 2026-06-10)
+
+- [ ] Reconcile the removed-run stop path: D2 ("exits promptly when it observes
+      `:cancelled` (or a removed run)") and Scope in-scope ("cooperative
+      cancellation check … keyed on run status (`:cancelled`/removed)") assign the
+      removed case to the cooperative read-path check, but D8(b) says the removed
+      case has "no signal remains to read" and is push-only. State explicitly
+      whether the cooperative checkpoint treats a missing `workflow-run-in` result
+      (removed run) as a stop signal (pull) or whether removed is exclusively the
+      `future-cancel(true)` push backstop, and align D2/Scope/D8 wording.
+- [ ] Disambiguate thread-interrupt disposition: Scope Out-of-scope rejects
+      "Force-killing threads … (manual `Thread.interrupt` … not the intended API)"
+      while D7/D8 make `future-cancel(true)` (a JVM thread interrupt that wakes the
+      parked `send-and-drain` deref) a required in-scope mechanism. Explicitly
+      distinguish the in-scope cooperative `future-cancel(true)` interrupt from the
+      out-of-scope force-kill / manual `Thread.interrupt`, so the two sections do
+      not appear to assign thread interruption opposite statuses.

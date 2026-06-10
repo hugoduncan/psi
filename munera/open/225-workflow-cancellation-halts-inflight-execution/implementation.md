@@ -166,3 +166,34 @@ cancel-then-remove routes its terminal transition through D4's serialized writer
 No new ambiguity introduced; the only acknowledged residual is the physics
 exception in D6 (one in-flight effect may land), which is testable as a negative
 (no *new* effect initiated).
+
+## Inconsistency review (ψ, 2026-06-10)
+
+Reviewed design.md for internal inconsistency (claims that contradict each other)
+and design-vs-artifact consistency. Code premises confirmed accurate: pure
+`cancel-run`/`remove-run` (`workflow-runtime/core.clj`), the `reset!`-after-guard
+TOCTOU in the agent-session Pathom mutations (`mutations/canonical_workflows.clj`),
+and `delegate remove` orphaning the future (no `future-cancel`,
+`workflow/core.clj:489`) all match the Evidence/Root-Cause/D4 narrative. Two
+internal contradictions remain:
+
+1. **Removed-run: pull vs push contradiction.** D2 ("exits promptly when it
+   observes `:cancelled` (or a removed run)") and Scope in-scope ("cooperative
+   cancellation check … keyed on run status (`:cancelled`/removed)") both assign
+   the *removed* case to the cooperative read-path check. But D8(b) states the
+   removed case has "**no signal remains to read**" and is therefore handled by the
+   `future-cancel(true)`/interrupt **push** backstop. These contradict on whether a
+   removed run is observable via the read path (run absence = stop signal) or only
+   via push interrupt. An implementer cannot tell whether the cooperative checkpoint
+   must treat a missing `workflow-run-in` result as a stop condition.
+
+2. **Thread-interrupt disposition contradiction.** Scope Out-of-scope lists
+   "Force-killing threads as the primary mechanism (manual `Thread.interrupt` was a
+   one-off recovery, not the intended API)", while D7/D8 make `future-cancel(true)`
+   — which delivers a JVM thread interrupt to wake the parked `send-and-drain` deref
+   — a *required, intended, in-scope* mechanism ("neither is merely a backstop";
+   wait interrupt-safety "is in scope"). The design never explicitly distinguishes
+   the in-scope cooperative `future-cancel(true)` interrupt from the out-of-scope
+   "force-kill / manual `Thread.interrupt`", so the two sections appear to assign
+   thread interruption opposite statuses. (Contrast D7, which *did* explicitly
+   reconcile the "between steps" wording.)
