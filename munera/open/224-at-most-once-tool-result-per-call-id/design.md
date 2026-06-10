@@ -115,8 +115,13 @@ has exactly this shape: one synthetic `"interrupted"` result plus one real resul
   journal and in the in-memory message history — **first writer wins**.
 - Whichever of {real tool result, interrupt result} is recorded first is kept;
   the later one is suppressed (both its in-memory record and its journal append).
-- An aborted, still-in-flight tool keeps its `"interrupted"` result for the
-  model-visible turn. The tool's eventual real completion **still dispatches
+- An aborted, **genuinely still in-flight** tool — one whose real result has
+  **not yet been produced or dispatched** at abort time — keeps its
+  `"interrupted"` result for the model-visible turn. This is the typical headline
+  case; in the concurrent-completion window (real result dispatched first) the
+  real result may win instead (still exactly one result) — see the determinism
+  bullet below, D1 Mechanism, and Resolved Question 3. The tool's eventual real
+  completion **still dispatches
   `:session/tool-agent-record-result`** (the adapter `:record-result!` always
   re-dispatches the event — `tool_runtime_adapter.clj:114`); the recorded-ids
   guard in the handler is what prevents it becoming a second `tool_result` by

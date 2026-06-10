@@ -352,7 +352,7 @@
 
 # Design follow-up — ambiguity review (fifth pass)
 
-- [ ] Align the Desired-Behaviour bullet "An aborted, still-in-flight tool keeps
+- [x] Align the Desired-Behaviour bullet "An aborted, still-in-flight tool keeps
       its `"interrupted"` result for the model-visible turn" (design.md:118) with
       the first-writer-wins / concurrent-window framing the fourth pass installed.
       As written it reads as an **unconditional** interrupt-wins claim, whereas
@@ -372,3 +372,13 @@
       may win (still exactly one result)". Distinct from the resolved fourth-pass
       item, which rewrote the determinism bullet / D1 / Resolved-Q3 but never
       touched :118.
+      → Resolved: qualified :118 to "An aborted, **genuinely still in-flight**
+      tool — one whose real result has **not yet been produced or dispatched** at
+      abort time — keeps its `"interrupted"` result," matching the narrow phrasing
+      the fourth pass installed at the determinism bullet (:130+), D1 Mechanism
+      (:314+), and Resolved Question 3 (:376+). Added an inline qualifier that
+      this is the typical headline case and that in the concurrent-completion
+      window the real result may win (still exactly one result), with a
+      cross-reference to those three sites. Removes the false reading (a) (any id
+      pending at abort deterministically keeps its interrupt result); all four
+      sites now use the same "genuinely still in-flight" framing.

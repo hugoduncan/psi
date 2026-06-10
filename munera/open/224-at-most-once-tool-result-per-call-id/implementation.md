@@ -303,6 +303,21 @@ New actionable ambiguity (see design-steps.md):
 
 No blockers; one actionable ambiguity.
 
+## Ambiguity review (fifth pass) — follow-up executed
+
+Resolved the :118 alignment item. Qualified the Desired-Behaviour bullet to read
+"An aborted, **genuinely still in-flight** tool — one whose real result has **not
+yet been produced or dispatched** at abort time — keeps its `"interrupted"`
+result," matching the narrow phrasing the fourth pass installed at the
+determinism bullet (:130+), D1 Mechanism (:314+), and Resolved Question 3 (:376+).
+Added an inline qualifier that this is the typical headline case and that in the
+concurrent-completion window the real result may win (still exactly one result),
+with a cross-reference to the determinism bullet, D1 Mechanism, and Resolved
+Question 3. This removes reading (a) (the over-claim that any id pending at abort
+deterministically keeps its interrupt result), which was literally false in the
+concurrent window. All four sites now use the same "genuinely still in-flight"
+framing. No blockers.
+
 ## Inconsistency review (design.md) — second pass
 
 Re-reviewed design.md for internal inconsistencies and design-vs-code
