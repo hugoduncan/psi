@@ -156,3 +156,28 @@
         ;; first writer (the real result) wins
         (is (= "bash" (:tool-name (first journal))))
         (is (= "bash" (:tool-name (first memory))))))))
+
+(deftest distinct-tool-call-ids-both-recorded-test
+  (testing "the recorded-ids guard is per-tool-call-id, not per-session: two
+            distinct tool-call-ids in one session each record their real result
+            (no cross-id suppression). A per-session boolean guard would suppress
+            the second distinct call and fail this test."
+    (let [[ctx session-id] (create-session-context)
+          id-a             "tc-distinct-a"
+          id-b             "tc-distinct-b"]
+      (record-result! ctx session-id (real-result-msg id-a))
+      (record-result! ctx session-id (real-result-msg id-b))
+      (let [journal-a (journal-tool-results ctx session-id id-a)
+            journal-b (journal-tool-results ctx session-id id-b)
+            memory-a  (memory-tool-results ctx session-id id-a)
+            memory-b  (memory-tool-results ctx session-id id-b)]
+        (is (= 1 (count journal-a))
+            "first id records exactly one toolResult in the journal")
+        (is (= 1 (count journal-b))
+            "second distinct id is not suppressed — records its own toolResult")
+        (is (= 1 (count memory-a))
+            "first id records exactly one toolResult in the in-memory history")
+        (is (= 1 (count memory-b))
+            "second distinct id records its own toolResult in the in-memory history")
+        (is (= "bash" (:tool-name (first journal-a))))
+        (is (= "bash" (:tool-name (first journal-b))))))))

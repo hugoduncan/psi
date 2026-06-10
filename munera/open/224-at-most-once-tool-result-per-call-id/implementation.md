@@ -1840,3 +1840,19 @@ New actionable (1) — see steps.md "Test review follow-ups (second pass)":
   handler-layer test that records real results for two distinct tool-call-ids in
   one session and asserts both are recorded (each →1, no cross-suppression); a
   per-session guard would fail it.
+
+## Test review follow-ups (second pass) — executed
+
+Added `distinct-tool-call-ids-both-recorded-test` to
+`tool_result_at_most_once_test.clj`. Records real results for two distinct
+tool-call-ids (`tc-distinct-a`, `tc-distinct-b`) in one session via
+`record-result!` and asserts each id records exactly one `toolResult` at the raw
+recorded layer — journal (`journal-tool-results`) and agent-core in-memory
+history (`memory-tool-results`) — with no cross-id suppression (each →1, tool-name
+`"bash"`). Locks per-tool-call-id granularity of the `:state*` recorded-ids
+guard: a per-session boolean "recorded" flag (suppress-after-first) would suppress
+`id-b` and fail its count-1 assertions, while the actual per-id `contains?`/`conj`
+guard records both. Symmetric to the cross-turn lifetime lock already present
+(`recorded-ids-survive-turn-boundary-test`). Focused suite green (6 tests / 25
+assertions, scry CLI `-n` RC=0); clj-kondo clean, parens balanced. Test-only
+change; no production code touched, no doc/changelog impact.

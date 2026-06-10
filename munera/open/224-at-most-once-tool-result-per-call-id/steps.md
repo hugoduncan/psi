@@ -390,7 +390,7 @@
 
 ## Test review follow-ups (second pass)
 
-- [ ] **Lock at-most-once *per tool-call-id* (not per-session) at the handler
+- [x] **Lock at-most-once *per tool-call-id* (not per-session) at the handler
       layer.** Every handler-layer test in `tool_result_at_most_once_test.clj`
       uses a single id per session, so a regression making the `:state*` guard
       per-session (a boolean "recorded" flag instead of the per-id set) would
@@ -401,3 +401,12 @@
       history; no cross-id suppression). The only existing two-distinct-id
       coverage is at the projection layer (`dedupe-tool-results`), not the
       `:state*` handler guard. A per-session guard must fail this test.
+      → **Resolved:** added `distinct-tool-call-ids-both-recorded-test` to
+      `tool_result_at_most_once_test.clj`. It dispatches real results for two
+      distinct ids (`tc-distinct-a`, `tc-distinct-b`) in one session via
+      `record-result!` and asserts **each** id records exactly one `toolResult`
+      at the raw recorded layer (journal + agent-core in-memory history) with no
+      cross-id suppression. A per-session boolean guard (suppress-after-first)
+      would suppress `id-b` and fail the count-1 assertions for the second id.
+      Focused suite green (6 tests / 25 assertions); clj-kondo clean, parens
+      balanced.
