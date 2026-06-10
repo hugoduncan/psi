@@ -131,7 +131,7 @@
 
 ## Ambiguity follow-ups (ψ pass 2, 2026-06-10)
 
-- [ ] Resolve the per-sub-run cancellation-effect target for nested sub-runs.
+- [x] Resolve the per-sub-run cancellation-effect target for nested sub-runs.
       Nested delegate sub-runs run **synchronously on the parent worker thread**
       (`delegate/delegate-step-runtime-result` calls `send-and-drain-fn` inline);
       only top-level runs register a `{:future :job-id}` in `inflight-runs`. State
@@ -143,7 +143,14 @@
       Scope, and D3/D12 so the recursive sub-run cancel's *effect* (not just its
       signal) has a defined target. Include the "in-flight sub-run" status filter
       used for the D3 cascade enumeration.
-- [ ] Specify how the cancel/cascade path resolves the **session-id** argument for
+      → design.md D14: worker `future-cancel(true)` targets only the single
+      top-level run's future (run-tree root owning the `inflight-runs` entry);
+      sub-runs are synchronous, carry no own future, and wind down via per-sub-run
+      cooperative `:cancelled` signals + the one parent-thread interrupt +
+      per-in-flight-run child abort. D3 cascade enumerates non-terminal
+      (`#{:pending :running :blocked}`) descendants by `:delegating-run-id`
+      parentage. Intent/Desired Behaviour/Scope/D3/D12 reconciled.
+- [x] Specify how the cancel/cascade path resolves the **session-id** argument for
       the `:runtime/agent-abort` child-session-abort effect. Its `execute-effect!`
       is keyed on a session-id (`effect-session-id`), but D9/D12 do not state whether
       that session-id comes from the in-flight attempt's `:execution-session-id`
@@ -151,3 +158,9 @@
       `:parent-session-id`, nor whether a parent cancel aborts only the single
       in-flight child turn or every descendant run's recorded child session. State
       the read rule (from canonical run state) and the set of sessions aborted.
+      → design.md D15: abort `:session-id` = the in-flight child turn's
+      `:execution-session-id` (latest live attempt of the run's `:current-step-id`,
+      attempt status ∈ `#{:running :validating}`), read from canonical `:state*`;
+      never the run's `:parent-session-id`. Set aborted = the directly-cancelled
+      run + each in-flight descendant sub-run with a live attempt (one abort per
+      currently-executing child turn), not every descendant's historical session.

@@ -61,7 +61,11 @@ loop:
   remove, D5) — never drop the handle and leave the thread running.
 - **Transitive propagation:** cancelling a parent run cancels its in-flight nested
   delegate sub-runs and signals their child agent sessions to stop, so the whole
-  tree winds down.
+  tree winds down. Because nested sub-runs run synchronously on the single
+  top-level worker thread (no per-sub-run future), the wind-down is: a `:cancelled`
+  signal per in-flight sub-run (pull stop), the one top-level `future-cancel(true)`
+  interrupt (push wake-up), and a child-session abort per in-flight attempt
+  (D14/D15).
 - **In-flight child turn:** when cancel arrives with a child agent turn already
   mid-execution, the workflow does not advance past that step **and** the child
   turn is interrupted (guaranteed, via the `:session/abort` path) so it initiates
@@ -86,6 +90,12 @@ In scope:
   cancel; `remove` of a live run cancels-then-removes (D5) rather than orphaning.
 - Propagation of cancellation to nested delegate sub-runs and their child agent
   sessions (reuse the existing session interrupt/abort path where possible).
+  Effect targets are pinned: the worker `future-cancel` hits only the single
+  top-level run's future (sub-runs are synchronous, no own future — D14); the
+  child-session abort targets each in-flight run's current attempt
+  `:execution-session-id`, never a run's `:parent-session-id` (D15); the D3
+  cascade enumerates non-terminal (`#{:pending :running :blocked}`) descendants by
+  `:delegating-run-id` parentage.
 - Modelling the cancellation side effects as canonical dispatch `:runtime/*`
   effects (parity: `effect-schema` + `execute-effect!`) executed by the dispatch
   `:effects` interceptor — child-session abort reusing the existing
@@ -199,9 +209,14 @@ session-dispatch authority — not ad-hoc cross-handle reach-in and **not** a
 propagation shim (AGENTS.md authority + `λ shims_adapters`).
 
 - **Nested sub-runs:** the parent cancel enumerates in-flight nested sub-runs from
-  the canonical run-tree state (`:state*`) and dispatches a cancel for each
-  (recursively), reusing the same cancel mutation path. Discovery is from
-  canonical state via the read path; no cross-handle reach-in.
+  the canonical run-tree state (`:state*`) — by `:delegating-run-id` parentage,
+  keeping only non-terminal (`#{:pending :running :blocked}`) runs (D14) — and
+  dispatches a cancel for each (recursively), reusing the same cancel mutation
+  path. Discovery is from canonical state via the read path; no cross-handle
+  reach-in. Per-sub-run *effect* targets are pinned by D14 (worker future-cancel
+  hits only the single top-level run; sub-runs wind down via cooperative signals)
+  and D15 (child-session abort targets each in-flight attempt's
+  `:execution-session-id`).
 - **Child agent sessions:** child-turn abort reuses the **existing** session
   interrupt/abort pathway (`turn/abort-active-turn-in!` → `:session/abort`
   dispatch → `agent-core/abort-in!` → context thread interrupt), which already
@@ -416,7 +431,13 @@ Mapping:
   `:runtime/*` cancellation effect carrying the `run-id`; its `execute-effect!`
   method cancels the future held in the `inflight-runs` runtime handle (reached via
   `ctx`). A new effect type is added only where no existing one matches, and it is
-  registered in `effect-schema` with a parity `execute-effect!` method.
+  registered in `effect-schema` with a parity `execute-effect!` method. **Target
+  (D14):** this effect targets only the **single top-level run's** future (the
+  run-tree root that owns the `inflight-runs` entry); nested sub-runs run
+  synchronously on that one worker thread and carry no future of their own, so the
+  `run-id` resolves to (or is walked up to) the top-level run. The child-session
+  abort target session-id is pinned by D15 (the in-flight attempt's
+  `:execution-session-id`).
 
 Routing through the dispatch `:effects` interceptor is required so the cancellation
 effects:
@@ -450,6 +471,99 @@ emits `:runtime/mark-workflow-jobs-terminal` as part of its effect set (alongsid
 the D12 cancellation effects), and the job reaches terminal via the existing
 handler. Scope and Desired Behaviour are updated to name this reuse and the single
 owner.
+
+## Transitive-Cancellation Target Decisions (ψ pass 2, 2026-06-10)
+
+Resolves the two ambiguity (pass 2) follow-ups. These pin the cancellation
+*effect targets* to the actual single-thread synchronous execution structure —
+contract clarifications grounded in the code, not step-machine redesigns.
+
+Code premises confirmed:
+
+- Only **top-level** runs register a `{:future :job-id}` in `inflight-runs`
+  (`orchestration/execute-async!` and `continue-blocked-run-async!`); a nested
+  delegate sub-run is created and driven **synchronously on the parent worker
+  thread** by `delegate/delegate-step-runtime-result` via `send-and-drain-fn`,
+  with **no** `inflight-runs` entry of its own.
+- A run records its delegating parent run via `:delegating-run-id` (sub-run →
+  parent) and its delegating session via `:parent-session-id`. The in-flight
+  child agent turn of a run is the latest attempt of the run's `:current-step-id`
+  step; that attempt carries `:execution-session-id` — the child-session-id UUID
+  that performs the LLM call / commits (`workflow-runtime/attempts.clj`).
+- Run statuses: `#{:pending :running :blocked}` are non-terminal (in-flight);
+  `#{:completed :failed :cancelled}` are terminal. Attempt statuses: the active
+  child turn is `:running` (`:validating` is also live); terminal-ish attempt
+  statuses are `#{:succeeded :validation-failed :execution-failed :cancelled}`.
+
+### D14. Worker `future-cancel` targets the single top-level run only; sub-runs wind down cooperatively (resolves Q-pass2-1)
+
+A nested delegate sub-run has **no `inflight-runs` entry and no cancellable worker
+future of its own** — it executes synchronously on the one top-level worker
+thread. Therefore the D12 worker `future-cancel(true)` effect targets **only the
+single top-level run's future**: the run-tree root, i.e. the ancestor reached by
+walking `:delegating-run-id` upward until the run that owns the `inflight-runs`
+entry. There is exactly **one** such future for the whole synchronous sub-tree.
+
+The recursive D3 sub-run cancel therefore emits, **per in-flight sub-run** (not a
+per-sub-run future-cancel — there is no target):
+
+- (a) the cooperative `:cancelled` **signal** — the canonical-state terminal
+  transition (D2/D4) — which is the **pull** stop the synchronous parent worker
+  reads at its next checkpoint when it returns up from that sub-run's
+  `send-and-drain`; and
+- (b) the **child-session-abort** effect for that sub-run's in-flight attempt's
+  `:execution-session-id` (D15).
+
+The single parent-thread `future-cancel(true)` interrupt (D7/D8 push) wakes the
+parent worker wherever it is parked in the synchronous sub-tree (a sub-run's
+`send-and-drain` deref) so it returns to the nearest cooperative checkpoint, where
+the per-sub-run pull signals (a) stop further advancement. So the sub-tree winds
+down via: per-sub-run cooperative `:cancelled` signals + the one parent-thread
+interrupt + per-in-flight-run child-session abort. Option (a) of the follow-up is
+chosen; sub-runs do **not** carry their own futures.
+
+**In-flight sub-run status filter for the D3 cascade enumeration:** enumerate
+descendant runs from canonical run-tree state by `:delegating-run-id` parentage
+(transitively from the cancelled run), keeping only runs whose status ∈
+`#{:pending :running :blocked}` (non-terminal). Terminal sub-runs
+(`#{:completed :failed :cancelled}`) are skipped — nothing to cancel.
+
+Intent ("transitively across nested sub-runs"), Desired Behaviour
+("cancelling a parent run cancels its in-flight nested delegate sub-runs"), Scope,
+and D3/D12 are reconciled: the *signal* cascades to every in-flight sub-run; the
+*worker-future cancel effect* has a single target (the top-level run); the
+child-abort effect is per in-flight run.
+
+### D15. Child-session-abort session-id = the in-flight attempt's `:execution-session-id` (resolves Q-pass2-2)
+
+The `:runtime/agent-abort` effect's required `:session-id` argument is the
+**in-flight child turn's `:execution-session-id`**, read from canonical run state —
+**not** the run's `:parent-session-id` (the delegating/caller session, which must
+**not** be aborted).
+
+**Read rule (from canonical `:state*`, per cascade run `r`):**
+
+```
+step    = (:current-step-id r)
+attempt = (last (get-in r [:step-runs step :attempts]))
+sid     = (:execution-session-id attempt)   ; child-session-id UUID
+```
+
+Emit `{:effect/type :runtime/agent-abort :session-id sid}` **iff** `r` is
+non-terminal, `attempt` is live (status ∈ `#{:running :validating}`), and `sid` is
+present. A run with no live attempt (e.g. parked between steps with no active
+child turn) emits **no** abort effect — there is no in-flight turn to abort.
+
+**Set of sessions aborted:** the directly-cancelled run **plus each in-flight
+descendant sub-run** (the D14 cascade set), one abort per run that currently has a
+live in-flight attempt — i.e. the chain of currently-executing child turns, not
+every descendant run's historically-recorded session, and never the
+`:parent-session-id` of any run. In the common synchronous single-chain case this
+is the one deepest in-flight child turn plus any ancestor turns still mid-flight.
+
+This makes the D9/D12 reuse of `:runtime/agent-abort` well-defined: its keyed
+`session-id` (`effect-session-id`) is supplied from the canonical in-flight
+attempt's `:execution-session-id`.
 
 ## Design Questions — Resolution status (ψ, 2026-06-10)
 
