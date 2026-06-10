@@ -601,3 +601,32 @@ Resolution applied to design.md (three contradicting sites):
 
 Funnel property (general invariant — any producer dispatches the one event) left
 intact. No blockers; item completed.
+
+## Architecture-fit review (design.md) — fourth pass
+
+Independent architecture-fit pass on the current post-D1 (Option-C) design.
+Grounded against doc/architecture.md (State boundary: canonical root vs runtime
+handles; Dispatch sequencing contract — pure result → apply → effects last;
+pure-result kinds incl. `:root-state-update`), META.md, and AGENTS.md
+(single-source-of-truth atom, dispatch-owns-writes, effects-as-data, one_way,
+¬shims/adapters).
+
+Fit confirmed; **no new actionable architectural misfit**:
+- recorded-tool-result-ids in `:state*` with `:pending-tool-calls` (agent-core
+  `swap-data!` atom) kept external → matches State-boundary "project queryable
+  status into canonical state, keep handle external".
+- pure guarded handler returning `:root-state-update` (a recognized pure-result
+  kind) with both-or-neither effect emission, dispatch-serialized atomicity, no
+  test-and-set → conforms to the Dispatch sequencing contract.
+- single chokepoint at `:session/tool-agent-record-result` (funnel property) →
+  one_way / single-source; interrupt producers bypassing the dispatch-owned
+  `:session/tool-record-result` slice is pre-existing topology, rerouting is
+  out of scope → not an actionable misfit.
+- defensive de-dup at `journal->provider-messages` is a purely-derived
+  provider-request projection keyed by tool-call-id; complementary recovery of
+  already-persisted duplicates, not a redundant second source of truth → robust(code).
+- session-lifetime recorded-ids set is bounded by per-session tool-call count and
+  the session-scoped journal it guards → no unbounded-growth concern beyond the
+  journal itself.
+
+No new follow-up items; prior architecture-fit items remain resolved by D1.
