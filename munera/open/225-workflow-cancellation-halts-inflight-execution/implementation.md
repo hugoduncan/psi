@@ -518,3 +518,49 @@ This is a boundary-sequencing decision for the design to state, not a step-machi
 redesign (correctly out of scope). It is distinct from the pass-2 inconsistency
 note/D16, which identified the `(when wf …)`-skip + missing `:cancelled` branch but
 did not reconcile the ordering against the dispatch apply-before-effects pipeline.
+
+## Architecture-fit follow-up resolution (ψ pass 3, 2026-06-10)
+
+Executed the single pass-3 architecture-fit follow-up design-step (a
+design-decision step: state how D16's terminalize-before-remove ordering is
+expressible under the dispatch apply-before-effects contract). Completable now —
+no blocker. Code + contract premises re-confirmed before deciding:
+
+- `remove-run` is a pure `:state*` dissoc (`workflow-runtime/core.clj:217`,
+  `state → [state', run]`) → runs in the `:apply` phase.
+- `:runtime/mark-workflow-jobs-terminal` `execute-effect!` →
+  `background_job_runtime/maybe-mark-workflow-jobs-terminal!` re-reads each run via
+  `extension-workflow-runtime/workflow-in` → runs in the `:effects` phase.
+- doc/architecture.md "Dispatch sequencing contract": effective after-order
+  `:apply → :validate → :trim-effects-on-replay → :effects` — all pure apply
+  precedes all effects within one dispatch. So a single cancel-then-remove dispatch
+  removes the record (apply) before the terminalize effect re-reads it → skipped.
+
+Resolution written to design.md as "Dispatch-Sequencing Reconciliation (ψ pass 3)"
+D17, with D5 step 3, D13, and D16(1) updated:
+
+- D17 — chose option (a): cancel-then-remove is **two serialized dispatches**. The
+  cancel dispatch applies the D4 `:cancelled` transition (run still present) and
+  emits the D12 cancellation effects + the D13 terminalization effect together (the
+  D16(2) `:cancelled` branch terminalizes the still-resolvable run with
+  `:outcome :cancelled`); the subsequent serialized remove dispatch applies the
+  pure `remove-run` dissoc. D4 single-writer serialization guarantees dispatch 2
+  sees dispatch 1's applied state, so terminalize-before-remove holds across the
+  two dispatches though it is impossible within one.
+- Rejected option (b) (effect-payload self-containment): it would duplicate the
+  canonical `:cancelled` run state into the effect payload (second source of truth
+  vs `source_of_truth ≡ … :state*`), fork the effect into a hybrid
+  reconcile-all + terminalize-this-run path diverging from its single
+  reconcile-from-canonical-state contract and its payload-free `statechart_actions`
+  call site. The split keeps the effect contract intact (`λ extend` compose) and
+  reuses D4's existing serialized ordering.
+- D16(1) reworded: terminalize-before-remove is realized by the D17 two-dispatch
+  split, not an intra-effect-set ordering. D16(2)'s `:cancelled` reconcile branch
+  remains required (it is what terminalizes the still-present cancelled run in the
+  cancel dispatch). D5 step 3 + D13 updated to name the cancel-dispatch /
+  remove-dispatch split.
+
+Consistency check: D17 is consistent with D4 (serialized single-writer ordering
+across both dispatches), D5 (cancel-then-remove sequence, now two dispatches),
+D13 (single background-job terminal writer, reuse not a second writer), and D16(2)
+(`:cancelled` reconcile branch). No new contradictions; no step-machine redesign.

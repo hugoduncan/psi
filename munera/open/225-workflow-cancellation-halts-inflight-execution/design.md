@@ -267,8 +267,12 @@ reject-while-live. A `remove` request on a live run:
 
 1. commits the `:cancelled` terminal transition (D4: serialized single-writer),
 2. emits the cancellation effects (D1: `future-cancel`/interrupt + transitive
-   cascade per D3),
-3. removes the run record from the registry/`inflight-runs`.
+   cascade per D3) **and** the job-terminalization effect (D13), all in the same
+   **cancel dispatch** while the run record is still present,
+3. removes the run record from the registry/`inflight-runs` in a **distinct,
+   subsequent remove dispatch** (D17) — not within the cancel dispatch's effect
+   set — so the job is terminalized (step 2) before the canonical record is
+   dropped.
 
 The `future-cancel` interrupt (D8) guarantees the worker stops even though its run
 record and canonical signal are gone after removal — so removal cannot re-orphan
@@ -477,13 +481,16 @@ D13 governs only the latter; it does not (and must not) write run `:status`. The
 earlier "single writer for run-terminal status" label conflated the two — corrected
 here, in Desired Behaviour, and in Scope.
 
-Concretely: the cancel/remove terminal transition (D4, serialized single-writer)
-emits `:runtime/mark-workflow-jobs-terminal` as part of its effect set (alongside
-the D12 cancellation effects), and the job reaches terminal via the existing
-handler — subject to the D16 ordering + cancelled-path constraints (the current
-handler reconciles only when the run record is still present and only for
-`:done?`/`:error?`, so a naive cancel-then-remove would leave the job lingering).
-Scope and Desired Behaviour are updated to name this reuse and the single owner.
+Concretely: the **cancel dispatch** terminal transition (D4, serialized
+single-writer) emits `:runtime/mark-workflow-jobs-terminal` as part of its effect
+set (alongside the D12 cancellation effects), and the job reaches terminal via the
+existing handler **while the run record is still present** — subject to the D16
+cancelled-path constraint + the D17 two-dispatch ordering (the current handler
+reconciles only when the run record is still resolvable via `workflow-in` and only
+for `:done?`/`:error?`, so terminalization must happen in the cancel dispatch,
+before the separate D17 remove dispatch drops the record, and the handler must
+gain a `:cancelled` branch). Scope and Desired Behaviour are updated to name this
+reuse and the single owner.
 
 ## Transitive-Cancellation Target Decisions (ψ pass 2, 2026-06-10)
 
@@ -603,12 +610,16 @@ handler (`background-job-runtime/maybe-mark-workflow-jobs-terminal!`) as it stan
 Decision — both constraints apply (the effect set is ordered, and the handler gains
 a cancelled path):
 
-1. **Ordering (terminalize-before-remove).** In the D5 cancel-then-remove effect
-   set, the `:runtime/mark-workflow-jobs-terminal` reconcile is emitted/ordered to
-   run **before** the run-record removal, so the job is terminalized while the run
-   is still resolvable. The removal of the registry/`inflight-runs` record is the
-   last step of the cancel-then-remove sequence (after the D4 `:cancelled` status
-   transition and after job terminalization).
+1. **Ordering (terminalize-before-remove).** The
+   `:runtime/mark-workflow-jobs-terminal` reconcile must run **before** the
+   run-record removal, so the job is terminalized while the run is still
+   resolvable via `workflow-in`. This ordering is **not** expressible inside a
+   single dispatch's effect set — the run-record removal is a pure `:state*`
+   dissoc (`remove-run`) that runs in the `:apply` phase, which the dispatch
+   sequencing contract places **before all effects** (`:apply → :validate →
+   :trim-effects-on-replay → :effects`); a pure state removal cannot be sequenced
+   *after* an effect within one dispatch. The ordering is therefore realized by
+   **splitting cancel-then-remove across two serialized dispatches** — see D17.
 
 2. **Cancelled reconcile path.** `maybe-mark-workflow-jobs-terminal!` gains a
    `:cancelled` reconciliation branch: a run whose status is `:cancelled` (or whose
@@ -626,6 +637,68 @@ reconcile). Both are required for the guarantee to hold across cancel,
 cancel-then-remove, and remove-of-live-run. This is a handler reconcile-path
 extension (`λ extend` compose), not a step-machine redesign; it stays within the
 single existing background-job terminal writer (no second writer introduced).
+
+## Dispatch-Sequencing Reconciliation (ψ pass 3, 2026-06-10)
+
+Resolves the pass-3 architecture-fit follow-up: D16(1)'s "terminalize-before-
+remove" ordering is not expressible within a single dispatch under the
+apply-before-effects sequencing contract. States the fit resolution.
+
+### D17. Cancel-then-remove is two serialized dispatches (terminalize in the cancel dispatch; drop the record in a subsequent remove dispatch)
+
+**Premise (code- + contract-confirmed).** The dispatch sequencing contract
+(doc/architecture.md "Dispatch sequencing contract") fixes the effective
+after-order as `:apply → :validate → :trim-effects-on-replay → :effects`: in a
+single dispatch **all** pure state application precedes **all** effects. The
+cancel-then-remove run-record removal is the pure `remove-run` dissoc on canonical
+`:state*` (`workflow-runtime/core.clj`: `(update-in (runs-path) dissoc run-id)`,
+`state → [state', run]`), so it runs in the `:apply` phase. The job
+terminalization is the `:runtime/mark-workflow-jobs-terminal` effect (D13), which
+runs in the `:effects` phase and re-reads the run via
+`extension-workflow-runtime/workflow-in`. So **within one dispatch** the apply-phase
+removal necessarily precedes the terminalize effect → `workflow-in` → `nil` → the
+job is skipped (the exact lingering-job failure D16 set out to prevent). A pure
+`:state*` removal **cannot** be ordered after an effect inside one dispatch.
+
+**Decision — split cancel-then-remove across two serialized dispatches** (chosen
+over carrying run identity + outcome in the effect payload):
+
+1. **Cancel dispatch.** Applies the D4 `:cancelled` terminal transition (run
+   record **still present**) and emits, in its effect set, the D12 cancellation
+   effects (worker `future-cancel`/interrupt + the D3/D14/D15 transitive cascade)
+   **and** the D13 `:runtime/mark-workflow-jobs-terminal` effect. Because the run
+   is still resolvable via `workflow-in` during this dispatch's `:effects` phase,
+   the D16(2) `:cancelled` reconcile branch terminalizes the background job with
+   `:outcome :cancelled`.
+2. **Remove dispatch.** A **distinct, subsequent** serialized dispatch applies the
+   pure `remove-run` dissoc, dropping the canonical run record and its
+   `inflight-runs` entry. The job is already terminal from dispatch 1, so this
+   dispatch performs no terminalization and the dropped record cannot leave a
+   lingering job.
+
+Serialized dispatch (D4 single-writer) guarantees dispatch 2 observes dispatch 1's
+applied state, so the ordering (terminalize → then remove) holds across the two
+dispatches even though it is impossible within one.
+
+**Why split, not effect-payload self-containment.** The rejected alternative —
+make `:runtime/mark-workflow-jobs-terminal` carry the run identity + `:cancelled`
+outcome in its payload so it terminalizes without re-reading the canonical run —
+would (a) duplicate canonical run state (the `:cancelled` outcome) into the effect
+payload, a second source of truth contrary to `source_of_truth ≡ … :state*`; (b)
+fork the effect into a hybrid reconcile-all-from-canonical-state **plus**
+terminalize-this-named-run path, diverging from its single
+reconcile-from-canonical-state semantics and from its other call site
+(`statechart_actions` emits it payload-free); and (c) re-read-free terminalization
+still needs the run's job mapping, which lives in canonical state anyway. The
+two-dispatch split keeps the effect's reconcile-from-canonical-state contract
+intact (`λ extend` compose; no divergent payload path) and reuses D4's existing
+serialized single-writer ordering.
+
+D5 step 3, D13, and D16(1) are updated to name the two-dispatch split as the
+ordering mechanism. D16(2)'s `:cancelled` reconcile branch remains required (it is
+what terminalizes the still-present cancelled run in the cancel dispatch);
+together D16(2) + D17 satisfy the "no lingering job" guarantee under
+apply-before-effects.
 
 ## Design Questions — Resolution status (ψ, 2026-06-10)
 

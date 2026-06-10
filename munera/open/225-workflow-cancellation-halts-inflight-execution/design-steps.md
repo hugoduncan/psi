@@ -200,7 +200,7 @@
 
 ## Architecture-fit follow-ups (ψ pass 3, 2026-06-10)
 
-- [ ] Reconcile D16's terminalize-before-remove ordering with the dispatch
+- [x] Reconcile D16's terminalize-before-remove ordering with the dispatch
       apply-before-effects sequencing contract (doc/architecture.md "Dispatch
       sequencing contract": effective after-order `:apply → :validate →
       :trim-effects-on-replay → :effects`). The run-record removal is the pure
@@ -219,3 +219,10 @@
       payload). Update D5/D13/D16 so the ordering is expressible under the
       apply-before-effects pipeline (a pure `:state*` removal cannot be sequenced
       after an effect within one dispatch).
+      → design.md D17: option (a) — cancel-then-remove is two serialized
+      dispatches; the cancel dispatch terminalizes the job (D13) + emits the D12
+      cancellation effects while the run record is still present, the subsequent
+      remove dispatch applies the pure `remove-run` dissoc. Option (b) rejected
+      (duplicates canonical run state into the effect payload, forks the
+      reconcile-from-canonical-state contract). D5 step 3, D13, and D16(1) updated
+      to name the two-dispatch split; D16(2) `:cancelled` branch still required.
