@@ -564,3 +564,21 @@
       like `append-journal-entry-root-update`), defeating the bind-once goal — the
       single `let` binding keeps the path in one place for both uses with less
       indirection.
+
+## Code-shaper review follow-ups (second pass)
+
+- [ ] **Seed `:recorded-tool-result-ids` via the path helper, not a literal
+      path, in `init.clj`.** `initialize-session-slots`
+      (`components/session-state/src/psi/session_state/init.clj:88`) currently
+      seeds `(assoc-in [:agent-session :sessions sid :recorded-tool-result-ids]
+      #{})` with a hand-written path that duplicates the canonical helper
+      `session-recorded-tool-result-ids-path` (`state.clj:31`) the handler uses,
+      splitting the path shape across two sites. init.clj already requires
+      `state` (`:as state`), and unlike the neighbouring `:telemetry`/`:turn`
+      seeds (whose helpers don't match their seed paths) this helper `[sid]` →
+      `[… :recorded-tool-result-ids]` matches the seed path exactly. Replace with
+      `(assoc-in (state/session-recorded-tool-result-ids-path sid) #{})` so the
+      path is single-sourced (a future path relocation can't silently leave the
+      slot unseeded at the old location). Low priority;
+      `consistent(idioms)` ∧ single-source-of-path. Re-run the at-most-once suite
+      to confirm still green.

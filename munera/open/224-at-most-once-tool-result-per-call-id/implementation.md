@@ -2187,3 +2187,44 @@ Executed both first-pass code-shaper follow-up items in
 Verification: at-most-once suite green (6 tests / 29 assertions); clj-kondo
 clean, parens balanced. No design/spec/doc/changelog change (pure-result idiom +
 DRY refactor; behaviour identical, no user surface).
+
+## Code-shaper review (second pass)
+
+Fresh code-shaper pass on the implemented code (`session_mutations.clj` handler,
+`prompt_request.clj` `dedupe-tool-results`, `state.clj` path helper, `init.clj`
+seeding). Grounded against `simple ∧ consistent ∧ robust`.
+
+Confirmed well-shaped (not actionable):
+- **Handler guard** is a clean pure both-or-neither transform; `recorded-ids-path`
+  bound once (prior pass). The two `#{}` defaults are **both load-bearing**, not
+  redundant: `(or (get-state-value-in …) #{})` defends the *read* for pre-init
+  in-flight sessions, and `(fnil conj #{})` defends the *update-in* against a nil
+  slot in `state`. Neither is removable.
+- **`dedupe-tool-results`** is an idiomatic dedup-by-key reduce
+  (`[acc seen]`), first-occurrence-wins, order- and non-toolResult-preserving;
+  de-dup-after-repair placement matches design. Good.
+- clj-kondo clean on all four changed files.
+
+New actionable consistency/robustness item (see steps.md → "Code-shaper review
+follow-ups (second pass)"):
+1. **`init.clj` seeds `:recorded-tool-result-ids` with a literal path that
+   duplicates `session-recorded-tool-result-ids-path`.**
+   `initialize-session-slots` (`session_state/init.clj:88`) seeds
+   `(assoc-in [:agent-session :sessions sid :recorded-tool-result-ids] #{})`
+   with a hand-written path, while the handler reads/updates the same slot via
+   the helper `session/session-recorded-tool-result-ids-path`
+   (`session_state/state.clj:31`). The canonical path shape now lives in **two**
+   places. init.clj already requires `state` (`:as state`, init.clj:9), so the
+   helper is in scope. Unlike its neighbours — `:telemetry` (helper
+   `session-telemetry-path [sid k]` takes a key, can't seed the whole map) and
+   `:turn` (helper is `session-turn-ctx-path [sid]` → `[… :turn :ctx]`, the seed
+   targets `[… :turn]`) — the recorded-ids helper `[sid]` → `[…
+   :recorded-tool-result-ids]` matches the seed path **exactly**, so this is the
+   one seed that can single-source its path without breaking neighbour
+   consistency. Robustness: if the slot's path is ever relocated, the helper (and
+   thus the handler) updates while the literal init seed silently targets the old
+   location — leaving the slot unseeded at the new path (handler then relies on
+   its `(or … #{})` defence rather than canonical seeding). Replace the literal
+   with `(assoc-in (state/session-recorded-tool-result-ids-path sid) #{})`.
+   Low priority; `consistent(idioms)` ∧ single-source-of-path
+   (`shaped_by(formalisms) → enforceable(invariants)`).
