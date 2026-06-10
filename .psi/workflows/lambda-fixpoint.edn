@@ -31,16 +31,17 @@
     {:type :source, :from {:step "compile", :yield :text}}
     {:type :template,
      :text
-     "Compare the newly compiled lambda with the previous iteration's lambda.\n\nPrevious lambda (input to this cycle's decompile step):\n{{previous}}\n\nNewly compiled lambda:\n{{current}}\n\nDetermine whether these two lambda expressions are structurally equivalent — same semantics, same structure, same symbols. Minor whitespace or formatting differences do not count as changes.\n\nIf they are equivalent, respond with: FIXED\nIf they differ, respond with: CHANGED\n\nAfter your verdict, on a new line output a brief one-sentence summary of what changed (or that nothing changed).",
+     "Compare the newly compiled lambda with the previous iteration's lambda.\n\nPrevious lambda (input to this cycle's decompile step):\n{{previous}}\n\nNewly compiled lambda:\n{{current}}\n\nDetermine whether these two lambda expressions are structurally equivalent — same semantics, same structure, same symbols. Minor whitespace or formatting differences do not count as changes.\n\nFirst, write a brief one-sentence summary of what changed (or that nothing changed).\n\nThen end your reply with the routing marker on its own final line, written verbatim as exactly one of these two lines, with no leading dash, bullet, indentation, quote, or any trailing text:\n\nFIXPOINT_ROUTE: FIXED\n\nFIXPOINT_ROUTE: CHANGED\n\nUse FIXED if the two lambdas are equivalent, or CHANGED if they differ. The marker must appear exactly once, start at the very first column of the line (no characters before FIXPOINT_ROUTE), have exactly one space after the colon, and contain only the single token FIXED or CHANGED.",
      :vars
      {"previous" {:from :workflow-input, :path [:input]},
       "current" {:from {:step "compile", :yield :text}}}}],
    :judge
-   {:type :llm,
-    :contributions
-    [{:type :template,
-      :text "Respond with exactly one word: FIXED or CHANGED.",
-      :vars {}}]},
+   {:type :invoke,
+    :operation "workflow/exact-marker-routing",
+    :args
+    {:text {:from {:step "compare", :output :final-llm-reply}},
+     :marker-label "FIXPOINT_ROUTE",
+     :allowed-routes ["FIXED" "CHANGED"]}},
    :on
    {"FIXED" {:goto "report"},
     "CHANGED" {:goto "iterate-decompile", :max-iterations 10}}}
@@ -76,16 +77,17 @@
     {:type :source, :from {:step "iterate-compile", :yield :text}}
     {:type :template,
      :text
-     "Compare the newly compiled lambda with the previous iteration's lambda.\n\nPrevious lambda (input to this cycle's decompile step):\n{{previous}}\n\nNewly compiled lambda:\n{{current}}\n\nDetermine whether these two lambda expressions are structurally equivalent — same semantics, same structure, same symbols. Minor whitespace or formatting differences do not count as changes.\n\nIf they are equivalent, respond with: FIXED\nIf they differ, respond with: CHANGED\n\nAfter your verdict, on a new line output a brief one-sentence summary of what changed (or that nothing changed).",
+     "Compare the newly compiled lambda with the previous iteration's lambda.\n\nPrevious lambda (input to this cycle's decompile step):\n{{previous}}\n\nNewly compiled lambda:\n{{current}}\n\nDetermine whether these two lambda expressions are structurally equivalent — same semantics, same structure, same symbols. Minor whitespace or formatting differences do not count as changes.\n\nFirst, write a brief one-sentence summary of what changed (or that nothing changed).\n\nThen end your reply with the routing marker on its own final line, written verbatim as exactly one of these two lines, with no leading dash, bullet, indentation, quote, or any trailing text:\n\nFIXPOINT_ROUTE: FIXED\n\nFIXPOINT_ROUTE: CHANGED\n\nUse FIXED if the two lambdas are equivalent, or CHANGED if they differ. The marker must appear exactly once, start at the very first column of the line (no characters before FIXPOINT_ROUTE), have exactly one space after the colon, and contain only the single token FIXED or CHANGED.",
      :vars
      {"previous" {:from {:step "compile", :yield :text}},
       "current" {:from {:step "iterate-compile", :yield :text}}}}],
    :judge
-   {:type :llm,
-    :contributions
-    [{:type :template,
-      :text "Respond with exactly one word: FIXED or CHANGED.",
-      :vars {}}]},
+   {:type :invoke,
+    :operation "workflow/exact-marker-routing",
+    :args
+    {:text {:from {:step "iterate-compare", :output :final-llm-reply}},
+     :marker-label "FIXPOINT_ROUTE",
+     :allowed-routes ["FIXED" "CHANGED"]}},
    :on
    {"FIXED" {:goto "report"},
     "CHANGED" {:goto "iterate-decompile", :max-iterations 10}}}
