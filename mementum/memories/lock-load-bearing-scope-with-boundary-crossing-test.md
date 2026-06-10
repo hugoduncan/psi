@@ -1,0 +1,5 @@
+🔁 When a fix depends on a load-bearing *lifetime/scope* decision (e.g. recorded-ids must be session-scoped, cleared only at session reset, NOT turn-scoped like `:pending-tool-calls`), a characterization test that exercises both events within a single turn does NOT lock that decision. A regression to the wrong scope (turn-scoped clear) would pass the whole suite while silently reintroducing the bug.
+
+The headline race here is *cross-turn*: an aborted tool's real result arrives in a later turn than the interrupt that recorded it. To lock it, write a test that crosses the boundary: record the first writer, advance the turn (`agent/end-loop-in!` resets `:pending-tool-calls`), then dispatch the late writer and assert at-most-once still holds at the raw recorded layer.
+
+General rule: identify the boundary the decision hinges on and make at least one test traverse it. "Outcome-determining, not a plan detail" scope choices need a test that fails if the scope is wrong — caught only on a second implementation-review pass here.
