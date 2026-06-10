@@ -567,7 +567,7 @@
 
 ## Code-shaper review follow-ups (second pass)
 
-- [ ] **Seed `:recorded-tool-result-ids` via the path helper, not a literal
+- [x] **Seed `:recorded-tool-result-ids` via the path helper, not a literal
       path, in `init.clj`.** `initialize-session-slots`
       (`components/session-state/src/psi/session_state/init.clj:88`) currently
       seeds `(assoc-in [:agent-session :sessions sid :recorded-tool-result-ids]
@@ -582,3 +582,10 @@
       slot unseeded at the old location). Low priority;
       `consistent(idioms)` ∧ single-source-of-path. Re-run the at-most-once suite
       to confirm still green.
+      → **Resolved:** `initialize-session-slots` now seeds via
+      `(assoc-in (state/session-recorded-tool-result-ids-path sid) #{})` (init.clj
+      already requires `session-state.state :as state`), single-sourcing the path
+      shape with the handler's read/update site. Path is byte-identical
+      (`[:agent-session :sessions sid :recorded-tool-result-ids]`) so no behaviour
+      change; clj-kondo clean, parens balanced. At-most-once suite green
+      (6 tests / 29 assertions).

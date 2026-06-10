@@ -2228,3 +2228,26 @@ follow-ups (second pass)"):
    with `(assoc-in (state/session-recorded-tool-result-ids-path sid) #{})`.
    Low priority; `consistent(idioms)` ∧ single-source-of-path
    (`shaped_by(formalisms) → enforceable(invariants)`).
+
+## Code-shaper review follow-up resolution (second pass)
+
+Executed the single second-pass code-shaper item (seed
+`:recorded-tool-result-ids` via the path helper, not a literal path).
+
+- **Change:** `initialize-session-slots`
+  (`components/session-state/src/psi/session_state/init.clj:88`) now seeds
+  `(assoc-in (state/session-recorded-tool-result-ids-path sid) #{})` instead of
+  the hand-written `(assoc-in [:agent-session :sessions sid
+  :recorded-tool-result-ids] #{})`. init.clj already requires
+  `psi.session-state.state :as state`, so the helper was in scope.
+- **Single-source:** the canonical path shape now lives in one place
+  (`state.clj:31` `session-recorded-tool-result-ids-path`), shared by the init
+  seed and the handler's read/`:root-state-update` site — a future path
+  relocation can't silently leave the slot unseeded at the old location.
+- **No behaviour change:** the helper returns the byte-identical path
+  (`[:agent-session :sessions sid :recorded-tool-result-ids]`).
+- **Verify:** clj-kondo clean on init.clj; parens balanced
+  (`clj-paren-repair` success). At-most-once suite green (6 tests / 29
+  assertions).
+
+No blockers; item completed.
