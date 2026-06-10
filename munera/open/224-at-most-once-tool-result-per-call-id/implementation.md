@@ -630,3 +630,54 @@ Fit confirmed; **no new actionable architectural misfit**:
   journal itself.
 
 No new follow-up items; prior architecture-fit items remain resolved by D1.
+
+## Ambiguity review (design.md) — fourth pass
+
+Re-reviewed design.md for ambiguities (statements admitting >1 interpretation),
+not architecture-fit/correctness. Prior ambiguity + inconsistency items remain
+resolved. Grounded the abort/real-result ordering against code:
+`:pending-tool-calls` is *cleared* inside `record-tool-result-in!`
+(`agent_core/core.clj:407`, `disj`), which runs only via the **effect**
+`:runtime/agent-record-tool-result` (`dispatch_effects.clj:125`) — i.e. *after*
+the `:session/tool-agent-record-result` handler returns and state is applied
+(`session_mutations.clj:529`). Abort enumerates `:pending-tool-calls`
+synchronously (`turn.clj:217/220/233`).
+
+New actionable ambiguity (see design-steps.md):
+1. **The determinism claim conflates "still pending at abort (enumeration)" with
+   "the interrupt's record-event is dispatched before the real result's" — and
+   in a real window they diverge, so interrupt-first is not guaranteed for every
+   tool that was pending at abort.** Desired Behaviour ("Interrupt-first is
+   guaranteed … not left to dispatch tie-breaking") and D1 Mechanism assert the
+   interrupt is "deterministically the first writer for any tool that was still
+   pending at abort", justified by "a real result for a still-in-flight tool
+   necessarily arrives *after* the abort that enumerated it as pending." But
+   "still pending" is an **apply-state** property: an id is removed from
+   `:pending-tool-calls` only when the *effect* `:runtime/agent-record-tool-result`
+   runs (`core.clj:407`), which is strictly later than the dispatch+apply of that
+   real result's `:session/tool-agent-record-result`. So there is a window where
+   a real result's record-event is already **enqueued** (and may be serialized
+   *first*) while its id is **still in** `:pending-tool-calls` because the
+   clearing effect has not yet executed. In that window abort enumerates the id
+   as pending and dispatches an interrupt *after* the real-result record event;
+   under dispatch serialization the real-result record applies first (adds the id
+   to recorded-ids, keeps the **real** result) and the interrupt is suppressed —
+   the opposite of the claimed "interrupt is the one kept." The design's
+   parenthetical only excludes the case where the real result "completed and
+   recorded *before* the abort enumerated it" using "no longer pending", but that
+   exclusion is keyed to the *clearing effect having run*, not to *record-event
+   enqueue order* — so the enqueued-but-not-yet-cleared window is unaddressed.
+   "Arrives after" / "recorded before" / "still pending at abort" therefore admit
+   two readings (dispatch-enqueue order vs effect-apply/pending-clear order) that
+   yield opposite model-visible winners. This does **not** threaten the
+   at-most-once invariant (still exactly one result either way) — only the
+   asserted determinism of *which* result the model sees. Resolve by either
+   (a) restating the headline-race guarantee as "at most one result, and
+   first-writer-wins by dispatch order" and dropping the stronger
+   "interrupt-first is deterministic for any tool pending at abort" claim
+   (acknowledging the enqueued-real-result window can make the real result win),
+   or (b) defining "still pending at abort" precisely in dispatch-enqueue terms
+   and justifying why a real result's record-event cannot already be enqueued
+   ahead of the abort's interrupt dispatch for an id abort still sees as pending.
+
+No blockers; one actionable ambiguity.

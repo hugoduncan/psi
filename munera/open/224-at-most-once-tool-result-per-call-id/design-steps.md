@@ -294,3 +294,39 @@
       Mechanism determinism bullets now attribute the headline `:user-abort` race's
       first writer deterministically to the synchronous inline `abort-in!`
       recording. Funnel property (general invariant) left intact.
+
+# Design follow-up — ambiguity review (fourth pass)
+
+- [ ] Disambiguate the **headline-race determinism claim**, which conflates
+      "still pending at abort (enumeration)" with "the interrupt's record-event
+      is dispatched before the real result's". Desired Behaviour ("Interrupt-first
+      is guaranteed for the headline abort race, not left to dispatch
+      tie-breaking") and D1 Mechanism assert the interrupt is "deterministically
+      the first writer for any tool that was still pending at abort", justified by
+      "a real result for a still-in-flight tool necessarily arrives *after* the
+      abort that enumerated it as pending." But `:pending-tool-calls` is cleared
+      only inside `record-tool-result-in!` (`agent_core/core.clj:407`, `disj`),
+      which runs via the **effect** `:runtime/agent-record-tool-result`
+      (`dispatch_effects.clj:125`) — strictly *after* the
+      `:session/tool-agent-record-result` handler returns and applies. So a real
+      result's record-event can be **enqueued first** while its id is **still in**
+      `:pending-tool-calls` (clearing effect not yet run); abort
+      (`turn.clj:217/220/233`) then enumerates that id as pending and dispatches
+      the interrupt *after* the real-result record event, and dispatch
+      serialization keeps the **real** result (suppressing the interrupt) — the
+      opposite of the claimed "interrupt is the one kept." The design's
+      parenthetical exclusion ("the real result could win only if it … recorded
+      *before* the abort enumerated it … no longer pending") is keyed to the
+      clearing effect having run, not to record-event enqueue order, so this
+      enqueued-but-not-yet-cleared window is unaddressed. "Arrives after" /
+      "recorded before" / "still pending at abort" admit two readings
+      (dispatch-enqueue order vs effect-apply/pending-clear order) that yield
+      opposite model-visible winners. The at-most-once invariant is unaffected
+      (still exactly one result); only the asserted determinism of *which* result
+      the model sees is at issue. Resolve by either (a) restating the
+      headline-race guarantee as "at most one result, first-writer-wins by
+      dispatch order" and dropping the stronger "interrupt-first is deterministic
+      for any tool pending at abort" claim, or (b) defining "still pending at
+      abort" precisely in dispatch-enqueue terms and justifying why a real
+      result's record-event cannot already be enqueued ahead of the abort's
+      interrupt dispatch for an id abort still sees as pending.
