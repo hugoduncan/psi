@@ -1073,3 +1073,43 @@ would be a sixth-order nitpick.
 
 **No new actionable inconsistency.** Design is internally consistent and
 consistent with referenced code on all checked points.
+
+## Plan/steps ambiguity follow-up resolution (plan + steps) — first pass
+
+Executed the three plan/steps ambiguity follow-up items added by the preceding
+review pass (commit 7082a3db1). All three resolve plan/steps ambiguities; no
+implementation has started (all Slice A–D items still unchecked), so resolution
+is confined to plan.md/steps.md refinement — no code/test/doc change yet.
+
+Code grounding before deciding:
+- `initialize-session-slots` (`session_state/init.clj:78`) seeds `:telemetry
+  initial-telemetry` and `:turn`; it is the session-init/journal-discard boundary,
+  called on new, resume (`:114`, `:181`), fork (`:151`), branch (`:204`), and
+  child (`child_session_state.clj:228`). Existing update sites use `(fnil conj …)`
+  defensively (`session_mutations.clj:469/498/588/597`). Path helpers
+  (`session-data-path`, `session-telemetry-path`) live in `session_state/state.clj`.
+
+Resolutions:
+- **(item 3 — default source) → choice (a): init seeding.** Seed
+  `:recorded-tool-result-ids #{}` in `initialize-session-slots` alongside
+  `:telemetry`. This supplies the `#{}` default **and**, because init runs on
+  every session-lifecycle reset that discards journal/history, clears the set on
+  that same boundary — so it also **resolves the Slice-B clearing-boundary item**
+  (no per-turn clear, no standalone clear handler). Read/update site keeps nil-safe
+  `#{}` / `(fnil conj #{})` as defense-in-depth only, not as the canonical default.
+  Chosen over (b) read-site-only because the codebase seeds slots explicitly and
+  this collapses default + clearing into one consistent mechanism.
+- **(item 2 — repro interrupt path) → `:user-abort` synchronous `abort-in!`.**
+  Slice-B repro now drives `turn.clj:233` `abort-in!` →
+  `record-pending-tool-call-interrupts!` (`turn.clj:217`), matching the design
+  Evidence and the deterministic first-writer reasoning; excludes the
+  statechart-effect `:deferred-interrupt` producer (different ordering).
+- **(item 1 — assertion layer) → raw recorded layer.** Slice-B repro asserts
+  exactly one `toolResult` entry for the id in the journal + agent-core in-memory
+  message history (not the rebuilt provider conversation), isolating the forward
+  fix from the Slice-C `journal->provider-messages` de-dup. Slice-C retains the
+  separate projection-recovery test.
+
+Edits: steps.md (Slice A default-source bullet, Slice B repro/handler/clearing
+bullets, three follow-up items checked with resolutions), plan.md (Key decisions
++ Slice order Slice-A/Slice-B). No blockers; all three items completed.

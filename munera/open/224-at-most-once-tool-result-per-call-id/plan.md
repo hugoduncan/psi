@@ -54,17 +54,38 @@ Two complementary fixes plus docs, decomposed as vertical slices:
   by journal `tool-call-id`, first occurrence wins.
 - `:pending-tool-calls` (agent-core handle) retained for interrupt enumeration
   only; no longer gates effects.
+- **recorded-ids default + clearing = init seeding** (plan/steps ambiguity
+  follow-up item 3). Seed `:recorded-tool-result-ids #{}` in
+  `initialize-session-slots` (`session_state/init.clj`, the journal/history-discard
+  + session-init boundary alongside `:telemetry`). This supplies the `#{}` default
+  **and** clears the set on every session-lifecycle reset, so no separate clear at
+  the per-turn `:pending-tool-calls` reset and no standalone clear handler are
+  needed. The read/update site keeps nil-safe `#{}` / `(fnil conj #{})` as
+  defense-in-depth only.
+- **Forward-fix repro = `:user-abort` synchronous `abort-in!` path** asserted at
+  the **raw recorded layer** (plan/steps ambiguity follow-ups 1 & 2). The
+  reproduction drives `turn.clj:233` `abort-in!` →
+  `record-pending-tool-call-interrupts!` (not the statechart-effect
+  `:deferred-interrupt` producer) and asserts exactly one `toolResult` entry for
+  the id in the journal + agent-core in-memory history — not on the rebuilt
+  provider conversation — so the Slice-C de-dup cannot mask a forward-fix
+  regression. Slice-C keeps a separate projection-recovery test.
 
 ## Slice order
 
-- **Slice A — canonical recorded-ids state + path helper.** Add the `:state*`
-  path and (if helpful) a small predicate/update helper. No behaviour change yet.
+- **Slice A — canonical recorded-ids state + path helper + init seeding.** Add
+  the `:state*` path helper and seed `:recorded-tool-result-ids #{}` in
+  `initialize-session-slots` (alongside `:telemetry`). The init seeding is the
+  default source and the session-lifecycle clearing boundary in one. No behaviour
+  change yet.
 - **Slice B — guarded handler (forward fix) + characterization tests.** Write the
-  failing reproduction test first (interrupt with a pending tool-call, then a
-  late real result → assert exactly one `tool_result` per `tool_use` in the
-  rebuilt provider conversation), then make the handler pure-guarded so it passes.
-  Add normal-single-result and interrupt-only coverage. Wire the
-  session-reset/clear clearing of recorded-ids.
+  failing reproduction test first via the `:user-abort` synchronous `abort-in!`
+  path (start a pending tool-call, drive `abort-in!`, then a late real result →
+  assert exactly one `toolResult` entry for the id at the raw recorded layer:
+  journal + agent-core in-memory history), then make the handler pure-guarded so
+  it passes. Add normal-single-result and interrupt-only coverage. No separate
+  clearing wiring needed — handled by Slice-A init seeding; just confirm no
+  journal-only `/clear` reset bypasses `initialize-session-slots`.
 - **Slice C — defensive projection de-dup + test.** Drop duplicate `toolResult`
   projected messages in `journal->provider-messages`; add a test that a journal
   pre-populated with duplicate `toolResult` entries projects to exactly one
