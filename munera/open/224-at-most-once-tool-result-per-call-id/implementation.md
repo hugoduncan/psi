@@ -1181,3 +1181,43 @@ Code verified before editing:
   design.md's De-dup Location bullet and the code.
 
 No blockers; both items completed.
+
+## Plan/steps ambiguity review (plan.md + steps.md) — second pass
+
+Reviewed `plan.md` + `steps.md` (not `design.md`) for statements admitting >1
+implementer interpretation. Grounded against code: `journal->provider-messages`
+= `(repair-dangling-tool-uses (into [] (keep …) journal))` (`prompt_request.clj:111`);
+`repair-dangling-tool-uses` collects only the **contiguous** toolResult run after
+each assistant message via `split-with tool-result-message?` and adds a synthetic
+`interrupted` result for any tool-call-id not present in that contiguous run
+(`prompt_request.clj:97-101`); `tool-result-message?` keys on `:role "toolResult"`,
+`tool-result-id` = `:tool-call-id`; `initialize-session-slots` (`init.clj:78`) seeds
+`:telemetry`/`:turn` after `assoc-in session-data-path next-sd` and is called on
+new/resume/fork/branch/child (`init.clj:114/151/181/204`, `child_session_state.clj:228`)
+— Slice-A seeding decision verified sound and unambiguous; the handler funnel
+`:session/tool-agent-record-result` (`session_mutations.clj:529`) returns only
+`{:effects […]}` today, confirming the both-or-neither rewrite premise.
+
+New actionable ambiguity (see steps.md → "Plan/steps ambiguity review follow-ups
+(second pass)"):
+
+1. **Slice-C de-dup ordering relative to `repair-dangling-tool-uses` is unpinned,
+   and the two placements yield different recovery outputs.** Plan §3 and steps
+   Slice C say to add the de-dup "in `journal->provider-messages`" and to "ensure
+   interaction with `repair-dangling-tool-uses` is correct (de-dup removes extras;
+   repair adds missing)", but never state whether de-dup runs **before** or
+   **after** `repair-dangling-tool-uses`. Because repair only inspects the
+   *contiguous* toolResult run following each assistant message (`split-with`), a
+   tool-call-id whose real result sits **non-contiguously** is treated as missing
+   and gets a synthetic result appended. For an already-wedged/malformed journal —
+   exactly Slice C's recovery target — de-dup-**before**-repair can leave **two**
+   results for one id (non-contiguous real + repair's synthetic), while
+   de-dup-**after**-repair guarantees ≤1 unconditionally. Plan's Risks "disjoint
+   concerns" framing understates this interaction. Two reasonable implementer
+   interpretations differ in robustness/outcome → actionable. Resolution: pin
+   de-dup to run on `repair-dangling-tool-uses`'s **output** (wrap it) so
+   at-most-once holds even against synthetic results repair adds for non-contiguous
+   ids, and have the Slice-C recovery test include a **non-contiguous** duplicate
+   so the test actually distinguishes (and locks) the placement.
+
+No blockers; one actionable plan/steps ambiguity.

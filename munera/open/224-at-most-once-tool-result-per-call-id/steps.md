@@ -126,6 +126,24 @@
       clearing-boundary item); the read/update site keeps nil-safe `#{}` /
       `(fnil conj #{})` as defense-in-depth only.
 
+## Plan/steps ambiguity review follow-ups (second pass)
+
+- [ ] **Pin the Slice-C de-dup ordering relative to `repair-dangling-tool-uses`.**
+      Plan §3 / steps Slice C only say de-dup goes "in `journal->provider-messages`"
+      and to "ensure interaction … is correct", leaving it unspecified whether
+      de-dup runs **before** or **after** `repair-dangling-tool-uses`. Repair only
+      scans the *contiguous* toolResult run after each assistant message
+      (`split-with`), so a non-contiguous real result for an id is treated as
+      missing and gets a synthetic appended — meaning de-dup-before-repair can
+      leave two results for one id on a malformed (already-wedged) journal, while
+      de-dup-after-repair guarantees ≤1 unconditionally. Decide and state in plan
+      §3 + steps Slice C that the de-dup applies to `repair-dangling-tool-uses`'s
+      **output** (wrap the repaired list), so at-most-once holds even against
+      synthetic results repair adds for non-contiguous ids. Then extend the
+      Slice-C recovery test to include a **non-contiguous** duplicate `toolResult`
+      for one id, so the test actually distinguishes and locks the chosen
+      placement.
+
 ## Plan/steps inconsistency review follow-ups
 
 - [x] **Reconcile the Slice-B test enumeration between plan.md and steps.md.**
