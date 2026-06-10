@@ -666,3 +666,43 @@ before the record drop). D19 is consistent with D3/D14/D15 (downward cascade,
 single top-level future, per-attempt abort target) and D6 ("no new side effects
 after the checkpoint" for the cancelled sub-run while the parent legitimately
 continues its own work). No step-machine redesign; no new contradictions introduced.
+
+## Inconsistency review (ψ pass 3, 2026-06-10)
+
+Fresh internal-consistency pass over design.md after D17–D19, checking the
+D4 race-safety mechanism against the now-explicit dispatch concurrency model (D18)
+and the referenced `state-kernel/dispatch.clj` + doc/architecture.md. The
+D10/D11/D16/D17/D18/D19 reconciliations stand. One **new** actionable contradiction:
+
+1. **D4 "serialized single-writer dispatch" race-safety contradicts D18's "no
+   global lock" + the dispatch code.** D4 attributes the design's idempotent /
+   no-double-terminal / no-resurrection / "two concurrent cancels cannot both apply
+   a terminal transition" guarantees to "the single serialized writer (dispatch)"
+   and "atomicity-from-dispatch-serialization," and explicitly disavows the
+   mutation guard ("the authoritative atomicity comes from dispatch serialization,
+   not the mutation's outer `when` guard"). But D18 (pass 3) states `dispatch!`
+   "runs the interceptor chain synchronously on the calling thread with **no global
+   lock**," and the referenced code confirms it: `kernel/dispatch!`
+   (`state-kernel/dispatch.clj:387`) runs the chain on the caller's thread with no
+   lock; worker futures dispatch from `clojure-agent-send-off-pool` threads
+   (Evidence). doc/architecture.md's "Dispatch sequencing contract" describes only
+   phase ordering (`:apply → :validate → :trim → :effects`), **not** single-writer
+   serialization. So dispatch is **not** a serialized single-writer against
+   concurrent threads — two cancels on two threads run two unsynchronized
+   `dispatch!` calls. The only atomicity is the per-`swap!` CAS on `:state*` in the
+   `:apply` phase (`apply-root-state-update!` = `(swap! (:state* env)
+   root-update-fn)`), and the terminal-status guard is computed in the `:handler`
+   `:before` (reading `:state*`) **separately** from that `swap!` — so the
+   read-guard-and-commit is **not** atomic unless the guard is re-evaluated inside
+   the `:root-state-update` fn passed to `swap!`. D4's stated mechanism
+   ("dispatch serialization") does not exist as described; the guarantee, if it
+   holds, must come from the atom CAS with the guard inside the update fn — which D4
+   disavows. This contradiction propagates: D13/D16/D17 ("D4 single-writer",
+   "serialized dispatch (D4 single-writer) guarantees dispatch 2 observes dispatch
+   1's applied state") all lean on the same "serialization" framing. (For the D17
+   re-entrant remove dispatch the cross-dispatch ordering actually holds via
+   single-thread in-thread sequencing per D18, not serialization — same mislabel.)
+
+This is an internal D4⟷D18 contradiction and a design-vs-code/doc inconsistency;
+it does not redesign the step machine (the fix is to restate the real atomicity
+basis, not change the cancellation mechanism).

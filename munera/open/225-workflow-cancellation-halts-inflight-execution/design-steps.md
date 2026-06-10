@@ -266,3 +266,27 @@
       `delegate-step-runtime-result` `:cancelled` case and continues (not halted).
       D14 emission rule refined; Scope + out-of-scope note updated; reuses existing
       result-delivery path (no redesign).
+
+## Inconsistency follow-ups (ψ pass 3, 2026-06-10)
+
+- [ ] Reconcile D4's race-safety mechanism with the actual dispatch concurrency
+      model now made explicit by D18. D4 attributes terminal-transition idempotency
+      / no-double-terminal / no-resurrection / "two concurrent cancels cannot both
+      apply a terminal transition" to "the single serialized writer (dispatch)" /
+      "atomicity-from-dispatch-serialization" and disavows the mutation's outer
+      guard. But D18 and the referenced `state-kernel/dispatch.clj:387` establish
+      that `dispatch!` runs the interceptor chain synchronously on the **calling
+      thread with no global lock** (worker futures dispatch from pool threads), and
+      doc/architecture.md's "Dispatch sequencing contract" describes only phase
+      ordering, not single-writer serialization. So dispatch is not serialized
+      against concurrent threads; the only atomicity is the per-`swap!` CAS on
+      `:state*` in `:apply` (`apply-root-state-update!`), and the terminal-status
+      guard is computed in the `:handler` `:before` separately from that `swap!` —
+      so the read-guard-and-commit is not atomic unless the guard lives inside the
+      `:root-state-update` fn. State the real atomicity basis: either (a) require
+      the guard-and-commit to be performed inside the `:apply` `swap!`
+      root-update-fn (atom CAS) and correct D4's "dispatch serialization" wording
+      (and the dependent "D4 single-writer" phrasing in D13/D16/D17), or (b) name
+      the actual serialization point if one exists. Align D4/D13/D16/D17 with
+      D18 and the dispatch code/doc so the race-safety claim is backed by a real
+      mechanism.
