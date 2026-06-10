@@ -125,3 +125,24 @@
       default **and** clears on session-lifecycle reset (resolving the Slice-B
       clearing-boundary item); the read/update site keeps nil-safe `#{}` /
       `(fnil conj #{})` as defense-in-depth only.
+
+## Plan/steps inconsistency review follow-ups
+
+- [ ] **Reconcile the Slice-B test enumeration between plan.md and steps.md.**
+      plan.md Slice order Slice B lists only three Slice-B tests (reproduction +
+      "normal-single-result and interrupt-only coverage"); steps.md Slice B lists
+      a **fourth** test — "asserting at-most-once under the concurrent-completion
+      window (real result recorded first → real result kept, interrupt
+      suppressed)". An implementer following plan.md writes 3 tests, following
+      steps.md writes 4. Add the concurrent-completion at-most-once test to
+      plan.md's Slice-B enumeration (it currently appears only in plan.md Risks
+      as a constraint) so the two files agree on Slice-B coverage.
+- [ ] **Fix the plan.md `conversation.clj` line citation to match design/code.**
+      plan.md §3 ("Defensive projection de-dup") cites
+      "`agent-messages->ai-conversation`, the sole `tool_result`-block emitter,
+      `conversation.clj:95`", but `agent-messages->ai-conversation` is at
+      `conversation.clj:136`; line `:95` is `conv/add-tool-result` (inside
+      `append-tool-result-msg`), the actual sole block emitter. design.md's
+      De-dup Location bullet distinguishes the rebuild fn (`:136`) from the block
+      emitter (`:95`). Update plan.md to cite the rebuild at `:136` and attribute
+      block emission to `conv/add-tool-result` `:95`.

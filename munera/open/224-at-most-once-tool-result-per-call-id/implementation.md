@@ -1113,3 +1113,47 @@ Resolutions:
 Edits: steps.md (Slice A default-source bullet, Slice B repro/handler/clearing
 bullets, three follow-up items checked with resolutions), plan.md (Key decisions
 + Slice order Slice-A/Slice-B). No blockers; all three items completed.
+
+## Plan/steps inconsistency review (plan.md + steps.md) — first pass
+
+Reviewed `plan.md` and `steps.md` for inconsistencies — internal/cross-file
+disagreements and plan/steps-vs-code/design citation drift (not ambiguity/
+architecture-fit). Grounded against code: handler `:session/tool-agent-record-result`
+takes `_ctx` and currently returns only `{:effects [...]}`
+(`session_mutations.clj:529/531/533`) — confirms the rename premise; `abort-in!`
+defn `turn.clj:229`, calls `record-pending-tool-call-interrupts!` with `:user-abort`
+at `turn.clj:233`, `record-pending-tool-call-interrupts!` defn `turn.clj:217`;
+`journal->provider-messages` `prompt_request.clj:111`; `initialize-session-slots`
+seeds `:telemetry`/`:turn` `init.clj:78/87/88`; `agent-messages->ai-conversation`
+`conversation.clj:136`, sole block emitter `conv/add-tool-result` `conversation.clj:95`.
+
+New actionable inconsistencies (see steps.md → "Plan/steps inconsistency review follow-ups"):
+
+1. **Slice-B test enumeration disagrees between plan.md and steps.md.** plan.md
+   Slice order Slice B enumerates only three Slice-B tests — reproduction +
+   "normal-single-result and interrupt-only coverage". steps.md Slice B lists
+   **four** tests: it adds a dedicated test "asserting **at-most-once** under the
+   concurrent-completion window (real result recorded first → real result kept,
+   interrupt suppressed)". plan.md mentions the concurrent window only in its
+   Risks section (as a constraint, "Tests must assert *at-most-once* … not
+   unconditionally interrupt wins"), never as a Slice-B test. An implementer
+   following plan.md writes 3 tests; following steps.md writes 4 — the two files
+   disagree on Slice-B coverage. Reconcile: add the concurrent-completion
+   at-most-once test to plan.md's Slice-B enumeration (or fold it explicitly into
+   the listed coverage) so plan and steps agree.
+
+2. **plan.md cites `agent-messages->ai-conversation` at the wrong line, contradicting
+   the design's verified citation.** plan.md §3 ("Defensive projection de-dup")
+   writes "The downstream conversation rebuild (`turn_runtime/conversation.clj`
+   `agent-messages->ai-conversation`, the sole `tool_result`-block emitter,
+   `conversation.clj:95`)", attaching line `:95` to `agent-messages->ai-conversation`.
+   Code: `agent-messages->ai-conversation` is at `conversation.clj:136`; `:95` is
+   `conv/add-tool-result` inside `append-tool-result-msg` (the actual sole
+   block-emit site). design.md's De-dup Location bullet and the prior
+   inconsistency-review passes deliberately distinguish these (rebuild fn `:136`;
+   block emitter `conv/add-tool-result` `:95`). plan.md conflates the function
+   name with the emit line, contradicting the verified design/code model.
+   Reconcile: cite the rebuild at `:136` and attribute the block emission to
+   `conv/add-tool-result` `:95` (matching design.md).
+
+No blockers; two actionable plan/steps inconsistencies.
