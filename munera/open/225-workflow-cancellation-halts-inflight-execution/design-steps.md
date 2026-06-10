@@ -164,3 +164,27 @@
       never the run's `:parent-session-id`. Set aborted = the directly-cancelled
       run + each in-flight descendant sub-run with a live attempt (one abort per
       currently-executing child turn), not every descendant's historical session.
+
+## Inconsistency follow-ups (ψ pass 2, 2026-06-10)
+
+- [ ] Relabel `:runtime/mark-workflow-jobs-terminal` in D13 and Desired Behaviour:
+      it is the single writer for the **background-job (projected) terminal
+      status** (reconciled *from* run status), not "the single writer for
+      run-terminal status." D4 already owns the run's `:status` single-writer
+      (serialized dispatch transition). Fix the conflated wording so the two
+      writers (run `:status` = D4 dispatch transition; job/projection terminal =
+      `:runtime/mark-workflow-jobs-terminal`) are not both titled "single writer
+      for run-terminal status."
+- [ ] Reconcile cancel-then-remove (D5) with the "no lingering `:running` job"
+      guarantee (Desired Behaviour) and D13's reuse of
+      `:runtime/mark-workflow-jobs-terminal`. As implemented,
+      `maybe-mark-workflow-jobs-terminal!` reconciles each job only `(when wf ...)`
+      (skips when the run/workflow instance is absent) and has branches only for
+      `:error?`/`:done?` — no `:cancelled`/removed-run path. After D5 step 3
+      removes the run record, the effect cannot terminalize that run's job, leaving
+      it lingering. State either (a) an ordering constraint that job
+      terminalization runs **before** the run record is removed, and/or (b) that
+      the reused effect must gain a cancelled/removed-run terminalization path
+      (and a correct `:cancelled` outcome rather than `:done?`→`:completed`), so
+      the guarantee holds for the cancel-then-remove path — not just natural
+      completion.

@@ -400,3 +400,44 @@ via the agent-session `:session/abort`/`:runtime/agent-abort` path), and D12
 (canonical `:runtime/*` effects). D14 pins the single worker-future target; D15
 pins the abort `session-id` argument the D12 `:runtime/agent-abort` reuse needs. No
 step-machine redesign; no new contradictions introduced.
+
+## Inconsistency review (ψ pass 2, 2026-06-10)
+
+Fresh internal-consistency pass over design.md focused on the D12–D15
+dispatch-effect/terminalization decisions against the actual effect
+implementations. D1–D11 contradictions stay resolved; D14/D15 targets verified
+code-accurate (`inflight-runs` only on top-level runs; `:runtime/agent-abort`
+keyed on `:session-id`, with the dispatch `:effects` interceptor injecting the
+*dispatching* session-id when absent — so D15's explicit `:execution-session-id`
+is required to avoid aborting the parent). Two new contradictions found around
+the reused `:runtime/mark-workflow-jobs-terminal` effect:
+
+1. **"single writer for run-terminal status" mislabels the job-terminalization
+   effect (D13/Desired Behaviour vs D4 + code).** D4 makes the serialized
+   dispatch terminal transition (`cancel-run` under single-writer dispatch) the
+   single writer of the run's `:status :cancelled`. But D13 and Desired Behaviour
+   call `:runtime/mark-workflow-jobs-terminal` "the single writer for run-terminal
+   status." That effect (`background_job_runtime/maybe-mark-workflow-jobs-terminal!`)
+   does **not** write run status — it reconciles the **background-job** (projected)
+   terminal status *from* run status. Two different mechanisms are both titled
+   "single writer for run-terminal status," contradicting D4 and the code. The
+   correct label is "single writer for the background-job (projected) terminal
+   status."
+
+2. **Cancel-then-remove leaves a lingering non-terminal job (D5 + Desired vs D13 +
+   code).** Desired Behaviour requires "no lingering `:running` job" after cancel,
+   and D5 removes the run record (cancel-then-remove). But
+   `maybe-mark-workflow-jobs-terminal!` reconciles each job only `(when wf ...)`
+   via `extension-workflow-runtime/workflow-in`, with branches solely for
+   `:error?`(→failed) / `:done?`(→completed) — **no `:cancelled` branch**, and it
+   **skips** the job entirely when the workflow/run is absent. After D5 step 3
+   removes the run record, `workflow-in` returns nil, so the reused effect cannot
+   terminalize that run's job → the job lingers non-terminal, contradicting the
+   "no lingering job" guarantee. The design states no ordering constraint
+   (terminalize before remove) and does not note that the effect's reconcile has
+   no cancelled/removed-run path. (Plain cancel-without-remove likely reaches
+   terminal via the `:done?` branch but is mislabeled outcome `:completed` — a
+   secondary concern folded into the same fix.)
+
+Both are contradictions an implementer hits when wiring D13; neither redesigns
+the step machine.
