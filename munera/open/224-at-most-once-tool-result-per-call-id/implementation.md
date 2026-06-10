@@ -1411,3 +1411,44 @@ Resolution applied (chose **direct dispatch**, `abort-in!` not the vehicle):
 
 No blockers; item completed. (Task remains design/plan-only; Slices A–D not yet
 implemented.)
+
+## Plan/steps inconsistency review (plan.md + steps.md) — third pass
+
+Reviewed `plan.md` + `steps.md` for cross-file / internal inconsistencies
+(citation drift + intra-file disagreement; not ambiguity/architecture-fit).
+Re-verified every load-bearing code cite against current source — all accurate:
+handler `:session/tool-agent-record-result` `session_mutations.clj:529` takes
+`_ctx`, returns only `{:effects [...]}` (rename premise holds); `abort-in!`
+`turn.clj:229`, calls `record-pending-tool-call-interrupts!` with `:user-abort`
+`turn.clj:233`, enumeration `turn.clj:217/220`; `disj` of `:pending-tool-calls`
+inside `:runtime/agent-record-tool-result` at `agent_core/core.clj:407`
+(post-apply); adapter `:record-result!` re-dispatch `tool_runtime_adapter.clj:114`;
+`journal->provider-messages` `prompt_request.clj:111` wrapping
+`repair-dangling-tool-uses` `:119`, contiguous `split-with` `:96`; conversation
+rebuild `agent-messages->ai-conversation` `conversation.clj:136`, sole block
+emitter `conv/add-tool-result` `:95`; `initialize-session-slots` `init.clj:78`.
+Prior plan↔steps items (Slice-B test count 3→4; `conversation.clj:95`↔`:136`;
+design repro raw-recorded-layer) remain resolved and consistent.
+
+New actionable inconsistency (see steps.md → "Plan/steps inconsistency review
+follow-ups (third pass)"):
+
+1. **Slice-A proposed path-helper name violates the very naming convention the
+   same step requires.** steps.md Slice A proposes the helper
+   `recorded-tool-result-ids-path [sid]` (no `session-` prefix), and its third
+   bullet then requires "naming/placement is **consistent with existing
+   per-session path helpers** (`session-data-path`, `session-telemetry-path`)".
+   But every existing per-session path helper in
+   `components/session-state/src/psi/session_state/state.clj` is uniformly
+   `session-`-prefixed: `session-data-path` (`:29`), `session-telemetry-path`
+   (`:30`), `session-turn-ctx-path` (`:33`), `session-scheduler-path` (`:34`),
+   `session-scheduler-schedules-path` (`:35`), `session-scheduler-queue-path`
+   (`:36`). The proposed `recorded-tool-result-ids-path` drops the `session-`
+   prefix, so an implementer who follows the literal proposed name breaks the
+   convention the same step demands, while one who follows the convention bullet
+   must rename it (e.g. `session-recorded-tool-result-ids-path`). The two
+   directives in one step contradict. Reconcile: rename the proposed helper to
+   the `session-`-prefixed form (`session-recorded-tool-result-ids-path`),
+   matching the established convention the bullet cites.
+
+No blockers; one actionable plan/steps inconsistency.

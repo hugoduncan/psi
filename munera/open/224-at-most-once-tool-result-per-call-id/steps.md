@@ -284,3 +284,20 @@
       regression). AC bullet 4 (already-wedged journal projection recovery) left
       on the rebuild / `journal->provider-messages` de-dup. design.md now agrees
       with plan.md Key decisions and steps.md Slice B.
+
+## Plan/steps inconsistency review follow-ups (third pass)
+
+- [ ] **Reconcile the Slice-A path-helper name with the `session-` prefix
+      convention the same step requires.** Slice A proposes the helper
+      `recorded-tool-result-ids-path [sid]` (no `session-` prefix) yet its third
+      bullet requires naming "consistent with existing per-session path helpers
+      (`session-data-path`, `session-telemetry-path`)". Every existing
+      per-session helper in `session_state/state.clj` is `session-`-prefixed
+      (`session-data-path` `:29`, `session-telemetry-path` `:30`,
+      `session-turn-ctx-path` `:33`, `session-scheduler-path` `:34`,
+      `session-scheduler-schedules-path` `:35`, `session-scheduler-queue-path`
+      `:36`), so the proposed name breaks the convention the step demands. Rename
+      the proposed helper to the `session-`-prefixed form
+      (`session-recorded-tool-result-ids-path [sid]` →
+      `[:agent-session :sessions sid :recorded-tool-result-ids]`) in the Slice-A
+      step so the proposed name and the convention bullet agree.
