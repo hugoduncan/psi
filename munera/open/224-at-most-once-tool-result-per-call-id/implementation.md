@@ -2054,3 +2054,41 @@ Executed both third-pass test-shaper follow-up items in
 
 Focused suite green (6 tests / 29 assertions); clj-kondo clean, parens
 balanced. No blockers.
+
+## Test shaper review follow-ups (fourth pass)
+
+Review of `tool_result_at_most_once_test.clj` + `prompt_request_test.clj`
+(`journal-duplicate-tool-results-project-to-one-test`) against test-shaper
+(clarity ∧ signal ∧ robustness ∧ economical). Both suites green (handler 6/29,
+prompt-request 17/49); clj-kondo clean.
+
+Assessment — **REVIEW_COMPLETE, no actionable feedback.** Prior three test-shaper
+passes plus the test-review passes have left the suite well-shaped:
+
+- clarity/signal: layer-naming failure messages on count + winner assertions;
+  intent kept local (winner name passed at the `assert-single-recorded-result`
+  call site, not hidden in the helper).
+- consistency/economy: both-layer (journal + in-memory) count+winner ceremony
+  collapsed into one `assert-single-recorded-result` contract; the projection
+  test pins first-occurrence-wins (contiguous) and locks de-dup-after-repair
+  (non-contiguous).
+- determinism: handler-suite message builders stamp a fixed `test-instant`
+  (EPOCH). The projection test's journal entries route through
+  `persist/message-entry` → `make-entry`, which stamps a random UUID +
+  `Instant/now`, but `journal->provider-messages`/`repair`/`dedupe` process in
+  list order keyed only by `tool-call-id` — those fields are not load-bearing,
+  so the test is deterministic (not flaky). Forcing a fixed timestamp there would
+  reach past the production constructor and add coupling, not remove it → left as-is.
+- behavior-focus: `recorded-ids-survive-turn-boundary-test` reads
+  `:pending-tool-calls` only as a precondition guard (proving the turn boundary
+  genuinely cleared it), which strengthens the test's signal rather than asserting
+  an implementation detail of the behaviour under test → acceptable.
+- faithfulness: the abort-race/interrupt-only tests assert the production interrupt
+  `:tool-name "interrupted"` (turn.clj:208), so the winner check locks real
+  production behaviour, not a test-local synthetic.
+
+Considered-but-rejected micro-nits (not raised — redundant / would reduce signal):
+asserting `:is-error`/`:content` in the winner check (tool-name already
+disambiguates "bash" vs "interrupted"); dropping `normal-single-result-path-...`
+as subsumed by `distinct-tool-call-ids-...` (it documents a distinct
+happy-path-unaffected concern). No follow-up steps added.
