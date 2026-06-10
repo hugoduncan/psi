@@ -161,3 +161,23 @@
       (rewrote the final journal-tolerance bullet + added two location/keying
       bullets), Scope in-scope bullet, Acceptance criterion, and Resolved
       Question 2. Distinct from resolved item 1.
+
+# Design follow-up — inconsistency review (second pass)
+
+- [ ] Fix the **Root Cause "Result:" line** that attributes provider
+      `tool_result` *block* emission to `journal->provider-messages`. The closing
+      "Result:" arrow ("two journal `toolResult` entries with one tool-call-id →
+      `journal->provider-messages` → two `tool_result` blocks for one `tool_use`")
+      contradicts (a) Root Cause step 4, which says the **conversation rebuild**
+      (`turn-runtime/conversation.clj`) emits one `tool_result` block per
+      `toolResult` message, and (b) the Desired-Behaviour De-dup Location bullet,
+      which states `journal->provider-messages` emits only `toolResult`-role
+      *message maps* and "the rebuild is the only place provider `tool_result`
+      blocks are emitted" (code-confirmed: `conversation.clj:95`
+      `conv/add-tool-result`). Rewrite the arrow to route through the rebuild,
+      e.g. "two journal `toolResult` entries → `journal->provider-messages` (two
+      duplicate message maps) → conversation rebuild → two `tool_result` blocks
+      for one `tool_use` → provider 400", so Root Cause, step 4, and the De-dup
+      Location bullet agree on which projection emits the blocks. (Distinct from
+      the resolved second-pass ambiguity item, which fixed the de-dup
+      location/keying bullets but left this Root Cause arrow uncorrected.)

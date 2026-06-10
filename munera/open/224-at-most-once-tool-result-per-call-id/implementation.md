@@ -303,6 +303,49 @@ New actionable ambiguity (see design-steps.md):
 
 No blockers; one actionable ambiguity.
 
+## Inconsistency review (design.md) — second pass
+
+Re-reviewed design.md for internal inconsistencies and design-vs-code
+inconsistencies. Re-verified all cited line numbers against current code:
+`core.clj:424` (swap-data! :pending-tool-calls) ✓, `statechart_actions.clj:129`
+(:on-agent-done) / `:149` (record-pending effect emit) ✓, `dispatch_effects.clj:127`
+(effect handler) / `:131` (enumerate :pending-tool-calls) ✓, `turn.clj:217`
+(record-pending-tool-call-interrupts!) / `:220` (enumerate) / `:233` (abort-in! call) ✓,
+`tool_runtime_adapter.clj:114` (:record-result! re-dispatch) ✓,
+`session_mutations.clj:529` (handler: agent-record-tool-result + append-message-effect) ✓,
+`prompt_request.clj:111` (journal->provider-messages) / `:296` (:turn/messages) ✓,
+`conversation.clj:95` (add-tool-result) / `:136` (agent-messages->ai-conversation) ✓,
+`request.clj:54/60` (build-provider-conversation reads :turn/messages) ✓.
+
+New actionable inconsistency (see design-steps.md):
+1. **Root Cause "Result:" line attributes provider `tool_result` *block*
+   emission to `journal->provider-messages`, contradicting both Root Cause
+   step 4 and the De-dup Location bullet.** The Root Cause closing line reads
+   "two journal `toolResult` entries with one tool-call-id →
+   `journal->provider-messages` → two `tool_result` blocks for one `tool_use` →
+   provider 400", presenting `journal->provider-messages` as the emitter of the
+   two `tool_result` blocks. But (a) Root Cause step 4 (same section) states the
+   **conversation rebuild** (`turn-runtime/conversation.clj`) "emits one
+   `tool_result` block per `toolResult` message", and (b) the Desired-Behaviour
+   De-dup Location bullet states explicitly that `journal->provider-messages`
+   "emits `toolResult`-role provider *message maps*" and "The rebuild is the only
+   place provider `tool_result` blocks are emitted." Code confirms (b):
+   `conversation.clj:95` `conv/add-tool-result` is the only `tool_result`-block
+   emitter; `journal->provider-messages` (`prompt_request.clj:111`) emits message
+   maps. The "Result:" arrow elides the rebuild step and mis-attributes block
+   emission to the journal projection, now actively contradicting the precise
+   pipeline model the second-pass ambiguity resolution added. (The second-pass
+   ambiguity item *noticed* this Root Cause implication as supporting evidence
+   but its resolution updated only the de-dup bullets/Scope/AC/Resolved-Q2 — it
+   did not correct the Root Cause "Result:" line, so the contradiction is now
+   present in design.md.) Fix: rewrite the "Result:" arrow to route through the
+   rebuild, e.g. "two journal `toolResult` entries → `journal->provider-messages`
+   (two duplicate message maps) → conversation rebuild → two `tool_result` blocks
+   for one `tool_use` → provider 400", consistent with step 4 and the De-dup
+   Location bullet.
+
+No blockers; one actionable inconsistency.
+
 ## Ambiguity follow-up resolution (design-steps) — second pass
 
 Executed the single second-pass ambiguity item (de-dup projection
