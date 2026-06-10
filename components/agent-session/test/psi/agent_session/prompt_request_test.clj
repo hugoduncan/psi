@@ -387,12 +387,14 @@
 (defn- user-entry [text]
   (persist/message-entry {:role "user" :content [{:type :text :text text}]}))
 
-(defn- rebuilt-tool-result-count [messages tool-call-id]
+(defn- rebuilt-tool-results [messages tool-call-id]
   (->> (:messages
         (conversation/agent-messages->ai-conversation "sys" messages [] {}))
        (filter #(and (= :tool-result (:role %))
-                     (= tool-call-id (:tool-call-id %))))
-       count))
+                     (= tool-call-id (:tool-call-id %))))))
+
+(defn- rebuilt-tool-result-count [messages tool-call-id]
+  (count (rebuilt-tool-results messages tool-call-id)))
 
 (deftest journal-duplicate-tool-results-project-to-one-test
   (testing "a journal with duplicate toolResult entries for one tool-call-id —
@@ -414,4 +416,8 @@
           "non-contiguous duplicate de-duped after repair (would be two without
            de-dup-after-repair)")
       (is (= 1 (rebuilt-tool-result-count messages "id-contig"))
-          "contiguous duplicate de-duped"))))
+          "contiguous duplicate de-duped")
+      (is (= "first-contig"
+             (-> (rebuilt-tool-results messages "id-contig")
+                 first :content :text))
+          "first occurrence wins (kept first-contig, not dup-contig)"))))

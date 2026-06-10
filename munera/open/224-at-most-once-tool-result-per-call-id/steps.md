@@ -367,7 +367,7 @@
 
 ## Test review follow-ups (first pass)
 
-- [ ] **Lock "first occurrence wins" in the projection de-dup test.**
+- [x] **Lock "first occurrence wins" in the projection de-dup test.**
       `journal-duplicate-tool-results-project-to-one-test`
       (`prompt_request_test.clj:397`) asserts only `count=1` per id, so it would
       pass even if `dedupe-tool-results` kept the *last* occurrence — yet
@@ -379,3 +379,11 @@
       (`first-contig`), not `dup-contig`, so the stated first-wins semantic is
       locked. (Leave the non-contiguous case on count-only — its survivor is the
       repair synthetic, an orthogonal subtlety.)
+      → **Resolved:** added a `rebuilt-tool-results` helper (extracted from
+      `rebuilt-tool-result-count`) and a third assertion to
+      `journal-duplicate-tool-results-project-to-one-test` asserting the surviving
+      rebuilt `tool_result` for `id-contig` carries `:content :text "first-contig"`
+      (the **first** occurrence), not `dup-contig`. A last-wins `dedupe-tool-results`
+      would now fail this assertion. Non-contiguous case left count-only (its
+      survivor is the repair synthetic). Focused test green (1 test / 3
+      assertions); clj-kondo clean, parens balanced.

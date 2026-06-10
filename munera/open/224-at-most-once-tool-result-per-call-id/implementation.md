@@ -1797,3 +1797,14 @@ New actionable (1) — see steps.md "Test review follow-ups (first pass)":
   would pass equally if de-dup kept the *last* occurrence. The contiguous case has
   distinct content (`first-contig` vs `dup-contig`), so locking "first occurrence
   wins" is a one-line assertion.
+
+## Test review follow-up (first pass) — resolved
+
+- **Locked first-occurrence-wins in the projection de-dup test.** Extracted a
+  `rebuilt-tool-results` helper from `rebuilt-tool-result-count` and added a third
+  assertion to `journal-duplicate-tool-results-project-to-one-test`
+  (`prompt_request_test.clj`): the surviving rebuilt `tool_result` for `id-contig`
+  must carry `:content :text "first-contig"` (the **first** journal occurrence),
+  not `dup-contig`. A last-wins `dedupe-tool-results` would now fail. Non-contiguous
+  case left count-only (its survivor is the repair-appended synthetic). Focused
+  test green (1 test / 3 assertions); clj-kondo clean; parens balanced.
