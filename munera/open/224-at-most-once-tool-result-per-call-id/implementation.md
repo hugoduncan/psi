@@ -1323,3 +1323,60 @@ Resolution applied to design.md (two sites):
 
 design.md now agrees with plan.md Key decisions and steps.md Slice B. No blockers;
 item completed. No code/test/doc changes required (design-only reconciliation).
+
+## Plan/steps ambiguity review (plan.md + steps.md) — third pass
+
+Reviewed `plan.md` + `steps.md` (not `design.md`) for statements admitting >1
+implementer interpretation. Re-verified the existing pins against code:
+`:root-state-update` is established as a `(fn [state] …)` over root-state
+(`session_mutations.clj:509`, `dispatch_schema.clj:17` `fn?`), so steps Slice-B's
+`<(fnil conj #{}) id into recorded-ids>` is loose shorthand but the convention is
+unambiguous in practice; `record-pending-tool-call-interrupts!` (`turn.clj:217`)
+enumerates `:pending-tool-calls` and dispatches the record event, and
+`record-tool-result-in!` performs the `:pending-tool-calls` `disj` **inside** the
+`:runtime/agent-record-tool-result` effect (`agent_core/core.clj:407`), i.e.
+strictly after the handler's apply — confirming the design's apply-before-disj
+window.
+
+New actionable ambiguity (see steps.md → "Plan/steps ambiguity review follow-ups
+(third pass)"):
+
+1. **The Slice-B concurrent-completion (4th) test's construction mechanism is
+   unspecified, and the obvious construction cannot exercise the suppression it
+   claims to.** Steps Slice B test 4 says "assert at-most-once under the
+   concurrent-completion window (real result recorded first → real result kept,
+   interrupt suppressed) — assert exactly one result, not which one." The
+   *assertion* is pinned, but the *setup* is not, and the setup is the hard part.
+   The headline repro (test 1) is explicitly driven through `abort-in!`
+   (`turn.clj:233`), which enumerates `:pending-tool-calls` and dispatches an
+   interrupt record-event **only** for ids still present in that set
+   (`turn.clj:219-220`). But `:pending-tool-calls` `disj` for an id happens
+   *inside* the real result's `:runtime/agent-record-tool-result` effect
+   (`agent_core/core.clj:407`), which runs after that handler's apply completes.
+   In a single-threaded sequential dispatch test, once the real result's
+   `:session/tool-agent-record-result` dispatch has fully run (apply **and**
+   effect), the id is both in recorded-ids **and** already removed from
+   `:pending-tool-calls` — so a subsequent `abort-in!` enumerates a set that no
+   longer contains the id and **dispatches no interrupt at all**. The genuine
+   concurrent window (id still pending because the `disj` effect has not yet run
+   while recorded-ids already has the id) only exists under real apply/effect
+   interleaving, which sequential tests cannot reproduce without a seam.
+   Two materially different implementer interpretations result: (a) drive
+   `abort-in!` after recording the real result — but then the interrupt is never
+   dispatched, so the test vacuously "passes" without ever exercising the
+   suppression path it purports to cover (false-confidence test); or (b) bypass
+   `abort-in!` and directly dispatch two `:session/tool-agent-record-result`
+   events for the same id in real-then-interrupt order — trivially deterministic
+   and does exercise the recorded-ids suppression, but does **not** go through the
+   `abort-in!` enumeration path that the real concurrent race uses. The step gives
+   no guidance on which, and the choice decides whether the test actually proves
+   "interrupt suppressed when real result won the race." Pin the construction:
+   state that the concurrent-completion test directly dispatches the two
+   `:session/tool-agent-record-result` events (real first, then a synthetic
+   interrupt for the same id) — exercising the handler chokepoint's first-writer
+   suppression — and explicitly note that the faithful `abort-in!`-enumeration
+   window is not sequentially reproducible (so `abort-in!` is **not** the vehicle
+   for this test), or specify the seam if `abort-in!` is required.
+
+No blockers; one actionable plan/steps ambiguity. (Task remains design/plan-only;
+Slices A–D not yet implemented.)

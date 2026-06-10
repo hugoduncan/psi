@@ -172,6 +172,33 @@
       require the Slice-C recovery test to include a **non-contiguous** duplicate
       (alongside a contiguous one) so the placement is locked.
 
+## Plan/steps ambiguity review follow-ups (third pass)
+
+- [ ] **Pin the Slice-B concurrent-completion (4th) test's construction
+      mechanism.** Slice B test 4 ("at-most-once under the concurrent-completion
+      window — real result recorded first → real result kept, interrupt
+      suppressed; assert exactly one result, not which one") pins the assertion
+      but not the setup, and the obvious setup cannot exercise the suppression it
+      claims. `abort-in!` (`turn.clj:233`) enumerates `:pending-tool-calls` and
+      dispatches an interrupt record-event only for ids still in that set
+      (`turn.clj:219-220`), but the id's `disj` from `:pending-tool-calls` happens
+      *inside* the real result's `:runtime/agent-record-tool-result` effect
+      (`agent_core/core.clj:407`), after that handler's apply. So in a sequential
+      dispatch test, once the real result's `:session/tool-agent-record-result`
+      has fully run, the id is gone from `:pending-tool-calls` and a later
+      `abort-in!` dispatches **no** interrupt — the genuine "still pending while
+      recorded-ids already has the id" window only exists under real apply/effect
+      interleaving, which sequential tests can't reproduce. Decide and state in
+      plan.md Slice B + steps Slice B that this test **directly dispatches** the
+      two `:session/tool-agent-record-result` events for one id (real first, then
+      a synthetic interrupt for the same id) to exercise the handler chokepoint's
+      first-writer suppression, and explicitly note that `abort-in!` is **not**
+      the vehicle for this test (the faithful enumeration window is not
+      sequentially reproducible) — or specify the seam if `abort-in!` is required.
+      Without this pin, interpretation (a) drives `abort-in!` and writes a
+      vacuously-passing test that never dispatches the interrupt it claims to
+      suppress.
+
 ## Plan/steps inconsistency review follow-ups
 
 - [x] **Reconcile the Slice-B test enumeration between plan.md and steps.md.**
