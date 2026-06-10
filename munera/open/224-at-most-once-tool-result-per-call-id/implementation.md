@@ -407,3 +407,34 @@ explicit note that the block-emitting projection is the rebuild, not
 Location bullet.
 
 No blockers; item completed.
+
+## Architecture-fit review (design.md) — third pass
+
+Fresh architecture-fit pass on the current (post-D1, Option-C) design. Grounded
+against doc/architecture.md (State boundary: canonical root vs runtime handles;
+Dispatch sequencing contract; tool-execution dispatch-owned slice
+`:session/tool-run` → `:session/tool-execute-prepared` + `:session/tool-record-result`),
+META.md, and AGENTS.md (single-source-of-truth atom, dispatch-owns-writes,
+effects-as-data, one_way, ¬shims/adapters). No new code re-verification needed
+beyond prior passes.
+
+Fit confirmed; **no new actionable architectural misfit**:
+- recorded-tool-result-ids in `:state*`, handle (`:pending-tool-calls`,
+  agent-core `swap-data!` atom) external → matches State-boundary "project
+  queryable status into canonical state, keep handle external".
+- pure guarded handler (read predicate → `:root-state-update` → both-or-neither
+  effects), dispatch-serialized atomicity, no runtime test-and-set → conforms to
+  Dispatch sequencing contract.
+- guard at `:session/tool-agent-record-result` (inner event) is the only point
+  all three producers (two interrupt + real-result) converge — interrupt
+  producers bypass the dispatch-owned `:session/tool-record-result` slice; the
+  interrupt-bypass is pre-existing topology and routing them through
+  `:session/tool-record-result` is explicitly out of scope, so no actionable
+  misfit here. one_way / single-source preserved.
+- defensive de-dup at `journal->provider-messages` is a provider-request
+  projection in agent-session/turn-runtime, distinct from app-runtime UI
+  transcript projections; purely-derived, tool-call-id keyed → robust(code).
+- Option B (would have needed a documented deviation per ¬shims/adapters) was
+  rejected for the architecturally-aligned Option C.
+
+No new follow-up items; prior architecture-fit items remain resolved by D1.
