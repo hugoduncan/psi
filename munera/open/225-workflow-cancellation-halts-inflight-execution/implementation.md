@@ -197,3 +197,37 @@ internal contradictions remain:
    "force-kill / manual `Thread.interrupt`", so the two sections appear to assign
    thread interruption opposite statuses. (Contrast D7, which *did* explicitly
    reconcile the "between steps" wording.)
+
+## Inconsistency follow-up resolution (ψ, 2026-06-10)
+
+Executed both inconsistency follow-up design-steps. Each was a design-decision
+step (reconcile an internal contradiction in design.md); both completable now —
+no blockers. Resolutions written to design.md as "Consistency Reconciliations"
+D10–D11, with the cross-referenced wording aligned at D2, D8(b), and Scope
+Out-of-scope:
+
+- D10 — removed-run pull/push: a removed run is observed as **absence** of a
+  `workflow-run-in` result, which the cooperative checkpoint treats as a pull stop
+  signal identical to `:cancelled`. D2/Scope (removed handled by the read-path
+  check) stand correct; D8(b)'s "no signal remains to read" was an overstatement
+  (the `:cancelled` *status value* is gone, but run-absence is itself the readable
+  stop signal). `future-cancel(true)` push keeps its D8 role — wake a parked worker
+  so it reaches the checkpoint — and is not the sole removed-run stop mechanism.
+  Single stop-signal predicate stated: `(or (nil? r) (= :cancelled (:status r)))`.
+  D8(b) bullet reworded to wait-wakeup (push, both cancelled and removed parked
+  cases); D2 annotated with the D10 pointer.
+
+- D11 — thread-interrupt disposition: the in-scope *cooperative* `future-cancel(true)`
+  wait-wakeup (interrupt-aware `send-and-drain` handles `InterruptedException`,
+  returns to the checkpoint, terminates cleanly) is distinct from the out-of-scope
+  unsafe force-kill / ad-hoc manual `Thread.interrupt` (non-interrupt-aware worker,
+  no checkpoint, abrupt abandonment) used as a one-off Evidence recovery. The two
+  Scope/D7-D8 statements do not assign opposite statuses: intended mechanism =
+  cooperative interrupt (in scope); rejected = unsafe abrupt termination as the
+  primary stop mechanism. Scope Out-of-scope bullet reworded to name the rejected
+  thing precisely and point to D11.
+
+Consistency check: D10/D11 are consistent with D2 (signal/handle split, pull read
+path), D7/D8 (push wait-wakeup + interrupt-safety), and D5 (cancel-then-remove
+removes the status value but the future-cancel push + run-absence pull still stop
+the worker). No new contradictions introduced.

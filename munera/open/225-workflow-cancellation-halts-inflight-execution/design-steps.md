@@ -78,7 +78,7 @@
 
 ## Inconsistency follow-ups (ψ, 2026-06-10)
 
-- [ ] Reconcile the removed-run stop path: D2 ("exits promptly when it observes
+- [x] Reconcile the removed-run stop path: D2 ("exits promptly when it observes
       `:cancelled` (or a removed run)") and Scope in-scope ("cooperative
       cancellation check … keyed on run status (`:cancelled`/removed)") assign the
       removed case to the cooperative read-path check, but D8(b) says the removed
@@ -86,10 +86,19 @@
       whether the cooperative checkpoint treats a missing `workflow-run-in` result
       (removed run) as a stop signal (pull) or whether removed is exclusively the
       `future-cancel(true)` push backstop, and align D2/Scope/D8 wording.
-- [ ] Disambiguate thread-interrupt disposition: Scope Out-of-scope rejects
+      → design.md D10: removed run = pull stop signal (run-absence) at the
+      checkpoint, identical to `:cancelled`; push only wakes a parked worker so it
+      reaches the checkpoint. D8(b)'s "no signal remains to read" corrected; D2 and
+      Scope confirmed correct; single stop-signal predicate stated.
+- [x] Disambiguate thread-interrupt disposition: Scope Out-of-scope rejects
       "Force-killing threads … (manual `Thread.interrupt` … not the intended API)"
       while D7/D8 make `future-cancel(true)` (a JVM thread interrupt that wakes the
       parked `send-and-drain` deref) a required in-scope mechanism. Explicitly
       distinguish the in-scope cooperative `future-cancel(true)` interrupt from the
       out-of-scope force-kill / manual `Thread.interrupt`, so the two sections do
       not appear to assign thread interruption opposite statuses.
+      → design.md D11: cooperative `future-cancel(true)` wait-wakeup (interrupt-aware
+      worker exits cleanly at checkpoint) is in scope; out-of-scope is unsafe abrupt
+      termination / ad-hoc manual `Thread.interrupt` as primary stop mechanism. Scope
+      Out-of-scope bullet reworded to name the rejected thing precisely and point to
+      D11.

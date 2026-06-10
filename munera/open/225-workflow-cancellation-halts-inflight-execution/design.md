@@ -94,8 +94,13 @@ Out of scope:
 - The duplicate-tool_result fix (task 224 — already closed).
 - Redesigning the workflow step machine or the delegate result-delivery paths
   beyond what cancellation propagation requires.
-- Force-killing threads as the primary mechanism (manual `Thread.interrupt` was a
-  one-off recovery, not the intended API).
+- Force-killing threads / abrupt unsafe termination as the primary stop mechanism
+  — the one-off REPL `Thread.interrupt` on a non-interrupt-aware worker during the
+  Evidence recovery (`Thread.stop`-style abandonment, not an API). This is
+  **distinct from** the in-scope *cooperative* `future-cancel(true)` wait-wakeup
+  interrupt (D7/D8/D11), which an interrupt-aware worker handles to return to its
+  cooperative checkpoint and exit cleanly. See D11 for the in-scope/out-of-scope
+  thread-interrupt boundary.
 
 ## Design Questions (resolve during refinement)
 
@@ -154,7 +159,8 @@ The **cancellation signal** is the run's `:status :cancelled` already committed 
 canonical `:state*` at `(run-path run-id)` by `cancel-run`. The cooperative
 step-loop check reads this signal **via the read path** (`workflow-run-in` / a
 status read) at each step boundary and at interrupt-aware wait wake-ups, and exits
-promptly when it observes `:cancelled` (or a removed run).
+promptly when it observes `:cancelled` (or a removed run — run-absence is itself a
+pull stop signal, D10).
 
 `inflight-runs` and the worker `future` stay a **pure runtime handle** (per
 doc/architecture.md "State boundary: canonical root vs runtime handles" — the
@@ -270,7 +276,10 @@ abort, *not* natural turn completion. This is the concrete behaviour behind D2's
 steps)" wording in Desired Behaviour is the *cooperative* path for cancels that
 arrive while running between steps — the parked-wait case is the interrupt path.
 
-### D8. Division of labor: cooperative read = advance-guard (pull); future-cancel/interrupt = wait-wakeup + removed-run backstop (push)
+### D8. Division of labor: cooperative read = advance-guard (pull); future-cancel/interrupt = wait-wakeup (push)
+
+(Removed-run stop is the pull read-path check on run-absence, not a push backstop
+— see D10.)
 
 Both mechanisms are required and cover **different runtime states**; neither is
 merely a backstop:
@@ -281,10 +290,13 @@ merely a backstop:
   step/sub-run/child-session. This is the authoritative "do not advance"
   mechanism, and the only one needed when a cancel arrives while the loop is
   running between steps.
-- **`future-cancel(true)` / interrupt — wait-wakeup + removed-run backstop
-  (push).** Used to (a) wake a thread parked on a `send-and-drain` deref so the
-  cooperative check can run (D7), and (b) stop a worker whose run record/signal was
-  already removed by `remove` (D5), where no signal remains to read.
+- **`future-cancel(true)` / interrupt — wait-wakeup (push).** Used to wake a
+  thread parked on a `send-and-drain` deref so the cooperative check can run —
+  both for a `:cancelled` run (D7) and for a `remove`d run (D5) whose worker is
+  parked between checkpoints. Push never *replaces* the cooperative read: it only
+  gets a parked worker *to* the next checkpoint, where the pull read decides to
+  stop. For a removed run the stop signal is run-absence read via the pull path,
+  not the push interrupt — see D10.
 
 Consequently **interrupt-safety of the `send-and-drain` wait is in scope**: the
 wait must propagate/handle `InterruptedException` so control returns to the
@@ -302,6 +314,54 @@ names *where the effect is emitted and executed* (the runtime boundary that owns
 `inflight-runs`); D3 names *what that handler invokes* (the session-dispatch
 authority). There is a single owner of the invocation (agent-session) reached
 through a single effect path.
+
+## Consistency Reconciliations (ψ, 2026-06-10)
+
+Resolves the inconsistency follow-ups raised by the design review. These remove
+two internal contradictions without redesigning the step machine.
+
+### D10. Removed run = pull stop signal (run-absence) at the checkpoint; push only wakes a parked worker (reconciles D2/Scope vs D8)
+
+A `remove`d run is observed by the cooperative read-path check as **absence** of a
+`workflow-run-in` result. The cooperative checkpoint treats a missing run record
+**identically** to a `:cancelled` status: both are stop signals read via the
+**pull** path. So D2 ("exits promptly when it observes `:cancelled` (or a removed
+run)") and Scope ("keyed on run status (`:cancelled`/removed)") are correct — the
+removed case *is* handled by the cooperative read-path check, with run-absence as
+the readable stop signal.
+
+D8(b)'s earlier "no signal remains to read" is corrected: what is gone after
+`remove` is the `:cancelled` *status value*, not the observability of the stop
+condition — run-absence is itself the readable stop signal. `future-cancel(true)`
+push is therefore **not** the sole stop mechanism for a removed run; its role is
+unchanged from D8 — wake a *parked* worker so it reaches the checkpoint where the
+pull read (now seeing run-absence) stops it. A worker between checkpoints stops via
+pull; a worker parked on a wait is woken by push, then stops via pull.
+
+Stop-signal predicate at the checkpoint (single rule covering both cases):
+`(let [r (workflow-run-in state run-id)] (or (nil? r) (= :cancelled (:status r))))`.
+
+### D11. In-scope cooperative `future-cancel(true)` interrupt vs out-of-scope force-kill (reconciles Scope Out-of-scope vs D7/D8)
+
+`future-cancel(true)` and the rejected "force-kill / manual `Thread.interrupt`"
+are distinct mechanisms with opposite safety properties:
+
+- **In-scope — cooperative `future-cancel(true)`.** Delivers a JVM thread
+  interrupt to an **interrupt-aware** worker: the `send-and-drain` wait
+  propagates/handles `InterruptedException` (D8 interrupt-safety) and returns
+  control to the cooperative checkpoint, where the worker reads the stop signal
+  (D10) and **terminates itself cleanly**. The interrupt only *wakes* the wait; the
+  thread is never abandoned mid-mutation. This is the intended API.
+- **Out-of-scope — force-kill / ad-hoc manual interrupt.** The one-off REPL
+  `Thread.interrupt` (and any `Thread.stop`-style abrupt termination) used during
+  the Evidence recovery targeted a worker that was *not* interrupt-aware, with no
+  cooperative checkpoint to return to — unsafe abrupt termination as the primary
+  stop mechanism.
+
+The two sections do not assign thread interruption opposite statuses: the *intended
+mechanism* is the cooperative wait-wakeup interrupt (in scope); what is out of
+scope is *unsafe abrupt termination as the primary stop mechanism*. Scope
+Out-of-scope is updated to name the rejected thing precisely and point here.
 
 ## Design Questions — Resolution status (ψ, 2026-06-10)
 
