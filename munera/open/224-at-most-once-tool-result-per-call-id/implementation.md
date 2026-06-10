@@ -802,3 +802,42 @@ Fit confirmed; **no new actionable architectural misfit**:
   `:pending-tool-calls`, matching the cross-turn race; bounded set.
 
 No new follow-up items; prior architecture-fit items remain resolved by D1.
+
+## Ambiguity review (design.md) — fifth pass
+
+Re-reviewed design.md for ambiguities (statements admitting >1 interpretation),
+not architecture-fit/correctness. Prior four ambiguity passes + inconsistency
+items remain resolved. Cross-checked the determinism narrative for residual
+tension between the early Desired-Behaviour bullet and the later determinism
+framing the fourth pass installed.
+
+New actionable ambiguity (see design-steps.md):
+1. **The Desired-Behaviour bullet "An aborted, still-in-flight tool keeps its
+   `"interrupted"` result for the model-visible turn" (design.md:118) reads as
+   an *unconditional* interrupt-wins claim, contradicting the later
+   first-writer-wins / concurrent-window framing.** The fourth-pass resolution
+   reframed *which* result the model sees as **first-writer-wins by dispatch
+   order** and explicitly added that in the concurrent-completion window the
+   **real** result may win — but it rewrote only three sites (the Desired-
+   Behaviour *determinism* bullet at :130+, the D1 Mechanism determinism bullet
+   at :314+, and Resolved Question 3 at :376+), each of which now carefully
+   qualifies "**genuinely** still in-flight (real result not yet produced/
+   dispatched)". The earlier bullet at :118 was left using the bare phrase
+   "still-in-flight tool keeps its interrupted result," which admits two
+   readings: (a) for **any** id still in `:pending-tool-calls` at abort the
+   interrupt result is deterministically kept (the over-claim the fourth pass
+   removed elsewhere), or (b) "still-in-flight" silently carries the later
+   bullet's narrow meaning "genuinely in-flight, real result not yet dispatched"
+   (excluding the concurrent window). Reading (a) is literally false in the
+   concurrent-completion window — the model sees the real result, so the tool
+   does **not** keep its interrupted result. A reader reconciling :118 with the
+   determinism bullet cannot tell which reading is intended. Distinct from the
+   resolved fourth-pass item, which targeted the determinism bullet/D1/Resolved-Q3
+   and never touched :118. Resolve by aligning :118 with the determinism framing:
+   either qualify it ("genuinely still in-flight — real result not yet produced/
+   dispatched") with a cross-reference to the determinism bullet, or restate it
+   as "keeps its interrupted result in the typical headline case; in the
+   concurrent-completion window the real result may win (still exactly one
+   result)".
+
+No blockers; one actionable ambiguity.

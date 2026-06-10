@@ -349,3 +349,26 @@
       at-most-once" with typical-headline-case / concurrent-window /
       no-regression sub-bullets), D1 Mechanism determinism bullet, and Resolved
       Question 3. At-most-once invariant explicitly unaffected.
+
+# Design follow-up — ambiguity review (fifth pass)
+
+- [ ] Align the Desired-Behaviour bullet "An aborted, still-in-flight tool keeps
+      its `"interrupted"` result for the model-visible turn" (design.md:118) with
+      the first-writer-wins / concurrent-window framing the fourth pass installed.
+      As written it reads as an **unconditional** interrupt-wins claim, whereas
+      the later determinism bullet (:130+), D1 Mechanism (:314+), and Resolved
+      Question 3 (:376+) say the model-visible winner is **first-writer-wins by
+      dispatch order** and that in the concurrent-completion window the **real**
+      result may win — those three sites were rewritten to qualify "**genuinely**
+      still in-flight (real result not yet produced/dispatched)", but :118 still
+      uses the bare phrase "still-in-flight," which admits two opposite readings
+      (any id pending at abort ⇒ interrupt kept, vs the narrow "genuinely
+      in-flight" reading that excludes the concurrent window). Reading (a) is
+      literally false in the concurrent window (model sees the real result).
+      Resolve by either qualifying :118 to "genuinely still in-flight — real
+      result not yet produced/dispatched" with a cross-reference to the
+      determinism bullet, or restating it as "keeps its interrupted result in the
+      typical headline case; in the concurrent-completion window the real result
+      may win (still exactly one result)". Distinct from the resolved fourth-pass
+      item, which rewrote the determinism bullet / D1 / Resolved-Q3 but never
+      touched :118.
