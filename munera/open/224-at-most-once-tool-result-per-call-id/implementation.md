@@ -856,3 +856,53 @@ New actionable ambiguity (see design-steps.md):
    result)".
 
 No blockers; one actionable ambiguity.
+
+## Inconsistency review (design.md) — fifth pass
+
+Re-reviewed design.md for internal inconsistencies and design-vs-code
+inconsistencies (not ambiguity/architecture-fit). Re-verified every load-bearing
+code cite against current source — all accurate:
+- statechart-effect producer `statechart_actions.clj:132` (read non-nil
+  `:interrupt-reason`) / `:149` (emit `:runtime/record-pending-tool-call-interrupts`,
+  guarded by `(cond-> … interruption-reason …)`) ✓
+- effect handler `dispatch_effects.clj:127` / enumerate `:131` / dispatch `:134`;
+  in-memory record effect `:124` ✓
+- synchronous abort producer `turn.clj:217` (record-pending-tool-call-interrupts!)
+  / `:220` (enumerate `:pending-tool-calls`) / `:229` (abort-in! defn) / `:233`
+  (call with `:user-abort`); `:deferred-interrupt` set at `turn.clj:193` via
+  `:session/request-interrupt` (`:189`) ✓
+- session-close producer `session_close.clj:55/58/61`, called by
+  `close-session-in!` `:106` (after `abort-session-runtime!` `:105`) ✓
+- real-result re-dispatch `tool_runtime_adapter.clj:114` ✓
+- handler emits **both** effects unconditionally `session_mutations.clj:529/531/533`;
+  `:interrupt-reason (or reason :deferred-interrupt)` at `:638` ✓
+- `core.clj:407` (`disj` :pending-tool-calls inside record-tool-result-in!,
+  `dispatch_effects.clj:124` effect only) / `:424` (conj on tool-start) / `:466`
+  (agent-core abort-in! clears, does not record); per-turn clear in
+  `end-loop-in!` `:447` confirms the "`:pending-tool-calls` resets at the per-turn
+  boundary" claim ✓
+- `journal->provider-messages` `prompt_request.clj:111` emits provider *message
+  maps* (not blocks); `session->provider-messages` `:131`; `:turn/messages` `:296`;
+  `conv/add-tool-result` `conversation.clj:95` is the sole `tool_result`-block
+  emitter (`agent-messages->ai-conversation` `:136`); `build-provider-conversation`
+  reads `:turn/messages` `request.clj:60` ✓
+
+Checked the cross-section narrative for residual contradiction:
+- `:user-abort` ⇒ synchronous `abort-in!` path / `:deferred-interrupt` ⇒
+  statechart-effect path is now consistent across Root Cause step 2, the
+  "Which producer fires for which reason" paragraph, the Funnel property, the
+  Desired-Behaviour determinism bullets, and D1 Mechanism — matches code
+  (`:interrupt-reason` is never assigned `:user-abort`).
+- at-most-once (deterministic) vs first-writer-wins-by-dispatch (which result)
+  reconciled identically at all four sites (:118, determinism bullet, D1
+  Mechanism, Resolved Q3), all using the "genuinely still in-flight" qualifier
+  and the concurrent-completion caveat.
+- Root Cause "Result:" arrow routes block emission through the conversation
+  rebuild, agreeing with step 4 and the De-dup Location/keying bullets.
+- in-memory-history vs journal: forward fix covers both (both-or-neither);
+  defensive de-dup is journal-projection only, and the broken-session recovery
+  path is journal-derived (`:turn/messages`), so no second in-memory de-dup is
+  needed — internally consistent.
+
+**No new actionable inconsistency.** Design is internally consistent and
+consistent with referenced code on all checked points.
