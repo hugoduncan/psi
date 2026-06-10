@@ -199,3 +199,23 @@
       `conversation.clj:136` and attributes block emission to `conv/add-tool-result`
       (inside `append-tool-result-msg`) `conversation.clj:95`. Line numbers
       re-verified against code (`add-tool-result` :95, rebuild fn :136).
+
+## Plan/steps inconsistency review follow-ups (second pass)
+
+- [ ] **Reconcile design.md's forward-fix reproduction-test assertion layer with
+      the plan/steps raw-recorded-layer decision.** design.md still pins the
+      forward-fix reproduction test to the rebuilt provider conversation in two
+      places — Scope ("asserts a single `tool_result` per `tool_use` in the
+      rebuilt provider conversation", `design.md:225`) and Acceptance Criteria
+      bullet 1 ("asserting exactly one `tool_result` per `tool_use` id in the
+      provider-facing conversation", `design.md:396`). plan.md Key decisions and
+      steps.md Slice B (resolved ambiguity follow-up item 1) instead assert the
+      forward-fix reproduction at the **raw recorded layer** (journal +
+      agent-core in-memory history), **not** on the rebuilt provider conversation,
+      so the Slice-C `journal->provider-messages` de-dup cannot mask a forward-fix
+      regression. An implementer following design.md asserts on the post-de-dup
+      rebuild (masking the regression); following plan/steps asserts on the raw
+      layer. Update design.md Scope (`:225`) + AC bullet 1 (`:396`) to assert the
+      forward-fix reproduction at the raw recorded layer, keeping design AC bullet
+      4 (already-wedged journal projection recovery, `:399-403`) on the rebuild /
+      `journal->provider-messages` de-dup.

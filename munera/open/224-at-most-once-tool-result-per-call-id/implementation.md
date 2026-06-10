@@ -1257,3 +1257,44 @@ Resolution applied (decision: **de-dup applies to repair's output**):
 
 No blockers; item completed. (Task remains design/plan-only; Slices A–D not yet
 implemented.)
+
+## Plan/steps inconsistency review (plan.md + steps.md) — second pass
+
+Reviewed `plan.md` + `steps.md` for cross-file inconsistencies (internal +
+plan/steps-vs-design/code citation drift; not ambiguity/architecture-fit).
+Re-verified every plan/steps code cite against current source — all accurate:
+handler `:session/tool-agent-record-result` `session_mutations.clj:529` takes
+`_ctx` and returns only `{:effects […]}` (rename premise holds);
+`journal->provider-messages` `prompt_request.clj:111` wraps
+`repair-dangling-tool-uses` at `:119`, `split-with` contiguous scan `:96`;
+conversation rebuild `agent-messages->ai-conversation` `conversation.clj:136`,
+sole block emitter `conv/add-tool-result` `:95`; `initialize-session-slots`
+`init.clj:78` seeds `:telemetry` `:87` / `:turn` `:88`. Prior plan↔steps items
+(Slice-B test count 3→4; `conversation.clj:95` vs `:136`) remain resolved and
+consistent.
+
+New actionable inconsistency (see steps.md → "Plan/steps inconsistency review
+follow-ups (second pass)"):
+
+1. **design.md's forward-fix reproduction-test assertion layer contradicts the
+   plan/steps raw-recorded-layer decision.** design.md still pins the forward-fix
+   reproduction test to the rebuilt provider conversation in **two** places:
+   Scope ("asserts a single `tool_result` per `tool_use` in the rebuilt provider
+   conversation", design.md:225) and Acceptance Criteria bullet 1 ("asserting
+   exactly one `tool_result` per `tool_use` id in the provider-facing
+   conversation", design.md:396). But plan.md Key decisions ("Forward-fix repro …
+   asserted at the **raw recorded layer** … the journal + agent-core in-memory
+   history — **not** on the rebuilt provider conversation") and steps.md Slice B
+   (plus the resolved ambiguity follow-up item 1) deliberately moved that
+   assertion to the raw recorded layer **specifically so the Slice-C
+   `journal->provider-messages` de-dup cannot mask a forward-fix regression**. An
+   implementer following design.md asserts on the post-de-dup rebuild (the exact
+   masking the plan/steps decision exists to prevent); following plan/steps
+   asserts on the raw layer. The two file sets disagree on the load-bearing
+   assertion layer of the same reproduction test. Reconcile: update design.md
+   Scope (:225) + AC bullet 1 (:396) to assert the forward-fix reproduction at the
+   raw recorded layer (journal + agent-core in-memory history), keeping the
+   separate Slice-C projection-recovery assertion (design AC bullet 4, :399-403)
+   on the rebuild/`journal->provider-messages` de-dup.
+
+No blockers; one actionable plan/steps inconsistency.
