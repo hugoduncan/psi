@@ -1899,3 +1899,37 @@ Candidate gaps examined and discharged (no new actionable):
 Verdict: REVIEW_COMPLETE — three skill criteria satisfied; the two prior passes
 resolved the genuine gaps (first-occurrence-wins, per-tool-call-id granularity).
 No new actionable feedback.
+
+## Test shaper review (test-shaper) — first pass
+
+Applied `test-shaper` (clarity ∧ signal ∧ robustness ∧ economy ∧ consistency),
+distinct from the prior `task-test-review` passes (which covered behaviour
+coverage + infra hygiene).
+
+Strong as-is:
+- **simple / single-concern / minimal setup** — every test one behaviour, real
+  `create-context` + in-memory persistence, real agent-core seams
+  (`emit-tool-start-in!`/`abort-in!`/`end-loop-in!`), state-based assertions only.
+- **robust both-or-neither** — count asserted on **both** journal and in-memory
+  layers in the headline/cross-turn tests, so a one-sided suppression regression
+  (journal≠memory) fails. No flakiness (sequential, no I/O/concurrency; the
+  unasserted `Instant/now` timestamps don't influence outcomes).
+- **economy** — `recorded-ids-survive-turn-boundary` (cross-turn lifetime) and
+  `distinct-tool-call-ids-both-recorded` (per-id granularity) are not redundant
+  with the headline test; each locks a distinct load-bearing property.
+- projection test genuinely distinguishes de-dup-after-repair (non-contiguous
+  count=1) and first-occurrence-wins.
+
+New actionable (1) — see steps.md "Test shaper review follow-ups (first pass)":
+- **Inconsistent assertion style across the at-most-once suite** (`consistent(
+  assertion_style)` ∧ `meaningful_failures`). Failure messages are present on the
+  count assertions in `abort-races…`, `recorded-ids-survive-turn-boundary…`,
+  `concurrent-completion…` (first only), and `distinct…`, but absent in
+  `normal-single-result-path-unaffected…` and `interrupt-only-path-yields-one-
+  result…` and on the second count assertion of `concurrent-completion…`.
+  Symmetry is also uneven: `normal-single-result…` / `interrupt-only…` assert the
+  winning `:tool-name` only on `journal`, while the headline/cross-turn/concurrent
+  tests assert it on **both** journal and memory. Normalize: give the count/tool-
+  name assertions consistent failure messages and the same journal+memory
+  symmetry across the suite, so a failing count/winner reports which layer and
+  which expectation. Low-priority consistency polish; no behaviour gap.

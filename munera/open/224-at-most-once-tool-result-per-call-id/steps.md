@@ -410,3 +410,24 @@
       would suppress `id-b` and fail the count-1 assertions for the second id.
       Focused suite green (6 tests / 25 assertions); clj-kondo clean, parens
       balanced.
+
+## Test shaper review follow-ups (first pass)
+
+- [ ] **Normalize assertion style across the at-most-once suite**
+      (`tool_result_at_most_once_test.clj`) — test-shaper `consistent(
+      assertion_style)` ∧ `meaningful_failures`. Failure messages are present on
+      the `count` assertions in `abort-races-real-result-yields-one-tool-result-
+      test`, `recorded-ids-survive-turn-boundary-test`, `concurrent-completion-
+      real-result-wins-test` (first count only), and `distinct-tool-call-ids-
+      both-recorded-test`, but absent in `normal-single-result-path-unaffected-
+      test`, `interrupt-only-path-yields-one-result-test`, and on the second
+      `count` assertion of `concurrent-completion-real-result-wins-test`. Add
+      consistent failure messages to those bare `count` assertions so a failure
+      reports which layer (journal vs in-memory) and which expectation diverged.
+- [ ] **Even up journal/memory winner symmetry** in the same suite —
+      `normal-single-result-path-unaffected-test` and `interrupt-only-path-
+      yields-one-result-test` assert the winning `:tool-name` only on `journal`,
+      while the headline/cross-turn/concurrent tests assert it on **both**
+      `journal` and `memory`. Assert the winning `:tool-name` on both layers in
+      those two tests so the both-or-neither winner check is uniform across the
+      suite (low-priority consistency polish; no behaviour gap).
