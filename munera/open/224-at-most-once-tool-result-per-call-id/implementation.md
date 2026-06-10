@@ -71,6 +71,46 @@ decision; resolved together in design.md ("Design Decisions → D1").
   `:pending-tool-calls` turn/session reset) so the set stays bounded.
 - No blockers; all three items completed.
 
+## Architecture-fit review (design.md) — second pass (post-D1)
+
+Re-reviewed the design after D1 adopted Option (C). Grounded against
+doc/architecture.md (State boundary: canonical root vs runtime handles;
+Dispatch sequencing contract; tool-execution dispatch-owned slice
+`:session/tool-run` → `:session/tool-record-result`) and AGENTS.md
+(single-source-of-truth atom, one_way, effects-as-data). Verified code topology.
+
+Fit confirmed; **no new actionable architectural misfit**:
+- **Chokepoint is the true convergence event.** `:session/tool-record-result`
+  (the architecture-described recording slice) funnels into
+  `:session/tool-agent-record-result` via `record-tool-call-result!`'s
+  `:record-result!` (`tool_runtime_adapter.clj:114`), where the journal append +
+  in-memory record actually happen (`session_mutations.clj:529`). Both interrupt
+  producers (`turn.clj`, `dispatch_effects.clj`) also converge there. Guarding
+  `:session/tool-agent-record-result` (not `:session/tool-record-result`) is
+  correct — the interrupt producers bypass `tool-record-result`, so the inner
+  event is the only point all three producers share. Matches one_way /
+  single-source.
+- **recorded-ids set in `:state*` is a legitimate projection, not redundant
+  canonical state.** The in-memory history and `:pending-tool-calls` live on the
+  agent-core data atom (external handle, `swap-data!` `core.clj:424`); the
+  journal is disk-persisted via effect. Neither is queryable `:state*`. So the
+  at-most-once predicate cannot be derived from `:state*` and must be projected
+  in — exactly the State-boundary pattern (project status, keep handle external).
+  No single-source-of-truth violation.
+- **Pure both-or-neither + dispatch-serialized atomicity** conforms to the
+  Dispatch sequencing contract (pure result → apply → effects last); no runtime
+  test-and-set. Session-lifetime persistence (decoupled from per-turn
+  `:pending-tool-calls`) correctly matches the cross-turn race. Bounded set.
+- **Defensive projection de-dup placement is correct.**
+  `journal->provider-messages` (`prompt_request.clj`) and the conversation
+  rebuild (`turn_runtime/conversation.clj`) are provider-facing projections in
+  agent-session/turn-runtime — distinct from the app-runtime presentation
+  transcript projections in the adapter-convergence roadmap. Purely derived,
+  keyed by tool-call-id; consistent with robust(code).
+
+No new follow-up items; the three prior architecture-fit items remain resolved
+by D1.
+
 ## Ambiguity review (design.md)
 
 Reviewed design.md for ambiguities (statements admitting >1 interpretation),
