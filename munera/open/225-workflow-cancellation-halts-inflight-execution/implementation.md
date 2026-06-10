@@ -780,3 +780,47 @@ No new actionable architectural-fit misfit found. The design fits the architectu
 and principles; the only adjacent residual is the already-noted (D18) doc gap to
 document `:runtime/dispatch-event` re-entrancy in the sequencing contract, owned by
 the change-chain doc step at implementation time — not a new design misfit.
+
+## Ambiguity review (ψ pass 4, 2026-06-10)
+
+Fresh ambiguity pass over design.md after D17–D20 resolved the prior
+contract/sequencing/atomicity ambiguities. The happy paths (top-level cancel,
+direct sub-run cancel, cancel-then-remove of a top-level run) are well-pinned. Two
+boundary contracts remain under-specified — multiple-interpretation gaps an
+implementer would have to guess:
+
+1. **Direct `remove` of a live *nested sub-run* (D5 × D19 intersection).** D5
+   states cancel-then-remove as the general semantics for "remove of a live
+   (non-terminal) run" without restricting to top-level; D19 pins the
+   parent-observes-failed-delegate-step contract only for direct *cancel* of a
+   sub-run, where the sub-run reaches a readable `:cancelled` status and
+   `delegate-step-runtime-result` keys on `(:status delegate-run) = :cancelled`.
+   But under D5/D17 a *remove* of a live sub-run drops the run record (D17 dispatch
+   2) — so when the shared parent worker returns from `send-and-drain`,
+   `(workflow-run-in state sub-run-id)` is `nil`, and the existing `case` on
+   `(:status nil)` falls to the **default** branch ("Delegated workflow did not
+   reach terminal or blocked status"), not the `:cancelled` branch D19 assumes
+   (code-confirmed `delegate.clj:76` `case`, default at lines ~108–112). The
+   design does not state whether direct remove-of-a-live-sub-run is in scope and,
+   if so, which delegate-result contract the parent observes after run-absence
+   (vs the `:cancelled` failure). Ambiguous: implementer can't tell if the generic
+   "did not reach terminal" failure is acceptable or a defect.
+
+2. **Effect emission when the D20 terminal guard makes the transition a no-op.**
+   D20 says a second/racing terminal request "commits a no-op" via the in-`swap!`
+   guard — but that covers only the `:state*` CAS. In the pure-result shape the
+   handler computes its `:effects` in the `:handler` `:before` (pre-CAS), so the
+   cancellation effect set (worker `future-cancel`, per-run `:runtime/agent-abort`,
+   `:runtime/mark-workflow-jobs-terminal`, and — for remove — the re-entrant
+   `:runtime/dispatch-event`) is queued **before** the CAS decides no-op. The
+   design does not state whether effects are **suppressed when the guard no-ops**
+   (run already terminal / lost the CAS race to natural completion). This matters
+   for (a) the stated idempotency guarantee — "a second terminal request … is a
+   no-op" is only true of state, not effects, as written; and (b) correctness of
+   the `:runtime/agent-abort` target — a no-op'd cancel against an
+   already-`:completed` run would still emit an abort for that run's
+   `:execution-session-id`, whose turn already finished (benign no-op only if the
+   session-id is never reused). Ambiguous: implementer can't tell if cancellation
+   effects are gated on the guard actually applying `:cancelled`.
+
+No other new actionable ambiguity found; D1–D20 cover the remaining contracts.

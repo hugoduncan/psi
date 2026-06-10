@@ -290,3 +290,33 @@
       the actual serialization point if one exists. Align D4/D13/D16/D17 with
       D18 and the dispatch code/doc so the race-safety claim is backed by a real
       mechanism.
+
+## Ambiguity follow-ups (ψ pass 4, 2026-06-10)
+
+- [ ] Resolve the D5 × D19 intersection for **direct `remove` of a live nested
+      sub-run**. D5 states cancel-then-remove for any "remove of a live
+      (non-terminal) run"; D17 dispatch 2 drops the run record; but D19's
+      parent-observes-failed-delegate-step contract is pinned only for direct
+      *cancel* of a sub-run (parent reads `(:status delegate-run) = :cancelled`).
+      After a sub-run *remove*, `workflow-run-in` returns `nil` and the existing
+      `delegate-step-runtime-result` `case` (code-confirmed `delegate.clj`) hits
+      the **default** branch ("Delegated workflow did not reach terminal or blocked
+      status"), not the `:cancelled` branch. State whether direct
+      remove-of-a-live-sub-run is in scope and, if so, which delegate-result
+      contract the parent observes after run-absence (e.g. treat run-absence the
+      same as `:cancelled` for delegate-result purposes, or accept the generic
+      "did not reach terminal" failure) — or scope direct sub-run *remove* out
+      explicitly in Scope. Reconcile D5/D17/D19.
+- [ ] Specify whether the cancellation effect set is **suppressed when the D20
+      terminal guard makes the transition a no-op** (run already terminal / lost
+      the CAS race to natural completion). D20 establishes the `:state*` CAS no-op
+      for racing/second terminal requests, but the handler computes `:effects` in
+      the `:before` pre-CAS, so the effects (worker `future-cancel`,
+      `:runtime/agent-abort`, `:runtime/mark-workflow-jobs-terminal`, and the
+      remove path's re-entrant `:runtime/dispatch-event`) would still fire even
+      when the guard no-ops. State whether effects are gated on the guard actually
+      applying `:cancelled` (so a no-op'd terminal request emits no effects), to
+      back the "second terminal request is a no-op" idempotency claim and avoid an
+      `:runtime/agent-abort` against an already-completed run's
+      `:execution-session-id`. Align D4/D20 (and the idempotency wording) with the
+      pure-result effect-emission shape.
