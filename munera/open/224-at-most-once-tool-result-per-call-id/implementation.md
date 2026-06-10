@@ -1514,3 +1514,43 @@ Re-grounded the remaining candidate ambiguities against code:
 three inconsistency passes have converged; plan.md and steps.md are exhaustively
 disambiguated and agree with each other and with referenced code on every checked
 point. No follow-up items added.
+
+## Plan/steps inconsistency review (plan.md + steps.md) — fourth pass
+
+Reviewed `plan.md` + `steps.md` for cross-file / internal inconsistencies
+(citation drift + intra-file disagreement; not ambiguity/architecture-fit).
+Re-verified every load-bearing code cite against current source — all accurate:
+- handler `:session/tool-agent-record-result` fn line `session_mutations.clj:529`
+  (still `_ctx`, returns `{:effects [...]}` — rename premise holds);
+- `record-pending-tool-call-interrupts!` defn `turn.clj:217`, enumeration `:220`;
+  `abort-in!` defn `turn.clj:229` with its `:user-abort` dispatch of
+  `record-pending-tool-call-interrupts!` at the call line `:233` (the meaningful
+  dispatch line the files cite, consistent with their internal-line convention
+  e.g. `dispatch_effects.clj:131`, `turn.clj:220`, `core.clj:407`);
+- `disj` of `:pending-tool-calls` inside `record-tool-result-in!`
+  (`core.clj:398`) at `:407`, run by `:runtime/agent-record-tool-result`
+  (`dispatch_effects.clj:124/125`); adapter `:record-result!` re-dispatch
+  `tool_runtime_adapter.clj:114`;
+- `journal->provider-messages` defn `prompt_request.clj:111` wrapping
+  `repair-dangling-tool-uses` (defn `:83`) at `:119`; the repair's contiguous
+  `split-with tool-result-message?` at `:96` (the one inside repair, not the `:56`
+  occurrence);
+- conversation rebuild `agent-messages->ai-conversation`
+  `turn_runtime/conversation.clj:136`; sole block emitter `conv/add-tool-result`
+  `:95` (inside `append-tool-result-msg` `:93`);
+- Slice-A path helpers `session-data-path` `:29` … `session-scheduler-queue-path`
+  `:36` all `session-`-prefixed; `get-state-value-in [ctx path]` `state.clj:84`;
+  `initialize-session-slots` defn `init.clj:78`, seeds `:telemetry`/`:turn` at
+  `:87`/`:88` (the "alongside `:telemetry`" anchor).
+
+Cross-file checks: Slice-B test enumeration (4 tests) matches between plan.md and
+steps.md; the reproduction (test 1, interrupt-first via `abort-in!`) vs the
+concurrent-completion (test 4, real-first via direct dispatch, `abort-in!`
+explicitly excluded) are complementary and non-contradictory; Slice-A helper name
+(`session-`-prefixed), `conversation.clj:95`/`:136` split, and the design
+raw-recorded-layer repro all remain reconciled from prior passes. Slice-D
+CHANGELOG framing agrees (Fixed; session no longer wedges after abort).
+
+**No new actionable inconsistency.** Three prior plan/steps inconsistency passes
+have converged; plan.md and steps.md agree with each other and with referenced
+code on every checked point. No follow-up items added.
