@@ -1673,3 +1673,40 @@ dispatch (out of scope).
 
 Verification: clj-kondo clean, clj-paren-repair success; focused suite green
 (4 tests / 14 assertions); full `bb clojure:test:unit` green (exit 0).
+
+## Implementation review (task-implementation-review) — second pass
+
+Re-reviewed code/tests/docs against design D1 (Option C) + architecture. Verified:
+focused suite green (`tool-result-at-most-once-test` + `prompt-request-test`, 21
+tests / 62 assertions); clj-kondo clean on all changed files; handler is a pure
+both-or-neither guard reading canonical `:state*` recorded-ids and returning
+`:root-state-update` + both effects or `{}` (matches D1); `dedupe-tool-results`
+de-dup-after-repair in `journal->provider-messages` is a local domain dedupe,
+consistent with existing per-component dedupe helpers (`memory/core.clj`
+`dedupe-records`, `resolvers/telemetry.clj` `dedupe-api-errors`) — not a missed
+reusable shared utility. No new architectural/abstraction/performance misfit.
+
+Actionable (one):
+1. **The load-bearing session-scoped (not turn-scoped) lifetime of recorded-ids
+   is not exercised by any test, so a regression to turn-scoped reset would pass
+   the whole suite while reintroducing the cross-turn duplicate.** design.md D1
+   flags the persistence/reset boundary as "outcome-determining, not a plan
+   detail": recorded-ids "must persist for the session lifetime, not reset at the
+   turn boundary," because the headline race is **cross-turn** (the aborted
+   tool's real result arrives in a *later* turn than the one that recorded the
+   interrupt). The implementation is correct — recorded-ids is touched only in
+   `initialize-session-slots` (session lifecycle), while `:pending-tool-calls`
+   resets per-turn in `end-loop-in!` (`agent_core/core.clj:449`). But every
+   characterization test records the interrupt and the late real result within a
+   single in-flight sequence with **no intervening turn boundary**
+   (`abort-races-real-result-…`, `interrupt-only-…`, `concurrent-…` never call
+   `end-loop-in!` / start a new turn between the two record events). So if a
+   future change added a recorded-ids clear at the per-turn boundary (mirroring
+   `:pending-tool-calls`), all four tests would still pass yet the cross-turn
+   headline race this task exists to fix would silently regress — the test net
+   does not lock the session-scoped decision. Add a regression test that crosses
+   a turn boundary between recording the interrupt result and dispatching the
+   late real result for the same tool-call-id (e.g. record the synthetic
+   interrupt, advance the turn via `end-loop-in!`/new-turn so `:pending-tool-calls`
+   resets, then dispatch the real result) and assert at-most-once still holds at
+   the raw recorded layer — so a turn-scoped reset of recorded-ids would fail.

@@ -333,3 +333,21 @@
       `session-recorded-tool-result-ids-path [sid]` (with the `session-` prefix)
       and inlines the `session-`-prefixed existing helpers it must match, so the
       proposed name and the consistency requirement now agree.
+
+## Implementation review follow-ups (second pass)
+
+- [ ] **Add a cross-turn regression test locking the session-scoped lifetime of
+      recorded-ids.** The design's D1 persistence/reset boundary
+      ("outcome-determining") requires recorded-ids to persist across turns (the
+      headline race is cross-turn: the late real result arrives in a *later* turn
+      than the interrupt that recorded it). No current test crosses a turn
+      boundary between recording the interrupt and the late real result — all
+      four record both within one in-flight sequence — so a future regression
+      that clears recorded-ids at the per-turn boundary (mirroring
+      `:pending-tool-calls` reset in `end-loop-in!` `agent_core/core.clj:449`)
+      would pass the whole suite while reintroducing the duplicate. Add a test
+      that records the synthetic `"interrupted"` result for a pending id, advances
+      the turn (so `:pending-tool-calls` resets but recorded-ids must survive),
+      then dispatches the real result for the same id, and asserts exactly one
+      `toolResult` at the raw recorded layer (journal + in-memory history). The
+      test must fail if recorded-ids were turn-scoped.
