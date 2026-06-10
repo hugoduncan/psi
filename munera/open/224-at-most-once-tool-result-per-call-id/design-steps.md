@@ -297,7 +297,7 @@
 
 # Design follow-up — ambiguity review (fourth pass)
 
-- [ ] Disambiguate the **headline-race determinism claim**, which conflates
+- [x] Disambiguate the **headline-race determinism claim**, which conflates
       "still pending at abort (enumeration)" with "the interrupt's record-event
       is dispatched before the real result's". Desired Behaviour ("Interrupt-first
       is guaranteed for the headline abort race, not left to dispatch
@@ -330,3 +330,22 @@
       abort" precisely in dispatch-enqueue terms and justifying why a real
       result's record-event cannot already be enqueued ahead of the abort's
       interrupt dispatch for an id abort still sees as pending.
+      → Resolved: chose **(a)** — the deterministic guarantee is **at-most-once**
+      (exactly one result per id); the model-visible winner is
+      **first-writer-wins by dispatch order**. Dropped the over-strong
+      "interrupt-first is deterministic for any tool pending at abort" claim.
+      Code-verified the window: `:pending-tool-calls` is cleared only inside the
+      **effect** `:runtime/agent-record-tool-result` → `record-tool-result-in!`
+      (`agent_core/core.clj:407` `disj`, via `dispatch_effects.clj:125`), strictly
+      after the real result's `:session/tool-agent-record-result` handler applies
+      and adds the id to recorded-ids; `record-pending-tool-call-interrupts!`
+      (`turn.clj:217/220`) reads `:pending-tool-calls` synchronously. So in a
+      concurrent-completion window a real-result record-event can be serialized
+      first while the id is still enumerable as pending — abort then dispatches an
+      interrupt that is suppressed and the **real** result wins (acceptable: a
+      real result is valid, still exactly one result). Distinguished "still
+      pending" (apply-state) from dispatch-enqueue order. Rewrote three sites:
+      Desired-Behaviour determinism bullet (now "deterministic guarantee is
+      at-most-once" with typical-headline-case / concurrent-window /
+      no-regression sub-bullets), D1 Mechanism determinism bullet, and Resolved
+      Question 3. At-most-once invariant explicitly unaffected.

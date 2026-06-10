@@ -125,26 +125,41 @@ has exactly this shape: one synthetic `"interrupted"` result plus one real resul
   an **orthogonal content-delivery mechanism** that surfaces the real outcome to
   the model in a *later* turn; it is not what suppresses the duplicate and does
   not itself emit a `tool_result` for the aborted call. (See D1 Mechanism.)
-- **Interrupt-first is guaranteed for the headline abort race, not left to
-  dispatch tie-breaking.** The headline reproduced race is `:user-abort`
-  (Evidence `reason=:user-abort`), whose first writer is **deterministically the
-  synchronous inline recording in `abort-in!`** (`turn.clj:233` →
-  `record-pending-tool-call-interrupts!` `turn.clj:217`), executed as part of
-  handling the abort. The distinct `:deferred-interrupt` race instead routes
-  through the statechart-effect producer (`:on-agent-done` →
-  `:runtime/record-pending-tool-call-interrupts` `dispatch_effects.clj:127`);
-  `:user-abort` never reaches that producer (it is never written to
-  `:interrupt-reason` — see Root Cause). In either race the interrupt producer
-  enumerates only *still-pending* tool-call-ids, so the interrupt result for a
-  still-pending tool is recorded before that tool's own real-result re-dispatch: a real result
-  for a still-in-flight tool necessarily arrives *after* the abort that
-  enumerated it as pending, so its id is already in recorded-ids and it is
-  suppressed. First-writer-wins is the general invariant
-  mechanism; for the aborted case the first writer is deterministically the
-  interrupt because it is recorded while the tool is still pending. (The only
-  way the real result could win is if it completed and recorded *before* the
-  abort enumerated it — in which case the tool was no longer pending and no
-  interrupt result is emitted for it, so there is still exactly one result.)
+- **The deterministic guarantee is at-most-once; the model-visible winner is
+  first-writer-wins by dispatch order.** Exactly one `toolResult` is kept per
+  tool-call-id regardless of interleaving — that is the load-bearing,
+  deterministic invariant. *Which* of {interrupt result, real result} the model
+  sees is decided by which `:session/tool-agent-record-result` dispatch is
+  serialized first (adds the id to recorded-ids); the later one is suppressed.
+  This is **not** left to chance in the typical headline case but it is **not**
+  unconditionally "interrupt-first" either:
+  - **Typical headline case — interrupt wins.** The reproduced race is
+    `:user-abort` (Evidence `reason=:user-abort`), recorded by the **synchronous
+    inline `abort-in!` path** (`turn.clj:233` → `record-pending-tool-call-interrupts!`
+    `turn.clj:217`). When the aborted tool is genuinely still in-flight, its real
+    result has **not yet been produced or dispatched** at abort time, so the
+    interrupt's record-event is the first writer and the `"interrupted"` result
+    is kept. (The distinct `:deferred-interrupt` race routes through the
+    statechart-effect producer `:on-agent-done` →
+    `:runtime/record-pending-tool-call-interrupts` `dispatch_effects.clj:127`;
+    `:user-abort` never reaches it — see Root Cause.)
+  - **Concurrent-completion window — real result may win.** "Still pending at
+    abort" is an *apply-state* property: an id leaves `:pending-tool-calls` only
+    when the **effect** `:runtime/agent-record-tool-result` runs
+    (`agent_core/core.clj:407` `disj`, via `dispatch_effects.clj:125`), strictly
+    *after* the real result's `:session/tool-agent-record-result` handler has
+    applied (and already added the id to recorded-ids). So if a tool completes
+    concurrently with the abort, its real-result record-event can be serialized
+    **first** while `:pending-tool-calls` still lists the id (clearing effect not
+    yet run); `abort-in!` then enumerates that id and dispatches an interrupt
+    that is **suppressed** — the **real** result wins. This is an acceptable
+    model-visible outcome: a real tool result is a valid result, and the
+    at-most-once invariant still holds (exactly one result).
+  - **Why this does not regress the task.** The defect this task removes is
+    *two* `toolResult` entries for one id; first-writer-wins guarantees *one*
+    regardless of which producer races first. The interrupt path only ever
+    enumerates ids still in `:pending-tool-calls`, so it never adds a second
+    result for an id whose real result already won.
 - **Synchronous tools (`bash`, `psi-tool`) have no background-completion path.**
   When their real result is suppressed by an abort, it is **silently dropped** —
   the model sees only the `"interrupted"` result. This is the intended
@@ -289,23 +304,30 @@ the `:session/tool-agent-record-result` handler. **Option (B) is rejected.**
   path** (`tool_runtime_adapter.clj:114`) — but the invariant does **not** depend
   on this list being complete. Dispatch ordering decides the first writer; any
   later dispatch of the same id reads it already present and is suppressed.
-- **First-writer-wins is the general mechanism; the aborted-tool outcome is still
-  deterministic.** Generic first-writer-wins says "whichever dispatch of the
-  record event for an id is serialized first is kept" (covering both interrupt
-  producers and the real-result producer). For the headline `:user-abort` race
-  that does *not* leave
-  the model-visible result to chance: the interrupt is recorded **synchronously
-  in-line by `abort-in!`** (`turn.clj:233/217`) — the deterministic first writer
-  for `:user-abort`, since `:user-abort` never reaches the statechart-effect
-  producer (it is never written to `:interrupt-reason`; that producer fires only
-  for the distinct `:deferred-interrupt` race). The interrupt path only
-  enumerates *still-pending* tool-call-ids, while a real result for a
-  still-in-flight tool can only arrive *after* abort. So the interrupt is
-  deterministically the first writer for any tool that was still pending at
-  abort, and its `"interrupted"` result is the one kept. (If a tool had already completed and recorded its real
-  result before abort, it is no longer pending, the interrupt path emits nothing
-  for it, and there is still exactly one result.) See the Desired Behaviour
-  "Interrupt-first is guaranteed" bullet.
+- **First-writer-wins by dispatch order is the mechanism; at-most-once is the
+  deterministic guarantee.** "Whichever dispatch of the record event for an id is
+  serialized first is kept" (covering both interrupt producers and the
+  real-result producer); the later dispatch reads the id already in recorded-ids
+  and is suppressed. The deterministic guarantee is **exactly one** result per
+  id, not *which* result. For the headline `:user-abort` race the interrupt is
+  recorded **synchronously in-line by `abort-in!`** (`turn.clj:233/217`); when
+  the aborted tool is genuinely still in-flight its real result has not yet been
+  produced, so the interrupt is the first writer and its `"interrupted"` result
+  is kept. (`:user-abort` never reaches the statechart-effect producer — it is
+  never written to `:interrupt-reason`; that producer fires only for the distinct
+  `:deferred-interrupt` race.) **This is not unconditional interrupt-first.**
+  "Still pending at abort" is an *apply-state* property: an id is removed from
+  `:pending-tool-calls` only when the **effect** `:runtime/agent-record-tool-result`
+  runs (`agent_core/core.clj:407` `disj`, `dispatch_effects.clj:125`), strictly
+  after the real result's `:session/tool-agent-record-result` handler applies and
+  adds the id to recorded-ids. So in a concurrent-completion window a real
+  result's record-event can be serialized *first* while `:pending-tool-calls`
+  still lists the id; `abort-in!` then enumerates that id and dispatches an
+  interrupt that is suppressed, and the **real** result wins — an acceptable
+  outcome (a real result is valid; still exactly one result). The interrupt path
+  only ever enumerates ids still in `:pending-tool-calls`, so it never produces a
+  second result for an id whose real result already won. See the Desired
+  Behaviour "deterministic guarantee is at-most-once" bullet.
 - `:pending-tool-calls` (agent-core) is retained for its existing runtime use
   (enumerating still-pending ids on interrupt/close). The interrupt producers
   enumerate it at three sites: the synchronous abort path (`turn.clj:220`), the
@@ -348,13 +370,19 @@ All previously-open questions are now resolved in this design; none remain open.
    consumes the de-duped messages and is not a second de-dup site. Cheap,
    purely-derived, first-occurrence-wins.
 
-3. **First-wins outcome on abort.** Resolved: keeping the `"interrupted"` result
-   and suppressing the late real result is the intended model-visible behaviour.
-   For async/background tools the real outcome is re-surfaced via the
-   background-completion path in a later turn; for synchronous tools it is
-   silently dropped (the user aborted). Interrupt-first is deterministic for
-   still-pending tools (see the Desired Behaviour determinism and sync-tool
-   bullets, and D1 Mechanism).
+3. **First-wins outcome on abort.** Resolved: the deterministic guarantee is
+   **at-most-once** (exactly one result per id); the model-visible winner is
+   **first-writer-wins by dispatch order**. In the typical headline case the
+   aborted tool is genuinely still in-flight (its real result not yet produced),
+   so the interrupt's synchronous inline recording in `abort-in!` is the first
+   writer and the `"interrupted"` result is kept; for async/background tools the
+   real outcome is re-surfaced via the background-completion path in a later
+   turn, and for synchronous tools it is silently dropped (the user aborted). In
+   the narrow concurrent-completion window (the tool completes as the abort runs)
+   the real result can be the first writer and win — also acceptable, since a
+   real result is valid and exactly one result is still kept. This is **not**
+   unconditional interrupt-first (see the Desired Behaviour determinism and
+   sync-tool bullets, and D1 Mechanism).
 
 ## Acceptance Criteria
 

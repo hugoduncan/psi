@@ -681,3 +681,49 @@ New actionable ambiguity (see design-steps.md):
    ahead of the abort's interrupt dispatch for an id abort still sees as pending.
 
 No blockers; one actionable ambiguity.
+
+## Ambiguity follow-up resolution (design-steps) — fourth pass
+
+Executed the single fourth-pass ambiguity item (headline-race determinism claim
+conflates enumeration-pending with record-event dispatch order).
+
+Code verified before editing:
+- `:pending-tool-calls` is cleared **only** inside `record-tool-result-in!`
+  (`agent_core/core.clj:407`, `update :pending-tool-calls disj tool-call-id`),
+  which runs solely via the **effect** `:runtime/agent-record-tool-result`
+  (`dispatch_effects.clj:124`) — strictly *after* the
+  `:session/tool-agent-record-result` handler returns and its `:root-state-update`
+  (recorded-ids add) applies.
+- `record-pending-tool-call-interrupts!` (`turn.clj:217`) reads
+  `:pending-tool-calls` **synchronously** off the agent-core data atom
+  (`turn.clj:220`, `agent/get-data-in … :pending-tool-calls`) and dispatches the
+  record event per pending id; called by `abort-in!` (`turn.clj:233`).
+- Confirms the reviewer's window: a real-result record-event can be serialized
+  first (adding its id to recorded-ids) while `:pending-tool-calls` still lists
+  the id (clearing effect not yet run), so abort enumerates it and dispatches an
+  interrupt that the guard then suppresses — the **real** result wins. So
+  "interrupt-first is deterministic for any tool pending at abort" over-claims.
+
+Resolution applied (chose **(a)**): the deterministic guarantee is
+**at-most-once** (exactly one result per id); the model-visible winner is
+**first-writer-wins by dispatch order**. Dropped the unconditional
+"interrupt-first" claim. Distinguished "still pending at abort" (apply-state,
+cleared by a later effect) from record-event dispatch-enqueue order. Three sites
+rewritten in design.md:
+- **Desired-Behaviour determinism bullet** — replaced "Interrupt-first is
+  guaranteed for the headline abort race" with "The deterministic guarantee is
+  at-most-once; the model-visible winner is first-writer-wins by dispatch order",
+  with three sub-bullets: typical headline case (genuinely in-flight tool → real
+  result not yet produced → interrupt wins), concurrent-completion window (real
+  result may be first writer and win — acceptable), and why this does not regress
+  the task (one result regardless; interrupt path only enumerates still-pending
+  ids).
+- **D1 Mechanism determinism bullet** — same reframing, grounded in the
+  effect-clears-pending vs handler-applies ordering, with "This is not
+  unconditional interrupt-first."
+- **Resolved Question 3** — restated as at-most-once + first-writer-wins, typical
+  headline case interrupt-wins, concurrent window real-result-may-win.
+
+At-most-once invariant explicitly unaffected (always exactly one result); only
+the over-asserted determinism of *which* result was corrected. No blockers; item
+completed.
