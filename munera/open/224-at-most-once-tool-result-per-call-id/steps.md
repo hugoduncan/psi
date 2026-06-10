@@ -524,3 +524,27 @@
       `:timestamp test-instant` instead of `(java.time.Instant/now)`. Setup is
       fully deterministic; no assertion depends on the timestamp. Focused suite
       green.
+
+## Code-shaper review follow-ups (first pass)
+
+- [ ] **Return `{:effects []}` (not `{}`) from the guard's suppression branch**
+      (`dispatch_handlers/session_mutations.clj:543`). `{}` is not a valid
+      pure-result per `pure-result-schema`
+      (`state_kernel/dispatch_schema.clj:12`, requires ≥1 recognized key) and
+      only works via `normalize-handler-result`'s `{:return result}` coercion
+      (`state_kernel/dispatch.clj:197`); `{:effects []}` is a valid pure-result
+      that expresses "no effects, no state update" directly and matches the
+      established no-op idiom already used in the same file
+      (`:session/retarget-runtime-prompt-metadata`, `session_mutations.clj:429`)
+      and namespace (`prompt_handlers.clj:172`, `statechart_actions.clj:195`).
+      `consistent(idioms)` ∧ `shaped_by(formalisms) → enforceable(invariants)`.
+      Re-run the at-most-once suite to confirm still green (suppression behaviour
+      unchanged).
+- [ ] **Bind `session-recorded-tool-result-ids-path` once in the handler `let`**
+      (`session_mutations.clj`), reusing it for both the
+      `session/get-state-value-in` read and the `:root-state-update`
+      `update-in`, instead of recomputing it in the closure (DRY/clarity, low
+      priority). Optionally factor a `record-tool-result-id-root-update`
+      closure-builder in `session_state/state.clj` mirroring the existing
+      `append-journal-entry-root-update` (`state.clj:108`) `*-root-update`
+      convention so the path + `(fnil conj #{})` shape live in one named place.

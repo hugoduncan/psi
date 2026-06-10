@@ -2122,3 +2122,42 @@ surface (no command, flag, config, or extension capability).
   `tool_use`, `tool-call-id`) consistent with code and design.
 
 No actionable docs feedback. No follow-up steps added.
+
+## Code-shaper review (first pass)
+
+Applied `code-shaper` (simple ∧ consistent ∧ robust) to the implemented
+production changes (handler at `session_mutations.clj:529`, `dedupe-tool-results`
++ projection wiring at `prompt_request.clj`, state/init seeding). The de-dup
+fold and the path/init seeding are clean (single-responsibility, idiomatic).
+**Two actionable consistency/robustness items on the guarded handler:**
+
+1. **Suppression branch returns `{}` — breaks the no-op idiom and the
+   pure-result formalism.** The guard's suppress arm
+   (`session_mutations.clj:543`) returns `{}`. But (a) the established no-op
+   idiom in this very file/namespace is `{:effects []}` —
+   `:session/retarget-runtime-prompt-metadata` (`session_mutations.clj:429`),
+   also `prompt_handlers.clj:172`, `statechart_actions.clj:195`; and (b) `{}` is
+   **not** a valid pure-result per `pure-result-schema`
+   (`state_kernel/dispatch_schema.clj:12`), which requires ≥1 of
+   `{:root-state-update :effects :return :return-key :return-effect-result?}`.
+   It only works because `normalize-handler-result`
+   (`state_kernel/dispatch.clj:197`) coerces any non-pure-result to
+   `{:return result}`, i.e. `{}` → `{:return {}}`. The correctness of the
+   suppress path thus rides on a coercion fallback rather than expressing a
+   valid pure-result. `{:effects []}` is a valid pure-result that states "no
+   effects, no state update" directly and matches the existing idiom —
+   `consistent(idioms)` ∧ `shaped_by(formalisms) → enforceable(invariants)`.
+
+2. **`session-recorded-tool-result-ids-path` is computed twice** in the handler
+   (`session_mutations.clj:537` read + `:546` inside the `:root-state-update`
+   closure). Bind it once in the `let` (DRY/clarity). Optionally factor a
+   `record-tool-result-id-root-update` closure-builder in `session_state/state.clj`
+   to match the existing `append-journal-entry-root-update` (`state.clj:108`)
+   `*-root-update` convention, keeping the path computation and the
+   `(fnil conj #{})` shape in one named place. Low priority.
+
+Non-issues confirmed: `dedupe-tool-results` `(first (reduce …))` fold is
+idiomatic and single-responsibility; reduce (vs the surrounding loop/recur) is
+the natural fit for a stateful first-wins fold; the dual nil-safety
+(`or … #{}` read + `(fnil conj #{})` update) is documented defense-in-depth, not
+redundancy.
