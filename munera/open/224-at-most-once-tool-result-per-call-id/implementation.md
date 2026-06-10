@@ -2025,3 +2025,32 @@ actionable items, both in `tool_result_at_most_once_test.clj` (see steps.md):
    `minimal_incidental_setup`). `real-result-msg`/`interrupt-result-msg` stamp
    `:timestamp (java.time.Instant/now)` — incidental wall-clock time, never
    asserted, no de-dup/ordering keys off it. Use a fixed instant. Low priority.
+
+## Test shaper follow-up resolution (third pass)
+
+Executed both third-pass test-shaper follow-up items in
+`tool_result_at_most_once_test.clj`.
+
+1. **Assertion-ceremony helper.** Extracted
+   `assert-single-recorded-result [ctx session-id tool-call-id
+   expected-tool-name]`: asserts `count=1` on **both** the journal and
+   in-memory layers and the surviving `:tool-name` on **both**, carrying the
+   established layer-naming failure messages. The five single-id handler-layer
+   tests (`abort-races-real-result-yields-one-tool-result-test`,
+   `recorded-ids-survive-turn-boundary-test`,
+   `normal-single-result-path-unaffected-test`,
+   `interrupt-only-path-yields-one-result-test`,
+   `concurrent-completion-real-result-wins-test`) each call it once with the
+   winner name passed at the call site (intent stays locally visible);
+   `distinct-tool-call-ids-both-recorded-test` calls it twice (once per id).
+   Removed the per-test `let`/`is` ceremony — the both-layer count+winner
+   invariant is now one enforced contract, collapsing the per-test divergence
+   the prior two passes fixed by hand. Assertion count preserved (29).
+
+2. **Controlled time.** Added `test-instant` (`java.time.Instant/EPOCH`);
+   `real-result-msg` and `interrupt-result-msg` now stamp `:timestamp
+   test-instant` instead of `(java.time.Instant/now)`. Setup is deterministic;
+   no assertion depends on the timestamp.
+
+Focused suite green (6 tests / 29 assertions); clj-kondo clean, parens
+balanced. No blockers.

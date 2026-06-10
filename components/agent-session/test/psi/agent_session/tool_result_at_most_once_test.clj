@@ -16,6 +16,12 @@
    [psi.session-persistence.core :as persist]
    [psi.session-state.state :as ss]))
 
+(def ^:private test-instant
+  "Fixed instant for test toolResult messages. The timestamp is never asserted
+   and no de-dup/ordering keys off it, so a constant keeps setup deterministic
+   and free of incidental wall-clock detail."
+  java.time.Instant/EPOCH)
+
 (defn- create-session-context []
   (let [ctx (session/create-context (test-support/safe-context-opts {:persist? false}))
         sd  (session/new-session-in! ctx nil {})]
@@ -27,7 +33,7 @@
    :tool-name "bash"
    :content [{:type :text :text "real output"}]
    :is-error false
-   :timestamp (java.time.Instant/now)})
+   :timestamp test-instant})
 
 (defn- interrupt-result-msg [tool-call-id]
   {:role "toolResult"
@@ -35,7 +41,7 @@
    :tool-name "interrupted"
    :content [{:type :text :text "Tool execution interrupted before completion."}]
    :is-error true
-   :timestamp (java.time.Instant/now)})
+   :timestamp test-instant})
 
 (defn- journal-tool-results [ctx session-id tool-call-id]
   (->> (persist/all-entries-in ctx session-id)
@@ -56,6 +62,25 @@
                          :tool-result-msg tool-result-msg}
                         {:origin :core}))
 
+(defn- assert-single-recorded-result
+  "Assert exactly one toolResult is recorded for `tool-call-id` on both recorded
+   layers (journal + agent-core in-memory history), and that the surviving
+   result's `:tool-name` is `expected-tool-name` on both layers. Compresses the
+   repeated count+winner both-layer ceremony into one enforced contract with the
+   established layer-naming failure messages; the winner name is passed at the
+   call site so intent stays locally visible."
+  [ctx session-id tool-call-id expected-tool-name]
+  (let [journal (journal-tool-results ctx session-id tool-call-id)
+        memory  (memory-tool-results ctx session-id tool-call-id)]
+    (is (= 1 (count journal))
+        "exactly one toolResult entry for the id in the journal")
+    (is (= 1 (count memory))
+        "exactly one toolResult entry for the id in the in-memory history")
+    (is (= expected-tool-name (:tool-name (first journal)))
+        "the surviving result wins on the journal layer")
+    (is (= expected-tool-name (:tool-name (first memory)))
+        "the surviving result wins on the in-memory history layer")))
+
 (deftest abort-races-real-result-yields-one-tool-result-test
   (testing "an interrupt (:user-abort abort-in!) for a pending tool-call plus a
             late real result records exactly one toolResult for the id in the
@@ -69,17 +94,8 @@
       (session/abort-in! ctx session-id)
       ;; the in-flight tool then completes and dispatches its real result
       (record-result! ctx session-id (real-result-msg tool-call-id))
-      (let [journal (journal-tool-results ctx session-id tool-call-id)
-            memory  (memory-tool-results ctx session-id tool-call-id)]
-        (is (= 1 (count journal))
-            "exactly one toolResult entry for the id in the journal")
-        (is (= 1 (count memory))
-            "exactly one toolResult entry for the id in the in-memory history")
-        ;; first writer (the interrupt) wins for the in-flight headline case
-        (is (= "interrupted" (:tool-name (first journal)))
-            "the interrupt wins on the journal layer")
-        (is (= "interrupted" (:tool-name (first memory)))
-            "the interrupt wins on the in-memory history layer")))))
+      ;; first writer (the interrupt) wins for the in-flight headline case
+      (assert-single-recorded-result ctx session-id tool-call-id "interrupted"))))
 
 (deftest recorded-ids-survive-turn-boundary-test
   (testing "recorded-tool-result-ids is session-scoped, not turn-scoped: an
@@ -101,34 +117,16 @@
           ":pending-tool-calls cleared at the turn boundary")
       ;; turn N+1: the late real result arrives for the same id
       (record-result! ctx session-id (real-result-msg tool-call-id))
-      (let [journal (journal-tool-results ctx session-id tool-call-id)
-            memory  (memory-tool-results ctx session-id tool-call-id)]
-        (is (= 1 (count journal))
-            "exactly one toolResult entry for the id in the journal after the turn boundary")
-        (is (= 1 (count memory))
-            "exactly one toolResult entry for the id in the in-memory history after the turn boundary")
-        ;; first writer (the interrupt) still wins across the turn boundary
-        (is (= "interrupted" (:tool-name (first journal)))
-            "the interrupt wins on the journal layer")
-        (is (= "interrupted" (:tool-name (first memory)))
-            "the interrupt wins on the in-memory history layer")))))
+      ;; first writer (the interrupt) still wins across the turn boundary
+      (assert-single-recorded-result ctx session-id tool-call-id "interrupted"))))
 
 (deftest normal-single-result-path-unaffected-test
   (testing "a normal tool call records exactly one real result (happy path)"
     (let [[ctx session-id] (create-session-context)
           tool-call-id     "tc-normal"]
       (record-result! ctx session-id (real-result-msg tool-call-id))
-      (let [journal (journal-tool-results ctx session-id tool-call-id)
-            memory  (memory-tool-results ctx session-id tool-call-id)]
-        (is (= 1 (count journal))
-            "exactly one toolResult entry for the id in the journal")
-        (is (= 1 (count memory))
-            "exactly one toolResult entry for the id in the in-memory history")
-        ;; the real result wins on both recorded layers
-        (is (= "bash" (:tool-name (first journal)))
-            "the real result wins on the journal layer")
-        (is (= "bash" (:tool-name (first memory)))
-            "the real result wins on the in-memory history layer")))))
+      ;; the real result wins on both recorded layers
+      (assert-single-recorded-result ctx session-id tool-call-id "bash"))))
 
 (deftest interrupt-only-path-yields-one-result-test
   (testing "an interrupt for a pending tool-call with no later real result yields
@@ -138,17 +136,8 @@
           tool-call-id     "tc-interrupt-only"]
       (agent/emit-tool-start-in! agent-ctx {:id tool-call-id :name "bash" :arguments "{}"})
       (session/abort-in! ctx session-id)
-      (let [journal (journal-tool-results ctx session-id tool-call-id)
-            memory  (memory-tool-results ctx session-id tool-call-id)]
-        (is (= 1 (count journal))
-            "exactly one toolResult entry for the id in the journal")
-        (is (= 1 (count memory))
-            "exactly one toolResult entry for the id in the in-memory history")
-        ;; the interrupt wins on both recorded layers
-        (is (= "interrupted" (:tool-name (first journal)))
-            "the interrupt wins on the journal layer")
-        (is (= "interrupted" (:tool-name (first memory)))
-            "the interrupt wins on the in-memory history layer")))))
+      ;; the interrupt wins on both recorded layers
+      (assert-single-recorded-result ctx session-id tool-call-id "interrupted"))))
 
 (deftest concurrent-completion-real-result-wins-test
   (testing "at-most-once under the concurrent-completion window: when the real
@@ -164,17 +153,8 @@
           tool-call-id     "tc-concurrent"]
       (record-result! ctx session-id (real-result-msg tool-call-id))
       (record-result! ctx session-id (interrupt-result-msg tool-call-id))
-      (let [journal (journal-tool-results ctx session-id tool-call-id)
-            memory  (memory-tool-results ctx session-id tool-call-id)]
-        (is (= 1 (count journal))
-            "exactly one toolResult entry for the id in the journal, not two")
-        (is (= 1 (count memory))
-            "exactly one toolResult entry for the id in the in-memory history, not two")
-        ;; first writer (the real result) wins
-        (is (= "bash" (:tool-name (first journal)))
-            "the real result wins on the journal layer")
-        (is (= "bash" (:tool-name (first memory)))
-            "the real result wins on the in-memory history layer")))))
+      ;; first writer (the real result) wins
+      (assert-single-recorded-result ctx session-id tool-call-id "bash"))))
 
 (deftest distinct-tool-call-ids-both-recorded-test
   (testing "the recorded-ids guard is per-tool-call-id, not per-session: two
@@ -186,23 +166,6 @@
           id-b             "tc-distinct-b"]
       (record-result! ctx session-id (real-result-msg id-a))
       (record-result! ctx session-id (real-result-msg id-b))
-      (let [journal-a (journal-tool-results ctx session-id id-a)
-            journal-b (journal-tool-results ctx session-id id-b)
-            memory-a  (memory-tool-results ctx session-id id-a)
-            memory-b  (memory-tool-results ctx session-id id-b)]
-        (is (= 1 (count journal-a))
-            "first id records exactly one toolResult in the journal")
-        (is (= 1 (count journal-b))
-            "second distinct id is not suppressed — records its own toolResult")
-        (is (= 1 (count memory-a))
-            "first id records exactly one toolResult in the in-memory history")
-        (is (= 1 (count memory-b))
-            "second distinct id records its own toolResult in the in-memory history")
-        (is (= "bash" (:tool-name (first journal-a)))
-            "first id's real result wins on the journal layer")
-        (is (= "bash" (:tool-name (first journal-b)))
-            "second id's real result wins on the journal layer")
-        (is (= "bash" (:tool-name (first memory-a)))
-            "first id's real result wins on the in-memory history layer")
-        (is (= "bash" (:tool-name (first memory-b)))
-            "second id's real result wins on the in-memory history layer")))))
+      ;; each distinct id records its own real result — no cross-id suppression
+      (assert-single-recorded-result ctx session-id id-a "bash")
+      (assert-single-recorded-result ctx session-id id-b "bash"))))

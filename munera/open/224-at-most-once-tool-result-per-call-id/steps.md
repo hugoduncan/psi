@@ -476,7 +476,7 @@
 
 ## Test shaper review follow-ups (third pass)
 
-- [ ] **Compress the repeated both-layer count+winner assertion ceremony into a
+- [x] **Compress the repeated both-layer count+winner assertion ceremony into a
       shared helper** in `tool_result_at_most_once_test.clj` (test-shaper
       `economical` ∧ `consistent(assertion_style)` ∧ robustness-against-drift).
       Five of the six handler-layer tests
@@ -500,8 +500,17 @@
       `distinct-tool-call-ids-both-recorded-test` (two ids) calls it twice. This
       collapses the per-test divergence the prior passes fixed by hand into one
       enforced contract. Re-run the focused suite green.
+      → **Resolved:** extracted `assert-single-recorded-result [ctx session-id
+      tool-call-id expected-tool-name]` (asserts `count=1` + surviving
+      `:tool-name` on **both** journal and in-memory layers, with the established
+      layer-naming messages). The five single-id handler-layer tests now call it
+      once each with the winner name at the call site (intent stays locally
+      visible); `distinct-tool-call-ids-both-recorded-test` calls it twice (once
+      per id). Removed the hand-rolled `let`/`is` ceremony from all six tests.
+      Focused suite green (6 tests / 29 assertions — assertion count preserved);
+      clj-kondo clean, parens balanced.
 
-- [ ] **Control time in the test message builders** (test-shaper
+- [x] **Control time in the test message builders** (test-shaper
       `deterministic(control(time))` ∧ `minimal_incidental_setup`). `real-result-msg`
       and `interrupt-result-msg` (`tool_result_at_most_once_test.clj`) stamp
       `:timestamp (java.time.Instant/now)`, injecting uncontrolled wall-clock
@@ -510,3 +519,8 @@
       instant (e.g. a named `test`-constant or `java.time.Instant/EPOCH`) so the
       setup is fully deterministic and carries no incidental time detail. Low
       priority (no assertion currently depends on it).
+      → **Resolved:** added a `test-instant` constant (`java.time.Instant/EPOCH`)
+      and both `real-result-msg` and `interrupt-result-msg` now stamp
+      `:timestamp test-instant` instead of `(java.time.Instant/now)`. Setup is
+      fully deterministic; no assertion depends on the timestamp. Focused suite
+      green.
