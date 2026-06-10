@@ -231,3 +231,47 @@ Consistency check: D10/D11 are consistent with D2 (signal/handle split, pull rea
 path), D7/D8 (push wait-wakeup + interrupt-safety), and D5 (cancel-then-remove
 removes the status value but the future-cancel push + run-absence pull still stop
 the worker). No new contradictions introduced.
+
+## Architecture-fit review (ψ pass 2, 2026-06-10)
+
+Fresh architecture-fit pass over design.md (AGENTS.md VSM + `λ parity` +
+`λ extend`, META.md, doc/architecture.md dispatch/effects/replay surfaces). D1–D11
+already place the cancellation side effects as effects-as-data, split signal/handle,
+own the cascade via the session-dispatch authority, and serialize terminal
+transitions — those fit. Two *new* actionable misfits remain where the design does
+not commit the effects to the project's canonical dispatch-effect pathway:
+
+1. **Cancellation effects executor placement — out-of-dispatch vs canonical
+   `:effects` interceptor (effect-schema parity, replay-trim, trace).** D1 names the
+   executor as "the orchestration runtime boundary — the layer that owns
+   `inflight-runs` (`psi.agent-session.workflow.orchestration`/`runtime_state`)",
+   and D9 as a "runtime-boundary effect handler". But the project's effects-as-data
+   contract runs effects through the dispatch `:effects` interceptor against a
+   malli `effect-schema` with a matching `execute-effect!` multimethod
+   (`agent-session/dispatch_effects.clj` + `dispatch_schema.clj`; see existing
+   `:runtime/agent-abort`, `:runtime/mark-workflow-jobs-terminal`). Executing
+   cancellation effects at the orchestration layer instead bypasses (a) the
+   validate-interceptor effect-schema check, (b) `:trim-effects-on-replay`
+   suppression — breaking the `∀change → event → log → replayable` S5 closure for
+   the real side effects `future-cancel`/interrupt/abort, and (c) dispatch-trace
+   `:dispatch/effect-start`/`-finish` observability (the very signal whose absence
+   made the Evidence runaway hard to diagnose). Fit decision the design must state:
+   the new effects are canonical `:runtime/*` effect types registered in
+   `effect-schema` with parity `execute-effect!` methods, executed by the dispatch
+   `:effects` interceptor — not an orchestration-layer execution path. (AGENTS.md
+   `λ parity`, S1 effects/S3 dispatch, doc/architecture.md replay-trim + dispatch
+   trace.)
+
+2. **Background-job terminalization ownership — reuse existing effect, not a new
+   ad-hoc write.** Scope/Desired/Acceptance require "the background job for a
+   cancelled run is marked terminal" but assign it no owner. An effect already
+   exists for exactly this (`:runtime/mark-workflow-jobs-terminal`), and the
+   background job is a projection of the workflow-registry handle into `:state*`
+   (doc/architecture.md State-boundary table). Fit decision: job-terminal status
+   should fall out of the D2/D4 terminal transition by reusing the existing
+   terminalization effect (λ extend compose > new mechanism), not a separate
+   out-of-band registry write that re-introduces a second writer for run-terminal
+   status.
+
+Both are boundary-commitment decisions for the design to state, not step-machine
+redesigns (correctly out of scope).
