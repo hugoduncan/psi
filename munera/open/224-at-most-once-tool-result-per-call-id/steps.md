@@ -289,6 +289,23 @@
       on the rebuild / `journal->provider-messages` de-dup. design.md now agrees
       with plan.md Key decisions and steps.md Slice B.
 
+## Implementation review follow-ups (first pass)
+
+- [ ] **Seed in-flight tool state via the public `agent/emit-tool-start-in!`
+      API, not a direct `:data-atom` swap, in the characterization tests.**
+      `abort-races-real-result-yields-one-tool-result-test` and
+      `interrupt-only-path-yields-one-result-test`
+      (`tool_result_at_most_once_test.clj`) currently mark the tool pending with
+      `(swap! (:data-atom agent-ctx) update :pending-tool-calls (fnil conj #{})
+      tool-call-id)`, reaching into agent-core data-atom internals and
+      re-implementing `agent/emit-tool-start-in!` (`agent_core/core.clj:420`).
+      Replace with `(agent/emit-tool-start-in! agent-ctx {:id tool-call-id :name
+      "bash" :arguments "{}"})` so the tests exercise the real in-flight path
+      (including the `:tool-execution-start` event) and stay robust to changes in
+      the `:pending-tool-calls` representation. Leave
+      `concurrent-completion-real-result-wins-test` on direct dispatch (its
+      design-pinned seam). Re-run the suite to confirm still green.
+
 ## Plan/steps inconsistency review follow-ups (third pass)
 
 - [x] **Reconcile the Slice-A path-helper name with the `session-` prefix

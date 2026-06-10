@@ -1619,3 +1619,38 @@ Executed Slices A–D. All design decisions held; no deviations.
 
 No doc file documents the toolResult invariant beyond CHANGELOG, so no other doc
 update needed.
+
+## Implementation review (task-implementation-review) — first pass
+
+Reviewed code/tests/docs against design D1 (Option C) + architecture. Verified:
+re-ran `tool-result-at-most-once-test` + `prompt-request-test` (21 tests, 62
+assertions, all green); clj-kondo clean on all changed files; CHANGELOG Fixed
+entry present and user-facing.
+
+Fit confirmed — no architectural or correctness misfit:
+- Forward-fix handler (`session_mutations.clj:529`) is a pure both-or-neither
+  guard reading the canonical `:state*` recorded-ids set via
+  `session/get-state-value-in`, returning `:root-state-update` + both effects or
+  `{}`; atomicity from dispatch serialization, no test-and-set. Matches D1
+  exactly (State-boundary, Dispatch-sequencing, single-source).
+- Init seeding (`init.clj`) supplies default + session-lifecycle clear in one
+  place; path helper `session-`-prefixed per convention.
+- `dedupe-tool-results` de-dup-after-repair in `journal->provider-messages`
+  recovers wedged journals; non-contiguous + contiguous recovery test locks the
+  ordering. Single upstream chokepoint, no second de-dup site.
+
+Actionable (one):
+1. **Characterization tests reimplement production pending-marking instead of
+   using the public agent-core API.** `abort-races-real-result-…` and
+   `interrupt-only-…` seed the in-flight tool with
+   `(swap! (:data-atom agent-ctx) update :pending-tool-calls (fnil conj #{}) id)`
+   — a direct reach into the agent-core data-atom internals that re-implements
+   `agent/emit-tool-start-in!` (`agent_core/core.clj:420`, the production
+   mechanism that adds an id to `:pending-tool-calls` *and* emits the
+   `:tool-execution-start` event). Per the project λtest guidance (use real
+   infrastructure for logic deps, not reimplementations), drive the pending state
+   through `agent/emit-tool-start-in!` so the test (a) exercises the real
+   in-flight path including the start event, and (b) is robust to changes in the
+   `:pending-tool-calls` representation rather than silently breaking or passing
+   vacuously. (`concurrent-completion-…` correctly uses direct dispatch by
+   design and is out of scope for this item.)
