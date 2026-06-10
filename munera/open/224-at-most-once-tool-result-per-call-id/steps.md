@@ -387,3 +387,17 @@
       would now fail this assertion. Non-contiguous case left count-only (its
       survivor is the repair synthetic). Focused test green (1 test / 3
       assertions); clj-kondo clean, parens balanced.
+
+## Test review follow-ups (second pass)
+
+- [ ] **Lock at-most-once *per tool-call-id* (not per-session) at the handler
+      layer.** Every handler-layer test in `tool_result_at_most_once_test.clj`
+      uses a single id per session, so a regression making the `:state*` guard
+      per-session (a boolean "recorded" flag instead of the per-id set) would
+      suppress every result after the first distinct call yet pass the suite. Add
+      a handler-layer test that dispatches real results for **two distinct
+      tool-call-ids** in one session via `record-result!` and asserts **both**
+      are recorded at the raw recorded layer (each id →1 in journal + in-memory
+      history; no cross-id suppression). The only existing two-distinct-id
+      coverage is at the projection layer (`dedupe-tool-results`), not the
+      `:state*` handler guard. A per-session guard must fail this test.

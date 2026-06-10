@@ -1808,3 +1808,35 @@ New actionable (1) — see steps.md "Test review follow-ups (first pass)":
   not `dup-contig`. A last-wins `dedupe-tool-results` would now fail. Non-contiguous
   case left count-only (its survivor is the repair-appended synthetic). Focused
   test green (1 test / 3 assertions); clj-kondo clean; parens balanced.
+
+## Test review (task-test-review) — second pass
+
+Re-applied `task-test-review` (well-formed ∧ behaviour-coverage(∀b∈design.∃t) ∧
+infra-hygiene(injectable ∧ nullable ∧ ¬mock ∧ ¬stub)). Suites green:
+`tool-result-at-most-once` 5/19, `prompt-request` 17/49. Infra deps clean — real
+`session/create-context` + in-memory persistence (`:persist? false`) + real
+agent-core via `agent/emit-tool-start-in!`; no mocks/stubs, state/output
+assertions only. First-pass first-occurrence-wins follow-up confirmed resolved.
+
+New actionable (1) — see steps.md "Test review follow-ups (second pass)":
+- **No handler-layer test records two *distinct* tool-call-ids in one session, so
+  the at-most-once-PER-tool-call-id granularity is unlocked at the `:state*`
+  guard.** Every handler-layer test (`abort-races…`,
+  `recorded-ids-survive-turn-boundary…`, `normal-single-result…`,
+  `interrupt-only…`, `concurrent-completion…`) uses exactly one id per session
+  (`tc-abort-race`, `tc-cross-turn`, `tc-normal`, `tc-interrupt-only`,
+  `tc-concurrent`). The guard is `(contains? recorded-ids tool-call-id)` /
+  `(conj recorded-ids tool-call-id)` — keyed per id — but a regression that made
+  it per-**session** (e.g. a single boolean "a result was recorded" flag instead
+  of the per-id set) would suppress every tool result after the *first* distinct
+  call in a session — a severe normal-path break (every multi-tool turn loses all
+  but the first result) — yet pass the whole suite: no test dispatches a real
+  result for a second distinct id in the same session and asserts it is still
+  recorded. The only two-distinct-id coverage is at the projection layer
+  (`dedupe-tool-results`, `journal-duplicate-tool-results-project-to-one-test`
+  uses `id-noncontig`/`id-contig`), **not** the `:state*` handler guard. This is
+  the symmetric gap to the cross-turn lifetime test already added (2nd impl-review
+  pass): per-id keying is as load-bearing as session-scoped lifetime. Add a
+  handler-layer test that records real results for two distinct tool-call-ids in
+  one session and asserts both are recorded (each →1, no cross-suppression); a
+  per-session guard would fail it.
