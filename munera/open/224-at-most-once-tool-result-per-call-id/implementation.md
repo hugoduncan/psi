@@ -1933,3 +1933,23 @@ New actionable (1) — see steps.md "Test shaper review follow-ups (first pass)"
   name assertions consistent failure messages and the same journal+memory
   symmetry across the suite, so a failing count/winner reports which layer and
   which expectation. Low-priority consistency polish; no behaviour gap.
+
+## Test shaper follow-up (first pass) — executed
+
+Applied both test-shaper follow-ups to `tool_result_at_most_once_test.clj`
+(test-only; no production change, no docs/changelog):
+
+- **Assertion-style normalization** — added layer-naming failure messages to the
+  previously-bare `count` assertions in `normal-single-result-path-unaffected-
+  test`, `interrupt-only-path-yields-one-result-test`, and the second `count`
+  assertion of `concurrent-completion-real-result-wins-test` ("…in the journal" /
+  "…in the in-memory history"). All `count` assertions in the suite now report
+  which recorded layer diverged on failure.
+- **Journal/memory winner symmetry** — `normal-single-result-path-unaffected-
+  test` (`"bash"`) and `interrupt-only-path-yields-one-result-test`
+  (`"interrupted"`) now assert the winning `:tool-name` on **both** `journal` and
+  `memory`, matching the headline/cross-turn/concurrent tests' both-or-neither
+  winner check.
+
+Verify: focused suite green (6 tests / 27 assertions, up from 25 — the two added
+memory winner assertions); clj-kondo clean; clj-paren-repair balanced.

@@ -116,9 +116,13 @@
       (record-result! ctx session-id (real-result-msg tool-call-id))
       (let [journal (journal-tool-results ctx session-id tool-call-id)
             memory  (memory-tool-results ctx session-id tool-call-id)]
-        (is (= 1 (count journal)))
-        (is (= 1 (count memory)))
-        (is (= "bash" (:tool-name (first journal))))))))
+        (is (= 1 (count journal))
+            "exactly one toolResult entry for the id in the journal")
+        (is (= 1 (count memory))
+            "exactly one toolResult entry for the id in the in-memory history")
+        ;; the real result wins on both recorded layers
+        (is (= "bash" (:tool-name (first journal))))
+        (is (= "bash" (:tool-name (first memory))))))))
 
 (deftest interrupt-only-path-yields-one-result-test
   (testing "an interrupt for a pending tool-call with no later real result yields
@@ -130,9 +134,13 @@
       (session/abort-in! ctx session-id)
       (let [journal (journal-tool-results ctx session-id tool-call-id)
             memory  (memory-tool-results ctx session-id tool-call-id)]
-        (is (= 1 (count journal)))
-        (is (= 1 (count memory)))
-        (is (= "interrupted" (:tool-name (first journal))))))))
+        (is (= 1 (count journal))
+            "exactly one toolResult entry for the id in the journal")
+        (is (= 1 (count memory))
+            "exactly one toolResult entry for the id in the in-memory history")
+        ;; the interrupt wins on both recorded layers
+        (is (= "interrupted" (:tool-name (first journal))))
+        (is (= "interrupted" (:tool-name (first memory))))))))
 
 (deftest concurrent-completion-real-result-wins-test
   (testing "at-most-once under the concurrent-completion window: when the real
@@ -151,8 +159,9 @@
       (let [journal (journal-tool-results ctx session-id tool-call-id)
             memory  (memory-tool-results ctx session-id tool-call-id)]
         (is (= 1 (count journal))
-            "exactly one toolResult entry for the id, not two")
-        (is (= 1 (count memory)))
+            "exactly one toolResult entry for the id in the journal, not two")
+        (is (= 1 (count memory))
+            "exactly one toolResult entry for the id in the in-memory history, not two")
         ;; first writer (the real result) wins
         (is (= "bash" (:tool-name (first journal))))
         (is (= "bash" (:tool-name (first memory))))))))
