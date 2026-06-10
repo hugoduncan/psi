@@ -79,6 +79,36 @@
         (is (= "interrupted" (:tool-name (first journal))))
         (is (= "interrupted" (:tool-name (first memory))))))))
 
+(deftest recorded-ids-survive-turn-boundary-test
+  (testing "recorded-tool-result-ids is session-scoped, not turn-scoped: an
+            interrupt records the synthetic result in one turn, the turn ends
+            (resetting :pending-tool-calls), and a late real result for the same
+            id in a later turn is still suppressed — exactly one toolResult at
+            the raw recorded layer (journal + in-memory history). Fails if
+            recorded-ids were cleared at the per-turn boundary."
+    (let [[ctx session-id] (create-session-context)
+          agent-ctx        (ss/agent-ctx-in ctx session-id)
+          tool-call-id     "tc-cross-turn"]
+      ;; turn N: tool-call in-flight, :user-abort records the synthetic interrupt
+      (agent/emit-tool-start-in! agent-ctx {:id tool-call-id :name "bash" :arguments "{}"})
+      (session/abort-in! ctx session-id)
+      ;; turn boundary: end the loop, resetting :pending-tool-calls to #{}
+      ;; (mirrors the per-turn reset the recorded-ids set must NOT share)
+      (agent/end-loop-in! agent-ctx)
+      (is (empty? (:pending-tool-calls (agent/get-data-in agent-ctx)))
+          ":pending-tool-calls cleared at the turn boundary")
+      ;; turn N+1: the late real result arrives for the same id
+      (record-result! ctx session-id (real-result-msg tool-call-id))
+      (let [journal (journal-tool-results ctx session-id tool-call-id)
+            memory  (memory-tool-results ctx session-id tool-call-id)]
+        (is (= 1 (count journal))
+            "exactly one toolResult entry for the id in the journal after the turn boundary")
+        (is (= 1 (count memory))
+            "exactly one toolResult entry for the id in the in-memory history after the turn boundary")
+        ;; first writer (the interrupt) still wins across the turn boundary
+        (is (= "interrupted" (:tool-name (first journal))))
+        (is (= "interrupted" (:tool-name (first memory))))))))
+
 (deftest normal-single-result-path-unaffected-test
   (testing "a normal tool call records exactly one real result (happy path)"
     (let [[ctx session-id] (create-session-context)

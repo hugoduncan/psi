@@ -336,7 +336,7 @@
 
 ## Implementation review follow-ups (second pass)
 
-- [ ] **Add a cross-turn regression test locking the session-scoped lifetime of
+- [x] **Add a cross-turn regression test locking the session-scoped lifetime of
       recorded-ids.** The design's D1 persistence/reset boundary
       ("outcome-determining") requires recorded-ids to persist across turns (the
       headline race is cross-turn: the late real result arrives in a *later* turn
@@ -351,3 +351,16 @@
       then dispatches the real result for the same id, and asserts exactly one
       `toolResult` at the raw recorded layer (journal + in-memory history). The
       test must fail if recorded-ids were turn-scoped.
+      → **Resolved:** added `recorded-ids-survive-turn-boundary-test` to
+      `tool_result_at_most_once_test.clj`. It seeds the in-flight tool via
+      `agent/emit-tool-start-in!`, records the synthetic interrupt via
+      `session/abort-in!` (turn N), advances the turn with `agent/end-loop-in!`
+      (asserting `:pending-tool-calls` is cleared — the per-turn reset the
+      recorded-ids set must *not* share), then dispatches the late real result
+      (turn N+1) and asserts exactly one `toolResult` for the id at the raw
+      recorded layer (journal + agent-core in-memory history), interrupt
+      first-writer-wins. Because recorded-ids lives in `:state*` (seeded only at
+      session init, untouched by `end-loop-in!`'s agent-core data-atom reset), it
+      survives the boundary; a turn-scoped clear would let the late real result
+      record a second entry and fail the count assertions. Focused suite green
+      (5 tests / 19 assertions).

@@ -1710,3 +1710,29 @@ Actionable (one):
    interrupt, advance the turn via `end-loop-in!`/new-turn so `:pending-tool-calls`
    resets, then dispatch the real result) and assert at-most-once still holds at
    the raw recorded layer — so a turn-scoped reset of recorded-ids would fail.
+
+## Implementation review (second pass) follow-up — cross-turn recorded-ids regression test
+
+Executed the single second-pass implementation-review follow-up item: add a
+cross-turn regression test locking the session-scoped lifetime of recorded-ids.
+
+Added `recorded-ids-survive-turn-boundary-test` to
+`components/agent-session/test/psi/agent_session/tool_result_at_most_once_test.clj`:
+- turn N: `agent/emit-tool-start-in!` (pending) → `session/abort-in!` records the
+  synthetic `"interrupted"` result and adds the id to the canonical recorded-ids
+  set in `:state*`.
+- turn boundary: `agent/end-loop-in!` resets `:pending-tool-calls #{}` (asserted),
+  the per-turn reset the recorded-ids set must NOT share. `end-loop-in!` only
+  touches the agent-core data atom, so `:state*` recorded-ids is untouched.
+- turn N+1: `record-result!` dispatches the late real result for the same id; the
+  guard reads recorded-ids from `:state*` (still present) and suppresses it.
+- asserts exactly one `toolResult` for the id at the raw recorded layer (journal
+  + agent-core in-memory history), interrupt first-writer-wins.
+
+A turn-scoped clear of recorded-ids (mirroring the `:pending-tool-calls` reset)
+would let the late real result record a second entry → the `(= 1 (count …))`
+assertions fail; this is the regression the test locks.
+
+Test-only change (no production edit, no docs/changelog — the guarantee is
+already documented). clj-kondo clean, clj-paren-repair clean. Focused suite green
+(5 tests / 19 assertions).
