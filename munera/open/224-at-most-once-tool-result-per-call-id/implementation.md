@@ -1475,3 +1475,42 @@ follow-ups (third pass)"):
    matching the established convention the bullet cites.
 
 No blockers; one actionable plan/steps inconsistency.
+
+## Plan/steps ambiguity review (plan.md + steps.md) — fourth pass
+
+Reviewed `plan.md` + `steps.md` (not `design.md`) for statements admitting >1
+implementer interpretation. Prior three plan/steps ambiguity passes (assertion
+layer / repro interrupt path / Slice-A default source; Slice-C de-dup ordering;
+Slice-B test-4 construction) and the three plan/steps inconsistency passes remain
+resolved. Task is still design/plan-only (Slices A–D unchecked).
+
+Re-grounded the remaining candidate ambiguities against code:
+- **Slice-A path vs seeding placement (candidate — non-actionable).** Proposed
+  helper `session-recorded-tool-result-ids-path [sid]` →
+  `[:agent-session :sessions sid :recorded-tool-result-ids]`
+  (`session_state/state.clj`). `initialize-session-slots`
+  (`session_state/init.clj:87/88`) seeds `[… sid :telemetry]` and `[… sid :turn]`
+  **directly under the session map**, and `session-telemetry-path`
+  (`state.clj:30`) is `[… sid :telemetry k]` — same session-map level. So
+  "seed `#{}` alongside `:telemetry`" writes the datum at exactly the level the
+  path helper reads. No level mismatch; placement is unambiguous.
+- **Handler read API (candidate — non-actionable).** `get-state-value-in`
+  (`state.clj:84`) is 2-arity `[ctx path]`; the handler already destructures
+  `{:keys [session-id tool-result-msg]}` and `tool-result-msg` carries top-level
+  `:tool-call-id`. Steps' "read via `session/get-state-value-in`, nil-safe to
+  `#{}`" combined with the Slice-A path helper resolves to one call shape.
+  Current handler returns only `{:effects [...]}` (`session_mutations.clj:529`),
+  confirming the both-or-neither rewrite premise. Single interpretation.
+- **Slice-B repro setup "start a tool call (pending)" (candidate —
+  non-actionable).** The step qualifies "pending" / "still-pending id", which
+  already constrains the tool to be in-flight (not completed) at abort; the
+  concrete pending-seeding mechanism is ordinary test mechanics that does not
+  change the repro's validity so long as the id is pending when `abort-in!`
+  enumerates `:pending-tool-calls`.
+- **`:root-state-update` shorthand, de-dup first-occurrence-wins, Slice-C test
+  wiring** — all previously judged unambiguous and re-confirmed.
+
+**No new actionable plan/steps ambiguity.** Three prior ambiguity passes plus
+three inconsistency passes have converged; plan.md and steps.md are exhaustively
+disambiguated and agree with each other and with referenced code on every checked
+point. No follow-up items added.
