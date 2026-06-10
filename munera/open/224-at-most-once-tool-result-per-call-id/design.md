@@ -27,27 +27,39 @@ call:
 
 1. `emit-tool-start-in!` (agent-core) adds the tool-call-id to
    `:pending-tool-calls`.
-2. On turn interruption, an interrupt result is recorded for **every
-   still-pending** id. There are **two distinct interrupt producers** in the
-   code, each enumerating `:pending-tool-calls` and dispatching
-   `:session/tool-agent-record-result` with a synthetic `"interrupted"` error
-   toolResult:
+2. On turn interruption (and on session close), an interrupt result is recorded
+   for **every still-pending** id. The code has **several** distinct interrupt
+   producers; the exact count is **not load-bearing** (see the funnel property
+   below) and the list here is illustrative, not a closed set. Each enumerates
+   `:pending-tool-calls` and dispatches `:session/tool-agent-record-result` with
+   a synthetic `"interrupted"` error toolResult:
    - the **statechart effect path**: `:on-agent-done`
      (`dispatch_handlers/statechart_actions.clj:129/149`) sees
      `:interrupt-reason` (e.g. `:user-abort`) and emits the
      `:runtime/record-pending-tool-call-interrupts` effect, whose handler
-     (`dispatch_effects.clj:127`) enumerates `:pending-tool-calls` and dispatches
-     the record event; and
+     (`dispatch_effects.clj:127`) enumerates `:pending-tool-calls`
+     (`dispatch_effects.clj:131`) and dispatches the record event;
    - the **synchronous abort path**: `abort-in!` (`turn.clj:233`) calls
      `record-pending-tool-call-interrupts!` (`turn.clj:217`), which enumerates
      `:pending-tool-calls` (`turn.clj:220`) and dispatches the record event
-     synchronously.
+     synchronously; and
+   - the **session-close path**: `repair-pending-tool-calls-before-close!`
+     (`session_close.clj:55`, called by `close-session-in!`
+     `session_close.clj:106`) enumerates `:pending-tool-calls`
+     (`session_close.clj:58`) and dispatches the record event
+     (`session_close.clj:61`) for any id still pending at close.
 
-   Both producers converge on the **same single event**
-   `:session/tool-agent-record-result`, so the single-chokepoint guard there
-   covers both. The reproduced `:user-abort` Evidence below can flow through the
-   statechart-effect producer (effect executed during dispatch), not only the
-   literal synchronous `abort-in!` call.
+   **Funnel property (load-bearing).** Every producer — these interrupt
+   producers and the real-result path alike — converges on the **same single
+   event** `:session/tool-agent-record-result`. The single-chokepoint guard
+   there therefore covers **any** producer regardless of how many exist; the
+   invariant's soundness rests on this funnel, not on the enumeration being
+   exhaustive. So even if a producer is omitted from the list above (or a later
+   producer such as session-close re-enumerates an id an earlier producer
+   already recorded), the recorded-ids guard suppresses the duplicate. The
+   reproduced `:user-abort` Evidence below can flow through the statechart-effect
+   producer (effect executed during dispatch), not only the literal synchronous
+   `abort-in!` call.
 3. The in-flight tool then **also** completes and dispatches
    `:session/tool-agent-record-result` with its real result.
 4. The `:session/tool-agent-record-result` handler
@@ -248,13 +260,17 @@ the `:session/tool-agent-record-result` handler. **Option (B) is rejected.**
     and emit **both** effects.
 - **Atomicity** comes from dispatch serialization (single writer to `:state*`),
   not from a test-and-set on the agent-core atom — consistent with the
-  single-source-of-truth atom invariant. The racing producers all dispatch the
-  same event `:session/tool-agent-record-result`: the **two interrupt producers**
-  (statechart-effect path `dispatch_effects.clj:127` via `:on-agent-done`, and
-  synchronous abort path `turn.clj:217/233`) and the **real-result path**
-  (`tool_runtime_adapter.clj:114`). Dispatch ordering decides the first writer;
-  any later dispatch of the same id reads it already present and is suppressed.
-  The single chokepoint covers all three producers.
+  single-source-of-truth atom invariant. The guarantee rests on the **funnel
+  property**, not on enumerating producers: every producer that can record a
+  result for an id dispatches the **same single event**
+  `:session/tool-agent-record-result`, so the chokepoint guard covers **any**
+  producer regardless of count. Illustratively, the known producers are the
+  interrupt producers (statechart-effect path `dispatch_effects.clj:127` via
+  `:on-agent-done`; synchronous abort path `turn.clj:217/233`; session-close
+  path `session_close.clj:55/61` via `close-session-in!`) and the **real-result
+  path** (`tool_runtime_adapter.clj:114`) — but the invariant does **not** depend
+  on this list being complete. Dispatch ordering decides the first writer; any
+  later dispatch of the same id reads it already present and is suppressed.
 - **First-writer-wins is the general mechanism; the aborted-tool outcome is still
   deterministic.** Generic first-writer-wins says "whichever dispatch of the
   record event for an id is serialized first is kept" (covering both interrupt
@@ -271,11 +287,12 @@ the `:session/tool-agent-record-result` handler. **Option (B) is rejected.**
   for it, and there is still exactly one result.) See the Desired Behaviour
   "Interrupt-first is guaranteed" bullet.
 - `:pending-tool-calls` (agent-core) is retained for its existing runtime use
-  (enumerating still-pending ids on interrupt). Both interrupt producers
-  enumerate it: the synchronous abort path at `turn.clj:220` and the
-  statechart-effect path at `dispatch_effects.clj:131`. It no longer gates effect
-  emission. The canonical recorded-ids predicate — not the agent-core atom — is
-  the source of truth for the at-most-once decision.
+  (enumerating still-pending ids on interrupt/close). The interrupt producers
+  enumerate it at three sites: the synchronous abort path (`turn.clj:220`), the
+  statechart-effect path (`dispatch_effects.clj:131`), and the session-close path
+  (`session_close.clj:58`). It no longer gates effect emission. The canonical
+  recorded-ids predicate — not the agent-core atom — is the source of truth for
+  the at-most-once decision.
 - **Persistence/reset boundary (outcome-determining, not a plan detail).** The
   recorded-ids set must **persist for the session lifetime**, not reset at the
   turn boundary. The headline race is cross-turn: an aborted tool's real result

@@ -196,7 +196,7 @@
 
 # Design follow-up — ambiguity review (third pass)
 
-- [ ] Disambiguate whether the at-most-once guarantee **depends on an exhaustive
+- [x] Disambiguate whether the at-most-once guarantee **depends on an exhaustive
       producer enumeration** or only on the **general funnel property** (every
       producer dispatches the single event `:session/tool-agent-record-result`,
       so the chokepoint guard covers any producer regardless of how many exist).
@@ -222,3 +222,25 @@
       `repair-pending-tool-calls-before-close!` both enumerate the same
       `:pending-tool-calls` during close), which the recorded-ids guard
       suppresses but the design never mentions.
+      → Resolved: chose **(a) — the guarantee rests on the funnel property**
+      (every producer dispatches the single event
+      `:session/tool-agent-record-result`; the chokepoint guard covers any
+      producer regardless of count), and **also completed the enumeration** for
+      accuracy. Root Cause step 2 now lists three interrupt producers
+      (statechart-effect `dispatch_effects.clj:127/131`, synchronous abort
+      `turn.clj:217/220/233`, session-close
+      `repair-pending-tool-calls-before-close!` `session_close.clj:55/58/61/106`)
+      under an explicit **"Funnel property (load-bearing)"** heading stating the
+      list is illustrative, not exhaustive. D1's atomicity bullet drops the
+      "two interrupt producers"/"covers all three producers" exhaustive-count
+      language in favour of the funnel framing (known producers listed
+      illustratively, invariant does not depend on completeness). D1's
+      `:pending-tool-calls` retention bullet now cites all three enumeration
+      sites (`turn.clj:220`, `dispatch_effects.clj:131`, `session_close.clj:58`).
+      Duplicate-across-producers (incl. session-close re-enumerating an
+      already-recorded id) is explicitly acknowledged as suppressed by the
+      recorded-ids guard. Code verified, including that session-close's
+      `agent/abort-in!` (agent-core) *clears* `:pending-tool-calls` rather than
+      recording — so the review's specific "abort-in! `turn.clj:223` + repair
+      both enumerate during close" duplicate mechanism is inaccurate; the funnel
+      framing makes the precise interaction non-load-bearing.

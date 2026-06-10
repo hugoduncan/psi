@@ -481,3 +481,43 @@ New actionable ambiguity (see design-steps.md):
    (b) completing the enumeration to include the session-close producer.
 
 No blockers; one actionable ambiguity.
+
+## Ambiguity follow-up resolution (design-steps) — third pass
+
+Executed the single third-pass ambiguity item (exhaustive enumeration vs funnel
+property; enumeration incomplete — session-close producer omitted).
+
+Code verified before editing:
+- Third interrupt producer confirmed: `repair-pending-tool-calls-before-close!`
+  (`session_close.clj:55`) enumerates `:pending-tool-calls` (`:58`) and
+  dispatches `:session/tool-agent-record-result` (`:61`) with an `"interrupted"`
+  toolResult; called by `close-session-in!` (`:106`).
+- Statechart-effect producer (`dispatch_effects.clj:127` enumerate `:131`),
+  synchronous abort producer (`turn.clj:217/220/233`), real-result path
+  (`tool_runtime_adapter.clj:114`) re-verified. All four dispatch sites converge
+  on handler `session_mutations.clj:529`.
+- **Review's close-path-duplicate mechanism is inaccurate.** In
+  `close-session-in!`, `abort-session-runtime!` (`:105`) calls agent-core
+  `agent/abort-in!` (`agent_core/core.clj:466`), which **clears**
+  `:pending-tool-calls` to `#{}` (it does *not* record interrupt results) — it
+  is *not* `turn.clj`'s `abort-in!` (`turn.clj:229`, which does record). So the
+  review's "abort-in! `turn.clj:223` + repair both enumerate the same pending set
+  during close" duplicate is not the actual close path. This argues for the
+  funnel framing: the precise per-producer interaction is non-load-bearing.
+
+Resolution applied (chose **(a) funnel property load-bearing**, plus completed
+the enumeration for accuracy):
+- **Root Cause step 2** rewritten: "several distinct interrupt producers", count
+  "not load-bearing", list illustrative; added the session-close producer as a
+  third bullet; added an explicit **"Funnel property (load-bearing)"** paragraph
+  stating soundness rests on every producer dispatching the one event (chokepoint
+  covers any producer regardless of count), and that duplicates from an omitted
+  or re-enumerating producer (incl. session-close) are suppressed by the guard.
+- **D1 atomicity bullet**: dropped "two interrupt producers"/"covers all three
+  producers" exhaustive-count language; now leads with the funnel property and
+  lists known producers (three interrupt incl. session-close + real-result)
+  illustratively, noting the invariant does not depend on completeness.
+- **D1 `:pending-tool-calls` retention bullet**: now cites all three enumeration
+  sites (`turn.clj:220`, `dispatch_effects.clj:131`, `session_close.clj:58`).
+
+No blockers; item completed.
