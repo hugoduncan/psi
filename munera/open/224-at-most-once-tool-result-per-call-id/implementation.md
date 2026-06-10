@@ -946,3 +946,33 @@ vs test-and-set) and cross-component-layering rationales, so the unrealized
 queryability claim is non-load-bearing.
 
 No new follow-up items; prior architecture-fit items remain resolved by D1.
+
+## Ambiguity review (design.md) — sixth pass
+
+Re-reviewed design.md for ambiguities (statements admitting >1 interpretation),
+not architecture-fit/correctness. All prior five ambiguity-pass items +
+inconsistency items remain resolved and present in design.md. Focused this pass
+on residual tension in the determinism narrative and the under-specified-boundary
+candidates, since those drove the prior diminishing-returns passes.
+
+Checked and judged **non-actionable** (recorded so future passes do not re-raise):
+- **Early Desired-Behaviour bullets (:114–:117) "first writer wins".** Bullets 1–2
+  state plainly "at most one … first writer wins" / "Whichever of {real, interrupt}
+  is recorded first is kept". These are consistent with — not contradicting — the
+  later determinism bullet's "deterministic guarantee is at-most-once; winner is
+  first-writer-wins by dispatch order". No unconditional interrupt-wins reading
+  survives (the :118 bullet was qualified to "genuinely still in-flight" in pass 5).
+  Not ambiguous.
+- **"session reset/clear" recorded-ids clearing boundary.** D1 specifies it
+  semantically as "the same boundary that discards the journal/history", decoupled
+  from the per-turn `:pending-tool-calls` reset. The concrete clearing event is a
+  plan/implementation detail; specifying the boundary by reference to the
+  journal/history-discard lifecycle is appropriate at design level and admits one
+  interpretation. Not actionable as ambiguity.
+- **Async re-surface vs out-of-scope.** The background/async re-surfacing path is
+  explicitly an orthogonal content-delivery mechanism, not a `tool_result`, and
+  changing it is out of scope — consistently stated. Not ambiguous.
+
+**No new actionable ambiguity.** The design is exhaustively disambiguated; five
+prior passes show clear convergence (the last two addressed single-bullet phrasing
+alignment, both resolved).
