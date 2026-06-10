@@ -68,18 +68,44 @@ has exactly this shape: one synthetic `"interrupted"` result plus one real resul
   journal and in the in-memory message history — **first writer wins**.
 - Whichever of {real tool result, interrupt result} is recorded first is kept;
   the later one is suppressed (both its in-memory record and its journal append).
-- An aborted, still-in-flight async tool keeps its `"interrupted"` result for the
-  model-visible turn; the tool's eventual real completion is still delivered
-  through the existing async/background completion path (chat-injection /
-  background-job terminal), not as a second `tool_result` for the aborted call.
+- An aborted, still-in-flight tool keeps its `"interrupted"` result for the
+  model-visible turn. The tool's eventual real completion **still dispatches
+  `:session/tool-agent-record-result`** (the adapter `:record-result!` always
+  re-dispatches the event — `tool_runtime_adapter.clj:114`); the recorded-ids
+  guard in the handler is what prevents it becoming a second `tool_result` by
+  suppressing both its in-memory record and its journal append. The
+  async/background completion path (chat-injection / background-job terminal) is
+  an **orthogonal content-delivery mechanism** that surfaces the real outcome to
+  the model in a *later* turn; it is not what suppresses the duplicate and does
+  not itself emit a `tool_result` for the aborted call. (See D1 Mechanism.)
+- **Interrupt-first is guaranteed for the headline abort race, not left to
+  dispatch tie-breaking.** The interrupt path enumerates only *still-pending*
+  tool-call-ids and records their `"interrupted"` results synchronously at abort
+  time (`turn.clj` `record-pending-tool-call-interrupts!`). A real result for a
+  still-in-flight tool necessarily arrives *after* abort, so its id is already in
+  recorded-ids and it is suppressed. First-writer-wins is the general invariant
+  mechanism; for the aborted case the first writer is deterministically the
+  interrupt because it is recorded while the tool is still pending. (The only
+  way the real result could win is if it completed and recorded *before* the
+  abort enumerated it — in which case the tool was no longer pending and no
+  interrupt result is emitted for it, so there is still exactly one result.)
+- **Synchronous tools (`bash`, `psi-tool`) have no background-completion path.**
+  When their real result is suppressed by an abort, it is **silently dropped** —
+  the model sees only the `"interrupted"` result. This is the intended
+  model-visible behaviour: the user aborted the turn, so the discarded synchronous
+  output is expected. Only async/background tools (e.g. `delegate`) re-surface
+  their real outcome via the background path in a later turn.
 - No change to the non-interrupted happy path: a normal tool call still records
   exactly one real result.
-- Existing journals already containing duplicates should not crash subsequent
+- Existing journals already containing duplicates must not crash subsequent
   requests. The provider-facing projection
   (`prompt-request/journal->provider-messages` and the conversation rebuild)
   must tolerate already-persisted duplicates by emitting at most one
-  `tool_result` per id. (Whether this defensive de-dup is in scope or split into
-  a follow-up is an open question — see below.)
+  `tool_result` per id. **This defensive de-dup is in scope** (see Scope): the
+  forward-fix alone leaves already-wedged sessions broken because their journals
+  already contain two `toolResult` entries, so recovering them requires the
+  projection to be tolerant. It is a cheap, purely-derived projection guard
+  keyed by tool-call-id.
 
 ## Scope
 
@@ -97,6 +123,11 @@ In scope:
   provider conversation.
 - Coverage that the normal single-result path is unaffected and that the
   interrupt-only path still yields exactly one `"interrupted"` result.
+- Defensive de-dup in the provider-facing projection
+  (`prompt-request/journal->provider-messages` and the conversation rebuild):
+  emit at most one `tool_result` per tool-call-id so already-persisted duplicate
+  journals do not crash subsequent requests. Purely derived from the journal,
+  keyed by tool-call-id; first occurrence wins.
 
 Out of scope:
 
@@ -163,30 +194,61 @@ the `:session/tool-agent-record-result` handler. **Option (B) is rejected.**
   path `turn.clj:223`, real-result path `tool_runtime_adapter.clj:114`) both
   dispatch the same event; dispatch ordering decides the first writer, the second
   reads its own id already present and is suppressed.
+- **First-writer-wins is the general mechanism; the aborted-tool outcome is still
+  deterministic.** Generic first-writer-wins says "whichever of the two events is
+  serialized first is kept." For the headline abort race that does *not* leave
+  the model-visible result to chance: the interrupt path only enumerates
+  *still-pending* tool-call-ids and records their `"interrupted"` results
+  synchronously at abort time, while a real result for a still-in-flight tool can
+  only arrive *after* abort. So the interrupt is deterministically the first
+  writer for any tool that was still pending at abort, and its `"interrupted"`
+  result is the one kept. (If a tool had already completed and recorded its real
+  result before abort, it is no longer pending, the interrupt path emits nothing
+  for it, and there is still exactly one result.) See the Desired Behaviour
+  "Interrupt-first is guaranteed" bullet.
 - `:pending-tool-calls` (agent-core) is retained for its existing runtime use
   (enumerating still-pending ids on interrupt, `turn.clj:220`); it no longer
   gates effect emission. The canonical recorded-ids predicate — not the agent-core
   atom — is the source of truth for the at-most-once decision.
-- The recorded-ids set is bounded by being session-scoped and cleared/reset on
-  the same lifecycle boundaries that already reset `:pending-tool-calls`
-  (turn/session reset). Plan-time detail: confirm the exact reset point so the
-  set does not accrete across turns.
+- **Persistence/reset boundary (outcome-determining, not a plan detail).** The
+  recorded-ids set must **persist for the session lifetime**, not reset at the
+  turn boundary. The headline race is cross-turn: an aborted tool's real result
+  arrives *after* the turn that recorded the interrupt. If recorded-ids reset at
+  the turn boundary, the late real result would find its id absent and would
+  *not* be suppressed — re-introducing the very duplicate this task removes. The
+  id must therefore outlive the turn that recorded it and remain present until
+  the late real result has been resolved (suppressed). Concretely: recorded-ids
+  is session-scoped and cleared only on session reset/clear (the same boundary
+  that discards the journal/history), **not** on the per-turn boundary that
+  resets `:pending-tool-calls`. This deliberately decouples recorded-ids
+  lifetime from `:pending-tool-calls` lifetime. The set is bounded because
+  tool-call-ids are finite per session and the journal it guards is itself
+  session-scoped.
 
 This supersedes the earlier lean toward (B); Scope below is updated to reference
 the canonical predicate rather than `:pending-tool-calls`.
 
-## Remaining Open Question
+## Resolved Questions
 
-2. **Defensive projection de-dup.** Should this task also make
-   `journal->provider-messages` / conversation rebuild tolerate pre-existing
-   duplicate journals (so already-corrupted sessions recover), or is that a
-   separate task? Forward-fix (stop creating duplicates) is the core deliverable;
-   defensive de-dup is a recovery concern that may be bundled or split.
+All previously-open questions are now resolved in this design; none remain open.
 
-3. **First-wins outcome on abort.** Confirm that keeping the `"interrupted"`
-   result (and dropping the late real result from the conversation) is the
-   intended model-visible behaviour for an aborted async tool, given the real
-   result is still surfaced via the background-completion path.
+1. **Guard location (B vs C).** Resolved in Design Decision D1: Option (C),
+   canonical recorded-tool-result-ids predicate in `:state*`. Option (B)
+   rejected.
+
+2. **Defensive projection de-dup.** Resolved: **in scope** (see Scope and the
+   final Desired-Behaviour bullet). The forward-fix alone leaves already-wedged
+   sessions broken, so the provider-facing projection must emit at most one
+   `tool_result` per tool-call-id to recover them. Cheap, purely-derived,
+   first-occurrence-wins.
+
+3. **First-wins outcome on abort.** Resolved: keeping the `"interrupted"` result
+   and suppressing the late real result is the intended model-visible behaviour.
+   For async/background tools the real outcome is re-surfaced via the
+   background-completion path in a later turn; for synchronous tools it is
+   silently dropped (the user aborted). Interrupt-first is deterministic for
+   still-pending tools (see the Desired Behaviour determinism and sync-tool
+   bullets, and D1 Mechanism).
 
 ## Acceptance Criteria
 
@@ -197,5 +259,9 @@ the canonical predicate rather than `:pending-tool-calls`.
   history, first-writer-wins, for any tool (`delegate`, `bash`, `psi-tool`, …).
 - The non-interrupted single-result path and the interrupt-only path each yield
   exactly one result; existing agent-core / agent-session tests stay green.
+- A journal already containing duplicate `toolResult` entries for one
+  tool-call-id projects to exactly one `tool_result` per id through
+  `journal->provider-messages` / conversation rebuild (defensive de-dup), so an
+  already-wedged session recovers on its next request.
 - `bb test` green; clj-kondo clean; CHANGELOG updated if user-visible (a tool-use
   no longer wedges the session after an abort qualifies as a user-visible fix).

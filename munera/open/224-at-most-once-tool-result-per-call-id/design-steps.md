@@ -31,12 +31,15 @@
 
 # Design follow-up — ambiguity review
 
-- [ ] Resolve the **defensive projection de-dup scope** inconsistency. Desired
+- [x] Resolve the **defensive projection de-dup scope** inconsistency. Desired
       Behaviour states it as a "must", Scope omits it, Open Question 2 calls it
       open. Pick one: in-scope (move the requirement into Scope) or deferred to a
       follow-up task (downgrade the Desired-Behaviour "must" to a non-goal /
       reference), and make all three sections agree.
-- [ ] Disambiguate **how the late real result is prevented from producing a
+      → Resolved: chose **in scope**. Added a Scope in-scope bullet + acceptance
+      criterion; rewrote the Desired-Behaviour bullet ("This defensive de-dup is
+      in scope"); resolved Open Question 2. All three sections now agree.
+- [x] Disambiguate **how the late real result is prevented from producing a
       second `tool_result`**. Reconcile Desired Behaviour ("delivered through the
       async/background completion path, not as a second `tool_result`") with Root
       Cause step 3 + D1 Mechanism (real result still dispatches
@@ -44,7 +47,12 @@
       guard). Code confirms the adapter `:record-result!` re-dispatches the
       event. State explicitly whether the guard suppresses the re-dispatched real
       result, the real result is rerouted away from the record handler, or both.
-- [ ] Specify the **recorded-ids reset/persistence boundary** in design.md (not
+      → Resolved: **the recorded-ids guard suppresses the re-dispatched real
+      result** (it still dispatches the event; the handler suppresses both its
+      in-memory record and journal append). The background/async path is an
+      orthogonal content-delivery mechanism (later turn), not the suppressor and
+      not a `tool_result`. Stated in the rewritten Desired-Behaviour bullet.
+- [x] Specify the **recorded-ids reset/persistence boundary** in design.md (not
       only plan.md), because it determines whether the invariant holds for the
       headline cross-turn race. An aborted tool's real result arrives after the
       turn that recorded the interrupt; if recorded-ids resets at the turn
@@ -52,17 +60,33 @@
       lifetime (id persists until the late result is resolved) or the assumption
       that the late result never re-dispatches the record event (link to the
       item above).
-- [ ] Reconcile **"first-writer-wins" (nondeterministic by dispatch order)**
+      → Resolved: recorded-ids **persists for the session lifetime**, cleared
+      only on session reset/clear — explicitly **not** at the per-turn boundary
+      and **decoupled** from `:pending-tool-calls` lifetime. New D1 Mechanism
+      "Persistence/reset boundary" bullet replaces the prior plan-time defer.
+- [x] Reconcile **"first-writer-wins" (nondeterministic by dispatch order)**
       with **"an aborted async tool keeps its `interrupted` result"
       (deterministic)**. State whether the interrupt result is guaranteed to be
       recorded first (and how) or whether the model-visible outcome is genuinely
       whichever producer races first. Fold Open Question 3's "confirm intended
       behaviour" into this resolution.
-- [ ] Specify the **fate of a suppressed real result for synchronous tools**
+      → Resolved: first-writer-wins is the general invariant mechanism, but for
+      the headline abort race interrupt-first is **deterministic**: the interrupt
+      path enumerates only *still-pending* ids and records them synchronously at
+      abort, so a still-in-flight tool's real result can only arrive after and is
+      suppressed. New Desired-Behaviour determinism bullet + D1 Mechanism bullet;
+      Open Question 3 resolved.
+- [x] Specify the **fate of a suppressed real result for synchronous tools**
       (`bash`, `psi-tool`), which appear in the Root Cause evidence but may have
       no async/background completion path. State whether their real result is
       silently dropped on abort and whether that is the intended model-visible
       behaviour.
-- [ ] Renumber the **"Remaining Open Question"** list (currently starts at 2 with
+      → Resolved: synchronous tools have no background path; their suppressed
+      real result is **silently dropped** on abort, which is the intended
+      model-visible behaviour (the user aborted). New Desired-Behaviour
+      sync-tool bullet.
+- [x] Renumber the **"Remaining Open Question"** list (currently starts at 2 with
       no item 1) so it no longer implies a missing item 1; the guard-location
       question is resolved in D1.
+      → Resolved: replaced "Remaining Open Question" with a "Resolved Questions"
+      section (items 1–3, no gap); all questions now resolved, none open.

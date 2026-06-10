@@ -127,3 +127,37 @@ New actionable ambiguities (see design-steps.md):
 6. **Open Question numbering starts at 2 (no item 1).** The resolved
    guard-location question (now D1) left a numbering gap, so "Remaining Open
    Question" is ambiguous about whether an item 1 still exists. Minor: renumber.
+
+## Ambiguity follow-up resolution (design-steps)
+
+Executed all six ambiguity-review follow-up items; all updates landed in
+design.md. Grounded against code: real-result re-dispatch confirmed in
+`tool_runtime_adapter.clj` `record-tool-call-result!` (`:record-result!` →
+`dispatch! :session/tool-agent-record-result`); interrupt path confirmed in
+`turn.clj` `record-pending-tool-call-interrupts!` enumerating *still-pending*
+`:pending-tool-calls` and recording synthetic results synchronously at abort;
+handler `session_mutations.clj:529` currently emits both effects unconditionally.
+
+- **(1) De-dup scope → in scope.** Reconciled Desired Behaviour, Scope (new
+  in-scope bullet), and the open question; added acceptance criterion. Rationale:
+  forward-fix alone leaves already-wedged journals broken; defensive projection
+  de-dup is cheap and purely derived.
+- **(2) Late-result mechanism → guard suppresses the re-dispatch.** Real result
+  still dispatches the record event; recorded-ids guard suppresses its in-memory
+  record + journal append. Background/async path is orthogonal content delivery
+  (later turn), not the suppressor.
+- **(3) Persistence boundary → session lifetime.** recorded-ids must persist
+  across turns (cleared only on session reset/clear), decoupled from
+  `:pending-tool-calls` per-turn reset; otherwise the cross-turn late result is
+  not suppressed. Replaced the prior plan-time-defer text in D1 Mechanism.
+- **(4) Determinism reconciled.** first-writer-wins is the general mechanism;
+  interrupt-first is deterministic for still-pending tools because the interrupt
+  is recorded synchronously at abort while a still-in-flight real result arrives
+  after. Folded Open Question 3 in.
+- **(5) Sync-tool fate → silently dropped on abort.** No background path for
+  `bash`/`psi-tool`; suppressed real result is dropped, intended since the user
+  aborted.
+- **(6) Renumbered.** "Remaining Open Question" → "Resolved Questions" (1–3, no
+  gap); none remain open.
+
+No blockers; all six items completed.
