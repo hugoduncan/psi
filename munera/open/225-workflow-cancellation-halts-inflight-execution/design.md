@@ -77,8 +77,9 @@ loop:
 - Cancelled runs reach a clean terminal state with their background job marked
   terminal (no lingering `:running` job, as also seen this session) — job
   terminalization is emitted by the D2/D4 terminal transition reusing the existing
-  `:runtime/mark-workflow-jobs-terminal` effect, the single writer for run-terminal
-  status (D13), not a separate registry write.
+  `:runtime/mark-workflow-jobs-terminal` effect, the single writer for the
+  background-job (projected) terminal status (D13) — the run's own `:status` is
+  written by the D4 serialized dispatch transition — not a separate registry write.
 
 ## Scope
 
@@ -102,8 +103,10 @@ In scope:
   `:runtime/agent-abort` effect (D12); not an out-of-dispatch execution path.
 - Ensuring the background job for a cancelled run is marked terminal by reusing the
   existing `:runtime/mark-workflow-jobs-terminal` effect from the D2/D4 terminal
-  transition (single writer for run-terminal status, D13) — not a separate ad-hoc
-  registry write.
+  transition (single writer for the background-job (projected) terminal status, D13;
+  the run's `:status` single-writer is the D4 dispatch transition) — not a separate
+  ad-hoc registry write — with the D16 ordering + cancelled-path constraints so the
+  cancel-then-remove path leaves no lingering job.
 - Tests: (a) a cancelled run performs no further step attempts after the cancel
   checkpoint; (b) `remove` of a live run does not leave a running future; (c)
   nested sub-run + child-session cancellation propagation; (d) no commits/journal
@@ -462,15 +465,25 @@ reusing the **existing** `:runtime/mark-workflow-jobs-terminal` effect (already
 registered in `effect-schema` with an `execute-effect!` method) — `λ extend`
 compose > new mechanism. The background job is a projection of the
 workflow-registry runtime handle into `:state*` (doc/architecture.md State-boundary
-table), so terminalizing it must go through the one existing writer for
-run-terminal status, not a second out-of-band path that would re-introduce a
-double-writer for the same projected status.
+table), so terminalizing it must go through the one existing writer for the
+**background-job (projected) terminal status**, not a second out-of-band path that
+would re-introduce a double-writer for the same projected status.
+
+**Two distinct writers (not conflated):** the run's own `:status :cancelled` is
+written by the D4 serialized dispatch terminal transition (the single writer of
+*run* status); `:runtime/mark-workflow-jobs-terminal` is the single writer of the
+*background-job* terminal status, which it **reconciles from** that run status.
+D13 governs only the latter; it does not (and must not) write run `:status`. The
+earlier "single writer for run-terminal status" label conflated the two — corrected
+here, in Desired Behaviour, and in Scope.
 
 Concretely: the cancel/remove terminal transition (D4, serialized single-writer)
 emits `:runtime/mark-workflow-jobs-terminal` as part of its effect set (alongside
 the D12 cancellation effects), and the job reaches terminal via the existing
-handler. Scope and Desired Behaviour are updated to name this reuse and the single
-owner.
+handler — subject to the D16 ordering + cancelled-path constraints (the current
+handler reconciles only when the run record is still present and only for
+`:done?`/`:error?`, so a naive cancel-then-remove would leave the job lingering).
+Scope and Desired Behaviour are updated to name this reuse and the single owner.
 
 ## Transitive-Cancellation Target Decisions (ψ pass 2, 2026-06-10)
 
@@ -564,6 +577,55 @@ is the one deepest in-flight child turn plus any ancestor turns still mid-flight
 This makes the D9/D12 reuse of `:runtime/agent-abort` well-defined: its keyed
 `session-id` (`effect-session-id`) is supplied from the canonical in-flight
 attempt's `:execution-session-id`.
+
+## Consistency Reconciliations (ψ pass 2, 2026-06-10)
+
+Resolves the two inconsistency (pass 2) follow-ups. The first (writer-label
+conflation) is addressed inline at D13, Desired Behaviour, and Scope (run `:status`
+single-writer = D4 dispatch transition; background-job projected terminal status
+single-writer = `:runtime/mark-workflow-jobs-terminal`). The second is D16 below.
+
+### D16. Cancel-then-remove must not leave a lingering job: terminalize-before-remove ordering + a `:cancelled` reconcile path (reconciles D5 + Desired vs D13 + code)
+
+The "no lingering `:running` job" guarantee (Desired Behaviour) is at risk under
+D5 cancel-then-remove because the reused `:runtime/mark-workflow-jobs-terminal`
+handler (`background-job-runtime/maybe-mark-workflow-jobs-terminal!`) as it stands:
+
+- reconciles a job **only `(when wf …)`** — i.e. only while the run/workflow
+  instance is still resolvable via `extension-workflow-runtime/workflow-in`; once
+  D5 step 3 removes the run record, `workflow-in` returns `nil` and the job is
+  **skipped**, leaving it non-terminal; and
+- branches only on `:error?`(→`:failed`) / `:done?`(→`:completed`) — there is **no
+  `:cancelled` / removed-run branch**, so even a cancel-*without*-remove would
+  reconcile a cancelled run through the wrong outcome (`:done?`→`:completed`)
+  rather than `:cancelled`.
+
+Decision — both constraints apply (the effect set is ordered, and the handler gains
+a cancelled path):
+
+1. **Ordering (terminalize-before-remove).** In the D5 cancel-then-remove effect
+   set, the `:runtime/mark-workflow-jobs-terminal` reconcile is emitted/ordered to
+   run **before** the run-record removal, so the job is terminalized while the run
+   is still resolvable. The removal of the registry/`inflight-runs` record is the
+   last step of the cancel-then-remove sequence (after the D4 `:cancelled` status
+   transition and after job terminalization).
+
+2. **Cancelled reconcile path.** `maybe-mark-workflow-jobs-terminal!` gains a
+   `:cancelled` reconciliation branch: a run whose status is `:cancelled` (or whose
+   `wf` reports cancellation) terminalizes its job with **`:outcome :cancelled`**
+   (not `:completed`). This also makes plain cancel-without-remove terminalize with
+   the correct outcome. Whether cancellation is surfaced via a `:cancelled?`
+   predicate on `wf` or read from the canonical run `:status` is an implementation
+   choice for the builder; the contract is: a cancelled run's job reaches terminal
+   with `:cancelled` outcome.
+
+Constraint (1) alone is insufficient (outcome would still be mislabeled and a
+pure-removal with no preceding cancel could still skip), and (2) alone is
+insufficient (post-removal `workflow-in` returns `nil`, so there is nothing to
+reconcile). Both are required for the guarantee to hold across cancel,
+cancel-then-remove, and remove-of-live-run. This is a handler reconcile-path
+extension (`λ extend` compose), not a step-machine redesign; it stays within the
+single existing background-job terminal writer (no second writer introduced).
 
 ## Design Questions — Resolution status (ψ, 2026-06-10)
 

@@ -441,3 +441,39 @@ the reused `:runtime/mark-workflow-jobs-terminal` effect:
 
 Both are contradictions an implementer hits when wiring D13; neither redesigns
 the step machine.
+
+## Inconsistency follow-up resolution (ψ pass 2, 2026-06-10)
+
+Executed both inconsistency (pass 2) follow-up design-steps. Both were
+design-decision steps (reconcile an internal contradiction in design.md); both
+completable now — no blockers. Code premise re-confirmed before deciding:
+`background-job-runtime/maybe-mark-workflow-jobs-terminal!` reconciles each job
+only `(when wf …)` (skips when the run/workflow instance is absent via
+`extension-workflow-runtime/workflow-in`) and has branches solely for
+`:error?`(→`:failed`) / `:done?`(→`:completed`) — no `:cancelled`/removed-run
+branch. Resolutions:
+
+- **Writer-label conflation (item 1)** — fixed inline (no new D-section). The
+  "single writer for run-terminal status" label is corrected at Desired Behaviour,
+  Scope, and D13 to "single writer for the **background-job (projected) terminal
+  status**", with an explicit "Two distinct writers" paragraph in D13 separating
+  the run `:status` single-writer (D4 serialized dispatch transition) from the
+  background-job projected-terminal single-writer
+  (`:runtime/mark-workflow-jobs-terminal`, which reconciles *from* run status).
+  No contradiction with D4 remains.
+
+- **Cancel-then-remove lingering job (item 2)** — new "Consistency Reconciliations
+  (ψ pass 2)" section with D16. Decision: both constraints apply — (1)
+  terminalize-before-remove ordering (run-record removal is the last step of the
+  D5 cancel-then-remove effect set, so the job is reconciled while the run is still
+  resolvable), and (2) `maybe-mark-workflow-jobs-terminal!` gains a `:cancelled`
+  reconcile branch terminalizing with `:outcome :cancelled` (not `:completed`).
+  Both required: (1) alone mislabels outcome and still skips a pure-removal with no
+  preceding cancel; (2) alone hits post-removal `workflow-in`→nil. Stays within the
+  single existing background-job terminal writer (`λ extend` compose; no second
+  writer). Desired Behaviour and Scope updated to point at the D16 constraints.
+
+Consistency check: D16 is consistent with D4 (run `:status` single-writer), D5
+(cancel-then-remove sequence ordering), and D13 (single background-job terminal
+writer, reuse not a second writer). No new contradictions introduced; no
+step-machine redesign.

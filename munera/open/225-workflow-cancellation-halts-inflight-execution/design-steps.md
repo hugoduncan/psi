@@ -167,7 +167,7 @@
 
 ## Inconsistency follow-ups (ψ pass 2, 2026-06-10)
 
-- [ ] Relabel `:runtime/mark-workflow-jobs-terminal` in D13 and Desired Behaviour:
+- [x] Relabel `:runtime/mark-workflow-jobs-terminal` in D13 and Desired Behaviour:
       it is the single writer for the **background-job (projected) terminal
       status** (reconciled *from* run status), not "the single writer for
       run-terminal status." D4 already owns the run's `:status` single-writer
@@ -175,7 +175,10 @@
       writers (run `:status` = D4 dispatch transition; job/projection terminal =
       `:runtime/mark-workflow-jobs-terminal`) are not both titled "single writer
       for run-terminal status."
-- [ ] Reconcile cancel-then-remove (D5) with the "no lingering `:running` job"
+      → design.md: relabeled at Desired Behaviour, Scope, and D13 (added explicit
+      "Two distinct writers" paragraph); run `:status` = D4 dispatch writer,
+      background-job projected terminal = `:runtime/mark-workflow-jobs-terminal`.
+- [x] Reconcile cancel-then-remove (D5) with the "no lingering `:running` job"
       guarantee (Desired Behaviour) and D13's reuse of
       `:runtime/mark-workflow-jobs-terminal`. As implemented,
       `maybe-mark-workflow-jobs-terminal!` reconciles each job only `(when wf ...)`
@@ -188,3 +191,9 @@
       (and a correct `:cancelled` outcome rather than `:done?`→`:completed`), so
       the guarantee holds for the cancel-then-remove path — not just natural
       completion.
+      → design.md D16: both (a) terminalize-before-remove ordering (record removal
+      is the last cancel-then-remove step) and (b) a new `:cancelled` reconcile
+      branch in `maybe-mark-workflow-jobs-terminal!` with `:outcome :cancelled`.
+      Both required: (a) alone mislabels outcome/skips pure-removal; (b) alone hits
+      post-removal `workflow-in`→nil. Code-confirmed the `(when wf …)` +
+      `:error?`/`:done?`-only handler.
