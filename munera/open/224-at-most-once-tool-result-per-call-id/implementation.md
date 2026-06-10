@@ -1298,3 +1298,28 @@ follow-ups (second pass)"):
    on the rebuild/`journal->provider-messages` de-dup.
 
 No blockers; one actionable plan/steps inconsistency.
+
+## Plan/steps inconsistency review (second pass) follow-up — design repro-test assertion layer
+
+Executed the single second-pass plan/steps inconsistency item: design.md still
+pinned the forward-fix reproduction test to the **rebuilt provider conversation**
+(Scope characterization-test bullet + Acceptance Criteria bullet 1), contradicting
+plan.md Key decisions and steps.md Slice B, which assert the forward-fix
+reproduction at the **raw recorded layer** so the Slice-C
+`journal->provider-messages` de-dup cannot mask a forward-fix regression.
+
+Resolution applied to design.md (two sites):
+- **Scope characterization-test bullet** — now asserts at the raw recorded layer
+  (exactly one `toolResult` entry per tool-call-id in the journal **and** the
+  agent-core in-memory message history), via the `:user-abort` synchronous
+  `abort-in!` path, explicitly **not** on the rebuilt provider conversation;
+  notes the projection-level recovery is characterized separately.
+- **Acceptance Criteria bullet 1** — same reframing to the raw recorded layer +
+  `:user-abort` synchronous path, explicitly not the rebuilt provider
+  conversation; cross-references the separate already-wedged-journal recovery AC.
+- **AC bullet 4** (already-wedged journal projects to one `tool_result` via the
+  upstream `journal->provider-messages` de-dup) left unchanged on the rebuild /
+  de-dup path — the two fixes stay independently characterized.
+
+design.md now agrees with plan.md Key decisions and steps.md Slice B. No blockers;
+item completed. No code/test/doc changes required (design-only reconciliation).

@@ -202,7 +202,7 @@
 
 ## Plan/steps inconsistency review follow-ups (second pass)
 
-- [ ] **Reconcile design.md's forward-fix reproduction-test assertion layer with
+- [x] **Reconcile design.md's forward-fix reproduction-test assertion layer with
       the plan/steps raw-recorded-layer decision.** design.md still pins the
       forward-fix reproduction test to the rebuilt provider conversation in two
       places — Scope ("asserts a single `tool_result` per `tool_use` in the
@@ -219,3 +219,12 @@
       forward-fix reproduction at the raw recorded layer, keeping design AC bullet
       4 (already-wedged journal projection recovery, `:399-403`) on the rebuild /
       `journal->provider-messages` de-dup.
+      → **Resolved:** design.md Scope characterization-test bullet and Acceptance
+      Criteria bullet 1 now assert the forward-fix reproduction at the **raw
+      recorded layer** — exactly one `toolResult` entry for the tool-call-id in
+      the journal **and** the agent-core in-memory message history, via the
+      `:user-abort` synchronous `abort-in!` path, explicitly **not** on the
+      rebuilt provider conversation (so Slice-C de-dup cannot mask a forward-fix
+      regression). AC bullet 4 (already-wedged journal projection recovery) left
+      on the rebuild / `journal->provider-messages` de-dup. design.md now agrees
+      with plan.md Key decisions and steps.md Slice B.

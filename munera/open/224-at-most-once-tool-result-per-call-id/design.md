@@ -221,9 +221,14 @@ In scope:
   recorded-tool-result-ids predicate in `:state*`** (see Design Decision D1).
   Atomicity comes from dispatch serialization, not from a runtime test-and-set.
 - A characterization/regression test that reproduces the abort-races-tool-result
-  duplication end-to-end (interrupt with a pending tool-call, then a late real
-  result) and asserts a single `tool_result` per `tool_use` in the rebuilt
-  provider conversation.
+  duplication end-to-end via the `:user-abort` synchronous `abort-in!` path
+  (interrupt with a pending tool-call, then a late real result) and asserts at
+  the **raw recorded layer**: exactly one `toolResult` entry for that
+  tool-call-id in the journal **and** in the agent-core in-memory message
+  history — **not** on the rebuilt provider conversation, so the Slice-C
+  `journal->provider-messages` de-dup cannot mask a forward-fix regression. The
+  projection-level recovery is characterized separately (see the
+  already-persisted-duplicates de-dup bullet and its Acceptance Criterion).
 - Coverage that the normal single-result path is unaffected and that the
   interrupt-only path still yields exactly one `"interrupted"` result.
 - Defensive de-dup at a single upstream chokepoint —
@@ -391,9 +396,14 @@ All previously-open questions are now resolved in this design; none remain open.
 
 ## Acceptance Criteria
 
-- Reproduction test (interrupt a turn with a pending tool-call, then record a
-  late real result) fails before the fix and passes after, asserting exactly one
-  `tool_result` per `tool_use` id in the provider-facing conversation.
+- Reproduction test (interrupt a turn with a pending tool-call via the
+  `:user-abort` synchronous `abort-in!` path, then record a late real result)
+  fails before the fix and passes after, asserting at the **raw recorded layer**:
+  exactly one `toolResult` entry for that tool-call-id in the journal **and** in
+  the agent-core in-memory message history — **not** on the rebuilt provider
+  conversation, so the Slice-C `journal->provider-messages` de-dup cannot mask a
+  forward-fix regression (the already-wedged-journal projection recovery is
+  asserted separately below).
 - The at-most-once invariant holds for both the journal and the in-memory message
   history, first-writer-wins, for any tool (`delegate`, `bash`, `psi-tool`, …).
 - The non-interrupted single-result path and the interrupt-only path each yield
