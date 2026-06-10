@@ -73,3 +73,55 @@ currently `reset!` `:state*` directly after a status guard (the TOCTOU D4
 addresses); `inflight-runs` holds `{:future :job-id}` (orchestration.clj); the
 session abort path `turn/abort-active-turn-in!` → `:session/abort` →
 `agent-core/abort-in!` → context thread interrupt already exists for D3 reuse.
+
+## Ambiguity review (ψ, 2026-06-10)
+
+Reviewed design.md for ambiguities (multiple-interpretation statements,
+unresolved decisions, contract gaps). Not architecture/correctness. D1–D4 resolved
+the boundary questions but left several original Design Questions and behaviour
+contracts under-specified:
+
+1. **Q3 `remove` on a live run unresolved.** Desired Behaviour ("cancel it first
+   (or refuse while live)"), Scope ("cancels-then-removes (or rejects)"), and
+   Design Question 3 ("Pick one and make it explicit") all still present both
+   options. No D-decision picks one. Implementer cannot tell which API contract to
+   build.
+
+2. **Q1 in-flight child-turn contract ambiguous (and conflicts with Intent).**
+   Intent/Acceptance assert "no further side effects (commits, journal writes) …
+   after cancel" (absolute), but Desired Behaviour qualifies the in-flight child
+   turn as "at minimum … must not advance past that step, and ideally the child
+   turn is interrupted so no further … commits run." Acceptance criterion #3's
+   "signalled to stop / its turn does not advance the parent" reuses the same "/".
+   Whether interrupting the directly-cancelled run's in-flight child turn (thus
+   preventing the one in-flight commit) is a *guaranteed* requirement or
+   best-effort is undecided — and the absolute "no side effects after cancel"
+   acceptance test cannot pass if it is only best-effort.
+
+3. **Cancel during a blocking `send-and-drain` wait: stop latency undefined.**
+   D2 says the loop reads the signal "at each step boundary and at interrupt-aware
+   wait wake-ups," but the original runaway was the loop *parked* on a
+   `send-and-drain` deref. It is unstated whether a cancel arriving mid-wait is
+   observed only after the wait returns naturally (next between-steps checkpoint —
+   the in-flight turn still runs to completion) or whether the wait is actively
+   interrupted to stop promptly. "next safe checkpoint (at minimum, between steps)"
+   vs "interrupt-aware waits" are in tension; the guaranteed bound is ambiguous.
+
+4. **Division of labor: cooperative signal-read (D2) vs `future-cancel`/interrupt
+   (Scope/Desired).** Both mechanisms are required but their roles are unclear: is
+   `future-cancel` (with interrupt) the primary means of unblocking a parked
+   `send-and-drain` wait, with the read-path check the between-steps guard — or is
+   `future-cancel` a backstop applied only after cooperative exit? Determines
+   whether interrupt-safety of the wait is in scope.
+
+5. **D1 vs D3 owner of child-session abort.** D1 models child-session abort as an
+   effect-as-data "executed at the orchestration runtime boundary … against … the
+   session-dispatch authority"; D3 routes child-session abort "through the
+   agent-session session-dispatch authority" via `:session/abort`. Whether these
+   name one path (effect handler invokes the dispatch authority) or two owners is
+   not made explicit.
+
+6. **Stale "Design Questions" section.** Q1–Q4 are headed "resolve during
+   refinement"; D1–D4 only resolve the boundary questions (Q2 via D3, Q4 partly via
+   D2), leaving Q1 and Q3 open with no marker of resolution status. An implementer
+   cannot tell which questions are still live.
