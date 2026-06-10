@@ -44,6 +44,21 @@ Two complementary fixes plus docs, decomposed as vertical slices:
    `tool_result`-block emitter is `conv/add-tool-result` (inside
    `append-tool-result-msg`, `conversation.clj:95`).
 
+   **De-dup ordering = after `repair-dangling-tool-uses` (wrap its output).**
+   `journal->provider-messages` currently returns
+   `(repair-dangling-tool-uses (into [] …))` (`prompt_request.clj:119`). The
+   de-dup must wrap that **repaired** list, not the pre-repair message list,
+   because `repair-dangling-tool-uses` only scans the *contiguous* toolResult run
+   after each assistant block (`split-with tool-result-message?`,
+   `prompt_request.clj:96`): a real toolResult that is **non-contiguous** with its
+   assistant tool-use block is treated as *missing* and a **synthetic**
+   `interrupted-tool-result` is appended for the same id, so de-dup-before-repair
+   can still leave two results for one id on a malformed (already-wedged) journal.
+   De-dup applied to repair's output guarantees at-most-once **unconditionally**
+   (de-dup removes extras *including* synthetics repair adds for non-contiguous
+   ids; repair still adds missing for genuinely dangling blocks). Concretely:
+   `(dedupe-tool-results (repair-dangling-tool-uses (into [] …)))`.
+
 ## Key decisions (from design, not re-litigated here)
 
 - **Guard location = Option C** (canonical `:state*` predicate), Option B
@@ -91,9 +106,13 @@ Two complementary fixes plus docs, decomposed as vertical slices:
   Slice-A init seeding; just confirm no journal-only `/clear` reset bypasses
   `initialize-session-slots`.
 - **Slice C — defensive projection de-dup + test.** Drop duplicate `toolResult`
-  projected messages in `journal->provider-messages`; add a test that a journal
-  pre-populated with duplicate `toolResult` entries projects to exactly one
-  `tool_result` per id through the rebuild (already-wedged session recovers).
+  projected messages in `journal->provider-messages` by de-duping
+  `repair-dangling-tool-uses`'s **output** (first occurrence wins); add a test
+  that a journal pre-populated with duplicate `toolResult` entries projects to
+  exactly one `tool_result` per id through the rebuild (already-wedged session
+  recovers), **including a non-contiguous duplicate** for one id so the test
+  locks de-dup-after-repair (de-dup-before-repair would still emit two for the
+  non-contiguous case).
 - **Slice D — verify, docs, changelog.** `bb test` green, clj-kondo clean, update
   CHANGELOG ([Unreleased] → Fixed, user-visible: a tool-use no longer wedges the
   session after an abort), and any affected doc.
@@ -110,10 +129,17 @@ Two complementary fixes plus docs, decomposed as vertical slices:
   path; if the only discard is whole-session removal, the set is bounded
   naturally and no explicit clear is needed — but verify there is no journal-only
   reset (`/clear`-style) that would leave a stale id set. Resolve during Slice B.
-- **De-dup ordering vs `repair-dangling-tool-uses`.** The de-dup removes *extra*
-  duplicate `toolResult` messages; `repair-dangling-tool-uses` adds *missing*
-  synthetic results. They address disjoint concerns; ensure de-dup runs such that
-  the rebuild sees ≤1 `toolResult` per id without breaking dangling repair.
+- **De-dup ordering vs `repair-dangling-tool-uses` (decided: de-dup *after*
+  repair).** The de-dup removes *extra* duplicate `toolResult` messages;
+  `repair-dangling-tool-uses` adds *missing* synthetic results. They address
+  disjoint concerns, but the order is **load-bearing**: repair only scans the
+  *contiguous* toolResult run per assistant block, so a non-contiguous real
+  result for an id is treated as missing and gets a synthetic appended.
+  De-dup-before-repair would therefore leave two results for one id on a malformed
+  journal, while de-dup-after-repair (wrapping repair's output) guarantees ≤1
+  unconditionally. Plan §3 pins de-dup to repair's output. The Slice-C recovery
+  test must include a **non-contiguous** duplicate `toolResult` to lock this
+  placement (a contiguous-only test passes under either order).
 - **Concurrent-completion window is acceptable, not a bug.** Tests must assert
   *at-most-once* (exactly one result), not unconditionally "interrupt wins" — the
   real result legitimately wins in the narrow concurrent window.

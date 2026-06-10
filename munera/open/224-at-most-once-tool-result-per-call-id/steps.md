@@ -73,14 +73,31 @@
 - [ ] In `prompt_request/journal->provider-messages`
       (`prompt_request.clj:111`), drop any `toolResult`-role projected message
       whose `:tool-call-id` already appeared (first occurrence wins), keying off
-      the journal-derived messages. Keep ordering and non-`toolResult` messages
-      intact; ensure interaction with `repair-dangling-tool-uses` is correct
-      (de-dup removes extras; repair adds missing).
+      the journal-derived messages. Apply the de-dup to
+      `repair-dangling-tool-uses`'s **output** — i.e. wrap the existing
+      `(repair-dangling-tool-uses (into [] …))` (`prompt_request.clj:119`) as
+      `(dedupe-tool-results (repair-dangling-tool-uses (into [] …)))` — **not**
+      the pre-repair message list. Rationale: `repair-dangling-tool-uses` only
+      scans the *contiguous* toolResult run per assistant block (`split-with`,
+      `prompt_request.clj:96`), so a **non-contiguous** real result for an id is
+      treated as missing and a **synthetic** `interrupted-tool-result` is appended
+      for the same id; de-dup-before-repair would therefore leave two results for
+      one id, while de-dup-after-repair guarantees ≤1 unconditionally. Keep
+      ordering and non-`toolResult` messages intact (de-dup removes extras
+      *including* synthetics repair adds for non-contiguous ids; repair still adds
+      missing for genuinely dangling blocks).
 - [ ] Add a test: a journal pre-populated with **duplicate** `toolResult` entries
       for one `tool-call-id` projects to **exactly one** `tool_result` per id
       through the downstream conversation rebuild
       (`agent-messages->ai-conversation`), so an already-wedged session recovers
-      on its next request.
+      on its next request. Include **two** duplicate shapes: (i) a **contiguous**
+      duplicate (two adjacent `toolResult` entries for one id), and (ii) a
+      **non-contiguous** duplicate (a `toolResult` for an id separated from its
+      assistant tool-use block by an intervening non-`toolResult` message, so
+      `repair-dangling-tool-uses` would otherwise append a synthetic for the same
+      id). The non-contiguous case distinguishes and locks
+      de-dup-after-repair: it must still yield exactly one `tool_result` for that
+      id (de-dup-before-repair would emit two).
 - [ ] Confirm no independent de-dup is added at the conversation rebuild (single
       upstream chokepoint only).
 
@@ -128,7 +145,7 @@
 
 ## Plan/steps ambiguity review follow-ups (second pass)
 
-- [ ] **Pin the Slice-C de-dup ordering relative to `repair-dangling-tool-uses`.**
+- [x] **Pin the Slice-C de-dup ordering relative to `repair-dangling-tool-uses`.**
       Plan §3 / steps Slice C only say de-dup goes "in `journal->provider-messages`"
       and to "ensure interaction … is correct", leaving it unspecified whether
       de-dup runs **before** or **after** `repair-dangling-tool-uses`. Repair only
@@ -143,6 +160,17 @@
       Slice-C recovery test to include a **non-contiguous** duplicate `toolResult`
       for one id, so the test actually distinguishes and locks the chosen
       placement.
+      → **Resolved: de-dup applies to `repair-dangling-tool-uses`'s output**
+      (`(dedupe-tool-results (repair-dangling-tool-uses (into [] …)))`,
+      `prompt_request.clj:119`). Code-verified that `repair-dangling-tool-uses`
+      scans only the *contiguous* toolResult run per assistant block
+      (`split-with tool-result-message?`, `prompt_request.clj:96`), so a
+      non-contiguous real result is treated as missing and a synthetic is appended
+      for the same id — de-dup-before-repair would leave two; de-dup-after-repair
+      guarantees ≤1 unconditionally. plan.md §3, the de-dup-ordering risk, the
+      Slice-C slice-order entry, and steps Slice C now pin de-dup-after-repair and
+      require the Slice-C recovery test to include a **non-contiguous** duplicate
+      (alongside a contiguous one) so the placement is locked.
 
 ## Plan/steps inconsistency review follow-ups
 

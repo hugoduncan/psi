@@ -1221,3 +1221,39 @@ New actionable ambiguity (see steps.md → "Plan/steps ambiguity review follow-u
    so the test actually distinguishes (and locks) the placement.
 
 No blockers; one actionable plan/steps ambiguity.
+
+## Plan/steps ambiguity follow-up resolution (second pass)
+
+Executed the single second-pass plan/steps ambiguity item (Slice-C de-dup
+ordering relative to `repair-dangling-tool-uses`).
+
+Code verified before editing:
+- `journal->provider-messages` (`prompt_request.clj:111`) returns
+  `(repair-dangling-tool-uses (into [] …))` (`prompt_request.clj:119`) — repair
+  is the **last** transform applied today.
+- `repair-dangling-tool-uses` (`prompt_request.clj:83`) scans only the
+  **contiguous** toolResult run after each assistant tool-use block via
+  `(split-with tool-result-message? (rest remaining))` (`prompt_request.clj:96`),
+  collecting `present-ids` from that contiguous run and appending a synthetic
+  `interrupted-tool-result` for each tool-call-id **not** present in it. So a real
+  toolResult for an id that is **non-contiguous** with its assistant block is seen
+  as missing, and a synthetic for the same id is appended → two results for one id
+  survive a de-dup applied to the pre-repair list.
+
+Resolution applied (decision: **de-dup applies to repair's output**):
+- **plan.md §3** — added a "De-dup ordering = after `repair-dangling-tool-uses`
+  (wrap its output)" paragraph with the contiguous-scan rationale and the concrete
+  shape `(dedupe-tool-results (repair-dangling-tool-uses (into [] …)))`.
+- **plan.md Risks** — rewrote the "De-dup ordering vs `repair-dangling-tool-uses`"
+  bullet from "disjoint concerns / ensure ≤1" to the decided de-dup-after-repair
+  ordering, noting the order is load-bearing and the Slice-C test must include a
+  non-contiguous duplicate.
+- **plan.md Slice order (Slice C)** — pinned de-dup to repair's output and required
+  the recovery test to include a non-contiguous duplicate.
+- **steps.md Slice C** — rewrote the de-dup step to wrap repair's output (with
+  rationale + line cites) and extended the recovery-test step to assert both a
+  contiguous and a **non-contiguous** duplicate yield exactly one `tool_result`
+  per id, locking de-dup-after-repair.
+
+No blockers; item completed. (Task remains design/plan-only; Slices A–D not yet
+implemented.)
