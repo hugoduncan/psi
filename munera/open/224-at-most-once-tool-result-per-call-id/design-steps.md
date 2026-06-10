@@ -247,7 +247,7 @@
 
 # Design follow-up — inconsistency review (third pass)
 
-- [ ] Fix the design's claim that the reproduced `:user-abort` evidence can flow
+- [x] Fix the design's claim that the reproduced `:user-abort` evidence can flow
       through the **statechart-effect interrupt producer**; code shows it cannot.
       `:on-agent-done` (`statechart_actions.clj:132`) reads session-data
       `:interrupt-reason`, whose **only** writer is the `:session/request-interrupt`
@@ -279,3 +279,18 @@
       statechart-effect path. (Introduced by the first-pass inconsistency
       resolution, which incorrectly asserted the reproduced `:user-abort` "can
       run through the `:on-agent-done` effect".)
+      → Resolved: corrected all three contradicting sites; the `:user-abort`
+      evidence flows **exclusively** through the synchronous `abort-in!` path,
+      the statechart-effect producer fires only for `:deferred-interrupt`.
+      Code verified: `:interrupt-reason` is written only by
+      `:session/request-interrupt` (`session_mutations.clj:638`,
+      `(or reason :deferred-interrupt)`), whose sole dispatcher (`turn.clj:189/193`)
+      passes `:deferred-interrupt`; `:user-abort` (`turn.clj:233`) is only a
+      message reason and is never written to `:interrupt-reason`. (a) Root Cause
+      statechart bullet now says "non-nil `:interrupt-reason` (only ever
+      `:deferred-interrupt`)"; (b) added a "Which producer fires for which
+      reason" paragraph stating `:user-abort` ⇒ synchronous, `:deferred-interrupt`
+      ⇒ statechart-effect, funnel unaffected; (c) Desired-Behaviour and D1
+      Mechanism determinism bullets now attribute the headline `:user-abort` race's
+      first writer deterministically to the synchronous inline `abort-in!`
+      recording. Funnel property (general invariant) left intact.

@@ -564,3 +564,40 @@ New actionable inconsistency (see design-steps.md):
    incorrect.)
 
 No blockers; one actionable inconsistency.
+
+## Inconsistency follow-up resolution (design-steps) — third pass
+
+Executed the single third-pass inconsistency item (`:user-abort` cannot flow
+through the statechart-effect producer).
+
+Code verified before editing:
+- `:interrupt-reason` writers: `:session/request-interrupt` handler
+  (`session_mutations.clj:638`, `(or reason :deferred-interrupt)`) and
+  `:on-agent-done`/`:on-abort` resets to nil (`statechart_actions.clj:144/160`).
+  Default nil (`session_state/model.clj:273`). No writer assigns `:user-abort`.
+- `:session/request-interrupt`'s only dispatcher is `turn.clj:189`, passing
+  `:reason :deferred-interrupt` (`turn.clj:193`).
+- `:user-abort` appears only at `turn.clj:233` as the interrupt *message* reason
+  passed to the synchronous `record-pending-tool-call-interrupts!` (`turn.clj:217`)
+  in `abort-in!`.
+- `:on-agent-done` (`statechart_actions.clj:132`) reads `:interrupt-reason` and
+  emits `:runtime/record-pending-tool-call-interrupts` (`:149`) only when it is
+  non-nil — i.e. only for `:deferred-interrupt`. Effect handler at
+  `dispatch_effects.clj:127`.
+
+Resolution applied to design.md (three contradicting sites):
+- **(a) Root Cause step 2 statechart bullet** — changed "sees `:interrupt-reason`
+  (e.g. `:user-abort`)" to "sees a non-nil `:interrupt-reason` (only ever
+  `:deferred-interrupt`)"; fixed the read line cite to `:132`.
+- **(b) Funnel-property section** — removed the false "reproduced `:user-abort`
+  Evidence can flow through the statechart-effect producer" claim; added a
+  "Which producer fires for which reason" paragraph: `:user-abort` ⇒ synchronous
+  `abort-in!` path exclusively, `:deferred-interrupt` ⇒ statechart-effect path;
+  funnel property explicitly noted unaffected.
+- **(c) Desired-Behaviour + D1 Mechanism determinism bullets** — stopped
+  attributing the headline `:user-abort` race to "either producer"; the first
+  writer is deterministically the synchronous inline recording in `abort-in!`;
+  the statechart-effect path applies to the distinct `:deferred-interrupt` race.
+
+Funnel property (general invariant — any producer dispatches the one event) left
+intact. No blockers; item completed.

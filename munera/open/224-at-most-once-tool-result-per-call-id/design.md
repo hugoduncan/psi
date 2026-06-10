@@ -34,9 +34,9 @@ call:
    `:pending-tool-calls` and dispatches `:session/tool-agent-record-result` with
    a synthetic `"interrupted"` error toolResult:
    - the **statechart effect path**: `:on-agent-done`
-     (`dispatch_handlers/statechart_actions.clj:129/149`) sees
-     `:interrupt-reason` (e.g. `:user-abort`) and emits the
-     `:runtime/record-pending-tool-call-interrupts` effect, whose handler
+     (`dispatch_handlers/statechart_actions.clj:132/149`) sees a non-nil
+     `:interrupt-reason` (only ever `:deferred-interrupt` — see below) and emits
+     the `:runtime/record-pending-tool-call-interrupts` effect, whose handler
      (`dispatch_effects.clj:127`) enumerates `:pending-tool-calls`
      (`dispatch_effects.clj:131`) and dispatches the record event;
    - the **synchronous abort path**: `abort-in!` (`turn.clj:233`) calls
@@ -56,10 +56,24 @@ call:
    invariant's soundness rests on this funnel, not on the enumeration being
    exhaustive. So even if a producer is omitted from the list above (or a later
    producer such as session-close re-enumerates an id an earlier producer
-   already recorded), the recorded-ids guard suppresses the duplicate. The
-   reproduced `:user-abort` Evidence below can flow through the statechart-effect
-   producer (effect executed during dispatch), not only the literal synchronous
-   `abort-in!` call.
+   already recorded), the recorded-ids guard suppresses the duplicate.
+
+   **Which producer fires for which reason (grounded in code).** The two
+   *reason-bearing* interrupt paths are distinct and do not overlap on the
+   reproduced reason. `:interrupt-reason` is written **only** by the
+   `:session/request-interrupt` handler (`session_mutations.clj:638`,
+   `(or reason :deferred-interrupt)`), whose **only** dispatcher
+   (`turn.clj:189/193`) passes `:reason :deferred-interrupt`; no code ever writes
+   `:interrupt-reason :user-abort`. So the **statechart-effect producer**
+   (`:on-agent-done` → `:runtime/record-pending-tool-call-interrupts`,
+   `dispatch_effects.clj:127`) fires **only** for the `:deferred-interrupt` race,
+   never for `:user-abort`. The reproduced `:user-abort` Evidence below
+   (`reason=:user-abort`) therefore flows **exclusively** through the synchronous
+   `abort-in!` path (`turn.clj:233`), which passes `:user-abort` as the interrupt
+   *message* reason directly to `record-pending-tool-call-interrupts!`
+   (`turn.clj:217`). The funnel property is unaffected: both producers still
+   dispatch the single event, so the chokepoint guard covers both regardless of
+   which reason routes where.
 3. The in-flight tool then **also** completes and dispatches
    `:session/tool-agent-record-result` with its real result.
 4. The `:session/tool-agent-record-result` handler
@@ -112,13 +126,17 @@ has exactly this shape: one synthetic `"interrupted"` result plus one real resul
   the model in a *later* turn; it is not what suppresses the duplicate and does
   not itself emit a `tool_result` for the aborted call. (See D1 Mechanism.)
 - **Interrupt-first is guaranteed for the headline abort race, not left to
-  dispatch tie-breaking.** Either interrupt producer (the statechart-effect path
-  `dispatch_effects.clj:127`, reached via `:on-agent-done`, or the synchronous
-  `abort-in!` path `turn.clj:217/233`) enumerates only *still-pending*
-  tool-call-ids and records their `"interrupted"` results as part of handling the
-  abort — the statechart path during effect execution, the synchronous path in
-  the `abort-in!` call. In both cases the interrupt result for a still-pending
-  tool is recorded before that tool's own real-result re-dispatch: a real result
+  dispatch tie-breaking.** The headline reproduced race is `:user-abort`
+  (Evidence `reason=:user-abort`), whose first writer is **deterministically the
+  synchronous inline recording in `abort-in!`** (`turn.clj:233` →
+  `record-pending-tool-call-interrupts!` `turn.clj:217`), executed as part of
+  handling the abort. The distinct `:deferred-interrupt` race instead routes
+  through the statechart-effect producer (`:on-agent-done` →
+  `:runtime/record-pending-tool-call-interrupts` `dispatch_effects.clj:127`);
+  `:user-abort` never reaches that producer (it is never written to
+  `:interrupt-reason` — see Root Cause). In either race the interrupt producer
+  enumerates only *still-pending* tool-call-ids, so the interrupt result for a
+  still-pending tool is recorded before that tool's own real-result re-dispatch: a real result
   for a still-in-flight tool necessarily arrives *after* the abort that
   enumerated it as pending, so its id is already in recorded-ids and it is
   suppressed. First-writer-wins is the general invariant
@@ -274,12 +292,14 @@ the `:session/tool-agent-record-result` handler. **Option (B) is rejected.**
 - **First-writer-wins is the general mechanism; the aborted-tool outcome is still
   deterministic.** Generic first-writer-wins says "whichever dispatch of the
   record event for an id is serialized first is kept" (covering both interrupt
-  producers and the real-result producer). For the headline abort race that does
-  *not* leave
-  the model-visible result to chance: the interrupt path only enumerates
-  *still-pending* tool-call-ids and records their `"interrupted"` results as part
-  of handling the abort (the statechart-effect producer during effect execution,
-  or the synchronous `abort-in!` producer in-line), while a real result for a
+  producers and the real-result producer). For the headline `:user-abort` race
+  that does *not* leave
+  the model-visible result to chance: the interrupt is recorded **synchronously
+  in-line by `abort-in!`** (`turn.clj:233/217`) — the deterministic first writer
+  for `:user-abort`, since `:user-abort` never reaches the statechart-effect
+  producer (it is never written to `:interrupt-reason`; that producer fires only
+  for the distinct `:deferred-interrupt` race). The interrupt path only
+  enumerates *still-pending* tool-call-ids, while a real result for a
   still-in-flight tool can only arrive *after* abort. So the interrupt is
   deterministically the first writer for any tool that was still pending at
   abort, and its `"interrupted"` result is the one kept. (If a tool had already completed and recorded its real
