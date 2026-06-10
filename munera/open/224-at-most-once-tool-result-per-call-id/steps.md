@@ -364,3 +364,18 @@
       survives the boundary; a turn-scoped clear would let the late real result
       record a second entry and fail the count assertions. Focused suite green
       (5 tests / 19 assertions).
+
+## Test review follow-ups (first pass)
+
+- [ ] **Lock "first occurrence wins" in the projection de-dup test.**
+      `journal-duplicate-tool-results-project-to-one-test`
+      (`prompt_request_test.clj:397`) asserts only `count=1` per id, so it would
+      pass even if `dedupe-tool-results` kept the *last* occurrence — yet
+      design.md Scope pins the projection de-dup as "**first occurrence wins,
+      purely derived from the journal**" and the forward-fix tests assert their
+      winner. The contiguous case already uses distinct content (`first-contig`
+      vs `dup-contig`); add an assertion that the surviving rebuilt
+      `tool_result` for `id-contig` carries the **first** content
+      (`first-contig`), not `dup-contig`, so the stated first-wins semantic is
+      locked. (Leave the non-contiguous case on count-only — its survivor is the
+      repair synthetic, an orthogonal subtlety.)

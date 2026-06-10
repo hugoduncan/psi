@@ -1765,3 +1765,35 @@ No new architectural/abstraction/performance/correctness misfit. The two prior
 implementation-review actionable items (public `emit-tool-start-in!` seeding;
 cross-turn lifetime regression test) remain resolved. **No new actionable
 feedback.**
+
+## Test review (task-test-review) — first pass
+
+Applied `task-test-review`: well-formedness, behaviour coverage (∀b ∈ design.
+∃t), and infra-dep hygiene (injectable ∧ nullable ∧ ¬mock ∧ ¬stub).
+
+Verified:
+- **Well-formed.** Both test files (`tool_result_at_most_once_test.clj`,
+  `prompt_request_test.clj` de-dup block) are clear, single-purpose, accurately
+  named, with helper extraction (`record-result!`, `journal-tool-results`,
+  `memory-tool-results`, `rebuilt-tool-result-count`). `(first journal/memory)`
+  is sound only because count=1 is asserted first. Green: 5/19 + 17/48.
+- **Infra deps clean.** Real `session/create-context` + in-memory persistence
+  (`:persist? false`); real agent-core via `agent/emit-tool-start-in!`. No
+  mocks, no stubs, no interaction assertions — state/output assertions only
+  (journal entry counts + in-memory message counts + winning tool-name).
+- **Behaviour coverage.** Forward-fix headline (interrupt wins), both-or-neither
+  (journal ∧ memory asserted together), normal single-result, interrupt-only,
+  concurrent-completion (real wins, direct-dispatch seam per design pin),
+  cross-turn lifetime, and projection recovery (contiguous ∧ non-contiguous,
+  locking de-dup-after-repair) are all covered. Cross-id isolation is implicitly
+  covered (each id asserted →1, so over-dedup collapsing distinct ids would be
+  caught).
+
+New actionable (1) — see steps.md "Test review follow-ups (first pass)":
+- The projection de-dup test (`journal-duplicate-tool-results-project-to-one-test`)
+  asserts only `count=1` per id, never **which** result survives. design.md Scope
+  pins the projection de-dup as "**first occurrence wins, purely derived from the
+  journal**", and the forward-fix tests do assert their winner — but this test
+  would pass equally if de-dup kept the *last* occurrence. The contiguous case has
+  distinct content (`first-contig` vs `dup-contig`), so locking "first occurrence
+  wins" is a one-line assertion.
