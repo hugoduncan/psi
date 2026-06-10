@@ -164,7 +164,7 @@
 
 # Design follow-up — inconsistency review (second pass)
 
-- [ ] Fix the **Root Cause "Result:" line** that attributes provider
+- [x] Fix the **Root Cause "Result:" line** that attributes provider
       `tool_result` *block* emission to `journal->provider-messages`. The closing
       "Result:" arrow ("two journal `toolResult` entries with one tool-call-id →
       `journal->provider-messages` → two `tool_result` blocks for one `tool_use`")
@@ -181,3 +181,15 @@
       Location bullet agree on which projection emits the blocks. (Distinct from
       the resolved second-pass ambiguity item, which fixed the de-dup
       location/keying bullets but left this Root Cause arrow uncorrected.)
+      → Resolved: rewrote the Root Cause "Result:" arrow to route block emission
+      through the conversation rebuild — "two journal `toolResult` entries →
+      `journal->provider-messages` (two duplicate `toolResult`-role *message
+      maps*) → conversation rebuild (`agent-messages->ai-conversation`, one
+      `tool_result` *block* per message via `conv/add-tool-result`
+      `conversation.clj:95`) → two `tool_result` blocks → provider 400" — and
+      added an explicit note that the block-emitting projection is the rebuild,
+      not `journal->provider-messages`. Root Cause now agrees with step 4 and the
+      De-dup Location bullet. Code verified: `journal->provider-messages`
+      (`prompt_request.clj:111`) emits provider message maps;
+      `append-tool-result-msg` → `conv/add-tool-result` (`conversation.clj:95`)
+      is the sole block emitter, one per `toolResult` message.

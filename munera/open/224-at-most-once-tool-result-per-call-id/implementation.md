@@ -378,3 +378,32 @@ Resolution applied to design.md:
   Resolved Question 2.
 
 No blockers; item completed.
+
+## Inconsistency review (second pass) follow-up — Root Cause "Result:" arrow
+
+Item: the Root Cause closing "Result:" line attributed provider `tool_result`
+*block* emission to `journal->provider-messages`, contradicting (a) Root Cause
+step 4 and (b) the Desired-Behaviour De-dup Location bullet, which state the
+conversation rebuild emits the blocks.
+
+Code verified before editing:
+- `journal->provider-messages` (`prompt_request.clj:111`) projects journal
+  entries into provider *message maps* (`:message` entries → message maps;
+  `toolResult`-role maps built at `prompt_request.clj:36`). It does **not** emit
+  provider `tool_result` blocks.
+- The conversation rebuild `agent-messages->ai-conversation`
+  (`conversation.clj`) dispatches `toolResult`-role messages to
+  `append-tool-result-msg`, which calls `conv/add-tool-result`
+  (`conversation.clj:95`) — exactly one provider `tool_result` block per
+  `toolResult` message. This is the sole block emitter.
+
+Resolution applied to design.md: rewrote the Root Cause "Result:" arrow to route
+block emission through the rebuild ("two journal `toolResult` entries →
+`journal->provider-messages` (two duplicate message maps) → conversation rebuild
+(`agent-messages->ai-conversation`, one block per message via `conv/add-tool-result`
+`conversation.clj:95`) → two `tool_result` blocks → provider 400") and added an
+explicit note that the block-emitting projection is the rebuild, not
+`journal->provider-messages`. Root Cause now agrees with step 4 and the De-dup
+Location bullet.
+
+No blockers; item completed.

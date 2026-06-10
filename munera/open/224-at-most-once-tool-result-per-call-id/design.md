@@ -60,8 +60,14 @@ call:
    `toolResult` message, keyed by tool-call-id).
 
 Result: two journal `toolResult` entries with one tool-call-id →
-`journal->provider-messages` → two `tool_result` blocks for one `tool_use` →
-provider 400 on the next request.
+`journal->provider-messages` (two duplicate `toolResult`-role provider *message
+maps*) → conversation rebuild (`turn-runtime/conversation.clj`
+`agent-messages->ai-conversation`, which emits one provider `tool_result`
+*block* per `toolResult` message via `conv/add-tool-result`
+`conversation.clj:95`) → two `tool_result` blocks for one `tool_use` → provider
+400 on the next request. The block-emitting projection is the rebuild, not
+`journal->provider-messages` (which only emits message maps) — consistent with
+Root Cause step 4 and the Desired-Behaviour De-dup Location bullet.
 
 ### Evidence
 
