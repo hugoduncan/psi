@@ -102,7 +102,19 @@ Two complementary fixes plus docs, decomposed as vertical slices:
   it passes. Add normal-single-result coverage, interrupt-only coverage, and an
   **at-most-once concurrent-completion** test (real result recorded first → real
   result kept, interrupt suppressed; assert exactly one result, not which one,
-  per the determinism framing). No separate clearing wiring needed — handled by
+  per the determinism framing). **Construction:** this test **directly
+  dispatches** the two `:session/tool-agent-record-result` events for one
+  `tool-call-id` (real result first, then a synthetic `"interrupted"` result for
+  the same id) to exercise the handler chokepoint's first-writer suppression;
+  `abort-in!` is **not** the vehicle, because the real result's record effect
+  `disj`s the id from `:pending-tool-calls` (`agent_core/core.clj:407`) after its
+  handler applies, so a sequential `abort-in!` (`turn.clj:233` →
+  `record-pending-tool-call-interrupts!` `turn.clj:217`, which only enumerates
+  still-pending ids `turn.clj:219-220`) dispatches no interrupt and the test would
+  pass vacuously. The faithful enumeration window only exists under real
+  apply/effect interleaving, not reproducible in sequential tests — direct
+  dispatch of the two record events is the correct seam. No separate clearing
+  wiring needed — handled by
   Slice-A init seeding; just confirm no journal-only `/clear` reset bypasses
   `initialize-session-slots`.
 - **Slice C — defensive projection de-dup + test.** Drop duplicate `toolResult`

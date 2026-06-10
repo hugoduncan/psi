@@ -44,7 +44,23 @@
 - [ ] Add a test asserting **at-most-once** under the concurrent-completion
       window (real result recorded first → real result kept, interrupt
       suppressed) — assert exactly one result, not which one, per the determinism
-      framing.
+      framing. **Construction (pinned, ambiguity follow-up 3rd pass):** this test
+      **directly dispatches** the two `:session/tool-agent-record-result` events
+      for one `tool-call-id` — the **real** result first, then a **synthetic
+      `"interrupted"`** result for the same id — to exercise the handler
+      chokepoint's first-writer suppression. **Do not** drive this test through
+      `abort-in!` (`turn.clj:233`): `abort-in!` →
+      `record-pending-tool-call-interrupts!` (`turn.clj:217`) only enumerates ids
+      still in `:pending-tool-calls` (`turn.clj:219-220`), but the real result's
+      `:runtime/agent-record-tool-result` effect `disj`s the id from
+      `:pending-tool-calls` (`agent_core/core.clj:407`) *after* its handler
+      applies, so once the real result has fully run sequentially the id is gone
+      and a subsequent `abort-in!` dispatches **no** interrupt — making an
+      `abort-in!`-based test vacuously pass without ever dispatching the interrupt
+      it claims to suppress. The genuine "still pending while recorded-ids already
+      has the id" window only exists under real apply/effect interleaving, which
+      sequential tests cannot reproduce; direct dispatch of the two record events
+      is the faithful sequential seam for the chokepoint suppression.
 - [ ] Rename `_ctx` → `ctx` in the `:session/tool-agent-record-result` handler
       (`dispatch_handlers/session_mutations.clj:529`) and read the canonical
       recorded-ids set for `session-id` via `session/get-state-value-in`,
@@ -174,7 +190,7 @@
 
 ## Plan/steps ambiguity review follow-ups (third pass)
 
-- [ ] **Pin the Slice-B concurrent-completion (4th) test's construction
+- [x] **Pin the Slice-B concurrent-completion (4th) test's construction
       mechanism.** Slice B test 4 ("at-most-once under the concurrent-completion
       window — real result recorded first → real result kept, interrupt
       suppressed; assert exactly one result, not which one") pins the assertion
@@ -198,6 +214,19 @@
       Without this pin, interpretation (a) drives `abort-in!` and writes a
       vacuously-passing test that never dispatches the interrupt it claims to
       suppress.
+      → **Resolved: direct dispatch of the two record events** (real first, then
+      a synthetic `"interrupted"` for the same id); `abort-in!` explicitly **not**
+      the vehicle. Code-verified: `record-pending-tool-call-interrupts!`
+      (`turn.clj:217`) enumerates only still-pending ids (`turn.clj:219-220`), and
+      the real result's `:runtime/agent-record-tool-result` effect `disj`s the id
+      from `:pending-tool-calls` in `record-tool-result-in!`
+      (`agent_core/core.clj:407`) *after* the handler applies — so a sequential
+      `abort-in!` after the real result has fully run dispatches no interrupt and
+      a test would pass vacuously. The faithful enumeration window only exists
+      under real apply/effect interleaving (not sequentially reproducible), so the
+      handler chokepoint's first-writer suppression is exercised by directly
+      dispatching the two `:session/tool-agent-record-result` events. plan.md
+      Slice B and steps.md Slice B test 4 now both pin this construction.
 
 ## Plan/steps inconsistency review follow-ups
 

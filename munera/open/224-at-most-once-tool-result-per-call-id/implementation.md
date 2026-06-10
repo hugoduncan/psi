@@ -1380,3 +1380,34 @@ New actionable ambiguity (see steps.md → "Plan/steps ambiguity review follow-u
 
 No blockers; one actionable plan/steps ambiguity. (Task remains design/plan-only;
 Slices A–D not yet implemented.)
+
+## Plan/steps ambiguity follow-up resolution (third pass)
+
+Executed the single third-pass plan/steps ambiguity item (pin the Slice-B
+concurrent-completion (4th) test's construction mechanism).
+
+Code verified before editing:
+- `record-pending-tool-call-interrupts!` (`turn.clj:217`) reads
+  `:pending-tool-calls` synchronously (`turn.clj:219-220`) and dispatches
+  `:session/tool-agent-record-result` only for ids still in that set; called by
+  `abort-in!` (`turn.clj:233`).
+- The real result's `:runtime/agent-record-tool-result` effect runs
+  `record-tool-result-in!`, which `disj`s the id from `:pending-tool-calls`
+  (`agent_core/core.clj:407`) *after* the `:session/tool-agent-record-result`
+  handler applies (handler `session_mutations.clj:529` only emits effects).
+- Confirms the reviewer's window: in a sequential test, once the real result has
+  fully run (apply + effect), the id is in recorded-ids and gone from
+  `:pending-tool-calls`, so a later `abort-in!` enumerates nothing and dispatches
+  no interrupt — an `abort-in!`-based test would pass vacuously.
+
+Resolution applied (chose **direct dispatch**, `abort-in!` not the vehicle):
+- **steps.md Slice B test 4** now pins construction: directly dispatch the two
+  `:session/tool-agent-record-result` events for one id (real first, then a
+  synthetic `"interrupted"` for the same id) to exercise the handler chokepoint's
+  first-writer suppression; explicit note that `abort-in!` is not the vehicle and
+  why (enumeration window not sequentially reproducible).
+- **plan.md Slice B** now states the same construction + the `abort-in!`-vacuity
+  rationale, grounded in the `disj`-in-effect ordering.
+
+No blockers; item completed. (Task remains design/plan-only; Slices A–D not yet
+implemented.)
