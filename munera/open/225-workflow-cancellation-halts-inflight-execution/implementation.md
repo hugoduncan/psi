@@ -858,3 +858,49 @@ Both pass-4 ambiguity follow-ups resolved in design.md; no blocking reasons.
    mark-workflow-jobs-terminal / re-entrant remove are inherently idempotent. Aligns
    D4/D20's "second terminal request is a no-op" with the pre-CAS pure-result shape:
    state no-op = D20 in-`swap!` guard; effect no-op = D22.1 gate + D22.2 idempotency.
+
+## Inconsistency review (ψ pass 4, 2026-06-10)
+
+Fresh internal-consistency pass over design.md focused on the newest decisions
+(D21, D22) against the established cancel-then-remove body (D5/D17/D18) and the
+acceptance criteria. D1–D20 internal reconciliations stand. One **new** actionable
+contradiction:
+
+1. **D22.1's "already-terminal ⇒ identity update + empty effects" gate contradicts
+   D5 (remove-of-terminal = plain record removal) and D17/D18 (the remove dispatch
+   always runs against a just-terminalized run).** D22.1 states "the cancel/remove
+   handler … if the target run is already terminal (or absent) at that read …
+   returns a no-op pure-result with empty `:effects` (`{:root-state-update identity
+   :effects []}`)," and explicitly lists "a **remove** after the run is already
+   terminal/removed" as one of the no-op'd cases. But:
+   - **vs D5:** D5 says "`remove` of an already-terminal run is unchanged (**plain
+     record removal**)" — the record must be dropped. Under D22.1 the remove
+     handler returns `identity` for an already-terminal run, so `remove-run` never
+     dissocs the record; the terminal record lingers forever.
+   - **vs D17/D18 (the core cancel-then-remove flow):** D17 splits cancel-then-
+     remove into a cancel dispatch (applies `:cancelled`) and a **subsequent**
+     remove dispatch that "applies the pure `remove-run` dissoc." By construction
+     the remove dispatch (D18 effect #3, the re-entrant `:runtime/dispatch-event`)
+     runs *after* the cancel dispatch already set `:cancelled`, so the remove
+     handler **always** reads the run as terminal. If that remove handler is the
+     "cancel/remove handler" carrying the D22.1 gate, it no-ops via `identity` and
+     the record is **never removed** — defeating D5/D17 cancel-then-remove and
+     re-orphaning exactly the scenario this task fixes.
+
+   Root cause: D22.1 conflates two concerns in one gate — (a) the
+   *cancellation/terminal-transition + cancellation-effects* part (correctly
+   suppressed when the run is already terminal, to keep idempotency) and (b) the
+   *record-removal* `remove-run` dissoc (which by design operates **on** an
+   already-terminal run and must still apply). The gate as written suppresses (b)
+   along with (a). The design must state that the handler-before terminal gate
+   suppresses only the cancellation/terminal-transition effects, while the
+   `remove-run` record-drop still applies to an already-terminal run (the cancel-
+   then-remove sequenced case and the plain remove-of-terminal case). Reconcile
+   D22.1 with D5/D17/D18.
+
+(Secondary, non-blocking observation — not filed as a separate step: Acceptance
+criterion #2 phrases "`remove` of a live run … future is cancelled" generically,
+but D14/D19/D21 establish a nested-sub-run remove emits **no** worker
+`future-cancel` — the sub-run owns no future. The criterion is correct only for a
+top-level run; it is consistent for its intended top-level scenario, so it is a
+coverage/phrasing nuance rather than a contradiction.)

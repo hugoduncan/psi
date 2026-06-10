@@ -338,3 +338,22 @@
       attempt; future-cancel/terminalize/re-entrant-remove are inherently idempotent.
       D4/D20 cross-referenced: state no-op = in-`swap!` guard, effect no-op =
       D22.1 gate + D22.2 idempotency.
+
+## Inconsistency follow-ups (ψ pass 4, 2026-06-10)
+
+- [ ] Reconcile D22.1's "already-terminal ⇒ `{:root-state-update identity
+      :effects []}`" handler-before gate with D5 (remove of an already-terminal
+      run = **plain record removal**) and D17/D18 (the cancel-then-remove **remove
+      dispatch** runs *after* the cancel dispatch already applied `:cancelled`, so
+      its handler always reads the run as terminal). As written, applying the
+      D22.1 no-op gate to "the cancel/remove handler" makes the `remove-run` dissoc
+      a no-op for any already-terminal run — so cancel-then-remove (D5/D17) never
+      drops the record and plain remove-of-terminal (D5) leaves the record
+      lingering, re-orphaning the exact case this task fixes. State explicitly that
+      the handler-before terminal-precondition gate suppresses only the
+      **cancellation / terminal-transition effects** (future-cancel, agent-abort,
+      mark-jobs-terminal, the re-entrant remove-trigger), while the **record-removal
+      `remove-run` dissoc still applies** to an already-terminal run (both the
+      cancel-then-remove sequenced remove dispatch and the plain remove-of-terminal
+      case). Update D22 (and D5/D17 cross-refs) so the gate does not suppress the
+      record drop.
