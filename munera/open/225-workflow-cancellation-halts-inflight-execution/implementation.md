@@ -564,3 +564,45 @@ Consistency check: D17 is consistent with D4 (serialized single-writer ordering
 across both dispatches), D5 (cancel-then-remove sequence, now two dispatches),
 D13 (single background-job terminal writer, reuse not a second writer), and D16(2)
 (`:cancelled` reconcile branch). No new contradictions; no step-machine redesign.
+
+## Ambiguity review (ψ pass 3, 2026-06-10)
+
+Fresh ambiguity pass over design.md after D17. D5–D16 + D17 resolved the prior
+contract/sequencing ambiguities; two new under-specified contracts remain that an
+implementer hits when wiring D17 and the Evidence's direct sub-run cancel:
+
+1. **D17 two-dispatch trigger/sequencing mechanism unspecified.** D17 (and D5
+   step 3) say cancel-then-remove is "two serialized dispatches" — a cancel
+   dispatch then "a distinct, subsequent remove dispatch" — but never state how the
+   second dispatch is *issued* and ordered after the first for a single
+   remove-of-live-run request. The two candidate mechanisms have different boundary
+   implications: (a) the cancel dispatch emits a re-entrant dispatch effect (e.g. a
+   `:runtime/dispatch`-style effect) that enqueues the remove dispatch as
+   effects-as-data (fits D1/D12: no inline orchestration in the mutation), vs (b)
+   the `remove` command flow synchronously issues two `dispatch` calls (orchestration
+   logic in the mutation/command layer, in tension with D1's "no inline side effects /
+   effects-as-data"). doc/architecture.md's dispatch sequencing contract documents
+   no re-entrant dispatch-emits-dispatch effect today, so the chaining mechanism is
+   an open boundary decision, not just an impl detail. An implementer cannot tell
+   which to build, nor whether a new "dispatch a follow-on event" effect type is in
+   scope.
+
+2. **Direct cancellation of a nested sub-run: parent-run contract unspecified.**
+   The Evidence (step 2) explicitly cancels the *nested sub-run* directly, yet the
+   design only specifies *top-down* propagation ("cancelling a parent run cancels
+   its in-flight nested sub-runs"). Because sub-runs are synchronous on the single
+   top-level worker thread and D14 walks `:delegating-run-id` upward so the
+   `future-cancel(true)` interrupt necessarily hits the *shared top-level* worker,
+   directly cancelling a sub-run interrupts the parent's worker too. The design does
+   not state the resulting contract: after the shared worker is woken and the pull
+   check sees only the sub-run `:cancelled` (parent still `:running`), does the
+   parent run (a) continue executing — and if so, how does the parent's delegate
+   step interpret a directly-cancelled sub-run's delegate result (fail the step /
+   propagate / continue) — or (b) does interrupting the shared worker effectively
+   halt the parent as well? "delegate result-delivery paths" are nominally
+   out-of-scope, but the cancelled-sub-run result handling is required for direct
+   sub-run cancellation (a demonstrated Evidence case) to behave sanely. Either
+   pin the contract or explicitly scope direct sub-run cancellation out.
+
+Both are contract gaps an implementer hits immediately; neither redesigns the step
+machine.

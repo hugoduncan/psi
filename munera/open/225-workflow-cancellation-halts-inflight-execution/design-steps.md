@@ -226,3 +226,29 @@
       (duplicates canonical run state into the effect payload, forks the
       reconcile-from-canonical-state contract). D5 step 3, D13, and D16(1) updated
       to name the two-dispatch split; D16(2) `:cancelled` branch still required.
+
+## Ambiguity follow-ups (ψ pass 3, 2026-06-10)
+
+- [ ] Specify the D17 two-dispatch trigger/sequencing mechanism for
+      remove-of-live-run: state how the second (remove) dispatch is issued and
+      ordered after the cancel dispatch for a single `remove` request. Decide
+      between (a) the cancel dispatch emitting a re-entrant dispatch effect
+      (effects-as-data, e.g. a `:runtime/dispatch`-style follow-on effect) that
+      enqueues the remove dispatch — consistent with D1/D12 (no inline orchestration
+      in the mutation) — vs (b) the `remove` command flow synchronously issuing two
+      `dispatch` calls. Note doc/architecture.md documents no re-entrant
+      dispatch-emits-dispatch effect today, so state whether a new follow-on-dispatch
+      effect type is in scope. Update D17/D5 step 3 so the chaining mechanism is
+      expressible and fits the effects-as-data boundary.
+- [ ] Pin (or explicitly scope out) the contract for **direct** cancellation of a
+      nested sub-run (Evidence step 2). Because sub-runs share the single top-level
+      worker thread and D14's `future-cancel(true)` walks `:delegating-run-id` up to
+      the shared top-level future, directly cancelling a sub-run interrupts the
+      parent's worker. State whether, after the pull check sees only the sub-run
+      `:cancelled` (parent still `:running`), the parent run continues — and if so
+      how its delegate step interprets a directly-cancelled sub-run's delegate
+      result (fail-step / propagate / continue) — or whether interrupting the shared
+      worker halts the parent too. If direct sub-run cancellation is out of scope,
+      say so explicitly in Scope; otherwise pin the parent-run + cancelled-sub-run
+      result-delivery contract. Reconcile with the "Redesigning … delegate
+      result-delivery paths" out-of-scope note.
