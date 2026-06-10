@@ -1980,3 +1980,22 @@ New actionable (2) — see steps.md "Test shaper review follow-ups (second pass)
    which layer diverged, winner assertions do not. Add layer-naming failure
    messages to the winner `:tool-name` assertions so a winner mismatch also
    reports journal-vs-memory. Low priority.
+
+## Test shaper review (second pass) follow-up — executed
+
+Executed both second-pass test-shaper items in
+`tool_result_at_most_once_test.clj`:
+
+1. **Winner-symmetry restored in `distinct-tool-call-ids-both-recorded-test`.**
+   Added `(is (= "bash" (:tool-name (first memory-a))) …)` and the `memory-b`
+   equivalent (bindings already present), so the test asserts the winning
+   `:tool-name` on **both** journal and memory layers, matching the suite-wide
+   both-layer winner check.
+2. **Layer-naming messages on all winner `:tool-name` assertions.** Every winner
+   assertion across the suite now carries a journal/memory layer message
+   ("the interrupt wins on the journal layer" / "…on the in-memory history
+   layer"; "the real result wins on the … layer"), matching the layer-naming the
+   first pass applied to the `count` assertions. Assertion style is now uniform.
+
+Verification: focused suite green (6 tests / 29 assertions, up from 27 — the two
+new memory-layer winner assertions); clj-kondo clean; parens balanced.

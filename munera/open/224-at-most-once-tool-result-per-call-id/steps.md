@@ -446,7 +446,7 @@
 
 ## Test shaper review follow-ups (second pass)
 
-- [ ] **Restore both-layer winner symmetry in
+- [x] **Restore both-layer winner symmetry in
       `distinct-tool-call-ids-both-recorded-test`**
       (`tool_result_at_most_once_test.clj`). The test asserts the winning
       `:tool-name` (`"bash"`) only on `journal-a`/`journal-b`, not on
@@ -456,7 +456,10 @@
       exist (used by the count assertions). Add `(is (= "bash" (:tool-name (first
       memory-a))))` and the `memory-b` equivalent so the winner check is uniform
       across the suite.
-- [ ] **Add layer-naming failure messages to the winner `:tool-name` assertions**
+      → **Resolved:** `distinct-tool-call-ids-both-recorded-test` now asserts the
+      winning `:tool-name` (`"bash"`) on `memory-a` and `memory-b` (already
+      bound), matching the both-layer winner check used by the rest of the suite.
+- [x] **Add layer-naming failure messages to the winner `:tool-name` assertions**
       across `tool_result_at_most_once_test.clj`
       (`consistent(assertion_style)` ∧ `meaningful_failures`). The first pass
       messaged every `count` assertion ("…in the journal" / "…in the in-memory
@@ -464,3 +467,9 @@
       so a winner mismatch does not report which recorded layer diverged.
       Normalize the winner assertions to carry the same journal/memory layer
       messages. Low priority.
+      → **Resolved:** every winner `:tool-name` assertion across the suite now
+      carries a layer-naming message (e.g. "the interrupt wins on the journal
+      layer" / "…on the in-memory history layer", "the real result wins on the
+      … layer"), matching the layer-naming style the first pass applied to the
+      `count` assertions. Focused suite green (6 tests / 29 assertions, up from
+      27); clj-kondo clean, parens balanced.

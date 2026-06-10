@@ -76,8 +76,10 @@
         (is (= 1 (count memory))
             "exactly one toolResult entry for the id in the in-memory history")
         ;; first writer (the interrupt) wins for the in-flight headline case
-        (is (= "interrupted" (:tool-name (first journal))))
-        (is (= "interrupted" (:tool-name (first memory))))))))
+        (is (= "interrupted" (:tool-name (first journal)))
+            "the interrupt wins on the journal layer")
+        (is (= "interrupted" (:tool-name (first memory)))
+            "the interrupt wins on the in-memory history layer")))))
 
 (deftest recorded-ids-survive-turn-boundary-test
   (testing "recorded-tool-result-ids is session-scoped, not turn-scoped: an
@@ -106,8 +108,10 @@
         (is (= 1 (count memory))
             "exactly one toolResult entry for the id in the in-memory history after the turn boundary")
         ;; first writer (the interrupt) still wins across the turn boundary
-        (is (= "interrupted" (:tool-name (first journal))))
-        (is (= "interrupted" (:tool-name (first memory))))))))
+        (is (= "interrupted" (:tool-name (first journal)))
+            "the interrupt wins on the journal layer")
+        (is (= "interrupted" (:tool-name (first memory)))
+            "the interrupt wins on the in-memory history layer")))))
 
 (deftest normal-single-result-path-unaffected-test
   (testing "a normal tool call records exactly one real result (happy path)"
@@ -121,8 +125,10 @@
         (is (= 1 (count memory))
             "exactly one toolResult entry for the id in the in-memory history")
         ;; the real result wins on both recorded layers
-        (is (= "bash" (:tool-name (first journal))))
-        (is (= "bash" (:tool-name (first memory))))))))
+        (is (= "bash" (:tool-name (first journal)))
+            "the real result wins on the journal layer")
+        (is (= "bash" (:tool-name (first memory)))
+            "the real result wins on the in-memory history layer")))))
 
 (deftest interrupt-only-path-yields-one-result-test
   (testing "an interrupt for a pending tool-call with no later real result yields
@@ -139,8 +145,10 @@
         (is (= 1 (count memory))
             "exactly one toolResult entry for the id in the in-memory history")
         ;; the interrupt wins on both recorded layers
-        (is (= "interrupted" (:tool-name (first journal))))
-        (is (= "interrupted" (:tool-name (first memory))))))))
+        (is (= "interrupted" (:tool-name (first journal)))
+            "the interrupt wins on the journal layer")
+        (is (= "interrupted" (:tool-name (first memory)))
+            "the interrupt wins on the in-memory history layer")))))
 
 (deftest concurrent-completion-real-result-wins-test
   (testing "at-most-once under the concurrent-completion window: when the real
@@ -163,8 +171,10 @@
         (is (= 1 (count memory))
             "exactly one toolResult entry for the id in the in-memory history, not two")
         ;; first writer (the real result) wins
-        (is (= "bash" (:tool-name (first journal))))
-        (is (= "bash" (:tool-name (first memory))))))))
+        (is (= "bash" (:tool-name (first journal)))
+            "the real result wins on the journal layer")
+        (is (= "bash" (:tool-name (first memory)))
+            "the real result wins on the in-memory history layer")))))
 
 (deftest distinct-tool-call-ids-both-recorded-test
   (testing "the recorded-ids guard is per-tool-call-id, not per-session: two
@@ -188,5 +198,11 @@
             "first id records exactly one toolResult in the in-memory history")
         (is (= 1 (count memory-b))
             "second distinct id records its own toolResult in the in-memory history")
-        (is (= "bash" (:tool-name (first journal-a))))
-        (is (= "bash" (:tool-name (first journal-b))))))))
+        (is (= "bash" (:tool-name (first journal-a)))
+            "first id's real result wins on the journal layer")
+        (is (= "bash" (:tool-name (first journal-b)))
+            "second id's real result wins on the journal layer")
+        (is (= "bash" (:tool-name (first memory-a)))
+            "first id's real result wins on the in-memory history layer")
+        (is (= "bash" (:tool-name (first memory-b)))
+            "second id's real result wins on the in-memory history layer")))))
