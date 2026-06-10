@@ -2092,3 +2092,33 @@ asserting `:is-error`/`:content` in the winner check (tool-name already
 disambiguates "bash" vs "interrupted"); dropping `normal-single-result-path-...`
 as subsumed by `distinct-tool-call-ids-...` (it documents a distinct
 happy-path-unaffected concern). No follow-up steps added.
+
+## Docs review (review-task-docs) — first pass
+
+Applied `review-task-docs`: checked README, `doc/`, CHANGELOG for accuracy ∧
+completeness ∧ consistency against the implemented change.
+
+Scope of the change is internal (handler at-most-once chokepoint guard +
+`journal->provider-messages` projection de-dup); it adds **no** new user-facing
+surface (no command, flag, config, or extension capability).
+
+- CHANGELOG `[Unreleased]` → `Fixed`: present and accurate. Symptom (provider 400
+  `each tool_use must have a single result` after `:user-abort`), mechanism
+  (synthetic `"interrupted"` + real result → two `toolResult` for one
+  `tool_use` id), fix (at-most-once per tool-call-id, first-writer-wins at the
+  single recording chokepoint, suppresses both in-memory record and journal
+  append), and projection-recovery for already-wedged journals are all correctly
+  described and match design.md + the implementation. Provider error string and
+  event names verified against design Evidence.
+- README: no stale references; nothing to add (no user surface changed).
+- `doc/`: extension `tool_result`/`tool_call` docs (`doc/extensions.md`,
+  `doc/extension-api.md`) describe the per-result event bus, which is unchanged
+  by this fix (a `tool_result` event still fires per recorded result; the guard
+  acts on journal/in-memory recording, not on the extension bus). No doc claims
+  contradicted; nothing to update. `doc/architecture.md` journal/replay material
+  is dev-internal and does not document a tool-result-per-id invariant requiring
+  amendment.
+- Examples/consistency: backticked names (`:user-abort`, `toolResult`,
+  `tool_use`, `tool-call-id`) consistent with code and design.
+
+No actionable docs feedback. No follow-up steps added.
