@@ -87,7 +87,10 @@ In scope:
 
 - Enforce the at-most-once invariant at the single chokepoint where a toolResult
   is recorded for a tool-call-id, covering **both** the in-memory record and the
-  journal append atomically, guarded by `:pending-tool-calls`.
+  journal append as one both-or-neither decision, guarded purely in the
+  `:session/tool-agent-record-result` dispatch handler against a **canonical
+  recorded-tool-result-ids predicate in `:state*`** (see Design Decision D1).
+  Atomicity comes from dispatch serialization, not from a runtime test-and-set.
 - A characterization/regression test that reproduces the abort-races-tool-result
   duplication end-to-end (interrupt with a pending tool-call, then a late real
   result) and asserts a single `tool_result` per `tool_use` in the rebuilt
@@ -102,21 +105,77 @@ Out of scope:
 - Workflow definitions (`lambda-build` et al.) — they are not defective.
 - Broad refactor of the interrupt subsystem beyond enforcing the invariant.
 
-## Design Questions (to resolve during refinement)
+## Design Decisions (resolved in refinement)
 
-1. **Where the guard lives.** `:pending-tool-calls` is owned by the agent-core
-   data atom, not canonical session root-state, so the pure
-   `:session/tool-agent-record-result` handler cannot read it cleanly. Two
-   candidate approaches:
-   - **(B)** Collapse record + journal into one guarded operation co-located with
-     `:pending-tool-calls` ownership (agent-core atomically decides `applied?`;
-     the journal append happens only when applied). Smaller blast radius;
-     keeps pending-state ownership in agent-core.
-   - **(C)** Promote `:pending-tool-calls` into canonical session root-state so the
-     dispatch handler guards purely and emits both effects or neither. More
-     architecturally "pure" (reads via resolvers/state), larger change.
-   Recommendation leans **(B)** for minimal mechanism; confirm against the
-   dispatch-owns-writes / effects-as-data architecture before planning.
+### D1. Where the guard lives — **Option (C): canonical-state predicate**
+
+**Decision.** Enforce the at-most-once invariant with a *canonical* predicate
+projected into session root-state (`:state*`) through dispatch, read purely by
+the `:session/tool-agent-record-result` handler. **Option (B) is rejected.**
+
+**Rationale (grounded in doc/architecture.md).**
+
+- *State boundary (canonical root vs runtime handles).* `:pending-tool-calls`
+  lives on the agent-core data atom and is mutated via `swap-data!`
+  (`agent_core/core.clj:424`). It is a *runtime handle's* internal mutable
+  lifecycle, explicitly *not* queryable canonical `:state*`. The architecture's
+  stated direction is: when a subsystem has observable status worth querying,
+  that status is **projected into `:state*` as canonical data through dispatch**,
+  while the handle stays external. "At-most-once tool-result has been recorded
+  for `tool-call-id`" is exactly such observable, queryable status. Anchoring the
+  guard to the agent-core atom (Option B) runs against this direction; per the
+  shims/adapters guidance a deviation would require an explicit documented design
+  decision — and here no deviation is warranted because the architecturally
+  aligned option is available at acceptable cost.
+
+- *Dispatch sequencing contract.* The contract is: handler computes a **pure
+  result** → apply writes state → effects execute **last**. Option (B)'s
+  "agent-core atomically decides `applied?`, journal append happens only when
+  applied" is a stateful test-and-set against a runtime atom at effect-decision
+  time — a mutation that gates effect emission, which is *not* pure-result +
+  effects-as-data. Option (C) keeps the shape pure: the handler reads the
+  canonical predicate, returns a `:root-state-update` that records the id, and
+  emits both effects or neither based on that pure read.
+
+- *Cross-component layering.* The journal append is an agent-session (higher
+  component) effect; `:pending-tool-calls` ownership is in agent-core (lower
+  component). Making a higher-layer effect conditional on a lower-layer atomic
+  decision couples the layers. Option (C) places the applied?/effects decision in
+  the agent-session pure handler, reading canonical `:state*`; agent-core remains
+  the data/handle the system projects from, not the gate.
+
+**Mechanism.**
+
+- Introduce a canonical, per-session set of recorded tool-result ids in
+  `:state*` (the at-most-once predicate). Maintain it only through dispatch.
+- The `:session/tool-agent-record-result` handler becomes a pure guarded
+  transform:
+  - read canonical recorded-ids for the session;
+  - if `tool-call-id ∈ recorded-ids` → `applied? = false`: return no
+    `:root-state-update` and **emit neither effect** (suppress both the
+    `:runtime/agent-record-tool-result` in-memory record and the
+    `append-message-effect` journal append);
+  - else → return a `:root-state-update` adding `tool-call-id` to recorded-ids,
+    and emit **both** effects.
+- **Atomicity** comes from dispatch serialization (single writer to `:state*`),
+  not from a test-and-set on the agent-core atom — consistent with the
+  single-source-of-truth atom invariant. The two racing producers (interrupt
+  path `turn.clj:223`, real-result path `tool_runtime_adapter.clj:114`) both
+  dispatch the same event; dispatch ordering decides the first writer, the second
+  reads its own id already present and is suppressed.
+- `:pending-tool-calls` (agent-core) is retained for its existing runtime use
+  (enumerating still-pending ids on interrupt, `turn.clj:220`); it no longer
+  gates effect emission. The canonical recorded-ids predicate — not the agent-core
+  atom — is the source of truth for the at-most-once decision.
+- The recorded-ids set is bounded by being session-scoped and cleared/reset on
+  the same lifecycle boundaries that already reset `:pending-tool-calls`
+  (turn/session reset). Plan-time detail: confirm the exact reset point so the
+  set does not accrete across turns.
+
+This supersedes the earlier lean toward (B); Scope below is updated to reference
+the canonical predicate rather than `:pending-tool-calls`.
+
+## Remaining Open Question
 
 2. **Defensive projection de-dup.** Should this task also make
    `journal->provider-messages` / conversation rebuild tolerate pre-existing

@@ -43,3 +43,30 @@ Actionable architectural misfits (see design-steps.md):
    atomic decision couples the layers. The agent-session pure handler should own
    the applied?/effects decision from canonical state; agent-core stays the data
    the handler reads.
+
+## Architecture-fit follow-up resolution (design-steps)
+
+Executed the three architecture-fit follow-up items. All three converge on one
+decision; resolved together in design.md ("Design Decisions → D1").
+
+- **Decision: Option (C), Option (B) rejected.** Guard via a canonical
+  recorded-tool-result-ids predicate projected into `:state*` through dispatch,
+  read purely by `:session/tool-agent-record-result`. Grounded in
+  doc/architecture.md: State boundary (project queryable status into `:state*`;
+  handles stay external), Dispatch sequencing contract (pure result → apply →
+  effects last), and cross-component layering.
+- **Code grounding confirmed:** `:pending-tool-calls` is an agent-core data atom
+  mutated via `swap-data!` (`agent_core/core.clj:424`), i.e. a runtime handle —
+  not canonical `:state*`. Producers: interrupt path `turn.clj:223`, real-result
+  path `tool_runtime_adapter.clj:114`, both dispatching the same event into the
+  unconditional handler `session_mutations.clj:529`.
+- **Mechanism (pure both-or-neither):** handler reads canonical recorded-ids; if
+  id present → no `:root-state-update`, emit neither effect; else →
+  `:root-state-update` adds id, emit both effects. Atomicity from dispatch
+  serialization (single writer to `:state*`), not a runtime test-and-set.
+- `:pending-tool-calls` retained for interrupt enumeration only; no longer gates
+  effects. Scope section in design.md updated to reference the canonical
+  predicate instead of `:pending-tool-calls`.
+- Plan-time detail flagged in D1: confirm the recorded-ids reset point (mirror
+  `:pending-tool-calls` turn/session reset) so the set stays bounded.
+- No blockers; all three items completed.
