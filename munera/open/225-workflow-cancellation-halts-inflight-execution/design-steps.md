@@ -293,7 +293,7 @@
 
 ## Ambiguity follow-ups (ψ pass 4, 2026-06-10)
 
-- [ ] Resolve the D5 × D19 intersection for **direct `remove` of a live nested
+- [x] Resolve the D5 × D19 intersection for **direct `remove` of a live nested
       sub-run**. D5 states cancel-then-remove for any "remove of a live
       (non-terminal) run"; D17 dispatch 2 drops the run record; but D19's
       parent-observes-failed-delegate-step contract is pinned only for direct
@@ -307,7 +307,15 @@
       same as `:cancelled` for delegate-result purposes, or accept the generic
       "did not reach terminal" failure) — or scope direct sub-run *remove* out
       explicitly in Scope. Reconcile D5/D17/D19.
-- [ ] Specify whether the cancellation effect set is **suppressed when the D20
+      → design.md D21: direct remove of a live sub-run = in scope (D5 applies to any
+      live run). Cancel-vs-remove race means the parent reads either `:cancelled`
+      (record present, D19) or run-absence (record dropped, D17 dispatch 2 →
+      `(:status nil)` default branch). Decision: run-absence specifically is mapped
+      identically to `:cancelled` at the delegate result (existing `:cancelled`
+      failure mapping, via a `nil`/absent guard before the `case`) so D19's
+      parent-continues-not-halted outcome is race-independent; non-`nil` non-terminal
+      statuses still hit the existing default. Scope updated; D5/D17/D19 reconciled.
+- [x] Specify whether the cancellation effect set is **suppressed when the D20
       terminal guard makes the transition a no-op** (run already terminal / lost
       the CAS race to natural completion). D20 establishes the `:state*` CAS no-op
       for racing/second terminal requests, but the handler computes `:effects` in
@@ -320,3 +328,13 @@
       `:runtime/agent-abort` against an already-completed run's
       `:execution-session-id`. Align D4/D20 (and the idempotency wording) with the
       pure-result effect-emission shape.
+      → design.md D22: code-confirmed `apply-pure-result` takes pre-CAS `:effects`
+      verbatim, so the D20 in-`swap!` no-op does not suppress effects. Two-layer gate:
+      (1) handler-before terminal-precondition gate emits empty `:effects` when the
+      run is already terminal/absent at the handler read (covers all sequential
+      idempotency cases — "no-op terminal request emits no effects"); (2) effect-level
+      idempotency for the residual true-concurrent CAS race — `:runtime/agent-abort`
+      re-checks the D15 live-attempt predicate at execute time and no-ops a non-live
+      attempt; future-cancel/terminalize/re-entrant-remove are inherently idempotent.
+      D4/D20 cross-referenced: state no-op = in-`swap!` guard, effect no-op =
+      D22.1 gate + D22.2 idempotency.

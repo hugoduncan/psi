@@ -824,3 +824,37 @@ implementer would have to guess:
    effects are gated on the guard actually applying `:cancelled`.
 
 No other new actionable ambiguity found; D1–D20 cover the remaining contracts.
+
+## Pass-4 ambiguity follow-up resolutions (ψ, 2026-06-10)
+
+Both pass-4 ambiguity follow-ups resolved in design.md; no blocking reasons.
+
+1. **Direct `remove` of a live nested sub-run → D21.** In scope (D5 cancel-then-
+   remove applies to any live run). The cancel/remove timing race means the parent
+   worker, returning from `send-and-drain`, may read either `:cancelled` (record
+   present → D19 branch) or run-absence (record dropped by D17 dispatch 2 →
+   `(:status nil)` → existing `case` default branch). Decision: **run-absence
+   specifically** is treated identically to `:cancelled` at the delegate result
+   (maps to the `:cancelled` failed-step result, "Delegated workflow cancelled or
+   removed"), via an explicit `nil`/absent-run guard before the status `case` — so
+   D19's parent-continues-not-halted contract is race-independent. Non-`nil`
+   non-terminal statuses still fall through to the existing default, so real "did
+   not reach terminal" anomalies are not masked. Reuses the existing `:cancelled`
+   failure mapping (`λ extend`), inside the no-new-result-delivery-path boundary.
+   Scope updated.
+
+2. **Effect gating on a no-op'd terminal guard → D22.** Code-confirmed
+   (`state-kernel/dispatch.clj`): `:effects` are computed in handler `:before`
+   (pre-CAS) and `apply-pure-result` sets `:applied-effects` verbatim regardless of
+   whether the D20 `swap!` changed state — so the in-`swap!` no-op does NOT suppress
+   effects. Decision: gate in two layers — (1) **handler-before terminal-precondition
+   gate**: a request whose run is already terminal/absent at the handler-before read
+   returns `{:root-state-update identity :effects []}` (no effects), covering all
+   sequentially-later terminal requests (dominant idempotency case); (2)
+   **effect-level idempotency** for the residual true-concurrent CAS race where both
+   threads pass the before-gate — `:runtime/agent-abort` re-checks the D15
+   live-attempt predicate at execute time and no-ops a non-live attempt (cannot abort
+   an already-completed/reused `:execution-session-id`), and future-cancel /
+   mark-workflow-jobs-terminal / re-entrant remove are inherently idempotent. Aligns
+   D4/D20's "second terminal request is a no-op" with the pre-CAS pure-result shape:
+   state no-op = D20 in-`swap!` guard; effect no-op = D22.1 gate + D22.2 idempotency.

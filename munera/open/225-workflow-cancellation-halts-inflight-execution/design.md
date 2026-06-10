@@ -103,7 +103,11 @@ In scope:
   cancels — D14/D19); the downward child-abort unblocks the shared parent worker,
   the sub-run reaches `:cancelled`, and the parent observes it as a **failed
   delegate step** via the existing `delegate-step-runtime-result` `:cancelled`
-  case and continues (the parent is not halted) — D19.
+  case and continues (the parent is not halted) — D19. Direct **`remove`** of a
+  live nested sub-run is likewise in scope (cancel-then-remove per D5/D17); after
+  the record is dropped the parent reads run-absence, which maps to the **same**
+  failed-delegate-step result as `:cancelled` so the parent's continue-not-halt
+  outcome is race-independent — D21.
 - Modelling the cancellation side effects as canonical dispatch `:runtime/*`
   effects (parity: `effect-schema` + `execute-effect!`) executed by the dispatch
   `:effects` interceptor — child-session abort reusing the existing
@@ -926,6 +930,119 @@ no-resurrection guarantees on a no-global-lock dispatch.
 
 D4, D13, D16, and D17's "serialized"/"single-writer" phrasings are reconciled here;
 no step-machine redesign and no change to the cancellation effect set.
+
+## Edge-Case & Idempotency Reconciliations (ψ pass 4, 2026-06-10)
+
+Resolves the two pass-4 ambiguity follow-ups: the D5 × D17 × D19 intersection for a
+direct `remove` of a live nested sub-run, and whether the cancellation effect set is
+suppressed when the D20 terminal guard no-ops the transition. Neither redesigns the
+step machine.
+
+### D21. Direct `remove` of a live nested sub-run: in scope; run-absence ≡ `:cancelled` at the delegate result (reconciles D5 × D17 × D19)
+
+Direct `remove` of a live (non-terminal) nested sub-run is **in scope** — D5
+cancel-then-remove applies to **any** live run, sub-runs included. The contract:
+
+- The remove is cancel-then-remove (D5/D17): a **cancel dispatch** terminalizes the
+  sub-run (signal `:cancelled` + the downward, **no-worker-future-cancel** child
+  abort of D19 + job terminalize per D13/D16), then a **subsequent re-entrant remove
+  dispatch** (D18) drops the sub-run record.
+- The remove dispatch runs on the **operator/command thread**, concurrently with the
+  **parent worker thread** parked in the sub-run's `send-and-drain` deref. So when
+  the child abort unblocks the sub-run and control returns to
+  `delegate-step-runtime-result`, the parent worker may read **either**
+  `(:status delegate-run) = :cancelled` (record not yet removed → D19 `:cancelled`
+  branch) **or** `delegate-run = nil` / run-absence (record already removed). Code-
+  confirmed: after removal `workflow-run-in` → `nil`, `(:status nil) = nil`, and the
+  existing `delegate.clj` `case` hits the **default** branch ("Delegated workflow did
+  not reach terminal or blocked status"), **not** the `:cancelled` branch. This is a
+  genuine cancel-vs-remove timing race.
+- **Decision.** The parent must observe the **same failed-delegate-step semantics**
+  in both readings, so D19's "parent observes a failed delegate step and **continues**
+  (not halted)" holds regardless of the race. **Run-absence specifically** (`nil`
+  delegate-run / `nil` status) at the delegate result is treated **identically to
+  `:cancelled`**: it maps to the `:cancelled` failed-step result
+  (`:pending-kind :failure`, message "Delegated workflow cancelled or removed"), **not**
+  the generic "did not reach terminal or blocked status" default. This is folded into
+  the existing `delegate.clj` `:cancelled` → failure mapping (`λ extend` compose;
+  absence routed into the cancelled case via an explicit `nil`/absent-run guard before
+  the status `case`), staying inside the out-of-scope "no new result-delivery path"
+  boundary.
+
+**Scope precision.** Only **run-absence** (`nil` delegate-run) is relabeled to the
+cancelled result; a genuinely non-terminal *present* status
+(`:running`/`:pending`/`:blocked`, all non-`nil`) still falls through to the existing
+default branch — so this does not mask real "did not reach terminal" anomalies, it
+only covers the removed-mid-delegate case.
+
+Reconciliation: D5 (cancel-then-remove applies to sub-runs), D17 (the two-dispatch
+remove drops the sub-run record), and D19 (parent continues on a failed delegate
+step) are consistent — D19's contract is extended to cover run-absence so the
+parent's continue-as-failed-step outcome is **race-independent**. Scope is updated to
+name direct sub-run remove in scope with this contract.
+
+### D22. Cancellation effects gated on the terminal transition actually applying: handler-before terminal-precondition gate + effect-level idempotency (reconciles D4/D20 idempotency with the pure-result effect-emission shape)
+
+The pure-result effect-emission shape computes `:effects` **in the handler `:before`
+(pre-CAS)** and the `:apply` interceptor takes them verbatim as `:applied-effects`
+**regardless** of whether the apply-phase `swap!` (D20) actually changed state.
+Code-confirmed (`state-kernel/dispatch.clj`): `handler-interceptor` `:before` builds
+`:pure-result {:root-state-update f :effects effs}`; `apply-pure-result` runs the
+`swap!` and then sets `:applied-effects (:effects pure-result)` **unconditionally**;
+`effect-interceptor` executes `:applied-effects`. So D20's in-`swap!`-fn terminal
+guard making a racing/second terminal request a **no-op for `:state*`** does **not**,
+by itself, suppress the cancellation effects — without further gating a no-op'd
+terminal request would still fire worker `future-cancel`, `:runtime/agent-abort`,
+`:runtime/mark-workflow-jobs-terminal`, and the remove path's re-entrant
+`:runtime/dispatch-event`, contradicting the "second terminal request is a no-op"
+idempotency claim (D4/D20) and risking an `:runtime/agent-abort` against an
+already-completed run's (possibly reused) `:execution-session-id`.
+
+**Decision — gate effect emission in two complementary layers:**
+
+1. **Handler-before terminal-precondition gate (primary).** The cancel/remove handler
+   computes its pure result from the current `:state*` read in the handler `:before`;
+   if the target run is **already terminal (or absent)** at that read, it returns a
+   no-op pure-result with **empty `:effects`** (`{:root-state-update identity
+   :effects []}`). This emits **no** cancellation effects for every *sequentially*
+   later terminal request — a second `cancel`, a `remove` after the run is already
+   terminal/removed, or a `cancel` arriving after natural completion — the dominant
+   idempotency case. This realizes "a no-op'd terminal request emits no effects"
+   within the pure-result shape: effects are conditioned on the same terminal
+   precondition that D20 guards inside the `swap!` fn.
+
+2. **Effect-level idempotency (covers the residual true-concurrent CAS race).** Two
+   cancels racing on two threads can **both** read non-terminal in their respective
+   handler-before gates and **both** emit effects, while the D20 CAS applies
+   `:cancelled` exactly once (the loser's `swap!` fn no-ops the state). The pre-CAS
+   pure-result shape cannot retract the loser's already-computed effects, so the
+   cancellation effects must be **execution-time idempotent / liveness-rechecking** so
+   a redundant emission is harmless:
+   - `:runtime/agent-abort` re-reads the **D15 live-attempt predicate** (attempt
+     status ∈ `#{:running :validating}` for the run's `:current-step-id`) from
+     canonical `:state*` **at execute time** and **no-ops** when the attempt is no
+     longer live — so it cannot abort an already-completed/superseded turn or a reused
+     `:execution-session-id`;
+   - worker `future-cancel(true)` of an already-cancelled / completed / absent future
+     is a JVM no-op;
+   - `:runtime/mark-workflow-jobs-terminal` reconciles idempotently from canonical
+     state (D13/D16);
+   - the re-entrant `:runtime/dispatch-event` remove re-enters a dispatch whose
+     apply-phase `remove-run` dissoc is idempotent (removing an absent record is a
+     no-op).
+
+Both layers are required: (1) makes the common sequential idempotency case emit zero
+effects (and is what backs the "no-op terminal request emits no effects" claim); (2)
+makes the narrow concurrent-CAS race harmless where (1) cannot suppress an
+already-computed effect list. Together they align D4/D20's idempotency /
+no-double-terminal claim with the actual pre-CAS pure-result effect-emission shape: a
+terminal transition that does not apply `:cancelled` initiates no **observable**
+cancellation side effect.
+
+**Cross-reference (D4/D20).** D4 and D20's "second terminal request is a no-op" now
+reads: the **state** no-op is the in-`swap!`-fn guard (D20); the **effect** no-op is
+the handler-before gate (D22.1) for sequential requests plus effect-level idempotency
+(D22.2) for the concurrent-CAS race.
 
 ## Design Questions — Resolution status (ψ, 2026-06-10)
 
