@@ -97,6 +97,13 @@ In scope:
   `:execution-session-id`, never a run's `:parent-session-id` (D15); the D3
   cascade enumerates non-terminal (`#{:pending :running :blocked}`) descendants by
   `:delegating-run-id` parentage.
+- **Direct** cancellation of a nested sub-run (Evidence step 2): in scope. The
+  cascade runs downward from the cancelled sub-run only; the worker
+  `future-cancel(true)` is **not** emitted (it is reserved for top-level-run
+  cancels — D14/D19); the downward child-abort unblocks the shared parent worker,
+  the sub-run reaches `:cancelled`, and the parent observes it as a **failed
+  delegate step** via the existing `delegate-step-runtime-result` `:cancelled`
+  case and continues (the parent is not halted) — D19.
 - Modelling the cancellation side effects as canonical dispatch `:runtime/*`
   effects (parity: `effect-schema` + `execute-effect!`) executed by the dispatch
   `:effects` interceptor — child-session abort reusing the existing
@@ -116,7 +123,9 @@ Out of scope:
 
 - The duplicate-tool_result fix (task 224 — already closed).
 - Redesigning the workflow step machine or the delegate result-delivery paths
-  beyond what cancellation propagation requires.
+  beyond what cancellation propagation requires. (Direct sub-run cancellation
+  reuses the *existing* `delegate-step-runtime-result` `:cancelled` → failed-step
+  mapping — D19 — so it stays inside this boundary; no new result-delivery path.)
 - Force-killing threads / abrupt unsafe termination as the primary stop mechanism
   — the one-off REPL `Thread.interrupt` on a non-interrupt-aware worker during the
   Evidence recovery (`Thread.stop`-style abandonment, not an API). This is
@@ -270,9 +279,11 @@ reject-while-live. A `remove` request on a live run:
    cascade per D3) **and** the job-terminalization effect (D13), all in the same
    **cancel dispatch** while the run record is still present,
 3. removes the run record from the registry/`inflight-runs` in a **distinct,
-   subsequent remove dispatch** (D17) — not within the cancel dispatch's effect
-   set — so the job is terminalized (step 2) before the canonical record is
-   dropped.
+   subsequent remove dispatch** (D17), chained from the cancel dispatch via a
+   re-entrant `:runtime/dispatch-event` effect ordered after the
+   terminalization/cancellation effects (D18) — not within the cancel dispatch's
+   own apply phase — so the job is terminalized (step 2) before the canonical
+   record is dropped.
 
 The `future-cancel` interrupt (D8) guarantees the worker stops even though its run
 record and canonical signal are gone after removal — so removal cannot re-orphan
@@ -524,6 +535,15 @@ single top-level run's future**: the run-tree root, i.e. the ancestor reached by
 walking `:delegating-run-id` upward until the run that owns the `inflight-runs`
 entry. There is exactly **one** such future for the whole synchronous sub-tree.
 
+**Emission rule (refined by D19).** The walk-up framing here describes how the
+single worker interrupt is *targeted* during a **top-level** run's top-down
+cascade. It is **not** emitted when a nested sub-run is cancelled **directly** —
+interrupting the shared top-level worker would wrongly disrupt the still-`:running`
+parent. So the worker `future-cancel(true)` is emitted **iff the directly-cancelled
+run is itself the top-level run** that owns the `inflight-runs` entry; a direct
+sub-run cancel emits no worker interrupt and relies on the downward child-session
+abort to unblock the parked worker (D19).
+
 The recursive D3 sub-run cancel therefore emits, **per in-flight sub-run** (not a
 per-sub-run future-cancel — there is no target):
 
@@ -680,6 +700,14 @@ Serialized dispatch (D4 single-writer) guarantees dispatch 2 observes dispatch 1
 applied state, so the ordering (terminalize → then remove) holds across the two
 dispatches even though it is impossible within one.
 
+**Trigger/chaining mechanism (D18).** Dispatch 2 is issued by dispatch 1 as
+**effects-as-data**: the cancel dispatch's effect set ends with a re-entrant
+`:runtime/dispatch-event` follow-on effect (an existing canonical effect, no new
+type) that enqueues/re-enters the remove dispatch, ordered after the
+terminalization + cancellation effects. See D18 for the wiring and why option (a)
+(re-entrant effect) is chosen over option (b) (synchronous two `dispatch` calls in
+the command layer).
+
 **Why split, not effect-payload self-containment.** The rejected alternative —
 make `:runtime/mark-workflow-jobs-terminal` carry the run identity + `:cancelled`
 outcome in its payload so it terminalizes without re-reading the canonical run —
@@ -699,6 +727,109 @@ ordering mechanism. D16(2)'s `:cancelled` reconcile branch remains required (it 
 what terminalizes the still-present cancelled run in the cancel dispatch);
 together D16(2) + D17 satisfy the "no lingering job" guarantee under
 apply-before-effects.
+
+## Ambiguity Reconciliations (ψ pass 3, 2026-06-10)
+
+Resolves the two pass-3 ambiguity follow-ups: the D17 two-dispatch chaining
+mechanism, and the contract for **direct** cancellation of a nested sub-run.
+Neither redesigns the step machine.
+
+### D18. D17 two-dispatch chaining = a re-entrant `:runtime/dispatch-event` follow-on effect emitted by the cancel dispatch (reuse existing effect; option (a))
+
+D17 splits cancel-then-remove across two serialized dispatches but did not state
+**how** the second (remove) dispatch is issued/ordered after the cancel dispatch
+for a single remove-of-live-run request. Decision: option (a) — the cancel
+dispatch emits the remove dispatch as **effects-as-data**, not option (b)
+(synchronous two `dispatch` calls in the `remove` command/mutation layer, which
+would put orchestration logic in the mutation in tension with D1's
+no-inline-orchestration boundary).
+
+**Mechanism — reuse the existing `:runtime/dispatch-event` effect; no new effect
+type is in scope.** A re-entrant dispatch-emits-dispatch effect **already exists**
+in the codebase: `:runtime/dispatch-event` (`dispatch_effects.clj`) whose
+`execute-effect!` calls `dispatch/dispatch!` from within the `:effects`
+interceptor. `dispatch!` runs the interceptor chain synchronously on the calling
+thread with no global lock, so the nested dispatch is a reentry-safe in-thread call
+(the pattern is already used by scheduler drain/post-tool flows). The follow-up's
+premise "doc/architecture.md documents no re-entrant dispatch-emits-dispatch effect
+today" is accurate only about the *documentation*: the effect exists in code but is
+not described in the "Dispatch sequencing contract" section. So no new
+follow-on-dispatch effect type is added; the only artifact gap is a doc update
+(document `:runtime/dispatch-event` re-entrancy in the sequencing contract),
+handled by the change-chain doc step when implemented.
+
+**Wiring (within the cancel dispatch's effect set, ordered):**
+
+1. the D13 `:runtime/mark-workflow-jobs-terminal` effect (terminalize the job with
+   the run still present), then
+2. the D12 cancellation effects (worker `future-cancel`/interrupt + D3/D14/D15
+   cascade), then
+3. a `:runtime/dispatch-event` effect targeting the remove event
+   (`{:effect/type :runtime/dispatch-event :event-type <remove-run dispatch>
+   :event-data {:run-id …}}`), which re-enters dispatch to apply the pure
+   `remove-run` dissoc.
+
+Effects within a dispatch execute in declared order, so the terminalize effect (1)
+runs before the re-entrant remove dispatch (3) — i.e. the job is terminalized while
+the run record is still resolvable via `workflow-in`, satisfying D17/D16(1)
+terminalize-before-remove. The re-entrant remove dispatch is itself a serialized
+dispatch (D4 single-writer), so it observes the applied `:cancelled` state. Plain
+`cancel` (no remove) simply omits effect (3); a direct `remove` of a live run is
+the only flow that emits (3). This keeps the chaining as effects-as-data at the
+dispatch boundary (consistent with D1/D12) rather than command-layer orchestration.
+
+### D19. Direct cancellation of a nested sub-run: in scope; parent observes a failed delegate step and continues (does not halt the parent)
+
+Direct cancellation of a nested sub-run (Evidence step 2) is **in scope** with a
+pinned contract that reuses the existing delegate result-delivery path — it is
+**not** a redesign of delegate result-delivery (which stays out of scope).
+
+**Cascade direction.** The transitive cascade (D3/D14/D15) always operates
+**downward** from the directly-cancelled run: the `:cancelled` signal (pull) and
+the per-in-flight-attempt child-session abort (D15) are emitted for the cancelled
+run **and each of its in-flight descendant sub-runs** — never upward to ancestors.
+
+**Worker future-cancel emission rule (refines D14).** The worker
+`future-cancel(true)` interrupt (D12/D14) is emitted **only when the
+directly-cancelled run is itself the top-level run** that owns the `inflight-runs`
+entry. When the directly-cancelled run is a **nested sub-run**, **no** worker
+`future-cancel(true)` is emitted — interrupting the shared top-level worker would
+wrongly disrupt the still-`:running` parent (and every sibling sub-run on that
+thread). D14's "walk `:delegating-run-id` upward to the top-level future" describes
+how the single worker interrupt is *targeted* during a **top-level** cancel's
+top-down cascade; it is **not** a license to interrupt the top-level worker when a
+sub-run is cancelled directly.
+
+**How the shared worker is unblocked for a direct sub-run cancel.** The parent
+worker is parked in the cancelled sub-run's (or a deeper descendant's)
+`send-and-drain` deref of an in-flight child turn. The **downward child-session
+abort** (D15) for that in-flight attempt terminates the turn, which lets the
+sub-run's cooperative checkpoint observe its `:cancelled` signal (D2/D10) and drive
+the sub-run statechart to its `:cancelled` terminal — returning control to the
+parent worker from `send-and-drain`. So child-abort, not a worker interrupt, is the
+wake mechanism in the sub-run case. (If the cancelled sub-run has no live LLM
+attempt — e.g. it is itself parked awaiting a *deeper* delegate sub-run — the D3
+downward cascade aborts that deeper descendant's in-flight turn, which unblocks the
+worker the same way.)
+
+**Parent-run + cancelled-sub-run result-delivery contract.** When `send-and-drain`
+returns, `delegate-step-runtime-result` reads the sub-run's
+`(:status delegate-run) = :cancelled` and returns its **existing** `:cancelled`
+case — `{:pending-kind :failure :payload {:message "Delegated workflow cancelled"
+…}}`. The parent run (still `:running`) therefore observes the directly-cancelled
+sub-run as a **failed delegate step** via the already-present delegate
+result-delivery path, and **continues** per its normal step-failure handling
+(fail-step / step recovery as the parent definition specifies). The parent is **not
+halted**: a child cancel must not kill a still-running parent. This is exactly the
+existing `delegate.clj` `:cancelled` → failure mapping (`λ extend` compose; no new
+mechanism), so it sits inside the "Redesigning … delegate result-delivery paths"
+out-of-scope boundary.
+
+Top-down cancellation of the **parent** (top-level) run is unchanged: there the
+parent itself is the runaway, so the single top-level worker `future-cancel(true)`
+*is* emitted (D14) and the parent terminates — distinct from the direct-sub-run
+case above. Scope is updated to name direct sub-run cancellation in scope with this
+failed-delegate-step contract.
 
 ## Design Questions — Resolution status (ψ, 2026-06-10)
 

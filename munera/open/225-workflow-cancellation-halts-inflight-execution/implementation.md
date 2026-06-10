@@ -606,3 +606,63 @@ implementer hits when wiring D17 and the Evidence's direct sub-run cancel:
 
 Both are contract gaps an implementer hits immediately; neither redesigns the step
 machine.
+
+## Ambiguity follow-up resolution (ψ pass 3, 2026-06-10)
+
+Executed both pass-3 ambiguity follow-up design-steps. Both were design-decision
+steps (pin a contract in design.md); both completable now — no blockers. Code
+premises verified before deciding:
+
+- `:runtime/dispatch-event` (`dispatch_effects.clj:186`) **already exists** as a
+  re-entrant dispatch-emits-dispatch effect: its `execute-effect!` calls
+  `dispatch/dispatch!` from the `:effects` interceptor. `kernel/dispatch!`
+  (`state-kernel/dispatch.clj:387`) runs the interceptor chain synchronously
+  in-thread with no global lock → reentry-safe (pattern already used by
+  scheduler/post-tool flows). So item-1 option (a) needs **no new effect type**;
+  the follow-up's "no re-entrant effect today" premise is true only of the *doc*
+  (the effect exists in code, just undocumented in the sequencing contract).
+- `delegate-step-runtime-result` (`statechart_runtime/delegate.clj`) **already has
+  a `:cancelled` case** in its status `case`: returns `{:pending-kind :failure
+  :payload {:message "Delegated workflow cancelled" …}}`. So a directly-cancelled
+  sub-run already maps to a failed delegate step via the existing result-delivery
+  path — item-2 needs no new mechanism (stays within the out-of-scope boundary).
+- `cancel-run`/`remove-run` are the `reset!`-after-guard Pathom mutations
+  (`mutations/canonical_workflows.clj:220,244`); `remove-run` pure dissoc
+  (`workflow-runtime/core.clj`).
+
+Resolutions written to design.md as "Ambiguity Reconciliations (ψ pass 3)" D18–D19,
+with D17, D5 step 3, D14, Scope, and the out-of-scope note updated:
+
+- D18 — D17's two-dispatch chaining is option (a): the cancel dispatch emits the
+  remove dispatch as **effects-as-data** via the **existing** `:runtime/dispatch-event`
+  effect (no new follow-on-dispatch type in scope), ordered after the D13
+  terminalize + D12 cancellation effects in the cancel dispatch's effect set →
+  terminalize-before-remove holds (effects run in declared order; the re-entrant
+  remove dispatch is itself D4-serialized). Option (b) (synchronous two `dispatch`
+  calls in the `remove` mutation/command layer) rejected — command-layer
+  orchestration in tension with D1. Noted residual artifact gap: document
+  `:runtime/dispatch-event` re-entrancy in doc/architecture.md's "Dispatch
+  sequencing contract" (change-chain doc step at implementation time).
+
+- D19 — direct nested sub-run cancellation is **in scope**. Cascade runs **downward
+  only** from the cancelled run (signal + per-attempt child abort to it and its
+  in-flight descendants). The worker `future-cancel(true)` is emitted **iff the
+  directly-cancelled run is the top-level run** (owns the `inflight-runs` entry);
+  for a direct sub-run cancel it is **not** emitted (would disrupt the
+  still-`:running` parent + siblings on the shared thread). The downward
+  child-session abort terminates the in-flight turn, the sub-run reaches
+  `:cancelled` terminal, `send-and-drain` returns, and
+  `delegate-step-runtime-result`'s **existing** `:cancelled` case maps it to a
+  failed delegate step; the parent run continues per normal step-failure handling
+  and is **not halted** (a child cancel must not kill a running parent). D14's
+  future-cancel emission rule refined (walk-up targets the single interrupt during
+  a top-level cascade; not a license to interrupt the worker on a direct sub-run
+  cancel); Scope adds the direct-sub-run-cancel bullet; the out-of-scope
+  delegate-result-delivery note now points to D19 (reuse, not redesign).
+
+Consistency check: D18 is consistent with D1/D12 (effects-as-data at the dispatch
+boundary), D4 (re-entrant remove dispatch is serialized), D13/D16/D17 (terminalize
+before the record drop). D19 is consistent with D3/D14/D15 (downward cascade,
+single top-level future, per-attempt abort target) and D6 ("no new side effects
+after the checkpoint" for the cancelled sub-run while the parent legitimately
+continues its own work). No step-machine redesign; no new contradictions introduced.

@@ -229,7 +229,7 @@
 
 ## Ambiguity follow-ups (ψ pass 3, 2026-06-10)
 
-- [ ] Specify the D17 two-dispatch trigger/sequencing mechanism for
+- [x] Specify the D17 two-dispatch trigger/sequencing mechanism for
       remove-of-live-run: state how the second (remove) dispatch is issued and
       ordered after the cancel dispatch for a single `remove` request. Decide
       between (a) the cancel dispatch emitting a re-entrant dispatch effect
@@ -240,7 +240,13 @@
       dispatch-emits-dispatch effect today, so state whether a new follow-on-dispatch
       effect type is in scope. Update D17/D5 step 3 so the chaining mechanism is
       expressible and fits the effects-as-data boundary.
-- [ ] Pin (or explicitly scope out) the contract for **direct** cancellation of a
+      → design.md D18: option (a) — re-entrant follow-on effect reusing the
+      **existing** `:runtime/dispatch-event` effect (no new effect type in scope),
+      emitted by the cancel dispatch ordered after terminalize+cancel effects;
+      option (b) rejected (command-layer orchestration vs D1). Doc gap noted
+      (`:runtime/dispatch-event` re-entrancy undocumented in the sequencing
+      contract — change-chain doc step). D17 + D5 step 3 updated.
+- [x] Pin (or explicitly scope out) the contract for **direct** cancellation of a
       nested sub-run (Evidence step 2). Because sub-runs share the single top-level
       worker thread and D14's `future-cancel(true)` walks `:delegating-run-id` up to
       the shared top-level future, directly cancelling a sub-run interrupts the
@@ -252,3 +258,11 @@
       say so explicitly in Scope; otherwise pin the parent-run + cancelled-sub-run
       result-delivery contract. Reconcile with the "Redesigning … delegate
       result-delivery paths" out-of-scope note.
+      → design.md D19: in scope. Cascade runs downward only; worker
+      `future-cancel(true)` emitted iff the cancelled run is the top-level run
+      (not for a direct sub-run cancel — would disrupt the still-running parent).
+      Downward child-abort unblocks the shared parent worker; sub-run reaches
+      `:cancelled`; parent observes a **failed delegate step** via the existing
+      `delegate-step-runtime-result` `:cancelled` case and continues (not halted).
+      D14 emission rule refined; Scope + out-of-scope note updated; reuses existing
+      result-delivery path (no redesign).
