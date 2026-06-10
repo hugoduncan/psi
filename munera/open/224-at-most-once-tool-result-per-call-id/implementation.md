@@ -1157,3 +1157,27 @@ New actionable inconsistencies (see steps.md → "Plan/steps inconsistency revie
    `conv/add-tool-result` `:95` (matching design.md).
 
 No blockers; two actionable plan/steps inconsistencies.
+
+## Plan/steps inconsistency follow-up resolution (steps) — first pass
+
+Executed both first-pass plan/steps inconsistency-review follow-up items; both
+landed in plan.md (no code/test/doc touched — pure plan↔steps reconciliation).
+
+Code verified before editing:
+- `conv/add-tool-result` at `conversation.clj:95` (sole `tool_result`-block
+  emitter, inside `append-tool-result-msg`); `agent-messages->ai-conversation`
+  (the rebuild fn) at `conversation.clj:136`.
+
+- **(1) Slice-B test enumeration reconciled.** plan.md Slice-order Slice B
+  previously listed three tests (reproduction + normal-single-result +
+  interrupt-only); steps.md Slice B lists a fourth (at-most-once
+  concurrent-completion). Added the concurrent-completion at-most-once test to
+  plan.md's Slice-B enumeration (it had appeared only in plan.md Risks), so
+  plan.md and steps.md now agree on four Slice-B tests.
+- **(2) `conversation.clj` citation fixed.** plan.md §3 mis-cited
+  `agent-messages->ai-conversation` as the block emitter at `conversation.clj:95`.
+  Rewrote to cite the rebuild fn at `:136` and attribute block emission to
+  `conv/add-tool-result` (inside `append-tool-result-msg`) at `:95`, matching
+  design.md's De-dup Location bullet and the code.
+
+No blockers; both items completed.

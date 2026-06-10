@@ -39,9 +39,10 @@ Two complementary fixes plus docs, decomposed as vertical slices:
    drops a `toolResult`-role projected message whose `:tool-call-id` already
    appeared (first occurrence wins, purely derived from the journal). The
    downstream conversation rebuild (`turn_runtime/conversation.clj`
-   `agent-messages->ai-conversation`, the sole `tool_result`-block emitter,
-   `conversation.clj:95`) consumes the de-duped list and is **not** a second
-   de-dup site.
+   `agent-messages->ai-conversation`, `conversation.clj:136`) consumes the
+   de-duped list and is **not** a second de-dup site; the sole
+   `tool_result`-block emitter is `conv/add-tool-result` (inside
+   `append-tool-result-msg`, `conversation.clj:95`).
 
 ## Key decisions (from design, not re-litigated here)
 
@@ -83,9 +84,12 @@ Two complementary fixes plus docs, decomposed as vertical slices:
   path (start a pending tool-call, drive `abort-in!`, then a late real result →
   assert exactly one `toolResult` entry for the id at the raw recorded layer:
   journal + agent-core in-memory history), then make the handler pure-guarded so
-  it passes. Add normal-single-result and interrupt-only coverage. No separate
-  clearing wiring needed — handled by Slice-A init seeding; just confirm no
-  journal-only `/clear` reset bypasses `initialize-session-slots`.
+  it passes. Add normal-single-result coverage, interrupt-only coverage, and an
+  **at-most-once concurrent-completion** test (real result recorded first → real
+  result kept, interrupt suppressed; assert exactly one result, not which one,
+  per the determinism framing). No separate clearing wiring needed — handled by
+  Slice-A init seeding; just confirm no journal-only `/clear` reset bypasses
+  `initialize-session-slots`.
 - **Slice C — defensive projection de-dup + test.** Drop duplicate `toolResult`
   projected messages in `journal->provider-messages`; add a test that a journal
   pre-populated with duplicate `toolResult` entries projects to exactly one

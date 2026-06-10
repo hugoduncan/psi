@@ -128,7 +128,7 @@
 
 ## Plan/steps inconsistency review follow-ups
 
-- [ ] **Reconcile the Slice-B test enumeration between plan.md and steps.md.**
+- [x] **Reconcile the Slice-B test enumeration between plan.md and steps.md.**
       plan.md Slice order Slice B lists only three Slice-B tests (reproduction +
       "normal-single-result and interrupt-only coverage"); steps.md Slice B lists
       a **fourth** test — "asserting at-most-once under the concurrent-completion
@@ -137,7 +137,10 @@
       steps.md writes 4. Add the concurrent-completion at-most-once test to
       plan.md's Slice-B enumeration (it currently appears only in plan.md Risks
       as a constraint) so the two files agree on Slice-B coverage.
-- [ ] **Fix the plan.md `conversation.clj` line citation to match design/code.**
+      → **Resolved:** plan.md Slice-B enumeration now lists four tests —
+      reproduction + normal-single-result + interrupt-only + at-most-once
+      concurrent-completion — matching steps.md Slice B.
+- [x] **Fix the plan.md `conversation.clj` line citation to match design/code.**
       plan.md §3 ("Defensive projection de-dup") cites
       "`agent-messages->ai-conversation`, the sole `tool_result`-block emitter,
       `conversation.clj:95`", but `agent-messages->ai-conversation` is at
@@ -146,3 +149,7 @@
       De-dup Location bullet distinguishes the rebuild fn (`:136`) from the block
       emitter (`:95`). Update plan.md to cite the rebuild at `:136` and attribute
       block emission to `conv/add-tool-result` `:95`.
+      → **Resolved:** plan.md §3 now cites `agent-messages->ai-conversation` at
+      `conversation.clj:136` and attributes block emission to `conv/add-tool-result`
+      (inside `append-tool-result-msg`) `conversation.clj:95`. Line numbers
+      re-verified against code (`add-tool-result` :95, rebuild fn :136).
