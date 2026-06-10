@@ -112,6 +112,102 @@ Out of scope:
    the loop blocks on `send-and-drain` promises — likely both: a status poll at
    each step boundary plus interrupt-aware waits.
 
+## Architecture & Boundary Decisions (ψ, 2026-06-10)
+
+Resolves the four architecture-fit follow-ups raised by the design review. These
+state how cancellation maps onto the project's State boundary, effects-as-data,
+session-dispatch authority, and dispatch-serialization invariants — they do not
+redesign the step machine (still out of scope).
+
+### D1. Side effects as data at the runtime boundary (¬inline mutation side effects)
+
+The pure workflow-runtime transition functions stay pure. `cancel-run` /
+`remove-run` in `psi.workflow-runtime.core` remain `state → [state', run]` and
+perform **no** side effects: no `future-cancel`, no thread interrupt, no
+child-session abort inline.
+
+The three cancellation side effects (`future-cancel`/interrupt of the worker
+future, child-session abort) are modeled as **effects-as-data** returned from the
+cancel/remove path and executed at the orchestration runtime boundary — the layer
+that already owns `inflight-runs` (`psi.agent-session.workflow.orchestration` /
+`runtime_state`). Concretely the agent-session cancel/remove mutation:
+
+1. commits the pure canonical-state transition (signal → `:cancelled`), then
+2. emits a cancellation effect (e.g. `{:cancel-inflight-run {:run-id …}}` plus,
+   transitively, child-session abort effects) that the runtime boundary executes
+   against the future handle and the session-dispatch authority.
+
+This keeps side effects out of the pure transition and out of silent inline
+mutation bodies, satisfying AGENTS.md S1/S3 + `λ(state)` (effects flow as data,
+executed at the boundary). No legacy-mutation exception is taken; the only
+canonical-state write in the mutation is the pure status transition (see D4 for
+its serialization).
+
+### D2. Signal in canonical `:state*`; future/`inflight-runs` is a runtime handle
+
+The **cancellation signal** is the run's `:status :cancelled` already committed to
+canonical `:state*` at `(run-path run-id)` by `cancel-run`. The cooperative
+step-loop check reads this signal **via the read path** (`workflow-run-in` / a
+status read) at each step boundary and at interrupt-aware wait wake-ups, and exits
+promptly when it observes `:cancelled` (or a removed run).
+
+`inflight-runs` and the worker `future` stay a **pure runtime handle** (per
+doc/architecture.md "State boundary: canonical root vs runtime handles" — the
+workflow registry / pump thread is already listed as a handle, projected into
+`:state*` as background-job + workflow public data). The handle never becomes
+queryable domain state; only its observable status is projected. Split:
+
+- signal (status, terminal-outcome, history) ∈ canonical `:state*`
+- handle (future, job-id, thread) ∈ `inflight-runs` runtime handle
+
+The step loop is driven by the **signal** (pull via read path), not by reaching
+into the handle.
+
+### D3. Transitive cascade owned by the agent-session session-dispatch authority
+
+The cancellation cascade (nested delegate sub-runs + child agent sessions) is
+owned by a coordinated dispatch path routed through the agent-session
+session-dispatch authority — not ad-hoc cross-handle reach-in and **not** a
+propagation shim (AGENTS.md authority + `λ shims_adapters`).
+
+- **Nested sub-runs:** the parent cancel enumerates in-flight nested sub-runs from
+  the canonical run-tree state (`:state*`) and dispatches a cancel for each
+  (recursively), reusing the same cancel mutation path. Discovery is from
+  canonical state via the read path; no cross-handle reach-in.
+- **Child agent sessions:** child-turn abort reuses the **existing** session
+  interrupt/abort pathway (`turn/abort-active-turn-in!` → `:session/abort`
+  dispatch → `agent-core/abort-in!` → context thread interrupt), which already
+  aborts an in-flight turn. This is `λ extend` compose-over-new-mechanism; no new
+  abort mechanism is introduced.
+
+agent-session remains the authoritative owner of session-dispatch invocation;
+workflow-runtime exposes pure domain APIs (run-tree reads, pure transitions) that
+the agent-session cascade composes.
+
+### D4. Terminal transitions route through serialized dispatch (single-writer)
+
+Terminal-state transitions (cancel / remove / natural complete) route through the
+serialized dispatch single-writer path (`state-kernel` dispatch pipeline) to earn
+the design's idempotent / no-double-terminal / cancel-during-wait race-safety —
+the same shape solved in task 224 by atomicity-from-dispatch-serialization.
+
+The current `reset!`-on-`:state*` check-then-write in the cancel/remove mutations
+is a TOCTOU race (status guard read, then unconditional `reset!`). The decision:
+the read-guard-and-commit of the terminal transition is performed atomically under
+the single serialized writer (dispatch), so that:
+
+- two concurrent cancels, or cancel racing natural completion, cannot both apply a
+  terminal transition (no double-terminal, no resurrection);
+- a cancel arriving during a blocking wait commits the signal atomically, and the
+  step loop observes it at the next read-path checkpoint (D2);
+- terminal transitions are idempotent — a second terminal request on an
+  already-terminal run is a no-op via the in-pipeline guard, not a racy outer check.
+
+This supersedes ad-hoc guards on a directly-`reset!`'d atom. The pure transition
+functions keep their argument-checks (terminal-status precondition) but the
+authoritative atomicity comes from dispatch serialization, not the mutation's
+outer `when` guard.
+
 ## Acceptance Criteria
 
 - A test cancels a multi-step workflow run mid-flight and asserts that **no step
