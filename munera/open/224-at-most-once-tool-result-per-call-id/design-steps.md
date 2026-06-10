@@ -193,3 +193,32 @@
       (`prompt_request.clj:111`) emits provider message maps;
       `append-tool-result-msg` → `conv/add-tool-result` (`conversation.clj:95`)
       is the sole block emitter, one per `toolResult` message.
+
+# Design follow-up — ambiguity review (third pass)
+
+- [ ] Disambiguate whether the at-most-once guarantee **depends on an exhaustive
+      producer enumeration** or only on the **general funnel property** (every
+      producer dispatches the single event `:session/tool-agent-record-result`,
+      so the chokepoint guard covers any producer regardless of how many exist).
+      Root Cause step 2 ("There are **two distinct interrupt producers**") and
+      D1's atomicity bullet ("the **two interrupt producers** … and the
+      **real-result path** … The single chokepoint covers all three producers")
+      read as an exhaustive count, while the same text also asserts the general
+      funnel property — a reader cannot tell which the invariant relies on. The
+      enumeration is in fact **incomplete**: code has **three** interrupt
+      producers (four dispatch sites total), not two —
+      `dispatch_effects.clj:127/134` (statechart-effect path),
+      `turn.clj:217/223` (synchronous abort path), and the omitted
+      **`session_close.clj:55/61` `repair-pending-tool-calls-before-close!`**
+      (session-close path, called by `close-session-in!`), all enumerating
+      `:pending-tool-calls` and dispatching the `"interrupted"` toolResult, plus
+      the real-result path `tool_runtime_adapter.clj:114`; all converge on the
+      handler `session_mutations.clj:529`. Resolve by either (a) stating the
+      guarantee rests on the funnel property and dropping the exhaustive-count
+      language ("two interrupt producers" / "covers all three producers"), or
+      (b) completing the enumeration to include the session-close producer.
+      Also acknowledge that the close path can itself produce a duplicate for one
+      pending id (abort-in!'s interrupt at `turn.clj:223` plus
+      `repair-pending-tool-calls-before-close!` both enumerate the same
+      `:pending-tool-calls` during close), which the recorded-ids guard
+      suppresses but the design never mentions.

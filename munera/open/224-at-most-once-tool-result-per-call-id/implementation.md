@@ -438,3 +438,46 @@ Fit confirmed; **no new actionable architectural misfit**:
   rejected for the architecturally-aligned Option C.
 
 No new follow-up items; prior architecture-fit items remain resolved by D1.
+
+## Ambiguity review (design.md) — third pass
+
+Re-reviewed design.md for ambiguities (statements admitting >1 interpretation),
+not architecture-fit/correctness. Prior ambiguity + inconsistency items remain
+resolved. Audited every dispatcher of `:session/tool-agent-record-result` in
+code to ground the producer-enumeration claims.
+
+New actionable ambiguity (see design-steps.md):
+1. **The at-most-once guarantee's reliance on an *exhaustive* producer
+   enumeration vs. the *general funnel* property is ambiguous — and the
+   enumeration is in fact incomplete.** Root Cause step 2 asserts "There are
+   **two distinct interrupt producers** in the code", and D1's atomicity bullet
+   says "The racing producers all dispatch the same event …: the **two interrupt
+   producers** … and the **real-result path** … The single chokepoint covers
+   all three producers." This reads as an exhaustive count (two interrupt + one
+   real = three). But the same bullets also state a general property ("any later
+   dispatch of the same id reads it already present and is suppressed"), under
+   which the enumeration is illustrative, not load-bearing. A reader cannot tell
+   whether the invariant's soundness *depends on* the enumeration being complete
+   (in which case it must be correct) or only on the funnel (all producers
+   dispatch the one event, enumeration irrelevant). This matters because the
+   enumeration is **incomplete**: code has **three** interrupt producers, not
+   two — a third enumerates `:pending-tool-calls` and dispatches
+   `:session/tool-agent-record-result` with an `"interrupted"` toolResult at
+   session close:
+   - statechart-effect path `dispatch_effects.clj:127/134` (`:on-agent-done`)
+   - synchronous abort path `turn.clj:217/223` (`abort-in!`)
+   - **session-close path `session_close.clj:55/61`
+     `repair-pending-tool-calls-before-close!`** (called by `close-session-in!`)
+   So four dispatch sites converge on the handler `session_mutations.clj:529`,
+   not three. The single-chokepoint fix still covers the omitted producer (it
+   dispatches the same event), but the design's "two interrupt producers" /
+   "covers all three producers" wording is factually incomplete, and the
+   close path can itself record a duplicate for one pending id (abort-in!'s
+   interrupt at `turn.clj:223` plus `repair-pending-tool-calls-before-close!`
+   both enumerate the same `:pending-tool-calls` during close), which the design
+   never acknowledges. Resolve by either (a) stating the guarantee rests on the
+   funnel property (every producer dispatches the one event; enumeration is
+   illustrative, not exhaustive) and dropping the exhaustive-count language, or
+   (b) completing the enumeration to include the session-close producer.
+
+No blockers; one actionable ambiguity.
