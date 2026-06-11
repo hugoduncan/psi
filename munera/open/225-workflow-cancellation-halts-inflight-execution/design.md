@@ -1182,16 +1182,71 @@ No Design Questions remain live.
 
 ## Acceptance Criteria
 
-- A test cancels a multi-step workflow run mid-flight and asserts that **no step
-  attempt is started after the cancel checkpoint** and the run reaches a clean
-  `:cancelled` terminal state with its background job terminal.
-- A test asserts `remove` of a live run does not leave a running worker future /
-  orphaned thread (future is cancelled, inflight cleared only after cancel).
-- A test asserts cancellation propagates to a nested delegate sub-run: its child
-  session is signalled to stop so its turn does not advance the parent.
-- No **new** side effects (commits, journal writes, new child sessions) are
-  initiated after the cancel checkpoint — the in-flight turn is interrupted and at
-  most one already-in-flight tool call may complete (D6) — verified in a
-  nullable/controlled harness.
-- `bb test` green; clj-kondo clean; CHANGELOG updated (user-visible: cancelling a
-  delegated workflow now actually stops it).
+Each criterion is tagged **[guaranteed]** (a definition-of-done requirement an
+implementer must cover with a test) or **[out-of-test-scope]** (a true-concurrency
+race whose harmlessness is asserted by construction/code review, not a deterministic
+test). The criteria are reconciled with D14/D19/D21/D22 so the test surface covers
+the motivating Evidence cases.
+
+### Top-level run cancellation
+
+1. **[guaranteed]** A test cancels a multi-step **top-level** workflow run mid-flight
+   and asserts that **no step attempt is started after the cancel checkpoint** and the
+   run reaches a clean `:cancelled` terminal state with its background job terminal.
+2. **[guaranteed]** A test asserts `remove` of a live **top-level** run does not leave
+   a running worker future / orphaned thread: the single top-level run's future is
+   `future-cancel`'d (D14) and its `inflight-runs` entry is cleared only after the
+   cancel dispatch terminalizes the job (cancel-then-remove, D5/D17). (Criterion #2 is
+   explicitly **qualified to a top-level run** — the worker `future-cancel` target is
+   the single top-level run, never a sub-run, per D14.)
+3. **[guaranteed]** No **new** side effects (commits, journal writes, new child
+   sessions) are initiated after the cancel checkpoint — the in-flight turn is
+   interrupted and at most one already-in-flight tool call may complete (D6) —
+   verified in a nullable/controlled harness.
+
+### Transitive / nested sub-run propagation
+
+4. **[guaranteed]** A test asserts top-down cancellation propagates to a nested
+   delegate sub-run: each in-flight descendant's child session is aborted (D15) so its
+   turn does not advance, and the cancelled run plus its in-flight descendants reach
+   `:cancelled` terminal via the single multi-run apply-phase transition (D23). **No**
+   per-sub-run worker `future-cancel` is emitted (sub-runs are synchronous, carry no
+   own future — D14); only the single top-level future is interrupted.
+5. **[guaranteed]** A test asserts `remove` of a live **nested sub-run** (the nested
+   variant of criterion #2): its guarantee is child-turn abort + the parent observing
+   **run-absence ≡ `:cancelled`** and **continuing** (not halted) — and **no** worker
+   `future-cancel` is emitted (D14/D19/D21). (Distinct from criterion #2's top-level
+   future cancellation.)
+
+### Evidence-step-2 direct cases
+
+6. **[guaranteed]** A test asserts **direct cancel of a nested sub-run** (Evidence
+   step 2): the downward child abort unblocks the shared parent worker, the sub-run
+   reaches `:cancelled`, and the parent observes a **failed delegate step** via the
+   existing `delegate-step-runtime-result` `:cancelled` case and **continues, not
+   halted** (D19). No worker `future-cancel` is emitted for the sub-run.
+7. **[guaranteed]** A test asserts **direct `remove` of a live sub-run**: after the
+   record is dropped, the parent reading **run-absence** (`nil` delegate-run) maps to
+   the **same** failed-delegate-step result as `:cancelled` (D21), so the parent's
+   continue-not-halt outcome is race-independent across the cancel-vs-remove timing.
+
+### Idempotency / race-safety
+
+8. **[guaranteed]** A test asserts a repeated/**sequential** terminal request (a
+   second `cancel`, the `cancel`-half of `remove`-of-already-terminal, or a `cancel`
+   after natural completion) is a no-op that **emits no cancellation effects** — the
+   handler-before terminal-precondition gate contributes `identity` + empty effect set
+   when the run is already terminal/absent (D22.1) — while the `remove-run` record-drop
+   **still applies** to an already-terminal run (D22.1; not re-orphaned).
+9. **[out-of-test-scope]** Execute-time idempotency on the **true-concurrent** CAS
+   race (two cancels racing on two threads both emitting effects, D20 applying
+   `:cancelled` once): `:runtime/agent-abort` re-checks the D15 live-attempt predicate
+   at execute time and no-ops a non-live attempt; `future-cancel`, terminalize, and
+   the re-entrant remove are inherently idempotent (D22.2). Harmlessness is established
+   by construction/code review (the narrow concurrent race is not deterministically
+   reproducible), not a deterministic test.
+
+### Build gates
+
+10. **[guaranteed]** `bb test` green; clj-kondo clean; CHANGELOG updated
+    (user-visible: cancelling a delegated workflow now actually stops it).

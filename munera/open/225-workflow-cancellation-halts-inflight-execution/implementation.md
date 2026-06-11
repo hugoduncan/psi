@@ -1066,3 +1066,35 @@ longer matches the pinned contracts.
 These are acceptance-contract (definition-of-done / test-surface) ambiguities, not
 step-machine redesigns. Prior passes treated acceptance reconciliation as in-scope
 for ambiguity review (D6 updated acceptance #3/#4), so this fits the profile.
+
+## Ambiguity follow-up resolution (ψ pass 5, 2026-06-10)
+
+Executed the single pass-5 ambiguity follow-up design-step (reconcile the
+Acceptance Criteria with D14/D19/D21/D22). A design-decision step (rewrite the
+acceptance/test surface in design.md); completable now — no blocker. All referenced
+decisions already exist (D14, D19, D21, D22), so this was pure reconciliation, no
+new contract pinned.
+
+Rewrote the Acceptance Criteria section into 10 numbered criteria, grouped
+(top-level / transitive nested / Evidence-step-2 direct / idempotency / build), each
+explicitly tagged **[guaranteed]** (definition-of-done, derive a test) or
+**[out-of-test-scope]** (true-concurrency race, harmlessness by construction):
+
+- (a) **Criterion #2 qualified to a top-level run** — the worker `future-cancel`
+  target is the single top-level run only (D14); added **#5** as the nested sub-run
+  remove variant whose guarantee is child-turn abort + parent observing run-absence
+  ≡ `:cancelled` + continuing, **no** worker future-cancel (D14/D19/D21).
+- (b) Added Evidence-step-2 direct cases: **#6** direct cancel of a nested sub-run →
+  parent observes a failed delegate step and **continues, not halted** (D19); **#7**
+  direct `remove` of a live sub-run → run-absence ≡ `:cancelled`, race-independent
+  (D21); **#8** sequential terminal idempotency → no cancellation effects emitted +
+  record-drop still applies [guaranteed] (D22.1); **#9** concurrent-CAS execute-time
+  idempotency [out-of-test-scope] (D22.2, narrow non-reproducible race).
+- #4 now also states the no-per-sub-run-future-cancel + single multi-run
+  apply-phase transition (D14/D23); #10 keeps the build gates.
+
+Consistency check: the rewritten criteria are consistent with D14 (single top-level
+future), D19/D21 (parent continues on failed delegate step / run-absence), D22
+(sequential gate vs concurrent execute-time idempotency), and D23 (multi-run
+apply-phase cascade). No new contract introduced; only the test/definition-of-done
+surface made unambiguous. No step-machine redesign.

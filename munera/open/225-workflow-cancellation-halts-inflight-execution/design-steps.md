@@ -417,7 +417,7 @@
 
 ## Ambiguity follow-ups (ψ pass 5, 2026-06-10)
 
-- [ ] Reconcile the Acceptance Criteria section with D14/D19/D21/D22 so the
+- [x] Reconcile the Acceptance Criteria section with D14/D19/D21/D22 so the
       test / definition-of-done surface is unambiguous and covers the motivating
       Evidence cases. (a) Qualify criterion #2 ("`remove` of a live run … future is
       cancelled") to a **top-level** run, and add (or explicitly note) the nested
@@ -432,3 +432,14 @@
       idempotent effects on the concurrent-CAS race (D22.2). State which are
       guaranteed acceptance requirements (vs out-of-test-scope) so an implementer
       deriving tests from the acceptance criteria covers them.
+      → design.md Acceptance Criteria rewritten: 10 numbered criteria grouped
+      (top-level / transitive / Evidence-step-2 direct / idempotency / build),
+      each tagged [guaranteed] or [out-of-test-scope]. Criterion #2 qualified to a
+      top-level run (single top-level future, D14); criterion #5 adds the nested
+      sub-run remove variant (child abort + parent observes run-absence ≡
+      `:cancelled` + continues, no worker future-cancel — D14/D19/D21). #6 direct
+      sub-run cancel → parent failed-delegate-step + continues-not-halted (D19);
+      #7 direct sub-run remove → run-absence ≡ `:cancelled` race-independent (D21);
+      #8 sequential terminal idempotency → no cancellation effects + record-drop
+      still applies [guaranteed] (D22.1); #9 concurrent-CAS execute-time idempotency
+      [out-of-test-scope] (D22.2).
