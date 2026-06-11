@@ -1733,3 +1733,23 @@ ordering case; guarded workflow aborts reuse `:runtime/agent-abort` without
 breaking unguarded aborts; direct nested sub-run cancel/remove preserves parent
 continuation via existing delegate failure semantics. No new `design-steps.md`
 follow-up item added.
+
+## Ambiguity review (ψ pass 17, 2026-06-11)
+
+Reviewed `design.md` for ambiguity only after the pass-15 wording fixes, consulting
+current dispatch effect schema/executor code (`dispatch_schema.clj`,
+`dispatch_effects.clj`) and the workflow `inflight-runs` handle path. Did not review
+`plan.md` or `steps.md`.
+
+One new actionable ambiguity found:
+
+1. **Worker future-cancel effect type/payload is not pinned.** D12/D14/D18/D23 require
+   a canonical dispatch `:runtime/*` effect that `future-cancel(true)`s the top-level
+   worker future via `inflight-runs`, with effect-schema + `execute-effect!` parity.
+   Unlike D24 (`:runtime/drop-inflight-run`) and D18 (`:runtime/dispatch-event`), the
+   design never names the exact `:effect/type` keyword or payload shape for this
+   worker-cancel effect. Builders/tests could choose different representations
+   (`:runtime/cancel-inflight-run`, `:runtime/workflow-future-cancel`, etc.) while
+   still satisfying the prose. Pin one keyword and required keys.
+
+No other new actionable ambiguity found in the current D1–D34 design.

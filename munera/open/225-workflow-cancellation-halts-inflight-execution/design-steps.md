@@ -766,3 +766,10 @@
       `:workflow-step-id`, `:workflow-attempt-id`, `:expected-session-id`) as the
       workflow-cancellation emit rule. It explicitly reserves bare session-id-only
       aborts for unguarded non-workflow emissions.
+
+## Ambiguity follow-ups (ψ pass 17, 2026-06-11)
+
+- [ ] Pin the canonical worker-future-cancel effect representation: exact
+      `:effect/type` keyword, required payload keys, and target semantics for the
+      top-level workflow run's `inflight-runs` future. Update D12/D14/D18/D23,
+      effect-schema/executor implications, and tests to use that single shape.
