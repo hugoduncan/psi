@@ -79,8 +79,17 @@
   (when (stopped?)
     (throw (workflow-stopped-ex message data))))
 
+(defn- maybe-call-judge-start-hook!
+  [ctx judge-sid stop-data]
+  (when-let [f (:before-workflow-judge-start-fn ctx)]
+    (f ctx judge-sid stop-data)))
+
 (defn- execute-judge-turn-if-live!
   [ctx judge-sid prompt opts stopped? stop-data]
+  (assert-workflow-live! stopped?
+                         "Workflow execution stopped before judge turn"
+                         stop-data)
+  (maybe-call-judge-start-hook! ctx judge-sid stop-data)
   (assert-workflow-live! stopped?
                          "Workflow execution stopped before judge turn"
                          stop-data)
@@ -108,8 +117,9 @@
                               :operation-result operation-result}}})
 
 (defn- execute-invoke-judge!
-  [ctx parent-session-id judge-spec routing-table {:keys [current-step-id step-order step-runs workflow-run-id workflow-run]}]
-  (let [invoke-spec (or (:invoke judge-spec) judge-spec)
+  [ctx parent-session-id judge-spec routing-table {:keys [current-step-id step-order step-runs workflow-run-id workflow-run stopped?]}]
+  (let [stopped? (or stopped? (constantly false))
+        invoke-spec (or (:invoke judge-spec) judge-spec)
         args (workflow-source-resolution/resolve-invoke-args workflow-run current-step-id (:args invoke-spec))
         operation-result (op-reg/invoke-operation-in
                           (:deterministic-operation-registry ctx)
@@ -117,9 +127,17 @@
                           {:ctx ctx
                            :parent-session-id parent-session-id
                            :workflow-run-id workflow-run-id
+                           :workflow-attempt-id (some-> workflow-run
+                                                        (get-in [:step-runs current-step-id :attempts])
+                                                        last
+                                                        :attempt-id)
                            :step-id current-step-id
                            :args args}
                           deterministic-op-runtime/invoke-operation)]
+    (assert-workflow-live! stopped?
+                           "Workflow execution stopped after invoke judge"
+                           {:workflow-run-id workflow-run-id
+                            :workflow-step-id current-step-id})
     (if (= :ok (:status operation-result))
       (let [judge-event (:data operation-result)
             routing-result (workflow-judge/evaluate-routing judge-event routing-table

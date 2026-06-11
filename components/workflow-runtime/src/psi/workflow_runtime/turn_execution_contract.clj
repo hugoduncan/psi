@@ -74,17 +74,76 @@
       execution-session-id
       (assoc :session-id execution-session-id))))
 
-(defn- workflow-session-stop-signal
+(defn- workflow-session-data
   [ctx session-id]
+  (when-let [get-session-data (:get-session-data (execution-adapter/adapter ctx))]
+    (get-session-data ctx session-id)))
+
+(defn- workflow-session-stop-signal-for
+  [ctx session-data]
   (when-let [state* (:state* ctx)]
-    (let [session-data (when-let [get-session-data (:get-session-data (execution-adapter/adapter ctx))]
-                         (get-session-data ctx session-id))
-          run-id (:workflow-run-id session-data)
+    (let [run-id (:workflow-run-id session-data)
           run (when run-id (get-in @state* [:workflows :runs run-id]))]
       (when (and (:workflow-owned? session-data) run-id)
         (cond
           (nil? run) :removed
           (= :cancelled (:status run)) :cancelled)))))
+
+(defn- latest-attempt-index
+  [attempts]
+  (when (seq attempts)
+    (dec (count attempts))))
+
+(defn- reserve-workflow-turn-start-in-state
+  [state-map {:keys [workflow-run-id workflow-step-id workflow-attempt-id]}]
+  (let [run (get-in state-map [:workflows :runs workflow-run-id])
+        attempt-path [:workflows :runs workflow-run-id :step-runs workflow-step-id :attempts]
+        attempts (get-in state-map attempt-path)
+        latest-idx (latest-attempt-index attempts)
+        latest-attempt (when latest-idx (nth attempts latest-idx))]
+    (cond
+      (nil? run)
+      {:state state-map :reserved? false :reason :removed}
+
+      (= :cancelled (:status run))
+      {:state state-map :reserved? false :reason :cancelled}
+
+      (not= workflow-attempt-id (:attempt-id latest-attempt))
+      {:state state-map :reserved? false :reason :attempt-mismatch}
+
+      :else
+      {:state (update-in state-map (conj attempt-path latest-idx)
+                         (fn [attempt]
+                           (-> attempt
+                               (assoc :turn-started-at (java.time.Instant/now))
+                               (update :turn-start-count (fnil inc 0)))))
+       :reserved? true})))
+
+(defn- reserve-workflow-turn-start!
+  [ctx session-data]
+  (if-not (and (:workflow-owned? session-data)
+               (:workflow-run-id session-data)
+               (:workflow-step-id session-data)
+               (:workflow-attempt-id session-data)
+               (:state* ctx))
+    {:reserved? true}
+    (loop []
+      (let [state* (:state* ctx)
+            state-map @state*
+            {:keys [state reserved? reason]} (reserve-workflow-turn-start-in-state state-map session-data)]
+        (cond
+          (not reserved?) {:reserved? false :reason reason}
+          (compare-and-set! state* state-map state) {:reserved? true}
+          :else (recur))))))
+
+(defn- maybe-call-workflow-turn-start-hook!
+  [ctx session-id session-data]
+  (when (and (:workflow-owned? session-data)
+             (:workflow-run-id session-data))
+    (when-let [f (:before-workflow-turn-start-fn ctx)]
+      (f ctx session-id {:workflow-run-id (:workflow-run-id session-data)
+                         :workflow-step-id (:workflow-step-id session-data)
+                         :workflow-attempt-id (:workflow-attempt-id session-data)}))))
 
 (defn- stopped-execution-result
   [session-id reason]
@@ -102,9 +161,15 @@
 
 (defn- prompt-execution-result
   [ctx session-id text images opts]
-  (if-let [reason (workflow-session-stop-signal ctx session-id)]
-    (stopped-execution-result session-id reason)
-    (execution-adapter/prompt-execution-result! ctx session-id text images opts)))
+  (let [session-data (workflow-session-data ctx session-id)]
+    (if-let [reason (workflow-session-stop-signal-for ctx session-data)]
+      (stopped-execution-result session-id reason)
+      (do
+        (maybe-call-workflow-turn-start-hook! ctx session-id session-data)
+        (let [{:keys [reserved? reason]} (reserve-workflow-turn-start! ctx session-data)]
+          (if-not reserved?
+            (stopped-execution-result session-id reason)
+            (execution-adapter/prompt-execution-result! ctx session-id text images opts)))))))
 
 (defn execute-session-turn!
   "Execute one bounded prompt turn for `session-id` using already-shaped prompt

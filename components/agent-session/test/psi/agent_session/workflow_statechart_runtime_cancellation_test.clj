@@ -5,6 +5,7 @@
    [psi.agent-session.turn]
    [psi.agent-session.test-support :as test-support]
    [psi.agent-session.workflow-judge]
+   [psi.deterministic-operation-registry.registry]
    [psi.workflow-registry.registry :as workflow-registry]
    [psi.workflow-runtime.attempts]
    [psi.workflow-runtime.core :as workflow-runtime]
@@ -409,6 +410,101 @@
           "the next candidate model must not be selected after cancellation")
       (is (= :running (:status attempt))
           "late fallback failure must not be recorded after cancellation"))))
+
+(deftest actor-turn-final-read-to-call-race-is-cancellation-safe-test
+  ;; Regression for task 225 implementation review pass 10: cancellation after
+  ;; the final workflow-state read but before the actor prompt adapter call must
+  ;; not initiate the ordinary actor turn.
+  (let [[ctx0 session-id] (create-session-context)
+        prompt-calls* (atom 0)
+        ctx (test-support/with-workflow-execution-adapter-overrides
+              (assoc ctx0
+                     :before-workflow-turn-start-fn
+                     (fn [ctx _session-id {:keys [workflow-run-id workflow-step-id]}]
+                       (swap! (:state* ctx)
+                              (fn [state]
+                                (-> state
+                                    (assoc-in [:workflows :runs workflow-run-id :status] :cancelled)
+                                    (assoc-in [:workflows :runs workflow-run-id :finished-at] (java.time.Instant/now))
+                                    (assoc-in [:workflows :runs workflow-run-id :terminal-outcome]
+                                              {:outcome :cancelled
+                                               :reason "actor final-start race"
+                                               :step-id workflow-step-id}))))))
+              {:get-session-data (fn [_ctx session-id]
+                                   {:session-id session-id
+                                    :workflow-owned? true
+                                    :workflow-run-id "run-actor-final-start-race"
+                                    :workflow-step-id "plan"
+                                    :workflow-attempt-id "attempt-plan"})
+               :prompt-execution-result! (fn [& _]
+                                           (swap! prompt-calls* inc)
+                                           {:execution-result/assistant-message
+                                            {:role "assistant"
+                                             :content [{:type :text :text "must not start"}]
+                                             :stop-reason :stop}})})
+        _ (install-run! ctx linear-definition "run-actor-final-start-race")
+        wf-ctx (runtime/create-workflow-context ctx session-id "run-actor-final-start-race")]
+    (with-redefs [psi.workflow-runtime.attempts/create-step-attempt-session!
+                  (fn [_ctx _parent-session-id _opts]
+                    {:attempt {:attempt-id "attempt-plan"
+                               :status :pending
+                               :execution-session-id "plan-child"}
+                     :execution-session {:session-id "plan-child"}})]
+      (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil))
+    (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-actor-final-start-race")
+          attempt (get-in run [:step-runs "plan" :attempts 0])]
+      (is (= :cancelled (:status run)))
+      (is (= 0 @prompt-calls*)
+          "the prompt adapter must not be called after cancellation wins the final read->call window")
+      (is (= :running (:status attempt))
+          "the stopped turn result must not be recorded as ordinary actor output"))))
+
+(deftest invoke-operation-final-read-to-call-race-is-cancellation-safe-test
+  ;; Regression for task 225 implementation review pass 10: cancellation after
+  ;; the deterministic-operation runtime's final workflow-state read but before
+  ;; the operation handler call must not invoke the handler.
+  (let [[ctx0 session-id] (create-session-context)
+        operation-calls* (atom 0)
+        op-reg (:deterministic-operation-registry ctx0)
+        _ (psi.deterministic-operation-registry.registry/register-operation-in!
+           op-reg
+           {:id "workflow/final-start-race"
+            :handler (fn [_]
+                       (swap! operation-calls* inc)
+                       {:status :ok :data {:started? true}})})
+        ctx (assoc ctx0
+                   :before-workflow-operation-start-fn
+                   (fn [ctx {:keys [workflow-run-id step-id]}]
+                     (swap! (:state* ctx)
+                            (fn [state]
+                              (-> state
+                                  (assoc-in [:workflows :runs workflow-run-id :status] :cancelled)
+                                  (assoc-in [:workflows :runs workflow-run-id :finished-at] (java.time.Instant/now))
+                                  (assoc-in [:workflows :runs workflow-run-id :terminal-outcome]
+                                            {:outcome :cancelled
+                                             :reason "invoke final-start race"
+                                             :step-id step-id}))))))
+        definition {:definition-id "invoke-final-start-race"
+                    :steps [{:name "invoke"
+                             :type :invoke
+                             :operation "workflow/final-start-race"
+                             :args {}}
+                            {:name "next"
+                             :type :session
+                             :contributions [{:type :template
+                                              :text "Next"
+                                              :vars {}}]}]}
+        _ (install-run! ctx definition "run-invoke-final-start-race")
+        wf-ctx (runtime/create-workflow-context ctx session-id "run-invoke-final-start-race")]
+    (runtime/send-and-drain! wf-ctx (:wm wf-ctx) :workflow/start nil)
+    (let [run (workflow-runtime/workflow-run-in @(:state* ctx) "run-invoke-final-start-race")
+          attempt (get-in run [:step-runs "invoke" :attempts 0])]
+      (is (= :cancelled (:status run)))
+      (is (= 0 @operation-calls*)
+          "the operation handler must not be called after cancellation wins the final read->call window")
+      (is (= :running (:status attempt))
+          "the stopped operation result must not be recorded as ordinary invoke output")
+      (is (empty? (get-in run [:step-runs "next" :attempts]))))))
 
 (deftest cancel-during-judged-step-judge-turn-does-not-record-judge-output-test
   ;; Regression for task 225 implementation review pass 2: cancellation during a

@@ -2708,3 +2708,31 @@ invoke starts.
 Verification during review:
 
 - `bb clojure:test:scry --namespace psi.agent-session.workflow-cancellation-dispatch-test --namespace psi.agent-session.workflow-statechart-runtime-cancellation-test --namespace psi.workflow-runtime.turn-execution-contract-test --namespace psi.deterministic-operation-runtime.core-test --namespace psi.agent-session.workflow-judge-test` → 39 tests / 193 assertions green.
+
+## Implementation follow-up pass 10 (ψ, 2026-06-11)
+
+Executed the pass-10 final read→call cancellation follow-up. The remaining
+check-then-call gates now use a cancellation-safe start reservation immediately
+before ordinary work starts:
+
+- workflow-owned actor and judge turn starts CAS-mark the latest live attempt with
+  `:turn-started-at` / `:turn-start-count` after the review-injected final race
+  window and before calling the prompt adapter; if cancellation/removal wins that
+  CAS, the prompt adapter is not invoked and the caller receives a workflow-stopped
+  result;
+- deterministic-operation starts CAS-mark the latest live invoke attempt with
+  `:operation-started-at` / `:operation-start-count` after the final race window
+  and before invoking the operation handler; if cancellation/removal wins, the
+  handler is not invoked and a `:workflow-stopped` operation result is returned;
+- invoke-step and invoke-judge callers also re-check after the operation returns so
+  a cancellation racing during operation execution does not record ordinary invoke
+  outputs.
+
+Added regressions for cancellation in the forced final read→call window for actor
+turn start, judge turn start, and deterministic operation invocation.
+
+Validation:
+
+- `bb clojure:test:scry --namespace psi.workflow-runtime.turn-execution-contract-test --namespace psi.deterministic-operation-runtime.core-test --namespace psi.agent-session.workflow-judge-test --namespace psi.agent-session.workflow-statechart-runtime-cancellation-test` → 34 tests / 151 assertions green.
+- `bb clojure:test:scry --namespace psi.agent-session.workflow-execution-test --namespace psi.agent-session.workflow-execution-cancellation-test --namespace psi.agent-session.workflow-invoke-runtime-test --namespace psi.workflow-runtime.statechart-runtime.step-execution-test --namespace psi.workflow-runtime.terminal-contract-execution-test` → 31 tests / 166 assertions green.
+- Focused `clj-kondo --lint` over changed cancellation source/test files → clean.

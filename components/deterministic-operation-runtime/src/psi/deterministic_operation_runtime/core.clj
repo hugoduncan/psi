@@ -26,6 +26,64 @@
           (nil? run) :removed
           (= :cancelled (:status run)) :cancelled)))))
 
+(defn- latest-attempt-index
+  [attempts]
+  (when (seq attempts)
+    (dec (count attempts))))
+
+(defn- reserve-workflow-operation-start-in-state
+  [state-map {:keys [workflow-run-id workflow-attempt-id step-id]}]
+  (let [run (get-in state-map [:workflows :runs workflow-run-id])
+        attempt-path [:workflows :runs workflow-run-id :step-runs step-id :attempts]
+        attempts (get-in state-map attempt-path)
+        latest-idx (latest-attempt-index attempts)
+        latest-attempt (when latest-idx (nth attempts latest-idx))]
+    (cond
+      (nil? run)
+      {:state state-map :reserved? false :reason :removed}
+
+      (= :cancelled (:status run))
+      {:state state-map :reserved? false :reason :cancelled}
+
+      (nil? latest-idx)
+      {:state state-map :reserved? false :reason :attempt-missing}
+
+      (and workflow-attempt-id
+           (not= workflow-attempt-id (:attempt-id latest-attempt)))
+      {:state state-map :reserved? false :reason :attempt-mismatch}
+
+      :else
+      {:state (update-in state-map (conj attempt-path latest-idx)
+                         (fn [attempt]
+                           (-> attempt
+                               (assoc :operation-started-at (java.time.Instant/now))
+                               (update :operation-start-count (fnil inc 0)))))
+       :reserved? true})))
+
+(defn- reserve-workflow-operation-start!
+  [invocation]
+  (if-not (and (get-in invocation [:ctx :state*])
+               (:workflow-run-id invocation)
+               (:step-id invocation))
+    {:reserved? true}
+    (loop []
+      (let [state* (get-in invocation [:ctx :state*])
+            state-map @state*
+            {:keys [state reserved? reason]} (reserve-workflow-operation-start-in-state state-map invocation)]
+        (cond
+          (not reserved?) {:reserved? false :reason reason}
+          (compare-and-set! state* state-map state) {:reserved? true}
+          :else (recur))))))
+
+(defn- maybe-call-workflow-operation-start-hook!
+  [operation invocation]
+  (when (:workflow-run-id invocation)
+    (when-let [f (get-in invocation [:ctx :before-workflow-operation-start-fn])]
+      (f (:ctx invocation)
+         {:operation-id (:id operation)
+          :workflow-run-id (:workflow-run-id invocation)
+          :step-id (:step-id invocation)}))))
+
 (defn- workflow-stopped-result
   [operation invocation reason]
   {:status :error
@@ -58,7 +116,11 @@
   (let [result (if-let [reason (workflow-stop-signal invocation)]
                  (workflow-stopped-result operation invocation reason)
                  (try
-                   ((:handler operation) (assoc invocation :operation-id (:id operation)))
+                   (maybe-call-workflow-operation-start-hook! operation invocation)
+                   (let [{:keys [reserved? reason]} (reserve-workflow-operation-start! invocation)]
+                     (if-not reserved?
+                       (workflow-stopped-result operation invocation reason)
+                       ((:handler operation) (assoc invocation :operation-id (:id operation)))))
                    (catch Throwable t
                      {:status :error
                       :reason :operation-threw

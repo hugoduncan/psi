@@ -52,9 +52,18 @@
                           {:ctx ctx
                            :parent-session-id parent-session-id
                            :workflow-run-id run-id
+                           :workflow-attempt-id (some-> workflow-run
+                                                        (get-in [:step-runs step-id :attempts])
+                                                        last
+                                                        :attempt-id)
                            :step-id step-id
                            :args args}
                           deterministic-op-runtime/invoke-operation)]
+    (when (state/workflow-stopped? ctx run-id)
+      (throw (ex-info "Workflow execution stopped after invoke operation"
+                      {:reason (state/workflow-stop-signal ctx run-id)
+                       :run-id run-id
+                       :step-id step-id})))
     {:effective-args args
      :operation-result operation-result}))
 
