@@ -2197,3 +2197,21 @@ interrupt a parent/top-level worker (exact-key drop only).
 
 Also updated D35's test implication to include terminal top-level remove and absent
 remove cleanup and to assert absence for terminal nested-sub-run remove.
+
+## Architecture-fit review (ψ pass 34, 2026-06-11)
+
+Reviewed current `design.md` for architectural fit only after the pass-33 D35
+runtime-handle cleanup reconciliation. Consulted AGENTS.md VSM/principles,
+META.md, and `doc/architecture.md` state-boundary, dispatch sequencing,
+replay-trim, dispatch-trace, ctx-managed-service, and adapter/public-surface
+contracts. Did not review `plan.md` or `steps.md`.
+
+No new actionable architectural-fit feedback found. The design remains aligned:
+canonical workflow cancel/remove is owned by state-kernel events with public
+surfaces as adapters; cancellation state changes stay in canonical `:state*`;
+runtime handles are reached through ctx-injected canonical `:runtime/*` effects;
+effect schema/executor parity, replay trimming, and dispatch trace cover the real
+side effects; top-level/terminal/absent handle cleanup preserves the no-orphan
+invariant without inferring parent workers for nested sub-runs; and the cascade is
+a pure multi-run apply-phase transition with guarded abort effects. No new
+`design-steps.md` follow-up item added.
