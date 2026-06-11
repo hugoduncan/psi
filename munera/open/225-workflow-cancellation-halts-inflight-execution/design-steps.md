@@ -843,3 +843,19 @@
       :origin :core}`. Pathom mutations, psi-tool cancel, and delegate remove route
       into these keyword events and do not call workflow-runtime pure functions or
       mutate `inflight-runs` directly. D18 placeholder replaced.
+
+## Inconsistency follow-ups (ψ pass 21, 2026-06-11)
+
+- [ ] Align D1's owner wording with the D26/D37 state-kernel entry-event taxonomy.
+      D1 still says the "agent-session cancel/remove mutation" commits the
+      canonical `:cancelled` transition and emits cancellation effects, and that the
+      mutation's only canonical-state write is the pure status transition. D26/D37
+      instead make the Pathom mutation symbols thin adapters: the registered
+      state-kernel keyword handlers `:psi.workflow/cancel-run` and
+      `:psi.workflow/remove-run` own the shared cancel-transition helper, effect
+      set, and remove branch; Pathom/psi-tool/delegate surfaces route into those
+      events and must not call workflow-runtime pure functions or mutate handles
+      directly. Reword D1 so the **state-kernel handlers/events** commit the pure
+      transition and return the canonical effects-as-data, while Pathom mutations
+      are public adapters only. This avoids two owners for the same transition/effect
+      boundary and prevents reintroducing direct Pathom mutation writes.

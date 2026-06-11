@@ -1882,3 +1882,23 @@ Executed the newly added pass-20 design follow-up; no blockers.
 - Stated routing: Pathom mutation symbols remain public adapters, while Pathom,
   psi-tool cancel, and delegate remove route into the keyword dispatch events and
   must not directly call workflow-runtime pure functions or mutate `inflight-runs`.
+
+## Inconsistency review (ψ pass 21, 2026-06-11)
+
+Reviewed current `design.md` for internal/design-vs-artifact inconsistency after
+D37. Did not review `plan.md` or `steps.md`.
+
+One new actionable inconsistency found:
+
+1. **D1 still assigns the canonical transition/effects to the Pathom mutation,
+   contradicting D26/D37's state-kernel event ownership.** D1 says the
+   "agent-session cancel/remove mutation" commits the pure canonical-state
+   transition and emits cancellation effects, and that the mutation's only
+   canonical-state write is the pure status transition. But D26/D37 now say the
+   public Pathom mutation symbols are thin adapters: the registered state-kernel
+   keyword handlers (`:psi.workflow/cancel-run`, `:psi.workflow/remove-run`) own the
+   shared cancel-transition helper, effect set, and remove branch; Pathom/psi-tool/
+   delegate surfaces route into those events and must not call workflow-runtime pure
+   functions or mutate handles directly. Leaving D1's mutation-owned wording gives
+   two different owners for the same transition/effect boundary and could lead an
+   implementer to keep direct Pathom mutation writes that D37 explicitly forbids.
