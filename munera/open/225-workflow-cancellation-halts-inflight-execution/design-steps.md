@@ -486,3 +486,28 @@
       by `(swap! inflight-runs dissoc run-id)` (`workflow/core.clj:493`). Scope's
       natural-completion `orchestration.clj` cleanups stay out of scope. D17 step 2,
       D5 step 3, Acceptance #2, and the Scope effects bullet updated.
+
+## Architecture-fit follow-ups (ψ pass 7, 2026-06-10)
+
+- [ ] Commit a handle-reachability mechanism for the D12 worker `future-cancel` and
+      D24 `:runtime/drop-inflight-run` cancellation/cleanup effects, reconciling the
+      design's repeated "the `inflight-runs` handle reached **via `ctx`**"
+      (D12/D24) with the code-confirmed fact that `inflight-runs` is a process-global
+      `(defonce inflight-runs (atom {}))` (`runtime_state.clj:11`,
+      aliased `workflow/core.clj:31`) **not on the dispatch `ctx`** (absent from
+      `context.clj`). Every existing `:runtime/*` handler reaches workflow runtime
+      state through a **ctx-injected fn/handle** wired in `context.clj`
+      (`:runtime/mark-workflow-jobs-terminal` → `((:mark-workflow-jobs-terminal-fn
+      ctx) ctx)`; `:runtime/agent-abort` via `(effect-session-id ctx …)`). State
+      either (a) thread `inflight-runs` onto the dispatch `ctx` (a `context.clj`
+      injection, in scope) so the new `execute-effect!` methods reach it via `ctx`
+      with parity to the existing `:runtime/*` handlers (honoring the asserted "via
+      ctx" wording), or (b) explicitly justify the new handlers reaching the
+      `defonce` global directly as a documented exception — noting that (b) diverges
+      from the ctx-injection parity of every other `:runtime/*` effect and is the
+      extension-local-hidden-state pattern META.md cautions against (managed services
+      keyed on ctx, ¬extension-local hidden state), coupling the new effects to a
+      process-global atom (replay/test-isolation hazard). Update D12/D24 so the
+      handle-reachability mechanism is committed and the "via ctx" premise is either
+      made true (a) or replaced (b). (AGENTS.md S1 effects / `λ parity` / `λ(state)`;
+      META.md managed-services-on-ctx; design.md D1/D2/D12/D24)

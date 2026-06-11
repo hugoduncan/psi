@@ -1188,3 +1188,49 @@ interceptor, replay-trimmed/traced), and D17/D18 (two-dispatch ordering;
 future-cancel in dispatch 1, handle-drop in dispatch 2). No new contradictions; no
 step-machine redesign; the cancellation effect set gains one cleanup effect on the
 existing dispatch-effect pathway.
+
+## Architecture-fit review (ψ pass 7, 2026-06-10)
+
+Fresh architecture-fit pass over design.md against AGENTS.md VSM (S1 effects /
+S3 dispatch, `λ parity`, `λ(state)`, `λ shims_adapters`), META.md (managed services
+keyed on ctx, ¬extension-local hidden state), doc/architecture.md (State boundary,
+dispatch sequencing, replay-trim, dispatch trace). D1–D24 commit the effects-as-data
+boundary, signal/handle split, multi-run cascade, two-dispatch cancel-then-remove,
+atom-CAS atomicity, and the `:runtime/drop-inflight-run` cleanup effect (D24). Those
+all fit.
+
+One **new** actionable misfit (the D12/D24 "via ctx" handle-reachability premise is
+code-false and uncommitted):
+
+1. **Cancellation/cleanup effect handles reached "via ctx" — but `inflight-runs` is
+   a process-global `defonce` atom, not on ctx.** D12 and D24 both assert the new
+   worker `future-cancel` and `:runtime/drop-inflight-run` `execute-effect!` methods
+   reach "the `inflight-runs` handle reached **via `ctx`**" ("which already reaches
+   `inflight-runs` via `ctx`"). Code-confirmed this premise is false:
+   `inflight-runs` is a free-standing `(defonce inflight-runs (atom {}))` in
+   `runtime_state.clj:11`, aliased in `workflow/core.clj:31`, and never placed on the
+   dispatch `ctx` (absent from `context.clj`; it is only passed as a plain arg in
+   local option maps to orchestration fns). Every existing `:runtime/*` handler that
+   touches workflow runtime state reaches it through a **ctx-injected fn/handle**
+   wired in `context.clj` — e.g. `:runtime/mark-workflow-jobs-terminal` →
+   `((:mark-workflow-jobs-terminal-fn ctx) ctx)` (`dispatch_effects.clj:191`,
+   `context.clj:248`); `:runtime/agent-abort` keys off `(effect-session-id ctx …)`.
+   So the project's `:runtime/*` effect pattern is dependency-injection-through-ctx,
+   not direct namespace-global access. The design therefore leaves the new
+   cancellation/cleanup effects on an unstated, code-contradicted wiring: it neither
+   (a) commits to threading `inflight-runs` onto the dispatch `ctx` (a `context.clj`
+   injection change, in scope for the new effect handlers to honor the asserted "via
+   ctx" parity), nor (b) explicitly justifies the new handlers reaching the `defonce`
+   global directly. Direct-global access (b) diverges from the ctx-injection parity
+   of every other `:runtime/*` handler and is exactly the **extension-local hidden
+   state** META.md cautions against ("managed services keyed by logical identity …
+   reused within ctx rather than extension-local hidden state"), coupling the new
+   effects to a process-global atom (replay/test-isolation hazard) — undercutting the
+   D12/D24 parity + replay-closure rationale. Architectural-fit gap: the
+   handle-reachability mechanism for the D12/D24 cancellation/cleanup effects is
+   under-committed and rests on a false "via ctx" premise. Actionable — file as a
+   pass-7 architecture-fit follow-up. (AGENTS.md S1 effects / `λ parity` /
+   `λ(state)`; META.md managed-services-on-ctx; design.md D1/D2/D12/D24)
+
+No other new actionable architectural-fit misfit found; D1–D24 cover the remaining
+boundary commitments.
