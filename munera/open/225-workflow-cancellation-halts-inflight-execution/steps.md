@@ -136,3 +136,8 @@
   - Covered 2026-06-11: failed live-run attachment now aborts the just-created execution session through the workflow execution adapter; the existing step-entry race regression asserts the abort.
 - [x] Make judge child-session creation cancellation-safe: if cancellation wins after judge child-session creation but before `attach-judge-session-if-live!` records `:judge-session-id` on the latest attempt, the just-created judge session must be aborted/cleaned up rather than left untracked and unaddressable by guarded cancellation aborts. Add a regression for cancellation between judge session creation and judge-session attachment.
   - Covered 2026-06-11: failed judge-session attachment now aborts the just-created judge session through the workflow execution adapter; `workflow-judge-test` covers cancellation between creation and attachment.
+
+## Implementation review follow-ups (ψ pass 5, 2026-06-11)
+
+- [ ] Make ranked model fallback cancellation-safe: thread the workflow stop predicate into `execute-with-ranked-fallback!` (or equivalent) and re-check run presence/`:cancelled` before each fallback candidate turn after the first, so a cancel racing after one fallback-worthy actor failure cannot start another ordinary actor turn after the D31 checkpoint; add a regression for cancellation between fallback candidates.
+- [ ] Make judge retry loops cancellation-safe: re-check the workflow stop predicate immediately before every structured-output retry turn and every no-match retry turn in `execute-judge!`, so cancellation after a judge response is routed to retry cannot start another ordinary judge turn after the D31 checkpoint; add regression coverage for cancellation between judge retry attempts.

@@ -2536,3 +2536,22 @@ Additional gate verification after pass-4 follow-ups:
 
 - `bb test` → green.
 - `clj-kondo --lint components` → errors 0 / warnings 0; existing info-level suggestions outside this pass remain.
+
+## Implementation review (ψ pass 5, 2026-06-11)
+
+Reviewed the post-pass-4 implementation against `task-implementation-review`, the
+D30/D31 no-post-checkpoint ordinary child-turn contract, current task artifacts,
+and changed workflow runtime/judge code. The unattached actor/judge child-session
+follow-ups are implemented and covered.
+
+New actionable issue: retry/fallback loops can still start additional ordinary
+child turns after a D31 cancel checkpoint because the cancellation predicate is
+only checked outside the loop or after the retry turn returns. In
+`step_execution.clj`, `execute-with-ranked-fallback!` can proceed from one
+fallback-worthy model failure to the next `execute-actor-turn!` without rechecking
+workflow stop state between candidate attempts. In `workflow_judge.clj`, both
+structured-output judge retries and no-match judge retries can call
+`execute-judge-turn!` again after routing decides to retry but before a fresh stop
+check. These paths can initiate a new ordinary actor/judge turn after cancellation;
+follow-up should thread/check the stop predicate immediately before every fallback
+or judge retry turn and add regressions.
