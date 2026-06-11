@@ -129,3 +129,8 @@
 
 - [x] Make invoke-step attempt-data recording cancellation-safe: the post-`invoke-step-runtime-result` `merge-latest-attempt-data` write must re-check run presence/`:cancelled` inside the state update (or equivalent CAS-safe helper) so a cancel racing after the post-invoke stop check cannot record ordinary `:effective-args`/attempt metadata after the D31 checkpoint; add a regression test for cancel between the post-invoke stop check and the attempt-data write.
   - Covered 2026-06-11: invoke attempt-data now uses the existing CAS live-run helper; regression cancels during the metadata write window and asserts no `:effective-args`, ordinary result, or downstream session spawn after cancellation.
+
+## Implementation review follow-ups (ψ pass 4, 2026-06-11)
+
+- [ ] Make actor child-session creation cancellation-safe: if a D31 cancel checkpoint wins during/after `create-step-attempt-session!` but before the guarded attempt-start CAS attaches the attempt to the workflow run, the implementation must not leave an untracked ordinary workflow child session alive after cancellation; either attach/commit through a guarded protocol or immediately abort/cleanup the just-created session on failed live-run attachment. Add a regression for cancellation between actor child-session creation and attempt attachment.
+- [ ] Make judge child-session creation cancellation-safe: if cancellation wins after judge child-session creation but before `attach-judge-session-if-live!` records `:judge-session-id` on the latest attempt, the just-created judge session must be aborted/cleaned up rather than left untracked and unaddressable by guarded cancellation aborts. Add a regression for cancellation between judge session creation and judge-session attachment.

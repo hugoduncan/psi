@@ -2488,3 +2488,32 @@ Verification:
 - `bb clojure:test:scry --namespace psi.agent-session.workflow-execution-test` → 17 tests / 83 assertions green.
 - `bb clojure:test:scry --namespace psi.agent-session.workflow-statechart-runtime-cancellation-test --namespace psi.agent-session.workflow-execution-test --namespace psi.agent-session.workflow-judge-test --namespace psi.agent-session.workflow-cancellation-dispatch-test` → 48 tests / 242 assertions green.
 - `clj-kondo --lint components/workflow-runtime/src/psi/workflow_runtime/statechart_runtime.clj components/agent-session/test/psi/agent_session/workflow_execution_test.clj` → clean.
+
+## Implementation review (ψ pass 4, 2026-06-11)
+
+Reviewed the post-pass-3 implementation against `task-implementation-review`, the
+D31/D30 no-post-checkpoint ordinary-child-session contract, current steps, and the
+changed workflow cancellation code/tests. The prior invoke attempt-data race is fixed
+and covered; focused cancellation/execution suites and lint stayed green.
+
+New actionable issue: child-session creation itself is still outside the
+cancellation-safe commit/abort discipline. For normal session steps,
+`:step/enter` creates the workflow-owned child session before the guarded
+attempt-start CAS. If cancellation wins during/after `create-step-attempt-session!`
+but before the attempt is attached to the run, the attempt-start write is skipped
+and the turn does not run, but production can still leave a newly-created ordinary
+workflow child session after the D31 checkpoint with no recorded attempt for the
+D28 guarded abort to target. Judge execution has the same shape: `execute-judge!`
+creates the judge session before `attach-judge-session-if-live!`; if cancellation
+wins before attach, the judge output is suppressed but the just-created judge session
+is not recorded/aborted. Follow-up should make actor/judge child-session creation
+cancellation-safe by either moving creation behind an attach/commit protocol that
+can be guarded atomically, or immediately aborting/cleaning the just-created session
+when the live-run attach CAS fails; add regressions for cancellation between child
+session creation and run attempt/judge attachment.
+
+Verification during review:
+
+- `bb clojure:test:scry --namespace psi.agent-session.workflow-execution-cancellation-test --namespace psi.agent-session.workflow-statechart-runtime-cancellation-test --namespace psi.agent-session.workflow-cancellation-dispatch-test` → 21 tests / 96 assertions green.
+- `bb clojure:test:scry --namespace psi.agent-session.workflow-execution-test --namespace psi.agent-session.workflow-execution-cancellation-test` → 17 tests / 83 assertions green.
+- `clj-kondo --lint components/agent-session/test/psi/agent_session/workflow_execution_cancellation_test.clj components/agent-session/test/psi/agent_session/workflow_execution_test.clj` → clean.
