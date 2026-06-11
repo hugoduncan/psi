@@ -3020,3 +3020,29 @@ Added prompt-lifecycle regressions for cancellation between
 `:session/prompt-submit` and `:session/prompt`, and between `:session/prompt` and
 `:session/prompt-prepare-request`. Focused prompt-lifecycle and cancellation
 suites passed; focused lint for changed files passed.
+
+## Implementation review (ψ pass 20, 2026-06-11)
+
+Reviewed the pass-19 prompt-lifecycle guards against `task-implementation-review`,
+D30/D31, `turn/handlers.clj`, `dispatch_effects.clj`, and the prompt-lifecycle
+regressions. The `:session/prompt` and `:session/prompt-prepare-request` entry
+checks now block the tested pre-dispatch windows, and provider execution re-checks
+workflow stop state in the runtime prompt execution effects. One ordinary effect
+window remains.
+
+New actionable issue: the normal `:session/prompt-prepare-request` path
+(`return-execution-result?` false) emits a standalone `:memory/recover-query`
+effect before `:runtime/prompt-execute-and-record`. The prepare handler releases
+the cancellation-entry read lock when it returns the effect vector; a D31 cancel
+CAS can then land before the effects interceptor executes the first effect. The
+provider execution effect re-checks workflow cancellation, but the standalone
+memory recovery effect has no session/run metadata and will still run after the
+cancel checkpoint, contradicting the pass-19 contract that cancelled workflow-owned
+prompt preparation must not initiate memory recovery / provider execution after
+D31. Follow-up should make workflow-owned memory recovery (and any adjacent
+ordinary prompt-lifecycle cleanup effects emitted from prepare) cancellation-safe,
+for example by using a guarded combined runtime effect or adding workflow metadata
+and a stop check to the memory recovery effect. Add a regression that forces cancel
+after prepare handler/effect-vector construction but before effects execution.
+
+No tests run (review-only pass).
