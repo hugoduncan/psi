@@ -97,4 +97,4 @@
 
 ## Plan/steps inconsistency follow-ups (ψ, 2026-06-11)
 
-- [ ] Reconcile `plan.md`'s `remove-run` terminal/absent wording with D29/D34/D36b and Slice 3 steps: terminal remove drops an existing canonical record, while absent remove returns success/no-op with no canonical record found/removed and emits only the ordered stale-handle cleanup pair (`:runtime/cancel-inflight-run` then `:runtime/drop-inflight-run`).
+- [x] Reconcile `plan.md`'s `remove-run` terminal/absent wording with D29/D34/D36b and Slice 3 steps: terminal remove drops an existing canonical record, while absent remove returns success/no-op with no canonical record found/removed and emits only the ordered stale-handle cleanup pair (`:runtime/cancel-inflight-run` then `:runtime/drop-inflight-run`).

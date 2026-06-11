@@ -2268,3 +2268,12 @@ No production code/tests/docs were changed in this follow-up pass; the review it
 Reviewed `plan.md` and `steps.md` against the current D1–D38 design, prior review notes, Acceptance Criteria, and referenced cancel/remove dispatch/effect/runtime code. One new actionable inconsistency found:
 
 1. `plan.md` says the `remove-run` "terminal/absent pass drops the canonical record", but `design.md` D29/D34/D36b and `steps.md` distinguish terminal and absent remove: terminal remove drops an existing canonical record, while absent remove is a success/no-op canonical result with no record found/removed and only the ordered stale-handle cleanup pair. The plan wording conflates terminal and absent semantics and contradicts the step-level absent branch.
+
+## Plan/steps inconsistency follow-up resolution (ψ, 2026-06-11)
+
+Executed the newly added plan/steps inconsistency follow-up. Updated `plan.md` key decisions so `remove-run` terminal vs absent branches are no longer collapsed:
+
+- Terminal remove drops the existing canonical record and performs runtime-handle cleanup.
+- Absent remove returns success/no-op with no canonical record found/removed and emits only the ordered stale-handle cleanup pair (`:runtime/cancel-inflight-run` then `:runtime/drop-inflight-run`) per D29/D34/D36b.
+
+Marked the follow-up complete in `steps.md`. No code/tests/docs changes were required because the item was a planning-artifact reconciliation.
