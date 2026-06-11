@@ -1496,3 +1496,54 @@ The current design fits the project architecture:
   effects boundary or introducing hidden state.
 
 No new design-steps.md follow-up item added.
+
+## Ambiguity review (ψ pass 11, 2026-06-11)
+
+Fresh ambiguity pass over design.md (D1–D27 + Scope/Acceptance), consulting the
+relevant dispatch/effect code and doc/architecture.md. Four new actionable
+ambiguities found; none duplicate existing design-steps.
+
+1. **Workflow-cancellation `:runtime/agent-abort` liveness recheck is underspecified.**
+   D15 emits the existing `:runtime/agent-abort` keyed by `:session-id` (the
+   in-flight attempt's `:execution-session-id`), while D22.2 requires
+   `:runtime/agent-abort` to re-read the D15 live-attempt predicate from canonical
+   run state at execute time. The effect payload/read rule is not pinned: with only
+   `:session-id`, an implementer must guess whether to carry guard metadata
+   (`run-id`/`step-id`/attempt id/expected execution-session-id), scan canonical
+   runs by `:execution-session-id`, or apply the guard to every existing
+   `:runtime/agent-abort` use. Existing non-workflow abort emissions (e.g.
+   statechart `:on-abort`) also lack workflow run context, so the design must state
+   how workflow-specific execute-time idempotency composes with the reused generic
+   abort effect.
+
+2. **Idempotent terminal/absent API result semantics are unclear.** D4/D20/D22 say
+   repeated terminal requests are no-op/idempotent and D26 routes terminal/absent
+   `remove-run` to bare record-drop + cleanup, but the public mutation outputs have
+   `:error` / `:removed?` fields and current code errors on terminal cancel. The
+   design does not state what `cancel-run` returns for already-terminal/absent runs,
+   or what `remove-run` returns for absent/terminal runs, while still emitting no
+   cancellation effects. Implementers/test authors need the public success/error
+   contract, not only the state/effect contract.
+
+3. **"No new side effects / journal writes" conflicts with required cancellation
+   bookkeeping unless scoped.** D6 and Acceptance #3 forbid new side effects after
+   the cancel checkpoint, explicitly including journal writes. But the chosen design
+   requires cancellation-control effects and writes: `:cancelled` state, background
+   job terminalization, `:runtime/agent-abort` / session-abort consequences, possible
+   interruption/tool-result records, and `inflight-runs` cleanup. The design needs a
+   crisp distinction between forbidden child-work side effects (new tool calls,
+   commits, ordinary child-turn journal writes) and allowed/required cancellation
+   bookkeeping, otherwise tests can read Acceptance #3 as forbidding the abort path
+   the design mandates.
+
+4. **"Cancel checkpoint" is not a single testable boundary.** Acceptance #1/#3 and
+   D6/D7/D27 assert behaviour "after the cancel checkpoint", but the design does
+   not define whether that checkpoint is the cancel request, the apply-phase CAS
+   that writes `:cancelled`, interrupt delivery, or the worker's cooperative read
+   that observes `:cancelled`/run-absence. This matters for attempts or child
+   sessions started in the request→CAS→interrupt→read window, especially in the
+   direct sub-run case. The term should be defined once and applied consistently to
+   top-level and nested-run acceptance tests.
+
+No other new actionable ambiguity found; the remaining D1–D27 contracts otherwise
+choose single behaviours.

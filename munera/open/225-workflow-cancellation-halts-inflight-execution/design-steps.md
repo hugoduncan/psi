@@ -647,3 +647,38 @@
       D17's "two serialized dispatches" (686/711/727/809) describes in-thread
       *sequencing/ordering* (reconciled by D20, not the race-safety single-writer
       claim); 917/928/960/985 are D20's own reconciliation text. No blocker.
+
+## Ambiguity follow-ups (ψ pass 11, 2026-06-11)
+
+- [ ] Pin the execution-time idempotency payload/read rule for workflow-cancellation
+      `:runtime/agent-abort`. D15 emits the existing effect with `:session-id` = the
+      in-flight attempt's `:execution-session-id`, while D22.2 requires the executor
+      to re-read the D15 live-attempt predicate from canonical run state at execute
+      time. State whether workflow-cancel abort effects carry guard metadata
+      (`run-id`, `step-id`, attempt identity, expected `execution-session-id`) or the
+      executor locates the attempt by `:execution-session-id`; also state how existing
+      non-workflow `:runtime/agent-abort` emissions remain unguarded (or are otherwise
+      handled). Update D12/D15/D22.2 and any effect-schema/executor implications.
+
+- [ ] Define public result/error semantics for idempotent terminal/absent
+      `cancel-run` and `remove-run`. When the target run is already terminal,
+      absent, or naturally completes before cancel applies, state whether the API
+      returns success with the current/removed status, `:removed? true`, or an error,
+      while still emitting no cancellation effects. Align D4/D20/D22/D26, the
+      mutation output fields, and the acceptance tests.
+
+- [ ] Scope Acceptance #3's "no new side effects (commits, journal writes, new child
+      sessions)" against required cancellation bookkeeping. Explicitly distinguish
+      forbidden child workflow/turn side effects after cancellation (new tool calls,
+      commits, ordinary child-turn journal writes, new child sessions) from
+      allowed/required cancellation-control writes/effects (`:cancelled` state,
+      background-job terminalization, abort/interruption records if any, and
+      `inflight-runs` cleanup). Update D6 and Acceptance #3 so tests assert the
+      intended boundary.
+
+- [ ] Define the testable meaning of "cancel checkpoint" used by D6/D7/D27 and
+      Acceptance #1/#3. Choose whether it denotes the cancel request, the apply-phase
+      CAS that writes `:cancelled`, interrupt delivery, the worker's cooperative read
+      observing `:cancelled`/run-absence, or another event; state what work may
+      legally start in the request→CAS→interrupt→read window. Apply the same term
+      consistently to top-level and nested-run acceptance criteria.
