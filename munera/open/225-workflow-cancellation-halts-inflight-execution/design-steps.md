@@ -414,3 +414,21 @@
       distinguishing the cascade (intra-dispatch, all pure) from the remove
       re-dispatch (cross-dispatch, ordering-forced). No command-layer loop / no
       cross-handle reach-in. No blocker.
+
+## Ambiguity follow-ups (ψ pass 5, 2026-06-10)
+
+- [ ] Reconcile the Acceptance Criteria section with D14/D19/D21/D22 so the
+      test / definition-of-done surface is unambiguous and covers the motivating
+      Evidence cases. (a) Qualify criterion #2 ("`remove` of a live run … future is
+      cancelled") to a **top-level** run, and add (or explicitly note) the nested
+      sub-run remove variant whose guarantee is child-turn abort + the parent
+      observing run-absence ≡ `:cancelled` and continuing — **no** worker
+      `future-cancel` is emitted (D14/D19/D21). (b) Add acceptance criteria for the
+      Evidence-step-2 direct cases: direct cancel of a nested sub-run → parent
+      observes a failed delegate step and **continues, not halted** (D19); direct
+      remove of a live sub-run → run-absence treated identically to `:cancelled`
+      (D21); repeated/concurrent terminal-request **idempotency** → a no-op'd
+      terminal request emits no cancellation effects (D22.1) with execute-time
+      idempotent effects on the concurrent-CAS race (D22.2). State which are
+      guaranteed acceptance requirements (vs out-of-test-scope) so an implementer
+      deriving tests from the acceptance criteria covers them.

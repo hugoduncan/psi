@@ -1030,3 +1030,39 @@ update fn — now multi-run), D18 (re-entrant dispatch reserved for the
 ordering-forced record-drop), and D22.2 (execute-time idempotency for the
 concurrent-CAS race). No step-machine redesign; cancellation effect set unchanged;
 no new contradictions introduced.
+
+## Ambiguity review (ψ pass 5, 2026-06-10)
+
+Fresh ambiguity pass after D21–D23. The cancellation contracts are thoroughly
+pinned: directly-cancelled run, top-down propagation, cancel-then-remove, direct
+sub-run cancel/remove, the multi-run cascade, and idempotency are all
+single-interpretation (D1–D23). One **new** actionable ambiguity: the **Acceptance
+Criteria** section is stale relative to D14/D19/D21/D22 — it predates the
+direct-sub-run + idempotency decisions, so the test / definition-of-done surface no
+longer matches the pinned contracts.
+
+1. **Criterion #2 asserts a universal post-condition that holds only for a
+   top-level run.** "`remove` of a live run … future is cancelled" reads as the
+   general contract for any live run, but D14/D19/D21 establish that a live
+   **nested sub-run** remove emits **no** worker `future-cancel` (a sub-run owns no
+   future); its guarantee is instead child-turn abort + the parent observing
+   run-absence ≡ `:cancelled` and continuing (D21). The criterion does not qualify
+   run-type, so an implementer deriving the test cannot tell whether "a live run"
+   includes a sub-run — and "future is cancelled" is false there. (Noted but
+   explicitly not filed by the pass-4 inconsistency review; it is a genuine
+   acceptance-contract ambiguity.)
+
+2. **No criterion covers the Evidence-step-2 motivating cases.** The acceptance
+   criteria omit: direct cancel of a nested sub-run → parent observes a failed
+   delegate step and **continues, not halted** (D19); direct remove of a live
+   sub-run → run-absence treated identically to `:cancelled` (D21); and
+   repeated/concurrent terminal-request **idempotency** → a no-op'd terminal request
+   emits no cancellation effects (D22.1) with execute-time-idempotent effects on the
+   concurrent-CAS race (D22.2). Evidence step 2 was precisely a *direct sub-run*
+   cancel, yet the acceptance/test surface that derives the tests does not require
+   that behaviour — so "done" is under-specified for the exact cases the heaviest
+   refinement pinned.
+
+These are acceptance-contract (definition-of-done / test-surface) ambiguities, not
+step-machine redesigns. Prior passes treated acceptance reconciliation as in-scope
+for ambiguity review (D6 updated acceptance #3/#4), so this fits the profile.
