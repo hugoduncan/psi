@@ -30,7 +30,7 @@
 - [ ] Add a helper to locate a run's current live attempt and construct the guarded `:runtime/agent-abort` payload from `:execution-session-id`.
 - [ ] Implement the shared cancel-transition builder used by both handlers: handler-before gate, cascade-set enumeration, one multi-run `:root-state-update`, and ordered cancellation effects.
 - [ ] Ensure each per-run terminal guard is evaluated inside the returned `:root-state-update` fn, not only in handler-before.
-- [ ] Emit `:runtime/cancel-inflight-run` only when the directly cancelled live run is top-level.
+- [ ] Emit `:runtime/cancel-inflight-run` according to the D35 split: canonical cancellation/cascade emits worker cancel only for top-level cancel or the live top-level remove first pass; runtime-handle cleanup may also emit it before `:runtime/drop-inflight-run` for terminal top-level remove (D38) and absent stale-handle cleanup (D36b); direct/terminal nested sub-run remove emits no worker cancel and must not infer a parent/top-level worker.
 - [ ] Emit guarded `:runtime/agent-abort` once per cascade-set run with a live current attempt.
 - [ ] Emit `:runtime/mark-workflow-jobs-terminal` from the cancel dispatch while the run record is still present.
 - [ ] Implement `:psi.workflow/cancel-run` live behaviour using the shared cancel-transition builder with no re-entrant remove effect and no record drop.
@@ -68,7 +68,7 @@
 - [ ] Extend `maybe-mark-workflow-jobs-terminal!` (or its workflow status predicate) so `:cancelled` runs terminalize background jobs with `:outcome :cancelled`.
 - [ ] Add tests proving cancel-without-remove terminalizes the job as cancelled while the run record remains present.
 - [ ] Add tests proving live remove terminalizes the job before the re-entrant remove drops the run record.
-- [ ] Remove any remaining command-layer or mutation-layer direct `inflight-runs` cleanup for cancel/remove flows.
+- [ ] Remove or reroute any remaining command-layer or mutation-layer cancel/remove side effects: direct `inflight-runs` cleanup and the current `delegate remove` active-background-job cleanup (`cleanup-active-delegate-background-jobs-before-remove!` / `terminalize-active-delegate-background-jobs!`) must be removed/routed through canonical `:psi.workflow/remove-run` dispatch/effects, or any retained pre-remove cleanup must be explicitly documented as not being a cancellation/remove side effect.
 - [ ] Document the existing re-entrant `:runtime/dispatch-event` sequencing in `doc/architecture.md` dispatch sequencing/runtime effects guidance.
 - [ ] Add a CHANGELOG `[Unreleased]` entry for the user-visible fix: cancelling/removing delegated workflows now stops in-flight execution and avoids orphaned workflow workers.
 
@@ -92,5 +92,5 @@
 
 ## Plan/steps ambiguity follow-ups (ψ, 2026-06-11)
 
-- [ ] Qualify the Slice 3 `:runtime/cancel-inflight-run` emission step with the D35 split: **canonical cancellation/cascade** emits worker cancel only for top-level cancel / live top-level remove, while **runtime-handle cleanup** may also emit it for terminal top-level remove (D38) and absent stale-handle cleanup (D36b) before `:runtime/drop-inflight-run`; direct/terminal nested sub-run remove must still emit no worker cancel and must not infer a parent/top-level worker.
-- [ ] Reconcile `delegate remove` command-layer background-job cleanup with the adapter-only cancel/remove boundary: remove/reroute the current `cleanup-active-delegate-background-jobs-before-remove!` / `terminalize-active-delegate-background-jobs!` side effect through the canonical `:psi.workflow/remove-run` dispatch/effects path (or explicitly document why any retained pre-remove cleanup is not a cancellation/remove side effect), so steps cover more than the direct `inflight-runs` `swap!`.
+- [x] Qualify the Slice 3 `:runtime/cancel-inflight-run` emission step with the D35 split: **canonical cancellation/cascade** emits worker cancel only for top-level cancel / live top-level remove, while **runtime-handle cleanup** may also emit it for terminal top-level remove (D38) and absent stale-handle cleanup (D36b) before `:runtime/drop-inflight-run`; direct/terminal nested sub-run remove must still emit no worker cancel and must not infer a parent/top-level worker.
+- [x] Reconcile `delegate remove` command-layer background-job cleanup with the adapter-only cancel/remove boundary: remove/reroute the current `cleanup-active-delegate-background-jobs-before-remove!` / `terminalize-active-delegate-background-jobs!` side effect through the canonical `:psi.workflow/remove-run` dispatch/effects path (or explicitly document why any retained pre-remove cleanup is not a cancellation/remove side effect), so steps cover more than the direct `inflight-runs` `swap!`.

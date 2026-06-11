@@ -2253,3 +2253,12 @@ plan/steps ambiguities found:
    also performs command-layer background-job terminalization before remove; steps
    should explicitly remove/reroute or justify that side effect so the adapter-only
    boundary is unambiguous.
+
+## Plan/steps ambiguity follow-up execution (ψ, 2026-06-11)
+
+Executed both newly added unchecked plan/steps follow-up items from `steps.md`; both were task-artifact reconciliation items and were completable now.
+
+- Qualified the Slice 3 `:runtime/cancel-inflight-run` step with the D35 split: canonical cancellation/cascade worker cancel is limited to top-level cancel / live top-level remove, while runtime-handle cleanup may emit cancel-before-drop for D38 terminal top-level remove and D36b absent stale-handle cleanup; direct/terminal nested remove remains no-worker-cancel/no-parent-inference.
+- Reconciled Slice 6 and `plan.md` with the adapter-only cancel/remove boundary by explicitly including `delegate remove` active-background-job cleanup (`cleanup-active-delegate-background-jobs-before-remove!` / `terminalize-active-delegate-background-jobs!`) alongside direct `inflight-runs` cleanup as a command-layer side effect to remove/reroute through canonical `:psi.workflow/remove-run` dispatch/effects, unless a retained pre-remove cleanup is explicitly documented as non-cancellation/remove.
+
+No production code/tests/docs were changed in this follow-up pass; the review items only required clarifying implementation steps and plan intent before execution.

@@ -6,7 +6,7 @@ Implement cancellation as an agent-session dispatch/effects feature, not as inli
 
 Key decisions from `design.md`:
 
-- Canonical events are `:psi.workflow/cancel-run` and `:psi.workflow/remove-run`; Pathom mutations, `psi-tool`, and `delegate remove` are adapters only.
+- Canonical events are `:psi.workflow/cancel-run` and `:psi.workflow/remove-run`; Pathom mutations, `psi-tool`, and `delegate remove` are adapters only. `delegate remove` must not own cancel/remove cleanup side effects, including direct `inflight-runs` mutation or active-background-job terminalization; those must be removed/rerouted through the canonical remove dispatch/effects path (or explicitly documented as a non-cancel/remove precondition if retained).
 - `cancel-run` and live `remove-run` share one cancel-transition helper. `remove-run` owns cancel-then-remove: live first pass cancels and emits a re-entrant `:runtime/dispatch-event` for `:psi.workflow/remove-run`; terminal/absent pass drops the canonical record and performs runtime-handle cleanup.
 - Cancellation state is committed in canonical `:state*`; `inflight-runs` remains a runtime handle reached by dispatch effects through ctx injection.
 - Cascade cancellation is one multi-run apply-phase `:root-state-update` over the directly cancelled run plus non-terminal descendants discovered by `:delegating-run-id`; per-run terminal guards live inside the update fn so the atom CAS is the atomicity boundary.
