@@ -2908,3 +2908,11 @@ Validation:
 - `bb clojure:test:scry --namespace psi.agent-session.workflow-statechart-runtime-call-start-cancellation-test --namespace psi.agent-session.workflow-judge-cancellation-test --namespace psi.deterministic-operation-runtime.core-test --namespace psi.workflow-runtime.turn-execution-contract-test --namespace psi.agent-session.workflow-cancellation-dispatch-test` → 32 tests / 157 assertions green.
 - Focused `clj-kondo --lint` over changed source/test files → clean.
 - `bb test` → green.
+
+## Implementation review (ψ pass 16, 2026-06-11)
+
+Reviewed the pass-15 cancellation-entry lock implementation against `task-implementation-review`, D6/D7/D31, `cancellation_entry.clj`, `turn_execution_contract.clj`, `turn.clj`, `deterministic_operation_runtime/core.clj`, and the dispatch apply lock path. The final read→call gap is closed, but the lock scope now violates the cancellation-latency/abort contract.
+
+New actionable issue: the per-run read lock is held across the whole ordinary actor/judge prompt execution (`turn_execution_contract.clj` wraps `execution-adapter/prompt-execution-result!`) and across the whole deterministic operation handler (`deterministic_operation_runtime/core.clj` wraps `invoke-operation-result`). Because cancel/remove apply takes the write lock before the D31 state CAS, a cancel arriving during a long/blocking child turn or operation cannot commit `:cancelled`, emit guarded aborts, or run `future-cancel(true)` until that ordinary work returns naturally. That regresses D7's active parked-wait interruption and D6's guaranteed in-flight child-turn abort. Follow-up should narrow the read-locked region to the entry linearization point (or replace it with a durable in-flight marker that cancellation can observe/abort) so D31 can commit promptly while still proving no ordinary work is initiated after D31; add regressions for cancelling during a blocked actor turn, judge turn, and deterministic operation.
+
+No tests run (review-only pass).
