@@ -2736,3 +2736,11 @@ Validation:
 - `bb clojure:test:scry --namespace psi.workflow-runtime.turn-execution-contract-test --namespace psi.deterministic-operation-runtime.core-test --namespace psi.agent-session.workflow-judge-test --namespace psi.agent-session.workflow-statechart-runtime-cancellation-test` → 34 tests / 151 assertions green.
 - `bb clojure:test:scry --namespace psi.agent-session.workflow-execution-test --namespace psi.agent-session.workflow-execution-cancellation-test --namespace psi.agent-session.workflow-invoke-runtime-test --namespace psi.workflow-runtime.statechart-runtime.step-execution-test --namespace psi.workflow-runtime.terminal-contract-execution-test` → 31 tests / 166 assertions green.
 - Focused `clj-kondo --lint` over changed cancellation source/test files → clean.
+
+## Implementation review (ψ pass 11, 2026-06-11)
+
+Reviewed the pass-10 start-reservation implementation against `task-implementation-review`, D30/D31, the changed actor/judge/invoke start paths, and the new regressions. The previous check-then-call window is narrowed but not closed.
+
+New actionable issue: `:turn-started-at` / `:operation-started-at` reservation is still not atomic with the ordinary side-effecting call. Actor/judge turn execution and deterministic operation invocation CAS-mark the latest attempt, then call the prompt adapter / operation handler. A D31 cancel CAS can still land after the reservation CAS but before that call, so the prompt adapter or operation handler can initiate ordinary work after the cancel checkpoint. The current regressions force cancellation before reservation, not in the post-reservation→call window. Follow-up should make reservation and crossing into ordinary work mutually ordered with cancellation (or otherwise make cancel observe/close the reservation as an already-started in-flight unit) and add actor, judge, and invoke regressions for cancellation after a successful start reservation but before the adapter/handler call.
+
+No tests run (review-only pass).
