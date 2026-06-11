@@ -489,7 +489,7 @@
 
 ## Architecture-fit follow-ups (ψ pass 7, 2026-06-10)
 
-- [ ] Commit a handle-reachability mechanism for the D12 worker `future-cancel` and
+- [x] Commit a handle-reachability mechanism for the D12 worker `future-cancel` and
       D24 `:runtime/drop-inflight-run` cancellation/cleanup effects, reconciling the
       design's repeated "the `inflight-runs` handle reached **via `ctx`**"
       (D12/D24) with the code-confirmed fact that `inflight-runs` is a process-global
@@ -511,3 +511,20 @@
       handle-reachability mechanism is committed and the "via ctx" premise is either
       made true (a) or replaced (b). (AGENTS.md S1 effects / `λ parity` / `λ(state)`;
       META.md managed-services-on-ctx; design.md D1/D2/D12/D24)
+      → design.md D25: option (a) — thread `inflight-runs` onto the dispatch `ctx`
+      via a `context.clj` injection (e.g. `:workflow-inflight-runs-handle
+      runtime-state/inflight-runs`, alongside the existing `:mark-workflow-jobs-terminal-fn`
+      / workflow-runtime injections); the D12 worker `future-cancel` and D24
+      `:runtime/drop-inflight-run` `execute-effect!` methods read
+      `(:workflow-inflight-runs-handle ctx)` with parity to every other `:runtime/*`
+      handler — making the asserted "via ctx" premise true. The `context.clj`
+      injection is in scope. Option (b) (direct `defonce` global reach-in,
+      documented exception) rejected: diverges from ctx-injection parity, is the
+      extension-local-hidden-state pattern META.md cautions against, and couples the
+      effects to a process-global atom (replay/test-isolation hazard) — undercutting
+      the D12/D24 parity + replay-closure rationale. Code-confirmed: `inflight-runs`
+      = `defonce` atom (`runtime_state.clj:11`, aliased `workflow/core.clj:31`),
+      absent from `context.clj`; existing `:runtime/*` handlers reach workflow runtime
+      state via ctx-injected fns (`:mark-workflow-jobs-terminal-fn` at
+      `context.clj:248` → `((:mark-workflow-jobs-terminal-fn ctx) ctx)`). D12/D24
+      "via ctx" wording annotated with the D25 pointer. No blocker.

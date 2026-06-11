@@ -1234,3 +1234,54 @@ code-false and uncommitted):
 
 No other new actionable architectural-fit misfit found; D1–D24 cover the remaining
 boundary commitments.
+
+## Architecture-fit follow-up resolution (ψ pass 7, 2026-06-10)
+
+Executed the single pass-7 architecture-fit follow-up design-step (a
+design-decision step: commit a handle-reachability mechanism for the D12 worker
+`future-cancel` and D24 `:runtime/drop-inflight-run` effects, reconciling the
+code-false "via ctx" premise). Completable now — no blocker. Code premises
+re-confirmed before deciding:
+
+- `inflight-runs` is a free-standing `(defonce inflight-runs (atom {}))`
+  (`agent-session/workflow/runtime_state.clj:11`, aliased `workflow/core.clj:31`)
+  and is **absent from `context.clj`** — never placed on the dispatch `ctx`.
+- Every existing `:runtime/*` handler reaches workflow runtime state through a
+  **ctx-injected fn/handle** wired in the `context.clj` ctx map — e.g.
+  `:mark-workflow-jobs-terminal-fn bg-rt/maybe-mark-workflow-jobs-terminal!`
+  (`context.clj:248`), invoked as `((:mark-workflow-jobs-terminal-fn ctx) ctx)`
+  (`dispatch_effects.clj:191`); `:runtime/agent-abort` keys off
+  `(effect-session-id ctx effect)`. The pattern is dependency-injection-through-`ctx`,
+  not direct namespace-global access.
+
+Resolution written to design.md as "Handle-Reachability Reconciliation (ψ pass 7)"
+D25, with D12 and D24 annotated:
+
+- D25 — chose **option (a)**: thread `inflight-runs` onto the dispatch `ctx` via a
+  `context.clj` injection (e.g. `:workflow-inflight-runs-handle
+  runtime-state/inflight-runs`); the D12 worker `future-cancel` and D24
+  `:runtime/drop-inflight-run` `execute-effect!` methods read
+  `(:workflow-inflight-runs-handle ctx)` with parity to every other `:runtime/*`
+  handler, making the asserted "via ctx" premise true. The `context.clj` injection
+  is in scope for the new effect handlers.
+- Rejected **option (b)** (direct `defonce` global reach-in as a documented
+  exception): diverges from the ctx-injection parity of every other `:runtime/*`
+  handler (`λ parity`/`λ(state)`), is the extension-local-hidden-state pattern
+  META.md cautions against (managed services keyed on `ctx`, ¬extension-local hidden
+  state), and couples the effects to a process-global atom — a replay/test-isolation
+  hazard that undercuts the D12/D24 parity + replay-closure rationale. Option (a) is
+  also the one-line, simpler fit (`λ build` simple > complex) and gives tests/replay
+  a `ctx` seam to substitute an isolated handle.
+- Scope note in D25: the injected handle is still backed by the same
+  `runtime-state/inflight-runs` atom in production (the out-of-scope
+  natural-completion `orchestration.clj` cleanups keep mutating that atom directly);
+  `ctx` injection only adds the dispatch-side reach-path + the test/replay seam.
+- D12/D24 "reached via `ctx`" / "supplies the handle through `ctx`" wording
+  annotated with the D25 pointer so the premise is now true.
+
+Consistency check: D25 is consistent with D1/D12 (effects-as-data, canonical
+`:runtime/*` effects via the `:effects` interceptor), D2 (`inflight-runs` ∈ runtime
+handle), D24 (the `:runtime/drop-inflight-run` cleanup effect), and `λ parity`
+(parity with every other ctx-injected `:runtime/*` handler). No new contradictions;
+no step-machine redesign; the cancellation/cleanup effect set is unchanged (only its
+handle reach-path is committed).

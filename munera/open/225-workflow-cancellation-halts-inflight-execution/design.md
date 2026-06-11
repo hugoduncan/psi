@@ -465,7 +465,9 @@ agent-session `effect-schema` (`dispatch_schema.clj`) with matching
 path used by every other `:runtime/*` effect — **not** by an out-of-dispatch
 "orchestration runtime boundary" execution path. This refines D1/D9's
 runtime-boundary wording: the layer that owns `inflight-runs` only supplies the
-handle (through `ctx`) on which the canonical `execute-effect!` method acts.
+handle (through `ctx`) on which the canonical `execute-effect!` method acts. The
+`inflight-runs` handle is reached via `ctx` by a `context.clj` injection (D25) — not
+as a namespace global — with parity to every other `:runtime/*` handler.
 
 Mapping:
 
@@ -1199,8 +1201,9 @@ cancellation effect set defines no effect to clear the entry.
 `inflight-runs` entry-drop is its **own canonical `:runtime/*` effect** (e.g.
 `:runtime/drop-inflight-run`, carrying `run-id`), registered in the agent-session
 `effect-schema` with a **parity** `execute-effect!` method that dissocs the entry
-from the `inflight-runs` handle reached via `ctx` — exactly the parity shape of the
-D12 worker `future-cancel` effect, which already reaches `inflight-runs` via `ctx`.
+from the `inflight-runs` handle reached via `ctx` (the `context.clj` injection of
+D25) — exactly the parity shape of the D12 worker `future-cancel` effect, which
+likewise reaches the `ctx`-injected `inflight-runs` handle (D25).
 It is emitted in the **remove dispatch's** (D17 dispatch 2) effect set and executed
 by the dispatch **`:effects` interceptor** (D1/D12), so it passes the
 validate-interceptor `effect-schema` check, is suppressed by
@@ -1247,6 +1250,68 @@ effect set; migrating those handle mutations is not this task's concern.
 D17 step 2, D5 step 3, and Acceptance #2 are updated to attribute the
 `inflight-runs` entry-drop to the `:runtime/drop-inflight-run` cleanup effect rather
 than the pure `remove-run` dissoc.
+
+## Handle-Reachability Reconciliation (ψ pass 7, 2026-06-10)
+
+Resolves the pass-7 architecture-fit follow-up: D12 and D24 both assert the new
+worker `future-cancel` and `:runtime/drop-inflight-run` `execute-effect!` methods
+reach `inflight-runs` "via `ctx`", but that premise is code-false — `inflight-runs`
+is a process-global `defonce` atom not on the dispatch `ctx`. Commits the
+handle-reachability mechanism so the "via ctx" parity is real. No step-machine
+redesign; one `context.clj` injection added.
+
+### D25. `inflight-runs` is injected onto the dispatch `ctx`; the D12/D24 effect handlers reach it via `ctx` with parity (option (a); not direct defonce-global access)
+
+**Premise (code-confirmed).** `inflight-runs` is a free-standing
+`(defonce inflight-runs (atom {}))` (`agent-session/workflow/runtime_state.clj:11`,
+aliased `workflow/core.clj:31`) and is **not** on the dispatch `ctx` (absent from
+`context.clj`; it is only passed as a plain arg in local orchestration option maps).
+Every existing `:runtime/*` `execute-effect!` that touches workflow runtime state
+reaches it through a **ctx-injected fn/handle** wired in the `context.clj` ctx map —
+e.g. `:runtime/mark-workflow-jobs-terminal` → `((:mark-workflow-jobs-terminal-fn
+ctx) ctx)` (injected at `context.clj:248` as `bg-rt/maybe-mark-workflow-jobs-terminal!`);
+`:runtime/agent-abort` keys off `(effect-session-id ctx effect)`. So the project's
+`:runtime/*` effect pattern is dependency-injection-through-`ctx`, never direct
+namespace-global access.
+
+**Decision — option (a): thread `inflight-runs` onto the dispatch `ctx` via a
+`context.clj` injection.** The `context.clj` ctx map gains an injected handle key
+(e.g. `:workflow-inflight-runs-handle runtime-state/inflight-runs`, alongside the
+existing `:mark-workflow-jobs-terminal-fn` / workflow-runtime injections). The new
+D12 worker `future-cancel` and D24 `:runtime/drop-inflight-run` `execute-effect!`
+methods read that handle from `ctx` — `(:workflow-inflight-runs-handle ctx)` — and
+`future-cancel` / `dissoc` against it. This makes the D12/D24 "the `inflight-runs`
+handle reached via `ctx`" wording **true**, with parity to every other `:runtime/*`
+handler (handle/fn supplied by `ctx`, not reached as a namespace global). This
+`context.clj` injection is **in scope** for this task (it is the wiring the new
+effect handlers require).
+
+**Why (a), not (b).** Option (b) — let the new `execute-effect!` methods reach the
+`defonce inflight-runs` global directly (`(swap! workflow-core/inflight-runs dissoc
+…)`) and document it as an exception — is rejected:
+
+- It diverges from the ctx-injection parity of every other `:runtime/*` handler
+  (the consistency `λ parity`/`λ(state)` mandate), making the two new effects the
+  lone direct-global reach-ins in the effect dispatch surface.
+- It is exactly the **extension-local hidden state** META.md cautions against
+  ("managed services keyed by logical identity … reused within `ctx`, ¬extension-
+  local hidden state"): coupling the dispatch effect handlers to a process-global
+  atom is a replay/test-isolation hazard (no `ctx`-scoped seam to substitute a
+  fresh handle per test/replay), undercutting the D12/D24 parity + replay-closure
+  rationale those decisions are built on.
+- Threading the handle onto `ctx` (a) is a one-line injection — the cheaper, more
+  consistent fit (`λ build` simple > complex), and it gives tests/replay a `ctx`
+  seam to inject an isolated `inflight-runs` handle without rebinding a global.
+
+**Scope note.** The injected handle is still backed by the same
+`runtime-state/inflight-runs` atom in production (the orchestration handle owner's
+natural-completion cleanups in `orchestration.clj` continue to mutate that same
+atom directly — out of scope per D24); `ctx` injection only adds the dispatch-side
+**reach-path** the D12/D24 effects need, plus the test/replay substitution seam. No
+change to the handle's identity or to the out-of-scope natural-completion cleanups.
+
+D12 and D24's "reached via `ctx`" / "supplies the handle through `ctx`" wording is
+made true by this injection; both are annotated with the D25 pointer.
 
 ## Design Questions — Resolution status (ψ, 2026-06-10)
 
