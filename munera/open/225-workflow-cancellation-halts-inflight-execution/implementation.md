@@ -2450,3 +2450,27 @@ Additional gate verification after the follow-up:
 
 - `bb test` → green.
 - `clj-kondo --lint components` → errors 0 / warnings 0; existing info-level suggestions outside this pass remain.
+
+## Implementation review (ψ pass 3, 2026-06-11)
+
+Reviewed the post-pass-2 implementation against `task-implementation-review`, the
+D31 no-post-checkpoint ordinary-advancement contract, changed cancellation runtime
+code/tests/docs, and focused verification. The prior guarded writes for step-entry,
+delegate creation, result/failure/judge/iteration actions, and judge abortability
+are implemented and covered.
+
+New actionable issue: invoke-step attempt-data recording still has a stale-check
+race. In `statechart_runtime.clj` the invoke branch checks `workflow-stopped?`
+after `invoke-step-runtime-result`, then performs an unguarded
+`swap!`/`merge-latest-attempt-data` to write `:effective-args` before queuing the
+actor result. If cancel commits after that post-invoke stop check but before the
+`swap!`, the cancelled run can still receive ordinary invoke attempt metadata after
+the D31 checkpoint. This does not resurrect `:status`, but it violates the same
+cancellation-safe write discipline applied to the other post-entry ordinary action
+writes; follow-up should guard or fold the attempt-data write into
+`update-state-if-live!` and add a race regression.
+
+Verification during review:
+
+- `bb clojure:test:scry --namespace psi.agent-session.workflow-statechart-runtime-cancellation-test --namespace psi.agent-session.workflow-execution-test --namespace psi.agent-session.workflow-judge-test --namespace psi.agent-session.workflow-cancellation-dispatch-test` → 47 tests / 236 assertions green.
+- Focused `clj-kondo --lint` over changed workflow cancellation source files → clean.
