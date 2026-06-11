@@ -238,3 +238,7 @@
 ## Implementation review follow-ups (ψ pass 26, 2026-06-11)
 
 - [ ] Make guarded nested dispatch pure results cancellation-safe: when a workflow-guarded `:runtime/dispatch-event` / `:runtime/dispatch-event-with-effect-result` admits a nested handler before D31 but cancellation lands before that handler's apply/effects, ordinary root updates/effects must still no-op. Cover at least `:session/append-journal-entry` from workflow-owned `:session/prompt-submit` (in-memory journal append plus `:persist/session-journal-io`) and any adjacent context-usage/update dispatches that can be reached through guarded workflow prompt lifecycle effects. Add a regression for cancellation between guarded nested-dispatch handler-result construction and apply/effects.
+
+## Test review follow-ups (ψ, 2026-06-11)
+
+- [ ] Add a canonical live top-level remove regression that seeds `:workflow-inflight-runs-handle` with a real parked future, dispatches `:psi.workflow/remove-run`, and asserts the future is cancelled/interrupted and the inflight entry is dropped after the re-entrant remove; this should cover acceptance criterion #2 as an end-to-end remove-path behaviour, not only separate effect-vector/executor units.

@@ -3250,3 +3250,19 @@ New actionable issue: guarded `:runtime/dispatch-event` / `:runtime/dispatch-eve
 Verification during review:
 
 - Static review of `turn.handlers/synthetic-user-prompt-effects`, `prompt_lifecycle.clj` prompt-submit/synthetic handlers, `journal_append_effect.clj`, and `dispatch_effects.clj` guarded dispatch execution.
+
+## Test review (ψ, 2026-06-11)
+
+Reviewed the task's cancellation test net against `task-test-review`: tests are
+broadly well-formed and most guaranteed behaviours have direct regression coverage,
+but one coverage gap remains. Acceptance criterion #2 is covered only by separate
+pieces: live top-level remove asserts the declared cancel/drop effects, and a
+separate executor test asserts `:runtime/cancel-inflight-run` can cancel a seeded
+future. No single canonical live top-level remove test seeds a real inflight worker
+future, dispatches `:psi.workflow/remove-run`, and then asserts the future is
+cancelled/interrupted and the `inflight-runs` entry is dropped after the re-entrant
+remove. That leaves the original `delegate remove` orphaned-worker failure mode
+under-proved at the composition boundary. Add that regression through the canonical
+remove path.
+
+No tests run (review-only pass).
