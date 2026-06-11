@@ -1574,3 +1574,33 @@ completable design-clarification item; no blockers.
   interrupt delivery, or the worker's later read. Acceptance #1/#3/#4/#6 updated to
   use this testable boundary; D27's bounded direct-sub-run spawn race remains the
   explicit out-of-test-scope exception.
+
+## Inconsistency review (ψ pass 12, 2026-06-11)
+
+Fresh internal-consistency pass over design.md after D28–D31, checking D28's
+`:runtime/agent-abort` schema/executor contract against the dispatch validation
+order and existing abort emitters. One new actionable contradiction found:
+
+1. **D28 makes `:session-id` required for `:runtime/agent-abort`, but existing
+   unguarded abort effects omit it and validation runs before effect-time session-id
+   injection.** D28 says the `:runtime/agent-abort` effect schema keeps
+   `:session-id` required while adding optional workflow guard keys, and also says
+   existing non-workflow abort emissions omit the workflow guard and keep current
+   session-id-only behaviour. Code-confirmed: `:on-abort` emits
+   `{:effect/type :runtime/agent-abort}` with no `:session-id`
+   (`dispatch_handlers/statechart_actions.clj`), and the state-kernel
+   `effect-interceptor` injects the dispatching `:session-id` into effects only
+   when effects execute. But dispatch validation runs before the effect interceptor
+   (`:apply → :validate → :trim-effects-on-replay → :effects`), so an
+   `effect-schema` that requires `:session-id` would reject the existing unguarded
+   abort effect before injection. This contradicts D12's validate-interceptor parity
+   and D28's "existing non-workflow aborts keep current behaviour." The design must
+   choose either (a) keep `:session-id` optional in the schema for unguarded aborts
+   that rely on effect-interceptor injection, while requiring it only for guarded
+   workflow-cancel abort payloads or documenting the injected-session path, or (b)
+   require all abort emitters (including `:on-abort`) to include `:session-id`
+   before validation. As written, the D28 schema requirement is unbuildable without
+   breaking existing abort effects.
+
+No other new actionable inconsistency found in D28–D31; D29–D31 align with the
+acceptance criteria and D22/D30 boundaries.

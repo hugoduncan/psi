@@ -705,3 +705,19 @@
       post-checkpoint violation; ordinary advancement after the CAS is forbidden;
       interrupt/abort only wake blocked work to observe the signal. Acceptance
       criteria updated; D27's bounded spawn race remains out-of-test-scope.
+
+## Inconsistency follow-ups (ψ pass 12, 2026-06-11)
+
+- [ ] Reconcile D28's `:runtime/agent-abort` `:session-id` schema requirement with
+      existing unguarded abort effects and the dispatch validation/effect order.
+      D28 says the effect schema keeps `:session-id` required, but existing
+      non-workflow aborts such as `:on-abort` emit only
+      `{:effect/type :runtime/agent-abort}` and rely on the effect interceptor to
+      inject the dispatching `:session-id`; validation runs before that injection
+      (`:apply → :validate → :trim-effects-on-replay → :effects`). State the chosen
+      contract: either keep `:session-id` optional in the schema for unguarded
+      aborts while requiring/validating it for guarded workflow-cancel abort
+      payloads (or documenting the injected-session path), or require every abort
+      emitter to include `:session-id` before validation. Align D28, D12, the
+      effect-schema implication, and existing non-workflow abort behaviour so
+      validation parity does not reject current `:runtime/agent-abort` effects.
