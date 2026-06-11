@@ -2975,3 +2975,31 @@ No tests run (review-only pass).
 Added lifecycle cleanup for workflow cancellation-entry locks. `psi.workflow-runtime.cancellation-entry/drop-lock!` removes exact `:workflow-cancellation-entry-locks-handle` entries; canonical remove dispatch now emits a validated `:runtime/drop-workflow-cancellation-entry-lock` cleanup effect after inflight-run cleanup for terminal, nested, and absent remove paths; the dispatch effect executor performs the exact lock drop. Retention cleanup also drops locks for evicted top-level and nested workflow runs, bounding the runtime lock handle to retained canonical run records.
 
 Regression coverage: cancellation dispatch tests now validate the new effect schema, remove-effect ordering, and exact lock-drop executor behaviour. Retention tests seed lock entries for evicted top-level/nested runs and a retained run, then assert cleanup drops only the evicted run locks. Focused scry suites and focused clj-kondo passed.
+
+## Implementation review (ψ pass 19, 2026-06-11)
+
+Reviewed the pass-18 cleanup against `task-implementation-review`, D6/D31,
+`turn_execution_contract.clj`, production `turn.clj`, dispatch apply locking, and
+the cancellation-entry regressions. Lock cleanup is addressed, but the production
+workflow prompt lifecycle still has an uncovered ordinary-start race below the
+adapter boundary.
+
+New actionable issue: actor/judge tests linearize entry at the workflow-runtime
+adapter call, but the production adapter (`turn/prompt-execution-result-in!` →
+`prompt-dispatch-result`) continues with multiple ordinary session dispatches.
+`submit-workflow-prompt!` takes the cancellation-entry read lock only around
+`:session/prompt-submit`; after it returns, `prompt-dispatch-result` performs a
+check-then-call sequence for `:session/prompt` and then another for
+`:session/prompt-prepare-request`. A D31 cancel CAS can land after either final
+stop read and before those ordinary dispatches. In that window the guarded abort
+can no-op/abort an idle or just-submitted child session, then the workflow turn
+can still transition the session to streaming or prepare/execute the provider
+request after cancellation. Follow-up should extend the cancellation-safe entry
+protocol to the production workflow-owned prompt lifecycle entry as a whole (or add
+per-dispatch workflow stop guards inside the prompt lifecycle handlers/effects),
+covering `:session/prompt` and `:session/prompt-prepare-request`, and add a
+regression that forces cancellation after `:session/prompt-submit` but before each
+later ordinary dispatch and proves no streaming transition/provider execution
+starts after D31.
+
+No tests run (review-only pass).
