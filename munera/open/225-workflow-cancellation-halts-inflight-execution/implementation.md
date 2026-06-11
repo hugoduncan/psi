@@ -3197,3 +3197,11 @@ background jobs, emit terminal messages, or drain the scheduler.
 Verification: focused Scry suites for prompt lifecycle workflow cancellation,
 statechart actions, scheduler handlers, and turn handlers passed; focused
 clj-kondo over touched agent-session code/tests passed.
+
+## Implementation review (ψ pass 24, 2026-06-11)
+
+Reviewed pass-23 `:on-agent-done` cancellation guards against `task-implementation-review`, D30/D31, `turn.handlers/prompt-finish-handler`, `:session/submit-synthetic-user-prompt`, and the guarded dispatch-effect path. The `:on-agent-done` stale pure-result window is addressed, but one analogous follow-up prompt window remains.
+
+New actionable issue: workflow-owned follow-up prompt dispatch can still build unguarded synthetic prompt effects. `prompt-finish` guards the outer `:runtime/dispatch-event-with-effect-result` to `:session/submit-synthetic-user-prompt`, but if D31 cancellation lands after that guarded dispatch effect's stop check admits the nested dispatch and before the nested handler's effects execute, `:session/submit-synthetic-user-prompt` returns unguarded `synthetic-user-prompt-effects`. The first unguarded `:session/prompt-submit` can append an ordinary follow-up user journal entry after cancellation; the later prompt/prepare dispatches rely on downstream guards but are still emitted without the workflow guard. Follow-up should derive/carry `:workflow-run-id` into `:session/submit-synthetic-user-prompt` and its synthetic lifecycle effects (or guard the handler/root effect vector equivalently), with a regression for cancellation between synthetic-follow-up handler-result construction and effect execution.
+
+No tests run (review-only pass).
