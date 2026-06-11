@@ -3108,3 +3108,29 @@ stale already-built record-response pure result also leaves no summary/journal
 write and does not re-enter ordinary lifecycle events after cancellation. Focused
 prompt-lifecycle cancellation + prompt-lifecycle/dispatch suites pass; focused lint
 is clean.
+
+## Implementation review (ψ pass 22, 2026-06-11)
+
+Reviewed the pass-21 response-recording guard against `task-implementation-review`,
+D6/D30/D31, `turn.handlers/prompt-continue-handler`, `prompt-finish-handler`,
+`dispatch_effects.clj`, and prompt-lifecycle cancellation tests. The direct
+record-response entry and stale record-response effects are now guarded, and the
+focused prompt-lifecycle suites are green.
+
+New actionable issue: prompt continuation/finish pure results remain unguarded once
+those handlers have entered. If `:session/prompt-continue` builds a pure result and
+D31 cancellation lands before its effects execute, `:runtime/prompt-continue-chain`
+can still dispatch `:session/tool-run` and start ordinary tool work after the cancel
+checkpoint because that effect carries no `:workflow-run-id` and its executor does no
+stop check. `:session/prompt-finish` has the same stale-result shape for ordinary
+finish/follow-up effects and follow-up state consumption. Follow-up should carry the
+workflow guard into prompt-continue/prompt-finish pure results (including
+`prompt-continue-chain`, follow-up dispatches, terminal notifications/reset, and any
+root-state updates) or route them through cancellation-entry ordering; add regressions
+for cancellation after each handler builds its pure result but before apply/effects,
+proving no tool-run/follow-up/ordinary finish effects or state updates occur after
+D31.
+
+Verification during review:
+
+- `bb clojure:test:scry --namespace psi.agent-session.prompt-lifecycle-workflow-cancellation-test --namespace psi.agent-session.prompt-lifecycle-test` → 29 tests / 139 assertions green.
