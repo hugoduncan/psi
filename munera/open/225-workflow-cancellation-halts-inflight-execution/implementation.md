@@ -1695,3 +1695,21 @@ actionable contradictions found; neither duplicates existing design-steps:
    `:expected-session-id`) in addition to `:session-id`; only non-workflow aborts
    may remain unguarded/session-id-only. The D15 emit rule must show or reference
    the guarded shape, not a bare abort effect.
+
+## Design follow-up resolution (ψ pass 15, 2026-06-11)
+
+Executed the two newly added inconsistency follow-up design-steps from
+`design-steps.md` pass 15. Both were design wording/contract reconciliations and
+were completable now; no blockers.
+
+- Qualified the live-`remove` worker/future-stop guarantee to **top-level** runs in
+  Desired Behaviour, Scope, the Scope test bullet, and D5. Direct live nested-sub-run
+  remove remains in scope under D19/D21: no worker `future-cancel`, child abort wakes
+  the shared parent worker, run-absence maps to the `:cancelled` failed delegate-step
+  result, and the parent continues.
+- Aligned D15's workflow-cancellation `:runtime/agent-abort` emit rule with D28/D33:
+  D15 now reads `attempt-id` and shows the complete flat guarded payload
+  (`:session-id`, `:workflow-run-id`, `:workflow-step-id`, `:workflow-attempt-id`,
+  `:expected-session-id`). The stale bare `{:effect/type :runtime/agent-abort
+  :session-id sid}` workflow-cancel example is removed; session-id-only aborts are
+  explicitly reserved for unguarded non-workflow emissions.

@@ -56,9 +56,13 @@ loop:
 - **Cooperative stop:** after a run is cancelled, the execution loop halts at the
   next safe checkpoint (at minimum, between steps) — it must not start another
   step, create another sub-run, or spawn another child session.
-- **No orphaned futures:** cancelling a run cancels/interrupts its worker future;
-  `remove` of a live run cancels it first then removes the record (cancel-then-
-  remove, D5) — never drop the handle and leave the thread running.
+- **No orphaned futures (top-level runs):** cancelling or removing a live
+  **top-level** run cancels/interrupts its single worker future before the
+  `inflight-runs` handle is dropped; `remove` of that live top-level run cancels
+  first then removes the record (cancel-then-remove, D5) — never drop the handle
+  and leave the thread running. Direct live **nested sub-run** remove is the D19/D21
+  case: no worker `future-cancel` is emitted, the child turn is aborted, and the
+  shared parent worker continues.
 - **Transitive propagation:** cancelling a parent run cancels its in-flight nested
   delegate sub-runs and signals their child agent sessions to stop, so the whole
   tree winds down. Because nested sub-runs run synchronously on the single
@@ -91,7 +95,10 @@ In scope:
 - A cooperative cancellation check in the workflow execution/step-advance loop
   keyed on run status (`:cancelled`/removed), so the loop exits promptly.
 - `execute-async!` / inflight-run lifecycle: `future-cancel` (with interrupt) on
-  cancel; `remove` of a live run cancels-then-removes (D5) rather than orphaning.
+  cancel/remove of the live **top-level** run that owns the `inflight-runs` entry;
+  `remove` of that live top-level run cancels-then-removes (D5) rather than
+  orphaning. Direct live nested-sub-run remove is handled by D19/D21 (child abort +
+  parent continues, no worker `future-cancel`).
 - Propagation of cancellation to nested delegate sub-runs and their child agent
   sessions (reuse the existing session interrupt/abort path where possible).
   Effect targets are pinned: the worker `future-cancel` hits only the single
@@ -126,9 +133,11 @@ In scope:
   ad-hoc registry write — with the D16 ordering + cancelled-path constraints so the
   cancel-then-remove path leaves no lingering job.
 - Tests: (a) a cancelled run performs no further step attempts after the cancel
-  checkpoint; (b) `remove` of a live run does not leave a running future; (c)
-  nested sub-run + child-session cancellation propagation; (d) no commits/journal
-  writes after cancel in a controlled (nullable) harness.
+  checkpoint; (b) `remove` of a live **top-level** run does not leave a running
+  future/orphaned thread; (c) nested sub-run + child-session cancellation
+  propagation, including direct nested-sub-run remove's no-worker-`future-cancel`
+  parent-continues contract (D19/D21); (d) no commits/journal writes after cancel
+  in a controlled (nullable) harness.
 
 Out of scope:
 
@@ -320,13 +329,18 @@ orchestration). On a live run the `remove-run` handler's first pass:
    `:runtime/drop-inflight-run` cleanup effect removes the **`inflight-runs` handle
    entry** (the pure transition does not mutate the handle — D24).
 
-The `future-cancel` interrupt (D8) guarantees the worker stops even though its run
-record and canonical signal are gone after removal — so removal cannot re-orphan
-the thread. This matches the observed user intent in the Evidence (the operator
-ran `delegate remove` expecting the run to stop). `remove` of an
-already-terminal run is unchanged (plain record removal). This is the single
-chosen semantics; Desired Behaviour and Scope are updated to drop the "or refuse
-while live" / "(or rejects)" alternative.
+For a **top-level** live run, the `future-cancel` interrupt (D8/D14) guarantees
+that the single worker stops even though its run record and canonical signal are
+gone after removal — so top-level removal cannot re-orphan the thread. For a
+**nested sub-run** removed directly while live, no worker `future-cancel` is emitted
+(D19/D21): the downward child-session abort wakes the shared parent worker, the
+parent observes run-absence as the same failed delegate-step result as
+`:cancelled`, and the parent continues. This matches the observed user intent in
+the Evidence (the operator ran `delegate remove` expecting the targeted run to
+stop) without contradicting the direct nested-sub-run contract. `remove` of an
+already-terminal run is unchanged (plain record removal). This is the single chosen
+semantics; Desired Behaviour and Scope are updated to drop the "or refuse while
+live" / "(or rejects)" alternative.
 
 ### D6. In-flight child turn: guaranteed interrupt action; "no new side effects initiated" contract (resolves Q1)
 
@@ -645,15 +659,29 @@ with existing unguarded abort effects whose session id is injected by the
 **Read rule (from canonical `:state*`, per cascade run `r`):**
 
 ```
-step    = (:current-step-id r)
-attempt = (last (get-in r [:step-runs step :attempts]))
-sid     = (:execution-session-id attempt)   ; child-session-id UUID
+step       = (:current-step-id r)
+attempt    = (last (get-in r [:step-runs step :attempts]))
+attempt-id = (:attempt-id attempt)
+sid        = (:execution-session-id attempt)   ; child-session-id UUID
 ```
 
-Emit `{:effect/type :runtime/agent-abort :session-id sid}` **iff** `r` is
-non-terminal, `attempt` is live (status ∈ `#{:running :validating}`), and `sid` is
-present. A run with no live attempt (e.g. parked between steps with no active
-child turn) emits **no** abort effect — there is no in-flight turn to abort.
+Emit the **guarded workflow-cancellation** `:runtime/agent-abort` payload from
+D28/D33 **iff** `r` is non-terminal, `attempt` is live (status ∈
+`#{:running :validating}`), `sid` is present, and the attempt identity is present:
+
+```clojure
+{:effect/type :runtime/agent-abort
+ :session-id sid
+ :workflow-run-id run-id
+ :workflow-step-id step
+ :workflow-attempt-id attempt-id
+ :expected-session-id sid}
+```
+
+A run with no live attempt (e.g. parked between steps with no active child turn)
+emits **no** abort effect — there is no in-flight turn to abort. The bare
+session-id-only form is reserved for unguarded non-workflow abort emissions
+(D28/D32/D33), not workflow-cancellation emitters.
 
 **Set of sessions aborted:** the directly-cancelled run **plus each in-flight
 descendant sub-run** (the D14 cascade set), one abort per run that currently has a

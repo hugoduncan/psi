@@ -739,7 +739,7 @@
 
 ## Inconsistency follow-ups (ψ pass 15, 2026-06-11)
 
-- [ ] Qualify the generic live-`remove` worker/future-stop wording so it does not
+- [x] Qualify the generic live-`remove` worker/future-stop wording so it does not
       contradict the direct nested-sub-run remove contract. D5 currently states
       "remove of a live run" and then says the `future-cancel` interrupt guarantees
       the worker stops, and Scope's test bullet says "`remove` of a live run does
@@ -748,7 +748,12 @@
       require the shared parent worker to continue. Update D5 and the Scope tests
       bullet to either qualify the future/worker-stop guarantee to **top-level**
       runs or split top-level vs nested-sub-run remove behaviour explicitly.
-- [ ] Align D15's workflow-cancellation abort emit rule with D28/D33. D15 still
+      → design.md: Desired Behaviour, Scope, test-scope bullet, and D5 now split
+      top-level live remove (future-cancel + no orphaned worker) from direct live
+      nested-sub-run remove (no worker `future-cancel`; child abort wakes the shared
+      parent worker; parent observes run-absence ≡ `:cancelled` and continues per
+      D19/D21). The future/worker-stop guarantee is qualified to top-level runs.
+- [x] Align D15's workflow-cancellation abort emit rule with D28/D33. D15 still
       says to emit a bare `{:effect/type :runtime/agent-abort :session-id sid}`
       for workflow-cancellation aborts, while D28/D33 require the complete flat
       guarded payload (`:session-id`, `:workflow-run-id`, `:workflow-step-id`,
@@ -756,3 +761,8 @@
       session-id-only aborts for non-workflow effects. Update the D15 emission
       example/read rule to show the guarded shape or explicitly point to D28/D33,
       so emitters/tests do not implement the stale bare workflow abort.
+      → design.md D15 now reads `attempt-id` and shows the canonical D28/D33 flat
+      guarded `:runtime/agent-abort` payload (`:session-id`, `:workflow-run-id`,
+      `:workflow-step-id`, `:workflow-attempt-id`, `:expected-session-id`) as the
+      workflow-cancellation emit rule. It explicitly reserves bare session-id-only
+      aborts for unguarded non-workflow emissions.
