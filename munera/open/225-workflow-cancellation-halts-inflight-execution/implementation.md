@@ -1827,3 +1827,22 @@ Executed both newly added pass-18 design follow-ups; no blockers.
 
 Acceptance #10 and related D24/D26/D29/D34/D35 wording now reflect the no-orphan
 cleanup ordering.
+
+## Architecture-fit review (ψ pass 19, 2026-06-11)
+
+Reviewed current design.md for architectural fit only after the pass-18
+reconciliations (D36/D36b), consulting AGENTS.md VSM/principles, META.md, and
+`doc/architecture.md` state-boundary / dispatch sequencing / replay-trace surfaces.
+No new actionable architectural-fit feedback found.
+
+The design now fits the project boundaries: canonical cancellation signal stays in
+`:state*`; `inflight-runs` remains a runtime handle reached by dispatch effects via
+ctx; cancellation/cleanup effects are canonical `:runtime/*` effects with schema /
+executor parity, replay trimming, and dispatch trace; child abort reuses the existing
+`:runtime/agent-abort` side-effect executor with workflow guard metadata; cascade is
+a pure multi-run apply-phase update; cancel-then-remove uses the existing re-entrant
+`:runtime/dispatch-event` only for the apply-before-effects ordering case; and
+absent-remove stale-handle cleanup cancels before dropping the handle, preserving the
+no-orphan invariant. Existing D18 doc-gap note for documenting `:runtime/dispatch-event`
+re-entrancy remains an implementation/doc follow-through item, not a new design
+architecture misfit.
