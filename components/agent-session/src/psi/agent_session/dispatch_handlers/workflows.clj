@@ -22,13 +22,47 @@
 (defn- workflow-run [state run-id]
   (workflow-runtime/workflow-run-in state run-id))
 
-(defn- cancel-state-update
-  [run-id reason]
+(defn- ordered-runs [state]
+  (filterv some? (workflow-runtime/list-workflow-runs state)))
+
+(defn- child-runs [runs parent-run-id seen-run-ids]
+  (->> runs
+       (filter #(= parent-run-id (:delegating-run-id %)))
+       (remove #(contains? seen-run-ids (:run-id %)))
+       vec))
+
+(defn- live-descendant-runs
+  "Return non-terminal descendant runs of root-run-id in canonical run-order."
+  [state root-run-id]
+  (let [runs (ordered-runs state)]
+    (loop [frontier [root-run-id]
+           seen #{root-run-id}
+           descendants []]
+      (if (empty? frontier)
+        descendants
+        (let [children (mapcat #(child-runs runs % seen) frontier)
+              child-ids (mapv :run-id children)]
+          (recur child-ids
+                 (into seen child-ids)
+                 (into descendants (filter #(live-status? (:status %)) children))))))))
+
+(defn- cancellation-cascade-runs
+  [state run-id]
+  (let [run (workflow-run state run-id)]
+    (cond-> []
+      run (conj run)
+      run (into (live-descendant-runs state run-id)))))
+
+(defn- cancel-cascade-state-update
+  [run-ids reason]
   (fn [state]
-    (let [run (workflow-run state run-id)]
-      (if (live-status? (:status run))
-        (first (workflow-runtime/cancel-run state run-id reason))
-        state))))
+    (reduce (fn [state' run-id]
+              (let [run (workflow-run state' run-id)]
+                (if (live-status? (:status run))
+                  (first (workflow-runtime/cancel-run state' run-id reason))
+                  state')))
+            state
+            run-ids)))
 
 (defn- remove-state-update
   [run-id]
@@ -77,12 +111,13 @@
        :expected-session-id session-id})))
 
 (defn- cancellation-effects
-  [run-id run]
-  (cond-> [{:effect/type :runtime/mark-workflow-jobs-terminal}]
-    (top-level-run? run)
-    (conj (cancel-inflight-run-effect run-id))
-    (live-attempt-abort-effect run)
-    (conj (live-attempt-abort-effect run))))
+  [run cascade-runs]
+  (let [abort-effects (keep live-attempt-abort-effect cascade-runs)]
+    (cond-> [{:effect/type :runtime/mark-workflow-jobs-terminal}]
+      (top-level-run? run)
+      (conj (cancel-inflight-run-effect (:run-id run)))
+      true
+      (into abort-effects))))
 
 (defn- remove-dispatch-effect
   [run-id reason session-id]
@@ -114,8 +149,11 @@
 (defn- cancel-run-handler
   [ctx {:keys [run-id reason]}]
   (let [reason' (or reason "cancelled")
-        run (workflow-run @(:state* ctx) run-id)
-        status (:status run)]
+        state @(:state* ctx)
+        run (workflow-run state run-id)
+        status (:status run)
+        cascade-runs (when (live-status? status)
+                       (cancellation-cascade-runs state run-id))]
     (cond
       (nil? run)
       {:return (cancel-result run-id nil nil true)}
@@ -126,15 +164,18 @@
        :return (cancel-result run-id run status true)}
 
       :else
-      {:root-state-update (cancel-state-update run-id reason')
-       :effects (cancellation-effects run-id run)
+      {:root-state-update (cancel-cascade-state-update (mapv :run-id cascade-runs) reason')
+       :effects (cancellation-effects run cascade-runs)
        :return (cancel-result run-id run :cancelled false)})))
 
 (defn- remove-run-handler
   [ctx {:keys [run-id reason session-id]}]
   (let [reason' (or reason "cancelled by remove")
-        run (workflow-run @(:state* ctx) run-id)
-        status (:status run)]
+        state @(:state* ctx)
+        run (workflow-run state run-id)
+        status (:status run)
+        cascade-runs (when (live-status? status)
+                       (cancellation-cascade-runs state run-id))]
     (cond
       (nil? run)
       {:root-state-update identity
@@ -151,8 +192,8 @@
                                       :noop? false})}
 
       :else
-      {:root-state-update (cancel-state-update run-id reason')
-       :effects (conj (cancellation-effects run-id run)
+      {:root-state-update (cancel-cascade-state-update (mapv :run-id cascade-runs) reason')
+       :effects (conj (cancellation-effects run cascade-runs)
                       (remove-dispatch-effect run-id reason' session-id))
        :return (remove-result run-id {:found? true
                                       :removed? true

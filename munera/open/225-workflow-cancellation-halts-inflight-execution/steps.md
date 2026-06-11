@@ -26,12 +26,12 @@
 
 - [x] Add a helper to identify terminal workflow-run statuses and live statuses (`:pending`, `:running`, `:blocked`).
 - [x] Add a helper to determine whether a run is top-level (no `:delegating-run-id`) vs nested.
-- [ ] Add a helper to enumerate non-terminal descendant runs transitively by `:delegating-run-id` from a directly cancelled run.
+- [x] Add a helper to enumerate non-terminal descendant runs transitively by `:delegating-run-id` from a directly cancelled run.
 - [x] Add a helper to locate a run's current live attempt and construct the guarded `:runtime/agent-abort` payload from `:execution-session-id`.
-- [ ] Implement the shared cancel-transition builder used by both handlers: handler-before gate, cascade-set enumeration, one multi-run `:root-state-update`, and ordered cancellation effects.
+- [x] Implement the shared cancel-transition builder used by both handlers: handler-before gate, cascade-set enumeration, one multi-run `:root-state-update`, and ordered cancellation effects.
 - [x] Ensure each per-run terminal guard is evaluated inside the returned `:root-state-update` fn, not only in handler-before.
 - [x] Emit `:runtime/cancel-inflight-run` according to the D35 split: canonical cancellation/cascade emits worker cancel only for top-level cancel or the live top-level remove first pass; runtime-handle cleanup may also emit it before `:runtime/drop-inflight-run` for terminal top-level remove (D38) and absent stale-handle cleanup (D36b); direct/terminal nested sub-run remove emits no worker cancel and must not infer a parent/top-level worker.
-- [ ] Emit guarded `:runtime/agent-abort` once per cascade-set run with a live current attempt.
+- [x] Emit guarded `:runtime/agent-abort` once per cascade-set run with a live current attempt.
 - [x] Emit `:runtime/mark-workflow-jobs-terminal` from the cancel dispatch while the run record is still present.
 - [x] Implement `:psi.workflow/cancel-run` live behaviour using the shared cancel-transition builder with no re-entrant remove effect and no record drop.
 - [x] Implement `:psi.workflow/cancel-run` terminal/absent behaviour as success/no-op with no canonical cancellation/cascade effects.
@@ -57,11 +57,11 @@
 
 ## Slice 5 — Delegate result and nested-run semantics
 
-- [ ] Update `delegate-step-runtime-result` so a missing delegate run maps to the same failed-step result as `:cancelled` (message may say cancelled or removed).
-- [ ] Keep present non-terminal delegate statuses on the existing anomaly/default path; only run absence is folded into cancelled semantics.
+- [x] Update `delegate-step-runtime-result` so a missing delegate run maps to the same failed-step result as `:cancelled` (message may say cancelled or removed).
+- [x] Keep present non-terminal delegate statuses on the existing anomaly/default path; only run absence is folded into cancelled semantics.
 - [ ] Add a direct nested sub-run cancel test proving no `:runtime/cancel-inflight-run` worker effect is emitted, the child attempt is aborted, the sub-run reaches `:cancelled`, and the parent continues via a failed delegate step.
 - [ ] Add a direct live nested sub-run remove test proving cancel-then-remove drops the sub-run record, run absence maps to cancelled failure, and the parent continues.
-- [ ] Add a top-down parent cancel test proving descendant cascade-set runs reach `:cancelled`, guarded child aborts target `:execution-session-id`, and only the single top-level worker cancel effect is emitted.
+- [x] Add a top-down parent cancel test proving descendant cascade-set runs reach `:cancelled`, guarded child aborts target `:execution-session-id`, and only the single top-level worker cancel effect is emitted.
 
 ## Slice 6 — Background job terminalization and public-surface cleanup
 
@@ -77,15 +77,15 @@
 - [ ] Add or update tests for acceptance criterion 1: top-level cancel stops post-checkpoint attempts and reaches cancelled terminal state with terminal job.
 - [x] Add or update tests for acceptance criterion 2: live top-level remove cancels the top-level future and drops the handle via effects.
 - [ ] Add or update tests for acceptance criterion 3: no forbidden ordinary workflow side effects are initiated after the D31 checkpoint in a nullable/controlled harness.
-- [ ] Add or update tests for acceptance criterion 4: top-down nested propagation uses guarded child aborts and one top-level future cancel only.
-  - Partial 2026-06-11: guarded abort payload and top-level-vs-nested worker-cancel effect routing covered for directly-cancelled runs; full descendant cascade still remains.
+- [x] Add or update tests for acceptance criterion 4: top-down nested propagation uses guarded child aborts and one top-level future cancel only.
+  - Covered 2026-06-11: parent cancel cascades `:cancelled` to live descendants, emits guarded aborts for cascade-set live attempts, skips terminal descendants, and emits exactly one top-level worker cancel.
 - [ ] Add or update tests for acceptance criterion 5: live nested remove aborts child turn, emits no worker cancel, and parent continues.
 - [ ] Add or update tests for acceptance criterion 6: direct nested cancel produces failed delegate-step semantics and parent continuation.
-- [ ] Add or update tests for acceptance criterion 7: removed/absent delegate run maps to cancelled failed-step result.
+- [x] Add or update tests for acceptance criterion 7: removed/absent delegate run maps to cancelled failed-step result.
 - [x] Add or update tests for acceptance criterion 8: sequential terminal requests emit no canonical cancellation/cascade effects while terminal remove still removes records/cleans handles.
 - [x] Add or update tests for acceptance criterion 10: D29 public result contracts and ordered handle cleanup for terminal/absent remove.
 - [ ] Add comments or review notes covering out-of-test-scope criteria 9 and 9a, tying the code to D22.2 and D27.
-- [ ] Run focused workflow-runtime tests affected by cooperative checkpoints and delegate result semantics.
+- [x] Run focused workflow-runtime tests affected by cooperative checkpoints and delegate result semantics.
 - [x] Run focused agent-session dispatch/effect/mutation/workflow tests affected by cancel/remove routing and effects.
 - [ ] Run `bb test`.
 - [x] Run `clj-kondo --lint components` (or the project-standard lint target if narrower/faster lint tasks are available).

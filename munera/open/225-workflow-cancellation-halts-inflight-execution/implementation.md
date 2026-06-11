@@ -2322,3 +2322,20 @@ Verification:
 
 - `bb clojure:test:scry --namespace psi.agent-session.mutations.canonical-workflows-test --namespace psi.agent-session.workflow-tools-test --namespace psi.agent-session.workflow-delegate-list-test --namespace psi.agent-session.workflow-cancellation-dispatch-test --namespace psi.agent-session.dispatch-test --namespace psi.agent-session.statechart-actions-test` → 60 tests / 479 assertions green.
 - Focused `clj-kondo --lint` over changed source/test files → clean.
+
+## Implementation pass — cascade cancel + removed delegate result (ψ, 2026-06-11)
+
+Implemented the next cancellation slice:
+
+- Added transitive cascade enumeration in the canonical workflow cancel/remove dispatch handlers: live descendants are discovered by `:delegating-run-id` from canonical run state, and the directly-cancelled run plus live descendants are cancelled in one multi-run `:root-state-update`.
+- Cancellation effects now use the cascade set: guarded `:runtime/agent-abort` is emitted for each cascade-set run with a live current attempt, while worker `:runtime/cancel-inflight-run` remains limited to the directly-cancelled top-level run.
+- Updated delegate result handling so a removed/missing delegated run maps to the cancellation/removal failed-step result instead of the generic non-terminal anomaly. Present non-terminal delegate runs still use the existing anomaly/default branch.
+- Added focused tests for top-down cascade cancellation/abort effect targeting and removed delegate-run semantics.
+
+Verification:
+
+- `bb clojure:test:scry --namespace psi.agent-session.workflow-cancellation-dispatch-test` → 5 tests / 32 assertions green.
+- Focused affected suite: `bb clojure:test:scry --namespace psi.agent-session.mutations.canonical-workflows-test --namespace psi.agent-session.workflow-tools-test --namespace psi.agent-session.workflow-delegate-list-test --namespace psi.agent-session.workflow-cancellation-dispatch-test --namespace psi.agent-session.dispatch-test --namespace psi.agent-session.statechart-actions-test --namespace psi.agent-session.workflow-execution-terminal-contract-test` → 62 tests / 492 assertions green.
+- `clj-kondo --lint components/agent-session/src/psi/agent_session/dispatch_handlers/workflows.clj components/workflow-runtime/src/psi/workflow_runtime/statechart_runtime/delegate.clj components/agent-session/test/psi/agent_session/workflow_cancellation_dispatch_test.clj` → clean.
+
+Remaining concrete work: cooperative execution checkpoints / interrupt-aware waits and full direct nested cancel/remove parent-continuation acceptance coverage remain unchecked in `steps.md`.

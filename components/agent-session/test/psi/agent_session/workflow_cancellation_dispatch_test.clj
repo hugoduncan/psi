@@ -6,6 +6,8 @@
    [psi.agent-session.dispatch-schema :as dispatch-schema]
    [psi.agent-session.test-support :as test-support]
    [psi.workflow-runtime.model :as workflow-model]
+   [psi.workflow-runtime.statechart-runtime.delegate :as delegate]
+   [psi.workflow-registry.registry :as registry]
    [psi.state-kernel.dispatch :as kernel]))
 
 (defn- make-ctx []
@@ -89,6 +91,43 @@
             entry (last-log-entry :psi.workflow/cancel-run)]
         (is (= :cancelled (:psi.workflow/status result)))
         (is (= [{:effect/type :runtime/mark-workflow-jobs-terminal}]
+               (:declared-effects entry))))))
+
+  (testing "parent cancel cascades to live descendants and aborts cascade-set attempts"
+    (kernel/clear-event-log!)
+    (let [ctx (make-ctx)]
+      (install-run! ctx (run "parent" :running
+                             :step-runs {"step-1" {:attempts [{:attempt-id "parent-attempt"
+                                                               :status :running
+                                                               :execution-session-id "parent-session"}]}}))
+      (install-run! ctx (run "child" :running
+                             :delegating-run-id "parent"
+                             :step-runs {"step-1" {:attempts [{:attempt-id "child-attempt"
+                                                               :status :validating
+                                                               :execution-session-id "child-session"}]}}))
+      (install-run! ctx (run "grandchild" :blocked :delegating-run-id "child"))
+      (install-run! ctx (run "done-child" :completed :delegating-run-id "parent"))
+      (let [result (dispatch/dispatch! ctx :psi.workflow/cancel-run {:run-id "parent"} {:origin :core})
+            entry (last-log-entry :psi.workflow/cancel-run)]
+        (is (= :cancelled (:psi.workflow/status result)))
+        (is (= :cancelled (get-in @(:state* ctx) [:workflows :runs "parent" :status])))
+        (is (= :cancelled (get-in @(:state* ctx) [:workflows :runs "child" :status])))
+        (is (= :cancelled (get-in @(:state* ctx) [:workflows :runs "grandchild" :status])))
+        (is (= :completed (get-in @(:state* ctx) [:workflows :runs "done-child" :status])))
+        (is (= [{:effect/type :runtime/mark-workflow-jobs-terminal}
+                {:effect/type :runtime/cancel-inflight-run :run-id "parent"}
+                {:effect/type :runtime/agent-abort
+                 :session-id "parent-session"
+                 :workflow-run-id "parent"
+                 :workflow-step-id "step-1"
+                 :workflow-attempt-id "parent-attempt"
+                 :expected-session-id "parent-session"}
+                {:effect/type :runtime/agent-abort
+                 :session-id "child-session"
+                 :workflow-run-id "child"
+                 :workflow-step-id "step-1"
+                 :workflow-attempt-id "child-attempt"
+                 :expected-session-id "child-session"}]
                (:declared-effects entry)))))))
 
 (deftest remove-run-dispatch-cleanup-effects-test
@@ -131,6 +170,45 @@
       (is (= [{:effect/type :runtime/cancel-inflight-run :run-id "ghost"}
               {:effect/type :runtime/drop-inflight-run :run-id "ghost"}]
              (:declared-effects (last-log-entry :psi.workflow/remove-run)))))))
+
+(deftest delegate-removed-run-result-test
+  ;; Tests removed delegate run result handling as state-based behavior: the
+  ;; child run is removed before result collection and the parent receives the
+  ;; cancellation/removal failure class.
+  (let [state* (atom {})
+        ctx {:state* state*}
+        create-context-fn (fn [_ctx _parent-session-id run-id]
+                            {:wm {}
+                             :run-id run-id})
+        send-and-drain-fn (fn [wf-ctx _wm _event _data]
+                            (swap! state* update-in [:workflows :runs] dissoc (:run-id wf-ctx)))]
+    (swap! state* assoc :workflows (workflow-model/initial-workflow-state))
+    (let [[registered-state definition-id _]
+          (registry/register-definition @state*
+                                        {:definition-id "child-flow"
+                                         :steps [{:name "only"
+                                                  :type :session
+                                                  :contributions [{:type :template
+                                                                   :text "done"
+                                                                   :vars {}}]}]})]
+      (reset! state* registered-state)
+      (let [parent-run {:run-id "parent"
+                        :status :running
+                        :effective-definition {:definition-id "parent-flow"}}
+            step-def {:delegate {:target definition-id
+                                 :prompt-string "go"}}
+            result (delegate/delegate-step-runtime-result
+                    create-context-fn
+                    send-and-drain-fn
+                    nil
+                    ctx
+                    "parent-session"
+                    "delegate-step"
+                    step-def
+                    parent-run)]
+        (is (= :failure (:pending-kind result)))
+        (is (= "Delegated workflow cancelled or removed" (get-in result [:payload :message])))
+        (is (= {:status :removed} (get-in result [:payload :details])))))))
 
 (deftest inflight-run-effect-execution-test
   ;; Tests cancellation/cleanup effects against a real isolated inflight-runs atom.

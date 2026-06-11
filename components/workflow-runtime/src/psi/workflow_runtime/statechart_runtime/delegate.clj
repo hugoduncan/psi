@@ -33,6 +33,52 @@
   [workflow-run]
   (workflow-terminal-contract/terminal-result-envelope workflow-run))
 
+(defn- delegate-run-runtime-result
+  [delegate-run delegate-run-id target-name boundary]
+  (if (nil? delegate-run)
+    {:pending-kind :failure
+     :payload {:message "Delegated workflow cancelled or removed"
+               :delegate-run-id delegate-run-id
+               :target target-name
+               :details {:status :removed}}}
+    (case (:status delegate-run)
+      :completed
+      (let [contract-outputs (workflow-terminal-contract/terminal-contract-outputs delegate-run)]
+        {:pending-kind :success
+         :payload (cond-> (terminal-step-result-envelope delegate-run)
+                    (seq contract-outputs) (update :outputs #(merge contract-outputs (or % {})))
+                    true (update :diagnostics #(merge boundary (or % {}))))})
+
+      :blocked
+      {:pending-kind :blocked
+       :payload {:outcome :blocked
+                 :blocked {:delegate-run-id delegate-run-id
+                           :target target-name
+                           :step-id (get-in delegate-run [:blocked :step-id])}
+                 :diagnostics boundary}}
+
+      :failed
+      {:pending-kind :failure
+       :payload {:message "Delegated workflow failed"
+                 :delegate-run-id delegate-run-id
+                 :target target-name
+                 :details (or (:terminal-outcome delegate-run)
+                              {:status (:status delegate-run)})}}
+
+      :cancelled
+      {:pending-kind :failure
+       :payload {:message "Delegated workflow cancelled"
+                 :delegate-run-id delegate-run-id
+                 :target target-name
+                 :details (or (:terminal-outcome delegate-run)
+                              {:status (:status delegate-run)})}}
+
+      {:pending-kind :failure
+       :payload {:message "Delegated workflow did not reach terminal or blocked status"
+                 :delegate-run-id delegate-run-id
+                 :target target-name
+                 :details {:status (:status delegate-run)}}})))
+
 (defn delegate-step-runtime-result
   "Resolve a delegate step by creating + driving a child workflow run.
 
@@ -73,40 +119,4 @@
                              :step-id step-id
                              :prompt-string prompt-string
                              :context context}}]
-    (case (:status delegate-run)
-      :completed
-      (let [contract-outputs (workflow-terminal-contract/terminal-contract-outputs delegate-run)]
-        {:pending-kind :success
-         :payload (cond-> (terminal-step-result-envelope delegate-run)
-                    (seq contract-outputs) (update :outputs #(merge contract-outputs (or % {})))
-                    true (update :diagnostics #(merge boundary (or % {}))))})
-
-      :blocked
-      {:pending-kind :blocked
-       :payload {:outcome :blocked
-                 :blocked {:delegate-run-id delegate-run-id
-                           :target target-name
-                           :step-id (get-in delegate-run [:blocked :step-id])}
-                 :diagnostics boundary}}
-
-      :failed
-      {:pending-kind :failure
-       :payload {:message "Delegated workflow failed"
-                 :delegate-run-id delegate-run-id
-                 :target target-name
-                 :details (or (:terminal-outcome delegate-run)
-                              {:status (:status delegate-run)})}}
-
-      :cancelled
-      {:pending-kind :failure
-       :payload {:message "Delegated workflow cancelled"
-                 :delegate-run-id delegate-run-id
-                 :target target-name
-                 :details (or (:terminal-outcome delegate-run)
-                              {:status (:status delegate-run)})}}
-
-      {:pending-kind :failure
-       :payload {:message "Delegated workflow did not reach terminal or blocked status"
-                 :delegate-run-id delegate-run-id
-                 :target target-name
-                 :details {:status (:status delegate-run)}}})))
+    (delegate-run-runtime-result delegate-run delegate-run-id target-name boundary)))
