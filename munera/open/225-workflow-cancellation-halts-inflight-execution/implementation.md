@@ -1917,3 +1917,20 @@ Executed the newly added pass-21 design follow-up; no blockers.
 - D1 now names the shared cancel-transition helper, live-remove first pass,
   terminal/absent record-drop branch, and dispatch `:effects` interceptor as the
   executor boundary.
+
+## Architecture-fit review (ψ pass 22, 2026-06-11)
+
+Reviewed current `design.md` for architectural fit only, consulting AGENTS.md VSM /
+principles, META.md, and `doc/architecture.md` state-boundary, dispatch sequencing,
+replay-trim, dispatch-trace, and ctx-managed-service guidance. Did not review
+`plan.md` or `steps.md`.
+
+No new actionable architectural-fit misfit found. The D1–D37 design continues to
+fit the project boundaries: public surfaces are adapters over canonical
+state-kernel events; cancellation/cleanup remains effects-as-data through dispatch
+with schema/executor parity, replay trimming, and trace visibility; canonical
+`:state*` signals stay separate from ctx-reached runtime handles; the cascade is a
+pure multi-run apply-phase update; cancel-then-remove uses re-entrant dispatch only
+for the apply-before-effects ordering case; and guarded abort / stale-handle cleanup
+reuse existing runtime-effect mechanisms without command-layer reach-in. No new
+`design-steps.md` follow-up item added.
