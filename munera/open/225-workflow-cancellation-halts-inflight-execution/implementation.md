@@ -2107,3 +2107,21 @@ Two new actionable inconsistencies found:
    possible top-level handle before dropping it (likely the same ordered cleanup
    pair as absent remove, scoped so nested sub-run removes still do not infer/kill
    a parent worker).
+
+## Design follow-up resolution (ψ pass 30 follow-up, 2026-06-11)
+
+Executed the two newly added unchecked design-steps from `design-steps.md` pass 30.
+Both were design-contract reconciliation items and were completable now; no blockers.
+
+- **D23 child-abort effect set:** corrected the effect-set wording so guarded
+  `:runtime/agent-abort` emits for each **cascade-set** run with a live attempt,
+  including the directly-cancelled run itself and in-flight descendants. Acceptance
+  #4 now asserts abort coverage over the cascade-set live attempts, preserving the
+  D15/D28/D33 guarded payload/read rule.
+- **Terminal remove handle cleanup:** added D38. Chose cancel-before-drop cleanup for
+  already-terminal **top-level** remove: emit `:runtime/cancel-inflight-run` before
+  `:runtime/drop-inflight-run` so a still-unwinding/stale worker is not orphaned.
+  Terminal **nested** remove remains no-worker-cancel (no parent/top-level inference)
+  and may only exact-key drop. D24/D26/D29/D34/D36b and Acceptance #8/#10 were
+  aligned to distinguish canonical cancellation/cascade effects from idempotent
+  runtime-handle cleanup.

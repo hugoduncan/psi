@@ -908,7 +908,7 @@
 
 ## Inconsistency follow-ups (ψ pass 30, 2026-06-11)
 
-- [ ] Reconcile D23's child-abort effect-set wording with D6/D15/D3. D6 guarantees
+- [x] Reconcile D23's child-abort effect-set wording with D6/D15/D3. D6 guarantees
       the directly-cancelled run's in-flight child turn is interrupted; D15 states
       the aborted-session set is the directly-cancelled run plus each in-flight
       descendant with a live attempt; D3 defines the cascade set as cancelled run ∪
@@ -917,8 +917,13 @@
       itself. Update D23 (and any acceptance/test wording if needed) so the abort
       effect is emitted for each **cascade-set** run with a live attempt — including
       the directly-cancelled run — while preserving D15's guarded payload/read rule.
+      → design.md D23 effect-set wording now emits one guarded `:runtime/agent-abort`
+      per **cascade-set run** whose current attempt satisfies the D15 live-attempt
+      predicate, explicitly including the directly-cancelled run plus descendants;
+      Acceptance #4 updated to require abort coverage for each cascade-set live
+      attempt while preserving the D28/D33 guarded payload/read rule.
 
-- [ ] Reconcile already-terminal `remove-run` cleanup with the no-orphan
+- [x] Reconcile already-terminal `remove-run` cleanup with the no-orphan
       runtime-handle invariant. D26/D29 currently make terminal remove a bare
       record drop plus D24 `:runtime/drop-inflight-run` only, while D36b's
       cancel-before-drop ordered cleanup pair applies only to absent remove. A
@@ -932,3 +937,9 @@
       requested run id (with clear top-level/stale-handle semantics so nested
       sub-run removes still do not infer or interrupt a parent worker). Align
       D24/D26/D29/D34/D36b and Acceptance #10.
+      → design.md D38 chooses option (b) for terminal **top-level** remove: emit the
+      ordered runtime-handle cleanup pair (`:runtime/cancel-inflight-run` before
+      `:runtime/drop-inflight-run`) without any canonical cancellation/cascade
+      effects. Terminal **nested** remove emits no worker cancel effect and does not
+      infer/interrupt the parent/top-level worker; it may only exact-key drop. D24,
+      D26, D29, D34, D36b, Acceptance #8/#10 aligned.

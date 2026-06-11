@@ -1280,9 +1280,11 @@ multi-run update fn**, never a command-layer loop or cross-handle reach-in
    replay-trim, trace): the D35 **single** top-level worker interrupt effect
    `{:effect/type :runtime/cancel-inflight-run :run-id top-level-run-id}` **iff the
    directly-cancelled run is the top-level run** (D14/D19); one guarded
-   `:runtime/agent-abort` per in-flight descendant attempt (D15/D28/D33
-   live-attempt predicate); and the D13 `:runtime/mark-workflow-jobs-terminal`
-   terminalization. No per-descendant re-dispatch.
+   `:runtime/agent-abort` per **cascade-set run** whose current attempt satisfies
+   the D15 live-attempt predicate — including the directly-cancelled run itself as
+   well as any in-flight descendants (D6/D15/D28/D33); and the D13
+   `:runtime/mark-workflow-jobs-terminal` terminalization. No per-descendant
+   re-dispatch.
 
 **Reconciliation with D4/D20 (atomicity).** D20's single-run atomicity (terminal
 guard inside the `:root-state-update` fn riding one CAS) **generalises directly** to
@@ -1356,14 +1358,24 @@ signal(canonical)/handle(`inflight-runs`) split. There is no apply-vs-effect
 ordering hazard between them (the canonical record removal does not depend on the
 handle entry, and vice versa).
 
-**Cross-dispatch ordering vs the worker `future-cancel` (D12/D14).** The handle
-entry-drop runs in the **remove dispatch** (dispatch 2), strictly after the **cancel
-dispatch's** (dispatch 1) worker `future-cancel(true)` effect — which reads the
-future *from* `inflight-runs` via `ctx`. So the future is cancelled **before** its
-handle entry is dropped (drop-after-cancel; never drop-then-orphan — the exact
-Evidence-step-3 orphaning this task fixes). The two-dispatch split (D17/D18)
-sequences them via in-thread re-entrancy (D20), so dispatch 2's drop observes
-dispatch 1's future-cancel.
+**No drop-before-cancel invariant for possible top-level handles (D12/D14/D38).**
+The remove-flow cleanup must never discard a possible live **top-level**
+`inflight-runs` handle before attempting to cancel its worker future. For a live
+**top-level** remove, the first-pass cancel dispatch emits the D35
+`:runtime/cancel-inflight-run` effect, and the re-entrant terminal remove pass emits
+an idempotent top-level handle cleanup pair (D38) before dropping the handle. For a
+plain remove of an already-terminal **top-level** run — including a run already
+`:cancelled` while its worker is still unwinding — the terminal branch likewise emits
+that ordered pair in the same effect vector:
+`{:effect/type :runtime/cancel-inflight-run :run-id run-id}` before
+`{:effect/type :runtime/drop-inflight-run :run-id run-id}`. For an already-terminal
+**nested** sub-run, no worker cancel effect is emitted and no parent/top-level worker
+is inferred; only the exact-key drop cleanup may run, which is a no-op because
+nested sub-runs own no `inflight-runs` entry. For an absent run, D36b applies the
+same cancel-before-drop pair to the requested id as stale top-level-handle cleanup
+because no canonical run record remains to classify. This preserves the original
+D17 drop-after-cancel ordering for live top-level remove and extends the no-orphan
+invariant to terminal/absent cleanup.
 
 **Idempotency.** `(swap! inflight-runs dissoc run-id)` is a no-op on an absent
 entry, so the cleanup effect is execution-time idempotent (D22.2): if the
@@ -1504,11 +1516,15 @@ no command-layer orchestration; the cancel-transition logic is a shared helper.*
     `remove-run` dissoc** (D22.1 record-drop, status-independent) + runtime-handle
     cleanup; **no canonical cancellation/cascade effects** (the run is already
     terminal or absent at the handler-`:before` read, so the D22.1 gate contributes
-    none). For a terminal canonical record, cleanup is the D24
-    `:runtime/drop-inflight-run` effect (the live-run first pass already cancelled a
-    top-level future if needed). For an absent run, the pure dissoc is an identity/no
+    none). For a terminal **top-level** canonical record, cleanup is the D38 ordered
+    pair: `:runtime/cancel-inflight-run` followed by D24
+    `:runtime/drop-inflight-run`, so a still-unwinding/stale top-level worker is
+    interrupted before its handle is dropped. For a terminal **nested** canonical
+    record, cleanup emits no worker cancel effect and does not infer or interrupt the
+    parent/top-level worker; it may emit only the exact-key D24 drop cleanup (a no-op
+    for ordinary nested runs). For an absent run, the pure dissoc is an identity/no
     canonical record removal, and the D36b cleanup pair runs to cancel any possible
-    stale live handle before dropping it (D34/D36b).
+    stale live handle before dropping it (D34/D36b/D38).
 
 - **(c) Where the live-vs-terminal branch lives.** Inside the `remove-run`
   **handler-`:before`** (the canonical-state read), **not** the command layer — it
@@ -1720,8 +1736,12 @@ transition applied; it is not a promise that no idempotent cleanup effect emitte
   second pass; the public command reports the requested remove as accepted/successful.
 - **Already terminal run:** performs the bare record-drop branch (D22.1/D26) and
   returns `:psi.workflow/removed? true`, `:psi.workflow/noop? false`,
-  `:psi.workflow/error nil`. The cancellation-effect set is empty; only the
-  record-drop and `:runtime/drop-inflight-run` cleanup run.
+  `:psi.workflow/error nil`. The canonical cancellation/cascade-effect set is empty
+  (no `:cancelled` transition, no guarded workflow aborts, no job terminalization,
+  no re-entrant remove). Runtime-handle cleanup still runs: for a terminal
+  **top-level** run it is the D38 ordered `:runtime/cancel-inflight-run` →
+  `:runtime/drop-inflight-run` pair; for a terminal **nested** run it is only the
+  exact-key drop cleanup, with no parent/top-level worker inferred.
 - **Absent run:** returns success/idempotent no-op removal:
   `:psi.workflow/removed? false`, `:psi.workflow/found? false`,
   `:psi.workflow/noop? true`, `:psi.workflow/error nil`. No canonical record was
@@ -1900,7 +1920,9 @@ D26's terminal/absent `remove-run` branch emits the bare record-drop plus the D2
 
 This reconciles D26/D29/Acceptance #10 and preserves the fix for the Evidence-step-3
 class without recreating it: a record may be absent while a stale runtime handle still
-needs cancellation before cleanup.
+needs cancellation before cleanup. D38 extends the same no-orphan cancel-before-drop
+invariant to already-terminal **top-level** remove cleanup, while preserving the
+nested-sub-run rule that no parent/top-level worker is inferred from a nested record.
 
 ## Ambiguity Reconciliation (ψ pass 17, 2026-06-11)
 
@@ -2013,12 +2035,14 @@ worker still running, no remaining way to stop it.
 ```
 
 Within the terminal/absent cleanup branch where no canonical cancel transition
-applies, this pair is emitted for the **absent** case. (A terminal canonical record
-keeps the existing D24 drop-only cleanup: the live-run first pass is the path that
-cancels a top-level future before record removal.) The absent pair is not a cascade,
-emits no guarded `:runtime/agent-abort`, emits no job terminalization, and emits no
-re-entrant remove. It is runtime-handle cleanup for a possible stale **top-level**
-handle key. Because there is no canonical run record, the emitter cannot classify
+applies, this pair is emitted for the **absent** case. D38 applies the same ordered
+pair to an already-terminal **top-level** canonical record; an already-terminal
+**nested** canonical record remains drop-only because nested sub-runs own no
+`inflight-runs` future and the remove path must not infer or interrupt the parent
+worker. The absent/top-level-terminal pair is not a cascade, emits no guarded
+`:runtime/agent-abort`, emits no job terminalization, and emits no re-entrant
+remove. It is runtime-handle cleanup for a possible stale **top-level** handle key.
+For the absent case there is no canonical run record, so the emitter cannot classify
 nested-vs-top-level by run tree; it simply treats the requested id as a possible
 direct `inflight-runs` key.
 `execute-effect! :runtime/cancel-inflight-run` already looks up exactly that key and
@@ -2035,6 +2059,44 @@ cancelled, cancellation is harmless and drop performs cleanup.
 no canonical record was found/removed and no cancel transition was applied. `:noop?`
 does not mean no runtime cleanup effects emitted. Acceptance #10 targets this
 ordered pair so absent cleanup cannot orphan a live worker.
+
+### D38. Terminal top-level `remove-run` cleanup also cancels before dropping the handle
+
+**Premise.** A canonical run can be terminal while its top-level worker handle is
+still live or stale: for example, after a prior cancel request commits `:cancelled`
+but before the interrupted worker has unwound and cleaned up, or after legacy/orphan
+states of the kind described in the Evidence. If a terminal remove drops the
+`inflight-runs` handle without first attempting `future-cancel`, it can recreate the
+Evidence-step-3 failure (handle gone, worker still running, no remaining handle to
+interrupt).
+
+**Decision — option (b): terminal top-level remove emits cancel-before-drop cleanup.**
+For an already-terminal **top-level** canonical record, the `remove-run`
+terminal/absent branch emits the ordered runtime-handle cleanup pair:
+
+```clojure
+[{:effect/type :runtime/cancel-inflight-run :run-id run-id}
+ {:effect/type :runtime/drop-inflight-run   :run-id run-id}]
+```
+
+This is runtime-handle cleanup, not a canonical cancellation/cascade: it does not
+apply a new `:cancelled` transition, does not emit guarded `:runtime/agent-abort`,
+does not mark jobs terminal, and does not emit another re-entrant remove. The pair
+is idempotent if the first-pass cancel, natural-completion cleanup, or a prior remove
+already cancelled/dropped the handle.
+
+**Nested terminal records.** For an already-terminal **nested** sub-run, the branch
+emits **no** `:runtime/cancel-inflight-run`: nested sub-runs own no future, and the
+cleanup path must not infer a top-level ancestor or interrupt the still-running
+parent worker (D14/D19/D21/D35). It may emit only the exact-key
+`:runtime/drop-inflight-run` cleanup, which is normally a no-op. This preserves the
+direct nested-sub-run remove contract while still allowing stale exact-key cleanup.
+
+**Absent records.** Absent remove remains D36b: with no canonical record left to
+classify, it treats the requested id as a possible stale top-level handle key and
+emits the same ordered cancel-before-drop pair. Thus both terminal top-level remove
+and absent remove satisfy the no-orphan invariant; terminal nested remove remains
+no-worker-cancel.
 
 ## Ambiguity Reconciliations (ψ pass 20, 2026-06-11)
 
@@ -2184,10 +2246,12 @@ test). The criteria are reconciled with D14/D19/D21/D22 and the pass-11 refineme
 ### Transitive / nested sub-run propagation
 
 4. **[guaranteed]** A test asserts top-down cancellation propagates to a nested
-   delegate sub-run: each in-flight descendant's child session is aborted using the
-   D28 guarded `:runtime/agent-abort` payload/read rule so its turn does not advance,
-   and the cancelled run plus its in-flight descendants reach `:cancelled` terminal
-   via the single multi-run apply-phase transition (D23). **No** per-sub-run worker
+   delegate sub-run: each **cascade-set** run with a live attempt — including the
+   directly-cancelled run itself and any in-flight descendants — has its child
+   session aborted using the D28 guarded `:runtime/agent-abort` payload/read rule so
+   its turn does not advance, and the cancelled run plus its in-flight descendants
+   reach `:cancelled` terminal via the single multi-run apply-phase transition
+   (D23). **No** per-sub-run worker
    `:runtime/cancel-inflight-run` effect is emitted (sub-runs are synchronous, carry
    no own future — D14/D35); only the single top-level future is interrupted by the
    effect whose `:run-id` is the top-level run id.
@@ -2214,12 +2278,14 @@ test). The criteria are reconciled with D14/D19/D21/D22 and the pass-11 refineme
 
 8. **[guaranteed]** A test asserts a repeated/**sequential** terminal request (a
    second `cancel`, the `cancel`-half of `remove`-of-already-terminal, or a `cancel`
-   after natural completion) is a no-op that **emits no cancellation effects** — the
-   handler-before terminal-precondition gate contributes `identity` + empty effect set
-   when the run is already terminal/absent (D22.1) — while the `remove-run` record-drop
-   **still applies** to an already-terminal run (D22.1; not re-orphaned). Public
-   result fields follow D29: terminal/absent cancel/remove are success/no-op shapes,
-   not "already terminal" / "not found" errors.
+   after natural completion) is a no-op that **emits no canonical cancellation/cascade
+   effects** — the handler-before terminal-precondition gate contributes `identity` +
+   empty canonical cancellation effect set when the run is already terminal/absent
+   (D22.1). `remove-run` record-drop **still applies** to an already-terminal run
+   (D22.1; not re-orphaned) and may emit only the idempotent runtime-handle cleanup
+   required by D38/D36b. Public result fields follow D29: terminal/absent
+   cancel/remove are success/no-op shapes, not "already terminal" / "not found"
+   errors.
 9. **[out-of-test-scope]** Execute-time idempotency on the **true-concurrent** CAS
    race (two cancels racing on two threads both emitting effects, D20 applying
    `:cancelled` once): workflow-cancellation `:runtime/agent-abort` re-checks the D15
@@ -2243,13 +2309,15 @@ test). The criteria are reconciled with D14/D19/D21/D22 and the pass-11 refineme
 
 10. **[guaranteed]** Tests assert the D29 public result contract: live cancel returns
     success with `:status :cancelled`; terminal cancel and absent cancel return
-    success/no-op without cancellation effects; live remove returns successful
-    cancel-then-remove; terminal remove drops the record without cancellation
-    effects; absent remove returns success/idempotent no-op (`:removed? false`,
+    success/no-op without canonical cancellation/cascade effects; live remove returns
+    successful cancel-then-remove; terminal remove drops the record without canonical
+    cancellation/cascade effects and performs only the D38 runtime-handle cleanup
+    (top-level terminal: ordered `:runtime/cancel-inflight-run` before
+    `:runtime/drop-inflight-run`; nested terminal: exact-key drop only, no worker
+    cancel); absent remove returns success/idempotent no-op (`:removed? false`,
     `:found? false`, `:noop? true`) while still emitting only the idempotent D36b
-    ordered handle-cleanup pair (`:runtime/cancel-inflight-run` before
-    `:runtime/drop-inflight-run`) to stop and clear a possible orphaned top-level
-    handle (D34/D36b).
+    ordered handle-cleanup pair to stop and clear a possible orphaned top-level
+    handle (D34/D36b/D38).
 
 ### Build gates
 
