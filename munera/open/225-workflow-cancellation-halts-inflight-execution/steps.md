@@ -89,3 +89,8 @@
 - [ ] Run `bb test`.
 - [ ] Run `clj-kondo --lint components` (or the project-standard lint target if narrower/faster lint tasks are available).
 - [ ] Fix any failing tests or lint findings without weakening the cancellation contract.
+
+## Plan/steps ambiguity follow-ups (ψ, 2026-06-11)
+
+- [ ] Qualify the Slice 3 `:runtime/cancel-inflight-run` emission step with the D35 split: **canonical cancellation/cascade** emits worker cancel only for top-level cancel / live top-level remove, while **runtime-handle cleanup** may also emit it for terminal top-level remove (D38) and absent stale-handle cleanup (D36b) before `:runtime/drop-inflight-run`; direct/terminal nested sub-run remove must still emit no worker cancel and must not infer a parent/top-level worker.
+- [ ] Reconcile `delegate remove` command-layer background-job cleanup with the adapter-only cancel/remove boundary: remove/reroute the current `cleanup-active-delegate-background-jobs-before-remove!` / `terminalize-active-delegate-background-jobs!` side effect through the canonical `:psi.workflow/remove-run` dispatch/effects path (or explicitly document why any retained pre-remove cleanup is not a cancellation/remove side effect), so steps cover more than the direct `inflight-runs` `swap!`.

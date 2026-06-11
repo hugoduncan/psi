@@ -2237,3 +2237,19 @@ aligned with that split. No new `design-steps.md` follow-up item added.
 Reviewed current `design.md` for internal/design-vs-referenced-artifact inconsistency after the pass-35 ambiguity review. Consulted Scope, Intent, D1–D38, Acceptance Criteria, and referenced dispatch/effect/runtime code where needed. Did not review task `plan.md` or `steps.md`.
 
 No new actionable inconsistency found. The current design is internally aligned on state-kernel event ownership, effect payloads and ordering, top-level vs nested run cleanup, guarded abort semantics, terminal/absent result semantics, idempotency, and the D23/D31 cascade-set guarantee with the D27 bounded exception. No new `design-steps.md` follow-up item added.
+
+## Plan/steps ambiguity review (ψ, 2026-06-11)
+
+Reviewed `plan.md` and `steps.md` against the current D1–D38 design plus referenced
+workflow dispatch/effect/runtime code and `doc/architecture.md`. Two new actionable
+plan/steps ambiguities found:
+
+1. `steps.md` says to emit `:runtime/cancel-inflight-run` only when the directly
+   cancelled live run is top-level, while later terminal/absent remove steps require
+   the same effect for D38/D36b runtime-handle cleanup. The step needs the D35 split:
+   canonical cancellation emissions vs cleanup emissions.
+2. `plan.md` says Pathom/psi-tool/`delegate remove` are adapters only, but the steps
+   only call out removing direct `inflight-runs` cleanup. Current `delegate-remove`
+   also performs command-layer background-job terminalization before remove; steps
+   should explicitly remove/reroute or justify that side effect so the adapter-only
+   boundary is unambiguous.
