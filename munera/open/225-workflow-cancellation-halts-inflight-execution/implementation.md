@@ -3240,3 +3240,13 @@ verification:
 - `bb clojure:test:scry --namespace psi.agent-session.prompt-lifecycle-workflow-cancellation-test` → 9 tests / 53 assertions green.
 - `bb clojure:test:scry --namespace psi.agent-session.prompt-lifecycle-test` → 24 tests / 117 assertions green.
 - `clj-kondo --lint components/agent-session/src/psi/agent_session/turn/handlers.clj components/agent-session/src/psi/agent_session/dispatch_handlers/prompt_lifecycle.clj components/agent-session/test/psi/agent_session/prompt_lifecycle_workflow_cancellation_test.clj` → errors 0, warnings 0.
+
+## Implementation review (ψ pass 26, 2026-06-11)
+
+Reviewed the pass-24/25 synthetic follow-up guard and adjacent prompt-lifecycle dispatch/effect paths. The synthetic follow-up effects now carry `:workflow-run-id` and stale outer effects no-op when cancellation is already visible, but one admitted nested-dispatch stale-result window remains.
+
+New actionable issue: guarded `:runtime/dispatch-event` / `:runtime/dispatch-event-with-effect-result` effects check cancellation only before starting the nested dispatch. If that check passes and the nested handler builds an ordinary pure result, a D31 cancel can still land before that nested result is applied/effects executed. Concrete case: workflow-owned `:session/prompt-submit` emits guarded `:session/append-journal-entry` dispatch effects, but the append-journal handler receives no workflow guard and returns an unguarded journal root update plus `:persist/session-journal-io`; cancellation after the append-journal dispatch is admitted but before apply/effects can still append/persist an ordinary user journal entry after D31. Follow-up should carry/derive workflow guard metadata into admitted nested journal/context-update handlers (or make the guarded dispatch mechanism wrap their root updates/effects) and add a regression for cancellation between guarded nested-dispatch handler-result construction and apply/effects.
+
+Verification during review:
+
+- Static review of `turn.handlers/synthetic-user-prompt-effects`, `prompt_lifecycle.clj` prompt-submit/synthetic handlers, `journal_append_effect.clj`, and `dispatch_effects.clj` guarded dispatch execution.
