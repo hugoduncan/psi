@@ -46,9 +46,6 @@
               s)))))
 
 (deftest ranked-model-fallback-rechecks-cancellation-before-next-candidate-test
-  ;; Regression for task 225 implementation review pass 5: cancellation after a
-  ;; fallback-worthy actor failure must not start another ordinary actor turn for
-  ;; the next ranked model candidate.
   (let [[ctx session-id] (create-session-context)
         definition {:definition-id "ranked-fallback-cancel"
                     :steps [{:name "plan"
