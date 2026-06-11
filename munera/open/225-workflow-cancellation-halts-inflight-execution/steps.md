@@ -151,4 +151,5 @@
 
 ## Implementation review follow-ups (ψ pass 7, 2026-06-11)
 
-- [ ] Update `doc/workflows.md` to reflect the new `delegate remove` / workflow removal contract: live top-level remove is canonical cancel-then-remove with dispatch-owned background-job terminalization and cancel-before-drop worker cleanup; live nested-sub-run remove aborts the child turn and lets the parent continue via cancelled/removed delegate failure semantics; terminal/absent remove is idempotent canonical-record cleanup (with stale-handle cleanup where applicable), not the old command-layer pre-cleanup/fail-if-cleanup-fails model.
+- [x] Update `doc/workflows.md` to reflect the new `delegate remove` / workflow removal contract: live top-level remove is canonical cancel-then-remove with dispatch-owned background-job terminalization and cancel-before-drop worker cleanup; live nested-sub-run remove aborts the child turn and lets the parent continue via cancelled/removed delegate failure semantics; terminal/absent remove is idempotent canonical-record cleanup (with stale-handle cleanup where applicable), not the old command-layer pre-cleanup/fail-if-cleanup-fails model.
+  - Covered 2026-06-11: `doc/workflows.md` now describes canonical dispatch removal, live top-level cancel-then-remove, live nested sub-run parent-continuation semantics, and terminal/absent idempotent cleanup.

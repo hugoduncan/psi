@@ -124,11 +124,24 @@ blocked workflow may list as primary status `blocked` with a separate delegate
 attempt status of `completed`, and a retained timed-out delegate attempt may show
 the canonical workflow status plus a separate `delegate timed-out` status.
 
-`delegate remove` deletes the canonical workflow run. When the listed run still
-has an active delegate/background job, remove first cleans up or terminalizes that
-active job so a later `delegate list` does not report a stale active attempt for a
-removed workflow run. If that cleanup cannot be completed, remove fails with an
-actionable error and leaves the canonical run visible/manageable.
+`delegate remove` requests canonical workflow removal through the workflow
+runtime dispatch path. For a live top-level run, removal is cancel-then-remove:
+psi first marks the run and its live descendant sub-runs cancelled, terminalizes
+workflow background-job projections as cancelled, interrupts the top-level
+workflow worker before dropping its runtime handle, then removes the canonical run
+record. This prevents removed delegated workflows from continuing in the
+background.
+
+Direct removal of a live nested delegate sub-run does not interrupt the shared
+parent/top-level workflow worker. Instead, psi aborts that sub-run's in-flight
+child turn, removes the sub-run record, and lets the parent workflow continue by
+observing the delegated step as a cancelled/removed failed step.
+
+Removing an already-terminal run is idempotent canonical-record cleanup. Removing
+an absent run is a success/no-op for the canonical record and still performs
+stale runtime-handle cleanup when a leftover handle exists. Removal no longer uses
+command-layer active-job pre-cleanup or a fail-if-pre-cleanup-fails model; job
+terminalization and worker-handle cleanup are dispatch-owned runtime effects.
 
 ## Reloading workflow definitions
 

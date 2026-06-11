@@ -2646,3 +2646,15 @@ new follow-up item was added to `steps.md` to avoid duplicating that existing st
 Verification during review:
 
 - `bb clojure:test:scry --namespace psi.agent-session.workflow-statechart-runtime-cancellation-test --namespace psi.agent-session.workflow-judge-test --namespace psi.agent-session.workflow-cancellation-dispatch-test --namespace psi.workflow-runtime.statechart-runtime.step-execution-test --namespace psi.workflow-runtime.turn-execution-contract-test --namespace psi.deterministic-operation-runtime.core-test` → 49 tests / 255 assertions green.
+
+## Implementation follow-up pass 7 (ψ, 2026-06-11)
+
+Executed the remaining pass-7 documentation follow-up. `doc/workflows.md` no longer describes `delegate remove` as command-layer active-background-job pre-cleanup that can fail before canonical removal. It now states the implemented workflow removal contract:
+
+- live top-level remove is canonical dispatch cancel-then-remove, with cancelled background-job terminalization and worker interrupt before runtime-handle drop;
+- live nested delegate sub-run remove aborts the child turn, removes the sub-run record, and lets the parent continue via cancelled/removed failed-step semantics;
+- terminal remove is idempotent canonical-record cleanup;
+- absent remove is canonical success/no-op with stale runtime-handle cleanup when applicable;
+- job terminalization and worker-handle cleanup are dispatch-owned runtime effects.
+
+Validation: `git diff --check` passed. No code/test changes were required for this doc-only follow-up.
