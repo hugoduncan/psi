@@ -708,7 +708,7 @@
 
 ## Inconsistency follow-ups (ψ pass 12, 2026-06-11)
 
-- [ ] Reconcile D28's `:runtime/agent-abort` `:session-id` schema requirement with
+- [x] Reconcile D28's `:runtime/agent-abort` `:session-id` schema requirement with
       existing unguarded abort effects and the dispatch validation/effect order.
       D28 says the effect schema keeps `:session-id` required, but existing
       non-workflow aborts such as `:on-abort` emit only
@@ -721,3 +721,11 @@
       emitter to include `:session-id` before validation. Align D28, D12, the
       effect-schema implication, and existing non-workflow abort behaviour so
       validation parity does not reject current `:runtime/agent-abort` effects.
+      → design.md D32: option (a). `:runtime/agent-abort` keeps `:session-id`
+      optional for unguarded/non-workflow aborts so current `:on-abort` effects can
+      validate before the `:effects` interceptor injects the dispatching session id;
+      guarded workflow-cancel aborts require explicit `:session-id`,
+      `:expected-session-id`, and complete workflow guard metadata before validation.
+      D28/D15 schema implication updated; executor keeps existing session-id-only
+      behaviour when no guard is present and applies the D28 liveness re-check only
+      for guarded payloads.

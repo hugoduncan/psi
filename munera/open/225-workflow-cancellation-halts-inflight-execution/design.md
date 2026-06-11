@@ -634,10 +634,13 @@ child-abort effect is per in-flight run.
 
 ### D15. Child-session-abort session-id = the in-flight attempt's `:execution-session-id` (resolves Q-pass2-2)
 
-The `:runtime/agent-abort` effect's required `:session-id` argument is the
-**in-flight child turn's `:execution-session-id`**, read from canonical run state —
-**not** the run's `:parent-session-id` (the delegating/caller session, which must
-**not** be aborted).
+For workflow-cancellation abort emissions, the `:runtime/agent-abort` effect's
+explicit `:session-id` field is the **in-flight child turn's
+`:execution-session-id`**, read from canonical run state — **not** the run's
+`:parent-session-id` (the delegating/caller session, which must **not** be
+aborted). D32 reconciles this workflow-guarded explicit `:session-id` requirement
+with existing unguarded abort effects whose session id is injected by the
+`:effects` interceptor after validation.
 
 **Read rule (from canonical `:state*`, per cascade run `r`):**
 
@@ -671,7 +674,9 @@ plus `:expected-session-id sid` (equal to `:session-id`). At execute time the
 locate the same run/step/latest attempt, and abort only if the latest attempt still
 has the same `:attempt-id`, live status, and the same `:execution-session-id`.
 Existing non-workflow `:runtime/agent-abort` emissions omit the metadata and keep
-the current unguarded session-id-only behaviour.
+the current unguarded session-id-only behaviour: their session id may be supplied
+explicitly in the effect payload or injected from the dispatching event's
+`:session-id` by the `:effects` interceptor (D32).
 
 ## Consistency Reconciliations (ψ pass 2, 2026-06-10)
 
@@ -1579,11 +1584,22 @@ At execute time the effect handler branches on presence of the workflow guard:
   existing session-id-only behaviour. They are not forced to invent workflow state
   they do not have, and their schemas remain valid.
 
-**Schema/executor implication.** `effect-schema` extends the existing
-`:runtime/agent-abort` shape with optional workflow guard keys (or a nested optional
-`:workflow-abort-guard` map) while keeping `:session-id` required. No new abort
-effect type is introduced; this is a guarded workflow-cancellation variant of the
-existing effect. D12/D15/D22.2 are aligned to this rule.
+**Schema/executor implication (refined by D32).** `effect-schema` extends the
+existing `:runtime/agent-abort` shape as a two-variant contract:
+
+- **Unguarded abort variant:** workflow guard keys are absent and top-level
+  `:session-id` is **optional** in the schema, because existing emitters such as
+  `:on-abort` may emit only `{:effect/type :runtime/agent-abort}` and rely on the
+  dispatch `:effects` interceptor to inject the dispatching event's `:session-id`
+  after validation.
+- **Guarded workflow-cancellation variant:** workflow guard keys are present and
+  validation requires the complete guard plus an explicit `:session-id` and
+  `:expected-session-id` before effects execute. This is the D15 child
+  `:execution-session-id`; the executor does not rely on post-validation session-id
+  injection for workflow-cancel aborts.
+
+No new abort effect type is introduced; this is a guarded workflow-cancellation
+variant of the existing effect. D12/D15/D22.2 are aligned to this rule.
 
 ### D29. Public result semantics for terminal/absent `cancel-run` and `remove-run`
 
@@ -1684,6 +1700,47 @@ Consequences:
 Acceptance #1/#3/#4/#6 now use this definition: tests should record/observe the
 canonical `:cancelled` commit (or a controlled hook immediately after the apply
 phase) and assert no forbidden advancement begins after that point.
+
+
+### D32. `:runtime/agent-abort` schema keeps unguarded `:session-id` optional; guarded workflow-cancel aborts require it
+
+D28's first wording made `:session-id` required for every `:runtime/agent-abort`
+effect. That contradicts existing unguarded abort emitters and the actual dispatch
+phase order: handlers such as `:on-abort` currently emit
+`{:effect/type :runtime/agent-abort}` with no `:session-id`, validation runs before
+the `:effects` interceptor, and only the `:effects` interceptor injects the
+dispatching event's `:session-id` into effects that omit it. A schema that globally
+requires `:session-id` would therefore fail validation before the injection point,
+breaking existing non-workflow abort behaviour and D12's validation-parity claim.
+
+**Decision — option (a): keep `:session-id` optional for unguarded aborts; require
+it for guarded workflow-cancellation aborts.** The effect schema represents
+`:runtime/agent-abort` as one existing effect type with two payload variants:
+
+1. **Unguarded/non-workflow abort.** No workflow guard keys are present.
+   `:session-id` is optional at validation time. If absent, the dispatch
+   `:effects` interceptor injects the event/session `:session-id` before
+   `execute-effect!`; if present, the explicit value is used. This preserves
+   current `:on-abort` and other session-dispatch-local abort behaviour.
+2. **Guarded workflow-cancel abort.** Any workflow-cancel guard key implies the
+   full guarded variant is required before validation succeeds:
+   `:session-id`, `:workflow-run-id`, `:workflow-step-id`,
+   `:workflow-attempt-id`, and `:expected-session-id`. The schema should enforce
+   all-or-none guard keys (or use a required nested `:workflow-abort-guard` map).
+   Workflow-cancel emitters always know the child `:execution-session-id` from D15,
+   so they must provide it explicitly; relying on the dispatching operator
+   session's injected `:session-id` would target the wrong session.
+
+**Executor rule.** After the interceptor's possible injection, `execute-effect!`
+continues to resolve the effective session id with `(effect-session-id ctx effect)`.
+When workflow guard metadata is absent it performs the existing session-id-only
+abort. When workflow guard metadata is present it first applies D28's canonical
+run/step/attempt liveness re-check and aborts only if the guarded latest attempt
+still matches the explicit session id; otherwise it no-ops.
+
+This reconciles D12/D28 with validation order: unguarded aborts remain valid before
+injection, guarded workflow-cancel aborts are fully validated before execution, and
+no new abort effect type or command-layer exception is introduced.
 
 ## Design Questions — Resolution status (ψ, 2026-06-10)
 

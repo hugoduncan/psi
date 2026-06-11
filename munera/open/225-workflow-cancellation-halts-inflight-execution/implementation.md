@@ -1604,3 +1604,20 @@ order and existing abort emitters. One new actionable contradiction found:
 
 No other new actionable inconsistency found in D28–D31; D29–D31 align with the
 acceptance criteria and D22/D30 boundaries.
+
+## Inconsistency follow-up resolution (ψ pass 12, 2026-06-11)
+
+Executed the single newly-added pass-12 design follow-up. The item was a
+completable schema/validation-order design clarification; no blockers.
+
+- D32 resolves D28's `:runtime/agent-abort` schema contradiction by choosing option
+  (a): unguarded/non-workflow abort payloads keep `:session-id` optional at schema
+  validation time because the `:effects` interceptor injects the dispatching
+  session id after validation; guarded workflow-cancel aborts require explicit
+  `:session-id`, `:expected-session-id`, and complete workflow guard metadata before
+  validation. The executor keeps current session-id-only behaviour when no guard is
+  present and applies the D28 liveness re-check only for guarded workflow-cancel
+  payloads.
+- D15 and D28 were updated so the explicit `:session-id` requirement applies only
+  to workflow-cancellation abort emissions; existing `:on-abort`-style emissions
+  remain valid before effect-time session-id injection.
