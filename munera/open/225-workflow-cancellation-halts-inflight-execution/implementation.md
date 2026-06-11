@@ -2950,3 +2950,14 @@ Validation during review: focused Scry namespaces
 `psi.agent-session.workflow-judge-cancellation-test`,
 `psi.deterministic-operation-runtime.core-test`, and
 `psi.workflow-runtime.turn-execution-contract-test` passed (27 tests / 117 assertions).
+
+## Implementation follow-up pass 17 (ψ, 2026-06-11)
+
+Completed the deterministic-operation entry follow-up from implementation review pass 17. `invoke-operation-result` now separates deterministic-operation handler entry from the already-existing call commit: after the final call commit it records a durable `:operation-handler-entry-state :pending` marker, then uses the workflow cancellation-entry read lock only around the handler-entry linearization CAS that changes the marker to `:entered`. The lock is released before invoking the operation handler, so D31 cancel/remove write locks are not held behind blocked handler execution, while a cancel that lands before handler entry is observed before ordinary work starts.
+
+Regression coverage updates:
+
+- Moved the earlier invoke final-entry race hook to `:before-handler-entry`, matching the new real final entry boundary.
+- Added `invoke-operation-cancel-between-prepared-entry-and-handler-entry-stops-handler-test`, which commits cancellation in the prepared-entry → handler-entry window and asserts the operation handler is not called after D31.
+
+Verification: `bb clojure:test:scry --namespace psi.agent-session.workflow-statechart-runtime-call-start-cancellation-test --namespace psi.deterministic-operation-runtime.core-test` passed (18 tests / 80 assertions). Focused lint passed for deterministic-operation runtime src/tests and the updated agent-session cancellation test.

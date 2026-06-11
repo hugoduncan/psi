@@ -665,7 +665,7 @@
         ctx (assoc ctx0
                    :before-workflow-operation-start-fn
                    (fn [ctx {:keys [phase]}]
-                     (when (= :after-call-commit phase)
+                     (when (= :before-handler-entry phase)
                        (reset! cancel-future*
                                (future
                                  (session/dispatch-in! ctx :psi.workflow/cancel-run
@@ -693,9 +693,66 @@
     (is (some? @cancel-future*)
         "the regression forces a canonical cancel dispatch in the final entry window")
     (deref @cancel-future* 5000 ::timeout)
-    (is (= 1 @operation-calls*)
-        "the operation handler entry is ordered before the D31 cancel checkpoint, not after it")
+    (is (= 0 @operation-calls*)
+        "the operation handler entry is not allowed after the D31 cancel checkpoint")
     (is (= :cancelled (get-in @(:state* ctx) [:workflows :runs run-id :status])))))
+
+(deftest invoke-operation-cancel-between-prepared-entry-and-handler-entry-stops-handler-test
+  ;; Regression for task 225 implementation review pass 17: deterministic
+  ;; operation entry is linearized without holding the cancellation-entry lock
+  ;; across the full handler. A cancel after the final stop read/pre-entry
+  ;; marker but before handler entry must stop the handler rather than start
+  ;; ordinary work after D31.
+  (let [[ctx0 _session-id] (create-session-context)
+        operation-calls* (atom 0)
+        cancel-result* (atom nil)
+        run-id "run-invoke-pre-entry-cancel"
+        op-reg (:deterministic-operation-registry ctx0)
+        _ (operation-registry/register-operation-in!
+           op-reg
+           {:id "workflow/pre-entry-cancel"
+            :handler (fn [_]
+                       (swap! operation-calls* inc)
+                       {:status :ok :data {:started-after-d31? true}})})
+        operation (operation-registry/get-operation-in op-reg "workflow/pre-entry-cancel")
+        ctx (assoc ctx0
+                   :before-workflow-operation-start-fn
+                   (fn [ctx {:keys [phase]}]
+                     (when (= :before-handler-entry phase)
+                       (reset! cancel-result*
+                               (session/dispatch-in! ctx :psi.workflow/cancel-run
+                                                     {:run-id run-id
+                                                      :reason "invoke pre-entry race"})))))
+        result (do
+                 (install-run! ctx {:definition-id "invoke-pre-entry-cancel"
+                                    :steps [{:name "invoke"
+                                             :type :invoke
+                                             :operation "workflow/pre-entry-cancel"
+                                             :args {}}]}
+                               run-id)
+                 (swap! (:state* ctx) assoc-in [:workflows :runs run-id :current-step-id] "invoke")
+                 (swap! (:state* ctx) assoc-in [:workflows :runs run-id :step-runs "invoke" :attempts]
+                        [{:attempt-id "attempt-invoke"
+                          :status :running}])
+                 (operation-runtime/invoke-operation
+                  operation
+                  {:ctx ctx
+                   :workflow-run-id run-id
+                   :workflow-attempt-id "attempt-invoke"
+                   :step-id "invoke"
+                   :args {}}))]
+    (is (= :cancelled (:psi.workflow/status @cancel-result*))
+        "the regression commits D31 in the prepared-entry → handler-entry window")
+    (is (= :error (:status result)))
+    (is (= :workflow-stopped (:reason result)))
+    (is (= 0 @operation-calls*)
+        "the operation handler must not enter after the D31 checkpoint")
+    (let [attempt (get-in @(:state* ctx)
+                          [:workflows :runs run-id :step-runs "invoke" :attempts 0])]
+      (is (= :committed (:operation-call-state attempt)))
+      (is (= :pending (:operation-handler-entry-state attempt))
+          "the prepared entry marker records the cancelled-before-entry window")
+      (is (nil? (:operation-handler-entered-at attempt))))))
 
 (deftest actor-turn-cancel-dispatch-does-not-wait-for-blocked-prompt-execution-test
   ;; Regression for task 225 implementation review pass 16: the workflow
