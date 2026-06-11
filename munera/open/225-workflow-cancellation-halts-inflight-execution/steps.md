@@ -153,3 +153,7 @@
 
 - [x] Update `doc/workflows.md` to reflect the new `delegate remove` / workflow removal contract: live top-level remove is canonical cancel-then-remove with dispatch-owned background-job terminalization and cancel-before-drop worker cleanup; live nested-sub-run remove aborts the child turn and lets the parent continue via cancelled/removed delegate failure semantics; terminal/absent remove is idempotent canonical-record cleanup (with stale-handle cleanup where applicable), not the old command-layer pre-cleanup/fail-if-cleanup-fails model.
   - Covered 2026-06-11: `doc/workflows.md` now describes canonical dispatch removal, live top-level cancel-then-remove, live nested sub-run parent-continuation semantics, and terminal/absent idempotent cleanup.
+
+## Implementation review follow-ups (ψ pass 8, 2026-06-11)
+
+- [ ] Make guarded judge abort effects no-op after the judge turn/result is complete: do not treat `:status :succeeded` alone as proof that a judge session is still live; add a judge-specific active/completed marker or active-turn/session liveness check so stale duplicate/concurrent cancellation aborts cannot abort an already-completed judge session, while in-flight judge sessions remain abortable. Add a regression where a guarded judge abort effect is executed after judge output/result is recorded and assert the abort executor no-ops.

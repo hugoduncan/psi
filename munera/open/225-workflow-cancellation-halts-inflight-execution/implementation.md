@@ -2658,3 +2658,14 @@ Executed the remaining pass-7 documentation follow-up. `doc/workflows.md` no lon
 - job terminalization and worker-handle cleanup are dispatch-owned runtime effects.
 
 Validation: `git diff --check` passed. No code/test changes were required for this doc-only follow-up.
+
+## Implementation review (ψ pass 9, 2026-06-11)
+
+Reviewed the post-doc-follow-up implementation against `task-implementation-review`, task artifacts, cancellation dispatch/effect code, workflow execution/judge/runtime guards, docs, and focused tests. `doc/workflows.md` now reflects the canonical remove contract and focused cancellation suites remain green.
+
+New actionable issue: guarded judge abort idempotency is still weaker than D22.2. `workflow-abort-guard-matches?` treats a judge attempt with `:status :succeeded` as live so cancellation can abort an already-completed judge session after judge output was recorded, because judged actor attempts also remain `:succeeded` while judging. The guard needs a judge-specific in-flight/completed distinction (or an active-turn/session liveness check) so duplicate/stale guarded judge abort effects no-op after the judge turn/result is complete, while still aborting a genuinely in-flight judge turn.
+
+Verification during review:
+
+- `git diff --check` passed.
+- `bb clojure:test:scry --namespace psi.agent-session.workflow-cancellation-dispatch-test --namespace psi.agent-session.workflow-statechart-runtime-cancellation-test --namespace psi.workflow-runtime.turn-execution-contract-test --namespace psi.deterministic-operation-runtime.core-test` → 21 tests / 100 assertions green.
